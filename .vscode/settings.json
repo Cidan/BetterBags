@@ -1,5 +1,7 @@
 {
   "Lua.diagnostics.globals": [
-    "LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG"
+    "LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG",
+    "CreateObjectPool",
+    "CreateFramePool"
   ]
 }

@@ -10,6 +10,9 @@ local L = addon:GetModule('Localization')
 ---@class Database: AceModule
 local DB = addon:GetModule('Database')
 
+---@class BagFrame: AceModule
+local BagFrame = addon:GetModule('BagFrame')
+
 -- OnInitialize is called when the addon is loaded.
 function addon:OnInitialize()
   -- Disable the bag tutorial screens, as Better Bags does not match
@@ -19,6 +22,9 @@ function addon:OnInitialize()
 		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
 		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
 	end
+  local b = BagFrame:Create('test')
+  b:Test()
+  BagFrame:Destroy(b)
 end
 
 -- OnEnable is called when the addon is enabled.
