@@ -23,4 +23,7 @@ core\boot.lua
 core\constants.lua
 core\localization.lua
 core\database.lua
+core\hooks.lua
+
+
 core\init.lua
