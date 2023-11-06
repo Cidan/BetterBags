@@ -19,4 +19,8 @@ libs\LibSharedMedia-3.0\lib.xml
 
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 
-core\Boot.lua
+core\boot.lua
+core\constants.lua
+core\localization.lua
+core\database.lua
+core\init.lua
