@@ -5,7 +5,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Database: AceModule
 local DB = addon:NewModule('Database')
-DB:Enable()
 
 -- Set the default option values.
 DB.data = {
@@ -14,6 +13,8 @@ DB.data = {
   },
   char = {}
 }
+
+DB:Enable()
 
 function DB:OnInitialize()
   -- Create the settings database.
