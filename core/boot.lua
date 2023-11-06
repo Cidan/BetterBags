@@ -3,6 +3,6 @@ local addonName, root = ...
 
 -- BetterBags is the root module of the addon.
 ---@class BetterBags: AceModule
-local addon = LibStub("AceAddon-3.0"):NewAddon(root, addonName)
+local addon = LibStub("AceAddon-3.0"):NewAddon(root, addonName, 'AceHook-3.0')
 
 addon:SetDefaultModuleState(false)

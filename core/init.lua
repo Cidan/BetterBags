@@ -2,15 +2,13 @@ local addonName = ...
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+---@cast addon +AceHook-3.0
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
 ---@class Database: AceModule
 local DB = addon:GetModule('Database')
-
----@class Hooks: AceModule
-local Hooks = addon:GetModule('Hooks')
 
 -- OnInitialize is called when the addon is loaded.
 function addon:OnInitialize()
@@ -25,5 +23,6 @@ end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  Hooks:On()
+  self:SecureHook('OpenAllBags')
+  self:SecureHook('ToggleAllBags')
 end
