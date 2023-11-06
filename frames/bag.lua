@@ -22,8 +22,12 @@ local pool = CreateFramePool("Frame", nil, "BackdropTemplate")
 ---@field frame Frame The raw frame of the bag.
 local bagProto = {}
 
-function bagProto:Test()
-  print("bag test")
+function bagProto:Show()
+  self.frame:Show()
+end
+
+function bagProto:Hide()
+  self.frame:Hide()
 end
 
 -------
@@ -38,6 +42,7 @@ function bagFrame:Create(kind)
   setmetatable(b, { __index = bagProto })
   local f = pool:Acquire()
   b.frame = f
+  b.frame:Hide()
   return b
 end
 
