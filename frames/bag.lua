@@ -11,6 +11,10 @@ local bagFrame = addon:NewModule('BagFrame')
 ---@field Release fun(pool: BagPool, frame: Frame)
 local pool = CreateFramePool("Frame", nil, "BackdropTemplate")
 
+-------
+--- Bag Prototype
+-------
+
 --- Bag is a view of a single bag object. Note that this is not
 --- a single bag slot, but a combined view of all bags for a given
 --- kind (i.e. bank, backpack).
@@ -22,10 +26,14 @@ function bagProto:Test()
   print("bag test")
 end
 
+-------
+--- Bag Frame
+-------
+
 --- Create creates a new bag view.
----@param name string
+---@param kind BagKind
 ---@return Bag
-function bagFrame:Create(name)
+function bagFrame:Create(kind)
   local b = {}
   setmetatable(b, { __index = bagProto })
   local f = pool:Acquire()
