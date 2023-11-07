@@ -30,6 +30,14 @@ function bagProto:Hide()
   self.frame:Hide()
 end
 
+function bagProto:Toggle()
+  if self.frame:IsShown() then
+    self:Hide()
+  else
+    self:Show()
+  end
+end
+
 -------
 --- Bag Frame
 -------
