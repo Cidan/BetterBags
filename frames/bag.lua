@@ -29,7 +29,6 @@ local LSM = LibStub('LibSharedMedia-3.0')
 ---@field leftHeader Frame The top left header of the bag.
 ---@field title FontString The title of the bag.
 ---@field content Frame The main content frame of the bag.
-
 local bagProto = {}
 
 function bagProto:Show()
@@ -48,6 +47,10 @@ function bagProto:Toggle()
   end
 end
 
+--- Draw is the main entry point for drawing the bag.
+function bagProto:Draw()
+  
+end
 -------
 --- Bag Frame
 -------

@@ -16,6 +16,9 @@ local BagFrame = addon:GetModule('BagFrame')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class BagFrames
 ---@field Backpack Bag
 ---@field Bank Bag
@@ -35,6 +38,8 @@ function addon:OnInitialize()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
+
+  items:Enable()
 end
 
 -- OnEnable is called when the addon is enabled.

@@ -28,6 +28,8 @@ core\hooks.lua
 debug\debug.lua
 debug\frames.lua
 
+data\items.lua
+
 frames\section.lua
 frames\bag.lua
 
