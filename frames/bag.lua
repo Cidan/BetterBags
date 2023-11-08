@@ -28,6 +28,8 @@ local LSM = LibStub('LibSharedMedia-3.0')
 ---@field frame Frame The raw frame of the bag.
 ---@field leftHeader Frame The top left header of the bag.
 ---@field title FontString The title of the bag.
+---@field content Frame The main content frame of the bag.
+
 local bagProto = {}
 
 function bagProto:Show()
@@ -94,14 +96,25 @@ function bagFrame:Create(kind)
 
   --debug:DrawDebugBorder(leftHeader, 1, 1, 1)
 
+  -- Create the bag title.
   local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetText(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   title:SetFontObject("GameFontNormal")
   title:SetHeight(18)
   title:SetJustifyH("LEFT")
   title:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
-
   b.title = title
+
+  -- Create the bag content frame.
+  ---@class Frame: BackdropTemplate
+  local content = CreateFrame("Frame", nil, b.frame, "BackdropTemplate")
+  content:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 0, -3)
+  content:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
+  content:Show()
+  b.content = content
+
+  --debug:DrawDebugBorder(content, 1, 1, 1)
+
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)
