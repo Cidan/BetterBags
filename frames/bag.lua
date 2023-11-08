@@ -6,6 +6,17 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class BagFrame: AceModule
 local bagFrame = addon:NewModule('BagFrame')
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
+local LSM = LibStub('LibSharedMedia-3.0')
+
 -------
 --- Bag Prototype
 -------
@@ -15,6 +26,8 @@ local bagFrame = addon:NewModule('BagFrame')
 --- kind (i.e. bank, backpack).
 ---@class Bag
 ---@field frame Frame The raw frame of the bag.
+---@field leftHeader Frame The top left header of the bag.
+---@field title FontString The title of the bag.
 local bagProto = {}
 
 function bagProto:Show()
@@ -41,6 +54,7 @@ end
 ---@param kind BagKind
 ---@return Bag
 function bagFrame:Create(kind)
+  ---@class Bag
   local b = {}
   setmetatable(b, { __index = bagProto })
   -- TODO(lobato): Compose the entire frame here.
@@ -50,20 +64,54 @@ function bagFrame:Create(kind)
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
 
+  -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
   b.frame:SetPoint("CENTER")
+
+  -- Setup the default skin/theme.
+  -- TODO(lobato): Move this to a separate module for themes.
   b.frame:SetBackdropColor(0, 0, 0, 1)
   b.frame:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+    edgeFile = LSM:Fetch(LSM.MediaType.BORDER, "Blizzard Tooltip"),
     tile = true,
     tileSize = 32,
-    edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 }
+    edgeSize = 16,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 }
   })
+
+  -- Create the top left header.
+  ---@class Frame: BackdropTemplate
+  local leftHeader = CreateFrame("Frame", nil, b.frame, "BackdropTemplate")
+  leftHeader:SetPoint("TOPLEFT", 3, -3)
+  leftHeader:SetPoint("TOPRIGHT", -3, -3)
+  leftHeader:SetHeight(20)
+  leftHeader:Show()
+  b.leftHeader = leftHeader
+
+  --debug:DrawDebugBorder(leftHeader, 1, 1, 1)
+
+  local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  title:SetText(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
+  title:SetFontObject("GameFontNormal")
+  title:SetHeight(18)
+  title:SetJustifyH("LEFT")
+  title:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
+
+  b.title = title
+  -- Enable dragging of the bag frame.
+  b.frame:SetMovable(true)
+  b.frame:EnableMouse(true)
+  b.frame:RegisterForDrag("LeftButton")
+  b.frame:SetScript("OnDragStart", function(drag)
+    drag:StartMoving()
+  end)
+  b.frame:SetScript("OnDragStop", function(drag)
+    drag:StopMovingOrSizing()
+  end)
   return b
 end
 

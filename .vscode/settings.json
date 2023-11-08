@@ -3,6 +3,7 @@
     "LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG",
     "CreateObjectPool",
     "CreateFramePool",
-    "BACK"
+    "BACK",
+    "GameFontNormal"
   ]
 }

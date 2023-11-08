@@ -25,6 +25,9 @@ core\localization.lua
 core\database.lua
 core\hooks.lua
 
+debug\debug.lua
+debug\frames.lua
+
 frames\bag.lua
 
 core\init.lua
