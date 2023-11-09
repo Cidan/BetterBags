@@ -17,11 +17,22 @@ local debug = addon:GetModule('Debug')
 ---@field _doingRefreshAll boolean
 local items = addon:NewModule('Items')
 
+-- Small debug function for printing items after every refresh.
+local function printDirtyItems(event, it)
+  for bid, _ in ipairs(it) do
+    for _, item in ipairs(it[bid]) do
+      debug:Log("items/printDirtyItems/dirty", item:GetItemLink())
+    end
+  end
+end
+
+
 function items:OnEnable()
   self.items = {}
   self.dirtyItems = {}
   self.itemsByBagAndSlot = {}
   self._continueCounter = 0
+  events:RegisterMessage('items/RefreshAllItems/Done', printDirtyItems)
   events:RegisterEvent('BAG_UPDATE', self.RefreshAllItems, self)
   self:RefreshAllItems()
 end
@@ -41,14 +52,6 @@ function items:RefreshAllItems()
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyItems[i] = self.dirtyItems[i] or {}
     self:RefreshBag(i)
-  end
-end
-
-local function printDirtyItems()
-  for bid, _ in ipairs(items.dirtyItems) do
-    for _, item in ipairs(items.dirtyItems[bid]) do
-      debug:Log("items/printDirtyItems/dirty", item:GetItemLink())
-    end
   end
 end
 
@@ -97,7 +100,6 @@ function items:RefreshBag(bagid)
         items._continueCounter = 0
         items._doingRefreshAll = false
         events:SendMessage('items/RefreshAllItems/Done', items.dirtyItems)
-        printDirtyItems()
         wipe(items.dirtyItems)
       end
     end
