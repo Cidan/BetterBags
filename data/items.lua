@@ -44,6 +44,14 @@ function items:RefreshAllItems()
   end
 end
 
+local function printDirtyItems()
+  for bid, _ in ipairs(items.dirtyItems) do
+    for _, item in ipairs(items.dirtyItems[bid]) do
+      debug:Log("items/printDirtyItems/dirty", item:GetItemLink())
+    end
+  end
+end
+
 -- RefreshBag will refresh a bag's contents entirely and update the
 -- item database.
 ---@private
@@ -89,11 +97,7 @@ function items:RefreshBag(bagid)
         items._continueCounter = 0
         items._doingRefreshAll = false
         events:SendMessage('items/RefreshAllItems/Done', items.dirtyItems)
-        for bid, _ in ipairs(items.dirtyItems) do
-          for _, item in ipairs(items.dirtyItems[bid]) do
-            debug:Log("items/ContinueOnLoad/dirty", item:GetItemLink())
-          end
-        end
+        printDirtyItems()
         wipe(items.dirtyItems)
       end
     end
