@@ -15,6 +15,7 @@ local items = addon:NewModule('Items')
 function items:OnEnable()
   self.items = {}
   self._continueCounter = 0
+  events:RegisterEvent('BAG_UPDATE', self.RefreshAllItems, self)
   self:RefreshAllItems()
 end
 

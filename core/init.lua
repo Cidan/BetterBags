@@ -45,5 +45,6 @@ end
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
   self:SecureHook('OpenAllBags')
+  self:SecureHook('CloseAllBags')
   self:SecureHook('ToggleAllBags')
 end
