@@ -4,6 +4,13 @@
     "CreateObjectPool",
     "CreateFramePool",
     "BACK",
-    "GameFontNormal"
+    "GameFontNormal",
+    "ContinuableContainer",
+    "UIParent",
+    "NUM_TOTAL_EQUIPPED_BAG_SLOTS",
+    "setmetatable",
+    "C_Container",
+    "Item",
+    "C_CVar"
   ]
 }
