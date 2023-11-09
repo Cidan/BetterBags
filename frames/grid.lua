@@ -13,7 +13,7 @@ local cellProto = {}
 ---@class Grid
 ---@field frame Frame
 ---@field cells Cell|Section[]
----@field maxCellWidth number
+---@field maxCellWidth number The maximum number of cells per row.
 local gridProto = {}
 
 function gridProto:Show()

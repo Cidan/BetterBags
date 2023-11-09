@@ -32,6 +32,7 @@ debug\frames.lua
 data\items.lua
 
 frames\grid.lua
+frames\item.lua
 frames\section.lua
 frames\bag.lua
 
