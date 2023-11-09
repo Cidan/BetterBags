@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Events: AceEvent-3.0
 local events = addon:GetModule('Events')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Items: AceModule
 ---@field items table<number, table<string, ItemMixin>>
 ---@field itemsByBagAndSlot table<number, table<number, ItemMixin>>
@@ -86,6 +89,11 @@ function items:RefreshBag(bagid)
         items._continueCounter = 0
         items._doingRefreshAll = false
         events:SendMessage('items/RefreshAllItems/Done', items.dirtyItems)
+        for bid, _ in ipairs(items.dirtyItems) do
+          for _, item in ipairs(items.dirtyItems[bid]) do
+            debug:Log("items/ContinueOnLoad/dirty", item:GetItemLink())
+          end
+        end
         wipe(items.dirtyItems)
       end
     end

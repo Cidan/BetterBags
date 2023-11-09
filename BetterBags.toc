@@ -7,7 +7,7 @@
 ## SavedVariables: BetterBagsDB
 ## X-Date: @project-date-iso@
 ## X-License: MIT
-## OptionalDeps: LibStub, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0
+## OptionalDeps: LibStub, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
