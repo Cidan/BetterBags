@@ -34,17 +34,19 @@ function addon:OnInitialize()
 		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
 	end
 
+  items:Enable()
+
   -- Create the bag frames.
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
 
-  items:Enable()
 end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  self:SecureHook('OpenAllBags')
   self:SecureHook('CloseAllBags')
-  self:SecureHook('ToggleAllBags')
+
+  self:RawHook('OpenAllBags', self.OpenAllBags, true)
+  self:RawHook('ToggleAllBags', self.ToggleAllBags, true)
 end

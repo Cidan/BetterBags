@@ -23,6 +23,10 @@ function items:OnEnable()
   self:RefreshAllItems()
 end
 
+function items:Disable()
+  events:UnregisterEvent('BAG_UPDATE')
+end
+
 -- RefreshAllItems will refresh all bags' contents entirely and update
 -- the item database.
 function items:RefreshAllItems()
@@ -43,13 +47,13 @@ end
 ---@param bagid number
 function items:RefreshBag(bagid)
   local container = ContinuableContainer:Create()
-  local size = C_Container.GetContainerNumFreeSlots(bagid)
+  local size = C_Container.GetContainerNumSlots(bagid)
 
   -- Loop through every container slot and create an item for it.
   for slot = 1, size do
     local item = Item:CreateFromBagAndSlot(bagid, slot)
 
-    -- Check if this slot already has an item in it, and if it does,
+    -- Check if this slot already has an item in it, and if it's not the same,
     -- mark the item as dirty.
     if not item:Matches(self.itemsByBagAndSlot[bagid][slot]) then
       self.dirtyItems[bagid][slot] = item
@@ -88,5 +92,3 @@ function items:RefreshBag(bagid)
     events:SendMessage('items/RefreshBag/Done', bagid)
   end)
 end
-
-items:Enable()

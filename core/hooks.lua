@@ -11,6 +11,6 @@ function addon:CloseAllBags()
   addon.Bags.Backpack:Hide()
 end
 
-function addon:ToggleAllBags(requesterFrame)
+function addon:ToggleAllBags()
   addon.Bags.Backpack:Toggle()
 end
