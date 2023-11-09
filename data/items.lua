@@ -9,6 +9,7 @@ local events = addon:GetModule('Events')
 ---@class Items: AceModule
 ---@field items table<number, table<string, ItemMixin>>
 ---@field _continueCounter number
+---@field _doingRefreshAll boolean
 local items = addon:NewModule('Items')
 
 function items:OnEnable()
@@ -22,6 +23,7 @@ end
 function items:RefreshAllItems()
   wipe(self.items)
   self._continueCounter = 0
+  self._doingRefreshAll = true
   for i = 1, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
     self.items[i] = {}
     self:RefreshBag(i)
@@ -41,14 +43,17 @@ function items:RefreshBag(bagid)
       self.items[bagid][item:GetItemGUID()] = item
     end
   end
-  -- Load item data in the background, and fire
-  -- a message when all items are loaded.
+  -- Load item data in the background, and fire a message when
+  -- all bags are done loading if this is a full refresh.
   -- Additionally, fire a message when this bag is done loading.
   container:ContinueOnLoad(function()
-    items._continueCounter = items._continueCounter + 1
-    if items._continueCounter == NUM_TOTAL_EQUIPPED_BAG_SLOTS then
-      items._continueCounter = 0
-      events:SendMessage('items/RefreshAllItems/Done')
+    if items._doingRefreshAll then
+      items._continueCounter = items._continueCounter + 1
+      if items._continueCounter == NUM_TOTAL_EQUIPPED_BAG_SLOTS then
+        items._continueCounter = 0
+        items._doingRefreshAll = false
+        events:SendMessage('items/RefreshAllItems/Done')
+      end
     end
     events:SendMessage('items/RefreshBag/Done', bagid)
   end)
