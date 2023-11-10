@@ -39,7 +39,7 @@ function items:OnEnable()
 end
 
 function items:Disable()
-  events:UnregisterEvent('BAG_UPDATE')
+  --events:UnregisterEvent('BAG_UPDATE')
 end
 
 -- RefreshAllItems will refresh all bags' contents entirely and update
