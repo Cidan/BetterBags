@@ -11,6 +11,11 @@
     "setmetatable",
     "C_Container",
     "Item",
-    "C_CVar"
+    "C_CVar",
+    "TRADESKILL_REAGENT_COUNT",
+    "MERCHANT_STOCK",
+    "TextureKitConstants",
+    "HIGHLIGHT_FONT_COLOR",
+    "ProfessionsFrame"
   ]
 }

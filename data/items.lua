@@ -3,7 +3,7 @@ local addonName = ...
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Events: AceEvent-3.0
+---@class Events: AceModule
 local events = addon:GetModule('Events')
 
 ---@class Debug: AceModule
@@ -19,6 +19,7 @@ local items = addon:NewModule('Items')
 
 -- Small debug function for printing items after every refresh.
 local function printDirtyItems(event, it)
+  print("got di")
   for bid, _ in ipairs(it) do
     for _, item in ipairs(it[bid]) do
       debug:Log("items/printDirtyItems/dirty", item:GetItemLink())
