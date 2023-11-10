@@ -41,7 +41,8 @@ function itemProto:SetItem(i)
   self.IconTexture:SetTexCoord(0,1,0,1)
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.frame:SetBagID(bagid)
-  self.frame:UpdateCooldown(i:GetItemIcon())
+  self.frame:SetID(slotid)
+  self.frame:UpdateCooldown(true)
   self.frame:Show()
 end
 
@@ -53,7 +54,7 @@ function item:Create()
   local name = format("BetterBagsItemButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
-  ---@class ItemButton: Button
+  ---@class ItemButton
   local f = CreateFrame("ItemButton", name, nil, "ContainerFrameItemButtonTemplate")
 
   -- Assign the global item button textures to the item button.
