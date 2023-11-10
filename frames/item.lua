@@ -41,6 +41,7 @@ function itemProto:SetItem(i)
   self.IconTexture:SetTexCoord(0,1,0,1)
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.frame:SetBagID(bagid)
+  self.frame:UpdateCooldown(i:GetItemIcon())
   self.frame:Show()
 end
 

@@ -74,7 +74,7 @@ function grid:Create(parent)
   f:SetParent(parent)
   g.frame = f
   g.cells = {}
-  g.maxCellWidth = 3
+  g.maxCellWidth = 5
   return g
 end
 

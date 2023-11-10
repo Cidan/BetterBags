@@ -67,8 +67,8 @@ function bagProto:Draw()
     end
   end
   local w, h = self.content:Draw()
-  self.frame:SetWidth(w + 6)
-  self.frame:SetHeight(h + 6 + self.leftHeader:GetHeight() + self.title:GetHeight())
+  self.frame:SetWidth(w + 12)
+  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
 end
 -------
 --- Bag Frame
@@ -129,12 +129,12 @@ function bagFrame:Create(kind)
 
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
-  content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 0, -3)
+  content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
   content:Show()
   b.content = content
 
-  debug:DrawDebugBorder(content.frame, 1, 1, 1)
+  --debug:DrawDebugBorder(content.frame, 1, 1, 1)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
