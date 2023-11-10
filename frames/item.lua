@@ -9,17 +9,25 @@ local item = addon:NewModule('Item')
 ---@class Item
 ---@field frame ItemButton
 ---@field IconTexture Texture
+---@field Count FontString
+---@field Stock FontString
+---@field IconBorder Texture
+---@field IconQuestTexture Texture
+---@field NormalTexture Texture
+---@field NewItemTexture Texture
+---@field IconOverlay2 Texture
+---@field ItemContextOverlay Texture
+---@field Cooldown Cooldown
 local itemProto = {}
 
 local buttonCount = 0
--- TODO(lobato): Add field annotations for the children in itemProto.
 local children = {
-  "Cooldown",
-  "IconBorder",
-  "IconTexture",
   "IconQuestTexture",
+  "IconTexture",
   "Count",
   "Stock",
+  "IconBorder",
+  "Cooldown",
   "NormalTexture",
   "NewItemTexture",
   "IconOverlay2",
@@ -29,6 +37,8 @@ local children = {
 ---@param i ItemMixin
 function itemProto:SetItem(i)
   assert(i, 'item must be provided')
+  self.IconTexture:SetTexture(i:GetItemIcon())
+  self.IconTexture:SetTexCoord(0,1,0,1)
 end
 
 ---@return Item
@@ -39,15 +49,16 @@ function item:Create()
   local name = format("BetterBagsItemButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
-  ---@class ItemButton: Frame
+  ---@class ItemButton: Button
   local f = CreateFrame("ItemButton", name, nil, "ContainerFrameItemButtonTemplate")
 
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
     i[child] = _G[name..child]
   end
-
   f:SetSize(37, 37)
+  f:RegisterForDrag("LeftButton")
+  f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   i.frame = f
 
   return i
