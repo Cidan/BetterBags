@@ -16,6 +16,7 @@
     "MERCHANT_STOCK",
     "TextureKitConstants",
     "HIGHLIGHT_FONT_COLOR",
-    "ProfessionsFrame"
+    "ProfessionsFrame",
+    "ContainerFrameCombinedBags"
   ]
 }

@@ -45,10 +45,21 @@ function addon:OnInitialize()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
 
- end
+end
+
+-- HideBlizzardBags will hide the default Blizzard bag frames.
+function addon:HideBlizzardBags()
+  local sneakyFrame = CreateFrame("Frame")
+  sneakyFrame:Hide()
+  ContainerFrameCombinedBags:SetParent(sneakyFrame)
+  for i = 1, 13 do
+    _G["ContainerFrame"..i]:SetParent(sneakyFrame)
+  end
+end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
+  self:HideBlizzardBags()
   self:SecureHook('CloseAllBags')
 
   self:SecureHook('OpenAllBags', self.OpenAllBags)
