@@ -26,15 +26,16 @@ local function printDirtyItems(event, it)
   end
 end
 
-
-function items:OnEnable()
+function items:OnInitialize()
   self.items = {}
   self.dirtyItems = {}
   self.itemsByBagAndSlot = {}
   self._continueCounter = 0
+end
+
+function items:OnEnable()
   events:RegisterMessage('items/RefreshAllItems/Done', printDirtyItems)
   events:RegisterEvent('BAG_UPDATE', self.RefreshAllItems, self)
-  self:RefreshAllItems()
 end
 
 function items:Disable()

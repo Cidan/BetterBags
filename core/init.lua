@@ -19,6 +19,12 @@ local const = addon:GetModule('Constants')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class BagFrames
 ---@field Backpack Bag
 ---@field Bank Bag
@@ -34,14 +40,12 @@ function addon:OnInitialize()
 		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
 	end
 
-  items:Enable()
-
   -- Create the bag frames.
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
 
-end
+ end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
@@ -49,4 +53,13 @@ function addon:OnEnable()
 
   self:RawHook('OpenAllBags', self.OpenAllBags, true)
   self:RawHook('ToggleAllBags', self.ToggleAllBags, true)
+
+  items:Enable()
+
+  events:RegisterMessage('items/RefreshAllItems/Done', function()
+    debug:Log("init/OnInitialize/items", "Drawing bag")
+    addon.Bags.Backpack:Draw()
+   end)
+
+   items:RefreshAllItems()
 end

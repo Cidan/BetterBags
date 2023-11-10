@@ -25,10 +25,11 @@ function gridProto:Hide()
 end
 
 -- AddCell will add a cell to this grid.
----@param cell Cell|Section
+---@param cell Cell|Section|Item
 function gridProto:AddCell(cell)
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
+  cell.frame:SetParent(self.frame)
   table.insert(self.cells, cell)
 end
 
@@ -39,6 +40,8 @@ function gridProto:Sort(fn)
 end
 
 -- Draw will draw the grid.
+---@return number width
+---@return number height
 function gridProto:Draw()
   local width = 0
   local height = 0
@@ -48,16 +51,17 @@ function gridProto:Draw()
       cell.frame:SetPoint('TOPLEFT', self.frame, 'TOPLEFT', 0, 0)
       width = width + cell.frame:GetWidth()
       height = height + cell.frame:GetHeight()
-    elseif i % self.maxCellWidth == 0 then
+    elseif i % self.maxCellWidth == 1 then
       cell.frame:SetPoint('TOPLEFT', self.cells[i - self.maxCellWidth].frame, 'BOTTOMLEFT', 0, 0)
       height = height + cell.frame:GetHeight()
     else
       cell.frame:SetPoint('TOPLEFT', self.cells[i - 1].frame, 'TOPRIGHT', 0, 0)
-      width = width + cell.frame:GetWidth()
+      if i <= self.maxCellWidth then
+        width = width + cell.frame:GetWidth()
+      end
     end
   end
-  self.frame:SetWidth(width)
-  self.frame:SetHeight(height)
+  return width, height
 end
 
 -- Create will create a new grid frame.

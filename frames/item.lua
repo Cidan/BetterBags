@@ -4,7 +4,7 @@ local addonName = ...
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class ItemFrame: AceModule
-local item = addon:NewModule('Item')
+local item = addon:NewModule('ItemFrame')
 
 ---@class Item
 ---@field frame ItemButton
@@ -39,6 +39,9 @@ function itemProto:SetItem(i)
   assert(i, 'item must be provided')
   self.IconTexture:SetTexture(i:GetItemIcon())
   self.IconTexture:SetTexCoord(0,1,0,1)
+  local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
+  self.frame:SetBagID(bagid)
+  self.frame:Show()
 end
 
 ---@return Item
@@ -65,4 +68,3 @@ function item:Create()
 end
 
 item:Enable()
-item:Create()

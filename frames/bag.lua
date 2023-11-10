@@ -12,6 +12,15 @@ local L = addon:GetModule('Localization')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class GridFrame: AceModule
+local grid = addon:GetModule('Grid')
+
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
+---@class ItemFrame: AceModule
+local itemFrame = addon:GetModule('ItemFrame')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -28,7 +37,7 @@ local LSM = LibStub('LibSharedMedia-3.0')
 ---@field frame Frame The raw frame of the bag.
 ---@field leftHeader Frame The top left header of the bag.
 ---@field title FontString The title of the bag.
----@field content Frame The main content frame of the bag.
+---@field content Grid The main content frame of the bag.
 local bagProto = {}
 
 function bagProto:Show()
@@ -49,7 +58,17 @@ end
 
 --- Draw is the main entry point for drawing the bag.
 function bagProto:Draw()
-  
+  debug:Log("bagProto/Draw", "Drawing bag", self.kind)
+  for _, itemData in pairs(items.items) do
+    for guid, item in pairs(itemData) do
+      local iframe = itemFrame:Create()
+      iframe:SetItem(item)
+      self.content:AddCell(iframe)
+    end
+  end
+  local w, h = self.content:Draw()
+  self.frame:SetWidth(w + 6)
+  self.frame:SetHeight(h + 6 + self.leftHeader:GetHeight() + self.title:GetHeight())
 end
 -------
 --- Bag Frame
@@ -109,14 +128,13 @@ function bagFrame:Create(kind)
   b.title = title
 
   -- Create the bag content frame.
-  ---@class Frame: BackdropTemplate
-  local content = CreateFrame("Frame", nil, b.frame, "BackdropTemplate")
-  content:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 0, -3)
-  content:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
+  local content = grid:Create(b.frame)
+  content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 0, -3)
+  content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
   content:Show()
   b.content = content
 
-  --debug:DrawDebugBorder(content, 1, 1, 1)
+  debug:DrawDebugBorder(content.frame, 1, 1, 1)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
