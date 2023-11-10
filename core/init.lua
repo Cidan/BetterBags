@@ -51,8 +51,8 @@ function addon:OnInitialize()
 function addon:OnEnable()
   self:SecureHook('CloseAllBags')
 
-  self:RawHook('OpenAllBags', self.OpenAllBags, true)
-  self:RawHook('ToggleAllBags', self.ToggleAllBags, true)
+  self:SecureHook('OpenAllBags', self.OpenAllBags)
+  self:SecureHook('ToggleAllBags', self.ToggleAllBags)
 
   items:Enable()
 

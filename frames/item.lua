@@ -8,7 +8,8 @@ local item = addon:NewModule('ItemFrame')
 
 ---@class Item
 ---@field mixin ItemMixin
----@field frame ItemButton
+---@field frame Frame
+---@field button ItemButton
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -41,20 +42,13 @@ function itemProto:SetItem(i)
   self.mixin = i
   local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
-  self.frame:SetBagID(bagid)
-  self.frame:SetID(slotid)
+  self.button:SetID(slotid)
+  self.frame:SetID(bagid)
 
   local info = C_Container.GetContainerItemInfo(bagid, self.frame:GetID());
-  local texture = info and info.iconFileID;
-  local itemCount = info and info.stackCount;
-  local locked = info and info.isLocked;
-  local quality = info and info.quality;
   local readable = info and info.isReadable;
-  local itemLink = info and info.hyperlink;
   local isFiltered = info and info.isFiltered;
   local noValue = info and info.hasNoValue;
-  local itemID = info and info.itemID;
-  local isBound = info and info.isBound;
   local questInfo = C_Container.GetContainerItemQuestInfo(bagid, self.frame:GetID());
   local isQuestItem = questInfo.isQuestItem;
   local questID = questInfo.questID;
@@ -66,44 +60,25 @@ function itemProto:SetItem(i)
     bound = C_Item.IsBound(l)
   end
 
-  self.IconTexture:SetTexture(i:GetItemIcon())
-  self.IconTexture:SetTexCoord(0,1,0,1)
-  --self.frame.GetBagID = function() return -1 end
 
-  self.frame.GetItemContextMatchResult = nil
---[[
-  ClearItemButtonOverlay(self.frame)
-  self.frame:SetHasItem(i:GetItemIcon())
-  --self.frame:SetItemButtonTexture(i:GetItemIcon())
-  SetItemButtonQuality(self.frame, i:GetItemQuality(), i:GetItemLink(), false, bound);
-  --SetItemButtonCount(self.frame, i:GetStackCount())
-  SetItemButtonDesaturated(self.frame, i:IsItemLocked())
-  --self.frame:UpdateExtended()
-  self.frame:UpdateQuestItem(isQuestItem, questID, isActive)
-  --self.frame:UpdateNewItem(i:GetItemQuality())
-  --self.frame:UpdateJunkItem(i:GetItemQuality(), noValue)
-  self.frame:UpdateItemContextMatching()
-  --self.frame:UpdateCooldown(i:GetItemIcon())
-  self.frame:SetReadable(readable)
-  self.frame:CheckUpdateTooltip(tooltipOwner)
-  self.frame:SetMatchesSearch(not isFiltered)
-  --self.frame.PostOnShow = nil
-  ]]--
+  ClearItemButtonOverlay(self.button)
+  self.button:SetHasItem(i:GetItemIcon())
+  self.button:SetItemButtonTexture(i:GetItemIcon())
+  SetItemButtonQuality(self.button, i:GetItemQuality(), i:GetItemLink(), false, bound);
+  SetItemButtonCount(self.button, i:GetStackCount())
+  SetItemButtonDesaturated(self.button, i:IsItemLocked())
+  self.button:UpdateExtended()
+  self.button:UpdateQuestItem(isQuestItem, questID, isActive)
+  self.button:UpdateNewItem(i:GetItemQuality())
+  self.button:UpdateJunkItem(i:GetItemQuality(), noValue)
+  self.button:UpdateItemContextMatching()
+  self.button:UpdateCooldown(i:GetItemIcon())
+  self.button:SetReadable(readable)
+  self.button:CheckUpdateTooltip(tooltipOwner)
+  self.button:SetMatchesSearch(not isFiltered)
+
   self.frame:Show()
-end
-
-function itemProto:OnEnter()
-  self.mixin:GetItemID()
-  GameTooltip:SetOwner(self.frame, "ANCHOR_RIGHT")
-  GameTooltip:SetHyperlink(self.mixin:GetItemLink())
-  GameTooltip:Show()
-end
-
-function itemProto:OnLeave()
-  GameTooltip:Hide()
-end
-
-function itemProto:OnClick()
+  self.button:Show()
 end
 
 ---@return Item
@@ -114,21 +89,25 @@ function item:Create()
   local name = format("BetterBagsItemButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
+  -- Create a hidden parent to the ItemButton frame to work around
+  -- item taint introduced in 10.x
+  local p = CreateFrame("Frame")
+
   ---@class ItemButton
-  local f = CreateFrame("ItemButton", name, nil)
+  local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
 
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
     i[child] = _G[name..child]
   end
-  f:SetSize(37, 37)
-  f:RegisterForDrag("LeftButton")
-  f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  f:SetScript("OnEnter", function() i:OnEnter() end)
-  f:SetScript("OnLeave", function() i:OnLeave() end)
-  f:SetScript("OnClick", function() i:OnClick() end)
-  i.frame = f
 
+  p:SetSize(37, 37)
+  button:SetSize(37, 37)
+  button:RegisterForDrag("LeftButton")
+  button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  i.button = button
+  button:SetAllPoints(p)
+  i.frame = p
   return i
 end
 

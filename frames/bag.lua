@@ -49,11 +49,7 @@ function bagProto:Hide()
 end
 
 function bagProto:Toggle()
-  if self.frame:IsShown() then
-    self:Hide()
-  else
-    self:Show()
-  end
+  self.frame:SetShown(not self.frame:IsShown())
 end
 
 --- Draw is the main entry point for drawing the bag.
