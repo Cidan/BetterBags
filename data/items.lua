@@ -19,7 +19,6 @@ local items = addon:NewModule('Items')
 
 -- Small debug function for printing items after every refresh.
 local function printDirtyItems(event, it)
-  print("got di")
   for bid, _ in ipairs(it) do
     for _, item in ipairs(it[bid]) do
       debug:Log("items/printDirtyItems/dirty", item:GetItemLink())
@@ -49,7 +48,7 @@ function items:RefreshAllItems()
   wipe(self.items)
   self._continueCounter = 0
   self._doingRefreshAll = true
-  for i = 1, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+  for i = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
     self.items[i] = {}
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyItems[i] = self.dirtyItems[i] or {}
