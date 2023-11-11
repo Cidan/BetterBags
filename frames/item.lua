@@ -97,7 +97,7 @@ function item:OnInitialize()
 end
 
 ---@param i Item
-function item:_DoReset(_, i)
+function item:_DoReset(i)
   i:ClearItem()
 end
 
