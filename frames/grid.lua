@@ -12,7 +12,7 @@ local cellProto = {}
 
 ---@class Grid
 ---@field frame Frame
----@field cells Cell|Section[]
+---@field cells Cell[]|Item[]|Section[]
 ---@field maxCellWidth number The maximum number of cells per row.
 local gridProto = {}
 
@@ -62,6 +62,10 @@ function gridProto:Draw()
     end
   end
   return width, height
+end
+
+function gridProto:Wipe()
+  wipe(self.cells)
 end
 
 -- Create will create a new grid frame.

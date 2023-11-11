@@ -17,6 +17,25 @@
     "TextureKitConstants",
     "HIGHLIGHT_FONT_COLOR",
     "ProfessionsFrame",
-    "ContainerFrameCombinedBags"
+    "ContainerFrameCombinedBags",
+    "Object",
+    "WOW_PROJECT_ID",
+    "WOW_PROJECT_MAINLINE",
+    "WOW_PROJECT_CLASSIC",
+    "assert",
+    "_G",
+    "print",
+    "format",
+    "CreateFrame",
+    "table",
+    "ipairs",
+    "wipe",
+    "ClearItemButtonOverlay",
+    "SetItemButtonQuality",
+    "SetItemButtonCount",
+    "SetItemButtonDesaturated",
+    "pairs",
+    "GameTooltip",
+    "C_Item"
   ]
 }

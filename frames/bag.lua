@@ -52,8 +52,18 @@ function bagProto:Toggle()
   self.frame:SetShown(not self.frame:IsShown())
 end
 
---- Draw is the main entry point for drawing the bag.
+-- Wipe will wipe the contents of the bag and release all cells.
+function bagProto:Wipe()
+  for _, cell in ipairs(self.content.cells) do
+    ---@cast cell -Section,-Cell
+    itemFrame:Release(cell)
+  end
+  self.content:Wipe()
+end
+
+--- Draw does a complete redraw of the bags.
 function bagProto:Draw()
+  self:Wipe()
   debug:Log("bagProto/Draw", "Drawing bag", self.kind)
   for _, itemData in pairs(items.items) do
     for guid, item in pairs(itemData) do
@@ -65,6 +75,10 @@ function bagProto:Draw()
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 12)
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
+end
+
+function bagProto:Refresh()
+
 end
 -------
 --- Bag Frame

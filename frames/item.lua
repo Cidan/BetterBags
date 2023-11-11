@@ -81,8 +81,27 @@ function itemProto:SetItem(i)
   self.button:Show()
 end
 
----@return Item
-function item:Create()
+function itemProto:ClearItem()
+  self.mixin = nil
+  self.frame:ClearAllPoints()
+  self.frame:SetParent(nil)
+  self.frame:Hide()
+  self.button:Hide()
+  self.button:SetID(0)
+  self.button:SetHasItem(false)
+  self.frame:SetID(0)
+end
+
+function item:OnInitialize()
+  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+end
+
+---@param i Item
+function item:_DoReset(_, i)
+  i:ClearItem()
+end
+
+function item:_DoCreate()
   local i = setmetatable({}, { __index = itemProto })
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
@@ -109,6 +128,17 @@ function item:Create()
   button:SetAllPoints(p)
   i.frame = p
   return i
+end
+
+---@return Item
+function item:Create()
+  ---@return Item
+  return self._pool:Acquire()
+end
+
+---@param i Item
+function item:Release(i)
+  self._pool:Release(i)
 end
 
 item:Enable()
