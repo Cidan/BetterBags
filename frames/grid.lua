@@ -26,7 +26,7 @@ end
 
 -- AddCell will add a cell to this grid.
 ---@param cell Cell|Section|Item
-function gridProto:AddCell(cell)
+function gridProto:AddCell(id, cell)
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
   cell.frame:SetParent(self.frame)
