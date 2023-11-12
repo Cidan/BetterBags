@@ -8,6 +8,7 @@ local item = addon:NewModule('ItemFrame')
 
 ---@class Item
 ---@field mixin ItemMixin
+---@field guid string
 ---@field frame Frame
 ---@field button ItemButton
 ---@field IconTexture Texture
@@ -40,6 +41,7 @@ local children = {
 function itemProto:SetItem(i)
   assert(i, 'item must be provided')
   self.mixin = i
+  self.guid = i:GetItemGUID() or ""
   local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.button:SetID(slotid)
@@ -83,6 +85,7 @@ end
 
 function itemProto:ClearItem()
   self.mixin = nil
+  self.guid = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.frame:Hide()

@@ -13,7 +13,7 @@ local debug = addon:GetModule('Debug')
 ---@field items table<number, table<string, ItemMixin>>
 ---@field itemsByBagAndSlot table<number, table<number, ItemMixin>>
 ---@field dirtyItems table<number, table<number, ItemMixin>>
----@field previousItemData table<string, table<string, any>>
+---@field previousItemGUID table<number, table<number, string>>
 ---@field _continueCounter number
 ---@field _doingRefreshAll boolean
 local items = addon:NewModule('Items')
@@ -31,7 +31,7 @@ function items:OnInitialize()
   self.items = {}
   self.dirtyItems = {}
   self.itemsByBagAndSlot = {}
-  self.previousItemData = {}
+  self.previousItemGUID = {}
   self._continueCounter = 0
 end
 
@@ -54,6 +54,7 @@ function items:RefreshAllItems()
     self.items[i] = {}
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyItems[i] = self.dirtyItems[i] or {}
+    self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i)
   end
 end
@@ -90,7 +91,7 @@ function items:RefreshBag(bagid)
   end
 
   -- Delete old entries that no longer exist because the bag size shrunk.
-  for i = size, #self.itemsByBagAndSlot[bagid] do
+  for i = size+1, #self.itemsByBagAndSlot[bagid] do
     self.itemsByBagAndSlot[bagid][i] = nil
   end
 

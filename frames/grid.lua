@@ -25,12 +25,30 @@ function gridProto:Hide()
 end
 
 -- AddCell will add a cell to this grid.
+---@param id string|nil
 ---@param cell Cell|Section|Item
 function gridProto:AddCell(id, cell)
+  assert(id, 'id is required')
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
   cell.frame:SetParent(self.frame)
   table.insert(self.cells, cell)
+end
+
+-- RemoveCell will add a cell to this grid.
+---@param id string|nil
+---@param cell Cell|Section|Item
+function gridProto:RemoveCell(id, cell)
+  assert(id, 'id is required')
+  assert(cell, 'cell is required')
+  for i, c in ipairs(self.cells) do
+    if c == cell then
+      cell.frame:SetParent(nil)
+      table.remove(self.cells, i)
+      return
+    end
+  end
+  assert(false, 'cell not found')
 end
 
 -- Sort will sort the cells in this grid using the given function.

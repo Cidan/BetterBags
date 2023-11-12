@@ -38,7 +38,7 @@ local LSM = LibStub('LibSharedMedia-3.0')
 ---@field leftHeader Frame The top left header of the bag.
 ---@field title FontString The title of the bag.
 ---@field content Grid The main content frame of the bag.
----@field guidToItemFrame table<string, Item> A map of item GUIDs to item frames.
+---@field itemsByBagAndSlot table<number, table<number, Item>>
 local bagProto = {}
 
 function bagProto:Show()
@@ -60,19 +60,20 @@ function bagProto:Wipe()
     itemFrame:Release(cell)
   end
   self.content:Wipe()
-  wipe(self.guidToItemFrame)
+  wipe(self.itemsByBagAndSlot)
 end
 
 --- Draw does a complete redraw of the bags.
-function bagProto:Draww()
+function bagProto:Draw()
   self:Wipe()
   debug:Log("bagProto/Draw", "Drawing bag", self.kind)
   for _, itemData in pairs(items.items) do
     for guid, item in pairs(itemData) do
+      local bagid, slotid = item:GetItemLocation():GetBagAndSlot()
       local iframe = itemFrame:Create()
       iframe:SetItem(item)
       self.content:AddCell(guid, iframe)
-      self.guidToItemFrame[guid] = iframe
+      self.itemsByBagAndSlot[bagid][slotid] = iframe
     end
   end
   local w, h = self.content:Draw()
@@ -82,33 +83,31 @@ end
 
 -- Refresh will only refresh the dirty items in a bag.
 function bagProto:Refresh()
-  for _, bagData in pairs(items.dirtyItems) do
-   for _, itemData in pairs(bagData) do
-    local guid
-    if itemData:IsItemEmpty() then
-      guid = "0"
-    else
-      guid = itemData:GetItemGUID()
-    end
-    local oldFrame = self.guidToItemFrame[guid] --[[@as Item]]
+  for bid, bagData in pairs(items.dirtyItems) do
+    self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
+    for sid, itemData in pairs(bagData) do
+      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
+      local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
 
-    -- The old frame does not exist, so we need to create a new one.
-    if oldFrame == nil and not itemData:IsItemEmpty() then
-      local newFrame = itemFrame:Create()
-      newFrame:SetItem(itemData)
-      self.content:AddCell(guid, newFrame)
-      self.guidToItemFrame[itemData:GetItemGUID()] = newFrame
-    elseif itemData:IsItemEmpty() and oldFrame ~= nil then
-      --TODO(lobato): delete the item frame.
-      -- remove cell from grid
-      -- remove item from guidToItemFrame
-      -- release item frame 
-    elseif oldFrame ~= nil then
-      -- The old frame exists, so we need to update it.
-      oldFrame:SetItem(itemData)
+      -- The old frame does not exist, so we need to create a new one.
+      if oldFrame == nil and not itemData:IsItemEmpty() then
+        local newFrame = itemFrame:Create()
+        newFrame:SetItem(itemData)
+        self.content:AddCell(itemData:GetItemGUID(), newFrame)
+        self.itemsByBagAndSlot[bagid][slotid] = newFrame
+      elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
+        -- The old frame exists, so we need to update it.
+        oldFrame:SetItem(itemData)
+      elseif itemData:IsItemEmpty() and oldFrame ~= nil then
+        -- The old frame exists, but the item is empty, so we need to delete it.
+        self.itemsByBagAndSlot[bid][sid] = nil
+        self.content:RemoveCell(oldFrame.guid, oldFrame)
+        itemFrame:Release(oldFrame)
+      end
     end
-   end
   end
+
+  -- Redraw the world.
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 12)
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
@@ -127,7 +126,7 @@ function bagFrame:Create(kind)
   setmetatable(b, { __index = bagProto })
   -- TODO(lobato): Compose the entire frame here.
 
-  b.guidToItemFrame = {}
+  b.itemsByBagAndSlot = {}
   b.kind = kind
   -- The main display frame for the bag.
   ---@class Frame: BackdropTemplate
