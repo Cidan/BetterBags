@@ -35,6 +35,12 @@ end
 function sectionProto:List()
 end
 
+-- SetTitle will set the title of the section.
+---@param text string The text to set the title to.
+function sectionProto:SetTitle(text)
+  self.title:SetText(text)
+end
+
 -------
 --- Section Frame
 -------
