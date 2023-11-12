@@ -8,6 +8,10 @@ local sectionFrame = addon:NewModule('Section')
 
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
+
+---@class GridFrame: AceModule
+local grid = addon:GetModule('Grid')
+
 -------
 --- Section Prototype
 -------
@@ -20,6 +24,7 @@ local debug = addon:GetModule('Debug')
 ---@class Section
 ---@field frame Frame The raw frame of the section.
 ---@field title FontString The title of the section.
+---@field content Grid The main content frame of the section.
 local sectionProto = {}
 
 -- Grid will render the section as a grid of icons.
@@ -56,8 +61,13 @@ function sectionFrame:Create(parent)
   title:SetFontObject("GameFontNormal")
   title:SetHeight(18)
   title:SetJustifyH("LEFT")
-  title:SetPoint("BOTTOMLEFT", s.frame, "TOPLEFT", 0, -4)
+  title:SetPoint("BOTTOMLEFT", s.frame, "TOPLEFT", 3, -4)
   s.title = title
 
+  local content = grid:Create(s.frame)
+  content.frame:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 3, 3)
+  content.frame:SetPoint("BOTTOMRIGHT", s.frame, "BOTTOMRIGHT", -3, -3)
+  content:Show()
+  s.content = content
   return s
 end
