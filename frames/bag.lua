@@ -34,6 +34,7 @@ local LSM = LibStub('LibSharedMedia-3.0')
 --- a single bag slot, but a combined view of all bags for a given
 --- kind (i.e. bank, backpack).
 ---@class Bag
+---@field kind BagKind
 ---@field frame Frame The raw frame of the bag.
 ---@field leftHeader Frame The top left header of the bag.
 ---@field title FontString The title of the bag.
@@ -42,15 +43,27 @@ local LSM = LibStub('LibSharedMedia-3.0')
 local bagProto = {}
 
 function bagProto:Show()
+  if self.frame:IsShown() then
+    return
+  end
+  PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
   self.frame:Show()
 end
 
 function bagProto:Hide()
+  if not self.frame:IsShown() then
+    return
+  end
+  PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
   self.frame:Hide()
 end
 
 function bagProto:Toggle()
-  self.frame:SetShown(not self.frame:IsShown())
+  if self.frame:IsShown() then
+    self:Hide()
+  else
+    self:Show()
+  end
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
