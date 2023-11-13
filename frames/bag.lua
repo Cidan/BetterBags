@@ -84,7 +84,8 @@ function bagProto:Wipe()
   wipe(self.sections)
 end
 
--- Refresh will only refresh the dirty items in a bag.
+-- DrawOneBag draws all items as a combined container view, similar to the Blizzard
+-- combined bag view.
 function bagProto:DrawOneBag()
   for bid, bagData in pairs(items.dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
@@ -116,6 +117,8 @@ function bagProto:DrawOneBag()
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
 end
 
+-- DrawSectionGridBag draws all items in sections according to their type and, optionally,
+-- subtype and expansion the item is from. This is the tradition AdiBags style.
 function bagProto:DrawSectionGridBag()
   for bid, bagData in pairs(items.dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
@@ -129,6 +132,7 @@ function bagProto:DrawSectionGridBag()
         newFrame:SetItem(itemData)
         local category = newFrame:GetCategory()
         local section = self.sections[category]
+        -- Create the section if it doesn't exist.
         if section == nil then
           debug:Log("create", "creating category " .. category)
           section = sectionFrame:Create()
@@ -147,6 +151,7 @@ function bagProto:DrawSectionGridBag()
         self.itemsByBagAndSlot[bid][sid] = nil
         local section = self.sections[oldFrame:GetCategory()]
         section.content:RemoveCell(oldFrame.guid, oldFrame)
+        -- Delete the section if it's empty as well.
         if #section.content.cells == 0 then
           self.content:RemoveCell(oldFrame:GetCategory(), section)
           sectionFrame:Release(section)
@@ -157,10 +162,12 @@ function bagProto:DrawSectionGridBag()
     end
   end
 
+  -- Loop through each section and draw it's size.
   for _, section in pairs(self.sections) do
     section:Draw()
   end
-  -- Redraw the world.
+
+  -- Position all sections and draw the main bag.
   local w, h = self.content:Draw()
   debug:Log("w", tostring(w))
   debug:Log("h", tostring(w))
@@ -168,6 +175,8 @@ function bagProto:DrawSectionGridBag()
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
 end
 
+-- DrawSectionListBag draws the bag as a scrollable list of sections with a small icon
+-- and the item name as a single row.
 function bagProto:DrawSectionListBag()
 end
 
