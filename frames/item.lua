@@ -11,6 +11,8 @@ local item = addon:NewModule('ItemFrame')
 ---@field guid string
 ---@field frame Frame
 ---@field button ItemButton
+---@field itemType string
+---@field itemSubType string
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -54,8 +56,10 @@ function itemProto:SetItem(i)
   local questInfo = C_Container.GetContainerItemQuestInfo(bagid, self.frame:GetID());
   local isQuestItem = questInfo.isQuestItem;
   local questID = questInfo.questID;
-  local isActive = questInfo.isActive;
-
+  local isActive = questInfo.isActive
+  local _, _, _, _, _, itemType, itemSubType = GetItemInfo(i:GetItemID() or 0)
+  self.itemType = itemType
+  self.itemSubType = itemSubType
   local l = i:GetItemLocation()
   local bound = false
   if l ~= nil then
@@ -84,7 +88,7 @@ function itemProto:SetItem(i)
 end
 
 function itemProto:GetCategory()
-  return "debug"
+  return self.itemType
 end
 
 function itemProto:ClearItem()
