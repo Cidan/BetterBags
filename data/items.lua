@@ -101,7 +101,9 @@ function items:RefreshBag(bagid)
   container:ContinueOnLoad(function()
     if items._doingRefreshAll then
       items._continueCounter = items._continueCounter + 1
-      if items._continueCounter == NUM_TOTAL_EQUIPPED_BAG_SLOTS then
+      -- We need to offset by one here on the loop because, annoyingly,
+      -- the bag index starts at 0 and not 1, meaning there are 6 bags.
+      if items._continueCounter == NUM_TOTAL_EQUIPPED_BAG_SLOTS+1 then
         items._continueCounter = 0
         items._doingRefreshAll = false
         events:SendMessage('items/RefreshAllItems/Done', items.dirtyItems)
