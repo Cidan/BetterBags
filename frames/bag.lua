@@ -117,8 +117,8 @@ function bagProto:DrawOneBag()
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
 end
 
--- DrawSectionGridBag draws all items in sections according to their type and, optionally,
--- subtype and expansion the item is from. This is the tradition AdiBags style.
+-- DrawSectionGridBag draws all items in sections according to their configured type.
+-- This is the tradition AdiBags style.
 function bagProto:DrawSectionGridBag()
   for bid, bagData in pairs(items.dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
