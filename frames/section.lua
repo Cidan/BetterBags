@@ -41,22 +41,32 @@ function sectionProto:SetTitle(text)
   self.title:SetText(text)
 end
 
+function sectionProto:Wipe()
+  self.frame:ClearAllPoints()
+  self.frame:SetParent(nil)
+end
+
 -------
 --- Section Frame
 -------
 
--- Create will create a new section view as a child of the
--- given parent.
----@param parent Frame
+function sectionFrame:OnInitialize()
+  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+end
+
+---@param f Section
+function sectionFrame:_DoReset(f)
+  f:Wipe()
+end
+
 ---@return Section
-function sectionFrame:Create(parent)
+function sectionFrame:_DoCreate()
   ---@class Section
   local s = {}
   setmetatable(s, { __index = sectionProto })
 
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
-  f.SetParent(parent)
   s.frame = f
 
   debug:DrawDebugBorder(f, 1, 1, 1)
@@ -76,4 +86,12 @@ function sectionFrame:Create(parent)
   content:Show()
   s.content = content
   return s
+end
+
+
+-- Create will create a new section view.
+---@return Section
+function sectionFrame:Create()
+  ---@return Section
+  return self._pool:Acquire()
 end

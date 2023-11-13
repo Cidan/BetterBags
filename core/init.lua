@@ -69,7 +69,7 @@ function addon:OnEnable()
 
   events:RegisterMessage('items/RefreshAllItems/Done', function()
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:Refresh()
+    addon.Bags.Backpack:DrawOneBag()
    end)
 
    items:RefreshAllItems()

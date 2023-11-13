@@ -76,26 +76,8 @@ function bagProto:Wipe()
   wipe(self.itemsByBagAndSlot)
 end
 
---- Draw does a complete redraw of the bags.
-function bagProto:Draw()
-  self:Wipe()
-  debug:Log("bagProto/Draw", "Drawing bag", self.kind)
-  for _, itemData in pairs(items.items) do
-    for guid, item in pairs(itemData) do
-      local bagid, slotid = item:GetItemLocation():GetBagAndSlot()
-      local iframe = itemFrame:Create()
-      iframe:SetItem(item)
-      self.content:AddCell(guid, iframe)
-      self.itemsByBagAndSlot[bagid][slotid] = iframe
-    end
-  end
-  local w, h = self.content:Draw()
-  self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
-end
-
 -- Refresh will only refresh the dirty items in a bag.
-function bagProto:Refresh()
+function bagProto:DrawOneBag()
   for bid, bagData in pairs(items.dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
@@ -124,6 +106,12 @@ function bagProto:Refresh()
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 12)
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
+end
+
+function bagProto:DrawSectionGridBag()
+end
+
+function bagProto:DrawSectionListBag()
 end
 
 -------

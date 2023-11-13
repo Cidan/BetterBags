@@ -83,6 +83,10 @@ function itemProto:SetItem(i)
   self.button:Show()
 end
 
+function itemProto:GetCategory()
+  return self.mixin:GetInventoryTypeName()
+end
+
 function itemProto:ClearItem()
   self.mixin = nil
   self.guid = nil
