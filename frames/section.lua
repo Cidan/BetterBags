@@ -4,7 +4,7 @@ local addonName = ...
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class SectionFrame: AceModule
-local sectionFrame = addon:NewModule('Section')
+local sectionFrame = addon:NewModule('SectionFrame')
 
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
@@ -46,6 +46,17 @@ function sectionProto:Wipe()
   self.frame:SetParent(nil)
 end
 
+---@return number width
+---@return number height
+function sectionProto:Draw()
+  local w, h = self.content:Draw()
+  self.content.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 3, 3)
+  self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -3, -3)
+  self.content:Show()
+  self.frame:SetSize(w, h)
+  return w, h
+end
+
 -------
 --- Section Frame
 -------
@@ -69,7 +80,7 @@ function sectionFrame:_DoCreate()
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
 
-  debug:DrawDebugBorder(f, 1, 1, 1)
+  --debug:DrawDebugBorder(f, 1, 1, 1)
 
   -- Create the section title.
   local title = s.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -85,13 +96,17 @@ function sectionFrame:_DoCreate()
   content.frame:SetPoint("BOTTOMRIGHT", s.frame, "BOTTOMRIGHT", -3, -3)
   content:Show()
   s.content = content
+  f:Show()
   return s
 end
-
 
 -- Create will create a new section view.
 ---@return Section
 function sectionFrame:Create()
   ---@return Section
   return self._pool:Acquire()
+end
+
+function sectionFrame:Release(s)
+  self._pool:Release(s)
 end

@@ -3,6 +3,9 @@ local addonName = ...
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class GridFrame: AceModule
 local grid = addon:NewModule('Grid')
 
@@ -31,6 +34,7 @@ function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
+  debug:Log("addCell", id)
   cell.frame:SetParent(self.frame)
   table.insert(self.cells, cell)
 end

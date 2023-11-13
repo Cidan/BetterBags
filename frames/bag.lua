@@ -21,6 +21,9 @@ local items = addon:GetModule('Items')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule('SectionFrame')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -40,6 +43,7 @@ local LSM = LibStub('LibSharedMedia-3.0')
 ---@field title FontString The title of the bag.
 ---@field content Grid The main content frame of the bag.
 ---@field itemsByBagAndSlot table<number, table<number, Item>>
+---@field sections table<string, Section>
 local bagProto = {}
 
 function bagProto:Show()
@@ -72,8 +76,12 @@ function bagProto:Wipe()
     ---@cast cell -Section,-Cell
     itemFrame:Release(cell)
   end
+  for _, section in pairs(self.sections) do
+    sectionFrame:Release(section)
+  end
   self.content:Wipe()
   wipe(self.itemsByBagAndSlot)
+  wipe(self.sections)
 end
 
 -- Refresh will only refresh the dirty items in a bag.
@@ -109,6 +117,55 @@ function bagProto:DrawOneBag()
 end
 
 function bagProto:DrawSectionGridBag()
+  for bid, bagData in pairs(items.dirtyItems) do
+    self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
+    for sid, itemData in pairs(bagData) do
+      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
+      local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
+
+      -- The old frame does not exist, so we need to create a new one.
+      if oldFrame == nil and not itemData:IsItemEmpty() then
+        local newFrame = itemFrame:Create()
+        newFrame:SetItem(itemData)
+        local category = newFrame:GetCategory()
+        local section = self.sections[category]
+        if section == nil then
+          debug:Log("create", "creating category " .. category)
+          section = sectionFrame:Create()
+          section:SetTitle(category)
+          section.content.maxCellWidth = 5
+          self.content:AddCell(category, section)
+          self.sections[category] = section
+        end
+        section.content:AddCell(itemData:GetItemGUID(), newFrame)
+        self.itemsByBagAndSlot[bagid][slotid] = newFrame
+      elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
+        -- The old frame exists, so we need to update it.
+        oldFrame:SetItem(itemData)
+      elseif itemData:IsItemEmpty() and oldFrame ~= nil then
+        -- The old frame exists, but the item is empty, so we need to delete it.
+        self.itemsByBagAndSlot[bid][sid] = nil
+        local section = self.sections[oldFrame:GetCategory()]
+        section.content:RemoveCell(oldFrame.guid, oldFrame)
+        if #section.content.cells == 0 then
+          self.content:RemoveCell(oldFrame:GetCategory(), section)
+          sectionFrame:Release(section)
+          self.sections[oldFrame:GetCategory()] = nil
+        end
+        itemFrame:Release(oldFrame)
+      end
+    end
+  end
+
+  for _, section in pairs(self.sections) do
+    section:Draw()
+  end
+  -- Redraw the world.
+  local w, h = self.content:Draw()
+  debug:Log("w", tostring(w))
+  debug:Log("h", tostring(w))
+  self.frame:SetWidth(w + 12)
+  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
 end
 
 function bagProto:DrawSectionListBag()
@@ -128,6 +185,7 @@ function bagFrame:Create(kind)
   -- TODO(lobato): Compose the entire frame here.
 
   b.itemsByBagAndSlot = {}
+  b.sections = {}
   b.kind = kind
   -- The main display frame for the bag.
   ---@class Frame: BackdropTemplate

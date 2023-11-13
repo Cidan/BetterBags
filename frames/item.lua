@@ -84,7 +84,7 @@ function itemProto:SetItem(i)
 end
 
 function itemProto:GetCategory()
-  return self.mixin:GetInventoryTypeName()
+  return "debug"
 end
 
 function itemProto:ClearItem()
