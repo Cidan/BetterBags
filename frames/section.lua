@@ -53,7 +53,7 @@ function sectionProto:Draw()
   self.content.frame:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 0)
   self.content:Show()
-  self.frame:SetSize(w, h)
+  self.frame:SetSize(w, h + self.title:GetHeight())
   return w, h
 end
 
