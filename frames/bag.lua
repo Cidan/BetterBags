@@ -119,8 +119,8 @@ end
 
 -- DrawSectionGridBag draws all items in sections according to their configured type.
 -- This is the tradition AdiBags style.
-function bagProto:DrawSectionGridBag()
-  for bid, bagData in pairs(items.dirtyItems) do
+function bagProto:DrawSectionGridBag(dirtyItems)
+  for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()

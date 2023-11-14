@@ -74,11 +74,16 @@ function addon:OnEnable()
 
   items:Enable()
 
-  events:RegisterMessage('items/RefreshAllItems/Done', function()
+  events:RegisterMessage('items/RefreshBackpack/Done', function(event, itemData)
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:DrawSectionGridBag()
+    addon.Bags.Backpack:DrawSectionGridBag(itemData)
+   end)
+
+   events:RegisterMessage('items/RefreshBank/Done', function(event, itemData)
+    debug:Log("init/OnInitialize/items", "Drawing bank")
+    addon.Bags.Bank:DrawSectionGridBag(itemData)
    end)
 
    debug:Log("init", "about refresh all items")
-   items:RefreshAllItems()
+   items:RefreshBackpack()
 end

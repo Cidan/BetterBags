@@ -15,7 +15,7 @@ function events:OnInitialize()
 end
 
 ---@param event string
----@param callback fun()
+---@param callback fun(...)
 ---@param arg? any
 function events:RegisterMessage(event, callback, arg)
   if self._messageMap[event] == nil then
