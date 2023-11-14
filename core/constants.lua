@@ -18,3 +18,14 @@ const.BAG_KIND = {
   BACKPACK = 0,
   BANK = 1,
 }
+
+const.BANK_BAGS = {
+  [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
+  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
+  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
+  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
+  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
+  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
+  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
+  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+}

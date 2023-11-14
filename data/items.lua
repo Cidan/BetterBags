@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -58,8 +61,7 @@ function items:RefreshBank()
   self._bankContainer = ContinuableContainer:Create()
 
   -- Loop through all the bags and schedule each item for a refresh.
-
-  for i = 6, NUM_TOTAL_EQUIPPED_BAG_SLOTS+NUM_BANKBAGSLOTS do
+  for i in pairs(const.BANK_BAGS) do
     self.items[i] = {}
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyBankItems[i] = self.dirtyBankItems[i] or {}
