@@ -29,3 +29,12 @@ const.BANK_BAGS = {
   [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
   [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
 }
+
+const.BACKPACK_BAGS = {
+  [Enum.BagIndex.Backpack] = Enum.BagIndex.Backpack,
+  [Enum.BagIndex.Bag_1] = Enum.BagIndex.Bag_1,
+  [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
+  [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
+  [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
+  [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
+}

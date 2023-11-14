@@ -84,7 +84,7 @@ function items:RefreshBackpack()
   self._container = ContinuableContainer:Create()
 
   -- Loop through all the bags and schedule each item for a refresh.
-  for i = 0, NUM_TOTAL_EQUIPPED_BAG_SLOTS do
+  for i in pairs(const.BACKPACK_BAGS) do
     self.items[i] = {}
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyItems[i] = self.dirtyItems[i] or {}
