@@ -36,6 +36,7 @@
     "SetItemButtonDesaturated",
     "pairs",
     "GameTooltip",
-    "C_Item"
+    "C_Item",
+    "CallErrorHandler"
   ]
 }

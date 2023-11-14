@@ -29,3 +29,6 @@ function itemButton:SetReadable(readable) end
 function itemButton:CheckUpdateTooltip(tooltipOwner) end
 
 function itemButton:SetMatchesSearch(matchesSearch) end
+
+---@class ContinuableContainer 
+local ContinuableContainer = {}
