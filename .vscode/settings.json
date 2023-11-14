@@ -37,6 +37,7 @@
     "pairs",
     "GameTooltip",
     "C_Item",
-    "CallErrorHandler"
+    "CallErrorHandler",
+    "BankFrame"
   ]
 }

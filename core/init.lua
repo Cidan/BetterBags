@@ -55,6 +55,10 @@ function addon:HideBlizzardBags()
   for i = 1, 13 do
     _G["ContainerFrame"..i]:SetParent(sneakyFrame)
   end
+  BankFrame:SetParent(sneakyFrame)
+  BankFrame:SetScript("OnHide", nil)
+  BankFrame:SetScript("OnShow", nil)
+  BankFrame:SetScript("OnEvent", nil)
 end
 
 -- OnEnable is called when the addon is enabled.
@@ -64,6 +68,9 @@ function addon:OnEnable()
 
   self:SecureHook('OpenAllBags', self.OpenAllBags)
   self:SecureHook('ToggleAllBags', self.ToggleAllBags)
+
+  events:RegisterEvent('BANKFRAME_OPENED', self.OpenBank)
+  events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
 
   items:Enable()
 
