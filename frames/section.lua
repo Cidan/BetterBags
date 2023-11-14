@@ -51,10 +51,10 @@ end
 function sectionProto:Draw()
   local w, h = self.content:Draw()
   self.content.frame:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
-  self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 0)
+  self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
   self.content:Show()
-  self.frame:SetSize(w, h + self.title:GetHeight())
-  return w, h
+  self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
+  return w+12, h + self.title:GetHeight() + 6
 end
 
 -------
@@ -88,7 +88,7 @@ function sectionFrame:_DoCreate()
   title:SetFontObject("GameFontNormal")
   title:SetHeight(18)
   title:SetJustifyH("LEFT")
-  title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 0, 0)
+  title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 6, 0)
   s.title = title
 
   local content = grid:Create(s.frame)

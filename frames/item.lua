@@ -58,8 +58,8 @@ function itemProto:SetItem(i)
   local questID = questInfo.questID;
   local isActive = questInfo.isActive
   local _, _, _, _, _, itemType, itemSubType = GetItemInfo(i:GetItemID() or 0)
-  self.itemType = itemType
-  self.itemSubType = itemSubType
+  self.itemType = itemType or "unknown"
+  self.itemSubType = itemSubType or "unknown"
   local l = i:GetItemLocation()
   local bound = false
   if l ~= nil then

@@ -67,23 +67,27 @@ end
 function gridProto:Draw()
   local width = 0
   local height = 0
+  local maxWidth = 0
+  local maxHeight = 0
   for i, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
     if i == 1 then
       cell.frame:SetPoint('TOPLEFT', self.frame, 'TOPLEFT', 0, 0)
-      width = width + cell.frame:GetWidth()
-      height = height + cell.frame:GetHeight()
+      width = cell.frame:GetWidth()
+      height = cell.frame:GetHeight()
     elseif i % self.maxCellWidth == 1 then
       cell.frame:SetPoint('TOPLEFT', self.cells[i - self.maxCellWidth].frame, 'BOTTOMLEFT', 0, 0)
-      height = height + cell.frame:GetHeight()
+      maxWidth = math.max(maxWidth, width)
+      maxHeight = math.max(maxHeight, height)
+      height = math.max(height + cell.frame:GetHeight(), maxHeight)
+      width = cell.frame:GetWidth()
     else
       cell.frame:SetPoint('TOPLEFT', self.cells[i - 1].frame, 'TOPRIGHT', 0, 0)
-      if i <= self.maxCellWidth then
-        width = width + cell.frame:GetWidth()
-      end
+      width = width + cell.frame:GetWidth()
+      height = math.max(height, cell.frame:GetHeight() + maxHeight)
     end
   end
-  return width, height
+  return math.max(width, maxWidth), height
 end
 
 function gridProto:Wipe()

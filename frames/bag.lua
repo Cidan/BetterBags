@@ -169,6 +169,7 @@ function bagProto:DrawSectionGridBag()
 
   -- Position all sections and draw the main bag.
   local w, h = self.content:Draw()
+  --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
   debug:Log("w", tostring(w))
   debug:Log("h", tostring(w))
   self.frame:SetWidth(w + 12)
@@ -243,6 +244,7 @@ function bagFrame:Create(kind)
   local content = grid:Create(b.frame)
   content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
+  content.maxCellWidth = 3
   content:Show()
   b.content = content
 
