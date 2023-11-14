@@ -30,6 +30,10 @@ const.BANK_BAGS = {
   [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
 }
 
+const.REAGENTBANK_BAGS = {
+  [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
+}
+
 const.BACKPACK_BAGS = {
   [Enum.BagIndex.Backpack] = Enum.BagIndex.Backpack,
   [Enum.BagIndex.Bag_1] = Enum.BagIndex.Bag_1,
