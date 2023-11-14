@@ -72,5 +72,6 @@ function addon:OnEnable()
     addon.Bags.Backpack:DrawSectionGridBag()
    end)
 
+   debug:Log("init", "about refresh all items")
    items:RefreshAllItems()
 end

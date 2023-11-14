@@ -32,3 +32,8 @@ function itemButton:SetMatchesSearch(matchesSearch) end
 
 ---@class ContinuableContainer 
 local ContinuableContainer = {}
+
+---@param func fun()
+function ContinuableContainer:ContinueOnLoad(func) end
+
+function ContinuableContainer:AddContinuable(cont) end

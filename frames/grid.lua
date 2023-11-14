@@ -34,7 +34,6 @@ function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
-  debug:Log("addCell", id)
   cell.frame:SetParent(self.frame)
   table.insert(self.cells, cell)
 end
