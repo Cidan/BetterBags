@@ -49,11 +49,11 @@ function itemProto:SetItem(i)
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
-  local info = C_Container.GetContainerItemInfo(bagid, slotid);
+  local info = C_Container.GetContainerItemInfo(bagid, slotid)
   local readable = info and info.isReadable;
   local isFiltered = info and info.isFiltered;
   local noValue = info and info.hasNoValue;
-  local questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid);
+  local questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
   local isQuestItem = questInfo.isQuestItem;
   local questID = questInfo.questID;
   local isActive = questInfo.isActive

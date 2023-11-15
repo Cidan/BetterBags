@@ -31,9 +31,11 @@ function itemButton:CheckUpdateTooltip(tooltipOwner) end
 function itemButton:SetMatchesSearch(matchesSearch) end
 
 ---@class ContinuableContainer 
-local ContinuableContainer = {}
+ContinuableContainer = {}
 
+--[[
 ---@param func fun()
 function ContinuableContainer:ContinueOnLoad(func) end
 
 function ContinuableContainer:AddContinuable(cont) end
+--]]

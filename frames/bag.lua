@@ -167,6 +167,13 @@ function bagProto:DrawSectionGridBag(dirtyItems)
     section:Draw()
   end
 
+  -- Sort all sections by title.
+  self.content:Sort(function(a, b)
+    ---@cast a +Section
+    ---@cast b +Section
+    return a.title:GetText() < b.title:GetText()
+  end)
+
   -- Position all sections and draw the main bag.
   local w, h = self.content:Draw()
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)

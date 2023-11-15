@@ -13,6 +13,25 @@ local grid = addon:NewModule('Grid')
 ---@field frame Frame
 local cellProto = {}
 
+------
+--- Column Proto
+------
+---@class column
+---@field cells Cell[]|Item[]|Section[]
+---@field frame Frame
+local columnProto = {}
+
+function columnProto:Wipe()
+  self.frame:ClearAllPoints()
+  self.frame:SetParent(nil)
+  self.frame:Hide()
+  wipe(self.cells)
+end
+
+------
+--- Grid Proto
+------
+
 ---@class Grid
 ---@field frame Frame
 ---@field cells Cell[]|Item[]|Section[]
@@ -91,6 +110,26 @@ end
 
 function gridProto:Wipe()
   wipe(self.cells)
+end
+
+
+function grid:OnInitialize()
+  self._columnPool = CreateObjectPool(self._DoCreateColumn, self._DoResetColumn)
+end
+
+---@param c column
+function grid:_DoResetColumn(c)
+  c:Wipe()
+end
+
+function grid:_DoCreateColumn()
+  local c = setmetatable({}, { __index = columnProto })
+  ---@class Frame: BackdropTemplate
+  local f = CreateFrame('Frame', nil, nil, "BackdropTemplate")
+  c.frame = f
+  c.cells = {}
+  c.frame:Show()
+  return c
 end
 
 -- Create will create a new grid frame.
