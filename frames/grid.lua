@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class ColumnFrame: AceModule
+local columnFrame = addon:GetModule('ColumnFrame')
+
 ---@class GridFrame: AceModule
 local grid = addon:NewModule('Grid')
 
@@ -52,6 +55,7 @@ function gridProto:RemoveCell(id, cell)
   assert(cell, 'cell is required')
   for i, c in ipairs(self.cells) do
     if c == cell then
+      cell.frame:ClearAllPoints()
       cell.frame:SetParent(nil)
       table.remove(self.cells, i)
       return
@@ -66,37 +70,43 @@ function gridProto:Sort(fn)
   table.sort(self.cells, fn)
 end
 
---TODO(lobato): Wipe all columns, loop cells and add to columns, then
--- loop columns and draw them.
-
 -- Draw will draw the grid.
 ---@return number width
 ---@return number height
 function gridProto:Draw()
+  for _, column in pairs(self.columns) do
+    columnFrame:Release(column)
+  end
+  wipe(self.columns)
+  wipe(self.cellToColumn)
+
   local width = 0
   local height = 0
-  local maxWidth = 0
-  local maxHeight = 0
-
   for i, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
-    if i == 1 then
-      cell.frame:SetPoint('TOPLEFT', self.frame, 'TOPLEFT', 0, 0)
-      width = cell.frame:GetWidth()
-      height = cell.frame:GetHeight()
-    elseif i % self.maxCellWidth == 1 then
-      cell.frame:SetPoint('TOPLEFT', self.cells[i - self.maxCellWidth].frame, 'BOTTOMLEFT', 0, 0)
-      maxWidth = math.max(maxWidth, width)
-      maxHeight = math.max(maxHeight, height)
-      height = math.max(height + cell.frame:GetHeight(), maxHeight)
-      width = cell.frame:GetWidth()
-    else
-      cell.frame:SetPoint('TOPLEFT', self.cells[i - 1].frame, 'TOPRIGHT', 0, 0)
-      width = width + cell.frame:GetWidth()
-      height = math.max(height, cell.frame:GetHeight() + maxHeight)
+    local column = self.columns[i % self.maxCellWidth]
+    if column == nil then
+      column = columnFrame:Create()
+      column.frame:SetParent(self.frame)
+      self.columns[i % self.maxCellWidth] = column
+      if i == 1 then
+        column.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, 0)
+      else
+        local previousColumn = self.columns[i - 1]
+        column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 0, 0)
+      end
     end
+    column:AddCell(cell)
+    self.cellToColumn[cell] = column
+    cell.frame:Show()
   end
-  return math.max(width, maxWidth), height
+
+  for _, column in pairs(self.columns) do
+    w, h = column:Draw()
+    width = width + w
+    height = math.max(height, h)
+  end
+  return width, height
 end
 
 function gridProto:Wipe()

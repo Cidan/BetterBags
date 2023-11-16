@@ -68,6 +68,8 @@ function columnProto:Draw()
     end
   end
   self.frame:SetSize(w, h)
+  self.frame:Show()
+  return w, h
 end
 
 ------
@@ -100,4 +102,14 @@ function columnFrame:_DoReset(c)
     cell.frame:SetParent(nil)
   end
   wipe(c.cells)
+end
+
+---@return Column
+function columnFrame:Create()
+  return self._pool:Acquire()
+end
+
+---@param c Column
+function columnFrame:Release(c)
+  self._pool:Release(c)
 end
