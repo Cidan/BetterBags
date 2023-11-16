@@ -31,6 +31,7 @@ debug\frames.lua
 
 data\items.lua
 
+frames\column.lua
 frames\grid.lua
 frames\item.lua
 frames\section.lua

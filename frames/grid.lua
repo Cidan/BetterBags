@@ -14,27 +14,14 @@ local grid = addon:NewModule('Grid')
 local cellProto = {}
 
 ------
---- Column Proto
-------
----@class column
----@field cells Cell[]|Item[]|Section[]
----@field frame Frame
-local columnProto = {}
-
-function columnProto:Wipe()
-  self.frame:ClearAllPoints()
-  self.frame:SetParent(nil)
-  self.frame:Hide()
-  wipe(self.cells)
-end
-
-------
 --- Grid Proto
 ------
 
 ---@class Grid
 ---@field frame Frame
 ---@field cells Cell[]|Item[]|Section[]
+---@field columns Column[]
+---@field cellToColumn table<Cell|Item|Section, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
 local gridProto = {}
 
@@ -87,6 +74,7 @@ function gridProto:Draw()
   local height = 0
   local maxWidth = 0
   local maxHeight = 0
+
   for i, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
     if i == 1 then
@@ -112,26 +100,6 @@ function gridProto:Wipe()
   wipe(self.cells)
 end
 
-
-function grid:OnInitialize()
-  self._columnPool = CreateObjectPool(self._DoCreateColumn, self._DoResetColumn)
-end
-
----@param c column
-function grid:_DoResetColumn(c)
-  c:Wipe()
-end
-
-function grid:_DoCreateColumn()
-  local c = setmetatable({}, { __index = columnProto })
-  ---@class Frame: BackdropTemplate
-  local f = CreateFrame('Frame', nil, nil, "BackdropTemplate")
-  c.frame = f
-  c.cells = {}
-  c.frame:Show()
-  return c
-end
-
 -- Create will create a new grid frame.
 ---@param parent Frame
 ---@return Grid
@@ -142,6 +110,8 @@ function grid:Create(parent)
   f:SetParent(parent)
   g.frame = f
   g.cells = {}
+  g.columns = {}
+  g.cellToColumn = {}
   g.maxCellWidth = 5
   return g
 end
