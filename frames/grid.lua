@@ -44,7 +44,7 @@ function gridProto:AddCell(id, cell)
   table.insert(self.cells, cell)
 end
 
--- RemoveCell will add a cell to this grid.
+-- RemoveCell will removed a cell from this grid.
 ---@param id string|nil
 ---@param cell Cell|Section|Item
 function gridProto:RemoveCell(id, cell)

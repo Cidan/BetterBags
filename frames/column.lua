@@ -47,9 +47,27 @@ function columnProto:RemoveCell(cell)
   end
 end
 
+--TODO(lobato): Figure out if we need to do cell compaction.
 -- Draw will full redraw this column and snap all cells into the correct
 -- position.
 function columnProto:Draw()
+  local w = self.minimumWidth
+  local h = 0
+  local previousRow = 0
+  local cellOffset = 1
+  for cellPos, cell in ipairs(self.cells) do
+    -- cell.position = cellPos unsure if need this
+    w = math.max(w, cell.frame:GetWidth()+4)
+    if cellPos == 1 then
+      cell.frame:SetPoint("TOPLEFT", self.frame)
+      -- previousRow = cell.frame.count unsure what this was
+      h = h + cell.frame:GetHeight()
+    else
+      cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -4)
+      h = h + cell.frame:GetHeight() + 4
+    end
+  end
+  self.frame:SetSize(w, h)
 end
 
 ------
