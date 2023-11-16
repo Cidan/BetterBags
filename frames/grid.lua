@@ -74,6 +74,7 @@ end
 ---@return number width
 ---@return number height
 function gridProto:Draw()
+  -- Wipe and release all columns.
   for _, column in pairs(self.columns) do
     columnFrame:Release(column)
   end
@@ -84,8 +85,11 @@ function gridProto:Draw()
   local height = 0
   for i, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
+    -- Get the current column for a given cell order, left to right.
     local column = self.columns[i % self.maxCellWidth]
     if column == nil then
+      -- Create the column if it doesn't exist and position it within
+      -- the grid.
       column = columnFrame:Create()
       column.frame:SetParent(self.frame)
       self.columns[i % self.maxCellWidth] = column
@@ -96,16 +100,19 @@ function gridProto:Draw()
         column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 0, 0)
       end
     end
+    -- Add the cell to the column.
     column:AddCell(cell)
     self.cellToColumn[cell] = column
     cell.frame:Show()
   end
 
+  -- Draw all the columns and their cells.
   for _, column in pairs(self.columns) do
-    w, h = column:Draw()
+    local w, h = column:Draw()
     width = width + w
     height = math.max(height, h)
   end
+
   return width, height
 end
 
