@@ -66,6 +66,9 @@ function gridProto:Sort(fn)
   table.sort(self.cells, fn)
 end
 
+--TODO(lobato): Wipe all columns, loop cells and add to columns, then
+-- loop columns and draw them.
+
 -- Draw will draw the grid.
 ---@return number width
 ---@return number height
