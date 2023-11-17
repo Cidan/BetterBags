@@ -39,6 +39,15 @@ local children = {
   "ItemContextOverlay"
 }
 
+-- OnEvent is the event handler for the item button.
+---@param i Item
+---@param event string
+local function OnEvent(i, event, ...)
+  if event == 'BAG_UPDATE_COOLDOWN' or event == 'SPELL_UPDATE_COOLDOWN' then
+    i.button:UpdateCooldown(i.mixin:GetItemIcon())
+  end
+end
+
 ---@param i ItemMixin
 function itemProto:SetItem(i)
   assert(i, 'item must be provided')
@@ -83,7 +92,9 @@ function itemProto:SetItem(i)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
-
+  self.button:RegisterEvent('BAG_UPDATE_COOLDOWN')
+  self.button:RegisterEvent('SPELL_UPDATE_COOLDOWN')
+  self.button:SetScript('OnEvent', function(_, event, ...) OnEvent(self, event, ...) end)
   self.frame:Show()
   self.button:Show()
 end
@@ -93,6 +104,9 @@ function itemProto:GetCategory()
 end
 
 function itemProto:ClearItem()
+  self.button:UnregisterEvent('BAG_UPDATE_COOLDOWN')
+  self.button:UnregisterEvent('SPELL_UPDATE_COOLDOWN')
+  self.button:SetScript('OnEvent', nil)
   self.mixin = nil
   self.guid = nil
   self.frame:ClearAllPoints()
