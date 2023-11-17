@@ -36,7 +36,7 @@ ContinuableContainer = {}
 ---@class MasqueGroup
 MasqueGroup = {}
 
-function MasqueGroup:AddButton() end
+function MasqueGroup:AddButton(group, button) end
 
 ---@class Masque
 Masque = {}
