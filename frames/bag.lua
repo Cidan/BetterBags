@@ -86,8 +86,8 @@ end
 
 -- DrawOneBag draws all items as a combined container view, similar to the Blizzard
 -- combined bag view.
-function bagProto:DrawOneBag()
-  for bid, bagData in pairs(items.dirtyItems) do
+function bagProto:DrawOneBag(dirtyItems)
+  for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
@@ -110,6 +110,12 @@ function bagProto:DrawOneBag()
       end
     end
   end
+
+  self.content:Sort(function (a, b)
+    ---@cast a +Item
+    ---@cast b +Item
+    return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
+  end)
 
   -- Redraw the world.
   local w, h = self.content:Draw()
