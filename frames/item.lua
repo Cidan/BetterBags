@@ -49,6 +49,7 @@ function itemProto:SetItem(i)
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
+  -- TODO(lobato): Move all this to the items.lua database.
   local info = C_Container.GetContainerItemInfo(bagid, slotid)
   local readable = info and info.isReadable;
   local isFiltered = info and info.isFiltered;

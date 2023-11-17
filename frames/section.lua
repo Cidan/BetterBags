@@ -49,6 +49,11 @@ end
 ---@return number width
 ---@return number height
 function sectionProto:Draw()
+  self.content:Sort(function (a, b)
+    ---@cast a +Item
+    ---@cast b +Item
+    return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
+  end)
   local w, h = self.content:Draw()
   self.content.frame:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
