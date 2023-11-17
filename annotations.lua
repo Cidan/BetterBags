@@ -33,9 +33,15 @@ function itemButton:SetMatchesSearch(matchesSearch) end
 ---@class ContinuableContainer 
 ContinuableContainer = {}
 
---[[
----@param func fun()
-function ContinuableContainer:ContinueOnLoad(func) end
+---@class MasqueGroup
+MasqueGroup = {}
 
-function ContinuableContainer:AddContinuable(cont) end
---]]
+function MasqueGroup:AddButton() end
+
+---@class Masque
+Masque = {}
+
+---@param name string
+---@param group string
+---@return MasqueGroup
+function Masque:Group(name, group) return {} end

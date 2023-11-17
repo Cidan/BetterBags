@@ -29,6 +29,8 @@ core\hooks.lua
 debug\debug.lua
 debug\frames.lua
 
+theme\masque.lua
+
 data\items.lua
 
 frames\column.lua

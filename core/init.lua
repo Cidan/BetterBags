@@ -22,6 +22,9 @@ local items = addon:GetModule('Items')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class MasqueTheme: AceModule
+local masque = addon:GetModule('Masque')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -71,7 +74,7 @@ function addon:OnEnable()
 
   events:RegisterEvent('BANKFRAME_OPENED', self.OpenBank)
   events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
-
+  masque:Enable()
   items:Enable()
 
   events:RegisterMessage('items/RefreshBackpack/Done', function(event, itemData)

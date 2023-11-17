@@ -24,6 +24,9 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class MasqueTheme: AceModule
+local masque = addon:GetModule('Masque')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -148,6 +151,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           self.sections[category] = section
         end
         section.content:AddCell(itemData:GetItemGUID(), newFrame)
+        masque:AddButtonToGroup('Backpack', newFrame.button)
         self.itemsByBagAndSlot[bagid][slotid] = newFrame
       elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
         -- The old frame exists, so we need to update it.
