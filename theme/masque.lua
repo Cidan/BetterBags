@@ -13,7 +13,6 @@ function masque:OnEnable()
   if not Masque then
     return
   end
-  print("yay")
   self.groups = {}
   self.groups["Backpack"] = Masque:Group('BetterBags', 'Backpack')
   self.groups["Bank"] = Masque:Group('BetterBags', 'Bank')
