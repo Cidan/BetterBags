@@ -7,9 +7,10 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field groups table<string, MasqueGroup>
 local masque = addon:NewModule('Masque')
 
+---@class Masque: AceAddon
+local Masque = LibStub('Masque', true)
+
 function masque:OnEnable()
-  ---@class Masque: AceAddon
-  local Masque = LibStub('Masque', true)
   if not Masque then
     return
   end
@@ -19,5 +20,18 @@ function masque:OnEnable()
 end
 
 function masque:AddButtonToGroup(group, button)
+  if not Masque then
+    return
+  end
   self.groups[group]:AddButton(button)
+end
+
+function masque:RemoveButtonFromGroup(group, button)
+  if not Masque then
+    return
+  end
+  if group == nil then
+    return
+  end
+  self.groups[group]:RemoveButton(button)
 end

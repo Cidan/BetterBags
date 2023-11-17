@@ -3,6 +3,12 @@ local addonName = ...
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class MasqueTheme: AceModule
+local masque = addon:GetModule('Masque')
+
 ---@class ItemFrame: AceModule
 local item = addon:NewModule('ItemFrame')
 
@@ -13,6 +19,7 @@ local item = addon:NewModule('ItemFrame')
 ---@field button ItemButton
 ---@field itemType string
 ---@field itemSubType string
+---@field masqueGroup string
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -104,6 +111,8 @@ function itemProto:GetCategory()
 end
 
 function itemProto:ClearItem()
+  masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
+  self.masqueGroup = nil
   self.button:UnregisterEvent('BAG_UPDATE_COOLDOWN')
   self.button:UnregisterEvent('SPELL_UPDATE_COOLDOWN')
   self.button:SetScript('OnEvent', nil)
@@ -116,6 +125,17 @@ function itemProto:ClearItem()
   self.button:SetID(0)
   self.button:SetHasItem(false)
   self.frame:SetID(0)
+end
+
+---@param kind BagKind
+function itemProto:AddToMasqueGroup(kind)
+  if kind == const.BAG_KIND.BANK then
+    self.masqueGroup = "Bank"
+    masque:AddButtonToGroup(self.masqueGroup, self.button)
+  else
+    self.masqueGroup = "Backpack"
+    masque:AddButtonToGroup(self.masqueGroup, self.button)
+  end
 end
 
 function item:OnInitialize()
