@@ -46,6 +46,17 @@ function sectionProto:Wipe()
   self.frame:SetParent(nil)
 end
 
+---@param item Item
+---@return boolean
+function sectionProto:HasItem(item)
+  for _, i in pairs(self.content.cells) do
+    if item == i then
+      return true
+    end
+  end
+  return false
+end
+
 ---@return number width
 ---@return number height
 function sectionProto:Draw()
@@ -58,6 +69,11 @@ function sectionProto:Draw()
   self.content.frame:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
   self.content:Show()
+  if w == 0 then
+    self.frame:Hide()
+    return 0, 0
+  end
+  self.frame:Show()
   self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
   return w+12, h + self.title:GetHeight() + 6
 end

@@ -110,6 +110,11 @@ function itemProto:GetCategory()
   return self.itemType
 end
 
+---@return boolean
+function itemProto:IsNewItem()
+  return C_NewItems.IsNewItem(self.mixin:GetItemLocation():GetBagAndSlot())
+end
+
 function itemProto:ClearItem()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil

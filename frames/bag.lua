@@ -42,6 +42,7 @@ local LSM = LibStub('LibSharedMedia-3.0')
 ---@field leftHeader Frame The top left header of the bag.
 ---@field title FontString The title of the bag.
 ---@field content Grid The main content frame of the bag.
+---@field recentItems Section The recent items section.
 ---@field itemsByBagAndSlot table<number, table<number, Item>>
 ---@field sections table<string, Section>
 local bagProto = {}
@@ -125,6 +126,7 @@ end
 
 -- DrawSectionGridBag draws all items in sections according to their configured type.
 -- This is the tradition AdiBags style.
+---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawSectionGridBag(dirtyItems)
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
@@ -137,7 +139,12 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         local newFrame = itemFrame:Create()
         newFrame:SetItem(itemData)
         local category = newFrame:GetCategory()
-        local section = self.sections[category]
+        local section
+        if newFrame:IsNewItem() then
+          section = self.recentItems
+        else
+          section = self.sections[category]
+        end
         -- Create the section if it doesn't exist.
         if section == nil then
           debug:Log("create", "creating category " .. category)
@@ -156,13 +163,19 @@ function bagProto:DrawSectionGridBag(dirtyItems)
       elseif itemData:IsItemEmpty() and oldFrame ~= nil then
         -- The old frame exists, but the item is empty, so we need to delete it.
         self.itemsByBagAndSlot[bid][sid] = nil
-        local section = self.sections[oldFrame:GetCategory()]
-        section.content:RemoveCell(oldFrame.guid, oldFrame)
-        -- Delete the section if it's empty as well.
-        if #section.content.cells == 0 then
-          self.content:RemoveCell(oldFrame:GetCategory(), section)
-          sectionFrame:Release(section)
-          self.sections[oldFrame:GetCategory()] = nil
+
+        -- Special handling for the recent items section.
+        if self.recentItems:HasItem(oldFrame) then
+          self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)
+        else
+          local section = self.sections[oldFrame:GetCategory()]
+          section.content:RemoveCell(oldFrame.guid, oldFrame)
+          -- Delete the section if it's empty as well.
+          if #section.content.cells == 0 then
+            self.content:RemoveCell(oldFrame:GetCategory(), section)
+            sectionFrame:Release(section)
+            self.sections[oldFrame:GetCategory()] = nil
+          end
         end
         itemFrame:Release(oldFrame)
       end
@@ -170,6 +183,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   end
 
   -- Loop through each section and draw it's size.
+  local recentW, recentH = self.recentItems:Draw()
   for _, section in pairs(self.sections) do
     section:Draw()
   end
@@ -183,9 +197,16 @@ function bagProto:DrawSectionGridBag(dirtyItems)
 
   -- Position all sections and draw the main bag.
   local w, h = self.content:Draw()
+  -- Reposition the content frame if the recent items section is empty.
+  if recentW == 0 then
+    self.content.frame:SetPoint("TOPLEFT", self.leftHeader, "BOTTOMLEFT", 3, -3)
+  else
+    self.content.frame:SetPoint("TOPLEFT", self.recentItems.frame, "BOTTOMLEFT", 3, -3)
+  end
+
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
   self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
+  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight() + recentH)
 end
 
 -- DrawSectionListBag draws the bag as a scrollable list of sections with a small icon
@@ -260,6 +281,13 @@ function bagFrame:Create(kind)
   content:Show()
   b.content = content
 
+  local recentItems = sectionFrame:Create()
+  recentItems:SetTitle(L:G("Recent Items"))
+  recentItems.content.maxCellWidth = 5
+  recentItems.frame:SetParent(b.frame)
+  recentItems.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
+  recentItems.frame:Hide()
+  b.recentItems = recentItems
   --debug:DrawDebugBorder(content.frame, 1, 1, 1)
 
   -- Enable dragging of the bag frame.

@@ -25,6 +25,9 @@ local events = addon:GetModule('Events')
 ---@class MasqueTheme: AceModule
 local masque = addon:GetModule('Masque')
 
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule('SectionFrame')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -42,12 +45,6 @@ function addon:OnInitialize()
 		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
 		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
 	end
-
-  -- Create the bag frames.
-
-  addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
-  addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
-
 end
 
 -- HideBlizzardBags will hide the default Blizzard bag frames.
@@ -67,6 +64,11 @@ end
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
   self:HideBlizzardBags()
+  sectionFrame:Enable()
+
+  addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
+  addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
+
   self:SecureHook('CloseAllBags')
 
   self:SecureHook('OpenAllBags', self.OpenAllBags)
