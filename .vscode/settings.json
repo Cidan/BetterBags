@@ -38,6 +38,8 @@
     "GameTooltip",
     "C_Item",
     "CallErrorHandler",
-    "BankFrame"
+    "BankFrame",
+    "SecondsFormatterMixin",
+    "SecondsFormatter"
   ]
 }

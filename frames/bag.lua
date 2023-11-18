@@ -24,6 +24,9 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -69,6 +72,14 @@ function bagProto:Toggle()
   else
     self:Show()
   end
+end
+
+---@return number x
+---@return number y
+function bagProto:GetPosition()
+  local scale = self.frame:GetScale()
+  local x, y = self.frame:GetCenter()
+  return x * scale, y * scale
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -230,16 +241,16 @@ function bagFrame:Create(kind)
   b.itemsByBagAndSlot = {}
   b.sections = {}
   b.kind = kind
+  local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
+  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BackdropTemplate")
 
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
-  b.frame:SetPoint("CENTER")
 
   -- Setup the default skin/theme.
   -- TODO(lobato): Move this to a separate module for themes.
@@ -299,7 +310,16 @@ function bagFrame:Create(kind)
   end)
   b.frame:SetScript("OnDragStop", function(drag)
     drag:StopMovingOrSizing()
+    local x, y = b:GetPosition()
+    database:SetBagPosition(kind, "CENTER", x, y)
   end)
+
+  -- Load the bag position from settings.
+  b.frame:ClearAllPoints()
+  local scale = b.frame:GetScale()
+  local position = database:GetBagPosition(kind)
+  b.frame:SetPoint(position.point, UIParent, "BOTTOMLEFT", position.x / scale, position.y / scale)
+
   return b
 end
 

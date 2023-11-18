@@ -42,3 +42,23 @@ const.BACKPACK_BAGS = {
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
   [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }
+
+---@class databaseOptions
+const.DATABASE_DEFAULTS = {
+  profile = {
+    enabled = true,
+    positions = {
+      Backpack = {
+        point = "CENTER",
+        x = 2277,
+        y = 443
+      },
+      Bank = {
+        point = "CENTER",
+        x = 424,
+        y = 898
+      },
+    }
+  },
+  char = {}
+}
