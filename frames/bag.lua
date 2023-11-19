@@ -147,7 +147,6 @@ function bagProto:DrawSectionGridBag(dirtyItems)
     for sid, itemData in pairs(bagData) do
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
       local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
-
       -- The old frame does not exist, so we need to create a new one.
       if oldFrame == nil and not itemData:IsItemEmpty() then
         local newFrame = itemFrame:Create()

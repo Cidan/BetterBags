@@ -13,6 +13,7 @@ local masque = addon:GetModule('Masque')
 local item = addon:NewModule('ItemFrame')
 
 ---@class Item
+---@field name string
 ---@field mixin ItemMixin
 ---@field guid string
 ---@field frame Frame
@@ -59,6 +60,7 @@ end
 function itemProto:SetItem(i)
   assert(i, 'item must be provided')
   self.mixin = i
+  self.name = i:GetItemName() or ""
   self.guid = i:GetItemGUID() or ""
   local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
@@ -123,6 +125,7 @@ function itemProto:ClearItem()
   self.button:SetScript('OnEvent', nil)
   self.mixin = nil
   self.guid = nil
+  self.name = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.frame:Hide()
