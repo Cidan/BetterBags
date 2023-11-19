@@ -219,7 +219,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   end
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
-  self.frame:SetWidth(w + 12)
+  self.frame:SetWidth(w + 3)
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight() + recentH)
 end
 
@@ -271,13 +271,24 @@ function bagFrame:Create(kind)
   -- Create the top left header.
   ---@class Frame: BackdropTemplate
   local leftHeader = CreateFrame("Frame", nil, b.frame, "BackdropTemplate")
-  leftHeader:SetPoint("TOPLEFT", 3, -3)
-  leftHeader:SetPoint("TOPRIGHT", -3, -3)
+  leftHeader:SetPoint("TOPLEFT", 3, -8)
+  leftHeader:SetPoint("TOPRIGHT", -3, 3)
   leftHeader:SetHeight(20)
   leftHeader:Show()
   b.leftHeader = leftHeader
 
   --debug:DrawDebugBorder(leftHeader, 1, 1, 1)
+
+  local bagButton = CreateFrame("CheckButton")
+  bagButton:SetParent(leftHeader)
+  bagButton:SetNormalTexture([[Interface\Buttons\Button-Backpack-Up]])
+	bagButton:SetCheckedTexture([[Interface\Buttons\CheckButtonHilight]])
+  ---@class Texture: TextureBase
+	local tex = bagButton:GetCheckedTexture()
+  tex:SetBlendMode("ADD")
+  bagButton:SetWidth(18)
+  bagButton:SetHeight(18)
+  bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
 
   -- Create the bag title.
   local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -285,7 +296,7 @@ function bagFrame:Create(kind)
   title:SetFontObject("GameFontNormal")
   title:SetHeight(18)
   title:SetJustifyH("LEFT")
-  title:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
+  title:SetPoint("LEFT", bagButton, "RIGHT", 4, 0)
   b.title = title
 
   -- Create the bag content frame.
