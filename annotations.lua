@@ -46,3 +46,10 @@ Masque = {}
 ---@param group string
 ---@return MasqueGroup
 function Masque:Group(name, group) return {} end
+
+---@class LibWindow-1.1
+Window = {}
+
+function Window.RegisterConfig(frame, config) end
+function Window.SavePosition(frame) end
+function Window.RestorePosition(frame) end

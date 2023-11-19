@@ -16,7 +16,7 @@ libs\AceDB-3.0\AceDB-3.0.xml
 libs\AceHook-3.0\AceHook-3.0.xml
 libs\AceConsole-3.0\AceConsole-3.0.xml
 libs\LibSharedMedia-3.0\lib.xml
-
+libs\libwindow-1-1\LibWindow-1.1\LibWindow-1.1.lua
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 
 core\boot.lua

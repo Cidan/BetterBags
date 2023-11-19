@@ -48,17 +48,9 @@ const.DATABASE_DEFAULTS = {
   profile = {
     enabled = true,
     positions = {
-      Backpack = {
-        point = "CENTER",
-        x = 2277,
-        y = 443
-      },
-      Bank = {
-        point = "CENTER",
-        x = 424,
-        y = 898
-      },
-    }
+      Backpack = {},
+      Bank = {},
+    },
   },
   char = {}
 }

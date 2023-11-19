@@ -23,7 +23,3 @@ end
 function DB:GetBagPosition(kind)
   return DB.data.profile.positions[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
 end
-
-function DB:SetBagPosition(kind, point, x, y)
-  DB.data.profile.positions[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'] = {point = point, x = x, y = y}
-end

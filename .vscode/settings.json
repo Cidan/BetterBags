@@ -40,6 +40,7 @@
     "CallErrorHandler",
     "BankFrame",
     "SecondsFormatterMixin",
-    "SecondsFormatter"
+    "SecondsFormatter",
+    "ChatFrame1"
   ]
 }

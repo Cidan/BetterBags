@@ -32,6 +32,9 @@ local debug = addon:GetModule('Debug')
 
 local LSM = LibStub('LibSharedMedia-3.0')
 
+---@class LibWindow-1.1: AceAddon
+local Window = LibStub('LibWindow-1.1')
+
 -------
 --- Bag Prototype
 -------
@@ -252,6 +255,7 @@ function bagFrame:Create(kind)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
 
+  Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
   -- Setup the default skin/theme.
   -- TODO(lobato): Move this to a separate module for themes.
   b.frame:SetBackdropColor(0, 0, 0, 1)
@@ -310,16 +314,11 @@ function bagFrame:Create(kind)
   end)
   b.frame:SetScript("OnDragStop", function(drag)
     drag:StopMovingOrSizing()
-    local x, y = b:GetPosition()
-    database:SetBagPosition(kind, "CENTER", x, y)
+    Window.SavePosition(b.frame)
   end)
 
   -- Load the bag position from settings.
-  b.frame:ClearAllPoints()
-  local scale = b.frame:GetScale()
-  local position = database:GetBagPosition(kind)
-  b.frame:SetPoint(position.point, UIParent, "BOTTOMLEFT", position.x / scale, position.y / scale)
-
+  Window.RestorePosition(b.frame)
   return b
 end
 
