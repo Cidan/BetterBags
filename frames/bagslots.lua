@@ -16,6 +16,12 @@ local L = addon:GetModule('Localization')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
+---@class ItemFrame: AceModule
+local itemFrame = addon:GetModule('ItemFrame')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 local LSM = LibStub('LibSharedMedia-3.0')
 
 ---@class bagButton
@@ -29,10 +35,8 @@ local bagSlotProto = {}
 
 function bagSlotProto:Draw()
   local w, h = self.content:Draw()
-  w = w + 100
-  h = h + 70
-  self.frame:SetWidth(w + 6)
-  self.frame:SetHeight(h + self.title:GetHeight() + 3)
+  self.frame:SetWidth(w + 12)
+  self.frame:SetHeight(h + self.title:GetHeight() + 12)
 end
 
 function bagSlotProto:SetShown(shown)
@@ -82,7 +86,16 @@ function BagSlots:CreatePanel(kind)
   b.title = title
 
   b.content = grid:Create(b.frame)
-  b.content.frame:SetPoint("TOPLEFT", b.title, "BOTTOMLEFT", 0, 3)
+  b.content.frame:SetPoint("TOPLEFT", b.title, "BOTTOMLEFT", 3, 0)
+  b.content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", 0, 3)
   b.content:Show()
+
+  local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_BAGS or const.BANK_BAGS
+  for i, bag in ipairs(bags) do
+    local invID = C_Container.ContainerIDToInventoryID(bag)
+    local iframe = itemFrame:Create()
+    iframe:SetBag(invID)
+    b.content:AddCell(tostring(i), iframe)
+  end
   return b
 end

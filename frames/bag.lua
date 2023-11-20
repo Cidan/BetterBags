@@ -325,6 +325,7 @@ function bagFrame:Create(kind)
 
   local slots = bagSlots:CreatePanel(kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 3)
+  slots.frame:SetParent(b.frame)
   b.slots = slots
 
   -- Enable dragging of the bag frame.
