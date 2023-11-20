@@ -37,6 +37,7 @@ frames\column.lua
 frames\grid.lua
 frames\item.lua
 frames\section.lua
+frames\bagslots.lua
 frames\bag.lua
 
 core\init.lua

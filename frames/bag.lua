@@ -21,6 +21,9 @@ local items = addon:GetModule('Items')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class BagSlots: AceModule
+local bagSlots = addon:GetModule('BagSlots')
+
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
@@ -51,6 +54,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field recentItems Section The recent items section.
 ---@field itemsByBagAndSlot table<number, table<number, Item>>
 ---@field sections table<string, Section>
+---@field slots bagSlots
 local bagProto = {}
 
 function bagProto:Show()
@@ -288,6 +292,10 @@ function bagFrame:Create(kind)
   bagButton:SetWidth(18)
   bagButton:SetHeight(18)
   bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
+  bagButton:SetScript("OnClick", function()
+    b.slots:Draw()
+    b.slots:SetShown(bagButton:GetChecked())
+  end)
 
   -- Create the bag title.
   local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -314,6 +322,10 @@ function bagFrame:Create(kind)
   recentItems.frame:Hide()
   b.recentItems = recentItems
   --debug:DrawDebugBorder(content.frame, 1, 1, 1)
+
+  local slots = bagSlots:CreatePanel(kind)
+  slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 3)
+  b.slots = slots
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
