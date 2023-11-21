@@ -94,10 +94,11 @@ function BagSlots:CreatePanel(kind)
   b.content = grid:Create(b.frame)
   b.content.frame:SetPoint("TOPLEFT", b.title, "BOTTOMLEFT", 3, 0)
   b.content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", 0, 3)
+  b.content.maxCellWidth = 10
   b.content:Show()
 
-  local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_BAGS or const.BANK_BAGS
-  for i, bag in ipairs(bags) do
+  local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS or const.BANK_ONLY_BAGS
+  for i, bag in pairs(bags) do
     local iframe = bagButton:Create()
     iframe:SetBag(bag)
     iframe:AddToMasqueGroup(kind)

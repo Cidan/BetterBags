@@ -30,6 +30,16 @@ const.BANK_BAGS = {
   [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
 }
 
+const.BANK_ONLY_BAGS = {
+  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
+  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
+  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
+  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
+  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
+  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
+  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+}
+
 const.REAGENTBANK_BAGS = {
   [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
 }
@@ -43,6 +53,13 @@ const.BACKPACK_BAGS = {
   [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }
 
+const.BACKPACK_ONLY_BAGS = {
+  [Enum.BagIndex.Bag_1] = Enum.BagIndex.Bag_1,
+  [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
+  [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
+  [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
+  [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
+}
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
