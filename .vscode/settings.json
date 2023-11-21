@@ -42,5 +42,6 @@
     "SecondsFormatterMixin",
     "SecondsFormatter",
     "ChatFrame1"
-  ]
+  ],
+  "Notes.notesLocation": ".notes"
 }
