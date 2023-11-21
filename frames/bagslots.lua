@@ -19,6 +19,9 @@ local grid = addon:GetModule('Grid')
 ---@class BagButtonFrame: AceModule
 local bagButton = addon:GetModule('BagButton')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -34,6 +37,9 @@ local bagButtonProto = {}
 local bagSlotProto = {}
 
 function bagSlotProto:Draw()
+  for _, cell in ipairs(self.content.cells) do
+    cell:Draw()
+  end
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 12)
   self.frame:SetHeight(h + self.title:GetHeight() + 12)
@@ -97,5 +103,7 @@ function BagSlots:CreatePanel(kind)
     iframe:AddToMasqueGroup(kind)
     b.content:AddCell(tostring(i), iframe)
   end
+
+  events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   return b
 end
