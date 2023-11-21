@@ -65,6 +65,7 @@ end
 function addon:OnEnable()
   self:HideBlizzardBags()
   sectionFrame:Enable()
+  masque:Enable()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
@@ -76,7 +77,6 @@ function addon:OnEnable()
 
   events:RegisterEvent('BANKFRAME_OPENED', self.OpenBank)
   events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
-  masque:Enable()
   items:Enable()
 
   events:RegisterMessage('items/RefreshBackpack/Done', function(event, itemData)

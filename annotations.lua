@@ -30,6 +30,8 @@ function itemButton:CheckUpdateTooltip(tooltipOwner) end
 
 function itemButton:SetMatchesSearch(matchesSearch) end
 
+function itemButton:SetItemButtonQuality(quality) end
+
 function itemButton:HasItem() end
 
 ---@class ContinuableContainer 

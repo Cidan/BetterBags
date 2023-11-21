@@ -24,7 +24,6 @@ local debug = addon:GetModule('Debug')
 ---@field itemType string
 ---@field itemSubType string
 ---@field masqueGroup string
----@field invID number
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -58,28 +57,6 @@ local function OnEvent(i, event, ...)
   if event == 'BAG_UPDATE_COOLDOWN' or event == 'SPELL_UPDATE_COOLDOWN' then
     i.button:UpdateCooldown(i.mixin:GetItemIcon())
   end
-end
-
----@param invID number
-function itemProto:SetBag(invID)
-  self.invID = invID
-  self.button:SetID(invID)
-  self.frame:SetID(1)
-  local icon = GetInventoryItemTexture("player", invID) --[[@as number|string]]
-  self.button:SetHasItem(icon)
-  if self.button:HasItem() then
-  else
-    icon = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
-  end
-
-  ClearItemButtonOverlay(self.button)
-  self.button:SetItemButtonTexture(icon)
-  self.button:UpdateExtended()
-  self.button:UpdateItemContextMatching()
-  self.button:UpdateCooldown(self.button:HasItem() and true or false)
-  self.button:SetMatchesSearch(false)
-  self.frame:Show()
-  self.button:Show()
 end
 
 ---@param i ItemMixin

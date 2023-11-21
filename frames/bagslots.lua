@@ -16,8 +16,8 @@ local L = addon:GetModule('Localization')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
+---@class BagButtonFrame: AceModule
+local bagButton = addon:GetModule('BagButton')
 
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
@@ -92,9 +92,9 @@ function BagSlots:CreatePanel(kind)
 
   local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_BAGS or const.BANK_BAGS
   for i, bag in ipairs(bags) do
-    local invID = C_Container.ContainerIDToInventoryID(bag)
-    local iframe = itemFrame:Create()
-    iframe:SetBag(invID)
+    local iframe = bagButton:Create()
+    iframe:SetBag(bag)
+    iframe:AddToMasqueGroup(kind)
     b.content:AddCell(tostring(i), iframe)
   end
   return b
