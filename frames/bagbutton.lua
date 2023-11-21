@@ -80,6 +80,14 @@ function bagButtonProto:OnClick()
   end
 end
 
+function bagButtonProto:OnDragStart()
+  PickupBagFromSlot(self.invID)
+end
+
+function bagButtonProto:OnReceiveDrag()
+  PutItemInBag(self.invID)
+end
+
 function BagButtonFrame:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
 end
@@ -112,6 +120,8 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnEnter", function() b:OnEnter() end)
   f:SetScript("OnLeave", function() b:OnLeave() end)
   f:SetScript("OnClick", function() b:OnClick() end)
+  f:SetScript("OnDragStart", function() b:OnDragStart() end)
+  f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
   return b
 end
