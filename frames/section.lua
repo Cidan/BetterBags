@@ -63,6 +63,7 @@ function sectionProto:Draw()
   self.content:Sort(function (a, b)
     ---@cast a +Item
     ---@cast b +Item
+    if a == nil or b == nil then return false end
     if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
       return a.mixin:GetItemName() < b.mixin:GetItemName()
     end
