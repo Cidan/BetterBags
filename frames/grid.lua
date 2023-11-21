@@ -38,7 +38,7 @@ end
 
 -- AddCell will add a cell to this grid.
 ---@param id string|nil
----@param cell Cell|Section|Item
+---@param cell Cell|Section|Item|BagButton
 function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
@@ -49,7 +49,7 @@ end
 
 -- RemoveCell will removed a cell from this grid.
 ---@param id string|nil
----@param cell Cell|Section|Item
+---@param cell Cell|Section|Item|BagButton
 function gridProto:RemoveCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
