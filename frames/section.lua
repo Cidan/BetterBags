@@ -65,6 +65,7 @@ function sectionProto:Draw()
     ---@cast b +Item
     if a == nil or b == nil then return false end
     if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
+      if a.mixin:GetItemName() == nil or b.mixin:GetItemName() == nil then return false end
       return a.mixin:GetItemName() < b.mixin:GetItemName()
     end
     return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()

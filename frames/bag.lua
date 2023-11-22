@@ -242,6 +242,15 @@ end
 ---@return MenuList[]
 local function createContextMenu(bag)
   local menuList = {}
+
+  -- Context Menu title.
+  table.insert(menuList, {
+    text = L:G("BetterBags Menu"),
+    isTitle = true,
+    notCheckable = true
+  })
+
+  -- Show bag slot toggle.
   table.insert(menuList, {
     text = L:G("Show Bags"),
     checked = function() return bag.slots:IsShown() end,
