@@ -25,6 +25,10 @@ function bagButtonProto:Draw()
   self:SetBag(self.bag)
 end
 
+function bagButtonProto:Release()
+  BagButtonFrame._pool:Release(self)
+end
+
 ---@param bag number
 function bagButtonProto:SetBag(bag)
   self.bag = bag
@@ -95,11 +99,6 @@ end
 ---@return BagButton
 function BagButtonFrame:Create()
   return self._pool:Acquire()
-end
-
----@param b BagButton
-function BagButtonFrame:Release(b)
-  self._pool:Release(b)
 end
 
 ---@param b BagButton

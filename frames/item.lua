@@ -125,7 +125,6 @@ function itemProto:Release()
 end
 
 function itemProto:ClearItem()
-  debug:Log("clearItem", "Clearing item", self)
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
   self.button:UnregisterEvent('BAG_UPDATE_COOLDOWN')
@@ -171,7 +170,6 @@ end
 
 ---@param i Item
 function item:_DoReset(i)
-  debug:Log("item/_DoReset", "Resetting item", i.guid)
   i:ClearItem()
 end
 

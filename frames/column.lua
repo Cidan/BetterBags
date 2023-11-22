@@ -50,6 +50,21 @@ function columnProto:RemoveCell(cell)
   end
 end
 
+function columnProto:Release()
+  columnFrame:Release(self)
+end
+
+function columnProto:Wipe()
+  self.frame:Hide()
+  self.frame:ClearAllPoints()
+  self.frame:SetParent(nil)
+  self.minimumWidth = 0
+  for _, cell in ipairs(self.cells) do
+    cell:Release()
+  end
+  wipe(self.cells)
+end
+
 --TODO(lobato): Figure out if we need to do cell compaction.
 -- Draw will full redraw this column and snap all cells into the correct
 -- position.
@@ -96,15 +111,7 @@ end
 
 ---@param c Column
 function columnFrame:_DoReset(c)
-  c.frame:Hide()
-  c.frame:ClearAllPoints()
-  c.frame:SetParent(nil)
-  c.minimumWidth = 0
-  for _, cell in ipairs(c.cells) do
-    cell.frame:ClearAllPoints()
-    cell.frame:SetParent(nil)
-  end
-  wipe(c.cells)
+  c:Wipe()
 end
 
 ---@return Column

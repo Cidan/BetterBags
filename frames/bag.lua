@@ -95,17 +95,6 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagProto:Wipe()
-  for _, bag in pairs(self.itemsByBagAndSlot) do
-    for _, cell in pairs(bag) do
-      cell:Release()
-    end
-  end
-
-  for _, section in pairs(self.sections) do
-    print("wiping section", section.title:GetText())
-    section:Release()
-  end
-
   self.content:Wipe()
   wipe(self.itemsByBagAndSlot)
   wipe(self.sections)
@@ -156,6 +145,62 @@ function bagProto:DrawOneBag(dirtyItems)
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
 end
 
+---@param dirtyItems table<number, table<number, ItemMixin>>
+function bagProto:DrawSectionGridBagNew(dirtyItems)
+  for bid, bagData in pairs(dirtyItems) do
+    self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
+    for _, itemData in pairs(bagData) do
+      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
+      local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
+
+      -- There is no old frame for this bag and slot, create a new one.
+      if oldFrame == nil and not itemData:IsItemEmpty() then
+        debug:Log("bagdraw", "creating new frame for", itemData:GetItemLink())
+        local newFrame = itemFrame:Create()
+        newFrame:SetItem(itemData)
+        local category = newFrame:GetCategory()
+        local section = self.sections[category]
+        if section == nil then
+          section = sectionFrame:Create()
+          section:SetTitle(category)
+          section.content.maxCellWidth = 5
+          self.content:AddCell(category, section)
+          self.sections[category] = section
+        end
+        section.content:AddCell(itemData:GetItemGUID(), newFrame)
+        newFrame:AddToMasqueGroup(self.kind)
+        self.itemsByBagAndSlot[bagid][slotid] = newFrame
+      end -- end no old frame
+    end
+  end
+
+  -- Loop through each section and draw it's size.
+  local recentW, recentH = self.recentItems:Draw()
+  for _, section in pairs(self.sections) do
+    section:Draw()
+  end
+
+  -- Sort all sections by title.
+  self.content:Sort(function(a, b)
+    ---@cast a +Section
+    ---@cast b +Section
+    return a.title:GetText() < b.title:GetText()
+  end)
+
+  -- Position all sections and draw the main bag.
+  local w, h = self.content:Draw()
+  -- Reposition the content frame if the recent items section is empty.
+  if recentW == 0 then
+    self.content.frame:SetPoint("TOPLEFT", self.leftHeader, "BOTTOMLEFT", 3, -3)
+  else
+    self.content.frame:SetPoint("TOPLEFT", self.recentItems.frame, "BOTTOMLEFT", 3, -3)
+  end
+
+  --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
+  self.frame:SetWidth(w + 3)
+  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight() + recentH)
+end
+
 -- DrawSectionGridBag draws all items in sections according to their configured type.
 -- This is the tradition AdiBags style.
 ---@param dirtyItems table<number, table<number, ItemMixin>>
@@ -178,7 +223,6 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         end
         -- Create the section if it doesn't exist.
         if section == nil then
-          debug:Log("create", "creating category " .. category)
           section = sectionFrame:Create()
           section:SetTitle(category)
           section.content.maxCellWidth = 5
@@ -193,7 +237,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         oldFrame:SetItem(itemData)
       elseif itemData:IsItemEmpty() and oldFrame ~= nil then
         -- The old frame exists, but the item is empty, so we need to delete it.
-        self.itemsByBagAndSlot[bid][sid] = nil
+        self.itemsByBagAndSlot[bagid][slotid] = nil
         -- Special handling for the recent items section.
         if self.recentItems:HasItem(oldFrame) then
           self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)

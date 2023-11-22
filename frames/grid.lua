@@ -115,8 +115,12 @@ end
 
 function gridProto:Wipe()
   for _, column in pairs(self.columns) do
-    columnFrame:Release(column)
+    column:Release()
   end
+  for _, cell in pairs(self.cells) do
+    cell:Release()
+  end
+  wipe(self.columns)
   wipe(self.cells)
 end
 
