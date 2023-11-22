@@ -234,7 +234,29 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         self.itemsByBagAndSlot[bagid][slotid] = newFrame
       elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
         -- The old frame exists, so we need to update it.
+        local oldCategory = oldFrame:GetCategory()
+        local oldSection = self.sections[oldCategory]
+        local oldGuid = oldFrame.guid
         oldFrame:SetItem(itemData)
+        local newCategory = oldFrame:GetCategory()
+        local newSection = self.sections[newCategory]
+        -- Create the section if it doesn't exist.
+        if newSection == nil then
+          newSection = sectionFrame:Create()
+          newSection:SetTitle(newCategory)
+          newSection.content.maxCellWidth = 5
+          self.content:AddCell(newCategory, newSection)
+          self.sections[newCategory] = newSection
+        end
+        if oldCategory ~= newCategory then
+          oldSection.content:RemoveCell(oldGuid, oldFrame)
+          newSection.content:AddCell(oldFrame.guid, oldFrame)
+        end
+        if #oldSection.content.cells == 0 then
+          self.sections[oldCategory] = nil
+          self.content:RemoveCell(oldCategory, oldSection)
+          oldSection:Release()
+        end
       elseif itemData:IsItemEmpty() and oldFrame ~= nil then
         -- The old frame exists, but the item is empty, so we need to delete it.
         self.itemsByBagAndSlot[bagid][slotid] = nil
