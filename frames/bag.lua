@@ -95,20 +95,17 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagProto:Wipe()
+  for _, bag in pairs(self.itemsByBagAndSlot) do
+    for _, cell in pairs(bag) do
+      cell:Release()
+    end
+  end
+
   for _, section in pairs(self.sections) do
     print("wiping section", section.title:GetText())
-    for _, cell in pairs(section.content.cells) do
-      ---@cast cell -Section,-Cell
-      itemFrame:Release(cell)
-    end
     sectionFrame:Release(section)
   end
 
-  for _, bag in pairs(self.itemsByBagAndSlot) do
-    for _, cell in pairs(bag) do
-      itemFrame:Release(cell)
-    end
-  end
   self.content:Wipe()
   wipe(self.itemsByBagAndSlot)
   wipe(self.sections)
@@ -137,7 +134,7 @@ function bagProto:DrawOneBag(dirtyItems)
         -- The old frame exists, but the item is empty, so we need to delete it.
         self.itemsByBagAndSlot[bid][sid] = nil
         self.content:RemoveCell(oldFrame.guid, oldFrame)
-        itemFrame:Release(oldFrame)
+        oldFrame:Release()
       end
     end
   end
@@ -210,7 +207,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
             self.sections[oldFrame:GetCategory()] = nil
           end
         end
-        itemFrame:Release(oldFrame)
+        oldFrame:Release()
       end
     end
   end

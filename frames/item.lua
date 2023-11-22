@@ -120,6 +120,10 @@ function itemProto:IsNewItem()
   return C_NewItems.IsNewItem(self.mixin:GetItemLocation():GetBagAndSlot())
 end
 
+function itemProto:Release()
+  item._pool:Release(self)
+end
+
 function itemProto:ClearItem()
   debug:Log("clearItem", "Clearing item", self)
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
@@ -204,11 +208,6 @@ end
 function item:Create()
   ---@return Item
   return self._pool:Acquire()
-end
-
----@param i Item
-function item:Release(i)
-  self._pool:Release(i)
 end
 
 item:Enable()
