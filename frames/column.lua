@@ -20,7 +20,6 @@ local columnProto = {}
 ---@param cell Cell|Item|Section
 ---@param position? number
 function columnProto:AddCell(cell, position)
-  cell.frame:ClearAllPoints()
   cell.frame:SetParent(self.frame)
   if position and position < 1 then
     position = 1
@@ -43,11 +42,18 @@ end
 function columnProto:RemoveCell(cell)
   for i, c in ipairs(self.cells) do
     if cell == c then
-      cell.frame:ClearAllPoints()
       table.remove(self.cells, i)
       return
     end
   end
+end
+
+function columnProto:RemoveAll()
+  for _, cell in pairs(self.cells) do
+    cell.frame:SetParent(nil)
+    cell.frame:ClearAllPoints()
+  end
+  wipe(self.cells)
 end
 
 function columnProto:Release()
@@ -74,6 +80,7 @@ function columnProto:Draw()
   local previousRow = 0
   local cellOffset = 1
   for cellPos, cell in ipairs(self.cells) do
+    cell.frame:ClearAllPoints()
     -- cell.position = cellPos unsure if need this
     w = math.max(w, cell.frame:GetWidth()+4)
     if cellPos == 1 then

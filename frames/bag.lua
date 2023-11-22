@@ -246,9 +246,9 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           section.content:RemoveCell(oldFrame.guid, oldFrame)
           -- Delete the section if it's empty as well.
           if #section.content.cells == 0 then
+            self.sections[oldFrame:GetCategory()] = nil
             self.content:RemoveCell(oldFrame:GetCategory(), section)
             section:Release()
-            self.sections[oldFrame:GetCategory()] = nil
           end
         end
         oldFrame:Release()

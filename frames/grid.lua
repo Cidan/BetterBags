@@ -71,12 +71,12 @@ end
 ---@return number width
 ---@return number height
 function gridProto:Draw()
-  -- Wipe and release all columns.
   for _, column in pairs(self.columns) do
-    columnFrame:Release(column)
+    column:RemoveAll()
+    column:Release()
   end
-  wipe(self.columns)
   wipe(self.cellToColumn)
+  wipe(self.columns)
 
   local width = 0
   local height = 0
