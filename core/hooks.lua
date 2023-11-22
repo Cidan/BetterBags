@@ -23,4 +23,5 @@ end
 function addon:CloseBank()
   addon.Bags.Bank:Hide()
   addon.Bags.Backpack:Hide()
+  addon.Bags.Bank:SwitchToBank()
 end

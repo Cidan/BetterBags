@@ -89,7 +89,9 @@ function addon:OnEnable()
 
    events:RegisterMessage('items/RefreshBank/Done', function(event, itemData)
     debug:Log("init/OnInitialize/items", "Drawing bank")
-    addon.Bags.Bank:DrawSectionGridBag(itemData)
+    addon.Bags.Bank.content.maxCellWidth = 20
+    addon.Bags.Bank:DrawOneBag(itemData)
+    --addon.Bags.Bank:DrawSectionGridBag(itemData)
     if not addon.Bags.Bank:IsShown() then
       addon.Bags.Bank:Show()
     end

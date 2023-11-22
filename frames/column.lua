@@ -91,7 +91,6 @@ function columnFrame:_DoCreate()
   column.minimumWidth = 0
   column.cells = {}
   column.frame:Show()
-  debug:DrawDebugBorder(column.frame, 1, 1, 1)
   return column
 end
 

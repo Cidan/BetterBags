@@ -103,6 +103,12 @@ function bagProto:Wipe()
     end
     sectionFrame:Release(section)
   end
+
+  for _, bag in pairs(self.itemsByBagAndSlot) do
+    for _, cell in pairs(bag) do
+      itemFrame:Release(cell)
+    end
+  end
   self.content:Wipe()
   wipe(self.itemsByBagAndSlot)
   wipe(self.sections)
@@ -121,6 +127,7 @@ function bagProto:DrawOneBag(dirtyItems)
       if oldFrame == nil and not itemData:IsItemEmpty() then
         local newFrame = itemFrame:Create()
         newFrame:SetItem(itemData)
+        newFrame:AddToMasqueGroup(self.kind)
         self.content:AddCell(itemData:GetItemGUID(), newFrame)
         self.itemsByBagAndSlot[bagid][slotid] = newFrame
       elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
@@ -138,6 +145,11 @@ function bagProto:DrawOneBag(dirtyItems)
   self.content:Sort(function (a, b)
     ---@cast a +Item
     ---@cast b +Item
+    if a.mixin:GetItemQuality() == nil or b.mixin:GetItemQuality() == nil then return false end
+    if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
+      if a.mixin:GetItemName() == nil or b.mixin:GetItemName() == nil then return false end
+      return a.mixin:GetItemName() < b.mixin:GetItemName()
+    end
     return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
   end)
 
@@ -243,13 +255,21 @@ function bagProto:ToggleReagentBank()
     BankFrame.selectedTab = 2
     self.title:SetText(L:G("Reagent Bank"))
     self:Wipe()
-    --items:RefreshReagentBank()
+    items:RefreshReagentBank()
   else
     BankFrame.selectedTab = 1
     self.title:SetText(L:G("Bank"))
     self:Wipe()
     items:RefreshBank()
   end
+end
+
+function bagProto:SwitchToBank()
+  if self.kind == const.BAG_KIND.BACKPACK then return end
+  self.isReagentBank = false
+  BankFrame.selectedTab = 1
+  self.title:SetText(L:G("Bank"))
+  self:Wipe()
 end
 
 -------

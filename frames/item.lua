@@ -133,11 +133,18 @@ function itemProto:ClearItem()
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.frame:Hide()
-  self.button:Hide()
-  self.button:SetID(0)
   self.button:SetHasItem(false)
   self.button:SetItemButtonTexture(0)
+  self.button:UpdateQuestItem(false, nil, nil)
+  self.button:UpdateNewItem(false)
+  self.button:UpdateJunkItem(false, false)
+  self.button:UpdateItemContextMatching()
+  SetItemButtonQuality(self.button, false);
+  SetItemButtonCount(self.button, 0)
+  SetItemButtonDesaturated(self.button, false)
+  ClearItemButtonOverlay(self.button)
   self.frame:SetID(0)
+  self.button:SetID(0)
   self.itemType = nil
   self.itemSubType = nil
 end
@@ -155,6 +162,7 @@ end
 
 function item:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+  self._pool:SetResetDisallowedIfNew()
 end
 
 ---@param i Item
