@@ -70,6 +70,7 @@ function addon:OnEnable()
   sectionFrame:Enable()
   masque:Enable()
   context:Enable()
+  items:Enable()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
@@ -79,9 +80,7 @@ function addon:OnEnable()
   self:SecureHook('OpenAllBags', self.OpenAllBags)
   self:SecureHook('ToggleAllBags', self.ToggleAllBags)
 
-  events:RegisterEvent('BANKFRAME_OPENED', self.OpenBank)
   events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
-  items:Enable()
 
   events:RegisterMessage('items/RefreshBackpack/Done', function(event, itemData)
     debug:Log("init/OnInitialize/items", "Drawing bag")
@@ -91,6 +90,9 @@ function addon:OnEnable()
    events:RegisterMessage('items/RefreshBank/Done', function(event, itemData)
     debug:Log("init/OnInitialize/items", "Drawing bank")
     addon.Bags.Bank:DrawSectionGridBag(itemData)
+    if not addon.Bags.Bank:IsShown() then
+      addon.Bags.Bank:Show()
+    end
    end)
 
    debug:Log("init", "about refresh all items")

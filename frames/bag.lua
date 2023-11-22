@@ -77,11 +77,11 @@ function bagProto:Hide()
 end
 
 function bagProto:Toggle()
-  if self.frame:IsShown() then
-    self:Hide()
-  else
-    self:Show()
-  end
+  self.frame:SetShown(not self.frame:IsShown())
+end
+
+function bagProto:IsShown()
+  return self.frame:IsShown()
 end
 
 ---@return number x
@@ -316,6 +316,7 @@ function bagFrame:Create(kind)
   local bagButton = CreateFrame("Button")
   bagButton:SetParent(leftHeader)
   bagButton:SetNormalTexture([[Interface\Buttons\Button-Backpack-Up]])
+  bagButton:SetHighlightTexture([[Interface\Buttons\CheckButtonHilight]])
   bagButton:SetWidth(18)
   bagButton:SetHeight(18)
   bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
