@@ -54,8 +54,6 @@ function gridProto:RemoveCell(id, cell)
   assert(cell, 'cell is required')
   for i, c in ipairs(self.cells) do
     if c == cell then
-      cell.frame:ClearAllPoints()
-      cell.frame:SetParent(nil)
       table.remove(self.cells, i)
       return
     end

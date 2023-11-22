@@ -58,6 +58,10 @@ function sectionProto:HasItem(item)
   return false
 end
 
+function sectionProto:Release()
+  sectionFrame._pool:Release(self)
+end
+
 ---@return number width
 ---@return number height
 function sectionProto:Draw()
@@ -131,8 +135,4 @@ end
 function sectionFrame:Create()
   ---@return Section
   return self._pool:Acquire()
-end
-
-function sectionFrame:Release(s)
-  self._pool:Release(s)
 end

@@ -103,7 +103,7 @@ function bagProto:Wipe()
 
   for _, section in pairs(self.sections) do
     print("wiping section", section.title:GetText())
-    sectionFrame:Release(section)
+    section:Release()
   end
 
   self.content:Wipe()
@@ -203,7 +203,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           -- Delete the section if it's empty as well.
           if #section.content.cells == 0 then
             self.content:RemoveCell(oldFrame:GetCategory(), section)
-            sectionFrame:Release(section)
+            section:Release()
             self.sections[oldFrame:GetCategory()] = nil
           end
         end
