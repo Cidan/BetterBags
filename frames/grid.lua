@@ -117,6 +117,9 @@ function gridProto:Draw()
 end
 
 function gridProto:Wipe()
+  for _, column in pairs(self.columns) do
+    columnFrame:Release(column)
+  end
   wipe(self.cells)
 end
 

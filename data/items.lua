@@ -52,9 +52,29 @@ end
 
 function items:RefreshAll()
   if addon.Bags.Bank.frame:IsShown() then
-    self:RefreshBank()
+    if addon.Bags.Bank.isReagentBank then
+      self:RefreshReagentBank()
+    else
+      self:RefreshBank()
+    end
   end
   self:RefreshBackpack()
+end
+
+function items:RefreshReagentBank()
+  self._bankContainer = ContinuableContainer:Create()
+
+  -- Loop through all the bags and schedule each item for a refresh.
+  for i in pairs(const.REAGENTBANK_BAGS) do
+    self.items[i] = {}
+    self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
+    self.dirtyBankItems[i] = self.dirtyBankItems[i] or {}
+    self.previousItemGUID[i] = self.previousItemGUID[i] or {}
+    self:RefreshBag(i, true)
+  end
+
+  --- Process the item container.
+  self:ProcessBankContainer()
 end
 
 function items:RefreshBank()

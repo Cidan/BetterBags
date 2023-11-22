@@ -121,6 +121,7 @@ function itemProto:IsNewItem()
 end
 
 function itemProto:ClearItem()
+  debug:Log("clearItem", "Clearing item", self)
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
   self.button:UnregisterEvent('BAG_UPDATE_COOLDOWN')
@@ -135,7 +136,10 @@ function itemProto:ClearItem()
   self.button:Hide()
   self.button:SetID(0)
   self.button:SetHasItem(false)
+  self.button:SetItemButtonTexture(0)
   self.frame:SetID(0)
+  self.itemType = nil
+  self.itemSubType = nil
 end
 
 ---@param kind BagKind
@@ -155,6 +159,7 @@ end
 
 ---@param i Item
 function item:_DoReset(i)
+  debug:Log("item/_DoReset", "Resetting item", i.guid)
   i:ClearItem()
 end
 

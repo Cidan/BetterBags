@@ -58,6 +58,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field itemsByBagAndSlot table<number, table<number, Item>>
 ---@field sections table<string, Section>
 ---@field slots bagSlots
+---@field isReagentBank boolean
 local bagProto = {}
 
 function bagProto:Show()
@@ -94,11 +95,12 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagProto:Wipe()
-  for _, cell in ipairs(self.content.cells) do
-    ---@cast cell -Section,-Cell
-    itemFrame:Release(cell)
-  end
   for _, section in pairs(self.sections) do
+    print("wiping section", section.title:GetText())
+    for _, cell in pairs(section.content.cells) do
+      ---@cast cell -Section,-Cell
+      itemFrame:Release(cell)
+    end
     sectionFrame:Release(section)
   end
   self.content:Wipe()
@@ -183,7 +185,6 @@ function bagProto:DrawSectionGridBag(dirtyItems)
       elseif itemData:IsItemEmpty() and oldFrame ~= nil then
         -- The old frame exists, but the item is empty, so we need to delete it.
         self.itemsByBagAndSlot[bid][sid] = nil
-
         -- Special handling for the recent items section.
         if self.recentItems:HasItem(oldFrame) then
           self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)
@@ -234,6 +235,23 @@ end
 function bagProto:DrawSectionListBag()
 end
 
+function bagProto:ToggleReagentBank()
+  -- This should never happen, but just in case!
+  if self.kind == const.BAG_KIND.BACKPACK then return end
+  self.isReagentBank = not self.isReagentBank
+  if self.isReagentBank then
+    BankFrame.selectedTab = 2
+    self.title:SetText(L:G("Reagent Bank"))
+    self:Wipe()
+    --items:RefreshReagentBank()
+  else
+    BankFrame.selectedTab = 1
+    self.title:SetText(L:G("Bank"))
+    self:Wipe()
+    items:RefreshBank()
+  end
+end
+
 -------
 --- Bag Frame
 -------
@@ -274,7 +292,7 @@ function bagFrame:Create(kind)
   local b = {}
   setmetatable(b, { __index = bagProto })
   -- TODO(lobato): Compose the entire frame here.
-
+  b.isReagentBank = false
   b.itemsByBagAndSlot = {}
   b.sections = {}
   b.kind = kind
@@ -320,7 +338,19 @@ function bagFrame:Create(kind)
   bagButton:SetWidth(18)
   bagButton:SetHeight(18)
   bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
-
+  bagButton:SetScript("OnEnter", function()
+    GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
+    if kind == const.BAG_KIND.BACKPACK then
+      GameTooltip:SetText(L:G("Left Click to open the menu."))
+    else
+      GameTooltip:SetText(L:G("Left Click to open the menu, right click to swap to reagent bank and back."))
+    end
+    GameTooltip:Show()
+  end)
+  bagButton:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+  bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
   -- Create the bag title.
   local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -370,9 +400,14 @@ function bagFrame:Create(kind)
 
   -- Setup the context menu.
   local contextMenu = createContextMenu(b)
-  bagButton:SetScript("OnClick", function()
-    context:Show(contextMenu)
+  bagButton:SetScript("OnClick", function(_, e)
+    if e == "LeftButton" then
+      context:Show(contextMenu)
+    else
+      b:ToggleReagentBank()
+    end
   end)
+
   return b
 end
 

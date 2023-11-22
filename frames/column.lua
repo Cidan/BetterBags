@@ -3,6 +3,9 @@ local addonName = ...
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class ColumnFrame: AceModule
 local columnFrame = addon:NewModule('ColumnFrame')
 
@@ -88,6 +91,7 @@ function columnFrame:_DoCreate()
   column.minimumWidth = 0
   column.cells = {}
   column.frame:Show()
+  debug:DrawDebugBorder(column.frame, 1, 1, 1)
   return column
 end
 

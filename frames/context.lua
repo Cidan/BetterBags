@@ -36,12 +36,5 @@ end
 
 ---@param menuList MenuList[]
 function context:Show(menuList)
---		menuList - menu table
---		menuFrame - the UI frame to populate
---		anchor - where to anchor the frame (e.g. CURSOR)
---		x - x offset
---		y - y offset
---		displayMode - border type
---		autoHideDelay - how long until the menu disappears
   LibDD:EasyMenu(menuList, self.frame, 'cursor', 0, 0, 'MENU')
 end
