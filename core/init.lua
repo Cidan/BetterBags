@@ -28,6 +28,9 @@ local masque = addon:GetModule('Masque')
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -66,6 +69,7 @@ function addon:OnEnable()
   self:HideBlizzardBags()
   sectionFrame:Enable()
   masque:Enable()
+  context:Enable()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)

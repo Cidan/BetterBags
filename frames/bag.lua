@@ -30,6 +30,9 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -235,6 +238,25 @@ end
 --- Bag Frame
 -------
 
+---@param bag Bag
+---@return MenuList[]
+local function createContextMenu(bag)
+  local menuList = {}
+  table.insert(menuList, {
+    text = L:G("Show Bags"),
+    checked = function() return bag.slots:IsShown() end,
+    func = function()
+      if bag.slots:IsShown() then
+        bag.slots:Hide()
+      else
+        bag.slots:Draw()
+        bag.slots:Show()
+      end
+    end
+  })
+  return menuList
+end
+
 --- Create creates a new bag view.
 ---@param kind BagKind
 ---@return Bag
@@ -282,20 +304,13 @@ function bagFrame:Create(kind)
 
   --debug:DrawDebugBorder(leftHeader, 1, 1, 1)
 
-  local bagButton = CreateFrame("CheckButton")
+  local bagButton = CreateFrame("Button")
   bagButton:SetParent(leftHeader)
   bagButton:SetNormalTexture([[Interface\Buttons\Button-Backpack-Up]])
-	bagButton:SetCheckedTexture([[Interface\Buttons\CheckButtonHilight]])
-  ---@class Texture: TextureBase
-	local tex = bagButton:GetCheckedTexture()
-  tex:SetBlendMode("ADD")
   bagButton:SetWidth(18)
   bagButton:SetHeight(18)
   bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
-  bagButton:SetScript("OnClick", function()
-    b.slots:Draw()
-    b.slots:SetShown(bagButton:GetChecked())
-  end)
+
 
   -- Create the bag title.
   local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -342,6 +357,12 @@ function bagFrame:Create(kind)
 
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
+
+  -- Setup the context menu.
+  local contextMenu = createContextMenu(b)
+  bagButton:SetScript("OnClick", function()
+    context:Show(contextMenu)
+  end)
   return b
 end
 

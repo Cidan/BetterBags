@@ -63,6 +63,10 @@ function bagSlotProto:Hide()
   self.frame:Hide()
 end
 
+function bagSlotProto:IsShown()
+  return self.frame:IsShown()
+end
+
 ---@param kind BagKind
 ---@return bagSlots
 function BagSlots:CreatePanel(kind)
@@ -106,5 +110,6 @@ function BagSlots:CreatePanel(kind)
   end
 
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
+  b:Hide()
   return b
 end
