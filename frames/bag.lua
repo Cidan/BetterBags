@@ -176,7 +176,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         section.content:AddCell(itemData:GetItemGUID(), newFrame)
         newFrame:AddToMasqueGroup(self.kind)
         self.itemsByBagAndSlot[bagid][slotid] = newFrame
-      elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
+      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() ~= itemData:GetItemGUID() then
         -- The old frame exists, so we need to update it.
         local oldCategory = oldFrame:GetCategory()
         local oldSection = self.sections[oldCategory]
@@ -205,6 +205,22 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           self.sections[oldCategory] = nil
           self.content:RemoveCell(oldCategory, oldSection)
           oldSection:Release()
+        end
+      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() == itemData:GetItemGUID() then
+        -- The old frame exists, so we need to update it.
+        oldFrame:SetItem(itemData)
+        if not oldFrame:IsNewItem() and self.recentItems:HasItem(oldFrame) then
+          self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)
+          local category = oldFrame:GetCategory()
+          local section = self.sections[category]
+          if section == nil then
+            section = sectionFrame:Create()
+            section:SetTitle(category)
+            section.content.maxCellWidth = 5
+            self.content:AddCell(category, section)
+            self.sections[category] = section
+          end
+          section.content:AddCell(oldFrame.guid, oldFrame)
         end
       elseif itemData:IsItemEmpty() and oldFrame ~= nil then
         -- The old frame exists, but the item is empty, so we need to delete it.

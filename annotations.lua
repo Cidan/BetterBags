@@ -1,5 +1,6 @@
 ---@class ItemButton: Button
 ---@field bagID number
+---@field NewItemTexture Texture
 local itemButton = {}
 
 ---@param bagid number

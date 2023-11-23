@@ -126,6 +126,9 @@ end
 
 ---@return boolean
 function itemProto:IsNewItem()
+  if self.button.NewItemTexture:IsShown() then
+    return true
+  end
   return C_NewItems.IsNewItem(self.mixin:GetItemLocation():GetBagAndSlot())
 end
 
