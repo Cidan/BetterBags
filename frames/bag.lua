@@ -57,6 +57,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field recentItems Section The recent items section.
 ---@field freeSlots Section The free slots section.
 ---@field freeBagSlotsButton Item The free bag slots button.
+---@field freeReagentBagSlotsButton Item The free reagent bag slots button.
 ---@field itemsByBagAndSlot table<number, table<number, Item>>
 ---@field sections table<string, Section>
 ---@field slots bagSlots
@@ -153,6 +154,7 @@ end
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawSectionGridBag(dirtyItems)
   local freeSlots = 0
+  local freeReagentSlots = 0
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
@@ -160,8 +162,13 @@ function bagProto:DrawSectionGridBag(dirtyItems)
 
       if itemData:IsItemEmpty() then
         --TODO(lobato): Optimize this.
-        freeSlots = freeSlots + 1
-        self.freeBagSlotsButton:SetFreeSlots(bagid, slotid, freeSlots)
+        if bagid == Enum.BagIndex.ReagentBag then
+          freeReagentSlots = freeReagentSlots + 1
+          self.freeReagentBagSlotsButton:SetFreeSlots(bagid, slotid, freeReagentSlots, true)
+        else
+          freeSlots = freeSlots + 1
+          self.freeBagSlotsButton:SetFreeSlots(bagid, slotid, freeSlots)
+        end
       end
 
       local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
@@ -457,10 +464,16 @@ function bagFrame:Create(kind)
   local freeBagSlotsButton = itemFrame:Create()
   b.freeBagSlotsButton = freeBagSlotsButton
 
+  local freeReagentBagSlotsButton = itemFrame:Create()
+  b.freeReagentBagSlotsButton = freeReagentBagSlotsButton
+
   local freeSlots = sectionFrame:Create()
   freeSlots:SetTitle(L:G("Free Slots"))
   freeSlots.content.maxCellWidth = 5
   freeSlots.content:AddCell(freeSlots.title:GetText(), freeBagSlotsButton)
+  if kind == const.BAG_KIND.BACKPACK then
+    freeSlots.content:AddCell(freeSlots.title:GetText(), freeReagentBagSlotsButton)
+  end
   b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)

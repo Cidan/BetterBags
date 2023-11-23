@@ -69,6 +69,11 @@ const.BACKPACK_ONLY_BAGS = {
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
   [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }
+
+const.BACKPACK_ONLY_REAGENT_BAGS = {
+  [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
+}
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {

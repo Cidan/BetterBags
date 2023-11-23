@@ -117,13 +117,19 @@ function itemProto:SetItem(i)
 end
 
 -- SetFreeSlots will set the item button to a free slot.
-function itemProto:SetFreeSlots(bagid, slotid, count)
+function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
   SetItemButtonCount(self.button, count)
+  if reagent then
+    SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false);
+    self:AddToMasqueGroup(const.BAG_KIND.REAGENT)
+  else
+    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
+  end
   self.button.ItemSlotBackground:Show()
   self.frame:Show()
   self.button:Show()
