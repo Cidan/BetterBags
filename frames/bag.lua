@@ -270,6 +270,12 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   end
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
+  if w == 0 then
+    w = 120
+  end
+  if h == 0 then
+    h = 120
+  end
   self.frame:SetWidth(w + 3)
   self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight() + recentH)
 end
