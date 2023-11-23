@@ -236,6 +236,10 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         -- The old frame exists, so we need to update it.
         local oldCategory = oldFrame:GetCategory()
         local oldSection = self.sections[oldCategory]
+        if self.recentItems:HasItem(oldFrame) then
+          oldSection = self.recentItems
+          oldCategory = self.recentItems.title:GetText()
+        end
         local oldGuid = oldFrame.guid
         oldFrame:SetItem(itemData)
         local newCategory = oldFrame:GetCategory()
@@ -252,7 +256,8 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           oldSection.content:RemoveCell(oldGuid, oldFrame)
           newSection.content:AddCell(oldFrame.guid, oldFrame)
         end
-        if #oldSection.content.cells == 0 then
+        if oldSection == self.recentItems then
+        elseif #oldSection.content.cells == 0 then
           self.sections[oldCategory] = nil
           self.content:RemoveCell(oldCategory, oldSection)
           oldSection:Release()
