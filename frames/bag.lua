@@ -55,6 +55,8 @@ local Window = LibStub('LibWindow-1.1')
 ---@field title FontString The title of the bag.
 ---@field content Grid The main content frame of the bag.
 ---@field recentItems Section The recent items section.
+---@field freeSlots Section The free slots section.
+---@field freeBagSlotsButton Item The free bag slots button.
 ---@field itemsByBagAndSlot table<number, table<number, Item>>
 ---@field sections table<string, Section>
 ---@field slots bagSlots
@@ -95,6 +97,7 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagProto:Wipe()
+  self.content:RemoveCell(self.freeSlots.title:GetText(), self.freeSlots)
   self.content:Wipe()
   wipe(self.itemsByBagAndSlot)
   wipe(self.sections)
@@ -149,10 +152,18 @@ end
 -- This is the tradition AdiBags style.
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawSectionGridBag(dirtyItems)
+  local freeSlots = 0
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
+
+      if itemData:IsItemEmpty() then
+        --TODO(lobato): Optimize this.
+        freeSlots = freeSlots + 1
+        self.freeBagSlotsButton:SetFreeSlots(bagid, slotid, freeSlots)
+      end
+
       local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
       -- The old frame does not exist, so we need to create a new one.
       if oldFrame == nil and not itemData:IsItemEmpty() then
@@ -252,6 +263,10 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   for _, section in pairs(self.sections) do
     section:Draw()
   end
+  self.freeSlots:Draw()
+
+  -- Remove the freeSlots section.
+  self.content:RemoveCell(self.freeSlots.title:GetText(), self.freeSlots)
 
   -- Sort all sections by title.
   self.content:Sort(function(a, b)
@@ -259,6 +274,9 @@ function bagProto:DrawSectionGridBag(dirtyItems)
     ---@cast b +Section
     return a.title:GetText() < b.title:GetText()
   end)
+
+  -- Add the freeSlots section back to the end of all sections
+  self.content:AddCell(self.freeSlots.title:GetText(), self.freeSlots)
 
   -- Position all sections and draw the main bag.
   local w, h = self.content:Draw()
@@ -435,6 +453,15 @@ function bagFrame:Create(kind)
   recentItems.frame:Hide()
   b.recentItems = recentItems
   --debug:DrawDebugBorder(content.frame, 1, 1, 1)
+
+  local freeBagSlotsButton = itemFrame:Create()
+  b.freeBagSlotsButton = freeBagSlotsButton
+
+  local freeSlots = sectionFrame:Create()
+  freeSlots:SetTitle(L:G("Free Slots"))
+  freeSlots.content.maxCellWidth = 5
+  freeSlots.content:AddCell(freeSlots.title:GetText(), freeBagSlotsButton)
+  b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 3)

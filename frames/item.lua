@@ -116,6 +116,19 @@ function itemProto:SetItem(i)
   self.button:Show()
 end
 
+-- SetFreeSlots will set the item button to a free slot.
+function itemProto:SetFreeSlots(bagid, slotid, count)
+  self.button:SetID(slotid)
+  self.frame:SetID(bagid)
+
+  ClearItemButtonOverlay(self.button)
+  self.button:SetHasItem(false)
+  SetItemButtonCount(self.button, count)
+  self.button.ItemSlotBackground:Show()
+  self.frame:Show()
+  self.button:Show()
+end
+
 function itemProto:GetCategory()
   -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
   if self.info.quality == Enum.ItemQuality.Poor then
@@ -158,6 +171,7 @@ function itemProto:ClearItem()
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
   ClearItemButtonOverlay(self.button)
+  self.button.ItemSlotBackground:Hide()
   self.frame:SetID(0)
   self.button:SetID(0)
   self.itemType = nil
@@ -211,6 +225,10 @@ function item:_DoCreate()
   i.button = button
   button:SetAllPoints(p)
   i.frame = p
+
+  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
+  button.ItemSlotBackground:SetAllPoints(button);
+  button.ItemSlotBackground:Hide()
   return i
 end
 

@@ -61,7 +61,7 @@ function gridProto:RemoveCell(id, cell)
       return
     end
   end
-  assert(false, 'cell not found')
+  --assert(false, 'cell not found')
 end
 
 -- Sort will sort the cells in this grid using the given function.
