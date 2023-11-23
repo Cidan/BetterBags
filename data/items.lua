@@ -80,6 +80,13 @@ end
 function items:RefreshBank()
   self._bankContainer = ContinuableContainer:Create()
 
+  -- This is a small hack to force the bank bag quality data to be cached
+  -- before the bank bag frame is drawn.
+  for _, bag in pairs(const.BANK_ONLY_BAGS) do
+    local id = C_Container.ContainerIDToInventoryID(bag)
+    GetInventoryItemQuality("player", id)
+  end
+
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
     self.items[i] = {}
