@@ -93,7 +93,7 @@ function itemProto:SetItem(i)
     bound = C_Item.IsBound(l)
   end
 
-
+  self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(i:GetItemIcon())
   self.button:SetItemButtonTexture(i:GetItemIcon())
@@ -125,7 +125,7 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:SetHasItem(false)
   SetItemButtonCount(self.button, count)
   if reagent then
-    SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false);
+    SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
     self:AddToMasqueGroup(const.BAG_KIND.REAGENT)
   else
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)

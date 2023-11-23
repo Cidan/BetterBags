@@ -57,7 +57,8 @@
     "SharedTooltip_SetBackdropStyle",
     "GRAY_FONT_COLOR",
     "RED_FONT_COLOR",
-    "GameTooltip_AddErrorLine"
+    "GameTooltip_AddErrorLine",
+    "REAGENTBANK_DEPOSIT"
   ],
   "Notes.notesLocation": ".notes"
 }
