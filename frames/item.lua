@@ -12,6 +12,9 @@ local masque = addon:GetModule('Masque')
 ---@class ItemFrame: AceModule
 local item = addon:NewModule('ItemFrame')
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -24,6 +27,7 @@ local debug = addon:GetModule('Debug')
 ---@field itemType string
 ---@field itemSubType string
 ---@field masqueGroup string
+---@field info ContainerItemInfo
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -72,6 +76,7 @@ function itemProto:SetItem(i)
 
   -- TODO(lobato): Move all this to the items.lua database.
   local info = C_Container.GetContainerItemInfo(bagid, slotid)
+  self.info = info
   local readable = info and info.isReadable;
   local isFiltered = info and info.isFiltered;
   local noValue = info and info.hasNoValue;
@@ -112,6 +117,10 @@ function itemProto:SetItem(i)
 end
 
 function itemProto:GetCategory()
+  -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
+  if self.info.quality == Enum.ItemQuality.Poor then
+    return L:G('Junk')
+  end
   return self.itemType
 end
 
