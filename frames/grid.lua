@@ -55,6 +55,9 @@ function gridProto:RemoveCell(id, cell)
   for i, c in ipairs(self.cells) do
     if c == cell then
       table.remove(self.cells, i)
+      for _, column in pairs(self.columns) do
+        column:RemoveCell(cell)
+      end
       return
     end
   end
