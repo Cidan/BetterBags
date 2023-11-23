@@ -177,6 +177,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         newFrame:AddToMasqueGroup(self.kind)
         self.itemsByBagAndSlot[bagid][slotid] = newFrame
       elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() ~= itemData:GetItemGUID() then
+        -- This case handles the situation where the item in this slot no longer matches the item displayed.
         -- The old frame exists, so we need to update it.
         local oldCategory = oldFrame:GetCategory()
         local oldSection = self.sections[oldCategory]
@@ -207,8 +208,11 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           oldSection:Release()
         end
       elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() == itemData:GetItemGUID() then
-        -- The old frame exists, so we need to update it.
+        -- This case handles when the item in this slot is the same as the item displayed.
         oldFrame:SetItem(itemData)
+
+        -- The item in this same slot may no longer be a new item, i.e. it was moused over. If so, we
+        -- need to resection it.
         if not oldFrame:IsNewItem() and self.recentItems:HasItem(oldFrame) then
           self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)
           local category = oldFrame:GetCategory()
