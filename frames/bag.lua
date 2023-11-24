@@ -418,7 +418,6 @@ function bagFrame:Create(kind)
 
   b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
   b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
-
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
     --bgFile = "Interface\\FrameGeneral\\UI-Background-Rock",
   -- Setup the default skin/theme.
@@ -447,12 +446,14 @@ function bagFrame:Create(kind)
   --debug:DrawDebugBorder(leftHeader, 1, 1, 1)
 
   local bagButton = CreateFrame("Button")
-  bagButton:SetParent(leftHeader)
+  bagButton:EnableMouse(true)
+  bagButton:SetParent(b.frame)
   bagButton:SetNormalTexture([[Interface\Buttons\Button-Backpack-Up]])
   bagButton:SetHighlightTexture([[Interface\Buttons\CheckButtonHilight]])
   bagButton:SetWidth(18)
   bagButton:SetHeight(18)
-  bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
+  --bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
+  bagButton:SetPoint("TOPLEFT", b.frame, "TOPLEFT", 4, -4)
   bagButton:SetScript("OnEnter", function()
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
     if kind == const.BAG_KIND.BACKPACK then
