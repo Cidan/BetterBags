@@ -1,4 +1,4 @@
-local addonName = ...
+local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
@@ -50,7 +50,7 @@ local Window = LibStub('LibWindow-1.1')
 --- kind (i.e. bank, backpack).
 ---@class Bag
 ---@field kind BagKind
----@field frame Frame The raw frame of the bag.
+---@field frame Frame The fancy frame of the bag.
 ---@field leftHeader Frame The top left header of the bag.
 ---@field title FontString The title of the bag.
 ---@field content Grid The main content frame of the bag.
@@ -62,6 +62,8 @@ local Window = LibStub('LibWindow-1.1')
 ---@field sections table<string, Section>
 ---@field slots bagSlots
 ---@field isReagentBank boolean
+---@field decorator Texture
+---@field bg Texture
 local bagProto = {}
 
 function bagProto:Show()
@@ -106,6 +108,7 @@ end
 
 -- DrawOneBag draws all items as a combined container view, similar to the Blizzard
 -- combined bag view.
+---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawOneBag(dirtyItems)
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
@@ -177,7 +180,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         local newFrame = itemFrame:Create()
         newFrame:SetItem(itemData)
         local category = newFrame:GetCategory()
-        local section
+        local section ---@type Section|nil
         if newFrame:IsNewItem() then
           section = self.recentItems
         else
@@ -383,21 +386,50 @@ function bagFrame:Create(kind)
   -- The main display frame for the bag.
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BackdropTemplate")
-
+  --Mixin(f, PortraitFrameMixin)
+  --[[
+    local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagTemplate")
+    Mixin(f, PortraitFrameMixin)
+  ]]
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
 
+  --
+  --  
+
+--[[
+  local bg = b.frame:CreateTexture(name .. "BagBackground", "BACKGROUND", nil, -6)
+  bg:SetPoint("TOPLEFT", 2, -4)
+  bg:SetPoint("BOTTOMRIGHT", -2, 2)
+  bg:SetTexture('Interface\\FrameGeneral\\UI-Background-Rock')
+  bg:SetHorizTile(true)
+  bg:SetVertTile(true)
+  bg:SetAlpha(0.9)
+  b.bg = bg
+
+  local decorator = b.frame:CreateTexture(name .. "Decorator", "BORDER", "_UI-Frame-TopTileStreaks", -7)
+  decorator:SetPoint("TOPLEFT", 0, -6)
+  decorator:SetPoint("TOPRIGHT", -2, 6)
+  decorator:SetAlpha(0.9)
+  self.decorator = decorator
+  --]]
+
+  --b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
+  --b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
+
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
+    --bgFile = "Interface\\FrameGeneral\\UI-Background-Rock",
   -- Setup the default skin/theme.
   -- TODO(lobato): Move this to a separate module for themes.
   b.frame:SetBackdropColor(0, 0, 0, 1)
   b.frame:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    bgFile = LSM:Fetch(LSM.MediaType.BACKGROUND, "Blizzard Dialog Background"),
     edgeFile = LSM:Fetch(LSM.MediaType.BORDER, "Blizzard Tooltip"),
-    tile = true,
+    tile = false,
+    tileEdge = true,
     tileSize = 32,
     edgeSize = 16,
     insets = { left = 3, right = 3, top = 3, bottom = 3 }

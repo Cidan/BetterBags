@@ -1,10 +1,17 @@
-local addonName = ...
+local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Callback
+---@field cb fun(...)
+---@field a any
+local callbackProto = {}
+
 ---@class Events: AceModule
 ---@field _eventHandler AceEvent-3.0
+---@field _messageMap table<string, {fn: fun(...), cbs: Callback[]}>
+---@field _eventMap table<string, {fn: fun(...), cbs: Callback[]}>
 local events = addon:NewModule('Events')
 
 function events:OnInitialize()

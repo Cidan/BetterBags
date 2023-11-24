@@ -1,5 +1,6 @@
 -- boot.lua handles the initialisation of the addon and the creation of the root module.
-local addonName, root = ...
+
+local addonName, root = ... --[[@type string, table]]
 
 -- BetterBags is the root module of the addon.
 ---@class BetterBags: AceModule

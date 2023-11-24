@@ -1,4 +1,4 @@
-local addonName = ...
+local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
@@ -21,7 +21,6 @@ function debug:OnInitialize()
       "Sort by Verbosity",
       "Sort by Message",
     },
-    GetSTData = DLAPI.IsFormatRegistered("default").GetSTData
   }
   debug._bdi = bdi
 end
@@ -70,11 +69,10 @@ function debug:GetTableName(value)
   if type(value) ~= "table" then
     return tostring(value)
   end
-  local ok, name = pcall(debug.UnsafeGetTableName, debug, value)
+  local ok, name = pcall(debug.UnsafeGetTableName, debug, value) ---@type boolean, string
   if ok then
     return name
   end
-  print("nope " .. value.name)
   return debug:GetRawTableName(value)
 end
 
@@ -88,7 +86,7 @@ end
 
 function debug:Clean(value)
   local valueType = debug:GetType(value)
-  local str
+  local str ---@type string
   if valueType == "table" or valueType == "UIObject" then
     return debug:GetTableLink(value)
   else
@@ -105,6 +103,7 @@ function debug:Format(...)
   elseif n == 1 then
     return debug:Clean(...)
   end
+  ---@type table<number, string>
   local tempFormat = {}
   for i = 1, n do
     local v = select(i, ...)

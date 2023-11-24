@@ -1,4 +1,4 @@
-local addonName = ...
+local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
@@ -44,7 +44,7 @@ function addon:OnInitialize()
   -- Disable the bag tutorial screens, as Better Bags does not match
   -- the base UI/UX these screens refer to.
   if addon.isRetail then
-		C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG, true)
+		C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
 		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
 		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
 	end

@@ -1,12 +1,15 @@
-local addonName = ...
+local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Localization: AceModule
+---@field data table<string, string>
 local L = addon:NewModule('Localization')
-L:Enable()
-L.data = {}
+
+function L:OnInitialize()
+  self.data = {}
+end
 
 -- G returns the localized string for the given key.
 -- If no localized string is found, the key is returned.
@@ -23,3 +26,5 @@ end
 function L:S(key, value)
   self.data[key] = value
 end
+
+L:Enable()

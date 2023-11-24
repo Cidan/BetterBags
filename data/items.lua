@@ -1,4 +1,4 @@
-local addonName = ...
+local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
@@ -22,15 +22,6 @@ local debug = addon:GetModule('Debug')
 ---@field _bankContainer ContinuableContainer
 ---@field _doingRefreshAll boolean
 local items = addon:NewModule('Items')
-
--- Small debug function for printing items after every refresh.
-local function printDirtyItems(event, it)
-  for _, bagData in pairs(it) do
-    for _, itemData in pairs(bagData) do
-      debug:Log("items/printDirtyItems/dirty", itemData:GetItemLink())
-    end
-  end
-end
 
 function items:OnInitialize()
   self.items = {}
@@ -177,8 +168,8 @@ function items:RefreshBag(bagid, bankBag)
       else
         self._container:AddContinuable(item)
       end
-    elseif not item:IsItemEmpty() then
-      self.items[bagid][item:GetItemGUID()] = item
+    elseif not item:IsItemEmpty() and item:GetItemGUID() then
+      self.items[bagid][item:GetItemGUID() --[[@as string]]] = item
     end
 
     -- All items are added to the bag/slot lookup table, including

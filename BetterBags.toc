@@ -20,6 +20,8 @@ libs\LibWindow-1.1\LibWindow-1.1.lua
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
 
+templates\container.xml
+
 core\boot.lua
 core\events.lua
 core\constants.lua

@@ -1,4 +1,4 @@
-local addonName = ...
+local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
@@ -221,7 +221,7 @@ function item:_DoCreate()
 
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
-    i[child] = _G[name..child]
+    i[child] = _G[name..child] ---@type texture
   end
 
   p:SetSize(37, 37)

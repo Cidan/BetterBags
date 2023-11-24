@@ -58,7 +58,36 @@
     "GRAY_FONT_COLOR",
     "RED_FONT_COLOR",
     "GameTooltip_AddErrorLine",
-    "REAGENTBANK_DEPOSIT"
+    "REAGENTBANK_DEPOSIT",
+    "NineSliceUtil",
+    "PortraitFrameFlatBaseMixin",
+    "PortraitFrameMixin",
+    "PlaySound",
+    "SOUNDKIT",
+    "Enum",
+    "GetInventoryItemQuality",
+    "strjoin",
+    "SetItemButtonTexture",
+    "CursorUpdate",
+    "PickupBagFromSlot",
+    "PutItemInBag",
+    "GetInventoryItemTexture",
+    "IsModifiedClick",
+    "math",
+    "GetItemInfo",
+    "C_NewItems"
   ],
-  "Notes.notesLocation": ".notes"
+  "Notes.notesLocation": ".notes",
+  "Lua.diagnostics.ignoredFiles": "Disable",
+  "Lua.diagnostics.libraryFiles": "Disable",
+  "Lua.hint.setType": true,
+  "Lua.codeLens.enable": false,
+  "Lua.diagnostics.groupFileStatus": {
+    "strong": "Any",
+    "strict": "Any",
+    "type-check": "Any"
+  },
+  "Lua.diagnostics.groupSeverity": {
+    "strict": "Error"
+  }
 }
