@@ -10,10 +10,6 @@ local const = addon:GetModule('Constants')
 ---@field data databaseOptions
 local DB = addon:NewModule('Database')
 
--- Set the default option values.
-
-DB:Enable()
-
 function DB:OnInitialize()
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
@@ -23,3 +19,5 @@ end
 function DB:GetBagPosition(kind)
   return DB.data.profile.positions[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
 end
+
+DB:Enable()
