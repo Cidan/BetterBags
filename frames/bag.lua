@@ -52,7 +52,6 @@ local Window = LibStub('LibWindow-1.1')
 ---@field kind BagKind
 ---@field frame Frame The fancy frame of the bag.
 ---@field leftHeader Frame The top left header of the bag.
----@field title FontString The title of the bag.
 ---@field content Grid The main content frame of the bag.
 ---@field recentItems Section The recent items section.
 ---@field freeSlots Section The free slots section.
@@ -149,7 +148,7 @@ function bagProto:DrawOneBag(dirtyItems)
   -- Redraw the world.
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight())
+  self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight())
 end
 
 -- DrawSectionGridBag draws all items in sections according to their configured type.
@@ -305,7 +304,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
     h = 120
   end
   self.frame:SetWidth(w + 3)
-  self.frame:SetHeight(h + 12 + self.leftHeader:GetHeight() + self.title:GetHeight() + recentH)
+  self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight() + recentH)
 end
 
 -- DrawSectionListBag draws the bag as a scrollable list of sections with a small icon
@@ -319,12 +318,12 @@ function bagProto:ToggleReagentBank()
   self.isReagentBank = not self.isReagentBank
   if self.isReagentBank then
     BankFrame.selectedTab = 2
-    self.title:SetText(L:G("Reagent Bank"))
+    self.frame:SetTitle(L:G("Reagent Bank"))
     self:Wipe()
     items:RefreshReagentBank()
   else
     BankFrame.selectedTab = 1
-    self.title:SetText(L:G("Bank"))
+    self.frame:SetTitle(L:G("Bank"))
     self:Wipe()
     items:RefreshBank()
   end
@@ -334,7 +333,7 @@ function bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1
-  self.title:SetText(L:G("Bank"))
+  self.frame:SetTitle(L:G("Bank"))
   self:Wipe()
 end
 
@@ -384,9 +383,8 @@ function bagFrame:Create(kind)
   b.kind = kind
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
-  ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BackdropTemplate")
-  --Mixin(f, PortraitFrameMixin)
+  ---@class Frame: BetterBagsBagPortraitTemplate
+  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
   --[[
     local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagTemplate")
     Mixin(f, PortraitFrameMixin)
@@ -396,6 +394,7 @@ function bagFrame:Create(kind)
   b.frame:SetParent(UIParent)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
+  b.frame.Bg:SetAlpha(0.8)
 
   --
   --  
@@ -417,13 +416,14 @@ function bagFrame:Create(kind)
   self.decorator = decorator
   --]]
 
-  --b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
-  --b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
+  b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
+  b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
 
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
     --bgFile = "Interface\\FrameGeneral\\UI-Background-Rock",
   -- Setup the default skin/theme.
   -- TODO(lobato): Move this to a separate module for themes.
+  --[[
   b.frame:SetBackdropColor(0, 0, 0, 1)
   b.frame:SetBackdrop({
     bgFile = LSM:Fetch(LSM.MediaType.BACKGROUND, "Blizzard Dialog Background"),
@@ -434,11 +434,11 @@ function bagFrame:Create(kind)
     edgeSize = 16,
     insets = { left = 3, right = 3, top = 3, bottom = 3 }
   })
-
+  ]]--
   -- Create the top left header.
   ---@class Frame: BackdropTemplate
   local leftHeader = CreateFrame("Frame", nil, b.frame, "BackdropTemplate")
-  leftHeader:SetPoint("TOPLEFT", 3, -8)
+  leftHeader:SetPoint("TOPLEFT", 3, -20) -- -8 to -20
   leftHeader:SetPoint("TOPRIGHT", -3, 3)
   leftHeader:SetHeight(20)
   leftHeader:Show()
@@ -467,15 +467,7 @@ function bagFrame:Create(kind)
   end)
   bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-  -- Create the bag title.
-  local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetText(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
-  title:SetFontObject("GameFontNormal")
-  title:SetHeight(18)
-  title:SetJustifyH("LEFT")
-  title:SetPoint("LEFT", bagButton, "RIGHT", 4, 0)
-  b.title = title
-
+  b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
   content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)

@@ -90,3 +90,11 @@ local LibUIDropDownMenu = {}
 function LibUIDropDownMenu:Create_UIDropDownMenu(name, parent) end
 function LibUIDropDownMenu:EasyMenu_Initialize(frame, level, menuList, anchor, x, y, displayMode, autoHideDelay) end
 function LibUIDropDownMenu:EasyMenu(menuList, frame, anchor, x, y, displayMode, autoHideDelay) end
+
+---@class BetterBagsBagPortraitTemplate
+---@field Bg Texture
+local BetterBagsBagPortraitTemplate = {}
+
+function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
+function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
+function BetterBagsBagPortraitTemplate:SetTitle(title) end
