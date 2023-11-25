@@ -26,8 +26,8 @@ function debug:OnInitialize()
 end
 
 function debug:OnEnable()
-  print("BetterBags: debug mode enabled")
   if DLAPI then
+    print("BetterBags: debug mode enabled")
     DLAPI.RegisterFormat("bdi", debug._bdi)
     DLAPI.SetFormat("BetterBags", "bdi")
   end
@@ -113,6 +113,7 @@ function debug:Format(...)
 end
 
 function debug:Log(category, ...)
+  if not DLAPI then return end
   DLAPI.DebugLog("BetterBags", format("%s~%s", category, debug:Format(...)))
 end
 debug:Enable()
