@@ -36,6 +36,21 @@ function gridProto:Hide()
   self.frame:Hide()
 end
 
+---@param id string|nil
+---@param cell Cell|Section|Item|BagButton
+function gridProto:AddCellToLastColumn(id, cell)
+  assert(id, 'id is required')
+  assert(cell, 'cell is required')
+  assert(cell.frame, 'the added cell must have a frame')
+  local position = 0
+  for i, _ in ipairs(self.cells) do
+    if i % self.maxCellWidth == self.maxCellWidth - 1 then
+      position = i
+    end
+  end
+  table.insert(self.cells, position+1, cell)
+end
+
 -- AddCell will add a cell to this grid.
 ---@param id string|nil
 ---@param cell Cell|Section|Item|BagButton

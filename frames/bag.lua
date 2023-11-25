@@ -285,7 +285,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   end)
 
   -- Add the freeSlots section back to the end of all sections
-  self.content:AddCell(self.freeSlots.title:GetText(), self.freeSlots)
+  self.content:AddCellToLastColumn(self.freeSlots.title:GetText(), self.freeSlots)
 
   -- Position all sections and draw the main bag.
   local w, h = self.content:Draw()
