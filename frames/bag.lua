@@ -303,7 +303,8 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   if h == 0 then
     h = 40
   end
-  self.frame:SetWidth(w + 3)
+
+  self.frame:SetWidth(w + 12)
   self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight() + recentH)
 end
 

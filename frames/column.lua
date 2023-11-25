@@ -77,15 +77,11 @@ end
 function columnProto:Draw()
   local w = self.minimumWidth
   local h = 0
-  local previousRow = 0
-  local cellOffset = 1
   for cellPos, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
-    -- cell.position = cellPos unsure if need this
-    w = math.max(w, cell.frame:GetWidth()+4)
+    w = math.max(w, cell.frame:GetWidth())
     if cellPos == 1 then
       cell.frame:SetPoint("TOPLEFT", self.frame)
-      -- previousRow = cell.frame.count unsure what this was
       h = h + cell.frame:GetHeight()
     else
       cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -4)
@@ -113,6 +109,7 @@ function columnFrame:_DoCreate()
   column.minimumWidth = 0
   column.cells = {}
   column.frame:Show()
+  --debug:DrawDebugBorder(column.frame, 1, 1, 1)
   return column
 end
 

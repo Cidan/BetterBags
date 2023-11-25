@@ -81,7 +81,7 @@ function gridProto:Draw()
   wipe(self.cellToColumn)
   wipe(self.columns)
 
-  local width = 0
+  local width = 0 ---@type number
   local height = 0
   for i, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
@@ -97,7 +97,7 @@ function gridProto:Draw()
         column.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, 0)
       else
         local previousColumn = self.columns[i - 1]
-        column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 0, 0)
+        column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 4, 0)
       end
     end
     -- Add the cell to the column.
@@ -109,8 +109,13 @@ function gridProto:Draw()
   -- Draw all the columns and their cells.
   for _, column in pairs(self.columns) do
     local w, h = column:Draw()
-    width = width + w
+    width = width + w + 4
     height = math.max(height, h)
+  end
+
+  -- Remove the last 4 pixels of padding.
+  if width > 4 then
+    width = width - 4 ---@type number
   end
 
   return width, height
