@@ -74,6 +74,12 @@ const.BACKPACK_ONLY_REAGENT_BAGS = {
   [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }
 
+---@enum BagView
+const.BAG_VIEW = {
+  ONE_BAG = 1,
+  SECTION_GRID = 2
+}
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
@@ -82,6 +88,10 @@ const.DATABASE_DEFAULTS = {
       Backpack = {},
       Bank = {},
     },
+    views = {
+      Backpack = const.BAG_VIEW.SECTION_GRID,
+      Bank = const.BAG_VIEW.SECTION_GRID,
+    }
   },
   char = {}
 }

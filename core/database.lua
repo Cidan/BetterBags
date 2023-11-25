@@ -20,4 +20,16 @@ function DB:GetBagPosition(kind)
   return DB.data.profile.positions[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
 end
 
+---@param kind BagKind
+---@return BagView
+function DB:GetBagView(kind)
+  return DB.data.profile.views[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+end
+
+---@param kind BagKind
+---@param view BagView
+function DB:SetBagView(kind, view)
+  DB.data.profile.views[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'] = view
+end
+
 DB:Enable()

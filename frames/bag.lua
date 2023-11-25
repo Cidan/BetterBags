@@ -97,22 +97,64 @@ function bagProto:GetPosition()
   return x * scale, y * scale
 end
 
+function bagProto:WipeFreeSlots()
+  self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
+  self.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
+  self.freeSlots.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
+  self.freeSlots.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
+end
+
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagProto:Wipe()
+  self:WipeFreeSlots()
   self.content:RemoveCell(self.freeSlots.title:GetText(), self.freeSlots)
   self.content:Wipe()
   wipe(self.itemsByBagAndSlot)
   wipe(self.sections)
 end
 
+function bagProto:UpdateCellWidth()
+  if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
+    self.content.maxCellWidth = 15
+  else
+    self.content.maxCellWidth = self.kind == const.BAG_KIND.BACKPACK and 3 or 5
+  end
+end
+
+---@param dirtyItems table<number, table<number, ItemMixin>>
+function bagProto:Draw(dirtyItems)
+  self:UpdateCellWidth()
+  if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
+    self:DrawOneBag(dirtyItems)
+  elseif database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_GRID then
+    self:DrawSectionGridBag(dirtyItems)
+  end
+end
+
 -- DrawOneBag draws all items as a combined container view, similar to the Blizzard
 -- combined bag view.
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawOneBag(dirtyItems)
+  self:WipeFreeSlots()
+  local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
+  local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
+
+      if itemData:IsItemEmpty() then
+        if bagid == Enum.BagIndex.ReagentBag then
+          freeReagentSlotsData.count = freeReagentSlotsData.count + 1
+          freeReagentSlotsData.bagid = bagid
+          freeReagentSlotsData.slotid = slotid
+        else
+          freeSlotsData.count = freeSlotsData.count + 1
+          freeSlotsData.bagid = bagid
+          freeSlotsData.slotid = slotid
+        end
+      end
+
       local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
 
       -- The old frame does not exist, so we need to create a new one.
@@ -137,6 +179,7 @@ function bagProto:DrawOneBag(dirtyItems)
   self.content:Sort(function (a, b)
     ---@cast a +Item
     ---@cast b +Item
+    if not a.mixin or not b.mixin then return false end
     if a.mixin:GetItemQuality() == nil or b.mixin:GetItemQuality() == nil then return false end
     if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
       if a.mixin:GetItemName() == nil or b.mixin:GetItemName() == nil then return false end
@@ -145,16 +188,21 @@ function bagProto:DrawOneBag(dirtyItems)
     return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
   end)
 
+  self.content:AddCell("freeBagSlots", self.freeBagSlotsButton)
+  self.content:AddCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
+  self.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
+  self.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
   -- Redraw the world.
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight())
+  self.frame:SetHeight(h + 28 + self.leftHeader:GetHeight())
 end
 
 -- DrawSectionGridBag draws all items in sections according to their configured type.
 -- This is the tradition AdiBags style.
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawSectionGridBag(dirtyItems)
+  self:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   for bid, bagData in pairs(dirtyItems) do
@@ -163,7 +211,6 @@ function bagProto:DrawSectionGridBag(dirtyItems)
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
 
       if itemData:IsItemEmpty() then
-        --TODO(lobato): Optimize this.
         if bagid == Enum.BagIndex.ReagentBag then
           freeReagentSlotsData.count = freeReagentSlotsData.count + 1
           freeReagentSlotsData.bagid = bagid
@@ -269,6 +316,9 @@ function bagProto:DrawSectionGridBag(dirtyItems)
     end
   end
 
+  self.freeSlots.content:AddCell("freeBagSlots", self.freeBagSlotsButton)
+  self.freeSlots.content:AddCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
+
   self.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
   self.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
 
@@ -286,6 +336,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   self.content:Sort(function(a, b)
     ---@cast a +Section
     ---@cast b +Section
+    if not a.title or not b.title then return false end
     return a.title:GetText() < b.title:GetText()
   end)
 
@@ -356,6 +407,37 @@ local function createContextMenu(bag)
     text = L:G("BetterBags Menu"),
     isTitle = true,
     notCheckable = true
+  })
+
+  -- View menu for switching between one bag and section grid.
+  table.insert(menuList, {
+    text = L:G("View"),
+    hasArrow = true,
+    notCheckable = true,
+    menuList = {
+      {
+        text = L:G("One Bag"),
+        keepShownOnClick = false,
+        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.ONE_BAG end,
+        func = function()
+          context:Hide()
+          database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
+          bag:Wipe()
+          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+        end
+      },
+      {
+        text = L:G("Section Grid"),
+        keepShownOnClick = false,
+        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_GRID end,
+        func = function()
+          context:Hide()
+          database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
+          bag:Wipe()
+          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+        end
+      }
+    }
   })
 
   -- Show bag slot toggle.
@@ -502,10 +584,6 @@ function bagFrame:Create(kind)
   local freeSlots = sectionFrame:Create()
   freeSlots:SetTitle(L:G("Free Slots"))
   freeSlots.content.maxCellWidth = 5
-  freeSlots.content:AddCell(freeSlots.title:GetText(), freeBagSlotsButton)
-  if kind == const.BAG_KIND.BACKPACK then
-    freeSlots.content:AddCell(freeSlots.title:GetText(), freeReagentBagSlotsButton)
-  end
   b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)

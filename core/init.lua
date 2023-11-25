@@ -84,13 +84,12 @@ function addon:OnEnable()
 
   events:RegisterMessage('items/RefreshBackpack/Done', function(event, itemData)
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:DrawSectionGridBag(itemData)
+    addon.Bags.Backpack:Draw(itemData)
    end)
 
    events:RegisterMessage('items/RefreshBank/Done', function(event, itemData)
     debug:Log("init/OnInitialize/items", "Drawing bank")
-    --addon.Bags.Bank:DrawOneBag(itemData)
-    addon.Bags.Bank:DrawSectionGridBag(itemData)
+    addon.Bags.Bank:Draw(itemData)
     if not addon.Bags.Bank:IsShown() then
       addon.Bags.Bank:Show()
     end

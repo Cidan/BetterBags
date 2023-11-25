@@ -22,6 +22,7 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field notCheckable? boolean
 ---@field hasArrow? boolean
 ---@field menuList? MenuList[]
+---@field keepShownOnClick? boolean
 local menuListProto = {}
 
 function context:OnInitialize()
@@ -37,4 +38,8 @@ end
 ---@param menuList MenuList[]
 function context:Show(menuList)
   LibDD:EasyMenu(menuList, self.frame, 'cursor', 0, 0, 'MENU')
+end
+
+function context:Hide()
+  LibDD:HideDropDownMenu(1)
 end
