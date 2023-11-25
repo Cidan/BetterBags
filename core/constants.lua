@@ -77,7 +77,8 @@ const.BACKPACK_ONLY_REAGENT_BAGS = {
 ---@enum BagView
 const.BAG_VIEW = {
   ONE_BAG = 1,
-  SECTION_GRID = 2
+  SECTION_GRID = 2,
+  LIST = 3,
 }
 
 ---@class databaseOptions

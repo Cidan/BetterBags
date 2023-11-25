@@ -132,6 +132,8 @@ function bagProto:Draw(dirtyItems)
     self:DrawOneBag(dirtyItems)
   elseif database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_GRID then
     self:DrawSectionGridBag(dirtyItems)
+  elseif database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
+    self:DrawSectionListBag(dirtyItems)
   end
 end
 
@@ -370,7 +372,9 @@ end
 
 -- DrawSectionListBag draws the bag as a scrollable list of sections with a small icon
 -- and the item name as a single row.
-function bagProto:DrawSectionListBag()
+---@param dirtyItems table<number, table<number, ItemMixin>>
+function bagProto:DrawSectionListBag(dirtyItems)
+  self:WipeFreeSlots()
 end
 
 function bagProto:ToggleReagentBank()
@@ -440,7 +444,20 @@ local function createContextMenu(bag)
           bag:Wipe()
           if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
         end
+      },
+      --[[
+      {
+        text = L:G("List"),
+        keepShownOnClick = false,
+        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.LIST end,
+        func = function()
+          context:Hide()
+          database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
+          bag:Wipe()
+          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+        end
       }
+      --]]
     }
   })
 
