@@ -7,6 +7,12 @@
     </KeyValues>
     <Frames>
       <Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButtonDefaultAnchors"/>
+      <EditBox name="$parentSearchBox" parentKey="SearchBox" inherits="BagSearchBoxTemplate" frameLevel="510" letters="15">
+        <Size x="130" y="20"/>
+        <Anchors>
+          <Anchor point="TOPRIGHT" x="-27" y="-2"/>
+        </Anchors>
+      </EditBox>
     </Frames>
   </Frame>
 </Ui>

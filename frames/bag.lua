@@ -616,6 +616,24 @@ function bagFrame:Create(kind)
   slots.frame:SetParent(b.frame)
   b.slots = slots
 
+  -- Setup the search box events.
+  b.frame.SearchBox:SetAlpha(0)
+  b.frame.SearchBox:SetScript("OnEnter", function()
+    b.frame.SearchBox:SetAlpha(1)
+  end)
+  b.frame.SearchBox:SetScript("OnLeave", function()
+    if b.frame.SearchBox:HasFocus() then return end
+    if b.frame.SearchBox:GetText() ~= "" then return end
+    b.frame.SearchBox:SetAlpha(0)
+  end)
+  b.frame.SearchBox:SetScript("OnEditFocusGained", function()
+    b.frame.SearchBox:SetAlpha(1)
+  end)
+  b.frame.SearchBox:SetScript("OnEditFocusLost", function()
+    if b.frame.SearchBox:GetText() ~= "" then return end
+    b.frame.SearchBox:SetAlpha(0)
+  end)
+
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)
