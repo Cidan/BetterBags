@@ -12,6 +12,9 @@ local masque = addon:GetModule('Masque')
 ---@class ItemFrame: AceModule
 local item = addon:NewModule('ItemFrame')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -56,11 +59,11 @@ local children = {
 
 -- OnEvent is the event handler for the item button.
 ---@param i Item
----@param event string
-local function OnEvent(i, event, ...)
-  if event == 'BAG_UPDATE_COOLDOWN' or event == 'SPELL_UPDATE_COOLDOWN' then
-    i.button:UpdateCooldown(i.mixin:GetItemIcon())
+local function OnEvent(i)
+  if i.mixin == nil then
+    return
   end
+  i.button:UpdateCooldown(i.mixin:GetItemIcon())
 end
 
 ---@param i ItemMixin
@@ -111,7 +114,8 @@ function itemProto:SetItem(i)
   self.button:SetMatchesSearch(not isFiltered)
   self.button:RegisterEvent('BAG_UPDATE_COOLDOWN')
   self.button:RegisterEvent('SPELL_UPDATE_COOLDOWN')
-  self.button:SetScript('OnEvent', function(_, event, ...) OnEvent(self, event, ...) end)
+
+  --self.button:SetScript('OnEvent', function(_, event, ...) OnEvent(self, event, ...) end)
   self.frame:Show()
   self.button:Show()
 end
@@ -243,6 +247,7 @@ function item:_DoCreate()
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
   button.ItemSlotBackground:SetAllPoints(button);
   button.ItemSlotBackground:Hide()
+  events:RegisterEvent('BAG_UPDATE_COOLDOWN', function(_, ...) OnEvent(i) end)
   return i
 end
 
