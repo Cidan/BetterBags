@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - '**'
+env:
+  CF_API_KEY: ${{ secrets.CF_API_KEY }}
 
 # a workflow is built up as jobs, and within these jobs are steps
 jobs:
