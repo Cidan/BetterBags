@@ -14,8 +14,8 @@ externals:
   libs/LibDataBroker-1.1: https://github.com/tekkub/libdatabroker-1-1
   libs/LibSharedMedia-3.0: https://repos.wowace.com/wow/libsharedmedia-3-0/trunk/LibSharedMedia-3.0
   libs/AceGUI-3.0-SharedMediaWidgets: https://repos.wowace.com/wow/ace-gui-3-0-shared-media-widgets/trunk/AceGUI-3.0-SharedMediaWidgets
-  libs/LibWindow-1.1 https://repos.curseforge.com/wow/libwindow-1-1/trunk/LibWindow-1.1
-  libs/LibUIDropDownMenu https://repos.wowace.com/wow/libuidropdownmenu/trunk/LibUIDropDownMenu
+  libs/LibWindow-1.1: https://repos.curseforge.com/wow/libwindow-1-1/trunk/LibWindow-1.1
+  libs/LibUIDropDownMenu: https://repos.wowace.com/wow/libuidropdownmenu/trunk/LibUIDropDownMenu
 
 ignore:
   - install-deps.sh
