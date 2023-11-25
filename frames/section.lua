@@ -121,6 +121,7 @@ function sectionFrame:_DoCreate()
   title:SetHeight(18)
   title:SetJustifyH("LEFT")
   title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 6, 0)
+  title:SetPoint("TOPRIGHT", s.frame, "TOPRIGHT", -6, 0)
   s.title = title
 
   local content = grid:Create(s.frame)
