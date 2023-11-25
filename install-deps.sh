@@ -9,6 +9,7 @@ svn checkout https://repos.wowace.com/wow/ace3/trunk/AceHook-3.0 ./libs/AceHook-
 svn checkout https://repos.wowace.com/wow/ace3/trunk/AceGUI-3.0 ./libs/AceGUI-3.0
 svn checkout https://repos.wowace.com/wow/ace3/trunk/AceConsole-3.0 ./libs/AceConsole-3.0
 svn checkout https://repos.wowace.com/wow/ace3/trunk/AceConfig-3.0 ./libs/AceConfig-3.0
+svn checkout https://repos.wowace.com/wow/ace3/trunk/AceEvent-3.0 ./libs/AceEvent-3.0
 git clone https://github.com/tekkub/libdatabroker-1-1 ./libs/LibDataBroker-1.1
 svn checkout https://repos.wowace.com/wow/libsharedmedia-3-0/trunk/LibSharedMedia-3.0 ./libs/LibSharedMedia-3.0
 svn checkout https://repos.wowace.com/wow/ace-gui-3-0-shared-media-widgets/trunk/AceGUI-3.0-SharedMediaWidgets ./libs/AceGUI-3.0-SharedMediaWidgets
