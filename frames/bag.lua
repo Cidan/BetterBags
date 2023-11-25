@@ -480,7 +480,7 @@ function bagFrame:Create(kind)
   local content = grid:Create(b.frame)
   content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
-  content.maxCellWidth = 3
+  content.maxCellWidth = kind == const.BAG_KIND.BACKPACK and 3 or 5
   content:Show()
   b.content = content
 
