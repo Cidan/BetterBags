@@ -82,7 +82,11 @@ function bagProto:Hide()
 end
 
 function bagProto:Toggle()
-  self.frame:SetShown(not self.frame:IsShown())
+  if self.frame:IsShown() then
+    self:Hide()
+  else
+    self:Show()
+  end
 end
 
 function bagProto:IsShown()
@@ -482,6 +486,10 @@ function bagFrame:Create(kind)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
   b.frame.Bg:SetAlpha(0.8)
+  b.frame.CloseButton:SetScript("OnClick", function()
+    b:Hide()
+    if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
+  end)
 
   --
   --  

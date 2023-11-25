@@ -5,5 +5,8 @@
     <KeyValues>
 		  <KeyValue key="layoutType" value="HeldBagLayout" type="string"/>
     </KeyValues>
+    <Frames>
+      <Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButtonDefaultAnchors"/>
+    </Frames>
   </Frame>
 </Ui>

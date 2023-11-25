@@ -94,6 +94,7 @@ function LibUIDropDownMenu:EasyMenu(menuList, frame, anchor, x, y, displayMode, 
 ---@class BetterBagsBagPortraitTemplate
 ---@field Bg Texture
 ---@field PortraitContainer Frame
+---@field CloseButton Button
 local BetterBagsBagPortraitTemplate = {}
 
 function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
