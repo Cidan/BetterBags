@@ -297,11 +297,11 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   end
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
-  if w == 0 then
-    w = 120
+  if w < 160 then
+    w = 160
   end
   if h == 0 then
-    h = 120
+    h = 40
   end
   self.frame:SetWidth(w + 3)
   self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight() + recentH)
