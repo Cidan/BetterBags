@@ -6,6 +6,7 @@ on:
       - '**'
 env:
   CF_API_KEY: ${{ secrets.CF_API_KEY }}
+  WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
 
 # a workflow is built up as jobs, and within these jobs are steps
 jobs:

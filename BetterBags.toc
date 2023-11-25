@@ -8,6 +8,7 @@
 ## X-Date: @project-date-iso@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
+## X-Wago-ID: aNDmy96o
 ## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog
 
 libs\LibStub\LibStub.lua
