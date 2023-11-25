@@ -155,8 +155,8 @@ end
 -- This is the tradition AdiBags style.
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawSectionGridBag(dirtyItems)
-  local freeSlots = 0
-  local freeReagentSlots = 0
+  local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
+  local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
@@ -165,11 +165,13 @@ function bagProto:DrawSectionGridBag(dirtyItems)
       if itemData:IsItemEmpty() then
         --TODO(lobato): Optimize this.
         if bagid == Enum.BagIndex.ReagentBag then
-          freeReagentSlots = freeReagentSlots + 1
-          self.freeReagentBagSlotsButton:SetFreeSlots(bagid, slotid, freeReagentSlots, true)
+          freeReagentSlotsData.count = freeReagentSlotsData.count + 1
+          freeReagentSlotsData.bagid = bagid
+          freeReagentSlotsData.slotid = slotid
         else
-          freeSlots = freeSlots + 1
-          self.freeBagSlotsButton:SetFreeSlots(bagid, slotid, freeSlots)
+          freeSlotsData.count = freeSlotsData.count + 1
+          freeSlotsData.bagid = bagid
+          freeSlotsData.slotid = slotid
         end
       end
 
@@ -266,6 +268,9 @@ function bagProto:DrawSectionGridBag(dirtyItems)
       end
     end
   end
+
+  self.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count)
+  self.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
 
   -- Loop through each section and draw it's size.
   local recentW, recentH = self.recentItems:Draw()

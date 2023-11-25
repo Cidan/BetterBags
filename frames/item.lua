@@ -117,7 +117,15 @@ function itemProto:SetItem(i)
 end
 
 -- SetFreeSlots will set the item button to a free slot.
+---@param bagid number
+---@param slotid number
+---@param count number
+---@param reagent boolean
 function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
+  if count == 0 then
+    self.frame:Hide()
+    return
+  end
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
