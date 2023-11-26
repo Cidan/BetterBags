@@ -127,6 +127,15 @@ function bagProto:Refresh()
   end
 end
 
+---@param text? string
+function bagProto:Search(text)
+  for _, bagData in pairs(self.itemsByBagAndSlot) do
+    for _, item in pairs(bagData) do
+      item:UpdateSearch(text)
+    end
+  end
+end
+
 function bagProto:UpdateCellWidth()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
     self.content.maxCellWidth = 15
@@ -145,6 +154,8 @@ function bagProto:Draw(dirtyItems)
   elseif database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
     self:DrawSectionListBag(dirtyItems)
   end
+  local text = self.frame.SearchBox:GetText()
+  self:Search(text)
 end
 
 -- DrawOneBag draws all items as a combined container view, similar to the Blizzard
@@ -687,6 +698,10 @@ function bagFrame:Create(kind)
     b.frame.SearchBox:SetAlpha(0)
   end)
 
+  b.frame.SearchBox:SetScript("OnTextChanged", function()
+    local text = b.frame.SearchBox:GetText()
+    b:Search(text)
+  end)
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)

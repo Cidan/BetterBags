@@ -73,6 +73,21 @@ local function OnEvent(i)
   i.button:UpdateCooldown(i.mixin:GetItemIcon())
 end
 
+---@param text? string
+function itemProto:UpdateSearch(text)
+  if not text or text == "" then
+    self.button:SetMatchesSearch(true)
+    return
+  end
+
+  if string.find(string.lower(self.name), string.lower(text), 1, true) then
+    self.button:SetMatchesSearch(true)
+    return
+  end
+
+  self.button:SetMatchesSearch(false)
+end
+
 ---@param i ItemMixin
 function itemProto:SetItem(i)
   assert(i, 'item must be provided')
