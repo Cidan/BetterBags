@@ -83,7 +83,8 @@
     "BANK_BAG",
     "show",
     "MainMenuBar",
-    "MainMenuBarBackpackButton"
+    "MainMenuBarBackpackButton",
+    "BagBarExpandToggle"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

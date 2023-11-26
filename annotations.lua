@@ -73,6 +73,9 @@ BagsBar = {}
 ---@class MainMenuBarBackpackButton: Button
 MainMenuBarBackpackButton = {}
 
+---@class BagBarExpandToggle: Button
+BagBarExpandToggle = {}
+
 ---@class DLAPI
 DLAPI = {}
 
