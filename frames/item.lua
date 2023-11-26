@@ -15,6 +15,9 @@ local item = addon:NewModule('ItemFrame')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -31,6 +34,9 @@ local debug = addon:GetModule('Debug')
 ---@field itemSubType string
 ---@field masqueGroup string
 ---@field info ContainerItemInfo
+---@field kind BagKind
+---@field expacID number
+---@field subclassID number
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -76,7 +82,11 @@ function itemProto:SetItem(i)
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
-
+  if const.BANK_BAGS[bagid] then
+    self.kind = const.BAG_KIND.BANK
+  else
+    self.kind = const.BAG_KIND.BACKPACK
+  end
   -- TODO(lobato): Move all this to the items.lua database.
   local info = C_Container.GetContainerItemInfo(bagid, slotid)
   self.info = info
@@ -87,7 +97,14 @@ function itemProto:SetItem(i)
   local isQuestItem = questInfo.isQuestItem;
   local questID = questInfo.questID;
   local isActive = questInfo.isActive
-  local _, _, _, _, _, itemType, itemSubType = GetItemInfo(i:GetItemID() or 0)
+
+  local itemName, itemLink, itemQuality,
+  itemLevel, itemMinLevel, itemType, itemSubType,
+  itemStackCount, itemEquipLoc, itemTexture,
+  sellPrice, classID, subclassID, bindType, expacID,
+  setID, isCraftingReagent = GetItemInfo(i:GetItemID() or 0)
+  self.expacID = expacID
+  self.subclassID = subclassID
   self.itemType = itemType or "unknown"
   self.itemSubType = itemSubType or "unknown"
   local l = i:GetItemLocation()
@@ -138,8 +155,9 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   SetItemButtonCount(self.button, count)
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
-    self:AddToMasqueGroup(const.BAG_KIND.REAGENT)
+    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   else
+    --TODO(lobato): detect right masque group
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
   self.button.ItemSlotBackground:Show()
@@ -148,11 +166,39 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 end
 
 function itemProto:GetCategory()
+  if not self.kind then return L:G('Everything') end
   -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
   if self.info.quality == Enum.ItemQuality.Poor then
     return L:G('Junk')
   end
-  return self.itemType
+  local category = ""
+
+  -- Add the type filter to the category if enabled.
+  if database:GetCategoryFilter(self.kind, "Type") then
+    category = category .. self.itemType
+  end
+
+  -- Add the tradeskill filter to the category if enabled.
+  if database:GetCategoryFilter(self.kind, "TradeSkill") then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.TRADESKILL_MAP[self.subclassID]
+  end
+
+  -- Add the expansion filter to the category if enabled.
+  if database:GetCategoryFilter(self.kind, "Expansion") then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.EXPANSION_MAP[self.expacID]
+  end
+
+  if category == "" then
+    category = L:G('Everything')
+  end
+
+  return category
 end
 
 ---@return boolean
@@ -176,6 +222,9 @@ function itemProto:ClearItem()
   self.mixin = nil
   self.guid = nil
   self.name = nil
+  self.kind = nil
+  self.expacID = nil
+  self.subclassID = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.frame:Hide()

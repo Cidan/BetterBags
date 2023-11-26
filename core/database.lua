@@ -32,4 +32,12 @@ function DB:SetBagView(kind, view)
   DB.data.profile.views[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'] = view
 end
 
+function DB:GetCategoryFilter(kind, filter)
+  return DB.data.profile.categoryFilters[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'][filter]
+end
+
+function DB:SetCategoryFilter(kind, filter, value)
+  DB.data.profile.categoryFilters[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'][filter] = value
+end
+
 DB:Enable()

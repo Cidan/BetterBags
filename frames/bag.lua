@@ -461,6 +461,49 @@ local function createContextMenu(bag)
     }
   })
 
+  -- Category filter menu for selecting how categories are created in grid view.
+  table.insert(menuList, {
+    text = L:G("Section Categories"),
+    hasArrow = true,
+    notCheckable = true,
+    menuList = {
+      {
+        text = L:G("Type"),
+        checked = function() return database:GetCategoryFilter(bag.kind, "Type") end,
+        func = function()
+          context:Hide()
+          database:SetCategoryFilter(bag.kind, "Type", not database:GetCategoryFilter(bag.kind, "Type"))
+          bag:Wipe()
+          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+        end
+      },
+      {
+        text = L:G("Expansion"),
+        tooltipTitle = L:G("Expansion"),
+        tooltipText = L:G("If enabled, will categorize items by expansion."),
+        checked = function() return database:GetCategoryFilter(bag.kind, "Expansion") end,
+        func = function()
+          context:Hide()
+          database:SetCategoryFilter(bag.kind, "Expansion", not database:GetCategoryFilter(bag.kind, "Expansion"))
+          bag:Wipe()
+          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+        end
+      },
+      {
+        text = L:G("Trade Skill"),
+        tooltipTitle = L:G("Trade Skill"),
+        tooltipText = L:G("If enabled, will categorize items by trade skill."),
+        checked = function() return database:GetCategoryFilter(bag.kind, "TradeSkill") end,
+        func = function()
+          context:Hide()
+          database:SetCategoryFilter(bag.kind, "TradeSkill", not database:GetCategoryFilter(bag.kind, "TradeSkill"))
+          bag:Wipe()
+          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+        end
+      }
+    }
+  })
+
   -- Show bag slot toggle.
   table.insert(menuList, {
     text = L:G("Show Bags"),

@@ -27,8 +27,8 @@ templates\container.xml
 
 core\boot.lua
 core\events.lua
-core\constants.lua
 core\localization.lua
+core\constants.lua
 core\database.lua
 core\hooks.lua
 

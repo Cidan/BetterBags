@@ -7,9 +7,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field data table<string, string>
 local L = addon:NewModule('Localization')
 
-function L:OnInitialize()
-  self.data = {}
-end
+-- Data is set outside of the initialization function so that
+-- it loads when the file is read.
+L.data = {}
 
 -- G returns the localized string for the given key.
 -- If no localized string is found, the key is returned.

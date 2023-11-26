@@ -2,6 +2,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
 ---@class Constants: AceModule
 local const = addon:NewModule('Constants')
 
@@ -81,6 +84,59 @@ const.BAG_VIEW = {
   LIST = 3,
 }
 
+const.EXPANSION_TYPE = {
+  LE_EXPANSION_CLASSIC = 0,
+  LE_EXPANSION_BURNING_CRUSADE = 1,
+  LE_EXPANSION_WRATH_OF_THE_LICH_KING = 2,
+  LE_EXPANSION_CATACLYSM = 3,
+  LE_EXPANSION_MISTS_OF_PANDARIA = 4,
+  LE_EXPANSION_WARLORDS_OF_DRAENOR = 5,
+  LE_EXPANSION_LEGION = 6,
+  LE_EXPANSION_BATTLE_FOR_AZEROTH = 7,
+  LE_EXPANSION_SHADOWLANDS = 8,
+  LE_EXPANSION_DRAGONFLIGHT = 9,
+}
+
+---@class ExpansionMap
+---@type table<number, string>
+const.EXPANSION_MAP = {
+  [_G.LE_EXPANSION_CLASSIC] = _G.EXPANSION_NAME0,
+  [_G.LE_EXPANSION_BURNING_CRUSADE] = _G.EXPANSION_NAME1,
+  [_G.LE_EXPANSION_WRATH_OF_THE_LICH_KING] = _G.EXPANSION_NAME2,
+  [_G.LE_EXPANSION_CATACLYSM] = _G.EXPANSION_NAME3,
+  [_G.LE_EXPANSION_MISTS_OF_PANDARIA] = _G.EXPANSION_NAME4,
+  [_G.LE_EXPANSION_WARLORDS_OF_DRAENOR] = _G.EXPANSION_NAME5,
+  [_G.LE_EXPANSION_LEGION] = _G.EXPANSION_NAME6,
+  [_G.LE_EXPANSION_BATTLE_FOR_AZEROTH] = _G.EXPANSION_NAME7,
+  [_G.LE_EXPANSION_SHADOWLANDS] = _G.EXPANSION_NAME8,
+  [_G.LE_EXPANSION_DRAGONFLIGHT] = _G.EXPANSION_NAME9,
+}
+
+---@class TradeSkillMap
+---@type table<number, string>
+const.TRADESKILL_MAP = {
+	[ 0] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 0),   -- "Trade Goods (OBSOLETE)"
+	[ 1] = L:G("Engineering"),                                  -- "Parts"
+	[ 2] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 2),   -- "Explosives (OBSOLETE)"
+	[ 3] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 3),   -- "Devices (OBSOLETE)"
+	[ 4] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 4),   -- "Jewelcrafting"
+	[ 5] = L:G("Tailoring"),                                    -- "Cloth"
+	[ 6] = L:G("Leatherworking"),                               -- "Leather"
+	[ 7] = L:G("Mining"),                                       -- "Metal & Stone"
+	[ 8] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 8),   -- "Cooking"
+	[ 9] = L:G("Herbalism"),                                    -- "Herb"
+	[10] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 10), -- "Elemental"
+	[11] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 11), -- "Other"
+	[12] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 12), -- "Enchanting"
+	[13] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 13), -- "Materials (OBSOLETE)"
+	[14] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 14), -- "Item Enchantment (OBSOLETE)"
+	[15] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 15), -- "Weapon Enchantment - Obsolete"
+	[16] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 16), -- "Inscription"
+	[17] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 17), -- "Explosives and Devices (OBSOLETE)"
+	[18] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 18), -- "Optional Reagents"
+	[19] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 19), -- "Finishing Reagents"
+}
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
@@ -92,6 +148,18 @@ const.DATABASE_DEFAULTS = {
     views = {
       Backpack = const.BAG_VIEW.SECTION_GRID,
       Bank = const.BAG_VIEW.SECTION_GRID,
+    },
+    categoryFilters = {
+      Backpack = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+      },
+      Bank = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+      },
     }
   },
   char = {}

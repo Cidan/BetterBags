@@ -101,3 +101,27 @@ local BetterBagsBagPortraitTemplate = {}
 function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
 function BetterBagsBagPortraitTemplate:SetTitle(title) end
+
+
+_G.LE_EXPANSION_CLASSIC = 0
+_G.LE_EXPANSION_BURNING_CRUSADE = 1
+_G.LE_EXPANSION_WRATH_OF_THE_LICH_KING = 2
+_G.LE_EXPANSION_CATACLYSM = 3
+_G.LE_EXPANSION_MISTS_OF_PANDARIA = 4
+_G.LE_EXPANSION_WARLORDS_OF_DRAENOR = 5
+_G.LE_EXPANSION_LEGION = 6
+_G.LE_EXPANSION_BATTLE_FOR_AZEROTH = 7
+_G.LE_EXPANSION_SHADOWLANDS = 8
+_G.LE_EXPANSION_DRAGONFLIGHT = 9
+
+-- Write out all the expansion names.
+_G.EXPANSION_NAME0 = "Classic"
+_G.EXPANSION_NAME1 = "The Burning Crusade"
+_G.EXPANSION_NAME2 = "Wrath of the Lich King"
+_G.EXPANSION_NAME3 = "Cataclysm"
+_G.EXPANSION_NAME4 = "Mists of Pandaria"
+_G.EXPANSION_NAME5 = "Warlords of Draenor"
+_G.EXPANSION_NAME6 = "Legion"
+_G.EXPANSION_NAME7 = "Battle for Azeroth"
+_G.EXPANSION_NAME8 = "Shadowlands"
+_G.EXPANSION_NAME9 = "Dragonflight"
