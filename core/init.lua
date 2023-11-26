@@ -8,7 +8,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local L = addon:GetModule('Localization')
 
 ---@class Database: AceModule
-local DB = addon:GetModule('Database')
+local database = addon:GetModule('Database')
 
 ---@class BagFrame: AceModule
 local BagFrame = addon:GetModule('BagFrame')
@@ -58,7 +58,11 @@ function addon:HideBlizzardBags()
   for i = 1, 13 do
     _G["ContainerFrame"..i]:SetParent(sneakyFrame)
   end
-  BagsBar:SetParent(sneakyFrame)
+
+  if not database:GetShowBagButton() then
+    BagsBar:Hide()
+  end
+
   BankFrame:SetParent(sneakyFrame)
   BankFrame:SetScript("OnHide", nil)
   BankFrame:SetScript("OnShow", nil)
@@ -67,11 +71,11 @@ end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  self:HideBlizzardBags()
   sectionFrame:Enable()
   masque:Enable()
   context:Enable()
   items:Enable()
+  self:HideBlizzardBags()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)

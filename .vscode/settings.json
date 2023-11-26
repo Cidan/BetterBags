@@ -80,7 +80,8 @@
     "BANK_BAG_PURCHASE",
     "BANK",
     "COSTS_LABEL",
-    "BANK_BAG"
+    "BANK_BAG",
+    "show"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

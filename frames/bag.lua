@@ -543,6 +543,15 @@ local function createContextMenu(bag)
       end
     end
   })
+
+  table.insert(menuList, {
+    text = L:G("Show Bag Button"),
+    checked = function() return BagsBar:IsShown() end,
+    func = function()
+      BagsBar:SetShown(not BagsBar:IsShown())
+      database:SetShowBagButton(BagsBar:IsShown())
+    end
+  })
   return menuList
 end
 

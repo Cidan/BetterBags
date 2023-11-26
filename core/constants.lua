@@ -158,6 +158,7 @@ const.TRADESKILL_MAP = {
 const.DATABASE_DEFAULTS = {
   profile = {
     enabled = true,
+    showBagButton = true,
     positions = {
       Backpack = {},
       Bank = {},

@@ -40,4 +40,14 @@ function DB:SetCategoryFilter(kind, filter, value)
   DB.data.profile.categoryFilters[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'][filter] = value
 end
 
+---@param show boolean
+function DB:SetShowBagButton(show)
+  DB.data.profile.showBagButton = show
+end
+
+---@return boolean
+function DB:GetShowBagButton()
+  return DB.data.profile.showBagButton
+end
+
 DB:Enable()
