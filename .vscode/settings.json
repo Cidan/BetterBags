@@ -75,7 +75,8 @@
     "IsModifiedClick",
     "math",
     "GetItemInfo",
-    "C_NewItems"
+    "C_NewItems",
+    "BagsBar"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

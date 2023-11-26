@@ -3,7 +3,7 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
-function addon:OpenAllBags(requesterFrame)
+function addon:OpenAllBags()
   addon.Bags.Backpack:Show()
 end
 

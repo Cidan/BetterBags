@@ -58,6 +58,7 @@ function addon:HideBlizzardBags()
   for i = 1, 13 do
     _G["ContainerFrame"..i]:SetParent(sneakyFrame)
   end
+  BagsBar:SetParent(sneakyFrame)
   BankFrame:SetParent(sneakyFrame)
   BankFrame:SetScript("OnHide", nil)
   BankFrame:SetScript("OnShow", nil)

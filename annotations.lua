@@ -67,6 +67,9 @@ ContainerFrameCombinedBags = {}
 ---@class BankFrame: Frame
 BankFrame = {}
 
+---@class BagsBar: Frame
+BagsBar = {}
+
 ---@class DLAPI
 DLAPI = {}
 
