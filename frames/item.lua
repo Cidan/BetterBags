@@ -36,6 +36,7 @@ local debug = addon:GetModule('Debug')
 ---@field info ContainerItemInfo
 ---@field kind BagKind
 ---@field expacID number
+---@field classID number
 ---@field subclassID number
 ---@field IconTexture Texture
 ---@field Count FontString
@@ -82,7 +83,7 @@ function itemProto:SetItem(i)
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
-  if const.BANK_BAGS[bagid] then
+  if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
     self.kind = const.BAG_KIND.BACKPACK
@@ -104,6 +105,7 @@ function itemProto:SetItem(i)
   sellPrice, classID, subclassID, bindType, expacID,
   setID, isCraftingReagent = GetItemInfo(i:GetItemID() or 0)
   self.expacID = expacID
+  self.classID = classID
   self.subclassID = subclassID
   self.itemType = itemType or "unknown"
   self.itemSubType = itemSubType or "unknown"
@@ -171,6 +173,7 @@ function itemProto:GetCategory()
   if self.info.quality == Enum.ItemQuality.Poor then
     return L:G('Junk')
   end
+
   local category = ""
 
   -- Add the type filter to the category if enabled.
@@ -179,7 +182,7 @@ function itemProto:GetCategory()
   end
 
   -- Add the tradeskill filter to the category if enabled.
-  if database:GetCategoryFilter(self.kind, "TradeSkill") then
+  if self.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill") then
     if category ~= "" then
       category = category .. " - "
     end
@@ -188,6 +191,7 @@ function itemProto:GetCategory()
 
   -- Add the expansion filter to the category if enabled.
   if database:GetCategoryFilter(self.kind, "Expansion") then
+    if not self.expacID then return L:G('Unknown') end
     if category ~= "" then
       category = category .. " - "
     end
@@ -224,6 +228,7 @@ function itemProto:ClearItem()
   self.name = nil
   self.kind = nil
   self.expacID = nil
+  self.classID = nil
   self.subclassID = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)

@@ -117,6 +117,16 @@ function bagProto:Wipe()
   wipe(self.sections)
 end
 
+function bagProto:Refresh()
+  if self.kind == const.BAG_KIND.BACKPACK then
+    items:RefreshBackpack()
+  elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
+    items:RefreshBank()
+  else
+    items:RefreshReagentBank()
+  end
+end
+
 function bagProto:UpdateCellWidth()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
     self.content.maxCellWidth = 15
@@ -431,7 +441,7 @@ local function createContextMenu(bag)
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
           bag:Wipe()
-          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+          bag:Refresh()
         end
       },
       {
@@ -442,7 +452,7 @@ local function createContextMenu(bag)
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
           bag:Wipe()
-          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+          bag:Refresh()
         end
       },
       --[[
@@ -474,7 +484,7 @@ local function createContextMenu(bag)
           context:Hide()
           database:SetCategoryFilter(bag.kind, "Type", not database:GetCategoryFilter(bag.kind, "Type"))
           bag:Wipe()
-          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+          bag:Refresh()
         end
       },
       {
@@ -486,11 +496,11 @@ local function createContextMenu(bag)
           context:Hide()
           database:SetCategoryFilter(bag.kind, "Expansion", not database:GetCategoryFilter(bag.kind, "Expansion"))
           bag:Wipe()
-          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+          bag:Refresh()
         end
       },
       {
-        text = L:G("Trade Skill"),
+        text = L:G("Trade Skill (Reagents Only)"),
         tooltipTitle = L:G("Trade Skill"),
         tooltipText = L:G("If enabled, will categorize items by trade skill."),
         checked = function() return database:GetCategoryFilter(bag.kind, "TradeSkill") end,
@@ -498,7 +508,7 @@ local function createContextMenu(bag)
           context:Hide()
           database:SetCategoryFilter(bag.kind, "TradeSkill", not database:GetCategoryFilter(bag.kind, "TradeSkill"))
           bag:Wipe()
-          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+          bag:Refresh()
         end
       }
     }

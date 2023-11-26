@@ -90,6 +90,7 @@ local LibUIDropDownMenu = {}
 function LibUIDropDownMenu:Create_UIDropDownMenu(name, parent) end
 function LibUIDropDownMenu:EasyMenu_Initialize(frame, level, menuList, anchor, x, y, displayMode, autoHideDelay) end
 function LibUIDropDownMenu:EasyMenu(menuList, frame, anchor, x, y, displayMode, autoHideDelay) end
+function LibUIDropDownMenu:HideDropDownMenu(level) end
 
 ---@class BetterBagsBagPortraitTemplate
 ---@field Bg Texture
