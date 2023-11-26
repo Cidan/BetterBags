@@ -59,6 +59,10 @@ function addon:HideBlizzardBags()
     _G["ContainerFrame"..i]:SetParent(sneakyFrame)
   end
 
+  MainMenuBarBackpackButton:SetScript("OnClick", function()
+    self:ToggleAllBags()
+  end)
+
   if not database:GetShowBagButton() then
     BagsBar:Hide()
   end
@@ -80,10 +84,15 @@ function addon:OnEnable()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
 
+  --[[
+  self:SecureHook('OpenAllBags')
+  self:SecureHook('OpenBackpack')
+  self:SecureHook('ToggleBackpack')
+  self:SecureHook('CloseBackpack')
   self:SecureHook('CloseAllBags')
-
-  self:SecureHook('OpenAllBags', self.OpenAllBags)
-  self:SecureHook('ToggleAllBags', self.ToggleAllBags)
+  --]]
+  self:SecureHook('CloseSpecialWindows')
+  self:SecureHook('ToggleAllBags')
 
   events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
 

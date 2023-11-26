@@ -81,7 +81,9 @@
     "BANK",
     "COSTS_LABEL",
     "BANK_BAG",
-    "show"
+    "show",
+    "MainMenuBar",
+    "MainMenuBarBackpackButton"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

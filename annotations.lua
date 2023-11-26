@@ -70,6 +70,9 @@ BankFrame = {}
 ---@class BagsBar: Frame
 BagsBar = {}
 
+---@class MainMenuBarBackpackButton: Button
+MainMenuBarBackpackButton = {}
+
 ---@class DLAPI
 DLAPI = {}
 
