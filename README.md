@@ -5,6 +5,11 @@ Better Bags is a bag replacement addon for World of Warcraft, inspired by AdiBag
 
 Currently, Better Bags does not contain all the features from AdiBags yet, but will slowly incorporate more and more changes over time.
 
+## Downloads
+* [Wago Addons](https://addons.wago.io/addons/betterbags/versions?stability=stable)
+* CurseForce (TBD, await approval)
+
+
 # Screenshots
 
 <p align="center">
