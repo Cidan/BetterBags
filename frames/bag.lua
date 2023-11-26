@@ -33,6 +33,9 @@ local database = addon:GetModule('Database')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class MoneyFrame: AceModule
+local money = addon:GetModule('MoneyFrame')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -52,6 +55,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field kind BagKind
 ---@field frame Frame The fancy frame of the bag.
 ---@field leftHeader Frame The top left header of the bag.
+---@field bottomBar Frame The bottom bar of the bag.
 ---@field content Grid The main content frame of the bag.
 ---@field recentItems Section The recent items section.
 ---@field freeSlots Section The free slots section.
@@ -63,6 +67,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field isReagentBank boolean
 ---@field decorator Texture
 ---@field bg Texture
+---@field moneyFrame Money
 local bagProto = {}
 
 function bagProto:Show()
@@ -222,7 +227,7 @@ function bagProto:DrawOneBag(dirtyItems)
   -- Redraw the world.
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 28 + self.leftHeader:GetHeight())
+  self.frame:SetHeight(h + 28 + self.bottomBar:GetHeight() + self.leftHeader:GetHeight())
 end
 
 -- DrawSectionGridBag draws all items in sections according to their configured type.
@@ -388,7 +393,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   end
 
   self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight() + recentH)
+  self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight() + self.bottomBar:GetHeight() + recentH)
 end
 
 -- DrawSectionListBag draws the bag as a scrollable list of sections with a small icon
@@ -620,6 +625,18 @@ function bagFrame:Create(kind)
   leftHeader:Show()
   b.leftHeader = leftHeader
 
+  local bottomBar = CreateFrame("Frame", nil, b.frame)
+  bottomBar:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMLEFT", 0, 6)
+  bottomBar:SetPoint("TOPRIGHT", b.frame, "BOTTOMRIGHT", 0, 40)
+  bottomBar:Show()
+  b.bottomBar = bottomBar
+
+  if kind == const.BAG_KIND.BACKPACK then
+    local moneyFrame = money:Create()
+    moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", 0, 0)
+    moneyFrame.frame:SetParent(b.frame)
+    b.moneyFrame = moneyFrame
+  end
   --debug:DrawDebugBorder(leftHeader, 1, 1, 1)
 
   local bagButton = CreateFrame("Button")

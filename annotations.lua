@@ -110,6 +110,9 @@ function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
 function BetterBagsBagPortraitTemplate:SetTitle(title) end
 
+---@class FontString
+local FontString = {}
+function FontString:SetScript(event, func) end
 
 _G.LE_EXPANSION_CLASSIC = 0
 _G.LE_EXPANSION_BURNING_CRUSADE = 1
