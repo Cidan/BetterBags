@@ -32,7 +32,6 @@ local bagButtonProto = {}
 
 ---@class bagSlots
 ---@field frame Frame
----@field title FontString
 ---@field content Grid
 local bagSlotProto = {}
 
@@ -41,8 +40,8 @@ function bagSlotProto:Draw()
     cell:Draw()
   end
   local w, h = self.content:Draw()
-  self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + self.title:GetHeight() + 12)
+  self.frame:SetWidth(w + 20)
+  self.frame:SetHeight(h + 38)
 end
 
 function bagSlotProto:SetShown(shown)
@@ -75,29 +74,14 @@ function BagSlots:CreatePanel(kind)
   setmetatable(b, {__index = bagSlotProto})
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BackdropTemplate")
+  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BetterBagsBagSlotPanelTemplate")
   b.frame = f
-  b.frame:SetBackdropColor(0, 0, 0, 1)
-  b.frame:SetBackdrop({
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-    edgeFile = LSM:Fetch(LSM.MediaType.BORDER, "Blizzard Tooltip"),
-    tile = true,
-    tileSize = 32,
-    edgeSize = 16,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 }
-  })
 
-  local title = b.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  title:SetText(L:G("Equipped Bags"))
-  title:SetFontObject("GameFontNormal")
-  title:SetHeight(18)
-  title:SetJustifyH("LEFT")
-  title:SetPoint("TOPLEFT", b.frame, "TOPLEFT", 6, -3)
-  b.title = title
+  b.frame:SetTitle(L:G("Equipped Bags"))
 
   b.content = grid:Create(b.frame)
-  b.content.frame:SetPoint("TOPLEFT", b.title, "BOTTOMLEFT", 3, 0)
-  b.content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", 0, 3)
+  b.content.frame:SetPoint("TOPLEFT", b.frame, "TOPLEFT", 12, -30)
+  b.content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -12, 12)
   b.content.maxCellWidth = 10
   b.content:Show()
 

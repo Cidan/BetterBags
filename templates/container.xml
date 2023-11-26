@@ -15,4 +15,6 @@
       </EditBox>
     </Frames>
   </Frame>
+  <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
+  </Frame>
 </Ui>

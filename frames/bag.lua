@@ -677,7 +677,7 @@ function bagFrame:Create(kind)
   b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)
-  slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 3)
+  slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
   slots.frame:SetParent(b.frame)
   b.slots = slots
 
