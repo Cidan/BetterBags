@@ -146,8 +146,6 @@ function itemProto:SetItem(i)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
-  self.button:RegisterEvent('BAG_UPDATE_COOLDOWN')
-  self.button:RegisterEvent('SPELL_UPDATE_COOLDOWN')
 
   self.frame:Show()
   self.button:Show()
@@ -166,16 +164,26 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
+  if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
+    self.kind = const.BAG_KIND.BANK
+  else
+    self.kind = const.BAG_KIND.BACKPACK
+  end
+
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
   SetItemButtonCount(self.button, count)
+
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
-    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
+  end
+
+  if self.kind == const.BAG_KIND.BANK then
+    self:AddToMasqueGroup(const.BAG_KIND.BANK)
   else
-    --TODO(lobato): detect right masque group
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
+
   self.button.ItemSlotBackground:Show()
   self.frame:Show()
   self.button:Show()
@@ -234,9 +242,6 @@ end
 function itemProto:ClearItem()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
-  self.button:UnregisterEvent('BAG_UPDATE_COOLDOWN')
-  self.button:UnregisterEvent('SPELL_UPDATE_COOLDOWN')
-  self.button:SetScript('OnEvent', nil)
   self.mixin = nil
   self.guid = nil
   self.name = nil

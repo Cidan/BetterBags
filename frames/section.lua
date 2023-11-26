@@ -122,6 +122,19 @@ function sectionFrame:_DoCreate()
   title:SetJustifyH("LEFT")
   title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 6, 0)
   title:SetPoint("TOPRIGHT", s.frame, "TOPRIGHT", -6, 0)
+  title:SetScript("OnEnter", function(t)
+    GameTooltip:SetOwner(t, "ANCHOR_TOPLEFT")
+    GameTooltip:SetText(t:GetText())
+    local info = strjoin(" ",
+      "\n",
+      "Item Count: " .. #s.content.cells
+    )
+    GameTooltip:AddLine(info, 1, 1, 1)
+    GameTooltip:Show()
+  end)
+  title:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
   s.title = title
 
   local content = grid:Create(s.frame)
