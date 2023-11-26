@@ -564,6 +564,7 @@ function bagFrame:Create(kind)
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
+  b.frame:SetFrameStrata("HIGH")
   b.frame:Hide()
   b.frame:SetSize(200, 200)
   b.frame.Bg:SetAlpha(0.8)
@@ -700,6 +701,11 @@ function bagFrame:Create(kind)
 
   b.frame.SearchBox:SetScript("OnTextChanged", function()
     local text = b.frame.SearchBox:GetText()
+    if text == "" or text == nil then
+      b.frame.SearchBox.Instructions:Show()
+    else
+      b.frame.SearchBox.Instructions:Hide()
+    end
     b:Search(text)
   end)
   -- Enable dragging of the bag frame.

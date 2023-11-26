@@ -95,11 +95,15 @@ function LibUIDropDownMenu:EasyMenu_Initialize(frame, level, menuList, anchor, x
 function LibUIDropDownMenu:EasyMenu(menuList, frame, anchor, x, y, displayMode, autoHideDelay) end
 function LibUIDropDownMenu:HideDropDownMenu(level) end
 
+---@class SearchBox: EditBox
+---@field Instructions FontString
+local SearchBox = {}
+
 ---@class BetterBagsBagPortraitTemplate
 ---@field Bg Texture
 ---@field PortraitContainer Frame
 ---@field CloseButton Button
----@field SearchBox EditBox
+---@field SearchBox SearchBox
 local BetterBagsBagPortraitTemplate = {}
 
 function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
