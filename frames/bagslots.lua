@@ -101,7 +101,7 @@ function BagSlots:CreatePanel(kind)
   b.content.maxCellWidth = 10
   b.content:Show()
 
-  local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS or const.BANK_ONLY_BAGS
+  local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS_LIST or const.BANK_ONLY_BAGS_LIST
   for i, bag in pairs(bags) do
     local iframe = bagButton:Create()
     iframe:SetBag(bag)

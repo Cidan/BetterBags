@@ -149,7 +149,6 @@ function itemProto:SetItem(i)
   self.button:RegisterEvent('BAG_UPDATE_COOLDOWN')
   self.button:RegisterEvent('SPELL_UPDATE_COOLDOWN')
 
-  --self.button:SetScript('OnEvent', function(_, event, ...) OnEvent(self, event, ...) end)
   self.frame:Show()
   self.button:Show()
 end

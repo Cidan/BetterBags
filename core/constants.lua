@@ -46,6 +46,15 @@ const.BANK_ONLY_BAGS = {
   [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
   [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
 }
+const.BANK_ONLY_BAGS_LIST = {
+  Enum.BagIndex.BankBag_1,
+  Enum.BagIndex.BankBag_2,
+  Enum.BagIndex.BankBag_3,
+  Enum.BagIndex.BankBag_4,
+  Enum.BagIndex.BankBag_5,
+  Enum.BagIndex.BankBag_6,
+  Enum.BagIndex.BankBag_7,
+}
 
 -- REAGENTBANK_BAGS contains the reagent bank bag.
 const.REAGENTBANK_BAGS = {
@@ -71,6 +80,14 @@ const.BACKPACK_ONLY_BAGS = {
   [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
   [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
+}
+
+const.BACKPACK_ONLY_BAGS_LIST = {
+  Enum.BagIndex.Bag_1,
+  Enum.BagIndex.Bag_2,
+  Enum.BagIndex.Bag_3,
+  Enum.BagIndex.Bag_4,
+  Enum.BagIndex.ReagentBag,
 }
 
 const.BACKPACK_ONLY_REAGENT_BAGS = {

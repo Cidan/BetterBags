@@ -36,9 +36,7 @@ Items that are marked as recent by the WoW client are put into their own special
 
 * Custom and pre-built themes, with automatic detection/theme application for popular addons such as ElvUI.
 * Currency and money tracking
-* Bank slot purchasing
 * Custom sorting functions for sections and items
 * Reagent bag markers for items in the reagent bag
-* Custom section breakdown selections (section by tradeskill, expansion, etc)
 * Stacking of non-stackable items
 * Classic/WotLK/etc support (retail only now, sorry!)

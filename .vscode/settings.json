@@ -76,7 +76,11 @@
     "math",
     "GetItemInfo",
     "C_NewItems",
-    "BagsBar"
+    "BagsBar",
+    "BANK_BAG_PURCHASE",
+    "BANK",
+    "COSTS_LABEL",
+    "BANK_BAG"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

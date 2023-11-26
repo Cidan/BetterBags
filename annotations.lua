@@ -133,3 +133,6 @@ _G.EXPANSION_NAME6 = "Legion"
 _G.EXPANSION_NAME7 = "Battle for Azeroth"
 _G.EXPANSION_NAME8 = "Shadowlands"
 _G.EXPANSION_NAME9 = "Dragonflight"
+
+_G.BANK_BAG_PURCHASE = "Purchasable Bag Slot"
+_G.COSTS_LABEL = "Cost:"
