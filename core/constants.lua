@@ -163,6 +163,16 @@ const.DATABASE_DEFAULTS = {
       Backpack = {},
       Bank = {},
     },
+    size = {
+      Backpack = {
+        columnCount = 3,
+        itemsPerRow = 5,
+      },
+      Bank = {
+        columnCount = 5,
+        itemsPerRow = 5,
+      }
+    },
     views = {
       Backpack = const.BAG_VIEW.SECTION_GRID,
       Bank = const.BAG_VIEW.SECTION_GRID,

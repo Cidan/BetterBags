@@ -50,4 +50,21 @@ function DB:GetShowBagButton()
   return DB.data.profile.showBagButton
 end
 
+---@param kind BagKind
+function DB:GetBagSizeInfo(kind)
+  return DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+end
+
+---@param kind BagKind
+---@param count number
+function DB:SetBagSizeColumn(kind, count)
+  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].columnCount = count
+end
+
+---@param kind BagKind
+---@param count number
+function DB:SetBagSizeItems(kind, count)
+  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].itemsPerRow = count
+end
+
 DB:Enable()

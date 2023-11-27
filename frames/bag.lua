@@ -142,10 +142,11 @@ function bagProto:Search(text)
 end
 
 function bagProto:UpdateCellWidth()
-  if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
-    self.content.maxCellWidth = 15
-  else
-    self.content.maxCellWidth = self.kind == const.BAG_KIND.BACKPACK and 3 or 5
+  local sizeInfo = database:GetBagSizeInfo(self.kind)
+  self.content.maxCellWidth = sizeInfo.columnCount
+
+  for _, section in pairs(self.sections) do
+    section.content.maxCellWidth = sizeInfo.itemsPerRow
   end
 end
 
@@ -234,6 +235,7 @@ end
 -- This is the tradition AdiBags style.
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawSectionGridBag(dirtyItems)
+  local sizeInfo = database:GetBagSizeInfo(self.kind)
   self:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
@@ -270,7 +272,6 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         if section == nil then
           section = sectionFrame:Create()
           section:SetTitle(category)
-          section.content.maxCellWidth = 5
           self.content:AddCell(category, section)
           self.sections[category] = section
         end
@@ -294,7 +295,6 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         if newSection == nil then
           newSection = sectionFrame:Create()
           newSection:SetTitle(newCategory)
-          newSection.content.maxCellWidth = 5
           self.content:AddCell(newCategory, newSection)
           self.sections[newCategory] = newSection
         end
@@ -321,7 +321,6 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           if section == nil then
             section = sectionFrame:Create()
             section:SetTitle(category)
-            section.content.maxCellWidth = 5
             self.content:AddCell(category, section)
             self.sections[category] = section
           end
@@ -354,11 +353,14 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   self.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
   self.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
 
+  self.recentItems.content.maxCellWidth = sizeInfo.itemsPerRow
   -- Loop through each section and draw it's size.
   local recentW, recentH = self.recentItems:Draw()
   for _, section in pairs(self.sections) do
+    section.content.maxCellWidth = sizeInfo.itemsPerRow
     section:Draw()
   end
+  self.freeSlots.content.maxCellWidth = sizeInfo.itemsPerRow
   self.freeSlots:Draw()
 
   -- Remove the freeSlots section.
@@ -530,6 +532,127 @@ local function createContextMenu(bag)
     }
   })
 
+  table.insert(menuList, {
+    text = L:G("Size"),
+    hasArrow = true,
+    notCheckable = true,
+    menuList = {
+      {
+        text = L:G("Columns"),
+        hasArrow = true,
+        notCheckable = true,
+        menuList = {
+          {
+            text = L:G("3"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 3 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeColumn(bag.kind, 3)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("4"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 4 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeColumn(bag.kind, 4)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("5"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 5 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeColumn(bag.kind, 5)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("6"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 6 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeColumn(bag.kind, 6)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("7"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 7 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeColumn(bag.kind, 7)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+        }
+      },
+      {
+        text = L:G("Items per Row"),
+        hasArrow = true,
+        notCheckable = true,
+        menuList = {
+          {
+            text = L:G("3"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 3 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeItems(bag.kind, 3)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("4"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 4 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeItems(bag.kind, 4)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("5"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 5 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeItems(bag.kind, 5)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("6"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 6 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeItems(bag.kind, 6)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("7"),
+            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 7 end,
+            func = function()
+              context:Hide()
+              database:SetBagSizeItems(bag.kind, 7)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+        }
+      },
+    }
+  })
   -- Show bag slot toggle.
   table.insert(menuList, {
     text = L:G("Show Bags"),
@@ -567,6 +690,7 @@ function bagFrame:Create(kind)
   b.itemsByBagAndSlot = {}
   b.sections = {}
   b.kind = kind
+  local sizeInfo = database:GetBagSizeInfo(b.kind)
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsBagPortraitTemplate
@@ -678,13 +802,12 @@ function bagFrame:Create(kind)
   local content = grid:Create(b.frame)
   content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
-  content.maxCellWidth = kind == const.BAG_KIND.BACKPACK and 3 or 5
   content:Show()
   b.content = content
 
   local recentItems = sectionFrame:Create()
   recentItems:SetTitle(L:G("Recent Items"))
-  recentItems.content.maxCellWidth = 5
+  recentItems.content.maxCellWidth = sizeInfo.itemsPerRow
   recentItems.frame:SetParent(b.frame)
   recentItems.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   recentItems.frame:Hide()
@@ -699,7 +822,7 @@ function bagFrame:Create(kind)
 
   local freeSlots = sectionFrame:Create()
   freeSlots:SetTitle(L:G("Free Slots"))
-  freeSlots.content.maxCellWidth = 5
+  freeSlots.content.maxCellWidth = sizeInfo.itemsPerRow
   b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)
