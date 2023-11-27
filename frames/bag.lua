@@ -532,6 +532,7 @@ local function createContextMenu(bag)
     }
   })
 
+  --TODO(lobato): Abstract this into a function.
   table.insert(menuList, {
     text = L:G("Size"),
     hasArrow = true,
