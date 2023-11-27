@@ -52,7 +52,7 @@ end
 
 -- HideBlizzardBags will hide the default Blizzard bag frames.
 function addon:HideBlizzardBags()
-  local sneakyFrame = CreateFrame("Frame")
+  local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
   sneakyFrame:Hide()
   ContainerFrameCombinedBags:SetParent(sneakyFrame)
   for i = 1, 13 do
@@ -74,7 +74,7 @@ function addon:HideBlizzardBags()
   end
 
   if not database:GetShowBagButton() then
-    BagsBar:Hide()
+    BagsBar:SetParent(sneakyFrame)
   end
 
   BankFrame:SetParent(sneakyFrame)

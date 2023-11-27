@@ -229,10 +229,19 @@ function context:CreateContextMenu(bag)
     -- Show the Blizzard bag button toggle.
     table.insert(menuList, {
       text = L:G("Show Bag Button"),
-      checked = function() return BagsBar:IsShown() end,
+      checked = function()
+        local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
+        return BagsBar:GetParent() ~= sneakyFrame
+      end,
       func = function()
-        BagsBar:SetShown(not BagsBar:IsShown())
-        database:SetShowBagButton(BagsBar:IsShown())
+        local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
+        local isShown = BagsBar:GetParent() ~= sneakyFrame
+        if isShown then
+          BagsBar:SetParent(sneakyFrame)
+        else
+          BagsBar:SetParent(UIParent)
+        end
+        database:SetShowBagButton(not isShown)
       end
     })
   end
