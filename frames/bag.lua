@@ -122,6 +122,8 @@ function bagProto:Wipe()
   wipe(self.sections)
 end
 
+-- Refresh will refresh this bag's item database, and then redraw the bag.
+-- This is what would be considered a "full refresh".
 function bagProto:Refresh()
   if self.kind == const.BAG_KIND.BACKPACK then
     items:RefreshBackpack()
@@ -132,6 +134,9 @@ function bagProto:Refresh()
   end
 end
 
+-- Search will search all items in the bag for the given text.
+-- If a match is found for an item, it will be highlighted, while
+-- items that don't match will dim.
 ---@param text? string
 function bagProto:Search(text)
   for _, bagData in pairs(self.itemsByBagAndSlot) do
@@ -141,6 +146,8 @@ function bagProto:Search(text)
   end
 end
 
+-- UpdateCellWidth will update the cell width of the bag based on the current
+-- bag view configuration.
 function bagProto:UpdateCellWidth()
   local sizeInfo = database:GetBagSizeInfo(self.kind)
   self.content.maxCellWidth = sizeInfo.columnCount
@@ -150,6 +157,7 @@ function bagProto:UpdateCellWidth()
   end
 end
 
+-- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:Draw(dirtyItems)
   self:UpdateCellWidth()
@@ -162,6 +170,21 @@ function bagProto:Draw(dirtyItems)
   end
   local text = self.frame.SearchBox:GetText()
   self:Search(text)
+end
+
+-- GetOrCreateSection will get an existing section by category,
+-- creating it if it doesn't exist.
+---@param category string
+---@return Section
+function bagProto:GetOrCreateSection(category)
+  local section = self.sections[category]
+  if section == nil then
+    section = sectionFrame:Create()
+    section:SetTitle(category)
+    self.content:AddCell(category, section)
+    self.sections[category] = section
+  end
+  return section
 end
 
 -- DrawOneBag draws all items as a combined container view, similar to the Blizzard
@@ -244,6 +267,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
     for sid, itemData in pairs(bagData) do
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
 
+      -- Capture information about free slots.
       if itemData:IsItemEmpty() then
         if bagid == Enum.BagIndex.ReagentBag then
           freeReagentSlotsData.count = freeReagentSlotsData.count + 1
@@ -266,15 +290,9 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         if newFrame:IsNewItem() then
           section = self.recentItems
         else
-          section = self.sections[category]
+          section = self:GetOrCreateSection(category)
         end
-        -- Create the section if it doesn't exist.
-        if section == nil then
-          section = sectionFrame:Create()
-          section:SetTitle(category)
-          self.content:AddCell(category, section)
-          self.sections[category] = section
-        end
+
         section.content:AddCell(itemData:GetItemGUID(), newFrame)
         newFrame:AddToMasqueGroup(self.kind)
         self.itemsByBagAndSlot[bagid][slotid] = newFrame
@@ -290,14 +308,8 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         local oldGuid = oldFrame.guid
         oldFrame:SetItem(itemData)
         local newCategory = oldFrame:GetCategory()
-        local newSection = self.sections[newCategory]
-        -- Create the section if it doesn't exist.
-        if newSection == nil then
-          newSection = sectionFrame:Create()
-          newSection:SetTitle(newCategory)
-          self.content:AddCell(newCategory, newSection)
-          self.sections[newCategory] = newSection
-        end
+        local newSection = self:GetOrCreateSection(newCategory)
+
         if oldCategory ~= newCategory then
           oldSection.content:RemoveCell(oldGuid, oldFrame)
           newSection.content:AddCell(oldFrame.guid, oldFrame)
@@ -317,13 +329,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         if not oldFrame:IsNewItem() and self.recentItems:HasItem(oldFrame) then
           self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)
           local category = oldFrame:GetCategory()
-          local section = self.sections[category]
-          if section == nil then
-            section = sectionFrame:Create()
-            section:SetTitle(category)
-            self.content:AddCell(category, section)
-            self.sections[category] = section
-          end
+          local section = self:GetOrCreateSection(category)
           section.content:AddCell(oldFrame.guid, oldFrame)
         end
       elseif itemData:IsItemEmpty() and oldFrame ~= nil then
@@ -433,252 +439,6 @@ end
 --- Bag Frame
 -------
 
----@param bag Bag
----@return MenuList[]
-local function createContextMenu(bag)
-  local menuList = {}
-
-  -- Context Menu title.
-  table.insert(menuList, {
-    text = L:G("BetterBags Menu"),
-    isTitle = true,
-    notCheckable = true
-  })
-
-  -- View menu for switching between one bag and section grid.
-  table.insert(menuList, {
-    text = L:G("View"),
-    hasArrow = true,
-    notCheckable = true,
-    menuList = {
-      {
-        text = L:G("One Bag"),
-        keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.ONE_BAG end,
-        func = function()
-          context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
-          bag:Wipe()
-          bag:Refresh()
-        end
-      },
-      {
-        text = L:G("Section Grid"),
-        keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_GRID end,
-        func = function()
-          context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
-          bag:Wipe()
-          bag:Refresh()
-        end
-      },
-      --[[
-      {
-        text = L:G("List"),
-        keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.LIST end,
-        func = function()
-          context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
-          bag:Wipe()
-          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
-        end
-      }
-      --]]
-    }
-  })
-
-  -- Category filter menu for selecting how categories are created in grid view.
-  table.insert(menuList, {
-    text = L:G("Section Categories"),
-    hasArrow = true,
-    notCheckable = true,
-    menuList = {
-      {
-        text = L:G("Type"),
-        checked = function() return database:GetCategoryFilter(bag.kind, "Type") end,
-        func = function()
-          context:Hide()
-          database:SetCategoryFilter(bag.kind, "Type", not database:GetCategoryFilter(bag.kind, "Type"))
-          bag:Wipe()
-          bag:Refresh()
-        end
-      },
-      {
-        text = L:G("Expansion"),
-        tooltipTitle = L:G("Expansion"),
-        tooltipText = L:G("If enabled, will categorize items by expansion."),
-        checked = function() return database:GetCategoryFilter(bag.kind, "Expansion") end,
-        func = function()
-          context:Hide()
-          database:SetCategoryFilter(bag.kind, "Expansion", not database:GetCategoryFilter(bag.kind, "Expansion"))
-          bag:Wipe()
-          bag:Refresh()
-        end
-      },
-      {
-        text = L:G("Trade Skill (Reagents Only)"),
-        tooltipTitle = L:G("Trade Skill"),
-        tooltipText = L:G("If enabled, will categorize items by trade skill."),
-        checked = function() return database:GetCategoryFilter(bag.kind, "TradeSkill") end,
-        func = function()
-          context:Hide()
-          database:SetCategoryFilter(bag.kind, "TradeSkill", not database:GetCategoryFilter(bag.kind, "TradeSkill"))
-          bag:Wipe()
-          bag:Refresh()
-        end
-      }
-    }
-  })
-
-  --TODO(lobato): Abstract this into a function.
-  table.insert(menuList, {
-    text = L:G("Size"),
-    hasArrow = true,
-    notCheckable = true,
-    menuList = {
-      {
-        text = L:G("Columns"),
-        hasArrow = true,
-        notCheckable = true,
-        menuList = {
-          {
-            text = L:G("3"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 3 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeColumn(bag.kind, 3)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("4"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 4 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeColumn(bag.kind, 4)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("5"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 5 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeColumn(bag.kind, 5)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("6"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 6 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeColumn(bag.kind, 6)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("7"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == 7 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeColumn(bag.kind, 7)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-        }
-      },
-      {
-        text = L:G("Items per Row"),
-        hasArrow = true,
-        notCheckable = true,
-        menuList = {
-          {
-            text = L:G("3"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 3 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeItems(bag.kind, 3)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("4"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 4 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeItems(bag.kind, 4)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("5"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 5 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeItems(bag.kind, 5)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("6"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 6 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeItems(bag.kind, 6)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-          {
-            text = L:G("7"),
-            checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == 7 end,
-            func = function()
-              context:Hide()
-              database:SetBagSizeItems(bag.kind, 7)
-              bag:Wipe()
-              bag:Refresh()
-            end
-          },
-        }
-      },
-    }
-  })
-  -- Show bag slot toggle.
-  table.insert(menuList, {
-    text = L:G("Show Bags"),
-    checked = function() return bag.slots:IsShown() end,
-    func = function()
-      if bag.slots:IsShown() then
-        bag.slots:Hide()
-      else
-        bag.slots:Draw()
-        bag.slots:Show()
-      end
-    end
-  })
-
-  table.insert(menuList, {
-    text = L:G("Show Bag Button"),
-    checked = function() return BagsBar:IsShown() end,
-    func = function()
-      BagsBar:SetShown(not BagsBar:IsShown())
-      database:SetShowBagButton(BagsBar:IsShown())
-    end
-  })
-  return menuList
-end
-
 --- Create creates a new bag view.
 ---@param kind BagKind
 ---@return Bag
@@ -686,7 +446,7 @@ function bagFrame:Create(kind)
   ---@class Bag
   local b = {}
   setmetatable(b, { __index = bagProto })
-  -- TODO(lobato): Compose the entire frame here.
+
   b.isReagentBank = false
   b.itemsByBagAndSlot = {}
   b.sections = {}
@@ -696,10 +456,7 @@ function bagFrame:Create(kind)
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsBagPortraitTemplate
   local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
-  --[[
-    local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagTemplate")
-    Mixin(f, PortraitFrameMixin)
-  ]]
+
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
@@ -707,50 +464,19 @@ function bagFrame:Create(kind)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
   b.frame.Bg:SetAlpha(0.8)
+  b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()
     if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
   end)
-
-  --
-  --  
-
---[[
-  local bg = b.frame:CreateTexture(name .. "BagBackground", "BACKGROUND", nil, -6)
-  bg:SetPoint("TOPLEFT", 2, -4)
-  bg:SetPoint("BOTTOMRIGHT", -2, 2)
-  bg:SetTexture('Interface\\FrameGeneral\\UI-Background-Rock')
-  bg:SetHorizTile(true)
-  bg:SetVertTile(true)
-  bg:SetAlpha(0.9)
-  b.bg = bg
-
-  local decorator = b.frame:CreateTexture(name .. "Decorator", "BORDER", "_UI-Frame-TopTileStreaks", -7)
-  decorator:SetPoint("TOPLEFT", 0, -6)
-  decorator:SetPoint("TOPRIGHT", -2, 6)
-  decorator:SetAlpha(0.9)
-  self.decorator = decorator
-  --]]
-
   b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
   b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
+
+  -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
-    --bgFile = "Interface\\FrameGeneral\\UI-Background-Rock",
-  -- Setup the default skin/theme.
-  -- TODO(lobato): Move this to a separate module for themes.
-  --[[
-  b.frame:SetBackdropColor(0, 0, 0, 1)
-  b.frame:SetBackdrop({
-    bgFile = LSM:Fetch(LSM.MediaType.BACKGROUND, "Blizzard Dialog Background"),
-    edgeFile = LSM:Fetch(LSM.MediaType.BORDER, "Blizzard Tooltip"),
-    tile = false,
-    tileEdge = true,
-    tileSize = 32,
-    edgeSize = 16,
-    insets = { left = 3, right = 3, top = 3, bottom = 3 }
-  })
-  ]]--
+
   -- Create the top left header.
+  -- TODO(lobato): This is obsolete, remove it eventually.
   ---@class Frame: BackdropTemplate
   local leftHeader = CreateFrame("Frame", nil, b.frame, "BackdropTemplate")
   leftHeader:SetPoint("TOPLEFT", 3, -20) -- -8 to -20
@@ -759,30 +485,28 @@ function bagFrame:Create(kind)
   leftHeader:Show()
   b.leftHeader = leftHeader
 
+  -- Create the bottom bar for currency and money display.
   local bottomBar = CreateFrame("Frame", nil, b.frame)
   bottomBar:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMLEFT", 0, 6)
   bottomBar:SetPoint("TOPRIGHT", b.frame, "BOTTOMRIGHT", 0, 40)
   bottomBar:Show()
   b.bottomBar = bottomBar
 
+  -- Create the money frame only in the player backpack bag.
   if kind == const.BAG_KIND.BACKPACK then
     local moneyFrame = money:Create()
     moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", 0, 0)
     moneyFrame.frame:SetParent(b.frame)
     b.moneyFrame = moneyFrame
   end
-  --debug:DrawDebugBorder(leftHeader, 1, 1, 1)
 
+  -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
   bagButton:EnableMouse(true)
   bagButton:SetParent(b.frame.PortraitContainer)
-  --bagButton:ClearBackdrop()
-  --bagButton:SetNormalTexture([[Interface\Icons\INV_Misc_Bag_07]])
-  bagButton:SetHighlightTexture([[Interface\Buttons\CheckButtonHilight]])
   bagButton:SetHighlightTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
   bagButton:SetWidth(40)
   bagButton:SetHeight(40)
-  --bagButton:SetPoint("LEFT", leftHeader, "LEFT", 4, 0)
   bagButton:SetPoint("TOPLEFT", b.frame.PortraitContainer, "TOPLEFT", -6, 2)
   bagButton:SetScript("OnEnter", function()
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
@@ -798,7 +522,6 @@ function bagFrame:Create(kind)
   end)
   bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-  b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
   content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
@@ -806,6 +529,7 @@ function bagFrame:Create(kind)
   content:Show()
   b.content = content
 
+  -- Create the recent items section.
   local recentItems = sectionFrame:Create()
   recentItems:SetTitle(L:G("Recent Items"))
   recentItems.content.maxCellWidth = sizeInfo.itemsPerRow
@@ -813,8 +537,8 @@ function bagFrame:Create(kind)
   recentItems.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   recentItems.frame:Hide()
   b.recentItems = recentItems
-  --debug:DrawDebugBorder(content.frame, 1, 1, 1)
 
+  -- Create the free bag slots buttons and free bag slot section.
   local freeBagSlotsButton = itemFrame:Create()
   b.freeBagSlotsButton = freeBagSlotsButton
 
@@ -858,6 +582,7 @@ function bagFrame:Create(kind)
     end
     b:Search(text)
   end)
+
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)
@@ -875,7 +600,7 @@ function bagFrame:Create(kind)
   Window.RestorePosition(b.frame)
 
   -- Setup the context menu.
-  local contextMenu = createContextMenu(b)
+  local contextMenu = context:CreateContextMenu(b)
   bagButton:SetScript("OnClick", function(_, e)
     if e == "LeftButton" then
       context:Show(contextMenu)
