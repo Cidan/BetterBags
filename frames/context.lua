@@ -199,6 +199,17 @@ function context:CreateContextMenu(bag)
   end
   table.insert(menuList, sizeMenu)
 
+  if bag.kind == const.BAG_KIND.BANK then
+    table.insert(menuList, {
+      text = L:G("Deposit All Reagents"),
+      notCheckable = true,
+      func = function()
+        PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
+        DepositReagentBank()
+      end
+    })
+  end
+
   -- Show bag slot toggle.
   table.insert(menuList, {
     text = L:G("Show Bags"),
@@ -213,14 +224,17 @@ function context:CreateContextMenu(bag)
     end
   })
 
-  -- Show the Blizzard bag button toggle.
-  table.insert(menuList, {
-    text = L:G("Show Bag Button"),
-    checked = function() return BagsBar:IsShown() end,
-    func = function()
-      BagsBar:SetShown(not BagsBar:IsShown())
-      database:SetShowBagButton(BagsBar:IsShown())
-    end
-  })
+
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    -- Show the Blizzard bag button toggle.
+    table.insert(menuList, {
+      text = L:G("Show Bag Button"),
+      checked = function() return BagsBar:IsShown() end,
+      func = function()
+        BagsBar:SetShown(not BagsBar:IsShown())
+        database:SetShowBagButton(BagsBar:IsShown())
+      end
+    })
+  end
   return menuList
 end
