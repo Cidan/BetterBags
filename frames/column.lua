@@ -74,7 +74,6 @@ function columnProto:Wipe()
   wipe(self.cells)
 end
 
---TODO(lobato): Figure out if we need to do cell compaction.
 -- Draw will full redraw this column and snap all cells into the correct
 -- position.
 ---@param style? GridCompactStyle
@@ -85,7 +84,7 @@ function columnProto:Draw(style)
   ---@type table
   ---@type table<any, number>
   local cellToRow = {}
-  ---@type table<number, {count: number}>
+  ---@type table<number, {count: number, cells: Section[]}>
   local rows = {}
   ---@type table<number, any>
   local firstCellInRow = {}
@@ -97,7 +96,7 @@ function columnProto:Draw(style)
       h = h + cell.frame:GetHeight()
       if style == const.GRID_COMPACT_STYLE.SIMPLE then
         cellToRow[cell] = 1
-        rows[1] = {count = #cell.content.cells}
+        rows[1] = {count = #cell.content.cells, cells = {cell --[[@as Section]]}}
         firstCellInRow[1] = cell
       end
     elseif style == const.GRID_COMPACT_STYLE.NONE then
@@ -109,18 +108,31 @@ function columnProto:Draw(style)
       if rowData.count + #cell.content.cells <= cell.content.maxCellWidth then
         cell.frame:SetPoint("TOPLEFT", aboveCell.frame, "TOPRIGHT", 0, 0)
         rows[cellToRow[aboveCell]].count = rows[cellToRow[aboveCell]].count + #cell.content.cells
+        table.insert(rows[cellToRow[aboveCell]].cells, cell)
         cellToRow[cell] = cellToRow[aboveCell]
       else
         local first = firstCellInRow[#rows]
         cell.frame:SetPoint("TOPLEFT", first.frame, "BOTTOMLEFT", 0, -4)
         h = h + cell.frame:GetHeight()
         local newRow = #rows + 1
-        rows[newRow] = {count = #cell.content.cells}
+        rows[newRow] = {count = #cell.content.cells, cells = {cell --[[@as Section]]}}
         cellToRow[cell] = newRow
         firstCellInRow[newRow] = cell
       end
     end
   end
+
+  if style == const.GRID_COMPACT_STYLE.SIMPLE then
+    for _, rowData in pairs(rows) do
+      local rowWidth = 0
+      for _, cell in pairs(rowData.cells) do
+        rowWidth = rowWidth + cell.frame:GetWidth()
+      end
+      ---@type number
+      w = math.max(w, rowWidth)
+    end
+  end
+
   self.frame:SetSize(w, h)
   self.frame:Show()
   return w, h
