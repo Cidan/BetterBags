@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class ColumnFrame: AceModule
 local columnFrame = addon:NewModule('ColumnFrame')
 
@@ -74,18 +77,43 @@ end
 --TODO(lobato): Figure out if we need to do cell compaction.
 -- Draw will full redraw this column and snap all cells into the correct
 -- position.
-function columnProto:Draw()
+---@param style? GridCompactStyle
+function columnProto:Draw(style)
+  if not style then style = const.GRID_COMPACT_STYLE.NONE end
   local w = self.minimumWidth
   local h = 0
+  ---@type table
+  ---@type table<any, number>
+  local cellToRow = {}
+  ---@type table<number, {count: number}>
+  local rows = {}
   for cellPos, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
     w = math.max(w, cell.frame:GetWidth())
     if cellPos == 1 then
       cell.frame:SetPoint("TOPLEFT", self.frame)
       h = h + cell.frame:GetHeight()
-    else
+      if style == const.GRID_COMPACT_STYLE.SIMPLE then
+        cellToRow[cell] = 1
+        rows[1] = {count = #cell.content.cells}
+      end
+    elseif style == const.GRID_COMPACT_STYLE.NONE then
       cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -4)
       h = h + cell.frame:GetHeight() + 4
+    elseif style == const.GRID_COMPACT_STYLE.SIMPLE then
+      local aboveCell = self.cells[cellPos - 1]
+      local rowData = rows[cellToRow[aboveCell]]
+      if rowData.count + #cell.content.cells <= cell.content.maxCellWidth then
+        cell.frame:SetPoint("TOPLEFT", aboveCell.frame, "TOPRIGHT", 4, 0)
+        rows[cellToRow[aboveCell]].count = rows[cellToRow[aboveCell]].count + #cell.content.cells
+        cellToRow[cell] = cellToRow[aboveCell]
+      else
+        cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -4)
+        h = h + cell.frame:GetHeight()
+        local newRow = #rows + 1
+        rows[newRow] = {count = #cell.content.cells}
+        cellToRow[cell] = newRow
+      end
     end
   end
   self.frame:SetSize(w, h)

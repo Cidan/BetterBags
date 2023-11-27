@@ -199,6 +199,33 @@ function context:CreateContextMenu(bag)
   end
   table.insert(menuList, sizeMenu)
 
+  table.insert(menuList, {
+    text = L:G("Compaction"),
+    notCheckable = true,
+    hasArrow = true,
+    menuList = {
+      {
+        text = L:G("None"),
+        checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.NONE end,
+        func = function()
+          context:Hide()
+          database:SetBagCompaction(bag.kind, const.GRID_COMPACT_STYLE.NONE)
+          bag:Wipe()
+          bag:Refresh()
+        end
+      },
+      {
+        text = L:G("Simple"),
+        checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.SIMPLE end,
+        func = function()
+          context:Hide()
+          database:SetBagCompaction(bag.kind, const.GRID_COMPACT_STYLE.SIMPLE)
+          bag:Wipe()
+          bag:Refresh()
+        end
+      }
+    }
+  })
   if bag.kind == const.BAG_KIND.BANK then
     table.insert(menuList, {
       text = L:G("Deposit All Reagents"),

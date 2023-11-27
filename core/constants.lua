@@ -170,6 +170,10 @@ const.DATABASE_DEFAULTS = {
       Backpack = {},
       Bank = {},
     },
+    compaction = {
+      Backpack = const.GRID_COMPACT_STYLE.NONE,
+      Bank = const.GRID_COMPACT_STYLE.NONE,
+    },
     size = {
       Backpack = {
         columnCount = 3,

@@ -102,32 +102,38 @@ function gridProto:Draw()
 
   local width = 0 ---@type number
   local height = 0
-  for i, cell in ipairs(self.cells) do
-    cell.frame:ClearAllPoints()
-    -- Get the current column for a given cell order, left to right.
-    local column = self.columns[i % self.maxCellWidth]
-    if column == nil then
-      -- Create the column if it doesn't exist and position it within
-      -- the grid.
-      column = columnFrame:Create()
-      column.frame:SetParent(self.frame)
-      self.columns[i % self.maxCellWidth] = column
-      if i == 1 then
-        column.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, 0)
-      else
-        local previousColumn = self.columns[i - 1]
-        column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 4, 0)
-      end
-    end
-    -- Add the cell to the column.
-    column:AddCell(cell)
-    self.cellToColumn[cell] = column
-    cell.frame:Show()
-  end
 
+  -- Do not compact the cells at all and draw them in their ordered
+  -- rows and columns.
+  if self.compactStyle == const.GRID_COMPACT_STYLE.SIMPLE or
+  self.compactStyle == const.GRID_COMPACT_STYLE.NONE then
+    for i, cell in ipairs(self.cells) do
+      cell.frame:ClearAllPoints()
+      -- Get the current column for a given cell order, left to right.
+      local column = self.columns[i % self.maxCellWidth]
+      if column == nil then
+        -- Create the column if it doesn't exist and position it within
+        -- the grid.
+        column = columnFrame:Create()
+        column.frame:SetParent(self.frame)
+        self.columns[i % self.maxCellWidth] = column
+        if i == 1 then
+          column.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, 0)
+        else
+          local previousColumn = self.columns[i - 1]
+          column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 4, 0)
+        end
+      end
+      -- Add the cell to the column.
+      column:AddCell(cell)
+      self.cellToColumn[cell] = column
+      cell.frame:Show()
+    end
+  elseif self.compactStyle == const.GRID_COMPACT_STYLE.COMPACT then
+  end
   -- Draw all the columns and their cells.
   for _, column in pairs(self.columns) do
-    local w, h = column:Draw()
+    local w, h = column:Draw(self.compactStyle)
     width = width + w + 4
     height = math.max(height, h)
   end

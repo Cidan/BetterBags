@@ -262,6 +262,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
   self:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
+  self.content.compactStyle = database:GetBagCompaction(self.kind)
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do
@@ -530,6 +531,7 @@ function bagFrame:Create(kind)
   local content = grid:Create(b.frame)
   content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
+  content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   content:Show()
   b.content = content
 

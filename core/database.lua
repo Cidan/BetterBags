@@ -67,4 +67,16 @@ function DB:SetBagSizeItems(kind, count)
   DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].itemsPerRow = count
 end
 
+---@param kind BagKind
+---@return GridCompactStyle
+function DB:GetBagCompaction(kind)
+  return DB.data.profile.compaction[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+end
+
+---@param kind BagKind
+---@param style GridCompactStyle
+function DB:SetBagCompaction(kind, style)
+  DB.data.profile.compaction[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'] = style
+end
+
 DB:Enable()
