@@ -9,6 +9,9 @@ local debug = addon:GetModule('Debug')
 ---@class ColumnFrame: AceModule
 local columnFrame = addon:GetModule('ColumnFrame')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class GridFrame: AceModule
 local grid = addon:NewModule('Grid')
 
@@ -26,6 +29,7 @@ local cellProto = {}
 ---@field columns Column[]
 ---@field cellToColumn table<Cell|Item|Section, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
+---@field compactStyle GridCompactStyle
 local gridProto = {}
 
 function gridProto:Show()
@@ -160,6 +164,7 @@ function grid:Create(parent)
   g.columns = {}
   g.cellToColumn = {}
   g.maxCellWidth = 5
+  g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   return g
 end
 

@@ -460,7 +460,11 @@ function bagFrame:Create(kind)
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
-  b.frame:SetFrameStrata("HIGH")
+  if b.kind == const.BAG_KIND.BACKPACK then
+    b.frame:SetFrameStrata("HIGH")
+  else
+    b.frame:SetFrameStrata("DIALOG")
+  end
   b.frame:Hide()
   b.frame:SetSize(200, 200)
   b.frame.Bg:SetAlpha(0.8)

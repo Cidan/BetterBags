@@ -101,6 +101,13 @@ const.BAG_VIEW = {
   LIST = 3,
 }
 
+---@enum GridCompactStyle
+const.GRID_COMPACT_STYLE = {
+  NONE = 0,
+  SIMPLE = 1,
+  COMPACT = 2,
+}
+
 const.EXPANSION_TYPE = {
   LE_EXPANSION_CLASSIC = 0,
   LE_EXPANSION_BURNING_CRUSADE = 1,
