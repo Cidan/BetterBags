@@ -194,6 +194,7 @@ function bagProto:DrawOneBag(dirtyItems)
   self:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
+  self.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   for bid, bagData in pairs(dirtyItems) do
     self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
     for sid, itemData in pairs(bagData) do

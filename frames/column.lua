@@ -87,6 +87,8 @@ function columnProto:Draw(style)
   local cellToRow = {}
   ---@type table<number, {count: number}>
   local rows = {}
+  ---@type table<number, any>
+  local firstCellInRow = {}
   for cellPos, cell in ipairs(self.cells) do
     cell.frame:ClearAllPoints()
     w = math.max(w, cell.frame:GetWidth())
@@ -96,6 +98,7 @@ function columnProto:Draw(style)
       if style == const.GRID_COMPACT_STYLE.SIMPLE then
         cellToRow[cell] = 1
         rows[1] = {count = #cell.content.cells}
+        firstCellInRow[1] = cell
       end
     elseif style == const.GRID_COMPACT_STYLE.NONE then
       cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -4)
@@ -104,15 +107,17 @@ function columnProto:Draw(style)
       local aboveCell = self.cells[cellPos - 1]
       local rowData = rows[cellToRow[aboveCell]]
       if rowData.count + #cell.content.cells <= cell.content.maxCellWidth then
-        cell.frame:SetPoint("TOPLEFT", aboveCell.frame, "TOPRIGHT", 4, 0)
+        cell.frame:SetPoint("TOPLEFT", aboveCell.frame, "TOPRIGHT", 0, 0)
         rows[cellToRow[aboveCell]].count = rows[cellToRow[aboveCell]].count + #cell.content.cells
         cellToRow[cell] = cellToRow[aboveCell]
       else
-        cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -4)
+        local first = firstCellInRow[#rows]
+        cell.frame:SetPoint("TOPLEFT", first.frame, "BOTTOMLEFT", 0, -4)
         h = h + cell.frame:GetHeight()
         local newRow = #rows + 1
         rows[newRow] = {count = #cell.content.cells}
         cellToRow[cell] = newRow
+        firstCellInRow[newRow] = cell
       end
     end
   end
