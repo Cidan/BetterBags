@@ -7,7 +7,7 @@ Currently, Better Bags does not contain all the features from AdiBags yet, but w
 
 ## Downloads
 * [Wago Addons](https://addons.wago.io/addons/betterbags/versions?stability=stable)
-* CurseForce (TBD, await approval)
+* [CurseForce](https://www.curseforge.com/wow/addons/better-bags)
 
 
 # Screenshots
