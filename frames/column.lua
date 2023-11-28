@@ -96,7 +96,7 @@ function columnProto:Draw(style)
       h = h + cell.frame:GetHeight()
       if style == const.GRID_COMPACT_STYLE.SIMPLE then
         cellToRow[cell] = 1
-        rows[1] = {count = #cell.content.cells, cells = {cell --[[@as Section]]}}
+        rows[1] = {count = cell:GetCellCount(), cells = {cell --[[@as Section]]}}
         firstCellInRow[1] = cell
       end
     elseif style == const.GRID_COMPACT_STYLE.NONE then
@@ -105,9 +105,9 @@ function columnProto:Draw(style)
     elseif style == const.GRID_COMPACT_STYLE.SIMPLE then
       local aboveCell = self.cells[cellPos - 1]
       local rowData = rows[cellToRow[aboveCell]]
-      if rowData.count + #cell.content.cells <= cell.content.maxCellWidth then
+      if rowData.count + cell:GetCellCount() <= cell:GetMaxCellWidth() then
         cell.frame:SetPoint("TOPLEFT", aboveCell.frame, "TOPRIGHT", 0, 0)
-        rows[cellToRow[aboveCell]].count = rows[cellToRow[aboveCell]].count + #cell.content.cells
+        rows[cellToRow[aboveCell]].count = rows[cellToRow[aboveCell]].count + cell:GetCellCount()
         table.insert(rows[cellToRow[aboveCell]].cells, cell)
         cellToRow[cell] = cellToRow[aboveCell]
       else
@@ -115,7 +115,7 @@ function columnProto:Draw(style)
         cell.frame:SetPoint("TOPLEFT", first.frame, "BOTTOMLEFT", 0, -4)
         h = h + cell.frame:GetHeight()
         local newRow = #rows + 1
-        rows[newRow] = {count = #cell.content.cells, cells = {cell --[[@as Section]]}}
+        rows[newRow] = {count = cell:GetCellCount(), cells = {cell --[[@as Section]]}}
         cellToRow[cell] = newRow
         firstCellInRow[newRow] = cell
       end

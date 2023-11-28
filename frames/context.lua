@@ -93,7 +93,6 @@ function context:CreateContextMenu(bag)
           bag:Refresh()
         end
       },
-      --[[
       {
         text = L:G("List"),
         keepShownOnClick = false,
@@ -102,10 +101,9 @@ function context:CreateContextMenu(bag)
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
           bag:Wipe()
-          if bag.kind == const.BAG_KIND.BACKPACK then items:RefreshBackpack() else items:RefreshBank() end
+          bag:Refresh()
         end
       }
-      --]]
     }
   })
 

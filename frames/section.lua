@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:NewModule('SectionFrame')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -24,15 +27,24 @@ local grid = addon:GetModule('Grid')
 ---@class Section
 ---@field frame Frame The raw frame of the section.
 ---@field title FontString The title of the section.
----@field content Grid The main content frame of the section.
+---@field private content Grid The main content frame of the section.
+---@field view BagView The current view of the section.
 local sectionProto = {}
 
--- Grid will render the section as a grid of icons.
-function sectionProto:Grid()
-end
+---@param view? BagView
+---@return number width
+---@return number height
+function sectionProto:Draw(view)
+  --view = const.BAG_VIEW.LIST
+  if view == nil or view == const.BAG_VIEW.SECTION_GRID then
+    return self:Grid()
+  end
 
--- List will render the section as a list of rows, with optional icons.
-function sectionProto:List()
+  if view == const.BAG_VIEW.LIST then
+    return self:List()
+  end
+  assert(false, 'invalid view')
+  return 0, 0
 end
 
 -- SetTitle will set the title of the section.
@@ -41,8 +53,29 @@ function sectionProto:SetTitle(text)
   self.title:SetText(text)
 end
 
+function sectionProto:AddCell(id, cell)
+  self.content:AddCell(id, cell)
+end
+
+function sectionProto:RemoveCell(id, cell)
+  self.content:RemoveCell(id, cell)
+end
+
+function sectionProto:GetMaxCellWidth()
+  return self.content.maxCellWidth
+end
+
+function sectionProto:SetMaxCellWidth(width)
+  self.content.maxCellWidth = width
+end
+
+function sectionProto:GetCellCount()
+  return #self.content.cells
+end
+
 function sectionProto:Wipe()
   self.content:Wipe()
+  self.view = const.BAG_VIEW.SECTION_GRID
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
 end
@@ -62,20 +95,23 @@ function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end
 
+local function sortFn(a, b)
+  ---@cast a +Item
+  ---@cast b +Item
+  if a == nil or b == nil or a.mixin == nil or b.mixin == nil then return false end
+  if a.mixin:GetItemQuality() == nil or b.mixin:GetItemQuality() == nil then return false end
+  if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
+    if a.mixin:GetItemName() == nil or b.mixin:GetItemName() == nil then return false end
+    return a.mixin:GetItemName() < b.mixin:GetItemName()
+  end
+  return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
+end
+
+-- Grid will render the section as a grid of icons.
 ---@return number width
 ---@return number height
-function sectionProto:Draw()
-  self.content:Sort(function (a, b)
-    ---@cast a +Item
-    ---@cast b +Item
-    if a == nil or b == nil or a.mixin == nil or b.mixin == nil then return false end
-    if a.mixin:GetItemQuality() == nil or b.mixin:GetItemQuality() == nil then return false end
-    if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
-      if a.mixin:GetItemName() == nil or b.mixin:GetItemName() == nil then return false end
-      return a.mixin:GetItemName() < b.mixin:GetItemName()
-    end
-    return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
-  end)
+function sectionProto:Grid()
+  self.content:Sort(sortFn)
   local w, h = self.content:Draw()
   self.content.frame:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
@@ -87,6 +123,12 @@ function sectionProto:Draw()
   self.frame:Show()
   self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
   return w+12, h + self.title:GetHeight() + 6
+end
+
+-- List will render the section as a list of rows, with optional icons.
+---@return number width
+---@return number height
+function sectionProto:List()
 end
 
 -------
@@ -111,6 +153,7 @@ function sectionFrame:_DoCreate()
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
+  s.view = const.BAG_VIEW.SECTION_GRID
 
   --debug:DrawDebugBorder(f, 1, 1, 1)
 

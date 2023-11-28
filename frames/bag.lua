@@ -109,8 +109,8 @@ end
 function bagProto:WipeFreeSlots()
   self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
   self.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
-  self.freeSlots.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
+  self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
+  self.freeSlots:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -153,7 +153,7 @@ function bagProto:UpdateCellWidth()
   self.content.maxCellWidth = sizeInfo.columnCount
 
   for _, section in pairs(self.sections) do
-    section.content.maxCellWidth = sizeInfo.itemsPerRow
+    section:SetMaxCellWidth(sizeInfo.itemsPerRow)
   end
 end
 
@@ -295,7 +295,7 @@ function bagProto:DrawSectionGridBag(dirtyItems)
           section = self:GetOrCreateSection(category)
         end
 
-        section.content:AddCell(itemData:GetItemGUID(), newFrame)
+        section:AddCell(itemData:GetItemGUID(), newFrame)
         newFrame:AddToMasqueGroup(self.kind)
         self.itemsByBagAndSlot[bagid][slotid] = newFrame
       elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() ~= itemData:GetItemGUID() then
@@ -313,11 +313,11 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         local newSection = self:GetOrCreateSection(newCategory)
 
         if oldCategory ~= newCategory then
-          oldSection.content:RemoveCell(oldGuid, oldFrame)
-          newSection.content:AddCell(oldFrame.guid, oldFrame)
+          oldSection:RemoveCell(oldGuid, oldFrame)
+          newSection:AddCell(oldFrame.guid, oldFrame)
         end
         if oldSection == self.recentItems then
-        elseif #oldSection.content.cells == 0 then
+        elseif oldSection:GetCellCount() == 0 then
           self.sections[oldCategory] = nil
           self.content:RemoveCell(oldCategory, oldSection)
           oldSection:Release()
@@ -329,22 +329,22 @@ function bagProto:DrawSectionGridBag(dirtyItems)
         -- The item in this same slot may no longer be a new item, i.e. it was moused over. If so, we
         -- need to resection it.
         if not oldFrame:IsNewItem() and self.recentItems:HasItem(oldFrame) then
-          self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)
+          self.recentItems:RemoveCell(oldFrame.guid, oldFrame)
           local category = oldFrame:GetCategory()
           local section = self:GetOrCreateSection(category)
-          section.content:AddCell(oldFrame.guid, oldFrame)
+          section:AddCell(oldFrame.guid, oldFrame)
         end
       elseif itemData:IsItemEmpty() and oldFrame ~= nil then
         -- The old frame exists, but the item is empty, so we need to delete it.
         self.itemsByBagAndSlot[bagid][slotid] = nil
         -- Special handling for the recent items section.
         if self.recentItems:HasItem(oldFrame) then
-          self.recentItems.content:RemoveCell(oldFrame.guid, oldFrame)
+          self.recentItems:RemoveCell(oldFrame.guid, oldFrame)
         else
           local section = self.sections[oldFrame:GetCategory()]
-          section.content:RemoveCell(oldFrame.guid, oldFrame)
+          section:RemoveCell(oldFrame.guid, oldFrame)
           -- Delete the section if it's empty as well.
-          if #section.content.cells == 0 then
+          if section:GetCellCount() == 0 then
             self.sections[oldFrame:GetCategory()] = nil
             self.content:RemoveCell(oldFrame:GetCategory(), section)
             section:Release()
@@ -355,20 +355,20 @@ function bagProto:DrawSectionGridBag(dirtyItems)
     end
   end
 
-  self.freeSlots.content:AddCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots.content:AddCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
+  self.freeSlots:AddCell("freeBagSlots", self.freeBagSlotsButton)
+  self.freeSlots:AddCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
 
   self.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
   self.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
 
-  self.recentItems.content.maxCellWidth = sizeInfo.itemsPerRow
+  self.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   -- Loop through each section and draw it's size.
   local recentW, recentH = self.recentItems:Draw()
   for _, section in pairs(self.sections) do
-    section.content.maxCellWidth = sizeInfo.itemsPerRow
+    section:SetMaxCellWidth(sizeInfo.itemsPerRow)
     section:Draw()
   end
-  self.freeSlots.content.maxCellWidth = sizeInfo.itemsPerRow
+  self.freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
   self.freeSlots:Draw()
 
   -- Remove the freeSlots section.
@@ -411,6 +411,12 @@ end
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function bagProto:DrawSectionListBag(dirtyItems)
   self:WipeFreeSlots()
+  for bid, bagData in pairs(dirtyItems) do
+    self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
+    for sid, itemData in pairs(bagData) do
+      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
+    end
+  end
 end
 
 function bagProto:ToggleReagentBank()
@@ -539,7 +545,7 @@ function bagFrame:Create(kind)
   -- Create the recent items section.
   local recentItems = sectionFrame:Create()
   recentItems:SetTitle(L:G("Recent Items"))
-  recentItems.content.maxCellWidth = sizeInfo.itemsPerRow
+  recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   recentItems.frame:SetParent(b.frame)
   recentItems.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   recentItems.frame:Hide()
@@ -554,7 +560,7 @@ function bagFrame:Create(kind)
 
   local freeSlots = sectionFrame:Create()
   freeSlots:SetTitle(L:G("Free Slots"))
-  freeSlots.content.maxCellWidth = sizeInfo.itemsPerRow
+  freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
   b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)
