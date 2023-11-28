@@ -187,7 +187,7 @@ function items:RefreshBag(bagid, bankBag)
 
     --TODO(lobato): Remove this line in the future once bag drawing has
     -- been updated to use the dirty items table structure.
-    dirty[bagid][slot] = item
+    --dirty[bagid][slot] = item
 
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
