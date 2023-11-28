@@ -63,13 +63,13 @@ function views:OneBagView(bag, dirtyItems)
   bag.content:Sort(function (a, b)
     ---@cast a +Item
     ---@cast b +Item
-    if not a.mixin or not b.mixin then return false end
-    if a.mixin:GetItemQuality() == nil or b.mixin:GetItemQuality() == nil then return false end
-    if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
-      if a.mixin:GetItemName() == nil or b.mixin:GetItemName() == nil then return false end
-      return a.mixin:GetItemName() < b.mixin:GetItemName()
+    if not a:GetMixin() or not b:GetMixin() then return false end
+    if a:GetMixin():GetItemQuality() == nil or b:GetMixin():GetItemQuality() == nil then return false end
+    if a:GetMixin():GetItemQuality() == b:GetMixin():GetItemQuality() then
+      if a:GetMixin():GetItemName() == nil or b:GetMixin():GetItemName() == nil then return false end
+      return a:GetMixin():GetItemName() < b:GetMixin():GetItemName()
     end
-    return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
+    return a:GetMixin():GetItemQuality() > b:GetMixin():GetItemQuality()
   end)
 
   bag.content:AddCell("freeBagSlots", bag.freeBagSlotsButton)

@@ -64,7 +64,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field freeSlots Section The free slots section.
 ---@field freeBagSlotsButton Item The free bag slots button.
 ---@field freeReagentBagSlotsButton Item The free reagent bag slots button.
----@field itemsByBagAndSlot table<number, table<number, Item>>
+---@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
 ---@field sections table<string, Section>
 ---@field slots bagSlots
 ---@field isReagentBank boolean

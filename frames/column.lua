@@ -132,7 +132,6 @@ function columnProto:Draw(style)
       w = math.max(w, rowWidth)
     end
   end
-
   self.frame:SetSize(w, h)
   self.frame:Show()
   return w, h

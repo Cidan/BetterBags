@@ -58,7 +58,7 @@ function views:GridView(bag, dirtyItems)
         section:AddCell(itemData:GetItemGUID(), newFrame)
         newFrame:AddToMasqueGroup(bag.kind)
         bag.itemsByBagAndSlot[bagid][slotid] = newFrame
-      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() ~= itemData:GetItemGUID() then
+      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame:GetMixin():GetItemGUID() ~= itemData:GetItemGUID() then
         -- This case handles the situation where the item in this slot no longer matches the item displayed.
         -- The old frame exists, so we need to update it.
         local oldCategory = oldFrame:GetCategory()
@@ -82,7 +82,7 @@ function views:GridView(bag, dirtyItems)
           bag.content:RemoveCell(oldCategory, oldSection)
           oldSection:Release()
         end
-      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() == itemData:GetItemGUID() then
+      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame:GetMixin():GetItemGUID() == itemData:GetItemGUID() then
         -- This case handles when the item in this slot is the same as the item displayed.
         oldFrame:SetItem(itemData)
 

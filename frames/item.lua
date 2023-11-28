@@ -26,7 +26,7 @@ local debug = addon:GetModule('Debug')
 
 ---@class Item
 ---@field name string
----@field mixin ItemMixin
+---@field private mixin ItemMixin
 ---@field guid string
 ---@field frame Frame
 ---@field button ItemButton
@@ -67,10 +67,10 @@ local children = {
 -- OnEvent is the event handler for the item button.
 ---@param i Item
 local function OnEvent(i)
-  if i.mixin == nil then
+  if i:GetMixin() == nil then
     return
   end
-  i.button:UpdateCooldown(i.mixin:GetItemIcon())
+  i.button:UpdateCooldown(i:GetMixin():GetItemIcon())
 end
 
 ---@param text? string
@@ -236,6 +236,11 @@ function itemProto:IsNewItem()
     return true
   end
   return C_NewItems.IsNewItem(self.mixin:GetItemLocation():GetBagAndSlot())
+end
+
+---@return ItemMixin
+function itemProto:GetMixin()
+  return self.mixin
 end
 
 function itemProto:Release()

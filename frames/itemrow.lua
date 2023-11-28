@@ -21,14 +21,74 @@ local L = addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class ItemFrame: AceModule
+local itemFrame = addon:GetModule('ItemFrame')
+
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')
 
 
 ---@class ItemRow
+---@field frame Frame
+---@field button Item
+---@field rowButton ItemButton
+---@field text FontString
 local itemRowProto = {}
 
+---@param i ItemMixin
+function itemRowProto:SetItem(i)
+  self.button:SetItem(i)
+
+  local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
+  self.rowButton:SetID(slotid)
+  self.rowButton:SetHasItem(i:GetItemIcon())
+  self.rowButton:UpdateNewItem(i:GetItemQuality())
+  self.frame:SetID(bagid)
+  self.text:SetText(i:GetItemName())
+  self.frame:Show()
+  self.rowButton:Show()
+end
+
 function itemRowProto:ClearItem()
+  self.button:ClearItem()
+
+  self.rowButton:SetID(0)
+  self.frame:SetID(0)
+  self.frame:Hide()
+  self.rowButton:Hide()
+end
+
+---@return ItemMixin
+function itemRowProto:GetMixin()
+  return self.button:GetMixin()
+end
+
+---@return string
+function itemRowProto:GetCategory()
+  return self.button:GetCategory()
+end
+
+---@return boolean
+function itemRowProto:IsNewItem()
+  return self.button:IsNewItem()
+end
+
+---@param kind BagKind
+function itemRowProto:AddToMasqueGroup(kind)
+  self.button:AddToMasqueGroup(kind)
+end
+
+---@return string
+function itemRowProto:GetGUID()
+  return self.button:GetMixin():GetItemGUID() or ""
+end
+
+function itemRowProto:Release()
+  item._pool:Release(self)
+end
+
+function itemRowProto:UpdateSearch(text)
+  self.button:UpdateSearch(text)
 end
 
 local buttonCount = 0
@@ -48,12 +108,32 @@ function item:_DoCreate()
   local i = setmetatable({}, { __index = itemRowProto })
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
-  local name = format("BetterBagsItemButton%d", buttonCount)
+  local name = format("BetterBagsRowItemButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
   local p = CreateFrame("Frame")
+  ---@class ItemButton
+  local rowButton = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
+  rowButton:SetAllPoints(p)
+  i.rowButton = rowButton
+  i.frame = p
+
+  local button = itemFrame:Create()
+  button.frame:SetParent(i.rowButton)
+  button.frame:SetPoint("LEFT", i.rowButton)
+  i.frame:SetHeight(button.frame:GetHeight())
+  i.button = button
+
+  local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  text:SetParent(i.frame)
+  text:SetPoint("RIGHT", i.frame)
+  text:SetHeight(30)
+  i.text = text
+  i.frame:SetSize(300, 45)
+  i.frame:Show()
+
   --[[
   ---@class ItemButton
   local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
