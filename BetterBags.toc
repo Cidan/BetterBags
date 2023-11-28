@@ -44,6 +44,7 @@ frames\context.lua
 frames\column.lua
 frames\grid.lua
 frames\item.lua
+frames\itemrow.lua
 frames\section.lua
 frames\bagbutton.lua
 frames\bagslots.lua

@@ -163,5 +163,5 @@ function views:GridView(bag, dirtyItems)
   end
 
   bag.frame:SetWidth(w + 12)
-  bag.frame:SetHeight(h + 24 + bag.leftHeader:GetHeight() + bag.bottomBar:GetHeight() + recentH) 
+  bag.frame:SetHeight(h + 24 + bag.leftHeader:GetHeight() + bag.bottomBar:GetHeight() + recentH)
 end
