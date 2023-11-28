@@ -21,6 +21,8 @@ local debug = addon:GetModule('Debug')
 ---@field _container ContinuableContainer
 ---@field _bankContainer ContinuableContainer
 ---@field _doingRefreshAll boolean
+---@field _itemCacheBackpack table<number, table<number, ItemMixin>>
+---@field _itemCacheBank table<number, table<number, ItemMixin>>
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -29,6 +31,8 @@ function items:OnInitialize()
   self.dirtyBankItems = {}
   self.itemsByBagAndSlot = {}
   self.previousItemGUID = {}
+  self._itemCacheBackpack = {}
+  self._itemCacheBank = {}
 end
 
 function items:OnEnable()
@@ -146,20 +150,44 @@ end
 ---@param bankBag boolean
 function items:RefreshBag(bagid, bankBag)
   local size = C_Container.GetContainerNumSlots(bagid)
-
+  local cache = bankBag and self._itemCacheBank or self._itemCacheBackpack
+  local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
+  cache[bagid] = cache[bagid] or {}
+  dirty[bagid] = dirty[bagid] or {}
   -- Loop through every container slot and create an item for it.
   for slot = 1, size do
     local item = Item:CreateFromBagAndSlot(bagid, slot)
-
+    local cachedItem = cache[bagid][slot]
     -- TODO(lobato): Store the previous item's state and compare it to current
     -- state to decide if we need to refresh this item.
 
-    -- Mark all items as dirty so they are refreshed.
-    if bankBag then
-      self.dirtyBankItems[bagid][slot] = item
-    else
-      self.dirtyItems[bagid][slot] = item
+    if not item:IsItemEmpty() and not cachedItem then
+      -- The item is new for an empty slot, mark it dirty and cache.
+      dirty[bagid][slot] = item
+      cache[bagid][slot] = item
+    elseif not item:IsItemEmpty() and cachedItem then
+      if item:GetItemGUID() ~= cachedItem:GetItemGUID() or
+      item:GetItemQuality() ~= cachedItem:GetItemQuality() or
+      item:GetItemName() ~= cachedItem:GetItemName() or
+      item:GetItemIcon() ~= cachedItem:GetItemIcon() or
+      item:GetStackCount() ~= cachedItem:GetStackCount() or
+      item:GetItemID() ~= cachedItem:GetItemID() then
+        -- The item is new for a non-empty slot, mark it dirty and cache.
+        dirty[bagid][slot] = item
+        cache[bagid][slot] = item
+      end
+    elseif item:IsItemEmpty() and cachedItem then
+      -- The item is empty, but we have a cached item, mark it dirty.
+      dirty[bagid][slot] = item
+      cache[bagid][slot] = nil
+    elseif item:IsItemEmpty() and not cachedItem then
+      -- The item is empty and we don't have a cached item, do nothing.
+      -- Leaving this block here for full clarity.
     end
+
+    --TODO(lobato): Remove this line in the future once bag drawing has
+    -- been updated to use the dirty items table structure.
+    dirty[bagid][slot] = item
 
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
