@@ -33,7 +33,8 @@ end
 
 function items:OnEnable()
   --events:RegisterMessage('items/RefreshAllItems/Done', printDirtyItems)
-  events:RegisterEvent('BAG_UPDATE_DELAYED', self.RefreshAll, self)
+  --events:RegisterEvent('BAG_UPDATE_DELAYED', self.RefreshAll, self)
+  events:BucketEvent('BAG_UPDATE_DELAYED', function() self:RefreshAll() end)
   events:RegisterEvent('BANKFRAME_OPENED', self.RefreshBank, self)
 end
 
