@@ -47,6 +47,12 @@ frames\item.lua
 frames\section.lua
 frames\bagbutton.lua
 frames\bagslots.lua
+
+views\views.lua
+views\gridview.lua
+views\oneview.lua
+views\listview.lua
+
 frames\bag.lua
 
 core\init.lua

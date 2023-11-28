@@ -28,23 +28,13 @@ local grid = addon:GetModule('Grid')
 ---@field frame Frame The raw frame of the section.
 ---@field title FontString The title of the section.
 ---@field private content Grid The main content frame of the section.
----@field view BagView The current view of the section.
 local sectionProto = {}
 
 ---@param view? BagView
 ---@return number width
 ---@return number height
 function sectionProto:Draw(view)
-  --view = const.BAG_VIEW.LIST
-  if view == nil or view == const.BAG_VIEW.SECTION_GRID then
-    return self:Grid()
-  end
-
-  if view == const.BAG_VIEW.LIST then
-    return self:List()
-  end
-  assert(false, 'invalid view')
-  return 0, 0
+  return self:Grid()
 end
 
 -- SetTitle will set the title of the section.
@@ -125,12 +115,6 @@ function sectionProto:Grid()
   return w+12, h + self.title:GetHeight() + 6
 end
 
--- List will render the section as a list of rows, with optional icons.
----@return number width
----@return number height
-function sectionProto:List()
-end
-
 -------
 --- Section Frame
 -------
@@ -153,7 +137,6 @@ function sectionFrame:_DoCreate()
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
-  s.view = const.BAG_VIEW.SECTION_GRID
 
   --debug:DrawDebugBorder(f, 1, 1, 1)
 

@@ -36,6 +36,9 @@ local context = addon:GetModule('Context')
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
 
+---@class Views: AceModule
+local views = addon:GetModule('Views')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -162,11 +165,11 @@ end
 function bagProto:Draw(dirtyItems)
   self:UpdateCellWidth()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
-    self:DrawOneBag(dirtyItems)
+    views:OneBagView(self, dirtyItems)
   elseif database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_GRID then
-    self:DrawSectionGridBag(dirtyItems)
+    views:GridView(self, dirtyItems)
   elseif database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
-    self:DrawSectionListBag(dirtyItems)
+    views:ListView(self, dirtyItems)
   end
   local text = self.frame.SearchBox:GetText()
   self:Search(text)
@@ -185,238 +188,6 @@ function bagProto:GetOrCreateSection(category)
     self.sections[category] = section
   end
   return section
-end
-
--- DrawOneBag draws all items as a combined container view, similar to the Blizzard
--- combined bag view.
----@param dirtyItems table<number, table<number, ItemMixin>>
-function bagProto:DrawOneBag(dirtyItems)
-  self:WipeFreeSlots()
-  local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
-  local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
-  self.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
-  for bid, bagData in pairs(dirtyItems) do
-    self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
-    for sid, itemData in pairs(bagData) do
-      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
-
-      if itemData:IsItemEmpty() then
-        if bagid == Enum.BagIndex.ReagentBag then
-          freeReagentSlotsData.count = freeReagentSlotsData.count + 1
-          freeReagentSlotsData.bagid = bagid
-          freeReagentSlotsData.slotid = slotid
-        else
-          freeSlotsData.count = freeSlotsData.count + 1
-          freeSlotsData.bagid = bagid
-          freeSlotsData.slotid = slotid
-        end
-      end
-
-      local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
-
-      -- The old frame does not exist, so we need to create a new one.
-      if oldFrame == nil and not itemData:IsItemEmpty() then
-        local newFrame = itemFrame:Create()
-        newFrame:SetItem(itemData)
-        newFrame:AddToMasqueGroup(self.kind)
-        self.content:AddCell(itemData:GetItemGUID(), newFrame)
-        self.itemsByBagAndSlot[bagid][slotid] = newFrame
-      elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
-        -- The old frame exists, so we need to update it.
-        oldFrame:SetItem(itemData)
-      elseif itemData:IsItemEmpty() and oldFrame ~= nil then
-        -- The old frame exists, but the item is empty, so we need to delete it.
-        self.itemsByBagAndSlot[bid][sid] = nil
-        self.content:RemoveCell(oldFrame.guid, oldFrame)
-        oldFrame:Release()
-      end
-    end
-  end
-
-  self.content:Sort(function (a, b)
-    ---@cast a +Item
-    ---@cast b +Item
-    if not a.mixin or not b.mixin then return false end
-    if a.mixin:GetItemQuality() == nil or b.mixin:GetItemQuality() == nil then return false end
-    if a.mixin:GetItemQuality() == b.mixin:GetItemQuality() then
-      if a.mixin:GetItemName() == nil or b.mixin:GetItemName() == nil then return false end
-      return a.mixin:GetItemName() < b.mixin:GetItemName()
-    end
-    return a.mixin:GetItemQuality() > b.mixin:GetItemQuality()
-  end)
-
-  self.content:AddCell("freeBagSlots", self.freeBagSlotsButton)
-  self.content:AddCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
-  self.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
-  self.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
-  -- Redraw the world.
-  local w, h = self.content:Draw()
-  self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 28 + self.bottomBar:GetHeight() + self.leftHeader:GetHeight())
-end
-
--- DrawSectionGridBag draws all items in sections according to their configured type.
--- This is the tradition AdiBags style.
----@param dirtyItems table<number, table<number, ItemMixin>>
-function bagProto:DrawSectionGridBag(dirtyItems)
-  local sizeInfo = database:GetBagSizeInfo(self.kind)
-  self:WipeFreeSlots()
-  local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
-  local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
-  self.content.compactStyle = database:GetBagCompaction(self.kind)
-  for bid, bagData in pairs(dirtyItems) do
-    self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
-    for sid, itemData in pairs(bagData) do
-      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
-
-      -- Capture information about free slots.
-      if itemData:IsItemEmpty() then
-        if bagid == Enum.BagIndex.ReagentBag then
-          freeReagentSlotsData.count = freeReagentSlotsData.count + 1
-          freeReagentSlotsData.bagid = bagid
-          freeReagentSlotsData.slotid = slotid
-        else
-          freeSlotsData.count = freeSlotsData.count + 1
-          freeSlotsData.bagid = bagid
-          freeSlotsData.slotid = slotid
-        end
-      end
-
-      local oldFrame = self.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
-      -- The old frame does not exist, so we need to create a new one.
-      if oldFrame == nil and not itemData:IsItemEmpty() then
-        local newFrame = itemFrame:Create()
-        newFrame:SetItem(itemData)
-        local category = newFrame:GetCategory()
-        local section ---@type Section|nil
-        if newFrame:IsNewItem() then
-          section = self.recentItems
-        else
-          section = self:GetOrCreateSection(category)
-        end
-
-        section:AddCell(itemData:GetItemGUID(), newFrame)
-        newFrame:AddToMasqueGroup(self.kind)
-        self.itemsByBagAndSlot[bagid][slotid] = newFrame
-      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() ~= itemData:GetItemGUID() then
-        -- This case handles the situation where the item in this slot no longer matches the item displayed.
-        -- The old frame exists, so we need to update it.
-        local oldCategory = oldFrame:GetCategory()
-        local oldSection = self.sections[oldCategory]
-        if self.recentItems:HasItem(oldFrame) then
-          oldSection = self.recentItems
-          oldCategory = self.recentItems.title:GetText()
-        end
-        local oldGuid = oldFrame.guid
-        oldFrame:SetItem(itemData)
-        local newCategory = oldFrame:GetCategory()
-        local newSection = self:GetOrCreateSection(newCategory)
-
-        if oldCategory ~= newCategory then
-          oldSection:RemoveCell(oldGuid, oldFrame)
-          newSection:AddCell(oldFrame.guid, oldFrame)
-        end
-        if oldSection == self.recentItems then
-        elseif oldSection:GetCellCount() == 0 then
-          self.sections[oldCategory] = nil
-          self.content:RemoveCell(oldCategory, oldSection)
-          oldSection:Release()
-        end
-      elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame.mixin:GetItemGUID() == itemData:GetItemGUID() then
-        -- This case handles when the item in this slot is the same as the item displayed.
-        oldFrame:SetItem(itemData)
-
-        -- The item in this same slot may no longer be a new item, i.e. it was moused over. If so, we
-        -- need to resection it.
-        if not oldFrame:IsNewItem() and self.recentItems:HasItem(oldFrame) then
-          self.recentItems:RemoveCell(oldFrame.guid, oldFrame)
-          local category = oldFrame:GetCategory()
-          local section = self:GetOrCreateSection(category)
-          section:AddCell(oldFrame.guid, oldFrame)
-        end
-      elseif itemData:IsItemEmpty() and oldFrame ~= nil then
-        -- The old frame exists, but the item is empty, so we need to delete it.
-        self.itemsByBagAndSlot[bagid][slotid] = nil
-        -- Special handling for the recent items section.
-        if self.recentItems:HasItem(oldFrame) then
-          self.recentItems:RemoveCell(oldFrame.guid, oldFrame)
-        else
-          local section = self.sections[oldFrame:GetCategory()]
-          section:RemoveCell(oldFrame.guid, oldFrame)
-          -- Delete the section if it's empty as well.
-          if section:GetCellCount() == 0 then
-            self.sections[oldFrame:GetCategory()] = nil
-            self.content:RemoveCell(oldFrame:GetCategory(), section)
-            section:Release()
-          end
-        end
-        oldFrame:Release()
-      end
-    end
-  end
-
-  self.freeSlots:AddCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots:AddCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
-
-  self.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
-  self.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
-
-  self.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  -- Loop through each section and draw it's size.
-  local recentW, recentH = self.recentItems:Draw()
-  for _, section in pairs(self.sections) do
-    section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-    section:Draw()
-  end
-  self.freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  self.freeSlots:Draw()
-
-  -- Remove the freeSlots section.
-  self.content:RemoveCell(self.freeSlots.title:GetText(), self.freeSlots)
-
-  -- Sort all sections by title.
-  self.content:Sort(function(a, b)
-    ---@cast a +Section
-    ---@cast b +Section
-    if not a.title or not b.title then return false end
-    return a.title:GetText() < b.title:GetText()
-  end)
-
-  -- Add the freeSlots section back to the end of all sections
-  self.content:AddCellToLastColumn(self.freeSlots.title:GetText(), self.freeSlots)
-
-  -- Position all sections and draw the main bag.
-  local w, h = self.content:Draw()
-  -- Reposition the content frame if the recent items section is empty.
-  if recentW == 0 then
-    self.content.frame:SetPoint("TOPLEFT", self.leftHeader, "BOTTOMLEFT", 3, -3)
-  else
-    self.content.frame:SetPoint("TOPLEFT", self.recentItems.frame, "BOTTOMLEFT", 3, -3)
-  end
-
-  --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
-  if w < 160 then
-    w = 160
-  end
-  if h == 0 then
-    h = 40
-  end
-
-  self.frame:SetWidth(w + 12)
-  self.frame:SetHeight(h + 24 + self.leftHeader:GetHeight() + self.bottomBar:GetHeight() + recentH)
-end
-
--- DrawSectionListBag draws the bag as a scrollable list of sections with a small icon
--- and the item name as a single row.
----@param dirtyItems table<number, table<number, ItemMixin>>
-function bagProto:DrawSectionListBag(dirtyItems)
-  self:WipeFreeSlots()
-  for bid, bagData in pairs(dirtyItems) do
-    self.itemsByBagAndSlot[bid] = self.itemsByBagAndSlot[bid] or {}
-    for sid, itemData in pairs(bagData) do
-      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
-    end
-  end
 end
 
 function bagProto:ToggleReagentBank()
