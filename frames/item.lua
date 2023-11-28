@@ -198,8 +198,11 @@ function itemProto:GetCategory()
 
   local category = ""
 
-  -- Add the type filter to the category if enabled.
-  if database:GetCategoryFilter(self.kind, "Type") then
+  -- Add the type filter to the category if enabled, but not to trade goods
+  -- when the tradeskill filter is enabled. This makes it so trade goods are
+  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
+  if database:GetCategoryFilter(self.kind, "Type") and not
+  (self.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) then
     category = category .. self.itemType
   end
 
