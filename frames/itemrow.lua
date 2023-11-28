@@ -113,27 +113,27 @@ function item:_DoCreate()
 
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
-  local p = CreateFrame("Frame")
+  local p = CreateFrame("Frame", nil, nil, "BackdropTemplate")
+  i.frame = p
   ---@class ItemButton
   local rowButton = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
-  rowButton:SetAllPoints(p)
+  --rowButton:SetAllPoints(i.frame)
   i.rowButton = rowButton
-  i.frame = p
 
   local button = itemFrame:Create()
-  button.frame:SetParent(i.rowButton)
-  button.frame:SetPoint("LEFT", i.rowButton)
-  i.frame:SetHeight(button.frame:GetHeight())
+  button.frame:SetParent(i.frame)
+  button.frame:SetAllPoints(i.frame)
+  --button.frame:SetPoint("LEFT", i.frame)
   i.button = button
 
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   text:SetParent(i.frame)
-  text:SetPoint("RIGHT", i.frame)
+  text:SetPoint("RIGHT", i.frame, "RIGHT")
   text:SetHeight(30)
   i.text = text
   i.frame:SetSize(300, 45)
-  i.frame:Show()
 
+  debug:DrawDebugBorder(i.frame, 1, 1, 1)
   --[[
   ---@class ItemButton
   local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
