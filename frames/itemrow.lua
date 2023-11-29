@@ -50,7 +50,7 @@ function itemRowProto:SetItem(i)
   elseif quality == Enum.ItemQuality.Common then
     self.text:SetVertexColor(1, 1, 1, 1)
   elseif quality == Enum.ItemQuality.Uncommon then
-    self.text:SetVertexColor(0.12, 1, 1, 1)
+    self.text:SetVertexColor(0.12, 1, 0, 1)
   elseif quality == Enum.ItemQuality.Rare then
     self.text:SetVertexColor(0.00, 0.44, 0.87, 1)
   elseif quality == Enum.ItemQuality.Epic then
