@@ -80,7 +80,7 @@ end
 ---@param kind BagKind
 function itemRowProto:AddToMasqueGroup(kind)
   --TODO(lobato): Style the individual row frame, maybe?
-  --self.button:AddToMasqueGroup(kind)
+  self.button:AddToMasqueGroup(kind)
 end
 
 ---@return string
@@ -130,12 +130,23 @@ function item:_DoCreate()
   local button = itemFrame:Create()
   i.button = button
 
-  local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   text:SetParent(i.frame)
-  text:SetPoint("RIGHT", i.frame, "RIGHT")
+  text:SetPoint("LEFT", i.button.frame, "RIGHT", 5, 0)
   text:SetHeight(30)
+  text:SetWidth(310)
+  text:SetTextHeight(28)
+  text:SetWordWrap(true)
+  text:SetJustifyH("LEFT")
   i.text = text
-  i.frame:SetSize(350, 45)
+
+  local border = i.frame:CreateTexture(nil, "BORDER")
+  border:SetColorTexture(0.1, 0.1, 0.1, 1)
+  border:SetPoint("BOTTOMLEFT", i.frame)
+  border:SetPoint("BOTTOMRIGHT", i.frame)
+  border:SetHeight(2)
+  self.border = border
+  i.frame:SetSize(350, 40)
 
   return i
 end
