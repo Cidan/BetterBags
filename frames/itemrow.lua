@@ -49,6 +49,8 @@ function itemRowProto:SetItem(i)
   self.text:SetText(i:GetItemName())
   self.frame:Show()
   self.rowButton:Show()
+  _G[self.rowButton:GetName().."NormalTexture"]:Hide()
+
 end
 
 function itemRowProto:ClearItem()
@@ -133,9 +135,8 @@ function item:_DoCreate()
   text:SetPoint("RIGHT", i.frame, "RIGHT")
   text:SetHeight(30)
   i.text = text
-  i.frame:SetSize(300, 45)
+  i.frame:SetSize(350, 45)
 
-  --i.rowButton:SetScript("OnScroll", function(...) p.c.f)
   return i
 end
 
