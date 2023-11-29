@@ -40,11 +40,30 @@ function itemRowProto:SetItem(i)
   self.button:SetItem(i)
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame)
-
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.rowButton:SetID(slotid)
   self.rowButton:SetHasItem(i:GetItemIcon())
   self.rowButton:UpdateNewItem(i:GetItemQuality())
+  local quality = i:GetItemQuality()
+  if quality == Enum.ItemQuality.Poor then
+    self.text:SetVertexColor(0.62, 0.62, 0.62, 1)
+  elseif quality == Enum.ItemQuality.Common then
+    self.text:SetVertexColor(1, 1, 1, 1)
+  elseif quality == Enum.ItemQuality.Uncommon then
+    self.text:SetVertexColor(0.12, 1, 1, 1)
+  elseif quality == Enum.ItemQuality.Rare then
+    self.text:SetVertexColor(0.00, 0.44, 0.87, 1)
+  elseif quality == Enum.ItemQuality.Epic then
+    self.text:SetVertexColor(0.64, 0.21, 0.93, 1)
+  elseif quality == Enum.ItemQuality.Legendary then
+    self.text:SetVertexColor(1, 0.50, 0, 1)
+  elseif quality == Enum.ItemQuality.Artifact then
+    self.text:SetVertexColor(0.90, 0.80, 0.50, 1)
+  elseif quality == Enum.ItemQuality.Heirloom then
+    self.text:SetVertexColor(0, 0.8, 1, 1)
+  elseif quality == Enum.ItemQuality.WoWToken then
+    self.text:SetVertexColor(0, 0.8, 1, 1)
+  end
   self.frame:SetID(bagid)
   self.text:SetText(i:GetItemName())
   self.frame:Show()
@@ -138,6 +157,7 @@ function item:_DoCreate()
   text:SetTextHeight(28)
   text:SetWordWrap(true)
   text:SetJustifyH("LEFT")
+  text:SetFont("Fonts\\FRIZQT__.TTF", 14, "")
   i.text = text
 
   local border = i.frame:CreateTexture(nil, "BORDER")
