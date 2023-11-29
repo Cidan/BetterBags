@@ -40,10 +40,14 @@ function itemRowProto:SetItem(i)
   self.button:SetItem(i)
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame)
+
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.rowButton:SetID(slotid)
+  ClearItemButtonOverlay(self.rowButton)
+  self.rowButton:UpdateExtended()
   self.rowButton:SetHasItem(i:GetItemIcon())
-  self.rowButton:UpdateNewItem(i:GetItemQuality())
+  self.rowButton.NewItemTexture:Hide()
+  self.rowButton.BattlepayItemTexture:Hide()
   local quality = i:GetItemQuality()
   if quality == Enum.ItemQuality.Poor then
     self.text:SetVertexColor(0.62, 0.62, 0.62, 1)
@@ -68,7 +72,8 @@ function itemRowProto:SetItem(i)
   self.text:SetText(i:GetItemName())
   self.frame:Show()
   self.rowButton:Show()
-  _G[self.rowButton:GetName().."NormalTexture"]:Hide()
+  --self.rowButton.NormalTexture:Hide()
+  --_G[self.rowButton:GetName().."NormalTexture"]:Hide()
 
 end
 
@@ -139,6 +144,7 @@ function item:_DoCreate()
   -- item taint introduced in 10.x
   local p = CreateFrame("Frame")
   i.frame = p
+  --TODO(lobato): Create our own template for row buttons.
   ---@class ItemButton
   local rowButton = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
   rowButton:SetAllPoints(i.frame)
@@ -166,6 +172,13 @@ function item:_DoCreate()
   border:SetPoint("BOTTOMRIGHT", i.frame)
   border:SetHeight(2)
   self.border = border
+
+  rowButton.NormalTexture:Hide()
+  rowButton.NormalTexture:SetParent(nil)
+  rowButton.NormalTexture = nil --i.frame:CreateTexture()
+  rowButton.PushedTexture:Hide()
+  rowButton.PushedTexture:SetParent(nil)
+  rowButton.PushedTexture = nil
   i.frame:SetSize(350, 40)
 
   return i
