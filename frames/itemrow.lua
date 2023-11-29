@@ -38,6 +38,8 @@ local itemRowProto = {}
 ---@param i ItemMixin
 function itemRowProto:SetItem(i)
   self.button:SetItem(i)
+  self.button.frame:SetParent(self.frame)
+  self.button.frame:SetPoint("LEFT", self.frame)
 
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.rowButton:SetID(slotid)
@@ -113,17 +115,16 @@ function item:_DoCreate()
 
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
-  local p = CreateFrame("Frame", nil, nil, "BackdropTemplate")
+  local p = CreateFrame("Frame")
   i.frame = p
   ---@class ItemButton
   local rowButton = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
-  --rowButton:SetAllPoints(i.frame)
+  rowButton:SetAllPoints(i.frame)
   i.rowButton = rowButton
 
+  -- Button properties are set when setting the item,
+  -- and setting them here will have no effect.
   local button = itemFrame:Create()
-  button.frame:SetParent(i.frame)
-  button.frame:SetAllPoints(i.frame)
-  --button.frame:SetPoint("LEFT", i.frame)
   i.button = button
 
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -133,24 +134,6 @@ function item:_DoCreate()
   i.text = text
   i.frame:SetSize(300, 45)
 
-  debug:DrawDebugBorder(i.frame, 1, 1, 1)
-  --[[
-  ---@class ItemButton
-  local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
-
-  p:SetSize(37, 37)
-  button:SetSize(37, 37)
-  button:RegisterForDrag("LeftButton")
-  button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  i.button = button
-  button:SetAllPoints(p)
-  i.frame = p
-
-  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
-  button.ItemSlotBackground:SetAllPoints(button);
-  button.ItemSlotBackground:Hide()
-  events:RegisterEvent('BAG_UPDATE_COOLDOWN', function(_, ...) OnEvent(i) end)
-  ]]--
   return i
 end
 
