@@ -43,11 +43,9 @@ function itemRowProto:SetItem(i)
 
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.rowButton:SetID(slotid)
-  ClearItemButtonOverlay(self.rowButton)
-  self.rowButton:UpdateExtended()
+  --ClearItemButtonOverlay(self.rowButton)
+  --self.rowButton:UpdateExtended()
   self.rowButton:SetHasItem(i:GetItemIcon())
-  self.rowButton.NewItemTexture:Hide()
-  self.rowButton.BattlepayItemTexture:Hide()
   local quality = i:GetItemQuality()
   if quality == Enum.ItemQuality.Poor then
     self.text:SetVertexColor(0.62, 0.62, 0.62, 1)
@@ -179,6 +177,9 @@ function item:_DoCreate()
   rowButton.PushedTexture:Hide()
   rowButton.PushedTexture:SetParent(nil)
   rowButton.PushedTexture = nil
+  rowButton.NewItemTexture:Hide()
+  rowButton.BattlepayItemTexture:Hide()
+
   i.frame:SetSize(350, 40)
 
   return i
