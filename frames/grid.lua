@@ -28,6 +28,7 @@ local cellProto = {}
 ---@field package inner Frame
 ---@field package bar MinimalScrollBar
 ---@field cells Cell[]|Item[]|Section[]
+---@field headers Section[]
 ---@field columns Column[]
 ---@field cellToColumn table<Cell|Item|Section, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
@@ -87,6 +88,12 @@ function gridProto:RemoveCell(id, cell)
   --assert(false, 'cell not found')
 end
 
+---@param header Section
+function gridProto:AddHeader(header)
+  header.frame:SetParent(self.inner)
+  table.insert(self.headers, header)
+end
+
 ---@private
 ---@return Frame|WowScrollBox
 function gridProto:GetFrame()
@@ -142,7 +149,11 @@ function gridProto:Draw()
         column.frame:SetParent(self.inner)
         self.columns[i % self.maxCellWidth] = column
         if i == 1 then
-          column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
+          if #self.headers > 0 and self.headers[#self.headers]:GetCellCount() > 0 then
+            column.frame:SetPoint("TOPLEFT", self.headers[#self.headers].frame, "BOTTOMLEFT", 0, -4)
+          else
+            column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
+          end
         else
           local previousColumn = self.columns[i - 1]
           column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 4, 0)
@@ -155,11 +166,24 @@ function gridProto:Draw()
     end
   elseif self.compactStyle == const.GRID_COMPACT_STYLE.COMPACT then
   end
+
   -- Draw all the columns and their cells.
   for _, column in pairs(self.columns) do
     local w, h = column:Draw(self.compactStyle)
     width = width + w + 4
     height = math.max(height, h)
+  end
+
+  for i, header in pairs(self.headers) do
+    if i == 1 then
+      header.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
+    else
+      local previousHeader = self.headers[i - 1]
+      header.frame:SetPoint("TOPLEFT", previousHeader.frame, "BOTTOMLEFT", 0, -4)
+    end
+    local w, h = header:Draw()
+    width = math.max(width, w)
+    height = height + h + 4
   end
 
   -- Remove the last 4 pixels of padding.
@@ -225,6 +249,7 @@ function grid:Create(parent)
   g.cells = {}
   g.columns = {}
   g.cellToColumn = {}
+  g.headers = {}
   g.maxCellWidth = 5
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   g.bar:Show()

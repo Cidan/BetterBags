@@ -326,9 +326,10 @@ function bagFrame:Create(kind)
   local recentItems = sectionFrame:Create()
   recentItems:SetTitle(L:G("Recent Items"))
   recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  recentItems.frame:SetParent(b.frame)
-  recentItems.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
+  --recentItems.frame:SetParent(b.frame)
+  --recentItems.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   recentItems.frame:Hide()
+  content:AddHeader(recentItems)
   b.recentItems = recentItems
 
   -- Create the free bag slots buttons and free bag slot section.

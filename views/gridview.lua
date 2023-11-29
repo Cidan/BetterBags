@@ -123,7 +123,6 @@ function views:GridView(bag, dirtyItems)
 
   bag.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   -- Loop through each section and draw it's size.
-  local recentW, recentH = bag.recentItems:Draw()
   for _, section in pairs(bag.sections) do
     section:SetMaxCellWidth(sizeInfo.itemsPerRow)
     section:Draw()
@@ -148,11 +147,7 @@ function views:GridView(bag, dirtyItems)
   -- Position all sections and draw the main bag.
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
-  if recentW == 0 then
-    bag.content:GetContainer():SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
-  else
-    bag.content:GetContainer():SetPoint("TOPLEFT", bag.recentItems.frame, "BOTTOMLEFT", 3, -3)
-  end
+  bag.content:GetContainer():SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
   if w < 160 then
@@ -163,5 +158,5 @@ function views:GridView(bag, dirtyItems)
   end
   bag.content:HideScrollBar()
   bag.frame:SetWidth(w + 12)
-  bag.frame:SetHeight(h + 24 + bag.leftHeader:GetHeight() + bag.bottomBar:GetHeight() + recentH)
+  bag.frame:SetHeight(h + 24 + bag.leftHeader:GetHeight() + bag.bottomBar:GetHeight())
 end
