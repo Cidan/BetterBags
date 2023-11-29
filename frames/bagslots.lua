@@ -80,8 +80,8 @@ function BagSlots:CreatePanel(kind)
   b.frame:SetTitle(L:G("Equipped Bags"))
 
   b.content = grid:Create(b.frame)
-  b.content.frame:SetPoint("TOPLEFT", b.frame, "TOPLEFT", 12, -30)
-  b.content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -12, 12)
+  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", 12, -30)
+  b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -12, 12)
   b.content.maxCellWidth = 10
   b.content:Show()
 

@@ -149,9 +149,9 @@ function views:GridView(bag, dirtyItems)
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
   if recentW == 0 then
-    bag.content.frame:SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
+    bag.content:GetContainer():SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
   else
-    bag.content.frame:SetPoint("TOPLEFT", bag.recentItems.frame, "BOTTOMLEFT", 3, -3)
+    bag.content:GetContainer():SetPoint("TOPLEFT", bag.recentItems.frame, "BOTTOMLEFT", 3, -3)
   end
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
@@ -161,7 +161,7 @@ function views:GridView(bag, dirtyItems)
   if h == 0 then
     h = 40
   end
-
+  bag.content:HideScrollBar()
   bag.frame:SetWidth(w + 12)
   bag.frame:SetHeight(h + 24 + bag.leftHeader:GetHeight() + bag.bottomBar:GetHeight() + recentH)
 end

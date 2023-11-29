@@ -240,9 +240,10 @@ function bagFrame:Create(kind)
   b.frame = f
   b.frame:SetParent(UIParent)
   if b.kind == const.BAG_KIND.BACKPACK then
-    b.frame:SetFrameStrata("HIGH")
+    b.frame:SetFrameStrata("MEDIUM")
+    b.frame:SetFrameLevel(500)
   else
-    b.frame:SetFrameStrata("DIALOG")
+    b.frame:SetFrameStrata("HIGH")
   end
   b.frame:Hide()
   b.frame:SetSize(200, 200)
@@ -307,8 +308,8 @@ function bagFrame:Create(kind)
 
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
-  content.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
-  content.frame:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
+  content:GetContainer():SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
+  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
   content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   content:Show()
   b.content = content

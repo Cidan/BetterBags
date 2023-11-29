@@ -148,9 +148,9 @@ function views:ListView(bag, dirtyItems)
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
   if recentW == 0 then
-    bag.content.frame:SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
+    bag.content:GetContainer():SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
   else
-    bag.content.frame:SetPoint("TOPLEFT", bag.recentItems.frame, "BOTTOMLEFT", 3, -3)
+    bag.content:GetContainer():SetPoint("TOPLEFT", bag.recentItems.frame, "BOTTOMLEFT", 3, -3)
   end
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
@@ -160,7 +160,33 @@ function views:ListView(bag, dirtyItems)
   if h == 0 then
     h = 40
   end
-
-  bag.frame:SetWidth(300)
+  bag.content:ShowScrollBar()
+  bag.frame:SetWidth(380)
   bag.frame:SetHeight(700)
 end
+
+--[[
+local ScrollBox = CreateFrame("Frame", nil, UIParent, "WowScrollBox")
+ScrollBox:SetPoint("CENTER")
+ScrollBox:SetSize(300, 300)
+ScrollBox:SetInterpolateScroll(true)
+
+local ScrollBar = CreateFrame("EventFrame", nil, UIParent, "MinimalScrollBar")
+ScrollBar:SetPoint("TOPLEFT", ScrollBox, "TOPRIGHT")
+ScrollBar:SetPoint("BOTTOMLEFT", ScrollBox, "BOTTOMRIGHT")
+ScrollBar:SetInterpolateScroll(true)
+
+local ScrollView = CreateScrollBoxLinearView()
+ScrollView:SetPanExtent(100)
+
+local ScrollChild = CreateFrame("Frame", nil, ScrollBox)
+ScrollChild:SetSize(300, 1500)
+ScrollChild.scrollable = true
+
+local ScrollChildFill = ScrollChild:CreateTexture()
+ScrollChildFill:SetAllPoints(ScrollChild)
+ScrollChildFill:SetColorTexture(1, 1, 1, 1)
+ScrollChildFill:SetGradient("VERTICAL", CreateColor(0, 0, 0, 1), CreateColor(1, 0, 0, 1))
+
+ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, ScrollView)
+--]]

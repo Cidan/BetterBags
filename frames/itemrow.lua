@@ -77,7 +77,8 @@ end
 
 ---@param kind BagKind
 function itemRowProto:AddToMasqueGroup(kind)
-  self.button:AddToMasqueGroup(kind)
+  --TODO(lobato): Style the individual row frame, maybe?
+  --self.button:AddToMasqueGroup(kind)
 end
 
 ---@return string
@@ -134,6 +135,7 @@ function item:_DoCreate()
   i.text = text
   i.frame:SetSize(300, 45)
 
+  --i.rowButton:SetScript("OnScroll", function(...) p.c.f)
   return i
 end
 

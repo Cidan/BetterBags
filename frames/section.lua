@@ -103,8 +103,8 @@ end
 function sectionProto:Grid()
   self.content:Sort(sortFn)
   local w, h = self.content:Draw()
-  self.content.frame:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
-  self.content.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
+  self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
   self.content:Show()
   if w == 0 then
     self.frame:Hide()
@@ -165,6 +165,7 @@ function sectionFrame:_DoCreate()
 
   local content = grid:Create(s.frame)
   content:Show()
+  content:HideScrollBar()
   s.content = content
   f:Show()
   return s

@@ -84,7 +84,9 @@
     "show",
     "MainMenuBar",
     "MainMenuBarBackpackButton",
-    "BagBarExpandToggle"
+    "BagBarExpandToggle",
+    "ScrollUtil",
+    "CreateScrollBoxLinearView"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",
@@ -97,6 +99,7 @@
     "type-check": "Any"
   },
   "Lua.diagnostics.groupSeverity": {
-    "strict": "Error"
+    "strict": "Error",
+    "unbalanced": "Error"
   }
 }

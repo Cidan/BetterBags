@@ -24,12 +24,16 @@ local cellProto = {}
 ------
 
 ---@class Grid
----@field frame Frame
+---@field package frame WowScrollBox
+---@field package inner Frame
+---@field package bar MinimalScrollBar
 ---@field cells Cell[]|Item[]|Section[]
 ---@field columns Column[]
 ---@field cellToColumn table<Cell|Item|Section, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
 ---@field compactStyle GridCompactStyle
+---@field private scrollable boolean
+---@field package scrollBox WowScrollBox
 local gridProto = {}
 
 function gridProto:Show()
@@ -83,6 +87,26 @@ function gridProto:RemoveCell(id, cell)
   --assert(false, 'cell not found')
 end
 
+---@private
+---@return Frame|WowScrollBox
+function gridProto:GetFrame()
+  if self.scrollable then
+    return self.scrollBox
+  end
+  return self.frame
+end
+
+function gridProto:GetContainer()
+  return self.frame
+end
+
+function gridProto:HideScrollBar()
+  self.bar:Hide()
+end
+
+function gridProto:ShowScrollBar()
+  self.bar:Show()
+end
 -- Sort will sort the cells in this grid using the given function.
 ---@param fn fun(a: `T`, b: `T`):boolean
 function gridProto:Sort(fn)
@@ -115,10 +139,10 @@ function gridProto:Draw()
         -- Create the column if it doesn't exist and position it within
         -- the grid.
         column = columnFrame:Create()
-        column.frame:SetParent(self.frame)
+        column.frame:SetParent(self.inner)
         self.columns[i % self.maxCellWidth] = column
         if i == 1 then
-          column.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, 0)
+          column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
         else
           local previousColumn = self.columns[i - 1]
           column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 4, 0)
@@ -142,7 +166,7 @@ function gridProto:Draw()
   if width > 4 then
     width = width - 4 ---@type number
   end
-
+  self.inner:SetSize(width, height)
   return width, height
 end
 
@@ -157,20 +181,54 @@ function gridProto:Wipe()
   wipe(self.cells)
 end
 
+---@private
+---@param g Grid
+---@param parent Frame
+---@return WowScrollBox
+function grid:CreateScrollFrame(g, parent, child)
+  local box = CreateFrame("Frame", nil, parent, "WowScrollBox") --[[@as WowScrollBox]]
+  box:SetAllPoints(parent)
+  box:SetInterpolateScroll(true)
+
+  local bar = CreateFrame("EventFrame", nil, box, "MinimalScrollBar")
+  bar:SetPoint("TOPLEFT", box, "TOPRIGHT", -10, 0)
+  bar:SetPoint("BOTTOMLEFT", box, "BOTTOMRIGHT", -10, 0)
+  bar:SetInterpolateScroll(true)
+
+  local view = CreateScrollBoxLinearView()
+  view:SetPanExtent(100)
+
+  child:SetParent(box)
+  child.scrollable = true
+  g.bar = bar
+  g.box = box
+  g.view = view
+  ScrollUtil.InitScrollBoxWithScrollBar(box, bar, view)
+  return box
+end
+
 -- Create will create a new grid frame.
 ---@param parent Frame
 ---@return Grid
 function grid:Create(parent)
   local g = setmetatable({}, { __index = gridProto })
-  ---@class Frame: BackdropTemplate
-  local f = CreateFrame('Frame', nil, nil, "BackdropTemplate")
-  f:SetParent(parent)
+  ---@class Frame
+  local c = CreateFrame("Frame")
+
+  ---@class WowScrollBox
+  local f = grid:CreateScrollFrame(g, parent, c)
+
+  --f:SetParent(parent)
   g.frame = f
+  g.inner = c
   g.cells = {}
   g.columns = {}
   g.cellToColumn = {}
   g.maxCellWidth = 5
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
+  g.bar:Show()
+  --g.scrollBox = grid:CreateScrollFrame(f)
+  --g.scrollBox:Hide()
   return g
 end
 
