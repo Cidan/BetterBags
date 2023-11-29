@@ -81,6 +81,10 @@ function sectionProto:HasItem(item)
   return false
 end
 
+function sectionProto:GetAllCells()
+  return self.content.cells
+end
+
 function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end

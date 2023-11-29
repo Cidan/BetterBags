@@ -177,6 +177,7 @@ function gridProto:Wipe()
   for _, cell in pairs(self.cells) do
     cell:Release()
   end
+  wipe(self.cellToColumn)
   wipe(self.columns)
   wipe(self.cells)
 end
