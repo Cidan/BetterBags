@@ -39,6 +39,9 @@ local money = addon:GetModule('MoneyFrame')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
+---@class Resize: AceModule
+local resize = addon:GetModule('Resize')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -412,7 +415,7 @@ function bagFrame:Create(kind)
       b:ToggleReagentBank()
     end
   end)
-
+  resize:MakeResizable(b.frame)
   return b
 end
 

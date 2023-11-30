@@ -39,6 +39,8 @@ theme\masque.lua
 
 data\items.lua
 
+util\resize.lua
+
 frames\money.lua
 frames\context.lua
 frames\column.lua
