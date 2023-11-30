@@ -18,6 +18,9 @@ local events = addon:GetModule('Events')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Color: AceModule
+local color = addon:GetModule('Color')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -136,6 +139,8 @@ function itemProto:SetItem(i)
      classID == Enum.ItemClass.Weapon or
      classID == Enum.ItemClass.Gem then
     self.ilvlText:SetText(tostring(effectiveIlvl) or "")
+    local r, g, b = color:GetItemLevelColor(effectiveIlvl)
+    self.ilvlText:SetTextColor(r, g, b, 1)
   end
 
   self.button.ItemSlotBackground:Hide()
@@ -343,7 +348,6 @@ function item:_DoCreate()
   button.ItemSlotBackground:Hide()
 
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-  ilvlText:SetTextColor(1, 1, 1, 1)
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
 
   i.ilvlText = ilvlText
