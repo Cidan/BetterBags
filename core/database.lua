@@ -94,4 +94,8 @@ function DB:SetBagCompaction(kind, style)
   DB.data.profile.compaction[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'] = style
 end
 
+function DB:GetItemLevelOptions(kind)
+  return DB.data.profile.itemLevel[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+end
+
 DB:Enable()

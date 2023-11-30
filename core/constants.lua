@@ -167,6 +167,16 @@ const.DATABASE_DEFAULTS = {
   profile = {
     enabled = true,
     showBagButton = true,
+    itemLevel = {
+      Backpack = {
+        enabled = true,
+        color = true
+      },
+      Bank = {
+        enabled = true,
+        color = true
+      }
+    },
     positions = {
       Backpack = {},
       Bank = {},

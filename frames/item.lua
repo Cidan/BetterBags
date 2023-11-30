@@ -126,13 +126,23 @@ function itemProto:SetItem(i)
     bound = C_Item.IsBound(l)
   end
 
-  if i.itemInfo.classID == Enum.ItemClass.Armor or
-     i.itemInfo.classID == Enum.ItemClass.Weapon or
-     i.itemInfo.classID == Enum.ItemClass.Gem then
-    self.ilvlText:SetText(tostring(i.itemInfo.effectiveIlvl) or "")
-    local r, g, b = color:GetItemLevelColor(i.itemInfo.effectiveIlvl)
-    self.ilvlText:SetTextColor(r, g, b, 1)
+  local ilvlOpts = database:GetItemLevelOptions(self.kind)
+  if ilvlOpts.enabled and
+    i.itemInfo.classID == Enum.ItemClass.Armor or
+    i.itemInfo.classID == Enum.ItemClass.Weapon or
+    i.itemInfo.classID == Enum.ItemClass.Gem then
+      self.ilvlText:SetText(tostring(i.itemInfo.effectiveIlvl) or "")
+      if ilvlOpts.color then
+        local r, g, b = color:GetItemLevelColor(i.itemInfo.effectiveIlvl)
+        self.ilvlText:SetTextColor(r, g, b, 1)
+      else
+        self.ilvlText:SetTextColor(1, 1, 1, 1)
+      end
+      self.ilvlText:Show()
+  else
+    self.ilvlText:Hide()
   end
+
 
   self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
