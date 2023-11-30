@@ -108,11 +108,11 @@ function gridProto:GetContainer()
 end
 
 function gridProto:HideScrollBar()
-  self.bar:Hide()
+  self.bar:SetAlpha(0)
 end
 
 function gridProto:ShowScrollBar()
-  self.bar:Show()
+  self.bar:SetAlpha(1)
 end
 -- Sort will sort the cells in this grid using the given function.
 ---@param fn fun(a: `T`, b: `T`):boolean
@@ -206,12 +206,13 @@ function gridProto:Wipe()
   wipe(self.cells)
 end
 
+local scrollFrameCounter = 0
 ---@private
 ---@param g Grid
 ---@param parent Frame
 ---@return WowScrollBox
 function grid:CreateScrollFrame(g, parent, child)
-  local box = CreateFrame("Frame", nil, parent, "WowScrollBox") --[[@as WowScrollBox]]
+  local box = CreateFrame("Frame", "BetterBagsScrollGrid"..scrollFrameCounter, parent, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetAllPoints(parent)
   box:SetInterpolateScroll(true)
 
@@ -229,6 +230,7 @@ function grid:CreateScrollFrame(g, parent, child)
   g.box = box
   g.view = view
   ScrollUtil.InitScrollBoxWithScrollBar(box, bar, view)
+  scrollFrameCounter = scrollFrameCounter + 1 
   return box
 end
 

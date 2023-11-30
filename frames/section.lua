@@ -121,9 +121,6 @@ function sectionProto:Grid()
     return 0, 0
   end
   self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
-  if self.fillWidth then
-    self.frame:SetWidth(self.frame:GetParent():GetWidth() + 12)
-  end
   self.frame:Show()
   return w+12, h + self.title:GetHeight() + 6
 end

@@ -157,6 +157,12 @@ end
 ---@param count number
 ---@param reagent boolean
 function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
+  if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
+    self.kind = const.BAG_KIND.BANK
+  else
+    self.kind = const.BAG_KIND.BACKPACK
+  end
+
   if count == 0 then
     self.button:Disable()
   else
@@ -165,12 +171,6 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button.minDisplayCount = -1
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
-
-  if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
-    self.kind = const.BAG_KIND.BANK
-  else
-    self.kind = const.BAG_KIND.BACKPACK
-  end
 
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
