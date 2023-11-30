@@ -28,6 +28,7 @@ local grid = addon:GetModule('Grid')
 ---@field frame Frame The raw frame of the section.
 ---@field title FontString The title of the section.
 ---@field private content Grid The main content frame of the section.
+---@field private fillWidth boolean
 local sectionProto = {}
 
 ---@param view? BagView
@@ -63,11 +64,16 @@ function sectionProto:GetCellCount()
   return #self.content.cells
 end
 
+function sectionProto:SetFillWidth(fill)
+  self.fillWidth = fill
+end
+
 function sectionProto:Wipe()
   self.content:Wipe()
   self.view = const.BAG_VIEW.SECTION_GRID
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
+  self.fillWidth = false
 end
 
 ---@param item Item
@@ -114,8 +120,11 @@ function sectionProto:Grid()
     self.frame:Hide()
     return 0, 0
   end
-  self.frame:Show()
   self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
+  if self.fillWidth then
+    self.frame:SetWidth(self.frame:GetParent():GetWidth() + 12)
+  end
+  self.frame:Show()
   return w+12, h + self.title:GetHeight() + 6
 end
 

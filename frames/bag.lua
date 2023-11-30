@@ -183,6 +183,12 @@ function bagProto:Draw(dirtyItems)
   self:Search(text)
 end
 
+function bagProto:OnResize()
+  if database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
+    views:UpdateListSize(self)
+  end
+end
+
 -- GetOrCreateSection will get an existing section by category,
 -- creating it if it doesn't exist.
 ---@param category string
@@ -191,6 +197,7 @@ function bagProto:GetOrCreateSection(category)
   local section = self.sections[category]
   if section == nil then
     section = sectionFrame:Create()
+    section.frame:SetParent(self.content.inner)
     section:SetTitle(category)
     self.content:AddCell(category, section)
     self.sections[category] = section
@@ -390,6 +397,9 @@ function bagFrame:Create(kind)
     Window.SavePosition(b.frame)
   end)
 
+  b.frame:SetScript("OnSizeChanged", function()
+    b:OnResize()
+  end)
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
 

@@ -20,6 +20,14 @@ function addon:OpenBackpack()
   addon.Bags.Backpack:Show()
 end
 
+function addon:ToggleBag()
+  print("toggle")
+end
+
+function addon:CloseBag()
+  print("Close Bag")
+end
+
 function addon:ToggleAllBags()
   addon.Bags.Backpack:Toggle()
 end

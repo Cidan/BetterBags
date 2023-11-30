@@ -16,6 +16,17 @@ local itemRowFrame = addon:GetModule('ItemRowFrame')
 local views = addon:GetModule('Views')
 
 ---@param bag Bag
+function views:UpdateListSize(bag)
+  local w, h = bag.frame:GetSize()
+  for _, section in pairs(bag.sections) do
+    section.frame:SetWidth(w - 35)
+    for _, cell in pairs(section:GetAllCells()) do
+      cell.frame:SetWidth(w - 35)
+    end
+  end
+end
+
+---@param bag Bag
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function views:ListView(bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind)
@@ -157,7 +168,7 @@ function views:ListView(bag, dirtyItems)
     h = 40
   end
   bag.content:ShowScrollBar()
-  bag.frame:SetWidth(380)
+  bag.frame:SetWidth(600)
   bag.frame:SetHeight(700)
 end
 
