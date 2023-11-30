@@ -36,7 +36,6 @@ local debug = addon:GetModule('Debug')
 ---@field itemType string
 ---@field itemSubType string
 ---@field masqueGroup string
----@field info ContainerItemInfo
 ---@field kind BagKind
 ---@field expacID number
 ---@field classID number
@@ -107,39 +106,31 @@ function itemProto:SetItem(i)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-  -- TODO(lobato): Move all this to the items.lua database.
-  local info = C_Container.GetContainerItemInfo(bagid, slotid)
-  self.info = info
+  local questInfo = i.questInfo
+  local info = i.containerInfo
   local readable = info and info.isReadable;
   local isFiltered = info and info.isFiltered;
   local noValue = info and info.hasNoValue;
-  local questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
   local isQuestItem = questInfo.isQuestItem;
   local questID = questInfo.questID;
   local isActive = questInfo.isActive
 
-  local itemName, itemLink, itemQuality,
-  itemLevel, itemMinLevel, itemType, itemSubType,
-  itemStackCount, itemEquipLoc, itemTexture,
-  sellPrice, classID, subclassID, bindType, expacID,
-  setID, isCraftingReagent = GetItemInfo(i:GetItemID() or 0)
-  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(i:GetItemLink())
-  self.expacID = expacID
-  self.classID = classID
-  self.subclassID = subclassID
-  self.itemType = itemType or "unknown"
-  self.itemSubType = itemSubType or "unknown"
+  self.expacID = i.itemInfo.expacID
+  self.classID = i.itemInfo.classID
+  self.subclassID = i.itemInfo.subclassID
+  self.itemType = i.itemInfo.itemType or "unknown"
+  self.itemSubType = i.itemInfo.itemSubType or "unknown"
   local l = i:GetItemLocation()
   local bound = false
   if l ~= nil then
     bound = C_Item.IsBound(l)
   end
 
-  if classID == Enum.ItemClass.Armor or
-     classID == Enum.ItemClass.Weapon or
-     classID == Enum.ItemClass.Gem then
-    self.ilvlText:SetText(tostring(effectiveIlvl) or "")
-    local r, g, b = color:GetItemLevelColor(effectiveIlvl)
+  if i.itemInfo.classID == Enum.ItemClass.Armor or
+     i.itemInfo.classID == Enum.ItemClass.Weapon or
+     i.itemInfo.classID == Enum.ItemClass.Gem then
+    self.ilvlText:SetText(tostring(i.itemInfo.effectiveIlvl) or "")
+    local r, g, b = color:GetItemLevelColor(i.itemInfo.effectiveIlvl)
     self.ilvlText:SetTextColor(r, g, b, 1)
   end
 
@@ -207,7 +198,7 @@ end
 function itemProto:GetCategory()
   if not self.kind then return L:G('Everything') end
   -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
-  if self.info.quality == Enum.ItemQuality.Poor then
+  if self:GetMixin().containerInfo.quality == Enum.ItemQuality.Poor then
     return L:G('Junk')
   end
 

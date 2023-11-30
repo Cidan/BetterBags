@@ -108,6 +108,7 @@ const.GRID_COMPACT_STYLE = {
   COMPACT = 2,
 }
 
+---@enum ExpansionType
 const.EXPANSION_TYPE = {
   LE_EXPANSION_CLASSIC = 0,
   LE_EXPANSION_BURNING_CRUSADE = 1,

@@ -119,6 +119,14 @@ end
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
+    for _, bagdata in pairs(items.dirtyItems) do
+      for _, item in pairs(bagdata) do
+        if item:GetItemID() then
+          items:AttachItemInfo(item)
+        end
+      end
+    end
+
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessage('items/RefreshBackpack/Done', items.dirtyItems)
     wipe(items.dirtyItems)
@@ -131,12 +139,54 @@ end
 -- all bags are done loading.
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function()
+    for _, bagdata in pairs(items.dirtyBankItems) do
+      for _, item in pairs(bagdata) do
+        if item:GetItemID() then
+          items:AttachItemInfo(item)
+        end
+      end
+    end
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
     wipe(items.dirtyBankItems)
     items._bankContainer = nil
     items._doingRefreshAll = false
   end)
+end
+
+---@param item ItemMixin
+function items:AttachItemInfo(item)
+  local bagid, slotid = item:GetItemLocation():GetBagAndSlot()
+  local itemName, itemLink, itemQuality,
+  itemLevel, itemMinLevel, itemType, itemSubType,
+  itemStackCount, itemEquipLoc, itemTexture,
+  sellPrice, classID, subclassID, bindType, expacID,
+  setID, isCraftingReagent = GetItemInfo(item:GetItemID() or 0)
+  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(item:GetItemLink())
+  item.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
+  item.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+  item.itemInfo = {
+    itemName = itemName,
+    itemLink = itemLink,
+    itemQuality = itemQuality,
+    itemLevel = itemLevel,
+    itemMinLevel = itemMinLevel,
+    itemType = itemType,
+    itemSubType = itemSubType,
+    itemStackCount = itemStackCount,
+    itemEquipLoc = itemEquipLoc,
+    itemTexture = itemTexture,
+    sellPrice = sellPrice,
+    classID = classID,
+    subclassID = subclassID,
+    bindType = bindType,
+    expacID = expacID,
+    setID = setID or 0,
+    isCraftingReagent = isCraftingReagent,
+    effectiveIlvl = effectiveIlvl --[[@as number]],
+    isPreview = isPreview --[[@as boolean]],
+    baseIlvl = baseIlvl --[[@as number]],
+  }
 end
 
 -- RefreshBag will refresh a bag's contents entirely and update the
