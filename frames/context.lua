@@ -53,6 +53,12 @@ function context:Hide()
   LibDD:HideDropDownMenu(1)
 end
 
+---@param a MenuList
+---@param b MenuList
+local function sortMenu(a, b)
+  return a.text < b.text
+end
+
 ---@param bag Bag
 ---@return MenuList[]
 function context:CreateContextMenu(bag)
@@ -63,48 +69,6 @@ function context:CreateContextMenu(bag)
     text = L:G("BetterBags Menu"),
     isTitle = true,
     notCheckable = true
-  })
-
-  -- View menu for switching between one bag and section grid.
-  table.insert(menuList, {
-    text = L:G("View"),
-    hasArrow = true,
-    notCheckable = true,
-    menuList = {
-      {
-        text = L:G("One Bag"),
-        keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.ONE_BAG end,
-        func = function()
-          context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
-          bag:Wipe()
-          bag:Refresh()
-        end
-      },
-      {
-        text = L:G("Section Grid"),
-        keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_GRID end,
-        func = function()
-          context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
-          bag:Wipe()
-          bag:Refresh()
-        end
-      },
-      {
-        text = L:G("List"),
-        keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.LIST end,
-        func = function()
-          context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
-          bag:Wipe()
-          bag:Refresh()
-        end
-      }
-    }
   })
 
   -- Category filter menu for selecting how categories are created in grid view.
@@ -143,6 +107,76 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetCategoryFilter(bag.kind, "TradeSkill", not database:GetCategoryFilter(bag.kind, "TradeSkill"))
+          bag:Wipe()
+          bag:Refresh()
+        end
+      }
+    }
+  })
+
+  table.insert(menuList, {
+    text = L:G("Compaction"),
+    notCheckable = true,
+    hasArrow = true,
+    menuList = {
+      {
+        text = L:G("None"),
+        checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.NONE end,
+        func = function()
+          context:Hide()
+          database:SetBagCompaction(bag.kind, const.GRID_COMPACT_STYLE.NONE)
+          bag:Wipe()
+          bag:Refresh()
+        end
+      },
+      {
+        text = L:G("Simple"),
+        checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.SIMPLE end,
+        func = function()
+          context:Hide()
+          database:SetBagCompaction(bag.kind, const.GRID_COMPACT_STYLE.SIMPLE)
+          bag:Wipe()
+          bag:Refresh()
+        end
+      }
+    }
+  })
+
+  -- View menu for switching between one bag and section grid.
+  table.insert(menuList, {
+    text = L:G("View"),
+    hasArrow = true,
+    notCheckable = true,
+    menuList = {
+      {
+        text = L:G("One Bag"),
+        keepShownOnClick = false,
+        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.ONE_BAG end,
+        func = function()
+          context:Hide()
+          database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
+          bag:Wipe()
+          bag:Refresh()
+        end
+      },
+      {
+        text = L:G("Section Grid"),
+        keepShownOnClick = false,
+        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_GRID end,
+        func = function()
+          context:Hide()
+          database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
+          bag:Wipe()
+          bag:Refresh()
+        end
+      },
+      {
+        text = L:G("List"),
+        keepShownOnClick = false,
+        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.LIST end,
+        func = function()
+          context:Hide()
+          database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
           bag:Wipe()
           bag:Refresh()
         end
@@ -197,33 +231,6 @@ function context:CreateContextMenu(bag)
   end
   table.insert(menuList, sizeMenu)
 
-  table.insert(menuList, {
-    text = L:G("Compaction"),
-    notCheckable = true,
-    hasArrow = true,
-    menuList = {
-      {
-        text = L:G("None"),
-        checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.NONE end,
-        func = function()
-          context:Hide()
-          database:SetBagCompaction(bag.kind, const.GRID_COMPACT_STYLE.NONE)
-          bag:Wipe()
-          bag:Refresh()
-        end
-      },
-      {
-        text = L:G("Simple"),
-        checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.SIMPLE end,
-        func = function()
-          context:Hide()
-          database:SetBagCompaction(bag.kind, const.GRID_COMPACT_STYLE.SIMPLE)
-          bag:Wipe()
-          bag:Refresh()
-        end
-      }
-    }
-  })
   if bag.kind == const.BAG_KIND.BANK then
     table.insert(menuList, {
       text = L:G("Deposit All Reagents"),
@@ -249,7 +256,6 @@ function context:CreateContextMenu(bag)
     end
   })
 
-
   if bag.kind == const.BAG_KIND.BACKPACK then
     -- Show the Blizzard bag button toggle.
     table.insert(menuList, {
@@ -270,5 +276,6 @@ function context:CreateContextMenu(bag)
       end
     })
   end
+
   return menuList
 end
