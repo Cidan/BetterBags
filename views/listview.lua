@@ -168,9 +168,8 @@ function views:ListView(bag, dirtyItems)
     h = 40
   end
   bag.content:ShowScrollBar()
-  --TODO(lobato): Load this from the database.
-  bag.frame:SetWidth(600)
-  bag.frame:SetHeight(700)
+
+  bag.frame:SetSize(database:GetBagFrameSize(bag.kind))
 end
 
 --[[

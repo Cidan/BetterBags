@@ -7,7 +7,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local resize = addon:NewModule('Resize')
 
 ---@param frame Frame
-function resize:MakeResizable(frame)
+---@param onDone fun()
+---@return Button
+function resize:MakeResizable(frame, onDone)
   frame:SetResizable(true)
   frame:SetResizeBounds(300, 300)
   local resizeHandle = CreateFrame("Button", nil, frame)
@@ -22,6 +24,7 @@ function resize:MakeResizable(frame)
   end)
   resizeHandle:SetScript("OnMouseUp", function(p)
     p:GetParent():StopMovingOrSizing("BOTTOMRIGHT")
+    onDone()
   end)
   resizeHandle:SetScript("OnEnter", function(p)
     p:SetAlpha(1)
@@ -30,4 +33,5 @@ function resize:MakeResizable(frame)
     p:SetAlpha(0)
   end)
   resizeHandle:SetAlpha(0)
+  return resizeHandle
 end

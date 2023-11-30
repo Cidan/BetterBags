@@ -7,7 +7,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local const = addon:GetModule('Constants')
 
 ---@class Database: AceModule
----@field data databaseOptions
+---@field private data databaseOptions
 local DB = addon:NewModule('Database')
 
 function DB:OnInitialize()
@@ -65,6 +65,21 @@ end
 ---@param count number
 function DB:SetBagSizeItems(kind, count)
   DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].itemsPerRow = count
+end
+
+---@param kind BagKind
+---@return number, number
+function DB:GetBagFrameSize(kind)
+  local s = DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+  return s.width, s.height
+end
+
+---@param kind BagKind
+---@param width number
+---@param height number
+function DB:SetBagFrameSize(kind, width, height)
+  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].width = width
+  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].height = height
 end
 
 ---@param kind BagKind

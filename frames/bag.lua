@@ -74,6 +74,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field decorator Texture
 ---@field bg Texture
 ---@field moneyFrame Money
+---@field resizeHandle Button
 local bagProto = {}
 
 function bagProto:Show()
@@ -176,10 +177,13 @@ function bagProto:Draw(dirtyItems)
   end
   self.recentItems.content:Wipe()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
+    self.resizeHandle:Hide()
     views:OneBagView(self, dirtyItems)
   elseif database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_GRID then
+    self.resizeHandle:Hide()
     views:GridView(self, dirtyItems)
   elseif database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
+    self.resizeHandle:Show()
     views:ListView(self, dirtyItems)
   end
   local text = self.frame.SearchBox:GetText()
@@ -415,7 +419,10 @@ function bagFrame:Create(kind)
       b:ToggleReagentBank()
     end
   end)
-  resize:MakeResizable(b.frame)
+  b.resizeHandle = resize:MakeResizable(b.frame, function()
+    local fw, fh = b.frame:GetSize()
+    database:SetBagFrameSize(b.kind, fw, fh)
+  end)
   return b
 end
 

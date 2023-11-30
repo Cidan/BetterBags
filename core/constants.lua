@@ -178,10 +178,14 @@ const.DATABASE_DEFAULTS = {
       Backpack = {
         columnCount = 3,
         itemsPerRow = 5,
+        width = 700,
+        height = 500,
       },
       Bank = {
         columnCount = 5,
         itemsPerRow = 5,
+        width = 700,
+        height = 500,
       }
     },
     views = {
