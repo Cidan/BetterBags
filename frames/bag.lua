@@ -332,7 +332,7 @@ function bagFrame:Create(kind)
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
   content:GetContainer():SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
-  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 30)
+  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
   content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   content:Show()
   b.content = content

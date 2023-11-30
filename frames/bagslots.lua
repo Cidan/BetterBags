@@ -40,8 +40,8 @@ function bagSlotProto:Draw()
     cell:Draw()
   end
   local w, h = self.content:Draw()
-  self.frame:SetWidth(w + 20)
-  self.frame:SetHeight(h + 38)
+  self.frame:SetWidth(w + 24)
+  self.frame:SetHeight(h + 42)
 end
 
 function bagSlotProto:SetShown(shown)
@@ -83,6 +83,7 @@ function BagSlots:CreatePanel(kind)
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", 12, -30)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -12, 12)
   b.content.maxCellWidth = 10
+  b.content:HideScrollBar()
   b.content:Show()
 
   local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS_LIST or const.BANK_ONLY_BAGS_LIST
