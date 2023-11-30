@@ -297,7 +297,7 @@ function bagFrame:Create(kind)
   -- Create the money frame only in the player backpack bag.
   if kind == const.BAG_KIND.BACKPACK then
     local moneyFrame = money:Create()
-    moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", 0, 0)
+    moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", -10, 0)
     moneyFrame.frame:SetParent(b.frame)
     b.moneyFrame = moneyFrame
   end
@@ -327,7 +327,7 @@ function bagFrame:Create(kind)
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
   content:GetContainer():SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
-  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
+  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 30)
   content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   content:Show()
   b.content = content
