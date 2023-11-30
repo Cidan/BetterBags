@@ -38,6 +38,7 @@ local debug = addon:GetModule('Debug')
 ---@field expacID number
 ---@field classID number
 ---@field subclassID number
+---@field ilvlText FontString
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -119,6 +120,7 @@ function itemProto:SetItem(i)
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
   setID, isCraftingReagent = GetItemInfo(i:GetItemID() or 0)
+  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(i:GetItemLink())
   self.expacID = expacID
   self.classID = classID
   self.subclassID = subclassID
@@ -128,6 +130,12 @@ function itemProto:SetItem(i)
   local bound = false
   if l ~= nil then
     bound = C_Item.IsBound(l)
+  end
+
+  if classID == Enum.ItemClass.Armor or
+     classID == Enum.ItemClass.Weapon or
+     classID == Enum.ItemClass.Gem then
+    self.ilvlText:SetText(tostring(effectiveIlvl) or "")
   end
 
   self.button.ItemSlotBackground:Hide()
@@ -279,6 +287,7 @@ function itemProto:ClearItem()
   self.itemSubType = nil
   self.button.minDisplayCount = 1
   self.button:Enable()
+  self.ilvlText:SetText("")
 end
 
 ---@param kind BagKind
@@ -332,6 +341,13 @@ function item:_DoCreate()
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
   button.ItemSlotBackground:SetAllPoints(button);
   button.ItemSlotBackground:Hide()
+
+  local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+  ilvlText:SetTextColor(1, 1, 1, 1)
+  ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
+
+  i.ilvlText = ilvlText
+
   events:RegisterEvent('BAG_UPDATE_COOLDOWN', function(_, ...) OnEvent(i) end)
   return i
 end
