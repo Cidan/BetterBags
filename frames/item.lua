@@ -158,9 +158,11 @@ end
 ---@param reagent boolean
 function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   if count == 0 then
-    self.frame:Hide()
-    return
+    self.button:Disable()
+  else
+    self.button:Enable()
   end
+  self.button.minDisplayCount = -1
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
@@ -275,6 +277,7 @@ function itemProto:ClearItem()
   self.button:SetID(0)
   self.itemType = nil
   self.itemSubType = nil
+  self.button.minDisplayCount = 1
 end
 
 ---@param kind BagKind
