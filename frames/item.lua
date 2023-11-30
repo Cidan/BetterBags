@@ -278,6 +278,7 @@ function itemProto:ClearItem()
   self.itemType = nil
   self.itemSubType = nil
   self.button.minDisplayCount = 1
+  self.button:Enable()
 end
 
 ---@param kind BagKind
