@@ -175,7 +175,7 @@ function bagProto:Draw(dirtyItems)
       self.itemsByBagAndSlot[bagid][slotid] = nil
     end
   end
-  self.recentItems.content:Wipe()
+  self.recentItems:WipeOnlyContents()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
     self.resizeHandle:Hide()
     views:OneBagView(self, dirtyItems)
@@ -204,7 +204,7 @@ function bagProto:GetOrCreateSection(category)
   local section = self.sections[category]
   if section == nil then
     section = sectionFrame:Create()
-    section.frame:SetParent(self.content.inner)
+    section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
     self.content:AddCell(category, section)
     self.sections[category] = section

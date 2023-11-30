@@ -3,6 +3,10 @@
 ---@class ItemButton: Button
 ---@field bagID number
 ---@field NewItemTexture Texture
+---@field minDisplayCount number
+---@field NormalTexture Texture
+---@field PushedTexture Texture
+---@field BattlepayItemTexture Texture
 local itemButton = {}
 
 ---@param bagid number
@@ -119,6 +123,20 @@ function BetterBagsBagPortraitTemplate:SetTitle(title) end
 ---@class FontString
 local FontString = {}
 function FontString:SetScript(event, func) end
+
+---@class WowScrollBox: Frame
+local WowScrollBox = {}
+function WowScrollBox:SetInterpolateScroll(interpolate) end
+
+---@class MinimalScrollBar: Frame
+local MinimalScrollBar = {}
+function MinimalScrollBar:SetInterpolateScroll(interpolate) end
+
+---@class EventFrame
+local EventFrame = {}
+
+---@return Frame
+function CreateScrollBoxLinearView() end
 
 _G.LE_EXPANSION_CLASSIC = 0
 _G.LE_EXPANSION_BURNING_CRUSADE = 1

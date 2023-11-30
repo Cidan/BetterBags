@@ -26,7 +26,9 @@ local cellProto = {}
 ---@class Grid
 ---@field package frame WowScrollBox
 ---@field package inner Frame
----@field package bar MinimalScrollBar
+---@field package bar EventFrame|MinimalScrollBar
+---@field package box WowScrollBox
+---@field package view Frame
 ---@field cells Cell[]|Item[]|Section[]
 ---@field headers Section[]
 ---@field columns Column[]
@@ -107,6 +109,10 @@ function gridProto:GetContainer()
   return self.frame
 end
 
+function gridProto:GetScrollView()
+  return self.inner
+end
+
 function gridProto:HideScrollBar()
   self.bar:SetAlpha(0)
 end
@@ -182,8 +188,8 @@ function gridProto:Draw()
       header.frame:SetPoint("TOPLEFT", previousHeader.frame, "BOTTOMLEFT", 0, -4)
     end
     local w, h = header:Draw()
-    width = math.max(width, w)
-    height = height + h + 4
+    width = math.max(width, w) ---@type number
+    height = height + h + 4 ---@type number
   end
 
   -- Remove the last 4 pixels of padding.

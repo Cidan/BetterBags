@@ -76,6 +76,10 @@ function sectionProto:Wipe()
   self.fillWidth = false
 end
 
+function sectionProto:WipeOnlyContents()
+  self.content:Wipe()
+end
+
 ---@param item Item
 ---@return boolean
 function sectionProto:HasItem(item)

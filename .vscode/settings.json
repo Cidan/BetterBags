@@ -86,7 +86,13 @@
     "MainMenuBarBackpackButton",
     "BagBarExpandToggle",
     "ScrollUtil",
-    "CreateScrollBoxLinearView"
+    "CreateScrollBoxLinearView",
+    "CloseBankFrame",
+    "C_Timer",
+    "tostring",
+    "GetItemSubClassInfo",
+    "DepositReagentBank",
+    "string"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",
