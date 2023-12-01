@@ -182,13 +182,13 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = {},
     },
     compaction = {
-      [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.NONE,
+      [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.SIMPLE,
       [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.NONE,
     },
     size = {
       [const.BAG_KIND.BACKPACK] = {
-        columnCount = 3,
-        itemsPerRow = 5,
+        columnCount = 1,
+        itemsPerRow = 15,
         width = 700,
         height = 500,
       },
