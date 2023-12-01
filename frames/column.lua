@@ -113,7 +113,7 @@ function columnProto:Draw(style)
       else
         local first = firstCellInRow[#rows]
         cell.frame:SetPoint("TOPLEFT", first.frame, "BOTTOMLEFT", 0, -4)
-        h = h + cell.frame:GetHeight()
+        h = h + cell.frame:GetHeight() + 4
         local newRow = #rows + 1
         rows[newRow] = {count = cell:GetCellCount(), cells = {cell --[[@as Section]]}}
         cellToRow[cell] = newRow
