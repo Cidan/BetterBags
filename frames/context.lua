@@ -13,6 +13,9 @@ local const = addon:GetModule('Constants')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class SliderFrame: AceModule
+local slider = addon:GetModule('Slider')
+
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
@@ -41,7 +44,7 @@ end
 
 function context:OnEnable()
   local frame = LibDD:Create_UIDropDownMenu("BetterBagsContextMenu", UIParent)
-  LibDD:EasyMenu_Initialize(frame, 1, {})
+  LibDD:EasyMenu_Initialize(frame, 4, {})
   self.frame = frame
 end
 
@@ -249,52 +252,64 @@ function context:CreateContextMenu(bag)
     }
   })
 
+  local columnSlider = slider:CreateDropdownSlider()
+  columnSlider:SetMinMaxValues(3, 20)
+  columnSlider:SetValue(database:GetBagSizeInfo(bag.kind).columnCount)
+  columnSlider.OnMouseUp = function()
+    context:Hide()
+  end
+  columnSlider.OnValueChanged = function(_, value)
+    if database:GetBagSizeInfo(bag.kind).columnCount == value then return end
+    database:SetBagSizeColumn(bag.kind, value)
+    bag:Wipe()
+    bag:Refresh()
+  end
+
+  local itemsPerRowSlider = slider:CreateDropdownSlider()
+  itemsPerRowSlider:SetMinMaxValues(3, 20)
+  itemsPerRowSlider:SetValue(database:GetBagSizeInfo(bag.kind).itemsPerRow)
+  itemsPerRowSlider.OnMouseUp = function()
+    context:Hide()
+  end
+  itemsPerRowSlider.OnValueChanged = function(_, value)
+    if database:GetBagSizeInfo(bag.kind).itemsPerRow == value then return end
+    database:SetBagSizeItems(bag.kind, value)
+    bag:Wipe()
+    bag:Refresh()
+  end
+
   -- Create the size menu.
-  local sizeMenu = {
+  table.insert(menuList, {
     text = L:G("Size"),
     hasArrow = true,
     notCheckable = true,
-    menuList = {}
-  }
-
-  -- Loop through the two size menu types, as they are extremely similar.
-  for _, sub in pairs({"Columns", "Items per Row"}) do
-    local subMenu = {
-      text = L:G(sub),
-      hasArrow = true,
-      notCheckable = true,
-      menuList = {}
+    menuList = {
+      {
+        text = L:G("Columns"),
+        notCheckable = true,
+        hasArrow = true,
+        menuList = {
+          {
+            text = L:G("Columns"),
+            notCheckable = true,
+            customFrame = columnSlider:GetFrame(),
+          }
+        }
+      },
+      {
+        text = L:G("Items per Row"),
+        notCheckable = true,
+        hasArrow = true,
+        menuList = {
+          {
+            text = L:G("Items per Row"),
+            notCheckable = true,
+            customFrame = itemsPerRowSlider:GetFrame(),
+          }
+        }
+      }
     }
-
-    -- Loop through the size options. Change these if you want to have more size options.
-    for i = 3, 7 do
-      if sub == "Columns" then
-        table.insert(subMenu.menuList, {
-          text = L:G(tostring(i)),
-          checked = function() return database:GetBagSizeInfo(bag.kind).columnCount == i end,
-          func = function()
-            context:Hide()
-            database:SetBagSizeColumn(bag.kind, i)
-            bag:Wipe()
-            bag:Refresh()
-          end
-        })
-      else
-        table.insert(subMenu.menuList, {
-          text = L:G(tostring(i)),
-          checked = function() return database:GetBagSizeInfo(bag.kind).itemsPerRow == i end,
-          func = function()
-            context:Hide()
-            database:SetBagSizeItems(bag.kind, i)
-            bag:Wipe()
-            bag:Refresh()
-          end
-        })
-      end
-    end
-    table.insert(sizeMenu.menuList, subMenu)
-  end
-  table.insert(menuList, sizeMenu)
+  })
 
   if bag.kind == const.BAG_KIND.BANK then
     table.insert(menuList, {

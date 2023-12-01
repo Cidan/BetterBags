@@ -42,6 +42,7 @@ data\items.lua
 util\color.lua
 util\resize.lua
 
+frames\slider.lua
 frames\money.lua
 frames\context.lua
 frames\column.lua
