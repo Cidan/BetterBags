@@ -32,6 +32,7 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field hasArrow? boolean
 ---@field menuList? MenuList[]
 ---@field keepShownOnClick? boolean
+---@field tooltipOnButton? boolean
 local menuListProto = {}
 
 function context:OnInitialize()
@@ -59,9 +60,20 @@ local function sortMenu(a, b)
   return a.text < b.text
 end
 
+---@param menu MenuList[]
+local function enableTooltips(menu)
+  for _, m in ipairs(menu) do
+    m.tooltipOnButton = true
+    if m.menuList then
+      enableTooltips(m.menuList)
+    end
+  end
+end
+
 ---@param bag Bag
 ---@return MenuList[]
 function context:CreateContextMenu(bag)
+  ---@type MenuList[]
   local menuList = {}
 
   -- Context Menu title.
@@ -79,6 +91,8 @@ function context:CreateContextMenu(bag)
     menuList = {
       {
         text = L:G("Type"),
+        tooltipTitle = L:G("Type"),
+        tooltipText = L:G("If enabled, will categorize items by their auction house type."),
         checked = function() return database:GetCategoryFilter(bag.kind, "Type") end,
         func = function()
           context:Hide()
@@ -121,6 +135,8 @@ function context:CreateContextMenu(bag)
     menuList = {
       {
         text = L:G("None"),
+        tooltipTitle = L:G("None"),
+        tooltipText = L:G("Item sections will be sorted from left to right without any consideration for empty space in the bag window."),
         checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.NONE end,
         func = function()
           context:Hide()
@@ -131,6 +147,8 @@ function context:CreateContextMenu(bag)
       },
       {
         text = L:G("Simple"),
+        tooltipTitle = L:G("Simple"),
+        tooltipText = L:G("Item sections will be sorted from left to right, however if a section can fit in the same row as the section above it, the section will move up."),
         checked = function() return database:GetBagCompaction(bag.kind) == const.GRID_COMPACT_STYLE.SIMPLE end,
         func = function()
           context:Hide()
@@ -151,10 +169,14 @@ function context:CreateContextMenu(bag)
         text = L:G("Item Level"),
         hasArrow = true,
         notCheckable = true,
+        tooltipTitle = L:G("Item Level"),
+        tooltipText = L:G("Item level related settings for this bag."),
         menuList = {
           {
             text = L:G("Show"),
             checked = function() return database:GetItemLevelOptions(bag.kind).enabled end,
+            tooltipTitle = L:G("Show"),
+            tooltipText = L:G("If enabled, the item level of each item will be displayed in the corner of the item icon."),
             func = function()
               context:Hide()
               database:SetItemLevelEnabled(bag.kind, not database:GetItemLevelOptions(bag.kind).enabled)
@@ -165,6 +187,8 @@ function context:CreateContextMenu(bag)
           {
             text = L:G("Item Level Colors"),
             checked = function() return database:GetItemLevelOptions(bag.kind).color end,
+            tooltipTitle = L:G("Item Level Colors"),
+            tooltipText = L:G("If enabled, the item level text will be colored based on the item level."),
             func = function()
               context:Hide()
               database:SetItemLevelColorEnabled(bag.kind, not database:GetItemLevelOptions(bag.kind).color)
@@ -187,6 +211,8 @@ function context:CreateContextMenu(bag)
         text = L:G("One Bag"),
         keepShownOnClick = false,
         checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.ONE_BAG end,
+        tooltipTitle = L:G("One Bag"),
+        tooltipText = L:G("This view will display all items in a single bag, regardless of category."),
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
@@ -198,6 +224,8 @@ function context:CreateContextMenu(bag)
         text = L:G("Section Grid"),
         keepShownOnClick = false,
         checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_GRID end,
+        tooltipTitle = L:G("Section Grid"),
+        tooltipText = L:G("This view will display items in sections, which are categorized by type, expansion, trade skill, and more."),
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
@@ -209,6 +237,8 @@ function context:CreateContextMenu(bag)
         text = L:G("List"),
         keepShownOnClick = false,
         checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.LIST end,
+        tooltipTitle = L:G("List"),
+        tooltipText = L:G("This view will display items in a list, which is categorized by type, expansion, trade skill, and more."),
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
@@ -270,6 +300,8 @@ function context:CreateContextMenu(bag)
     table.insert(menuList, {
       text = L:G("Deposit All Reagents"),
       notCheckable = true,
+      tooltipTitle = L:G("Deposit All Reagents"),
+      tooltipText = L:G("Click to deposit all reagents into your reagent bank."),
       func = function()
         PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
         DepositReagentBank()
@@ -281,6 +313,8 @@ function context:CreateContextMenu(bag)
   table.insert(menuList, {
     text = L:G("Show Bags"),
     checked = function() return bag.slots:IsShown() end,
+    tooltipTitle = L:G("Show Bags"),
+    tooltipText = L:G("Click to toggle the display of the bag slots."),
     func = function()
       if bag.slots:IsShown() then
         bag.slots:Hide()
@@ -295,6 +329,8 @@ function context:CreateContextMenu(bag)
     -- Show the Blizzard bag button toggle.
     table.insert(menuList, {
       text = L:G("Show Bag Button"),
+      tooltipTitle = L:G("Show Bag Button"),
+      tooltipText = L:G("Click to toggle the display of the Blizzard bag button."),
       checked = function()
         local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
         return BagsBar:GetParent() ~= sneakyFrame
@@ -312,5 +348,6 @@ function context:CreateContextMenu(bag)
     })
   end
 
+  enableTooltips(menuList)
   return menuList
 end
