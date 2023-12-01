@@ -129,6 +129,7 @@ local WowScrollBox = {}
 function WowScrollBox:SetInterpolateScroll(interpolate) end
 function WowScrollBox:ScrollInDirection(percent, direction) end
 function WowScrollBox:FullUpdate() end
+function WowScrollBox:OnMouseWheel(delta) end
 
 ---@class MinimalScrollBar: Frame
 local MinimalScrollBar = {}
