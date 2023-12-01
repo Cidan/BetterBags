@@ -17,27 +17,27 @@ end
 
 ---@param kind BagKind
 function DB:GetBagPosition(kind)
-  return DB.data.profile.positions[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+  return DB.data.profile.positions[kind]
 end
 
 ---@param kind BagKind
 ---@return BagView
 function DB:GetBagView(kind)
-  return DB.data.profile.views[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+  return DB.data.profile.views[kind]
 end
 
 ---@param kind BagKind
 ---@param view BagView
 function DB:SetBagView(kind, view)
-  DB.data.profile.views[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'] = view
+  DB.data.profile.views[kind] = view
 end
 
 function DB:GetCategoryFilter(kind, filter)
-  return DB.data.profile.categoryFilters[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'][filter]
+  return DB.data.profile.categoryFilters[kind][filter]
 end
 
 function DB:SetCategoryFilter(kind, filter, value)
-  DB.data.profile.categoryFilters[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'][filter] = value
+  DB.data.profile.categoryFilters[kind][filter] = value
 end
 
 ---@param show boolean
@@ -52,25 +52,25 @@ end
 
 ---@param kind BagKind
 function DB:GetBagSizeInfo(kind)
-  return DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+  return DB.data.profile.size[kind]
 end
 
 ---@param kind BagKind
 ---@param count number
 function DB:SetBagSizeColumn(kind, count)
-  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].columnCount = count
+  DB.data.profile.size[kind].columnCount = count
 end
 
 ---@param kind BagKind
 ---@param count number
 function DB:SetBagSizeItems(kind, count)
-  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].itemsPerRow = count
+  DB.data.profile.size[kind].itemsPerRow = count
 end
 
 ---@param kind BagKind
 ---@return number, number
 function DB:GetBagFrameSize(kind)
-  local s = DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+  local s = DB.data.profile.size[kind]
   return s.width, s.height
 end
 
@@ -78,32 +78,32 @@ end
 ---@param width number
 ---@param height number
 function DB:SetBagFrameSize(kind, width, height)
-  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].width = width
-  DB.data.profile.size[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].height = height
+  DB.data.profile.size[kind].width = width
+  DB.data.profile.size[kind].height = height
 end
 
 ---@param kind BagKind
 ---@return GridCompactStyle
 function DB:GetBagCompaction(kind)
-  return DB.data.profile.compaction[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+  return DB.data.profile.compaction[kind]
 end
 
 ---@param kind BagKind
 ---@param style GridCompactStyle
 function DB:SetBagCompaction(kind, style)
-  DB.data.profile.compaction[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'] = style
+  DB.data.profile.compaction[kind] = style
 end
 
 function DB:GetItemLevelOptions(kind)
-  return DB.data.profile.itemLevel[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
+  return DB.data.profile.itemLevel[kind]
 end
 
 function DB:SetItemLevelEnabled(kind, enabled)
-  DB.data.profile.itemLevel[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].enabled = enabled
+  DB.data.profile.itemLevel[kind].enabled = enabled
 end
 
 function DB:SetItemLevelColorEnabled(kind, enabled)
-  DB.data.profile.itemLevel[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].color = enabled
+  DB.data.profile.itemLevel[kind].color = enabled
 end
 
 DB:Enable()

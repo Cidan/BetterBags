@@ -168,31 +168,31 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     showBagButton = true,
     itemLevel = {
-      Backpack = {
+      [const.BAG_KIND.BACKPACK] = {
         enabled = true,
         color = true
       },
-      Bank = {
+      [const.BAG_KIND.BANK] = {
         enabled = true,
         color = true
       }
     },
     positions = {
-      Backpack = {},
-      Bank = {},
+      [const.BAG_KIND.BACKPACK] = {},
+      [const.BAG_KIND.BANK] = {},
     },
     compaction = {
-      Backpack = const.GRID_COMPACT_STYLE.NONE,
-      Bank = const.GRID_COMPACT_STYLE.NONE,
+      [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.NONE,
+      [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.NONE,
     },
     size = {
-      Backpack = {
+      [const.BAG_KIND.BACKPACK] = {
         columnCount = 3,
         itemsPerRow = 5,
         width = 700,
         height = 500,
       },
-      Bank = {
+      [const.BAG_KIND.BANK] = {
         columnCount = 5,
         itemsPerRow = 5,
         width = 700,
@@ -200,16 +200,16 @@ const.DATABASE_DEFAULTS = {
       }
     },
     views = {
-      Backpack = const.BAG_VIEW.SECTION_GRID,
-      Bank = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
     },
     categoryFilters = {
-      Backpack = {
+      [const.BAG_KIND.BACKPACK] = {
         Type = true,
         Expansion = false,
         TradeSkill = false,
       },
-      Bank = {
+      [const.BAG_KIND.BANK] = {
         Type = true,
         Expansion = false,
         TradeSkill = false,
