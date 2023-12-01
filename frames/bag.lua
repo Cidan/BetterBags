@@ -190,10 +190,21 @@ function bagProto:Draw(dirtyItems)
   self:Search(text)
 end
 
+function bagProto:KeepBagInBounds()
+  -- Size protection for the bag frame, to prevent it from going off screen.
+  local left, top = self.frame:GetLeft(), self.frame:GetTop()
+  local uitop = UIParent:GetTop()
+  if left < 0 or top > uitop then
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("TOPLEFT")
+  end
+end
+
 function bagProto:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
     views:UpdateListSize(self)
   end
+  self:KeepBagInBounds()
 end
 
 -- GetOrCreateSection will get an existing section by category,
