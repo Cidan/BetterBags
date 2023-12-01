@@ -188,17 +188,16 @@ function bagProto:Draw(dirtyItems)
   end
   local text = self.frame.SearchBox:GetText()
   self:Search(text)
+  self:KeepBagInBounds()
 end
 
 function bagProto:KeepBagInBounds()
-  -- Size protection for the bag frame, to prevent it from going off screen.
-  local left, top = self.frame:GetLeft(), self.frame:GetTop()
-  local uitop = UIParent:GetTop()
-  if left < 0 or top > uitop then
-    self.frame:SetClampedToScreen(false)
-  else
-    self.frame:SetClampedToScreen(true)
-  end
+  local w, h = self.frame:GetSize()
+  self.frame:SetClampRectInsets(0, -w+50, 0, h-50)
+  -- Toggle the clamp setting to force the frame to rebind to the screen
+  -- on the correct clamp insets.
+  self.frame:SetClampedToScreen(false)
+  self.frame:SetClampedToScreen(true)
 end
 
 function bagProto:OnResize()
@@ -410,6 +409,7 @@ function bagFrame:Create(kind)
   b.frame:RegisterForDrag("LeftButton")
   b.frame:SetClampedToScreen(true)
   b.frame:SetScript("OnDragStart", function(drag)
+    b:KeepBagInBounds()
     drag:StartMoving()
   end)
   b.frame:SetScript("OnDragStop", function(drag)
