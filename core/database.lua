@@ -51,20 +51,29 @@ function DB:GetShowBagButton()
 end
 
 ---@param kind BagKind
-function DB:GetBagSizeInfo(kind)
-  return DB.data.profile.size[kind]
+---@param view BagView
+function DB:GetBagSizeInfo(kind, view)
+  return DB.data.profile.size[view][kind]
 end
 
 ---@param kind BagKind
+---@param view BagView
 ---@param count number
-function DB:SetBagSizeColumn(kind, count)
-  DB.data.profile.size[kind].columnCount = count
+function DB:SetBagViewSizeColumn(kind, view, count)
+  DB.data.profile.size[view][kind].columnCount = count
 end
 
 ---@param kind BagKind
+---@param view BagView
 ---@param count number
-function DB:SetBagSizeItems(kind, count)
-  DB.data.profile.size[kind].itemsPerRow = count
+function DB:SetBagViewSizeItems(kind, view, count)
+  DB.data.profile.size[view][kind].itemsPerRow = count
+end
+---@param kind BagKind
+---@param view BagView
+---@param scale number
+function DB:SetBagViewSizeScale(kind, view, scale)
+  DB.data.profile.size[view][kind].scale = scale
 end
 
 ---@param kind BagKind
@@ -75,11 +84,12 @@ function DB:GetBagFrameSize(kind)
 end
 
 ---@param kind BagKind
+---@param view BagView
 ---@param width number
 ---@param height number
-function DB:SetBagFrameSize(kind, width, height)
-  DB.data.profile.size[kind].width = width
-  DB.data.profile.size[kind].height = height
+function DB:SetBagViewFrameSize(kind, view, width, height)
+  DB.data.profile.size[view][kind].width = width
+  DB.data.profile.size[view][kind].height = height
 end
 
 ---@param kind BagKind

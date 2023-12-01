@@ -254,28 +254,40 @@ function context:CreateContextMenu(bag)
 
   local columnSlider = slider:CreateDropdownSlider()
   columnSlider:SetMinMaxValues(1, 20)
-  columnSlider:SetValue(database:GetBagSizeInfo(bag.kind).columnCount)
+  columnSlider:SetValue(database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).columnCount)
   columnSlider.OnMouseUp = function()
     context:Hide()
   end
   columnSlider.OnValueChanged = function(_, value)
-    if database:GetBagSizeInfo(bag.kind).columnCount == value then return end
-    database:SetBagSizeColumn(bag.kind, value)
+    if database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).columnCount == value then return end
+    database:SetBagViewSizeColumn(bag.kind, database:GetBagView(bag.kind), value)
     bag:Wipe()
     bag:Refresh()
   end
 
   local itemsPerRowSlider = slider:CreateDropdownSlider()
   itemsPerRowSlider:SetMinMaxValues(3, 20)
-  itemsPerRowSlider:SetValue(database:GetBagSizeInfo(bag.kind).itemsPerRow)
+  itemsPerRowSlider:SetValue(database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).itemsPerRow)
   itemsPerRowSlider.OnMouseUp = function()
     context:Hide()
   end
   itemsPerRowSlider.OnValueChanged = function(_, value)
-    if database:GetBagSizeInfo(bag.kind).itemsPerRow == value then return end
-    database:SetBagSizeItems(bag.kind, value)
+    if database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).itemsPerRow == value then return end
+    database:SetBagViewSizeItems(bag.kind, database:GetBagView(bag.kind), value)
     bag:Wipe()
     bag:Refresh()
+  end
+
+  local scaleSlider = slider:CreateDropdownSlider()
+  scaleSlider:SetMinMaxValues(60, 100)
+  scaleSlider:SetValue(database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).scale)
+  scaleSlider.OnMouseUp = function()
+    context:Hide()
+  end
+  scaleSlider.OnValueChanged = function(_, value)
+    if database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).scale == value then return end
+    bag.frame:SetScale(value / 100)
+    database:SetBagViewSizeScale(bag.kind, database:GetBagView(bag.kind), value)
   end
 
   -- Create the size menu.
@@ -284,6 +296,18 @@ function context:CreateContextMenu(bag)
     hasArrow = true,
     notCheckable = true,
     menuList = {
+      {
+        text = L:G("Items per Row"),
+        notCheckable = true,
+        hasArrow = true,
+        menuList = {
+          {
+            text = L:G("Items per Row"),
+            notCheckable = true,
+            customFrame = itemsPerRowSlider:GetFrame(),
+          }
+        }
+      },
       {
         text = L:G("Columns"),
         notCheckable = true,
@@ -297,14 +321,14 @@ function context:CreateContextMenu(bag)
         }
       },
       {
-        text = L:G("Items per Row"),
+        text = L:G("Scale"),
         notCheckable = true,
         hasArrow = true,
         menuList = {
           {
-            text = L:G("Items per Row"),
+            text = L:G("Scale"),
             notCheckable = true,
-            customFrame = itemsPerRowSlider:GetFrame(),
+            customFrame = scaleSlider:GetFrame(),
           }
         }
       }

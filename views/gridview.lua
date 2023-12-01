@@ -19,7 +19,7 @@ local views = addon:GetModule('Views')
 ---@param bag Bag
 ---@param dirtyItems table<number, table<number, ItemMixin>>
 function views:GridView(bag, dirtyItems)
-  local sizeInfo = database:GetBagSizeInfo(bag.kind)
+  local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   bag:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}

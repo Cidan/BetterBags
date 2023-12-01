@@ -186,18 +186,54 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.NONE,
     },
     size = {
-      [const.BAG_KIND.BACKPACK] = {
-        columnCount = 1,
-        itemsPerRow = 15,
-        width = 700,
-        height = 500,
+      [const.BAG_VIEW.ONE_BAG] = {
+        [const.BAG_KIND.BACKPACK] = {
+          columnCount = 15,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+        },
+        [const.BAG_KIND.BANK] = {
+          columnCount = 15,
+          itemsPerRow = 5,
+          scale = 100,
+          width = 700,
+          height = 500,
+        }
       },
-      [const.BAG_KIND.BANK] = {
-        columnCount = 5,
-        itemsPerRow = 5,
-        width = 700,
-        height = 500,
-      }
+      [const.BAG_VIEW.SECTION_GRID] = {
+        [const.BAG_KIND.BACKPACK] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+        },
+        [const.BAG_KIND.BANK] = {
+          columnCount = 5,
+          itemsPerRow = 5,
+          scale = 100,
+          width = 700,
+          height = 500,
+        }
+      },
+      [const.BAG_VIEW.LIST] = {
+        [const.BAG_KIND.BACKPACK] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+        },
+        [const.BAG_KIND.BANK] = {
+          columnCount = 5,
+          itemsPerRow = 5,
+          scale = 100,
+          width = 700,
+          height = 500,
+        }
+      },
     },
     views = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,

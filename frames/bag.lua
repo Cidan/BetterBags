@@ -156,7 +156,7 @@ end
 -- UpdateCellWidth will update the cell width of the bag based on the current
 -- bag view configuration.
 function bagProto:UpdateCellWidth()
-  local sizeInfo = database:GetBagSizeInfo(self.kind)
+  local sizeInfo = database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind))
   self.content.maxCellWidth = sizeInfo.columnCount
 
   for _, section in pairs(self.sections) do
@@ -186,6 +186,7 @@ function bagProto:Draw(dirtyItems)
     self.resizeHandle:Show()
     views:ListView(self, dirtyItems)
   end
+  self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
   local text = self.frame.SearchBox:GetText()
   self:Search(text)
   self:KeepBagInBounds()
@@ -264,7 +265,7 @@ function bagFrame:Create(kind)
   b.itemsByBagAndSlot = {}
   b.sections = {}
   b.kind = kind
-  local sizeInfo = database:GetBagSizeInfo(b.kind)
+  local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsBagPortraitTemplate
@@ -434,7 +435,7 @@ function bagFrame:Create(kind)
   end)
   b.resizeHandle = resize:MakeResizable(b.frame, function()
     local fw, fh = b.frame:GetSize()
-    database:SetBagFrameSize(b.kind, fw, fh)
+    database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
   end)
   return b
 end
