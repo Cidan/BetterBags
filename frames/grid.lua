@@ -223,8 +223,8 @@ function grid:CreateScrollFrame(g, parent, child)
   box:SetInterpolateScroll(true)
 
   local bar = CreateFrame("EventFrame", nil, box, "MinimalScrollBar")
-  bar:SetPoint("TOPLEFT", box, "TOPRIGHT", -10, 0)
-  bar:SetPoint("BOTTOMLEFT", box, "BOTTOMRIGHT", -10, 0)
+  bar:SetPoint("TOPLEFT", box, "TOPRIGHT", -12, 0)
+  bar:SetPoint("BOTTOMLEFT", box, "BOTTOMRIGHT", -12, 0)
   bar:SetInterpolateScroll(true)
 
   local view = CreateScrollBoxLinearView()

@@ -170,6 +170,7 @@ function item:_DoCreate()
   border:SetPoint("BOTTOMLEFT", i.frame)
   border:SetPoint("BOTTOMRIGHT", i.frame)
   border:SetHeight(2)
+  border:Hide()
   self.border = border
 
   rowButton.NormalTexture:Hide()
