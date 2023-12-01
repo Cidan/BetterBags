@@ -195,8 +195,9 @@ function bagProto:KeepBagInBounds()
   local left, top = self.frame:GetLeft(), self.frame:GetTop()
   local uitop = UIParent:GetTop()
   if left < 0 or top > uitop then
-    self.frame:ClearAllPoints()
-    self.frame:SetPoint("TOPLEFT")
+    self.frame:SetClampedToScreen(false)
+  else
+    self.frame:SetClampedToScreen(true)
   end
 end
 
