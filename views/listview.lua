@@ -24,6 +24,10 @@ function views:UpdateListSize(bag)
       cell.frame:SetWidth(w - 35)
     end
   end
+  bag.recentItems.frame:SetWidth(w - 35)
+  for _, cell in pairs(bag.recentItems:GetAllCells()) do
+    cell.frame:SetWidth(w - 35)
+  end
 end
 
 ---@param bag Bag
