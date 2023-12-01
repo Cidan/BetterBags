@@ -56,6 +56,9 @@ function views:ListView(bag, dirtyItems)
       -- The old frame does not exist, so we need to create a new one.
       if oldFrame == nil and not itemData:IsItemEmpty() then
         local newFrame = itemRowFrame:Create()
+        newFrame.rowButton:SetScript("OnMouseWheel", function(_, delta)
+          bag.content:GetContainer():ScrollInDirection(0.05, -delta)
+        end)
         newFrame:SetItem(itemData)
         local category = newFrame:GetCategory()
         local section ---@type Section|nil
@@ -64,7 +67,9 @@ function views:ListView(bag, dirtyItems)
         else
           section = bag:GetOrCreateSection(category)
         end
-
+        section:GetContent():GetContainer():SetScript("OnMouseWheel", function(_, delta)
+          bag.content:GetContainer():ScrollInDirection(0.05, -delta)
+        end)
         section:AddCell(itemData:GetItemGUID(), newFrame)
         newFrame:AddToMasqueGroup(bag.kind)
         bag.itemsByBagAndSlot[bagid][slotid] = newFrame
@@ -169,6 +174,7 @@ function views:ListView(bag, dirtyItems)
   bag.content:ShowScrollBar()
 
   bag.frame:SetSize(database:GetBagFrameSize(bag.kind))
+  bag.content:GetContainer():FullUpdate()
 end
 
 --[[

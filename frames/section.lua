@@ -68,6 +68,10 @@ function sectionProto:SetFillWidth(fill)
   self.fillWidth = fill
 end
 
+function sectionProto:GetContent()
+  return self.content
+end
+
 function sectionProto:Wipe()
   self.content:Wipe()
   self.view = const.BAG_VIEW.SECTION_GRID

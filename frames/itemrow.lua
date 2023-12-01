@@ -82,6 +82,7 @@ function itemRowProto:ClearItem()
   self.frame:SetID(0)
   self.frame:Hide()
   self.rowButton:Hide()
+  self.rowButton:SetScript("OnMouseWheel", nil)
 end
 
 ---@return ItemMixin

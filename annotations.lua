@@ -127,6 +127,8 @@ function FontString:SetScript(event, func) end
 ---@class WowScrollBox: Frame
 local WowScrollBox = {}
 function WowScrollBox:SetInterpolateScroll(interpolate) end
+function WowScrollBox:ScrollInDirection(percent, direction) end
+function WowScrollBox:FullUpdate() end
 
 ---@class MinimalScrollBar: Frame
 local MinimalScrollBar = {}
