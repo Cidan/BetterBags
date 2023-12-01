@@ -142,6 +142,41 @@ function context:CreateContextMenu(bag)
     }
   })
 
+  table.insert(menuList, {
+    text = L:G("Items"),
+    hasArrow = true,
+    notCheckable = true,
+    menuList = {
+      {
+        text = L:G("Item Level"),
+        hasArrow = true,
+        notCheckable = true,
+        menuList = {
+          {
+            text = L:G("Show"),
+            checked = function() return database:GetItemLevelOptions(bag.kind).enabled end,
+            func = function()
+              context:Hide()
+              database:SetItemLevelEnabled(bag.kind, not database:GetItemLevelOptions(bag.kind).enabled)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("Item Level Colors"),
+            checked = function() return database:GetItemLevelOptions(bag.kind).color end,
+            func = function()
+              context:Hide()
+              database:SetItemLevelColorEnabled(bag.kind, not database:GetItemLevelOptions(bag.kind).color)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          }
+        }
+      },
+    }
+  })
+
   -- View menu for switching between one bag and section grid.
   table.insert(menuList, {
     text = L:G("View"),

@@ -98,4 +98,12 @@ function DB:GetItemLevelOptions(kind)
   return DB.data.profile.itemLevel[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank']
 end
 
+function DB:SetItemLevelEnabled(kind, enabled)
+  DB.data.profile.itemLevel[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].enabled = enabled
+end
+
+function DB:SetItemLevelColorEnabled(kind, enabled)
+  DB.data.profile.itemLevel[kind == const.BAG_KIND.BACKPACK and 'Backpack' or 'Bank'].color = enabled
+end
+
 DB:Enable()
