@@ -253,7 +253,7 @@ function context:CreateContextMenu(bag)
   })
 
   local columnSlider = slider:CreateDropdownSlider()
-  columnSlider:SetMinMaxValues(1, 20)
+  columnSlider:SetMinMaxValues(3, 20)
   columnSlider:SetValue(database:GetBagSizeInfo(bag.kind).columnCount)
   columnSlider.OnMouseUp = function()
     context:Hide()
