@@ -147,12 +147,13 @@ end
 ---@return Column
 function columnFrame:_DoCreate()
   local column = setmetatable({}, {__index = columnProto})
-  ---@class Frame: BackdropTemplate
-  local f = CreateFrame('Frame', nil, nil, "BackdropTemplate")
+  ---@class Frame
+  local f = CreateFrame('Frame', nil, nil)
   column.frame = f
   column.minimumWidth = 0
   column.cells = {}
   column.frame:Show()
+  --debug:DrawBorder(column.frame, 1, 0, 0)
   return column
 end
 

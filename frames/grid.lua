@@ -236,7 +236,7 @@ function grid:CreateScrollFrame(g, parent, child)
   g.box = box
   g.view = view
   ScrollUtil.InitScrollBoxWithScrollBar(box, bar, view)
-  scrollFrameCounter = scrollFrameCounter + 1 
+  scrollFrameCounter = scrollFrameCounter + 1
   return box
 end
 

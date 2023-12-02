@@ -147,7 +147,6 @@ function views:GridView(bag, dirtyItems)
   -- Position all sections and draw the main bag.
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
-  bag.content:GetContainer():SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
   if w < 160 then
@@ -160,5 +159,5 @@ function views:GridView(bag, dirtyItems)
   --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
   -- than the screen space.
   bag.frame:SetWidth(w + 12)
-  bag.frame:SetHeight(h + 24 + bag.leftHeader:GetHeight() + bag.bottomBar:GetHeight())
+  bag.frame:SetHeight(h + bag.bottomBar:GetHeight())
 end

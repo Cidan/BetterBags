@@ -80,5 +80,5 @@ function views:OneBagView(bag, dirtyItems)
   local w, h = bag.content:Draw()
   bag.content:HideScrollBar()
   bag.frame:SetWidth(w + 12)
-  bag.frame:SetHeight(h + 28 + bag.bottomBar:GetHeight() + bag.leftHeader:GetHeight())
+  bag.frame:SetHeight(h + 28 + bag.bottomBar:GetHeight())
 end

@@ -60,7 +60,6 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Bag
 ---@field kind BagKind
 ---@field frame Frame The fancy frame of the bag.
----@field leftHeader Frame The top left header of the bag.
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field content Grid The main content frame of the bag.
 ---@field recentItems Section The recent items section.
@@ -294,21 +293,13 @@ function bagFrame:Create(kind)
   -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
 
-  -- Create the top left header.
-  -- TODO(lobato): This is obsolete, remove it eventually.
-  ---@class Frame: BackdropTemplate
-  local leftHeader = CreateFrame("Frame", nil, b.frame, "BackdropTemplate")
-  leftHeader:SetPoint("TOPLEFT", 3, -20) -- -8 to -20
-  leftHeader:SetPoint("TOPRIGHT", -3, 3)
-  leftHeader:SetHeight(20)
-  leftHeader:Show()
-  b.leftHeader = leftHeader
-
   -- Create the bottom bar for currency and money display.
   local bottomBar = CreateFrame("Frame", nil, b.frame)
-  bottomBar:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMLEFT", 0, 6)
-  bottomBar:SetPoint("TOPRIGHT", b.frame, "BOTTOMRIGHT", 0, 40)
+  bottomBar:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMLEFT", const.OFFSETS.BOTTOM_BAR_LEFT_INSET, const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET)
+  bottomBar:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BOTTOM_BAR_RIGHT_INSET, const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET)
+  bottomBar:SetHeight(20)
   bottomBar:Show()
+  debug:DrawBorder(bottomBar, 0, 1, 0.5)
   b.bottomBar = bottomBar
 
   -- Create the money frame only in the player backpack bag.
@@ -343,8 +334,9 @@ function bagFrame:Create(kind)
 
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
-  content:GetContainer():SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
-  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -3, 3)
+  content:GetContainer():ClearAllPoints()
+  content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  content:GetContainer():SetPoint("BOTTOMRIGHT", b.bottomBar, "TOPRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET)
   content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   content:Show()
   b.content = content
@@ -353,8 +345,6 @@ function bagFrame:Create(kind)
   local recentItems = sectionFrame:Create()
   recentItems:SetTitle(L:G("Recent Items"))
   recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  --recentItems.frame:SetParent(b.frame)
-  --recentItems.frame:SetPoint("TOPLEFT", leftHeader, "BOTTOMLEFT", 3, -3)
   recentItems.frame:Hide()
   content:AddHeader(recentItems)
   b.recentItems = recentItems
@@ -437,6 +427,9 @@ function bagFrame:Create(kind)
     local fw, fh = b.frame:GetSize()
     database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
   end)
+
+  debug:DrawBorder(b.content:GetContainer(), 1, 0.5, 0)
+  --debug:DrawBorder(b.content:GetScrollView(), 0, 1, 0.5)
   return b
 end
 

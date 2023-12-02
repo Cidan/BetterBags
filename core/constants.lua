@@ -122,6 +122,30 @@ const.EXPANSION_TYPE = {
   LE_EXPANSION_DRAGONFLIGHT = 9,
 }
 
+const.OFFSETS = {
+  -- This is the offset from the top of the bag window to the start of the
+  -- content frame.
+  BAG_TOP_INSET = -42,
+  -- This is the offset from the left of the bag window to the start of the
+  -- content frame.
+  BAG_LEFT_INSET = 6,
+  -- This is the offset from the right of the bag window to the start of the
+  -- content frame.
+  BAG_RIGHT_INSET = 0,
+  -- This is the offset from the bottom of the bag window to the start of the
+  -- content frame.
+  BAG_BOTTOM_INSET = 3,
+
+  -- This is the height of the bag window bottom bar. 
+  BOTTOM_BAR_HEIGHT = 20,
+  -- This is how far the bottom bar is inset from the bottom of the bag window.
+  BOTTOM_BAR_BOTTOM_INSET = 6,
+  -- This is how far the bottom bar is inset from the left of the bag window.
+  BOTTOM_BAR_LEFT_INSET = 6,
+  -- This is how far the bottom bar is inset from the right of the bag window.
+  BOTTOM_BAR_RIGHT_INSET = -6,
+}
+
 ---@class ExpansionMap
 ---@type table<number, string>
 const.EXPANSION_MAP = {

@@ -166,7 +166,6 @@ function views:ListView(bag, dirtyItems)
   -- Position all sections and draw the main bag.
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
-  bag.content:GetContainer():SetPoint("TOPLEFT", bag.leftHeader, "BOTTOMLEFT", 3, -3)
 
   --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
   if w < 160 then
