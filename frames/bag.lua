@@ -426,7 +426,7 @@ function bagFrame:Create(kind)
     local fw, fh = b.frame:GetSize()
     database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
   end)
-
+  b:KeepBagInBounds()
   return b
 end
 
