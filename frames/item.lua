@@ -21,6 +21,9 @@ local database = addon:GetModule('Database')
 ---@class Color: AceModule
 local color = addon:GetModule('Color')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -213,6 +216,12 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 end
 
 function itemProto:GetCategory()
+  -- Return the custom category if it exists.
+  local customCategory = categories:GetCustomCategory(self:GetMixin().itemID)
+  if customCategory then
+    return customCategory
+  end
+
   if not self.kind then return L:G('Everything') end
   -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
   if self:GetMixin().containerInfo.quality == Enum.ItemQuality.Poor then
