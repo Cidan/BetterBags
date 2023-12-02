@@ -153,7 +153,6 @@ function columnFrame:_DoCreate()
   column.minimumWidth = 0
   column.cells = {}
   column.frame:Show()
-  --debug:DrawBorder(column.frame, 1, 0, 0)
   return column
 end
 

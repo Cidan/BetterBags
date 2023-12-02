@@ -159,5 +159,8 @@ function views:GridView(bag, dirtyItems)
   --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
   -- than the screen space.
   bag.frame:SetWidth(w + 12)
-  bag.frame:SetHeight(h + bag.bottomBar:GetHeight())
+  local bagHeight = h +
+  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+  bag.frame:SetHeight(bagHeight)
 end

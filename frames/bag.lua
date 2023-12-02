@@ -299,7 +299,6 @@ function bagFrame:Create(kind)
   bottomBar:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BOTTOM_BAR_RIGHT_INSET, const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET)
   bottomBar:SetHeight(20)
   bottomBar:Show()
-  debug:DrawBorder(bottomBar, 0, 1, 0.5)
   b.bottomBar = bottomBar
 
   -- Create the money frame only in the player backpack bag.
@@ -428,8 +427,6 @@ function bagFrame:Create(kind)
     database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
   end)
 
-  debug:DrawBorder(b.content:GetContainer(), 1, 0.5, 0)
-  --debug:DrawBorder(b.content:GetScrollView(), 0, 1, 0.5)
   return b
 end
 
