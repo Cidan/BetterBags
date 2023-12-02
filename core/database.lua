@@ -117,4 +117,12 @@ function DB:SetItemLevelColorEnabled(kind, enabled)
   DB.data.profile.itemLevel[kind].color = enabled
 end
 
+function DB:GetFirstTimeMenu()
+  return DB.data.profile.firstTimeMenu
+end
+
+function DB:SetFirstTimeMenu(value)
+  DB.data.profile.firstTimeMenu = value
+end
+
 DB:Enable()

@@ -189,6 +189,7 @@ const.TRADESKILL_MAP = {
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
+    firstTimeMenu = true,
     enabled = true,
     showBagButton = true,
     itemLevel = {

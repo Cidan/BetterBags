@@ -309,15 +309,37 @@ function bagFrame:Create(kind)
     b.moneyFrame = moneyFrame
   end
 
+  -- Setup the context menu.
+  local contextMenu = context:CreateContextMenu(b)
+
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
   bagButton:EnableMouse(true)
   bagButton:SetParent(b.frame.PortraitContainer)
-  bagButton:SetHighlightTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
+  --bagButton:SetHighlightTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
   bagButton:SetWidth(40)
   bagButton:SetHeight(40)
   bagButton:SetPoint("TOPLEFT", b.frame.PortraitContainer, "TOPLEFT", -6, 2)
+  local highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
+  highlightTex:SetTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
+  highlightTex:SetAllPoints()
+  highlightTex:SetAlpha(0)
+  local anig = highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
+  local ani = anig:CreateAnimation("Alpha")
+  ani:SetFromAlpha(0)
+  ani:SetToAlpha(1)
+  ani:SetDuration(0.2)
+  ani:SetSmoothing("IN")
+  if database:GetFirstTimeMenu() then
+    ani:SetDuration(0.4)
+    anig:SetLooping("BOUNCE")
+    anig:Play()
+  end
   bagButton:SetScript("OnEnter", function()
+    if not database:GetFirstTimeMenu() then
+      highlightTex:SetAlpha(1)
+      anig:Restart()
+    end
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
     if kind == const.BAG_KIND.BACKPACK then
       GameTooltip:SetText(L:G("Left Click to open the menu."))
@@ -328,8 +350,25 @@ function bagFrame:Create(kind)
   end)
   bagButton:SetScript("OnLeave", function()
     GameTooltip:Hide()
+    if not database:GetFirstTimeMenu() then
+      highlightTex:SetAlpha(0)
+      anig:Restart(true)
+    end
   end)
   bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  bagButton:SetScript("OnClick", function(_, e)
+    if e == "LeftButton" then
+      if database:GetFirstTimeMenu() then
+        database:SetFirstTimeMenu(false)
+        highlightTex:SetAlpha(1)
+        anig:SetLooping("NONE")
+        anig:Restart()
+      end
+      context:Show(contextMenu)
+    else
+      b:ToggleReagentBank()
+    end
+  end)
 
   -- Create the bag content frame.
   local content = grid:Create(b.frame)
@@ -413,15 +452,6 @@ function bagFrame:Create(kind)
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
 
-  -- Setup the context menu.
-  local contextMenu = context:CreateContextMenu(b)
-  bagButton:SetScript("OnClick", function(_, e)
-    if e == "LeftButton" then
-      context:Show(contextMenu)
-    else
-      b:ToggleReagentBank()
-    end
-  end)
   b.resizeHandle = resize:MakeResizable(b.frame, function()
     local fw, fh = b.frame:GetSize()
     database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
