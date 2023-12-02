@@ -77,9 +77,10 @@ function DB:SetBagViewSizeScale(kind, view, scale)
 end
 
 ---@param kind BagKind
+---@param view BagView
 ---@return number, number
-function DB:GetBagFrameSize(kind)
-  local s = DB.data.profile.size[kind]
+function DB:GetBagViewFrameSize(kind, view)
+  local s = DB.data.profile.size[view][kind]
   return s.width, s.height
 end
 

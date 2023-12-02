@@ -177,7 +177,7 @@ function views:ListView(bag, dirtyItems)
   end
   bag.content:ShowScrollBar()
 
-  bag.frame:SetSize(database:GetBagFrameSize(bag.kind))
+  bag.frame:SetSize(database:GetBagViewFrameSize(bag.kind, database:GetBagView(bag.kind)))
   bag.content:GetContainer():FullUpdate()
 end
 
