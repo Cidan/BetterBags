@@ -12,6 +12,9 @@ local database = addon:GetModule('Database')
 ---@class ItemRowFrame: AceModule
 local itemRowFrame = addon:GetModule('ItemRowFrame')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
@@ -64,6 +67,7 @@ function views:ListView(bag, dirtyItems)
           bag.content:GetContainer():OnMouseWheel(delta)
         end)
         newFrame:SetItem(itemData)
+        newFrame.button:SetSize(32, 32)
         local category = newFrame:GetCategory()
         local section ---@type Section|nil
         if newFrame:IsNewItem() then
@@ -167,7 +171,6 @@ function views:ListView(bag, dirtyItems)
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
 
-  --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
   if w < 160 then
     w = 160
   end

@@ -167,6 +167,11 @@ function itemProto:SetItem(i)
   self.button:Show()
 end
 
+function itemProto:SetSize(width, height)
+  self.frame:SetSize(width, height)
+  self.button:SetSize(width, height)
+end
+
 -- SetFreeSlots will set the item button to a free slot.
 ---@param bagid number
 ---@param slotid number
@@ -296,6 +301,7 @@ function itemProto:ClearItem()
   self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
+  self:SetSize(37, 37)
 end
 
 ---@param kind BagKind

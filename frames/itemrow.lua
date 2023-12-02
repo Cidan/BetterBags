@@ -43,35 +43,16 @@ function itemRowProto:SetItem(i)
 
   local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
   self.rowButton:SetID(slotid)
-  --ClearItemButtonOverlay(self.rowButton)
-  --self.rowButton:UpdateExtended()
   self.rowButton:SetHasItem(i:GetItemIcon())
+
   local quality = i:GetItemQuality()
-  if quality == Enum.ItemQuality.Poor then
-    self.text:SetVertexColor(0.62, 0.62, 0.62, 1)
-  elseif quality == Enum.ItemQuality.Common then
-    self.text:SetVertexColor(1, 1, 1, 1)
-  elseif quality == Enum.ItemQuality.Uncommon then
-    self.text:SetVertexColor(0.12, 1, 0, 1)
-  elseif quality == Enum.ItemQuality.Rare then
-    self.text:SetVertexColor(0.00, 0.44, 0.87, 1)
-  elseif quality == Enum.ItemQuality.Epic then
-    self.text:SetVertexColor(0.64, 0.21, 0.93, 1)
-  elseif quality == Enum.ItemQuality.Legendary then
-    self.text:SetVertexColor(1, 0.50, 0, 1)
-  elseif quality == Enum.ItemQuality.Artifact then
-    self.text:SetVertexColor(0.90, 0.80, 0.50, 1)
-  elseif quality == Enum.ItemQuality.Heirloom then
-    self.text:SetVertexColor(0, 0.8, 1, 1)
-  elseif quality == Enum.ItemQuality.WoWToken then
-    self.text:SetVertexColor(0, 0.8, 1, 1)
-  end
+  self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
+  self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
+
   self.frame:SetID(bagid)
   self.text:SetText(i:GetItemName())
   self.frame:Show()
   self.rowButton:Show()
-  --self.rowButton.NormalTexture:Hide()
-  --_G[self.rowButton:GetName().."NormalTexture"]:Hide()
 
 end
 
@@ -162,7 +143,8 @@ function item:_DoCreate()
   text:SetTextHeight(28)
   text:SetWordWrap(true)
   text:SetJustifyH("LEFT")
-  text:SetFont("Fonts\\FRIZQT__.TTF", 14, "")
+  text:SetFont("Fonts\\FRIZQT__.TTF", 14, "THICK")
+  text:SetShadowColor(0, 0, 0, 1)
   i.text = text
 
   local border = i.frame:CreateTexture(nil, "BORDER")
@@ -175,14 +157,30 @@ function item:_DoCreate()
 
   rowButton.NormalTexture:Hide()
   rowButton.NormalTexture:SetParent(nil)
-  rowButton.NormalTexture = nil --i.frame:CreateTexture()
+  rowButton.NormalTexture = nil
   rowButton.PushedTexture:Hide()
   rowButton.PushedTexture:SetParent(nil)
   rowButton.PushedTexture = nil
   rowButton.NewItemTexture:Hide()
   rowButton.BattlepayItemTexture:Hide()
+  rowButton:GetHighlightTexture():Hide()
+  rowButton:GetHighlightTexture():SetParent(nil)
+  rowButton.HighlightTexture = nil
 
-  i.frame:SetSize(350, 40)
+  local highlight = rowButton:CreateTexture()
+  highlight:SetDrawLayer("BACKGROUND")
+  highlight:SetBlendMode("ADD")
+  highlight:SetAllPoints()
+  highlight:SetTexture("Interface/Buttons/WHITE8x8")
+  highlight:Hide()
+  rowButton.HighlightTexture = highlight
+  rowButton:SetScript("OnEnter", function(s)
+    s.HighlightTexture:Show()
+  end)
+  rowButton:SetScript("OnLeave", function(s)
+    s.HighlightTexture:Hide()
+  end)
+  i.frame:SetSize(350, 35)
 
   return i
 end

@@ -146,6 +146,52 @@ const.OFFSETS = {
   BOTTOM_BAR_RIGHT_INSET = -6,
 }
 
+const.ITEM_QUALITY_COLOR = {
+  [Enum.ItemQuality.Poor] = {0.62, 0.62, 0.62, 1},
+  [Enum.ItemQuality.Common] = {1, 1, 1, 1},
+  [Enum.ItemQuality.Uncommon] = {0.12, 1, 0, 1},
+  [Enum.ItemQuality.Rare] = {0.00, 0.44, 0.87, 1},
+  [Enum.ItemQuality.Epic] = {0.64, 0.21, 0.93, 1},
+  [Enum.ItemQuality.Legendary] = {1, 0.50, 0, 1},
+  [Enum.ItemQuality.Artifact] = {0.90, 0.80, 0.50, 1},
+  [Enum.ItemQuality.Heirloom] = {0, 0.8, 1, 1},
+  [Enum.ItemQuality.WoWToken] = {0, 0.8, 1, 1},
+}
+
+const.ITEM_QUALITY_HIGHLIGHT = {
+  [Enum.ItemQuality.Poor] = {0.682, 0.682, 0.682, 1},
+  [Enum.ItemQuality.Common] = {1, 1, 1, 1},
+  [Enum.ItemQuality.Uncommon] = {0.132, 1, 0, 1},
+  [Enum.ItemQuality.Rare] = {0, 0.484, 0.957, 1},
+  [Enum.ItemQuality.Epic] = {0.704, 0.231, 1, 1},
+  [Enum.ItemQuality.Legendary] = {1, 0.55, 0, 1},
+  [Enum.ItemQuality.Artifact] = {0.99, 0.88, 0.55, 1},
+  [Enum.ItemQuality.Heirloom] = {0, 0.88, 1, 1},
+  [Enum.ItemQuality.WoWToken] = {0, 0.88, 1, 1},
+}
+const.ITEM_QUALITY_COLOR_HIGH = {
+  [Enum.ItemQuality.Poor] = {0.558, 0.558, 0.558, 0.3},
+  [Enum.ItemQuality.Common] = {0.9, 0.9, 0.9, 0.3},
+  [Enum.ItemQuality.Uncommon] = {0.108, 0.9, 0, 0.3},
+  [Enum.ItemQuality.Rare] = {0, 0.396, 0.783, 0.3},
+  [Enum.ItemQuality.Epic] = {0.576, 0.189, 0.837, 0.3},
+  [Enum.ItemQuality.Legendary] = {0.9, 0.45, 0, 0.3},
+  [Enum.ItemQuality.Artifact] = {0.81, 0.72, 0.45, 0.3},
+  [Enum.ItemQuality.Heirloom] = {0, 0.72, 0.9, 0.3},
+  [Enum.ItemQuality.WoWToken] = {0, 0.72, 0.9, 0.3},
+}
+
+const.ITEM_QUALITY_COLOR_LOW = {
+  [Enum.ItemQuality.Poor] = {0.558, 0.558, 0.558, 0.1},
+  [Enum.ItemQuality.Common] = {0.9, 0.9, 0.9, 0.1},
+  [Enum.ItemQuality.Uncommon] = {0.108, 0.9, 0, 0.1},
+  [Enum.ItemQuality.Rare] = {0, 0.396, 0.783, 0.1},
+  [Enum.ItemQuality.Epic] = {0.576, 0.189, 0.837, 0.1},
+  [Enum.ItemQuality.Legendary] = {0.9, 0.45, 0, 0.1},
+  [Enum.ItemQuality.Artifact] = {0.81, 0.72, 0.45, 0.1},
+  [Enum.ItemQuality.Heirloom] = {0, 0.72, 0.9, 0.1},
+  [Enum.ItemQuality.WoWToken] = {0, 0.72, 0.9, 0.1},
+}
 ---@class ExpansionMap
 ---@type table<number, string>
 const.EXPANSION_MAP = {

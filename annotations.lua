@@ -6,6 +6,7 @@
 ---@field minDisplayCount number
 ---@field NormalTexture Texture
 ---@field PushedTexture Texture
+---@field HighlightTexture Texture
 ---@field BattlepayItemTexture Texture
 local itemButton = {}
 
@@ -40,6 +41,9 @@ function itemButton:SetMatchesSearch(matchesSearch) end
 function itemButton:SetItemButtonQuality(quality) end
 
 function itemButton:HasItem() end
+
+---@return Texture
+function itemButton:GetHighlightTexture() end
 
 ---@class ContinuableContainer 
 ContinuableContainer = {}
