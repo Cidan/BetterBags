@@ -181,6 +181,7 @@ local EventFrame = {}
 ---@field isNewItem boolean
 ---@field currentItemCount number
 ---@field category string
+---@field currentItemLevel number
 
 --[[
 ---@class ItemMixin

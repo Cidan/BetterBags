@@ -194,6 +194,7 @@ function items:AttachItemInfo(data)
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
     currentItemCount = C_Item.GetStackCount(itemLocation),
     category = "",
+    currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
   }
 end
 

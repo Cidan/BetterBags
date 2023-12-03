@@ -116,9 +116,9 @@ function itemProto:SetItem(data)
     data.itemInfo.classID == Enum.ItemClass.Armor or
     data.itemInfo.classID == Enum.ItemClass.Weapon or
     data.itemInfo.classID == Enum.ItemClass.Gem then
-      self.ilvlText:SetText(tostring(data.itemInfo.effectiveIlvl) or "")
+      self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
       if ilvlOpts.color then
-        local r, g, b = color:GetItemLevelColor(data.itemInfo.effectiveIlvl)
+        local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
         self.ilvlText:SetTextColor(r, g, b, 1)
       else
         self.ilvlText:SetTextColor(1, 1, 1, 1)
@@ -223,7 +223,8 @@ function itemProto:GetCategory()
   -- when the tradeskill filter is enabled. This makes it so trade goods are
   -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
   if database:GetCategoryFilter(self.kind, "Type") and not
-  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) then
+  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) and
+  self.data.itemInfo.itemType then
     category = category .. self.data.itemInfo.itemType --[[@as string]]
   end
 
