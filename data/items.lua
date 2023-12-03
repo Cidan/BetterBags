@@ -165,6 +165,7 @@ function items:AttachItemInfo(data)
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
   setID, isCraftingReagent = GetItemInfo(itemID)
+  itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
@@ -197,7 +198,6 @@ function items:AttachItemInfo(data)
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
     currentItemCount = C_Item.GetStackCount(itemLocation)
   }
-  --data.isItemEmpty = C_Item.DoesItemExist(itemLocation)
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
