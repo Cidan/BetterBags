@@ -65,7 +65,6 @@ function items:RefreshReagentBank()
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
-    self.dirtyBankItems[i] = self.dirtyBankItems[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -87,7 +86,6 @@ function items:RefreshBank()
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
-    self.dirtyBankItems[i] = self.dirtyBankItems[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -109,7 +107,6 @@ function items:RefreshBackpack()
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
-    --self.dirtyItems[i] = self.dirtyItems[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, false)
   end
