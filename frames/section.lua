@@ -103,16 +103,16 @@ function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end
 
+---@param a ItemFrame|ItemRow
+---@param b ItemFrame|ItemRow
 local function sortFn(a, b)
-  ---@cast a +Item
-  ---@cast b +Item
-  if a == nil or b == nil or a:GetMixin() == nil or b:GetMixin() == nil then return false end
-  if a:GetMixin():GetItemQuality() == nil or b:GetMixin():GetItemQuality() == nil then return false end
-  if a:GetMixin():GetItemQuality() == b:GetMixin():GetItemQuality() then
-    if a:GetMixin():GetItemName() == nil or b:GetMixin():GetItemName() == nil then return false end
-    return a:GetMixin():GetItemName() < b:GetMixin():GetItemName()
+  if a == nil or b == nil or a.data == nil or b.data == nil or a.data.isItemEmpty or b.data.isItemEmpty then return false end
+  if a.data.itemInfo.itemQuality == nil or b.data.itemInfo.itemQuality == nil then return false end
+  if a.data.itemInfo.itemQuality == b.data.itemInfo.itemQuality then
+    if a.data.itemInfo.itemName == nil or b.data.itemInfo.itemName == nil then return false end
+    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
   end
-  return a:GetMixin():GetItemQuality() > b:GetMixin():GetItemQuality()
+  return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
 end
 
 -- Grid will render the section as a grid of icons.

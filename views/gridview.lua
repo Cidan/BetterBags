@@ -29,7 +29,7 @@ function views:GridView(bag, dirtyItems)
     bag.itemsByBagAndSlot[bagid] = bag.itemsByBagAndSlot[bagid] or {}
 
     -- Capture information about free slots.
-    if data.itemInfo.isItemEmpty then
+    if data.isItemEmpty then
       if bagid == Enum.BagIndex.ReagentBag then
         freeReagentSlotsData.count = freeReagentSlotsData.count + 1
         freeReagentSlotsData.bagid = bagid
@@ -43,7 +43,7 @@ function views:GridView(bag, dirtyItems)
 
     local oldFrame = bag.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
     -- The old frame does not exist, so we need to create a new one.
-    if oldFrame == nil and not data.itemInfo.isItemEmpty then
+    if oldFrame == nil and not data.isItemEmpty then
       local newFrame = itemFrame:Create()
       newFrame:SetItem(data)
       local category = newFrame:GetCategory()
@@ -57,7 +57,7 @@ function views:GridView(bag, dirtyItems)
       section:AddCell(data.itemInfo.itemGUID, newFrame)
       newFrame:AddToMasqueGroup(bag.kind)
       bag.itemsByBagAndSlot[bagid][slotid] = newFrame
-    elseif oldFrame ~= nil and not data.itemInfo.isItemEmpty and oldFrame.data.itemInfo.itemGUID ~= data.itemInfo.itemGUID then
+    elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame.data.itemInfo.itemGUID ~= data.itemInfo.itemGUID then
       -- This case handles the situation where the item in this slot no longer matches the item displayed.
       -- The old frame exists, so we need to update it.
       local oldCategory = oldFrame:GetCategory()
@@ -66,14 +66,14 @@ function views:GridView(bag, dirtyItems)
         oldSection = bag.recentItems
         oldCategory = bag.recentItems.title:GetText()
       end
-      local oldGuid = oldFrame.guid
-      oldFrame:SetItem(itemData)
+      local oldGuid = oldFrame.data.itemInfo.itemGUID
+      oldFrame:SetItem(data)
       local newCategory = oldFrame:GetCategory()
       local newSection = bag:GetOrCreateSection(newCategory)
 
       if oldCategory ~= newCategory then
         oldSection:RemoveCell(oldGuid, oldFrame)
-        newSection:AddCell(oldFrame.guid, oldFrame)
+        newSection:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       end
       if oldSection == bag.recentItems then
       elseif oldSection:GetCellCount() == 0 then
@@ -81,27 +81,27 @@ function views:GridView(bag, dirtyItems)
         bag.content:RemoveCell(oldCategory, oldSection)
         oldSection:Release()
       end
-    elseif oldFrame ~= nil and not itemData:IsItemEmpty() and oldFrame:GetMixin():GetItemGUID() == itemData:GetItemGUID() then
+    elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame.data.itemInfo.itemGUID == data.itemInfo.itemGUID then
       -- This case handles when the item in this slot is the same as the item displayed.
-      oldFrame:SetItem(itemData)
+      oldFrame:SetItem(data)
 
       -- The item in this same slot may no longer be a new item, i.e. it was moused over. If so, we
       -- need to resection it.
       if not oldFrame:IsNewItem() and bag.recentItems:HasItem(oldFrame) then
-        bag.recentItems:RemoveCell(oldFrame.guid, oldFrame)
+        bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
         local category = oldFrame:GetCategory()
         local section = bag:GetOrCreateSection(category)
-        section:AddCell(oldFrame.guid, oldFrame)
+        section:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       end
-    elseif itemData:IsItemEmpty() and oldFrame ~= nil then
+    elseif data.isItemEmpty and oldFrame ~= nil then
       -- The old frame exists, but the item is empty, so we need to delete it.
       bag.itemsByBagAndSlot[bagid][slotid] = nil
       -- Special handling for the recent items section.
       if bag.recentItems:HasItem(oldFrame) then
-        bag.recentItems:RemoveCell(oldFrame.guid, oldFrame)
+        bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       else
         local section = bag.sections[oldFrame:GetCategory()]
-        section:RemoveCell(oldFrame.guid, oldFrame)
+        section:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
         -- Delete the section if it's empty as well.
         if section:GetCellCount() == 0 then
           bag.sections[oldFrame:GetCategory()] = nil

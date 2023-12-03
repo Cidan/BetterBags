@@ -9,9 +9,6 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
-
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -21,6 +18,7 @@ local debug = addon:GetModule('Debug')
 ---@field questInfo ItemQuestInfo
 ---@field bagid number
 ---@field slotid number
+---@field isItemEmpty boolean
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -64,7 +62,6 @@ end
 
 function items:RefreshReagentBank()
   self._bankContainer = ContinuableContainer:Create()
-
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
@@ -107,11 +104,12 @@ function items:RefreshBackpack()
   end
   self._doingRefreshAll = true
   self._container = ContinuableContainer:Create()
+  wipe(self.dirtyItems)
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
-    self.dirtyItems[i] = self.dirtyItems[i] or {}
+    --self.dirtyItems[i] = self.dirtyItems[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, false)
   end
@@ -124,7 +122,7 @@ end
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
-    for _, data in pairs(items.dirtyBankItems) do
+    for _, data in pairs(items.dirtyItems) do
       items:AttachItemInfo(data)
     end
 
@@ -157,6 +155,11 @@ function items:AttachItemInfo(data)
   local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
   local bagid, slotid = data.bagid, data.slotid
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
+  if itemID == nil then
+    data.isItemEmpty = true
+    return
+  end
+  data.isItemEmpty = false
   local itemName, itemLink, itemQuality,
   itemLevel, itemMinLevel, itemType, itemSubType,
   itemStackCount, itemEquipLoc, itemTexture,
@@ -192,8 +195,8 @@ function items:AttachItemInfo(data)
     isBound = C_Item.IsBound(itemLocation),
     isLocked = C_Item.IsLocked(itemLocation),
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
-    isItemEmpty = C_Item.DoesItemExist(itemLocation),
   }
+  --data.isItemEmpty = C_Item.DoesItemExist(itemLocation)
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
@@ -222,6 +225,8 @@ function items:RefreshBag(bagid, bankBag)
       else
         self._container:AddContinuable(itemMixin)
       end
+    else
+      data.isItemEmpty = true
     end
 
     -- All items are added to the bag/slot lookup table, including
