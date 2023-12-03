@@ -199,21 +199,22 @@ function itemProto:GetCategory()
   -- Return the custom category if it exists.
   local customCategory = categories:GetCustomCategory(self.data)
   if customCategory then
+    self.data.itemInfo.category = customCategory
     return customCategory
   end
 
   -- Check for equipment sets next.
-  --[[ 
-  local equipmentSet = equipmentSets:GetItemSet(self:GetMixin():GetItemID())
+  local equipmentSet = equipmentSets:GetItemSet(self.data.itemInfo.itemID)
   if equipmentSet then
-    return "Gear: " .. equipmentSet
+    self.data.itemInfo.category = "Gear: " .. equipmentSet
+    return self.data.itemInfo.category
   end
-  ]]--
 
   if not self.kind then return L:G('Everything') end
   -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
   if self.data.containerInfo.quality == Enum.ItemQuality.Poor then
-    return L:G('Junk')
+    self.data.itemInfo.category = L:G('Junk')
+    return self.data.itemInfo.category
   end
 
   local category = ""
@@ -246,7 +247,7 @@ function itemProto:GetCategory()
   if category == "" then
     category = L:G('Everything')
   end
-
+  self.data.itemInfo.category = category
   return category
 end
 

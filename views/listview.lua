@@ -85,7 +85,7 @@ function views:ListView(bag, dirtyItems)
     elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame.data.itemInfo.itemGUID ~= data.itemInfo.itemGUID then
       -- This case handles the situation where the item in this slot no longer matches the item displayed.
       -- The old frame exists, so we need to update it.
-      local oldCategory = oldFrame:GetCategory()
+      local oldCategory = oldFrame.data.itemInfo.category
       local oldSection = bag.sections[oldCategory]
       if bag.recentItems:HasItem(oldFrame.button) then
         oldSection = bag.recentItems
@@ -108,7 +108,21 @@ function views:ListView(bag, dirtyItems)
       end
     elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame:GetGUID() == data.itemInfo.itemGUID then
       -- This case handles when the item in this slot is the same as the item displayed.
+      local oldCategory = oldFrame.data.itemInfo.category
+      local oldSection = bag.sections[oldCategory]
+      local oldGuid = oldFrame.data.itemInfo.itemGUID
       oldFrame:SetItem(data)
+      local newCategory = oldFrame:GetCategory()
+      local newSection = bag:GetOrCreateSection(newCategory)
+      if oldCategory ~= newCategory then
+        oldSection:RemoveCell(oldGuid, oldFrame)
+        newSection:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
+      end
+      if oldSection:GetCellCount() == 0 then
+        bag.sections[oldCategory] = nil
+        bag.content:RemoveCell(oldCategory, oldSection)
+        oldSection:Release()
+      end
 
       -- The item in this same slot may no longer be a new item, i.e. it was moused over. If so, we
       -- need to resection it.

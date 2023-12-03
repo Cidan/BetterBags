@@ -113,7 +113,6 @@ function items:RefreshBackpack()
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, false)
   end
-
   --- Process the item container.
   self:ProcessContainer()
 end
@@ -196,7 +195,8 @@ function items:AttachItemInfo(data)
     isBound = C_Item.IsBound(itemLocation),
     isLocked = C_Item.IsLocked(itemLocation),
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
-    currentItemCount = C_Item.GetStackCount(itemLocation)
+    currentItemCount = C_Item.GetStackCount(itemLocation),
+    category = "",
   }
 end
 

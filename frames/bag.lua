@@ -165,7 +165,7 @@ function bagProto:UpdateCellWidth()
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
----@param dirtyItems table<number, table<number, ItemData>>
+---@param dirtyItems ItemData[]
 function bagProto:Draw(dirtyItems)
   self:UpdateCellWidth()
   for _, i in pairs(self.recentItems:GetAllCells()) do
