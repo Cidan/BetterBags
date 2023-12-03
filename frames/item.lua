@@ -69,6 +69,7 @@ local children = {
 -- OnEvent is the event handler for the item button.
 ---@param i Item
 local function OnEvent(i)
+  if not i.data then return end
   i.button:UpdateCooldown(i.data.itemInfo.itemIcon)
 end
 

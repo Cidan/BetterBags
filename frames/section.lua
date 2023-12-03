@@ -103,8 +103,8 @@ function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end
 
----@param a ItemFrame|ItemRow
----@param b ItemFrame|ItemRow
+---@param a Item|ItemRow
+---@param b Item|ItemRow
 local function sortFn(a, b)
   if a == nil or b == nil or a.data == nil or b.data == nil or a.data.isItemEmpty or b.data.isItemEmpty then return false end
   if a.data.itemInfo.itemQuality == nil or b.data.itemInfo.itemQuality == nil then return false end

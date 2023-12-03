@@ -104,7 +104,13 @@
   "Lua.diagnostics.groupFileStatus": {
     "strong": "Any",
     "strict": "Any",
-    "type-check": "Any"
+    "type-check": "Any",
+    "luadoc": "Any",
+    "unused": "Any",
+    "unbalanced": "Any",
+    "redefined": "Any",
+    "ambiguity": "Any",
+    "duplicate": "Any"
   },
   "Lua.diagnostics.groupSeverity": {
     "strict": "Error",
@@ -114,7 +120,8 @@
     "type-check": "Error",
     "ambiguity": "Error",
     "unused": "Warning",
-    "duplicate": "Error"
+    "duplicate": "Error",
+    "luadoc": "Warning"
   },
   "Lua.runtime.version": "Lua 5.1"
 }

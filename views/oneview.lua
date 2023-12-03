@@ -15,62 +15,61 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
+---@param a Item
+---@param b Item
+local function SortView (a, b)
+  if a == nil or b == nil or a.data == nil or b.data == nil then return false end
+  if a.data.itemInfo.itemQuality == nil or b.data.itemInfo.itemQuality == nil then return false end
+  if a.data.itemInfo.itemQuality == b.data.itemInfo.itemQuality then
+    if a.data.itemInfo.itemName == nil or b.data.itemInfo.itemName == nil then return false end
+    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
+  end
+  return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
+end
+
 ---@param bag Bag
----@param dirtyItems table<number, table<number, ItemData>>
+---@param dirtyItems ItemData[]
 function views:OneBagView(bag, dirtyItems)
   bag:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   bag.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
-  for bid, bagData in pairs(dirtyItems) do
-    bag.itemsByBagAndSlot[bid] = bag.itemsByBagAndSlot[bid] or {}
-    for sid, itemData in pairs(bagData) do
-      local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
-
-      if itemData:IsItemEmpty() then
-        if bagid == Enum.BagIndex.ReagentBag then
-          freeReagentSlotsData.count = freeReagentSlotsData.count + 1
-          freeReagentSlotsData.bagid = bagid
-          freeReagentSlotsData.slotid = slotid
-        else
-          freeSlotsData.count = freeSlotsData.count + 1
-          freeSlotsData.bagid = bagid
-          freeSlotsData.slotid = slotid
-        end
+  for _, data in pairs(dirtyItems) do
+    local bagid, slotid = data.bagid, data.slotid
+    bag.itemsByBagAndSlot[bagid] = bag.itemsByBagAndSlot[bagid] or {}
+    if data.isItemEmpty then
+      if bagid == Enum.BagIndex.ReagentBag then
+        freeReagentSlotsData.count = freeReagentSlotsData.count + 1
+        freeReagentSlotsData.bagid = bagid
+        freeReagentSlotsData.slotid = slotid
+      else
+        freeSlotsData.count = freeSlotsData.count + 1
+        freeSlotsData.bagid = bagid
+        freeSlotsData.slotid = slotid
       end
+    end
 
-      local oldFrame = bag.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
+    local oldFrame = bag.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
 
-      -- The old frame does not exist, so we need to create a new one.
-      if oldFrame == nil and not itemData:IsItemEmpty() then
-        local newFrame = itemFrame:Create()
-        newFrame:SetItem(itemData)
-        newFrame:AddToMasqueGroup(bag.kind)
-        bag.content:AddCell(itemData:GetItemGUID(), newFrame)
-        bag.itemsByBagAndSlot[bagid][slotid] = newFrame
-      elseif oldFrame ~= nil and not itemData:IsItemEmpty() then
-        -- The old frame exists, so we need to update it.
-        oldFrame:SetItem(itemData)
-      elseif itemData:IsItemEmpty() and oldFrame ~= nil then
-        -- The old frame exists, but the item is empty, so we need to delete it.
-        bag.itemsByBagAndSlot[bid][sid] = nil
-        bag.content:RemoveCell(oldFrame.guid, oldFrame)
-        oldFrame:Release()
-      end
+    -- The old frame does not exist, so we need to create a new one.
+    if oldFrame == nil and not data.isItemEmpty then
+      local newFrame = itemFrame:Create()
+      newFrame:SetItem(data)
+      newFrame:AddToMasqueGroup(bag.kind)
+      bag.content:AddCell(data.itemInfo.itemGUID, newFrame)
+      bag.itemsByBagAndSlot[bagid][slotid] = newFrame
+    elseif oldFrame ~= nil and not data.isItemEmpty then
+      -- The old frame exists, so we need to update it.
+      oldFrame:SetItem(data)
+    elseif data.isItemEmpty and oldFrame ~= nil then
+      -- The old frame exists, but the item is empty, so we need to delete it.
+      bag.itemsByBagAndSlot[bagid][slotid] = nil
+      bag.content:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
+      oldFrame:Release()
     end
   end
 
-  bag.content:Sort(function (a, b)
-    ---@cast a +Item
-    ---@cast b +Item
-    if not a:GetMixin() or not b:GetMixin() then return false end
-    if a:GetMixin():GetItemQuality() == nil or b:GetMixin():GetItemQuality() == nil then return false end
-    if a:GetMixin():GetItemQuality() == b:GetMixin():GetItemQuality() then
-      if a:GetMixin():GetItemName() == nil or b:GetMixin():GetItemName() == nil then return false end
-      return a:GetMixin():GetItemName() < b:GetMixin():GetItemName()
-    end
-    return a:GetMixin():GetItemQuality() > b:GetMixin():GetItemQuality()
-  end)
+  bag.content:Sort(SortView)
 
   bag.content:AddCell("freeBagSlots", bag.freeBagSlotsButton)
   bag.content:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
