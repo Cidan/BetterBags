@@ -170,7 +170,7 @@ local EventFrame = {}
 ---@field isBound boolean
 ---@field isLocked boolean
 ---@field isNewItem boolean
-
+---@field currentItemCount number
 
 --[[
 ---@class ItemMixin

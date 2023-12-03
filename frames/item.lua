@@ -136,7 +136,7 @@ function itemProto:SetItem(data)
   self.button:SetHasItem(data.itemInfo.itemIcon)
   self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound);
-  SetItemButtonCount(self.button, data.itemInfo.itemStackCount)
+  SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
