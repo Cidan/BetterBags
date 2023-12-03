@@ -189,6 +189,7 @@ function items:AttachItemInfo(item)
   }
 end
 
+--TODO(lobato): Completely eliminate the use of ItemMixin.
 -- RefreshBag will refresh a bag's contents entirely and update the
 -- item database.
 ---@private

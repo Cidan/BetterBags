@@ -226,10 +226,12 @@ function itemProto:GetCategory()
   end
 
   -- Check for equipment sets next.
+  --[[ 
   local equipmentSet = equipmentSets:GetItemSet(self:GetMixin():GetItemID())
   if equipmentSet then
-    return equipmentSet
+    return "Gear: " .. equipmentSet
   end
+  ]]--
 
   if not self.kind then return L:G('Everything') end
   -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.

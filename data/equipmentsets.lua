@@ -10,6 +10,9 @@ local equipmentSets = addon:NewModule('EquipmentSets')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 function equipmentSets:OnInitialize()
   self.itemToSet = {}
 end
@@ -20,6 +23,7 @@ function equipmentSets:OnEnable()
 end
 
 function equipmentSets:Update()
+  wipe(self.itemToSet)
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do
     local setName = C_EquipmentSet.GetEquipmentSetInfo(setID)
@@ -28,6 +32,7 @@ function equipmentSets:Update()
       self.itemToSet[itemID] = setName
     end
   end
+  items:RefreshAll()
 end
 
 ---@param itemID number|nil
