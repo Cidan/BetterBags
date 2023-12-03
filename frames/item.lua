@@ -217,7 +217,7 @@ end
 
 function itemProto:GetCategory()
   -- Return the custom category if it exists.
-  local customCategory = categories:GetCustomCategory(self:GetMixin().itemID)
+  local customCategory = categories:GetCustomCategory(self:GetMixin())
   if customCategory then
     return customCategory
   end

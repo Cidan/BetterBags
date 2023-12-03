@@ -37,8 +37,8 @@ debug\frames.lua
 
 theme\masque.lua
 
-data\categories.lua
 data\items.lua
+data\categories.lua
 
 util\color.lua
 util\resize.lua
