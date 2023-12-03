@@ -27,8 +27,8 @@ function equipmentSets:Update()
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do
     local setName = C_EquipmentSet.GetEquipmentSetInfo(setID)
-    local items = C_EquipmentSet.GetItemIDs(setID)
-    for _, itemID in ipairs(items) do
+    local itemIDs = C_EquipmentSet.GetItemIDs(setID)
+    for _, itemID in ipairs(itemIDs) do
       self.itemToSet[itemID] = setName
     end
   end

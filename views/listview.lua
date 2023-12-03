@@ -18,9 +18,11 @@ local debug = addon:GetModule('Debug')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
+--TODO(lobato): Move the -35 below to constants.
+
 ---@param bag Bag
 function views:UpdateListSize(bag)
-  local w, h = bag.frame:GetSize()
+  local w, _ = bag.frame:GetSize()
   for _, section in pairs(bag.sections) do
     section.frame:SetWidth(w - 35)
     for _, cell in pairs(section:GetAllCells()) do
@@ -34,7 +36,7 @@ function views:UpdateListSize(bag)
 end
 
 ---@param bag Bag
----@param dirtyItems table<number, table<number, ItemMixin>>
+---@param dirtyItems table<number, table<number, ItemData>>
 function views:ListView(bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   bag:WipeFreeSlots()
@@ -43,7 +45,7 @@ function views:ListView(bag, dirtyItems)
   bag.content.compactStyle = database:GetBagCompaction(bag.kind)
   for bid, bagData in pairs(dirtyItems) do
     bag.itemsByBagAndSlot[bid] = bag.itemsByBagAndSlot[bid] or {}
-    for sid, itemData in pairs(bagData) do
+    for _, itemData in pairs(bagData) do
       local bagid, slotid = itemData:GetItemLocation():GetBagAndSlot()
 
       -- Capture information about free slots.

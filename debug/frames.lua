@@ -6,8 +6,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug
 local debug = addon:GetModule('Debug')
 
-local LSM = LibStub('LibSharedMedia-3.0')
-
 ---@param frame Frame The frame to draw the debug border around.
 ---@param r number The color of the debug border.
 ---@param g number The color of the debug border.

@@ -45,8 +45,6 @@ local resize = addon:GetModule('Resize')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
-local LSM = LibStub('LibSharedMedia-3.0')
-
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
 
@@ -164,11 +162,11 @@ function bagProto:UpdateCellWidth()
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
----@param dirtyItems table<number, table<number, ItemMixin>>
+---@param dirtyItems table<number, table<number, ItemData>>
 function bagProto:Draw(dirtyItems)
   self:UpdateCellWidth()
   for _, i in pairs(self.recentItems:GetAllCells()) do
-    local bagid, slotid = i:GetMixin():GetItemLocation():GetBagAndSlot()
+    local bagid, slotid = i.data.bagid, i.data.slotid
     if bagid and slotid then
       self.itemsByBagAndSlot[bagid] = self.itemsByBagAndSlot[bagid] or {}
       self.itemsByBagAndSlot[bagid][slotid] = nil
@@ -458,9 +456,4 @@ function bagFrame:Create(kind)
   end)
   b:KeepBagInBounds()
   return b
-end
-
---- Destroy destroys the given bag view.
----@param bag Bag
-function bagFrame:Destroy(bag)
 end

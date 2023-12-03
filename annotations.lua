@@ -60,7 +60,7 @@ Masque = {}
 ---@param name string
 ---@param group string
 ---@return MasqueGroup
-function Masque:Group(name, group) return {} end
+function Masque:Group(name, group) end
 
 ---@class LibWindow-1.1
 Window = {}

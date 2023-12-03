@@ -17,7 +17,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 local views = addon:GetModule('Views')
 
 ---@param bag Bag
----@param dirtyItems table<number, table<number, ItemMixin>>
+---@param dirtyItems table<number, table<number, ItemData>>
 function views:GridView(bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   bag:WipeFreeSlots()

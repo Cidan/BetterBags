@@ -16,7 +16,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 local views = addon:GetModule('Views')
 
 ---@param bag Bag
----@param dirtyItems table<number, table<number, ItemMixin>>
+---@param dirtyItems table<number, table<number, ItemData>>
 function views:OneBagView(bag, dirtyItems)
   bag:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
