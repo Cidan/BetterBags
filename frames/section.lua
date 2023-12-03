@@ -31,10 +31,9 @@ local grid = addon:GetModule('Grid')
 ---@field private fillWidth boolean
 local sectionProto = {}
 
----@param view? BagView
 ---@return number width
 ---@return number height
-function sectionProto:Draw(view)
+function sectionProto:Draw()
   return self:Grid()
 end
 
@@ -105,6 +104,7 @@ end
 
 ---@param a Item|ItemRow
 ---@param b Item|ItemRow
+---@return boolean
 local function sortFn(a, b)
   if a == nil or b == nil or a.data == nil or b.data == nil or a.data.isItemEmpty or b.data.isItemEmpty then return false end
   if a.data.itemInfo.itemQuality == nil or b.data.itemInfo.itemQuality == nil then return false end

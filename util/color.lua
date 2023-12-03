@@ -16,6 +16,7 @@ local colorTable = {
 
 ---@param colors table<number, table<number, number, number>>
 ---@param number number
+---@return table<number, number, number>
 local function interpolateColor(colors, number)
   local lowerBound = nil
   local upperBound = nil
@@ -58,6 +59,7 @@ local function interpolateColor(colors, number)
   return {r, g, b}
 end
 
+---@param itemLevel number
 ---@return number, number, number
 function color:GetItemLevelColor(itemLevel)
   return unpack(interpolateColor(colorTable, itemLevel))

@@ -77,6 +77,7 @@ end
 -- Draw will full redraw this column and snap all cells into the correct
 -- position.
 ---@param style? GridCompactStyle
+---@return number, number
 function columnProto:Draw(style)
   if not style then style = const.GRID_COMPACT_STYLE.NONE end
   local w = self.minimumWidth

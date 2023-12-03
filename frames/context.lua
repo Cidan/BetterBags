@@ -57,12 +57,6 @@ function context:Hide()
   LibDD:HideDropDownMenu(1)
 end
 
----@param a MenuList
----@param b MenuList
-local function sortMenu(a, b)
-  return a.text < b.text
-end
-
 ---@param menu MenuList[]
 local function enableTooltips(menu)
   for _, m in ipairs(menu) do

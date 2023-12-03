@@ -216,6 +216,7 @@ local scrollFrameCounter = 0
 ---@private
 ---@param g Grid
 ---@param parent Frame
+---@param child Frame
 ---@return WowScrollBox
 function grid:CreateScrollFrame(g, parent, child)
   local box = CreateFrame("Frame", "BetterBagsScrollGrid"..scrollFrameCounter, parent, "WowScrollBox") --[[@as WowScrollBox]]

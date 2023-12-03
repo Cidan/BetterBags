@@ -17,6 +17,7 @@ local views = addon:GetModule('Views')
 
 ---@param a Item
 ---@param b Item
+---@return boolean
 local function SortView (a, b)
   if a == nil or b == nil or a.data == nil or b.data == nil then return false end
   if a.data.itemInfo.itemQuality == nil or b.data.itemInfo.itemQuality == nil then return false end

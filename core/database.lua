@@ -16,6 +16,7 @@ function DB:OnInitialize()
 end
 
 ---@param kind BagKind
+---@return table
 function DB:GetBagPosition(kind)
   return DB.data.profile.positions[kind]
 end
@@ -52,6 +53,7 @@ end
 
 ---@param kind BagKind
 ---@param view BagView
+---@return table
 function DB:GetBagSizeInfo(kind, view)
   return DB.data.profile.size[view][kind]
 end

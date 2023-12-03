@@ -25,8 +25,6 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
-local LSM = LibStub('LibSharedMedia-3.0')
-
 ---@class bagButton
 local bagButtonProto = {}
 

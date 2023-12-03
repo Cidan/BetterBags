@@ -91,6 +91,8 @@ function DLAPI.RegisterFormat(name, format) end
 function DLAPI.SetFormat(name, format) end
 function DLAPI.DebugLog(category, message) end
 
+---@param createFunc fun(): any
+---@param resetFunc fun(any)
 ---@return ObjectPool
 function CreateObjectPool(createFunc, resetFunc) end
 
@@ -103,6 +105,9 @@ function ObjectPool:SetResetDisallowedIfNew() end
 
 ---@class LibUIDropDownMenu-4.0
 local LibUIDropDownMenu = {}
+
+---@param name string
+---@param parent Frame
 ---@return frame
 function LibUIDropDownMenu:Create_UIDropDownMenu(name, parent) end
 function LibUIDropDownMenu:EasyMenu_Initialize(frame, level, menuList, anchor, x, y, displayMode, autoHideDelay) end
@@ -134,6 +139,10 @@ function WowScrollBox:SetInterpolateScroll(interpolate) end
 function WowScrollBox:ScrollInDirection(percent, direction) end
 function WowScrollBox:FullUpdate() end
 function WowScrollBox:OnMouseWheel(delta) end
+
+---@class Frame
+---@field scrollable boolean
+local frameProto = {}
 
 ---@class MinimalScrollBar: Frame
 local MinimalScrollBar = {}
@@ -182,6 +191,7 @@ local ItemMixin = {}
 ---@return Frame
 function CreateScrollBoxLinearView() end
 
+---@param itemLink string
 ---@return number, boolean, number
 function GetDetailedItemLevelInfo(itemLink) end
 

@@ -32,7 +32,7 @@ function addon:ToggleAllBags()
   addon.Bags.Backpack:Toggle()
 end
 
-function addon:ToggleBackpack(rf)
+function addon:ToggleBackpack()
   addon.Bags.Backpack:Show()
 end
 
