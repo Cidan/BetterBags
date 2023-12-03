@@ -170,7 +170,8 @@ local EventFrame = {}
 ---@field isBound boolean
 ---@field isLocked boolean
 ---@field isNewItem boolean
-local itemInfo = {}
+---@field isItemEmpty boolean
+
 
 --[[
 ---@class ItemMixin

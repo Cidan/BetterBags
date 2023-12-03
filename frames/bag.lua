@@ -55,7 +55,7 @@ local Window = LibStub('LibWindow-1.1')
 --- Bag is a view of a single bag object. Note that this is not
 --- a single bag slot, but a combined view of all bags for a given
 --- kind (i.e. bank, backpack).
----@class Bag
+---@class (exact) Bag
 ---@field kind BagKind
 ---@field frame Frame The fancy frame of the bag.
 ---@field bottomBar Frame The bottom bar of the bag.

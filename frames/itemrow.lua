@@ -28,29 +28,31 @@ local itemFrame = addon:GetModule('ItemFrame')
 local item = addon:NewModule('ItemRowFrame')
 
 
----@class ItemRow
+---@class (exact) ItemRow
 ---@field frame Frame
 ---@field button Item
 ---@field rowButton ItemButton
 ---@field text FontString
+---@field data ItemData
 local itemRowProto = {}
 
----@param i ItemMixin
-function itemRowProto:SetItem(i)
-  self.button:SetItem(i)
+---@param data ItemData
+function itemRowProto:SetItem(data)
+  self.data = data
+  self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame)
 
-  local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
+  local bagid, slotid = data.bagid, data.slotid
   self.rowButton:SetID(slotid)
-  self.rowButton:SetHasItem(i:GetItemIcon())
+  self.rowButton:SetHasItem(data.itemInfo.itemIcon)
 
-  local quality = i:GetItemQuality()
+  local quality = data.itemInfo.itemQuality
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
   self.frame:SetID(bagid)
-  self.text:SetText(i:GetItemName())
+  self.text:SetText(data.itemInfo.itemName)
   self.frame:Show()
   self.rowButton:Show()
 
@@ -64,11 +66,7 @@ function itemRowProto:ClearItem()
   self.frame:Hide()
   self.rowButton:Hide()
   self.rowButton:SetScript("OnMouseWheel", nil)
-end
-
----@return ItemMixin
-function itemRowProto:GetMixin()
-  return self.button:GetMixin()
+  self.data = nil
 end
 
 ---@return string
@@ -89,7 +87,7 @@ end
 
 ---@return string
 function itemRowProto:GetGUID()
-  return self.button:GetMixin():GetItemGUID() or ""
+  return self.data.itemInfo.itemGUID
 end
 
 function itemRowProto:Release()

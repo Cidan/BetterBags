@@ -192,6 +192,7 @@ function items:AttachItemInfo(data)
     isBound = C_Item.IsBound(itemLocation),
     isLocked = C_Item.IsLocked(itemLocation),
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
+    isItemEmpty = C_Item.DoesItemExist(itemLocation),
   }
 end
 

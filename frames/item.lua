@@ -92,6 +92,7 @@ end
 ---@param data ItemData
 function itemProto:SetItem(data)
   assert(data, 'item must be provided')
+  self.data = data
   local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
   self.button:SetID(slotid)
@@ -287,6 +288,7 @@ function itemProto:ClearItem()
   self.button:Enable()
   self.ilvlText:SetText("")
   self:SetSize(37, 37)
+  self.data = nil
 end
 
 ---@param kind BagKind
