@@ -290,7 +290,7 @@ function bagFrame:Create(kind)
   end
   b.frame:Hide()
   b.frame:SetSize(200, 200)
-  b.frame.Bg:SetAlpha(0.89)
+  b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()

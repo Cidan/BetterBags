@@ -284,6 +284,18 @@ function context:CreateContextMenu(bag)
     database:SetBagViewSizeScale(bag.kind, database:GetBagView(bag.kind), value)
   end
 
+  local opacitySlider = slider:CreateDropdownSlider()
+  opacitySlider:SetMinMaxValues(60, 100)
+  opacitySlider:SetValue(database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).opacity)
+  opacitySlider.OnMouseUp = function()
+    context:Hide()
+  end
+  opacitySlider.OnValueChanged = function(_, value)
+    if database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind)).opacity == value then return end
+    bag.frame.Bg:SetAlpha(value / 100)
+    database:SetBagViewSizeOpacity(bag.kind, database:GetBagView(bag.kind), value)
+  end
+
   -- Create the size menu.
   table.insert(menuList, {
     text = L:G("Size"),
@@ -313,6 +325,19 @@ function context:CreateContextMenu(bag)
             customFrame = columnSlider:GetFrame(),
           }
         }
+      },
+      {
+        text = L:G("Opacity"),
+        notCheckable = true,
+        hasArrow = true,
+        menuList = {
+          {
+            text = L:G("Opacity"),
+            notCheckable = true,
+            customFrame = opacitySlider:GetFrame(),
+          }
+        }
+
       },
       {
         text = L:G("Scale"),

@@ -264,6 +264,7 @@ const.DATABASE_DEFAULTS = {
           scale = 100,
           width = 700,
           height = 500,
+          opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 15,
@@ -271,6 +272,7 @@ const.DATABASE_DEFAULTS = {
           scale = 100,
           width = 700,
           height = 500,
+          opacity = 89,
         }
       },
       [const.BAG_VIEW.SECTION_GRID] = {
@@ -280,6 +282,7 @@ const.DATABASE_DEFAULTS = {
           scale = 100,
           width = 700,
           height = 500,
+          opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 5,
@@ -287,6 +290,7 @@ const.DATABASE_DEFAULTS = {
           scale = 100,
           width = 700,
           height = 500,
+          opacity = 89,
         }
       },
       [const.BAG_VIEW.LIST] = {
@@ -296,6 +300,7 @@ const.DATABASE_DEFAULTS = {
           scale = 100,
           width = 700,
           height = 500,
+          opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 5,
@@ -303,6 +308,7 @@ const.DATABASE_DEFAULTS = {
           scale = 100,
           width = 700,
           height = 500,
+          opacity = 89,
         }
       },
     },

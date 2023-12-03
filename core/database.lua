@@ -53,7 +53,7 @@ end
 
 ---@param kind BagKind
 ---@param view BagView
----@return table
+---@return table 
 function DB:GetBagSizeInfo(kind, view)
   return DB.data.profile.size[view][kind]
 end
@@ -125,6 +125,10 @@ end
 
 function DB:SetFirstTimeMenu(value)
   DB.data.profile.firstTimeMenu = value
+end
+
+function DB:SetBagViewSizeOpacity(kind, view, opacity)
+  DB.data.profile.size[view][kind].opacity = opacity
 end
 
 DB:Enable()
