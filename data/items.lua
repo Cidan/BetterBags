@@ -9,14 +9,24 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class ItemFrame: AceModule
+local itemFrame = addon:GetModule('ItemFrame')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Items: AceModule
----@field items table<number, table<string, ItemMixin>>
----@field itemsByBagAndSlot table<number, table<number, ItemMixin>>
----@field dirtyItems table<number, table<number, ItemMixin>>
----@field dirtyBankItems table<number, table<number, ItemMixin>>
+---@class (exact) ItemData
+---@field itemInfo ExpandedItemInfo
+---@field containerInfo ContainerItemInfo
+---@field questInfo ItemQuestInfo
+---@field bagid number
+---@field slotid number
+local itemDataProto = {}
+
+---@class (exact) Items: AceModule
+---@field itemsByBagAndSlot table<number, table<number, ItemData>>
+---@field dirtyItems ItemData[]
+---@field dirtyBankItems ItemData[]
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _container ContinuableContainer
 ---@field _bankContainer ContinuableContainer
@@ -24,7 +34,6 @@ local debug = addon:GetModule('Debug')
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
-  self.items = {}
   self.dirtyItems = {}
   self.dirtyBankItems = {}
   self.itemsByBagAndSlot = {}
@@ -58,7 +67,6 @@ function items:RefreshReagentBank()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
-    self.items[i] = {}
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyBankItems[i] = self.dirtyBankItems[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
@@ -81,7 +89,6 @@ function items:RefreshBank()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
-    self.items[i] = {}
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyBankItems[i] = self.dirtyBankItems[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
@@ -99,12 +106,10 @@ function items:RefreshBackpack()
     return
   end
   self._doingRefreshAll = true
-  wipe(self.items)
   self._container = ContinuableContainer:Create()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
-    self.items[i] = {}
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.dirtyItems[i] = self.dirtyItems[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
@@ -119,12 +124,8 @@ end
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
-    for _, bagdata in pairs(items.dirtyItems) do
-      for _, item in pairs(bagdata) do
-        if item:GetItemID() then
-          items:AttachItemInfo(item)
-        end
-      end
+    for _, data in pairs(items.dirtyBankItems) do
+      items:AttachItemInfo(data)
     end
 
     -- All items in all bags have finished loading, fire the all done event.
@@ -139,12 +140,8 @@ end
 -- all bags are done loading.
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function()
-    for _, bagdata in pairs(items.dirtyBankItems) do
-      for _, item in pairs(bagdata) do
-        if item:GetItemID() then
-          items:AttachItemInfo(item)
-        end
-      end
+    for _, data in pairs(items.dirtyBankItems) do
+      items:AttachItemInfo(data)
     end
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
@@ -154,18 +151,23 @@ function items:ProcessBankContainer()
   end)
 end
 
----@param item ItemMixin
-function items:AttachItemInfo(item)
-  local bagid, slotid = item:GetItemLocation():GetBagAndSlot()
+---@param data ItemData
+function items:AttachItemInfo(data)
+  local itemMixin = Item:CreateFromBagAndSlot(data.bagid, data.slotid) --[[@as ItemMixin]]
+  local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
+  local bagid, slotid = data.bagid, data.slotid
+  local itemID = C_Container.GetContainerItemID(bagid, slotid)
   local itemName, itemLink, itemQuality,
   itemLevel, itemMinLevel, itemType, itemSubType,
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
-  setID, isCraftingReagent = GetItemInfo(item:GetItemID() or 0)
-  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(item:GetItemLink())
-  item.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
-  item.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
-  item.itemInfo = {
+  setID, isCraftingReagent = GetItemInfo(itemID)
+  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
+  data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
+  data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+  data.itemInfo = {
+    itemID = itemID,
+    itemGUID = C_Item.GetItemGUID(itemLocation),
     itemName = itemName,
     itemLink = itemLink,
     itemQuality = itemQuality,
@@ -186,6 +188,10 @@ function items:AttachItemInfo(item)
     effectiveIlvl = effectiveIlvl --[[@as number]],
     isPreview = isPreview --[[@as boolean]],
     baseIlvl = baseIlvl --[[@as number]],
+    itemIcon = C_Item.GetItemIconByID(itemID),
+    isBound = C_Item.IsBound(itemLocation),
+    isLocked = C_Item.IsLocked(itemLocation),
+    isNewItem = C_NewItems.IsNewItem(bagid, slotid),
   }
 end
 
@@ -198,28 +204,28 @@ end
 function items:RefreshBag(bagid, bankBag)
   local size = C_Container.GetContainerNumSlots(bagid)
   local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
-  dirty[bagid] = dirty[bagid] or {}
   -- Loop through every container slot and create an item for it.
-  for slot = 1, size do
-    local item = Item:CreateFromBagAndSlot(bagid, slot)
+  for slotid = 1, size do
+    local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+    local data = setmetatable({}, {__index = itemDataProto})
+    data.bagid = bagid
+    data.slotid = slotid
 
-    dirty[bagid][slot] = item
+    table.insert(dirty, data)
 
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
-    if not item:IsItemEmpty() and not item:IsItemDataCached() then
+    if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
       if bankBag then
-        self._bankContainer:AddContinuable(item)
+        self._bankContainer:AddContinuable(itemMixin)
       else
-        self._container:AddContinuable(item)
+        self._container:AddContinuable(itemMixin)
       end
-    elseif not item:IsItemEmpty() and item:GetItemGUID() then
-      self.items[bagid][item:GetItemGUID() --[[@as string]]] = item
     end
 
     -- All items are added to the bag/slot lookup table, including
     -- empty items
-    self.itemsByBagAndSlot[bagid][slot] = item
+    self.itemsByBagAndSlot[bagid][slotid] = data
   end
 
   -- Delete old entries that no longer exist because the bag size shrunk.

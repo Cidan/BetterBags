@@ -10,7 +10,7 @@ local items = addon:GetModule('Items')
 ---@field private itemToCategory table<number, string>
 ---@field private functionCategories table<number, string>
 ---@field private itemsWithNoCategory table<number, boolean>
----@field private categoryFunctions table<string, fun(mixin: ItemMixin): string>
+---@field private categoryFunctions table<string, fun(data: ItemData): string>
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
@@ -30,10 +30,10 @@ end
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.
----@param mixin ItemMixin The item mixin to get the custom category for.
+---@param data ItemData The item data to get the custom category for.
 ---@return string|nil
-function categories:GetCustomCategory(mixin)
-  local itemID = mixin:GetItemID()
+function categories:GetCustomCategory(data)
+  local itemID = data.itemInfo.itemID
   if not itemID then return nil end
 
   -- Check for categories manually set by item.
@@ -50,7 +50,7 @@ function categories:GetCustomCategory(mixin)
   if self.itemsWithNoCategory[itemID] then return nil end
 
   for _, func in pairs(self.categoryFunctions) do
-    category = func(mixin)
+    category = func(data)
     if category then
       self.functionCategories[itemID] = category
       return category
@@ -71,7 +71,7 @@ end
 -- as it has the potential to cause a significant amount of CPU usage the first time an item is rendered,
 -- which at game load time, is every item.
 ---@param id string A unique identifier for the category function. This is not used for the category name!
----@param func fun(mixin: ItemMixin): string The function to call to get the category name for an item.
+---@param func fun(mixin: ItemData): string The function to call to get the category name for an item.
 function categories:RegisterCategoryFunction(id, func)
   assert(not self.categoryFunctions[id], 'category function already registered: '.. id)
   self.categoryFunctions[id] = func

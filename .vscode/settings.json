@@ -108,7 +108,13 @@
   },
   "Lua.diagnostics.groupSeverity": {
     "strict": "Error",
-    "unbalanced": "Error"
+    "unbalanced": "Error",
+    "redefined": "Error",
+    "strong": "Error",
+    "type-check": "Error",
+    "ambiguity": "Error",
+    "unused": "Warning",
+    "duplicate": "Error"
   },
   "Lua.runtime.version": "Lua 5.1"
 }

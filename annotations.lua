@@ -143,7 +143,9 @@ function MinimalScrollBar:SetInterpolateScroll(interpolate) end
 local EventFrame = {}
 
 -- ItemInfo is the information about an item that is returned by GetItemInfo.
----@class ExpandedItemInfo
+---@class (exact) ExpandedItemInfo
+---@field itemID number
+---@field itemGUID string
 ---@field itemName string
 ---@field itemLink string
 ---@field itemQuality Enum.ItemQuality
@@ -164,14 +166,19 @@ local EventFrame = {}
 ---@field effectiveIlvl number
 ---@field isPreview boolean
 ---@field baseIlvl number
+---@field itemIcon? number
+---@field isBound boolean
+---@field isLocked boolean
+---@field isNewItem boolean
 local itemInfo = {}
 
+--[[
 ---@class ItemMixin
 ---@field itemInfo ExpandedItemInfo
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
 local ItemMixin = {}
-
+]]--
 ---@return Frame
 function CreateScrollBoxLinearView() end
 

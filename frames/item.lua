@@ -10,7 +10,7 @@ local const = addon:GetModule('Constants')
 local masque = addon:GetModule('Masque')
 
 ---@class ItemFrame: AceModule
-local item = addon:NewModule('ItemFrame')
+local itemFrame = addon:NewModule('ItemFrame')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
@@ -33,19 +33,12 @@ local L = addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Item
----@field name string
----@field private mixin ItemMixin
----@field guid string
+---@class (exact) Item
 ---@field frame Frame
 ---@field button ItemButton
----@field itemType string
----@field itemSubType string
----@field masqueGroup string
+---@field data ItemData
 ---@field kind BagKind
----@field expacID number
----@field classID number
----@field subclassID number
+---@field masqueGroup string
 ---@field ilvlText FontString
 ---@field IconTexture Texture
 ---@field Count FontString
@@ -76,10 +69,7 @@ local children = {
 -- OnEvent is the event handler for the item button.
 ---@param i Item
 local function OnEvent(i)
-  if i:GetMixin() == nil then
-    return
-  end
-  i.button:UpdateCooldown(i:GetMixin():GetItemIcon())
+  i.button:UpdateCooldown(i.data.itemInfo.itemIcon)
 end
 
 ---@param text? string
@@ -89,9 +79,9 @@ function itemProto:UpdateSearch(text)
     return
   end
   local lowerText = string.lower(text)
-  if string.find(string.lower(self.name), lowerText, 1, true) or
-  string.find(string.lower(self.itemType), lowerText, 1, true) or
-  string.find(string.lower(self.itemSubType), lowerText, 1, true) then
+  if string.find(string.lower(self.data.itemInfo.itemName), lowerText, 1, true) or
+  string.find(string.lower(self.data.itemInfo.itemType), lowerText, 1, true) or
+  string.find(string.lower(self.data.itemInfo.itemSubType), lowerText, 1, true) then
     self.button:SetMatchesSearch(true)
     return
   end
@@ -99,14 +89,11 @@ function itemProto:UpdateSearch(text)
   self.button:SetMatchesSearch(false)
 end
 
----@param i ItemMixin
-function itemProto:SetItem(i)
-  assert(i, 'item must be provided')
-  self.mixin = i
-  self.name = i:GetItemName() or ""
-  self.guid = i:GetItemGUID() or ""
+---@param data ItemData
+function itemProto:SetItem(data)
+  assert(data, 'item must be provided')
   local tooltipOwner = GameTooltip:GetOwner();
-  local bagid, slotid = i:GetItemLocation():GetBagAndSlot()
+  local bagid, slotid = data.bagid, data.slotid
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
@@ -114,8 +101,8 @@ function itemProto:SetItem(i)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-  local questInfo = i.questInfo
-  local info = i.containerInfo
+  local questInfo = data.questInfo
+  local info = data.containerInfo
   local readable = info and info.isReadable;
   local isFiltered = info and info.isFiltered;
   local noValue = info and info.hasNoValue;
@@ -123,25 +110,16 @@ function itemProto:SetItem(i)
   local questID = questInfo.questID;
   local isActive = questInfo.isActive
 
-  self.expacID = i.itemInfo.expacID
-  self.classID = i.itemInfo.classID
-  self.subclassID = i.itemInfo.subclassID
-  self.itemType = i.itemInfo.itemType or "unknown"
-  self.itemSubType = i.itemInfo.itemSubType or "unknown"
-  local l = i:GetItemLocation()
-  local bound = false
-  if l ~= nil then
-    bound = C_Item.IsBound(l)
-  end
+  local bound = data.itemInfo.isBound
 
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   if ilvlOpts.enabled and
-    i.itemInfo.classID == Enum.ItemClass.Armor or
-    i.itemInfo.classID == Enum.ItemClass.Weapon or
-    i.itemInfo.classID == Enum.ItemClass.Gem then
-      self.ilvlText:SetText(tostring(i.itemInfo.effectiveIlvl) or "")
+    data.itemInfo.classID == Enum.ItemClass.Armor or
+    data.itemInfo.classID == Enum.ItemClass.Weapon or
+    data.itemInfo.classID == Enum.ItemClass.Gem then
+      self.ilvlText:SetText(tostring(data.itemInfo.effectiveIlvl) or "")
       if ilvlOpts.color then
-        local r, g, b = color:GetItemLevelColor(i.itemInfo.effectiveIlvl)
+        local r, g, b = color:GetItemLevelColor(data.itemInfo.effectiveIlvl)
         self.ilvlText:SetTextColor(r, g, b, 1)
       else
         self.ilvlText:SetTextColor(1, 1, 1, 1)
@@ -154,17 +132,17 @@ function itemProto:SetItem(i)
 
   self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
-  self.button:SetHasItem(i:GetItemIcon())
-  self.button:SetItemButtonTexture(i:GetItemIcon())
-  SetItemButtonQuality(self.button, i:GetItemQuality(), i:GetItemLink(), false, bound);
-  SetItemButtonCount(self.button, i:GetStackCount())
-  SetItemButtonDesaturated(self.button, i:IsItemLocked())
+  self.button:SetHasItem(data.itemInfo.itemIcon)
+  self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
+  SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound);
+  SetItemButtonCount(self.button, data.itemInfo.itemStackCount)
+  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
-  self.button:UpdateNewItem(i:GetItemQuality())
-  self.button:UpdateJunkItem(i:GetItemQuality(), noValue)
+  self.button:UpdateNewItem(data.itemInfo.itemQuality)
+  self.button:UpdateJunkItem(data.itemInfo.itemQuality, noValue)
   self.button:UpdateItemContextMatching()
-  self.button:UpdateCooldown(i:GetItemIcon())
+  self.button:UpdateCooldown(data.itemInfo.itemIcon)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
@@ -220,7 +198,7 @@ end
 
 function itemProto:GetCategory()
   -- Return the custom category if it exists.
-  local customCategory = categories:GetCustomCategory(self:GetMixin())
+  local customCategory = categories:GetCustomCategory(self.data)
   if customCategory then
     return customCategory
   end
@@ -235,7 +213,7 @@ function itemProto:GetCategory()
 
   if not self.kind then return L:G('Everything') end
   -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
-  if self:GetMixin().containerInfo.quality == Enum.ItemQuality.Poor then
+  if self.data.containerInfo.quality == Enum.ItemQuality.Poor then
     return L:G('Junk')
   end
 
@@ -245,25 +223,25 @@ function itemProto:GetCategory()
   -- when the tradeskill filter is enabled. This makes it so trade goods are
   -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
   if database:GetCategoryFilter(self.kind, "Type") and not
-  (self.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) then
-    category = category .. self.itemType
+  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) then
+    category = category .. self.data.itemInfo.itemType --[[@as string]]
   end
 
   -- Add the tradeskill filter to the category if enabled.
-  if self.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill") then
+  if self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill") then
     if category ~= "" then
       category = category .. " - "
     end
-    category = category .. const.TRADESKILL_MAP[self.subclassID]
+    category = category .. const.TRADESKILL_MAP[self.data.itemInfo.subclassID]
   end
 
   -- Add the expansion filter to the category if enabled.
   if database:GetCategoryFilter(self.kind, "Expansion") then
-    if not self.expacID then return L:G('Unknown') end
+    if not self.data.itemInfo.expacID then return L:G('Unknown') end
     if category ~= "" then
       category = category .. " - "
     end
-    category = category .. const.EXPANSION_MAP[self.expacID]
+    category = category .. const.EXPANSION_MAP[self.data.itemInfo.expacID] --[[@as string]]
   end
 
   if category == "" then
@@ -278,28 +256,17 @@ function itemProto:IsNewItem()
   if self.button.NewItemTexture:IsShown() then
     return true
   end
-  return C_NewItems.IsNewItem(self.mixin:GetItemLocation():GetBagAndSlot())
-end
-
----@return ItemMixin
-function itemProto:GetMixin()
-  return self.mixin
+  return self.data.itemInfo.isNewItem
 end
 
 function itemProto:Release()
-  item._pool:Release(self)
+  itemFrame._pool:Release(self)
 end
 
 function itemProto:ClearItem()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
-  self.mixin = nil
-  self.guid = nil
-  self.name = nil
   self.kind = nil
-  self.expacID = nil
-  self.classID = nil
-  self.subclassID = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.frame:Hide()
@@ -316,8 +283,6 @@ function itemProto:ClearItem()
   self.button.ItemSlotBackground:Hide()
   self.frame:SetID(0)
   self.button:SetID(0)
-  self.itemType = nil
-  self.itemSubType = nil
   self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
@@ -335,17 +300,17 @@ function itemProto:AddToMasqueGroup(kind)
   end
 end
 
-function item:OnInitialize()
+function itemFrame:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
   self._pool:SetResetDisallowedIfNew()
 end
 
 ---@param i Item
-function item:_DoReset(i)
+function itemFrame:_DoReset(i)
   i:ClearItem()
 end
 
-function item:_DoCreate()
+function itemFrame:_DoCreate()
   local i = setmetatable({}, { __index = itemProto })
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
@@ -381,14 +346,14 @@ function item:_DoCreate()
 
   i.ilvlText = ilvlText
 
-  events:RegisterEvent('BAG_UPDATE_COOLDOWN', function(_, ...) OnEvent(i) end)
+  events:RegisterEvent('BAG_UPDATE_COOLDOWN', function(_) OnEvent(i) end)
   return i
 end
 
 ---@return Item
-function item:Create()
+function itemFrame:Create()
   ---@return Item
   return self._pool:Acquire()
 end
 
-item:Enable()
+itemFrame:Enable()
