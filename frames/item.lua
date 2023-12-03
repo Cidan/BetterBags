@@ -24,6 +24,9 @@ local color = addon:GetModule('Color')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class EquipmentSets: AceModule
+local equipmentSets = addon:GetModule('EquipmentSets')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -220,6 +223,12 @@ function itemProto:GetCategory()
   local customCategory = categories:GetCustomCategory(self:GetMixin())
   if customCategory then
     return customCategory
+  end
+
+  -- Check for equipment sets next.
+  local equipmentSet = equipmentSets:GetItemSet(self:GetMixin():GetItemID())
+  if equipmentSet then
+    return equipmentSet
   end
 
   if not self.kind then return L:G('Everything') end

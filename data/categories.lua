@@ -67,7 +67,7 @@ end
 
 -- RegisterCategoryFunction registers a function that will be called to get the category name for all items.
 -- Registered functions are only called once per item, and the result is cached. Registering a new
--- function will clear the cache and caused all items to be processed once. Do not abuse this API,
+-- function will clear the cache. Do not abuse this API,
 -- as it has the potential to cause a significant amount of CPU usage the first time an item is rendered,
 -- which at game load time, is every item.
 ---@param id string A unique identifier for the category function. This is not used for the category name!
