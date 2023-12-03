@@ -66,13 +66,6 @@ local children = {
   "ItemContextOverlay"
 }
 
--- OnEvent is the event handler for the item button.
----@param i Item
-local function OnEvent(i)
-  if not i.data then return end
-  i.button:UpdateCooldown(i.data.itemInfo.itemIcon)
-end
-
 ---@param text? string
 function itemProto:UpdateSearch(text)
   if not text or text == "" then
@@ -88,6 +81,10 @@ function itemProto:UpdateSearch(text)
   end
 
   self.button:SetMatchesSearch(false)
+end
+
+function itemProto:UpdateCooldown()
+  self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
 end
 
 ---@param data ItemData
@@ -349,7 +346,6 @@ function itemFrame:_DoCreate()
 
   i.ilvlText = ilvlText
 
-  events:RegisterEvent('BAG_UPDATE_COOLDOWN', function(_) OnEvent(i) end)
   return i
 end
 

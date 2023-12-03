@@ -42,6 +42,9 @@ local views = addon:GetModule('Views')
 ---@class Resize: AceModule
 local resize = addon:GetModule('Resize')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -244,6 +247,14 @@ function bagProto:SwitchToBank()
   BankFrame.selectedTab = 1
   self.frame:SetTitle(L:G("Bank"))
   self:Wipe()
+end
+
+function bagProto:OnCooldown()
+  for _, bagData in pairs(self.itemsByBagAndSlot) do
+    for _, item in pairs(bagData) do
+      item:UpdateCooldown()
+    end
+  end
 end
 
 -------
@@ -455,5 +466,10 @@ function bagFrame:Create(kind)
     database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
   end)
   b:KeepBagInBounds()
+
+  if b.kind == const.BAG_KIND.BACKPACK then
+    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
+  end
+
   return b
 end
