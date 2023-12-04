@@ -204,9 +204,8 @@ function itemProto:GetCategory()
   end
 
   -- Check for equipment sets next.
-  local equipmentSet = equipmentSets:GetItemSet(self.data.itemInfo.itemID)
-  if equipmentSet then
-    self.data.itemInfo.category = "Gear: " .. equipmentSet
+  if self.data.itemInfo.equipmentSet then
+    self.data.itemInfo.category = "Gear: " .. self.data.itemInfo.equipmentSet
     return self.data.itemInfo.category
   end
 

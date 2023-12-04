@@ -37,8 +37,8 @@ debug\frames.lua
 
 theme\masque.lua
 
-data\items.lua
 data\equipmentsets.lua
+data\items.lua
 data\categories.lua
 
 util\color.lua

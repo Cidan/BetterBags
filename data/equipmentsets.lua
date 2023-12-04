@@ -4,42 +4,42 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class EquipmentSets: AceModule
----@field itemToSet table<number, string>
+---@field bagAndSlotToSet table<number, table<number, string>>
 local equipmentSets = addon:NewModule('EquipmentSets')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 function equipmentSets:OnInitialize()
-  self.itemToSet = {}
+  self.bagAndSlotToSet = {}
 end
 
 function equipmentSets:OnEnable()
-  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:Update() end)
   self:Update()
 end
 
 function equipmentSets:Update()
-  wipe(self.itemToSet)
+  wipe(self.bagAndSlotToSet)
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do
     local setName = C_EquipmentSet.GetEquipmentSetInfo(setID)
-    local itemIDs = C_EquipmentSet.GetItemIDs(setID)
-    for _, itemID in ipairs(itemIDs) do
-      self.itemToSet[itemID] = setName
+    local setLocations = C_EquipmentSet.GetItemLocations(setID)
+    for _, location in ipairs(setLocations) do
+      local _, bank, bags, _, slot, bag = EquipmentManager_UnpackLocation(location)
+      if (bank or bags) and slot ~= nil and bag ~= nil then
+        self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
+        self.bagAndSlotToSet[bag][slot] = setName
+      end
     end
   end
-  items:RefreshAll()
 end
 
----@param itemID number|nil
+---@param bagid number
+---@param slotid number
 ---@return string|nil
-function equipmentSets:GetItemSet(itemID)
-  if not itemID then return nil end
-  return self.itemToSet[itemID]
+function equipmentSets:GetItemSet(bagid, slotid)
+  if not bagid or not slotid then return nil end
+  return self.bagAndSlotToSet[bagid] and self.bagAndSlotToSet[bagid][slotid]
 end
 
 equipmentSets:Enable()

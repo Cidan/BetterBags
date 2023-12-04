@@ -9,6 +9,9 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class EquipmentSets: AceModule
+local equipmentSets = addon:GetModule('EquipmentSets')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -41,6 +44,7 @@ end
 function items:OnEnable()
   --events:RegisterMessage('items/RefreshAllItems/Done', printDirtyItems)
   --events:RegisterEvent('BAG_UPDATE_DELAYED', self.RefreshAll, self)
+  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:RefreshAll() end)
   events:BucketEvent('BAG_UPDATE_DELAYED', function() self:RefreshAll() end)
   events:RegisterEvent('BANKFRAME_OPENED', self.RefreshBank, self)
 end
@@ -74,6 +78,7 @@ function items:RefreshReagentBank()
 end
 
 function items:RefreshBank()
+  equipmentSets:Update()
   self._bankContainer = ContinuableContainer:Create()
 
   -- This is a small hack to force the bank bag quality data to be cached
@@ -100,6 +105,7 @@ function items:RefreshBackpack()
   if self._doingRefreshAll then
     return
   end
+  equipmentSets:Update()
   self._doingRefreshAll = true
   self._container = ContinuableContainer:Create()
   wipe(self.dirtyItems)
@@ -195,6 +201,7 @@ function items:AttachItemInfo(data)
     currentItemCount = C_Item.GetStackCount(itemLocation),
     category = "",
     currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
+    equipmentSet = equipmentSets:GetItemSet(bagid, slotid),
   }
 end
 

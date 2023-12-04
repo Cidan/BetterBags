@@ -151,6 +151,10 @@ function MinimalScrollBar:SetInterpolateScroll(interpolate) end
 ---@class EventFrame
 local EventFrame = {}
 
+---@param location number
+---@return boolean, boolean, boolean, boolean, number, number
+function EquipmentManager_UnpackLocation(location) end
+
 -- ItemInfo is the information about an item that is returned by GetItemInfo.
 ---@class (exact) ExpandedItemInfo
 ---@field itemID number
@@ -182,6 +186,7 @@ local EventFrame = {}
 ---@field currentItemCount number
 ---@field category string
 ---@field currentItemLevel number
+---@field equipmentSet string|nil
 
 --[[
 ---@class ItemMixin
