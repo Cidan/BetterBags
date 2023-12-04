@@ -9,8 +9,24 @@ local database = addon:GetModule('Database')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Sort: AceModule
 local sort = addon:NewModule('Sort')
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+local function invalidData(aData, bData)
+  if not aData or not bData
+  or not aData.itemInfo or not bData.itemInfo
+  or not aData.itemInfo.itemQuality or not bData.itemInfo.itemQuality
+  or not aData.itemInfo.itemName or not bData.itemInfo.itemName then
+    return true
+  end
+  return false
+end
 
 ---@param kind BagKind
 ---@param view BagView
@@ -70,9 +86,9 @@ end
 ---@param b Item
 ---@return boolean
 function sort.SortItemsByQualityThenAlpha(a, b)
-  if not a.data or not b.data then return false end
+  if invalidData(a.data, b.data) then return false end
   if a.data.itemInfo.itemQuality == b.data.itemInfo.itemQuality then
-    return a.data.itemInfo.itemName < a.data.itemInfo.itemName
+    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
   end
   return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
 end
@@ -81,7 +97,7 @@ end
 ---@param b Item
 ---@return boolean
 function sort.SortItemsByAlphaThenQuality(a, b)
-  if not a.data or not b.data then return false end
+  if invalidData(a.data, b.data) then return false end
   if a.data.itemInfo.itemName == b.data.itemInfo.itemName then
     return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
   end
