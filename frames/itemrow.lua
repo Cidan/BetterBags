@@ -98,6 +98,10 @@ function itemRowProto:UpdateSearch(text)
   self.button:UpdateSearch(text)
 end
 
+function itemRowProto:UpdateCooldown()
+  self.button:UpdateCooldown()
+end
+
 local buttonCount = 0
 
 function item:OnInitialize()

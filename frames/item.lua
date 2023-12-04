@@ -306,6 +306,16 @@ function itemFrame:OnInitialize()
   self._pool:SetResetDisallowedIfNew()
 end
 
+function itemFrame:OnEnable()
+  -- Pre-populate the pool with 300 items. This is done
+  -- so that items acquired during combat do not taint
+  -- the bag frame.
+  for _ = 1, 300 do
+    local item = self:Create()
+    item:Release()
+  end
+end
+
 ---@param i Item
 function itemFrame:_DoReset(i)
   i:ClearItem()
