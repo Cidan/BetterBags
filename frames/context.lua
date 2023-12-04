@@ -21,7 +21,7 @@ local L =  addon:GetModule('Localization')
 
 local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 
----@class MenuList
+---@class (exact) MenuList
 ---@field text string
 ---@field value? any
 ---@field checked? boolean|function
@@ -153,6 +153,88 @@ function context:CreateContextMenu(bag)
           bag:Wipe()
           bag:Refresh()
         end
+      }
+    }
+  })
+
+  table.insert(menuList, {
+    text = L:G("Sorting"),
+    notCheckable = true,
+    hasArrow = true,
+    menuList = {
+      {
+        text = L:G("Sections"),
+        hasArrow = true,
+        notCheckable = true,
+        menuList = {
+          {
+            text = L:G("Alphabetical"),
+            tooltipTitle = L:G("Alphabetical"),
+            tooltipText = L:G("Sections will be sorted alphabetically from left to right."),
+            checked = function() return database:GetSectionSortType(bag.kind, database:GetBagView(bag.kind)) == const.SECTION_SORT_TYPE.ALPHABETICALLY end,
+            func = function()
+              context:Hide()
+              database:SetSectionSortType(bag.kind, database:GetBagView(bag.kind), const.SECTION_SORT_TYPE.ALPHABETICALLY)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("Size Descending (large to small)"),
+            tooltipTitle = L:G("Size Descending"),
+            tooltipText = L:G("Sections will be sorted by size from large to small."),
+            checked = function() return database:GetSectionSortType(bag.kind, database:GetBagView(bag.kind)) == const.SECTION_SORT_TYPE.SIZE_DESCENDING end,
+            func = function()
+              context:Hide()
+              database:SetSectionSortType(bag.kind, database:GetBagView(bag.kind), const.SECTION_SORT_TYPE.SIZE_DESCENDING)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("Size Ascending (small to large)"),
+            tooltipTitle = L:G("Size Ascending"),
+            tooltipText = L:G("Sections will be sorted by size from small to large."),
+            checked = function() return database:GetSectionSortType(bag.kind, database:GetBagView(bag.kind)) == const.SECTION_SORT_TYPE.SIZE_ASCENDING end,
+            func = function()
+              context:Hide()
+              database:SetSectionSortType(bag.kind, database:GetBagView(bag.kind), const.SECTION_SORT_TYPE.SIZE_ASCENDING)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          }
+        }
+      },
+      {
+        text = L:G("Items"),
+        hasArrow = true,
+        notCheckable = true,
+        menuList = {
+          {
+            text = L:G("Quality, then Alphabetical"),
+            tooltipTItle = L:G("Quality, then Alphabetical"),
+            tooltipText = L:G("Items will be sorted by quality, then alphabetically."),
+            checked = function() return database:GetItemSortType(bag.kind, database:GetBagView(bag.kind)) == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY end,
+            func = function()
+              context:Hide()
+              database:SetItemSortType(bag.kind, database:GetBagView(bag.kind), const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+          {
+            text = L:G("Alphabetical, then Quality"),
+            tooltipTItle = L:G("Alphabetical, then Quality"),
+            tooltipText = L:G("Items will be sorted alphabetically, then by quality."),
+            checked = function() return database:GetItemSortType(bag.kind, database:GetBagView(bag.kind)) == const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY end,
+            func = function()
+              context:Hide()
+              database:SetItemSortType(bag.kind, database:GetBagView(bag.kind), const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY)
+              bag:Wipe()
+              bag:Refresh()
+            end
+          },
+        }
       }
     }
   })

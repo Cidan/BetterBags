@@ -18,6 +18,7 @@ addon.isWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC
 
 ---@enum BagKind
 const.BAG_KIND = {
+  UNDEFINED = -1,
   BACKPACK = 0,
   BANK = 1,
 }
@@ -96,6 +97,7 @@ const.BACKPACK_ONLY_REAGENT_BAGS = {
 
 ---@enum BagView
 const.BAG_VIEW = {
+  UNDEFINED = 0,
   ONE_BAG = 1,
   SECTION_GRID = 2,
   LIST = 3,
@@ -106,6 +108,19 @@ const.GRID_COMPACT_STYLE = {
   NONE = 0,
   SIMPLE = 1,
   COMPACT = 2,
+}
+
+---@enum SectionSortType
+const.SECTION_SORT_TYPE = {
+  ALPHABETICALLY = 1,
+  SIZE_DESCENDING = 2,
+  SIZE_ASCENDING = 3,
+}
+
+---@enum ItemSortType
+const.ITEM_SORT_TYPE = {
+  ALPHABETICALLY_THEN_QUALITY = 1,
+  QUALITY_THEN_ALPHABETICALLY = 2,
 }
 
 ---@enum ExpansionType
@@ -255,6 +270,30 @@ const.DATABASE_DEFAULTS = {
     compaction = {
       [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.SIMPLE,
       [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.NONE,
+    },
+    sectionSort = {
+      [const.BAG_KIND.BACKPACK] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.BANK] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+    },
+    itemSort = {
+      [const.BAG_KIND.BACKPACK] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
+      [const.BAG_KIND.BANK] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
     },
     size = {
       [const.BAG_VIEW.ONE_BAG] = {

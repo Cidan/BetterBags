@@ -131,4 +131,32 @@ function DB:SetBagViewSizeOpacity(kind, view, opacity)
   DB.data.profile.size[view][kind].opacity = opacity
 end
 
+---@param kind BagKind
+---@param view BagView
+---@return SectionSortType
+function DB:GetSectionSortType(kind, view)
+  return DB.data.profile.sectionSort[kind][view]
+end
+
+---@param kind BagKind
+---@param view BagView
+---@param sort SectionSortType
+function DB:SetSectionSortType(kind, view, sort)
+  DB.data.profile.sectionSort[kind][view] = sort
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return ItemSortType
+function DB:GetItemSortType(kind, view)
+  return DB.data.profile.itemSort[kind][view]
+end
+
+---@param kind BagKind
+---@param view BagView
+---@param sort ItemSortType
+function DB:SetItemSortType(kind, view, sort)
+  DB.data.profile.itemSort[kind][view] = sort
+end
+
 DB:Enable()

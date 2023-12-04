@@ -42,6 +42,11 @@ function itemButton:SetItemButtonQuality(quality) end
 
 function itemButton:HasItem() end
 
+---@class Button
+local Button = {}
+
+function Button:RegisterForClicks(...) end
+
 ---@return Texture
 function itemButton:GetHighlightTexture() end
 
@@ -188,13 +193,6 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field currentItemLevel number
 ---@field equipmentSet string|nil
 
---[[
----@class ItemMixin
----@field itemInfo ExpandedItemInfo
----@field containerInfo ContainerItemInfo
----@field questInfo ItemQuestInfo
-local ItemMixin = {}
-]]--
 ---@return Frame
 function CreateScrollBoxLinearView() end
 

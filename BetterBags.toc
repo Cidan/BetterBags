@@ -43,6 +43,7 @@ data\categories.lua
 
 util\color.lua
 util\resize.lua
+util\sort.lua
 
 frames\slider.lua
 frames\money.lua

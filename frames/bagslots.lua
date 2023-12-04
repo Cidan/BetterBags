@@ -35,7 +35,7 @@ local bagSlotProto = {}
 
 function bagSlotProto:Draw()
   for _, cell in ipairs(self.content.cells) do
-    cell:Draw()
+    cell:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED)
   end
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + 24)

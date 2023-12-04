@@ -9,6 +9,9 @@ local sectionFrame = addon:NewModule('SectionFrame')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Sort: AceModule
+local sort = addon:GetModule('Sort')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -31,10 +34,12 @@ local grid = addon:GetModule('Grid')
 ---@field private fillWidth boolean
 local sectionProto = {}
 
+---@param kind BagKind
+---@param view BagView
 ---@return number width
 ---@return number height
-function sectionProto:Draw()
-  return self:Grid()
+function sectionProto:Draw(kind, view)
+  return self:Grid(kind, view)
 end
 
 -- SetTitle will set the title of the section.
@@ -102,24 +107,13 @@ function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end
 
----@param a Item|ItemRow
----@param b Item|ItemRow
----@return boolean
-local function sortFn(a, b)
-  if a == nil or b == nil or a.data == nil or b.data == nil or a.data.isItemEmpty or b.data.isItemEmpty then return false end
-  if a.data.itemInfo.itemQuality == nil or b.data.itemInfo.itemQuality == nil then return false end
-  if a.data.itemInfo.itemQuality == b.data.itemInfo.itemQuality then
-    if a.data.itemInfo.itemName == nil or b.data.itemInfo.itemName == nil then return false end
-    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
-  end
-  return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
-end
-
 -- Grid will render the section as a grid of icons.
+---@param kind BagKind
+---@param view BagView
 ---@return number width
 ---@return number height
-function sectionProto:Grid()
-  self.content:Sort(sortFn)
+function sectionProto:Grid(kind, view)
+  self.content:Sort(sort:GetItemSortFunction(kind, view))
   local w, h = self.content:Draw()
   self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)

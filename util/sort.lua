@@ -1,0 +1,89 @@
+local addonName = ... ---@type string
+
+---@class BetterBags: AceAddon
+local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Sort: AceModule
+local sort = addon:NewModule('Sort')
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetSectionSortFunction(kind, view)
+  local sortType = database:GetSectionSortType(kind, view)
+  if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
+    return self.SortSectionsAlphabetically
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
+    return self.SortSectionsBySizeAscending
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
+    return self.SortSectionsBySizeDescending
+  end
+  assert(false, "Unknown sort type: " .. sortType)
+  return function() end
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetItemSortFunction(kind, view)
+  if kind == const.BAG_KIND.UNDEFINED then
+    return function() return false end
+  end
+  local sortType = database:GetItemSortType(kind, view)
+  if sortType == const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY then
+    return self.SortItemsByAlphaThenQuality
+  elseif sortType == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY then
+    return self.SortItemsByQualityThenAlpha
+  end
+  assert(false, "Unknown sort type: " .. sortType)
+  return function() end
+end
+
+---@param a Section
+---@param b Section
+---@return boolean
+function sort.SortSectionsAlphabetically(a, b)
+  return a.title:GetText() < b.title:GetText()
+end
+
+---@param a Section
+---@param b Section
+---@return boolean
+function sort.SortSectionsBySizeDescending(a, b)
+  return a:GetCellCount() > b:GetCellCount()
+end
+
+---@param a Section
+---@param b Section
+---@return boolean
+function sort.SortSectionsBySizeAscending(a, b)
+  return a:GetCellCount() < b:GetCellCount()
+end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByQualityThenAlpha(a, b)
+  if not a.data or not b.data then return false end
+  if a.data.itemInfo.itemQuality == b.data.itemInfo.itemQuality then
+    return a.data.itemInfo.itemName < a.data.itemInfo.itemName
+  end
+  return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
+end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByAlphaThenQuality(a, b)
+  if not a.data or not b.data then return false end
+  if a.data.itemInfo.itemName == b.data.itemInfo.itemName then
+    return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
+  end
+  return a.data.itemInfo.itemName < b.data.itemInfo.itemName
+end

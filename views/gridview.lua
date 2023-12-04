@@ -12,9 +12,11 @@ local database = addon:GetModule('Database')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
-
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
+
+---@class Sort: AceModule
+local sort = addon:GetModule('Sort')
 
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
@@ -137,22 +139,15 @@ function views:GridView(bag, dirtyItems)
   -- Loop through each section and draw it's size.
   for _, section in pairs(bag.sections) do
     section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-    section:Draw()
+    section:Draw(bag.kind, database:GetBagView(bag.kind))
   end
   bag.freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  bag.freeSlots:Draw()
+  bag.freeSlots:Draw(bag.kind, database:GetBagView(bag.kind))
 
   -- Remove the freeSlots section.
   bag.content:RemoveCell(bag.freeSlots.title:GetText(), bag.freeSlots)
 
-  -- Sort all sections by title.
-  bag.content:Sort(function(a, b)
-    ---@cast a +Section
-    ---@cast b +Section
-    if not a.title or not b.title then return false end
-    return a.title:GetText() < b.title:GetText()
-  end)
-
+  bag.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
   -- Add the freeSlots section back to the end of all sections
   bag.content:AddCellToLastColumn(bag.freeSlots.title:GetText(), bag.freeSlots)
 

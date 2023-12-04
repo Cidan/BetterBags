@@ -187,7 +187,7 @@ function gridProto:Draw()
       local previousHeader = self.headers[i - 1]
       header.frame:SetPoint("TOPLEFT", previousHeader.frame, "BOTTOMLEFT", 0, -4)
     end
-    local w, h = header:Draw()
+    local w, h = header:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED)
     width = math.max(width, w) ---@type number
     height = height + h + 4 ---@type number
   end

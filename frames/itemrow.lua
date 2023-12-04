@@ -153,6 +153,7 @@ function item:_DoCreate()
   border:Hide()
   self.border = border
 
+  --TODO(lobato): Recycle these textures instead of creating new ones.
   rowButton.NormalTexture:Hide()
   rowButton.NormalTexture:SetParent(nil)
   rowButton.NormalTexture = nil

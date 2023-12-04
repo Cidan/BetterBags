@@ -12,21 +12,11 @@ local database = addon:GetModule('Database')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Sort: AceModule
+local sort = addon:GetModule('Sort')
+
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
-
----@param a Item
----@param b Item
----@return boolean
-local function SortView (a, b)
-  if a == nil or b == nil or a.data == nil or b.data == nil then return false end
-  if a.data.itemInfo.itemQuality == nil or b.data.itemInfo.itemQuality == nil then return false end
-  if a.data.itemInfo.itemQuality == b.data.itemInfo.itemQuality then
-    if a.data.itemInfo.itemName == nil or b.data.itemInfo.itemName == nil then return false end
-    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
-  end
-  return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
-end
 
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
@@ -70,7 +60,7 @@ function views:OneBagView(bag, dirtyItems)
     end
   end
 
-  bag.content:Sort(SortView)
+  bag.content:Sort(sort:GetItemSortFunction(bag.kind, const.BAG_VIEW.ONE_BAG))
 
   bag.content:AddCell("freeBagSlots", bag.freeBagSlotsButton)
   bag.content:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
