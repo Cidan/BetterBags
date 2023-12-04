@@ -10,6 +10,9 @@ local equipmentSets = addon:NewModule('EquipmentSets')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 function equipmentSets:OnInitialize()
   self.bagAndSlotToSet = {}
 end
@@ -24,7 +27,7 @@ function equipmentSets:Update()
   for _, setID in ipairs(sets) do
     local setName = C_EquipmentSet.GetEquipmentSetInfo(setID)
     local setLocations = C_EquipmentSet.GetItemLocations(setID)
-    for _, location in ipairs(setLocations) do
+    for _, location in pairs(setLocations) do
       local _, bank, bags, _, slot, bag = EquipmentManager_UnpackLocation(location)
       if (bank or bags) and slot ~= nil and bag ~= nil then
         self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
