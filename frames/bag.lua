@@ -346,8 +346,9 @@ function bagFrame:Create(kind)
   end
   bagButton:SetScript("OnEnter", function()
     if not database:GetFirstTimeMenu() then
+      anig:Stop()
       highlightTex:SetAlpha(1)
-      anig:Restart()
+      anig:Play()
     end
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
     if kind == const.BAG_KIND.BACKPACK then
@@ -360,6 +361,7 @@ function bagFrame:Create(kind)
   bagButton:SetScript("OnLeave", function()
     GameTooltip:Hide()
     if not database:GetFirstTimeMenu() then
+      anig:Stop()
       highlightTex:SetAlpha(0)
       anig:Restart(true)
     end
