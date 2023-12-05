@@ -34,7 +34,7 @@ function events:RegisterMessage(event, callback, arg)
   if self._messageMap[event] == nil then
     self._messageMap[event] = {
       fn = function(...)
-        for _, cb in ipairs(self._messageMap[event].cbs) do
+        for _, cb in pairs(self._messageMap[event].cbs) do
           if cb.a ~= nil then
             cb.cb(cb.a, ...)
           else
@@ -53,7 +53,7 @@ function events:RegisterEvent(event, callback, arg)
   if self._eventMap[event] == nil then
     self._eventMap[event] = {
       fn = function(...)
-        for _, cb in ipairs(self._eventMap[event].cbs) do
+        for _, cb in pairs(self._eventMap[event].cbs) do
           if cb.a ~= nil then
             cb.cb(cb.a, ...)
           else
@@ -77,7 +77,7 @@ function events:BucketEvent(event, callback)
         if not self._eventQueue[event] then
           return
         end
-        for _, cb in ipairs(self._bucketCallbacks[event]) do
+        for _, cb in pairs(self._bucketCallbacks[event]) do
           cb()
         end
         self._eventQueue[event] = false
