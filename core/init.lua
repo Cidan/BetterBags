@@ -19,6 +19,9 @@ local const = addon:GetModule('Constants')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class ItemFrame: AceModule
+local itemFrame = addon:GetModule('ItemFrame')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -85,6 +88,7 @@ end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
+  itemFrame:Enable()
   sectionFrame:Enable()
   masque:Enable()
   context:Enable()

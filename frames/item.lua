@@ -310,9 +310,13 @@ function itemFrame:OnEnable()
   -- Pre-populate the pool with 300 items. This is done
   -- so that items acquired during combat do not taint
   -- the bag frame.
-  for _ = 1, 300 do
-    local item = self:Create()
-    item:Release()
+  ---@type Item[]
+  local frames = {}
+  for i = 1, 300 do
+    frames[i] = self:Create()
+  end
+  for _, frame in pairs(frames) do
+    frame:Release()
   end
 end
 
@@ -327,7 +331,6 @@ function itemFrame:_DoCreate()
   -- button textures are named after the button itself.
   local name = format("BetterBagsItemButton%d", buttonCount)
   buttonCount = buttonCount + 1
-
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
   local p = CreateFrame("Frame")
@@ -365,5 +368,3 @@ function itemFrame:Create()
   ---@return Item
   return self._pool:Acquire()
 end
-
-itemFrame:Enable()
