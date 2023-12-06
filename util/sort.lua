@@ -22,6 +22,10 @@ local function invalidData(aData, bData)
   if not aData or not bData
   or not aData.itemInfo or not bData.itemInfo
   or not aData.itemInfo.itemQuality or not bData.itemInfo.itemQuality
+  or not aData.itemInfo.currentItemLevel or not bData.itemInfo.currentItemLevel
+  or not aData.itemInfo.currentItemCount or not bData.itemInfo.currentItemCount
+  or not aData.itemInfo.bagid or not bData.itemInfo.bagid
+  or not aData.itemInfo.slotid or not bData.itemInfo.slotid
   or not aData.itemInfo.itemName or not bData.itemInfo.itemName then
     return true
   end
@@ -72,14 +76,22 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeDescending(a, b)
-  return a:GetCellCount() > b:GetCellCount()
+  local aSize, bSize = a:GetCellCount(), b:GetCellCount()
+  if aSize ~= bSize then
+    return aSize > bSize
+  end
+  return a.title:GetText() < b.title:GetText()
 end
 
 ---@param a Section
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeAscending(a, b)
-  return a:GetCellCount() < b:GetCellCount()
+  local aSize, bSize = a:GetCellCount(), b:GetCellCount()
+  if aSize ~= bSize then
+    return aSize < bSize
+  end
+  return a.title:GetText() < b.title:GetText()
 end
 
 ---@param a Item
@@ -87,10 +99,18 @@ end
 ---@return boolean
 function sort.SortItemsByQualityThenAlpha(a, b)
   if invalidData(a.data, b.data) then return false end
-  if a.data.itemInfo.itemQuality == b.data.itemInfo.itemQuality then
+  if a.data.itemInfo.itemQuality ~= b.data.itemInfo.itemQuality then
+    return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
+  elseif a.data.itemInfo.currentItemLevel ~= b.data.itemInfo.currentItemLevel then
+    return a.data.itemInfo.currentItemLevel > b.data.itemInfo.currentItemLevel
+  elseif a.data.itemInfo.itemName ~= b.data.itemInfo.itemName then
     return a.data.itemInfo.itemName < b.data.itemInfo.itemName
+  elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
+    return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
+  elseif a.data.itemInfo.bagid ~= b.data.itemInfo.bagid then
+    return a.data.itemInfo.bagid > b.data.itemInfo.bagid
   end
-  return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
+  return a.data.itemInfo.slotid < b.data.itemInfo.slotid
 end
 
 ---@param a Item
@@ -98,8 +118,16 @@ end
 ---@return boolean
 function sort.SortItemsByAlphaThenQuality(a, b)
   if invalidData(a.data, b.data) then return false end
-  if a.data.itemInfo.itemName == b.data.itemInfo.itemName then
+  if a.data.itemInfo.itemName ~= b.data.itemInfo.itemName then
+    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
+  elseif a.data.itemInfo.itemQuality ~= b.data.itemInfo.itemQuality then
     return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
+  elseif a.data.itemInfo.currentItemLevel ~= b.data.itemInfo.currentItemLevel then
+    return a.data.itemInfo.currentItemLevel > b.data.itemInfo.currentItemLevel
+  elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
+    return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
+  elseif a.data.itemInfo.bagid ~= b.data.itemInfo.bagid then
+    return a.data.itemInfo.bagid > b.data.itemInfo.bagid
   end
-  return a.data.itemInfo.itemName < b.data.itemInfo.itemName
+  return a.data.itemInfo.slotid < b.data.itemInfo.slotid
 end
