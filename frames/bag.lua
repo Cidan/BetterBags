@@ -94,7 +94,6 @@ function bagProto:Hide()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
   self.frame:Hide()
   if self.drawOnClose then
-    print("drawing on close")
     self:Refresh()
   end
 end
