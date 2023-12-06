@@ -93,7 +93,7 @@ function bagProto:Hide()
   end
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
   self.frame:Hide()
-  if self.drawOnClose then
+  if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
     self:Refresh()
   end
 end

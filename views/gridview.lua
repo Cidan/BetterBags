@@ -148,7 +148,7 @@ function views:GridView(bag, dirtyItems)
 
   bag.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   -- Loop through each section and draw it's size.
-  if bag.currentItemCount <= itemCount then
+  if bag.currentItemCount <= itemCount or bag.kind ~= const.BAG_KIND.BACKPACK then
     for _, section in pairs(bag.sections) do
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       section:Draw(bag.kind, database:GetBagView(bag.kind))
