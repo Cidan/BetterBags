@@ -88,7 +88,7 @@ function sectionProto:WipeOnlyContents()
   self.content:Wipe()
 end
 
----@param item Item
+---@param item Item|ItemRow
 ---@return boolean
 function sectionProto:HasItem(item)
   for _, i in pairs(self.content.cells) do

@@ -74,7 +74,11 @@ function views:GridView(bag, dirtyItems)
       local newSection = bag:GetOrCreateSection(newCategory)
 
       if oldCategory ~= newCategory then
-        oldSection:RemoveCell(oldGuid, oldFrame)
+        if bag.recentItems:HasItem(oldFrame) then
+          bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
+        else
+          oldSection:RemoveCell(oldGuid, oldFrame)
+        end
         newSection:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       end
       if oldSection == bag.recentItems then
@@ -92,7 +96,11 @@ function views:GridView(bag, dirtyItems)
       local newCategory = oldFrame:GetCategory()
       local newSection = bag:GetOrCreateSection(newCategory)
       if oldCategory ~= newCategory then
-        oldSection:RemoveCell(oldGuid, oldFrame)
+        if bag.recentItems:HasItem(oldFrame) then
+          bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
+        else
+          oldSection:RemoveCell(oldGuid, oldFrame)
+        end
         newSection:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       end
       if oldSection:GetCellCount() == 0 then
