@@ -71,7 +71,6 @@ function views:ListView(bag, dirtyItems)
         bag.content:GetContainer():OnMouseWheel(delta)
       end)
       newFrame:SetItem(data)
-      newFrame.button:SetSize(32, 32)
       local category = newFrame:GetCategory()
       local section ---@type Section|nil
       if newFrame:IsNewItem() then

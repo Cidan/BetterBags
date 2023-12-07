@@ -51,6 +51,7 @@ function itemRowProto:SetItem(data)
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
+  self.button:SetSize(32, 32)
   self.frame:SetID(bagid)
   self.text:SetText(data.itemInfo.itemName)
   self.frame:Show()
@@ -183,7 +184,7 @@ function item:_DoCreate()
   rowButton:SetScript("OnLeave", function(s)
     s.HighlightTexture:Hide()
   end)
-  i.frame:SetSize(350, 35)
+  i.frame:SetSize(350, 34)
 
   return i
 end
