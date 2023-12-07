@@ -24,8 +24,7 @@ local function invalidData(aData, bData)
   or not aData.itemInfo.itemQuality or not bData.itemInfo.itemQuality
   or not aData.itemInfo.currentItemLevel or not bData.itemInfo.currentItemLevel
   or not aData.itemInfo.currentItemCount or not bData.itemInfo.currentItemCount
-  or not aData.itemInfo.bagid or not bData.itemInfo.bagid
-  or not aData.itemInfo.slotid or not bData.itemInfo.slotid
+  or not aData.itemInfo.itemGUID or not bData.itemInfo.itemGUID
   or not aData.itemInfo.itemName or not bData.itemInfo.itemName then
     return true
   end
@@ -107,10 +106,8 @@ function sort.SortItemsByQualityThenAlpha(a, b)
     return a.data.itemInfo.itemName < b.data.itemInfo.itemName
   elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
     return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
-  elseif a.data.itemInfo.bagid ~= b.data.itemInfo.bagid then
-    return a.data.itemInfo.bagid > b.data.itemInfo.bagid
   end
-  return a.data.itemInfo.slotid < b.data.itemInfo.slotid
+  return a.data.itemInfo.itemGUID < b.data.itemInfo.itemGUID
 end
 
 ---@param a Item
@@ -126,8 +123,6 @@ function sort.SortItemsByAlphaThenQuality(a, b)
     return a.data.itemInfo.currentItemLevel > b.data.itemInfo.currentItemLevel
   elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
     return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
-  elseif a.data.itemInfo.bagid ~= b.data.itemInfo.bagid then
-    return a.data.itemInfo.bagid > b.data.itemInfo.bagid
   end
-  return a.data.itemInfo.slotid < b.data.itemInfo.slotid
+  return a.data.itemInfo.itemGUID < b.data.itemInfo.itemGUID
 end

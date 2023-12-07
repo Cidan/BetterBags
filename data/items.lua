@@ -202,8 +202,6 @@ function items:AttachItemInfo(data)
     category = "",
     currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
     equipmentSet = equipmentSets:GetItemSet(bagid, slotid),
-    bagid = bagid,
-    slotid = slotid,
   }
 end
 
