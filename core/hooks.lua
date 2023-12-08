@@ -10,13 +10,13 @@ addon.backpackShouldClose = false
 
 function addon.ForceHideBlizzardBags()
   for i = 1, NUM_TOTAL_BAG_FRAMES, 1 do
-    _G["ContainerFrame"..i]:Hide()
+    CloseBag(i)
   end
 end
 
 function addon.ForceShowBlizzardBags()
   for i = 1, NUM_TOTAL_BAG_FRAMES, 1 do
-    _G["ContainerFrame"..i]:Show()
+    OpenBag(i)
   end
 end
 
