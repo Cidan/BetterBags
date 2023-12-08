@@ -1,39 +1,79 @@
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
+---@field backpackShouldOpen boolean
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@cast addon +AceHook-3.0
 
+addon.backpackShouldOpen = false
+addon.backpackShouldClose = false
+
+function addon.ForceHideBlizzardBags()
+  for i = 1, NUM_TOTAL_BAG_FRAMES, 1 do
+    _G["ContainerFrame"..i]:Hide()
+  end
+end
+
+function addon.ForceShowBlizzardBags()
+  for i = 1, NUM_TOTAL_BAG_FRAMES, 1 do
+    _G["ContainerFrame"..i]:Show()
+  end
+end
+
+function addon.OnUpdate()
+  if addon.backpackShouldOpen then
+    addon.backpackShouldOpen = false
+    addon.ForceShowBlizzardBags()
+    addon.Bags.Backpack:Show()
+  elseif addon.backpackShouldClose then
+    addon.backpackShouldClose = false
+    addon.ForceHideBlizzardBags()
+    addon.Bags.Backpack:Hide()
+  end
+end
+
 function addon:OpenAllBags()
-  addon.Bags.Backpack:Show()
+  addon.backpackShouldOpen = true
 end
 
 function addon:CloseAllBags()
-  addon.Bags.Backpack:Hide()
+  addon.backpackShouldClose = true
 end
 
 function addon:CloseBackpack()
-  addon.Bags.Backpack:Hide()
+  addon.backpackShouldClose = true
 end
 
 function addon:OpenBackpack()
-  addon.Bags.Backpack:Show()
+  addon.backpackShouldOpen = true
 end
 
 function addon:ToggleBag()
-  print("toggle")
+  if addon.Bags.Backpack:IsShown() then
+    addon.backpackShouldClose = true
+  else
+    addon.backpackShouldOpen = true
+  end
 end
 
 function addon:CloseBag()
-  print("Close Bag")
+  addon.backpackShouldClose = true
 end
 
 function addon:ToggleAllBags()
-  addon.Bags.Backpack:Toggle()
+  if addon.Bags.Backpack:IsShown() then
+    addon.backpackShouldClose = true
+  else
+    addon.backpackShouldOpen = true
+  end
 end
 
 function addon:ToggleBackpack()
-  addon.Bags.Backpack:Show()
+  if addon.Bags.Backpack:IsShown() then
+    addon.backpackShouldClose = true
+  else
+    addon.backpackShouldOpen = true
+  end
 end
 
 function addon:CloseSpecialWindows()
