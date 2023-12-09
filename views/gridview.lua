@@ -18,6 +18,9 @@ local views = addon:GetModule('Views')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
+---@type Item[]
+local toRelease = {}
+
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 function views:GridView(bag, dirtyItems)
@@ -136,7 +139,7 @@ function views:GridView(bag, dirtyItems)
           section:Release()
         end
       end
-      oldFrame:Release()
+      table.insert(toRelease, oldFrame)
     end
   end
 
@@ -149,11 +152,18 @@ function views:GridView(bag, dirtyItems)
   bag.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   -- Loop through each section and draw it's size.
   if bag.currentItemCount <= itemCount or bag.kind ~= const.BAG_KIND.BACKPACK then
+    for _, oldFrame in pairs(toRelease) do
+      oldFrame:Release()
+    end
+    wipe(toRelease)
     for _, section in pairs(bag.sections) do
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       section:Draw(bag.kind, database:GetBagView(bag.kind))
     end
   else
+    for _, oldFrame in pairs(toRelease) do
+      oldFrame:SetAlpha(0)
+    end
     bag.drawOnClose = true
   end
   bag.currentItemCount = itemCount

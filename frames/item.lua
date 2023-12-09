@@ -259,6 +259,11 @@ function itemProto:IsNewItem()
   return self.data.itemInfo.isNewItem
 end
 
+---@param alpha number
+function itemProto:SetAlpha(alpha)
+  self.frame:SetAlpha(alpha)
+end
+
 function itemProto:Release()
   itemFrame._pool:Release(self)
 end
@@ -269,6 +274,7 @@ function itemProto:ClearItem()
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
+  self.frame:SetAlpha(1)
   self.frame:Hide()
   self.button:SetHasItem(false)
   self.button:SetItemButtonTexture(0)
