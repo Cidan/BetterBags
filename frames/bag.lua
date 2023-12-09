@@ -77,6 +77,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field moneyFrame Money
 ---@field resizeHandle Button
 ---@field drawOnClose boolean
+---@field menuList MenuList[]
 local bagProto = {}
 
 function bagProto:Show()
@@ -264,6 +265,10 @@ function bagProto:OnCooldown()
   end
 end
 
+function bagProto:UpdateContextMenu()
+  self.menuList = context:CreateContextMenu(self)
+end
+
 -------
 --- Bag Frame
 -------
@@ -327,7 +332,7 @@ function bagFrame:Create(kind)
   end
 
   -- Setup the context menu.
-  local contextMenu = context:CreateContextMenu(b)
+  b.menuList = context:CreateContextMenu(b)
 
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
@@ -383,7 +388,7 @@ function bagFrame:Create(kind)
         anig:SetLooping("NONE")
         anig:Restart()
       end
-      context:Show(contextMenu)
+      context:Show(b.menuList)
     else
       b:ToggleReagentBank()
     end

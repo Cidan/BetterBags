@@ -159,4 +159,40 @@ function DB:SetItemSortType(kind, view, sort)
   DB.data.profile.itemSort[kind][view] = sort
 end
 
+---@param itemID number
+---@param category string
+function DB:SaveItemToCategory(itemID, category)
+  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
+  DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
+end
+
+---@param category string
+---@param enabled boolean
+function DB:SetItemCategoryEnabled(category, enabled)
+  DB.data.profile.customCategoryFilters[category].enabled = enabled
+end
+
+---@param category string
+function DB:DeleteItemCategory(category)
+  DB.data.profile.customCategoryFilters[category] = nil
+end
+
+---@param category string
+function DB:WipeItemCategory(category)
+  if DB.data.profile.customCategoryFilters[category] then
+    DB.data.profile.customCategoryFilters[category].itemList = {}
+  end
+end
+
+---@return table<string, CustomCategoryFilter>
+function DB:GetAllItemCategories()
+  return DB.data.profile.customCategoryFilters
+end
+
+---@param category string
+---@return CustomCategoryFilter
+function DB:GetItemCategory(category)
+  return DB.data.profile.customCategoryFilters[category]
+end
+
 DB:Enable()
