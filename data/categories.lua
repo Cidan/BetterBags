@@ -75,11 +75,23 @@ function categories:GetCustomCategory(data)
 
   -- Check for categories manually set by item.
   local category = self.itemToCategory[itemID]
-  if category then return category end
+  if category then
+    if self:IsCategoryEnabled(category) then
+      return category
+    else
+      return nil
+    end
+  end
 
   -- Check for categories set by registered functions.
   category = self.functionCategories[itemID]
-  if category then return category end
+  if category then
+    if self:IsCategoryEnabled(category) then
+      return category
+    else
+      return nil
+    end
+  end
 
   -- Check for items that had no category previously. This
   -- is a performance optimization to avoid calling all
@@ -92,7 +104,11 @@ function categories:GetCustomCategory(data)
       self.functionCategories[itemID] = category
       self.categoryList[category] = self.categoryList[category] or {}
       table.insert(self.categoryList[category], itemID)
-      return category
+      if self:IsCategoryEnabled(category) then
+        return category
+      else
+        return nil
+      end
     end
   end
   self.itemsWithNoCategory[itemID] = true
