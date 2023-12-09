@@ -9,6 +9,9 @@ local database = addon:GetModule('Database')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Categories: AceModule
 ---@field private itemToCategory table<number, string>
 ---@field private functionCategories table<number, string>
@@ -36,9 +39,11 @@ end
 ---@param category string The name of the custom category to add the item to.
 function categories:AddItemToCategory(id, category)
   self.itemToCategory[id] = category
+  local found = self.categoryList[category] and true or false
   self.categoryList[category] = self.categoryList[category] or {}
   table.insert(self.categoryList[category], id)
   database:SaveItemToCategory(id, category)
+  if not found then events:SendMessage('categories/Changed') end
 end
 
 -- WipeCategory removes all items from a custom category, but does not delete the category.
@@ -49,6 +54,7 @@ function categories:WipeCategory(category)
   end
   database:WipeItemCategory(category)
   self.categoryList[category] = nil
+  events:SendMessage('categories/Changed')
 end
 
 -- IsCategoryEnabled returns whether or not a custom category is enabled.
@@ -102,8 +108,10 @@ function categories:GetCustomCategory(data)
     category = func(data)
     if category then
       self.functionCategories[itemID] = category
+      local found = self.categoryList[category] and true or false
       self.categoryList[category] = self.categoryList[category] or {}
       table.insert(self.categoryList[category], itemID)
+      if not found then events:SendMessage('categories/Changed') end
       if self:IsCategoryEnabled(category) then
         return category
       else
