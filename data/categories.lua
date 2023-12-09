@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
@@ -11,7 +14,7 @@ local items = addon:GetModule('Items')
 ---@field private functionCategories table<number, string>
 ---@field private itemsWithNoCategory table<number, boolean>
 ---@field private categoryFunctions table<string, fun(data: ItemData): string>
----@field private categoryList table<string, boolean>
+---@field private categoryList table<string, number[]>
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
@@ -23,7 +26,7 @@ function categories:OnInitialize()
 end
 
 -- GetAllCategories returns a list of all custom categories.
----@return table<string, boolean>
+---@return table<string, number[]>
 function categories:GetAllCategories()
   return self.categoryList
 end
@@ -33,9 +36,34 @@ end
 ---@param category string The name of the custom category to add the item to.
 function categories:AddItemToCategory(id, category)
   self.itemToCategory[id] = category
-  self.categoryList[category] = true
+  self.categoryList[category] = self.categoryList[category] or {}
+  table.insert(self.categoryList[category], id)
+  database:SaveItemToCategory(id, category)
 end
 
+-- WipeCategory removes all items from a custom category, but does not delete the category.
+---@param category string The name of the custom category to wipe.
+function categories:WipeCategory(category)
+  for _, id in pairs(self.categoryList[category]) do
+    self.itemToCategory[id] = nil
+  end
+  database:WipeItemCategory(category)
+  self.categoryList[category] = nil
+end
+
+-- IsCategoryEnabled returns whether or not a custom category is enabled.
+---@param category string The name of the custom category to check.
+---@return boolean
+function categories:IsCategoryEnabled(category)
+  return database:GetItemCategory(category).enabled
+end
+
+-- ToggleCategory toggles the enabled state of a custom category.
+---@param category string The name of the custom category to toggle.
+function categories:ToggleCategory(category)
+  local enabled = not database:GetItemCategory(category).enabled
+  database:SetItemCategoryEnabled(category, enabled)
+end
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.
@@ -62,6 +90,8 @@ function categories:GetCustomCategory(data)
     category = func(data)
     if category then
       self.functionCategories[itemID] = category
+      self.categoryList[category] = self.categoryList[category] or {}
+      table.insert(self.categoryList[category], itemID)
       return category
     end
   end
@@ -79,6 +109,7 @@ end
 -- function will clear the cache. Do not abuse this API,
 -- as it has the potential to cause a significant amount of CPU usage the first time an item is rendered,
 -- which at game load time, is every item.
+-- Categories functions are not saved to the database, and must be registered every time the addon is loaded.
 ---@param id string A unique identifier for the category function. This is not used for the category name!
 ---@param func fun(mixin: ItemData): string The function to call to get the category name for an item.
 function categories:RegisterCategoryFunction(id, func)

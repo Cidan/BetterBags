@@ -154,10 +154,10 @@ function context:CreateContextMenu(bag)
       text = category,
       tooltipTitle = category,
       tooltipText = L:G("If enabled, will categorize items by ") .. category .. ".",
-      checked = function() return database:GetCategoryFilter(bag.kind, category) end,
+      checked = function() return categories:IsCategoryEnabled(category) end,
       func = function()
         context:Hide()
-        --database:SetCategoryFilter(bag.kind, category, not database:GetCategoryFilter(bag.kind, category))
+        categories:ToggleCategory(category)
         bag:Wipe()
         bag:Refresh()
       end

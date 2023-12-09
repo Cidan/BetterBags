@@ -131,5 +131,6 @@ function addon:OnEnable()
   debug:Log("init", "about refresh all items")
   items:RefreshBackpack()
   categories:AddItemToCategory(6948, L:G("Hearthstone"))
+  categories:AddItemToCategory(202046, L:G("Hearthstone"))
   addon.Bags.Backpack:UpdateContextMenu()
 end

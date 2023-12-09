@@ -247,6 +247,11 @@ const.TRADESKILL_MAP = {
 	[19] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 19), -- "Finishing Reagents"
 }
 
+---@class CustomCategoryFilter
+---@field enabled boolean
+---@field itemList table<number, boolean>
+---@field readOnly boolean
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
@@ -355,6 +360,8 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
     },
+    ---@type table<string, CustomCategoryFilter>
+    customCategoryFilters = {},
     categoryFilters = {
       [const.BAG_KIND.BACKPACK] = {
         Type = true,
