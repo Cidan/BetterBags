@@ -31,6 +31,9 @@ local masque = addon:GetModule('Masque')
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -95,6 +98,7 @@ function addon:OnEnable()
   masque:Enable()
   context:Enable()
   items:Enable()
+  categories:Enable()
   self:HideBlizzardBags()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
@@ -116,14 +120,16 @@ function addon:OnEnable()
     addon.Bags.Backpack:Draw(itemData)
    end)
 
-   events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
-    debug:Log("init/OnInitialize/items", "Drawing bank")
-    addon.Bags.Bank:Draw(itemData)
-    if not addon.Bags.Bank:IsShown() then
-      addon.Bags.Bank:Show()
-    end
-   end)
+  events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
+   debug:Log("init/OnInitialize/items", "Drawing bank")
+   addon.Bags.Bank:Draw(itemData)
+   if not addon.Bags.Bank:IsShown() then
+     addon.Bags.Bank:Show()
+   end
+  end)
 
-   debug:Log("init", "about refresh all items")
-   items:RefreshBackpack()
+  debug:Log("init", "about refresh all items")
+  items:RefreshBackpack()
+  categories:AddItemToCategory(6948, L:G("Hearthstone"))
+  addon.Bags.Backpack:UpdateContextMenu()
 end

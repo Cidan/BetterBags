@@ -11,6 +11,7 @@ local items = addon:GetModule('Items')
 ---@field private functionCategories table<number, string>
 ---@field private itemsWithNoCategory table<number, boolean>
 ---@field private categoryFunctions table<string, fun(data: ItemData): string>
+---@field private categoryList table<string, boolean>
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
@@ -18,6 +19,13 @@ function categories:OnInitialize()
   self.functionCategories = {}
   self.categoryFunctions = {}
   self.itemsWithNoCategory = {}
+  self.categoryList = {}
+end
+
+-- GetAllCategories returns a list of all custom categories.
+---@return table<string, boolean>
+function categories:GetAllCategories()
+  return self.categoryList
 end
 
 -- AddItemToCategory adds an item to a custom category by its ItemID.
@@ -25,6 +33,7 @@ end
 ---@param category string The name of the custom category to add the item to.
 function categories:AddItemToCategory(id, category)
   self.itemToCategory[id] = category
+  self.categoryList[category] = true
 end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
@@ -88,5 +97,3 @@ function categories:ReprocessAllItems()
   wipe(self.functionCategories)
   items:RefreshAll()
 end
-
-categories:Enable()
