@@ -253,11 +253,15 @@ function bagProto:ToggleReagentBank()
   if self.isReagentBank then
     BankFrame.selectedTab = 2
     self.frame:SetTitle(L:G("Reagent Bank"))
+    self.currentItemCount = -1
+    self:ClearRecentItems()
     self:Wipe()
     items:RefreshReagentBank()
   else
     BankFrame.selectedTab = 1
     self.frame:SetTitle(L:G("Bank"))
+    self.currentItemCount = -1
+    self:ClearRecentItems()
     self:Wipe()
     items:RefreshBank()
   end
