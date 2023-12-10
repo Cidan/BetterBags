@@ -18,12 +18,6 @@ local views = addon:GetModule('Views')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
----@type Item[]
-local toRelease = {}
-
----@type Section[]
-local sectionToRelease = {}
-
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 function views:GridView(bag, dirtyItems)
@@ -82,12 +76,12 @@ function views:GridView(bag, dirtyItems)
       elseif oldSection:GetCellCount() == 0 then
         bag.sections[oldCategory] = nil
         bag.content:RemoveCell(oldCategory, oldSection)
-        table.insert(sectionToRelease, oldSection)
+        table.insert(bag.toReleaseSections, oldSection)
       end
     elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame.data.itemInfo.itemGUID == data.itemInfo.itemGUID then
       -- This case handles when the item in this slot is the same as the item displayed.
       local oldCategory = oldFrame.data.itemInfo.category
-      local oldSection = bag.sections[oldCategory]
+      local oldSection = bag:GetOrCreateSection(oldCategory)
       local oldGuid = oldFrame.data.itemInfo.itemGUID
       oldFrame:SetItem(data)
       local newCategory = oldFrame:GetCategory()
@@ -100,21 +94,21 @@ function views:GridView(bag, dirtyItems)
       elseif oldSection:GetCellCount() == 0 then
         bag.sections[oldCategory] = nil
         bag.content:RemoveCell(oldCategory, oldSection)
-        table.insert(sectionToRelease, oldSection)
+        table.insert(bag.toReleaseSections, oldSection)
       end
     elseif data.isItemEmpty and oldFrame ~= nil then
       -- The old frame exists, but the item is empty, so we need to delete it.
       bag.itemsByBagAndSlot[bagid][slotid] = nil
-      local section = bag.sections[oldFrame:GetCategory()]
+      local section = bag:GetOrCreateSection(oldFrame:GetCategory())
       section:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       -- Delete the section if it's empty as well.
       if section == bag.recentItems then
       elseif section:GetCellCount() == 0 then
         bag.sections[oldFrame:GetCategory()] = nil
         bag.content:RemoveCell(oldFrame:GetCategory(), section)
-        table.insert(sectionToRelease, section)
+        table.insert(bag.toReleaseSections, section)
       end
-      table.insert(toRelease, oldFrame)
+      table.insert(bag.toRelease, oldFrame)
     end
   end
 
@@ -126,24 +120,25 @@ function views:GridView(bag, dirtyItems)
 
   bag.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   -- Loop through each section and draw it's size.
-  if bag.currentItemCount <= itemCount or bag.kind ~= const.BAG_KIND.BACKPACK then
-    for _, oldFrame in pairs(toRelease) do
+  if bag.currentItemCount <= itemCount or bag.currentItemCount == -1 then
+    for _, oldFrame in pairs(bag.toRelease) do
       oldFrame:Release()
     end
-    for _, section in pairs(sectionToRelease) do
+    for _, section in pairs(bag.toReleaseSections) do
       section:Release()
     end
-    wipe(toRelease)
-    wipe(sectionToRelease)
+    wipe(bag.toRelease)
+    wipe(bag.toReleaseSections)
     for _, section in pairs(bag.sections) do
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       section:Draw(bag.kind, database:GetBagView(bag.kind))
     end
+    bag.recentItems:Draw(bag.kind, database:GetBagView(bag.kind))
   else
-    for _, oldFrame in pairs(toRelease) do
+    for _, oldFrame in pairs(bag.toRelease) do
       oldFrame:SetAlpha(0)
     end
-    for _, section in pairs(sectionToRelease) do
+    for _, section in pairs(bag.toReleaseSections) do
       section:SetAlpha(0)
     end
     bag.drawOnClose = true
@@ -158,7 +153,7 @@ function views:GridView(bag, dirtyItems)
   -- Add the freeSlots section back to the end of all sections
   bag.content:AddCellToLastColumn(bag.freeSlots.title:GetText(), bag.freeSlots)
 
-  if bag.currentItemCount <= itemCount then
+  if bag.currentItemCount <= itemCount or bag.currentItemCount == -1 then
   -- Position all sections and draw the main bag.
     local w, h = bag.content:Draw()
     -- Reposition the content frame if the recent items section is empty.

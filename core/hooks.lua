@@ -90,8 +90,9 @@ function addon:OpenBank()
   addon.Bags.Backpack:Show()
 end
 
-function addon:CloseBank()
+---@param interactingFrame Frame
+function addon:CloseBank(interactingFrame)
+  if interactingFrame ~= nil then return end
   addon.Bags.Bank:Hide()
-  addon.Bags.Backpack:Hide()
   addon.Bags.Bank:SwitchToBank()
 end

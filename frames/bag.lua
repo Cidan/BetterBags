@@ -78,6 +78,8 @@ local Window = LibStub('LibWindow-1.1')
 ---@field resizeHandle Button
 ---@field drawOnClose boolean
 ---@field menuList MenuList[]
+---@field toRelease Item[]
+---@field toReleaseSections Section[]
 local bagProto = {}
 
 function bagProto:Show()
@@ -130,11 +132,19 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagProto:Wipe()
+  for _, oldFrame in pairs(self.toRelease) do
+    oldFrame:Release()
+  end
+  for _, section in pairs(self.toReleaseSections) do
+    section:Release()
+  end
   self:WipeFreeSlots()
   self.content:RemoveCell(self.freeSlots.title:GetText(), self.freeSlots)
   self.content:Wipe()
   wipe(self.itemsByBagAndSlot)
   wipe(self.sections)
+  wipe(self.toRelease)
+  wipe(self.toReleaseSections)
 end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
@@ -208,11 +218,23 @@ function bagProto:OnResize()
   self:KeepBagInBounds()
 end
 
+function bagProto:ClearRecentItems()
+  for _, i in pairs(self.recentItems:GetAllCells()) do
+    local bagid, slotid = i.data.bagid, i.data.slotid
+    if bagid and slotid then
+      self.itemsByBagAndSlot[bagid] = self.itemsByBagAndSlot[bagid] or {}
+      self.itemsByBagAndSlot[bagid][slotid] = nil
+    end
+  end
+  self.recentItems:WipeOnlyContents()
+end
+
 -- GetOrCreateSection will get an existing section by category,
 -- creating it if it doesn't exist.
 ---@param category string
 ---@return Section
 function bagProto:GetOrCreateSection(category)
+  if category == L:G("Recent Items") then return self.recentItems end
   local section = self.sections[category]
   if section == nil then
     section = sectionFrame:Create()
@@ -277,6 +299,8 @@ function bagFrame:Create(kind)
   b.isReagentBank = false
   b.itemsByBagAndSlot = {}
   b.sections = {}
+  b.toRelease = {}
+  b.toReleaseSections = {}
   b.kind = kind
   local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
@@ -401,7 +425,6 @@ function bagFrame:Create(kind)
   recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   recentItems.frame:Hide()
   content:AddHeader(recentItems)
-  b.sections[L:G("Recent Items")] = recentItems
   b.recentItems = recentItems
 
   -- Create the free bag slots buttons and free bag slot section.

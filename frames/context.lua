@@ -339,6 +339,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
+          bag:ClearRecentItems()
           bag:Wipe()
           bag:Refresh()
         end
@@ -352,6 +353,9 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
+          bag.drawOnClose = true
+          bag.currentItemCount = -1
+          bag:ClearRecentItems()
           bag:Wipe()
           bag:Refresh()
         end
@@ -365,6 +369,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
+          bag:ClearRecentItems()
           bag:Wipe()
           bag:Refresh()
         end
