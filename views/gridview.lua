@@ -59,11 +59,7 @@ function views:GridView(bag, dirtyItems)
       newFrame:SetItem(data)
       local category = newFrame:GetCategory()
       local section ---@type Section|nil
-      if newFrame:IsNewItem() then
-        section = bag.recentItems
-      else
-        section = bag:GetOrCreateSection(category)
-      end
+      section = bag:GetOrCreateSection(category)
 
       section:AddCell(data.itemInfo.itemGUID, newFrame)
       newFrame:AddToMasqueGroup(bag.kind)
@@ -73,21 +69,13 @@ function views:GridView(bag, dirtyItems)
       -- The old frame exists, so we need to update it.
       local oldCategory = oldFrame.data.itemInfo.category
       local oldSection = bag.sections[oldCategory]
-      if bag.recentItems:HasItem(oldFrame) then
-        oldSection = bag.recentItems
-        oldCategory = bag.recentItems.title:GetText()
-      end
       local oldGuid = oldFrame.data.itemInfo.itemGUID
       oldFrame:SetItem(data)
       local newCategory = oldFrame:GetCategory()
       local newSection = bag:GetOrCreateSection(newCategory)
 
       if oldCategory ~= newCategory then
-        if bag.recentItems:HasItem(oldFrame) then
-          bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
-        else
-          oldSection:RemoveCell(oldGuid, oldFrame)
-        end
+        oldSection:RemoveCell(oldGuid, oldFrame)
         newSection:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       end
       if oldSection == bag.recentItems then
@@ -105,42 +93,26 @@ function views:GridView(bag, dirtyItems)
       local newCategory = oldFrame:GetCategory()
       local newSection = bag:GetOrCreateSection(newCategory)
       if oldCategory ~= newCategory then
-        if bag.recentItems:HasItem(oldFrame) then
-          bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
-        else
-          oldSection:RemoveCell(oldGuid, oldFrame)
-        end
+        oldSection:RemoveCell(oldGuid, oldFrame)
         newSection:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
       end
-      if oldSection:GetCellCount() == 0 then
+      if oldSection == bag.recentItems then
+      elseif oldSection:GetCellCount() == 0 then
         bag.sections[oldCategory] = nil
         bag.content:RemoveCell(oldCategory, oldSection)
         table.insert(sectionToRelease, oldSection)
       end
-
-      -- The item in this same slot may no longer be a new item, i.e. it was moused over. If so, we
-      -- need to resection it.
-      if not oldFrame:IsNewItem() and bag.recentItems:HasItem(oldFrame) then
-        bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
-        local category = oldFrame:GetCategory()
-        local section = bag:GetOrCreateSection(category)
-        section:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
-      end
     elseif data.isItemEmpty and oldFrame ~= nil then
       -- The old frame exists, but the item is empty, so we need to delete it.
       bag.itemsByBagAndSlot[bagid][slotid] = nil
-      -- Special handling for the recent items section.
-      if bag.recentItems:HasItem(oldFrame) then
-        bag.recentItems:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
-      else
-        local section = bag.sections[oldFrame:GetCategory()]
-        section:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
-        -- Delete the section if it's empty as well.
-        if section:GetCellCount() == 0 then
-          bag.sections[oldFrame:GetCategory()] = nil
-          bag.content:RemoveCell(oldFrame:GetCategory(), section)
-          table.insert(sectionToRelease, section)
-        end
+      local section = bag.sections[oldFrame:GetCategory()]
+      section:RemoveCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
+      -- Delete the section if it's empty as well.
+      if section == bag.recentItems then
+      elseif section:GetCellCount() == 0 then
+        bag.sections[oldFrame:GetCategory()] = nil
+        bag.content:RemoveCell(oldFrame:GetCategory(), section)
+        table.insert(sectionToRelease, section)
       end
       table.insert(toRelease, oldFrame)
     end
@@ -162,6 +134,7 @@ function views:GridView(bag, dirtyItems)
       section:Release()
     end
     wipe(toRelease)
+    wipe(sectionToRelease)
     for _, section in pairs(bag.sections) do
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       section:Draw(bag.kind, database:GetBagView(bag.kind))

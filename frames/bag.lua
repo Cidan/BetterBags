@@ -409,6 +409,7 @@ function bagFrame:Create(kind)
   recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   recentItems.frame:Hide()
   content:AddHeader(recentItems)
+  b.sections[L:G("Recent Items")] = recentItems
   b.recentItems = recentItems
 
   -- Create the free bag slots buttons and free bag slot section.
