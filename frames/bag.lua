@@ -176,14 +176,6 @@ end
 ---@param dirtyItems ItemData[]
 function bagProto:Draw(dirtyItems)
   self:UpdateCellWidth()
-  for _, i in pairs(self.recentItems:GetAllCells()) do
-    local bagid, slotid = i.data.bagid, i.data.slotid
-    if bagid and slotid then
-      self.itemsByBagAndSlot[bagid] = self.itemsByBagAndSlot[bagid] or {}
-      self.itemsByBagAndSlot[bagid][slotid] = nil
-    end
-  end
-  self.recentItems:WipeOnlyContents()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
     self.resizeHandle:Hide()
     views:OneBagView(self, dirtyItems)
