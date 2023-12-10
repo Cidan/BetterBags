@@ -20,3 +20,4 @@ externals:
 ignore:
   - install-deps.sh
   - annotations.lua
+  - examples

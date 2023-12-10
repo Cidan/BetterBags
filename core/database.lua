@@ -169,6 +169,7 @@ end
 ---@param category string
 ---@param enabled boolean
 function DB:SetItemCategoryEnabled(category, enabled)
+  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {}
   DB.data.profile.customCategoryFilters[category].enabled = enabled
 end
 
@@ -192,7 +193,7 @@ end
 ---@param category string
 ---@return CustomCategoryFilter
 function DB:GetItemCategory(category)
-  return DB.data.profile.customCategoryFilters[category]
+  return DB.data.profile.customCategoryFilters[category] or {}
 end
 
 DB:Enable()

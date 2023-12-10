@@ -135,7 +135,7 @@ end
 -- which at game load time, is every item.
 -- Categories functions are not saved to the database, and must be registered every time the addon is loaded.
 ---@param id string A unique identifier for the category function. This is not used for the category name!
----@param func fun(mixin: ItemData): string The function to call to get the category name for an item.
+---@param func fun(data: ItemData): string|nil The function to call to get the category name for an item.
 function categories:RegisterCategoryFunction(id, func)
   assert(not self.categoryFunctions[id], 'category function already registered: '.. id)
   self.categoryFunctions[id] = func
