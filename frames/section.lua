@@ -82,10 +82,16 @@ function sectionProto:Wipe()
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.fillWidth = false
+  self.frame:SetAlpha(1)
 end
 
 function sectionProto:WipeOnlyContents()
   self.content:Wipe()
+end
+
+---@param alpha number
+function sectionProto:SetAlpha(alpha)
+  self.frame:SetAlpha(alpha)
 end
 
 ---@param item Item|ItemRow

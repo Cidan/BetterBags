@@ -21,6 +21,9 @@ local sort = addon:GetModule('Sort')
 ---@type Item[]
 local toRelease = {}
 
+---@type Section[]
+local sectionToRelease = {}
+
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 function views:GridView(bag, dirtyItems)
@@ -91,7 +94,7 @@ function views:GridView(bag, dirtyItems)
       elseif oldSection:GetCellCount() == 0 then
         bag.sections[oldCategory] = nil
         bag.content:RemoveCell(oldCategory, oldSection)
-        oldSection:Release()
+        table.insert(sectionToRelease, oldSection)
       end
     elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame.data.itemInfo.itemGUID == data.itemInfo.itemGUID then
       -- This case handles when the item in this slot is the same as the item displayed.
@@ -112,7 +115,7 @@ function views:GridView(bag, dirtyItems)
       if oldSection:GetCellCount() == 0 then
         bag.sections[oldCategory] = nil
         bag.content:RemoveCell(oldCategory, oldSection)
-        oldSection:Release()
+        table.insert(sectionToRelease, oldSection)
       end
 
       -- The item in this same slot may no longer be a new item, i.e. it was moused over. If so, we
@@ -136,7 +139,7 @@ function views:GridView(bag, dirtyItems)
         if section:GetCellCount() == 0 then
           bag.sections[oldFrame:GetCategory()] = nil
           bag.content:RemoveCell(oldFrame:GetCategory(), section)
-          section:Release()
+          table.insert(sectionToRelease, section)
         end
       end
       table.insert(toRelease, oldFrame)
@@ -155,6 +158,9 @@ function views:GridView(bag, dirtyItems)
     for _, oldFrame in pairs(toRelease) do
       oldFrame:Release()
     end
+    for _, section in pairs(sectionToRelease) do
+      section:Release()
+    end
     wipe(toRelease)
     for _, section in pairs(bag.sections) do
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
@@ -164,9 +170,11 @@ function views:GridView(bag, dirtyItems)
     for _, oldFrame in pairs(toRelease) do
       oldFrame:SetAlpha(0)
     end
+    for _, section in pairs(sectionToRelease) do
+      section:SetAlpha(0)
+    end
     bag.drawOnClose = true
   end
-  bag.currentItemCount = itemCount
   bag.freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
   bag.freeSlots:Draw(bag.kind, database:GetBagView(bag.kind))
 
@@ -177,23 +185,24 @@ function views:GridView(bag, dirtyItems)
   -- Add the freeSlots section back to the end of all sections
   bag.content:AddCellToLastColumn(bag.freeSlots.title:GetText(), bag.freeSlots)
 
+  if bag.currentItemCount <= itemCount then
   -- Position all sections and draw the main bag.
-  local w, h = bag.content:Draw()
-  -- Reposition the content frame if the recent items section is empty.
-
-  --debug:DrawDebugBorder(self.content.frame, 1, 1, 1)
-  if w < 160 then
-    w = 160
+    local w, h = bag.content:Draw()
+    -- Reposition the content frame if the recent items section is empty.
+    if w < 160 then
+      w = 160
+    end
+    if h == 0 then
+      h = 40
+    end
+    bag.content:HideScrollBar()
+    --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
+    -- than the screen space.
+    bag.frame:SetWidth(w + 12)
+    local bagHeight = h +
+    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+    bag.frame:SetHeight(bagHeight)
   end
-  if h == 0 then
-    h = 40
-  end
-  bag.content:HideScrollBar()
-  --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-  -- than the screen space.
-  bag.frame:SetWidth(w + 12)
-  local bagHeight = h +
-  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-  bag.frame:SetHeight(bagHeight)
+  bag.currentItemCount = itemCount
 end
