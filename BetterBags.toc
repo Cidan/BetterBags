@@ -26,14 +26,15 @@ libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
 templates\container.xml
 
 core\boot.lua
+
+debug\debug.lua
+debug\frames.lua
+
 core\events.lua
 core\localization.lua
 core\constants.lua
 core\database.lua
 core\hooks.lua
-
-debug\debug.lua
-debug\frames.lua
 
 theme\masque.lua
 

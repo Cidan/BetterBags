@@ -5,6 +5,9 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@cast addon +AceHook-3.0
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
@@ -22,35 +25,47 @@ end
 
 function addon.OnUpdate()
   if addon.backpackShouldOpen then
+    debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldOpen = false
+    addon.backpackShouldClose = false
     addon.ForceShowBlizzardBags()
     addon.Bags.Backpack:Show()
   elseif addon.backpackShouldClose then
+    debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldClose = false
     addon.ForceHideBlizzardBags()
     addon.Bags.Backpack:Hide()
   end
 end
 
-function addon:OpenAllBags()
+function addon:OpenAllBags(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'OpenAllBags')
   addon.backpackShouldOpen = true
 end
 
 ---@param interactingFrame Frame
 function addon:CloseAllBags(interactingFrame)
   if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'CloseAllBags')
   addon.backpackShouldClose = true
 end
 
-function addon:CloseBackpack()
+function addon:CloseBackpack(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'CloseBackpack')
   addon.backpackShouldClose = true
 end
 
-function addon:OpenBackpack()
+function addon:OpenBackpack(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'OpenBackpack')
   addon.backpackShouldOpen = true
 end
 
-function addon:ToggleBag()
+function addon:ToggleBag(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'ToggleBag')
   if addon.Bags.Backpack:IsShown() then
     addon.backpackShouldClose = true
   else
@@ -58,11 +73,15 @@ function addon:ToggleBag()
   end
 end
 
-function addon:CloseBag()
+function addon:CloseBag(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'CloseBag')
   addon.backpackShouldClose = true
 end
 
-function addon:ToggleAllBags()
+function addon:ToggleAllBags(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'ToggleAllBags')
   if addon.Bags.Backpack:IsShown() then
     addon.backpackShouldClose = true
   else
@@ -70,7 +89,9 @@ function addon:ToggleAllBags()
   end
 end
 
-function addon:ToggleBackpack()
+function addon:ToggleBackpack(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'ToggleBackpack')
   if addon.Bags.Backpack:IsShown() then
     addon.backpackShouldClose = true
   else
@@ -78,20 +99,25 @@ function addon:ToggleBackpack()
   end
 end
 
-function addon:CloseSpecialWindows()
+function addon:CloseSpecialWindows(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'CloseSpecialWindows')
   addon.backpackShouldClose = true
   addon.Bags.Bank:Hide()
   addon.Bags.Bank:SwitchToBank()
   CloseBankFrame()
 end
 
-function addon:OpenBank()
+function addon:OpenBank(interactingFrame)
+  if interactingFrame ~= nil then return end
+  debug:Log('Hooks', 'OpenBank')
   addon.Bags.Bank:Show()
   addon.Bags.Backpack:Show()
 end
 
 ---@param interactingFrame Frame
 function addon:CloseBank(interactingFrame)
+  debug:Log('Hooks', 'CloseBank')
   if interactingFrame ~= nil then return end
   addon.Bags.Bank:Hide()
   addon.Bags.Bank:SwitchToBank()
