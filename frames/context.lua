@@ -114,9 +114,9 @@ function context:CreateContextMenu(bag)
         text = L:G("Type"),
         tooltipTitle = L:G("Type"),
         tooltipText = L:G("If enabled, will categorize items by their auction house type."),
+        keepShownOnClick = true,
         checked = function() return database:GetCategoryFilter(bag.kind, "Type") end,
         func = function()
-          context:Hide()
           database:SetCategoryFilter(bag.kind, "Type", not database:GetCategoryFilter(bag.kind, "Type"))
           bag:Wipe()
           bag:Refresh()
@@ -126,9 +126,9 @@ function context:CreateContextMenu(bag)
         text = L:G("Expansion"),
         tooltipTitle = L:G("Expansion"),
         tooltipText = L:G("If enabled, will categorize items by expansion."),
+        keepShownOnClick = true,
         checked = function() return database:GetCategoryFilter(bag.kind, "Expansion") end,
         func = function()
-          context:Hide()
           database:SetCategoryFilter(bag.kind, "Expansion", not database:GetCategoryFilter(bag.kind, "Expansion"))
           bag:Wipe()
           bag:Refresh()
@@ -138,9 +138,9 @@ function context:CreateContextMenu(bag)
         text = L:G("Trade Skill (Reagents Only)"),
         tooltipTitle = L:G("Trade Skill"),
         tooltipText = L:G("If enabled, will categorize items by trade skill."),
+        keepShownOnClick = true,
         checked = function() return database:GetCategoryFilter(bag.kind, "TradeSkill") end,
         func = function()
-          context:Hide()
           database:SetCategoryFilter(bag.kind, "TradeSkill", not database:GetCategoryFilter(bag.kind, "TradeSkill"))
           bag:Wipe()
           bag:Refresh()
@@ -148,15 +148,24 @@ function context:CreateContextMenu(bag)
       }
     }
   })
+
   addDivider(menuList[2].menuList)
+
+  table.insert(menuList[2].menuList, {
+    text = L:G("Custom Categories"),
+    notCheckable = true,
+    hasArrow = false,
+    isTitle = true,
+  })
+
   for category, _ in pairs(categories:GetAllCategories()) do
     table.insert(menuList[2].menuList, {
       text = category,
       tooltipTitle = category,
       tooltipText = L:G("If enabled, will categorize items by ") .. category .. ".",
+      keepShownOnClick = true,
       checked = function() return categories:IsCategoryEnabled(category) end,
       func = function()
-        context:Hide()
         categories:ToggleCategory(category)
         bag:Wipe()
         bag:Refresh()
@@ -537,6 +546,13 @@ function context:CreateContextMenu(bag)
     })
   end
 
+  table.insert(menuList, {
+    text = L:G("Close Menu"),
+    notCheckable = true,
+    func = function()
+      context:Hide()
+    end
+  })
   enableTooltips(menuList)
   return menuList
 end
