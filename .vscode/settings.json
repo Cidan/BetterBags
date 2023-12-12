@@ -110,7 +110,8 @@
     "unbalanced": "Any",
     "redefined": "Any",
     "ambiguity": "Any",
-    "duplicate": "Any"
+    "duplicate": "Any",
+    "codestyle": "None"
   },
   "Lua.diagnostics.groupSeverity": {
     "strict": "Error",
@@ -121,7 +122,8 @@
     "ambiguity": "Error",
     "unused": "Warning",
     "duplicate": "Error",
-    "luadoc": "Warning"
+    "luadoc": "Warning",
+    "codestyle": "Information"
   },
   "Lua.runtime.version": "Lua 5.1"
 }

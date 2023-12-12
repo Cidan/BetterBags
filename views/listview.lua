@@ -26,7 +26,7 @@ local views = addon:GetModule('Views')
 ---@param bag Bag
 function views:UpdateListSize(bag)
   local w, _ = bag.frame:GetSize()
-  for _, section in pairs(bag.sections) do
+  for _, section in pairs(bag:GetAllSections()) do
     section.frame:SetWidth(w - 35)
     for _, cell in pairs(section:GetAllCells()) do
       cell.frame:SetWidth(w - 35)
@@ -85,7 +85,7 @@ function views:ListView(bag, dirtyItems)
       -- This case handles the situation where the item in this slot no longer matches the item displayed.
       -- The old frame exists, so we need to update it.
       local oldCategory = oldFrame.data.itemInfo.category
-      local oldSection = bag.sections[oldCategory]
+      local oldSection = bag:GetSection(oldCategory)
       local oldGuid = oldFrame:GetGUID()
       oldFrame:SetItem(data)
       local newCategory = oldFrame:GetCategory()
@@ -97,7 +97,7 @@ function views:ListView(bag, dirtyItems)
       end
       if oldSection == bag.recentItems then
       elseif oldSection:GetCellCount() == 0 then
-        bag.sections[oldCategory] = nil
+        bag:RemoveSection(oldCategory)
         bag.content:RemoveCell(oldCategory, oldSection)
         oldSection:Release()
       end
@@ -115,7 +115,7 @@ function views:ListView(bag, dirtyItems)
       end
       if oldSection == bag.recentItems then
       elseif oldSection:GetCellCount() == 0 then
-        bag.sections[oldCategory] = nil
+        bag:RemoveSection(oldCategory)
         bag.content:RemoveCell(oldCategory, oldSection)
         oldSection:Release()
       end
@@ -127,7 +127,7 @@ function views:ListView(bag, dirtyItems)
       -- Delete the section if it's empty as well.
       if section == bag.recentItems then
       elseif section:GetCellCount() == 0 then
-        bag.sections[oldFrame:GetCategory()] = nil
+        bag:RemoveSection(oldFrame:GetCategory())
         bag.content:RemoveCell(oldFrame:GetCategory(), section)
         section:Release()
       end
@@ -143,7 +143,7 @@ function views:ListView(bag, dirtyItems)
 
   bag.recentItems:SetMaxCellWidth(1)
   -- Loop through each section and draw it's size.
-  for _, section in pairs(bag.sections) do
+  for _, section in pairs(bag:GetAllSections()) do
     section:SetMaxCellWidth(1)
     section:Draw(bag.kind, database:GetBagView(bag.kind))
   end

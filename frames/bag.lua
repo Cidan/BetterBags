@@ -69,7 +69,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field freeReagentBagSlotsButton Item The free reagent bag slots button.
 ---@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
 ---@field currentItemCount number
----@field sections table<string, Section>
+---@field private sections table<string, Section>
 ---@field slots bagSlots
 ---@field isReagentBank boolean
 ---@field decorator Texture
@@ -244,6 +244,21 @@ function bagProto:GetOrCreateSection(category)
     self.sections[category] = section
   end
   return section
+end
+
+function bagProto:GetSection(category)
+  if category == L:G("Recent Items") then return self.recentItems end
+  return self.sections[category]
+end
+
+function bagProto:RemoveSection(category)
+  if category == L:G("Recent Items") then return end
+  self.sections[category] = nil
+end
+
+---@return table<string, Section>
+function bagProto:GetAllSections()
+  return self.sections
 end
 
 function bagProto:ToggleReagentBank()
