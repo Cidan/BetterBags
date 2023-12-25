@@ -111,6 +111,21 @@ function context:CreateContextMenu(bag)
     notCheckable = true,
     menuList = {
       {
+        text = L:G("Recent Items"),
+        tooltipTitle = L:G("Recent Items"),
+        tooltipText = L:G("If enabled, recent items are put into their own special section at the top of your bag."),
+        keepShownOnClick = true,
+        checked = function() return database:GetCategoryFilter(bag.kind, "Recent") end,
+        func = function()
+          database:SetCategoryFilter(bag.kind, "Recent", not database:GetCategoryFilter(bag.kind, "Recent"))
+          if not database:GetCategoryFilter(bag.kind, "Recent") then
+            bag:ClearRecentItems()
+          end
+          bag:Wipe()
+          bag:Refresh()
+        end
+      },
+      {
         text = L:G("Type"),
         tooltipTitle = L:G("Type"),
         tooltipText = L:G("If enabled, will categorize items by their auction house type."),
