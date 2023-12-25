@@ -196,9 +196,11 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 end
 
 function itemProto:GetCategory()
-  if self:IsNewItem() then
-    self.data.itemInfo.category = L:G("Recent Items")
-    return self.data.itemInfo.category
+  if database:GetCategoryFilter(self.kind, "Recent") then
+    if self:IsNewItem() then
+      self.data.itemInfo.category = L:G("Recent Items")
+      return self.data.itemInfo.category
+    end
   end
   -- Return the custom category if it exists.
   local customCategory = categories:GetCustomCategory(self.data)
