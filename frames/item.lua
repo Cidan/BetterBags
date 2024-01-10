@@ -145,6 +145,7 @@ function itemProto:SetItem(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
+  self.button.UpgradeIcon:SetShown(PawnIsContainerItemAnUpgrade and PawnIsContainerItemAnUpgrade(bagid, slotid) or false)
 
   self.frame:Show()
   self.button:Show()
