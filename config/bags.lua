@@ -23,6 +23,7 @@ function config:GetBagOptions(kind)
     type = "group",
     name = kind == const.BAG_KIND.BACKPACK and L:G("Backpack") or L:G("Bank"),
     args = {
+
       categories = {
         type = "multiselect",
         name = L:G("Categories"),
@@ -62,6 +63,26 @@ function config:GetBagOptions(kind)
         values =  {
           [const.GRID_COMPACT_STYLE.NONE] = L:G("None"),
           [const.GRID_COMPACT_STYLE.SIMPLE] = L:G("Simple"),
+        }
+      },
+
+      sectionSorting = {
+        type = "select",
+        name = L:G("Section Sorting"),
+        desc = L:G("Select how sections should be sorted."),
+        style = "radio",
+        get = function()
+          return DB:GetSectionSortType(kind, DB:GetBagView(kind))
+        end,
+        set = function(_, value)
+          DB:SetSectionSortType(kind, DB:GetBagView(kind), value)
+          config:GetBag(kind):Wipe()
+          config:GetBag(kind):Refresh()
+        end,
+        values = {
+          [const.SECTION_SORT_TYPE.ALPHABETICALLY] = L:G("Alphabetically"),
+          [const.SECTION_SORT_TYPE.SIZE_DESCENDING] = L:G("Size Descending"),
+          [const.SECTION_SORT_TYPE.SIZE_ASCENDING] = L:G("Size Ascending"),
         }
       }
     }
