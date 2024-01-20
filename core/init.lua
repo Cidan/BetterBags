@@ -37,6 +37,9 @@ local categories = addon:GetModule('Categories')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Config: AceModule
+local config = addon:GetModule('Config')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -99,6 +102,7 @@ function addon:OnEnable()
   context:Enable()
   items:Enable()
   categories:Enable()
+  config:Enable()
   self:HideBlizzardBags()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
