@@ -48,21 +48,8 @@ function config:GetGeneralOptions()
     type = "group",
     name = L:G("General"),
     args = {
-      showBagButton = {
-        type = "toggle",
-        name = L:G("Show Blizzard Bag Button"),
-        desc = L:G("Show or hide the default Blizzard bag button."),
-        get = DB.GetShowBagButton,
-        set = function(_, value)
-          local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
-          if value then
-            BagsBar:SetParent(UIParent)
-          else
-            BagsBar:SetParent(sneakyFrame)
-          end
-          DB:SetShowBagButton(value)
-        end,
-      },
+      backpack = self:GetBagOptions(const.BAG_KIND.BACKPACK),
+      bank = self:GetBagOptions(const.BAG_KIND.BANK),
     }
   }
   return options
@@ -70,15 +57,8 @@ end
 
 function config:OnEnable()
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, self:GetGeneralOptions())
-  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, addonName)
-
-  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName .. "/Backpack", self:GetBagOptions(const.BAG_KIND.BACKPACK))
-  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName .. "/Backpack", L:G("Backpack"), addonName)
-
-  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName .. "/Bank", self:GetBagOptions(const.BAG_KIND.BANK))
-  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName .. "/Bank", L:G("Bank"), addonName)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
-    Settings.OpenToCategory(addonName)
+    LibStub("AceConfigDialog-3.0"):Open(addonName)
   end)
 end
