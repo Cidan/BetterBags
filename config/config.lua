@@ -9,6 +9,9 @@ local L = addon:GetModule('Localization')
 ---@class Database: AceModule
 local DB = addon:GetModule('Database')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Config: AceModule
 local config = addon:NewModule('Config')
 
@@ -33,9 +36,10 @@ function config:ResolvePath(info)
   end
 end
 
-function config:Get(k)
-  local db, key = config:ResolvePath(k)
-  return db[key]
+---@param kind BagKind
+---@return Bag
+function config:GetBag(kind)
+  return kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank
 end
 
 function config:GetGeneralOptions()
@@ -43,13 +47,12 @@ function config:GetGeneralOptions()
   local options = {
     type = "group",
     name = L:G("General"),
-    handler = config,
-    get = 'Get',
     args = {
       showBagButton = {
         type = "toggle",
         name = L:G("Show Blizzard Bag Button"),
         desc = L:G("Show or hide the default Blizzard bag button."),
+        get = DB.GetShowBagButton,
         set = function(_, value)
           local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
           if value then
@@ -69,8 +72,11 @@ function config:OnEnable()
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, self:GetGeneralOptions())
   LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, addonName)
 
-  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName .. "/Bags", self:GetBagOptions())
-  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName .. "/Bags", L:G("Bags"), addonName)
+  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName .. "/Backpack", self:GetBagOptions(const.BAG_KIND.BACKPACK))
+  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName .. "/Backpack", L:G("Backpack"), addonName)
+
+  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName .. "/Bank", self:GetBagOptions(const.BAG_KIND.BANK))
+  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName .. "/Bank", L:G("Bank"), addonName)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
     Settings.OpenToCategory(addonName)
