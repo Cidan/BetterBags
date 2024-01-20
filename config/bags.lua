@@ -166,6 +166,47 @@ function config:GetBagOptions(kind)
           [const.BAG_VIEW.ONE_BAG] = L:G("One Bag"),
         }
       },
+
+      display = {
+        type = "group",
+        name = L:G("Display"),
+        order = 7,
+        inline = true,
+        args = {
+          opacity = {
+            type = "range",
+            name = L:G("Opacity"),
+            desc = L:G("Set the opacity of this bag."),
+            order = 1,
+            min = 60,
+            max = 100,
+            step = 1,
+            get = function()
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).opacity
+            end,
+            set = function(_, value)
+              config:GetBag(kind).frame.Bg:SetAlpha(value / 100)
+              DB:SetBagViewSizeOpacity(kind, DB:GetBagView(kind), value)
+            end,
+          },
+          scale = {
+            type = "range",
+            name = L:G("Scale"),
+            desc = L:G("Set the scale of this bag."),
+            order = 2,
+            min = 60,
+            max = 120,
+            step = 1,
+            get = function()
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).scale
+            end,
+            set = function(_, value)
+              config:GetBag(kind).frame:SetScale(value / 100)
+              DB:SetBagViewSizeScale(kind, DB:GetBagView(kind), value)
+            end,
+          },
+        }
+      },
     }
   }
   return options
