@@ -9,6 +9,9 @@ local L = addon:GetModule('Localization')
 ---@class Database: AceModule
 local DB = addon:GetModule('Database')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
@@ -18,7 +21,7 @@ function config:GetBagOptions(kind)
   ---@type AceConfig.OptionsTable
   local options = {
     type = "group",
-    name = L:G("Bags"),
+    name = kind == const.BAG_KIND.BACKPACK and L:G("Backpack") or L:G("Bank"),
     args = {
       categories = {
         type = "multiselect",
