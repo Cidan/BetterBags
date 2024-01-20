@@ -12,6 +12,9 @@ local DB = addon:GetModule('Database')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Bucket: AceModule
+local bucket = addon:GetModule('Bucket')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
@@ -173,6 +176,44 @@ function config:GetBagOptions(kind)
         order = 7,
         inline = true,
         args = {
+          itemsPerRow = {
+            type = "range",
+            name = L:G("Items Per Row"),
+            desc = L:G("Set the number of items per row in this bag."),
+            order = 0,
+            min = 3,
+            max = 20,
+            step = 1,
+            get = function()
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).itemsPerRow
+            end,
+            set = function(_, value)
+              DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
+              bucket:Later("setItemsPerRow", 0.2, function()
+                config:GetBag(kind):Wipe()
+                config:GetBag(kind):Refresh()
+              end)
+            end,
+          },
+          sectionsPerRow = {
+            type = "range",
+            name = L:G("Sections Per Row"),
+            desc = L:G("Set the number of sections per row in this bag."),
+            order = 1,
+            min = 1,
+            max = 20,
+            step = 1,
+            get = function()
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
+            end,
+            set = function(_, value)
+              DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
+              bucket:Later("setSectionsPerRow", 0.2, function()
+                config:GetBag(kind):Wipe()
+                config:GetBag(kind):Refresh()
+              end)
+            end,
+          },
           opacity = {
             type = "range",
             name = L:G("Opacity"),
