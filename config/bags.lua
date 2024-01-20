@@ -44,6 +44,31 @@ function config:GetBagOptions(kind)
           ["Expansion"] = L:G("Expansion"),
           ["TradeSkill"] = L:G("Trade Skill")
         }
+      },
+      compaction = {
+        type = "group",
+        name = L:G("Compaction"),
+        inline = true,
+        args = {
+          itemCompaction = {
+            type = "select",
+            name = L:G("Item Compaction"),
+            desc = L:G("If Simple is selected, item sections will be sorted from left to right, however if a section can fit in the same row as the section above it, the section will move up."),
+            style = "radio",
+            get = function()
+              return DB:GetBagCompaction(kind)
+            end,
+            set = function(_, value)
+              DB:SetBagCompaction(kind, value)
+              config:GetBag(kind):Wipe()
+              config:GetBag(kind):Refresh()
+            end,
+            values =  {
+              [const.GRID_COMPACT_STYLE.NONE] = L:G("None"),
+              [const.GRID_COMPACT_STYLE.SIMPLE] = L:G("Simple"),
+            }
+          }
+        }
       }
     }
   }
