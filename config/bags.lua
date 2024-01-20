@@ -109,6 +109,63 @@ function config:GetBagOptions(kind)
         }
       },
 
+      itemLevel = {
+        type = "group",
+        name = L:G("Item Level"),
+        order = 5,
+        inline = true,
+        args = {
+          enabled = {
+            type = "toggle",
+            name = L:G("Enabled"),
+            desc = L:G("Show the item level of items in this bag."),
+            order = 1,
+            get = function()
+              return DB:GetItemLevelOptions(kind).enabled
+            end,
+            set = function(_, value)
+              DB:SetItemLevelEnabled(kind, value)
+              config:GetBag(kind):Wipe()
+              config:GetBag(kind):Refresh()
+            end,
+          },
+          color = {
+            type = "toggle",
+            name = L:G("Color"),
+            desc = L:G("Color the item level text based on the item's quality."),
+            order = 2,
+            get = function()
+              return DB:GetItemLevelOptions(kind).color
+            end,
+            set = function(_, value)
+              DB:SetItemLevelColorEnabled(kind, value)
+              config:GetBag(kind):Wipe()
+              config:GetBag(kind):Refresh()
+            end,
+          },
+        }
+      },
+
+      view = {
+        type = "select",
+        name = L:G("View"),
+        desc = L:G("Select which view to use for this bag."),
+        order = 6,
+        style = "radio",
+        get = function()
+          return DB:GetBagView(kind)
+        end,
+        set = function(_, value)
+          DB:SetBagView(kind, value)
+          config:GetBag(kind):Wipe()
+          config:GetBag(kind):Refresh()
+        end,
+        values = {
+          [const.BAG_VIEW.SECTION_GRID] = L:G("Section Grid"),
+          [const.BAG_VIEW.LIST] = L:G("List"),
+          [const.BAG_VIEW.ONE_BAG] = L:G("One Bag"),
+        }
+      },
     }
   }
   return options
