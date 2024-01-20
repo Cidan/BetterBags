@@ -42,12 +42,41 @@ function config:GetBag(kind)
   return kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank
 end
 
+---@return AceConfig.OptionsTable
 function config:GetGeneralOptions()
   ---@type AceConfig.OptionsTable
   local options = {
     type = "group",
     name = L:G("General"),
+    order = 0,
     args = {
+      showBagButton = {
+        type = "toggle",
+        name = L:G("Show Blizzard Bag Button"),
+        desc = L:G("Show or hide the default Blizzard bag button."),
+        get = DB.GetShowBagButton,
+        set = function(_, value)
+          local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame	
+          if value then
+            BagsBar:SetParent(UIParent)
+          else
+            BagsBar:SetParent(sneakyFrame)
+          end
+          DB:SetShowBagButton(value)
+        end,
+      },
+    }
+  }
+  return options
+end
+
+function config:GetOptions()
+  ---@type AceConfig.OptionsTable
+  local options = {
+    type = "group",
+    name = L:G("BetterBags"),
+    args = {
+      general = self:GetGeneralOptions(),
       backpack = self:GetBagOptions(const.BAG_KIND.BACKPACK),
       bank = self:GetBagOptions(const.BAG_KIND.BANK),
     }
@@ -56,8 +85,8 @@ function config:GetGeneralOptions()
 end
 
 function config:OnEnable()
-  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, self:GetGeneralOptions())
-
+  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, self:GetOptions())
+  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
     LibStub("AceConfigDialog-3.0"):Open(addonName)
   end)
