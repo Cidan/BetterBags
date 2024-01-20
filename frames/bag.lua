@@ -132,6 +132,7 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagProto:Wipe()
+  if self.kind == const.BAG_KIND.BANK and not self:IsShown() then return end
   for _, oldFrame in pairs(self.toRelease) do
     oldFrame:Release()
   end
@@ -150,6 +151,7 @@ end
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
 function bagProto:Refresh()
+  if self.kind == const.BAG_KIND.BANK and not self:IsShown() then return end
   if self.kind == const.BAG_KIND.BACKPACK then
     items:RefreshBackpack()
   elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
