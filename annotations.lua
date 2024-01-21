@@ -296,7 +296,7 @@ function AceConfig:RegisterOptionsTable(appName, options, slashcmd) end
 ---@field name string|function Display name for the option
 ---@field order? number|string|function relative position of item (default = 100, 0=first, -1=last)
 ---@field set? string|function setter function
----@field type AceConfig.OptionsTable.Type|any Type of the option
+---@field type AceConfig.OptionsTable.Type Type of the option
 ---@field validate? string|function|false validate the input/value before setting it. return a string (error message) to indicate error.
 ---@field width? AceConfig.OptionsTable.Width If a number multiplier of the default width, ie. 0.5 equals "half", 2.0 equals "double"
 ---@field values? table<any, any>

@@ -27,7 +27,7 @@ function config:CreateCustomCategoryConfig(category)
         type = "multiselect",
         name = L:G("Items"),
         dialogControl = "ItemList",
-        values = {},
+        values = DB:GetItemCategory(category)
       }
     },
   }

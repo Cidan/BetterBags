@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule('SectionFrame')
+
 local GUI = LibStub('AceGUI-3.0')
 
 local function SetMultiselect(self, flag)
@@ -14,7 +17,12 @@ end
 local function SetLabel(self, name)
 end
 
+---@param self AceGUIInlineGroup
 local function SetList(self, values)
+  print(values)
+  self:SetLayout("Fill")
+  self:ResumeLayout()
+  self:DoLayout()
 end
 
 local function SetDisabled(self, disabled)
