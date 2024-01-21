@@ -22,7 +22,14 @@ function config:CreateCustomCategoryConfig(category)
   local options = {
     name = category,
     type = "group",
-    args = {},
+    args = {
+      items = {
+        type = "multiselect",
+        name = L:G("Items"),
+        dialogControl = "ItemList",
+        values = {},
+      }
+    },
   }
   return options
 end
