@@ -93,10 +93,14 @@ function itemProto:SetItem(data)
   self.data = data
   local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
-  self.button:SetID(slotid)
-  self.frame:SetID(bagid)
-  if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
-    self.kind = const.BAG_KIND.BANK
+  if bagid and slotid then
+    self.button:SetID(slotid)
+    self.frame:SetID(bagid)
+    if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
+      self.kind = const.BAG_KIND.BANK
+    else
+      self.kind = const.BAG_KIND.BACKPACK
+    end
   else
     self.kind = const.BAG_KIND.BACKPACK
   end

@@ -44,7 +44,9 @@ function itemRowProto:SetItem(data)
   self.button.frame:SetPoint("LEFT", self.frame)
 
   local bagid, slotid = data.bagid, data.slotid
-  self.rowButton:SetID(slotid)
+  if slotid then
+    self.rowButton:SetID(slotid)
+  end
   self.rowButton:SetHasItem(data.itemInfo.itemIcon)
 
   local quality = data.itemInfo.itemQuality
@@ -52,7 +54,9 @@ function itemRowProto:SetItem(data)
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
   self.button:SetSize(32, 32)
-  self.frame:SetID(bagid)
+  if bagid then
+    self.frame:SetID(bagid)
+  end
   self.text:SetText(data.itemInfo.itemName)
   self.frame:Show()
   self.rowButton:Show()

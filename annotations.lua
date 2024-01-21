@@ -305,3 +305,5 @@ local OptionsTable = {}
 
 ---@class AceItemList
 ---@field type string
+---@field frame Frame
+---@field section Section
