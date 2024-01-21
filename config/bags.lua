@@ -15,8 +15,51 @@ local const = addon:GetModule('Constants')
 ---@class Bucket: AceModule
 local bucket = addon:GetModule('Bucket')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
+
+---@param kind BagKind
+---@return AceConfig.OptionsTable
+function config:GetCustomCategoryOptions(kind)
+  if categories:GetCategoryCount() == 0 then
+    return {
+      type = "group",
+      name = L:G("Custom Categories"),
+      order = 2,
+      inline = true,
+      args = {
+        noCategories = {
+          type = "description",
+          name = L:G("No custom categories have been created yet."),
+          order = 1,
+        }
+      }
+    }
+  end
+  ---@type AceConfig.OptionsTable
+  local options = {
+    type = "multiselect",
+    name = L:G("Custom Categories"),
+    desc = L:G("Select which custom categories to show in this bag. If an option is checked, items that belong to the checked category will be put into a section for that category."),
+    order = 2,
+    get = function(_, value)
+      return categories:IsCategoryEnabled(value)
+    end,
+    set = function(_, value)
+      categories:SetCategoryState(value, not categories:IsCategoryEnabled(value))
+      config:GetBag(kind):Wipe()
+      config:GetBag(kind):Refresh()
+    end,
+    values = {}
+  }
+  for category, _ in pairs(categories:GetAllCategories()) do
+    options.values[category] = category
+  end
+  return options
+end
 
 ---@param kind BagKind
 ---@return AceConfig.OptionsTable
@@ -51,11 +94,13 @@ function config:GetBagOptions(kind)
         }
       },
 
+      customCategories = config:GetCustomCategoryOptions(kind),
+
       itemCompaction = {
         type = "select",
         name = L:G("Item Compaction"),
         desc = L:G("If Simple is selected, item sections will be sorted from left to right, however if a section can fit in the same row as the section above it, the section will move up."),
-        order = 2,
+        order = 3,
         style = "radio",
         get = function()
           return DB:GetBagCompaction(kind)
@@ -75,7 +120,7 @@ function config:GetBagOptions(kind)
         type = "select",
         name = L:G("Section Sorting"),
         desc = L:G("Select how sections should be sorted."),
-        order = 3,
+        order = 4,
         style = "radio",
         get = function()
           return DB:GetSectionSortType(kind, DB:GetBagView(kind))
@@ -96,7 +141,7 @@ function config:GetBagOptions(kind)
         type = "select",
         name = L:G("Item Sorting"),
         desc = L:G("Select how items should be sorted."),
-        order = 4,
+        order = 5,
         style = "radio",
         get = function()
           return DB:GetItemSortType(kind, DB:GetBagView(kind))
@@ -115,7 +160,7 @@ function config:GetBagOptions(kind)
       itemLevel = {
         type = "group",
         name = L:G("Item Level"),
-        order = 5,
+        order = 6,
         inline = true,
         args = {
           enabled = {
@@ -153,7 +198,7 @@ function config:GetBagOptions(kind)
         type = "select",
         name = L:G("View"),
         desc = L:G("Select which view to use for this bag."),
-        order = 6,
+        order = 7,
         style = "radio",
         get = function()
           return DB:GetBagView(kind)
@@ -173,7 +218,7 @@ function config:GetBagOptions(kind)
       display = {
         type = "group",
         name = L:G("Display"),
-        order = 7,
+        order = 8,
         inline = true,
         args = {
           itemsPerRow = {

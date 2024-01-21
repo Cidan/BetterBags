@@ -18,6 +18,7 @@ local events = addon:GetModule('Events')
 ---@field private itemsWithNoCategory table<number, boolean>
 ---@field private categoryFunctions table<string, fun(data: ItemData): string>
 ---@field private categoryList table<string, number[]>
+---@field private categoryCount number
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
@@ -26,6 +27,12 @@ function categories:OnInitialize()
   self.categoryFunctions = {}
   self.itemsWithNoCategory = {}
   self.categoryList = {}
+  self.categoryCount = 0
+end
+
+---@return number
+function categories:GetCategoryCount()
+  return self.categoryCount
 end
 
 -- GetAllCategories returns a list of all custom categories.
@@ -43,12 +50,16 @@ function categories:AddItemToCategory(id, category)
   self.categoryList[category] = self.categoryList[category] or {}
   table.insert(self.categoryList[category], id)
   database:SaveItemToCategory(id, category)
-  if not found then events:SendMessage('categories/Changed') end
+  if not found then
+    self.categoryCount = self.categoryCount + 1
+    events:SendMessage('categories/Changed')
+  end
 end
 
 -- WipeCategory removes all items from a custom category, but does not delete the category.
 ---@param category string The name of the custom category to wipe.
 function categories:WipeCategory(category)
+  if not self.categoryList[category] then return end
   for _, id in pairs(self.categoryList[category]) do
     self.itemToCategory[id] = nil
   end
@@ -70,6 +81,19 @@ function categories:ToggleCategory(category)
   local enabled = not database:GetItemCategory(category).enabled
   database:SetItemCategoryEnabled(category, enabled)
 end
+
+function categories:EnableCategory(category)
+  database:SetItemCategoryEnabled(category, true)
+end
+
+function categories:DisableCategory(category)
+  database:SetItemCategoryEnabled(category, false)
+end
+
+function categories:SetCategoryState(category, enabled)
+  database:SetItemCategoryEnabled(category, enabled)
+end
+
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.
@@ -111,7 +135,10 @@ function categories:GetCustomCategory(data)
       local found = self.categoryList[category] and true or false
       self.categoryList[category] = self.categoryList[category] or {}
       table.insert(self.categoryList[category], itemID)
-      if not found then events:SendMessage('categories/Changed') end
+      if not found then
+        self.categoryCount = self.categoryCount + 1
+        events:SendMessage('categories/Changed')
+      end
       if self:IsCategoryEnabled(category) then
         return category
       else

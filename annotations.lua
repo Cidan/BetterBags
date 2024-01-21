@@ -299,5 +299,6 @@ function AceConfig:RegisterOptionsTable(appName, options, slashcmd) end
 ---@field type AceConfig.OptionsTable.Type Type of the option
 ---@field validate? string|function|false validate the input/value before setting it. return a string (error message) to indicate error.
 ---@field width? AceConfig.OptionsTable.Width If a number multiplier of the default width, ie. 0.5 equals "half", 2.0 equals "double"
+---@field values? table<any, any>
 ---[Documentation](http://www.wowace.com/addons/ace3/pages/ace-config-3-0-options-tables/)
 local OptionsTable = {}
