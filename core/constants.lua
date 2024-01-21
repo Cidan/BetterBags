@@ -367,11 +367,13 @@ const.DATABASE_DEFAULTS = {
         Type = true,
         Expansion = false,
         TradeSkill = false,
+        RecentItems = true,
       },
       [const.BAG_KIND.BANK] = {
         Type = true,
         Expansion = false,
         TradeSkill = false,
+        RecentItems = true,
       },
     }
   },

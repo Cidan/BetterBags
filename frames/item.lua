@@ -196,7 +196,7 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 end
 
 function itemProto:GetCategory()
-  if database:GetCategoryFilter(self.kind, "Recent") then
+  if database:GetCategoryFilter(self.kind, "RecentItems") then
     if self:IsNewItem() then
       self.data.itemInfo.category = L:G("Recent Items")
       return self.data.itemInfo.category

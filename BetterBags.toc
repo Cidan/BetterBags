@@ -1,4 +1,4 @@
-## Interface: 100200
+## Interface: 100205
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -45,6 +45,7 @@ data\categories.lua
 util\color.lua
 util\resize.lua
 util\sort.lua
+util\bucket.lua
 
 frames\slider.lua
 frames\money.lua
@@ -63,5 +64,8 @@ views\oneview.lua
 views\listview.lua
 
 frames\bag.lua
+
+config\config.lua
+config\bags.lua
 
 core\init.lua

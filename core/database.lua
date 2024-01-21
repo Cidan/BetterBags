@@ -15,6 +15,11 @@ function DB:OnInitialize()
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
 end
 
+---@return databaseOptions
+function DB:GetData()
+  return DB.data
+end
+
 ---@param kind BagKind
 ---@return table
 function DB:GetBagPosition(kind)

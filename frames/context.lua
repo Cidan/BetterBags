@@ -115,10 +115,10 @@ function context:CreateContextMenu(bag)
         tooltipTitle = L:G("Recent Items"),
         tooltipText = L:G("If enabled, recent items are put into their own special section at the top of your bag."),
         keepShownOnClick = true,
-        checked = function() return database:GetCategoryFilter(bag.kind, "Recent") end,
+        checked = function() return database:GetCategoryFilter(bag.kind, "RecentItems") end,
         func = function()
-          database:SetCategoryFilter(bag.kind, "Recent", not database:GetCategoryFilter(bag.kind, "Recent"))
-          if not database:GetCategoryFilter(bag.kind, "Recent") then
+          database:SetCategoryFilter(bag.kind, "RecentItems", not database:GetCategoryFilter(bag.kind, "RecentItems"))
+          if not database:GetCategoryFilter(bag.kind, "RecentItems") then
             bag:ClearRecentItems()
           end
           bag:Wipe()
