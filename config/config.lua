@@ -15,6 +15,8 @@ local const = addon:GetModule('Constants')
 ---@class Config: AceModule
 local config = addon:NewModule('Config')
 
+local GUI = LibStub('AceGUI-3.0')
+
 ---@param info table
 ---@return any, string, string
 function config:ResolvePath(info)
@@ -77,6 +79,7 @@ function config:GetOptions()
     name = L:G("BetterBags"),
     args = {
       general = self:GetGeneralOptions(),
+      customCategories = self:GetCustomCategoryConfig(),
       backpack = self:GetBagOptions(const.BAG_KIND.BACKPACK),
       bank = self:GetBagOptions(const.BAG_KIND.BANK),
     }
@@ -85,6 +88,7 @@ function config:GetOptions()
 end
 
 function config:OnEnable()
+  GUI:RegisterWidgetType("ItemList", config.CreateItemListWidget, 1)
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, self:GetOptions())
   LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
   LibStub("AceConfigDialog-3.0"):SetDefaultSize(addonName, 700, 800)

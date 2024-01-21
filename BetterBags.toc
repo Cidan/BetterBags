@@ -67,5 +67,7 @@ frames\bag.lua
 
 config\config.lua
 config\bags.lua
+config\itemlist.lua
+config\customcat.lua
 
 core\init.lua

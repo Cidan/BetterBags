@@ -55,8 +55,12 @@ function config:GetCustomCategoryOptions(kind)
     end,
     values = {}
   }
-  for category, _ in pairs(categories:GetAllCategories()) do
-    options.values[category] = category
+  for category, _ in pairs(DB:GetAllItemCategories()) do
+    if type(category) == "string" then
+      options.values[category] = category
+    else
+      DB:DeleteItemCategory(category)
+    end
   end
   return options
 end
