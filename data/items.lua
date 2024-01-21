@@ -46,7 +46,13 @@ function items:OnEnable()
   --events:RegisterEvent('BAG_UPDATE_DELAYED', self.RefreshAll, self)
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:RefreshAll() end)
   events:BucketEvent('BAG_UPDATE_DELAYED', function() self:RefreshAll() end)
-  events:RegisterEvent('BANKFRAME_OPENED', self.RefreshBank, self)
+  events:RegisterEvent('BANKFRAME_OPENED', function()
+    addon.atBank = true
+    self:RefreshBank()
+  end)
+  events:RegisterEvent('BANKFRAME_CLOSED', function()
+    addon.atBank = false
+  end)
 end
 
 function items:Disable()
@@ -97,6 +103,11 @@ function items:RefreshBank()
 
   --- Process the item container.
   self:ProcessBankContainer()
+
+  -- Show the bank frame if it's not already shown.
+  if not addon.Bags.Bank:IsShown() and addon.atBank then
+    addon.Bags.Bank:Show()
+  end
 end
 
 -- RefreshBackback will refresh all bags' contents entirely and update

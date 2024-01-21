@@ -48,6 +48,8 @@ local debug = addon:GetModule('Debug')
 ---@field Bank Bag
 addon.Bags = {}
 
+addon.atBank = false
+
 -- OnInitialize is called when the addon is loaded.
 function addon:OnInitialize()
   -- Disable the bag tutorial screens, as Better Bags does not match
@@ -127,9 +129,7 @@ function addon:OnEnable()
   events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
    debug:Log("init/OnInitialize/items", "Drawing bank")
    addon.Bags.Bank:Draw(itemData)
-   if not addon.Bags.Bank:IsShown() then
-     addon.Bags.Bank:Show()
-   end
+
   end)
 
   events:RegisterMessage('categories/Changed', function()
