@@ -18,6 +18,12 @@ local items = addon:GetModule('Items')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -50,7 +56,16 @@ local function SetList(self, values)
       item.button.frame:SetPoint("LEFT", item.frame, "LEFT", 4, 0)
       item.button.button:SetScript("OnClick", function()
         -- TODO(lobato): Add context menu.
-        self:SetList(values)
+        context:Show({{
+          text = L:G("Remove"),
+          notCheckable = true,
+          hasArrow = false,
+          func = function()
+            ---@type CustomCategoryFilter
+            local list = self:GetUserData("values")
+            self:SetList(list)
+          end
+        }})
       end)
       self.section:AddCell(v.itemInfo.itemID, item)
     end
@@ -65,6 +80,7 @@ local function SetList(self, values)
     self:SetHeight(h + 6 * 2) -- 6 for the offset set in CreateItemListWidget
     self:ResumeLayout()
     self:DoLayout()
+    self:SetUserData("values", values)
   end)
 
 end
