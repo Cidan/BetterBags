@@ -18,6 +18,9 @@ local items = addon:GetModule('Items')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 local GUI = LibStub('AceGUI-3.0')
 
 local function SetMultiselect(self, flag)
@@ -34,6 +37,9 @@ local function SetList(self, values)
   for k, _ in pairs(values.itemList) do
     table.insert(itemList, k)
   end
+  self:SetFullWidth(true)
+  self:SetRelativeWidth(1)
+  self:DoLayout()
   self.section:WipeOnlyContents()
   items:GetItemData(itemList, function(itemData)
     ---@cast itemData +ItemData[]
@@ -41,14 +47,22 @@ local function SetList(self, values)
     for _, v in pairs(itemData) do
       local item = itemRowFrame:Create()
       item:SetItem(v)
+      item.button.frame:SetPoint("LEFT", item.frame, "LEFT", 4, 0)
+      item.button.button:SetScript("OnClick", function()
+        -- TODO(lobato): Add context menu.
+        self:SetList(values)
+      end)
       self.section:AddCell(v.itemInfo.itemID, item)
     end
     self.section:SetMaxCellWidth(1)
-    self.section:Draw(0, 3)
-    local height = self.section.frame:GetHeight()
+    local w, h = self.section:Draw(0, 3)
+    for _, cell in pairs(self.section:GetAllCells()) do
+      cell.frame:SetWidth(w * 2 - 35)
+    end
     self:SetLayout("Fill")
     self:SetFullWidth(true)
-    self:SetHeight(height + 6 * 2) -- 6 for the offset set in CreateItemListWidget
+    self:SetRelativeWidth(1)
+    self:SetHeight(h + 6 * 2) -- 6 for the offset set in CreateItemListWidget
     self:ResumeLayout()
     self:DoLayout()
   end)
@@ -71,9 +85,11 @@ function config:CreateItemListWidget()
   widget["SetDisabled"] = SetDisabled
   widget["SetItemValue"] = SetItemValue
   local section = sectionFrame:Create()
+  section:SetFillWidth(true)
   section:SetTitle("Items")
   section.frame:SetParent(widget.frame)
   section.frame:SetPoint("TOPLEFT", widget.frame, "TOPLEFT", 6, -6)
+  section.frame:SetPoint("BOTTOMRIGHT", widget.frame, "BOTTOMRIGHT", -6, 6)
   widget.section = section
   return widget
 end

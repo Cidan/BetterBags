@@ -307,3 +307,7 @@ local OptionsTable = {}
 ---@field type string
 ---@field frame Frame
 ---@field section Section
+local AceItemList = {}
+
+---@param values CustomCategoryFilter
+function AceItemList:SetList(values) end
