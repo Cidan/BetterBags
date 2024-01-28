@@ -238,6 +238,7 @@ end
 ---@param category string
 function DB:CreateCategory(category)
   DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
+  DB.data.profile.customCategoryFilters[category].itemList = DB.data.profile.customCategoryFilters[category].itemList or {}
   DB.data.profile.customCategoryFilters[category].name = category
   DB.data.profile.customCategoryFilters[category].enabled = true
 end
