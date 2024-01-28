@@ -149,7 +149,6 @@ end
 -- function will clear the cache. Do not abuse this API,
 -- as it has the potential to cause a significant amount of CPU usage the first time an item is rendered,
 -- which at game load time, is every item.
--- Categories functions are not saved to the database, and must be registered every time the addon is loaded.
 ---@param id string A unique identifier for the category function. This is not used for the category name!
 ---@param func fun(data: ItemData): string|nil The function to call to get the category name for an item.
 function categories:RegisterCategoryFunction(id, func)
