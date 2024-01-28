@@ -45,6 +45,9 @@ end
 ---@param id number The ItemID of the item to add to a custom category.
 ---@param category string The name of the custom category to add the item to.
 function categories:AddItemToCategory(id, category)
+  assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
+  assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
+  assert(GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
   local found = database:ItemCategoryExists(category)
   database:SaveItemToCategory(id, category)
   if not found then
