@@ -216,6 +216,53 @@ function items:AttachItemInfo(data)
   }
 end
 
+---@param itemID number
+---@param data ItemData
+function items:AttachBasicItemInfo(itemID, data)
+  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
+  local itemName, itemLink, itemQuality,
+  itemLevel, itemMinLevel, itemType, itemSubType,
+  itemStackCount, itemEquipLoc, itemTexture,
+  sellPrice, classID, subclassID, bindType, expacID,
+  setID, isCraftingReagent = GetItemInfo(itemID)
+  data.questInfo = {
+    isActive = false,
+    isQuestItem = false,
+  }
+  data.itemInfo = {
+    itemID = itemID,
+    itemGUID = "",
+    itemName = itemName,
+    itemLink = itemLink,
+    itemQuality = itemQuality,
+    itemLevel = itemLevel,
+    itemMinLevel = itemMinLevel,
+    itemType = itemType,
+    itemSubType = itemSubType,
+    itemStackCount = itemStackCount,
+    itemEquipLoc = itemEquipLoc,
+    itemTexture = itemTexture,
+    sellPrice = sellPrice,
+    classID = classID,
+    subclassID = subclassID,
+    bindType = bindType,
+    expacID = expacID,
+    setID = setID or 0,
+    isCraftingReagent = isCraftingReagent,
+    effectiveIlvl = effectiveIlvl --[[@as number]],
+    isPreview = isPreview --[[@as boolean]],
+    baseIlvl = baseIlvl --[[@as number]],
+    itemIcon = C_Item.GetItemIconByID(itemID),
+    isBound = false,
+    isLocked = false,
+    isNewItem = false,
+    currentItemCount = 1,
+    category = "",
+    currentItemLevel = 0 --[[@as number]],
+    equipmentSet = nil,
+  }
+end
+
 --TODO(lobato): Completely eliminate the use of ItemMixin.
 -- RefreshBag will refresh a bag's contents entirely and update the
 -- item database.
@@ -255,4 +302,24 @@ function items:RefreshBag(bagid, bankBag)
   for i = size+1, #self.itemsByBagAndSlot[bagid] do
     self.itemsByBagAndSlot[bagid][i] = nil
   end
+end
+
+---@param itemList number[]
+---@param callback function<ItemData[]>
+function items:GetItemData(itemList, callback)
+  local container = ContinuableContainer:Create()
+  for _, itemID in pairs(itemList) do
+    local itemMixin = Item:CreateFromItemID(itemID)
+    container:AddContinuable(itemMixin)
+  end
+  container:ContinueOnLoad(function()
+    ---@type ItemData[]
+    local dataList = {}
+    for _, itemID in pairs(itemList) do
+      local data = setmetatable({}, {__index = itemDataProto}) ---@type ItemData
+      self:AttachBasicItemInfo(itemID, data)
+      table.insert(dataList, data)
+    end
+    callback(dataList)
+  end)
 end

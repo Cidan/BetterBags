@@ -94,7 +94,10 @@
     "DepositReagentBank",
     "string",
     "unpack",
-    "GetDetailedItemLevelInfo"
+    "GetDetailedItemLevelInfo",
+    "error",
+    "type",
+    "CreateColor"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

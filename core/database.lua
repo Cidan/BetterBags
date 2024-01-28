@@ -167,31 +167,53 @@ end
 ---@param itemID number
 ---@param category string
 function DB:SaveItemToCategory(itemID, category)
-  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
+  DB:CreateCategory(category)
   DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
+  local previousCategory = DB.data.profile.customCategoryIndex[itemID]
+  if previousCategory and previousCategory ~= category then
+    DB.data.profile.customCategoryFilters[previousCategory].itemList[itemID] = nil
+  end
+  DB.data.profile.customCategoryIndex[itemID] = category
+end
+
+---@param itemID number
+---@param category string
+function DB:DeleteItemFromCategory(itemID, category)
+  if DB.data.profile.customCategoryFilters[category] then
+    DB.data.profile.customCategoryFilters[category].itemList[itemID] = nil
+    DB.data.profile.customCategoryIndex[itemID] = nil
+  end
 end
 
 ---@param category string
 ---@param enabled boolean
 function DB:SetItemCategoryEnabled(category, enabled)
-  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {}
+  DB:CreateCategory(category)
   DB.data.profile.customCategoryFilters[category].enabled = enabled
 end
 
 ---@param category string
 function DB:DeleteItemCategory(category)
+  for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
+    DB:DeleteItemFromCategory(itemID, category)
+  end
   DB.data.profile.customCategoryFilters[category] = nil
 end
 
 ---@param category string
 function DB:WipeItemCategory(category)
   if DB.data.profile.customCategoryFilters[category] then
-    DB.data.profile.customCategoryFilters[category].itemList = {}
+    for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
+      DB:DeleteItemFromCategory(itemID, category)
+    end
   end
 end
 
 ---@return table<string, CustomCategoryFilter>
 function DB:GetAllItemCategories()
+  for category, _ in pairs(DB.data.profile.customCategoryFilters) do
+    DB.data.profile.customCategoryFilters[category].name = category
+  end
   return DB.data.profile.customCategoryFilters
 end
 
@@ -199,6 +221,26 @@ end
 ---@return CustomCategoryFilter
 function DB:GetItemCategory(category)
   return DB.data.profile.customCategoryFilters[category] or {}
+end
+
+---@param category string
+---@return boolean
+function DB:ItemCategoryExists(category)
+  return DB.data.profile.customCategoryFilters[category] ~= nil
+end
+
+---@param itemID number
+---@return CustomCategoryFilter
+function DB:GetItemCategoryByItemID(itemID)
+  return DB.data.profile.customCategoryFilters[DB.data.profile.customCategoryIndex[itemID]] or {}
+end
+
+---@param category string
+function DB:CreateCategory(category)
+  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
+  DB.data.profile.customCategoryFilters[category].itemList = DB.data.profile.customCategoryFilters[category].itemList or {}
+  DB.data.profile.customCategoryFilters[category].name = category
+  DB.data.profile.customCategoryFilters[category].enabled = true
 end
 
 DB:Enable()
