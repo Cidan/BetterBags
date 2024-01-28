@@ -197,7 +197,9 @@ end
 ---@param category string
 function DB:WipeItemCategory(category)
   if DB.data.profile.customCategoryFilters[category] then
-    DB.data.profile.customCategoryFilters[category].itemList = {}
+    for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
+      DB:DeleteItemFromCategory(itemID, category)
+    end
   end
 end
 
@@ -213,6 +215,12 @@ end
 ---@return CustomCategoryFilter
 function DB:GetItemCategory(category)
   return DB.data.profile.customCategoryFilters[category] or {}
+end
+
+---@param category string
+---@return boolean
+function DB:ItemCategoryExists(category)
+  return DB.data.profile.customCategoryFilters[category] ~= nil
 end
 
 ---@param itemID number
