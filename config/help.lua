@@ -73,4 +73,9 @@ function config:CreateAllHelp()
     title = L:G("Why does a custom category reappear after I delete it?"),
     text = L:G("If you delete a custom category that was created by another addon/plugin, it will reappear the next time you log in/reload. To permanently delete a custom category created by a plugin/another addon, you must disable the addon creating the category and then delete the category in the UI.")
   })
+  self:AddHelp({
+    group = L:G("Custom Categories"),
+    title = L:G("How do I delete an item from a custom category?"),
+    text = L:G("When viewing a custom category configuration, you can right click on an item to open it's menu and select 'delete' to delete it from the category.")
+  })
 end
