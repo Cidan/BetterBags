@@ -78,6 +78,9 @@ local function SetList(self, values)
     items:RefreshAll()
     label.frame:EnableMouse(true)
     label.frame:SetScript("OnReceiveDrag", rec)
+    if self.parent then
+      self.parent:DoLayout()
+    end
     return
   end
 
