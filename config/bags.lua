@@ -28,7 +28,7 @@ function config:GetCustomCategoryOptions(kind)
     return {
       type = "group",
       name = L:G("Custom Categories"),
-      order = 2,
+      order = -1,
       inline = true,
       args = {
         noCategories = {
@@ -44,7 +44,7 @@ function config:GetCustomCategoryOptions(kind)
     type = "multiselect",
     name = L:G("Custom Categories"),
     desc = L:G("Select which custom categories to show in this bag. If an option is checked, items that belong to the checked category will be put into a section for that category."),
-    order = 2,
+    order = -1,
     get = function(_, value)
       return categories:IsCategoryEnabled(value)
     end,
@@ -97,8 +97,6 @@ function config:GetBagOptions(kind)
           ["TradeSkill"] = L:G("Trade Skill")
         }
       },
-
-      customCategories = config:GetCustomCategoryOptions(kind),
 
       itemCompaction = {
         type = "select",
@@ -297,6 +295,9 @@ function config:GetBagOptions(kind)
           },
         }
       },
+
+      customCategories = config:GetCustomCategoryOptions(kind),
+
     }
   }
   return options
