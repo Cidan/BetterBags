@@ -116,7 +116,7 @@ function itemProto:SetItem(data)
   local bound = data.itemInfo.isBound
 
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
-  if ilvlOpts.enabled and
+  if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0) and
     data.itemInfo.classID == Enum.ItemClass.Armor or
     data.itemInfo.classID == Enum.ItemClass.Weapon or
     data.itemInfo.classID == Enum.ItemClass.Gem then
