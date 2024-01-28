@@ -62,11 +62,16 @@ function config:GetCustomCategoryConfig()
             name = L:G("Custom categories allow you to create your own categories for items. Type the name of the category you want to create in the box below and press enter to create an empty category."),
             order = 0,
           },
+          useHelp = {
+            type = "description",
+            name = L:G("Categories you create can be enabled and disabled just like the default categories in the configuration menu option for the bag (Backpack or Bank) on the left. Once you have created a category, you can configure it by selecting it on the menu on the left."),
+            order = 1,
+          },
           name = {
-            name = L:G("Name"),
+            name = L:G("New Category Name"),
             type = "input",
             width = "full",
-            order = 1,
+            order = 2,
             get = function()
               return ""
             end,
