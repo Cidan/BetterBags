@@ -66,6 +66,7 @@ views\listview.lua
 frames\bag.lua
 
 config\config.lua
+config\help.lua
 config\bags.lua
 config\itemlist.lua
 config\customcat.lua

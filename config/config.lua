@@ -12,7 +12,13 @@ local DB = addon:GetModule('Database')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class HelpText
+---@field title string
+---@field text string
+---@field group string
+
 ---@class Config: AceModule
+---@field helpText HelpText[]
 local config = addon:NewModule('Config')
 
 ---@class Events: AceModule
@@ -86,12 +92,15 @@ function config:GetOptions()
       customCategories = self:GetCustomCategoryConfig(),
       backpack = self:GetBagOptions(const.BAG_KIND.BACKPACK),
       bank = self:GetBagOptions(const.BAG_KIND.BANK),
+      help = self:GenerateHelp(),
     }
   }
   return options
 end
 
 function config:OnEnable()
+  self.helpText = {}
+  self:CreateAllHelp()
   GUI:RegisterWidgetType("ItemList", config.CreateItemListWidget, 1)
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
   LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
@@ -103,5 +112,4 @@ function config:OnEnable()
   events:RegisterMessage('categories/Changed', function()
     LibStub('AceConfigRegistry-3.0'):NotifyChange(addonName)
   end)
-
 end
