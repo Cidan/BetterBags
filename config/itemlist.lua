@@ -57,8 +57,7 @@ local function SetList(self, values)
       local item = itemRowFrame:Create()
       item:SetItem(v)
       item.button.frame:SetPoint("LEFT", item.frame, "LEFT", 4, 0)
-      item.button.button:SetScript("OnClick", function()
-        -- TODO(lobato): Add context menu.
+      local fn = function()
         context:Show({{
           text = L:G("Remove"),
           notCheckable = true,
@@ -70,7 +69,9 @@ local function SetList(self, values)
             self:SetList(DB:GetItemCategory(list.name))
           end
         }})
-      end)
+      end
+      item.button.button:SetScript("OnClick", fn)
+      item.rowButton:SetScript("OnClick", fn)
       self.section:AddCell(v.itemInfo.itemID, item)
     end
     self.section:SetMaxCellWidth(1)
