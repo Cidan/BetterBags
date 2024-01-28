@@ -93,6 +93,12 @@ function categories:CreateCategory(category)
   events:SendMessage('categories/Changed')
 end
 
+function categories:DeleteCategory(category)
+  database:DeleteItemCategory(category)
+  events:SendMessage('categories/Changed')
+  items:RefreshAll()
+end
+
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.

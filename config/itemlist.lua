@@ -125,6 +125,7 @@ local function SetList(self, values)
     self:SetHeight(h + 6 * 2) -- 6 for the offset set in CreateItemListWidget
     self:ResumeLayout()
     self:DoLayout()
+    self.parent:DoLayout()
     self:SetUserData("values", values)
   end)
 
@@ -155,5 +156,6 @@ function config:CreateItemListWidget()
   section.frame:SetPoint("TOPLEFT", widget.frame, "TOPLEFT", 6, -6)
   section.frame:SetPoint("BOTTOMRIGHT", widget.frame, "BOTTOMRIGHT", -6, 6)
   widget.section = section
+
   return widget
 end

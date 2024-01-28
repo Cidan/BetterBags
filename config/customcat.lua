@@ -27,7 +27,18 @@ function config:CreateCustomCategoryConfig(category)
         type = "multiselect",
         name = L:G("Items"),
         dialogControl = "ItemList",
+        order = 1,
         values = DB:GetItemCategory(category)
+      },
+      delete = {
+        type = "execute",
+        name = L:G("Delete Category"),
+        confirm = true,
+        confirmText = L:G("Are you sure you want to delete this category?"),
+        order = 2,
+        func = function()
+          categories:DeleteCategory(category)
+        end,
       }
     },
   }
@@ -55,6 +66,7 @@ function config:GetCustomCategoryConfig()
               return ""
             end,
             set = function(_, value)
+              if value == "" then return end
               categories:CreateCategory(value)
             end,
           }
