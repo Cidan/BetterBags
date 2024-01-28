@@ -57,6 +57,11 @@ function config:GetCustomCategoryConfig()
         type = "group",
         inline = true,
         args = {
+          createHelp = {
+            type = "description",
+            name = L:G("Custom categories allow you to create your own categories for items. Type the name of the category you want to create in the box below and press enter to create an empty category."),
+            order = 0,
+          },
           name = {
             name = L:G("Name"),
             type = "input",
