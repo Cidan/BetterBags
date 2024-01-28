@@ -128,7 +128,9 @@ local function SetList(self, values)
     self:SetHeight(h + 6 * 2) -- 6 for the offset set in CreateItemListWidget
     self:ResumeLayout()
     self:DoLayout()
-    self.parent:DoLayout()
+    if self.parent then
+      self.parent:DoLayout()
+    end
     self:SetUserData("values", values)
   end)
 
