@@ -236,4 +236,10 @@ function DB:GetItemCategoryByItemID(itemID)
   return DB.data.profile.customCategoryFilters[DB.data.profile.customCategoryIndex[itemID]] or {}
 end
 
+---@param category string
+function DB:CreateCategory(category)
+  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {}
+  DB.data.profile.customCategoryFilters[category].name = category
+end
+
 DB:Enable()

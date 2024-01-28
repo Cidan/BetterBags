@@ -88,6 +88,11 @@ function categories:SetCategoryState(category, enabled)
   database:SetItemCategoryEnabled(category, enabled)
 end
 
+function categories:CreateCategory(category)
+  database:CreateCategory(category)
+  events:SendMessage('categories/Changed')
+end
+
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.

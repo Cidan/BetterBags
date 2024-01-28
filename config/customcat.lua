@@ -55,20 +55,9 @@ function config:GetCustomCategoryConfig()
               return ""
             end,
             set = function(_, value)
-              --categories:CreateCategory(value)
-              --config:Refresh()
+              categories:CreateCategory(value)
             end,
-          },
-          create = {
-            name = L:G("Create"),
-            type = "execute",
-            width = "half",
-            order = 2,
-            func = function()
-              --categories:CreateCategory()
-              --config:Refresh()
-            end,
-          },
+          }
         }
       }
     },
