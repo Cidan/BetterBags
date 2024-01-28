@@ -170,6 +170,7 @@ function DB:SaveItemToCategory(itemID, category)
   DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
   DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
   DB.data.profile.customCategoryFilters[category].name = category
+  DB.data.profile.customCategoryIndex[itemID] = category
 end
 
 ---@param itemID number
@@ -177,6 +178,7 @@ end
 function DB:DeleteItemFromCategory(itemID, category)
   if DB.data.profile.customCategoryFilters[category] then
     DB.data.profile.customCategoryFilters[category].itemList[itemID] = nil
+    DB.data.profile.customCategoryIndex[itemID] = nil
   end
 end
 
@@ -211,6 +213,12 @@ end
 ---@return CustomCategoryFilter
 function DB:GetItemCategory(category)
   return DB.data.profile.customCategoryFilters[category] or {}
+end
+
+---@param itemID number
+---@return CustomCategoryFilter
+function DB:GetItemCategoryByItemID(itemID)
+  return DB.data.profile.customCategoryFilters[DB.data.profile.customCategoryIndex[itemID]] or {}
 end
 
 DB:Enable()

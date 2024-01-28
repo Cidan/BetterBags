@@ -363,6 +363,8 @@ const.DATABASE_DEFAULTS = {
     },
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
+    ---@type table<number, string>
+    customCategoryIndex = {},
     categoryFilters = {
       [const.BAG_KIND.BACKPACK] = {
         Type = true,

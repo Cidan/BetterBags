@@ -31,15 +31,9 @@ function categories:OnInitialize()
 end
 
 function categories:OnEnable()
-  for category, data in pairs(database:GetAllItemCategories()) do
-    for id, _ in pairs(data.itemList) do
-      self.itemToCategory[id] = category
-      self.categoryList[category] = self.categoryList[category] or {}
-      table.insert(self.categoryList[category], id)
-    end
+  for _ in pairs(database:GetAllItemCategories()) do
     self.categoryCount = self.categoryCount + 1
   end
-  events:SendMessage('categories/Changed')
 end
 
 ---@return number
@@ -115,15 +109,12 @@ function categories:GetCustomCategory(data)
   local itemID = data.itemInfo.itemID
   if not itemID then return nil end
 
+  local filter = database:GetItemCategoryByItemID(itemID)
+  if filter.enabled then
+    return filter.name
+  end
   -- Check for categories manually set by item.
   local category = self.itemToCategory[itemID]
-  if category then
-    if self:IsCategoryEnabled(category) then
-      return category
-    else
-      return nil
-    end
-  end
 
   -- Check for categories set by registered functions.
   category = self.functionCategories[itemID]
