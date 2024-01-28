@@ -32,10 +32,10 @@ local DB = addon:GetModule('Database')
 
 local GUI = LibStub('AceGUI-3.0')
 
-local function SetMultiselect(self, flag)
+local function SetMultiselect(_, _)
 end
 
-local function SetLabel(self, name)
+local function SetLabel(_, _)
 end
 
 ---@param self AceGUIInlineGroup
@@ -136,10 +136,10 @@ local function SetList(self, values)
 
 end
 
-local function SetDisabled(self, disabled)
+local function SetDisabled(_, _)
 end
 
-local function SetItemValue(self, key, value)
+local function SetItemValue(_, _, _)
 end
 
 function config:CreateItemListWidget()
