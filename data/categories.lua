@@ -30,6 +30,18 @@ function categories:OnInitialize()
   self.categoryCount = 0
 end
 
+function categories:OnEnable()
+  for category, data in pairs(database:GetAllItemCategories()) do
+    for id, _ in pairs(data.itemList) do
+      self.itemToCategory[id] = category
+      self.categoryList[category] = self.categoryList[category] or {}
+      table.insert(self.categoryList[category], id)
+    end
+    self.categoryCount = self.categoryCount + 1
+  end
+  events:SendMessage('categories/Changed')
+end
+
 ---@return number
 function categories:GetCategoryCount()
   return self.categoryCount

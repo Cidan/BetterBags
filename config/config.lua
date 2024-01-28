@@ -15,6 +15,10 @@ local const = addon:GetModule('Constants')
 ---@class Config: AceModule
 local config = addon:NewModule('Config')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+
 local GUI = LibStub('AceGUI-3.0')
 
 ---@param info table
@@ -89,10 +93,15 @@ end
 
 function config:OnEnable()
   GUI:RegisterWidgetType("ItemList", config.CreateItemListWidget, 1)
-  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, self:GetOptions())
+  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
   LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
   LibStub("AceConfigDialog-3.0"):SetDefaultSize(addonName, 700, 800)
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
     LibStub("AceConfigDialog-3.0"):Open(addonName)
   end)
+
+  events:RegisterMessage('categories/Changed', function()
+    LibStub('AceConfigRegistry-3.0'):NotifyChange(addonName)
+  end)
+
 end

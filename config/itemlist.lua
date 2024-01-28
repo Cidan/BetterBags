@@ -57,7 +57,22 @@ local function SetList(self, values)
       local item = itemRowFrame:Create()
       item:SetItem(v)
       item.button.frame:SetPoint("LEFT", item.frame, "LEFT", 4, 0)
-      local fn = function()
+      local rec = function()
+        local kind, id = GetCursorInfo()
+        if kind ~= "item" or not tonumber(id) then return end
+        ClearCursor()
+        local itemid = tonumber(id) --[[@as number]]
+        local list = self:GetUserData("values")
+        DB:SaveItemToCategory(itemid, list.name)
+        self:SetList(DB:GetItemCategory(list.name))
+        items:RefreshAll()
+      end
+      local fn = function(_, b)
+        if b == "LeftButton" then
+          rec()
+          return
+        end
+        ClearCursor()
         context:Show({{
           text = L:G("Remove"),
           notCheckable = true,
@@ -67,9 +82,12 @@ local function SetList(self, values)
             local list = self:GetUserData("values")
             DB:DeleteItemFromCategory(v.itemInfo.itemID, list.name)
             self:SetList(DB:GetItemCategory(list.name))
+            items:RefreshAll()
           end
         }})
       end
+      item.button.button:SetScript("OnReceiveDrag", rec)
+      item.rowButton:SetScript("OnReceiveDrag", rec)
       item.button.button:SetScript("OnClick", fn)
       item.rowButton:SetScript("OnClick", fn)
       self.section:AddCell(v.itemInfo.itemID, item)
