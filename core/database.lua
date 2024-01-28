@@ -167,9 +167,8 @@ end
 ---@param itemID number
 ---@param category string
 function DB:SaveItemToCategory(itemID, category)
-  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
+  DB:CreateCategory(category)
   DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
-  DB.data.profile.customCategoryFilters[category].name = category
   local previousCategory = DB.data.profile.customCategoryIndex[itemID]
   if previousCategory and previousCategory ~= category then
     DB.data.profile.customCategoryFilters[previousCategory].itemList[itemID] = nil
@@ -189,7 +188,7 @@ end
 ---@param category string
 ---@param enabled boolean
 function DB:SetItemCategoryEnabled(category, enabled)
-  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {}
+  DB:CreateCategory(category)
   DB.data.profile.customCategoryFilters[category].enabled = enabled
 end
 
@@ -238,8 +237,9 @@ end
 
 ---@param category string
 function DB:CreateCategory(category)
-  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {}
+  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
   DB.data.profile.customCategoryFilters[category].name = category
+  DB.data.profile.customCategoryFilters[category].enabled = true
 end
 
 DB:Enable()

@@ -53,6 +53,7 @@ local function SetList(self, values)
   self:SetRelativeWidth(1)
   self:DoLayout()
   self.section:WipeOnlyContents()
+  self:SetUserData("values", values)
 
   -- TODO(lobato): Move this to a local file function.
   local rec = function()
@@ -69,10 +70,14 @@ local function SetList(self, values)
   if #itemList == 0 then
     local label = GUI:Create("Label") --[[@as AceGUILabel]]
     label:SetText(L:G("Drag an item here from your inventory, bank, or another source to add it to this category."))
+    label:SetFullWidth(true)
     self:AddChild(label)
     self:SetFullWidth(true)
     self:SetRelativeWidth(1)
     self:DoLayout()
+    items:RefreshAll()
+    label.frame:EnableMouse(true)
+    label.frame:SetScript("OnReceiveDrag", rec)
     return
   end
 
@@ -140,6 +145,8 @@ function config:CreateItemListWidget()
   widget["SetList"] = SetList
   widget["SetDisabled"] = SetDisabled
   widget["SetItemValue"] = SetItemValue
+
+  widget.frame:EnableMouse(true)
 
   local section = sectionFrame:Create()
   section:SetFillWidth(true)
