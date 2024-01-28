@@ -169,6 +169,15 @@ end
 function DB:SaveItemToCategory(itemID, category)
   DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
   DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
+  DB.data.profile.customCategoryFilters[category].name = category
+end
+
+---@param itemID number
+---@param category string
+function DB:DeleteItemFromCategory(itemID, category)
+  if DB.data.profile.customCategoryFilters[category] then
+    DB.data.profile.customCategoryFilters[category].itemList[itemID] = nil
+  end
 end
 
 ---@param category string
@@ -192,6 +201,9 @@ end
 
 ---@return table<string, CustomCategoryFilter>
 function DB:GetAllItemCategories()
+  for category, _ in pairs(DB.data.profile.customCategoryFilters) do
+    DB.data.profile.customCategoryFilters[category].name = category
+  end
   return DB.data.profile.customCategoryFilters
 end
 

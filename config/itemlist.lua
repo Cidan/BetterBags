@@ -27,6 +27,9 @@ local L =  addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Database: AceModule
+local DB = addon:GetModule('Database')
+
 local GUI = LibStub('AceGUI-3.0')
 
 local function SetMultiselect(self, flag)
@@ -63,7 +66,8 @@ local function SetList(self, values)
           func = function()
             ---@type CustomCategoryFilter
             local list = self:GetUserData("values")
-            self:SetList(list)
+            DB:DeleteItemFromCategory(v.itemInfo.itemID, list.name)
+            self:SetList(DB:GetItemCategory(list.name))
           end
         }})
       end)
