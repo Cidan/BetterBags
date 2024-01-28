@@ -170,6 +170,10 @@ function DB:SaveItemToCategory(itemID, category)
   DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
   DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
   DB.data.profile.customCategoryFilters[category].name = category
+  local previousCategory = DB.data.profile.customCategoryIndex[itemID]
+  if previousCategory and previousCategory ~= category then
+    DB.data.profile.customCategoryFilters[previousCategory].itemList[itemID] = nil
+  end
   DB.data.profile.customCategoryIndex[itemID] = category
 end
 
