@@ -32,7 +32,11 @@ end
 
 ---@return number
 function categories:GetCategoryCount()
-  return self.categoryCount
+  local count = 0
+  for _ in pairs(database:GetAllItemCategories()) do
+    count = count + 1
+  end
+  return count
 end
 
 -- GetAllCategories returns a list of all custom categories.
