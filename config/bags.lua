@@ -46,10 +46,10 @@ function config:GetCustomCategoryOptions(kind)
     desc = L:G("Select which custom categories to show in this bag. If an option is checked, items that belong to the checked category will be put into a section for that category."),
     order = -1,
     get = function(_, value)
-      return categories:IsCategoryEnabled(value)
+      return categories:IsCategoryEnabled(kind, value)
     end,
     set = function(_, value)
-      categories:SetCategoryState(value, not categories:IsCategoryEnabled(value))
+      categories:SetCategoryState(kind, value, not categories:IsCategoryEnabled(kind, value))
       config:GetBag(kind):Wipe()
       config:GetBag(kind):Refresh()
     end,

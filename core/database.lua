@@ -13,6 +13,7 @@ local DB = addon:NewModule('Database')
 function DB:OnInitialize()
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
+  DB:Migrate()
 end
 
 ---@return databaseOptions
@@ -185,11 +186,12 @@ function DB:DeleteItemFromCategory(itemID, category)
   end
 end
 
+---@param kind BagKind
 ---@param category string
 ---@param enabled boolean
-function DB:SetItemCategoryEnabled(category, enabled)
+function DB:SetItemCategoryEnabled(kind, category, enabled)
   DB:CreateCategory(category)
-  DB.data.profile.customCategoryFilters[category].enabled = enabled
+  DB.data.profile.customCategoryFilters[category].enabled[kind] = enabled
 end
 
 ---@param category string
@@ -240,7 +242,26 @@ function DB:CreateCategory(category)
   DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
   DB.data.profile.customCategoryFilters[category].itemList = DB.data.profile.customCategoryFilters[category].itemList or {}
   DB.data.profile.customCategoryFilters[category].name = category
-  DB.data.profile.customCategoryFilters[category].enabled = true
+  DB.data.profile.customCategoryFilters[category].enabled = DB.data.profile.customCategoryFilters[category].enabled or {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true
+  }
+end
+
+function DB:Migrate()
+  --[[
+    Migration of the custom category filters from single filter to per-bag filter.
+    Do not remove before Q4'24.
+  ]]
+  for name, _ in pairs(DB.data.profile.customCategoryFilters) do
+    if type(DB.data.profile.customCategoryFilters[name].enabled) == "boolean" then
+      local value = DB.data.profile.customCategoryFilters[name].enabled --[[@as boolean]]
+      DB.data.profile.customCategoryFilters[name].enabled = {
+        [const.BAG_KIND.BACKPACK] = value,
+        [const.BAG_KIND.BANK] = value
+      }
+    end
+  end
 end
 
 DB:Enable()

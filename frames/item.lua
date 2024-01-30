@@ -207,7 +207,7 @@ function itemProto:GetCategory()
     end
   end
   -- Return the custom category if it exists.
-  local customCategory = categories:GetCustomCategory(self.data)
+  local customCategory = categories:GetCustomCategory(self.kind, self.data)
   if customCategory then
     self.data.itemInfo.category = customCategory
     return customCategory

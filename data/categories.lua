@@ -68,29 +68,38 @@ function categories:WipeCategory(category)
 end
 
 -- IsCategoryEnabled returns whether or not a custom category is enabled.
+---@param kind BagKind
 ---@param category string The name of the custom category to check.
 ---@return boolean
-function categories:IsCategoryEnabled(category)
-  return database:GetItemCategory(category).enabled
+function categories:IsCategoryEnabled(kind, category)
+  return database:GetItemCategory(category).enabled[kind]
 end
 
 -- ToggleCategory toggles the enabled state of a custom category.
+---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
-function categories:ToggleCategory(category)
-  local enabled = not database:GetItemCategory(category).enabled
-  database:SetItemCategoryEnabled(category, enabled)
+function categories:ToggleCategory(kind, category)
+  local enabled = not database:GetItemCategory(category).enabled[kind]
+  database:SetItemCategoryEnabled(kind, category, enabled)
 end
 
-function categories:EnableCategory(category)
-  database:SetItemCategoryEnabled(category, true)
+---@param kind BagKind
+---@param category string The name of the custom category to toggle.
+function categories:EnableCategory(kind, category)
+  database:SetItemCategoryEnabled(kind, category, true)
 end
 
-function categories:DisableCategory(category)
-  database:SetItemCategoryEnabled(category, false)
+---@param kind BagKind
+---@param category string The name of the custom category to toggle.
+function categories:DisableCategory(kind, category)
+  database:SetItemCategoryEnabled(kind, category, false)
 end
 
-function categories:SetCategoryState(category, enabled)
-  database:SetItemCategoryEnabled(category, enabled)
+---@param kind BagKind
+---@param category string The name of the custom category to toggle.
+---@param enabled boolean
+function categories:SetCategoryState(kind, category, enabled)
+  database:SetItemCategoryEnabled(kind, category, enabled)
 end
 
 function categories:CreateCategory(category)
@@ -107,14 +116,15 @@ end
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.
+---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
 ---@return string|nil
-function categories:GetCustomCategory(data)
+function categories:GetCustomCategory(kind, data)
   local itemID = data.itemInfo.itemID
   if not itemID then return nil end
 
   local filter = database:GetItemCategoryByItemID(itemID)
-  if filter.enabled then
+  if filter.enabled and filter.enabled[kind] then
     return filter.name
   end
 
@@ -132,7 +142,7 @@ function categories:GetCustomCategory(data)
         self.categoryCount = self.categoryCount + 1
         events:SendMessage('categories/Changed')
       end
-      if self:IsCategoryEnabled(category) then
+      if self:IsCategoryEnabled(kind, category) then
         return category
       else
         return nil

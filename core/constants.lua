@@ -249,7 +249,7 @@ const.TRADESKILL_MAP = {
 
 ---@class CustomCategoryFilter
 ---@field name string
----@field enabled boolean
+---@field enabled table<BagKind, boolean>
 ---@field itemList table<number, boolean>
 ---@field readOnly boolean
 
