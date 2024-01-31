@@ -59,6 +59,7 @@ function CurrencyFrame:Update()
   local index = 1
   local showCount = 0
   repeat
+    local ref = index
     local info = C_CurrencyInfo.GetCurrencyListInfo(index)
     local item = self.currencyItems[index]
     item.icon:SetTexture(info.iconFileID)
@@ -73,6 +74,14 @@ function CurrencyFrame:Update()
         if not icon then
           icon = self:CreateCurrencyItem(index, false, true)
           icon.frame:SetSize(70, 18)
+          icon.frame:SetScript('OnEnter', function()
+            GameTooltip:SetOwner(icon.frame, "ANCHOR_RIGHT")
+            GameTooltip:SetCurrencyToken(ref)
+            GameTooltip:Show()
+          end)
+          icon.frame:SetScript('OnLeave', function()
+            GameTooltip:Hide()
+          end)
           icon.icon:SetSize(18, 18)
           icon.count:ClearAllPoints()
           icon.count:SetPoint("LEFT", icon.icon, "RIGHT", 5, 0)
