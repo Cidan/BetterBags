@@ -16,6 +16,7 @@ local columnFrame = addon:NewModule('ColumnFrame')
 ---@field frame Frame
 ---@field cells Cell[]|Item[]|Section[]
 ---@field minimumWidth number
+---@field spacing number
 local columnProto = {}
 
 -- AddCell adds a cell to this column at the given position, or
@@ -101,8 +102,8 @@ function columnProto:Draw(style)
         firstCellInRow[1] = cell
       end
     elseif style == const.GRID_COMPACT_STYLE.NONE then
-      cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -4)
-      h = h + cell.frame:GetHeight() + 4
+      cell.frame:SetPoint("TOPLEFT", self.cells[cellPos - 1].frame, "BOTTOMLEFT", 0, -self.spacing)
+      h = h + cell.frame:GetHeight() + self.spacing
     elseif style == const.GRID_COMPACT_STYLE.SIMPLE then
       local aboveCell = self.cells[cellPos - 1]
       local rowData = rows[cellToRow[aboveCell]]
@@ -113,8 +114,8 @@ function columnProto:Draw(style)
         cellToRow[cell] = cellToRow[aboveCell]
       else
         local first = firstCellInRow[#rows]
-        cell.frame:SetPoint("TOPLEFT", first.frame, "BOTTOMLEFT", 0, -4)
-        h = h + cell.frame:GetHeight() + 4
+        cell.frame:SetPoint("TOPLEFT", first.frame, "BOTTOMLEFT", 0, -self.spacing)
+        h = h + cell.frame:GetHeight() + self.spacing
         local newRow = #rows + 1
         rows[newRow] = {count = cell:GetCellCount(), cells = {cell --[[@as Section]]}}
         cellToRow[cell] = newRow
@@ -154,6 +155,7 @@ function columnFrame:_DoCreate()
   column.minimumWidth = 0
   column.cells = {}
   column.frame:Show()
+  column.spacing = 4
   return column
 end
 

@@ -34,6 +34,7 @@ local cellProto = {}
 ---@field columns Column[]
 ---@field cellToColumn table<Cell|Item|Section, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
+---@field spacing number
 ---@field compactStyle GridCompactStyle
 ---@field private scrollable boolean
 ---@field package scrollBox WowScrollBox
@@ -152,6 +153,7 @@ function gridProto:Draw()
         -- Create the column if it doesn't exist and position it within
         -- the grid.
         column = columnFrame:Create()
+        column.spacing = self.spacing
         column.frame:SetParent(self.inner)
         self.columns[i % self.maxCellWidth] = column
         if i == 1 then
@@ -261,6 +263,7 @@ function grid:Create(parent)
   g.headers = {}
   g.maxCellWidth = 5
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
+  g.spacing = 4
   g.bar:Show()
   --g.scrollBox = grid:CreateScrollFrame(f)
   --g.scrollBox:Hide()
