@@ -38,6 +38,7 @@ end
 ---@field frame Frame
 ---@field content Grid
 ---@field iconGrid Grid
+---@field loaded boolean
 ---@field private iconIndex CurrencyItem[]
 ---@field private currencyItems CurrencyItem[]
 local CurrencyFrame = {}
@@ -60,44 +61,46 @@ function CurrencyFrame:Update()
   local showCount = 0
   repeat
     local ref = index
-    local info = C_CurrencyInfo.GetCurrencyListInfo(index)
-    local item = self.currencyItems[index]
-    item.icon:SetTexture(info.iconFileID)
-    item.name:SetText(info.name)
-    if item.count and not info.isHeader then
-      item.count:SetText(tostring(info.quantity))
-    end
-    if info.isShowInBackpack then
-      item.frame:SetBackdropColor(1, 1, 0, .2)
-      if showCount < 7 then
-        local icon = self.iconIndex[index]
-        if not icon then
-          icon = self:CreateCurrencyItem(index, false, true)
-          icon.frame:SetSize(70, 18)
-          icon.frame:SetScript('OnEnter', function()
-            GameTooltip:SetOwner(icon.frame, "ANCHOR_RIGHT")
-            GameTooltip:SetCurrencyToken(ref)
-            GameTooltip:Show()
-          end)
-          icon.frame:SetScript('OnLeave', function()
-            GameTooltip:Hide()
-          end)
-          icon.icon:SetSize(18, 18)
-          icon.count:ClearAllPoints()
-          icon.count:SetPoint("LEFT", icon.icon, "RIGHT", 5, 0)
-          icon.frame:Show()
-          self.iconIndex[index] = icon
-        end
-        self.iconGrid:AddCell(info.name, icon)
-        icon.icon:SetTexture(info.iconFileID)
-        icon.count:SetText(tostring(info.quantity))
-        icon.frame:SetWidth(icon.count:GetStringWidth() + icon.icon:GetWidth() + 7)
-        showCount = showCount + 1
+    local info = C_CurrencyInfo.GetCurrencyListInfo(ref)
+    local item = self.currencyItems[ref]
+    if item then
+      item.icon:SetTexture(info.iconFileID)
+      item.name:SetText(info.name)
+      if item.count and not info.isHeader then
+        item.count:SetText(tostring(info.quantity))
       end
-    elseif index % 2 == 0 then
-      item.frame:SetBackdropColor(0, 0, 0, .2)
-    else
-      item.frame:SetBackdropColor(0, 0, 0, .1)
+      if info.isShowInBackpack then
+        item.frame:SetBackdropColor(1, 1, 0, .2)
+        if showCount < 7 then
+          local icon = self.iconIndex[index]
+          if not icon then
+            icon = self:CreateCurrencyItem(index, false, true)
+            icon.frame:SetSize(70, 18)
+            icon.frame:SetScript('OnEnter', function()
+              GameTooltip:SetOwner(icon.frame, "ANCHOR_RIGHT")
+              GameTooltip:SetCurrencyToken(ref)
+              GameTooltip:Show()
+            end)
+            icon.frame:SetScript('OnLeave', function()
+              GameTooltip:Hide()
+            end)
+            icon.icon:SetSize(18, 18)
+            icon.count:ClearAllPoints()
+            icon.count:SetPoint("LEFT", icon.icon, "RIGHT", 5, 0)
+            icon.frame:Show()
+            self.iconIndex[index] = icon
+          end
+          self.iconGrid:AddCell(info.name, icon)
+          icon.icon:SetTexture(info.iconFileID)
+          icon.count:SetText(tostring(info.quantity))
+          icon.frame:SetWidth(icon.count:GetStringWidth() + icon.icon:GetWidth() + 7)
+          showCount = showCount + 1
+        end
+      elseif index % 2 == 0 then
+        item.frame:SetBackdropColor(0, 0, 0, .2)
+      else
+        item.frame:SetBackdropColor(0, 0, 0, .1)
+      end
     end
     index = index + 1
   until index > C_CurrencyInfo.GetCurrencyListSize()
@@ -107,6 +110,7 @@ function CurrencyFrame:Update()
 end
 --TODO(lobato): use GetNumWatchedTokens();
 function CurrencyFrame:Setup()
+  print("setup called")
   local index = 1
   repeat
     local info = C_CurrencyInfo.GetCurrencyListInfo(index)
@@ -135,12 +139,12 @@ function CurrencyFrame:Setup()
       end
       self:Update()
     end)
-    self.currencyItems[index] = item
+    self.currencyItems[ref] = item
     item.frame:Show()
     self.content:AddCell(info.name, item)
     index = index + 1
   until index > C_CurrencyInfo.GetCurrencyListSize()
-  self:Update()
+  self.loaded = true
   events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
     self:Update()
   end)
@@ -188,6 +192,7 @@ function currency:Create(parent)
 
   b.currencyItems = {}
   b.iconIndex = {}
+  b.loaded = false
 
   ---CURRENCY_DISPLAY_UPDATE
   local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "DefaultPanelTemplate") --[[@as Frame]]
@@ -212,9 +217,23 @@ function currency:Create(parent)
   b.content = g
 
   b.iconGrid = self:CreateIconGrid(parent)
-  b:Setup()
 
+  hooksecurefunc('TokenFrame_Update', function()
+    if not b.loaded then
+      b:Setup()
+    end
+    b:Update()
+  end)
+  b:Setup()
   return b
+end
+
+function currency:warmCache()
+  local index = 1
+  repeat
+    C_CurrencyInfo.GetCurrencyListInfo(index)
+    index = index + 1
+  until index > C_CurrencyInfo.GetCurrencyListSize()
 end
 
 function currency:CreateIconGrid(parent)
@@ -227,4 +246,8 @@ function currency:CreateIconGrid(parent)
   g.maxCellWidth = 7
   --debug:DrawBorder(g:GetContainer(), 1, 0, 0)
   return g
+end
+
+function currency:OnInitialize()
+  self:warmCache()
 end
