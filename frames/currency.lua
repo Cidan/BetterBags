@@ -12,6 +12,9 @@ local grid = addon:GetModule('Grid')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class CurrencyItem
 ---@field frame Frame
 ---@field icon Texture
@@ -22,6 +25,7 @@ local CurrencyItem = {}
 ---@class CurrencyFrame
 ---@field frame Frame
 ---@field content Grid
+---@field private currencyItems CurrencyItem[]
 local CurrencyFrame = {}
 
 function CurrencyFrame:Show()
@@ -36,7 +40,12 @@ function CurrencyFrame:Update()
   local index = 1
   repeat
     local info = C_CurrencyInfo.GetCurrencyListInfo(index)
-    print(info.name)
+    local item = self.currencyItems[index]
+    item.icon:SetTexture(info.iconFileID)
+    item.name:SetText(info.name)
+    if item.count and not info.isHeader then
+      item.count:SetText(tostring(info.quantity))
+    end
     index = index + 1
   until index > C_CurrencyInfo.GetCurrencyListSize()
   self.content:Draw()
@@ -47,16 +56,25 @@ function CurrencyFrame:Setup()
   repeat
     local info = C_CurrencyInfo.GetCurrencyListInfo(index)
     local item = self:CreateCurrencyItem(index, info.isHeader)
-    item.frame:SetSize(242, 30)
-    item.icon:SetTexture(info.iconFileID)
-    item.name:SetText(info.name)
-    if item.count then
-      item.count:SetText(tostring(info.quantity))
-    end
+    local ref = index
+    item.frame:SetSize(238, 30)
+    item.frame:SetScript('OnEnter', function()
+      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
+      GameTooltip:SetCurrencyToken(ref)
+      GameTooltip:Show()
+    end)
+    item.frame:SetScript('OnLeave', function()
+      GameTooltip:Hide()
+    end)
+    self.currencyItems[index] = item
     item.frame:Show()
     self.content:AddCell(info.name, item)
     index = index + 1
   until index > C_CurrencyInfo.GetCurrencyListSize()
+  self:Update()
+  events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
+    self:Update()
+  end)
 end
 
 function CurrencyFrame:CreateCurrencyItem(index, header)
@@ -96,6 +114,8 @@ function currency:Create(parent)
   local b = {}
   setmetatable(b, {__index = CurrencyFrame})
 
+  b.currencyItems = {}
+
   ---CURRENCY_DISPLAY_UPDATE
   local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "DefaultPanelTemplate") --[[@as Frame]]
   frame:Hide()
@@ -112,7 +132,7 @@ function currency:Create(parent)
   b.frame = frame
 
   local g = grid:Create(b.frame)
-  g:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  g:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET+4, const.OFFSETS.BAG_TOP_INSET)
   g:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET)
   g.maxCellWidth = 1
   g.spacing = 0
