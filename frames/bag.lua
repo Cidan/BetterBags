@@ -51,6 +51,9 @@ local debug = addon:GetModule('Debug')
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
 
+---@class Currency: AceModule
+local currency = addon:GetModule('Currency')
+
 -------
 --- Bag Prototype
 -------
@@ -67,6 +70,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@field freeSlots Section The free slots section.
 ---@field freeBagSlotsButton Item The free bag slots button.
 ---@field freeReagentBagSlotsButton Item The free reagent bag slots button.
+---@field currencyFrame CurrencyFrame The currency frame.
 ---@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
@@ -491,6 +495,12 @@ function bagFrame:Create(kind)
     b:Search(text)
   end)
 
+  if kind == const.BAG_KIND.BACKPACK then
+    local currencyFrame = currency:Create(b.frame)
+    currencyFrame:Show()
+    currencyFrame:Update()
+    b.currencyFrame = currencyFrame
+  end
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)

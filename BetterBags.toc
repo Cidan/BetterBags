@@ -59,6 +59,7 @@ frames\itemrow.lua
 frames\section.lua
 frames\bagbutton.lua
 frames\bagslots.lua
+frames\currency.lua
 
 views\views.lua
 views\gridview.lua
