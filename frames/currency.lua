@@ -27,6 +27,7 @@ local CurrencyGrid = {}
 ---@field icon Texture
 ---@field name FontString
 ---@field count FontString
+---@field index number
 local CurrencyItem = {}
 
 function CurrencyItem:Release()
@@ -55,6 +56,51 @@ function CurrencyFrame:IsShown()
   return self.frame:IsShown()
 end
 
+---@param index number
+---@param info CurrencyInfo
+---@return CurrencyItem
+function CurrencyFrame:GetCurrencyItem(index, info)
+  local item = self.currencyItems[info.name]
+  if not item then
+    item = self:CreateCurrencyItem(index, info.isHeader)
+    item.frame:SetSize(234, 30)
+    item.frame:SetScript('OnEnter', function()
+      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
+      GameTooltip:SetCurrencyToken(item.index)
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    item.frame:SetScript('OnEnter', function()
+      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
+      GameTooltip:SetCurrencyToken(item.index)
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
+      GameTooltip:Show()
+    end)
+    item.frame:SetScript('OnLeave', function()
+      GameTooltip:Hide()
+    end)
+    item.frame:SetScript('OnMouseDown', function()
+      local refinfo = C_CurrencyInfo.GetCurrencyListInfo(item.index)
+      if refinfo.isHeader then
+        return
+      end
+      if refinfo.isShowInBackpack then
+        C_CurrencyInfo.SetCurrencyBackpack(item.index, false)
+      else
+        C_CurrencyInfo.SetCurrencyBackpack(item.index, true)
+      end
+      self:Update()
+    end)
+    item.frame:Show()
+    self.currencyItems[info.name] = item
+    self.content:AddCell(info.name, item)
+  end
+  item.index = index
+  return item
+end
+
 function CurrencyFrame:Update()
   self.iconGrid:Wipe()
   local index = 1
@@ -62,7 +108,7 @@ function CurrencyFrame:Update()
   repeat
     local ref = index
     local info = C_CurrencyInfo.GetCurrencyListInfo(ref)
-    local item = self.currencyItems[ref]
+    local item = self:GetCurrencyItem(ref, info)
     if item then
       item.icon:SetTexture(info.iconFileID)
       item.name:SetText(info.name)
@@ -101,53 +147,19 @@ function CurrencyFrame:Update()
       else
         item.frame:SetBackdropColor(0, 0, 0, .1)
       end
+      item.frame:Show()
+    else
     end
     index = index + 1
   until index > C_CurrencyInfo.GetCurrencyListSize()
+  self.content:Sort(function(a, b)
+    ---@cast a CurrencyItem
+    ---@cast b CurrencyItem
+    return a.index < b.index
+  end)
   self.content:Draw()
   local w, h = self.iconGrid:Draw()
   self.iconGrid:GetContainer():SetSize(w, h)
-end
---TODO(lobato): use GetNumWatchedTokens();
-function CurrencyFrame:Setup()
-  print("setup called")
-  local index = 1
-  repeat
-    local info = C_CurrencyInfo.GetCurrencyListInfo(index)
-    local item = self:CreateCurrencyItem(index, info.isHeader)
-    local ref = index
-    item.frame:SetSize(234, 30)
-    item.frame:SetScript('OnEnter', function()
-      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
-      GameTooltip:SetCurrencyToken(ref)
-      GameTooltip:AddLine(" ")
-      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
-      GameTooltip:Show()
-    end)
-    item.frame:SetScript('OnLeave', function()
-      GameTooltip:Hide()
-    end)
-    item.frame:SetScript('OnMouseDown', function()
-      local refinfo = C_CurrencyInfo.GetCurrencyListInfo(ref)
-      if refinfo.isHeader then
-        return
-      end
-      if refinfo.isShowInBackpack then
-        C_CurrencyInfo.SetCurrencyBackpack(ref, false)
-      else
-        C_CurrencyInfo.SetCurrencyBackpack(ref, true)
-      end
-      self:Update()
-    end)
-    self.currencyItems[ref] = item
-    item.frame:Show()
-    self.content:AddCell(info.name, item)
-    index = index + 1
-  until index > C_CurrencyInfo.GetCurrencyListSize()
-  self.loaded = true
-  events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
-    self:Update()
-  end)
 end
 
 function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
@@ -217,23 +229,11 @@ function currency:Create(parent)
   b.content = g
 
   b.iconGrid = self:CreateIconGrid(parent)
-
-  hooksecurefunc('TokenFrame_Update', function()
-    if not b.loaded then
-      b:Setup()
-    end
+  b:Update()
+  events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
     b:Update()
   end)
-  b:Setup()
   return b
-end
-
-function currency:warmCache()
-  local index = 1
-  repeat
-    C_CurrencyInfo.GetCurrencyListInfo(index)
-    index = index + 1
-  until index > C_CurrencyInfo.GetCurrencyListSize()
 end
 
 function currency:CreateIconGrid(parent)
@@ -244,10 +244,5 @@ function currency:CreateIconGrid(parent)
   g:GetContainer():SetWidth(200)
   g:HideScrollBar()
   g.maxCellWidth = 7
-  --debug:DrawBorder(g:GetContainer(), 1, 0, 0)
   return g
-end
-
-function currency:OnInitialize()
-  self:warmCache()
 end

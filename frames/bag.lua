@@ -498,7 +498,6 @@ function bagFrame:Create(kind)
   if kind == const.BAG_KIND.BACKPACK then
     local currencyFrame = currency:Create(b.frame)
     currencyFrame:Hide()
-    currencyFrame:Update()
     b.currencyFrame = currencyFrame
   end
   -- Enable dragging of the bag frame.

@@ -40,6 +40,9 @@ local context = addon:GetModule('Context')
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
+---@class Config: AceModule
+local currency = addon:GetModule('Currency')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -105,6 +108,7 @@ function addon:OnEnable()
   items:Enable()
   config:Enable()
   categories:Enable()
+  currency:Enable()
   self:HideBlizzardBags()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
