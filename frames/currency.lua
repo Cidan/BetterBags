@@ -105,7 +105,7 @@ function CurrencyFrame:Update()
   local w, h = self.iconGrid:Draw()
   self.iconGrid:GetContainer():SetSize(w, h)
 end
-
+--TODO(lobato): use GetNumWatchedTokens();
 function CurrencyFrame:Setup()
   local index = 1
   repeat
@@ -221,7 +221,7 @@ function currency:CreateIconGrid(parent)
   -- Setup the currency grid
   local g = grid:Create(parent)
   g:GetContainer():ClearAllPoints()
-  g:GetContainer():SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_BOTTOM_INSET+3)
+  g:GetContainer():SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", const.OFFSETS.BAG_LEFT_INSET+4, const.OFFSETS.BAG_BOTTOM_INSET+3)
   g:GetContainer():SetWidth(200)
   g:HideScrollBar()
   g.maxCellWidth = 7

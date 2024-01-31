@@ -244,3 +244,5 @@ function AceItemList:SetList(values) end
 
 ---@class AceGUILabel
 ---@field frame Frame
+
+---@class MoneyFrameButtonTemplate
