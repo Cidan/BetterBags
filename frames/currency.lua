@@ -50,6 +50,13 @@ function CurrencyFrame:Update()
     if item.count and not info.isHeader then
       item.count:SetText(tostring(info.quantity))
     end
+    if info.isShowInBackpack then
+      item.frame:SetBackdropColor(1, 1, 0, .2)
+    elseif index % 2 == 0 then
+      item.frame:SetBackdropColor(0, 0, 0, .2)
+    else
+      item.frame:SetBackdropColor(0, 0, 0, .1)
+    end
     index = index + 1
   until index > C_CurrencyInfo.GetCurrencyListSize()
   self.content:Draw()
@@ -65,10 +72,24 @@ function CurrencyFrame:Setup()
     item.frame:SetScript('OnEnter', function()
       GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
       GameTooltip:SetCurrencyToken(ref)
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
       GameTooltip:Show()
     end)
     item.frame:SetScript('OnLeave', function()
       GameTooltip:Hide()
+    end)
+    item.frame:SetScript('OnMouseDown', function()
+      local refinfo = C_CurrencyInfo.GetCurrencyListInfo(ref)
+      if refinfo.isHeader then
+        return
+      end
+      if refinfo.isShowInBackpack then
+        C_CurrencyInfo.SetCurrencyBackpack(ref, false)
+      else
+        C_CurrencyInfo.SetCurrencyBackpack(ref, true)
+      end
+      self:Update()
     end)
     self.currencyItems[index] = item
     item.frame:Show()
