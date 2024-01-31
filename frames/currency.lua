@@ -57,7 +57,7 @@ function CurrencyFrame:Setup()
     local info = C_CurrencyInfo.GetCurrencyListInfo(index)
     local item = self:CreateCurrencyItem(index, info.isHeader)
     local ref = index
-    item.frame:SetSize(238, 30)
+    item.frame:SetSize(234, 30)
     item.frame:SetScript('OnEnter', function()
       GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
       GameTooltip:SetCurrencyToken(ref)
@@ -133,7 +133,7 @@ function currency:Create(parent)
 
   local g = grid:Create(b.frame)
   g:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET+4, const.OFFSETS.BAG_TOP_INSET)
-  g:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET)
+  g:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET-4, const.OFFSETS.BAG_BOTTOM_INSET)
   g.maxCellWidth = 1
   g.spacing = 0
   b.content = g
