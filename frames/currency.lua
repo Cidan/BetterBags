@@ -15,6 +15,13 @@ local const = addon:GetModule('Constants')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
+---@class CurrencyGrid
+---@field frame Frame
+local CurrencyGrid = {}
+
 ---@class CurrencyItem: Item
 ---@field frame Frame
 ---@field icon Texture
@@ -22,9 +29,16 @@ local events = addon:GetModule('Events')
 ---@field count FontString
 local CurrencyItem = {}
 
+function CurrencyItem:Release()
+  self.frame:ClearAllPoints()
+  self.frame:Hide()
+end
+
 ---@class CurrencyFrame
 ---@field frame Frame
 ---@field content Grid
+---@field iconGrid Grid
+---@field private iconIndex CurrencyItem[]
 ---@field private currencyItems CurrencyItem[]
 local CurrencyFrame = {}
 
@@ -41,7 +55,9 @@ function CurrencyFrame:IsShown()
 end
 
 function CurrencyFrame:Update()
+  self.iconGrid:Wipe()
   local index = 1
+  local showCount = 0
   repeat
     local info = C_CurrencyInfo.GetCurrencyListInfo(index)
     local item = self.currencyItems[index]
@@ -52,6 +68,23 @@ function CurrencyFrame:Update()
     end
     if info.isShowInBackpack then
       item.frame:SetBackdropColor(1, 1, 0, .2)
+      if showCount < 7 then
+        local icon = self.iconIndex[index]
+        if not icon then
+          icon = self:CreateCurrencyItem(index, false, true)
+          icon.frame:SetSize(70, 18)
+          icon.icon:SetSize(18, 18)
+          icon.count:ClearAllPoints()
+          icon.count:SetPoint("LEFT", icon.icon, "RIGHT", 5, 0)
+          icon.frame:Show()
+          self.iconIndex[index] = icon
+        end
+        self.iconGrid:AddCell(info.name, icon)
+        icon.icon:SetTexture(info.iconFileID)
+        icon.count:SetText(tostring(info.quantity))
+        icon.frame:SetWidth(icon.count:GetStringWidth() + icon.icon:GetWidth() + 7)
+        showCount = showCount + 1
+      end
     elseif index % 2 == 0 then
       item.frame:SetBackdropColor(0, 0, 0, .2)
     else
@@ -60,6 +93,8 @@ function CurrencyFrame:Update()
     index = index + 1
   until index > C_CurrencyInfo.GetCurrencyListSize()
   self.content:Draw()
+  local w, h = self.iconGrid:Draw()
+  self.iconGrid:GetContainer():SetSize(w, h)
 end
 
 function CurrencyFrame:Setup()
@@ -102,19 +137,22 @@ function CurrencyFrame:Setup()
   end)
 end
 
-function CurrencyFrame:CreateCurrencyItem(index, header)
+function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
   local item = setmetatable({}, {__index = CurrencyItem})
   item.frame = CreateFrame("Frame", nil, nil, "BackdropTemplate") --[[@as Frame]]
   item.frame:SetBackdrop({
     bgFile = "Interface/Tooltips/UI-Tooltip-Background",
     insets = { left = 0, right = 0, top = 0, bottom = 0 },
   })
-  if index % 2 == 0 then
-    item.frame:SetBackdropColor(0, 0, 0, .2)
+  if not nobackdrop then
+    if index % 2 == 0 then
+      item.frame:SetBackdropColor(0, 0, 0, .2)
+    else
+      item.frame:SetBackdropColor(0, 0, 0, .1)
+    end
   else
-    item.frame:SetBackdropColor(0, 0, 0, .1)
+    item.frame:SetBackdropColor(1, 1, 0, 0)
   end
-
   item.icon = item.frame:CreateTexture(nil, "ARTWORK")
   item.icon:SetSize(24, 24)
   item.icon:SetPoint("LEFT", item.frame, "LEFT", 0, 0)
@@ -140,6 +178,7 @@ function currency:Create(parent)
   setmetatable(b, {__index = CurrencyFrame})
 
   b.currencyItems = {}
+  b.iconIndex = {}
 
   ---CURRENCY_DISPLAY_UPDATE
   local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "DefaultPanelTemplate") --[[@as Frame]]
@@ -162,7 +201,21 @@ function currency:Create(parent)
   g.maxCellWidth = 1
   g.spacing = 0
   b.content = g
+
+  b.iconGrid = self:CreateIconGrid(parent)
   b:Setup()
 
   return b
+end
+
+function currency:CreateIconGrid(parent)
+  -- Setup the currency grid
+  local g = grid:Create(parent)
+  g:GetContainer():ClearAllPoints()
+  g:GetContainer():SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_BOTTOM_INSET+3)
+  g:GetContainer():SetWidth(200)
+  g:HideScrollBar()
+  g.maxCellWidth = 7
+  --debug:DrawBorder(g:GetContainer(), 1, 0, 0)
+  return g
 end

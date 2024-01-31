@@ -30,6 +30,7 @@ local cellProto = {}
 ---@field package box WowScrollBox
 ---@field package view Frame
 ---@field cells Cell[]|Item[]|Section[]
+---@field idToCell table<string, Cell|Item|Section|BagButton>
 ---@field headers Section[]
 ---@field columns Column[]
 ---@field cellToColumn table<Cell|Item|Section, Column>
@@ -64,13 +65,14 @@ function gridProto:AddCellToLastColumn(id, cell)
 end
 
 -- AddCell will add a cell to this grid.
----@param id string|nil
+---@param id string
 ---@param cell Cell|Section|Item|BagButton
 function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
   table.insert(self.cells, cell)
+  self.idToCell[id] = cell
 end
 
 -- RemoveCell will removed a cell from this grid.
@@ -79,6 +81,7 @@ end
 function gridProto:RemoveCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
+  self.idToCell[id] = nil
   for i, c in ipairs(self.cells) do
     if c == cell then
       table.remove(self.cells, i)
@@ -89,6 +92,10 @@ function gridProto:RemoveCell(id, cell)
     end
   end
   --assert(false, 'cell not found')
+end
+
+function gridProto:GetCell(id)
+  return self.idToCell[id]
 end
 
 ---@param header Section
@@ -212,6 +219,7 @@ function gridProto:Wipe()
   wipe(self.cellToColumn)
   wipe(self.columns)
   wipe(self.cells)
+  wipe(self.idToCell)
 end
 
 local scrollFrameCounter = 0
@@ -258,6 +266,7 @@ function grid:Create(parent)
   g.frame = f
   g.inner = c
   g.cells = {}
+  g.idToCell = {}
   g.columns = {}
   g.cellToColumn = {}
   g.headers = {}
