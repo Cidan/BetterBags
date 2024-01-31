@@ -15,7 +15,7 @@ local const = addon:GetModule('Constants')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class CurrencyItem
+---@class CurrencyItem: Item
 ---@field frame Frame
 ---@field icon Texture
 ---@field name FontString
@@ -83,7 +83,7 @@ end
 
 function CurrencyFrame:CreateCurrencyItem(index, header)
   local item = setmetatable({}, {__index = CurrencyItem})
-  item.frame = CreateFrame("Frame", nil, nil, "BackdropTemplate")
+  item.frame = CreateFrame("Frame", nil, nil, "BackdropTemplate") --[[@as Frame]]
   item.frame:SetBackdrop({
     bgFile = "Interface/Tooltips/UI-Tooltip-Background",
     insets = { left = 0, right = 0, top = 0, bottom = 0 },

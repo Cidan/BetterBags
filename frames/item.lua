@@ -117,9 +117,9 @@ function itemProto:SetItem(data)
 
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0) and
-    data.itemInfo.classID == Enum.ItemClass.Armor or
+    (data.itemInfo.classID == Enum.ItemClass.Armor or
     data.itemInfo.classID == Enum.ItemClass.Weapon or
-    data.itemInfo.classID == Enum.ItemClass.Gem then
+    data.itemInfo.classID == Enum.ItemClass.Gem) then
       self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
       if ilvlOpts.color then
         local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)

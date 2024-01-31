@@ -59,7 +59,7 @@ end
 function context:Hide()
   LibDD:HideDropDownMenu(1)
 end
-
+--[[
 local function addDivider(menuList)
   table.insert(menuList, {
     text = "",
@@ -80,7 +80,7 @@ local function addDivider(menuList)
     },
   })
 end
-
+]]--
 ---@param menu MenuList[]
 local function enableTooltips(menu)
   for _, m in ipairs(menu) do
@@ -200,7 +200,7 @@ function context:CreateContextMenu(bag)
         end
       end
     })
-  
+
   if bag.kind == const.BAG_KIND.BACKPACK then
     -- Show the Blizzard bag button toggle.
     table.insert(menuList, {
