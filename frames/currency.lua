@@ -36,6 +36,10 @@ function CurrencyFrame:Hide()
   self.frame:Hide()
 end
 
+function CurrencyFrame:IsShown()
+  return self.frame:IsShown()
+end
+
 function CurrencyFrame:Update()
   local index = 1
   repeat
