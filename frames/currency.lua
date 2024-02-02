@@ -225,7 +225,7 @@ function currency:Create(parent)
 
   local g = grid:Create(b.frame)
   g:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET+4, const.OFFSETS.BAG_TOP_INSET)
-  g:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET-4, const.OFFSETS.BAG_BOTTOM_INSET)
+  g:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET-10, const.OFFSETS.BAG_BOTTOM_INSET)
   g.maxCellWidth = 1
   g.spacing = 0
   b.content = g
