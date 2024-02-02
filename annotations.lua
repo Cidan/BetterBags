@@ -136,7 +136,7 @@ function BetterBagsBagPortraitTemplate:SetTitle(title) end
 
 ---@class BetterBagsClassicBagPortrait
 ---@field Inset Texture
----@field PortraitContainer Frame
+---@field PortraitFrame Texture
 ---@field CloseButton Button
 ---@field SearchBox SearchBox
 local BetterBagsClassicBagPortrait = {}

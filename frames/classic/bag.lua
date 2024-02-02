@@ -331,7 +331,7 @@ function bagFrame:Create(kind)
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsClassicBagPortrait
   local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsClassicBagPortraitTemplate")
-
+  --Mixin(f, PortraitFrameMixin)
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
@@ -341,6 +341,17 @@ function bagFrame:Create(kind)
   else
     b.frame:SetFrameStrata("HIGH")
   end
+
+  -- Create a custom portrait texture.
+  local portraitSize = 48
+  local portrait = b.frame:CreateTexture(nil, "ARTWORK")
+  portrait:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  portrait:SetTexCoord(0, 0.2, 0, 1)
+  portrait:SetDrawLayer("OVERLAY", 7)
+  portrait:SetSize(portraitSize, portraitSize * 1.25)
+  portrait:ClearAllPoints()
+  portrait:SetPoint("TOPLEFT", b.frame, "TOPLEFT", -10, 10)
+
   b.frame:Hide()
   b.frame:SetSize(200, 200)
   ButtonFrameTemplate_HidePortrait(b.frame)
@@ -353,8 +364,6 @@ function bagFrame:Create(kind)
   end)
 
   --debug:DrawBorder(b.frame, 1, 0, 0)
-  --b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
-  --b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
 
   -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
@@ -381,13 +390,12 @@ function bagFrame:Create(kind)
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
   bagButton:EnableMouse(true)
-  bagButton:SetParent(b.frame.PortraitContainer)
-  --bagButton:SetHighlightTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
-  bagButton:SetWidth(40)
-  bagButton:SetHeight(40)
-  bagButton:SetPoint("TOPLEFT", b.frame.PortraitContainer, "TOPLEFT", -6, 2)
+  bagButton:SetParent(b.frame)
+  bagButton:SetSize(portraitSize, portraitSize * 1.25)
+  bagButton:SetPoint("CENTER", portrait, "CENTER", 2, 0)
   local highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
-  highlightTex:SetTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
+  highlightTex:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  highlightTex:SetTexCoord(0.2, 0.4, 0, 1)
   highlightTex:SetAllPoints()
   highlightTex:SetAlpha(0)
   local anig = highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
