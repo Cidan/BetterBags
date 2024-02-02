@@ -66,7 +66,7 @@ views\gridview.lua
 views\oneview.lua
 views\listview.lua
 
-frames\bag.lua
+frames\classic\bag.lua
 
 config\config.lua
 config\help.lua
@@ -74,4 +74,4 @@ config\bags.lua
 config\itemlist.lua
 config\customcat.lua
 
-core\init.lua
+core\classic\init.lua

@@ -287,17 +287,17 @@ function itemProto:ClearItem()
   self.frame:SetParent(nil)
   self.frame:SetAlpha(1)
   self.frame:Hide()
-  self.button:SetHasItem(false)
-  self.button:SetItemButtonTexture(0)
-  self.button:UpdateQuestItem(false, nil, nil)
-  self.button:UpdateNewItem(false)
-  self.button:UpdateJunkItem(false, false)
-  self.button:UpdateItemContextMatching()
+  --self.button:SetHasItem(false)
+  --self.button:SetItemButtonTexture(0)
+ -- self.button:UpdateQuestItem(false, nil, nil)
+  --self.button:UpdateNewItem(false)
+  --self.button:UpdateJunkItem(false, false)
+  --self.button:UpdateItemContextMatching()
   SetItemButtonQuality(self.button, false);
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
-  ClearItemButtonOverlay(self.button)
-  self.button.ItemSlotBackground:Hide()
+  --ClearItemButtonOverlay(self.button)
+  --self.button.ItemSlotBackground:Hide()
   self.frame:SetID(0)
   self.button:SetID(0)
   self.button.minDisplayCount = 1
@@ -368,9 +368,9 @@ function itemFrame:_DoCreate()
   button:SetAllPoints(p)
   i.frame = p
 
-  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
-  button.ItemSlotBackground:SetAllPoints(button);
-  button.ItemSlotBackground:Hide()
+  --button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
+  --button.ItemSlotBackground:SetAllPoints(button);
+  --button.ItemSlotBackground:Hide()
 
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
