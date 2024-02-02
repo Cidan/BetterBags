@@ -132,7 +132,14 @@ function itemProto:SetItem(data)
   else
     self.ilvlText:Hide()
   end
-  self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
+
+  SetItemButtonTexture(self.button, data.itemInfo.itemIcon)
+  SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false)
+  SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
+  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
+  ContainerFrame_UpdateCooldown(data.bagid, self.button)
+  self.button.BattlepayItemTexture:SetShown(false)
+  --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
 --[[
   self.button.ItemSlotBackground:Hide()
@@ -297,6 +304,7 @@ function itemProto:ClearItem()
   SetItemButtonQuality(self.button, false);
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
+  self.button.BattlepayItemTexture:SetShown(false)
   --ClearItemButtonOverlay(self.button)
   --self.button.ItemSlotBackground:Hide()
   self.frame:SetID(0)
@@ -353,9 +361,8 @@ function itemFrame:_DoCreate()
   -- item taint introduced in 10.x
   local p = CreateFrame("Frame")
 
-  ---@class ItemButton
+  ---@class Button
   local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate")
-  button:SetItemButtonTexture(0)
 
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do

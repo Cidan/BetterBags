@@ -246,3 +246,8 @@ function AceItemList:SetList(values) end
 ---@field frame Frame
 
 ---@class MoneyFrameButtonTemplate
+
+-- Legacy UpdateCooldown function for Classic.
+---@param id number
+---@param button Button
+function ContainerFrame_UpdateCooldown(id, button) end
