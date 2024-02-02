@@ -161,6 +161,18 @@ const.OFFSETS = {
   BOTTOM_BAR_RIGHT_INSET = -6,
 }
 
+if not addon.isRetail then
+  Enum.ItemQuality.Poor = 0
+  Enum.ItemQuality.Common = 1
+  Enum.ItemQuality.Uncommon = 2
+  Enum.ItemQuality.Rare = 3
+  Enum.ItemQuality.Epic = 4
+  Enum.ItemQuality.Legendary = 5
+  Enum.ItemQuality.Artifact = 6
+  Enum.ItemQuality.Heirloom = 7
+  Enum.ItemQuality.WoWToken = 8
+end
+
 const.ITEM_QUALITY_COLOR = {
   [Enum.ItemQuality.Poor] = {0.62, 0.62, 0.62, 1},
   [Enum.ItemQuality.Common] = {1, 1, 1, 1},
