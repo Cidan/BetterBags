@@ -134,6 +134,14 @@ function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
 function BetterBagsBagPortraitTemplate:SetTitle(title) end
 
+---@class BetterBagsClassicBagPortrait
+---@field TopTexture Texture
+---@field Bg Texture
+---@field PortraitContainer Frame
+---@field CloseButton Button
+---@field SearchBox SearchBox
+local BetterBagsClassicBagPortrait = {}
+
 ---@class FontString
 local FontString = {}
 function FontString:SetScript(event, func) end

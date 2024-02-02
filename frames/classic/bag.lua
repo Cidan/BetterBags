@@ -329,8 +329,8 @@ function bagFrame:Create(kind)
   local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
-  ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BackdropTemplate")
+  ---@class Frame: BetterBagsClassicBagPortrait
+  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsClassicBagPortraitTemplate")
 
   -- Setup the main frame defaults.
   b.frame = f
@@ -343,15 +343,18 @@ function bagFrame:Create(kind)
   end
   b.frame:Hide()
   b.frame:SetSize(200, 200)
-  b.frame:SetBackdrop({
-    bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
-    edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
-    tile = true,
-    tileSize = 16,
-    edgeSize = 16,
-    insets = { left = 4, right = 4, top = 4, bottom = 4 }
-  })
-  b.frame:SetBackdropColor(0, 0, 0, sizeInfo.opacity / 100)
+  ButtonFrameTemplate_HidePortrait(b.frame)
+  --b.frame.TopTexture:SetTexture([[Interface\BankFrame\Bank-Background]])
+  --debug:DrawBorder(b.frame, 1, 0, 0)
+  --b.frame:SetBackdrop({
+  --  bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+  --  edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+  --  tile = true,
+  --  tileSize = 16,
+  --  edgeSize = 16,
+  --  insets = { left = 4, right = 4, top = 4, bottom = 4 }
+  --})
+  --b.frame:SetBackdropColor(0, 0, 0, sizeInfo.opacity / 100)
   --[[
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()

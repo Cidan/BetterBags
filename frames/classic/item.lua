@@ -85,7 +85,7 @@ function itemProto:UpdateSearch(text)
 end
 
 function itemProto:UpdateCooldown()
-  self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
+  ContainerFrame_UpdateCooldown(self.frame:GetID(), self.button)
 end
 
 ---@param data ItemData
