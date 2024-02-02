@@ -1,0 +1,26 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\FrameXML\UI.xsd">
+
+  <Frame name="BetterBagsBagPortraitTemplate" inherits="PortraitFrameTexturedBaseTemplate" mixin="PortraitFrameMixin" virtual="true">
+    <KeyValues>
+		  <KeyValue key="layoutType" value="HeldBagLayout" type="string"/>
+    </KeyValues>
+    <Frames>
+      <FontString name="$parentName" inherits="GameFontNormal" text="Bag Name" justifyH="CENTER">
+        <Size x="0" y="12"/>
+        <Anchors>
+          <Anchor point="TOP" relativePoint="TOP" y="-5"/>
+        </Anchors>
+      </FontString>
+      <Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButtonDefaultAnchors"/>
+      <EditBox name="$parentSearchBox" parentKey="SearchBox" inherits="BagSearchBoxTemplate" frameLevel="510" letters="15">
+        <Size x="130" y="20"/>
+        <Anchors>
+          <Anchor point="TOP" x="0" y="-25"/>
+        </Anchors>
+      </EditBox>
+    </Frames>
+  </Frame>
+  <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
+  </Frame>
+</Ui>

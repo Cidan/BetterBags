@@ -19,7 +19,7 @@ local BagButtonFrame = addon:NewModule('BagButton')
 local buttonCount = 0
 
 ---@class BagButton
----@field frame ItemButton
+---@field frame Button
 ---@field masqueGroup string
 ---@field bag Enum.BagIndex
 ---@field empty boolean
@@ -75,12 +75,12 @@ function bagButtonProto:SetBag(bag)
     self.empty = false
   else
     --icon = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
-    self.frame.ItemSlotBackground:Show()
+    --self.frame.ItemSlotBackground:Show()
     self.empty = true
   end
-  SetItemButtonTexture(self.frame, icon)
-  SetItemButtonQuality(self.frame, GetInventoryItemQuality("player", self.invID))
-  SetItemButtonCount(self.frame, 1)
+  --SetItemButtonTexture(self.frame, icon)
+  --SetItemButtonQuality(self.frame, GetInventoryItemQuality("player", self.invID))
+  --SetItemButtonCount(self.frame, 1)
 end
 
 function bagButtonProto:ClearBag()
@@ -91,9 +91,9 @@ function bagButtonProto:ClearBag()
   self.empty = nil
   self.kind = nil
   self.canBuy = nil
-  self.frame.ItemSlotBackground:Hide()
-  SetItemButtonTexture(self.frame, nil)
-  SetItemButtonQuality(self.frame, nil)
+  --self.frame.ItemSlotBackground:Hide()
+  --SetItemButtonTexture(self.frame, nil)
+  --SetItemButtonQuality(self.frame, nil)
 end
 
 ---@param kind BagKind
@@ -170,7 +170,7 @@ function BagButtonFrame:_DoCreate()
   local name = format("BetterBagsBagButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
-  local f = CreateFrame("ItemButton", name)
+  local f = CreateFrame("Button", name)
   f:SetSize(37, 37)
   f:RegisterForDrag("LeftButton")
   f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -180,9 +180,9 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnDragStart", function() b:OnDragStart() end)
   f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
-  f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
-  f.ItemSlotBackground:SetAllPoints(f);
-  f.ItemSlotBackground:Hide()
+  --f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
+  --f.ItemSlotBackground:SetAllPoints(f);
+  --f.ItemSlotBackground:Hide()
   return b
 end
 

@@ -202,8 +202,8 @@ function bagProto:Draw(dirtyItems)
     views:ListView(self, dirtyItems)
   end
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = self.frame.SearchBox:GetText()
-  self:Search(text)
+  --local text = self.frame.SearchBox:GetText()
+  --self:Search(text)
   self:KeepBagInBounds()
 end
 
@@ -291,7 +291,7 @@ function bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1
-  self.frame:SetTitle(L:G("Bank"))
+  --self.frame:SetTitle(L:G("Bank"))
   self:Wipe()
 end
 
@@ -329,8 +329,8 @@ function bagFrame:Create(kind)
   local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
-  ---@class Frame: BetterBagsBagPortraitTemplate
-  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
+  ---@class Frame: BackdropTemplate
+  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BackdropTemplate")
 
   -- Setup the main frame defaults.
   b.frame = f
@@ -343,14 +343,24 @@ function bagFrame:Create(kind)
   end
   b.frame:Hide()
   b.frame:SetSize(200, 200)
-  b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
+  b.frame:SetBackdrop({
+    bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+    edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+    tile = true,
+    tileSize = 16,
+    edgeSize = 16,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 }
+  })
+  b.frame:SetBackdropColor(0, 0, 0, sizeInfo.opacity / 100)
+  --[[
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()
     if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
   end)
-  b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
-  b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
+  --]]
+  --b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
+  --b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
 
   -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
@@ -469,6 +479,7 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   -- Setup the search box events.
+  --[[
   b.frame.SearchBox:SetAlpha(0)
   b.frame.SearchBox:SetScript("OnEnter", function()
     b.frame.SearchBox:SetAlpha(1)
@@ -495,12 +506,8 @@ function bagFrame:Create(kind)
     end
     b:Search(text)
   end)
+  --]]
 
-  if kind == const.BAG_KIND.BACKPACK then
-    local currencyFrame = currency:Create(b.frame)
-    currencyFrame:Hide()
-    b.currencyFrame = currencyFrame
-  end
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)

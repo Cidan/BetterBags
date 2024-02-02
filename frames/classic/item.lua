@@ -133,7 +133,7 @@ function itemProto:SetItem(data)
     self.ilvlText:Hide()
   end
 
-
+--[[
   self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(data.itemInfo.itemIcon)
@@ -150,7 +150,7 @@ function itemProto:SetItem(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
-
+--]]
   self.frame:Show()
   self.button:Show()
 end
@@ -181,9 +181,9 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
-  ClearItemButtonOverlay(self.button)
-  self.button:SetHasItem(false)
-  SetItemButtonCount(self.button, count)
+  --ClearItemButtonOverlay(self.button)
+  --self.button:SetHasItem(false)
+  --SetItemButtonCount(self.button, count)
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -195,7 +195,7 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
 
-  self.button.ItemSlotBackground:Show()
+  --self.button.ItemSlotBackground:Show()
   self.frame:Show()
   self.button:Show()
 end

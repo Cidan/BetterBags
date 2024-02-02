@@ -11,6 +11,8 @@ local const = addon:NewModule('Constants')
 
 local WOW_PROJECT_WRATH_CLASSIC = 11
 
+_G.NUM_TOTAL_BAG_FRAMES = 5
+
 -- Constants for detecting WoW version.
 addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
@@ -161,6 +163,16 @@ const.OFFSETS = {
   -- This is how far the bottom bar is inset from the right of the bag window.
   BOTTOM_BAR_RIGHT_INSET = -6,
 }
+
+Enum.ItemQuality.Poor = 0
+Enum.ItemQuality.Common = 1
+Enum.ItemQuality.Uncommon = 2
+Enum.ItemQuality.Rare = 3
+Enum.ItemQuality.Epic = 4
+Enum.ItemQuality.Legendary = 5
+Enum.ItemQuality.Artifact = 6
+Enum.ItemQuality.Heirloom = 7
+Enum.ItemQuality.WoWToken = 8
 
 const.ITEM_QUALITY_COLOR = {
   [Enum.ItemQuality.Poor] = {0.62, 0.62, 0.62, 1},
