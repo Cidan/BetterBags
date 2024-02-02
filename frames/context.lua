@@ -186,6 +186,7 @@ function context:CreateContextMenu(bag)
     end
   })
 
+  if bag.kind == const.BAG_KIND.BACKPACK then
     -- Show bag slot toggle.
     table.insert(menuList, {
       text = L:G("Show Currencies"),
@@ -200,6 +201,7 @@ function context:CreateContextMenu(bag)
         end
       end
     })
+  end
 
   if bag.kind == const.BAG_KIND.BACKPACK then
     -- Show the Blizzard bag button toggle.
