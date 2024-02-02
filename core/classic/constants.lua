@@ -143,7 +143,7 @@ const.EXPANSION_TYPE = {
 const.OFFSETS = {
   -- This is the offset from the top of the bag window to the start of the
   -- content frame.
-  BAG_TOP_INSET = -68,
+  BAG_TOP_INSET = -38,
   -- This is the offset from the left of the bag window to the start of the
   -- content frame.
   BAG_LEFT_INSET = 6,

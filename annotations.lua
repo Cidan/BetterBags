@@ -135,8 +135,7 @@ function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, off
 function BetterBagsBagPortraitTemplate:SetTitle(title) end
 
 ---@class BetterBagsClassicBagPortrait
----@field TopTexture Texture
----@field Bg Texture
+---@field Inset Texture
 ---@field PortraitContainer Frame
 ---@field CloseButton Button
 ---@field SearchBox SearchBox

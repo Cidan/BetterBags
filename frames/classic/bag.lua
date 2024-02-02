@@ -344,24 +344,15 @@ function bagFrame:Create(kind)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
   ButtonFrameTemplate_HidePortrait(b.frame)
-  --b.frame.TopTexture:SetTexture([[Interface\BankFrame\Bank-Background]])
-  --debug:DrawBorder(b.frame, 1, 0, 0)
-  --b.frame:SetBackdrop({
-  --  bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
-  --  edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
-  --  tile = true,
-  --  tileSize = 16,
-  --  edgeSize = 16,
-  --  insets = { left = 4, right = 4, top = 4, bottom = 4 }
-  --})
-  --b.frame:SetBackdropColor(0, 0, 0, sizeInfo.opacity / 100)
-  --[[
+  ButtonFrameTemplate_HideButtonBar(b.frame)
+  b.frame.Inset:Hide()
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()
     if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
   end)
-  --]]
+
+  --debug:DrawBorder(b.frame, 1, 0, 0)
   --b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
   --b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
 
