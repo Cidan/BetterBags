@@ -51,7 +51,7 @@ util\bucket.lua
 
 frames\slider.lua
 frames\classic\money.lua
-frames\context.lua
+frames\classic\context.lua
 frames\column.lua
 frames\grid.lua
 frames\classic\item.lua

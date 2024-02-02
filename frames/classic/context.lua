@@ -187,46 +187,6 @@ function context:CreateContextMenu(bag)
     end
   })
 
-  if bag.kind == const.BAG_KIND.BACKPACK then
-    -- Show bag slot toggle.
-    table.insert(menuList, {
-      text = L:G("Show Currencies"),
-      checked = function() return bag.currencyFrame:IsShown() end,
-      tooltipTitle = L:G("Show Currencies"),
-      tooltipText = L:G("Click to toggle the display of the currencies side panel."),
-      func = function()
-        if bag.currencyFrame:IsShown() then
-          bag.currencyFrame:Hide()
-        else
-          bag.currencyFrame:Show()
-        end
-      end
-    })
-  end
-
-  if bag.kind == const.BAG_KIND.BACKPACK then
-    -- Show the Blizzard bag button toggle.
-    table.insert(menuList, {
-      text = L:G("Show Bag Button"),
-      tooltipTitle = L:G("Show Bag Button"),
-      tooltipText = L:G("Click to toggle the display of the Blizzard bag button."),
-      checked = function()
-        local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
-        return BagsBar:GetParent() ~= sneakyFrame
-      end,
-      func = function()
-        local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
-        local isShown = BagsBar:GetParent() ~= sneakyFrame
-        if isShown then
-          BagsBar:SetParent(sneakyFrame)
-        else
-          BagsBar:SetParent(UIParent)
-        end
-        database:SetShowBagButton(not isShown)
-      end
-    })
-  end
-
   table.insert(menuList, {
     text = L:G("Open Options Screen"),
     notCheckable = true,
