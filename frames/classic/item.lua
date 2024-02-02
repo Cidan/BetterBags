@@ -132,7 +132,8 @@ function itemProto:SetItem(data)
   else
     self.ilvlText:Hide()
   end
-
+  self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
+  --self.button.
 --[[
   self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
@@ -352,8 +353,9 @@ function itemFrame:_DoCreate()
   -- item taint introduced in 10.x
   local p = CreateFrame("Frame")
 
-  ---@class Button
+  ---@class ItemButton
   local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate")
+  button:SetItemButtonTexture(0)
 
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
