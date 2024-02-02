@@ -70,7 +70,6 @@ local currency = addon:GetModule('Currency')
 ---@field recentItems Section The recent items section.
 ---@field freeSlots Section The free slots section.
 ---@field freeBagSlotsButton Item The free bag slots button.
----@field freeReagentBagSlotsButton Item The free reagent bag slots button.
 ---@field currencyFrame CurrencyFrame The currency frame.
 ---@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
 ---@field currentItemCount number
@@ -130,9 +129,7 @@ end
 
 function bagProto:WipeFreeSlots()
   self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
   self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -466,9 +463,6 @@ function bagFrame:Create(kind)
   -- Create the free bag slots buttons and free bag slot section.
   local freeBagSlotsButton = itemFrame:Create()
   b.freeBagSlotsButton = freeBagSlotsButton
-
-  local freeReagentBagSlotsButton = itemFrame:Create()
-  b.freeReagentBagSlotsButton = freeReagentBagSlotsButton
 
   local freeSlots = sectionFrame:Create()
   freeSlots:SetTitle(L:G("Free Slots"))

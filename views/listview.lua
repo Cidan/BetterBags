@@ -136,11 +136,13 @@ function views:ListView(bag, dirtyItems)
   end
 
   bag.freeSlots:AddCell("freeBagSlots", bag.freeBagSlotsButton)
-  bag.freeSlots:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
-
+  if bag.freeReagentBagSlotsButton then
+    bag.freeSlots:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
+  end
   bag.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
-  bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
-
+  if bag.freeReagentBagSlotsButton then
+    bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
+  end
   bag.recentItems:SetMaxCellWidth(1)
   -- Loop through each section and draw it's size.
   for _, section in pairs(bag:GetAllSections()) do
