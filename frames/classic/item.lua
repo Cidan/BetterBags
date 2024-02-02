@@ -36,7 +36,7 @@ local debug = addon:GetModule('Debug')
 
 ---@class (exact) Item
 ---@field frame Frame
----@field button ItemButton
+---@field button Button
 ---@field data ItemData
 ---@field kind BagKind
 ---@field masqueGroup string
@@ -352,8 +352,8 @@ function itemFrame:_DoCreate()
   -- item taint introduced in 10.x
   local p = CreateFrame("Frame")
 
-  ---@class ItemButton
-  local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
+  ---@class Button
+  local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate")
 
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
