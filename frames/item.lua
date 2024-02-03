@@ -237,6 +237,18 @@ function itemProto:GetCategory()
     category = category .. self.data.itemInfo.itemType --[[@as string]]
   end
 
+  -- Add the subtype filter to the category if enabled, but same as with
+  -- the type filter we don't add it to trade goods when the tradeskill
+  -- filter is enabled.
+  if database:GetCategoryFilter(self.kind, "Subtype") and not
+  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) and
+  self.data.itemInfo.itemSubType then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. self.data.itemInfo.itemSubType
+  end
+
   -- Add the tradeskill filter to the category if enabled.
   if self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill") then
     if category ~= "" then
