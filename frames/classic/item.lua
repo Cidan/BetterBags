@@ -192,6 +192,7 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
+  SetItemButtonCount(self.button, count)
   --ClearItemButtonOverlay(self.button)
   --self.button:SetHasItem(false)
   --SetItemButtonCount(self.button, count)

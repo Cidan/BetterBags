@@ -133,6 +133,7 @@ function bagProto:WipeFreeSlots()
   self.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
   self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
   self.freeSlots:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
+  self.freeSlots:GetContent():Hide()
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
