@@ -76,6 +76,9 @@ function BagSlots:CreatePanel(kind)
   local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BetterBagsBagSlotPanelTemplate")
   b.frame = f
 
+  ButtonFrameTemplate_HidePortrait(b.frame)
+  ButtonFrameTemplate_HideButtonBar(b.frame)
+  b.frame.Inset:Hide()
   b.frame:SetTitle(L:G("Equipped Bags"))
 
   b.content = grid:Create(b.frame)

@@ -4,6 +4,6 @@
   <Frame name="BetterBagsClassicBagPortraitTemplate" virtual="true" inherits="ButtonFrameTemplate">
     <Size x="256" y="256"/>
   </Frame>
-  <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
+  <Frame name="BetterBagsBagSlotPanelTemplate" inherits="ButtonFrameTemplate" virtual="true">
   </Frame>
 </Ui>
