@@ -177,29 +177,3 @@ function views:ListView(bag, dirtyItems)
   bag.frame:SetSize(database:GetBagViewFrameSize(bag.kind, database:GetBagView(bag.kind)))
   bag.content:GetContainer():FullUpdate()
 end
-
---[[
-local ScrollBox = CreateFrame("Frame", nil, UIParent, "WowScrollBox")
-ScrollBox:SetPoint("CENTER")
-ScrollBox:SetSize(300, 300)
-ScrollBox:SetInterpolateScroll(true)
-
-local ScrollBar = CreateFrame("EventFrame", nil, UIParent, "MinimalScrollBar")
-ScrollBar:SetPoint("TOPLEFT", ScrollBox, "TOPRIGHT")
-ScrollBar:SetPoint("BOTTOMLEFT", ScrollBox, "BOTTOMRIGHT")
-ScrollBar:SetInterpolateScroll(true)
-
-local ScrollView = CreateScrollBoxLinearView()
-ScrollView:SetPanExtent(100)
-
-local ScrollChild = CreateFrame("Frame", nil, ScrollBox)
-ScrollChild:SetSize(300, 1500)
-ScrollChild.scrollable = true
-
-local ScrollChildFill = ScrollChild:CreateTexture()
-ScrollChildFill:SetAllPoints(ScrollChild)
-ScrollChildFill:SetColorTexture(1, 1, 1, 1)
-ScrollChildFill:SetGradient("VERTICAL", CreateColor(0, 0, 0, 1), CreateColor(1, 0, 0, 1))
-
-ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, ScrollView)
---]]
