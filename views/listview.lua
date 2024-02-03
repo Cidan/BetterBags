@@ -161,7 +161,7 @@ function views:ListView(bag, dirtyItems)
   bag.content.maxCellWidth = 1
   -- Add the freeSlots section back to the end of all sections
   --bag.content:AddCellToLastColumn(bag.freeSlots.title:GetText(), bag.freeSlots)
-
+  bag.freeSlots.frame:Hide()
   -- Position all sections and draw the main bag.
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
