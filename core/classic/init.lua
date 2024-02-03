@@ -65,6 +65,20 @@ function addon:OnInitialize()
 	end
 end
 
+function addon:HideBlizzardBags()
+  local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
+  sneakyFrame:Hide()
+
+  for i = 1, 13 do
+    _G["ContainerFrame"..i]:SetParent(sneakyFrame)
+  end
+
+  BankFrame:SetParent(sneakyFrame)
+  BankFrame:SetScript("OnHide", nil)
+  BankFrame:SetScript("OnShow", nil)
+  BankFrame:SetScript("OnEvent", nil)
+end
+
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
   local updateFrame = CreateFrame("Frame")
@@ -77,6 +91,7 @@ function addon:OnEnable()
   config:Enable()
   categories:Enable()
   currency:Enable()
+  self:HideBlizzardBags()
 
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
