@@ -32,7 +32,7 @@ local item = addon:NewModule('ItemRowFrame')
 ---@class (exact) ItemRow
 ---@field frame Frame
 ---@field button Item
----@field rowButton ItemButton
+---@field rowButton Button
 ---@field text FontString
 ---@field data ItemData
 local itemRowProto = {}
@@ -48,7 +48,7 @@ function itemRowProto:SetItem(data)
   if slotid then
     self.rowButton:SetID(slotid)
   end
-  self.rowButton:SetHasItem(data.itemInfo.itemIcon)
+  --self.rowButton:SetHasItem(data.itemInfo.itemIcon)
 
   local quality = data.itemInfo.itemQuality
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
@@ -146,8 +146,9 @@ function item:_DoCreate()
   local p = CreateFrame("Frame")
   i.frame = p
   --TODO(lobato): Create our own template for row buttons.
-  ---@class ItemButton
-  local rowButton = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
+  ---@class Button
+  ---@field BattlepayItemTexture Texture
+  local rowButton = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate")
   rowButton:SetAllPoints(i.frame)
   i.rowButton = rowButton
 
@@ -177,17 +178,21 @@ function item:_DoCreate()
   self.border = border
 
   --TODO(lobato): Recycle these textures instead of creating new ones.
-  rowButton.NormalTexture:Hide()
-  rowButton.NormalTexture:SetParent(nil)
-  rowButton.NormalTexture = nil
-  rowButton.PushedTexture:Hide()
-  rowButton.PushedTexture:SetParent(nil)
-  rowButton.PushedTexture = nil
-  rowButton.NewItemTexture:Hide()
-  rowButton.BattlepayItemTexture:Hide()
+  rowButton:GetNormalTexture():Hide()
+  rowButton:GetPushedTexture():Hide()
   rowButton:GetHighlightTexture():Hide()
-  rowButton:GetHighlightTexture():SetParent(nil)
-  rowButton.HighlightTexture = nil
+  rowButton.BattlepayItemTexture:SetShown(false)
+  --rowButton.NormalTexture:Hide()
+  --rowButton.NormalTexture:SetParent(nil)
+  --rowButton.NormalTexture = nil
+  --rowButton.PushedTexture:Hide()
+  --rowButton.PushedTexture:SetParent(nil)
+  --rowButton.PushedTexture = nil
+  --rowButton.NewItemTexture:Hide()
+  --rowButton.BattlepayItemTexture:Hide()
+  --rowButton:GetHighlightTexture():Hide()
+  --rowButton:GetHighlightTexture():SetParent(nil)
+  --rowButton.HighlightTexture = nil
 
   local highlight = rowButton:CreateTexture()
   highlight:SetDrawLayer("BACKGROUND")
