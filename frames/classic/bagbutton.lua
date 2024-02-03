@@ -71,7 +71,8 @@ function bagButtonProto:SetBag(bag)
   local hasItem = not not icon
   if hasItem then
     --TODO(lobato): Set count, other properties
-    self.frame.ItemSlotBackground:Hide()
+    self.frame.ItemSlotBackground:SetTexture(icon)
+    self.frame.ItemSlotBackground:Show()
     self.empty = false
   else
     local _, texture = GetInventorySlotInfo("Bag"..bag)
