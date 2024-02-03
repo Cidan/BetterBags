@@ -381,9 +381,9 @@ function itemFrame:_DoCreate()
   button:SetAllPoints(p)
   i.frame = p
 
-  --button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
-  --button.ItemSlotBackground:SetAllPoints(button);
-  --button.ItemSlotBackground:Hide()
+  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND");
+  button.ItemSlotBackground:SetAllPoints(button)
+  button.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
 
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)

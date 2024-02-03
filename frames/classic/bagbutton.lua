@@ -180,8 +180,9 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnDragStart", function() b:OnDragStart() end)
   f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
-  --f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
-  --f.ItemSlotBackground:SetAllPoints(f);
+  f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND");
+  f.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
+  f.ItemSlotBackground:SetAllPoints(f);
   --f.ItemSlotBackground:Hide()
   return b
 end
