@@ -74,6 +74,9 @@ function bagButtonProto:SetBag(bag)
     self.frame.ItemSlotBackground:Hide()
     self.empty = false
   else
+    local _, texture = GetInventorySlotInfo("Bag"..bag)
+    self.frame.ItemSlotBackground:SetTexture(texture)
+    self.frame.ItemSlotBackground:Show()
     --icon = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
     --self.frame.ItemSlotBackground:Show()
     self.empty = true
@@ -91,7 +94,7 @@ function bagButtonProto:ClearBag()
   self.empty = nil
   self.kind = nil
   self.canBuy = nil
-  --self.frame.ItemSlotBackground:Hide()
+  self.frame.ItemSlotBackground:Hide()
   --SetItemButtonTexture(self.frame, nil)
   --SetItemButtonQuality(self.frame, nil)
 end
@@ -180,8 +183,9 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnDragStart", function() b:OnDragStart() end)
   f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
-  f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND");
-  f.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
+  f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND")
+  --f.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
+  --f.ItemSlotBackground:SetTexture(texture)
   f.ItemSlotBackground:SetAllPoints(f);
   --f.ItemSlotBackground:Hide()
   return b

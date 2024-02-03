@@ -158,19 +158,6 @@ function context:CreateContextMenu(bag)
     }
   })
 
-  if bag.kind == const.BAG_KIND.BANK then
-    table.insert(menuList, {
-      text = L:G("Deposit All Reagents"),
-      notCheckable = true,
-      tooltipTitle = L:G("Deposit All Reagents"),
-      tooltipText = L:G("Click to deposit all reagents into your reagent bank."),
-      func = function()
-        PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-        DepositReagentBank()
-      end
-    })
-  end
-
   -- Show bag slot toggle.
   table.insert(menuList, {
     text = L:G("Show Bags"),
