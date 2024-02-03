@@ -137,7 +137,9 @@ function itemProto:SetItem(data)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false)
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
-  ContainerFrame_UpdateCooldown(data.bagid, self.button)
+  if data.bagid then
+    ContainerFrame_UpdateCooldown(data.bagid, self.button)
+  end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
