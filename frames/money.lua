@@ -24,7 +24,7 @@ function moneyProto:Update()
   local gold = floor(currentMoney / 1e4)
   local silver = floor(currentMoney / 100 % 100)
   local copper = currentMoney % 100
-  self.goldButton:SetText(tostring(gold))
+  self.goldButton:SetText(tostring(BreakUpLargeNumbers(gold)))
   self.silverButton:SetText(tostring(silver))
   self.copperButton:SetText(tostring(copper))
   self.copperButton:SetWidth(self.copperButton:GetTextWidth() + 13)
