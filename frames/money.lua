@@ -21,7 +21,7 @@ local moneyProto = {}
 
 function moneyProto:Update()
   local currentMoney = GetMoney()
-  local gold = floor(currentMoney / 1e4)
+  local gold = BreakUpLargeNumbers(floor(currentMoney / 1e4))
   local silver = floor(currentMoney / 100 % 100)
   local copper = currentMoney % 100
   self.goldButton:SetText(tostring(gold))
