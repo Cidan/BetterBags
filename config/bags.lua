@@ -99,6 +99,7 @@ function config:GetBagOptions(kind)
             values = {
               ["RecentItems"] = L:G("Recent Items"),
               ["Type"] = L:G("Type"),
+              ["Subtype"] = L:G("Subtype"),
               ["Expansion"] = L:G("Expansion"),
               ["TradeSkill"] = L:G("Trade Skill")
             }
