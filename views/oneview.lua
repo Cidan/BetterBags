@@ -73,7 +73,7 @@ function views:OneBagView(bag, dirtyItems)
   -- Redraw the world.
   local w, h = bag.content:Draw()
   bag.content:HideScrollBar()
-  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + const.OFFSETS.BAG_RIGHT_INSET)
+  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
   local bagHeight = h +
   const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
   const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET

@@ -361,7 +361,6 @@ function bagFrame:Create(kind)
     if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
   end)
 
-  --debug:DrawBorder(b.frame, 1, 0, 0)
 
   -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
@@ -453,7 +452,6 @@ function bagFrame:Create(kind)
   content:GetContainer():SetPoint("BOTTOMRIGHT", b.bottomBar, "TOPRIGHT", -const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET)
   content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   content:Show()
-  --debug:DrawBorder(content:GetContainer(), 1, 0, 0)
   b.content = content
 
   -- Create the recent items section.

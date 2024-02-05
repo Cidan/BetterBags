@@ -439,7 +439,7 @@ function bagFrame:Create(kind)
   local content = grid:Create(b.frame)
   content:GetContainer():ClearAllPoints()
   content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-  content:GetContainer():SetPoint("BOTTOMRIGHT", b.bottomBar, "TOPRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET)
+  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
   content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   content:Show()
   b.content = content

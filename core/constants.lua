@@ -147,7 +147,7 @@ const.OFFSETS = {
   BAG_LEFT_INSET = 6,
   -- This is the offset from the right of the bag window to the start of the
   -- content frame.
-  BAG_RIGHT_INSET = 6,
+  BAG_RIGHT_INSET = -6,
   -- This is the offset from the bottom of the bag window to the start of the
   -- content frame.
   BAG_BOTTOM_INSET = 3,

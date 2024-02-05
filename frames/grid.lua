@@ -171,7 +171,7 @@ function gridProto:Draw()
           end
         else
           local previousColumn = self.columns[i - 1]
-          column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", 4, 0)
+          column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
         end
       end
       -- Add the cell to the column.
@@ -232,7 +232,6 @@ function grid:CreateScrollFrame(g, parent, child)
   local box = CreateFrame("Frame", "BetterBagsScrollGrid"..scrollFrameCounter, parent, "WowScrollBox") --[[@as WowScrollBox]]
   box:SetAllPoints(parent)
   box:SetInterpolateScroll(true)
-
   local bar = CreateFrame("EventFrame", nil, box, "MinimalScrollBar")
   bar:SetPoint("TOPLEFT", box, "TOPRIGHT", -12, 0)
   bar:SetPoint("BOTTOMLEFT", box, "BOTTOMRIGHT", -12, 0)

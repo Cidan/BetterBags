@@ -10,22 +10,23 @@ local debug = addon:GetModule('Debug')
 ---@param r number The color of the debug border.
 ---@param g number The color of the debug border.
 ---@param b number The color of the debug border.
----@param offset? boolean Whether to offset the border by 2px or not.
-function debug:DrawBorder(frame, r, g, b, offset)
+---@param mouseover? boolean If true, only show the frame on mouseover.
+function debug:DrawBorder(frame, r, g, b, mouseover)
   assert(frame, 'No frame provided.')
   assert(r, 'No red color provided.')
   assert(g, 'No green color provided.')
   assert(b, 'No blue color provided.')
   local border = CreateFrame("Frame", nil, frame, "ThinBorderTemplate")
-  if offset then
-    border:SetPoint("TOPLEFT", frame, "TOPLEFT", -2, 2)
-    border:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 2, -2)
-  else
-    border:SetAllPoints(frame)
-  end
+  border:SetAllPoints(frame)
   for _, tex in pairs({"TopLeft", "TopRight", "BottomLeft", "BottomRight", "Top", "Bottom", "Left", "Right"}) do
     border[tex]:SetVertexColor(r, g, b)
   end
   border:SetFrameStrata("HIGH")
-  border:Show()
+  if mouseover then
+    frame:HookScript("OnEnter", function() border:Show() end)
+    frame:HookScript("OnLeave", function() border:Hide() end)
+    border:Hide()
+  else
+    border:Show()
+  end
 end
