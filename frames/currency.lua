@@ -58,8 +58,9 @@ end
 
 ---@param index number
 ---@param info CurrencyInfo
----@return CurrencyItem
+---@return CurrencyItem|nil
 function CurrencyFrame:GetCurrencyItem(index, info)
+  if not info then return nil end
   local item = self.currencyItems[info.name]
   if not item then
     item = self:CreateCurrencyItem(index, info.isHeader)
