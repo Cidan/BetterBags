@@ -39,7 +39,7 @@ function bagSlotProto:Draw()
     cell:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED)
   end
   local w, h = self.content:Draw()
-  self.frame:SetWidth(w + 24)
+  self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
   self.frame:SetHeight(h + 42)
 end
 
@@ -82,8 +82,8 @@ function BagSlots:CreatePanel(kind)
   b.frame:SetTitle(L:G("Equipped Bags"))
 
   b.content = grid:Create(b.frame)
-  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", 12, -30)
-  b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", -12, 12)
+  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
+  b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
   b.content.maxCellWidth = 10
   b.content:HideScrollBar()
   b.content:Show()
