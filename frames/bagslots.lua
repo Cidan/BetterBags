@@ -57,19 +57,13 @@ function bagSlotProto:SetShown(shown)
 end
 
 function bagSlotProto:Show()
-  PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
   self.fadeInGroup:Play()
-  --[[
-  self.frame:SetAlpha(0)
-  self.frame:Show()
-  self.group:Play()
-  --]]
 end
 
 function bagSlotProto:Hide()
-  PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
   self.fadeOutGroup:Play()
-  --self.frame:Hide()
 end
 
 function bagSlotProto:IsShown()

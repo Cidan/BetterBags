@@ -55,6 +55,9 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
 -------
 --- Bag Prototype
 -------
@@ -72,6 +75,8 @@ local currency = addon:GetModule('Currency')
 ---@field freeBagSlotsButton Item The free bag slots button.
 ---@field freeReagentBagSlotsButton Item The free reagent bag slots button.
 ---@field currencyFrame CurrencyFrame The currency frame.
+---@field fadeIn AnimationGroup
+---@field fadeOut AnimationGroup
 ---@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
@@ -336,6 +341,7 @@ function bagFrame:Create(kind)
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
+  b.frame:SetToplevel(true)
   if b.kind == const.BAG_KIND.BACKPACK then
     b.frame:SetFrameStrata("MEDIUM")
     b.frame:SetFrameLevel(500)

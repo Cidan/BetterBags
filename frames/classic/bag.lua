@@ -333,6 +333,7 @@ function bagFrame:Create(kind)
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
+  b.frame:SetToplevel(true)
   if b.kind == const.BAG_KIND.BACKPACK then
     b.frame:SetFrameStrata("MEDIUM")
     b.frame:SetFrameLevel(500)

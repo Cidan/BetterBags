@@ -51,12 +51,12 @@ end
 local CurrencyFrame = {}
 
 function CurrencyFrame:Show()
-  PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
   self.fadeIn:Play()
 end
 
 function CurrencyFrame:Hide()
-  PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
   self.fadeOut:Play()
 end
 
