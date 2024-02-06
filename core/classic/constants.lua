@@ -72,6 +72,7 @@ const.BACKPACK_BAGS = {
   [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
   [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
+  [Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring,
 }
 
 -- BACKPACK_ONLY_BAGS contains all the bags that are part of the backpack, excluding
@@ -81,6 +82,7 @@ const.BACKPACK_ONLY_BAGS = {
   [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
   [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
+  [Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring,
 }
 
 const.BACKPACK_ONLY_BAGS_LIST = {
