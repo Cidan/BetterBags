@@ -1,4 +1,4 @@
-## Interface: 11500
+## Interface: 11501
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -28,6 +28,8 @@ libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
 templates\classic\container.xml
 
 core\boot.lua
+
+animations\fade.lua
 
 debug\debug.lua
 debug\frames.lua

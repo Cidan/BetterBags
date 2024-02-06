@@ -26,12 +26,17 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
 ---@class bagButton
 local bagButtonProto = {}
 
 ---@class bagSlots
 ---@field frame Frame
 ---@field content Grid
+---@field fadeInGroup AnimationGroup
+---@field fadeOutGroup AnimationGroup
 local bagSlotProto = {}
 
 function bagSlotProto:Draw()
@@ -52,13 +57,13 @@ function bagSlotProto:SetShown(shown)
 end
 
 function bagSlotProto:Show()
-  PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-  self.frame:Show()
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  self.fadeInGroup:Play()
 end
 
 function bagSlotProto:Hide()
-  PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
-  self.frame:Hide()
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  self.fadeOutGroup:Play()
 end
 
 function bagSlotProto:IsShown()
@@ -82,7 +87,7 @@ function BagSlots:CreatePanel(kind)
   b.frame:SetTitle(L:G("Equipped Bags"))
 
   b.content = grid:Create(b.frame)
-  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
+  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, -30)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
   b.content.maxCellWidth = 10
   b.content:HideScrollBar()
@@ -96,6 +101,7 @@ function BagSlots:CreatePanel(kind)
     b.content:AddCell(tostring(i), iframe)
   end
 
+  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   b:Hide()
   return b
