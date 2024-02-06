@@ -35,3 +35,25 @@ function animations:AttachFadeGroup(region)
   end)
   return fadeInGroup, fadeOutGroup
 end
+
+---@param region Region
+---@return AnimationGroup, AnimationGroup
+function animations:AttachFadeAndSlideLeft(region)
+  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region)
+  local slideOut = fadeOutGroup:CreateAnimation('Translation')
+  slideOut:SetOffset(10, 0)
+  slideOut:SetDuration(0.10)
+  slideOut:SetSmoothing('IN')
+  return fadeInGroup, fadeOutGroup
+end
+
+---@param region Region
+---@return AnimationGroup, AnimationGroup
+function animations:AttachFadeAndSlideTop(region)
+  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region)
+  local slideOut = fadeOutGroup:CreateAnimation('Translation')
+  slideOut:SetOffset(0, -10)
+  slideOut:SetDuration(0.10)
+  slideOut:SetSmoothing('IN')
+  return fadeInGroup, fadeOutGroup
+end

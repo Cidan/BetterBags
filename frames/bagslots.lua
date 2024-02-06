@@ -103,7 +103,7 @@ function BagSlots:CreatePanel(kind)
     b.content:AddCell(tostring(i), iframe)
   end
 
-  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
+  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   b:Hide()
   return b

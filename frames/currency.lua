@@ -224,7 +224,7 @@ function currency:Create(parent)
   frame:SetWidth(260)
   frame:SetTitle("Currencies")
 
-  b.fadeIn, b.fadeOut = animations:AttachFadeGroup(frame)
+  b.fadeIn, b.fadeOut = animations:AttachFadeAndSlideLeft(frame)
   b.frame = frame
 
   local g = grid:Create(b.frame)
