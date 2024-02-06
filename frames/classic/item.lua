@@ -92,9 +92,9 @@ end
 function itemProto:SetItem(data)
   assert(data, 'item must be provided')
   self.data = data
-  local tooltipOwner = GameTooltip:GetOwner();
+  --local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
-  if bagid and slotid then
+  if bagid ~= nil and slotid ~= nil then
     self.button:SetID(slotid)
     self.frame:SetID(bagid)
     if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
@@ -137,11 +137,12 @@ function itemProto:SetItem(data)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false)
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
-  if data.bagid then
+  if data.bagid ~= nil then
     ContainerFrame_UpdateCooldown(data.bagid, self.button)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
+
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
 --[[
@@ -332,9 +333,18 @@ function itemProto:AddToMasqueGroup(kind)
   end
 end
 
+function itemProto:UpdateTooltip()
+  if self.button:GetParent():GetID() == -1 then
+    BankFrameItemButton_OnEnter(self.button)
+  else
+    ContainerFrameItemButton_OnEnter(self.button)
+  end
+end
+
 function itemFrame:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
   self._pool:SetResetDisallowedIfNew()
+
 end
 
 function itemFrame:OnEnable()
@@ -356,6 +366,7 @@ function itemFrame:_DoReset(i)
   i:ClearItem()
 end
 
+---@return Item
 function itemFrame:_DoCreate()
   local i = setmetatable({}, { __index = itemProto })
   -- Generate the item button name. This is needed because item
@@ -367,8 +378,7 @@ function itemFrame:_DoCreate()
   local p = CreateFrame("Frame")
 
   ---@class Button
-  local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate")
-
+  local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate") --[[@as Button]]
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
     i[child] = _G[name..child] ---@type texture
@@ -378,14 +388,17 @@ function itemFrame:_DoCreate()
   button:SetSize(37, 37)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  i.button = button
   button:SetAllPoints(p)
+  i.button = button
   i.frame = p
 
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND");
   button.ItemSlotBackground:SetAllPoints(button)
   button.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
 
+  button.GetInventorySlot = ButtonInventorySlot
+  button.UpdateTooltip = function() i:UpdateTooltip() end
+  button:SetScript("OnEnter", function() i:UpdateTooltip() end)
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
 

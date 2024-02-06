@@ -28,36 +28,35 @@ const.BAG_KIND = {
 
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
+-- The Enum.BagIndex values for bank bags is broken in Classic, so we have to subtract 1.
 const.BANK_BAGS = {
   [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  [Enum.BagIndex.BankBag_1 - 1] = Enum.BagIndex.BankBag_1 - 1,
+  [Enum.BagIndex.BankBag_2 - 1] = Enum.BagIndex.BankBag_2 - 1,
+  [Enum.BagIndex.BankBag_3 - 1] = Enum.BagIndex.BankBag_3 - 1,
+  [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
+  [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
+  [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
 }
+
 
 -- BANK_ONLY_BAGS contains all the bags that are part of the bank, excluding
 -- the main bank view.
 const.BANK_ONLY_BAGS = {
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  [Enum.BagIndex.BankBag_1 - 1] = Enum.BagIndex.BankBag_1 - 1,
+  [Enum.BagIndex.BankBag_2 - 1] = Enum.BagIndex.BankBag_2 - 1,
+  [Enum.BagIndex.BankBag_3 - 1] = Enum.BagIndex.BankBag_3 - 1,
+  [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
+  [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
+  [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
 }
 const.BANK_ONLY_BAGS_LIST = {
-  Enum.BagIndex.BankBag_1,
-  Enum.BagIndex.BankBag_2,
-  Enum.BagIndex.BankBag_3,
-  Enum.BagIndex.BankBag_4,
-  Enum.BagIndex.BankBag_5,
-  Enum.BagIndex.BankBag_6,
-  Enum.BagIndex.BankBag_7,
+  Enum.BagIndex.BankBag_1 - 1,
+  Enum.BagIndex.BankBag_2 - 1,
+  Enum.BagIndex.BankBag_3 - 1,
+  Enum.BagIndex.BankBag_4 - 1,
+  Enum.BagIndex.BankBag_5 - 1,
+  Enum.BagIndex.BankBag_6 - 1,
 }
 
 -- REAGENTBANK_BAGS contains the reagent bank bag.

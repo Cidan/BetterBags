@@ -60,6 +60,7 @@ function items:Disable()
 end
 
 function items:RefreshAll()
+  if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() then
     if addon.Bags.Bank.isReagentBank then
       self:RefreshReagentBank()
@@ -96,7 +97,7 @@ function items:RefreshBank()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
-    self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
+    self.itemsByBagAndSlot[i] = {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -296,11 +297,6 @@ function items:RefreshBag(bagid, bankBag)
     -- All items are added to the bag/slot lookup table, including
     -- empty items
     self.itemsByBagAndSlot[bagid][slotid] = data
-  end
-
-  -- Delete old entries that no longer exist because the bag size shrunk.
-  for i = size+1, #self.itemsByBagAndSlot[bagid] do
-    self.itemsByBagAndSlot[bagid][i] = nil
   end
 end
 
