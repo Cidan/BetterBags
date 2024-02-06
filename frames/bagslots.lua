@@ -26,12 +26,17 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
 ---@class bagButton
 local bagButtonProto = {}
 
 ---@class bagSlots
 ---@field frame Frame
 ---@field content Grid
+---@field fadeInGroup AnimationGroup
+---@field fadeOutGroup AnimationGroup
 local bagSlotProto = {}
 
 function bagSlotProto:Draw()
@@ -53,12 +58,18 @@ end
 
 function bagSlotProto:Show()
   PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
+  self.fadeInGroup:Play()
+  --[[
+  self.frame:SetAlpha(0)
   self.frame:Show()
+  self.group:Play()
+  --]]
 end
 
 function bagSlotProto:Hide()
   PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
-  self.frame:Hide()
+  self.fadeOutGroup:Play()
+  --self.frame:Hide()
 end
 
 function bagSlotProto:IsShown()
@@ -92,6 +103,7 @@ function BagSlots:CreatePanel(kind)
     b.content:AddCell(tostring(i), iframe)
   end
 
+  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   b:Hide()
   return b

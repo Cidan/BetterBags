@@ -19,6 +19,9 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
 ---@class CurrencyGrid
 ---@field frame Frame
 local CurrencyGrid = {}
@@ -41,16 +44,20 @@ end
 ---@field content Grid
 ---@field iconGrid Grid
 ---@field loaded boolean
+---@field private fadeIn AnimationGroup
+---@field private fadeOut AnimationGroup
 ---@field private iconIndex CurrencyItem[]
 ---@field private currencyItems CurrencyItem[]
 local CurrencyFrame = {}
 
 function CurrencyFrame:Show()
-  self.frame:Show()
+  PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
+  self.fadeIn:Play()
 end
 
 function CurrencyFrame:Hide()
-  self.frame:Hide()
+  PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+  self.fadeOut:Play()
 end
 
 function CurrencyFrame:IsShown()
@@ -216,12 +223,8 @@ function currency:Create(parent)
   frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   frame:SetWidth(260)
   frame:SetTitle("Currencies")
-  frame:SetScript('OnShow', function()
-    PlaySound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
-  end)
-  frame:SetScript('OnHide', function()
-    PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
-  end)
+
+  b.fadeIn, b.fadeOut = animations:AttachFadeGroup(frame)
   b.frame = frame
 
   local g = grid:Create(b.frame)

@@ -29,6 +29,8 @@ templates\container.xml
 
 core\boot.lua
 
+animations\fade.lua
+
 debug\debug.lua
 debug\frames.lua
 
