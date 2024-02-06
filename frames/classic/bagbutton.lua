@@ -174,7 +174,7 @@ function BagButtonFrame:_DoCreate()
   local name = format("BetterBagsBagButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
-  local f = CreateFrame("Button", name)
+  local f = CreateFrame("Button", name, nil, "ItemButtonTemplate") --[[@as Button]]
   f:SetSize(37, 37)
   f:RegisterForDrag("LeftButton")
   f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
