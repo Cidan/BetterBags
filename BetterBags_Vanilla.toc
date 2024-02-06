@@ -1,4 +1,4 @@
-## Interface: 100205
+## Interface: 11501
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -25,7 +25,7 @@ libs\LibWindow-1.1\LibWindow-1.1.lua
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
 
-templates\container.xml
+templates\classic\container.xml
 
 core\boot.lua
 
@@ -36,7 +36,7 @@ debug\frames.lua
 
 core\events.lua
 core\localization.lua
-core\constants.lua
+core\classic\constants.lua
 core\database.lua
 core\hooks.lua
 
@@ -52,15 +52,15 @@ util\sort.lua
 util\bucket.lua
 
 frames\slider.lua
-frames\money.lua
-frames\context.lua
+frames\classic\money.lua
+frames\classic\context.lua
 frames\column.lua
 frames\grid.lua
-frames\item.lua
-frames\itemrow.lua
+frames\classic\item.lua
+frames\classic\itemrow.lua
 frames\section.lua
-frames\bagbutton.lua
-frames\bagslots.lua
+frames\classic\bagbutton.lua
+frames\classic\bagslots.lua
 frames\currency.lua
 
 views\views.lua
@@ -68,12 +68,12 @@ views\gridview.lua
 views\oneview.lua
 views\listview.lua
 
-frames\bag.lua
+frames\classic\bag.lua
 
 config\config.lua
 config\help.lua
-config\bags.lua
+config\classic\bags.lua
 config\itemlist.lua
 config\customcat.lua
 
-core\init.lua
+core\classic\init.lua

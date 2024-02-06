@@ -63,13 +63,17 @@ function views:OneBagView(bag, dirtyItems)
   bag.content:Sort(sort:GetItemSortFunction(bag.kind, const.BAG_VIEW.ONE_BAG))
 
   bag.content:AddCell("freeBagSlots", bag.freeBagSlotsButton)
-  bag.content:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
+  if bag.freeReagentBagSlotsButton then
+    bag.content:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
+  end
   bag.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
-  bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
+  if bag.freeReagentBagSlotsButton then
+    bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
+  end
   -- Redraw the world.
   local w, h = bag.content:Draw()
   bag.content:HideScrollBar()
-  bag.frame:SetWidth(w + 12)
+  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
   local bagHeight = h +
   const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
   const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET

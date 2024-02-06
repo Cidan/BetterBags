@@ -36,7 +36,7 @@ local debug = addon:GetModule('Debug')
 
 ---@class (exact) Item
 ---@field frame Frame
----@field button ItemButton
+---@field button Button
 ---@field data ItemData
 ---@field kind BagKind
 ---@field masqueGroup string
@@ -85,16 +85,16 @@ function itemProto:UpdateSearch(text)
 end
 
 function itemProto:UpdateCooldown()
-  self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
+  ContainerFrame_UpdateCooldown(self.frame:GetID(), self.button)
 end
 
 ---@param data ItemData
 function itemProto:SetItem(data)
   assert(data, 'item must be provided')
   self.data = data
-  local tooltipOwner = GameTooltip:GetOwner();
+  --local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
-  if bagid and slotid then
+  if bagid ~= nil and slotid ~= nil then
     self.button:SetID(slotid)
     self.frame:SetID(bagid)
     if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
@@ -133,7 +133,19 @@ function itemProto:SetItem(data)
     self.ilvlText:Hide()
   end
 
+  SetItemButtonTexture(self.button, data.itemInfo.itemIcon)
+  SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false)
+  SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
+  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
+  if data.bagid ~= nil then
+    ContainerFrame_UpdateCooldown(data.bagid, self.button)
+  end
+  self.button.BattlepayItemTexture:SetShown(false)
+  self.button.NewItemTexture:Hide()
 
+  --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
+  --self.button.
+--[[
   self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(data.itemInfo.itemIcon)
@@ -150,7 +162,7 @@ function itemProto:SetItem(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
-
+--]]
   self.frame:Show()
   self.button:Show()
 end
@@ -181,9 +193,10 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
 
-  ClearItemButtonOverlay(self.button)
-  self.button:SetHasItem(false)
   SetItemButtonCount(self.button, count)
+  --ClearItemButtonOverlay(self.button)
+  --self.button:SetHasItem(false)
+  --SetItemButtonCount(self.button, count)
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -195,7 +208,7 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
 
-  self.button.ItemSlotBackground:Show()
+  --self.button.ItemSlotBackground:Show()
   self.frame:Show()
   self.button:Show()
 end
@@ -236,18 +249,6 @@ function itemProto:GetCategory()
   (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) and
   self.data.itemInfo.itemType then
     category = category .. self.data.itemInfo.itemType --[[@as string]]
-  end
-
-  -- Add the subtype filter to the category if enabled, but same as with
-  -- the type filter we don't add it to trade goods when the tradeskill
-  -- filter is enabled.
-  if database:GetCategoryFilter(self.kind, "Subtype") and not
-  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) and
-  self.data.itemInfo.itemSubType then
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. self.data.itemInfo.itemSubType
   end
 
   -- Add the tradeskill filter to the category if enabled.
@@ -299,17 +300,19 @@ function itemProto:ClearItem()
   self.frame:SetParent(nil)
   self.frame:SetAlpha(1)
   self.frame:Hide()
-  self.button:SetHasItem(false)
-  self.button:SetItemButtonTexture(0)
-  self.button:UpdateQuestItem(false, nil, nil)
-  self.button:UpdateNewItem(false)
-  self.button:UpdateJunkItem(false, false)
-  self.button:UpdateItemContextMatching()
+  --self.button:SetHasItem(false)
+  --self.button:SetItemButtonTexture(0)
+ -- self.button:UpdateQuestItem(false, nil, nil)
+  --self.button:UpdateNewItem(false)
+  --self.button:UpdateJunkItem(false, false)
+  --self.button:UpdateItemContextMatching()
   SetItemButtonQuality(self.button, false);
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
-  ClearItemButtonOverlay(self.button)
-  self.button.ItemSlotBackground:Hide()
+  self.button.BattlepayItemTexture:SetShown(false)
+  self.button.NewItemTexture:Hide()
+  --ClearItemButtonOverlay(self.button)
+  --self.button.ItemSlotBackground:Hide()
   self.frame:SetID(0)
   self.button:SetID(0)
   self.button.minDisplayCount = 1
@@ -330,9 +333,18 @@ function itemProto:AddToMasqueGroup(kind)
   end
 end
 
+function itemProto:UpdateTooltip()
+  if self.button:GetParent():GetID() == -1 then
+    BankFrameItemButton_OnEnter(self.button)
+  else
+    ContainerFrameItemButton_OnEnter(self.button)
+  end
+end
+
 function itemFrame:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
   self._pool:SetResetDisallowedIfNew()
+
 end
 
 function itemFrame:OnEnable()
@@ -354,6 +366,7 @@ function itemFrame:_DoReset(i)
   i:ClearItem()
 end
 
+---@return Item
 function itemFrame:_DoCreate()
   local i = setmetatable({}, { __index = itemProto })
   -- Generate the item button name. This is needed because item
@@ -364,9 +377,8 @@ function itemFrame:_DoCreate()
   -- item taint introduced in 10.x
   local p = CreateFrame("Frame")
 
-  ---@class ItemButton
-  local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
-
+  ---@class Button
+  local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate") --[[@as Button]]
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
     i[child] = _G[name..child] ---@type texture
@@ -376,14 +388,17 @@ function itemFrame:_DoCreate()
   button:SetSize(37, 37)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  i.button = button
   button:SetAllPoints(p)
+  i.button = button
   i.frame = p
 
-  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
-  button.ItemSlotBackground:SetAllPoints(button);
-  button.ItemSlotBackground:Hide()
+  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND");
+  button.ItemSlotBackground:SetAllPoints(button)
+  button.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
 
+  button.GetInventorySlot = ButtonInventorySlot
+  button.UpdateTooltip = function() i:UpdateTooltip() end
+  button:SetScript("OnEnter", function() i:UpdateTooltip() end)
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
 

@@ -81,9 +81,13 @@ function BagSlots:CreatePanel(kind)
   local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BetterBagsBagSlotPanelTemplate")
   b.frame = f
 
+  ButtonFrameTemplate_HidePortrait(b.frame)
+  ButtonFrameTemplate_HideButtonBar(b.frame)
+  b.frame.Inset:Hide()
   b.frame:SetTitle(L:G("Equipped Bags"))
+
   b.content = grid:Create(b.frame)
-  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
+  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, -30)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
   b.content.maxCellWidth = 10
   b.content:HideScrollBar()

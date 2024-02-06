@@ -134,6 +134,13 @@ function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
 function BetterBagsBagPortraitTemplate:SetTitle(title) end
 
+---@class BetterBagsClassicBagPortrait
+---@field Inset Texture
+---@field PortraitFrame Texture
+---@field CloseButton Button
+---@field SearchBox SearchBox
+local BetterBagsClassicBagPortrait = {}
+
 ---@class FontString
 local FontString = {}
 function FontString:SetScript(event, func) end
@@ -246,3 +253,8 @@ function AceItemList:SetList(values) end
 ---@field frame Frame
 
 ---@class MoneyFrameButtonTemplate
+
+-- Legacy UpdateCooldown function for Classic.
+---@param id number
+---@param button Button
+function ContainerFrame_UpdateCooldown(id, button) end

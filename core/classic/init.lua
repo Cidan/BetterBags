@@ -65,31 +65,12 @@ function addon:OnInitialize()
 	end
 end
 
--- HideBlizzardBags will hide the default Blizzard bag frames.
 function addon:HideBlizzardBags()
   local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
   sneakyFrame:Hide()
-  ContainerFrameCombinedBags:SetParent(sneakyFrame)
+
   for i = 1, 13 do
     _G["ContainerFrame"..i]:SetParent(sneakyFrame)
-  end
-
-  MainMenuBarBackpackButton:SetScript("OnClick", function()
-    self:ToggleAllBags()
-  end)
-
-  BagBarExpandToggle:SetParent(sneakyFrame)
-  for i = 0, 3 do
-    local bagButton = _G["CharacterBag"..i.."Slot"] --[[@as Button]]
-    bagButton:SetParent(sneakyFrame)
-  end
-  for i = 0, 0 do
-    local bagButton = _G["CharacterReagentBag"..i.."Slot"] --[[@as Button]]
-    bagButton:SetParent(sneakyFrame)
-  end
-
-  if not database:GetShowBagButton() then
-    BagsBar:SetParent(sneakyFrame)
   end
 
   BankFrame:SetParent(sneakyFrame)

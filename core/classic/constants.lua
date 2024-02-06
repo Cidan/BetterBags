@@ -11,6 +11,8 @@ local const = addon:NewModule('Constants')
 
 local WOW_PROJECT_WRATH_CLASSIC = 11
 
+_G.NUM_TOTAL_BAG_FRAMES = 5
+
 -- Constants for detecting WoW version.
 addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
@@ -26,36 +28,35 @@ const.BAG_KIND = {
 
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
+-- The Enum.BagIndex values for bank bags is broken in Classic, so we have to subtract 1.
 const.BANK_BAGS = {
   [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  [Enum.BagIndex.BankBag_1 - 1] = Enum.BagIndex.BankBag_1 - 1,
+  [Enum.BagIndex.BankBag_2 - 1] = Enum.BagIndex.BankBag_2 - 1,
+  [Enum.BagIndex.BankBag_3 - 1] = Enum.BagIndex.BankBag_3 - 1,
+  [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
+  [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
+  [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
 }
+
 
 -- BANK_ONLY_BAGS contains all the bags that are part of the bank, excluding
 -- the main bank view.
 const.BANK_ONLY_BAGS = {
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  [Enum.BagIndex.BankBag_1 - 1] = Enum.BagIndex.BankBag_1 - 1,
+  [Enum.BagIndex.BankBag_2 - 1] = Enum.BagIndex.BankBag_2 - 1,
+  [Enum.BagIndex.BankBag_3 - 1] = Enum.BagIndex.BankBag_3 - 1,
+  [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
+  [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
+  [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
 }
 const.BANK_ONLY_BAGS_LIST = {
-  Enum.BagIndex.BankBag_1,
-  Enum.BagIndex.BankBag_2,
-  Enum.BagIndex.BankBag_3,
-  Enum.BagIndex.BankBag_4,
-  Enum.BagIndex.BankBag_5,
-  Enum.BagIndex.BankBag_6,
-  Enum.BagIndex.BankBag_7,
+  Enum.BagIndex.BankBag_1 - 1,
+  Enum.BagIndex.BankBag_2 - 1,
+  Enum.BagIndex.BankBag_3 - 1,
+  Enum.BagIndex.BankBag_4 - 1,
+  Enum.BagIndex.BankBag_5 - 1,
+  Enum.BagIndex.BankBag_6 - 1,
 }
 
 -- REAGENTBANK_BAGS contains the reagent bank bag.
@@ -71,7 +72,6 @@ const.BACKPACK_BAGS = {
   [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
   [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
-  [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }
 
 -- BACKPACK_ONLY_BAGS contains all the bags that are part of the backpack, excluding
@@ -81,7 +81,6 @@ const.BACKPACK_ONLY_BAGS = {
   [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
   [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
-  [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }
 
 const.BACKPACK_ONLY_BAGS_LIST = {
@@ -89,7 +88,6 @@ const.BACKPACK_ONLY_BAGS_LIST = {
   Enum.BagIndex.Bag_2,
   Enum.BagIndex.Bag_3,
   Enum.BagIndex.Bag_4,
-  Enum.BagIndex.ReagentBag,
 }
 
 const.BACKPACK_ONLY_REAGENT_BAGS = {
@@ -141,7 +139,7 @@ const.EXPANSION_TYPE = {
 const.OFFSETS = {
   -- This is the offset from the top of the bag window to the start of the
   -- content frame.
-  BAG_TOP_INSET = -42,
+  BAG_TOP_INSET = -38,
   -- This is the offset from the left of the bag window to the start of the
   -- content frame.
   BAG_LEFT_INSET = 6,
@@ -161,6 +159,16 @@ const.OFFSETS = {
   -- This is how far the bottom bar is inset from the right of the bag window.
   BOTTOM_BAR_RIGHT_INSET = -6,
 }
+
+Enum.ItemQuality.Poor = 0
+Enum.ItemQuality.Common = 1
+Enum.ItemQuality.Uncommon = 2
+Enum.ItemQuality.Rare = 3
+Enum.ItemQuality.Epic = 4
+Enum.ItemQuality.Legendary = 5
+Enum.ItemQuality.Artifact = 6
+Enum.ItemQuality.Heirloom = 7
+Enum.ItemQuality.WoWToken = 8
 
 const.ITEM_QUALITY_COLOR = {
   [Enum.ItemQuality.Poor] = {0.62, 0.62, 0.62, 1},

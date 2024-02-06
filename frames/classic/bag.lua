@@ -55,9 +55,6 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
-
 -------
 --- Bag Prototype
 -------
@@ -73,10 +70,7 @@ local animations = addon:GetModule('Animations')
 ---@field recentItems Section The recent items section.
 ---@field freeSlots Section The free slots section.
 ---@field freeBagSlotsButton Item The free bag slots button.
----@field freeReagentBagSlotsButton Item The free reagent bag slots button.
 ---@field currencyFrame CurrencyFrame The currency frame.
----@field fadeIn AnimationGroup
----@field fadeOut AnimationGroup
 ---@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
@@ -135,9 +129,7 @@ end
 
 function bagProto:WipeFreeSlots()
   self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
   self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
   self.freeSlots:GetContent():Hide()
 end
 
@@ -208,8 +200,8 @@ function bagProto:Draw(dirtyItems)
     views:ListView(self, dirtyItems)
   end
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = self.frame.SearchBox:GetText()
-  self:Search(text)
+  --local text = self.frame.SearchBox:GetText()
+  --self:Search(text)
   self:KeepBagInBounds()
 end
 
@@ -297,7 +289,7 @@ function bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1
-  self.frame:SetTitle(L:G("Bank"))
+  --self.frame:SetTitle(L:G("Bank"))
   self:Wipe()
 end
 
@@ -335,9 +327,9 @@ function bagFrame:Create(kind)
   local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
-  ---@class Frame: BetterBagsBagPortraitTemplate
-  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
-
+  ---@class Frame: BetterBagsClassicBagPortrait
+  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsClassicBagPortraitTemplate")
+  --Mixin(f, PortraitFrameMixin)
   -- Setup the main frame defaults.
   b.frame = f
   b.frame:SetParent(UIParent)
@@ -348,16 +340,28 @@ function bagFrame:Create(kind)
   else
     b.frame:SetFrameStrata("HIGH")
   end
+
+  -- Create a custom portrait texture.
+  local portraitSize = 48
+  local portrait = b.frame:CreateTexture(nil, "ARTWORK")
+  portrait:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  portrait:SetTexCoord(0, 0.2, 0, 1)
+  portrait:SetDrawLayer("OVERLAY", 7)
+  portrait:SetSize(portraitSize, portraitSize * 1.25)
+  portrait:ClearAllPoints()
+  portrait:SetPoint("TOPLEFT", b.frame, "TOPLEFT", -10, 10)
+
   b.frame:Hide()
   b.frame:SetSize(200, 200)
-  b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
+  ButtonFrameTemplate_HidePortrait(b.frame)
+  ButtonFrameTemplate_HideButtonBar(b.frame)
+  b.frame.Inset:Hide()
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()
     if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
   end)
-  b.frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
-  b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
+
 
   -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
@@ -384,15 +388,16 @@ function bagFrame:Create(kind)
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
   bagButton:EnableMouse(true)
-  bagButton:SetParent(b.frame.PortraitContainer)
-  --bagButton:SetHighlightTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
-  bagButton:SetWidth(40)
-  bagButton:SetHeight(40)
-  bagButton:SetPoint("TOPLEFT", b.frame.PortraitContainer, "TOPLEFT", -6, 2)
-  local highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
-  highlightTex:SetTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
-  highlightTex:SetAllPoints()
+  bagButton:SetParent(b.frame)
+  bagButton:SetSize(portraitSize - 5, portraitSize - 5)
+  bagButton:SetPoint("CENTER", portrait, "CENTER", -2, 8)
+  local highlightTex = b.frame:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
+  highlightTex:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  highlightTex:SetSize(portraitSize, portraitSize * 1.25)
+  highlightTex:SetTexCoord(0.2, 0.4, 0, 1)
+  highlightTex:SetPoint("CENTER", portrait, "CENTER", 2, 0)
   highlightTex:SetAlpha(0)
+  highlightTex:SetDrawLayer("OVERLAY", 7)
   local anig = highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
   local ani = anig:CreateAnimation("Alpha")
   ani:SetFromAlpha(0)
@@ -462,9 +467,6 @@ function bagFrame:Create(kind)
   local freeBagSlotsButton = itemFrame:Create()
   b.freeBagSlotsButton = freeBagSlotsButton
 
-  local freeReagentBagSlotsButton = itemFrame:Create()
-  b.freeReagentBagSlotsButton = freeReagentBagSlotsButton
-
   local freeSlots = sectionFrame:Create()
   freeSlots:SetTitle(L:G("Free Slots"))
   freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
@@ -476,6 +478,7 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   -- Setup the search box events.
+  --[[
   b.frame.SearchBox:SetAlpha(0)
   b.frame.SearchBox:SetScript("OnEnter", function()
     b.frame.SearchBox:SetAlpha(1)
@@ -502,12 +505,8 @@ function bagFrame:Create(kind)
     end
     b:Search(text)
   end)
+  --]]
 
-  if kind == const.BAG_KIND.BACKPACK then
-    local currencyFrame = currency:Create(b.frame)
-    currencyFrame:Hide()
-    b.currencyFrame = currencyFrame
-  end
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)

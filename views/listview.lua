@@ -136,11 +136,13 @@ function views:ListView(bag, dirtyItems)
   end
 
   bag.freeSlots:AddCell("freeBagSlots", bag.freeBagSlotsButton)
-  bag.freeSlots:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
-
+  if bag.freeReagentBagSlotsButton then
+    bag.freeSlots:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
+  end
   bag.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
-  bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
-
+  if bag.freeReagentBagSlotsButton then
+    bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
+  end
   bag.recentItems:SetMaxCellWidth(1)
   -- Loop through each section and draw it's size.
   for _, section in pairs(bag:GetAllSections()) do
@@ -159,7 +161,7 @@ function views:ListView(bag, dirtyItems)
   bag.content.maxCellWidth = 1
   -- Add the freeSlots section back to the end of all sections
   --bag.content:AddCellToLastColumn(bag.freeSlots.title:GetText(), bag.freeSlots)
-
+  bag.freeSlots.frame:Hide()
   -- Position all sections and draw the main bag.
   local w, h = bag.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
@@ -175,29 +177,3 @@ function views:ListView(bag, dirtyItems)
   bag.frame:SetSize(database:GetBagViewFrameSize(bag.kind, database:GetBagView(bag.kind)))
   bag.content:GetContainer():FullUpdate()
 end
-
---[[
-local ScrollBox = CreateFrame("Frame", nil, UIParent, "WowScrollBox")
-ScrollBox:SetPoint("CENTER")
-ScrollBox:SetSize(300, 300)
-ScrollBox:SetInterpolateScroll(true)
-
-local ScrollBar = CreateFrame("EventFrame", nil, UIParent, "MinimalScrollBar")
-ScrollBar:SetPoint("TOPLEFT", ScrollBox, "TOPRIGHT")
-ScrollBar:SetPoint("BOTTOMLEFT", ScrollBox, "BOTTOMRIGHT")
-ScrollBar:SetInterpolateScroll(true)
-
-local ScrollView = CreateScrollBoxLinearView()
-ScrollView:SetPanExtent(100)
-
-local ScrollChild = CreateFrame("Frame", nil, ScrollBox)
-ScrollChild:SetSize(300, 1500)
-ScrollChild.scrollable = true
-
-local ScrollChildFill = ScrollChild:CreateTexture()
-ScrollChildFill:SetAllPoints(ScrollChild)
-ScrollChildFill:SetColorTexture(1, 1, 1, 1)
-ScrollChildFill:SetGradient("VERTICAL", CreateColor(0, 0, 0, 1), CreateColor(1, 0, 0, 1))
-
-ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, ScrollView)
---]]

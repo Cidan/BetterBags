@@ -113,11 +113,13 @@ function views:GridView(bag, dirtyItems)
   end
 
   bag.freeSlots:AddCell("freeBagSlots", bag.freeBagSlotsButton)
-  bag.freeSlots:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
-
+  if bag.freeReagentBagSlotsButton then
+    bag.freeSlots:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
+  end
   bag.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
-  bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
-
+  if bag.freeReagentBagSlotsButton then
+    bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
+  end
   bag.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   -- Loop through each section and draw it's size.
   if bag.currentItemCount <= itemCount or bag.currentItemCount == -1 then
@@ -166,7 +168,7 @@ function views:GridView(bag, dirtyItems)
     bag.content:HideScrollBar()
     --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
     -- than the screen space.
-    bag.frame:SetWidth(w + 12)
+    bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
     local bagHeight = h +
     const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
     const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
