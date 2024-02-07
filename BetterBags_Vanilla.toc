@@ -62,6 +62,7 @@ frames\classic\itemrow.lua
 frames\section.lua
 frames\bagbutton.lua
 frames\classic\bagbutton.lua
+frames\bagslots.lua
 frames\classic\bagslots.lua
 frames\currency.lua
 

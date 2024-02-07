@@ -64,6 +64,9 @@ end
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
 function bagFrame.bagProto:Draw(dirtyItems)
+  if self.slots:IsShown() then
+    self:Wipe()
+  end
   self:UpdateCellWidth()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
     self.resizeHandle:Hide()
