@@ -26,19 +26,10 @@ local debug = addon:GetModule('Debug')
 local itemFrame = addon:GetModule('ItemFrame')
 
 ---@class ItemRowFrame: AceModule
-local item = addon:NewModule('ItemRowFrame')
-
-
----@class (exact) ItemRow
----@field frame Frame
----@field button Item
----@field rowButton Button
----@field text FontString
----@field data ItemData
-local itemRowProto = {}
+local item = addon:GetModule('ItemRowFrame')
 
 ---@param data ItemData
-function itemRowProto:SetItem(data)
+function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
@@ -73,69 +64,11 @@ function itemRowProto:SetItem(data)
   self.rowButton:Show()
 end
 
-function itemRowProto:ClearItem()
-  self.button:ClearItem()
-
-  self.rowButton:SetID(0)
-  self.frame:SetID(0)
-  self.frame:Hide()
-  self.rowButton:Hide()
-  self.rowButton:SetScript("OnMouseWheel", nil)
-  self.rowButton:SetScript("OnEnter", function(s)
-    ---@cast s ItemButton
-    s.HighlightTexture:Show()
-  end)
-  self.data = nil
-end
-
----@return string
-function itemRowProto:GetCategory()
-  return self.button:GetCategory()
-end
-
----@return boolean
-function itemRowProto:IsNewItem()
-  return self.button:IsNewItem()
-end
-
----@param kind BagKind
-function itemRowProto:AddToMasqueGroup(kind)
-  --TODO(lobato): Style the individual row frame, maybe?
-  self.button:AddToMasqueGroup(kind)
-end
-
----@return string
-function itemRowProto:GetGUID()
-  return self.data.itemInfo.itemGUID
-end
-
-function itemRowProto:Release()
-  item._pool:Release(self)
-end
-
-function itemRowProto:UpdateSearch(text)
-  self.button:UpdateSearch(text)
-end
-
-function itemRowProto:UpdateCooldown()
-  self.button:UpdateCooldown()
-end
-
 local buttonCount = 0
-
-function item:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-  self._pool:SetResetDisallowedIfNew()
-end
-
----@param i ItemRow
-function item:_DoReset(i)
-  i:ClearItem()
-end
 
 ---@return ItemRow
 function item:_DoCreate()
-  local i = setmetatable({}, { __index = itemRowProto })
+  local i = setmetatable({}, { __index = item.itemRowProto })
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsRowItemButton%d", buttonCount)
@@ -209,10 +142,3 @@ function item:_DoCreate()
 
   return i
 end
-
----@return ItemRow
-function item:Create()
-  return self._pool:Acquire()
-end
-
-item:Enable()

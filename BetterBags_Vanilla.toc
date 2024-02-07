@@ -59,6 +59,7 @@ frames\column.lua
 frames\grid.lua
 frames\item.lua
 frames\classic\item.lua
+frames\itemrow.lua
 frames\classic\itemrow.lua
 frames\section.lua
 frames\bagbutton.lua

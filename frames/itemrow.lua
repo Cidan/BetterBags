@@ -32,13 +32,13 @@ local item = addon:NewModule('ItemRowFrame')
 ---@class (exact) ItemRow
 ---@field frame Frame
 ---@field button Item
----@field rowButton ItemButton
+---@field rowButton ItemButton|Button
 ---@field text FontString
 ---@field data ItemData
-local itemRowProto = {}
+item.itemRowProto = {}
 
 ---@param data ItemData
-function itemRowProto:SetItem(data)
+function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
@@ -73,7 +73,7 @@ function itemRowProto:SetItem(data)
   self.rowButton:Show()
 end
 
-function itemRowProto:ClearItem()
+function item.itemRowProto:ClearItem()
   self.button:ClearItem()
 
   self.rowButton:SetID(0)
@@ -89,35 +89,35 @@ function itemRowProto:ClearItem()
 end
 
 ---@return string
-function itemRowProto:GetCategory()
+function item.itemRowProto:GetCategory()
   return self.button:GetCategory()
 end
 
 ---@return boolean
-function itemRowProto:IsNewItem()
+function item.itemRowProto:IsNewItem()
   return self.button:IsNewItem()
 end
 
 ---@param kind BagKind
-function itemRowProto:AddToMasqueGroup(kind)
+function item.itemRowProto:AddToMasqueGroup(kind)
   --TODO(lobato): Style the individual row frame, maybe?
   self.button:AddToMasqueGroup(kind)
 end
 
 ---@return string
-function itemRowProto:GetGUID()
+function item.itemRowProto:GetGUID()
   return self.data.itemInfo.itemGUID
 end
 
-function itemRowProto:Release()
+function item.itemRowProto:Release()
   item._pool:Release(self)
 end
 
-function itemRowProto:UpdateSearch(text)
+function item.itemRowProto:UpdateSearch(text)
   self.button:UpdateSearch(text)
 end
 
-function itemRowProto:UpdateCooldown()
+function item.itemRowProto:UpdateCooldown()
   self.button:UpdateCooldown()
 end
 
@@ -135,7 +135,7 @@ end
 
 ---@return ItemRow
 function item:_DoCreate()
-  local i = setmetatable({}, { __index = itemRowProto })
+  local i = setmetatable({}, { __index = item.itemRowProto })
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsRowItemButton%d", buttonCount)
@@ -209,5 +209,3 @@ end
 function item:Create()
   return self._pool:Acquire()
 end
-
-item:Enable()
