@@ -35,6 +35,7 @@ local bagButtonProto = {}
 ---@class bagSlots
 ---@field frame Frame
 ---@field content Grid
+---@field kind BagKind
 ---@field fadeInGroup AnimationGroup
 ---@field fadeOutGroup AnimationGroup
 local bagSlotProto = {}
@@ -98,7 +99,24 @@ function BagSlots:CreatePanel(kind)
   end
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
+  b.fadeInGroup:HookScript("OnFinished", function()
+    if b.kind == const.BAG_KIND.BACKPACK then
+      addon.Bags.Backpack:Refresh()
+    elseif b.kind == const.BAG_KIND.BANK then
+      addon.Bags.Bank:Wipe()
+      addon.Bags.Bank:Refresh()
+    end
+  end)
+  b.fadeOutGroup:HookScript("OnFinished", function()
+    if b.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack then
+      addon.Bags.Backpack:Refresh()
+    elseif b.kind == const.BAG_KIND.BANK and addon.Bags.Bank then
+      addon.Bags.Bank:Wipe()
+      addon.Bags.Bank:Refresh()
+    end
+  end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
+  b.kind = kind
   b:Hide()
   return b
 end

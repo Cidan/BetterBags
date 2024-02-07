@@ -201,6 +201,23 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 end
 
 function itemProto:GetCategory()
+  --[[
+  if self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.slots:IsShown() then
+    local name = format("#%d: %s", self.data.bagid+1, C_Container.GetBagName(self.data.bagid))
+    print("returning name", name)
+    return format("#%d: %s", self.data.bagid+1, C_Container.GetBagName(self.data.bagid))
+  end
+
+  if self.kind == const.BAG_KIND.BANK and addon.Bags.Bank.slots:IsShown() then
+    local id = self.data.bagid
+    if id == -1 then
+      return format("#%d: %s", 1, L:G('Bank'))
+    elseif id == -3 then
+      return format("#%d: %s", 1, L:G('Reagent Bank'))
+    end
+    return format("#%d: %s", self.data.bagid - 4, C_Container.GetBagName(self.data.bagid))
+  end
+  --]]
   if database:GetCategoryFilter(self.kind, "RecentItems") then
     if self:IsNewItem() then
       self.data.itemInfo.category = L:G("Recent Items")
