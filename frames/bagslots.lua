@@ -103,7 +103,6 @@ function BagSlots:CreatePanel(kind)
     if b.kind == const.BAG_KIND.BACKPACK then
       addon.Bags.Backpack:Refresh()
     elseif b.kind == const.BAG_KIND.BANK then
-      addon.Bags.Bank:Wipe()
       addon.Bags.Bank:Refresh()
     end
   end)
@@ -111,7 +110,6 @@ function BagSlots:CreatePanel(kind)
     if b.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack then
       addon.Bags.Backpack:Refresh()
     elseif b.kind == const.BAG_KIND.BANK and addon.Bags.Bank then
-      addon.Bags.Bank:Wipe()
       addon.Bags.Bank:Refresh()
     end
   end)

@@ -34,6 +34,7 @@ local bagButtonProto = {}
 
 ---@class bagSlots
 ---@field frame Frame
+---@field kind BagKind
 ---@field content Grid
 ---@field fadeInGroup AnimationGroup
 ---@field fadeOutGroup AnimationGroup
@@ -80,6 +81,7 @@ function BagSlots:CreatePanel(kind)
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BetterBagsBagSlotPanelTemplate")
   b.frame = f
+  b.kind = kind
 
   ButtonFrameTemplate_HidePortrait(b.frame)
   ButtonFrameTemplate_HideButtonBar(b.frame)
@@ -102,6 +104,20 @@ function BagSlots:CreatePanel(kind)
   end
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
+  b.fadeInGroup:HookScript("OnFinished", function()
+    if b.kind == const.BAG_KIND.BACKPACK then
+      addon.Bags.Backpack:Refresh()
+    elseif b.kind == const.BAG_KIND.BANK then
+      addon.Bags.Bank:Refresh()
+    end
+  end)
+  b.fadeOutGroup:HookScript("OnFinished", function()
+    if b.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack then
+      addon.Bags.Backpack:Refresh()
+    elseif b.kind == const.BAG_KIND.BANK and addon.Bags.Bank then
+      addon.Bags.Bank:Refresh()
+    end
+  end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   b:Hide()
   return b

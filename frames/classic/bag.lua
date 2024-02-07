@@ -475,6 +475,7 @@ function bagFrame:Create(kind)
   local slots = bagSlots:CreatePanel(kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
   slots.frame:SetParent(b.frame)
+  slots.frame:Hide()
   b.slots = slots
 
   -- Setup the search box events.
