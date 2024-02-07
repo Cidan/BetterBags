@@ -47,24 +47,6 @@ local currency = addon:GetModule('Currency')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class BagFrames
----@field Backpack Bag
----@field Bank Bag
-addon.Bags = {}
-
-addon.atBank = false
-
--- OnInitialize is called when the addon is loaded.
-function addon:OnInitialize()
-  -- Disable the bag tutorial screens, as Better Bags does not match
-  -- the base UI/UX these screens refer to.
-  if addon.isRetail then
-		C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
-		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
-		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
-	end
-end
-
 function addon:HideBlizzardBags()
   local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
   sneakyFrame:Hide()
@@ -77,52 +59,4 @@ function addon:HideBlizzardBags()
   BankFrame:SetScript("OnHide", nil)
   BankFrame:SetScript("OnShow", nil)
   BankFrame:SetScript("OnEvent", nil)
-end
-
--- OnEnable is called when the addon is enabled.
-function addon:OnEnable()
-  local updateFrame = CreateFrame("Frame")
-  updateFrame:SetScript("OnUpdate", self.OnUpdate)
-  itemFrame:Enable()
-  sectionFrame:Enable()
-  masque:Enable()
-  context:Enable()
-  items:Enable()
-  config:Enable()
-  categories:Enable()
-  currency:Enable()
-  self:HideBlizzardBags()
-
-  addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
-  addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
-
-  self:SecureHook('OpenBackpack')
-  self:SecureHook('OpenAllBags')
-  self:SecureHook('CloseBackpack')
-  self:SecureHook('CloseAllBags')
-  self:SecureHook('ToggleBackpack')
-  self:SecureHook('ToggleAllBags')
-  self:SecureHook('ToggleBag')
-  self:SecureHook('CloseSpecialWindows')
-
-  events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
-
-  events:RegisterMessage('items/RefreshBackpack/Done', function(_, itemData)
-    debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:Draw(itemData)
-   end)
-
-  events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
-   debug:Log("init/OnInitialize/items", "Drawing bank")
-   addon.Bags.Bank:Draw(itemData)
-
-  end)
-
-  events:RegisterMessage('categories/Changed', function()
-    addon.Bags.Backpack:UpdateContextMenu()
-    addon.Bags.Bank:UpdateContextMenu()
-  end)
-
-  debug:Log("init", "about refresh all items")
-  items:RefreshBackpack()
 end
