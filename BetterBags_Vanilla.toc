@@ -69,6 +69,7 @@ views\gridview.lua
 views\oneview.lua
 views\listview.lua
 
+frames\bag.lua
 frames\classic\bag.lua
 
 config\config.lua

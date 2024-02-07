@@ -5,7 +5,7 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class BagFrame: AceModule
-local bagFrame = addon:NewModule('BagFrame')
+local bagFrame = addon:GetModule('BagFrame')
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
@@ -55,139 +55,15 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
--------
---- Bag Prototype
--------
-
---- Bag is a view of a single bag object. Note that this is not
---- a single bag slot, but a combined view of all bags for a given
---- kind (i.e. bank, backpack).
----@class (exact) Bag
----@field kind BagKind
----@field frame Frame The fancy frame of the bag.
----@field bottomBar Frame The bottom bar of the bag.
----@field content Grid The main content frame of the bag.
----@field recentItems Section The recent items section.
----@field freeSlots Section The free slots section.
----@field freeBagSlotsButton Item The free bag slots button.
----@field currencyFrame CurrencyFrame The currency frame.
----@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
----@field currentItemCount number
----@field private sections table<string, Section>
----@field slots bagSlots
----@field isReagentBank boolean
----@field decorator Texture
----@field bg Texture
----@field moneyFrame Money
----@field resizeHandle Button
----@field drawOnClose boolean
----@field menuList MenuList[]
----@field toRelease Item[]
----@field toReleaseSections Section[]
-local bagProto = {}
-
-function bagProto:Show()
-  if self.frame:IsShown() then
-    return
-  end
-  PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
-  self.frame:Show()
-end
-
-function bagProto:Hide()
-  if not self.frame:IsShown() then
-    return
-  end
-  PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
-  self.frame:Hide()
-  if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
-    debug:Log("draw", "Drawing bag on close")
-    self.drawOnClose = false
-    self:Refresh()
-  end
-end
-
-function bagProto:Toggle()
-  if self.frame:IsShown() then
-    self:Hide()
-  else
-    self:Show()
-  end
-end
-
-function bagProto:IsShown()
-  return self.frame:IsShown()
-end
-
----@return number x
----@return number y
-function bagProto:GetPosition()
-  local scale = self.frame:GetScale()
-  local x, y = self.frame:GetCenter()
-  return x * scale, y * scale
-end
-
-function bagProto:WipeFreeSlots()
+function bagFrame.bagProto:WipeFreeSlots()
   self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
   self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
   self.freeSlots:GetContent():Hide()
 end
 
--- Wipe will wipe the contents of the bag and release all cells.
-function bagProto:Wipe()
-  for _, oldFrame in pairs(self.toRelease) do
-    oldFrame:Release()
-  end
-  for _, section in pairs(self.toReleaseSections) do
-    section:Release()
-  end
-  self:WipeFreeSlots()
-  self.content:RemoveCell(self.freeSlots.title:GetText(), self.freeSlots)
-  self.content:Wipe()
-  wipe(self.itemsByBagAndSlot)
-  wipe(self.sections)
-  wipe(self.toRelease)
-  wipe(self.toReleaseSections)
-end
-
--- Refresh will refresh this bag's item database, and then redraw the bag.
--- This is what would be considered a "full refresh".
-function bagProto:Refresh()
-  if self.kind == const.BAG_KIND.BACKPACK then
-    items:RefreshBackpack()
-  elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
-    items:RefreshBank()
-  else
-    items:RefreshReagentBank()
-  end
-end
-
--- Search will search all items in the bag for the given text.
--- If a match is found for an item, it will be highlighted, while
--- items that don't match will dim.
----@param text? string
-function bagProto:Search(text)
-  for _, bagData in pairs(self.itemsByBagAndSlot) do
-    for _, item in pairs(bagData) do
-      item:UpdateSearch(text)
-    end
-  end
-end
-
--- UpdateCellWidth will update the cell width of the bag based on the current
--- bag view configuration.
-function bagProto:UpdateCellWidth()
-  local sizeInfo = database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind))
-  self.content.maxCellWidth = sizeInfo.columnCount
-
-  for _, section in pairs(self.sections) do
-    section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  end
-end
-
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
-function bagProto:Draw(dirtyItems)
+function bagFrame.bagProto:Draw(dirtyItems)
   self:UpdateCellWidth()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
     self.resizeHandle:Hide()
@@ -205,87 +81,8 @@ function bagProto:Draw(dirtyItems)
   self:KeepBagInBounds()
 end
 
-function bagProto:KeepBagInBounds()
-  local w, h = self.frame:GetSize()
-  self.frame:SetClampRectInsets(0, -w+50, 0, h-50)
-  -- Toggle the clamp setting to force the frame to rebind to the screen
-  -- on the correct clamp insets.
-  self.frame:SetClampedToScreen(false)
-  self.frame:SetClampedToScreen(true)
-end
 
-function bagProto:OnResize()
-  if database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
-    views:UpdateListSize(self)
-  end
-  self:KeepBagInBounds()
-end
-
-function bagProto:ClearRecentItems()
-  for _, i in pairs(self.recentItems:GetAllCells()) do
-    local bagid, slotid = i.data.bagid, i.data.slotid
-    if bagid and slotid then
-      self.itemsByBagAndSlot[bagid] = self.itemsByBagAndSlot[bagid] or {}
-      self.itemsByBagAndSlot[bagid][slotid] = nil
-    end
-  end
-  self.recentItems:WipeOnlyContents()
-end
-
--- GetOrCreateSection will get an existing section by category,
--- creating it if it doesn't exist.
----@param category string
----@return Section
-function bagProto:GetOrCreateSection(category)
-  if category == L:G("Recent Items") then return self.recentItems end
-  local section = self.sections[category]
-  if section == nil then
-    section = sectionFrame:Create()
-    section.frame:SetParent(self.content:GetScrollView())
-    section:SetTitle(category)
-    self.content:AddCell(category, section)
-    self.sections[category] = section
-  end
-  return section
-end
-
-function bagProto:GetSection(category)
-  if category == L:G("Recent Items") then return self.recentItems end
-  return self.sections[category]
-end
-
-function bagProto:RemoveSection(category)
-  if category == L:G("Recent Items") then return end
-  self.sections[category] = nil
-end
-
----@return table<string, Section>
-function bagProto:GetAllSections()
-  return self.sections
-end
-
-function bagProto:ToggleReagentBank()
-  -- This should never happen, but just in case!
-  if self.kind == const.BAG_KIND.BACKPACK then return end
-  self.isReagentBank = not self.isReagentBank
-  if self.isReagentBank then
-    BankFrame.selectedTab = 2
-    self.frame:SetTitle(L:G("Reagent Bank"))
-    self.currentItemCount = -1
-    self:ClearRecentItems()
-    self:Wipe()
-    items:RefreshReagentBank()
-  else
-    BankFrame.selectedTab = 1
-    self.frame:SetTitle(L:G("Bank"))
-    self.currentItemCount = -1
-    self:ClearRecentItems()
-    self:Wipe()
-    items:RefreshBank()
-  end
-end
-
-function bagProto:SwitchToBank()
+function bagFrame.bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1
@@ -293,17 +90,6 @@ function bagProto:SwitchToBank()
   self:Wipe()
 end
 
-function bagProto:OnCooldown()
-  for _, bagData in pairs(self.itemsByBagAndSlot) do
-    for _, item in pairs(bagData) do
-      item:UpdateCooldown()
-    end
-  end
-end
-
-function bagProto:UpdateContextMenu()
-  self.menuList = context:CreateContextMenu(self)
-end
 
 -------
 --- Bag Frame
@@ -315,7 +101,7 @@ end
 function bagFrame:Create(kind)
   ---@class Bag
   local b = {}
-  setmetatable(b, { __index = bagProto })
+  setmetatable(b, { __index = bagFrame.bagProto })
   b.currentItemCount = 0
   b.drawOnClose = false
   b.isReagentBank = false

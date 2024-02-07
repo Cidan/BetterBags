@@ -55,9 +55,6 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
-
 -------
 --- Bag Prototype
 -------
@@ -75,8 +72,6 @@ local animations = addon:GetModule('Animations')
 ---@field freeBagSlotsButton Item The free bag slots button.
 ---@field freeReagentBagSlotsButton Item The free reagent bag slots button.
 ---@field currencyFrame CurrencyFrame The currency frame.
----@field fadeIn AnimationGroup
----@field fadeOut AnimationGroup
 ---@field itemsByBagAndSlot table<number, table<number, Item|ItemRow>>
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
@@ -90,9 +85,9 @@ local animations = addon:GetModule('Animations')
 ---@field menuList MenuList[]
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
-local bagProto = {}
+bagFrame.bagProto = {}
 
-function bagProto:Show()
+function bagFrame.bagProto:Show()
   if self.frame:IsShown() then
     return
   end
@@ -100,7 +95,7 @@ function bagProto:Show()
   self.frame:Show()
 end
 
-function bagProto:Hide()
+function bagFrame.bagProto:Hide()
   if not self.frame:IsShown() then
     return
   end
@@ -113,7 +108,7 @@ function bagProto:Hide()
   end
 end
 
-function bagProto:Toggle()
+function bagFrame.bagProto:Toggle()
   if self.frame:IsShown() then
     self:Hide()
   else
@@ -121,19 +116,19 @@ function bagProto:Toggle()
   end
 end
 
-function bagProto:IsShown()
+function bagFrame.bagProto:IsShown()
   return self.frame:IsShown()
 end
 
 ---@return number x
 ---@return number y
-function bagProto:GetPosition()
+function bagFrame.bagProto:GetPosition()
   local scale = self.frame:GetScale()
   local x, y = self.frame:GetCenter()
   return x * scale, y * scale
 end
 
-function bagProto:WipeFreeSlots()
+function bagFrame.bagProto:WipeFreeSlots()
   self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
   self.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
   self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
@@ -142,7 +137,7 @@ function bagProto:WipeFreeSlots()
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
-function bagProto:Wipe()
+function bagFrame.bagProto:Wipe()
   for _, oldFrame in pairs(self.toRelease) do
     oldFrame:Release()
   end
@@ -160,7 +155,7 @@ end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
-function bagProto:Refresh()
+function bagFrame.bagProto:Refresh()
   if self.kind == const.BAG_KIND.BACKPACK then
     items:RefreshBackpack()
   elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
@@ -174,7 +169,7 @@ end
 -- If a match is found for an item, it will be highlighted, while
 -- items that don't match will dim.
 ---@param text? string
-function bagProto:Search(text)
+function bagFrame.bagProto:Search(text)
   for _, bagData in pairs(self.itemsByBagAndSlot) do
     for _, item in pairs(bagData) do
       item:UpdateSearch(text)
@@ -184,7 +179,7 @@ end
 
 -- UpdateCellWidth will update the cell width of the bag based on the current
 -- bag view configuration.
-function bagProto:UpdateCellWidth()
+function bagFrame.bagProto:UpdateCellWidth()
   local sizeInfo = database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind))
   self.content.maxCellWidth = sizeInfo.columnCount
 
@@ -195,7 +190,7 @@ end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
-function bagProto:Draw(dirtyItems)
+function bagFrame.bagProto:Draw(dirtyItems)
   self:UpdateCellWidth()
   if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
     self.resizeHandle:Hide()
@@ -213,7 +208,7 @@ function bagProto:Draw(dirtyItems)
   self:KeepBagInBounds()
 end
 
-function bagProto:KeepBagInBounds()
+function bagFrame.bagProto:KeepBagInBounds()
   local w, h = self.frame:GetSize()
   self.frame:SetClampRectInsets(0, -w+50, 0, h-50)
   -- Toggle the clamp setting to force the frame to rebind to the screen
@@ -222,14 +217,14 @@ function bagProto:KeepBagInBounds()
   self.frame:SetClampedToScreen(true)
 end
 
-function bagProto:OnResize()
+function bagFrame.bagProto:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
     views:UpdateListSize(self)
   end
   self:KeepBagInBounds()
 end
 
-function bagProto:ClearRecentItems()
+function bagFrame.bagProto:ClearRecentItems()
   for _, i in pairs(self.recentItems:GetAllCells()) do
     local bagid, slotid = i.data.bagid, i.data.slotid
     if bagid and slotid then
@@ -244,7 +239,7 @@ end
 -- creating it if it doesn't exist.
 ---@param category string
 ---@return Section
-function bagProto:GetOrCreateSection(category)
+function bagFrame.bagProto:GetOrCreateSection(category)
   if category == L:G("Recent Items") then return self.recentItems end
   local section = self.sections[category]
   if section == nil then
@@ -257,22 +252,22 @@ function bagProto:GetOrCreateSection(category)
   return section
 end
 
-function bagProto:GetSection(category)
+function bagFrame.bagProto:GetSection(category)
   if category == L:G("Recent Items") then return self.recentItems end
   return self.sections[category]
 end
 
-function bagProto:RemoveSection(category)
+function bagFrame.bagProto:RemoveSection(category)
   if category == L:G("Recent Items") then return end
   self.sections[category] = nil
 end
 
 ---@return table<string, Section>
-function bagProto:GetAllSections()
+function bagFrame.bagProto:GetAllSections()
   return self.sections
 end
 
-function bagProto:ToggleReagentBank()
+function bagFrame.bagProto:ToggleReagentBank()
   -- This should never happen, but just in case!
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = not self.isReagentBank
@@ -293,7 +288,7 @@ function bagProto:ToggleReagentBank()
   end
 end
 
-function bagProto:SwitchToBank()
+function bagFrame.bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1
@@ -301,7 +296,7 @@ function bagProto:SwitchToBank()
   self:Wipe()
 end
 
-function bagProto:OnCooldown()
+function bagFrame.bagProto:OnCooldown()
   for _, bagData in pairs(self.itemsByBagAndSlot) do
     for _, item in pairs(bagData) do
       item:UpdateCooldown()
@@ -309,7 +304,7 @@ function bagProto:OnCooldown()
   end
 end
 
-function bagProto:UpdateContextMenu()
+function bagFrame.bagProto:UpdateContextMenu()
   self.menuList = context:CreateContextMenu(self)
 end
 
@@ -323,7 +318,7 @@ end
 function bagFrame:Create(kind)
   ---@class Bag
   local b = {}
-  setmetatable(b, { __index = bagProto })
+  setmetatable(b, { __index = bagFrame.bagProto })
   b.currentItemCount = 0
   b.drawOnClose = false
   b.isReagentBank = false
