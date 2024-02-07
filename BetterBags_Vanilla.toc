@@ -36,6 +36,7 @@ debug\frames.lua
 
 core\events.lua
 core\localization.lua
+core\constants.lua
 core\classic\constants.lua
 core\database.lua
 core\hooks.lua
