@@ -19,24 +19,24 @@ local BagButtonFrame = addon:NewModule('BagButton')
 local buttonCount = 0
 
 ---@class BagButton
----@field frame ItemButton
+---@field frame ItemButton|Button
 ---@field masqueGroup string
 ---@field bag Enum.BagIndex
 ---@field empty boolean
 ---@field kind BagKind
 ---@field canBuy boolean
-local bagButtonProto = {}
+BagButtonFrame.bagButtonProto = {}
 
-function bagButtonProto:Draw()
+function BagButtonFrame.bagButtonProto:Draw()
   if not self.bag then return end
   self:SetBag(self.bag)
 end
 
-function bagButtonProto:Release()
+function BagButtonFrame.bagButtonProto:Release()
   BagButtonFrame._pool:Release(self)
 end
 
-function bagButtonProto:CheckForPurchase()
+function BagButtonFrame.bagButtonProto:CheckForPurchase()
   local _, full = GetNumBankSlots()
   if full then return end
   local cost = GetBankSlotCost(self.bag)
@@ -46,7 +46,7 @@ function bagButtonProto:CheckForPurchase()
 end
 
 ---@param bag Enum.BagIndex
-function bagButtonProto:SetBag(bag)
+function BagButtonFrame.bagButtonProto:SetBag(bag)
   self.bag = bag
   if const.BANK_ONLY_BAGS[bag] then
     self.kind = const.BAG_KIND.BANK
@@ -83,7 +83,7 @@ function bagButtonProto:SetBag(bag)
   SetItemButtonCount(self.frame, 1)
 end
 
-function bagButtonProto:ClearBag()
+function BagButtonFrame.bagButtonProto:ClearBag()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.frame)
   self.masqueGroup = nil
   self.invID = nil
@@ -97,7 +97,7 @@ function bagButtonProto:ClearBag()
 end
 
 ---@param kind BagKind
-function bagButtonProto:AddToMasqueGroup(kind)
+function BagButtonFrame.bagButtonProto:AddToMasqueGroup(kind)
   if kind == const.BAG_KIND.BANK then
     self.masqueGroup = "Bank"
     masque:AddButtonToGroup(self.masqueGroup, self.frame)
@@ -107,7 +107,7 @@ function bagButtonProto:AddToMasqueGroup(kind)
   end
 end
 
-function bagButtonProto:OnEnter()
+function BagButtonFrame.bagButtonProto:OnEnter()
   if self.empty and self.kind == const.BAG_KIND.BANK and self.canBuy then
     GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
     GameTooltip:SetText(BANK_BAG_PURCHASE, 1, 1, 1)
@@ -129,11 +129,11 @@ function bagButtonProto:OnEnter()
   CursorUpdate(self.frame)
 end
 
-function bagButtonProto:OnLeave()
+function BagButtonFrame.bagButtonProto:OnLeave()
   GameTooltip:Hide()
 end
 
-function bagButtonProto:OnClick()
+function BagButtonFrame.bagButtonProto:OnClick()
   if self.empty and self.kind == const.BAG_KIND.BANK then self:CheckForPurchase() return end
   if IsModifiedClick("PICKUPITEM") then
     PickupBagFromSlot(self.invID)
@@ -142,11 +142,11 @@ function bagButtonProto:OnClick()
   end
 end
 
-function bagButtonProto:OnDragStart()
+function BagButtonFrame.bagButtonProto:OnDragStart()
   PickupBagFromSlot(self.invID)
 end
 
-function bagButtonProto:OnReceiveDrag()
+function BagButtonFrame.bagButtonProto:OnReceiveDrag()
   PutItemInBag(self.invID)
 end
 
@@ -166,7 +166,7 @@ end
 
 ---@return BagButton
 function BagButtonFrame:_DoCreate()
-  local b = setmetatable({}, {__index = bagButtonProto})
+  local b = setmetatable({}, {__index = BagButtonFrame.bagButtonProto})
   local name = format("BetterBagsBagButton%d", buttonCount)
   buttonCount = buttonCount + 1
 

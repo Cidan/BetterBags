@@ -14,39 +14,13 @@ local masque = addon:GetModule('Masque')
 local L = addon:GetModule('Localization')
 
 ---@class BagButtonFrame: AceModule
-local BagButtonFrame = addon:NewModule('BagButton')
+local BagButtonFrame = addon:GetModule('BagButton')
 
 local buttonCount = 0
 
----@class BagButton
----@field frame Button
----@field masqueGroup string
----@field bag Enum.BagIndex
----@field empty boolean
----@field kind BagKind
----@field canBuy boolean
-local bagButtonProto = {}
-
-function bagButtonProto:Draw()
-  if not self.bag then return end
-  self:SetBag(self.bag)
-end
-
-function bagButtonProto:Release()
-  BagButtonFrame._pool:Release(self)
-end
-
-function bagButtonProto:CheckForPurchase()
-  local _, full = GetNumBankSlots()
-  if full then return end
-  local cost = GetBankSlotCost(self.bag)
-  BankFrame.nextSlotCost = cost
-  PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
-  StaticPopup_Show("CONFIRM_BUY_BANK_SLOT")
-end
 
 ---@param bag Enum.BagIndex
-function bagButtonProto:SetBag(bag)
+function BagButtonFrame.bagButtonProto:SetBag(bag)
   self.bag = bag
   if const.BANK_ONLY_BAGS[bag] then
     self.kind = const.BAG_KIND.BANK
@@ -87,7 +61,7 @@ function bagButtonProto:SetBag(bag)
   --SetItemButtonCount(self.frame, 1)
 end
 
-function bagButtonProto:ClearBag()
+function BagButtonFrame.bagButtonProto:ClearBag()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.frame)
   self.masqueGroup = nil
   self.invID = nil
@@ -100,77 +74,10 @@ function bagButtonProto:ClearBag()
   --SetItemButtonQuality(self.frame, nil)
 end
 
----@param kind BagKind
-function bagButtonProto:AddToMasqueGroup(kind)
-  if kind == const.BAG_KIND.BANK then
-    self.masqueGroup = "Bank"
-    masque:AddButtonToGroup(self.masqueGroup, self.frame)
-  else
-    self.masqueGroup = "Backpack"
-    masque:AddButtonToGroup(self.masqueGroup, self.frame)
-  end
-end
-
-function bagButtonProto:OnEnter()
-  if self.empty and self.kind == const.BAG_KIND.BANK and self.canBuy then
-    GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
-    GameTooltip:SetText(BANK_BAG_PURCHASE, 1, 1, 1)
-    local cost = GetBankSlotCost(self.bag)
-    local costInfo = strjoin("", COSTS_LABEL, " ", GetCoinTextureString(cost))
-    GameTooltip:AddLine(costInfo, 1, 1, 1, true)
-    GameTooltip:Show()
-    CursorUpdate(self.frame)
-    return
-  elseif self.empty then
-    GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
-    GameTooltip:SetText(L:G("Empty Bag Slot"), 1, 1, 1)
-    GameTooltip:Show()
-    return
-  end
-  GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
-  GameTooltip:SetInventoryItem("player", self.invID)
-  GameTooltip:Show()
-  CursorUpdate(self.frame)
-end
-
-function bagButtonProto:OnLeave()
-  GameTooltip:Hide()
-end
-
-function bagButtonProto:OnClick()
-  if self.empty and self.kind == const.BAG_KIND.BANK then self:CheckForPurchase() return end
-  if IsModifiedClick("PICKUPITEM") then
-    PickupBagFromSlot(self.invID)
-  else
-    PutItemInBag(self.invID)
-  end
-end
-
-function bagButtonProto:OnDragStart()
-  PickupBagFromSlot(self.invID)
-end
-
-function bagButtonProto:OnReceiveDrag()
-  PutItemInBag(self.invID)
-end
-
-function BagButtonFrame:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-end
-
----@return BagButton
-function BagButtonFrame:Create()
-  return self._pool:Acquire()
-end
-
----@param b BagButton
-function BagButtonFrame:_DoReset(b)
-  b:ClearBag()
-end
 
 ---@return BagButton
 function BagButtonFrame:_DoCreate()
-  local b = setmetatable({}, {__index = bagButtonProto})
+  local b = setmetatable({}, {__index = BagButtonFrame.bagButtonProto})
   local name = format("BetterBagsBagButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
