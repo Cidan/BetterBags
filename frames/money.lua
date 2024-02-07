@@ -18,9 +18,9 @@ local events = addon:GetModule('Events')
 ---@field copperButton Button
 ---@field silverButton Button
 ---@field goldButton Button
-local moneyProto = {}
+money.moneyProto = {}
 
-function moneyProto:Update()
+function money.moneyProto:Update()
   local currentMoney = GetMoney()
   local gold = floor(currentMoney / 1e4)
   local silver = floor(currentMoney / 100 % 100)
@@ -35,7 +35,7 @@ end
 ---@return Money
 function money:Create()
   ---@type Money
-  local m = setmetatable({}, { __index = moneyProto })
+  local m = setmetatable({}, { __index = money.moneyProto })
 
   local f = CreateFrame("Frame", addonName .. "MoneyFrame", UIParent)
   m.frame = f

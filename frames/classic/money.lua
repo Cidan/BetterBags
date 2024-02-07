@@ -5,7 +5,7 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class MoneyFrame: AceModule
-local money = addon:NewModule('MoneyFrame')
+local money = addon:GetModule('MoneyFrame')
 
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
@@ -13,44 +13,6 @@ local debug = addon:GetModule('Debug')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Money
----@field frame Frame
----@field copperButton Button
----@field silverButton Button
----@field goldButton Button
-local moneyProto = {}
-
-function moneyProto:Update()
-  local currentMoney = GetMoney()
-  local gold = floor(currentMoney / 1e4)
-  local silver = floor(currentMoney / 100 % 100)
-  local copper = currentMoney % 100
-  self.goldButton:SetText(tostring(gold))
-  self.silverButton:SetText(tostring(silver))
-  self.copperButton:SetText(tostring(copper))
-  self.copperButton:SetWidth(self.copperButton:GetTextWidth() + 13)
-  self.silverButton:SetWidth(self.silverButton:GetTextWidth() + 13)
-end
-
----@return Money
-function money:Create()
-  ---@type Money
-  local m = setmetatable({}, { __index = moneyProto })
-
-  local f = CreateFrame("Frame", addonName .. "MoneyFrame", UIParent)
-  m.frame = f
-  m.frame:SetSize(128,18)
-  m.copperButton = self:CreateButton("copper", m.frame)
-  m.silverButton = self:CreateButton("silver", m.copperButton)
-  m.goldButton = self:CreateButton("gold", m.silverButton)
-  m.frame:Show()
-
-  m:Update()
-  events:RegisterEvent("PLAYER_MONEY", function()
-    m:Update()
-  end)
-  return m
-end
 
 function money:CreateButton(kind, parent)
   local b = CreateFrame("Button", nil, parent)

@@ -53,6 +53,7 @@ util\sort.lua
 util\bucket.lua
 
 frames\slider.lua
+frames\money.lua
 frames\classic\money.lua
 frames\classic\context.lua
 frames\column.lua
