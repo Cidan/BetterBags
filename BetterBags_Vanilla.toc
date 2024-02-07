@@ -57,6 +57,7 @@ frames\classic\money.lua
 frames\classic\context.lua
 frames\column.lua
 frames\grid.lua
+frames\item.lua
 frames\classic\item.lua
 frames\classic\itemrow.lua
 frames\section.lua

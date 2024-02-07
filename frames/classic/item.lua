@@ -11,7 +11,7 @@ local const = addon:GetModule('Constants')
 local masque = addon:GetModule('Masque')
 
 ---@class ItemFrame: AceModule
-local itemFrame = addon:NewModule('ItemFrame')
+local itemFrame = addon:GetModule('ItemFrame')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
@@ -34,25 +34,6 @@ local L = addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class (exact) Item
----@field frame Frame
----@field button Button
----@field data ItemData
----@field kind BagKind
----@field masqueGroup string
----@field ilvlText FontString
----@field IconTexture Texture
----@field Count FontString
----@field Stock FontString
----@field IconBorder Texture
----@field IconQuestTexture Texture
----@field NormalTexture Texture
----@field NewItemTexture Texture
----@field IconOverlay2 Texture
----@field ItemContextOverlay Texture
----@field Cooldown Cooldown
-local itemProto = {}
-
 local buttonCount = 0
 local children = {
   "IconQuestTexture",
@@ -67,29 +48,13 @@ local children = {
   "ItemContextOverlay"
 }
 
----@param text? string
-function itemProto:UpdateSearch(text)
-  if not text or text == "" then
-    self.button:SetMatchesSearch(true)
-    return
-  end
-  local lowerText = string.lower(text)
-  if string.find(string.lower(self.data.itemInfo.itemName), lowerText, 1, true) or
-  string.find(string.lower(self.data.itemInfo.itemType), lowerText, 1, true) or
-  string.find(string.lower(self.data.itemInfo.itemSubType), lowerText, 1, true) then
-    self.button:SetMatchesSearch(true)
-    return
-  end
 
-  self.button:SetMatchesSearch(false)
-end
-
-function itemProto:UpdateCooldown()
+function itemFrame.itemProto:UpdateCooldown()
   ContainerFrame_UpdateCooldown(self.frame:GetID(), self.button)
 end
 
 ---@param data ItemData
-function itemProto:SetItem(data)
+function itemFrame.itemProto:SetItem(data)
   assert(data, 'item must be provided')
   self.data = data
   --local tooltipOwner = GameTooltip:GetOwner();
@@ -165,17 +130,13 @@ function itemProto:SetItem(data)
   self.button:Show()
 end
 
-function itemProto:SetSize(width, height)
-  self.frame:SetSize(width, height)
-  self.button:SetSize(width, height)
-end
 
 -- SetFreeSlots will set the item button to a free slot.
 ---@param bagid number
 ---@param slotid number
 ---@param count number
 ---@param reagent boolean
-function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
+function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
@@ -211,104 +172,8 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:Show()
 end
 
-function itemProto:GetCategory()
 
-  if self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.slots:IsShown() then
-    self.data.itemInfo.category = format("#%d: %s", self.data.bagid+1, C_Container.GetBagName(self.data.bagid))
-    return self.data.itemInfo.category
-  end
-
-  if self.kind == const.BAG_KIND.BANK and addon.Bags.Bank.slots:IsShown() then
-    local id = self.data.bagid
-    if id == -1 then
-      self.data.itemInfo.category = format("#%d: %s", 1, L:G('Bank'))
-    elseif id == -3 then
-      self.data.itemInfo.category = format("#%d: %s", 1, L:G('Reagent Bank'))
-    else
-      self.data.itemInfo.category = format("#%d: %s", id - 4, C_Container.GetBagName(id))
-    end
-    return self.data.itemInfo.category
-  end
-
-  if database:GetCategoryFilter(self.kind, "RecentItems") then
-    if self:IsNewItem() then
-      self.data.itemInfo.category = L:G("Recent Items")
-      return self.data.itemInfo.category
-    end
-  end
-  -- Return the custom category if it exists.
-  local customCategory = categories:GetCustomCategory(self.kind, self.data)
-  if customCategory then
-    self.data.itemInfo.category = customCategory
-    return customCategory
-  end
-
-  -- Check for equipment sets next.
-  if self.data.itemInfo.equipmentSet then
-    self.data.itemInfo.category = "Gear: " .. self.data.itemInfo.equipmentSet
-    return self.data.itemInfo.category
-  end
-
-  if not self.kind then return L:G('Everything') end
-  -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
-  if self.data.containerInfo.quality == Enum.ItemQuality.Poor then
-    self.data.itemInfo.category = L:G('Junk')
-    return self.data.itemInfo.category
-  end
-
-  local category = ""
-
-  -- Add the type filter to the category if enabled, but not to trade goods
-  -- when the tradeskill filter is enabled. This makes it so trade goods are
-  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
-  if database:GetCategoryFilter(self.kind, "Type") and not
-  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) and
-  self.data.itemInfo.itemType then
-    category = category .. self.data.itemInfo.itemType --[[@as string]]
-  end
-
-  -- Add the tradeskill filter to the category if enabled.
-  if self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill") then
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. const.TRADESKILL_MAP[self.data.itemInfo.subclassID]
-  end
-
-  -- Add the expansion filter to the category if enabled.
-  if database:GetCategoryFilter(self.kind, "Expansion") then
-    if not self.data.itemInfo.expacID then return L:G('Unknown') end
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. const.EXPANSION_MAP[self.data.itemInfo.expacID] --[[@as string]]
-  end
-
-  if category == "" then
-    category = L:G('Everything')
-  end
-  self.data.itemInfo.category = category
-  return category
-end
-
----@return boolean
-function itemProto:IsNewItem()
-  if self.button.NewItemTexture:IsShown() then
-    return true
-  end
-  return self.data.itemInfo.isNewItem
-end
-
----@param alpha number
-function itemProto:SetAlpha(alpha)
-  self.frame:SetAlpha(alpha)
-end
-
-function itemProto:Release()
-  itemFrame._pool:Release(self)
-end
-
-function itemProto:ClearItem()
+function itemFrame.itemProto:ClearItem()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
   self.kind = nil
@@ -338,18 +203,7 @@ function itemProto:ClearItem()
   self.data = nil
 end
 
----@param kind BagKind
-function itemProto:AddToMasqueGroup(kind)
-  if kind == const.BAG_KIND.BANK then
-    self.masqueGroup = "Bank"
-    masque:AddButtonToGroup(self.masqueGroup, self.button)
-  else
-    self.masqueGroup = "Backpack"
-    masque:AddButtonToGroup(self.masqueGroup, self.button)
-  end
-end
-
-function itemProto:UpdateTooltip()
+function itemFrame.itemProto:UpdateTooltip()
   if self.button:GetParent():GetID() == -1 then
     BankFrameItemButton_OnEnter(self.button)
   else
@@ -357,34 +211,9 @@ function itemProto:UpdateTooltip()
   end
 end
 
-function itemFrame:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-  self._pool:SetResetDisallowedIfNew()
-
-end
-
-function itemFrame:OnEnable()
-  -- Pre-populate the pool with 300 items. This is done
-  -- so that items acquired during combat do not taint
-  -- the bag frame.
-  ---@type Item[]
-  local frames = {}
-  for i = 1, 300 do
-    frames[i] = self:Create()
-  end
-  for _, frame in pairs(frames) do
-    frame:Release()
-  end
-end
-
----@param i Item
-function itemFrame:_DoReset(i)
-  i:ClearItem()
-end
-
 ---@return Item
 function itemFrame:_DoCreate()
-  local i = setmetatable({}, { __index = itemProto })
+  local i = setmetatable({}, { __index = itemFrame.itemProto })
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsItemButton%d", buttonCount)

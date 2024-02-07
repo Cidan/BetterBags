@@ -36,7 +36,7 @@ local debug = addon:GetModule('Debug')
 
 ---@class (exact) Item
 ---@field frame Frame
----@field button ItemButton
+---@field button ItemButton|Button
 ---@field data ItemData
 ---@field kind BagKind
 ---@field masqueGroup string
@@ -51,7 +51,8 @@ local debug = addon:GetModule('Debug')
 ---@field IconOverlay2 Texture
 ---@field ItemContextOverlay Texture
 ---@field Cooldown Cooldown
-local itemProto = {}
+---@field UpdateTooltip function
+itemFrame.itemProto = {}
 
 local buttonCount = 0
 local children = {
@@ -68,7 +69,7 @@ local children = {
 }
 
 ---@param text? string
-function itemProto:UpdateSearch(text)
+function itemFrame.itemProto:UpdateSearch(text)
   if not text or text == "" then
     self.button:SetMatchesSearch(true)
     return
@@ -84,12 +85,12 @@ function itemProto:UpdateSearch(text)
   self.button:SetMatchesSearch(false)
 end
 
-function itemProto:UpdateCooldown()
+function itemFrame.itemProto:UpdateCooldown()
   self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
 end
 
 ---@param data ItemData
-function itemProto:SetItem(data)
+function itemFrame.itemProto:SetItem(data)
   assert(data, 'item must be provided')
   self.data = data
   local tooltipOwner = GameTooltip:GetOwner();
@@ -155,7 +156,7 @@ function itemProto:SetItem(data)
   self.button:Show()
 end
 
-function itemProto:SetSize(width, height)
+function itemFrame.itemProto:SetSize(width, height)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
 end
@@ -165,7 +166,7 @@ end
 ---@param slotid number
 ---@param count number
 ---@param reagent boolean
-function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
+function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
@@ -200,7 +201,7 @@ function itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:Show()
 end
 
-function itemProto:GetCategory()
+function itemFrame.itemProto:GetCategory()
   if self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.slots:IsShown() then
     self.data.itemInfo.category = format("#%d: %s", self.data.bagid+1, C_Container.GetBagName(self.data.bagid))
     return self.data.itemInfo.category
@@ -292,7 +293,7 @@ function itemProto:GetCategory()
 end
 
 ---@return boolean
-function itemProto:IsNewItem()
+function itemFrame.itemProto:IsNewItem()
   if self.button.NewItemTexture:IsShown() then
     return true
   end
@@ -300,15 +301,15 @@ function itemProto:IsNewItem()
 end
 
 ---@param alpha number
-function itemProto:SetAlpha(alpha)
+function itemFrame.itemProto:SetAlpha(alpha)
   self.frame:SetAlpha(alpha)
 end
 
-function itemProto:Release()
+function itemFrame.itemProto:Release()
   itemFrame._pool:Release(self)
 end
 
-function itemProto:ClearItem()
+function itemFrame.itemProto:ClearItem()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
   self.kind = nil
@@ -337,7 +338,7 @@ function itemProto:ClearItem()
 end
 
 ---@param kind BagKind
-function itemProto:AddToMasqueGroup(kind)
+function itemFrame.itemProto:AddToMasqueGroup(kind)
   if kind == const.BAG_KIND.BANK then
     self.masqueGroup = "Bank"
     masque:AddButtonToGroup(self.masqueGroup, self.button)
@@ -372,7 +373,7 @@ function itemFrame:_DoReset(i)
 end
 
 function itemFrame:_DoCreate()
-  local i = setmetatable({}, { __index = itemProto })
+  local i = setmetatable({}, { __index = itemFrame.itemProto })
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsItemButton%d", buttonCount)
