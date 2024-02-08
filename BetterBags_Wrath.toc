@@ -1,0 +1,87 @@
+## Interface: 30403
+
+## Title: BetterBags
+## Notes: Better Bags for everyone!
+## Author: Cidan
+## Version: @project-version@
+## SavedVariables: BetterBagsDB
+## X-Date: @project-date-iso@
+## X-License: MIT
+## X-Curse-Project-ID: 942432
+## X-Wago-ID: aNDmy96o
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog
+
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+libs\AceAddon-3.0\AceAddon-3.0.xml
+libs\AceDB-3.0\AceDB-3.0.xml
+libs\AceHook-3.0\AceHook-3.0.xml
+libs\AceConsole-3.0\AceConsole-3.0.xml
+libs\AceEvent-3.0\AceEvent-3.0.xml
+libs\AceGUI-3.0\AceGUI-3.0.xml
+libs\AceConfig-3.0\AceConfig-3.0.xml
+libs\LibSharedMedia-3.0\lib.xml
+libs\LibWindow-1.1\LibWindow-1.1.lua
+libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
+
+templates\classic\container.xml
+
+core\boot.lua
+
+animations\fade.lua
+
+debug\debug.lua
+debug\frames.lua
+
+core\events.lua
+core\localization.lua
+core\constants.lua
+core\classic\constants.lua
+core\database.lua
+core\hooks.lua
+
+theme\masque.lua
+
+data\equipmentsets.lua
+data\items.lua
+data\categories.lua
+
+util\color.lua
+util\resize.lua
+util\sort.lua
+util\bucket.lua
+
+frames\slider.lua
+frames\money.lua
+frames\classic\money.lua
+frames\classic\context.lua
+frames\column.lua
+frames\grid.lua
+frames\item.lua
+frames\classic\item.lua
+frames\itemrow.lua
+frames\classic\itemrow.lua
+frames\section.lua
+frames\bagbutton.lua
+frames\classic\bagbutton.lua
+frames\bagslots.lua
+frames\classic\bagslots.lua
+frames\currency.lua
+
+views\views.lua
+views\gridview.lua
+views\oneview.lua
+views\listview.lua
+
+frames\bag.lua
+frames\classic\bag.lua
+
+config\config.lua
+config\help.lua
+config\classic\bags.lua
+config\itemlist.lua
+config\customcat.lua
+
+core\init.lua
+core\classic\init.lua
