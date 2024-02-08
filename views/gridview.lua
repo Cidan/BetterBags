@@ -122,7 +122,7 @@ function views:GridView(bag, dirtyItems)
   end
   bag.recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
   -- Loop through each section and draw it's size.
-  if bag.currentItemCount <= itemCount or bag.currentItemCount == -1 then
+  if bag.currentItemCount <= itemCount or bag.currentItemCount == -1 or bag.slots:IsShown() then
     for _, oldFrame in pairs(bag.toRelease) do
       oldFrame:Release()
     end
@@ -155,7 +155,7 @@ function views:GridView(bag, dirtyItems)
   -- Add the freeSlots section back to the end of all sections
   bag.content:AddCellToLastColumn(bag.freeSlots.title:GetText(), bag.freeSlots)
 
-  if bag.currentItemCount <= itemCount or bag.currentItemCount == -1 then
+  if bag.currentItemCount <= itemCount or bag.currentItemCount == -1 or bag.slots:IsShown() then
   -- Position all sections and draw the main bag.
     local w, h = bag.content:Draw()
     -- Reposition the content frame if the recent items section is empty.
