@@ -4,7 +4,7 @@
 Better Bags is a bag replacement addon for World of Warcraft, inspired by AdiBags. Better Bags sports a fresh clean look, updated to 2024 World of Warcraft art style.
 
 Currently, Better Bags does not contain all the features from AdiBags yet, but will slowly incorporate more and more changes over time.
-BetterBags does support Classic Era, but no WotLK yet. Sorry!
+BetterBags supports Retail, Classic Era, and WotLK.
 
 ## Downloads
 * [Wago Addons](https://addons.wago.io/addons/betterbags/versions?stability=stable)
