@@ -206,7 +206,7 @@ function bagFrame:Create(kind)
     end
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
     if kind == const.BAG_KIND.BACKPACK then
-      GameTooltip:SetText(L:G("Left Click to open the menu."))
+      GameTooltip:SetText(L:G("Left Click to open the menu, right click to clear recent items."))
     else
       GameTooltip:SetText(L:G("Left Click to open the menu, right click to swap to reagent bank and back."))
     end
@@ -230,8 +230,10 @@ function bagFrame:Create(kind)
         anig:Restart()
       end
       context:Show(b.menuList)
-    else
-      b:ToggleReagentBank()
+    elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
+    PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
+    items:RemoveNewItemFromAllItems()
+    b:Refresh()
     end
   end)
 
