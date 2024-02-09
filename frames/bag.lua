@@ -437,8 +437,9 @@ function bagFrame:Create(kind)
     elseif e == "RightButton" and kind == const.BAG_KIND.BANK then
       b:ToggleReagentBank()
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
+      PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
       items:RemoveNewItemFromAllItems()
-      b:Refresh()
+      C_Container:SortBags()
     end
   end)
 
