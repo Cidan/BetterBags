@@ -37,7 +37,7 @@ function views:GridView(bag, dirtyItems)
         freeReagentSlotsData.count = freeReagentSlotsData.count + 1
         freeReagentSlotsData.bagid = bagid
         freeReagentSlotsData.slotid = slotid
-      else
+      elseif bagid ~= Enum.BagIndex.Keyring then
         freeSlotsData.count = freeSlotsData.count + 1
         freeSlotsData.bagid = bagid
         freeSlotsData.slotid = slotid
