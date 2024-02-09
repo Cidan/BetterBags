@@ -208,7 +208,7 @@ function bagFrame:Create(kind)
     if kind == const.BAG_KIND.BACKPACK then
       GameTooltip:SetText(L:G("Left Click to open the menu, right click to clear recent items."))
     else
-      GameTooltip:SetText(L:G("Left Click to open the menu, right click to swap to reagent bank and back."))
+      GameTooltip:SetText(L:G("Left Click to open the menu."))
     end
     GameTooltip:Show()
   end)
