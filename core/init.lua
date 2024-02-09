@@ -111,7 +111,6 @@ function addon:OnEnable()
   categories:Enable()
   currency:Enable()
   self:HideBlizzardBags()
-
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
 

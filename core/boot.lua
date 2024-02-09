@@ -7,3 +7,5 @@ local addonName, root = ... --[[@type string, table]]
 local addon = LibStub("AceAddon-3.0"):NewAddon(root, addonName, 'AceHook-3.0')
 
 addon:SetDefaultModuleState(false)
+
+BINDING_NAME_BETTERBAGS_TOGGLESEARCH = "Search Bags"
