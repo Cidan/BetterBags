@@ -410,7 +410,7 @@ function bagFrame:Create(kind)
     end
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
     if kind == const.BAG_KIND.BACKPACK then
-      GameTooltip:SetText(L:G("Left Click to open the menu, right click to sort your bags."))
+      GameTooltip:SetText(L:G("Left Click to open the menu, right click redraw your bags and clear new items."))
     else
       GameTooltip:SetText(L:G("Left Click to open the menu, right click to swap to reagent bank and back."))
     end
@@ -437,7 +437,8 @@ function bagFrame:Create(kind)
     elseif e == "RightButton" and kind == const.BAG_KIND.BANK then
       b:ToggleReagentBank()
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
-      C_Container.SortBags()
+      items:RemoveNewItemFromAllItems()
+      b:Refresh()
     end
   end)
 

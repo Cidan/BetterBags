@@ -59,6 +59,16 @@ function items:Disable()
   --events:UnregisterEvent('BAG_UPDATE')
 end
 
+function items:RemoveNewItemFromAllItems()
+  for _, bagid in pairs(self.itemsByBagAndSlot) do
+    for _, item in pairs(bagid) do
+      if C_NewItems.IsNewItem(item.bagid, item.slotid) then
+        C_NewItems.RemoveNewItem(item.bagid, item.slotid)
+      end
+    end
+  end
+end
+
 function items:RefreshAll()
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() then
