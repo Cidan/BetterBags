@@ -56,6 +56,10 @@ function search.searchProto:UpdateSearch()
   addon.Bags.Bank:Search(text)
 end
 
+function search:GetText()
+  return self.searchFrame.textBox:GetText()
+end
+
 ---@param parent Frame
 ---@return SearchFrame
 function search:Create(parent)
