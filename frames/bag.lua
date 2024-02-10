@@ -415,7 +415,7 @@ function bagFrame:Create(kind)
     end
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
     if kind == const.BAG_KIND.BACKPACK then
-      GameTooltip:SetText(L:G("Left Click to open the menu, right click sort your bags and clear recent items."))
+      GameTooltip:SetText(L:G("Left Click to open the menu, right click sort your bags and clear recent items, shift left click to search."))
     else
       GameTooltip:SetText(L:G("Left Click to open the menu, right click to swap to reagent bank and back."))
     end
@@ -438,7 +438,12 @@ function bagFrame:Create(kind)
         anig:SetLooping("NONE")
         anig:Restart()
       end
-      context:Show(b.menuList)
+      if IsShiftKeyDown() then
+        BetterBags_ToggleSearch()
+      else
+        context:Show(b.menuList)
+      end
+
     elseif e == "RightButton" and kind == const.BAG_KIND.BANK then
       b:ToggleReagentBank()
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
