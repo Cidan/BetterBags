@@ -7,8 +7,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local animations = addon:NewModule('Animations')
 
 ---@param region Region
+---@param nohide? boolean
 ---@return AnimationGroup, AnimationGroup
-function animations:AttachFadeGroup(region)
+function animations:AttachFadeGroup(region, nohide)
   local fadeInGroup = region:CreateAnimationGroup()
   local fadeIn = fadeInGroup:CreateAnimation('Alpha')
   fadeIn:SetFromAlpha(0)
@@ -31,15 +32,20 @@ function animations:AttachFadeGroup(region)
   fadeOut:SetDuration(0.10)
   fadeOut:SetSmoothing('IN')
   fadeOutGroup:SetScript('OnFinished', function()
-    region:Hide()
+    if not nohide then
+      region:Hide()
+    else
+      region:SetAlpha(0)
+    end
   end)
   return fadeInGroup, fadeOutGroup
 end
 
 ---@param region Region
+---@param nohide? boolean
 ---@return AnimationGroup, AnimationGroup
-function animations:AttachFadeAndSlideLeft(region)
-  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region)
+function animations:AttachFadeAndSlideLeft(region, nohide)
+  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region, nohide)
   local slideOut = fadeOutGroup:CreateAnimation('Translation')
   slideOut:SetOffset(10, 0)
   slideOut:SetDuration(0.10)
@@ -48,9 +54,10 @@ function animations:AttachFadeAndSlideLeft(region)
 end
 
 ---@param region Region
+---@param nohide? boolean
 ---@return AnimationGroup, AnimationGroup
-function animations:AttachFadeAndSlideTop(region)
-  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region)
+function animations:AttachFadeAndSlideTop(region, nohide)
+  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region, nohide)
   local slideOut = fadeOutGroup:CreateAnimation('Translation')
   slideOut:SetOffset(0, -10)
   slideOut:SetDuration(0.10)

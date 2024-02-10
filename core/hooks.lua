@@ -8,6 +8,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
@@ -28,12 +31,10 @@ function addon.OnUpdate()
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldOpen = false
     addon.backpackShouldClose = false
-    addon.ForceShowBlizzardBags()
     addon.Bags.Backpack:Show()
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldClose = false
-    addon.ForceHideBlizzardBags()
     addon.Bags.Backpack:Hide()
   end
 end
@@ -105,6 +106,7 @@ function addon:CloseSpecialWindows(interactingFrame)
   addon.backpackShouldClose = true
   addon.Bags.Bank:Hide()
   addon.Bags.Bank:SwitchToBank()
+  events:SendMessage('addon/CloseSpecialWindows')
   CloseBankFrame()
 end
 

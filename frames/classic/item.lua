@@ -48,7 +48,6 @@ local children = {
   "ItemContextOverlay"
 }
 
-
 function itemFrame.itemProto:UpdateCooldown()
   ContainerFrame_UpdateCooldown(self.frame:GetID(), self.button)
 end
@@ -237,6 +236,13 @@ function itemFrame:_DoCreate()
   i.button = button
   i.frame = p
 
+  button.SetMatchesSearch = function(me, match)
+    if match then
+      me.searchOverlay:Hide()
+    else
+      me.searchOverlay:Show()
+    end
+  end
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND");
   button.ItemSlotBackground:SetAllPoints(button)
   button.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
