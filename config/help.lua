@@ -78,4 +78,29 @@ function config:CreateAllHelp()
     title = L:G("How do I delete an item from a custom category?"),
     text = L:G("When viewing a custom category configuration, you can right click on an item to open it's menu and select 'delete' to delete it from the category.")
   })
+ self:AddHelp({
+  group = L:G("Search"),
+  title = L:G("How do I search for items?"),
+  text = L:G([[
+    You can bind a key to open the search bar in the World of Warcraft keybindings menu. You can also open the search bar by shift clicking on the bag button at the top of the bag frame.
+    Once the search bar is open, you can type in the name of an item to search for it. You can also use the following search operators:
+    - `type:` to search for items of a specific type (e.g. `type:weapon`)
+    - `subtype:` to search for items of a specific subtype (e.g. `subtype:axe`)
+    - `name:` to search for items with a specific name (e.g. `name:axe`)
+    - `gear:` to search for items that are part of an equipment set (e.g. `gear:tank`)
+    - `exp:` to search for items from a specific expansion (e.g. `exp:shadowlands`)
+    
+    For expansions, you can use the following expansions shortcuts (e.g. `exp:classic`):
+    - `classic`
+    - `tbc`
+    - `wotlk`
+    - `cata`
+    - `mop`
+    - `wod`
+    - `legion`
+    - `bfa`
+    - `shadowlands`
+    - `dragonflight`
+  ]])
+ })
 end

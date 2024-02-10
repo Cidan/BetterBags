@@ -28,7 +28,8 @@ function BetterBags_ToggleSearch()
 end
 
 function search.searchProto:Toggle()
-  if self.frame:GetAlpha() > 0 then
+  if self.frame:IsShown() then
+    self.textBox:SetText("")
     self.textBox:ClearFocus()
     self.fadeOutGroup:Play()
   else
@@ -39,7 +40,7 @@ function search.searchProto:Toggle()
 end
 
 function search.searchProto:Hide()
-  if self.frame:GetAlpha() > 0 then
+  if self.frame:IsShown() then
     self.textBox:ClearFocus()
     self.fadeOutGroup:Play()
   end
@@ -97,7 +98,7 @@ function search:Create(parent)
   helpText:Show()
   sf.helpText = helpText
 
-  sf.fadeInGroup, sf.fadeOutGroup = animations:AttachFadeAndSlideLeft(f, true)
+  sf.fadeInGroup, sf.fadeOutGroup = animations:AttachFadeAndSlideLeft(f)
   sf.fadeInGroup:HookScript("OnFinished", function()
     textBox:SetFocus()
   end)

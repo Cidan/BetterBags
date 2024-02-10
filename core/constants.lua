@@ -235,6 +235,21 @@ const.EXPANSION_MAP = {
   [_G.LE_EXPANSION_DRAGONFLIGHT] = _G.EXPANSION_NAME9,
 }
 
+---@class BriefExpansionMap
+---@type table<number, string>
+const.BRIEF_EXPANSION_MAP = {
+  [_G.LE_EXPANSION_CLASSIC] = "classic",
+  [_G.LE_EXPANSION_BURNING_CRUSADE] = "bc",
+  [_G.LE_EXPANSION_WRATH_OF_THE_LICH_KING] = "wotlk",
+  [_G.LE_EXPANSION_CATACLYSM] = "cata",
+  [_G.LE_EXPANSION_MISTS_OF_PANDARIA] = "mop",
+  [_G.LE_EXPANSION_WARLORDS_OF_DRAENOR] = "wod",
+  [_G.LE_EXPANSION_LEGION] = "legion",
+  [_G.LE_EXPANSION_BATTLE_FOR_AZEROTH] = "bfa",
+  [_G.LE_EXPANSION_SHADOWLANDS] = "shadowlands",
+  [_G.LE_EXPANSION_DRAGONFLIGHT] = "dragonflight",
+}
+
 ---@class TradeSkillMap
 ---@type table<number, string>
 const.TRADESKILL_MAP = {
