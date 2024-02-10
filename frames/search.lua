@@ -60,7 +60,7 @@ end
 ---@return SearchFrame
 function search:Create(parent)
   local sf = setmetatable({}, {__index = search.searchProto})
-  local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "SimplePanelTemplate") --[[@as Frame]]
+  local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "BetterBagsSearchPanelTemplate") --[[@as Frame]]
   f:SetSize(400, 75)
   f:SetPoint("BOTTOM", parent, "TOP", 0, 10)
   f:SetFrameStrata("HIGH")

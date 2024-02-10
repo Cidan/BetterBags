@@ -52,6 +52,7 @@ util\resize.lua
 util\sort.lua
 util\bucket.lua
 
+frames\search.lua
 frames\slider.lua
 frames\money.lua
 frames\classic\money.lua

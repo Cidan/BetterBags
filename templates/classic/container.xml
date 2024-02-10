@@ -6,4 +6,77 @@
   </Frame>
   <Frame name="BetterBagsBagSlotPanelTemplate" inherits="ButtonFrameTemplate" virtual="true">
   </Frame>
+  <Frame name="BetterBagsSearchPanelTemplate" inherits="InsetFrameTemplate" virtual="true">
+		<Layers>
+			<Layer level="BORDER" textureSubLevel="1">
+      	<Texture name="$parentTopLeftCorner" inherits="UI-Frame-TopCornerLeft">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="-7" y="4"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentTopRightCorner" inherits="UI-Frame-TopCornerRightSimple">
+					<Anchors>
+						<Anchor point="TOPRIGHT" x="4" y="4"/>
+					</Anchors>
+				</Texture>
+        <Texture name="$parentTopBorder" inherits="_UI-Frame-Top">
+					<Anchors>
+						<Anchor point="TOPLEFT" relativeTo="$parentTopLeftCorner" relativePoint="TOPRIGHT" y="0"/>
+						<Anchor point="TOPRIGHT" relativeTo="$parentTopRightCorner" relativePoint="TOPLEFT" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentLeftBorder" inherits="!UI-Frame-LeftTile" parentKey="leftBorderBar">
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="0" />
+						<Anchor point="TOPLEFT" relativeTo="$parentTopLeftCorner" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentRightBorder" inherits="!UI-Frame-RightTile">
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="0" />
+						<Anchor point="TOPRIGHT" relativeTo="$parentTopRightCorner" relativePoint="BOTTOMRIGHT" x="1" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="botLeftCorner" inherits="UI-Frame-BotCornerLeft">
+					<Anchors>
+						<Anchor point="LEFT" x="-7" y="0"/>
+						<Anchor point="BOTTOM" x="0" y="-5"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="botRightCorner" inherits="UI-Frame-BotCornerRight">
+					<Anchors>
+						<Anchor point="BOTTOM" x="0" y="-5"/>
+						<Anchor point="RIGHT" x="4" y="0"/>
+					</Anchors>
+				</Texture>
+				<Texture parentKey="bottomBorder" inherits="_UI-Frame-Bot">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" relativeKey="$parent.botLeftCorner" relativePoint="BOTTOMRIGHT" y="0"/>
+						<Anchor point="BOTTOMRIGHT" relativeKey="$parent.botRightCorner" relativePoint="BOTTOMLEFT" y="0"/>
+					</Anchors>
+				</Texture>
+        <!--
+				<Texture name="$parentBtnCornerLeft" inherits="UI-Frame-BtnCornerLeft">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="-2" y="-1"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentBtnCornerRight" inherits="UI-Frame-BtnCornerRight">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="0" y="-1"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentButtonBottomBorder" inherits="_UI-Frame-BtnBotTile">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" relativeTo="$parentBtnCornerLeft" relativePoint="BOTTOMRIGHT" y="3"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentBtnCornerRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+        -->
+			</Layer>
+		</Layers>
+    <Frames>
+      <Frame name="$parentInset" parentKey="Inset" />
+    </Frames>
+  </Frame>
 </Ui>

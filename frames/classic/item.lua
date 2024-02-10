@@ -48,6 +48,8 @@ local children = {
   "ItemContextOverlay"
 }
 
+function itemFrame.itemProto:UpdateSearch(text)
+end
 
 function itemFrame.itemProto:UpdateCooldown()
   ContainerFrame_UpdateCooldown(self.frame:GetID(), self.button)
