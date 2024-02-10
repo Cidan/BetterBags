@@ -55,6 +55,9 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 -------
 --- Bag Prototype
 -------
@@ -91,6 +94,7 @@ function bagFrame.bagProto:Show()
   if self.frame:IsShown() then
     return
   end
+  addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
   self.frame:Show()
 end
@@ -99,6 +103,7 @@ function bagFrame.bagProto:Hide()
   if not self.frame:IsShown() then
     return
   end
+  addon.ForceHideBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
   self.frame:Hide()
   if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
@@ -478,6 +483,9 @@ function bagFrame:Create(kind)
   slots.frame:Hide()
   b.slots = slots
 
+  if kind == const.BAG_KIND.BACKPACK then
+    search:Create(b.frame)
+  end
   -- Setup the search box events.
   b.frame.SearchBox:SetAlpha(0)
   b.frame.SearchBox:SetScript("OnEnter", function()
