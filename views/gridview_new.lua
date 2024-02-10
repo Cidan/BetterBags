@@ -78,12 +78,11 @@ function views:GridView(bag, dirtyItems)
         section:RemoveCell(guid, itemButton)
       end
     end
+    -- Remove the section if it's empty, otherwise draw it.
     if section:GetCellCount() == 0 then
-      -- Remove the section if it's empty.
       bag:RemoveSection(sectionName)
       section:Release()
     else
-      -- Draw the section if it's not empty.
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       section:Draw(bag.kind, database:GetBagView(bag.kind))
     end

@@ -105,9 +105,11 @@ function bagFrame.bagProto:Hide()
   end
   addon.ForceHideBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
+  print("hiding")
   self.frame:Hide()
   if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
     debug:Log("draw", "Drawing bag on close")
+    print("draw on close")
     self.drawOnClose = false
     self:Refresh()
   end
@@ -143,6 +145,15 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagFrame.bagProto:Wipe()
+  for sectionName, section in pairs(self:GetAllSections()) do
+    for guid, itemButton in pairs(section:GetAllCells()) do
+      section:RemoveCell(guid, itemButton)
+      itemButton:Release()
+    end
+    self:RemoveSection(sectionName)
+    section:Release()
+  end
+  --[[
   for _, oldFrame in pairs(self.toRelease) do
     oldFrame:Release()
   end
@@ -156,6 +167,7 @@ function bagFrame.bagProto:Wipe()
   wipe(self.sections)
   wipe(self.toRelease)
   wipe(self.toReleaseSections)
+  --]]
 end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
@@ -196,6 +208,7 @@ end
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
 function bagFrame.bagProto:Draw(dirtyItems)
+  -- TODO(lobato): Implement slots view, maybe.
   if self.slots:IsShown() then
     self:Wipe()
   end
