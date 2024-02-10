@@ -232,7 +232,11 @@ function bagFrame:Create(kind)
         anig:SetLooping("NONE")
         anig:Restart()
       end
-      context:Show(b.menuList)
+      if IsShiftKeyDown() then
+        BetterBags_ToggleSearch()
+      else
+        context:Show(b.menuList)
+      end
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
     PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
     items:RemoveNewItemFromAllItems()

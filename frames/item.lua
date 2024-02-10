@@ -113,7 +113,7 @@ local function matchFilter(filter, data)
     if string.find(data.itemInfo.itemName:lower(), value, 1, true) then
       return true
     end
-  elseif prefix == "exp" then
+  elseif prefix == "exp" and data.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[data.itemInfo.expacID] ~= nil then
     if string.find(const.BRIEF_EXPANSION_MAP[data.itemInfo.expacID]:lower(), value, 1, true) then
       return true
     end
