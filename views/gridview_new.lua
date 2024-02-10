@@ -53,7 +53,10 @@ function views:GridView(bag, dirtyItems)
       bag.itemsByBagAndSlot[bagid][slotid] = itemButton
     end
 
+    -- Set the item data on the item frame.
     itemButton:SetItem(data)
+
+    -- Add the item to the correct category section.
     local category = itemButton:GetCategory()
     local section = bag:GetOrCreateSection(category)
     if not data.isItemEmpty then
@@ -61,21 +64,26 @@ function views:GridView(bag, dirtyItems)
     end
   end
 
+  -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(bag:GetAllSections()) do
     for guid, itemButton in pairs(section:GetAllCells()) do
       local data = itemButton.data
+      -- Remove item buttons that are empty from the grid.
       if data.isItemEmpty then
         section:RemoveCell(guid, itemButton)
         itemButton.frame:Hide()
       end
+      -- Remove item buttons that don't belong in this section.
       if data.itemInfo.category ~= sectionName then
         section:RemoveCell(guid, itemButton)
       end
     end
     if section:GetCellCount() == 0 then
+      -- Remove the section if it's empty.
       bag:RemoveSection(sectionName)
       section:Release()
     else
+      -- Draw the section if it's not empty.
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       section:Draw(bag.kind, database:GetBagView(bag.kind))
     end
