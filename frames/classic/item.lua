@@ -79,7 +79,7 @@ function itemFrame.itemProto:SetItem(data)
   local isActive = questInfo.isActive
 
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
-  if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0) and
+  if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1) and
     (data.itemInfo.classID == Enum.ItemClass.Armor or
     data.itemInfo.classID == Enum.ItemClass.Weapon or
     data.itemInfo.classID == Enum.ItemClass.Gem) then
