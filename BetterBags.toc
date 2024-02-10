@@ -65,7 +65,7 @@ frames\bagslots.lua
 frames\currency.lua
 
 views\views.lua
-views\gridview.lua
+views\gridview_new.lua
 views\oneview.lua
 views\listview.lua
 

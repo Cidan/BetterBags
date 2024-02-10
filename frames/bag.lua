@@ -267,6 +267,7 @@ end
 
 function bagFrame.bagProto:RemoveSection(category)
   if category == L:G("Recent Items") then return end
+  self.content:RemoveCell(category, self.sections[category])
   self.sections[category] = nil
 end
 
