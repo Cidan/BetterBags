@@ -17,6 +17,4 @@
   </Frame>
   <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
   </Frame>
-  <Frame name="BetterBagsSearchPanelTemplate" inherits="FlatPanelBackgroundTemplate" virtual="true">
-  </Frame>
 </Ui>

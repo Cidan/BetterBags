@@ -52,18 +52,21 @@ function search.searchProto:UpdateSearch()
   else
     self.helpText:Hide()
   end
+  addon.Bags.Backpack:Search(text)
+  addon.Bags.Bank:Search(text)
 end
 
 ---@param parent Frame
 ---@return SearchFrame
 function search:Create(parent)
   local sf = setmetatable({}, {__index = search.searchProto})
-  local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "BetterBagsSearchPanelTemplate") --[[@as Frame]]
+  local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "SimplePanelTemplate") --[[@as Frame]]
   f:SetSize(400, 75)
-  f:SetPoint("TOP", UIParent, "TOP", 0, -300)
+  f:SetPoint("BOTTOM", parent, "TOP", 0, 10)
   f:SetFrameStrata("HIGH")
   f:SetFrameLevel(700)
   f:SetAlpha(0)
+  f.Inset:Hide()
   f:Show()
 
   local textBox = CreateFrame("EditBox", nil, f) --[[@as EditBox]]
@@ -74,6 +77,7 @@ function search:Create(parent)
   textBox:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 0)
   textBox:ClearFocus()
   textBox:SetAutoFocus(false)
+  textBox:SetJustifyH("CENTER")
   textBox:SetScript("OnEscapePressed", function(me)
     ---@cast me +EditBox
     me:ClearFocus()
@@ -84,7 +88,7 @@ function search:Create(parent)
   end)
 
   local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK", "GameFontDisableLarge")
-  helpText:SetPoint("LEFT", textBox, "LEFT", 0, 0)
+  helpText:SetPoint("CENTER", textBox, "CENTER", 0, 0)
   helpText:SetText("Start typing to search your bags...")
   helpText:Show()
   sf.helpText = helpText
@@ -97,6 +101,7 @@ function search:Create(parent)
     textBox:SetText("")
     helpText:Show()
   end)
+
   sf.frame = f
   sf.textBox = textBox
   search.searchFrame = sf
