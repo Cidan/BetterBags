@@ -194,10 +194,8 @@ end
 ---@param text? string
 function bagFrame.bagProto:Search(text)
   if not self.currentView then return end
-  for _, bagData in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    for _, item in pairs(bagData) do
-      item:UpdateSearch(text)
-    end
+  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
+    item:UpdateSearch(text)
   end
 end
 
@@ -307,10 +305,8 @@ end
 
 function bagFrame.bagProto:OnCooldown()
   if not self.currentView then return end
-  for _, bagData in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    for _, item in pairs(bagData) do
-      item:UpdateCooldown()
-    end
+  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
+    item:UpdateCooldown()
   end
 end
 

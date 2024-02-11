@@ -37,7 +37,7 @@ local function GridView(view, bag, dirtyItems)
   --view.content:Clear()
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
-    view.itemsByBagAndSlot[bagid] = view.itemsByBagAndSlot[bagid] or {}
+    local slotkey = view:GetSlotKey(data)
 
     -- Capture information about free slots.
     if data.isItemEmpty then
@@ -55,11 +55,11 @@ local function GridView(view, bag, dirtyItems)
     end
 
     -- Create or get the item frame for this slot.
-    local itemButton = view.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
+    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
     if itemButton == nil then
       itemButton = itemFrame:Create()
       itemButton:AddToMasqueGroup(bag.kind)
-      view.itemsByBagAndSlot[bagid][slotid] = itemButton
+      view.itemsByBagAndSlot[slotkey] = itemButton
     end
 
     -- Set the item data on the item frame.
@@ -76,9 +76,9 @@ local function GridView(view, bag, dirtyItems)
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
     for slotkey, itemButton in pairs(section:GetAllCells()) do
+      print(slotkey)
       -- Get the bag and slot id from the slotkey.
-      local bagid, slotid = view:ParseSlotKey(slotkey)
-      local data = view.itemsByBagAndSlot[bagid][slotid].data
+      local data = view.itemsByBagAndSlot[slotkey].data
       -- Remove item buttons that are empty or don't match the category.
       if data.isItemEmpty  then
         section:RemoveCell(slotkey)

@@ -13,7 +13,7 @@ local views = addon:NewModule('Views')
 ---@field sections table<string, Section>
 ---@field content Grid
 ---@field kind BagView
----@field itemsByBagAndSlot table<number, table<number, Item>>
+---@field itemsByBagAndSlot table<string, Item>
 views.viewProto = {}
 
 ---@param bag Bag
@@ -67,7 +67,7 @@ function views.viewProto:GetAllSections()
   return self.sections
 end
 
----@return table<number, table<number, Item>>
+---@return table<string, Item>
 function views.viewProto:GetItemsByBagAndSlot()
   return self.itemsByBagAndSlot
 end
