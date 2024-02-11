@@ -306,6 +306,7 @@ function bagFrame.bagProto:SwitchToBank()
 end
 
 function bagFrame.bagProto:OnCooldown()
+  if not self.currentView then return end
   for _, bagData in pairs(self.currentView:GetItemsByBagAndSlot()) do
     for _, item in pairs(bagData) do
       item:UpdateCooldown()

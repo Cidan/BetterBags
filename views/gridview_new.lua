@@ -22,6 +22,9 @@ local views = addon:GetModule('Views')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
+---@class Debug : AceModule
+local debug = addon:GetModule('Debug')
+
 ---@param view view
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
@@ -63,9 +66,9 @@ local function GridView(view, bag, dirtyItems)
     itemButton:SetItem(data)
 
     -- Add the item to the correct category section.
-    local category = itemButton:GetCategory()
-    local section = view:GetOrCreateSection(category)
     if not data.isItemEmpty then
+      local category = itemButton:GetCategory()
+      local section = view:GetOrCreateSection(category)
       section:AddCell(data.itemInfo.itemGUID, itemButton)
     end
   end
@@ -74,15 +77,14 @@ local function GridView(view, bag, dirtyItems)
   for sectionName, section in pairs(view:GetAllSections()) do
     for guid, itemButton in pairs(section:GetAllCells()) do
       local data = itemButton.data
-      -- Remove item buttons that are empty from the grid.
-      if data.isItemEmpty then
+      -- Remove item buttons that are empty or don't match the category.
+      if data.isItemEmpty  then
+        debug:Log("Grid", "removing because empty", guid, "from section", sectionName)
         section:RemoveCell(guid)
         itemButton:Wipe()
-      end
-      -- Remove item buttons that don't belong in this section.
-      if data.itemInfo.category ~= sectionName then
+      elseif data.itemInfo.category ~= sectionName then
+        debug:Log("Grid", "item info does not match section", data.itemInfo.itemName, sectionName, data.itemInfo.category)
         section:RemoveCell(guid)
-        itemButton:Wipe()
       end
     end
     -- Remove the section if it's empty, otherwise draw it.

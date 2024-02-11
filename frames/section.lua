@@ -107,7 +107,7 @@ function sectionProto:HasItem(item)
 end
 
 function sectionProto:GetAllCells()
-  return self.content.cells
+  return self.content.idToCell
 end
 
 function sectionProto:Release()
