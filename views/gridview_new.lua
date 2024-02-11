@@ -26,6 +26,13 @@ local sort = addon:GetModule('Sort')
 local debug = addon:GetModule('Debug')
 
 ---@param view view
+local function Wipe(view)
+  view.content:Wipe()
+  wipe(view.sections)
+  wipe(view.itemsByBagAndSlot)
+end
+
+---@param view view
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 local function GridView(view, bag, dirtyItems)
@@ -69,14 +76,13 @@ local function GridView(view, bag, dirtyItems)
     if not data.isItemEmpty then
       local category = itemButton:GetCategory()
       local section = view:GetOrCreateSection(category)
-      section:AddCell(view:GetSlotKey(data), itemButton)
+      section:AddCell(slotkey, itemButton)
     end
   end
 
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
     for slotkey, itemButton in pairs(section:GetAllCells()) do
-      print(slotkey)
       -- Get the bag and slot id from the slotkey.
       local data = view.itemsByBagAndSlot[slotkey].data
       -- Remove item buttons that are empty or don't match the category.
@@ -134,5 +140,6 @@ function views:NewGrid(parent)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
   view.Render = GridView
+  view.Wipe = Wipe
   return view
 end

@@ -24,6 +24,10 @@ function views.viewProto:Render(bag, dirtyItems)
   error('Render method not implemented')
 end
 
+function views.viewProto:Wipe()
+  error('Wipe method not implemented')
+end
+
 ---@return BagView
 function views.viewProto:GetKind()
   return self.kind

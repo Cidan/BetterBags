@@ -147,7 +147,10 @@ end
 
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagFrame.bagProto:Wipe()
-  print("wipe the world")
+  if self.currentView then
+    print("wiping bag")
+    self.currentView:Wipe()
+  end
   --[[
   for sectionName, section in pairs(self:GetAllSections()) do
     for guid, itemButton in pairs(section:GetAllCells()) do
@@ -282,14 +285,14 @@ function bagFrame.bagProto:ToggleReagentBank()
     BankFrame.selectedTab = 2
     self.frame:SetTitle(L:G("Reagent Bank"))
     self.currentItemCount = -1
-    self:ClearRecentItems()
+    --self:ClearRecentItems()
     self:Wipe()
     items:RefreshReagentBank()
   else
     BankFrame.selectedTab = 1
     self.frame:SetTitle(L:G("Bank"))
     self.currentItemCount = -1
-    self:ClearRecentItems()
+    --self:ClearRecentItems()
     self:Wipe()
     items:RefreshBank()
   end
