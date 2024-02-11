@@ -13,23 +13,27 @@ local database = addon:GetModule('Database')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class GridFrame: AceModule
+local grid = addon:GetModule('Grid')
+
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
+---@param view view
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
-function views:GridView(bag, dirtyItems)
+local function GridView(view, bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   local itemCount = 0
-  bag.content.compactStyle = database:GetBagCompaction(bag.kind)
+  view.content.compactStyle = database:GetBagCompaction(bag.kind)
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
-    bag.itemsByBagAndSlot[bagid] = bag.itemsByBagAndSlot[bagid] or {}
+    view.itemsByBagAndSlot[bagid] = view.itemsByBagAndSlot[bagid] or {}
 
     -- Capture information about free slots.
     if data.isItemEmpty then
@@ -47,10 +51,10 @@ function views:GridView(bag, dirtyItems)
     end
 
     -- Create or get the item frame for this slot.
-    local itemButton = bag.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
+    local itemButton = view.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
     if itemButton == nil then
       itemButton = itemFrame:Create()
-      bag.itemsByBagAndSlot[bagid][slotid] = itemButton
+      view.itemsByBagAndSlot[bagid][slotid] = itemButton
     end
 
     -- Set the item data on the item frame.
@@ -58,29 +62,30 @@ function views:GridView(bag, dirtyItems)
 
     -- Add the item to the correct category section.
     local category = itemButton:GetCategory()
-    local section = bag:GetOrCreateSection(category)
+    local section = view:GetOrCreateSection(category)
     if not data.isItemEmpty then
       section:AddCell(data.itemInfo.itemGUID, itemButton)
     end
   end
 
   -- Loop through all sections and reconcile the items.
-  for sectionName, section in pairs(bag:GetAllSections()) do
+  for sectionName, section in pairs(view:GetAllSections()) do
     for guid, itemButton in pairs(section:GetAllCells()) do
       local data = itemButton.data
       -- Remove item buttons that are empty from the grid.
       if data.isItemEmpty then
         section:RemoveCell(guid, itemButton)
-        itemButton.frame:Hide()
+        itemButton:Wipe()
       end
       -- Remove item buttons that don't belong in this section.
       if data.itemInfo.category ~= sectionName then
         section:RemoveCell(guid, itemButton)
+        itemButton:Wipe()
       end
     end
     -- Remove the section if it's empty, otherwise draw it.
     if section:GetCellCount() == 0 then
-      bag:RemoveSection(sectionName)
+      view:RemoveSection(sectionName)
       section:Release()
     else
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
@@ -88,11 +93,12 @@ function views:GridView(bag, dirtyItems)
     end
   end
 
+  view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
-  bag.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
+  view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
 
   -- Position all sections and draw the main bag.
-  local w, h = bag.content:Draw()
+  local w, h = view.content:Draw()
   -- Reposition the content frame if the recent items section is empty.
   if w < 160 then
     w = 160
@@ -100,7 +106,7 @@ function views:GridView(bag, dirtyItems)
   if h == 0 then
     h = 40
   end
-  bag.content:HideScrollBar()
+  view.content:HideScrollBar()
   --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
   -- than the screen space.
   bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
@@ -108,7 +114,23 @@ function views:GridView(bag, dirtyItems)
   const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
   const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
   bag.frame:SetHeight(bagHeight)
+  view.content:Show()
+end
 
+---@param parent Frame
+---@return view
+function views:NewGrid(parent)
+  local view = setmetatable({}, {__index = views.viewProto})
+  view.sections = {}
+  view.itemsByBagAndSlot = {}
+  view.content = grid:Create(parent)
+  view.content:GetContainer():ClearAllPoints()
+  view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+  view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
+  view.content:Hide()
+  view.Render = GridView
+  return view
 end
 
 --function views:GridView(bag, dirtyItems)

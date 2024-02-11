@@ -374,6 +374,12 @@ function itemFrame.itemProto:Release()
   itemFrame._pool:Release(self)
 end
 
+function itemFrame.itemProto:Wipe()
+  self.frame:Hide()
+  self.frame:SetParent(nil)
+  self.frame:ClearAllPoints()
+end
+
 function itemFrame.itemProto:ClearItem()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
