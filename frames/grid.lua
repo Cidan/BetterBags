@@ -212,6 +212,20 @@ function gridProto:Draw()
   return width, height
 end
 
+-- Clear will remove and release all columns from the grid,
+-- but will not release cells.
+function gridProto:Clear()
+  for _, column in pairs(self.columns) do
+    column:RemoveAll()
+    column:Release()
+  end
+  wipe(self.cellToColumn)
+  wipe(self.columns)
+  wipe(self.cells)
+  wipe(self.idToCell)
+  wipe(self.cellToID)
+end
+
 function gridProto:Wipe()
   for _, column in pairs(self.columns) do
     column:Release()

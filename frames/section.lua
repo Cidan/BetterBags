@@ -49,11 +49,12 @@ function sectionProto:SetTitle(text)
 end
 
 function sectionProto:AddCell(id, cell)
+  if self.content:GetCell(id) ~= nil then return end
   self.content:AddCell(id, cell)
 end
 
-function sectionProto:RemoveCell(id, cell)
-  self.content:RemoveCell(id, cell)
+function sectionProto:RemoveCell(id)
+  self.content:RemoveCell(id)
 end
 
 function sectionProto:GetMaxCellWidth()
@@ -156,7 +157,7 @@ function sectionFrame:_DoCreate()
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
 
-  --debug:DrawDebugBorder(f, 1, 1, 1)
+  --debug:DrawBorder(f, 1, 0, 0)
 
   -- Create the section title.
   local title = s.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")

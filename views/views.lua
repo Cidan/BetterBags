@@ -46,6 +46,8 @@ function views.viewProto:GetOrCreateSection(category)
     section:SetTitle(category)
     self.content:AddCell(category, section)
     self.sections[category] = section
+  elseif self.content:GetCell(category) == nil then
+    self.content:AddCell(category, section)
   end
   return section
 end

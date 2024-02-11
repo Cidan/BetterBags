@@ -31,6 +31,7 @@ local function GridView(view, bag, dirtyItems)
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   local itemCount = 0
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
+  --view.content:Clear()
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
     view.itemsByBagAndSlot[bagid] = view.itemsByBagAndSlot[bagid] or {}
@@ -54,6 +55,7 @@ local function GridView(view, bag, dirtyItems)
     local itemButton = view.itemsByBagAndSlot[bagid][slotid] --[[@as Item]]
     if itemButton == nil then
       itemButton = itemFrame:Create()
+      itemButton:AddToMasqueGroup(bag.kind)
       view.itemsByBagAndSlot[bagid][slotid] = itemButton
     end
 
@@ -74,12 +76,12 @@ local function GridView(view, bag, dirtyItems)
       local data = itemButton.data
       -- Remove item buttons that are empty from the grid.
       if data.isItemEmpty then
-        section:RemoveCell(guid, itemButton)
+        section:RemoveCell(guid)
         itemButton:Wipe()
       end
       -- Remove item buttons that don't belong in this section.
       if data.itemInfo.category ~= sectionName then
-        section:RemoveCell(guid, itemButton)
+        section:RemoveCell(guid)
         itemButton:Wipe()
       end
     end
