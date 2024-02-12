@@ -110,18 +110,21 @@ local function GridView(view, bag, dirtyItems)
     end
   end
 
+  -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
 
   view.freeSlot = view.freeSlot or itemFrame:Create()
   view.freeSlot:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
   freeSlotsSection:AddCell('freeSlot', view.freeSlot)
 
+  -- Only add the reagent free slot to the backbag view.
   if bag.kind == const.BAG_KIND.BACKPACK then
     view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
     view.freeReagentSlot:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
     freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
   end
 
+  -- Draw the free slots section.
   freeSlotsSection:SetMaxCellWidth(2)
   freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind))
 
