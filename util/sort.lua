@@ -15,6 +15,9 @@ local debug = addon:GetModule('Debug')
 ---@class Sort: AceModule
 local sort = addon:NewModule('Sort')
 
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
 ---@param aData ItemData
 ---@param bData ItemData
 ---@return boolean
@@ -67,6 +70,8 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsAlphabetically(a, b)
+  if a.title:GetText() == L:G("Recent Items") then return true end
+  if b.title:GetText() == L:G("Recent Items") then return false end
   return a.title:GetText() < b.title:GetText()
 end
 
@@ -74,6 +79,8 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeDescending(a, b)
+  if a.title:GetText() == L:G("Recent Items") then return true end
+  if b.title:GetText() == L:G("Recent Items") then return false end
   local aSize, bSize = a:GetCellCount(), b:GetCellCount()
   if aSize ~= bSize then
     return aSize > bSize
@@ -85,6 +92,8 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeAscending(a, b)
+  if a.title:GetText() == L:G("Recent Items") then return true end
+  if b.title:GetText() == L:G("Recent Items") then return false end
   local aSize, bSize = a:GetCellCount(), b:GetCellCount()
   if aSize ~= bSize then
     return aSize < bSize

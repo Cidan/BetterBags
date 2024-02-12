@@ -105,11 +105,9 @@ function bagFrame.bagProto:Hide()
   end
   addon.ForceHideBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
-  print("hiding")
   self.frame:Hide()
   if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
     debug:Log("draw", "Drawing bag on close")
-    print("draw on close")
     self.drawOnClose = false
     self:Refresh()
   end
@@ -148,7 +146,6 @@ end
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagFrame.bagProto:Wipe()
   if self.currentView then
-    print("wiping bag")
     self.currentView:Wipe()
   end
   --[[
