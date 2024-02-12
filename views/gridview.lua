@@ -31,6 +31,8 @@ local debug = addon:GetModule('Debug')
 ---@param view view
 local function Wipe(view)
   view.content:Wipe()
+  view.freeSlot = nil
+  view.freeReagentSlot = nil
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
 end
@@ -109,10 +111,13 @@ local function GridView(view, bag, dirtyItems)
   end
 
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
+
+  view.freeSlot = view.freeSlot or itemFrame:Create()
   view.freeSlot:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
   freeSlotsSection:AddCell('freeSlot', view.freeSlot)
 
   if bag.kind == const.BAG_KIND.BACKPACK then
+    view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
     view.freeReagentSlot:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
     freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
   end
@@ -150,8 +155,6 @@ function views:NewGrid(parent)
   local view = setmetatable({}, {__index = views.viewProto})
   view.sections = {}
   view.itemsByBagAndSlot = {}
-  view.freeSlot = itemFrame:Create()
-  view.freeReagentSlot = itemFrame:Create()
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
