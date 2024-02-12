@@ -86,7 +86,11 @@ local function GridView(view, bag, dirtyItems)
     end
   end
 
-  if itemCount < view.itemCount then view.defer = true else view.defer = false end
+  if itemCount < view.itemCount and not bag.slots:IsShown() then
+    view.defer = true
+  else
+    view.defer = false
+  end
 
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
