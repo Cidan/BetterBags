@@ -22,6 +22,9 @@ local views = addon:GetModule('Views')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
@@ -83,14 +86,16 @@ local function GridView(view, bag, dirtyItems)
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
     for slotkey, itemButton in pairs(section:GetAllCells()) do
-      -- Get the bag and slot id from the slotkey.
-      local data = view.itemsByBagAndSlot[slotkey].data
-      -- Remove item buttons that are empty or don't match the category.
-      if data.isItemEmpty  then
-        section:RemoveCell(slotkey)
-        itemButton:Wipe()
-      elseif data.itemInfo.category ~= sectionName then
-        section:RemoveCell(slotkey)
+      if slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
+        -- Get the bag and slot id from the slotkey.
+        local data = view.itemsByBagAndSlot[slotkey].data
+        -- Remove item buttons that are empty or don't match the category.
+        if data.isItemEmpty  then
+          section:RemoveCell(slotkey)
+          itemButton:Wipe()
+        elseif data.itemInfo.category ~= sectionName then
+          section:RemoveCell(slotkey)
+        end
       end
     end
     -- Remove the section if it's empty, otherwise draw it.
@@ -102,6 +107,18 @@ local function GridView(view, bag, dirtyItems)
       section:Draw(bag.kind, database:GetBagView(bag.kind))
     end
   end
+
+  local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
+  view.freeSlot:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
+  freeSlotsSection:AddCell('freeSlot', view.freeSlot)
+
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    view.freeReagentSlot:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
+    freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
+  end
+
+  freeSlotsSection:SetMaxCellWidth(2)
+  freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind))
 
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
@@ -133,6 +150,8 @@ function views:NewGrid(parent)
   local view = setmetatable({}, {__index = views.viewProto})
   view.sections = {}
   view.itemsByBagAndSlot = {}
+  view.freeSlot = itemFrame:Create()
+  view.freeReagentSlot = itemFrame:Create()
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)

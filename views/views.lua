@@ -14,6 +14,8 @@ local views = addon:NewModule('Views')
 ---@field content Grid
 ---@field kind BagView
 ---@field itemsByBagAndSlot table<string, Item>
+---@field freeSlot Item
+---@field freeReagentSlot Item
 views.viewProto = {}
 
 ---@param bag Bag
