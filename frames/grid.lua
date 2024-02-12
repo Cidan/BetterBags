@@ -74,6 +74,7 @@ function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
+  if self.idToCell[id] ~= nil then return end
   table.insert(self.cells, cell)
   self.idToCell[id] = cell
   self.cellToID[cell] = id
@@ -99,6 +100,11 @@ end
 
 function gridProto:GetCell(id)
   return self.idToCell[id]
+end
+
+---@return table<string, Cell|Item|Section|BagButton>
+function gridProto:GetAllCells()
+  return self.idToCell
 end
 
 ---@param header Section
@@ -209,6 +215,8 @@ function gridProto:Draw()
     width = width - 4 ---@type number
   end
   self.inner:SetSize(width, height)
+  print("line below will break lists, fix tomorrow")
+  self.frame:SetSize(width, height)
   return width, height
 end
 
@@ -226,13 +234,13 @@ function gridProto:Clear()
   wipe(self.cellToID)
 end
 
+-- Wipe completely removes all cells and columns from the grid
+-- and releases all cells and columns.
 function gridProto:Wipe()
   for _, column in pairs(self.columns) do
     column:Release()
   end
-  for _, cell in pairs(self.cells) do
-    cell:Release()
-  end
+
   wipe(self.cellToColumn)
   wipe(self.columns)
   wipe(self.cells)

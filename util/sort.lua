@@ -114,6 +114,9 @@ end
 ---@param b Item
 ---@return boolean
 function sort.SortItemsByQualityThenAlpha(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+
   if invalidData(a.data, b.data) then return false end
   if a.data.itemInfo.itemQuality ~= b.data.itemInfo.itemQuality then
     return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
@@ -129,6 +132,9 @@ end
 ---@param b Item
 ---@return boolean
 function sort.SortItemsByAlphaThenQuality(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+
   if invalidData(a.data, b.data) then return false end
   if a.data.itemInfo.itemName ~= b.data.itemInfo.itemName then
     return a.data.itemInfo.itemName < b.data.itemInfo.itemName

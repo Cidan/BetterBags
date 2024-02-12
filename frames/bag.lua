@@ -71,9 +71,6 @@ local search = addon:GetModule('Search')
 ---@field frame Frame The fancy frame of the bag.
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
----@field freeSlots Section The free slots section.
----@field freeBagSlotsButton Item The free bag slots button.
----@field freeReagentBagSlotsButton Item The free reagent bag slots button.
 ---@field currencyFrame CurrencyFrame The currency frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
@@ -133,47 +130,11 @@ function bagFrame.bagProto:GetPosition()
   return x * scale, y * scale
 end
 
-function bagFrame.bagProto:WipeFreeSlots()
-  --[[
-  self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.content:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
-  self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots:RemoveCell("freeReagentBagSlots", self.freeReagentBagSlotsButton)
-  self.freeSlots:GetContent():Hide()
-  --]]
-end
-
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagFrame.bagProto:Wipe()
   if self.currentView then
     self.currentView:Wipe()
   end
-  --[[
-  for sectionName, section in pairs(self:GetAllSections()) do
-    for guid, itemButton in pairs(section:GetAllCells()) do
-      section:RemoveCell(guid, itemButton)
-      itemButton:Release()
-    end
-    self:RemoveSection(sectionName)
-    section:Release()
-  end
-  --]]
-  --self.itemsByBagAndSlot = {}
-  --[[
-  for _, oldFrame in pairs(self.toRelease) do
-    oldFrame:Release()
-  end
-  for _, section in pairs(self.toReleaseSections) do
-    section:Release()
-  end
-  self:WipeFreeSlots()
-  self.content:RemoveCell(self.freeSlots.title:GetText(), self.freeSlots)
-  self.content:Wipe()
-  wipe(self.itemsByBagAndSlot)
-  wipe(self.sections)
-  wipe(self.toRelease)
-  wipe(self.toReleaseSections)
-  --]]
 end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
@@ -199,13 +160,6 @@ function bagFrame.bagProto:Search(text)
   end
 end
 
--- UpdateCellWidth will update the cell width of the bag based on the current
--- bag view configuration.
-function bagFrame.bagProto:UpdateCellWidth()
-  local sizeInfo = database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind))
-  --self.content.maxCellWidth = sizeInfo.columnCount
-end
-
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
 function bagFrame.bagProto:Draw(dirtyItems)
@@ -213,7 +167,7 @@ function bagFrame.bagProto:Draw(dirtyItems)
   if self.slots:IsShown() then
     self:Wipe()
   end
-  self:UpdateCellWidth()
+
   local view = self.views[database:GetBagView(self.kind)]
   if view == nil then
     assert(view, "No view found for bag view: "..database:GetBagView(self.kind))
@@ -221,26 +175,13 @@ function bagFrame.bagProto:Draw(dirtyItems)
   end
 
   if self.currentView and self.currentView:GetKind() ~=  view:GetKind() then
+    self.currentView:Wipe()
     self.currentView:GetContent():Hide()
   end
 
   view:Render(self, dirtyItems)
   view:GetContent():Show()
   self.currentView = view
-  --[[
-  if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
-    print("Drawing onebag")
-    self.resizeHandle:Hide()
-    views:OneBagView(self, dirtyItems)
-  elseif database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_GRID then
-    print("drawing section grid")
-    self.resizeHandle:Hide()
-    views:GridView(self, dirtyItems)
-  elseif database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
-    self.resizeHandle:Show()
-    views:ListView(self, dirtyItems)
-  end
-  ]]--
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
   local text = search:GetText()
   self:Search(text)
@@ -262,18 +203,7 @@ function bagFrame.bagProto:OnResize()
   end
   self:KeepBagInBounds()
 end
---[[
-function bagFrame.bagProto:ClearRecentItems()
-  for _, i in pairs(self.recentItems:GetAllCells()) do
-    local bagid, slotid = i.data.bagid, i.data.slotid
-    if bagid and slotid then
-      self.itemsByBagAndSlot[bagid] = self.itemsByBagAndSlot[bagid] or {}
-      self.itemsByBagAndSlot[bagid][slotid] = nil
-    end
-  end
-  self.recentItems:WipeOnlyContents()
-end
---]]
+
 function bagFrame.bagProto:ToggleReagentBank()
   -- This should never happen, but just in case!
   if self.kind == const.BAG_KIND.BACKPACK then return end
@@ -360,7 +290,7 @@ function bagFrame:Create(kind)
   b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
 
   b.views = {
-    --[const.BAG_VIEW.ONE_BAG] = views:OneBagView,
+    [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f),
     [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f),
     --[const.BAG_VIEW.LIST] = views:ListView
   }
@@ -459,27 +389,6 @@ function bagFrame:Create(kind)
       C_Container:SortBags()
     end
   end)
-
-  -- Create the recent items section.
-  --[[
-  local recentItems = sectionFrame:Create()
-  recentItems:SetTitle(L:G("Recent Items"))
-  recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  recentItems.frame:Hide()
-  content:AddHeader(recentItems)
-  b.recentItems = recentItems
-  --]]
-  -- Create the free bag slots buttons and free bag slot section.
-  local freeBagSlotsButton = itemFrame:Create()
-  b.freeBagSlotsButton = freeBagSlotsButton
-
-  local freeReagentBagSlotsButton = itemFrame:Create()
-  b.freeReagentBagSlotsButton = freeReagentBagSlotsButton
-
-  local freeSlots = sectionFrame:Create()
-  freeSlots:SetTitle(L:G("Free Slots"))
-  freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)

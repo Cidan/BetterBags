@@ -38,6 +38,7 @@ local debug = addon:GetModule('Debug')
 ---@field frame Frame
 ---@field button ItemButton|Button
 ---@field data ItemData
+---@field isFreeSlot boolean
 ---@field kind BagKind
 ---@field masqueGroup string
 ---@field ilvlText FontString
@@ -261,6 +262,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
 
+  self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
   self.frame:Show()
   self.button:Show()
@@ -408,7 +410,7 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:SetText("")
   self:SetSize(37, 37)
   self.data = nil
-  self:SetAlpha(1)
+  self.isFreeSlot = false
 end
 
 ---@param kind BagKind

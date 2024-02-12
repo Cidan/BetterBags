@@ -47,7 +47,6 @@ local function GridView(view, bag, dirtyItems)
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   local itemCount = 0
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
-  --view.content:Clear()
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
     local slotkey = view:GetSlotKey(data)
@@ -173,7 +172,6 @@ local function GridView(view, bag, dirtyItems)
     bag.frame:SetHeight(bagHeight)
   end
 
-  view.content:Show()
   view.itemCount = itemCount
 end
 
@@ -184,6 +182,7 @@ function views:NewGrid(parent)
   view.sections = {}
   view.itemsByBagAndSlot = {}
   view.itemCount = 0
+  view.kind = const.BAG_VIEW.SECTION_GRID
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
