@@ -208,7 +208,8 @@ end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
-function bagFrame.bagProto:Draw(dirtyItems)
+---@param defer? boolean
+function bagFrame.bagProto:Draw(dirtyItems, defer)
   -- TODO(lobato): Implement slots view, maybe.
   if self.slots:IsShown() then
     self:Wipe()
@@ -224,6 +225,7 @@ function bagFrame.bagProto:Draw(dirtyItems)
     self.currentView:GetContent():Hide()
   end
 
+  view.defer = defer or false
   view:Render(self, dirtyItems)
   view:GetContent():Show()
   self.currentView = view

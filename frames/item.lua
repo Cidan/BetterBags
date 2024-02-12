@@ -216,6 +216,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 
+  self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end
@@ -407,6 +408,7 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:SetText("")
   self:SetSize(37, 37)
   self.data = nil
+  self:SetAlpha(1)
 end
 
 ---@param kind BagKind

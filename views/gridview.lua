@@ -33,6 +33,7 @@ local function Wipe(view)
   view.content:Wipe()
   view.freeSlot = nil
   view.freeReagentSlot = nil
+  view.itemCount = 0
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
 end
@@ -85,31 +86,47 @@ local function GridView(view, bag, dirtyItems)
     end
   end
 
+  if itemCount < view.itemCount then view.defer = true else view.defer = false end
+
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
-    for slotkey, itemButton in pairs(section:GetAllCells()) do
+    for slotkey, _ in pairs(section:GetAllCells()) do
       if slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
         -- Get the bag and slot id from the slotkey.
         local data = view.itemsByBagAndSlot[slotkey].data
         -- Remove item buttons that are empty or don't match the category.
-        if data.isItemEmpty  then
-          section:RemoveCell(slotkey)
-          itemButton:Wipe()
+        if data.isItemEmpty then
+          if view.defer then
+            view.itemsByBagAndSlot[slotkey]:SetAlpha(0)
+            bag.drawOnClose = true
+          else
+            section:RemoveCell(slotkey)
+            view.itemsByBagAndSlot[slotkey]:Wipe()
+            bag.drawOnClose = false
+          end
         elseif data.itemInfo.category ~= sectionName then
-          section:RemoveCell(slotkey)
+          if view.defer then
+            view.itemsByBagAndSlot[slotkey]:SetAlpha(0)
+            bag.drawOnClose = true
+          else
+            section:RemoveCell(slotkey)
+            bag.drawOnClose = false
+          end
         end
       end
     end
-    -- Remove the section if it's empty, otherwise draw it.
-    if section:GetCellCount() == 0 then
-      view:RemoveSection(sectionName)
-      section:Release()
-    else
-      section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-      section:Draw(bag.kind, database:GetBagView(bag.kind))
+
+    if not view.defer then
+      -- Remove the section if it's empty, otherwise draw it.
+      if section:GetCellCount() == 0 then
+        view:RemoveSection(sectionName)
+        section:Release()
+      else
+        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+        section:Draw(bag.kind, database:GetBagView(bag.kind))
+      end
     end
   end
-
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
 
@@ -132,24 +149,28 @@ local function GridView(view, bag, dirtyItems)
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
 
-  -- Position all sections and draw the main bag.
-  local w, h = view.content:Draw()
-  -- Reposition the content frame if the recent items section is empty.
-  if w < 160 then
-    w = 160
+  if not view.defer then
+    -- Position all sections and draw the main bag.
+    local w, h = view.content:Draw()
+    -- Reposition the content frame if the recent items section is empty.
+    if w < 160 then
+      w = 160
+    end
+    if h == 0 then
+      h = 40
+    end
+    view.content:HideScrollBar()
+    --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
+    -- than the screen space.
+    bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+    local bagHeight = h +
+    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+    bag.frame:SetHeight(bagHeight)
   end
-  if h == 0 then
-    h = 40
-  end
-  view.content:HideScrollBar()
-  --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-  -- than the screen space.
-  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
-  local bagHeight = h +
-  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-  bag.frame:SetHeight(bagHeight)
+
   view.content:Show()
+  view.itemCount = itemCount
 end
 
 ---@param parent Frame
@@ -158,6 +179,7 @@ function views:NewGrid(parent)
   local view = setmetatable({}, {__index = views.viewProto})
   view.sections = {}
   view.itemsByBagAndSlot = {}
+  view.itemCount = 0
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
