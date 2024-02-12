@@ -215,8 +215,6 @@ function gridProto:Draw()
     width = width - 4 ---@type number
   end
   self.inner:SetSize(width, height)
-  print("line below will break lists, fix tomorrow")
-  self.frame:SetSize(width, height)
   return width, height
 end
 
@@ -287,7 +285,6 @@ function grid:Create(parent)
   ---@class WowScrollBox
   local f = grid:CreateScrollFrame(g, parent, c)
 
-  --f:SetParent(parent)
   g.frame = f
   g.inner = c
   g.cells = {}
@@ -300,8 +297,8 @@ function grid:Create(parent)
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   g.spacing = 4
   g.bar:Show()
-  --g.scrollBox = grid:CreateScrollFrame(f)
-  --g.scrollBox:Hide()
+  -- Fixes a bug where the frame is not visble when anchored to the parent.
+  g.frame:SetSize(1,1)
   return g
 end
 

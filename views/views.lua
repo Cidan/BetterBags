@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule('SectionFrame')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
 
@@ -92,4 +95,11 @@ function views.viewProto:ParseSlotKey(slotkey)
   ---@type string, string
   local bagid, slotid = strsplit('-', slotkey)
   return tonumber(bagid) --[[@as number]], tonumber(slotid) --[[@as number]]
+end
+
+function views.viewProto:SetPoints()
+  local parent = self:GetContent():GetContainer():GetParent()
+  self.content:GetContainer():ClearAllPoints()
+  self.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
 end
