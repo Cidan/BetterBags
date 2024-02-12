@@ -48,6 +48,11 @@ function item.itemRowProto:SetItem(data)
   if slotid then
     self.rowButton:SetID(slotid)
   end
+
+  if data.isItemEmpty then
+    return
+  end
+
   self.rowButton:SetHasItem(data.itemInfo.itemIcon)
 
   local quality = data.itemInfo.itemQuality

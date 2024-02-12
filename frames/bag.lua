@@ -198,8 +198,8 @@ function bagFrame.bagProto:KeepBagInBounds()
 end
 
 function bagFrame.bagProto:OnResize()
-  if database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
-    views:UpdateListSize(self)
+  if database:GetBagView(self.kind) == const.BAG_VIEW.LIST and self.currentView ~= nil then
+    self.currentView:UpdateListSize(self)
   end
   self:KeepBagInBounds()
 end
@@ -292,7 +292,7 @@ function bagFrame:Create(kind)
   b.views = {
     [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f),
     [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f),
-    --[const.BAG_VIEW.LIST] = views:ListView
+    [const.BAG_VIEW.LIST] = views:NewList(f)
   }
 
   -- Register the bag frame so that window positions are saved.

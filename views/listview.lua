@@ -15,40 +15,49 @@ local itemRowFrame = addon:GetModule('ItemRowFrame')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
+---@class GridFrame: AceModule
+local grid = addon:GetModule('Grid')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
+---@param view view
+local function Wipe(view)
+  view.content:Wipe()
+  view.freeSlot = nil
+  view.freeReagentSlot = nil
+  wipe(view.sections)
+  wipe(view.itemsByBagAndSlot)
+end
+
 --TODO(lobato): Move the -35 below to constants.
 
+---@param view view
 ---@param bag Bag
-function views:UpdateListSize(bag)
+local function UpdateListSize(view, bag)
   local w, _ = bag.frame:GetSize()
-  for _, section in pairs(bag:GetAllSections()) do
+  for _, section in pairs(view:GetAllSections()) do
     section.frame:SetWidth(w - 35)
     for _, cell in pairs(section:GetAllCells()) do
       cell.frame:SetWidth(w - 35)
     end
   end
-  bag.recentItems.frame:SetWidth(w - 35)
-  for _, cell in pairs(bag.recentItems:GetAllCells()) do
-    cell.frame:SetWidth(w - 35)
-  end
 end
 
+---@param view view
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
-function views:ListView(bag, dirtyItems)
+local function ListView(view, bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
-  bag:WipeFreeSlots()
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
-  bag.content.compactStyle = database:GetBagCompaction(bag.kind)
+  view.content.compactStyle = database:GetBagCompaction(bag.kind)
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
-    bag.itemsByBagAndSlot[bagid] = bag.itemsByBagAndSlot[bagid] or {}
+    local slotkey = view:GetSlotKey(data)
 
     -- Capture information about free slots.
     if data.isItemEmpty then
@@ -63,117 +72,77 @@ function views:ListView(bag, dirtyItems)
       end
     end
 
-    local oldFrame = bag.itemsByBagAndSlot[bagid][slotid] --[[@as ItemRow]]
-    -- The old frame does not exist, so we need to create a new one.
-    if oldFrame == nil and not data.isItemEmpty then
-      local newFrame = itemRowFrame:Create()
-      newFrame.rowButton:SetScript("OnMouseWheel", function(_, delta)
-        bag.content:GetContainer():OnMouseWheel(delta)
+    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as ItemRow]]
+    if itemButton == nil then
+      itemButton = itemRowFrame:Create()
+      itemButton.rowButton:SetScript("OnMouseWheel", function(_, delta)
+        view.content:GetContainer():OnMouseWheel(delta)
       end)
-      newFrame:SetItem(data)
-      local category = newFrame:GetCategory()
-      local section ---@type Section|nil
-      section = bag:GetOrCreateSection(category)
+      itemButton:AddToMasqueGroup(bag.kind)
+      view.itemsByBagAndSlot[slotkey] = itemButton --[[@as Item]]
+    end
 
+    itemButton:SetItem(data)
+
+    if not data.isItemEmpty then
+      local category = itemButton:GetCategory()
+      local section = view:GetOrCreateSection(category)
       section:GetContent():GetContainer():SetScript("OnMouseWheel", function(_, delta)
-        bag.content:GetContainer():OnMouseWheel(delta)
+        view.content:GetContainer():OnMouseWheel(delta)
       end)
-      section:AddCell(data.itemInfo.itemGUID, newFrame)
-      newFrame:AddToMasqueGroup(bag.kind)
-      bag.itemsByBagAndSlot[bagid][slotid] = newFrame
-    elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame.data.itemInfo.itemGUID ~= data.itemInfo.itemGUID then
-      -- This case handles the situation where the item in this slot no longer matches the item displayed.
-      -- The old frame exists, so we need to update it.
-      local oldCategory = oldFrame.data.itemInfo.category
-      local oldSection = bag:GetSection(oldCategory)
-      local oldGuid = oldFrame:GetGUID()
-      oldFrame:SetItem(data)
-      local newCategory = oldFrame:GetCategory()
-      local newSection = bag:GetOrCreateSection(newCategory)
-
-      if oldCategory ~= newCategory then
-        oldSection:RemoveCell(oldGuid, oldFrame)
-        newSection:AddCell(oldFrame:GetGUID(), oldFrame)
-      end
-      if oldSection == bag.recentItems then
-      elseif oldSection:GetCellCount() == 0 then
-        bag:RemoveSection(oldCategory)
-        bag.content:RemoveCell(oldCategory, oldSection)
-        oldSection:Release()
-      end
-    elseif oldFrame ~= nil and not data.isItemEmpty and oldFrame:GetGUID() == data.itemInfo.itemGUID then
-      -- This case handles when the item in this slot is the same as the item displayed.
-      local oldCategory = oldFrame.data.itemInfo.category
-      local oldSection = bag:GetOrCreateSection(oldCategory)
-      local oldGuid = oldFrame.data.itemInfo.itemGUID
-      oldFrame:SetItem(data)
-      local newCategory = oldFrame:GetCategory()
-      local newSection = bag:GetOrCreateSection(newCategory)
-      if oldCategory ~= newCategory then
-        oldSection:RemoveCell(oldGuid, oldFrame)
-        newSection:AddCell(oldFrame.data.itemInfo.itemGUID, oldFrame)
-      end
-      if oldSection == bag.recentItems then
-      elseif oldSection:GetCellCount() == 0 then
-        bag:RemoveSection(oldCategory)
-        bag.content:RemoveCell(oldCategory, oldSection)
-        oldSection:Release()
-      end
-    elseif data.isItemEmpty and oldFrame ~= nil then
-      -- The old frame exists, but the item is empty, so we need to delete it.
-      bag.itemsByBagAndSlot[bagid][slotid] = nil
-      local section = bag:GetOrCreateSection(oldFrame:GetCategory())
-      section:RemoveCell(oldFrame:GetGUID(), oldFrame)
-      -- Delete the section if it's empty as well.
-      if section == bag.recentItems then
-      elseif section:GetCellCount() == 0 then
-        bag:RemoveSection(oldFrame:GetCategory())
-        bag.content:RemoveCell(oldFrame:GetCategory(), section)
-        section:Release()
-      end
-      oldFrame:Release()
+      section:AddCell(slotkey, itemButton)
     end
   end
 
-  bag.freeSlots:AddCell("freeBagSlots", bag.freeBagSlotsButton)
-  if bag.freeReagentBagSlotsButton then
-    bag.freeSlots:AddCell("freeReagentBagSlots", bag.freeReagentBagSlotsButton)
+  for sectionName, section in pairs(view:GetAllSections()) do
+    for slotkey, _ in pairs(section:GetAllCells()) do
+      local data = view.itemsByBagAndSlot[slotkey].data
+      if data.isItemEmpty then
+        section:RemoveCell(slotkey)
+        view.itemsByBagAndSlot[slotkey]:Release()
+      end
+    end
+    if section:GetCellCount() == 0 then
+      view:RemoveSection(sectionName)
+      section:Release()
+    else
+      section:SetMaxCellWidth(1)
+      section:Draw(bag.kind, database:GetBagView(bag.kind))
+    end
   end
-  bag.freeBagSlotsButton:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
-  if bag.freeReagentBagSlotsButton then
-    bag.freeReagentBagSlotsButton:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
-  end
-  bag.recentItems:SetMaxCellWidth(1)
-  -- Loop through each section and draw it's size.
-  for _, section in pairs(bag:GetAllSections()) do
-    section:SetMaxCellWidth(1)
-    section:Draw(bag.kind, database:GetBagView(bag.kind))
-  end
-  bag.recentItems:Draw(bag.kind, database:GetBagView(bag.kind))
-  bag.freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  bag.freeSlots:Draw(bag.kind, database:GetBagView(bag.kind))
 
-  -- Remove the freeSlots section.
-  bag.content:RemoveCell(bag.freeSlots.title:GetText(), bag.freeSlots)
-
-  -- Sort all sections by title.
-  bag.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.LIST))
-  bag.content.maxCellWidth = 1
-  -- Add the freeSlots section back to the end of all sections
-  --bag.content:AddCellToLastColumn(bag.freeSlots.title:GetText(), bag.freeSlots)
-  bag.freeSlots.frame:Hide()
-  -- Position all sections and draw the main bag.
-  local w, h = bag.content:Draw()
-  -- Reposition the content frame if the recent items section is empty.
+  view.content.maxCellWidth = 1
+  view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.LIST))
+  local w, h = view.content:Draw()
 
   if w < 160 then
-    w = 160
+  w = 160
   end
   if h == 0 then
-    h = 40
+  h = 40
   end
-  bag.content:ShowScrollBar()
+  view.content:ShowScrollBar()
 
   bag.frame:SetSize(database:GetBagViewFrameSize(bag.kind, database:GetBagView(bag.kind)))
-  bag.content:GetContainer():FullUpdate()
+  view.content:GetContainer():FullUpdate()
+end
+
+---@param parent Frame
+---@return view
+function views:NewList(parent)
+  local view = setmetatable({}, {__index = views.viewProto})
+  view.sections = {}
+  view.itemsByBagAndSlot = {}
+  view.itemCount = 0
+  view.kind = const.BAG_VIEW.LIST
+  view.content = grid:Create(parent)
+  view.content:GetContainer():ClearAllPoints()
+  view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+  view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
+  view.content:Hide()
+  view.Render = ListView
+  view.Wipe = Wipe
+  view.UpdateListSize = UpdateListSize
+  return view
 end
