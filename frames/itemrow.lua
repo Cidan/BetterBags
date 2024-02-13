@@ -78,6 +78,12 @@ function item.itemRowProto:SetItem(data)
   self.rowButton:Show()
 end
 
+function item.itemRowProto:Wipe()
+  self.frame:Hide()
+  self.frame:SetParent(nil)
+  self.frame:ClearAllPoints()
+end
+
 function item.itemRowProto:ClearItem()
   self.button:ClearItem()
 
