@@ -74,14 +74,6 @@ function itemFrame.itemProto:SetItem(data)
     return
   end
 
-  local questInfo = data.questInfo
-  local info = data.containerInfo
-  local readable = info and info.isReadable;
-  local isFiltered = info and info.isFiltered;
-  local noValue = info and info.hasNoValue;
-  local isQuestItem = questInfo.isQuestItem;
-  local questID = questInfo.questID;
-  local isActive = questInfo.isActive
 
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1) and
