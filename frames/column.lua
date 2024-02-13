@@ -73,9 +73,6 @@ function columnProto:Wipe()
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.minimumWidth = 0
-  for _, cell in ipairs(self.cells) do
-    cell:Release()
-  end
   wipe(self.cells)
   wipe(self.idToCell)
 end

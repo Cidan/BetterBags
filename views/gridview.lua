@@ -129,6 +129,7 @@ local function GridView(view, bag, dirtyItems)
       -- Remove the section if it's empty, otherwise draw it.
       if section:GetCellCount() == 0 then
         view:RemoveSection(sectionName)
+        section:ReleaseAllCells()
         section:Release()
       else
         section:SetMaxCellWidth(sizeInfo.itemsPerRow)

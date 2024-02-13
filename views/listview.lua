@@ -112,6 +112,7 @@ local function ListView(view, bag, dirtyItems)
     end
     if section:GetCellCount() == 0 then
       view:RemoveSection(sectionName)
+      section:ReleaseAllCells()
       section:Release()
     else
       section:SetMaxCellWidth(1)
