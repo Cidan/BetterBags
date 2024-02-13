@@ -238,7 +238,6 @@ function gridProto:Wipe()
   for _, column in pairs(self.columns) do
     column:Release()
   end
-
   wipe(self.cellToColumn)
   wipe(self.columns)
   wipe(self.cells)

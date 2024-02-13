@@ -430,12 +430,12 @@ function itemFrame:OnInitialize()
 end
 
 function itemFrame:OnEnable()
-  -- Pre-populate the pool with 300 items. This is done
+  -- Pre-populate the pool with 600 items. This is done
   -- so that items acquired during combat do not taint
   -- the bag frame.
   ---@type Item[]
   local frames = {}
-  for i = 1, 300 do
+  for i = 1, 600 do
     frames[i] = self:Create()
   end
   for _, frame in pairs(frames) do
