@@ -12,6 +12,9 @@ local const = addon:GetModule('Constants')
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
 
+---@class ItemFrame: AceModule
+local itemFrame = addon:GetModule('ItemFrame')
+
 ---@class view
 ---@field sections table<string, Section>
 ---@field content Grid
@@ -21,6 +24,7 @@ local views = addon:NewModule('Views')
 ---@field freeReagentSlot Item
 ---@field defer boolean
 ---@field itemCount number
+---@field itemFrames Item[]
 views.viewProto = {}
 
 ---@param bag Bag
@@ -95,6 +99,21 @@ function views.viewProto:ParseSlotKey(slotkey)
   ---@type string, string
   local bagid, slotid = strsplit('-', slotkey)
   return tonumber(bagid) --[[@as number]], tonumber(slotid) --[[@as number]]
+end
+
+---@return Item
+function views.viewProto:GetItemFrame()
+  self.itemFrames = self.itemFrames or {}
+  local i = itemFrame:Create()
+  tinsert(self.itemFrames, i)
+  return i
+end
+
+function views.viewProto:ReleaseItemFrames()
+  for _, item in pairs(self.itemFrames) do
+    item:Release()
+  end
+  wipe(self.itemFrames)
 end
 
 function views.viewProto:SetPoints()

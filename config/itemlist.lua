@@ -52,6 +52,7 @@ local function SetList(self, values)
   self:SetFullWidth(true)
   self:SetRelativeWidth(1)
   self:DoLayout()
+  self.section:ReleaseAllCells()
   self.section:WipeOnlyContents()
   self:SetUserData("values", values)
 
