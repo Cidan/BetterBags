@@ -37,6 +37,7 @@ local function Wipe(view)
   view.freeReagentSlot = nil
   view.itemCount = 0
   for _, section in pairs(view.sections) do
+    section:ReleaseAllCells()
     section:Release()
   end
   for _, item in pairs(view.itemsByBagAndSlot) do
