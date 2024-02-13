@@ -42,7 +42,7 @@ function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
-  self.button.frame:SetPoint("LEFT", self.frame)
+  self.button.frame:SetPoint("LEFT", self.frame, "LEFT")
 
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
@@ -207,6 +207,7 @@ function item:_DoCreate()
   end)
   i.frame:SetSize(350, 34)
 
+  --debug:DrawBorder(i.button.frame, 0, 0, 1)
   return i
 end
 

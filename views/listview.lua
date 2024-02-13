@@ -54,7 +54,7 @@ local function ListView(view, bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
-  view.content.compactStyle = database:GetBagCompaction(bag.kind)
+  view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
     local slotkey = view:GetSlotKey(data)
@@ -99,7 +99,9 @@ local function ListView(view, bag, dirtyItems)
       local data = view.itemsByBagAndSlot[slotkey].data
       if data.isItemEmpty then
         section:RemoveCell(slotkey)
-        view.itemsByBagAndSlot[slotkey]:Release()
+        view.itemsByBagAndSlot[slotkey]:Wipe()
+      elseif data.itemInfo.category ~= sectionName then
+        section:RemoveCell(slotkey)
       end
     end
     if section:GetCellCount() == 0 then
