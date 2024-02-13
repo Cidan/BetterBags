@@ -27,6 +27,8 @@ local views = addon:GetModule('Views')
 ---@param view view
 local function Wipe(view)
   view.content:Wipe()
+  view.freeSlot:Release()
+  view.freeReagentSlot:Release()
   view.freeSlot = nil
   view.freeReagentSlot = nil
   for _, item in pairs(view.itemsByBagAndSlot) do

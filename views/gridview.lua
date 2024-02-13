@@ -31,6 +31,8 @@ local debug = addon:GetModule('Debug')
 ---@param view view
 local function Wipe(view)
   view.content:Wipe()
+  view.freeSlot:Release()
+  view.freeReagentSlot:Release()
   view.freeSlot = nil
   view.freeReagentSlot = nil
   view.itemCount = 0
@@ -110,7 +112,8 @@ local function GridView(view, bag, dirtyItems)
             bag.drawOnClose = true
           else
             section:RemoveCell(slotkey)
-            view.itemsByBagAndSlot[slotkey]:Wipe()
+            view.itemsByBagAndSlot[slotkey]:Release()
+            view.itemsByBagAndSlot[slotkey] = nil
             bag.drawOnClose = false
           end
         elseif data.itemInfo.category ~= sectionName then
