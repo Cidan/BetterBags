@@ -58,36 +58,6 @@ local currency = addon:GetModule('Currency')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
-function bagFrame.bagProto:WipeFreeSlots()
-  self.content:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots:RemoveCell("freeBagSlots", self.freeBagSlotsButton)
-  self.freeSlots:GetContent():Hide()
-end
-
--- Draw will draw the correct bag view based on the bag view configuration.
----@param dirtyItems ItemData[]
-function bagFrame.bagProto:Draw(dirtyItems)
-  if self.slots:IsShown() then
-    self:Wipe()
-  end
-  self:UpdateCellWidth()
-  if database:GetBagView(self.kind) == const.BAG_VIEW.ONE_BAG then
-    self.resizeHandle:Hide()
-    views:OneBagView(self, dirtyItems)
-  elseif database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_GRID then
-    self.resizeHandle:Hide()
-    views:GridView(self, dirtyItems)
-  elseif database:GetBagView(self.kind) == const.BAG_VIEW.LIST then
-    self.resizeHandle:Show()
-    views:ListView(self, dirtyItems)
-  end
-  self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = search:GetText()
-  self:Search(text)
-  self:KeepBagInBounds()
-end
-
-
 function bagFrame.bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
@@ -95,7 +65,6 @@ function bagFrame.bagProto:SwitchToBank()
   --self.frame:SetTitle(L:G("Bank"))
   self:Wipe()
 end
-
 
 -------
 --- Bag Frame
@@ -111,12 +80,10 @@ function bagFrame:Create(kind)
   b.currentItemCount = 0
   b.drawOnClose = false
   b.isReagentBank = false
-  b.itemsByBagAndSlot = {}
   b.sections = {}
   b.toRelease = {}
   b.toReleaseSections = {}
   b.kind = kind
-  local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsClassicBagPortrait
@@ -154,6 +121,11 @@ function bagFrame:Create(kind)
     if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
   end)
 
+  b.views = {
+    [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f),
+    [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f),
+    [const.BAG_VIEW.LIST] = views:NewList(f)
+  }
 
   -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
@@ -246,32 +218,6 @@ function bagFrame:Create(kind)
     b:Refresh()
     end
   end)
-
-  -- Create the bag content frame.
-  local content = grid:Create(b.frame)
-  content:GetContainer():ClearAllPoints()
-  content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-  content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
-  content.compactStyle = const.GRID_COMPACT_STYLE.NONE
-  content:Show()
-  b.content = content
-
-  -- Create the recent items section.
-  local recentItems = sectionFrame:Create()
-  recentItems:SetTitle(L:G("Recent Items"))
-  recentItems:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  recentItems.frame:Hide()
-  content:AddHeader(recentItems)
-  b.recentItems = recentItems
-
-  -- Create the free bag slots buttons and free bag slot section.
-  local freeBagSlotsButton = itemFrame:Create()
-  b.freeBagSlotsButton = freeBagSlotsButton
-
-  local freeSlots = sectionFrame:Create()
-  freeSlots:SetTitle(L:G("Free Slots"))
-  freeSlots:SetMaxCellWidth(sizeInfo.itemsPerRow)
-  b.freeSlots = freeSlots
 
   local slots = bagSlots:CreatePanel(kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)

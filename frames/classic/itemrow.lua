@@ -39,7 +39,10 @@ function item.itemRowProto:SetItem(data)
   if slotid then
     self.rowButton:SetID(slotid)
   end
-  --self.rowButton:SetHasItem(data.itemInfo.itemIcon)
+
+  if data.isItemEmpty then
+    return
+  end
 
   local quality = data.itemInfo.itemQuality
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))

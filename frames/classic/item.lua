@@ -69,6 +69,11 @@ function itemFrame.itemProto:SetItem(data)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
+
+  if data.isItemEmpty then
+    return
+  end
+
   local questInfo = data.questInfo
   local info = data.containerInfo
   local readable = info and info.isReadable;
