@@ -160,7 +160,7 @@ local function GridView(view, bag, dirtyItems)
   freeSlotsSection:AddCell('freeSlot', view.freeSlot)
 
   -- Only add the reagent free slot to the backbag view.
-  if bag.kind == const.BAG_KIND.BACKPACK then
+  if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
     view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
     view.freeReagentSlot:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
     freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
