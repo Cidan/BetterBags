@@ -122,6 +122,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 --]]
+  self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end

@@ -55,9 +55,6 @@ end
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 local function GridView(view, bag, dirtyItems)
-  if not addon.isRetail then
-    view:Wipe()
-  end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
