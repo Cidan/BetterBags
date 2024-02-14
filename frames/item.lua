@@ -216,6 +216,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
+  self.button.minDisplayCount = 1
 
   self:SetAlpha(1)
   self.frame:Show()
