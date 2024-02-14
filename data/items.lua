@@ -181,6 +181,7 @@ function items:AttachItemInfo(data)
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
   if itemID == nil then
     data.isItemEmpty = true
+    data.itemInfo = {} --[[@as table]]
     return
   end
   data.isItemEmpty = false

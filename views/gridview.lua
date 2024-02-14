@@ -92,10 +92,14 @@ local function GridView(view, bag, dirtyItems)
     local previousCategory = itemButton.data and itemButton.data.itemInfo and itemButton.data.itemInfo.category
 
     -- Set the item data on the item frame.
-    itemButton:SetItem(data)
+    if bag.slots:IsShown() and data.isItemEmpty then
+      itemButton:SetFreeSlots(bagid, slotid, 1, bagid == Enum.BagIndex.ReagentBag)
+    else
+      itemButton:SetItem(data)
+    end
 
     -- Add the item to the correct category section.
-    if not data.isItemEmpty then
+    if (not bag.slots:IsShown() and not data.isItemEmpty) or (bag.slots:IsShown()) then
       local category = itemButton:GetCategory()
       local section = view:GetOrCreateSection(category)
       section:AddCell(slotkey, itemButton)
@@ -118,7 +122,7 @@ local function GridView(view, bag, dirtyItems)
         -- Get the bag and slot id from the slotkey.
         local data = view.itemsByBagAndSlot[slotkey].data
         -- Remove item buttons that are empty or don't match the category.
-        if data.isItemEmpty then
+        if data.isItemEmpty and not bag.slots:IsShown() then
           if view.defer then
             view.itemsByBagAndSlot[slotkey]:SetAlpha(0)
             bag.drawOnClose = true

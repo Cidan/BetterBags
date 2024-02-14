@@ -238,7 +238,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-
+  self.data = {bagid = bagid, slotid = slotid, isItemEmpty = true, itemInfo = {}} --[[@as table]]
   if count == 0 then
     self.button:Disable()
   else
@@ -269,7 +269,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 end
 
 function itemFrame.itemProto:GetCategory()
-  if self.data.isItemEmpty then return L:G('Empty Slot') end
 
   if self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.slots:IsShown() then
     self.data.itemInfo.category = format("#%d: %s", self.data.bagid+1, C_Container.GetBagName(self.data.bagid))
@@ -287,6 +286,8 @@ function itemFrame.itemProto:GetCategory()
     end
     return self.data.itemInfo.category
   end
+
+  if self.data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(self.kind, "RecentItems") then
     if self:IsNewItem() then
