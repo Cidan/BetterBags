@@ -72,6 +72,9 @@ const.BACKPACK_ONLY_BAGS_LIST = {
   Enum.BagIndex.Bag_4,
 }
 
+const.BACKPACK_ONLY_REAGENT_BAGS = {
+  [Enum.BagIndex.ReagentBag] = nil,
+}
 
 const.OFFSETS = {
   -- This is the offset from the top of the bag window to the start of the
