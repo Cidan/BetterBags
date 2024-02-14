@@ -59,6 +59,7 @@ local function GridView(view, bag, dirtyItems)
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   local itemCount = 0
+  local categoryChanged = false
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
@@ -87,6 +88,9 @@ local function GridView(view, bag, dirtyItems)
       view.itemsByBagAndSlot[slotkey] = itemButton
     end
 
+    -- Get the previous category for this slotkey.
+    local previousCategory = itemButton.data and itemButton.data.itemInfo and itemButton.data.itemInfo.category
+
     -- Set the item data on the item frame.
     itemButton:SetItem(data)
 
@@ -95,10 +99,13 @@ local function GridView(view, bag, dirtyItems)
       local category = itemButton:GetCategory()
       local section = view:GetOrCreateSection(category)
       section:AddCell(slotkey, itemButton)
+      if previousCategory ~= category then
+        categoryChanged = true
+      end
     end
   end
 
-  if itemCount < view.itemCount and not bag.slots:IsShown() then
+  if itemCount < view.itemCount and not bag.slots:IsShown() and not categoryChanged then
     view.defer = true
   else
     view.defer = false
