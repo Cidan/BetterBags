@@ -244,6 +244,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self.button:Enable()
   end
+
   self.button.minDisplayCount = -1
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
@@ -251,9 +252,18 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
   SetItemButtonCount(self.button, count)
+  self.button:SetItemButtonTexture(0)
+  self.button:UpdateQuestItem(false, nil, nil)
+  self.button:UpdateNewItem(false)
+  self.button:UpdateJunkItem(false, false)
+  self.button:UpdateItemContextMatching()
+  SetItemButtonDesaturated(self.button, false)
+  self.ilvlText:SetText("")
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
+  else
+    SetItemButtonDesaturated(self.button, false)
   end
 
   if self.kind == const.BAG_KIND.BANK then
@@ -399,7 +409,7 @@ function itemFrame.itemProto:ClearItem()
   self.button:UpdateNewItem(false)
   self.button:UpdateJunkItem(false, false)
   self.button:UpdateItemContextMatching()
-  SetItemButtonQuality(self.button, false);
+  SetItemButtonQuality(self.button, false)
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
   ClearItemButtonOverlay(self.button)

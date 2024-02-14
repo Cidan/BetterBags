@@ -119,7 +119,7 @@ local function SetList(self, values)
       self.section:AddCell(v.itemInfo.itemID, item)
     end
     self.section:SetMaxCellWidth(1)
-    local w, h = self.section:Draw(0, 3)
+    local w, h = self.section:Draw(0, 3, false)
     for _, cell in pairs(self.section:GetAllCells()) do
       cell.frame:SetWidth(w * 2 - 35)
     end
