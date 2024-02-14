@@ -46,6 +46,7 @@ function items:OnEnable()
   --events:RegisterEvent('BAG_UPDATE_DELAYED', self.RefreshAll, self)
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:RefreshAll() end)
   events:BucketEvent('BAG_UPDATE_DELAYED', function() self:RefreshAll() end)
+  events:BucketEvent('PLAYERBANKSLOTS_CHANGED', function() self:RefreshBank() end)
   events:RegisterEvent('BANKFRAME_OPENED', function()
     addon.atBank = true
     self:RefreshBank()
