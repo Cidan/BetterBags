@@ -145,3 +145,10 @@ function sort.SortItemsByAlphaThenQuality(a, b)
   end
   return a.data.itemInfo.itemGUID < b.data.itemInfo.itemGUID
 end
+
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.GetItemSortBySlot(a, b)
+  return a.data.slotid < b.data.slotid
+end

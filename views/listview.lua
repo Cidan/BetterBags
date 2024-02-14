@@ -116,7 +116,7 @@ local function ListView(view, bag, dirtyItems)
       section:Release()
     else
       section:SetMaxCellWidth(1)
-      section:Draw(bag.kind, database:GetBagView(bag.kind))
+      section:Draw(bag.kind, database:GetBagView(bag.kind), bag.slots:IsShown())
     end
   end
 

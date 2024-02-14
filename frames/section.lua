@@ -36,10 +36,11 @@ local sectionProto = {}
 
 ---@param kind BagKind
 ---@param view BagView
+---@param freeSpaceShown boolean
 ---@return number width
 ---@return number height
-function sectionProto:Draw(kind, view)
-  return self:Grid(kind, view)
+function sectionProto:Draw(kind, view, freeSpaceShown)
+  return self:Grid(kind, view, freeSpaceShown)
 end
 
 -- SetTitle will set the title of the section.
@@ -123,10 +124,15 @@ end
 -- Grid will render the section as a grid of icons.
 ---@param kind BagKind
 ---@param view BagView
+---@param freeSpaceShown boolean
 ---@return number width
 ---@return number height
-function sectionProto:Grid(kind, view)
-  self.content:Sort(sort:GetItemSortFunction(kind, view))
+function sectionProto:Grid(kind, view, freeSpaceShown)
+  if freeSpaceShown then
+    self.content:Sort(sort.GetItemSortBySlot)
+  else
+    self.content:Sort(sort:GetItemSortFunction(kind, view))
+  end
   local w, h = self.content:Draw()
   self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)

@@ -107,12 +107,6 @@ function gridProto:GetAllCells()
   return self.idToCell
 end
 
----@param header Section
-function gridProto:AddHeader(header)
-  header.frame:SetParent(self.inner)
-  table.insert(self.headers, header)
-end
-
 ---@private
 ---@return Frame|WowScrollBox
 function gridProto:GetFrame()
@@ -196,18 +190,6 @@ function gridProto:Draw()
     local w, h = column:Draw(self.compactStyle)
     width = width + w + 4
     height = math.max(height, h)
-  end
-
-  for i, header in pairs(self.headers) do
-    if i == 1 then
-      header.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
-    else
-      local previousHeader = self.headers[i - 1]
-      header.frame:SetPoint("TOPLEFT", previousHeader.frame, "BOTTOMLEFT", 0, -4)
-    end
-    local w, h = header:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED)
-    width = math.max(width, w) ---@type number
-    height = height + h + 4 ---@type number
   end
 
   -- Remove the last 4 pixels of padding.
