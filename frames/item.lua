@@ -282,7 +282,10 @@ end
 function itemFrame.itemProto:GetCategory()
 
   if self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.slots:IsShown() then
-    self.data.itemInfo.category = format("#%d: %s", self.data.bagid+1, C_Container.GetBagName(self.data.bagid))
+    ---@type string
+    local bagname = self.data.bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(self.data.bagid)
+    local displayid = self.data.bagid == Enum.BagIndex.Keyring and 6 or self.data.bagid+1
+    self.data.itemInfo.category = format("#%d: %s", displayid, bagname)
     return self.data.itemInfo.category
   end
 

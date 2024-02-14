@@ -101,6 +101,7 @@ function itemFrame.itemProto:SetItem(data)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
+  self.button.minDisplayCount = 1
 
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
@@ -139,7 +140,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-
+  self.data = {bagid = bagid, slotid = slotid, isItemEmpty = true, itemInfo = {}} --[[@as table]]
   if count == 0 then
     self.button:Disable()
   else
@@ -150,9 +151,12 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.frame:SetID(bagid)
 
   SetItemButtonCount(self.button, count)
-  --ClearItemButtonOverlay(self.button)
-  --self.button:SetHasItem(false)
-  --SetItemButtonCount(self.button, count)
+  SetItemButtonQuality(self.button, false)
+  SetItemButtonDesaturated(self.button, false)
+  SetItemButtonTexture(self.button, 0)
+  self.button.BattlepayItemTexture:SetShown(false)
+  self.button.NewItemTexture:Hide()
+  self.ilvlText:SetText("")
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -184,9 +188,10 @@ function itemFrame.itemProto:ClearItem()
   --self.button:UpdateNewItem(false)
   --self.button:UpdateJunkItem(false, false)
   --self.button:UpdateItemContextMatching()
-  SetItemButtonQuality(self.button, false);
+  SetItemButtonQuality(self.button, false)
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
+  SetItemButtonTexture(self.button, 0)
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
   --ClearItemButtonOverlay(self.button)
