@@ -14,6 +14,7 @@ local callbackProto = {}
 ---@field _eventMap table<string, {fn: fun(...), cbs: Callback[]}>
 ---@field _bucketTimers table<string, cbObject>
 ---@field _eventQueue table<string, boolean>
+---@field _eventArguments any[]
 ---@field _bucketCallbacks table<string, fun(...)[]>
 local events = addon:NewModule('Events')
 
@@ -24,6 +25,7 @@ function events:OnInitialize()
   self._bucketTimers = {}
   self._eventQueue = {}
   self._bucketCallbacks = {}
+  self._eventArguments = {}
   LibStub:GetLibrary('AceEvent-3.0'):Embed(self._eventHandler)
 end
 
@@ -105,12 +107,14 @@ function events:GroupBucketEvent(groupEvents, callback)
           return
         end
         for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
-          cb()
+          cb(self._eventArguments[joinedEvents])
         end
         self._eventQueue[joinedEvents] = false
+        self._eventArguments[joinedEvents] = nil
       end)
     for _, event in pairs(groupEvents) do
-      self:RegisterEvent(event, function()
+      self:RegisterEvent(event, function(eventName, ...)
+        self._eventArguments[joinedEvents] = {eventName, ...}
         self._eventQueue[joinedEvents] = true
       end)
     end
