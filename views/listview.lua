@@ -67,7 +67,7 @@ local function ListView(view, bag, dirtyItems)
 
     -- Capture information about free slots.
     if data.isItemEmpty then
-      if bagid == Enum.BagIndex.ReagentBag then
+      if bagid == const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil then
         freeReagentSlotsData.count = freeReagentSlotsData.count + 1
         freeReagentSlotsData.bagid = bagid
         freeReagentSlotsData.slotid = slotid

@@ -90,6 +90,34 @@ function events:BucketEvent(event, callback)
   table.insert(self._bucketCallbacks[event], callback)
 end
 
+-- GroupBucketEvent registers a callback for a group of events that will be
+-- called when any of the events in the group are fired. The callback will be
+-- called at most once every 0.5 seconds.
+---@param groupEvents string[]
+---@param callback fun(...)
+function events:GroupBucketEvent(groupEvents, callback)
+  local joinedEvents = table.concat(groupEvents, '')
+  if not self._bucketTimers[joinedEvents] then
+    self._bucketCallbacks[joinedEvents] = {}
+    self._bucketTimers[joinedEvents] = C_Timer.NewTicker(0.5,
+      function()
+        if not self._eventQueue[joinedEvents] then
+          return
+        end
+        for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
+          cb()
+        end
+        self._eventQueue[joinedEvents] = false
+      end)
+    for _, event in pairs(groupEvents) do
+      self:RegisterEvent(event, function()
+        self._eventQueue[joinedEvents] = true
+      end)
+    end
+  end
+  table.insert(self._bucketCallbacks[joinedEvents], callback)
+end
+
 function events:SendMessage(event, ...)
   self._eventHandler:SendMessage(event, ...)
 end

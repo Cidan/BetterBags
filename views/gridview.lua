@@ -93,7 +93,7 @@ local function GridView(view, bag, dirtyItems)
 
     -- Set the item data on the item frame.
     if bag.slots:IsShown() and data.isItemEmpty then
-      itemButton:SetFreeSlots(bagid, slotid, -1, bagid == Enum.BagIndex.ReagentBag)
+      itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
     else
       itemButton:SetItem(data)
     end

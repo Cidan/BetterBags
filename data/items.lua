@@ -42,11 +42,19 @@ function items:OnInitialize()
 end
 
 function items:OnEnable()
-  --events:RegisterMessage('items/RefreshAllItems/Done', printDirtyItems)
-  --events:RegisterEvent('BAG_UPDATE_DELAYED', self.RefreshAll, self)
+
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:RefreshAll() end)
-  events:BucketEvent('BAG_UPDATE_DELAYED', function() self:RefreshAll() end)
-  events:BucketEvent('PLAYERBANKSLOTS_CHANGED', function() self:RefreshBank() end)
+  local eventList = {
+    'BAG_UPDATE_DELAYED',
+    'PLAYERBANKSLOTS_CHANGED',
+  }
+
+  if addon.isRetail then
+    table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
+  end
+
+  events:GroupBucketEvent(eventList, function() self:RefreshAll() end)
+
   if addon.isRetail then
     events:BucketEvent('PLAYERREAGENTBANKSLOTS_CHANGED',
     function()
