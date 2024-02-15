@@ -264,7 +264,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
   else
-    SetItemButtonDesaturated(self.button, false)
+    SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
   end
 
   if self.kind == const.BAG_KIND.BANK then
