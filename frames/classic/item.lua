@@ -168,7 +168,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
 
-  --self.button.ItemSlotBackground:Show()
+  self.frame:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end

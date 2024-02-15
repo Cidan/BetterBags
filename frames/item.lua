@@ -275,6 +275,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
+  self.frame:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end
