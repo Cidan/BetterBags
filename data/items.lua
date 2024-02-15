@@ -69,10 +69,10 @@ function items:OnEnable()
       local eventName = eventParam[1]
       local bagid = eventParam[2]
       if eventName == 'BAG_UPDATE' then
-        if const.BACKPACK_BAGS[bagid] and not didUpdate['backpack'] then
+        if const.BACKPACK_BAGS[bagid] ~= nil and not didUpdate['backpack'] then
           self:RefreshBackpack()
           didUpdate['backpack'] = true
-        elseif const.BANK_BAGS[bagid] then
+        elseif const.BANK_BAGS[bagid] ~= nil then
           if addon.Bags.Bank.isReagentBank and not didUpdate['reagentbank'] then
             self:RefreshReagentBank()
             didUpdate['reagentbank'] = true
