@@ -45,7 +45,7 @@ function items:OnEnable()
 
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:RefreshAll() end)
   local eventList = {
-    'BAG_UPDATE_DELAYED',
+    'BAG_UPDATE',
     'PLAYERBANKSLOTS_CHANGED',
   }
 
@@ -53,7 +53,47 @@ function items:OnEnable()
     table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   end
 
-  events:GroupBucketEvent(eventList, function() self:RefreshAll() end)
+  -- This function is somewhat complex due to the way Blizzard handles bag events.
+  -- The BAG_UPDATE event is fired for every bag, including the bank bags, and the
+  -- reagent bank. The PLAYERBANKSLOTS_CHANGED event is fired for the main bank
+  -- view, and the PLAYERREAGENTBANKSLOTS_CHANGED event is fired for the reagent bank.
+  -- We need to handle all of these events to keep the item database up to date, but
+  -- we don't want to fire events for bags that didn't trigger, otherwise we'll refresh
+  -- a bag and potentially cause placeholder empty bag buttons to be removed when
+  -- they shouldn't be.
+  events:GroupBucketEvent(eventList,
+  function(eventData)
+    ---@type table<string, boolean>
+    local didUpdate = {}
+    for _, eventParam in pairs(eventData) do
+      local eventName = eventParam[1]
+      local bagid = eventParam[2]
+      if eventName == 'BAG_UPDATE' then
+        if const.BACKPACK_BAGS[bagid] and not didUpdate['backpack'] then
+          self:RefreshBackpack()
+          didUpdate['backpack'] = true
+        elseif const.BANK_BAGS[bagid] then
+          if addon.Bags.Bank.isReagentBank and not didUpdate['reagentbank'] then
+            self:RefreshReagentBank()
+            didUpdate['reagentbank'] = true
+          elseif not didUpdate['bank'] then
+            self:RefreshBank()
+            didUpdate['bank'] = true
+          end
+        end
+      elseif eventName == 'PLAYERBANKSLOTS_CHANGED' then
+        if not addon.Bags.Bank.isReagentBank and not didUpdate['bank'] then
+          self:RefreshBank()
+          didUpdate['bank'] = true
+        end
+      elseif eventName == 'PLAYERREAGENTBANKSLOTS_CHANGED' then
+        if addon.Bags.Bank.isReagentBank and not didUpdate['reagentbank'] then
+          self:RefreshReagentBank()
+          didUpdate['reagentbank'] = true
+        end
+      end
+    end
+  end)
 
   if addon.isRetail then
     events:BucketEvent('PLAYERREAGENTBANKSLOTS_CHANGED',

@@ -3,6 +3,8 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@alias eventData any[][]
+
 ---@class Callback
 ---@field cb fun(...)
 ---@field a any
@@ -96,11 +98,12 @@ end
 -- called when any of the events in the group are fired. The callback will be
 -- called at most once every 0.5 seconds.
 ---@param groupEvents string[]
----@param callback fun(...)
+---@param callback fun(eventData: eventData)
 function events:GroupBucketEvent(groupEvents, callback)
   local joinedEvents = table.concat(groupEvents, '')
   if not self._bucketTimers[joinedEvents] then
     self._bucketCallbacks[joinedEvents] = {}
+    self._eventArguments[joinedEvents] = {}
     self._bucketTimers[joinedEvents] = C_Timer.NewTicker(0.5,
       function()
         if not self._eventQueue[joinedEvents] then
@@ -110,11 +113,11 @@ function events:GroupBucketEvent(groupEvents, callback)
           cb(self._eventArguments[joinedEvents])
         end
         self._eventQueue[joinedEvents] = false
-        self._eventArguments[joinedEvents] = nil
+        self._eventArguments[joinedEvents] = {}
       end)
     for _, event in pairs(groupEvents) do
       self:RegisterEvent(event, function(eventName, ...)
-        self._eventArguments[joinedEvents] = {eventName, ...}
+        tinsert(self._eventArguments[joinedEvents], {eventName, ...})
         self._eventQueue[joinedEvents] = true
       end)
     end
