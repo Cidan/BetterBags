@@ -53,6 +53,7 @@ local debug = addon:GetModule('Debug')
 ---@field ItemContextOverlay Texture
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
+---@field LockTexture Texture
 itemFrame.itemProto = {}
 
 local buttonCount = 0
@@ -170,6 +171,8 @@ function itemFrame.itemProto:Lock()
   C_Item.LockItem(itemLocation)
   self.data.itemInfo.isLocked = true
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  self.LockTexture:Show()
+  self.ilvlText:Hide()
   database:SetItemLock(self.data.itemInfo.itemGUID, true)
 end
 
@@ -178,6 +181,8 @@ function itemFrame.itemProto:Unlock()
   C_Item.UnlockItem(itemLocation)
   self.data.itemInfo.isLocked = false
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  self.LockTexture:Hide()
+  self.ilvlText:Show()
   database:SetItemLock(self.data.itemInfo.itemGUID, false)
 end
 
@@ -528,13 +533,20 @@ function itemFrame:_DoCreate()
   button.ItemSlotBackground:SetAllPoints(button);
   button.ItemSlotBackground:Hide()
 
+  i.LockTexture = button:CreateTexture(name.."LockButton", "OVERLAY")
+  i.LockTexture:SetAtlas("UI-CharacterCreate-PadLock")
+  i.LockTexture:SetPoint("TOP")
+  i.LockTexture:SetSize(32,32)
+  i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
+  i.LockTexture:Hide()
+
   p:RegisterForClicks("MiddleButtonUp")
   p:SetScript("OnClick", function()
     i:ToggleLock()
   end)
+
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
-
   i.ilvlText = ilvlText
 
   return i

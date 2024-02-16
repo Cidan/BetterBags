@@ -241,6 +241,13 @@ function itemFrame:_DoCreate()
   i.button = button
   i.frame = p
 
+  i.LockTexture = button:CreateTexture(name.."LockButton", "OVERLAY")
+  i.LockTexture:SetAtlas("UI-CharacterCreate-PadLock")
+  i.LockTexture:SetPoint("TOP")
+  i.LockTexture:SetSize(32,32)
+  i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
+  i.LockTexture:Hide()
+
   p:RegisterForClicks("MiddleButtonUp")
   p:SetScript("OnClick", function()
     i:ToggleLock()
