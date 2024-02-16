@@ -148,6 +148,39 @@ function itemFrame.itemProto:UpdateCooldown()
   self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
 end
 
+function itemFrame.itemProto:ToggleLock()
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  if C_Item.IsLocked(itemLocation) then
+    self:Unlock()
+  else
+    self:Lock()
+  end
+end
+
+function itemFrame.itemProto:SetLock(lock)
+  if lock then
+    self:Lock()
+  else
+    self:Unlock()
+  end
+end
+
+function itemFrame.itemProto:Lock()
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  C_Item.LockItem(itemLocation)
+  self.data.itemInfo.isLocked = true
+  SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  database:SetItemLock(self.data.itemInfo.itemGUID, true)
+end
+
+function itemFrame.itemProto:Unlock()
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  C_Item.UnlockItem(itemLocation)
+  self.data.itemInfo.isLocked = false
+  SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  database:SetItemLock(self.data.itemInfo.itemGUID, false)
+end
+
 ---@param data ItemData
 function itemFrame.itemProto:SetItem(data)
   assert(data, 'item must be provided')
@@ -206,7 +239,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound);
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
-  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
+  self:SetLock(data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
   self.button:UpdateNewItem(data.itemInfo.itemQuality)
@@ -472,7 +505,7 @@ function itemFrame:_DoCreate()
   buttonCount = buttonCount + 1
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
-  local p = CreateFrame("Frame")
+  local p = CreateFrame("Button", name.."parent")
 
   ---@class ItemButton
   local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
@@ -488,12 +521,17 @@ function itemFrame:_DoCreate()
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   i.button = button
   button:SetAllPoints(p)
+  button:SetPassThroughButtons("MiddleButton")
   i.frame = p
 
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
   button.ItemSlotBackground:SetAllPoints(button);
   button.ItemSlotBackground:Hide()
 
+  p:RegisterForClicks("MiddleButtonUp")
+  p:SetScript("OnClick", function()
+    i:ToggleLock()
+  end)
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
 

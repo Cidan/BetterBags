@@ -248,6 +248,18 @@ function DB:CreateCategory(category)
   }
 end
 
+---@param guid string
+---@param locked boolean
+function DB:SetItemLock(guid, locked)
+  DB.data.profile.lockedItems[guid] = locked
+end
+
+---@param guid string
+---@return boolean
+function DB:GetItemLock(guid)
+  return DB.data.profile.lockedItems[guid]
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

@@ -12,6 +12,9 @@ local const = addon:GetModule('Constants')
 ---@class EquipmentSets: AceModule
 local equipmentSets = addon:GetModule('EquipmentSets')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -228,13 +231,17 @@ function items:AttachItemInfo(data)
     baseIlvl = baseIlvl --[[@as number]],
     itemIcon = C_Item.GetItemIconByID(itemID),
     isBound = C_Item.IsBound(itemLocation),
-    isLocked = C_Item.IsLocked(itemLocation),
+    isLocked = false,
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
     currentItemCount = C_Item.GetStackCount(itemLocation),
     category = "",
     currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
     equipmentSet = equipmentSets:GetItemSet(bagid, slotid),
   }
+
+  if database:GetItemLock(data.itemInfo.itemGUID) then
+    data.itemInfo.isLocked = true
+  end
 end
 
 ---@param itemID number
