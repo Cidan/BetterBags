@@ -298,6 +298,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:UpdateItemContextMatching()
   SetItemButtonDesaturated(self.button, false)
   self.ilvlText:SetText("")
+  self.LockTexture:Hide()
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -462,6 +463,7 @@ function itemFrame.itemProto:ClearItem()
   self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
+  self.LockTexture:Hide()
   self:SetSize(37, 37)
   self.data = nil
   self.isFreeSlot = false
