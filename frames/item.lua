@@ -150,6 +150,7 @@ function itemFrame.itemProto:UpdateCooldown()
 end
 
 function itemFrame.itemProto:ToggleLock()
+  if self.data.isItemEmpty then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
   if C_Item.IsLocked(itemLocation) then
     self:Unlock()
@@ -159,6 +160,7 @@ function itemFrame.itemProto:ToggleLock()
 end
 
 function itemFrame.itemProto:SetLock(lock)
+  if self.data.isItemEmpty then return end
   if lock then
     self:Lock()
   else
@@ -167,6 +169,7 @@ function itemFrame.itemProto:SetLock(lock)
 end
 
 function itemFrame.itemProto:Lock()
+  if self.data.isItemEmpty then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
   C_Item.LockItem(itemLocation)
   self.data.itemInfo.isLocked = true
@@ -177,6 +180,7 @@ function itemFrame.itemProto:Lock()
 end
 
 function itemFrame.itemProto:Unlock()
+  if self.data.isItemEmpty then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
   C_Item.UnlockItem(itemLocation)
   self.data.itemInfo.isLocked = false
