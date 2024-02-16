@@ -96,6 +96,7 @@ function itemFrame.itemProto:SetItem(data)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, data.itemInfo.isBound)
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
+  self:SetLock(data.itemInfo.isLocked)
   if data.bagid ~= nil then
     ContainerFrame_UpdateCooldown(data.bagid, self.button)
   end
@@ -222,7 +223,7 @@ function itemFrame:_DoCreate()
   buttonCount = buttonCount + 1
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
-  local p = CreateFrame("Frame")
+  local p = CreateFrame("Button")
 
   ---@class Button
   local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate") --[[@as Button]]
@@ -235,9 +236,15 @@ function itemFrame:_DoCreate()
   button:SetSize(37, 37)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  button:SetPassThroughButtons("MiddleButton")
   button:SetAllPoints(p)
   i.button = button
   i.frame = p
+
+  p:RegisterForClicks("MiddleButtonUp")
+  p:SetScript("OnClick", function()
+    i:ToggleLock()
+  end)
 
   button.SetMatchesSearch = function(me, match)
     if match then
