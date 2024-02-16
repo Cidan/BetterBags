@@ -59,7 +59,7 @@ function item.itemRowProto:SetItem(data)
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
-  self.button:SetSize(32, 32)
+  self.button:SetSize(37, 37)
   if bagid then
     self.frame:SetID(bagid)
   end
@@ -211,7 +211,7 @@ function item:_DoCreate()
     s.HighlightTexture:Hide()
     GameTooltip:Hide()
   end)
-  i.frame:SetSize(350, 34)
+  i.frame:SetSize(350, 37)
 
   --debug:DrawBorder(i.button.frame, 0, 0, 1)
   return i
