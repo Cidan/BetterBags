@@ -95,14 +95,6 @@ function items:OnEnable()
     end
   end)
 
-  if addon.isRetail then
-    events:BucketEvent('PLAYERREAGENTBANKSLOTS_CHANGED',
-    function()
-      if addon.Bags.Bank.isReagentBank then
-        self:RefreshReagentBank()
-      end
-    end)
-  end
   events:RegisterEvent('BANKFRAME_OPENED', function()
     addon.atBank = true
     self:RefreshBank()
