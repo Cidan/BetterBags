@@ -32,8 +32,10 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
     for i, id in ipairs(const.BANK_ONLY_BAGS_LIST) do
       if slotsPurchased >= i and id == self.bag  then
         self.canBuy = false
+        self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
       elseif id == self.bag then
         self.canBuy = true
+        self.frame.ItemSlotBackground:SetVertexColor(1.0,0.1,0.1)
       end
     end
   else
@@ -46,6 +48,7 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
   if hasItem then
     --TODO(lobato): Set count, other properties
     self.frame.ItemSlotBackground:SetTexture(icon)
+    self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
     self.frame.ItemSlotBackground:Show()
     self.empty = false
   else
@@ -69,6 +72,7 @@ function BagButtonFrame.bagButtonProto:ClearBag()
   self.empty = nil
   self.kind = nil
   self.canBuy = nil
+  self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
   self.frame.ItemSlotBackground:Hide()
   --SetItemButtonTexture(self.frame, nil)
   --SetItemButtonQuality(self.frame, nil)
