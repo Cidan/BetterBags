@@ -36,10 +36,11 @@ local sectionProto = {}
 
 ---@param kind BagKind
 ---@param view BagView
+---@param freeSpaceShown boolean
 ---@return number width
 ---@return number height
-function sectionProto:Draw(kind, view)
-  return self:Grid(kind, view)
+function sectionProto:Draw(kind, view, freeSpaceShown)
+  return self:Grid(kind, view, freeSpaceShown)
 end
 
 -- SetTitle will set the title of the section.
@@ -49,11 +50,12 @@ function sectionProto:SetTitle(text)
 end
 
 function sectionProto:AddCell(id, cell)
+  if self.content:GetCell(id) ~= nil then return end
   self.content:AddCell(id, cell)
 end
 
-function sectionProto:RemoveCell(id, cell)
-  self.content:RemoveCell(id, cell)
+function sectionProto:RemoveCell(id)
+  self.content:RemoveCell(id)
 end
 
 function sectionProto:GetMaxCellWidth()
@@ -74,6 +76,12 @@ end
 
 function sectionProto:GetContent()
   return self.content
+end
+
+function sectionProto:ReleaseAllCells()
+  for _, cell in pairs(self.content.cells) do
+    cell:Release()
+  end
 end
 
 function sectionProto:Wipe()
@@ -106,7 +114,7 @@ function sectionProto:HasItem(item)
 end
 
 function sectionProto:GetAllCells()
-  return self.content.cells
+  return self.content.idToCell
 end
 
 function sectionProto:Release()
@@ -116,10 +124,15 @@ end
 -- Grid will render the section as a grid of icons.
 ---@param kind BagKind
 ---@param view BagView
+---@param freeSpaceShown boolean
 ---@return number width
 ---@return number height
-function sectionProto:Grid(kind, view)
-  self.content:Sort(sort:GetItemSortFunction(kind, view))
+function sectionProto:Grid(kind, view, freeSpaceShown)
+  if freeSpaceShown then
+    self.content:Sort(sort.GetItemSortBySlot)
+  else
+    self.content:Sort(sort:GetItemSortFunction(kind, view))
+  end
   local w, h = self.content:Draw()
   self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
@@ -156,7 +169,7 @@ function sectionFrame:_DoCreate()
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
 
-  --debug:DrawDebugBorder(f, 1, 1, 1)
+  --debug:DrawBorder(f, 1, 0, 0)
 
   -- Create the section title.
   local title = s.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")

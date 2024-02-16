@@ -42,19 +42,24 @@ function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
-  self.button.frame:SetPoint("LEFT", self.frame)
+  self.button.frame:SetPoint("LEFT", self.frame, "LEFT")
 
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
     self.rowButton:SetID(slotid)
   end
+
+  if data.isItemEmpty then
+    return
+  end
+
   self.rowButton:SetHasItem(data.itemInfo.itemIcon)
 
   local quality = data.itemInfo.itemQuality
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
-  self.button:SetSize(32, 32)
+  self.button:SetSize(37, 37)
   if bagid then
     self.frame:SetID(bagid)
   end
@@ -71,6 +76,12 @@ function item.itemRowProto:SetItem(data)
   end)
   self.frame:Show()
   self.rowButton:Show()
+end
+
+function item.itemRowProto:Wipe()
+  self.frame:Hide()
+  self.frame:SetParent(nil)
+  self.frame:ClearAllPoints()
 end
 
 function item.itemRowProto:ClearItem()
@@ -200,8 +211,9 @@ function item:_DoCreate()
     s.HighlightTexture:Hide()
     GameTooltip:Hide()
   end)
-  i.frame:SetSize(350, 34)
+  i.frame:SetSize(350, 37)
 
+  --debug:DrawBorder(i.button.frame, 0, 0, 1)
   return i
 end
 

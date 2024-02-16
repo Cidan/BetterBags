@@ -3,6 +3,8 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@alias eventData any[][]
+
 ---@class Callback
 ---@field cb fun(...)
 ---@field a any
@@ -14,6 +16,7 @@ local callbackProto = {}
 ---@field _eventMap table<string, {fn: fun(...), cbs: Callback[]}>
 ---@field _bucketTimers table<string, cbObject>
 ---@field _eventQueue table<string, boolean>
+---@field _eventArguments any[]
 ---@field _bucketCallbacks table<string, fun(...)[]>
 local events = addon:NewModule('Events')
 
@@ -24,6 +27,7 @@ function events:OnInitialize()
   self._bucketTimers = {}
   self._eventQueue = {}
   self._bucketCallbacks = {}
+  self._eventArguments = {}
   LibStub:GetLibrary('AceEvent-3.0'):Embed(self._eventHandler)
 end
 
@@ -88,6 +92,37 @@ function events:BucketEvent(event, callback)
   end
 
   table.insert(self._bucketCallbacks[event], callback)
+end
+
+-- GroupBucketEvent registers a callback for a group of events that will be
+-- called when any of the events in the group are fired. The callback will be
+-- called at most once every 0.5 seconds.
+---@param groupEvents string[]
+---@param callback fun(eventData: eventData)
+function events:GroupBucketEvent(groupEvents, callback)
+  local joinedEvents = table.concat(groupEvents, '')
+  if not self._bucketTimers[joinedEvents] then
+    self._bucketCallbacks[joinedEvents] = {}
+    self._eventArguments[joinedEvents] = {}
+    self._bucketTimers[joinedEvents] = C_Timer.NewTicker(0.5,
+      function()
+        if not self._eventQueue[joinedEvents] then
+          return
+        end
+        for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
+          cb(self._eventArguments[joinedEvents])
+        end
+        self._eventQueue[joinedEvents] = false
+        self._eventArguments[joinedEvents] = {}
+      end)
+    for _, event in pairs(groupEvents) do
+      self:RegisterEvent(event, function(eventName, ...)
+        tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+        self._eventQueue[joinedEvents] = true
+      end)
+    end
+  end
+  table.insert(self._bucketCallbacks[joinedEvents], callback)
 end
 
 function events:SendMessage(event, ...)

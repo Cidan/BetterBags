@@ -14,6 +14,7 @@ local columnFrame = addon:NewModule('ColumnFrame')
 
 ---@class Column
 ---@field frame Frame
+---@field idToCell table<string, Cell|Item|Section>
 ---@field cells Cell[]|Item[]|Section[]
 ---@field minimumWidth number
 ---@field spacing number
@@ -21,17 +22,18 @@ local columnProto = {}
 
 -- AddCell adds a cell to this column at the given position, or
 -- at the end of the column if no position is given.
+---@param id string
 ---@param cell Cell|Item|Section
 ---@param position? number
-function columnProto:AddCell(cell, position)
+function columnProto:AddCell(id, cell, position)
   cell.frame:SetParent(self.frame)
   if position and position < 1 then
     position = 1
   else
     position = position or #self.cells + 1
   end
-  -- cell.position = position not sure if needed yet
   table.insert(self.cells, position, cell)
+  self.idToCell[id] = cell
   cell.frame:Show()
 end
 
@@ -43,10 +45,11 @@ function columnProto:GetCellPosition(cell)
 end
 
 -- RemoveCell removes a cell from this column.
-function columnProto:RemoveCell(cell)
+function columnProto:RemoveCell(id)
   for i, c in ipairs(self.cells) do
-    if cell == c then
+    if c == self.idToCell[id] then
       table.remove(self.cells, i)
+      self.idToCell[id] = nil
       return
     end
   end
@@ -58,6 +61,7 @@ function columnProto:RemoveAll()
     cell.frame:ClearAllPoints()
   end
   wipe(self.cells)
+  wipe(self.idToCell)
 end
 
 function columnProto:Release()
@@ -69,10 +73,8 @@ function columnProto:Wipe()
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.minimumWidth = 0
-  for _, cell in ipairs(self.cells) do
-    cell:Release()
-  end
   wipe(self.cells)
+  wipe(self.idToCell)
 end
 
 -- Draw will full redraw this column and snap all cells into the correct
@@ -154,6 +156,7 @@ function columnFrame:_DoCreate()
   column.frame = f
   column.minimumWidth = 0
   column.cells = {}
+  column.idToCell = {}
   column.frame:Show()
   column.spacing = 4
   return column

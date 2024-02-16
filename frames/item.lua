@@ -38,6 +38,7 @@ local debug = addon:GetModule('Debug')
 ---@field frame Frame
 ---@field button ItemButton|Button
 ---@field data ItemData
+---@field isFreeSlot boolean
 ---@field kind BagKind
 ---@field masqueGroup string
 ---@field ilvlText FontString
@@ -52,6 +53,7 @@ local debug = addon:GetModule('Debug')
 ---@field ItemContextOverlay Texture
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
+---@field LockTexture Texture
 itemFrame.itemProto = {}
 
 local buttonCount = 0
@@ -85,6 +87,7 @@ end
 ---@return boolean
 local function matchFilter(filter, data)
   if filter == "" then return true end
+  if data.isItemEmpty then return false end
   ---@type string, string
   local prefix, value = strsplit(":", filter, 2)
   -- If no prefix is provided, assume the filter is a name or type filter.
@@ -142,7 +145,49 @@ function itemFrame.itemProto:UpdateSearch(text)
 end
 
 function itemFrame.itemProto:UpdateCooldown()
+  if self.data.isItemEmpty then return end
   self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
+end
+
+function itemFrame.itemProto:ToggleLock()
+  if self.data.isItemEmpty then return end
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  if C_Item.IsLocked(itemLocation) then
+    self:Unlock()
+  else
+    self:Lock()
+  end
+end
+
+function itemFrame.itemProto:SetLock(lock)
+  if self.data.isItemEmpty then return end
+  if lock then
+    self:Lock()
+  else
+    self:Unlock()
+  end
+end
+
+function itemFrame.itemProto:Lock()
+  if self.data.isItemEmpty then return end
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  C_Item.LockItem(itemLocation)
+  self.data.itemInfo.isLocked = true
+  SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  self.LockTexture:Show()
+  self.ilvlText:Hide()
+  database:SetItemLock(self.data.itemInfo.itemGUID, true)
+end
+
+function itemFrame.itemProto:Unlock()
+  if self.data.isItemEmpty then return end
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  C_Item.UnlockItem(itemLocation)
+  self.data.itemInfo.isLocked = false
+  SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  self.LockTexture:Hide()
+  self.ilvlText:Show()
+  database:SetItemLock(self.data.itemInfo.itemGUID, false)
 end
 
 ---@param data ItemData
@@ -162,6 +207,12 @@ function itemFrame.itemProto:SetItem(data)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
+
+  -- TODO(lobato): Figure out what to do with empty items.
+  if data.isItemEmpty then
+    return
+  end
+
   local questInfo = data.questInfo
   local info = data.containerInfo
   local readable = info and info.isReadable;
@@ -197,7 +248,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound);
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
-  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
+  self:SetLock(data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
   self.button:UpdateNewItem(data.itemInfo.itemQuality)
@@ -207,7 +258,9 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
+  self.button.minDisplayCount = 1
 
+  self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end
@@ -228,12 +281,13 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-
+  self.data = {bagid = bagid, slotid = slotid, isItemEmpty = true, itemInfo = {}} --[[@as table]]
   if count == 0 then
     self.button:Disable()
   else
     self.button:Enable()
   end
+
   self.button.minDisplayCount = -1
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
@@ -241,9 +295,19 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
   SetItemButtonCount(self.button, count)
+  self.button:SetItemButtonTexture(0)
+  self.button:UpdateQuestItem(false, nil, nil)
+  self.button:UpdateNewItem(false)
+  self.button:UpdateJunkItem(false, false)
+  self.button:UpdateItemContextMatching()
+  SetItemButtonDesaturated(self.button, false)
+  self.ilvlText:SetText("")
+  self.LockTexture:Hide()
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
+  else
+    SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
   end
 
   if self.kind == const.BAG_KIND.BANK then
@@ -252,14 +316,20 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
 
+  self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
+  self.frame:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end
 
 function itemFrame.itemProto:GetCategory()
+
   if self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.slots:IsShown() then
-    self.data.itemInfo.category = format("#%d: %s", self.data.bagid+1, C_Container.GetBagName(self.data.bagid))
+    ---@type string
+    local bagname = self.data.bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(self.data.bagid)
+    local displayid = self.data.bagid == Enum.BagIndex.Keyring and 6 or self.data.bagid+1
+    self.data.itemInfo.category = format("#%d: %s", displayid, bagname)
     return self.data.itemInfo.category
   end
 
@@ -274,6 +344,8 @@ function itemFrame.itemProto:GetCategory()
     end
     return self.data.itemInfo.category
   end
+
+  if self.data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(self.kind, "RecentItems") then
     if self:IsNewItem() then
@@ -365,6 +437,12 @@ function itemFrame.itemProto:Release()
   itemFrame._pool:Release(self)
 end
 
+function itemFrame.itemProto:Wipe()
+  self.frame:Hide()
+  self.frame:SetParent(nil)
+  self.frame:ClearAllPoints()
+end
+
 function itemFrame.itemProto:ClearItem()
   masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
   self.masqueGroup = nil
@@ -379,7 +457,7 @@ function itemFrame.itemProto:ClearItem()
   self.button:UpdateNewItem(false)
   self.button:UpdateJunkItem(false, false)
   self.button:UpdateItemContextMatching()
-  SetItemButtonQuality(self.button, false);
+  SetItemButtonQuality(self.button, false)
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
   ClearItemButtonOverlay(self.button)
@@ -389,8 +467,10 @@ function itemFrame.itemProto:ClearItem()
   self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
+  self.LockTexture:Hide()
   self:SetSize(37, 37)
   self.data = nil
+  self.isFreeSlot = false
 end
 
 ---@param kind BagKind
@@ -410,12 +490,12 @@ function itemFrame:OnInitialize()
 end
 
 function itemFrame:OnEnable()
-  -- Pre-populate the pool with 300 items. This is done
+  -- Pre-populate the pool with 600 items. This is done
   -- so that items acquired during combat do not taint
   -- the bag frame.
   ---@type Item[]
   local frames = {}
-  for i = 1, 300 do
+  for i = 1, 600 do
     frames[i] = self:Create()
   end
   for _, frame in pairs(frames) do
@@ -436,7 +516,7 @@ function itemFrame:_DoCreate()
   buttonCount = buttonCount + 1
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
-  local p = CreateFrame("Frame")
+  local p = CreateFrame("Button", name.."parent")
 
   ---@class ItemButton
   local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
@@ -452,15 +532,27 @@ function itemFrame:_DoCreate()
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   i.button = button
   button:SetAllPoints(p)
+  button:SetPassThroughButtons("MiddleButton")
   i.frame = p
 
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
   button.ItemSlotBackground:SetAllPoints(button);
   button.ItemSlotBackground:Hide()
 
+  i.LockTexture = button:CreateTexture(name.."LockButton", "OVERLAY")
+  i.LockTexture:SetAtlas("UI-CharacterCreate-PadLock")
+  i.LockTexture:SetPoint("TOP")
+  i.LockTexture:SetSize(32,32)
+  i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
+  i.LockTexture:Hide()
+
+  p:RegisterForClicks("MiddleButtonUp")
+  p:SetScript("OnClick", function()
+    i:ToggleLock()
+  end)
+
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
-
   i.ilvlText = ilvlText
 
   return i

@@ -406,7 +406,9 @@ const.DATABASE_DEFAULTS = {
         TradeSkill = false,
         RecentItems = true,
       },
-    }
+    },
+    ---@type table<string, boolean>
+    lockedItems = {},
   },
   char = {}
 }

@@ -40,7 +40,7 @@ BagSlots.bagSlotProto = {}
 
 function BagSlots.bagSlotProto:Draw()
   for _, cell in ipairs(self.content.cells) do
-    cell:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED)
+    cell:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED, false)
   end
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)

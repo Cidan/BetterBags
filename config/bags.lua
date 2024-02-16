@@ -90,9 +90,6 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetCategoryFilter(kind, value, not DB:GetCategoryFilter(kind, value))
-              if not DB:GetCategoryFilter(kind, "RecentItems") then
-                config:GetBag(kind):ClearRecentItems()
-              end
               config:GetBag(kind):Wipe()
               config:GetBag(kind):Refresh()
             end,

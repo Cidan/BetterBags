@@ -31,6 +31,7 @@ local cellProto = {}
 ---@field package view Frame
 ---@field cells Cell[]|Item[]|Section[]
 ---@field idToCell table<string, Cell|Item|Section|BagButton>
+---@field cellToID table<Cell|Item|Section|BagButton, string>
 ---@field headers Section[]
 ---@field columns Column[]
 ---@field cellToColumn table<Cell|Item|Section, Column>
@@ -62,6 +63,8 @@ function gridProto:AddCellToLastColumn(id, cell)
     end
   end
   table.insert(self.cells, position+1, cell)
+  self.idToCell[id] = cell
+  self.cellToID[cell] = id
 end
 
 -- AddCell will add a cell to this grid.
@@ -71,23 +74,24 @@ function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
+  if self.idToCell[id] ~= nil then return end
   table.insert(self.cells, cell)
   self.idToCell[id] = cell
+  self.cellToID[cell] = id
 end
 
 -- RemoveCell will removed a cell from this grid.
 ---@param id string|nil
----@param cell Cell|Section|Item|BagButton
-function gridProto:RemoveCell(id, cell)
+function gridProto:RemoveCell(id)
   assert(id, 'id is required')
-  assert(cell, 'cell is required')
-  self.idToCell[id] = nil
   for i, c in ipairs(self.cells) do
-    if c == cell then
+    if c == self.idToCell[id] then
       table.remove(self.cells, i)
       for _, column in pairs(self.columns) do
-        column:RemoveCell(cell)
+        column:RemoveCell(id)
       end
+      self.cellToID[self.idToCell[id]] = nil
+      self.idToCell[id] = nil
       return
     end
   end
@@ -98,10 +102,9 @@ function gridProto:GetCell(id)
   return self.idToCell[id]
 end
 
----@param header Section
-function gridProto:AddHeader(header)
-  header.frame:SetParent(self.inner)
-  table.insert(self.headers, header)
+---@return table<string, Cell|Item|Section|BagButton>
+function gridProto:GetAllCells()
+  return self.idToCell
 end
 
 ---@private
@@ -175,7 +178,7 @@ function gridProto:Draw()
         end
       end
       -- Add the cell to the column.
-      column:AddCell(cell)
+      column:AddCell(self.cellToID[cell], cell)
       self.cellToColumn[cell] = column
       cell.frame:Show()
     end
@@ -189,18 +192,6 @@ function gridProto:Draw()
     height = math.max(height, h)
   end
 
-  for i, header in pairs(self.headers) do
-    if i == 1 then
-      header.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
-    else
-      local previousHeader = self.headers[i - 1]
-      header.frame:SetPoint("TOPLEFT", previousHeader.frame, "BOTTOMLEFT", 0, -4)
-    end
-    local w, h = header:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED)
-    width = math.max(width, w) ---@type number
-    height = height + h + 4 ---@type number
-  end
-
   -- Remove the last 4 pixels of padding.
   if width > 4 then
     width = width - 4 ---@type number
@@ -209,17 +200,31 @@ function gridProto:Draw()
   return width, height
 end
 
-function gridProto:Wipe()
+-- Clear will remove and release all columns from the grid,
+-- but will not release cells.
+function gridProto:Clear()
   for _, column in pairs(self.columns) do
+    column:RemoveAll()
     column:Release()
-  end
-  for _, cell in pairs(self.cells) do
-    cell:Release()
   end
   wipe(self.cellToColumn)
   wipe(self.columns)
   wipe(self.cells)
   wipe(self.idToCell)
+  wipe(self.cellToID)
+end
+
+-- Wipe completely removes all cells and columns from the grid
+-- and releases all cells and columns.
+function gridProto:Wipe()
+  for _, column in pairs(self.columns) do
+    column:Release()
+  end
+  wipe(self.cellToColumn)
+  wipe(self.columns)
+  wipe(self.cells)
+  wipe(self.idToCell)
+  wipe(self.cellToID)
 end
 
 local scrollFrameCounter = 0
@@ -261,11 +266,11 @@ function grid:Create(parent)
   ---@class WowScrollBox
   local f = grid:CreateScrollFrame(g, parent, c)
 
-  --f:SetParent(parent)
   g.frame = f
   g.inner = c
   g.cells = {}
   g.idToCell = {}
+  g.cellToID = {}
   g.columns = {}
   g.cellToColumn = {}
   g.headers = {}
@@ -273,8 +278,8 @@ function grid:Create(parent)
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   g.spacing = 4
   g.bar:Show()
-  --g.scrollBox = grid:CreateScrollFrame(f)
-  --g.scrollBox:Hide()
+  -- Fixes a bug where the frame is not visble when anchored to the parent.
+  g.frame:SetSize(1,1)
   return g
 end
 

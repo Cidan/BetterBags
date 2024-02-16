@@ -39,6 +39,7 @@ end
 function BagButtonFrame.bagButtonProto:CheckForPurchase()
   local _, full = GetNumBankSlots()
   if full then return end
+  if not self.canBuy then return end
   local cost = GetBankSlotCost(self.bag)
   BankFrame.nextSlotCost = cost
   PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
@@ -58,8 +59,10 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
     for i, id in ipairs(const.BANK_ONLY_BAGS_LIST) do
       if slotsPurchased >= i and id == self.bag  then
         self.canBuy = false
+        self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
       elseif id == self.bag then
         self.canBuy = true
+        self.frame.ItemSlotBackground:SetVertexColor(1.0,0.1,0.1)
       end
     end
   else
@@ -92,6 +95,7 @@ function BagButtonFrame.bagButtonProto:ClearBag()
   self.kind = nil
   self.canBuy = nil
   self.frame.ItemSlotBackground:Hide()
+  self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
   SetItemButtonTexture(self.frame, nil)
   SetItemButtonQuality(self.frame, nil)
 end
@@ -134,7 +138,7 @@ function BagButtonFrame.bagButtonProto:OnLeave()
 end
 
 function BagButtonFrame.bagButtonProto:OnClick()
-  if self.empty and self.kind == const.BAG_KIND.BANK then self:CheckForPurchase() return end
+  if self.empty and self.kind == const.BAG_KIND.BANK and self.canBuy then self:CheckForPurchase() return end
   if IsModifiedClick("PICKUPITEM") then
     PickupBagFromSlot(self.invID)
   else

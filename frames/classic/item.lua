@@ -69,14 +69,11 @@ function itemFrame.itemProto:SetItem(data)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-  local questInfo = data.questInfo
-  local info = data.containerInfo
-  local readable = info and info.isReadable;
-  local isFiltered = info and info.isFiltered;
-  local noValue = info and info.hasNoValue;
-  local isQuestItem = questInfo.isQuestItem;
-  local questID = questInfo.questID;
-  local isActive = questInfo.isActive
+
+  if data.isItemEmpty then
+    return
+  end
+
 
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1) and
@@ -99,11 +96,13 @@ function itemFrame.itemProto:SetItem(data)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, data.itemInfo.isBound)
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
+  self:SetLock(data.itemInfo.isLocked)
   if data.bagid ~= nil then
     ContainerFrame_UpdateCooldown(data.bagid, self.button)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
+  self.button.minDisplayCount = 1
 
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
@@ -125,6 +124,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 --]]
+  self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end
@@ -141,7 +141,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-
+  self.data = {bagid = bagid, slotid = slotid, isItemEmpty = true, itemInfo = {}} --[[@as table]]
   if count == 0 then
     self.button:Disable()
   else
@@ -152,9 +152,13 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.frame:SetID(bagid)
 
   SetItemButtonCount(self.button, count)
-  --ClearItemButtonOverlay(self.button)
-  --self.button:SetHasItem(false)
-  --SetItemButtonCount(self.button, count)
+  SetItemButtonQuality(self.button, false)
+  SetItemButtonDesaturated(self.button, false)
+  SetItemButtonTexture(self.button, 0)
+  self.button.BattlepayItemTexture:SetShown(false)
+  self.button.NewItemTexture:Hide()
+  self.ilvlText:SetText("")
+  self.LockTexture:Hide()
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -166,7 +170,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
 
-  --self.button.ItemSlotBackground:Show()
+  self.frame:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
 end
@@ -186,9 +190,10 @@ function itemFrame.itemProto:ClearItem()
   --self.button:UpdateNewItem(false)
   --self.button:UpdateJunkItem(false, false)
   --self.button:UpdateItemContextMatching()
-  SetItemButtonQuality(self.button, false);
+  SetItemButtonQuality(self.button, false)
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
+  SetItemButtonTexture(self.button, 0)
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
   --ClearItemButtonOverlay(self.button)
@@ -198,6 +203,7 @@ function itemFrame.itemProto:ClearItem()
   self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
+  self.LockTexture:Hide()
   self:SetSize(37, 37)
   self.data = nil
 end
@@ -219,7 +225,7 @@ function itemFrame:_DoCreate()
   buttonCount = buttonCount + 1
   -- Create a hidden parent to the ItemButton frame to work around
   -- item taint introduced in 10.x
-  local p = CreateFrame("Frame")
+  local p = CreateFrame("Button")
 
   ---@class Button
   local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate") --[[@as Button]]
@@ -232,9 +238,22 @@ function itemFrame:_DoCreate()
   button:SetSize(37, 37)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  button:SetPassThroughButtons("MiddleButton")
   button:SetAllPoints(p)
   i.button = button
   i.frame = p
+
+  i.LockTexture = button:CreateTexture(name.."LockButton", "OVERLAY")
+  i.LockTexture:SetAtlas("UI-CharacterCreate-PadLock")
+  i.LockTexture:SetPoint("TOP")
+  i.LockTexture:SetSize(32,32)
+  i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
+  i.LockTexture:Hide()
+
+  p:RegisterForClicks("MiddleButtonUp")
+  p:SetScript("OnClick", function()
+    i:ToggleLock()
+  end)
 
   button.SetMatchesSearch = function(me, match)
     if match then
