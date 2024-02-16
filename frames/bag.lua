@@ -185,7 +185,7 @@ function bagFrame.bagProto:Draw(dirtyItems)
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
   local text = search:GetText()
   self:Search(text)
-  self:KeepBagInBounds()
+  self:OnResize()
 end
 
 function bagFrame.bagProto:KeepBagInBounds()
