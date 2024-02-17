@@ -33,7 +33,7 @@ function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
-  self.button.frame:SetPoint("LEFT", self.frame)
+  self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
 
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
@@ -48,7 +48,11 @@ function item.itemRowProto:SetItem(data)
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
-  self.button:SetSize(32, 32)
+  self.button:SetSize(20, 20)
+  self.button.Count:Hide()
+  self.button.ilvlText:Hide()
+  self.button.LockTexture:Hide()
+
   if bagid then
     self.frame:SetID(bagid)
   end
@@ -63,6 +67,8 @@ function item.itemRowProto:SetItem(data)
     end
     GameTooltip:Show()
   end)
+
+  self:AddToMasqueGroup(data.kind)
   self.frame:Show()
   self.rowButton:Show()
 end
@@ -92,11 +98,13 @@ function item:_DoCreate()
   -- and setting them here will have no effect.
   local button = itemFrame:Create()
   i.button = button
+  i.button.NormalTexture:Hide()
+  i.button.NormalTexture:SetTexture(nil)
 
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   text:SetParent(i.frame)
   text:SetPoint("LEFT", i.button.frame, "RIGHT", 5, 0)
-  text:SetHeight(30)
+  text:SetHeight(16)
   text:SetWidth(310)
   text:SetTextHeight(28)
   text:SetWordWrap(true)
@@ -117,6 +125,9 @@ function item:_DoCreate()
   rowButton:GetNormalTexture():Hide()
   rowButton:GetPushedTexture():Hide()
   rowButton:GetHighlightTexture():Hide()
+  rowButton:GetNormalTexture():SetTexture(nil)
+  rowButton:GetPushedTexture():SetTexture(nil)
+  rowButton:GetHighlightTexture():SetTexture(nil)
   rowButton.BattlepayItemTexture:SetShown(false)
   --rowButton.NormalTexture:Hide()
   --rowButton.NormalTexture:SetParent(nil)
@@ -141,7 +152,7 @@ function item:_DoCreate()
     s.HighlightTexture:Hide()
     GameTooltip:Hide()
   end)
-  i.frame:SetSize(350, 34)
+  i.frame:SetSize(350, 24)
 
   return i
 end
