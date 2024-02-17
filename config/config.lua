@@ -64,6 +64,8 @@ function config:GetGeneralOptions()
     args = {
       showBagButton = {
         type = "toggle",
+        width = "full",
+        order = 1,
         name = L:G("Show Blizzard Bag Button"),
         desc = L:G("Show or hide the default Blizzard bag button."),
         get = DB.GetShowBagButton,
@@ -77,6 +79,21 @@ function config:GetGeneralOptions()
           DB:SetShowBagButton(value)
         end,
       },
+      newItemTime = {
+        type = "range",
+        order = 2,
+        name = L:G("New Item Duration"),
+        desc = L:G("The time, in minutes, to consider an item a new item."),
+        min = 0,
+        max = 240,
+        step = 5,
+        get = function()
+          return DB:GetData().profile.newItemTime / 60
+        end,
+        set = function(_, value)
+          DB:GetData().profile.newItemTime = value * 60
+        end,
+      }
     }
   }
   return options

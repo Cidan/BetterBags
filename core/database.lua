@@ -260,6 +260,16 @@ function DB:GetItemLock(guid)
   return DB.data.profile.lockedItems[guid]
 end
 
+---@param t number
+function DB:SetNewItemTime(t)
+  DB.data.profile.newItemTime = t
+end
+
+---@return number
+function DB:GetNewItemTime()
+  return DB.data.profile.newItemTime
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

@@ -409,6 +409,8 @@ const.DATABASE_DEFAULTS = {
     },
     ---@type table<string, boolean>
     lockedItems = {},
+    ---@type number
+    newItemTime = 300,
   },
   char = {}
 }

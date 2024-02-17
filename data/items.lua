@@ -365,7 +365,7 @@ end
 ---@return boolean
 function items:IsNewItem(data)
   if not data then return false end
-  if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < 500) or
+  if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
       data.itemInfo.isNewItem then
     return true
   end
