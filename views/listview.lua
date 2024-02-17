@@ -84,7 +84,7 @@ local function ListView(view, bag, dirtyItems)
       itemButton.rowButton:SetScript("OnMouseWheel", function(_, delta)
         view.content:GetContainer():OnMouseWheel(delta)
       end)
-      itemButton:AddToMasqueGroup(bag.kind)
+      --itemButton:AddToMasqueGroup(bag.kind)
       view.itemsByBagAndSlot[slotkey] = itemButton --[[@as Item]]
     end
 
