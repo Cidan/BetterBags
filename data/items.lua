@@ -27,6 +27,7 @@ local debug = addon:GetModule('Debug')
 ---@field slotid number
 ---@field isItemEmpty boolean
 ---@field kind BagKind
+---@field newItemTime number
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -37,6 +38,7 @@ local itemDataProto = {}
 ---@field _container ContinuableContainer
 ---@field _bankContainer ContinuableContainer
 ---@field _doingRefreshAll boolean
+---@field _newItemTimers table<string, number>
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -44,6 +46,7 @@ function items:OnInitialize()
   self.dirtyBankItems = {}
   self.itemsByBagAndSlot = {}
   self.previousItemGUID = {}
+  self._newItemTimers = {}
 end
 
 function items:OnEnable()
@@ -81,6 +84,7 @@ function items:RemoveNewItemFromAllItems()
       end
     end
   end
+  wipe(self._newItemTimers)
 end
 
 function items:RefreshAll()
@@ -247,6 +251,10 @@ function items:AttachItemInfo(data, kind)
   if database:GetItemLock(data.itemInfo.itemGUID) then
     data.itemInfo.isLocked = true
   end
+
+  if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
+    self._newItemTimers[data.itemInfo.itemGUID] = time()
+  end
 end
 
 ---@param itemID number
@@ -351,4 +359,20 @@ function items:GetItemData(itemList, callback)
     end
     callback(dataList)
   end)
+end
+
+---@param data ItemData
+---@return boolean
+function items:IsNewItem(data)
+  if not data then return false end
+  if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < 500) or
+      data.itemInfo.isNewItem then
+    return true
+  end
+  self._newItemTimers[data.itemInfo.itemGUID] = nil
+  return false
+end
+
+function items:ClearNewItems()
+  wipe(self._newItemTimers)
 end

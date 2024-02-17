@@ -31,6 +31,9 @@ local equipmentSets = addon:GetModule('EquipmentSets')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -348,11 +351,12 @@ function itemFrame.itemProto:GetCategory()
   if self.data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(self.kind, "RecentItems") then
-    if self:IsNewItem() then
+    if items:IsNewItem(self.data) then
       self.data.itemInfo.category = L:G("Recent Items")
       return self.data.itemInfo.category
     end
   end
+
   -- Return the custom category if it exists.
   local customCategory = categories:GetCustomCategory(self.kind, self.data)
   if customCategory then
