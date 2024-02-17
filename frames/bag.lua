@@ -130,6 +130,28 @@ function bagFrame.bagProto:GetPosition()
   return x * scale, y * scale
 end
 
+function bagFrame.bagProto:Sort()
+  if self.kind ~= const.BAG_KIND.BACKPACK then return end
+
+  -- Unlock all locked items so they can be sorted.
+  ---@type Item[]
+  local lockList = {}
+  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
+    if item.data.itemInfo.isLocked then
+      table.insert(lockList, item)
+      item:Unlock()
+    end
+  end
+
+  PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
+  items:RemoveNewItemFromAllItems()
+  C_Container:SortBags()
+
+  for _, item in pairs(lockList) do
+    item:Lock()
+  end
+end
+
 -- Wipe will wipe the contents of the bag and release all cells.
 function bagFrame.bagProto:Wipe()
   if self.currentView then
@@ -384,9 +406,7 @@ function bagFrame:Create(kind)
     elseif e == "RightButton" and kind == const.BAG_KIND.BANK then
       b:ToggleReagentBank()
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
-      PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-      items:RemoveNewItemFromAllItems()
-      C_Container:SortBags()
+      b:Sort()
     end
   end)
 
