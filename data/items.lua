@@ -19,6 +19,7 @@ local database = addon:GetModule('Database')
 local debug = addon:GetModule('Debug')
 
 ---@class (exact) ItemData
+---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
@@ -191,6 +192,7 @@ function items:AttachItemInfo(data)
   local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
   local bagid, slotid = data.bagid, data.slotid
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
+  data.basic = false
   if itemID == nil then
     data.isItemEmpty = true
     data.itemInfo = {} --[[@as table]]
@@ -257,6 +259,7 @@ function items:AttachBasicItemInfo(itemID, data)
     isActive = false,
     isQuestItem = false,
   }
+  data.basic = true
   data.itemInfo = {
     itemID = itemID,
     itemGUID = "",
