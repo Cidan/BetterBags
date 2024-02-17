@@ -47,9 +47,9 @@ end
 local function UpdateListSize(view, bag)
   local w, _ = bag.frame:GetSize()
   for _, section in pairs(view:GetAllSections()) do
-    section.frame:SetWidth(w - 35)
+    section.frame:SetWidth(w - 18)
     for _, cell in pairs(section:GetAllCells()) do
-      cell.frame:SetWidth(w - 35)
+      cell.frame:SetWidth(w - 18)
     end
   end
 end
@@ -84,7 +84,7 @@ local function ListView(view, bag, dirtyItems)
       itemButton.rowButton:SetScript("OnMouseWheel", function(_, delta)
         view.content:GetContainer():OnMouseWheel(delta)
       end)
-      itemButton:AddToMasqueGroup(bag.kind)
+      --itemButton:AddToMasqueGroup(bag.kind)
       view.itemsByBagAndSlot[slotkey] = itemButton --[[@as Item]]
     end
 

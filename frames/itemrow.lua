@@ -42,7 +42,7 @@ function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
-  self.button.frame:SetPoint("LEFT", self.frame, "LEFT")
+  self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
 
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
@@ -59,14 +59,18 @@ function item.itemRowProto:SetItem(data)
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
-  self.button:SetSize(37, 37)
+  self.button:SetSize(20, 20)
+  self.button.Count:Hide()
+  self.button.ilvlText:Hide()
+  self.button.LockTexture:Hide()
+
   if bagid then
     self.frame:SetID(bagid)
   end
   self.text:SetText(data.itemInfo.itemName)
   self.rowButton:SetScript("OnEnter", function(s)
     s.HighlightTexture:Show()
-    GameTooltip:SetOwner(self.button.frame, "ANCHOR_LEFT")
+    GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
     if bagid and slotid then
       GameTooltip:SetBagItem(bagid, slotid)
     else
@@ -74,6 +78,7 @@ function item.itemRowProto:SetItem(data)
     end
     GameTooltip:Show()
   end)
+  self:AddToMasqueGroup(data.kind)
   self.frame:Show()
   self.rowButton:Show()
 end
@@ -170,7 +175,7 @@ function item:_DoCreate()
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   text:SetParent(i.frame)
   text:SetPoint("LEFT", i.button.frame, "RIGHT", 5, 0)
-  text:SetHeight(30)
+  text:SetHeight(16)
   text:SetWidth(310)
   text:SetTextHeight(28)
   text:SetWordWrap(true)
@@ -211,7 +216,7 @@ function item:_DoCreate()
     s.HighlightTexture:Hide()
     GameTooltip:Hide()
   end)
-  i.frame:SetSize(350, 37)
+  i.frame:SetSize(350, 24)
 
   --debug:DrawBorder(i.button.frame, 0, 0, 1)
   return i

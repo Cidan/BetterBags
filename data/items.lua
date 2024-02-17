@@ -26,6 +26,7 @@ local debug = addon:GetModule('Debug')
 ---@field bagid number
 ---@field slotid number
 ---@field isItemEmpty boolean
+---@field kind BagKind
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -160,7 +161,7 @@ end
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
     for _, data in pairs(items.dirtyItems) do
-      items:AttachItemInfo(data)
+      items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
     end
 
     -- All items in all bags have finished loading, fire the all done event.
@@ -176,7 +177,7 @@ end
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function()
     for _, data in pairs(items.dirtyBankItems) do
-      items:AttachItemInfo(data)
+      items:AttachItemInfo(data, const.BAG_KIND.BANK)
     end
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
@@ -187,11 +188,13 @@ function items:ProcessBankContainer()
 end
 
 ---@param data ItemData
-function items:AttachItemInfo(data)
+---@param kind BagKind
+function items:AttachItemInfo(data, kind)
   local itemMixin = Item:CreateFromBagAndSlot(data.bagid, data.slotid) --[[@as ItemMixin]]
   local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
   local bagid, slotid = data.bagid, data.slotid
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
+  data.kind = kind
   data.basic = false
   if itemID == nil then
     data.isItemEmpty = true
