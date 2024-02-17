@@ -54,7 +54,7 @@ local function OneBagView(view, bag, dirtyItems)
     local slotkey = view:GetSlotKey(data)
     -- Capture information about free slots.
     if data.isItemEmpty then
-      if bagid == const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil then
+      if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil then
         freeReagentSlotsData.count = freeReagentSlotsData.count + 1
         freeReagentSlotsData.bagid = bagid
         freeReagentSlotsData.slotid = slotid

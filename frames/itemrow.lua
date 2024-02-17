@@ -42,7 +42,7 @@ function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
-  self.button.frame:SetPoint("LEFT", self.frame, "LEFT")
+  self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
 
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
@@ -59,7 +59,10 @@ function item.itemRowProto:SetItem(data)
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
-  self.button:SetSize(16, 16)
+  self.button:SetSize(20, 20)
+  self.button.Count:Hide()
+  self.button.ilvlText:Hide()
+  self.button.LockTexture:Hide()
 
   if bagid then
     self.frame:SetID(bagid)
@@ -67,7 +70,7 @@ function item.itemRowProto:SetItem(data)
   self.text:SetText(data.itemInfo.itemName)
   self.rowButton:SetScript("OnEnter", function(s)
     s.HighlightTexture:Show()
-    GameTooltip:SetOwner(self.button.frame, "ANCHOR_LEFT")
+    GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
     if bagid and slotid then
       GameTooltip:SetBagItem(bagid, slotid)
     else
