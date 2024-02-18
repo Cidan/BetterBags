@@ -20,6 +20,9 @@ local slider = addon:GetModule('Slider')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
@@ -55,11 +58,14 @@ end
 ---@param menuList MenuList[]
 function context:Show(menuList)
   LibDD:EasyMenu(menuList, self.frame, 'cursor', 0, 0, 'MENU')
+  events:SendMessage('context/show')
 end
 
 function context:Hide()
   LibDD:HideDropDownMenu(1)
+  events:SendMessage('context/hide')
 end
+
 --[[
 local function addDivider(menuList)
   table.insert(menuList, {
@@ -226,7 +232,7 @@ function context:CreateContextMenu(bag)
     tooltipText = L:G("Click to open the options screen."),
     func = function()
       context:Hide()
-      LibStub("AceConfigDialog-3.0"):Open(addonName)
+      events:SendMessage('config/Open')
     end
   })
 

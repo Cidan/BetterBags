@@ -126,9 +126,11 @@ end
 
 function gridProto:HideScrollBar()
   self.bar:SetAlpha(0)
+  self.bar:SetAttribute("nodeignore", true)
 end
 
 function gridProto:ShowScrollBar()
+  self.bar:SetAttribute("nodeignore", false)
   self.bar:SetAlpha(1)
 end
 -- Sort will sort the cells in this grid using the given function.

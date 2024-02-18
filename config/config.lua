@@ -1,3 +1,4 @@
+---@diagnostic disable: duplicate-set-field,duplicate-doc-field,duplicate-doc-alias
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
@@ -18,6 +19,8 @@ local const = addon:GetModule('Constants')
 ---@field group string
 
 ---@class Config: AceModule
+---@field frame Frame
+---@field category string
 ---@field helpText HelpText[]
 local config = addon:NewModule('Config')
 
@@ -115,18 +118,27 @@ function config:GetOptions()
   return options
 end
 
+function config:Open()
+  LibStub("AceConfigDialog-3.0"):Open(addonName)
+  events:SendMessage('config/Opened')
+end
+
 function config:OnEnable()
   self.helpText = {}
   self:CreateAllHelp()
   GUI:RegisterWidgetType("ItemList", config.CreateItemListWidget, 1)
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
-  LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
+  self.frame, self.category = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
   LibStub("AceConfigDialog-3.0"):SetDefaultSize(addonName, 700, 800)
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
-    LibStub("AceConfigDialog-3.0"):Open(addonName)
+    self:Open()
   end)
 
   events:RegisterMessage('categories/Changed', function()
     LibStub('AceConfigRegistry-3.0'):NotifyChange(addonName)
+  end)
+
+  events:RegisterMessage('config/Open', function()
+    self:Open()
   end)
 end

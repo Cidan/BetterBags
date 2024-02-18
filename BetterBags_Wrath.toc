@@ -9,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -79,10 +79,13 @@ frames\bag.lua
 frames\classic\bag.lua
 
 config\config.lua
+config\classic\config.lua
 config\help.lua
 config\classic\bags.lua
 config\itemlist.lua
 config\customcat.lua
+
+integrations\consoleport.lua
 
 core\init.lua
 core\classic\init.lua

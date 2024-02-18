@@ -258,3 +258,12 @@ function AceItemList:SetList(values) end
 ---@param id number
 ---@param button Button
 function ContainerFrame_UpdateCooldown(id, button) end
+
+----
+-- ConsolePort annotations
+----
+
+ConsolePort = {}
+
+---@param frame Frame
+function ConsolePort:AddInterfaceCursorFrame(frame) end
