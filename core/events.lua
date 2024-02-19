@@ -129,4 +129,13 @@ function events:SendMessage(event, ...)
   self._eventHandler:SendMessage(event, ...)
 end
 
+function events:SendMessageLater(event, callback, ...)
+  ---@type any[]
+  local vararg = ...
+  C_Timer.After(0, function()
+    self._eventHandler:SendMessage(event, vararg)
+    callback()
+  end)
+end
+
 events:Enable()

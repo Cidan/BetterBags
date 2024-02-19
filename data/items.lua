@@ -169,10 +169,12 @@ function items:ProcessContainer()
     end
 
     -- All items in all bags have finished loading, fire the all done event.
-    events:SendMessage('items/RefreshBackpack/Done', items.dirtyItems)
-    wipe(items.dirtyItems)
-    items._container = nil
-    items._doingRefreshAll = false
+    events:SendMessageLater('items/RefreshBackpack/Done', function()
+      wipe(items.dirtyItems)
+      items._container = nil
+      items._doingRefreshAll = false
+    end,
+    items.dirtyItems)
   end)
 end
 
