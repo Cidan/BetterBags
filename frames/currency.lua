@@ -111,6 +111,10 @@ function CurrencyFrame:GetCurrencyItem(index, info)
 end
 
 function CurrencyFrame:Update()
+  for _, cell in pairs(self.iconGrid.cells) do
+    ---@cast cell CurrencyItem
+    cell:Release()
+  end
   self.iconGrid:Wipe()
   local index = 1
   local showCount = 0
@@ -171,6 +175,10 @@ function CurrencyFrame:Update()
   self.iconGrid:GetContainer():SetSize(w, h)
 end
 
+---@param index number
+---@param header boolean
+---@param nobackdrop? boolean
+---@return CurrencyItem
 function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
   local item = setmetatable({}, {__index = CurrencyItem})
   item.frame = CreateFrame("Frame", nil, nil, "BackdropTemplate") --[[@as Frame]]

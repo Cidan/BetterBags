@@ -28,11 +28,13 @@ function equipmentSets:Update()
   for _, setID in ipairs(sets) do
     local setName = C_EquipmentSet.GetEquipmentSetInfo(setID)
     local setLocations = C_EquipmentSet.GetItemLocations(setID)
-    for _, location in pairs(setLocations) do
-      local _, bank, bags, _, slot, bag = EquipmentManager_UnpackLocation(location)
-      if (bank or bags) and slot ~= nil and bag ~= nil then
-        self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
-        self.bagAndSlotToSet[bag][slot] = setName
+    if setLocations ~= nil then -- This is a bugfix for #113, no idea why this would return nil.
+      for _, location in pairs(setLocations) do
+        local _, bank, bags, _, slot, bag = EquipmentManager_UnpackLocation(location)
+        if (bank or bags) and slot ~= nil and bag ~= nil then
+          self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
+          self.bagAndSlotToSet[bag][slot] = setName
+        end
       end
     end
   end

@@ -32,10 +32,10 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
     for i, id in ipairs(const.BANK_ONLY_BAGS_LIST) do
       if slotsPurchased >= i and id == self.bag  then
         self.canBuy = false
-        self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
+        self.frame:GetNormalTexture():SetVertexColor(1.0,1.0,1.0)
       elseif id == self.bag then
         self.canBuy = true
-        self.frame.ItemSlotBackground:SetVertexColor(1.0,0.1,0.1)
+        self.frame:GetNormalTexture():SetVertexColor(1.0,0.1,0.1)
       end
     end
   else
@@ -47,14 +47,12 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
   local hasItem = not not icon
   if hasItem then
     --TODO(lobato): Set count, other properties
-    self.frame.ItemSlotBackground:SetTexture(icon)
-    self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
-    self.frame.ItemSlotBackground:Show()
+    SetItemButtonTexture(self.frame, icon)
+    self.frame:GetNormalTexture():SetVertexColor(1.0,1.0,1.0)
     self.empty = false
   else
     local _, texture = GetInventorySlotInfo("Bag"..bag)
-    self.frame.ItemSlotBackground:SetTexture(texture)
-    self.frame.ItemSlotBackground:Show()
+    SetItemButtonTexture(self.frame, texture)
     --icon = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
     --self.frame.ItemSlotBackground:Show()
     self.empty = true
@@ -72,8 +70,7 @@ function BagButtonFrame.bagButtonProto:ClearBag()
   self.empty = nil
   self.kind = nil
   self.canBuy = nil
-  self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
-  self.frame.ItemSlotBackground:Hide()
+  self.frame:GetNormalTexture():SetVertexColor(1.0,1.0,1.0)
   --SetItemButtonTexture(self.frame, nil)
   --SetItemButtonQuality(self.frame, nil)
 end
@@ -95,10 +92,8 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnDragStart", function() b:OnDragStart() end)
   f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
-  f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND")
   --f.ItemSlotBackground:SetTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]])
   --f.ItemSlotBackground:SetTexture(texture)
-  f.ItemSlotBackground:SetAllPoints(f);
   --f.ItemSlotBackground:Hide()
   return b
 end
