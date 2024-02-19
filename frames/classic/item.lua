@@ -45,7 +45,8 @@ local children = {
   "NormalTexture",
   "NewItemTexture",
   "IconOverlay2",
-  "ItemContextOverlay"
+  "ItemContextOverlay",
+  "IconBorder"
 }
 
 function itemFrame.itemProto:UpdateCooldown()
