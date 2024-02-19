@@ -22,6 +22,7 @@ function equipmentSets:OnEnable()
 end
 
 function equipmentSets:Update()
+  if not addon.isRetail then return end
   wipe(self.bagAndSlotToSet)
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do

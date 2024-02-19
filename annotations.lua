@@ -8,6 +8,7 @@
 ---@field PushedTexture Texture
 ---@field HighlightTexture Texture
 ---@field BattlepayItemTexture Texture
+---@field IconBorder Texture
 local itemButton = {}
 
 ---@param bagid number

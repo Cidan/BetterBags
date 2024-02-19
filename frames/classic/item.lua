@@ -45,7 +45,8 @@ local children = {
   "NormalTexture",
   "NewItemTexture",
   "IconOverlay2",
-  "ItemContextOverlay"
+  "ItemContextOverlay",
+  "IconBorder"
 }
 
 function itemFrame.itemProto:UpdateCooldown()
@@ -93,7 +94,9 @@ function itemFrame.itemProto:SetItem(data)
   end
 
   SetItemButtonTexture(self.button, data.itemInfo.itemIcon)
-  SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, data.itemInfo.isBound)
+  self.button.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
+  self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
+  self.button.IconBorder:Show()
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self:SetLock(data.itemInfo.isLocked)
