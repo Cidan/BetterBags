@@ -53,6 +53,7 @@ function item.itemRowProto:SetItem(data)
   self.button.ilvlText:Hide()
   self.button.LockTexture:Hide()
   self.button.button.IconBorder:SetSize(20, 20)
+  self.button.button:GetNormalTexture():SetSize(20, 20)
 
   if bagid then
     self.frame:SetID(bagid)
