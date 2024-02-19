@@ -98,8 +98,8 @@ local function GridView(view, bag, dirtyItems)
       itemButton:SetItem(data)
     end
 
-    -- Add the item to the correct category section.
-    if (not bag.slots:IsShown() and not data.isItemEmpty) or (bag.slots:IsShown()) then
+    -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
+    if (not bag.slots:IsShown() and not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) or (bag.slots:IsShown()) then
       local category = itemButton:GetCategory()
       local section = view:GetOrCreateSection(category)
       section:AddCell(slotkey, itemButton)
