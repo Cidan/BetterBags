@@ -183,28 +183,44 @@ local function GridView(view, bag, dirtyItems)
 
   view.itemCount = itemCount
 end
+---@param view view
+---@param bag Bag
+---@param w number
+---@param h number
+local function postDraw(view, bag, w, h)
+  -- Reposition the content frame if the recent items section is empty.
+  if w < 160 then
+    w = 160
+  end
+  if h == 0 then
+    h = 40
+  end
+  view.content:HideScrollBar()
+  --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
+  -- than the screen space.
+  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+  local bagHeight = h +
+  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+  bag.frame:SetHeight(bagHeight)
+end
 
 ---@param view view
 ---@param bag Bag
-local function GridDraw(view, bag)
-  if not view.defer then
-    -- Position all sections and draw the main bag.
+---@param callback? function
+local function GridDraw(view, bag, callback)
+  if view.defer then return end
+  if callback and InCombatLockdown() then
+    view.content:Draw(function(w, h)
+      postDraw(view, bag, w, h)
+      callback()
+    end)
+  else
     local w, h = view.content:Draw()
-    -- Reposition the content frame if the recent items section is empty.
-    if w < 160 then
-      w = 160
-    end
-    if h == 0 then
-      h = 40
-    end
-    view.content:HideScrollBar()
-    --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-    -- than the screen space.
-    bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
-    local bagHeight = h +
-    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-    bag.frame:SetHeight(bagHeight)
+    postDraw(view, bag, w, h)
+  end
+  if callback then
+    callback()
   end
 end
 
@@ -227,8 +243,8 @@ function views:NewGrid(parent)
 
     if callback then
       C_Timer.After(0, function()
-        GridDraw(v, bag)
-        callback()
+        GridDraw(v, bag, callback)
+        --callback()
       end)
     else
       GridDraw(v, bag)
