@@ -270,7 +270,7 @@ function itemFrame.itemProto:SetItem(data)
   else
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
-  self.button.IconBorder:SetBlendMode("ADD")
+  self.button.IconBorder:SetBlendMode("BLEND")
   self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
@@ -326,7 +326,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
-  self.button.IconBorder:SetBlendMode("ADD")
+  self.button.IconBorder:SetBlendMode("BLEND")
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()

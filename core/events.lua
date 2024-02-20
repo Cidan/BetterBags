@@ -98,9 +98,11 @@ end
 -- called when any of the events in the group are fired. The callback will be
 -- called at most once every 0.5 seconds.
 ---@param groupEvents string[]
+---@param groupMessages string[]
 ---@param callback fun(eventData: eventData)
-function events:GroupBucketEvent(groupEvents, callback)
+function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   local joinedEvents = table.concat(groupEvents, '')
+  joinedEvents = joinedEvents .. table.concat(groupMessages, '')
   if not self._bucketTimers[joinedEvents] then
     self._bucketCallbacks[joinedEvents] = {}
     self._eventArguments[joinedEvents] = {}
@@ -117,6 +119,13 @@ function events:GroupBucketEvent(groupEvents, callback)
       end)
     for _, event in pairs(groupEvents) do
       self:RegisterEvent(event, function(eventName, ...)
+        tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+        self._eventQueue[joinedEvents] = true
+      end)
+    end
+
+    for _, event in pairs(groupMessages) do
+      self:RegisterMessage(event, function(eventName, ...)
         tinsert(self._eventArguments[joinedEvents], {eventName, ...})
         self._eventQueue[joinedEvents] = true
       end)

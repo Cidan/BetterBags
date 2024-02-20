@@ -162,8 +162,15 @@ end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
----@private
 function bagFrame.bagProto:Refresh()
+  if self.kind == const.BAG_KIND.BACKPACK then
+    events:SendMessage('bags/RefreshBackpack')
+  else
+    events:SendMessage('bags/RefreshBank')
+  end
+end
+
+function bagFrame.bagProto:DoRefresh()
   if self.kind == const.BAG_KIND.BACKPACK then
     items:RefreshBackpack()
   elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
