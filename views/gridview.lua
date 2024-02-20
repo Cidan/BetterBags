@@ -244,7 +244,6 @@ function views:NewGrid(parent)
     if callback then
       C_Timer.After(0, function()
         GridDraw(v, bag, callback)
-        --callback()
       end)
     else
       GridDraw(v, bag)
