@@ -81,6 +81,7 @@ local search = addon:GetModule('Search')
 ---@field moneyFrame Money
 ---@field resizeHandle Button
 ---@field drawOnClose boolean
+---@field drawAfterCombat boolean
 ---@field menuList MenuList[]
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
@@ -163,6 +164,14 @@ end
 -- This is what would be considered a "full refresh".
 function bagFrame.bagProto:Refresh()
   if self.kind == const.BAG_KIND.BACKPACK then
+    events:SendMessage('bags/RefreshBackpack')
+  else
+    events:SendMessage('bags/RefreshBank')
+  end
+end
+
+function bagFrame.bagProto:DoRefresh()
+  if self.kind == const.BAG_KIND.BACKPACK then
     items:RefreshBackpack()
   elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
     items:RefreshBank()
@@ -185,16 +194,17 @@ end
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
 function bagFrame.bagProto:Draw(dirtyItems)
+  local view = self.views[database:GetBagView(self.kind)]
   -- TODO(lobato): Implement slots view, maybe.
   if self.slots:IsShown() then
     self:Wipe()
   end
 
-  local view = self.views[database:GetBagView(self.kind)]
   if view == nil then
     assert(view, "No view found for bag view: "..database:GetBagView(self.kind))
     return
   end
+
 
   if self.currentView and self.currentView:GetKind() ~=  view:GetKind() then
     self.currentView:Wipe()
@@ -279,6 +289,7 @@ function bagFrame:Create(kind)
   setmetatable(b, { __index = bagFrame.bagProto })
   b.currentItemCount = 0
   b.drawOnClose = false
+  b.drawAfterCombat = false
   b.isReagentBank = false
   b.sections = {}
   b.toRelease = {}

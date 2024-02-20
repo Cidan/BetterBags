@@ -96,6 +96,7 @@ function itemFrame.itemProto:SetItem(data)
   SetItemButtonTexture(self.button, data.itemInfo.itemIcon)
   self.button.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
+  self.button.IconBorder:SetBlendMode("BLEND")
   self.button.IconBorder:Show()
   SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
@@ -176,7 +177,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
-
+  self.button.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
   self.frame:Show()
   self.button:Show()

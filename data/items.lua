@@ -51,7 +51,9 @@ end
 
 function items:OnEnable()
 
-  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:RefreshAll() end)
+  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
+    self:RefreshAll()
+  end)
   local eventList = {
     'BAG_UPDATE_DELAYED',
     'PLAYERBANKSLOTS_CHANGED',
@@ -61,7 +63,9 @@ function items:OnEnable()
     table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   end
 
-  events:GroupBucketEvent(eventList, function() self:RefreshAll() end)
+  events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
+    self:RefreshAll()
+  end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
     addon.atBank = true
@@ -169,10 +173,12 @@ function items:ProcessContainer()
     end
 
     -- All items in all bags have finished loading, fire the all done event.
-    events:SendMessage('items/RefreshBackpack/Done', items.dirtyItems)
-    wipe(items.dirtyItems)
-    items._container = nil
-    items._doingRefreshAll = false
+    events:SendMessageLater('items/RefreshBackpack/Done', function()
+      wipe(items.dirtyItems)
+      items._container = nil
+      items._doingRefreshAll = false
+    end,
+    items.dirtyItems)
   end)
 end
 

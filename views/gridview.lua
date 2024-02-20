@@ -109,8 +109,11 @@ local function GridView(view, bag, dirtyItems)
     end
   end
 
-  if itemCount < view.itemCount and not bag.slots:IsShown() and not categoryChanged then
+  if (itemCount < view.itemCount and not bag.slots:IsShown() and not categoryChanged) or InCombatLockdown() then
     view.defer = true
+    if InCombatLockdown() then
+      bag.drawAfterCombat = true
+    end
   else
     view.defer = false
   end
@@ -182,7 +185,6 @@ local function GridView(view, bag, dirtyItems)
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
 
   if not view.defer then
-    -- Position all sections and draw the main bag.
     local w, h = view.content:Draw()
     -- Reposition the content frame if the recent items section is empty.
     if w < 160 then
@@ -199,8 +201,9 @@ local function GridView(view, bag, dirtyItems)
     const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
     const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
     bag.frame:SetHeight(bagHeight)
+  elseif InCombatLockdown() then
+    -- TODO(lobato): Draw new items if in combat in their own section.
   end
-
   view.itemCount = itemCount
 end
 

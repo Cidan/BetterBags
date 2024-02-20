@@ -174,6 +174,7 @@ end
 function itemFrame.itemProto:Lock()
   if self.data.isItemEmpty or self.data.basic then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  if itemLocation == nil or (itemLocation.IsValid and not itemLocation:IsValid()) then return end
   C_Item.LockItem(itemLocation)
   self.data.itemInfo.isLocked = true
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
@@ -185,6 +186,7 @@ end
 function itemFrame.itemProto:Unlock()
   if self.data.isItemEmpty or self.data.basic then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  if itemLocation == nil or (itemLocation.IsValid and not itemLocation:IsValid()) then return end
   C_Item.UnlockItem(itemLocation)
   self.data.itemInfo.isLocked = false
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
@@ -263,6 +265,12 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetMatchesSearch(not isFiltered)
   self.button.minDisplayCount = 1
 
+  if self.kind == const.BAG_KIND.BANK then
+    self:AddToMasqueGroup(const.BAG_KIND.BANK)
+  else
+    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
+  end
+  self.button.IconBorder:SetBlendMode("BLEND")
   self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
@@ -318,6 +326,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
+  self.button.IconBorder:SetBlendMode("BLEND")
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()

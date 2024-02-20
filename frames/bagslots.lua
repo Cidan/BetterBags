@@ -113,6 +113,6 @@ function BagSlots:CreatePanel(kind)
   end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   b.kind = kind
-  b:Hide()
+  b.frame:Hide()
   return b
 end

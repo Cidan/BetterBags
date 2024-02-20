@@ -139,10 +139,8 @@ function gridProto:Sort(fn)
   table.sort(self.cells, fn)
 end
 
--- Draw will draw the grid.
----@return number width
----@return number height
-function gridProto:Draw()
+---@return number, number
+function gridProto:stage()
   for _, column in pairs(self.columns) do
     column:RemoveAll()
     column:Release()
@@ -186,7 +184,13 @@ function gridProto:Draw()
     end
   elseif self.compactStyle == const.GRID_COMPACT_STYLE.COMPACT then
   end
+  return width, height
+end
 
+---@param width number
+---@param height number
+---@return number, number
+function gridProto:render(width, height)
   -- Draw all the columns and their cells.
   for _, column in pairs(self.columns) do
     local w, h = column:Draw(self.compactStyle)
@@ -200,6 +204,22 @@ function gridProto:Draw()
   end
   self.inner:SetSize(width, height)
   return width, height
+end
+
+-- Draw will draw the grid.
+---@param callback? fun(width: number, height: number)
+---@return number width
+---@return number height
+function gridProto:Draw(callback)
+  if not callback then
+    return self:render(self:stage())
+  end
+  local width, height = self:stage()
+  C_Timer.After(0, function()
+    width, height = self:render(width, height)
+    callback(width, height)
+  end)
+  return 0,0
 end
 
 -- Clear will remove and release all columns from the grid,

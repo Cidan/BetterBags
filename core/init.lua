@@ -106,8 +106,6 @@ end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  local updateFrame = CreateFrame("Frame")
-  updateFrame:SetScript("OnUpdate", self.OnUpdate)
   itemFrame:Enable()
   sectionFrame:Enable()
   masque:Enable()
@@ -134,9 +132,9 @@ function addon:OnEnable()
 
   events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
 
-  events:RegisterMessage('items/RefreshBackpack/Done', function(_, itemData)
+  events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:Draw(itemData)
+    addon.Bags.Backpack:Draw(args[1])
    end)
 
   events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
@@ -150,6 +148,16 @@ function addon:OnEnable()
     addon.Bags.Bank:UpdateContextMenu()
   end)
 
-  debug:Log("init", "about refresh all items")
-  items:RefreshBackpack()
+  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
+    if addon.Bags.Backpack.drawAfterCombat then
+      addon.Bags.Backpack.drawAfterCombat = false
+      addon.Bags.Backpack:Refresh()
+    end
+    if addon.Bags.Bank.drawAfterCombat then
+      addon.Bags.Bank.drawAfterCombat = false
+      addon.Bags.Bank:Refresh()
+    end
+  end)
+
+  events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 end
