@@ -265,6 +265,12 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetMatchesSearch(not isFiltered)
   self.button.minDisplayCount = 1
 
+  if self.kind == const.BAG_KIND.BANK then
+    self:AddToMasqueGroup(const.BAG_KIND.BANK)
+  else
+    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
+  end
+  self.button.IconBorder:SetBlendMode("ADD")
   self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
@@ -320,6 +326,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
   end
+  self.button.IconBorder:SetBlendMode("ADD")
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()

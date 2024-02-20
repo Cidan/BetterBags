@@ -162,6 +162,7 @@ end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
+---@private
 function bagFrame.bagProto:Refresh()
   if self.kind == const.BAG_KIND.BACKPACK then
     items:RefreshBackpack()
