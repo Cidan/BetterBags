@@ -181,47 +181,25 @@ local function GridView(view, bag, dirtyItems)
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
 
-  view.itemCount = itemCount
-end
----@param view view
----@param bag Bag
----@param w number
----@param h number
-local function postDraw(view, bag, w, h)
-  -- Reposition the content frame if the recent items section is empty.
-  if w < 160 then
-    w = 160
-  end
-  if h == 0 then
-    h = 40
-  end
-  view.content:HideScrollBar()
-  --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-  -- than the screen space.
-  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
-  local bagHeight = h +
-  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-  bag.frame:SetHeight(bagHeight)
-end
-
----@param view view
----@param bag Bag
----@param callback? function
-local function GridDraw(view, bag, callback)
-  if view.defer then return end
-  if callback and InCombatLockdown() then
-    view.content:Draw(function(w, h)
-      postDraw(view, bag, w, h)
-      callback()
-    end)
-  else
+  if not view.defer then
     local w, h = view.content:Draw()
-    postDraw(view, bag, w, h)
+    -- Reposition the content frame if the recent items section is empty.
+    if w < 160 then
+      w = 160
+    end
+    if h == 0 then
+      h = 40
+    end
+    view.content:HideScrollBar()
+    --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
+    -- than the screen space.
+    bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+    local bagHeight = h +
+    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+    bag.frame:SetHeight(bagHeight)
   end
-  if callback then
-    callback()
-  end
+  view.itemCount = itemCount
 end
 
 ---@param parent Frame
@@ -238,17 +216,7 @@ function views:NewGrid(parent)
   view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
-  view.Render = function(v, bag, dirtyItems, callback)
-    GridView(v, bag, dirtyItems)
-
-    if callback then
-      C_Timer.After(0, function()
-        GridDraw(v, bag, callback)
-      end)
-    else
-      GridDraw(v, bag)
-    end
-  end
+  view.Render = GridView
   view.Wipe = Wipe
   return view
 end

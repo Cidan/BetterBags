@@ -186,30 +186,30 @@ end
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param dirtyItems ItemData[]
 function bagFrame.bagProto:Draw(dirtyItems)
+  local view = self.views[database:GetBagView(self.kind)]
   -- TODO(lobato): Implement slots view, maybe.
   if self.slots:IsShown() then
     self:Wipe()
   end
 
-  local view = self.views[database:GetBagView(self.kind)]
   if view == nil then
     assert(view, "No view found for bag view: "..database:GetBagView(self.kind))
     return
   end
+
 
   if self.currentView and self.currentView:GetKind() ~=  view:GetKind() then
     self.currentView:Wipe()
     self.currentView:GetContent():Hide()
   end
 
-  view:Render(self, dirtyItems, function()
-    view:GetContent():Show()
-    self.currentView = view
-    self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-    local text = search:GetText()
-    self:Search(text)
-    self:OnResize()
-  end)
+  view:Render(self, dirtyItems)
+  view:GetContent():Show()
+  self.currentView = view
+  self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
+  local text = search:GetText()
+  self:Search(text)
+  self:OnResize()
 end
 
 function bagFrame.bagProto:KeepBagInBounds()

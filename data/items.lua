@@ -51,7 +51,9 @@ end
 
 function items:OnEnable()
 
-  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function() self:RefreshAll() end)
+  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
+    self:RefreshAll()
+  end)
   local eventList = {
     'BAG_UPDATE_DELAYED',
     'PLAYERBANKSLOTS_CHANGED',
@@ -61,7 +63,9 @@ function items:OnEnable()
     table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   end
 
-  events:GroupBucketEvent(eventList, function() self:RefreshAll() end)
+  events:GroupBucketEvent(eventList, function()
+    self:RefreshAll()
+  end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
     addon.atBank = true

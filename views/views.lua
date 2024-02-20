@@ -29,11 +29,9 @@ views.viewProto = {}
 
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
----@param callback function
-function views.viewProto:Render(bag, dirtyItems, callback)
+function views.viewProto:Render(bag, dirtyItems)
   _ = bag
   _ = dirtyItems
-  _ = callback
   error('Render method not implemented')
 end
 

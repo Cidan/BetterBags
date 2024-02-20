@@ -161,6 +161,4 @@ function addon:OnEnable()
 
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 
-  debug:Log("init", "about refresh all items")
-  items:RefreshBackpack()
 end
