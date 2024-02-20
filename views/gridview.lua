@@ -109,7 +109,7 @@ local function GridView(view, bag, dirtyItems)
     end
   end
 
-  if itemCount < view.itemCount and not bag.slots:IsShown() and not categoryChanged then
+  if (itemCount < view.itemCount and not bag.slots:IsShown() and not categoryChanged) then
     view.defer = true
   else
     view.defer = false
@@ -181,6 +181,12 @@ local function GridView(view, bag, dirtyItems)
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
 
+  view.itemCount = itemCount
+end
+
+---@param view view
+---@param bag Bag
+local function GridDraw(view, bag)
   if not view.defer then
     -- Position all sections and draw the main bag.
     local w, h = view.content:Draw()
@@ -200,8 +206,6 @@ local function GridView(view, bag, dirtyItems)
     const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
     bag.frame:SetHeight(bagHeight)
   end
-
-  view.itemCount = itemCount
 end
 
 ---@param parent Frame
@@ -218,7 +222,18 @@ function views:NewGrid(parent)
   view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
-  view.Render = GridView
+  view.Render = function(v, bag, dirtyItems, callback)
+    GridView(v, bag, dirtyItems)
+
+    if callback then
+      C_Timer.After(0, function()
+        GridDraw(v, bag)
+        callback()
+      end)
+    else
+      GridDraw(v, bag)
+    end
+  end
   view.Wipe = Wipe
   return view
 end

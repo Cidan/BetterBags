@@ -81,6 +81,7 @@ local search = addon:GetModule('Search')
 ---@field moneyFrame Money
 ---@field resizeHandle Button
 ---@field drawOnClose boolean
+---@field drawAfterCombat boolean
 ---@field menuList MenuList[]
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
@@ -201,13 +202,14 @@ function bagFrame.bagProto:Draw(dirtyItems)
     self.currentView:GetContent():Hide()
   end
 
-  view:Render(self, dirtyItems)
-  view:GetContent():Show()
-  self.currentView = view
-  self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = search:GetText()
-  self:Search(text)
-  self:OnResize()
+  view:Render(self, dirtyItems, function()
+    view:GetContent():Show()
+    self.currentView = view
+    self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
+    local text = search:GetText()
+    self:Search(text)
+    self:OnResize()
+  end)
 end
 
 function bagFrame.bagProto:KeepBagInBounds()
@@ -279,6 +281,7 @@ function bagFrame:Create(kind)
   setmetatable(b, { __index = bagFrame.bagProto })
   b.currentItemCount = 0
   b.drawOnClose = false
+  b.drawAfterCombat = false
   b.isReagentBank = false
   b.sections = {}
   b.toRelease = {}

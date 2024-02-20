@@ -1,3 +1,4 @@
+---@diagnostic disable: duplicate-set-field,duplicate-doc-field
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
@@ -122,7 +123,10 @@ function views:NewOneBag(parent)
   view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
-  view.Render = OneBagView
+  view.Render = function(v, bag, dirtyItems, callback)
+    OneBagView(v, bag, dirtyItems)
+    callback()
+  end
   view.Wipe = Wipe
   return view
 end
