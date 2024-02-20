@@ -160,5 +160,4 @@ function addon:OnEnable()
   end)
 
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
-
 end

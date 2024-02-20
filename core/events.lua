@@ -110,7 +110,7 @@ function events:GroupBucketEvent(groupEvents, callback)
           return
         end
         for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
-          cb(self._eventArguments[joinedEvents])
+          xpcall(cb, geterrorhandler(), self._eventArguments[joinedEvents])
         end
         self._eventQueue[joinedEvents] = false
         self._eventArguments[joinedEvents] = {}
