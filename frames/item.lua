@@ -174,6 +174,7 @@ end
 function itemFrame.itemProto:Lock()
   if self.data.isItemEmpty or self.data.basic then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  if itemLocation == nil or not itemLocation:IsValid() then return end
   C_Item.LockItem(itemLocation)
   self.data.itemInfo.isLocked = true
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
@@ -185,6 +186,7 @@ end
 function itemFrame.itemProto:Unlock()
   if self.data.isItemEmpty or self.data.basic then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  if itemLocation == nil or not itemLocation:IsValid() then return end
   C_Item.UnlockItem(itemLocation)
   self.data.itemInfo.isLocked = false
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
