@@ -143,11 +143,6 @@ function addon:OnEnable()
 
   end)
 
-  events:RegisterMessage('categories/Changed', function()
-    addon.Bags.Backpack:UpdateContextMenu()
-    addon.Bags.Bank:UpdateContextMenu()
-  end)
-
   events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
     if addon.Bags.Backpack.drawAfterCombat then
       addon.Bags.Backpack.drawAfterCombat = false

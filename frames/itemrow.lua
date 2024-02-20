@@ -37,6 +37,12 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field data ItemData
 item.itemRowProto = {}
 
+function item.itemRowProto:Unlock()
+end
+
+function item.itemRowProto:Lock()
+end
+
 ---@param data ItemData
 function item.itemRowProto:SetItem(data)
   self.data = data

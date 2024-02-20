@@ -51,7 +51,6 @@ function config:GetCustomCategoryOptions(kind)
     end,
     set = function(_, value)
       categories:SetCategoryState(kind, value, not categories:IsCategoryEnabled(kind, value))
-      config:GetBag(kind):Wipe()
       config:GetBag(kind):Refresh()
     end,
     values = {}
@@ -90,7 +89,6 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetCategoryFilter(kind, value, not DB:GetCategoryFilter(kind, value))
-              config:GetBag(kind):Wipe()
               config:GetBag(kind):Refresh()
             end,
             values = {

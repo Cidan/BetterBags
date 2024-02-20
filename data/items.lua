@@ -52,7 +52,7 @@ end
 function items:OnEnable()
 
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:RefreshAll()
+    self:DoRefreshAll()
   end)
   local eventList = {
     'BAG_UPDATE_DELAYED',
@@ -64,7 +64,7 @@ function items:OnEnable()
   end
 
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
-    self:RefreshAll()
+    self:DoRefreshAll()
   end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
@@ -92,6 +92,11 @@ function items:RemoveNewItemFromAllItems()
 end
 
 function items:RefreshAll()
+  events:SendMessage('bags/RefreshAll')
+end
+
+---@private
+function items:DoRefreshAll()
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() then
     if addon.Bags.Bank.isReagentBank then
