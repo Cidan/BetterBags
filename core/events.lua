@@ -134,7 +134,9 @@ function events:SendMessageLater(event, callback, ...)
   local vararg = ...
   C_Timer.After(0, function()
     self._eventHandler:SendMessage(event, vararg)
-    callback()
+    if callback then
+      callback()
+    end
   end)
 end
 

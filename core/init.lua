@@ -106,8 +106,6 @@ end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  local updateFrame = CreateFrame("Frame")
-  updateFrame:SetScript("OnUpdate", self.OnUpdate)
   itemFrame:Enable()
   sectionFrame:Enable()
   masque:Enable()
@@ -160,6 +158,8 @@ function addon:OnEnable()
       addon.Bags.Bank:Refresh()
     end
   end)
+
+  events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 
   debug:Log("init", "about refresh all items")
   items:RefreshBackpack()

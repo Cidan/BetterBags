@@ -43,6 +43,7 @@ function addon:OpenAllBags(interactingFrame)
   if interactingFrame ~= nil then return end
   debug:Log('Hooks', 'OpenAllBags')
   addon.backpackShouldOpen = true
+  events:SendMessageLater('bags/OpenClose')
 end
 
 ---@param interactingFrame Frame
@@ -50,18 +51,21 @@ function addon:CloseAllBags(interactingFrame)
   if interactingFrame ~= nil then return end
   debug:Log('Hooks', 'CloseAllBags')
   addon.backpackShouldClose = true
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:CloseBackpack(interactingFrame)
   if interactingFrame ~= nil then return end
   debug:Log('Hooks', 'CloseBackpack')
   addon.backpackShouldClose = true
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:OpenBackpack(interactingFrame)
   if interactingFrame ~= nil then return end
   debug:Log('Hooks', 'OpenBackpack')
   addon.backpackShouldOpen = true
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:ToggleBag(interactingFrame)
@@ -72,12 +76,14 @@ function addon:ToggleBag(interactingFrame)
   else
     addon.backpackShouldOpen = true
   end
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:CloseBag(interactingFrame)
   if interactingFrame ~= nil then return end
   debug:Log('Hooks', 'CloseBag')
   addon.backpackShouldClose = true
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:ToggleAllBags(interactingFrame)
@@ -88,6 +94,7 @@ function addon:ToggleAllBags(interactingFrame)
   else
     addon.backpackShouldOpen = true
   end
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:ToggleBackpack(interactingFrame)
@@ -98,6 +105,7 @@ function addon:ToggleBackpack(interactingFrame)
   else
     addon.backpackShouldOpen = true
   end
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:CloseSpecialWindows(interactingFrame)
@@ -108,6 +116,7 @@ function addon:CloseSpecialWindows(interactingFrame)
   addon.Bags.Bank:SwitchToBank()
   events:SendMessage('addon/CloseSpecialWindows')
   CloseBankFrame()
+  events:SendMessageLater('bags/OpenClose')
 end
 
 function addon:OpenBank(interactingFrame)
