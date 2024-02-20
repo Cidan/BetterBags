@@ -234,7 +234,13 @@ function itemFrame.itemProto:SetItem(data)
     data.itemInfo.classID == Enum.ItemClass.Gem) then
       self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
       if ilvlOpts.color then
-        local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
+        if ilvlOpts.dynamicColor then
+          -- Use dynamic color based on the player's average item level
+          r, g, b = color:GetItemLevelDynamicColor(data.itemInfo.currentItemLevel)
+        else
+          -- Use static color based on item quality
+          r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
+        end
         self.ilvlText:SetTextColor(r, g, b, 1)
       else
         self.ilvlText:SetTextColor(1, 1, 1, 1)

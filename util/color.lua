@@ -14,6 +14,48 @@ local colorTable = {
   [489] = {1, 0.5, 0}
 }
 
+-- Color criteria based on the item level relative to the player's average item level
+local colorCriteria = {
+  orange = {1, 0.5, 0},      -- Above or equal to average item level
+  purple = {0.63, 0.21, 0.93}, -- 5 or less lower than average item level
+  blue = {0, 0.55, 0.87},    -- 6-10 lower than average item level
+  green = {0, 1, 0},         -- 10-20 lower than average item level
+  yellow = {1, 1, 0}         -- More than 20 lower than average item level
+}
+
+-- Function to determine the average item level of the player using the WoW API
+local function getAverageItemLevel()
+  local averageItemLevel, equippedItemLevel = GetAverageItemLevel()
+  return averageItemLevel -- Returns the average item level of all equipped items
+end
+
+-- Function to determine color based on the item level relative to average item level
+---@param itemLevel number
+---@return table<number, number, number>
+function color:GetItemLevelRelativeColor(itemLevel)
+  local averageItemLevel = getAverageItemLevel()
+  local difference = itemLevel - averageItemLevel
+  
+  if difference >= 0 then
+    return colorCriteria.orange
+  elseif difference >= -10 then
+    return colorCriteria.purple
+  elseif difference >= -15 then
+    return colorCriteria.blue
+  elseif difference >= -20 then
+    return colorCriteria.green
+  else
+    return colorCriteria.yellow
+  end
+end
+
+-- Function to use the determined color for an item level
+---@param itemLevel number
+---@return number, number, number
+function color:GetItemLevelDynamicColor(itemLevel)
+  return unpack(color:GetItemLevelRelativeColor(itemLevel))
+end
+
 ---@param colors table<number, table<number, number, number>>
 ---@param number number
 ---@return table<number, number, number>

@@ -290,11 +290,13 @@ const.DATABASE_DEFAULTS = {
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
         enabled = true,
-        color = true
+        color = true,
+        dynamicColor = false
       },
       [const.BAG_KIND.BANK] = {
         enabled = true,
-        color = true
+        color = true,
+        dynamicColor = false
       }
     },
     positions = {
