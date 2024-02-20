@@ -132,9 +132,9 @@ function addon:OnEnable()
 
   events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
 
-  events:RegisterMessage('items/RefreshBackpack/Done', function(_, itemData)
+  events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:Draw(itemData)
+    addon.Bags.Backpack:Draw(args[1])
    end)
 
   events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
