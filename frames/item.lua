@@ -191,8 +191,30 @@ function itemFrame.itemProto:Unlock()
   self.data.itemInfo.isLocked = false
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
   self.LockTexture:Hide()
-  self.ilvlText:Show()
+  self:DrawItemLevel()
   database:SetItemLock(self.data.itemInfo.itemGUID, false)
+end
+
+function itemFrame.itemProto:DrawItemLevel()
+  local data = self.data
+  local ilvlOpts = database:GetItemLevelOptions(self.kind)
+  local ilvl = data.itemInfo.effectiveIlvl
+  if (ilvlOpts.enabled and ilvl and ilvl > 1 and data.itemInfo.currentItemCount == 1) and
+    (data.itemInfo.classID == Enum.ItemClass.Armor or
+    data.itemInfo.classID == Enum.ItemClass.Weapon or
+    data.itemInfo.classID == Enum.ItemClass.Gem) then
+      self.ilvlText:SetText(tostring(ilvl))
+      if ilvlOpts.color then
+        local r, g, b = color:GetItemLevelColor(ilvl)
+        self.ilvlText:SetTextColor(r, g, b, 1)
+      else
+        self.ilvlText:SetTextColor(1, 1, 1, 1)
+      end
+      self.ilvlText:Show()
+  else
+    self.ilvlText:Hide()
+  end
+
 end
 
 ---@param data ItemData
@@ -229,24 +251,7 @@ function itemFrame.itemProto:SetItem(data)
 
   local bound = data.itemInfo.isBound
 
-  local ilvlOpts = database:GetItemLevelOptions(self.kind)
-  if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1) and
-    (data.itemInfo.classID == Enum.ItemClass.Armor or
-    data.itemInfo.classID == Enum.ItemClass.Weapon or
-    data.itemInfo.classID == Enum.ItemClass.Gem) then
-      self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
-      if ilvlOpts.color then
-        local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
-        self.ilvlText:SetTextColor(r, g, b, 1)
-      else
-        self.ilvlText:SetTextColor(1, 1, 1, 1)
-      end
-      self.ilvlText:Show()
-  else
-    self.ilvlText:Hide()
-  end
-
-
+  self:DrawItemLevel()
   self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(data.itemInfo.itemIcon)
@@ -309,6 +314,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button:UpdateItemContextMatching()
   SetItemButtonDesaturated(self.button, false)
   self.ilvlText:SetText("")
+  self.ilvlText:Hide()
   self.LockTexture:Hide()
 
   if reagent then
@@ -471,6 +477,7 @@ function itemFrame.itemProto:ClearItem()
   self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
+  self.ilvlText:Hide()
   self.LockTexture:Hide()
   self:SetSize(37, 37)
   self.data = nil
