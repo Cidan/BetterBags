@@ -108,7 +108,7 @@ function itemFrame.itemProto:SetItem(data)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
-  self.button.UpgradeIcon:SetShown(PawnIsContainerItemAnUpgrade and PawnIsContainerItemAnUpgrade(bagid, slotid) or false)
+  --self.button.UpgradeIcon:SetShown(IsContainerItemAnUpgrade(bagid, slotid) or false)
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
 --[[
