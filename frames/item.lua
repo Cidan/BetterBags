@@ -265,11 +265,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetMatchesSearch(not isFiltered)
   self.button.minDisplayCount = 1
 
-  if self.kind == const.BAG_KIND.BANK then
-    self:AddToMasqueGroup(const.BAG_KIND.BANK)
-  else
-    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
-  end
+  self:AddToMasqueGroup()
   self.button.IconBorder:SetBlendMode("BLEND")
   self:SetAlpha(1)
   self.frame:Show()
@@ -321,11 +317,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
   end
 
-  if self.kind == const.BAG_KIND.BANK then
-    self:AddToMasqueGroup(const.BAG_KIND.BANK)
-  else
-    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
-  end
+  self:AddToMasqueGroup()
   self.button.IconBorder:SetBlendMode("BLEND")
 
   self.isFreeSlot = true
@@ -457,8 +449,7 @@ function itemFrame.itemProto:Wipe()
 end
 
 function itemFrame.itemProto:ClearItem()
-  masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
-  self.masqueGroup = nil
+  self:RemoveFromMasqueGroup()
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
@@ -486,15 +477,20 @@ function itemFrame.itemProto:ClearItem()
   self.isFreeSlot = false
 end
 
----@param kind BagKind
-function itemFrame.itemProto:AddToMasqueGroup(kind)
-  if kind == const.BAG_KIND.BANK then
+function itemFrame.itemProto:AddToMasqueGroup()
+  if self.masqueGroup ~= nil then return end
+  if self.kind == const.BAG_KIND.BANK then
     self.masqueGroup = "Bank"
     masque:AddButtonToGroup(self.masqueGroup, self.button)
   else
     self.masqueGroup = "Backpack"
     masque:AddButtonToGroup(self.masqueGroup, self.button)
   end
+end
+
+function itemFrame.itemProto:RemoveFromMasqueGroup()
+  masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
+  self.masqueGroup = nil
 end
 
 function itemFrame:OnInitialize()

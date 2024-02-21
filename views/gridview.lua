@@ -84,7 +84,6 @@ local function GridView(view, bag, dirtyItems)
     local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
     if itemButton == nil then
       itemButton = itemFrame:Create()
-      itemButton:AddToMasqueGroup(bag.kind)
       view.itemsByBagAndSlot[slotkey] = itemButton
     end
 

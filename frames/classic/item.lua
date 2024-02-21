@@ -128,6 +128,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 --]]
+  self:AddToMasqueGroup()
   self:SetAlpha(1)
   self.frame:Show()
   self.button:Show()
@@ -172,11 +173,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
   end
 
-  if self.kind == const.BAG_KIND.BANK then
-    self:AddToMasqueGroup(const.BAG_KIND.BANK)
-  else
-    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
-  end
+  self:AddToMasqueGroup()
   self.button.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
   self.frame:Show()
@@ -185,8 +182,7 @@ end
 
 
 function itemFrame.itemProto:ClearItem()
-  masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
-  self.masqueGroup = nil
+  self:RemoveFromMasqueGroup()
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)

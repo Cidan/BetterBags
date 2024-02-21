@@ -70,7 +70,6 @@ local function OneBagView(view, bag, dirtyItems)
     if itemButton == nil then
       itemButton = itemFrame:Create()
       --debug:DrawBorder(itemButton.frame, 1, 1, 0)
-      itemButton:AddToMasqueGroup(bag.kind)
       view.itemsByBagAndSlot[slotkey] = itemButton
     end
 
