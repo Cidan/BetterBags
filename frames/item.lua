@@ -364,17 +364,17 @@ function itemFrame.itemProto:GetCategory()
     end
   end
 
-  -- Return the custom category if it exists.
+  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else..
+  if self.data.itemInfo.equipmentSet then
+    self.data.itemInfo.category = "Gear: " .. self.data.itemInfo.equipmentSet
+    return self.data.itemInfo.category
+  end
+
+  -- Return the custom category if it exists next.
   local customCategory = categories:GetCustomCategory(self.kind, self.data)
   if customCategory then
     self.data.itemInfo.category = customCategory
     return customCategory
-  end
-
-  -- Check for equipment sets next.
-  if self.data.itemInfo.equipmentSet then
-    self.data.itemInfo.category = "Gear: " .. self.data.itemInfo.equipmentSet
-    return self.data.itemInfo.category
   end
 
   if not self.kind then return L:G('Everything') end
