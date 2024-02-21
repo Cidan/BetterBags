@@ -202,6 +202,78 @@ function items:ProcessBankContainer()
   end)
 end
 
+--TODO(lobato): Completely eliminate the use of ItemMixin.
+-- RefreshBag will refresh a bag's contents entirely and update the
+-- item database.
+---@private
+---@param bagid number
+---@param bankBag boolean
+function items:RefreshBag(bagid, bankBag)
+  local size = C_Container.GetContainerNumSlots(bagid)
+  local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
+  -- Loop through every container slot and create an item for it.
+  for slotid = 1, size do
+    local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+    local data = setmetatable({}, {__index = itemDataProto})
+    data.bagid = bagid
+    data.slotid = slotid
+
+    table.insert(dirty, data)
+
+    -- If this is an actual item, add it to the callback container
+    -- so data is fetched from the server.
+    if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
+      if bankBag then
+        self._bankContainer:AddContinuable(itemMixin)
+      else
+        self._container:AddContinuable(itemMixin)
+      end
+    else
+      data.isItemEmpty = true
+    end
+
+    -- All items are added to the bag/slot lookup table, including
+    -- empty items
+    self.itemsByBagAndSlot[bagid][slotid] = data
+  end
+end
+
+---@param itemList number[]
+---@param callback function<ItemData[]>
+function items:GetItemData(itemList, callback)
+  local container = ContinuableContainer:Create()
+  for _, itemID in pairs(itemList) do
+    local itemMixin = Item:CreateFromItemID(itemID)
+    container:AddContinuable(itemMixin)
+  end
+  container:ContinueOnLoad(function()
+    ---@type ItemData[]
+    local dataList = {}
+    for _, itemID in pairs(itemList) do
+      local data = setmetatable({}, {__index = itemDataProto}) ---@type ItemData
+      self:AttachBasicItemInfo(itemID, data)
+      table.insert(dataList, data)
+    end
+    callback(dataList)
+  end)
+end
+
+---@param data ItemData
+---@return boolean
+function items:IsNewItem(data)
+  if not data then return false end
+  if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
+      data.itemInfo.isNewItem then
+    return true
+  end
+  self._newItemTimers[data.itemInfo.itemGUID] = nil
+  return false
+end
+
+function items:ClearNewItems()
+  wipe(self._newItemTimers)
+end
+
 ---@param data ItemData
 ---@param kind BagKind
 function items:AttachItemInfo(data, kind)
@@ -314,76 +386,4 @@ function items:AttachBasicItemInfo(itemID, data)
     currentItemLevel = 0 --[[@as number]],
     equipmentSet = nil,
   }
-end
-
---TODO(lobato): Completely eliminate the use of ItemMixin.
--- RefreshBag will refresh a bag's contents entirely and update the
--- item database.
----@private
----@param bagid number
----@param bankBag boolean
-function items:RefreshBag(bagid, bankBag)
-  local size = C_Container.GetContainerNumSlots(bagid)
-  local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
-  -- Loop through every container slot and create an item for it.
-  for slotid = 1, size do
-    local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
-    local data = setmetatable({}, {__index = itemDataProto})
-    data.bagid = bagid
-    data.slotid = slotid
-
-    table.insert(dirty, data)
-
-    -- If this is an actual item, add it to the callback container
-    -- so data is fetched from the server.
-    if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
-      if bankBag then
-        self._bankContainer:AddContinuable(itemMixin)
-      else
-        self._container:AddContinuable(itemMixin)
-      end
-    else
-      data.isItemEmpty = true
-    end
-
-    -- All items are added to the bag/slot lookup table, including
-    -- empty items
-    self.itemsByBagAndSlot[bagid][slotid] = data
-  end
-end
-
----@param itemList number[]
----@param callback function<ItemData[]>
-function items:GetItemData(itemList, callback)
-  local container = ContinuableContainer:Create()
-  for _, itemID in pairs(itemList) do
-    local itemMixin = Item:CreateFromItemID(itemID)
-    container:AddContinuable(itemMixin)
-  end
-  container:ContinueOnLoad(function()
-    ---@type ItemData[]
-    local dataList = {}
-    for _, itemID in pairs(itemList) do
-      local data = setmetatable({}, {__index = itemDataProto}) ---@type ItemData
-      self:AttachBasicItemInfo(itemID, data)
-      table.insert(dataList, data)
-    end
-    callback(dataList)
-  end)
-end
-
----@param data ItemData
----@return boolean
-function items:IsNewItem(data)
-  if not data then return false end
-  if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
-      data.itemInfo.isNewItem then
-    return true
-  end
-  self._newItemTimers[data.itemInfo.itemGUID] = nil
-  return false
-end
-
-function items:ClearNewItems()
-  wipe(self._newItemTimers)
 end
