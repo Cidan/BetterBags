@@ -21,7 +21,7 @@ local function onItemUpdate(event, item)
 end
 
 function pawn:OnEnable()
-  if not PawnVersion then return end
+  if not addon.isRetail then return end
   print("BetterBags: Pawn integration enabled.")
   events:RegisterMessage('item/Updated', onItemUpdate)
 end
