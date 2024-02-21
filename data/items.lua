@@ -18,6 +18,13 @@ local database = addon:GetModule('Database')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class (exact) ExtraSlotInfo
+---@field emptySlots? number
+---@field emptyReagentSlots? number
+---@field totalItems? number
+---@field freeSlotKey? string
+---@field freeReagentSlotKey? string
+
 ---@class (exact) ItemData
 ---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
@@ -33,6 +40,8 @@ local itemDataProto = {}
 ---@class (exact) Items: AceModule
 ---@field itemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
+---@field slotInfo ExtraSlotInfo
+---@field bankSlotInfo ExtraSlotInfo
 ---@field dirtyItems ItemData[]
 ---@field dirtyBankItems ItemData[]
 ---@field previousItemGUID table<number, table<number, string>>
@@ -48,6 +57,8 @@ function items:OnInitialize()
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
+  self.slotInfo = {}
+  self.bankSlotInfo = {}
   self._newItemTimers = {}
 end
 
@@ -94,6 +105,16 @@ function items:RemoveNewItemFromAllItems()
 end
 
 function items:RefreshAll()
+  events:SendMessage('bags/RefreshAll')
+end
+
+-- FullRefreshAll will wipe the item cache and refresh all items in all bags.
+function items:FullRefreshAll()
+  self.itemsByBagAndSlot = {}
+  self.bankItemsByBagAndSlot = {}
+  self.previousItemGUID = {}
+  self.slotInfo = {}
+  self.bankSlotInfo = {}
   events:SendMessage('bags/RefreshAll')
 end
 
@@ -180,26 +201,53 @@ function items:HasItemChanged(bagid, slotid, data)
   local itemLocation = itemMixin:GetItemLocation()
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
   local _, itemLink = itemID and GetItemInfo(itemID) or nil, nil
-  if itemLink ~= data.itemInfo.itemLink then
+  local oldItemLink = data.itemInfo and data.itemInfo.itemLink or nil
+  local oldStackCount = data.itemInfo and data.itemInfo.itemStackCount or 0
+
+  if itemLink ~= oldItemLink then
     return true
   end
-  if itemLocation and data.itemInfo.itemStackCount ~= C_Item.GetStackCount(itemLocation) then
+
+  if itemLocation and itemLocation:IsValid() and oldStackCount ~= C_Item.GetStackCount(itemLocation) then
     return true
   end
+
   return false
+end
+
+---@param kind BagKind
+---@return ExtraSlotInfo
+function items:GetExtraSlotInfo(kind)
+  return kind == const.BAG_KIND.BACKPACK and self.slotInfo or self.bankSlotInfo
 end
 
   -- Load item data in the background, and fire a message when
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
+    ---@type ExtraSlotInfo
+    local extraSlotInfo = {}
+
     for bagid, bag in pairs(items.itemsByBagAndSlot) do
       for slotid, data in pairs(bag) do
-        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
-        table.insert(items.dirtyItems, data)
+        if items:HasItemChanged(bagid, slotid, data) then
+          items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+          table.insert(items.dirtyItems, data)
+        end
+        if data.isItemEmpty then
+          if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+            extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
+            extraSlotInfo.freeReagentSlotKey = extraSlotInfo.freeReagentSlotKey or (bagid .. '-' .. slotid)
+          else
+            extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
+            extraSlotInfo.freeSlotKey = extraSlotInfo.freeSlotKey or (bagid .. '-' .. slotid)
+          end
+        else
+          extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
+        end
       end
     end
-
+    self.slotInfo = extraSlotInfo
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessageLater('items/RefreshBackpack/Done', function()
       wipe(items.dirtyItems)
@@ -258,12 +306,12 @@ function items:RefreshBag(bagid, bankBag)
       data.isItemEmpty = true
     end
 
-    -- All items are added to the bag/slot lookup table, including
-    -- empty items
-    if bankBag then
-      self.bankItemsByBagAndSlot[bagid][slotid] = self.bankItemsByBagAndSlot[bagid][slotid] or data
+    local index = bankBag and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
+
+    if index[bagid][slotid] then
+      index[bagid][slotid].isItemEmpty = data.isItemEmpty
     else
-      self.itemsByBagAndSlot[bagid][slotid] = self.itemsByBagAndSlot[bagid][slotid] or data
+      index[bagid][slotid] = data
     end
   end
 end

@@ -13,6 +13,9 @@ local database = addon:GetModule('Database')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -56,29 +59,13 @@ end
 ---@param dirtyItems ItemData[]
 local function GridView(view, bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
-  local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
-  local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
-  local itemCount = 0
   local categoryChanged = false
+  local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
+
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
     local slotkey = view:GetSlotKey(data)
-
-    -- Capture information about free slots.
-    if data.isItemEmpty then
-      if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil then
-        freeReagentSlotsData.count = freeReagentSlotsData.count + 1
-        freeReagentSlotsData.bagid = bagid
-        freeReagentSlotsData.slotid = slotid
-      elseif bagid ~= Enum.BagIndex.Keyring then
-        freeSlotsData.count = freeSlotsData.count + 1
-        freeSlotsData.bagid = bagid
-        freeSlotsData.slotid = slotid
-      end
-    else
-      itemCount = itemCount + 1
-    end
 
     -- Create or get the item frame for this slot.
     local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
@@ -108,7 +95,7 @@ local function GridView(view, bag, dirtyItems)
     end
   end
 
-  if (itemCount < view.itemCount and not bag.slots:IsShown() and not categoryChanged) or InCombatLockdown() then
+  if (extraSlotInfo.totalItems < view.itemCount and not bag.slots:IsShown() and not categoryChanged) or InCombatLockdown() then
     view.defer = true
     if InCombatLockdown() then
       bag.drawAfterCombat = true
@@ -163,14 +150,16 @@ local function GridView(view, bag, dirtyItems)
     -- Get the free slots section and add the free slots to it.
     local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
 
+    local freeSlotBag, freeSlotID = view:ParseSlotKey(extraSlotInfo.freeSlotKey)
     view.freeSlot = view.freeSlot or itemFrame:Create()
-    view.freeSlot:SetFreeSlots(freeSlotsData.bagid, freeSlotsData.slotid, freeSlotsData.count, false)
+    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, extraSlotInfo.emptySlots, false)
     freeSlotsSection:AddCell('freeSlot', view.freeSlot)
 
     -- Only add the reagent free slot to the backbag view.
     if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
+      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(extraSlotInfo.freeReagentSlotKey)
       view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
-      view.freeReagentSlot:SetFreeSlots(freeReagentSlotsData.bagid, freeReagentSlotsData.slotid, freeReagentSlotsData.count, true)
+      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, extraSlotInfo.emptyReagentSlots, true)
       freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
     end
 
@@ -203,7 +192,7 @@ local function GridView(view, bag, dirtyItems)
   elseif InCombatLockdown() then
     -- TODO(lobato): Draw new items if in combat in their own section.
   end
-  view.itemCount = itemCount
+  view.itemCount = extraSlotInfo.totalItems
 end
 
 ---@param parent Frame
