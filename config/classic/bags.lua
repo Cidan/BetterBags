@@ -51,7 +51,6 @@ function config:GetCustomCategoryOptions(kind)
     end,
     set = function(_, value)
       categories:SetCategoryState(kind, value, not categories:IsCategoryEnabled(kind, value))
-      config:GetBag(kind):Wipe()
       config:GetBag(kind):Refresh()
     end,
     values = {}
