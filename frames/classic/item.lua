@@ -93,6 +93,7 @@ function itemFrame.itemProto:SetItem(data)
     self.ilvlText:Hide()
   end
 
+  self.button.minDisplayCount = 1
   SetItemButtonTexture(self.button, data.itemInfo.itemIcon)
   self.button.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
@@ -107,8 +108,7 @@ function itemFrame.itemProto:SetItem(data)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
-  self.button.minDisplayCount = 1
-
+  self.button.UpgradeIcon:SetShown(PawnIsContainerItemAnUpgrade and PawnIsContainerItemAnUpgrade(bagid, slotid) or false)
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
 --[[
@@ -168,6 +168,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button.NewItemTexture:Hide()
   self.ilvlText:SetText("")
   self.LockTexture:Hide()
+  self.button.UpgradeIcon:SetShown(false)
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -208,6 +209,7 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:SetText("")
   self.LockTexture:Hide()
   self:SetSize(37, 37)
+  self.button.UpgradeIcon:SetShown(false)
   self.data = nil
 end
 

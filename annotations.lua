@@ -9,6 +9,7 @@
 ---@field HighlightTexture Texture
 ---@field BattlepayItemTexture Texture
 ---@field IconBorder Texture
+---@field UpgradeIcon Texture
 local itemButton = {}
 
 ---@param bagid number
@@ -268,3 +269,9 @@ ConsolePort = {}
 
 ---@param frame Frame
 function ConsolePort:AddInterfaceCursorFrame(frame) end
+
+
+--- Pawn Global
+---@param bag number
+---@param slot number
+function PawnIsContainerItemAnUpgrade(bag, slot) end

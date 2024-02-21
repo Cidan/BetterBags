@@ -70,7 +70,8 @@ local children = {
   "NormalTexture",
   "NewItemTexture",
   "IconOverlay2",
-  "ItemContextOverlay"
+  "ItemContextOverlay",
+  "UpgradeIcon"
 }
 
 -- parseQuery will parse a query string and return a set of boolean
@@ -184,7 +185,7 @@ function itemFrame.itemProto:Lock()
 end
 
 function itemFrame.itemProto:Unlock()
-  if self.data.isItemEmpty or self.data.basic or not database:GetItemLock(self.data.itemInfo.itemGUID) then return end
+  if self.data.isItemEmpty or self.data.basic then return end
   local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
   if itemLocation == nil or (itemLocation.IsValid and not itemLocation:IsValid()) then return end
   C_Item.UnlockItem(itemLocation)
@@ -251,6 +252,7 @@ function itemFrame.itemProto:SetItem(data)
 
   local bound = data.itemInfo.isBound
 
+  self.button.minDisplayCount = 1
   self:DrawItemLevel()
   self.button.ItemSlotBackground:Hide()
   ClearItemButtonOverlay(self.button)
@@ -268,7 +270,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
-  self.button.minDisplayCount = 1
+  self.button.UpgradeIcon:SetShown(PawnIsContainerItemAnUpgrade and PawnIsContainerItemAnUpgrade(bagid, slotid) or false)
 
   self:AddToMasqueGroup()
   self.button.IconBorder:SetBlendMode("BLEND")
@@ -316,6 +318,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
   self.LockTexture:Hide()
+  self.button.UpgradeIcon:SetShown(false)
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -480,6 +483,7 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:Hide()
   self.LockTexture:Hide()
   self:SetSize(37, 37)
+  self.button.UpgradeIcon:SetShown(false)
   self.data = nil
   self.isFreeSlot = false
 end
