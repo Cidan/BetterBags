@@ -248,6 +248,16 @@ function DB:CreateCategory(category)
   }
 end
 
+---@param category string
+---@param newName string
+function DB:RenameCategory(category, newName)
+  DB.data.profile.customCategoryFilters[newName] = DB.data.profile.customCategoryFilters[category]
+  DB.data.profile.customCategoryFilters[category] = nil
+  for itemID, _ in pairs(DB.data.profile.customCategoryFilters[newName].itemList) do
+    DB.data.profile.customCategoryIndex[itemID] = newName
+  end
+end
+
 ---@param guid string
 ---@param locked boolean
 function DB:SetItemLock(guid, locked)

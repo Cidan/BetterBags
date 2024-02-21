@@ -30,12 +30,23 @@ function config:CreateCustomCategoryConfig(category)
         order = 1,
         values = DB:GetItemCategory(category)
       },
+      rename = {
+        type = "input",
+        name = L:G("Rename Category"),
+        width = "double",
+        order = 2,
+        get = function() return "" end,
+        set = function(_, value)
+          if value == "" then return end
+          categories:RenameCategory(category, value)
+        end,
+      },
       delete = {
         type = "execute",
         name = L:G("Delete Category"),
         confirm = true,
         confirmText = L:G("Are you sure you want to delete this category?"),
-        order = 2,
+        order = 3,
         func = function()
           categories:DeleteCategory(category)
         end,

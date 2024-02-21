@@ -102,11 +102,21 @@ function categories:SetCategoryState(kind, category, enabled)
   database:SetItemCategoryEnabled(kind, category, enabled)
 end
 
+---@param category string The name of the custom category to create.
 function categories:CreateCategory(category)
   database:CreateCategory(category)
   events:SendMessage('categories/Changed')
 end
 
+---@param category string The name of the custom category to rename.
+---@param newName string The new name of the category.
+function categories:RenameCategory(category, newName)
+  database:RenameCategory(category, newName)
+  events:SendMessage('categories/Changed')
+  items:RefreshAll()
+end
+
+---@param category string The name of the custom category to delete.
 function categories:DeleteCategory(category)
   database:DeleteItemCategory(category)
   events:SendMessage('categories/Changed')
