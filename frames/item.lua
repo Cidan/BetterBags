@@ -318,6 +318,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
   self.LockTexture:Hide()
+  self.button.UpgradeIcon:SetShown(false)
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -472,13 +473,13 @@ function itemFrame.itemProto:ClearItem()
   self.button:UpdateJunkItem(false, false)
   self.button:UpdateItemContextMatching()
   SetItemButtonQuality(self.button, false)
+  self.button.minDisplayCount = 1
   SetItemButtonCount(self.button, 0)
   SetItemButtonDesaturated(self.button, false)
   ClearItemButtonOverlay(self.button)
   self.button.ItemSlotBackground:Hide()
   self.frame:SetID(0)
   self.button:SetID(0)
-  self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
@@ -486,6 +487,7 @@ function itemFrame.itemProto:ClearItem()
   self:SetSize(37, 37)
   self.data = nil
   self.isFreeSlot = false
+  self.button.UpgradeIcon:SetShown(false)
 end
 
 function itemFrame.itemProto:AddToMasqueGroup()
