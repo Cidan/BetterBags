@@ -63,6 +63,9 @@ function item.itemRowProto:SetItem(data)
   self.rowButton:SetHasItem(data.itemInfo.itemIcon)
 
   local quality = data.itemInfo.itemQuality
+  if quality == nil then
+    quality = 0
+  end
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
