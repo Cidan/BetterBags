@@ -22,7 +22,7 @@ function equipmentSets:OnEnable()
 end
 
 function equipmentSets:Update()
-  if not addon.isRetail then return end
+  if addon.isClassic then return end
   wipe(self.bagAndSlotToSet)
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do
@@ -30,7 +30,12 @@ function equipmentSets:Update()
     local setLocations = C_EquipmentSet.GetItemLocations(setID)
     if setLocations ~= nil then -- This is a bugfix for #113, no idea why this would return nil.
       for _, location in pairs(setLocations) do
-        local _, bank, bags, _, slot, bag = EquipmentManager_UnpackLocation(location)
+        local _, bank, bags, void, slot, bag = EquipmentManager_UnpackLocation(location)
+        -- There is no void bank in Wrath of the Lich King, so shift everything left by one.
+        if not addon.isRetail then
+          bag = slot
+          slot = void --[[@as number]]
+        end
         if (bank or bags) and slot ~= nil and bag ~= nil then
           self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
           self.bagAndSlotToSet[bag][slot] = setName
