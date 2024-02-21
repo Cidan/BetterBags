@@ -271,7 +271,11 @@ ConsolePort = {}
 function ConsolePort:AddInterfaceCursorFrame(frame) end
 
 
---- Pawn Global
+--- Pawn Globals
+
+-- PawnIsContainerItemAnUpgrade returns whether the item in the given bag and slot is an upgrade.
 ---@param bag number
 ---@param slot number
 function PawnIsContainerItemAnUpgrade(bag, slot) end
+
+PawnVersion = _G['PawnVersion'] --[[@as number]]

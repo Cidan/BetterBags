@@ -130,6 +130,7 @@ function itemFrame.itemProto:SetItem(data)
 --]]
   self:AddToMasqueGroup()
   self:SetAlpha(1)
+  events:SendMessage('item/Updated', self)
   self.frame:Show()
   self.button:Show()
 end
@@ -177,12 +178,14 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self:AddToMasqueGroup()
   self.button.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
+  events:SendMessage('item/Updated', self)
   self.frame:Show()
   self.button:Show()
 end
 
 
 function itemFrame.itemProto:ClearItem()
+  events:SendMessage('item/Clearing', self)
   self:RemoveFromMasqueGroup()
   self.kind = nil
   self.frame:ClearAllPoints()

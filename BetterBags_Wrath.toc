@@ -86,6 +86,7 @@ config\itemlist.lua
 config\customcat.lua
 
 integrations\consoleport.lua
+integrations\pawn.lua
 
 core\init.lua
 core\classic\init.lua

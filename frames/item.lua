@@ -270,11 +270,11 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
-  self.button.UpgradeIcon:SetShown(PawnIsContainerItemAnUpgrade and PawnIsContainerItemAnUpgrade(bagid, slotid) or false)
 
   self:AddToMasqueGroup()
   self.button.IconBorder:SetBlendMode("BLEND")
   self:SetAlpha(1)
+  events:SendMessage('item/Updated', self)
   self.frame:Show()
   self.button:Show()
 end
@@ -318,7 +318,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
   self.LockTexture:Hide()
-  self.button.UpgradeIcon:SetShown(false)
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
@@ -332,6 +331,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
+  events:SendMessage('item/Updated', self)
   self.frame:Show()
   self.button:Show()
 end
@@ -458,6 +458,7 @@ function itemFrame.itemProto:Wipe()
 end
 
 function itemFrame.itemProto:ClearItem()
+  events:SendMessage('item/Clearing', self)
   self:RemoveFromMasqueGroup()
   self.kind = nil
   self.frame:ClearAllPoints()
@@ -483,7 +484,6 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:Hide()
   self.LockTexture:Hide()
   self:SetSize(37, 37)
-  self.button.UpgradeIcon:SetShown(false)
   self.data = nil
   self.isFreeSlot = false
 end

@@ -71,6 +71,7 @@ function item.itemRowProto:SetItem(data)
     GameTooltip:Show()
   end)
 
+  events:SendMessage('item/UpdatedRow', self)
   self.frame:Show()
   self.rowButton:Show()
 end

@@ -50,6 +50,9 @@ local search = addon:GetModule('Search')
 ---@class ConsolePort: AceModule
 local consoleport = addon:GetModule('ConsolePort')
 
+---@class Pawn: AceModule
+local pawn = addon:GetModule('Pawn')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -115,6 +118,8 @@ function addon:OnEnable()
   categories:Enable()
   currency:Enable()
   search:Enable()
+  pawn:Enable()
+
   self:HideBlizzardBags()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)

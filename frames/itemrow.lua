@@ -89,6 +89,7 @@ function item.itemRowProto:SetItem(data)
     GameTooltip:Show()
   end)
 
+  events:SendMessage('item/UpdatedRow', self)
   self.frame:Show()
   self.rowButton:Show()
 end
@@ -100,6 +101,7 @@ function item.itemRowProto:Wipe()
 end
 
 function item.itemRowProto:ClearItem()
+  events:SendMessage('item/ClearingRow', self)
   self.button:ClearItem()
 
   self.rowButton:SetID(0)
