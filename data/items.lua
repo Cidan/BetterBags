@@ -32,6 +32,7 @@ local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
 ---@field itemsByBagAndSlot table<number, table<number, ItemData>>
+---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field dirtyItems ItemData[]
 ---@field dirtyBankItems ItemData[]
 ---@field previousItemGUID table<number, table<number, string>>
@@ -45,6 +46,7 @@ function items:OnInitialize()
   self.dirtyItems = {}
   self.dirtyBankItems = {}
   self.itemsByBagAndSlot = {}
+  self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
   self._newItemTimers = {}
 end
@@ -112,7 +114,7 @@ function items:RefreshReagentBank()
   self._bankContainer = ContinuableContainer:Create()
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
-    self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
+    self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -134,7 +136,7 @@ function items:RefreshBank()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
-    self.itemsByBagAndSlot[i] = {}
+    self.bankItemsByBagAndSlot[i] = {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -169,12 +171,33 @@ function items:RefreshBackpack()
   self:ProcessContainer()
 end
 
+---@param bagid number
+---@param slotid number
+---@param data ItemData
+---@return boolean
+function items:HasItemChanged(bagid, slotid, data)
+  local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+  local itemLocation = itemMixin:GetItemLocation()
+  local itemID = C_Container.GetContainerItemID(bagid, slotid)
+  local _, itemLink = itemID and GetItemInfo(itemID) or nil, nil
+  if itemLink ~= data.itemInfo.itemLink then
+    return true
+  end
+  if itemLocation and data.itemInfo.itemStackCount ~= C_Item.GetStackCount(itemLocation) then
+    return true
+  end
+  return false
+end
+
   -- Load item data in the background, and fire a message when
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
-    for _, data in pairs(items.dirtyItems) do
-      items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+    for bagid, bag in pairs(items.itemsByBagAndSlot) do
+      for slotid, data in pairs(bag) do
+        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+        table.insert(items.dirtyItems, data)
+      end
     end
 
     -- All items in all bags have finished loading, fire the all done event.
@@ -191,8 +214,11 @@ end
 -- all bags are done loading.
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function()
-    for _, data in pairs(items.dirtyBankItems) do
-      items:AttachItemInfo(data, const.BAG_KIND.BANK)
+    for bagid, bag in pairs(items.itemsByBagAndSlot) do
+      for slotid, data in pairs(bag) do
+        items:AttachItemInfo(data, const.BAG_KIND.BANK)
+        table.insert(items.dirtyBankItems, data)
+      end
     end
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
@@ -210,7 +236,7 @@ end
 ---@param bankBag boolean
 function items:RefreshBag(bagid, bankBag)
   local size = C_Container.GetContainerNumSlots(bagid)
-  local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
+  --local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
   -- Loop through every container slot and create an item for it.
   for slotid = 1, size do
     local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
@@ -218,7 +244,7 @@ function items:RefreshBag(bagid, bankBag)
     data.bagid = bagid
     data.slotid = slotid
 
-    table.insert(dirty, data)
+    --table.insert(dirty, data)
 
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
@@ -234,7 +260,11 @@ function items:RefreshBag(bagid, bankBag)
 
     -- All items are added to the bag/slot lookup table, including
     -- empty items
-    self.itemsByBagAndSlot[bagid][slotid] = data
+    if bankBag then
+      self.bankItemsByBagAndSlot[bagid][slotid] = self.bankItemsByBagAndSlot[bagid][slotid] or data
+    else
+      self.itemsByBagAndSlot[bagid][slotid] = self.itemsByBagAndSlot[bagid][slotid] or data
+    end
   end
 end
 
