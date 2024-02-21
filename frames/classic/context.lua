@@ -105,7 +105,12 @@ function context:CreateContextMenu(bag)
 
   -- Context Menu title.
   table.insert(menuList, {
-    text = L:G("BetterBags Menu"),
+    --@debug@
+		text = addonName..' Dev Mode',
+		--@end-debug@
+		--[===[@non-debug@
+		text = addonName..' @project-version@',
+		--@end-non-debug@]===]
     isTitle = true,
     notCheckable = true
   })
