@@ -240,7 +240,7 @@ function items:HasItemChanged(bagid, slotid, data)
   local oldItemLink = data.itemInfo and data.itemInfo.itemLink or nil
   local oldStackCount = data.itemInfo and data.itemInfo.itemStackCount or 0
   if itemLink ~= oldItemLink then
-    debug:Log("ItemChange", itemLink)
+    debug:Log("ItemChange", oldItemLink, "->", itemLink)
     return true
   end
 
