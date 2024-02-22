@@ -23,6 +23,9 @@ local bagButton = addon:GetModule('BagButton')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -64,18 +67,10 @@ function BagSlots:CreatePanel(kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
-    if b.kind == const.BAG_KIND.BACKPACK then
-      addon.Bags.Backpack:Refresh()
-    elseif b.kind == const.BAG_KIND.BANK then
-      addon.Bags.Bank:Refresh()
-    end
+    items:FullRefreshAll()
   end)
   b.fadeOutGroup:HookScript("OnFinished", function()
-    if b.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack then
-      addon.Bags.Backpack:Refresh()
-    elseif b.kind == const.BAG_KIND.BANK and addon.Bags.Bank then
-      addon.Bags.Bank:Refresh()
-    end
+    items:FullRefreshAll()
   end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   b.kind = kind

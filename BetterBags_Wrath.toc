@@ -33,6 +33,7 @@ animations\fade.lua
 
 debug\debug.lua
 debug\frames.lua
+debug\profile.lua
 
 core\events.lua
 core\localization.lua
@@ -69,6 +70,7 @@ frames\classic\bagbutton.lua
 frames\bagslots.lua
 frames\classic\bagslots.lua
 frames\currency.lua
+frames\debug.lua
 
 views\views.lua
 views\gridview.lua

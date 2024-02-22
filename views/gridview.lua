@@ -97,28 +97,37 @@ local function GridView(view, bag, dirtyItems)
   if bag.slots:IsShown() then
     for slotkey, itemButton in pairs(view.itemsByBagAndSlot) do
       local data = itemButton.data
+      local name = C_Container.GetBagName(data.bagid)
       local previousCategory = data.itemInfo and data.itemInfo.category
-      local newCategory = itemButton:GetCategory()
-      if not data.isItemEmpty and previousCategory ~= newCategory then
-        debug:Log("BagSlotShow", "Category difference", previousCategory, "->", newCategory)
-        local section = view:GetOrCreateSection(newCategory)
-        section:AddCell(slotkey, itemButton)
-        categoryChanged = true
+      if name ~= nil then
+        local newCategory = itemButton:GetCategory()
+        if not data.isItemEmpty and previousCategory ~= newCategory then
+          debug:Log("BagSlotShow", "Category difference", previousCategory, "->", newCategory)
+          local section = view:GetOrCreateSection(newCategory)
+          section:AddCell(slotkey, itemButton)
+          categoryChanged = true
+        end
+      else
+        debug:Log("MissingBag", "Removing slotkey from missing bag", slotkey, "bagid ->", data.bagid)
+        local section = view:GetOrCreateSection(previousCategory)
+        section:RemoveCell(slotkey)
       end
     end
     for bagid, emptyBagData in pairs(extraSlotInfo.emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
         local slotkey = view:GetSlotKey(data)
+        if C_Container.GetBagName(bagid) ~= nil then
 
-        local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-        if itemButton == nil then
-          itemButton = itemFrame:Create()
-          view.itemsByBagAndSlot[slotkey] = itemButton
+          local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+          if itemButton == nil then
+            itemButton = itemFrame:Create()
+            view.itemsByBagAndSlot[slotkey] = itemButton
+          end
+          itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
+          local category = itemButton:GetCategory()
+          local section = view:GetOrCreateSection(category)
+          section:AddCell(slotkey, itemButton)
         end
-        itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
-        local category = itemButton:GetCategory()
-        local section = view:GetOrCreateSection(category)
-        section:AddCell(slotkey, itemButton)
       end
     end
   end
@@ -164,10 +173,12 @@ local function GridView(view, bag, dirtyItems)
     if not view.defer then
       -- Remove the section if it's empty, otherwise draw it.
       if section:GetCellCount() == 0 then
+        debug:Log("RemoveSection", "Removed because empty", sectionName)
         view:RemoveSection(sectionName)
         section:ReleaseAllCells()
         section:Release()
       else
+        debug:Log("KeepSection", "Section kept because not empty", sectionName)
         section:SetMaxCellWidth(sizeInfo.itemsPerRow)
         section:Draw(bag.kind, database:GetBagView(bag.kind), bag.slots:IsShown())
       end

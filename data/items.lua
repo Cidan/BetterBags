@@ -244,7 +244,7 @@ function items:HasItemChanged(bagid, slotid, data)
     return true
   end
 
-  if itemLocation and itemLocation:IsValid() and oldStackCount ~= C_Item.GetStackCount(itemLocation) then
+  if itemLocation and C_Item.DoesItemExist(itemLocation) and oldStackCount ~= C_Item.GetStackCount(itemLocation) then
     debug:Log("ItemChange", itemLink, "count", oldStackCount, "->", C_Item.GetStackCount(itemLocation))
     return true
   end
