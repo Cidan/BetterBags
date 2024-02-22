@@ -19,6 +19,6 @@ function debug:EndProfile(name)
   assert(self.profiles[name] ~= nil, "profile does not exist")
   local start = self.profiles[name]
   local stop = debugprofilestop()
-  print(name, "took", stop - start, "ms")
+  self:Log("Profile", name, "took", stop - start, "ms")
   self.profiles[name] = nil
 end

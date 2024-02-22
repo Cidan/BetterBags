@@ -287,6 +287,7 @@ const.DATABASE_DEFAULTS = {
     firstTimeMenu = true,
     enabled = true,
     showBagButton = true,
+    debug = false,
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
         enabled = true,

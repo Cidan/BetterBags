@@ -6,7 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 ---@field _bdi table
 ---@field profiles table<string, number>
+---@field window DebugWindow
 local debug = addon:NewModule('Debug')
+
 
 local DLAPI = _G['DLAPI']
 
@@ -28,10 +30,13 @@ function debug:OnInitialize()
 end
 
 function debug:OnEnable()
+  ---@class DebugWindow: AceModule
+  self.window = addon:GetModule('DebugWindow')
+  self.window:Create()
   if DLAPI then
     print("BetterBags: debug mode enabled")
-    DLAPI.RegisterFormat("bdi", debug._bdi)
-    DLAPI.SetFormat("BetterBags", "bdi")
+    --DLAPI.RegisterFormat("bdi", debug._bdi)
+    --DLAPI.SetFormat("BetterBags", "bdi")
   end
 end
 
@@ -115,6 +120,7 @@ function debug:Format(...)
 end
 
 function debug:Log(category, ...)
+  self.window:AddLogLine(category, debug:Format(...))
   if not DLAPI then return end
   DLAPI.DebugLog("BetterBags", format("%s~%s", category, debug:Format(...)))
 end

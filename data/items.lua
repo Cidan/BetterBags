@@ -232,11 +232,14 @@ function items:HasItemChanged(bagid, slotid, data)
   local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
   local itemLocation = itemMixin:GetItemLocation()
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
-  local _, itemLink = itemID and GetItemInfo(itemID) or nil, nil
+  local itemLink = nil
+  if itemID ~= nil then
+    _, itemLink = GetItemInfo(itemID)
+  end
   local oldItemLink = data.itemInfo and data.itemInfo.itemLink or nil
   local oldStackCount = data.itemInfo and data.itemInfo.itemStackCount or 0
-
   if itemLink ~= oldItemLink then
+    debug:Log("ItemChange", itemLink)
     return true
   end
 

@@ -153,6 +153,7 @@ function WowScrollBox:SetInterpolateScroll(interpolate) end
 function WowScrollBox:ScrollInDirection(percent, direction) end
 function WowScrollBox:FullUpdate() end
 function WowScrollBox:OnMouseWheel(delta) end
+function WowScrollBox:ScrollToEnd() end
 
 ---@class Frame
 ---@field scrollable boolean
