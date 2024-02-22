@@ -35,10 +35,16 @@ function config:CreateCustomCategoryConfig(category)
         name = L:G("Rename Category"),
         width = "double",
         order = 2,
+        validate = function(_, newName)
+          if DB:ItemCategoryExists(newName) then
+            return L:G("A category with that name already exists.")
+          end
+          return true
+        end,
         get = function() return "" end,
-        set = function(_, value)
-          if value == "" then return end
-          categories:RenameCategory(category, value)
+        set = function(_, newName)
+          if newName == "" then return end
+          categories:RenameCategory(category, newName)
         end,
       },
       delete = {
