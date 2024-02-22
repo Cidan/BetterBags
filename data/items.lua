@@ -275,6 +275,7 @@ function items:ProcessContainer()
       extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
       for slotid, data in pairs(bag) do
         if items:HasItemChanged(bagid, slotid, data) then
+          debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
           items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
           table.insert(items.dirtyItems, data)
         end

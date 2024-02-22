@@ -14,6 +14,7 @@ local database = addon:GetModule('Database')
 
 ---@class DebugCell
 ---@field frame Frame
+---@field row FontString
 ---@field category FontString
 ---@field message FontString
 local debugCell = {}
@@ -22,24 +23,60 @@ local debugCell = {}
 ---@field frame Frame
 ---@field content Grid
 ---@field rows number
+---@field _pool ObjectPool
 local debugWindow = addon:NewModule('DebugWindow')
 
+---@return DebugCell
+function debugWindow:NewCell()
+  local cell = setmetatable({}, { __index = debugCell }) --[[@as DebugCell]]
+  cell.frame = CreateFrame("Frame", nil)
+  cell.frame:SetSize(self.content:GetContainer():GetWidth(), 20)
+  cell.frame:SetScript("OnMouseWheel", function(_, delta)
+    self.content:GetContainer():OnMouseWheel(delta)
+  end)
+  cell.frame:EnableMouse(true)
+  cell.row = cell.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+  cell.row:SetPoint("LEFT", 0, 0)
+  cell.row:SetText(format("%s", self.rows))
+  cell.row:SetTextColor(1, 1, 1)
+  cell.row:SetWidth(30)
+  cell.row:SetJustifyH("LEFT")
+  cell.category = cell.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  cell.category:SetPoint("LEFT", cell.row, "RIGHT", 10, 0)
+  cell.category:SetJustifyH("LEFT")
+  cell.category:SetTextColor(1, 1, 1)
+  cell.category:SetWidth(120)
+  cell.category:SetWordWrap(false)
+  cell.category:SetScript("OnLeave", function()
+    GameTooltip:Hide()
+  end)
+  cell.message = cell.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  cell.message:SetPoint("LEFT", cell.category, "RIGHT", 5, 0)
+  cell.message:SetTextColor(0.8, 0.8, 0.8)
+  return cell
+end
+
+function debugWindow:_ResetCell(cell)
+  cell.frame:Hide()
+end
+
+function debugWindow:SetupPool()
+  print("BetterBags: Creating Debug Pool")
+  self._pool = CreateObjectPool(function() return self:NewCell() end, self._ResetCell)
+  self._pool:SetResetDisallowedIfNew(true)
+  ---@type DebugCell[]
+  local objs = {}
+  for _ = 1, 1000 do
+    local o = self._pool:Acquire()
+    table.insert(objs, o)
+  end
+  for _, o in pairs(objs) do
+    self._pool:Release(o)
+  end
+end
+
 function debugWindow:Create()
-  self.frame = CreateFrame("Frame", "BetterBagsDebugWindow", UIParent, "BackdropTemplate") --[[@as Frame]]
-  self.frame:SetBackdrop({
-    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-    tile = true,
-    tileSize = 16,
-    edgeSize = 16,
-    insets = {
-      left = 4,
-      right = 4,
-      top = 4,
-      bottom = 4,
-    },
-  })
-  self.frame:SetBackdropColor(0, 0, 0, 0.9)
+  self.frame = CreateFrame("Frame", "BetterBagsDebugWindow", UIParent, "DefaultPanelFlatTemplate") --[[@as Frame]]
   self.frame:SetPoint("CENTER")
   self.frame:SetSize(800, 600)
   self.frame:SetMovable(true)
@@ -47,22 +84,27 @@ function debugWindow:Create()
   self.frame:RegisterForDrag("LeftButton")
   self.frame:SetScript("OnDragStart", self.frame.StartMoving)
   self.frame:SetScript("OnDragStop", self.frame.StopMovingOrSizing)
+  self.frame:SetTitle("BetterBags Debug Window")
   self.rows = 0
 
   self.content = grid:Create(self.frame)
-  self.content:GetContainer():SetPoint("TOPLEFT", 10, -10)
+  self.content:GetContainer():SetPoint("TOPLEFT", 10, -35)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", -10, 10)
   self.content.maxCellWidth = 1
 
   events:RegisterMessage('config/DebugMode', function(_, enabled)
     if enabled then
       self.frame:Show()
+      if not self._pool then
+        self:SetupPool()
+      end
     else
       self.frame:Hide()
     end
   end)
   if database:GetDebugMode() then
     self.frame:Show()
+    debugWindow:SetupPool()
   else
     self.frame:Hide()
   end
@@ -73,55 +115,18 @@ function debugWindow:AddLogLine(title, message)
   if not self.frame:IsVisible() then
     return
   end
-  local cell = setmetatable({}, { __index = debugCell }) --[[@as Cell]]
-  cell.frame = CreateFrame("Frame", nil)
-  cell.frame:SetSize(self.content:GetContainer():GetWidth(), 20)
-  cell.frame:SetScript("OnMouseWheel", function(_, delta)
-    self.content:GetContainer():OnMouseWheel(delta)
-  end)
-  cell.frame:EnableMouse(true)
-  --[[
-  local highlight = cell.frame:CreateTexture(nil, "HIGHLIGHT")
-  highlight:SetTexture("Interface/QuestFrame/UI-QuestLogTitleHighlight")
-  highlight:SetVertexColor(1, 222/255, 100/255, 0.5)
-  highlight:SetBlendMode("BLEND")
-  highlight:SetAllPoints()
-  --]]
-  --[[
-  cell.frame:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(cell.frame, "ANCHOR_TOP")
-    GameTooltip:SetText(message)
-    GameTooltip:Show()
-  end)
-  cell.frame:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-  end)
-  ]]--
-  local row = cell.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-  row:SetPoint("LEFT", 0, 0)
-  row:SetText(format("%s", self.rows))
-  row:SetTextColor(1, 1, 1)
-  row:SetWidth(20)
-  row:SetJustifyH("LEFT")
-  local category = cell.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  category:SetPoint("LEFT", row, "RIGHT", 10, 0)
-  category:SetText(format("%s", title))
-  category:SetJustifyH("LEFT")
-  category:SetTextColor(1, 1, 1)
-  category:SetWidth(120)
-  category:SetWordWrap(false)
-  category:SetScript("OnEnter", function()
+  local cell = self._pool:Acquire()
+
+  cell.row:SetText(format("%s", self.rows))
+  cell.category:SetText(format("%s", title))
+  cell.category:SetScript("OnEnter", function()
     GameTooltip:SetOwner(cell.frame, "ANCHOR_LEFT")
     GameTooltip:SetText(title)
     GameTooltip:Show()
   end)
-  category:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-  end)
-  local m = cell.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  m:SetPoint("LEFT", category, "RIGHT", 5, 0)
-  m:SetText(message)
-  m:SetTextColor(0.8, 0.8, 0.8)
+
+  cell.message:SetText(message)
+
   self.content:AddCell(tostring(self.rows), cell)
   self.content:Draw()
   self.content:GetContainer():FullUpdate()

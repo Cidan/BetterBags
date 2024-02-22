@@ -108,7 +108,7 @@ local ObjectPool = {}
 ---@return any
 function ObjectPool:Acquire() end
 function ObjectPool:Release(o) end
-function ObjectPool:SetResetDisallowedIfNew() end
+function ObjectPool:SetResetDisallowedIfNew(disallow) end
 
 ---@class LibUIDropDownMenu-4.0
 local LibUIDropDownMenu = {}
