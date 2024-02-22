@@ -102,6 +102,13 @@ function debugWindow:Create()
       self.frame:Hide()
     end
   end)
+
+  events:GroupBucketEvent({}, {'debug/LogLineAdded'}, function()
+    self.content:Draw()
+    self.content:GetContainer():FullUpdate()
+    self.content:GetContainer():ScrollToEnd()
+  end)
+
   if database:GetDebugMode() then
     self.frame:Show()
     debugWindow:SetupPool()
@@ -128,8 +135,6 @@ function debugWindow:AddLogLine(title, message)
   cell.message:SetText(message)
 
   self.content:AddCell(tostring(self.rows), cell)
-  self.content:Draw()
-  self.content:GetContainer():FullUpdate()
-  self.content:GetContainer():ScrollToEnd()
   self.rows = self.rows + 1
+  events:SendMessageLater('debug/LogLineAdded')
 end
