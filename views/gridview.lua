@@ -62,8 +62,8 @@ local function GridView(view, bag, dirtyItems)
   local categoryChanged = false
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
-  debug:StartProfile('Dirty Item Stage')
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
+  debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
     local slotkey = view:GetSlotKey(data)
