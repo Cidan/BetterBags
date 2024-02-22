@@ -78,14 +78,10 @@ local function GridView(view, bag, dirtyItems)
     local previousCategory = itemButton.data and itemButton.data.itemInfo and itemButton.data.itemInfo.category
 
     -- Set the item data on the item frame.
-    if bag.slots:IsShown() and data.isItemEmpty then
-      itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
-    else
-      itemButton:SetItem(data)
-    end
+    itemButton:SetItem(data)
 
     -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
-    if (not bag.slots:IsShown() and not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) or (bag.slots:IsShown()) then
+    if (not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) then
       local category = itemButton:GetCategory()
       local section = view:GetOrCreateSection(category)
       section:AddCell(slotkey, itemButton)
@@ -95,11 +91,27 @@ local function GridView(view, bag, dirtyItems)
     end
   end
 
-  if (extraSlotInfo.totalItems < view.itemCount and not bag.slots:IsShown() and not categoryChanged) or InCombatLockdown() then
-    view.defer = true
-    if InCombatLockdown() then
-      bag.drawAfterCombat = true
+  -- Add the empty slots to the view if bag slots are visible.
+  if bag.slots:IsShown() then
+    for bagid, emptyBagData in pairs(extraSlotInfo.emptySlotByBagAndSlot) do
+      for slotid, data in pairs(emptyBagData) do
+        local slotkey = view:GetSlotKey(data)
+
+        local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+        if itemButton == nil then
+          itemButton = itemFrame:Create()
+          view.itemsByBagAndSlot[slotkey] = itemButton
+        end
+        itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
+        local category = itemButton:GetCategory()
+        local section = view:GetOrCreateSection(category)
+        section:AddCell(slotkey, itemButton)
+      end
     end
+  end
+
+  if (extraSlotInfo.totalItems < view.itemCount and not bag.slots:IsShown() and not categoryChanged) then
+    view.defer = true
   else
     view.defer = false
   end
@@ -149,10 +161,13 @@ local function GridView(view, bag, dirtyItems)
   if not bag.slots:IsShown() then
     -- Get the free slots section and add the free slots to it.
     local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
-
-    local freeSlotBag, freeSlotID = view:ParseSlotKey(extraSlotInfo.freeSlotKey)
     view.freeSlot = view.freeSlot or itemFrame:Create()
-    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, extraSlotInfo.emptySlots, false)
+    if extraSlotInfo.emptySlots > 0 then
+      local freeSlotBag, freeSlotID = view:ParseSlotKey(extraSlotInfo.freeSlotKey)
+      view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, extraSlotInfo.emptySlots, false)
+    else
+      view.freeSlot:SetFreeSlots(0, 0, 0, false)
+    end
     freeSlotsSection:AddCell('freeSlot', view.freeSlot)
 
     -- Only add the reagent free slot to the backbag view.
@@ -189,8 +204,6 @@ local function GridView(view, bag, dirtyItems)
     const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
     const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
     bag.frame:SetHeight(bagHeight)
-  elseif InCombatLockdown() then
-    -- TODO(lobato): Draw new items if in combat in their own section.
   end
   view.itemCount = extraSlotInfo.totalItems
 end

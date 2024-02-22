@@ -19,11 +19,12 @@ local database = addon:GetModule('Database')
 local debug = addon:GetModule('Debug')
 
 ---@class (exact) ExtraSlotInfo
----@field emptySlots? number
----@field emptyReagentSlots? number
----@field totalItems? number
----@field freeSlotKey? string
----@field freeReagentSlotKey? string
+---@field emptySlots? number The number of empty normal slots across all bags.
+---@field emptyReagentSlots? number The number of empty reagent slots across all bags.
+---@field totalItems? number The total number of valid items across all bags.
+---@field freeSlotKey? string The key of the first empty normal slot.
+---@field freeReagentSlotKey? string The key of the first empty reagent slot.
+---@field emptySlotByBagAndSlot? table<number, table<number, ItemData>> A table of empty slots by bag and slot.
 
 ---@class (exact) ItemData
 ---@field basic boolean
@@ -227,8 +228,9 @@ function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
     ---@type ExtraSlotInfo
     local extraSlotInfo = {}
-
+    extraSlotInfo.emptySlotByBagAndSlot = extraSlotInfo.emptySlotByBagAndSlot or {}
     for bagid, bag in pairs(items.itemsByBagAndSlot) do
+      extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
       for slotid, data in pairs(bag) do
         if items:HasItemChanged(bagid, slotid, data) then
           items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
@@ -242,6 +244,7 @@ function items:ProcessContainer()
             extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
             extraSlotInfo.freeSlotKey = extraSlotInfo.freeSlotKey or (bagid .. '-' .. slotid)
           end
+          extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
         else
           extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
         end
