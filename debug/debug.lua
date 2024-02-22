@@ -5,6 +5,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Debug: AceModule
 ---@field _bdi table
+---@field profiles table<string, number>
 local debug = addon:NewModule('Debug')
 
 local DLAPI = _G['DLAPI']
@@ -22,6 +23,7 @@ function debug:OnInitialize()
       "Sort by Message",
     },
   }
+  self.profiles = {}
   debug._bdi = bdi
 end
 

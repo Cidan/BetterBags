@@ -61,8 +61,8 @@ local function GridView(view, bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local categoryChanged = false
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
-
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
+  debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
     local bagid, slotid = data.bagid, data.slotid
     local slotkey = view:GetSlotKey(data)
@@ -90,7 +90,7 @@ local function GridView(view, bag, dirtyItems)
       end
     end
   end
-
+  debug:EndProfile('Dirty Item Stage')
   -- Add the empty slots to the view if bag slots are visible.
   if bag.slots:IsShown() then
     for bagid, emptyBagData in pairs(extraSlotInfo.emptySlotByBagAndSlot) do
@@ -116,6 +116,7 @@ local function GridView(view, bag, dirtyItems)
     view.defer = false
   end
 
+  debug:StartProfile('Reconcile Stage')
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
     for slotkey, _ in pairs(section:GetAllCells()) do
@@ -157,6 +158,7 @@ local function GridView(view, bag, dirtyItems)
       end
     end
   end
+  debug:EndProfile('Reconcile Stage')
 
   if not bag.slots:IsShown() then
     -- Get the free slots section and add the free slots to it.
@@ -193,7 +195,9 @@ local function GridView(view, bag, dirtyItems)
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
 
   if not view.defer then
+    debug:StartProfile('Content Draw Stage')
     local w, h = view.content:Draw()
+    debug:EndProfile('Content Draw Stage')
     -- Reposition the content frame if the recent items section is empty.
     if w < 160 then
       w = 160
