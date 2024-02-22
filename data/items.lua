@@ -162,9 +162,10 @@ end
 
 function items:RefreshReagentBank()
   self._bankContainer = ContinuableContainer:Create()
+  self.bankItemsByBagAndSlot = {}
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
-    self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
+    self.bankItemsByBagAndSlot[i] = {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -176,7 +177,7 @@ end
 function items:RefreshBank()
   equipmentSets:Update()
   self._bankContainer = ContinuableContainer:Create()
-
+  self.bankItemsByBagAndSlot = {}
   -- This is a small hack to force the bank bag quality data to be cached
   -- before the bank bag frame is drawn.
   for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -274,10 +275,10 @@ function items:ProcessContainer()
         if data.isItemEmpty then
           if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
             extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-            extraSlotInfo.freeReagentSlotKey = bagid .. '-' .. slotid
+            extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
           else
             extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-            extraSlotInfo.freeSlotKey = bagid .. '-' .. slotid
+            extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
           end
           extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
         else
@@ -300,12 +301,36 @@ end
 -- all bags are done loading.
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function()
-    for bagid, bag in pairs(items.itemsByBagAndSlot) do
+    ---@type ExtraSlotInfo
+    local extraSlotInfo = {
+      emptySlots = 0,
+      emptyReagentSlots = 0,
+      totalItems = 0,
+      freeSlotKey = "",
+      freeReagentSlotKey = "",
+      emptySlotByBagAndSlot = {},
+    }
+    for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
+      extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
       for slotid, data in pairs(bag) do
-        items:AttachItemInfo(data, const.BAG_KIND.BANK)
+        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
         table.insert(items.dirtyBankItems, data)
+
+        if data.isItemEmpty then
+          if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+            extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
+            extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
+          else
+            extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
+            extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
+          end
+          extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
+        else
+          extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
+        end
       end
     end
+    self.bankSlotInfo = extraSlotInfo
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
     wipe(items.dirtyBankItems)
@@ -345,7 +370,6 @@ function items:RefreshBag(bagid, bankBag)
     end
 
     local index = bankBag and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
-
     if index[bagid][slotid] then
       index[bagid][slotid].isItemEmpty = data.isItemEmpty
     else

@@ -90,14 +90,14 @@ end
 ---@param data ItemData
 ---@return string
 function views.viewProto:GetSlotKey(data)
-  return data.bagid .. '-' .. data.slotid
+  return data.bagid .. '_' .. data.slotid
 end
 
 ---@param slotkey string
 ---@return number, number
 function views.viewProto:ParseSlotKey(slotkey)
   ---@type string, string
-  local bagid, slotid = strsplit('-', slotkey)
+  local bagid, slotid = strsplit('_', slotkey)
   return tonumber(bagid) --[[@as number]], tonumber(slotid) --[[@as number]]
 end
 
