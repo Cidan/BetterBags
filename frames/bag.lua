@@ -211,10 +211,9 @@ function bagFrame.bagProto:Draw(dirtyItems)
     self.currentView:GetContent():Hide()
   end
 
-  local startTime = debugprofilestop()
+  debug:StartProfile('Bag Render')
   view:Render(self, dirtyItems)
-  local endTime = debugprofilestop()
-  print("rendering took "..(endTime - startTime).."ms")
+  debug:EndProfile('Bag Render')
   view:GetContent():Show()
   self.currentView = view
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)

@@ -201,14 +201,15 @@ function items:RefreshBank()
   end
 end
 
-local backbackStartTime = 0
 -- RefreshBackback will refresh all bags' contents entirely and update
 -- the item database.
 function items:RefreshBackpack()
   if self._doingRefreshAll then
     return
   end
-  backbackStartTime = debugprofilestop()
+
+  debug:StartProfile('Backpack Data Pipeline')
+
   equipmentSets:Update()
   self._doingRefreshAll = true
   self._container = ContinuableContainer:Create()
@@ -292,8 +293,7 @@ function items:ProcessContainer()
       end
     end
     self.slotInfo = extraSlotInfo
-    local backpackendtime = debugprofilestop()
-    print("Backpack data pipeline took " .. (backpackendtime - backbackStartTime) .. "ms")
+    debug:EndProfile('Backpack Data Pipeline')
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessageLater('items/RefreshBackpack/Done', function()
       wipe(items.dirtyItems)

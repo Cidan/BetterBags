@@ -7,6 +7,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field _bdi table
 ---@field profiles table<string, number>
 ---@field window DebugWindow
+---@field enabled boolean
 local debug = addon:NewModule('Debug')
 
 
@@ -25,6 +26,7 @@ function debug:OnInitialize()
       "Sort by Message",
     },
   }
+  self.enabled = false
   self.profiles = {}
   debug._bdi = bdi
 end
@@ -33,10 +35,18 @@ function debug:OnEnable()
   ---@class DebugWindow: AceModule
   self.window = addon:GetModule('DebugWindow')
   self.window:Create()
-  if DLAPI then
+
+  ---@class Events: AceModule
+  local events = addon:GetModule('Events')
+  events:RegisterMessage('config/DebugMode', function(_, enabled)
+    self.enabled = enabled
+  end)
+
+  ---@class Database: AceModule
+  local database = addon:GetModule('Database')
+  self.enabled = database:GetDebugMode()
+  if self.enabled then
     print("BetterBags: debug mode enabled")
-    --DLAPI.RegisterFormat("bdi", debug._bdi)
-    --DLAPI.SetFormat("BetterBags", "bdi")
   end
 end
 
@@ -120,8 +130,7 @@ function debug:Format(...)
 end
 
 function debug:Log(category, ...)
+  if not self.enabled then return end
   self.window:AddLogLine(category, debug:Format(...))
-  if not DLAPI then return end
-  DLAPI.DebugLog("BetterBags", format("%s~%s", category, debug:Format(...)))
 end
 debug:Enable()
