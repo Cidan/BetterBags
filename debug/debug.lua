@@ -4,31 +4,13 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Debug: AceModule
----@field _bdi table
----@field profiles table<string, number>
 ---@field window DebugWindow
 ---@field enabled boolean
 local debug = addon:NewModule('Debug')
 
 
-local DLAPI = _G['DLAPI']
-
 function debug:OnInitialize()
-  local bdi = {
-    colNames = {"ID", "Time", "Cat", "Vrb", "Message"},
-    colWidth = { 0.05, 0.12, 0.15, 0.03, 1 - 0.05 - 0.12 - 0.15 - 0.03, },
-    colFlex = { "flex", "flex", "drop", "drop", "search", },
-    statusText = {
-      "Sort by ID",
-      "Sort by Time",
-      "Sort by Category",
-      "Sort by Verbosity",
-      "Sort by Message",
-    },
-  }
   self.enabled = false
-  self.profiles = {}
-  debug._bdi = bdi
 end
 
 function debug:OnEnable()
