@@ -19,12 +19,12 @@ local database = addon:GetModule('Database')
 local debug = addon:GetModule('Debug')
 
 ---@class (exact) ExtraSlotInfo
----@field emptySlots? number The number of empty normal slots across all bags.
----@field emptyReagentSlots? number The number of empty reagent slots across all bags.
----@field totalItems? number The total number of valid items across all bags.
----@field freeSlotKey? string The key of the first empty normal slot.
----@field freeReagentSlotKey? string The key of the first empty reagent slot.
----@field emptySlotByBagAndSlot? table<number, table<number, ItemData>> A table of empty slots by bag and slot.
+---@field emptySlots number The number of empty normal slots across all bags.
+---@field emptyReagentSlots number The number of empty reagent slots across all bags.
+---@field totalItems number The total number of valid items across all bags.
+---@field freeSlotKey string The key of the first empty normal slot.
+---@field freeReagentSlotKey string The key of the first empty reagent slot.
+---@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
 
 ---@class (exact) ItemData
 ---@field basic boolean
@@ -58,8 +58,22 @@ function items:OnInitialize()
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
-  self.slotInfo = {}
-  self.bankSlotInfo = {}
+  self.slotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
+  self.bankSlotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
   self._newItemTimers = {}
 end
 
@@ -114,8 +128,22 @@ function items:FullRefreshAll()
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
-  self.slotInfo = {}
-  self.bankSlotInfo = {}
+  self.slotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
+  self.bankSlotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
   events:SendMessage('bags/RefreshAll')
 end
 
@@ -227,8 +255,15 @@ end
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
     ---@type ExtraSlotInfo
-    local extraSlotInfo = {}
-    extraSlotInfo.emptySlotByBagAndSlot = extraSlotInfo.emptySlotByBagAndSlot or {}
+    local extraSlotInfo = {
+      emptySlots = 0,
+      emptyReagentSlots = 0,
+      totalItems = 0,
+      freeSlotKey = "",
+      freeReagentSlotKey = "",
+      emptySlotByBagAndSlot = {},
+    }
+
     for bagid, bag in pairs(items.itemsByBagAndSlot) do
       extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
       for slotid, data in pairs(bag) do
@@ -239,10 +274,10 @@ function items:ProcessContainer()
         if data.isItemEmpty then
           if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
             extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-            extraSlotInfo.freeReagentSlotKey = extraSlotInfo.freeReagentSlotKey or (bagid .. '-' .. slotid)
+            extraSlotInfo.freeReagentSlotKey = bagid .. '-' .. slotid
           else
             extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-            extraSlotInfo.freeSlotKey = extraSlotInfo.freeSlotKey or (bagid .. '-' .. slotid)
+            extraSlotInfo.freeSlotKey = bagid .. '-' .. slotid
           end
           extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
         else

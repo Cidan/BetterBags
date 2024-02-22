@@ -300,11 +300,11 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self.button:Disable()
   else
     self.button:Enable()
+    self.button:SetID(slotid)
+    self.frame:SetID(bagid)
   end
 
   self.button.minDisplayCount = -1
-  self.button:SetID(slotid)
-  self.frame:SetID(bagid)
 
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
