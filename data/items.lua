@@ -374,7 +374,7 @@ function items:RefreshBag(bagid, bankBag)
       else
         self._container:AddContinuable(itemMixin)
       end
-    else
+    elseif itemMixin:IsItemEmpty() then
       data.isItemEmpty = true
     end
 

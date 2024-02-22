@@ -130,7 +130,7 @@ local function GridView(view, bag, dirtyItems)
             view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
             bag.drawOnClose = true
           else
-            debug:Log("RemoveCell", "Removed because empty", slotkey)
+            debug:Log("RemoveCell", "Removed because empty", slotkey, data.itemInfo.itemLink)
             section:RemoveCell(slotkey)
             view.itemsByBagAndSlot[slotkey]:Release()
             view.itemsByBagAndSlot[slotkey] = nil
