@@ -181,6 +181,10 @@ function context:CreateContextMenu(bag)
     tooltipTitle = L:G("Show Bags"),
     tooltipText = L:G("Click to toggle the display of the bag slots."),
     func = function()
+      if InCombatLockdown() then
+        print("BetterBags: "..L:G("Cannot toggle bag slots in combat."))
+        return
+      end
       if bag.slots:IsShown() then
         bag.slots:Hide()
       else
