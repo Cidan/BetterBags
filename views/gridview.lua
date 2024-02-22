@@ -33,6 +33,7 @@ local debug = addon:GetModule('Debug')
 
 ---@param view view
 local function Wipe(view)
+  debug:Log("Wipe", "Grid View Wipe")
   view.content:Wipe()
   if view.freeSlot ~= nil then
     view.freeSlot:Release()
@@ -94,6 +95,17 @@ local function GridView(view, bag, dirtyItems)
   debug:EndProfile('Dirty Item Stage')
   -- Add the empty slots to the view if bag slots are visible.
   if bag.slots:IsShown() then
+    for slotkey, itemButton in pairs(view.itemsByBagAndSlot) do
+      local data = itemButton.data
+      local previousCategory = data.itemInfo and data.itemInfo.category
+      local newCategory = itemButton:GetCategory()
+      if not data.isItemEmpty and previousCategory ~= newCategory then
+        debug:Log("BagSlotShow", "Category difference", previousCategory, "->", newCategory)
+        local section = view:GetOrCreateSection(newCategory)
+        section:AddCell(slotkey, itemButton)
+        categoryChanged = true
+      end
+    end
     for bagid, emptyBagData in pairs(extraSlotInfo.emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
         local slotkey = view:GetSlotKey(data)

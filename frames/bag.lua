@@ -195,10 +195,6 @@ end
 ---@param dirtyItems ItemData[]
 function bagFrame.bagProto:Draw(dirtyItems)
   local view = self.views[database:GetBagView(self.kind)]
-  -- TODO(lobato): Implement slots view, maybe.
-  if self.slots:IsShown() then
-    self:Wipe()
-  end
 
   if view == nil then
     assert(view, "No view found for bag view: "..database:GetBagView(self.kind))
