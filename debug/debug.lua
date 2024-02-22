@@ -6,10 +6,11 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 ---@field window DebugWindow
 ---@field enabled boolean
+---@field profiles table<string, number>
 local debug = addon:NewModule('Debug')
 
-
 function debug:OnInitialize()
+  self.profiles = {}
   self.enabled = false
 end
 
