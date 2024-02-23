@@ -111,6 +111,8 @@ local function GridView(view, bag, dirtyItems)
         debug:Log("MissingBag", "Removing slotkey from missing bag", slotkey, "bagid ->", data.bagid)
         local section = view:GetOrCreateSection(previousCategory)
         section:RemoveCell(slotkey)
+        view.itemsByBagAndSlot[slotkey]:Release()
+        view.itemsByBagAndSlot[slotkey] = nil
       end
     end
     for bagid, emptyBagData in pairs(extraSlotInfo.emptySlotByBagAndSlot) do
