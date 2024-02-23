@@ -97,9 +97,10 @@ local function matchFilter(filter, data)
   -- If no prefix is provided, assume the filter is a name or type filter.
   if value == nil then
     if
+    data.itemInfo.itemName and (
     string.find(data.itemInfo.itemName:lower(), prefix, 1, true) or
     string.find(data.itemInfo.itemType:lower(), prefix, 1, true) or
-    string.find(data.itemInfo.itemSubType:lower(), prefix, 1, true) then
+    string.find(data.itemInfo.itemSubType:lower(), prefix, 1, true)) then
       return true
     end
     return false

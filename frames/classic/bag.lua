@@ -229,6 +229,14 @@ function bagFrame:Create(kind)
     search:Create(b.frame)
   end
 
+  local searchBox = search:CreateBox(kind, b.frame)
+  searchBox.frame:SetPoint("TOPRIGHT", b.frame, "TOPRIGHT", -25, -2)
+  searchBox.frame:SetSize(150, 20)
+  if database:GetInBagSearch() then
+    searchBox.frame:Show()
+  end
+  b.searchBox = searchBox
+
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)
@@ -259,5 +267,12 @@ function bagFrame:Create(kind)
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
   end
 
+  events:RegisterMessage('search/SetInFrame', function (_, shown)
+    if shown then
+      b.searchBox.frame:Show()
+    else
+      b.searchBox.frame:Hide()
+    end
+  end)
   return b
 end

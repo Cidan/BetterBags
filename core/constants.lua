@@ -288,6 +288,7 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     showBagButton = true,
     debug = false,
+    inBagSearch = false,
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
         enabled = true,

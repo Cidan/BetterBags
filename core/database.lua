@@ -280,6 +280,16 @@ function DB:GetDebugMode()
   return DB.data.profile.debug
 end
 
+---@param enabled boolean
+function DB:SetInBagSearch(enabled)
+  DB.data.profile.inBagSearch = enabled
+end
+
+---@return boolean
+function DB:GetInBagSearch()
+  return DB.data.profile.inBagSearch
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

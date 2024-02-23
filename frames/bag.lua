@@ -86,6 +86,7 @@ local search = addon:GetModule('Search')
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
 ---@field views table<BagView, view>
+---@field searchBox SearchFrame
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
@@ -429,6 +430,14 @@ function bagFrame:Create(kind)
     search:Create(b.frame)
   end
 
+  local searchBox = search:CreateBox(kind, b.frame)
+  searchBox.frame:SetPoint("TOPRIGHT", b.frame, "TOPRIGHT", -25, -2)
+  searchBox.frame:SetSize(150, 20)
+  if database:GetInBagSearch() then
+    searchBox.frame:Show()
+  end
+  b.searchBox = searchBox
+
   if kind == const.BAG_KIND.BACKPACK then
     local currencyFrame = currency:Create(b.frame)
     currencyFrame:Hide()
@@ -464,5 +473,12 @@ function bagFrame:Create(kind)
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
   end
 
+  events:RegisterMessage('search/SetInFrame', function (_, shown)
+    if shown then
+      b.searchBox.frame:Show()
+    else
+      b.searchBox.frame:Hide()
+    end
+  end)
   return b
 end

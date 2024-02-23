@@ -65,10 +65,24 @@ function config:GetGeneralOptions()
     name = L:G("General"),
     order = 0,
     args = {
+      inBagSearch = {
+        type = "toggle",
+        width = "full",
+        order = 0,
+        name = L:G("Enable In-Bag Search"),
+        desc = L:G("If enabled, a search bar will appear at the top of your bags."),
+        get = function()
+          return DB:GetInBagSearch()
+        end,
+        set = function(_, value)
+          DB:SetInBagSearch(value)
+          events:SendMessage('search/SetInFrame', value)
+        end,
+      },
       showBagButton = {
         type = "toggle",
         width = "full",
-        order = 1,
+        order = 2,
         name = L:G("Show Blizzard Bag Button"),
         desc = L:G("Show or hide the default Blizzard bag button."),
         get = DB.GetShowBagButton,
@@ -84,7 +98,7 @@ function config:GetGeneralOptions()
       },
       newItemTime = {
         type = "range",
-        order = 2,
+        order = 3,
         name = L:G("New Item Duration"),
         desc = L:G("The time, in minutes, to consider an item a new item."),
         min = 0,
