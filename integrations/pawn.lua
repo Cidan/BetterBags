@@ -13,7 +13,7 @@ local pawn = addon:NewModule('Pawn')
 ---@param item Item
 local function onItemUpdateRetail(event, item)
   local bagid, slotid = item.data.bagid, item.data.slotid
-  if item.data.isItemEmpty or event == 'item/Clearing' then
+  if item.data.isItemEmpty or event == 'item/Clearing' or not bagid or not slotid then
     item.button.UpgradeIcon:SetShown(false)
   else
     item.button.UpgradeIcon:SetShown(PawnIsContainerItemAnUpgrade(bagid, slotid) or false)
@@ -23,7 +23,7 @@ end
 ---@param event string
 ---@param item Item
 local function onItemUpdateClassic(event, item)
-  if item.data.isItemEmpty or event == 'item/Clearing' then
+  if item.data.isItemEmpty or event == 'item/Clearing' or not item.data.slotid or not item.data.bagid then
     item.button.UpgradeIcon:SetShown(false)
   else
     local pawnData = PawnGetItemData(item.data.itemInfo.itemLink)
