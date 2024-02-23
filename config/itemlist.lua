@@ -65,7 +65,7 @@ local function SetList(self, values)
     local list = self:GetUserData("values")
     DB:SaveItemToCategory(itemid, list.name)
     self:SetList(DB:GetItemCategory(list.name))
-    items:RefreshAll()
+    items:FullRefreshAll()
   end
 
   if #itemList == 0 then
@@ -108,7 +108,7 @@ local function SetList(self, values)
             local list = self:GetUserData("values")
             DB:DeleteItemFromCategory(v.itemInfo.itemID, list.name)
             self:SetList(DB:GetItemCategory(list.name))
-            items:RefreshAll()
+            items:FullRefreshAll()
           end
         }})
       end

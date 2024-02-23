@@ -110,7 +110,7 @@ end
 function categories:DeleteCategory(category)
   database:DeleteItemCategory(category)
   events:SendMessage('categories/Changed')
-  items:RefreshAll()
+  items:FullRefreshAll()
 end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
@@ -177,5 +177,5 @@ end
 -- reprocessed and re-categorized.
 function categories:ReprocessAllItems()
   wipe(self.itemsWithNoCategory)
-  items:RefreshAll()
+  items:FullRefreshAll()
 end

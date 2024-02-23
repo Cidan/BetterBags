@@ -30,6 +30,20 @@ function config:GetGeneralOptions()
     name = L:G("General"),
     order = 0,
     args = {
+      inBagSearch = {
+        type = "toggle",
+        width = "full",
+        order = 0,
+        name = L:G("Enable In-Bag Search"),
+        desc = L:G("If enabled, a search bar will appear at the top of your bags."),
+        get = function()
+          return DB:GetInBagSearch()
+        end,
+        set = function(_, value)
+          DB:SetInBagSearch(value)
+          events:SendMessage('search/SetInFrame', value)
+        end,
+      },
       newItemTime = {
         type = "range",
         order = 2,
