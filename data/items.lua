@@ -18,6 +18,14 @@ local database = addon:GetModule('Database')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class (exact) ExtraSlotInfo
+---@field emptySlots number The number of empty normal slots across all bags.
+---@field emptyReagentSlots number The number of empty reagent slots across all bags.
+---@field totalItems number The total number of valid items across all bags.
+---@field freeSlotKey string The key of the first empty normal slot.
+---@field freeReagentSlotKey string The key of the first empty reagent slot.
+---@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
+
 ---@class (exact) ItemData
 ---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
@@ -32,6 +40,9 @@ local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
 ---@field itemsByBagAndSlot table<number, table<number, ItemData>>
+---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
+---@field slotInfo ExtraSlotInfo
+---@field bankSlotInfo ExtraSlotInfo
 ---@field dirtyItems ItemData[]
 ---@field dirtyBankItems ItemData[]
 ---@field previousItemGUID table<number, table<number, string>>
@@ -45,14 +56,31 @@ function items:OnInitialize()
   self.dirtyItems = {}
   self.dirtyBankItems = {}
   self.itemsByBagAndSlot = {}
+  self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
+  self.slotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
+  self.bankSlotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
   self._newItemTimers = {}
 end
 
 function items:OnEnable()
 
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:RefreshAll()
+    self:DoRefreshAll()
   end)
   local eventList = {
     'BAG_UPDATE_DELAYED',
@@ -64,7 +92,7 @@ function items:OnEnable()
   end
 
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
-    self:RefreshAll()
+    self:DoRefreshAll()
   end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
@@ -92,6 +120,35 @@ function items:RemoveNewItemFromAllItems()
 end
 
 function items:RefreshAll()
+  events:SendMessage('bags/RefreshAll')
+end
+
+-- FullRefreshAll will wipe the item cache and refresh all items in all bags.
+function items:FullRefreshAll()
+  self.itemsByBagAndSlot = {}
+  self.bankItemsByBagAndSlot = {}
+  self.previousItemGUID = {}
+  self.slotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
+  self.bankSlotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
+  events:SendMessage('bags/RefreshAll')
+end
+
+---@private
+function items:DoRefreshAll()
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() then
     if addon.Bags.Bank.isReagentBank then
@@ -105,9 +162,10 @@ end
 
 function items:RefreshReagentBank()
   self._bankContainer = ContinuableContainer:Create()
+  self.bankItemsByBagAndSlot = {}
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
-    self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
+    self.bankItemsByBagAndSlot[i] = {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -119,7 +177,7 @@ end
 function items:RefreshBank()
   equipmentSets:Update()
   self._bankContainer = ContinuableContainer:Create()
-
+  self.bankItemsByBagAndSlot = {}
   -- This is a small hack to force the bank bag quality data to be cached
   -- before the bank bag frame is drawn.
   for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -129,7 +187,7 @@ function items:RefreshBank()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
-    self.itemsByBagAndSlot[i] = {}
+    self.bankItemsByBagAndSlot[i] = {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -149,6 +207,9 @@ function items:RefreshBackpack()
   if self._doingRefreshAll then
     return
   end
+
+  debug:StartProfile('Backpack Data Pipeline')
+
   equipmentSets:Update()
   self._doingRefreshAll = true
   self._container = ContinuableContainer:Create()
@@ -164,14 +225,77 @@ function items:RefreshBackpack()
   self:ProcessContainer()
 end
 
+---@param bagid number
+---@param slotid number
+---@param data ItemData
+---@return boolean
+function items:HasItemChanged(bagid, slotid, data)
+  local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+  local itemLocation = itemMixin:GetItemLocation()
+  local itemID = C_Container.GetContainerItemID(bagid, slotid)
+  local itemLink = nil
+  if itemID ~= nil then
+    _, itemLink = GetItemInfo(itemID)
+  end
+  local oldItemLink = data.itemInfo and data.itemInfo.itemLink or nil
+  local oldStackCount = data.itemInfo and data.itemInfo.currentItemCount or 1
+  if itemLink ~= oldItemLink then
+    debug:Log("ItemChange", oldItemLink, "->", itemLink)
+    return true
+  end
+
+  if itemLocation and C_Item.DoesItemExist(itemLocation) and oldStackCount ~= C_Item.GetStackCount(itemLocation) then
+    debug:Log("ItemChange", itemLink, "count", oldStackCount, "->", C_Item.GetStackCount(itemLocation))
+    return true
+  end
+
+  return false
+end
+
+---@param kind BagKind
+---@return ExtraSlotInfo
+function items:GetExtraSlotInfo(kind)
+  return kind == const.BAG_KIND.BACKPACK and self.slotInfo or self.bankSlotInfo
+end
+
   -- Load item data in the background, and fire a message when
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function()
-    for _, data in pairs(items.dirtyItems) do
-      items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
-    end
+    ---@type ExtraSlotInfo
+    local extraSlotInfo = {
+      emptySlots = 0,
+      emptyReagentSlots = 0,
+      totalItems = 0,
+      freeSlotKey = "",
+      freeReagentSlotKey = "",
+      emptySlotByBagAndSlot = {},
+    }
 
+    for bagid, bag in pairs(items.itemsByBagAndSlot) do
+      extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
+      for slotid, data in pairs(bag) do
+        if items:HasItemChanged(bagid, slotid, data) then
+          debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
+          items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+          table.insert(items.dirtyItems, data)
+        end
+        if data.isItemEmpty then
+          if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+            extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
+            extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
+          elseif bagid ~= Enum.BagIndex.Keyring then
+            extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
+            extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
+          end
+          extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
+        else
+          extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
+        end
+      end
+    end
+    self.slotInfo = extraSlotInfo
+    debug:EndProfile('Backpack Data Pipeline')
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessageLater('items/RefreshBackpack/Done', function()
       wipe(items.dirtyItems)
@@ -186,15 +310,117 @@ end
 -- all bags are done loading.
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function()
-    for _, data in pairs(items.dirtyBankItems) do
-      items:AttachItemInfo(data, const.BAG_KIND.BANK)
+    ---@type ExtraSlotInfo
+    local extraSlotInfo = {
+      emptySlots = 0,
+      emptyReagentSlots = 0,
+      totalItems = 0,
+      freeSlotKey = "",
+      freeReagentSlotKey = "",
+      emptySlotByBagAndSlot = {},
+    }
+    for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
+      extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
+      for slotid, data in pairs(bag) do
+        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+        table.insert(items.dirtyBankItems, data)
+
+        if data.isItemEmpty then
+          if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+            extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
+            extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
+          else
+            extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
+            extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
+          end
+          extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
+        else
+          extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
+        end
+      end
     end
+    self.bankSlotInfo = extraSlotInfo
     -- All items in all bags have finished loading, fire the all done event.
     events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
     wipe(items.dirtyBankItems)
     items._bankContainer = nil
     items._doingRefreshAll = false
   end)
+end
+
+--TODO(lobato): Completely eliminate the use of ItemMixin.
+-- RefreshBag will refresh a bag's contents entirely and update the
+-- item database.
+---@private
+---@param bagid number
+---@param bankBag boolean
+function items:RefreshBag(bagid, bankBag)
+  local size = C_Container.GetContainerNumSlots(bagid)
+  --local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
+  -- Loop through every container slot and create an item for it.
+  for slotid = 1, size do
+    local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+    local data = setmetatable({}, {__index = itemDataProto})
+    data.bagid = bagid
+    data.slotid = slotid
+
+    --table.insert(dirty, data)
+
+    -- If this is an actual item, add it to the callback container
+    -- so data is fetched from the server.
+    if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
+      if bankBag then
+        self._bankContainer:AddContinuable(itemMixin)
+      else
+        self._container:AddContinuable(itemMixin)
+      end
+    elseif itemMixin:IsItemEmpty() then
+      data.isItemEmpty = true
+    end
+
+    local index = bankBag and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
+    if index[bagid][slotid] then
+      index[bagid][slotid].isItemEmpty = data.isItemEmpty
+    else
+      index[bagid][slotid] = data
+    end
+  end
+end
+
+---@param itemList number[]
+---@param callback function<ItemData[]>
+function items:GetItemData(itemList, callback)
+  local container = ContinuableContainer:Create()
+  for _, itemID in pairs(itemList) do
+    local itemMixin = Item:CreateFromItemID(itemID)
+    container:AddContinuable(itemMixin)
+  end
+  container:ContinueOnLoad(function()
+    ---@type ItemData[]
+    local dataList = {}
+    for _, itemID in pairs(itemList) do
+      local data = setmetatable({}, {__index = itemDataProto}) ---@type ItemData
+      self:AttachBasicItemInfo(itemID, data)
+      table.insert(dataList, data)
+    end
+    callback(dataList)
+  end)
+end
+
+---@param data ItemData
+---@return boolean
+function items:IsNewItem(data)
+  if not data then return false end
+  if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
+      data.itemInfo.isNewItem then
+    return true
+  end
+  self._newItemTimers[data.itemInfo.itemGUID] = nil
+  return false
+end
+
+function items:ClearNewItems()
+  wipe(self._newItemTimers)
 end
 
 ---@param data ItemData
@@ -309,76 +535,4 @@ function items:AttachBasicItemInfo(itemID, data)
     currentItemLevel = 0 --[[@as number]],
     equipmentSet = nil,
   }
-end
-
---TODO(lobato): Completely eliminate the use of ItemMixin.
--- RefreshBag will refresh a bag's contents entirely and update the
--- item database.
----@private
----@param bagid number
----@param bankBag boolean
-function items:RefreshBag(bagid, bankBag)
-  local size = C_Container.GetContainerNumSlots(bagid)
-  local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
-  -- Loop through every container slot and create an item for it.
-  for slotid = 1, size do
-    local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
-    local data = setmetatable({}, {__index = itemDataProto})
-    data.bagid = bagid
-    data.slotid = slotid
-
-    table.insert(dirty, data)
-
-    -- If this is an actual item, add it to the callback container
-    -- so data is fetched from the server.
-    if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
-      if bankBag then
-        self._bankContainer:AddContinuable(itemMixin)
-      else
-        self._container:AddContinuable(itemMixin)
-      end
-    else
-      data.isItemEmpty = true
-    end
-
-    -- All items are added to the bag/slot lookup table, including
-    -- empty items
-    self.itemsByBagAndSlot[bagid][slotid] = data
-  end
-end
-
----@param itemList number[]
----@param callback function<ItemData[]>
-function items:GetItemData(itemList, callback)
-  local container = ContinuableContainer:Create()
-  for _, itemID in pairs(itemList) do
-    local itemMixin = Item:CreateFromItemID(itemID)
-    container:AddContinuable(itemMixin)
-  end
-  container:ContinueOnLoad(function()
-    ---@type ItemData[]
-    local dataList = {}
-    for _, itemID in pairs(itemList) do
-      local data = setmetatable({}, {__index = itemDataProto}) ---@type ItemData
-      self:AttachBasicItemInfo(itemID, data)
-      table.insert(dataList, data)
-    end
-    callback(dataList)
-  end)
-end
-
----@param data ItemData
----@return boolean
-function items:IsNewItem(data)
-  if not data then return false end
-  if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
-      data.itemInfo.isNewItem then
-    return true
-  end
-  self._newItemTimers[data.itemInfo.itemGUID] = nil
-  return false
-end
-
-function items:ClearNewItems()
-  wipe(self._newItemTimers)
 end

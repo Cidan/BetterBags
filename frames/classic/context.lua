@@ -23,6 +23,9 @@ local categories = addon:GetModule('Categories')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
@@ -105,7 +108,12 @@ function context:CreateContextMenu(bag)
 
   -- Context Menu title.
   table.insert(menuList, {
-    text = L:G("BetterBags Menu"),
+    --@debug@
+		text = addonName..' Dev Mode',
+		--@end-debug@
+		--[===[@non-debug@
+		text = addonName..' @project-version@',
+		--@end-non-debug@]===]
     isTitle = true,
     notCheckable = true
   })
@@ -125,7 +133,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       },
       {
@@ -139,7 +147,7 @@ function context:CreateContextMenu(bag)
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
           bag.drawOnClose = true
           bag.currentItemCount = -1
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       },
       {
@@ -151,7 +159,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       }
     }

@@ -19,6 +19,9 @@ local bucket = addon:GetModule('Bucket')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
@@ -51,8 +54,7 @@ function config:GetCustomCategoryOptions(kind)
     end,
     set = function(_, value)
       categories:SetCategoryState(kind, value, not categories:IsCategoryEnabled(kind, value))
-      config:GetBag(kind):Wipe()
-      config:GetBag(kind):Refresh()
+      items:FullRefreshAll()
     end,
     values = {}
   }
@@ -90,8 +92,7 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetCategoryFilter(kind, value, not DB:GetCategoryFilter(kind, value))
-              config:GetBag(kind):Wipe()
-              config:GetBag(kind):Refresh()
+              items:FullRefreshAll()
             end,
             values = {
               ["RecentItems"] = L:G("Recent Items"),
@@ -115,7 +116,6 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetBagCompaction(kind, value)
-          config:GetBag(kind):Wipe()
           config:GetBag(kind):Refresh()
         end,
         values =  {
@@ -135,7 +135,6 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetSectionSortType(kind, DB:GetBagView(kind), value)
-          config:GetBag(kind):Wipe()
           config:GetBag(kind):Refresh()
         end,
         values = {
@@ -156,7 +155,6 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetItemSortType(kind, DB:GetBagView(kind), value)
-          config:GetBag(kind):Wipe()
           config:GetBag(kind):Refresh()
         end,
         values = {
@@ -181,8 +179,7 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetItemLevelEnabled(kind, value)
-              config:GetBag(kind):Wipe()
-              config:GetBag(kind):Refresh()
+              items:FullRefreshAll()
             end,
           },
           color = {
@@ -195,8 +192,7 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetItemLevelColorEnabled(kind, value)
-              config:GetBag(kind):Wipe()
-              config:GetBag(kind):Refresh()
+              items:FullRefreshAll()
             end,
           },
         }
@@ -213,8 +209,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetBagView(kind, value)
-          config:GetBag(kind):Wipe()
-          config:GetBag(kind):Refresh()
+          items:FullRefreshAll()
         end,
         values = {
           [const.BAG_VIEW.SECTION_GRID] = L:G("Section Grid"),
@@ -243,7 +238,6 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
               bucket:Later("setItemsPerRow", 0.2, function()
-                config:GetBag(kind):Wipe()
                 config:GetBag(kind):Refresh()
               end)
             end,
@@ -262,7 +256,6 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
               bucket:Later("setSectionsPerRow", 0.2, function()
-                config:GetBag(kind):Wipe()
                 config:GetBag(kind):Refresh()
               end)
             end,

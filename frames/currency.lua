@@ -126,7 +126,7 @@ function CurrencyFrame:Update()
       item.icon:SetTexture(info.iconFileID)
       item.name:SetText(info.name)
       if item.count and not info.isHeader then
-        item.count:SetText(tostring(info.quantity))
+        item.count:SetText(BreakUpLargeNumbers(info.quantity))
       end
       if info.isShowInBackpack then
         item.frame:SetBackdropColor(1, 1, 0, .2)
@@ -151,7 +151,7 @@ function CurrencyFrame:Update()
           end
           self.iconGrid:AddCell(info.name, icon)
           icon.icon:SetTexture(info.iconFileID)
-          icon.count:SetText(tostring(info.quantity))
+          icon.count:SetText(BreakUpLargeNumbers(info.quantity))
           icon.frame:SetWidth(icon.count:GetStringWidth() + icon.icon:GetWidth() + 7)
           showCount = showCount + 1
         end

@@ -37,9 +37,16 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field data ItemData
 item.itemRowProto = {}
 
+function item.itemRowProto:Unlock()
+end
+
+function item.itemRowProto:Lock()
+end
+
 ---@param data ItemData
 function item.itemRowProto:SetItem(data)
   self.data = data
+  self.button:SetSize(20, 20)
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
@@ -56,10 +63,13 @@ function item.itemRowProto:SetItem(data)
   self.rowButton:SetHasItem(data.itemInfo.itemIcon)
 
   local quality = data.itemInfo.itemQuality
+  if quality == nil then
+    quality = 0
+  end
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
-  self.button:SetSize(20, 20)
+  --self.button:SetSize(20, 20)
   self.button.Count:Hide()
   self.button.ilvlText:Hide()
   self.button.LockTexture:Hide()
@@ -78,7 +88,8 @@ function item.itemRowProto:SetItem(data)
     end
     GameTooltip:Show()
   end)
-  self:AddToMasqueGroup(data.kind)
+
+  events:SendMessage('item/UpdatedRow', self)
   self.frame:Show()
   self.rowButton:Show()
 end
@@ -90,6 +101,7 @@ function item.itemRowProto:Wipe()
 end
 
 function item.itemRowProto:ClearItem()
+  events:SendMessage('item/ClearingRow', self)
   self.button:ClearItem()
 
   self.rowButton:SetID(0)
@@ -114,10 +126,9 @@ function item.itemRowProto:IsNewItem()
   return self.button:IsNewItem()
 end
 
----@param kind BagKind
-function item.itemRowProto:AddToMasqueGroup(kind)
+function item.itemRowProto:AddToMasqueGroup()
   --TODO(lobato): Style the individual row frame, maybe?
-  self.button:AddToMasqueGroup(kind)
+  self.button:AddToMasqueGroup()
 end
 
 ---@return string

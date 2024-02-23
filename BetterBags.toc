@@ -9,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -33,6 +33,7 @@ animations\fade.lua
 
 debug\debug.lua
 debug\frames.lua
+debug\profile.lua
 
 core\events.lua
 core\localization.lua
@@ -63,6 +64,7 @@ frames\section.lua
 frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
+frames\debug.lua
 
 views\views.lua
 views\gridview.lua
@@ -78,5 +80,6 @@ config\itemlist.lua
 config\customcat.lua
 
 integrations\consoleport.lua
+integrations\pawn.lua
 
 core\init.lua

@@ -141,4 +141,9 @@ function config:OnEnable()
   events:RegisterMessage('config/Open', function()
     self:Open()
   end)
+
+  LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()
+    DB:SetDebugMode(not DB:GetDebugMode())
+    events:SendMessage('config/DebugMode', DB:GetDebugMode())
+  end)
 end

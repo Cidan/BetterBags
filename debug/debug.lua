@@ -4,32 +4,32 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Debug: AceModule
----@field _bdi table
+---@field window DebugWindow
+---@field enabled boolean
+---@field profiles table<string, number>
 local debug = addon:NewModule('Debug')
 
-local DLAPI = _G['DLAPI']
-
 function debug:OnInitialize()
-  local bdi = {
-    colNames = {"ID", "Time", "Cat", "Vrb", "Message"},
-    colWidth = { 0.05, 0.12, 0.15, 0.03, 1 - 0.05 - 0.12 - 0.15 - 0.03, },
-    colFlex = { "flex", "flex", "drop", "drop", "search", },
-    statusText = {
-      "Sort by ID",
-      "Sort by Time",
-      "Sort by Category",
-      "Sort by Verbosity",
-      "Sort by Message",
-    },
-  }
-  debug._bdi = bdi
+  self.profiles = {}
+  self.enabled = false
 end
 
 function debug:OnEnable()
-  if DLAPI then
+  ---@class DebugWindow: AceModule
+  self.window = addon:GetModule('DebugWindow')
+  self.window:Create()
+
+  ---@class Events: AceModule
+  local events = addon:GetModule('Events')
+  events:RegisterMessage('config/DebugMode', function(_, enabled)
+    self.enabled = enabled
+  end)
+
+  ---@class Database: AceModule
+  local database = addon:GetModule('Database')
+  self.enabled = database:GetDebugMode()
+  if self.enabled then
     print("BetterBags: debug mode enabled")
-    DLAPI.RegisterFormat("bdi", debug._bdi)
-    DLAPI.SetFormat("BetterBags", "bdi")
   end
 end
 
@@ -113,7 +113,7 @@ function debug:Format(...)
 end
 
 function debug:Log(category, ...)
-  if not DLAPI then return end
-  DLAPI.DebugLog("BetterBags", format("%s~%s", category, debug:Format(...)))
+  if not self.enabled then return end
+  self.window:AddLogLine(category, debug:Format(...))
 end
 debug:Enable()

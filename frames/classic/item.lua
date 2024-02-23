@@ -93,6 +93,7 @@ function itemFrame.itemProto:SetItem(data)
     self.ilvlText:Hide()
   end
 
+  self.button.minDisplayCount = 1
   SetItemButtonTexture(self.button, data.itemInfo.itemIcon)
   self.button.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
@@ -107,8 +108,7 @@ function itemFrame.itemProto:SetItem(data)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
-  self.button.minDisplayCount = 1
-
+  --self.button.UpgradeIcon:SetShown(IsContainerItemAnUpgrade(bagid, slotid) or false)
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
 --[[
@@ -128,7 +128,9 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 --]]
+  self:AddToMasqueGroup()
   self:SetAlpha(1)
+  events:SendMessage('item/Updated', self)
   self.frame:Show()
   self.button:Show()
 end
@@ -167,26 +169,24 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button.NewItemTexture:Hide()
   self.ilvlText:SetText("")
   self.LockTexture:Hide()
+  self.button.UpgradeIcon:SetShown(false)
 
   if reagent then
     SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
   end
 
-  if self.kind == const.BAG_KIND.BANK then
-    self:AddToMasqueGroup(const.BAG_KIND.BANK)
-  else
-    self:AddToMasqueGroup(const.BAG_KIND.BACKPACK)
-  end
+  self:AddToMasqueGroup()
   self.button.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
+  events:SendMessage('item/Updated', self)
   self.frame:Show()
   self.button:Show()
 end
 
 
 function itemFrame.itemProto:ClearItem()
-  masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
-  self.masqueGroup = nil
+  events:SendMessage('item/Clearing', self)
+  self:RemoveFromMasqueGroup()
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
@@ -212,6 +212,7 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:SetText("")
   self.LockTexture:Hide()
   self:SetSize(37, 37)
+  self.button.UpgradeIcon:SetShown(false)
   self.data = nil
 end
 

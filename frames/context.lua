@@ -23,6 +23,9 @@ local categories = addon:GetModule('Categories')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
@@ -106,7 +109,12 @@ function context:CreateContextMenu(bag)
 
   -- Context Menu title.
   table.insert(menuList, {
-    text = L:G("BetterBags Menu"),
+    --@debug@
+		text = addonName..' Dev Mode',
+		--@end-debug@
+		--[===[@non-debug@
+		text = addonName..' @project-version@',
+		--@end-non-debug@]===]
     isTitle = true,
     notCheckable = true
   })
@@ -126,7 +134,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       },
       {
@@ -138,7 +146,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       },
       {
@@ -150,7 +158,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       }
     }
@@ -176,6 +184,10 @@ function context:CreateContextMenu(bag)
     tooltipTitle = L:G("Show Bags"),
     tooltipText = L:G("Click to toggle the display of the bag slots."),
     func = function()
+      if InCombatLockdown() then
+        print("BetterBags: "..L:G("Cannot toggle bag slots in combat."))
+        return
+      end
       if bag.slots:IsShown() then
         bag.slots:Hide()
       else

@@ -195,10 +195,6 @@ end
 ---@param dirtyItems ItemData[]
 function bagFrame.bagProto:Draw(dirtyItems)
   local view = self.views[database:GetBagView(self.kind)]
-  -- TODO(lobato): Implement slots view, maybe.
-  if self.slots:IsShown() then
-    self:Wipe()
-  end
 
   if view == nil then
     assert(view, "No view found for bag view: "..database:GetBagView(self.kind))
@@ -211,7 +207,9 @@ function bagFrame.bagProto:Draw(dirtyItems)
     self.currentView:GetContent():Hide()
   end
 
+  debug:StartProfile('Bag Render')
   view:Render(self, dirtyItems)
+  debug:EndProfile('Bag Render')
   view:GetContent():Show()
   self.currentView = view
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)

@@ -9,6 +9,7 @@
 ---@field HighlightTexture Texture
 ---@field BattlepayItemTexture Texture
 ---@field IconBorder Texture
+---@field UpgradeIcon Texture
 local itemButton = {}
 
 ---@param bagid number
@@ -107,7 +108,7 @@ local ObjectPool = {}
 ---@return any
 function ObjectPool:Acquire() end
 function ObjectPool:Release(o) end
-function ObjectPool:SetResetDisallowedIfNew() end
+function ObjectPool:SetResetDisallowedIfNew(disallow) end
 
 ---@class LibUIDropDownMenu-4.0
 local LibUIDropDownMenu = {}
@@ -152,6 +153,7 @@ function WowScrollBox:SetInterpolateScroll(interpolate) end
 function WowScrollBox:ScrollInDirection(percent, direction) end
 function WowScrollBox:FullUpdate() end
 function WowScrollBox:OnMouseWheel(delta) end
+function WowScrollBox:ScrollToEnd() end
 
 ---@class Frame
 ---@field scrollable boolean
@@ -268,3 +270,15 @@ ConsolePort = {}
 
 ---@param frame Frame
 function ConsolePort:AddInterfaceCursorFrame(frame) end
+
+
+--- Pawn Globals
+
+-- PawnIsContainerItemAnUpgrade returns whether the item in the given bag and slot is an upgrade.
+---@param bag number
+---@param slot number
+function PawnIsContainerItemAnUpgrade(bag, slot) end
+
+PawnVersion = _G['PawnVersion'] --[[@as number]]
+PawnGetItemData = _G['PawnGetItemData'] --[[@as fun(itemLink: string): table]]
+PawnIsItemAnUpgrade = _G['PawnIsItemAnUpgrade'] --[[@as fun(itemData: table): boolean]]

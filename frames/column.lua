@@ -57,6 +57,7 @@ end
 
 function columnProto:RemoveAll()
   for _, cell in pairs(self.cells) do
+    cell.frame:ClearAllPoints()
     cell.frame:SetParent(nil)
   end
   wipe(self.cells)
