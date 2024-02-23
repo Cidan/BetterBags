@@ -23,6 +23,9 @@ local categories = addon:GetModule('Categories')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
@@ -131,7 +134,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       },
       {
@@ -143,7 +146,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       },
       {
@@ -155,7 +158,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
-          bag:Refresh()
+          items:FullRefreshAll()
         end
       }
     }
