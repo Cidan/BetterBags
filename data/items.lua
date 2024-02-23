@@ -284,7 +284,7 @@ function items:ProcessContainer()
           if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
             extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
             extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
-          else
+          elseif bagid ~= Enum.BagIndex.Keyring then
             extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
             extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
           end
