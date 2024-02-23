@@ -200,10 +200,10 @@ function config:GetBagOptions(kind)
               config:GetBag(kind):Refresh()
             end,
           },
-          dynamicColor = { -- New sub-option for dynamic color selection based on item level
+          dynamicColor = { 
             type = "toggle",
             name = L:G("Dynamic colors"),
-            desc = L:G("Dynamically select the item level text color based on how the item's level compares to your average item level.\n\nSame or higher: Orange\n1-10 lower: Purple\n11-15 lower: Blue\n16-20 lower: Green\n21+ lower: Yellow"),
+            desc = L:G("Dynamically select the item level text color based on how the item's level compares to your average item level.\n\nSame or higher: Orange\n1-10 lower: Purple\n11-15 lower: Blue\n16-20 lower: Green\n21+ lower: Gray"),
             order = 3,
             get = function()
               return DB:GetItemLevelOptions(kind).dynamicColor

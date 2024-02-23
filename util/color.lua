@@ -20,7 +20,7 @@ local colorCriteria = {
   purple = {0.63, 0.21, 0.93}, -- 5 or less lower than average item level
   blue = {0, 0.55, 0.87},    -- 6-10 lower than average item level
   green = {0, 1, 0},         -- 10-20 lower than average item level
-  yellow = {1, 1, 0}         -- More than 20 lower than average item level
+  gray = {0.5, 0.5, 0.5}     -- More than 20 lower than average item level
 }
 
 -- Function to determine the average item level of the player using the WoW API
@@ -45,7 +45,7 @@ function color:GetItemLevelRelativeColor(itemLevel)
   elseif difference >= -20 then
     return colorCriteria.green
   else
-    return colorCriteria.yellow
+    return colorCriteria.gray
   end
 end
 
