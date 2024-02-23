@@ -66,7 +66,7 @@ local function GridView(view, bag, dirtyItems)
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
   debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
-    local bagid, slotid = data.bagid, data.slotid
+    local bagid = data.bagid
     local slotkey = view:GetSlotKey(data)
 
     -- Create or get the item frame for this slot.
@@ -93,7 +93,9 @@ local function GridView(view, bag, dirtyItems)
     end
   end
   debug:EndProfile('Dirty Item Stage')
-  -- Add the empty slots to the view if bag slots are visible.
+
+  -- TODO(lobato): Move all of this to it's own view.
+  -- Special section for handling bag slots being shown.
   if bag.slots:IsShown() then
     local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
     freeSlotsSection:RemoveCell('freeSlot')
