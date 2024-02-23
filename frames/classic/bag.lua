@@ -230,10 +230,11 @@ function bagFrame:Create(kind)
   end
 
   local searchBox = search:CreateBox(kind, b.frame)
-  searchBox.frame:SetPoint("TOPRIGHT", b.frame, "TOPRIGHT", -25, -2)
+  searchBox.frame:SetPoint("TOP", b.frame, "TOP", 0, -2)
   searchBox.frame:SetSize(150, 20)
   if database:GetInBagSearch() then
     searchBox.frame:Show()
+    b.frame:SetTitle("")
   end
   b.searchBox = searchBox
 
@@ -270,8 +271,10 @@ function bagFrame:Create(kind)
   events:RegisterMessage('search/SetInFrame', function (_, shown)
     if shown then
       b.searchBox.frame:Show()
+      b.frame:SetTitle("")
     else
       b.searchBox.frame:Hide()
+      b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
     end
   end)
   return b

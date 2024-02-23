@@ -154,6 +154,13 @@ function search:CreateBox(kind, parent)
   sf.kind = kind
   sf.helpText = textBox.Instructions
   sf.textBox = textBox
+  if kind == const.BAG_KIND.BACKPACK then
+    sf.helpText:SetText("Search Backpack")
+  else
+    sf.helpText:SetText("Search Bank")
+  end
+  sf.helpText:ClearAllPoints()
+  sf.helpText:SetPoint("CENTER")
   sf.frame:Hide()
   return sf
 end
