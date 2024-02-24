@@ -15,6 +15,9 @@ local equipmentSets = addon:GetModule('EquipmentSets')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -249,6 +252,11 @@ function items:HasItemChanged(bagid, slotid, data)
     return true
   end
 
+  if data.itemInfo and data.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(data) then
+    debug:Log("ItemChange", itemLink, "Not Recent Item")
+    return true
+  end
+
   return false
 end
 
@@ -411,8 +419,9 @@ end
 ---@return boolean
 function items:IsNewItem(data)
   if not data then return false end
+  if data.isItemEmpty then return false end
   if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
-      data.itemInfo.isNewItem then
+    C_NewItems.IsNewItem(data.bagid, data.slotid) then
     return true
   end
   self._newItemTimers[data.itemInfo.itemGUID] = nil

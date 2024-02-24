@@ -148,6 +148,7 @@ function bagFrame.bagProto:Sort()
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   items:RemoveNewItemFromAllItems()
   C_Container:SortBags()
+  items:RefreshAll()
 
   for _, item in pairs(lockList) do
     item:Lock()
