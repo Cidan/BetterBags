@@ -149,7 +149,10 @@ local function GridView(view, bag, dirtyItems)
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
     for slotkey, _ in pairs(section:GetAllCells()) do
-      if slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
+      if view.itemsByBagAndSlot[slotkey] == nil then
+        debug:Log("RemoveCell", "Removed because not in itemsByBagAndSlot", slotkey)
+        section:RemoveCell(slotkey)
+      elseif slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
         -- Get the bag and slot id from the slotkey.
         local data = view.itemsByBagAndSlot[slotkey].data
         -- Remove item buttons that are empty or don't match the category.
