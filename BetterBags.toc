@@ -26,6 +26,7 @@ libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
 
 templates\container.xml
+templates\debug.xml
 
 core\boot.lua
 
