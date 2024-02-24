@@ -50,6 +50,18 @@ function itemFrame.itemProto:UpdateCooldown()
   ContainerFrame_UpdateCooldown(self.frame:GetID(), self.button)
 end
 
+function itemFrame.itemProto:ResetSize()
+  self:SetSize(37, 37)
+end
+
+function itemFrame.itemProto:SetSize(width, height)
+  self.frame:SetSize(width, height)
+  self.button:SetSize(width, height)
+  self.button.IconBorder:SetSize(width, height)
+  self.IconQuestTexture:SetSize(width, height)
+  self.IconTexture:SetSize(width, height)
+end
+
 ---@param data ItemData
 function itemFrame.itemProto:SetItem(data)
   assert(data, 'item must be provided')

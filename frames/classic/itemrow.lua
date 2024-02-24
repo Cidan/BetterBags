@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class MasqueTheme: AceModule
-local masque = addon:GetModule('Masque')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -32,8 +29,6 @@ local item = addon:GetModule('ItemRowFrame')
 function item.itemRowProto:SetItem(data)
   self.data = data
   self.button:SetSize(20, 20)
-  self.button.button.IconBorder:SetSize(20, 20)
-  self.button.button:GetNormalTexture():SetSize(20, 20)
   self.button:SetItem(data)
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
