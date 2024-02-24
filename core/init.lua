@@ -68,7 +68,6 @@ function addon:OnInitialize()
   -- Disable the bag tutorial screens, as Better Bags does not match
   -- the base UI/UX these screens refer to.
   if addon.isRetail then
-		C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
 		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
 		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
 	end
@@ -160,4 +159,15 @@ function addon:OnEnable()
   end)
 
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
+
+  --This tutorial bitfield change does not persist when set in OnInitialize()
+  if addon.isRetail then
+  -- Disable the mount equipment tutorial as it triggers a taint error from micromenu flashing.
+  -- BetterBags blamed because of ContainerFrameItemButtonTemplate hooking by Tutorials
+  -- https://github.com/Stanzilla/WoWUIBugs/issues/434
+  C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME --[[@as number]], true)
+  -- Disable the reagent bag tutorial, as Better Bags does not match
+  -- the base UI/UX these screens refer to.
+  C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
+  end
 end
