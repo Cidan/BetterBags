@@ -7,8 +7,8 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class MasqueTheme: AceModule
-local masque = addon:GetModule('Masque')
+---@class Events: AceModule
+local events = addon:GetModule('Events')
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
@@ -57,13 +57,14 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
     --self.frame.ItemSlotBackground:Show()
     self.empty = true
   end
+  events:SendMessage('bagbutton/Updated', self)
   --SetItemButtonTexture(self.frame, icon)
   --SetItemButtonQuality(self.frame, GetInventoryItemQuality("player", self.invID))
   --SetItemButtonCount(self.frame, 1)
 end
 
 function BagButtonFrame.bagButtonProto:ClearBag()
-  masque:RemoveButtonFromGroup(self.masqueGroup, self.frame)
+  events:SendMessage('bagbutton/Clearing', self)
   self.masqueGroup = nil
   self.invID = nil
   self.bag = nil

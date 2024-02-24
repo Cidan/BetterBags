@@ -97,7 +97,8 @@
     "GetDetailedItemLevelInfo",
     "error",
     "type",
-    "CreateColor"
+    "CreateColor",
+    "LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",
