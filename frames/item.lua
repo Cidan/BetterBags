@@ -275,11 +275,16 @@ function itemFrame.itemProto:SetItem(data)
   self.button:Show()
 end
 
+function itemFrame.itemProto:ResetSize()
+  self:SetSize(37, 37)
+  self.button.NormalTexture:SetSize(64, 64)
+end
+
 function itemFrame.itemProto:SetSize(width, height)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
   self.button.IconBorder:SetSize(width, height)
-  self.button.NormalTexture:SetSize(width, height)
+  self.button.NormalTexture:SetSize(64/width, 64/height)
   self.IconQuestTexture:SetSize(width, height)
   self.IconTexture:SetSize(width, height)
   self.IconOverlay:SetSize(width, height)
@@ -481,7 +486,7 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
   self.LockTexture:Hide()
-  self:SetSize(37, 37)
+  self:ResetSize()
   self.data = nil
   self.isFreeSlot = false
   self.button.UpgradeIcon:SetShown(false)
@@ -532,8 +537,6 @@ function itemFrame:_DoCreate()
   -- Small fix for missing texture
   i.IconOverlay = button['IconOverlay']
 
-  p:SetSize(37, 37)
-  button:SetSize(37, 37)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   i.button = button
