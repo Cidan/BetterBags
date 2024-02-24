@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class MasqueTheme: AceModule
-local masque = addon:GetModule('Masque')
-
 ---@class ItemFrame: AceModule
 local itemFrame = addon:NewModule('ItemFrame')
 
@@ -52,11 +49,12 @@ local debug = addon:GetModule('Debug')
 ---@field IconQuestTexture Texture
 ---@field NormalTexture Texture
 ---@field NewItemTexture Texture
----@field IconOverlay2 Texture
+---@field IconOverlay Texture
 ---@field ItemContextOverlay Texture
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
 ---@field LockTexture Texture
+---@field IconQuestTexture Texture
 itemFrame.itemProto = {}
 
 local buttonCount = 0
@@ -69,7 +67,6 @@ local children = {
   "Cooldown",
   "NormalTexture",
   "NewItemTexture",
-  "IconOverlay2",
   "ItemContextOverlay",
   "UpgradeIcon"
 }
@@ -272,8 +269,6 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 
-  self:AddToMasqueGroup()
-  self.button.IconBorder:SetBlendMode("BLEND")
   self:SetAlpha(1)
   events:SendMessage('item/Updated', self)
   self.frame:Show()
@@ -283,6 +278,11 @@ end
 function itemFrame.itemProto:SetSize(width, height)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
+  self.button.IconBorder:SetSize(width, height)
+  self.button.NormalTexture:SetSize(width, height)
+  self.IconQuestTexture:SetSize(width, height)
+  self.IconTexture:SetSize(width, height)
+  self.IconOverlay:SetSize(width, height)
 end
 
 -- SetFreeSlots will set the item button to a free slot.
@@ -326,9 +326,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
   end
-
-  self:AddToMasqueGroup()
-  self.button.IconBorder:SetBlendMode("BLEND")
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
@@ -461,7 +458,6 @@ end
 
 function itemFrame.itemProto:ClearItem()
   events:SendMessage('item/Clearing', self)
-  self:RemoveFromMasqueGroup()
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
@@ -489,22 +485,6 @@ function itemFrame.itemProto:ClearItem()
   self.data = nil
   self.isFreeSlot = false
   self.button.UpgradeIcon:SetShown(false)
-end
-
-function itemFrame.itemProto:AddToMasqueGroup()
-  if self.masqueGroup ~= nil then return end
-  if self.kind == const.BAG_KIND.BANK then
-    self.masqueGroup = "Bank"
-    masque:AddButtonToGroup(self.masqueGroup, self.button)
-  else
-    self.masqueGroup = "Backpack"
-    masque:AddButtonToGroup(self.masqueGroup, self.button)
-  end
-end
-
-function itemFrame.itemProto:RemoveFromMasqueGroup()
-  masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
-  self.masqueGroup = nil
 end
 
 function itemFrame:OnInitialize()
@@ -548,6 +528,9 @@ function itemFrame:_DoCreate()
   for _, child in pairs(children) do
     i[child] = _G[name..child] ---@type texture
   end
+
+  -- Small fix for missing texture
+  i.IconOverlay = button['IconOverlay']
 
   p:SetSize(37, 37)
   button:SetSize(37, 37)

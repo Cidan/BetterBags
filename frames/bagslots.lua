@@ -95,7 +95,6 @@ function BagSlots:CreatePanel(kind)
   for i, bag in pairs(bags) do
     local iframe = bagButton:Create()
     iframe:SetBag(bag)
-    iframe:AddToMasqueGroup(kind)
     b.content:AddCell(tostring(i), iframe)
   end
 

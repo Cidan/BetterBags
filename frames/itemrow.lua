@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class MasqueTheme: AceModule
-local masque = addon:GetModule('Masque')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -124,11 +121,6 @@ end
 ---@return boolean
 function item.itemRowProto:IsNewItem()
   return self.button:IsNewItem()
-end
-
-function item.itemRowProto:AddToMasqueGroup()
-  --TODO(lobato): Style the individual row frame, maybe?
-  self.button:AddToMasqueGroup()
 end
 
 ---@return string

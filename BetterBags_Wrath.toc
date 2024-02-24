@@ -44,8 +44,6 @@ core\classic\constants.lua
 core\database.lua
 core\hooks.lua
 
-theme\masque.lua
-
 data\equipmentsets.lua
 data\items.lua
 data\categories.lua
@@ -91,6 +89,7 @@ config\customcat.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua
+integrations\masque.lua
 
 core\init.lua
 core\classic\init.lua
