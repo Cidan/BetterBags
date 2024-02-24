@@ -49,11 +49,12 @@ local debug = addon:GetModule('Debug')
 ---@field IconQuestTexture Texture
 ---@field NormalTexture Texture
 ---@field NewItemTexture Texture
----@field IconOverlay2 Texture
+---@field IconOverlay Texture
 ---@field ItemContextOverlay Texture
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
 ---@field LockTexture Texture
+---@field IconQuestTexture Texture
 itemFrame.itemProto = {}
 
 local buttonCount = 0
@@ -66,7 +67,6 @@ local children = {
   "Cooldown",
   "NormalTexture",
   "NewItemTexture",
-  "IconOverlay2",
   "ItemContextOverlay",
   "UpgradeIcon"
 }
@@ -278,6 +278,11 @@ end
 function itemFrame.itemProto:SetSize(width, height)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
+  self.button.IconBorder:SetSize(width, height)
+  self.button.NormalTexture:SetSize(width, height)
+  self.IconQuestTexture:SetSize(width, height)
+  self.IconTexture:SetSize(width, height)
+  self.IconOverlay:SetSize(width, height)
 end
 
 -- SetFreeSlots will set the item button to a free slot.
@@ -523,6 +528,9 @@ function itemFrame:_DoCreate()
   for _, child in pairs(children) do
     i[child] = _G[name..child] ---@type texture
   end
+
+  -- Small fix for missing texture
+  i.IconOverlay = button['IconOverlay']
 
   p:SetSize(37, 37)
   button:SetSize(37, 37)

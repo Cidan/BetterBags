@@ -13,6 +13,7 @@ local masque = addon:NewModule('Masque')
 ---@class Masque: AceAddon
 local Masque = LibStub('Masque', true)
 
+---@private
 function masque:AddButtonToGroup(group, button)
   if not Masque then
     return
@@ -20,6 +21,7 @@ function masque:AddButtonToGroup(group, button)
   self.groups[group]:AddButton(button)
 end
 
+---@private
 function masque:RemoveButtonFromGroup(group, button)
   if not Masque then
     return
@@ -49,14 +51,14 @@ function masque:OnEnable()
     group:RemoveButton(item.button)
   end)
 
-  events:RegisterMessage('bagslot/Updated', function(_, bag)
+  events:RegisterMessage('bagbutton/Updated', function(_, bag)
     ---@cast bag BagButton
     local group = bag.kind == 'Bank' and self.groups["Bank"] or self.groups["Backpack"]
     group:AddButton(bag.frame)
     bag.frame.IconBorder:SetBlendMode("BLEND")
   end)
 
-  events:RegisterMessage('bagslot/Clearing', function(_, bag)
+  events:RegisterMessage('bagbutton/Clearing', function(_, bag)
     ---@cast bag BagButton
     local group = bag.kind == 'Bank' and self.groups["Bank"] or self.groups["Backpack"]
     group:RemoveButton(bag.frame)
