@@ -48,6 +48,11 @@ function debugWindow:Create()
   self.frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
   self.frame.ScrollBox:SetDataProvider(self.provider)
 
+  events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
+    self.provider:InsertTable(self.cells)
+    wipe(self.cells)
+    self.frame.ScrollBox:ScrollToEnd()
+  end)
   events:RegisterMessage('config/DebugMode', function(_, enabled)
     if enabled then
       self.frame:Show()
@@ -68,11 +73,11 @@ function debugWindow:AddLogLine(title, message)
   if not self.frame:IsVisible() then
     return
   end
-  self.provider:Insert({
+  table.insert(self.cells, {
     row=self.rows,
     title=title,
     message=message
   })
-  self.frame.ScrollBox:ScrollToEnd()
   self.rows = self.rows + 1
+  events:SendMessage('debug/LogAdded')
 end
