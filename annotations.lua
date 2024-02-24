@@ -91,6 +91,15 @@ MainMenuBarBackpackButton = {}
 ---@class BagBarExpandToggle: Button
 BagBarExpandToggle = {}
 
+---@class BetterBagsDebugListButton: Button
+---@field RowNumber FontString
+---@field Category FontString
+---@field Message FontString
+
+---@class ScrollingFlatPanelTemplate: Frame
+---@field ScrollBox WowScrollBox
+---@field ScrollBar MinimalScrollBar
+
 ---@class DLAPI
 DLAPI = {}
 
@@ -154,6 +163,11 @@ function WowScrollBox:ScrollInDirection(percent, direction) end
 function WowScrollBox:FullUpdate() end
 function WowScrollBox:OnMouseWheel(delta) end
 function WowScrollBox:ScrollToEnd() end
+---@return Texture
+function WowScrollBox:GetUpperShadowTexture() end
+---@return Texture
+function WowScrollBox:GetLowerShadowTexture() end
+function WowScrollBox:SetDataProvider(provider) end
 
 ---@class Frame
 ---@field scrollable boolean

@@ -26,6 +26,7 @@ libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
 
 templates\container.xml
+templates\debug.xml
 
 core\boot.lua
 
@@ -64,7 +65,6 @@ frames\section.lua
 frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
-frames\list.lua
 frames\debug.lua
 
 views\views.lua
