@@ -64,6 +64,7 @@ frames\section.lua
 frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
+frames\list.lua
 frames\debug.lua
 
 views\views.lua
