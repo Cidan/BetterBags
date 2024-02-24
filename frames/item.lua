@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class MasqueTheme: AceModule
-local masque = addon:GetModule('Masque')
-
 ---@class ItemFrame: AceModule
 local itemFrame = addon:NewModule('ItemFrame')
 
@@ -272,8 +269,6 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 
-  self:AddToMasqueGroup()
-  self.button.IconBorder:SetBlendMode("BLEND")
   self:SetAlpha(1)
   events:SendMessage('item/Updated', self)
   self.frame:Show()
@@ -326,9 +321,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   else
     SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
   end
-
-  self:AddToMasqueGroup()
-  self.button.IconBorder:SetBlendMode("BLEND")
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
@@ -461,7 +453,6 @@ end
 
 function itemFrame.itemProto:ClearItem()
   events:SendMessage('item/Clearing', self)
-  self:RemoveFromMasqueGroup()
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
@@ -489,22 +480,6 @@ function itemFrame.itemProto:ClearItem()
   self.data = nil
   self.isFreeSlot = false
   self.button.UpgradeIcon:SetShown(false)
-end
-
-function itemFrame.itemProto:AddToMasqueGroup()
-  if self.masqueGroup ~= nil then return end
-  if self.kind == const.BAG_KIND.BANK then
-    self.masqueGroup = "Bank"
-    masque:AddButtonToGroup(self.masqueGroup, self.button)
-  else
-    self.masqueGroup = "Backpack"
-    masque:AddButtonToGroup(self.masqueGroup, self.button)
-  end
-end
-
-function itemFrame.itemProto:RemoveFromMasqueGroup()
-  masque:RemoveButtonFromGroup(self.masqueGroup, self.button)
-  self.masqueGroup = nil
 end
 
 function itemFrame:OnInitialize()
