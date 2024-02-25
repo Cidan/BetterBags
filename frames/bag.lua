@@ -218,6 +218,7 @@ function bagFrame.bagProto:Draw(dirtyItems)
   local text = search:GetText()
   self:Search(text)
   self:OnResize()
+  events:SendMessage('bag/Rendered', self)
 end
 
 function bagFrame.bagProto:KeepBagInBounds()
