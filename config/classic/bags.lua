@@ -22,6 +22,9 @@ local categories = addon:GetModule('Categories')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
@@ -54,7 +57,7 @@ function config:GetCustomCategoryOptions(kind)
     end,
     set = function(_, value)
       categories:SetCategoryState(kind, value, not categories:IsCategoryEnabled(kind, value))
-      items:FullRefreshAll()
+      events:SendMessage('bags/FullRefreshAll')
     end,
     values = {}
   }
@@ -92,7 +95,7 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetCategoryFilter(kind, value, not DB:GetCategoryFilter(kind, value))
-              items:FullRefreshAll()
+              events:SendMessage('bags/FullRefreshAll')
             end,
             values = {
               ["RecentItems"] = L:G("Recent Items"),
@@ -179,7 +182,7 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetItemLevelEnabled(kind, value)
-              items:FullRefreshAll()
+              events:SendMessage('bags/FullRefreshAll')
             end,
           },
           color = {
@@ -192,7 +195,7 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetItemLevelColorEnabled(kind, value)
-              items:FullRefreshAll()
+              events:SendMessage('bags/FullRefreshAll')
             end,
           },
         }
@@ -209,7 +212,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetBagView(kind, value)
-          items:FullRefreshAll()
+          events:SendMessage('bags/FullRefreshAll')
         end,
         values = {
           [const.BAG_VIEW.SECTION_GRID] = L:G("Section Grid"),

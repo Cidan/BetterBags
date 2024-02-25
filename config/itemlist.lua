@@ -18,6 +18,9 @@ local items = addon:GetModule('Items')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -65,7 +68,7 @@ local function SetList(self, values)
     local list = self:GetUserData("values")
     DB:SaveItemToCategory(itemid, list.name)
     self:SetList(DB:GetItemCategory(list.name))
-    items:FullRefreshAll()
+    events:SendMessage('bags/FullRefreshAll')
   end
 
   if #itemList == 0 then
@@ -108,7 +111,7 @@ local function SetList(self, values)
             local list = self:GetUserData("values")
             DB:DeleteItemFromCategory(v.itemInfo.itemID, list.name)
             self:SetList(DB:GetItemCategory(list.name))
-            items:FullRefreshAll()
+            events:SendMessage('bags/FullRefreshAll')
           end
         }})
       end

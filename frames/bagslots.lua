@@ -101,7 +101,7 @@ function BagSlots:CreatePanel(kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
-    items:FullRefreshAll()
+    events:SendMessage('bags/FullRefreshAll')
     --[[
     if b.kind == const.BAG_KIND.BACKPACK then
       addon.Bags.Backpack:Refresh()
@@ -111,7 +111,7 @@ function BagSlots:CreatePanel(kind)
     ]]--
   end)
   b.fadeOutGroup:HookScript("OnFinished", function()
-    items:FullRefreshAll()
+    events:SendMessage('bags/FullRefreshAll')
     --[[
     if b.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack then
       addon.Bags.Backpack:Refresh()

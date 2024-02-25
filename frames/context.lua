@@ -134,7 +134,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
-          items:FullRefreshAll()
+          events:SendMessage('bags/FullRefreshAll')
         end
       },
       {
@@ -146,7 +146,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
-          items:FullRefreshAll()
+          events:SendMessage('bags/FullRefreshAll')
         end
       },
       {
@@ -158,7 +158,7 @@ function context:CreateContextMenu(bag)
         func = function()
           context:Hide()
           database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
-          items:FullRefreshAll()
+          events:SendMessage('bags/FullRefreshAll')
         end
       }
     }
