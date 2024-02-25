@@ -130,6 +130,7 @@ function items:RefreshAll()
   events:SendMessage('bags/RefreshAll')
 end
 
+---@private
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
 function items:FullRefreshAll()
   self.itemsByBagAndSlot = {}
