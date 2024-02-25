@@ -49,6 +49,10 @@ end
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 local function OneBagView(view, bag, dirtyItems)
+  if view.fullRefresh then
+    view:Wipe()
+    view.fullRefresh = false
+  end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
 

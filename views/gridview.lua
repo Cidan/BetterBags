@@ -59,6 +59,10 @@ end
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 local function GridView(view, bag, dirtyItems)
+  if view.fullRefresh then
+    view:Wipe()
+    view.fullRefresh = false
+  end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local categoryChanged = false
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)

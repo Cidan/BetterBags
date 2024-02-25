@@ -48,6 +48,7 @@ function BagSlots.bagSlotProto:Draw()
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
   self.frame:SetHeight(h + 42)
+  events:SendMessage('bags/FullRefreshAll')
 end
 
 function BagSlots.bagSlotProto:SetShown(shown)
@@ -119,7 +120,7 @@ function BagSlots:CreatePanel(kind)
     end
     ]]--
   end)
-  events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
+  events:RegisterEvent('BAG_CONTAINER_UPDATE', function() b:Draw() end)
   events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function() b:Draw() end)
   b.kind = kind
   b.frame:Hide()

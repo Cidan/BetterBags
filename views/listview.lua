@@ -59,6 +59,10 @@ end
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
 local function ListView(view, bag, dirtyItems)
+  if view.fullRefresh then
+    view:Wipe()
+    view.fullRefresh = false
+  end
   local freeSlotsData = {count = 0, bagid = 0, slotid = 0}
   local freeReagentSlotsData = {count = 0, bagid = 0, slotid = 0}
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
