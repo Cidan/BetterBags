@@ -99,6 +99,7 @@ BagBarExpandToggle = {}
 ---@class ScrollingFlatPanelTemplate: Frame
 ---@field ScrollBox WowScrollBox
 ---@field ScrollBar MinimalScrollBar
+---@field ClosePanelButton Button
 
 ---@class DLAPI
 DLAPI = {}

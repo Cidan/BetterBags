@@ -43,16 +43,23 @@ function debugWindow:Create()
   local view = CreateScrollBoxListLinearView()
   view:SetElementInitializer("BetterBagsDebugListButton", initDebugListItem)
   view:SetPadding(4,4,8,4,0)
+  view:SetExtent(20)
   ScrollUtil.InitScrollBoxListWithScrollBar(self.frame.ScrollBox, self.frame.ScrollBar, view)
   self.frame.ScrollBox:GetUpperShadowTexture():ClearAllPoints()
   self.frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
   self.frame.ScrollBox:SetDataProvider(self.provider)
+
+  self.frame.ClosePanelButton:SetScript("OnClick", function()
+    database:SetDebugMode(false)
+    events:SendMessage('config/DebugMode', false)
+  end)
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
     self.provider:InsertTable(self.cells)
     wipe(self.cells)
     self.frame.ScrollBox:ScrollToEnd()
   end)
+
   events:RegisterMessage('config/DebugMode', function(_, enabled)
     if enabled then
       self.frame:Show()
