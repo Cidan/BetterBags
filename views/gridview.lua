@@ -102,8 +102,11 @@ local function GridView(view, bag, dirtyItems)
   -- Special section for handling bag slots being shown.
   if bag.slots:IsShown() then
     local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
+    freeSlotsSection:ReleaseAllCells()
     freeSlotsSection:RemoveCell('freeSlot')
     freeSlotsSection:RemoveCell('freeReagentSlot')
+    view.freeSlot = nil
+    view.freeReagentSlot = nil
     for slotkey, itemButton in pairs(view.itemsByBagAndSlot) do
       local data = itemButton.data
       local name = C_Container.GetBagName(data.bagid)
