@@ -120,6 +120,7 @@ function BagSlots:CreatePanel(kind)
     ]]--
   end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
+  events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function() b:Draw() end)
   b.kind = kind
   b.frame:Hide()
   return b
