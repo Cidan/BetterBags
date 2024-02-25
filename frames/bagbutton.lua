@@ -113,7 +113,11 @@ function BagButtonFrame.bagButtonProto:OnEnter()
     return
   elseif self.empty then
     GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
-    GameTooltip:SetText(L:G("Empty Bag Slot"), 1, 1, 1)
+    if const.BACKPACK_ONLY_REAGENT_BAGS[self.bag] then
+      GameTooltip:SetText(L:G("Empty Reagent Bag Slot"), 1, 1, 1)
+    else
+      GameTooltip:SetText(L:G("Empty Bag Slot"), 1, 1, 1)
+    end
     GameTooltip:Show()
     return
   end
