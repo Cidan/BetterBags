@@ -29,7 +29,7 @@ local grid = addon:GetModule('Grid')
 --- a list of icons, a list of rows, or a grid of icons.
 ---@class Section
 ---@field frame Frame The raw frame of the section.
----@field title FontString The title of the section.
+---@field title Button The title of the section.
 ---@field private content Grid The main content frame of the section.
 ---@field private fillWidth boolean
 local sectionProto = {}
@@ -172,11 +172,12 @@ function sectionFrame:_DoCreate()
   --debug:DrawBorder(f, 1, 0, 0)
 
   -- Create the section title.
-  local title = s.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")
-  title:SetFontObject("GameFontNormal")
+  title:SetNormalFontObject("GameFontNormal")
   title:SetHeight(18)
-  title:SetJustifyH("LEFT")
+  title:GetFontString():SetAllPoints()
+  title:GetFontString():SetJustifyH("LEFT")
   title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 6, 0)
   title:SetPoint("TOPRIGHT", s.frame, "TOPRIGHT", -6, 0)
   title:SetScript("OnEnter", function(t)

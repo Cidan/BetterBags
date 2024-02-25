@@ -11,6 +11,7 @@ local pawn = addon:NewModule('Pawn')
 
 ---@param item Item
 local function onItemUpdateRetail(item)
+  if not item.button.UpgradeIcon then return end
   local bagid, slotid = item.data.bagid, item.data.slotid
   if item.data.isItemEmpty or not bagid or not slotid then
     item.button.UpgradeIcon:SetShown(false)
@@ -21,6 +22,7 @@ end
 
 ---@param item Item
 local function onItemUpdateClassic(item)
+  if not item.button.UpgradeIcon then return end
   if item.data.isItemEmpty or not item.data.slotid or not item.data.bagid then
     item.button.UpgradeIcon:SetShown(false)
   else
