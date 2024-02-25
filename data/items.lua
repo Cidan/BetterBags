@@ -94,6 +94,10 @@ function items:OnEnable()
     table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   end
 
+  events:RegisterMessage('bags/FullRefreshAll', function()
+    self:FullRefreshAll()
+  end)
+
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
     self:DoRefreshAll()
   end)

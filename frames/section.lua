@@ -6,6 +6,12 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:NewModule('SectionFrame')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -159,6 +165,19 @@ function sectionFrame:_DoReset(f)
   f:Wipe()
 end
 
+---@param section Section
+local function onTitleClickOrDrop(section)
+  if not CursorHasItem() then return end
+  local cursorType, itemID = GetCursorInfo()
+  ---@cast cursorType string
+  ---@cast itemID number
+  if cursorType ~= "item" then return end
+  local category = section.title:GetText()
+  categories:AddItemToCategory(itemID, category)
+  ClearCursor()
+  events:SendMessage('bags/FullRefreshAll')
+end
+
 ---@return Section
 function sectionFrame:_DoCreate()
   ---@class Section
@@ -168,8 +187,6 @@ function sectionFrame:_DoCreate()
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
-
-  --debug:DrawBorder(f, 1, 0, 0)
 
   -- Create the section title.
   local title = CreateFrame("Button", nil, f)
@@ -188,11 +205,23 @@ function sectionFrame:_DoCreate()
       "Item Count: " .. #s.content.cells
     )
     GameTooltip:AddLine(info, 1, 1, 1)
+    if CursorHasItem() then
+      local cursorType, _, itemLink = GetCursorInfo()
+      if cursorType == "item" then
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("Click/drop here to add "..itemLink.." to "..title:GetText()..".", 1, 1, 1)
+      end
+    end
     GameTooltip:Show()
   end)
+
   title:SetScript("OnLeave", function()
     GameTooltip:Hide()
   end)
+
+  title:SetScript("OnClick", function() onTitleClickOrDrop(s) end)
+  title:SetScript("OnReceiveDrag", function() onTitleClickOrDrop(s) end)
+
   s.title = title
 
   local content = grid:Create(s.frame)
