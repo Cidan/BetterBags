@@ -26,12 +26,7 @@ local function onItemUpdateClassic(event, item)
   if item.data.isItemEmpty or event == 'item/Clearing' or not item.data.slotid or not item.data.bagid then
     item.button.UpgradeIcon:SetShown(false)
   else
-    local pawnData = PawnGetItemData(item.data.itemInfo.itemLink)
-    if not pawnData then
-      item.button.UpgradeIcon:SetShown(false)
-      return
-    end
-    local isUpgrade = PawnIsItemAnUpgrade(pawnData)
+    local isUpgrade = PawnShouldItemLinkHaveUpgradeArrow(item.data.itemInfo.itemLink)
     item.button.UpgradeIcon:SetShown(isUpgrade or false)
   end
 end
