@@ -66,10 +66,10 @@ function BagSlots:CreatePanel(kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
-    items:FullRefreshAll()
+    events:SendMessage('bags/FullRefreshAll')
   end)
   b.fadeOutGroup:HookScript("OnFinished", function()
-    items:FullRefreshAll()
+    events:SendMessage('bags/FullRefreshAll')
   end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
   b.kind = kind

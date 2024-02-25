@@ -6,6 +6,12 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:NewModule('SectionFrame')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -29,7 +35,7 @@ local grid = addon:GetModule('Grid')
 --- a list of icons, a list of rows, or a grid of icons.
 ---@class Section
 ---@field frame Frame The raw frame of the section.
----@field title FontString The title of the section.
+---@field title Button The title of the section.
 ---@field private content Grid The main content frame of the section.
 ---@field private fillWidth boolean
 local sectionProto = {}
@@ -159,6 +165,19 @@ function sectionFrame:_DoReset(f)
   f:Wipe()
 end
 
+---@param section Section
+local function onTitleClickOrDrop(section)
+  if not CursorHasItem() then return end
+  local cursorType, itemID = GetCursorInfo()
+  ---@cast cursorType string
+  ---@cast itemID number
+  if cursorType ~= "item" then return end
+  local category = section.title:GetText()
+  categories:AddItemToCategory(itemID, category)
+  ClearCursor()
+  events:SendMessage('bags/FullRefreshAll')
+end
+
 ---@return Section
 function sectionFrame:_DoCreate()
   ---@class Section
@@ -169,14 +188,13 @@ function sectionFrame:_DoCreate()
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
 
-  --debug:DrawBorder(f, 1, 0, 0)
-
   -- Create the section title.
-  local title = s.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")
-  title:SetFontObject("GameFontNormal")
+  title:SetNormalFontObject("GameFontNormal")
   title:SetHeight(18)
-  title:SetJustifyH("LEFT")
+  title:GetFontString():SetAllPoints()
+  title:GetFontString():SetJustifyH("LEFT")
   title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 6, 0)
   title:SetPoint("TOPRIGHT", s.frame, "TOPRIGHT", -6, 0)
   title:SetScript("OnEnter", function(t)
@@ -187,11 +205,23 @@ function sectionFrame:_DoCreate()
       "Item Count: " .. #s.content.cells
     )
     GameTooltip:AddLine(info, 1, 1, 1)
+    if CursorHasItem() then
+      local cursorType, _, itemLink = GetCursorInfo()
+      if cursorType == "item" then
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine("Click/drop here to add "..itemLink.." to "..title:GetText()..".", 1, 1, 1)
+      end
+    end
     GameTooltip:Show()
   end)
+
   title:SetScript("OnLeave", function()
     GameTooltip:Hide()
   end)
+
+  title:SetScript("OnClick", function() onTitleClickOrDrop(s) end)
+  title:SetScript("OnReceiveDrag", function() onTitleClickOrDrop(s) end)
+
   s.title = title
 
   local content = grid:Create(s.frame)

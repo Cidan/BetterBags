@@ -48,6 +48,7 @@ function BagSlots.bagSlotProto:Draw()
   local w, h = self.content:Draw()
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
   self.frame:SetHeight(h + 42)
+  events:SendMessage('bags/FullRefreshAll')
 end
 
 function BagSlots.bagSlotProto:SetShown(shown)
@@ -100,7 +101,7 @@ function BagSlots:CreatePanel(kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
-    items:FullRefreshAll()
+    events:SendMessage('bags/FullRefreshAll')
     --[[
     if b.kind == const.BAG_KIND.BACKPACK then
       addon.Bags.Backpack:Refresh()
@@ -110,7 +111,7 @@ function BagSlots:CreatePanel(kind)
     ]]--
   end)
   b.fadeOutGroup:HookScript("OnFinished", function()
-    items:FullRefreshAll()
+    events:SendMessage('bags/FullRefreshAll')
     --[[
     if b.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack then
       addon.Bags.Backpack:Refresh()
@@ -119,7 +120,8 @@ function BagSlots:CreatePanel(kind)
     end
     ]]--
   end)
-  events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
+  events:RegisterEvent('BAG_CONTAINER_UPDATE', function() b:Draw() end)
+  events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function() b:Draw() end)
   b.kind = kind
   b.frame:Hide()
   return b

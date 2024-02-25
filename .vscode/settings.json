@@ -98,7 +98,8 @@
     "error",
     "type",
     "CreateColor",
-    "LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME"
+    "LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME",
+    "GetText"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

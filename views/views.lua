@@ -25,6 +25,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@field defer boolean
 ---@field itemCount number
 ---@field itemFrames Item[]
+---@field fullRefresh boolean
 views.viewProto = {}
 
 ---@param bag Bag

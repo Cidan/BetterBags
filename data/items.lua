@@ -94,6 +94,10 @@ function items:OnEnable()
     table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   end
 
+  events:RegisterMessage('bags/FullRefreshAll', function()
+    self:FullRefreshAll()
+  end)
+
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
     self:DoRefreshAll()
   end)
@@ -126,6 +130,7 @@ function items:RefreshAll()
   events:SendMessage('bags/RefreshAll')
 end
 
+---@private
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
 function items:FullRefreshAll()
   self.itemsByBagAndSlot = {}
