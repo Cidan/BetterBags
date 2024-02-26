@@ -298,7 +298,7 @@ function bagFrame.bagProto:UpdateContextMenu()
   self.menuList = context:CreateContextMenu(self)
 end
 
-local function CreateCategoryForItemInCursor()
+function bagFrame.bagProto:CreateCategoryForItemInCursor()
   local _, itemID, itemLink = GetCursorInfo()
   ---@cast itemID number
   question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
@@ -442,7 +442,7 @@ function bagFrame:Create(kind)
     end
   end)
   bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  bagButton:SetScript("OnReceiveDrag", CreateCategoryForItemInCursor)
+  bagButton:SetScript("OnReceiveDrag", b.CreateCategoryForItemInCursor)
   bagButton:SetScript("OnClick", function(_, e)
     if e == "LeftButton" then
       if database:GetFirstTimeMenu() then
@@ -454,7 +454,7 @@ function bagFrame:Create(kind)
       if IsShiftKeyDown() then
         BetterBags_ToggleSearch()
       elseif CursorHasItem() and GetCursorInfo() == "item" then
-        CreateCategoryForItemInCursor()
+        b:CreateCategoryForItemInCursor()
       else
         context:Show(b.menuList)
       end
