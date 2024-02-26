@@ -19,9 +19,6 @@ local config = addon:GetModule('Config')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
-
-local GUI = LibStub('AceGUI-3.0')
-
 ---@return AceConfig.OptionsTable
 function config:GetGeneralOptions()
   ---@type AceConfig.OptionsTable

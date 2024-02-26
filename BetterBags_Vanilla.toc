@@ -54,6 +54,7 @@ util\resize.lua
 util\sort.lua
 util\bucket.lua
 
+frames\question.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua

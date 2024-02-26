@@ -49,6 +49,12 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Question: AceModule
+local question = addon:GetModule('Question')
+
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
 
@@ -292,6 +298,18 @@ function bagFrame.bagProto:UpdateContextMenu()
   self.menuList = context:CreateContextMenu(self)
 end
 
+function bagFrame.bagProto:CreateCategoryForItemInCursor()
+  local _, itemID, itemLink = GetCursorInfo()
+  ---@cast itemID number
+  question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
+  function(input)
+    categories:AddItemToCategory(itemID, input)
+    events:SendMessage('bags/FullRefreshAll')
+  end)
+  GameTooltip:Hide()
+  ClearCursor()
+end
+
 -------
 --- Bag Frame
 -------
@@ -405,6 +423,14 @@ function bagFrame:Create(kind)
       GameTooltip:AddDoubleLine(L:G("Shift Left Click"), L:G("Search Bags"), 1, 0.81, 0, 1, 1, 1)
       GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Swap Between Bank/Reagent Bank"), 1, 0.81, 0, 1, 1, 1)
     end
+
+    if CursorHasItem() then
+      local cursorType, _, itemLink = GetCursorInfo()
+      if cursorType == "item" then
+        GameTooltip:AddLine(" ", 1, 1, 1)
+        GameTooltip:AddLine(format(L:G("Drop %s here to create a new category for it."), itemLink), 1, 1, 1)
+      end
+    end
     GameTooltip:Show()
   end)
   bagButton:SetScript("OnLeave", function()
@@ -416,6 +442,7 @@ function bagFrame:Create(kind)
     end
   end)
   bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  bagButton:SetScript("OnReceiveDrag", b.CreateCategoryForItemInCursor)
   bagButton:SetScript("OnClick", function(_, e)
     if e == "LeftButton" then
       if database:GetFirstTimeMenu() then
@@ -426,6 +453,8 @@ function bagFrame:Create(kind)
       end
       if IsShiftKeyDown() then
         BetterBags_ToggleSearch()
+      elseif CursorHasItem() and GetCursorInfo() == "item" then
+        b:CreateCategoryForItemInCursor()
       else
         context:Show(b.menuList)
       end

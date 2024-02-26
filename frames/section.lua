@@ -4,6 +4,7 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class SectionFrame: AceModule
+---@field currentTooltip Section
 local sectionFrame = addon:NewModule('SectionFrame')
 
 ---@class Categories: AceModule
@@ -36,6 +37,7 @@ local grid = addon:GetModule('Grid')
 ---@class Section
 ---@field frame Frame The raw frame of the section.
 ---@field title Button The title of the section.
+---@field overlay Frame The overlay frame of the section, used as a drop zone.
 ---@field private content Grid The main content frame of the section.
 ---@field private fillWidth boolean
 local sectionProto = {}
@@ -158,6 +160,11 @@ end
 
 function sectionFrame:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+  events:RegisterEvent('MODIFIER_STATE_CHANGED', function()
+    if self.currentTooltip then
+      self.currentTooltip:onTitleMouseEnter()
+    end
+  end)
 end
 
 ---@param f Section
@@ -168,6 +175,7 @@ end
 ---@param section Section
 local function onTitleClickOrDrop(section)
   if not CursorHasItem() then return end
+  if not IsShiftKeyDown() then return end
   local cursorType, itemID = GetCursorInfo()
   ---@cast cursorType string
   ---@cast itemID number
@@ -176,6 +184,27 @@ local function onTitleClickOrDrop(section)
   categories:AddItemToCategory(itemID, category)
   ClearCursor()
   events:SendMessage('bags/FullRefreshAll')
+end
+
+function sectionProto:onTitleMouseEnter()
+  GameTooltip:SetOwner(self.title, "ANCHOR_TOPLEFT")
+  GameTooltip:SetText(self.title:GetText())
+  local info = strjoin(" ",
+    "\n",
+    "Item Count: " .. #self.content.cells
+  )
+  GameTooltip:AddLine(info, 1, 1, 1)
+  local cursorType, _, itemLink = GetCursorInfo()
+  if CursorHasItem() and IsShiftKeyDown() then
+    if cursorType == "item" then
+      GameTooltip:AddLine(" ", 1, 1, 1)
+      GameTooltip:AddLine("Drop "..itemLink.." here to add it to "..self.title:GetText()..".", 1, 1, 1)
+    end
+  elseif CursorHasItem() and cursorType == "item" then
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    GameTooltip:AddLine("Hold shift to add "..itemLink.." to "..self.title:GetText()..".", 1, 1, 1)
+  end
+  GameTooltip:Show()
 end
 
 ---@return Section
@@ -197,25 +226,13 @@ function sectionFrame:_DoCreate()
   title:GetFontString():SetJustifyH("LEFT")
   title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 6, 0)
   title:SetPoint("TOPRIGHT", s.frame, "TOPRIGHT", -6, 0)
-  title:SetScript("OnEnter", function(t)
-    GameTooltip:SetOwner(t, "ANCHOR_TOPLEFT")
-    GameTooltip:SetText(t:GetText())
-    local info = strjoin(" ",
-      "\n",
-      "Item Count: " .. #s.content.cells
-    )
-    GameTooltip:AddLine(info, 1, 1, 1)
-    if CursorHasItem() then
-      local cursorType, _, itemLink = GetCursorInfo()
-      if cursorType == "item" then
-        GameTooltip:AddLine(" ", 1, 1, 1)
-        GameTooltip:AddLine("Click/drop here to add "..itemLink.." to "..title:GetText()..".", 1, 1, 1)
-      end
-    end
-    GameTooltip:Show()
+  title:SetScript("OnEnter", function()
+    sectionFrame.currentTooltip = s
+    s:onTitleMouseEnter()
   end)
 
   title:SetScript("OnLeave", function()
+    sectionFrame.currentTooltip = nil
     GameTooltip:Hide()
   end)
 
