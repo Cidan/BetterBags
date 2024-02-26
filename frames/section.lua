@@ -194,12 +194,15 @@ function sectionProto:onTitleMouseEnter()
     "Item Count: " .. #self.content.cells
   )
   GameTooltip:AddLine(info, 1, 1, 1)
+  local cursorType, _, itemLink = GetCursorInfo()
   if CursorHasItem() and IsShiftKeyDown() then
-    local cursorType, _, itemLink = GetCursorInfo()
     if cursorType == "item" then
       GameTooltip:AddLine(" ", 1, 1, 1)
       GameTooltip:AddLine("Drop "..itemLink.." here to add it to "..self.title:GetText()..".", 1, 1, 1)
     end
+  elseif CursorHasItem() and cursorType == "item" then
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    GameTooltip:AddLine("Hold shift to add "..itemLink.." to "..self.title:GetText()..".", 1, 1, 1)
   end
   GameTooltip:Show()
 end

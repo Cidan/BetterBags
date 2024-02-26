@@ -23,6 +23,11 @@ end
 
 function equipmentSets:Update()
   if addon.isClassic then return end
+
+  -- Unfortunately, the Equipment Manager API crashes in WotlK, and only on Mac clients.
+  -- This is a bug somewhere in Blizzard's code, and there's nothing we can do about it.
+  if addon.isWrath and IsMacClient() then return end
+
   wipe(self.bagAndSlotToSet)
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do
