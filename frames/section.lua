@@ -37,6 +37,7 @@ local grid = addon:GetModule('Grid')
 ---@class Section
 ---@field frame Frame The raw frame of the section.
 ---@field title Button The title of the section.
+---@field overlay Frame The overlay frame of the section, used as a drop zone.
 ---@field private content Grid The main content frame of the section.
 ---@field private fillWidth boolean
 local sectionProto = {}
