@@ -342,7 +342,7 @@ end
 
 function itemFrame.itemProto:GetCategory()
 
-  if self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.slots:IsShown() then
+  if self.kind == const.BAG_KIND.BACKPACK and database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     ---@type string
     local bagname = self.data.bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(self.data.bagid)
     local displayid = self.data.bagid == Enum.BagIndex.Keyring and 6 or self.data.bagid+1
@@ -350,7 +350,7 @@ function itemFrame.itemProto:GetCategory()
     return self.data.itemInfo.category
   end
 
-  if self.kind == const.BAG_KIND.BANK and addon.Bags.Bank.slots:IsShown() then
+  if self.kind == const.BAG_KIND.BANK and database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     local id = self.data.bagid
     if id == -1 then
       self.data.itemInfo.category = format("#%d: %s", 1, L:G('Bank'))

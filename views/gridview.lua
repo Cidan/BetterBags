@@ -98,7 +98,7 @@ local function GridView(view, bag, dirtyItems)
   end
   debug:EndProfile('Dirty Item Stage')
 
-  if (extraSlotInfo.totalItems < view.itemCount and not bag.slots:IsShown() and not categoryChanged) then
+  if (extraSlotInfo.totalItems < view.itemCount and not categoryChanged) then
     view.defer = true
   else
     view.defer = false
@@ -115,7 +115,7 @@ local function GridView(view, bag, dirtyItems)
         -- Get the bag and slot id from the slotkey.
         local data = view.itemsByBagAndSlot[slotkey].data
         -- Remove item buttons that are empty or don't match the category.
-        if data.isItemEmpty and not bag.slots:IsShown() then
+        if data.isItemEmpty then
           if view.defer then
             view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
             bag.drawOnClose = true
@@ -149,41 +149,38 @@ local function GridView(view, bag, dirtyItems)
       else
         debug:Log("KeepSection", "Section kept because not empty", sectionName)
         section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-        section:Draw(bag.kind, database:GetBagView(bag.kind), bag.slots:IsShown())
+        section:Draw(bag.kind, database:GetBagView(bag.kind), false)
       end
     end
   end
   debug:EndProfile('Reconcile Stage')
 
-  if not bag.slots:IsShown() then
-    -- Get the free slots section and add the free slots to it.
-    local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
-    view.freeSlot = view.freeSlot or itemFrame:Create()
-    if extraSlotInfo.emptySlots > 0 then
-      local freeSlotBag, freeSlotID = view:ParseSlotKey(extraSlotInfo.freeSlotKey)
-      view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, extraSlotInfo.emptySlots, false)
-    else
-      view.freeSlot:SetFreeSlots(0, 0, 0, false)
-    end
-    freeSlotsSection:AddCell('freeSlot', view.freeSlot)
-
-    -- Only add the reagent free slot to the backbag view.
-    if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
-      view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
-      if extraSlotInfo.emptyReagentSlots > 0 then
-        local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(extraSlotInfo.freeReagentSlotKey)
-        view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, extraSlotInfo.emptyReagentSlots, true)
-      else
-        view.freeReagentSlot:SetFreeSlots(0, 0, 0, true)
-      end
-
-      freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
-    end
-
-    -- Draw the free slots section.
-    freeSlotsSection:SetMaxCellWidth(2)
-    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
+  -- Get the free slots section and add the free slots to it.
+  local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
+  view.freeSlot = view.freeSlot or itemFrame:Create()
+  if extraSlotInfo.emptySlots > 0 then
+    local freeSlotBag, freeSlotID = view:ParseSlotKey(extraSlotInfo.freeSlotKey)
+    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, extraSlotInfo.emptySlots, false)
+  else
+    view.freeSlot:SetFreeSlots(0, 0, 0, false)
   end
+  freeSlotsSection:AddCell('freeSlot', view.freeSlot)
+
+  -- Only add the reagent free slot to the backbag view.
+  if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
+    view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
+    if extraSlotInfo.emptyReagentSlots > 0 then
+      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(extraSlotInfo.freeReagentSlotKey)
+      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, extraSlotInfo.emptyReagentSlots, true)
+    else
+      view.freeReagentSlot:SetFreeSlots(0, 0, 0, true)
+    end
+    freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
+  end
+
+  -- Draw the free slots section.
+  freeSlotsSection:SetMaxCellWidth(2)
+  freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
 
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.

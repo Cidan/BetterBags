@@ -129,7 +129,7 @@ local function BagView(view, bag, dirtyItems)
     else
       debug:Log("KeepSection", "Section kept because not empty", sectionName)
       section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-      section:Draw(bag.kind, database:GetBagView(bag.kind), bag.slots:IsShown())
+      section:Draw(bag.kind, database:GetBagView(bag.kind), true)
     end
   end
   view.content.maxCellWidth = sizeInfo.columnCount
