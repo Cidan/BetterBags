@@ -98,54 +98,6 @@ local function GridView(view, bag, dirtyItems)
   end
   debug:EndProfile('Dirty Item Stage')
 
-  -- TODO(lobato): Move all of this to it's own view.
-  -- Special section for handling bag slots being shown.
-  if bag.slots:IsShown() then
-    local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
-    freeSlotsSection:ReleaseAllCells()
-    freeSlotsSection:RemoveCell('freeSlot')
-    freeSlotsSection:RemoveCell('freeReagentSlot')
-    view.freeSlot = nil
-    view.freeReagentSlot = nil
-    for slotkey, itemButton in pairs(view.itemsByBagAndSlot) do
-      local data = itemButton.data
-      local name = C_Container.GetBagName(data.bagid)
-      local previousCategory = data.itemInfo and data.itemInfo.category
-      if name ~= nil then
-        local newCategory = itemButton:GetCategory()
-        if not data.isItemEmpty and previousCategory ~= newCategory then
-          debug:Log("BagSlotShow", "Category difference", previousCategory, "->", newCategory)
-          local section = view:GetOrCreateSection(newCategory)
-          section:AddCell(slotkey, itemButton)
-          categoryChanged = true
-        end
-      else
-        debug:Log("MissingBag", "Removing slotkey from missing bag", slotkey, "bagid ->", data.bagid)
-        local section = view:GetOrCreateSection(previousCategory)
-        section:RemoveCell(slotkey)
-        view.itemsByBagAndSlot[slotkey]:Release()
-        view.itemsByBagAndSlot[slotkey] = nil
-      end
-    end
-    for bagid, emptyBagData in pairs(extraSlotInfo.emptySlotByBagAndSlot) do
-      for slotid, data in pairs(emptyBagData) do
-        local slotkey = view:GetSlotKey(data)
-        if C_Container.GetBagName(bagid) ~= nil then
-
-          local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-          if itemButton == nil then
-            itemButton = itemFrame:Create()
-            view.itemsByBagAndSlot[slotkey] = itemButton
-          end
-          itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
-          local category = itemButton:GetCategory()
-          local section = view:GetOrCreateSection(category)
-          section:AddCell(slotkey, itemButton)
-        end
-      end
-    end
-  end
-
   if (extraSlotInfo.totalItems < view.itemCount and not bag.slots:IsShown() and not categoryChanged) then
     view.defer = true
   else

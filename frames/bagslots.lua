@@ -103,7 +103,6 @@ function BagSlots:CreatePanel(kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
-    print("setting all bags view")
     database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
     events:SendMessage('bags/FullRefreshAll')
     --[[

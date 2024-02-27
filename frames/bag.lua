@@ -209,7 +209,6 @@ function bagFrame.bagProto:Draw(dirtyItems)
     return
   end
 
-
   if self.currentView and self.currentView:GetKind() ~=  view:GetKind() then
     self.currentView:Wipe()
     self.currentView:GetContent():Hide()
