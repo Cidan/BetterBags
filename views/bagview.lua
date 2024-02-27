@@ -27,7 +27,19 @@ local database = addon:GetModule('Database')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
+---@param view view
 local function Wipe(view)
+  view.content:Wipe()
+  view.itemCount = 0
+  for _, section in pairs(view.sections) do
+    section:ReleaseAllCells()
+    section:Release()
+  end
+  for _, item in pairs(view.itemsByBagAndSlot) do
+    item:Release()
+  end
+  wipe(view.sections)
+  wipe(view.itemsByBagAndSlot)
 end
 
 ---@param view view
