@@ -372,7 +372,7 @@ function itemFrame.itemProto:GetCategory()
   end
 
   -- Check for equipment sets first, as it doesn't make sense to put them anywhere else..
-  if self.data.itemInfo.equipmentSet then
+  if self.data.itemInfo.equipmentSet and database:GetCategoryFilter(self.kind, "GearSet") then
     self.data.itemInfo.category = "Gear: " .. self.data.itemInfo.equipmentSet
     return self.data.itemInfo.category
   end
