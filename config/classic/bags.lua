@@ -119,7 +119,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetBagCompaction(kind, value)
-          config:GetBag(kind):Refresh()
+          events:SendMessage('bags/FullRefreshAll')
         end,
         values =  {
           [const.GRID_COMPACT_STYLE.NONE] = L:G("None"),
@@ -138,7 +138,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetSectionSortType(kind, DB:GetBagView(kind), value)
-          config:GetBag(kind):Refresh()
+          events:SendMessage('bags/FullRefreshAll')
         end,
         values = {
           [const.SECTION_SORT_TYPE.ALPHABETICALLY] = L:G("Alphabetically"),
@@ -158,7 +158,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetItemSortType(kind, DB:GetBagView(kind), value)
-          config:GetBag(kind):Refresh()
+          events:SendMessage('bags/FullRefreshAll')
         end,
         values = {
           [const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY] = L:G("Quality, then Alphabetically"),
@@ -241,7 +241,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
               bucket:Later("setItemsPerRow", 0.2, function()
-                config:GetBag(kind):Refresh()
+                events:SendMessage('bags/FullRefreshAll')
               end)
             end,
           },
@@ -259,7 +259,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
               bucket:Later("setSectionsPerRow", 0.2, function()
-                config:GetBag(kind):Refresh()
+                events:SendMessage('bags/FullRefreshAll')
               end)
             end,
           },
