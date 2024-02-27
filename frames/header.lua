@@ -10,7 +10,7 @@ local header = addon:NewModule('Header')
 ---@field frame Frame
 header.headerProto = {}
 
-function header.headerProto:Add(name)
+function header.headerProto:Add()
 
 end
 
