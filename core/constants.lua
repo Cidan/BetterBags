@@ -102,6 +102,7 @@ const.BAG_VIEW = {
   ONE_BAG = 1,
   SECTION_GRID = 2,
   LIST = 3,
+  SECTION_ALL_BAGS = 4,
 }
 
 ---@enum GridCompactStyle
@@ -312,11 +313,13 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
       },
       [const.BAG_KIND.BANK] = {
         [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
       },
     },
     itemSort = {
@@ -324,11 +327,13 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
       [const.BAG_KIND.BANK] = {
         [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
     },
     size = {
@@ -386,8 +391,30 @@ const.DATABASE_DEFAULTS = {
           opacity = 89,
         }
       },
+      [const.BAG_VIEW.SECTION_ALL_BAGS] = {
+        [const.BAG_KIND.BACKPACK] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.BANK] = {
+          columnCount = 5,
+          itemsPerRow = 5,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        }
+      },
     },
     views = {
+      [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
+    },
+    previousViews = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
     },
@@ -401,12 +428,14 @@ const.DATABASE_DEFAULTS = {
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,
+        GearSet = true,
       },
       [const.BAG_KIND.BANK] = {
         Type = true,
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,
+        GearSet = true,
       },
     },
     ---@type table<string, boolean>

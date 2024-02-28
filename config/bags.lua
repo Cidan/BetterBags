@@ -102,7 +102,8 @@ function config:GetBagOptions(kind)
               ["Type"] = L:G("Type"),
               ["Subtype"] = L:G("Subtype"),
               ["Expansion"] = L:G("Expansion"),
-              ["TradeSkill"] = L:G("Trade Skill")
+              ["TradeSkill"] = L:G("Trade Skill"),
+              ["GearSet"] = L:G("Gear Set")
             }
           },
           customCategories = config:GetCustomCategoryOptions(kind),
@@ -120,7 +121,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetBagCompaction(kind, value)
-          config:GetBag(kind):Refresh()
+          events:SendMessage('bags/FullRefreshAll')
         end,
         values =  {
           [const.GRID_COMPACT_STYLE.NONE] = L:G("None"),
@@ -139,7 +140,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetSectionSortType(kind, DB:GetBagView(kind), value)
-          config:GetBag(kind):Refresh()
+          events:SendMessage('bags/FullRefreshAll')
         end,
         values = {
           [const.SECTION_SORT_TYPE.ALPHABETICALLY] = L:G("Alphabetically"),
@@ -159,7 +160,7 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetItemSortType(kind, DB:GetBagView(kind), value)
-          config:GetBag(kind):Refresh()
+          events:SendMessage('bags/FullRefreshAll')
         end,
         values = {
           [const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY] = L:G("Quality, then Alphabetically"),
@@ -209,11 +210,18 @@ function config:GetBagOptions(kind)
         order = 7,
         style = "radio",
         get = function()
+          if DB:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            return DB:GetPreviousView(kind)
+          end
           return DB:GetBagView(kind)
         end,
         set = function(_, value)
-          DB:SetBagView(kind, value)
-          events:SendMessage('bags/FullRefreshAll')
+          if DB:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            DB:SetPreviousView(kind, value)
+          else
+            DB:SetBagView(kind, value)
+            events:SendMessage('bags/FullRefreshAll')
+          end
         end,
         values = {
           [const.BAG_VIEW.SECTION_GRID] = L:G("Section Grid"),
@@ -242,7 +250,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
               bucket:Later("setItemsPerRow", 0.2, function()
-                config:GetBag(kind):Refresh()
+                events:SendMessage('bags/FullRefreshAll')
               end)
             end,
           },
@@ -260,7 +268,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
               bucket:Later("setSectionsPerRow", 0.2, function()
-                config:GetBag(kind):Refresh()
+                events:SendMessage('bags/FullRefreshAll')
               end)
             end,
           },
@@ -286,7 +294,7 @@ function config:GetBagOptions(kind)
             desc = L:G("Set the scale of this bag."),
             order = 2,
             min = 60,
-            max = 120,
+            max = 160,
             step = 1,
             get = function()
               return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).scale

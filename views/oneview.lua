@@ -58,7 +58,6 @@ local function OneBagView(view, bag, dirtyItems)
 
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   for _, data in pairs(dirtyItems) do
-    local bagid, slotid = data.bagid, data.slotid
     local slotkey = view:GetSlotKey(data)
 
     -- Create or get the item frame for this slot.
