@@ -53,6 +53,8 @@ local itemDataProto = {}
 ---@field _bankContainer ContinuableContainer
 ---@field _doingRefreshAll boolean
 ---@field _newItemTimers table<string, number>
+---@field _firstLoad boolean
+---@field _bankFirstLoad boolean
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -78,6 +80,8 @@ function items:OnInitialize()
     emptySlotByBagAndSlot = {},
   }
   self._newItemTimers = {}
+  self._firstLoad = true
+  self._bankFirstLoad = true
 end
 
 function items:OnEnable()
@@ -271,94 +275,117 @@ function items:GetExtraSlotInfo(kind)
   return kind == const.BAG_KIND.BACKPACK and self.slotInfo or self.bankSlotInfo
 end
 
-  -- Load item data in the background, and fire a message when
-  -- all bags are done loading.
-function items:ProcessContainer()
-  self._container:ContinueOnLoad(function()
-    ---@type ExtraSlotInfo
-    local extraSlotInfo = {
-      emptySlots = 0,
-      emptyReagentSlots = 0,
-      totalItems = 0,
-      freeSlotKey = "",
-      freeReagentSlotKey = "",
-      emptySlotByBagAndSlot = {},
-    }
+---@private
+function items:BackpackLoadFunction()
+  ---@type ExtraSlotInfo
+  local extraSlotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
 
-    for bagid, bag in pairs(items.itemsByBagAndSlot) do
-      extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
-      for slotid, data in pairs(bag) do
-        if items:HasItemChanged(bagid, slotid, data) then
-          debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
-          items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
-          table.insert(items.dirtyItems, data)
+  for bagid, bag in pairs(items.itemsByBagAndSlot) do
+    extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
+    for slotid, data in pairs(bag) do
+      if items:HasItemChanged(bagid, slotid, data) then
+        debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
+        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+        table.insert(items.dirtyItems, data)
+      end
+      if data.isItemEmpty then
+        if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+          extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
+          extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
+        elseif bagid ~= Enum.BagIndex.Keyring then
+          extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
+          extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
         end
-        if data.isItemEmpty then
-          if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-            extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-            extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
-          elseif bagid ~= Enum.BagIndex.Keyring then
-            extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-            extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
-          end
-          extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
-        else
-          extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
-        end
+        extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
+      else
+        extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
       end
     end
-    self.slotInfo = extraSlotInfo
-    debug:EndProfile('Backpack Data Pipeline')
-    -- All items in all bags have finished loading, fire the all done event.
+  end
+  self.slotInfo = extraSlotInfo
+  debug:EndProfile('Backpack Data Pipeline')
+  -- All items in all bags have finished loading, fire the all done event.
+  if not self._firstLoad then
     events:SendMessageLater('items/RefreshBackpack/Done', function()
       wipe(items.dirtyItems)
       items._container = nil
       items._doingRefreshAll = false
     end,
     items.dirtyItems)
-  end)
+  end
+end
+
+  -- Load item data in the background, and fire a message when
+  -- all bags are done loading.
+function items:ProcessContainer()
+  self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
+  -- Call the data load function twice on first load, because the first load
+  -- sometimes does not complete, even though the container is marked as done.
+  -- This is a Blizzard bug.
+  if self._firstLoad then
+    self._firstLoad = false
+    self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
+  end
+end
+
+function items:BankLoadFunction()
+  ---@type ExtraSlotInfo
+  local extraSlotInfo = {
+    emptySlots = 0,
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+  }
+  for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
+    extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
+    for slotid, data in pairs(bag) do
+      items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+      table.insert(items.dirtyBankItems, data)
+
+      if data.isItemEmpty then
+        if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+          extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
+          extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
+        else
+          extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
+          extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
+        end
+        extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
+      else
+        extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
+      end
+    end
+  end
+  self.bankSlotInfo = extraSlotInfo
+  -- All items in all bags have finished loading, fire the all done event.
+  if not self._bankFirstLoad then
+    events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
+    wipe(items.dirtyBankItems)
+    items._bankContainer = nil
+    items._doingRefreshAll = false
+  end
 end
 
 -- Load item data in the background, and fire a message when
 -- all bags are done loading.
 function items:ProcessBankContainer()
-  self._bankContainer:ContinueOnLoad(function()
-    ---@type ExtraSlotInfo
-    local extraSlotInfo = {
-      emptySlots = 0,
-      emptyReagentSlots = 0,
-      totalItems = 0,
-      freeSlotKey = "",
-      freeReagentSlotKey = "",
-      emptySlotByBagAndSlot = {},
-    }
-    for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
-      extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
-      for slotid, data in pairs(bag) do
-        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
-        table.insert(items.dirtyBankItems, data)
-
-        if data.isItemEmpty then
-          if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-            extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-            extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
-          else
-            extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-            extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
-          end
-          extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
-        else
-          extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
-        end
-      end
-    end
-    self.bankSlotInfo = extraSlotInfo
-    -- All items in all bags have finished loading, fire the all done event.
-    events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
-    wipe(items.dirtyBankItems)
-    items._bankContainer = nil
-    items._doingRefreshAll = false
-  end)
+  self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
+  -- Call the data load function twice on first load, because the first load
+  -- sometimes does not complete, even though the container is marked as done.
+  -- This is a Blizzard bug.
+  if self._bankFirstLoad then
+    self._bankFirstLoad = false
+    self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
+  end
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
