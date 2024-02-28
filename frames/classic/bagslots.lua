@@ -32,7 +32,8 @@ local debug = addon:GetModule('Debug')
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
-
+---@class Database: AceModule
+local database = addon:GetModule('Database')
 
 ---@param kind BagKind
 ---@return bagSlots
@@ -66,9 +67,15 @@ function BagSlots:CreatePanel(kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
+    if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+      return
+    end
+    database:SetPreviousView(kind, database:GetBagView(kind))
+    database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
     events:SendMessage('bags/FullRefreshAll')
   end)
   b.fadeOutGroup:HookScript("OnFinished", function()
+    database:SetBagView(kind, database:GetPreviousView(kind))
     events:SendMessage('bags/FullRefreshAll')
   end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)

@@ -78,6 +78,7 @@ views\views.lua
 views\gridview.lua
 views\oneview.lua
 views\listview.lua
+views\bagview.lua
 
 frames\bag.lua
 frames\classic\bag.lua

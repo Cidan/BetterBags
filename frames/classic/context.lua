@@ -127,39 +127,64 @@ function context:CreateContextMenu(bag)
       {
         text = L:G("One Bag"),
         keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.ONE_BAG end,
+        checked = function()
+          if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            return database:GetPreviousView(bag.kind) == const.BAG_VIEW.ONE_BAG
+          end
+          return database:GetBagView(bag.kind) == const.BAG_VIEW.ONE_BAG
+        end,
         tooltipTitle = L:G("One Bag"),
         tooltipText = L:G("This view will display all items in a single bag, regardless of category."),
         func = function()
           context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
-          events:SendMessage('bags/FullRefreshAll')
+          if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            database:SetPreviousView(bag.kind, const.BAG_VIEW.ONE_BAG)
+          else
+            database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
+            events:SendMessage('bags/FullRefreshAll')
+          end
         end
       },
       {
         text = L:G("Section Grid"),
         keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_GRID end,
+        checked = function()
+          if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            return database:GetPreviousView(bag.kind) == const.BAG_VIEW.SECTION_GRID
+          end
+          return database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_GRID
+        end,
         tooltipTitle = L:G("Section Grid"),
         tooltipText = L:G("This view will display items in sections, which are categorized by type, expansion, trade skill, and more."),
         func = function()
           context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
-          bag.drawOnClose = true
-          bag.currentItemCount = -1
-          events:SendMessage('bags/FullRefreshAll')
+          if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            database:SetPreviousView(bag.kind, const.BAG_VIEW.SECTION_GRID)
+          else
+            database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
+            events:SendMessage('bags/FullRefreshAll')
+          end
         end
       },
       {
         text = L:G("List"),
         keepShownOnClick = false,
-        checked = function() return database:GetBagView(bag.kind) == const.BAG_VIEW.LIST end,
+        checked = function()
+          if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            return database:GetPreviousView(bag.kind) == const.BAG_VIEW.LIST
+          end
+          return database:GetBagView(bag.kind) == const.BAG_VIEW.LIST
+        end,
         tooltipTitle = L:G("List"),
         tooltipText = L:G("This view will display items in a list, which is categorized by type, expansion, trade skill, and more."),
         func = function()
           context:Hide()
-          database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
-          events:SendMessage('bags/FullRefreshAll')
+          if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            database:SetPreviousView(bag.kind, const.BAG_VIEW.LIST)
+          else
+            database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
+            events:SendMessage('bags/FullRefreshAll')
+          end
         end
       }
     }

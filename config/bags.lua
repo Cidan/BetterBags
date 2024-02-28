@@ -210,11 +210,18 @@ function config:GetBagOptions(kind)
         order = 7,
         style = "radio",
         get = function()
+          if DB:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            return DB:GetPreviousView(kind)
+          end
           return DB:GetBagView(kind)
         end,
         set = function(_, value)
-          DB:SetBagView(kind, value)
-          events:SendMessage('bags/FullRefreshAll')
+          if DB:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+            DB:SetPreviousView(kind, value)
+          else
+            DB:SetBagView(kind, value)
+            events:SendMessage('bags/FullRefreshAll')
+          end
         end,
         values = {
           [const.BAG_VIEW.SECTION_GRID] = L:G("Section Grid"),
