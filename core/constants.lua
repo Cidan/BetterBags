@@ -414,6 +414,10 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
     },
+    previousViews = {
+      [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
+    },
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
     ---@type table<number, string>
@@ -424,12 +428,14 @@ const.DATABASE_DEFAULTS = {
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,
+        GearSet = true,
       },
       [const.BAG_KIND.BANK] = {
         Type = true,
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,
+        GearSet = true,
       },
     },
     ---@type table<string, boolean>

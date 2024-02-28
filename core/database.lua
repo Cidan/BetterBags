@@ -39,6 +39,18 @@ function DB:SetBagView(kind, view)
   DB.data.profile.views[kind] = view
 end
 
+---@param kind BagKind
+---@param view BagView
+function DB:SetPreviousView(kind, view)
+  DB.data.profile.previousViews[kind] = view
+end
+
+---@param kind BagKind
+---@return BagView
+function DB:GetPreviousView(kind)
+  return DB.data.profile.previousViews[kind]
+end
+
 function DB:GetCategoryFilter(kind, filter)
   return DB.data.profile.categoryFilters[kind][filter]
 end

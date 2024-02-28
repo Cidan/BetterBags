@@ -103,26 +103,16 @@ function BagSlots:CreatePanel(kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
+    if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+      return
+    end
+    database:SetPreviousView(kind, database:GetBagView(kind))
     database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
     events:SendMessage('bags/FullRefreshAll')
-    --[[
-    if b.kind == const.BAG_KIND.BACKPACK then
-      addon.Bags.Backpack:Refresh()
-    elseif b.kind == const.BAG_KIND.BANK then
-      addon.Bags.Bank:Refresh()
-    end
-    ]]--
   end)
   b.fadeOutGroup:HookScript("OnFinished", function()
-    database:SetBagView(kind, const.BAG_VIEW.SECTION_GRID)
+    database:SetBagView(kind, database:GetPreviousView(kind))
     events:SendMessage('bags/FullRefreshAll')
-    --[[
-    if b.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack then
-      addon.Bags.Backpack:Refresh()
-    elseif b.kind == const.BAG_KIND.BANK and addon.Bags.Bank then
-      addon.Bags.Bank:Refresh()
-    end
-    ]]--
   end)
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function() b:Draw() end)
   events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function() b:Draw() end)
