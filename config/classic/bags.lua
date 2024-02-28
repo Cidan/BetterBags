@@ -292,7 +292,7 @@ function config:GetBagOptions(kind)
             desc = L:G("Set the scale of this bag."),
             order = 2,
             min = 60,
-            max = 120,
+            max = 160,
             step = 1,
             get = function()
               return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).scale
