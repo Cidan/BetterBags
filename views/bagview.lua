@@ -53,7 +53,6 @@ local function BagView(view, bag, dirtyItems)
   -- Use the section grid sizing for this view type.
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_GRID)
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
-  local categoryChanged = false
 
   for _, data in pairs(dirtyItems) do
     local bagid = data.bagid
@@ -66,9 +65,6 @@ local function BagView(view, bag, dirtyItems)
       view.itemsByBagAndSlot[slotkey] = itemButton
     end
 
-    -- Get the previous category for this slotkey.
-    local previousCategory = itemButton.data and itemButton.data.itemInfo and itemButton.data.itemInfo.category
-
     -- Set the item data on the item frame.
     itemButton:SetItem(data)
 
@@ -77,9 +73,6 @@ local function BagView(view, bag, dirtyItems)
       local category = itemButton:GetCategory()
       local section = view:GetOrCreateSection(category)
       section:AddCell(slotkey, itemButton)
-      if previousCategory ~= category then
-        categoryChanged = true
-      end
     end
   end
 
@@ -93,7 +86,6 @@ local function BagView(view, bag, dirtyItems)
         debug:Log("BagSlotShow", "Category difference", previousCategory, "->", newCategory)
         local section = view:GetOrCreateSection(newCategory)
         section:AddCell(slotkey, itemButton)
-        categoryChanged = true
       end
     else
       debug:Log("MissingBag", "Removing slotkey from missing bag", slotkey, "bagid ->", data.bagid)
