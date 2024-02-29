@@ -53,6 +53,45 @@ local function Wipe(view)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
+  wipe(view.itemsByItemID)
+end
+
+---@param view view
+---@param data ItemData
+---@return boolean
+local function drawDirtyItemUnstacked(view, data)
+  local categoryChanged = false
+  local bagid = data.bagid
+  local slotkey = view:GetSlotKey(data)
+  -- Create or get the item frame for this slot.
+  local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+  if itemButton == nil then
+    itemButton = itemFrame:Create()
+    view.itemsByBagAndSlot[slotkey] = itemButton
+  end
+
+  -- Get the previous category for this slotkey.
+  local previousCategory = itemButton.data and itemButton.data.itemInfo and itemButton.data.itemInfo.category
+
+  -- Set the item data on the item frame.
+  itemButton:SetItem(data)
+
+  -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
+  if (not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) then
+    local category = itemButton:GetCategory()
+    local section = view:GetOrCreateSection(category)
+    section:AddCell(slotkey, itemButton)
+    if previousCategory ~= category then
+      categoryChanged = true
+    end
+  end
+  view.itemsByItemID[data.itemInfo.itemID] = view.itemsByBagAndSlot[slotkey]
+  return categoryChanged
+end
+
+---@param view view
+---@param data ItemData
+local function drawDirtyItemStacked(view, data)
 end
 
 ---@param view view
@@ -63,35 +102,20 @@ local function GridView(view, bag, dirtyItems)
     view:Wipe()
     view.fullRefresh = false
   end
+  wipe(view.itemsByItemID)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local categoryChanged = false
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
+  local stackingOptions = database:GetStackingOptions(bag.kind)
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
   debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
-    local bagid = data.bagid
     local slotkey = view:GetSlotKey(data)
-
-    -- Create or get the item frame for this slot.
-    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-    if itemButton == nil then
-      itemButton = itemFrame:Create()
-      view.itemsByBagAndSlot[slotkey] = itemButton
-    end
-
-    -- Get the previous category for this slotkey.
-    local previousCategory = itemButton.data and itemButton.data.itemInfo and itemButton.data.itemInfo.category
-
-    -- Set the item data on the item frame.
-    itemButton:SetItem(data)
-
-    -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
-    if (not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) then
-      local category = itemButton:GetCategory()
-      local section = view:GetOrCreateSection(category)
-      section:AddCell(slotkey, itemButton)
-      if previousCategory ~= category then
+    if stackingOptions.mergeStacks and not data.isItemEmpty and view.itemsByItemID[data.itemInfo.itemID] ~= nil and view.itemsByItemID[data.itemInfo.itemID] ~= view.itemsByBagAndSlot[slotkey] then
+      debug:Log('Stacking', 'Stacking item', data.itemInfo.itemLink)
+    else
+      if drawDirtyItemUnstacked(view, data) then
         categoryChanged = true
       end
     end
@@ -215,6 +239,7 @@ function views:NewGrid(parent)
   local view = setmetatable({}, {__index = views.viewProto})
   view.sections = {}
   view.itemsByBagAndSlot = {}
+  view.itemsByItemID = {}
   view.itemCount = 0
   view.kind = const.BAG_VIEW.SECTION_GRID
   view.content = grid:Create(parent)

@@ -290,6 +290,14 @@ const.DATABASE_DEFAULTS = {
     showBagButton = true,
     debug = false,
     inBagSearch = false,
+    stacking = {
+      [const.BAG_KIND.BACKPACK]  = {
+        mergeStacks = true
+      },
+      [const.BAG_KIND.BANK]  = {
+        mergeStacks = true
+      }
+    },
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
         enabled = true,

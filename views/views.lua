@@ -26,6 +26,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@field itemCount number
 ---@field itemFrames Item[]
 ---@field fullRefresh boolean
+---@field itemsByItemID table<number, Item> Used to dedup for stacked items.
 views.viewProto = {}
 
 ---@param bag Bag

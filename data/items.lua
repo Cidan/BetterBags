@@ -310,9 +310,9 @@ function items:BackpackLoadFunction()
     end
   end
   self.slotInfo = extraSlotInfo
-  debug:EndProfile('Backpack Data Pipeline')
   -- All items in all bags have finished loading, fire the all done event.
   if not self._firstLoad then
+    debug:EndProfile('Backpack Data Pipeline')
     events:SendMessageLater('items/RefreshBackpack/Done', function()
       wipe(items.dirtyItems)
       items._container = nil

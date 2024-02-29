@@ -38,6 +38,7 @@ local debug = addon:GetModule('Debug')
 ---@field frame Frame
 ---@field button ItemButton|Button
 ---@field data ItemData
+---@field stacks ItemData[]
 ---@field isFreeSlot boolean
 ---@field kind BagKind
 ---@field masqueGroup string
@@ -488,6 +489,7 @@ function itemFrame.itemProto:ClearItem()
   self.LockTexture:Hide()
   self:ResetSize()
   self.data = nil
+  self.stacks = {}
   self.isFreeSlot = false
   self.button.UpgradeIcon:SetShown(false)
 end
