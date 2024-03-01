@@ -44,6 +44,7 @@ local database = addon:GetModule('Database')
 BagSlots.bagSlotProto = {}
 
 function BagSlots.bagSlotProto:Draw()
+  debug:Log('BagSlots', "Bag Slots Draw called")
   for _, cell in ipairs(self.content.cells) do
     cell:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED, false)
   end
