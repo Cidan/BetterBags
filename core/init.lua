@@ -150,11 +150,11 @@ function addon:OnEnable()
   events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
     if addon.Bags.Backpack.drawAfterCombat then
       addon.Bags.Backpack.drawAfterCombat = false
-      addon.Bags.Backpack:Refresh()
+      events:SendMessage('bags/FullRefreshAll')
     end
     if addon.Bags.Bank.drawAfterCombat then
       addon.Bags.Bank.drawAfterCombat = false
-      addon.Bags.Bank:Refresh()
+      events:SendMessage('bags/FullRefreshAll')
     end
   end)
 
