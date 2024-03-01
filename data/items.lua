@@ -95,7 +95,11 @@ function items:OnEnable()
   end
 
   events:RegisterMessage('bags/FullRefreshAll', function()
-    self:FullRefreshAll()
+    if InCombatLockdown() then
+      addon.Bags.Backpack.drawAfterCombat = true
+    else
+      self:FullRefreshAll()
+    end
   end)
 
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
@@ -133,6 +137,7 @@ end
 ---@private
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
 function items:FullRefreshAll()
+  debug:Log('FullRefreshAll', "Full Refresh All triggered")
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
