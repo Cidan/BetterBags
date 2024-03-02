@@ -158,11 +158,29 @@ local function GridView(view, bag, dirtyItems)
         -- Remove item buttons that are empty or don't match the category.
         if data.isItemEmpty then
           if view.defer then
-            view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
+            local drewStack = false
+            local stacks = view.itemsByBagAndSlot[slotkey].stacks
+            for guid, stackItem in pairs(stacks) do
+              local oldButton = view.itemsByBagAndSlot[slotkey]
+              oldButton.stacks[guid] = nil
+              oldButton:SetItem(stackItem)
+              drewStack = true
+              break
+            end
+            if not drewStack then
+              view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
+            end
             bag.drawOnClose = true
           else
             debug:Log("RemoveCell", "Removed because empty", slotkey, data.itemInfo.itemLink)
+            local stacks = view.itemsByBagAndSlot[slotkey].stacks
             section:RemoveCell(slotkey)
+            for guid, stackItem in pairs(stacks) do
+              local oldButton = view.itemsByBagAndSlot[slotkey]
+              oldButton.stacks[guid] = nil
+              oldButton:SetItem(stackItem)
+              break
+            end
             view.itemsByBagAndSlot[slotkey]:Release()
             view.itemsByBagAndSlot[slotkey] = nil
             bag.drawOnClose = false
