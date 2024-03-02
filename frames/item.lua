@@ -38,7 +38,7 @@ local debug = addon:GetModule('Debug')
 ---@field frame Frame
 ---@field button ItemButton|Button
 ---@field data ItemData
----@field stacks ItemData[]
+---@field stacks table<string, ItemData>
 ---@field isFreeSlot boolean
 ---@field kind BagKind
 ---@field masqueGroup string
@@ -217,6 +217,11 @@ function itemFrame.itemProto:DrawItemLevel()
 
 end
 
+function itemFrame.itemProto:UpdateCount()
+  if self.data.isItemEmpty then return end
+  SetItemButtonCount(self.button, self.data.itemInfo.currentItemCount)
+end
+
 ---@param data ItemData
 function itemFrame.itemProto:SetItem(data)
   assert(data, 'item must be provided')
@@ -251,6 +256,12 @@ function itemFrame.itemProto:SetItem(data)
 
   local bound = data.itemInfo.isBound
 
+  local count = data.itemInfo.currentItemCount
+
+  for _, stack in pairs(self.stacks) do
+    count = count + stack.itemInfo.currentItemCount
+  end
+
   self.button.minDisplayCount = 1
   self:DrawItemLevel()
   self.button.ItemSlotBackground:Hide()
@@ -258,7 +269,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetHasItem(data.itemInfo.itemIcon)
   self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound);
-  SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
+  SetItemButtonCount(self.button, count)
   self:SetLock(data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
@@ -565,6 +576,8 @@ function itemFrame:_DoCreate()
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
   i.ilvlText = ilvlText
+
+  i.stacks = {}
 
   return i
 end

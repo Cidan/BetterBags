@@ -85,13 +85,32 @@ local function drawDirtyItemUnstacked(view, data)
       categoryChanged = true
     end
   end
-  view.itemsByItemID[data.itemInfo.itemID] = view.itemsByBagAndSlot[slotkey]
+  if not data.isItemEmpty then
+    view.itemsByItemID[data.itemInfo.itemID] = view.itemsByBagAndSlot[slotkey]
+  end
   return categoryChanged
 end
 
 ---@param view view
 ---@param data ItemData
 local function drawDirtyItemStacked(view, data)
+  debug:Log('Stacking', 'Stacking item', data.itemInfo.itemLink)
+  local baseItem = view.itemsByItemID[data.itemInfo.itemID]
+  baseItem.stacks[data.itemInfo.itemGUID] = data
+  baseItem:SetItem(baseItem.data)
+end
+
+---@param view view
+---@param bag Bag
+---@param data ItemData
+---@return boolean
+local function shouldStackItem(view, bag, data)
+  local stackingOptions = database:GetStackingOptions(bag.kind)
+  local slotkey = view:GetSlotKey(data)
+  if stackingOptions.mergeStacks and not data.isItemEmpty and view.itemsByItemID[data.itemInfo.itemID] ~= nil and view.itemsByItemID[data.itemInfo.itemID] ~= view.itemsByBagAndSlot[slotkey] then
+    return true
+  end
+  return false
 end
 
 ---@param view view
@@ -106,14 +125,12 @@ local function GridView(view, bag, dirtyItems)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local categoryChanged = false
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
-  local stackingOptions = database:GetStackingOptions(bag.kind)
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
   debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
-    local slotkey = view:GetSlotKey(data)
-    if stackingOptions.mergeStacks and not data.isItemEmpty and view.itemsByItemID[data.itemInfo.itemID] ~= nil and view.itemsByItemID[data.itemInfo.itemID] ~= view.itemsByBagAndSlot[slotkey] then
-      debug:Log('Stacking', 'Stacking item', data.itemInfo.itemLink)
+    if shouldStackItem(view, bag, data) then
+      drawDirtyItemStacked(view, data)
     else
       if drawDirtyItemUnstacked(view, data) then
         categoryChanged = true
