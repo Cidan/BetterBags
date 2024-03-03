@@ -37,7 +37,6 @@ end
 ---@param view BagView
 function DB:SetBagView(kind, view)
   DB.data.profile.views[kind] = view
-  self:SetPreviousView(kind, view)
 end
 
 ---@param kind BagKind

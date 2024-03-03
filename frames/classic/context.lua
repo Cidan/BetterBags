@@ -140,6 +140,7 @@ function context:CreateContextMenu(bag)
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.ONE_BAG)
           else
+            database:SetPreviousView(bag.kind, const.BAG_VIEW.ONE_BAG)
             database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
             events:SendMessage('bags/FullRefreshAll')
           end
@@ -161,6 +162,7 @@ function context:CreateContextMenu(bag)
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.SECTION_GRID)
           else
+            database:SetPreviousView(bag.kind, const.BAG_VIEW.SECTION_GRID)
             database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_GRID)
             events:SendMessage('bags/FullRefreshAll')
           end
@@ -182,6 +184,7 @@ function context:CreateContextMenu(bag)
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.LIST)
           else
+            database:SetPreviousView(bag.kind, const.BAG_VIEW.LIST)
             database:SetBagView(bag.kind, const.BAG_VIEW.LIST)
             events:SendMessage('bags/FullRefreshAll')
           end
