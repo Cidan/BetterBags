@@ -223,6 +223,10 @@ function bagFrame.bagProto:Draw(dirtyItems)
   local text = search:GetText()
   self:Search(text)
   self:OnResize()
+  if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
+    self.slots:Draw()
+    self.slots:Show()
+  end
   events:SendMessage('bag/Rendered', self)
 end
 
