@@ -217,6 +217,7 @@ function config:GetBagOptions(kind)
           if DB:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             DB:SetPreviousView(kind, value)
           else
+            DB:SetPreviousView(kind, value)
             DB:SetBagView(kind, value)
             events:SendMessage('bags/FullRefreshAll')
           end
