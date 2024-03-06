@@ -53,7 +53,6 @@ local function Wipe(view)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
-  wipe(view.itemsByItemID)
 end
 
 ---@param view view
@@ -85,33 +84,13 @@ local function drawDirtyItemUnstacked(view, data)
       categoryChanged = true
     end
   end
-  if not data.isItemEmpty then
-    view.itemsByItemID[data.itemInfo.itemID] = view.itemsByBagAndSlot[slotkey]
-  end
   return categoryChanged
 end
 
----@param view view
----@param data ItemData
-local function drawDirtyItemStacked(view, data)
-  debug:Log('Stacking', 'Stacking item', data.itemInfo.itemLink)
-  local baseItem = view.itemsByItemID[data.itemInfo.itemID]
-  baseItem.stacks[data.itemInfo.itemGUID] = data
-  baseItem:SetItem(baseItem.data)
-end
+--local stacks = {}
 
----@param view view
----@param bag Bag
----@param data ItemData
----@return boolean
-local function shouldStackItem(view, bag, data)
-  local stackingOptions = database:GetStackingOptions(bag.kind)
-  local slotkey = view:GetSlotKey(data)
-  if stackingOptions.mergeStacks and not data.isItemEmpty and view.itemsByItemID[data.itemInfo.itemID] ~= nil and view.itemsByItemID[data.itemInfo.itemID] ~= view.itemsByBagAndSlot[slotkey] then
-    return true
-  end
-  return false
-end
+---@type table<number, Item>
+local stacks = {}
 
 ---@param view view
 ---@param bag Bag
@@ -120,8 +99,9 @@ local function GridView(view, bag, dirtyItems)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
+    wipe(stacks)
   end
-  wipe(view.itemsByItemID)
+
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local categoryChanged = false
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
@@ -129,13 +109,7 @@ local function GridView(view, bag, dirtyItems)
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
   debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
-    if shouldStackItem(view, bag, data) then
-      drawDirtyItemStacked(view, data)
-    else
-      if drawDirtyItemUnstacked(view, data) then
-        categoryChanged = true
-      end
-    end
+    categoryChanged = drawDirtyItemUnstacked(view, data)
   end
   debug:EndProfile('Dirty Item Stage')
 
@@ -148,39 +122,28 @@ local function GridView(view, bag, dirtyItems)
   debug:StartProfile('Reconcile Stage')
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
-    for slotkey, _ in pairs(section:GetAllCells()) do
-      if view.itemsByBagAndSlot[slotkey] == nil then
+    local allCells = section:GetKeys()
+    for _, slotkey in pairs(allCells) do
+      local button = view.itemsByBagAndSlot[slotkey]
+      local data = button and button.data or nil
+      if button == nil then
         debug:Log("RemoveCell", "Removed because not in itemsByBagAndSlot", slotkey)
         section:RemoveCell(slotkey)
       elseif slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
-        -- Get the bag and slot id from the slotkey.
-        local data = view.itemsByBagAndSlot[slotkey].data
         -- Remove item buttons that are empty or don't match the category.
         if data.isItemEmpty then
-          if view.defer then
-            local drewStack = false
-            local stacks = view.itemsByBagAndSlot[slotkey].stacks
-            for guid, stackItem in pairs(stacks) do
-              local oldButton = view.itemsByBagAndSlot[slotkey]
-              oldButton.stacks[guid] = nil
-              oldButton:SetItem(stackItem)
-              drewStack = true
-              break
-            end
-            if not drewStack then
-              view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
-            end
+          if button:HasStacks() then
+            button:PromoteStack()
+            section:RemoveCell(slotkey)
+            section:AddCell(view:GetSlotKey(button.data), button)
+            view.itemsByBagAndSlot[slotkey] = nil
+            view.itemsByBagAndSlot[view:GetSlotKey(button.data)] = button
+          elseif view.defer then
+            view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
             bag.drawOnClose = true
           else
             debug:Log("RemoveCell", "Removed because empty", slotkey, data.itemInfo.itemLink)
-            local stacks = view.itemsByBagAndSlot[slotkey].stacks
             section:RemoveCell(slotkey)
-            for guid, stackItem in pairs(stacks) do
-              local oldButton = view.itemsByBagAndSlot[slotkey]
-              oldButton.stacks[guid] = nil
-              oldButton:SetItem(stackItem)
-              break
-            end
             view.itemsByBagAndSlot[slotkey]:Release()
             view.itemsByBagAndSlot[slotkey] = nil
             bag.drawOnClose = false
@@ -194,10 +157,43 @@ local function GridView(view, bag, dirtyItems)
             section:RemoveCell(slotkey)
             bag.drawOnClose = false
           end
+        else
+          --stacks[data.itemInfo.itemID] = stacks[data.itemInfo.itemID] or {}
+          --table.insert(stacks[data.itemInfo.itemID], button)
+          -- Stack case
+          local stackedItem = stacks[data.itemInfo.itemID] or button
+          if stackedItem ~= button and stackedItem.data ~= nil and button.data ~= nil and not stackedItem.data.isItemEmpty and not button.data.isItemEmpty and stackedItem.data.itemInfo.itemID == button.data.itemInfo.itemID and stackedItem.data.itemInfo.itemGUID ~= button.data.itemInfo.itemGUID then
+            stackedItem:AddToStack(data)
+            section:RemoveCell(slotkey)
+            button:Release()
+            view.itemsByBagAndSlot[slotkey] = nil
+            stackedItem:UpdateCount()
+          else
+            stacks[data.itemInfo.itemID] = button
+          end
         end
       end
     end
-
+  end
+  --[[
+  for itemid, buttons in pairs(stacks) do
+    if #buttons > 1 then
+      local item = buttons[1]
+      item:ClearStacks()
+      for i = 2, #buttons do
+        print("adding to stack", buttons[i].data.isItemEmpty, buttons[i].data.itemInfo.itemLink)
+        item:AddToStack(buttons[i].data)
+        local slotkey = view:GetSlotKey(buttons[i].data)
+        view:GetSection(buttons[i].data.itemInfo.category):RemoveCell(slotkey)
+        buttons[i]:Release()
+        view.itemsByBagAndSlot[slotkey] = nil
+      end
+      print("found stackable item id", itemid)
+    end
+  end
+  wipe(stacks)
+  ]]--
+  for sectionName, section in pairs(view:GetAllSections()) do
     if not view.defer then
       -- Remove the section if it's empty, otherwise draw it.
       if section:GetCellCount() == 0 then
@@ -274,7 +270,6 @@ function views:NewGrid(parent)
   local view = setmetatable({}, {__index = views.viewProto})
   view.sections = {}
   view.itemsByBagAndSlot = {}
-  view.itemsByItemID = {}
   view.itemCount = 0
   view.kind = const.BAG_VIEW.SECTION_GRID
   view.content = grid:Create(parent)

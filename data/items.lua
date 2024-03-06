@@ -39,6 +39,7 @@ local debug = addon:GetModule('Debug')
 ---@field isItemEmpty boolean
 ---@field kind BagKind
 ---@field newItemTime number
+---@field previousItemID number
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -296,8 +297,10 @@ function items:BackpackLoadFunction()
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
       if items:HasItemChanged(bagid, slotid, data) then
+        local previousItemID = data.itemInfo and data.itemInfo.itemID or nil
         debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
         items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+        data.previousItemID = previousItemID
         table.insert(items.dirtyItems, data)
       end
       if data.isItemEmpty then

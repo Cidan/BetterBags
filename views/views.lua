@@ -15,7 +15,7 @@ local views = addon:NewModule('Views')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class view
+---@class (exact) view
 ---@field sections table<string, Section>
 ---@field content Grid
 ---@field kind BagView
@@ -26,7 +26,6 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@field itemCount number
 ---@field itemFrames Item[]
 ---@field fullRefresh boolean
----@field itemsByItemID table<number, Item> Used to dedup for stacked items.
 views.viewProto = {}
 
 ---@param bag Bag
