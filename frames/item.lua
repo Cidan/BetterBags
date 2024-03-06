@@ -137,6 +137,10 @@ local function matchFilter(filter, data)
     if string.find(data.itemInfo.equipmentSet:lower(), value, 1, true) then
       return true
     end
+  elseif prefix == "loc" and data.itemInfo.itemEquipLoc ~= nil then
+    if string.find(data.itemInfo.itemEquipLoc:lower(), value, 1, true) then
+      return true
+    end
   end
   return false
 end
