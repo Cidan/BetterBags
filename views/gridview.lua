@@ -115,9 +115,6 @@ local function GridView(view, bag, dirtyItems)
     view.defer = false
   end
 
-  ---@type table<number, Item>
-  local stacks = {}
-
   debug:StartProfile('Reconcile Stage')
   -- Loop through all sections and reconcile the items.
   for sectionName, section in pairs(view:GetAllSections()) do
@@ -156,23 +153,31 @@ local function GridView(view, bag, dirtyItems)
             section:RemoveCell(slotkey)
             bag.drawOnClose = false
           end
-        else
-          --stacks[data.itemInfo.itemID] = stacks[data.itemInfo.itemID] or {}
-          --table.insert(stacks[data.itemInfo.itemID], button)
-          -- Stack case
-          local stackedItem = stacks[data.itemInfo.itemID] or button
-          if stackedItem ~= button then
-            print("merging", slotkey, "into", view:GetSlotKey(stackedItem.data))
-            stackedItem:MergeStacks(button)
-            --stackedItem:AddToStack(data)
-            section:RemoveCell(slotkey)
-            button:Release()
-            view.itemsByBagAndSlot[slotkey] = nil
-            --stackedItem:UpdateCount()
-          else
-            stacks[data.itemInfo.itemID] = button
-          end
         end
+      end
+    end
+  end
+  debug:EndProfile('Reconcile Stage')
+
+  debug:StartProfile("Stacking Stage")
+  ---@type table<number, Item>
+  local stacks = {}
+
+  for _, section in pairs(view:GetAllSections()) do
+    local allCells = section:GetKeys()
+    for _, slotkey in pairs(allCells) do
+      local button = view.itemsByBagAndSlot[slotkey]
+      local data = button and button.data or nil
+      local stackedItem = stacks[data.itemInfo.itemID] or button
+
+      if stackedItem ~= button then
+        print("merging", slotkey, button.data.itemInfo.itemLink, "into", view:GetSlotKey(stackedItem.data))
+        stackedItem:MergeStacks(button)
+        section:RemoveCell(slotkey)
+        button:Release()
+        view.itemsByBagAndSlot[slotkey] = nil
+      else
+        stacks[data.itemInfo.itemID] = button
       end
     end
   end
@@ -182,26 +187,9 @@ local function GridView(view, bag, dirtyItems)
       button:UpdateCount()
     end
   end
+  debug:EndProfile("Stacking Stage")
 
-  wipe(stacks)
-  --[[
-  for itemid, buttons in pairs(stacks) do
-    if #buttons > 1 then
-      local item = buttons[1]
-      item:ClearStacks()
-      for i = 2, #buttons do
-        print("adding to stack", buttons[i].data.isItemEmpty, buttons[i].data.itemInfo.itemLink)
-        item:AddToStack(buttons[i].data)
-        local slotkey = view:GetSlotKey(buttons[i].data)
-        view:GetSection(buttons[i].data.itemInfo.category):RemoveCell(slotkey)
-        buttons[i]:Release()
-        view.itemsByBagAndSlot[slotkey] = nil
-      end
-      print("found stackable item id", itemid)
-    end
-  end
-  wipe(stacks)
-  ]]--
+  debug:StartProfile('Section Draw Stage')
   for sectionName, section in pairs(view:GetAllSections()) do
     if not view.defer then
       -- Remove the section if it's empty, otherwise draw it.
@@ -217,7 +205,7 @@ local function GridView(view, bag, dirtyItems)
       end
     end
   end
-  debug:EndProfile('Reconcile Stage')
+  debug:EndProfile('Section Draw Stage')
 
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))

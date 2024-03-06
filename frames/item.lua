@@ -284,7 +284,7 @@ function itemFrame.itemProto:MergeStacks(item)
     self:AddToStack(item.data)
   end
   for guid, data in pairs(item.stacks) do
-    if not self:IsInStack(guid) then
+    if not self:IsInStack(guid) and data ~= nil and not data.isItemEmpty then
       self:AddToStack(data)
     end
   end
