@@ -88,6 +88,7 @@ function config:CreateAllHelp()
     - `subtype:` to search for items of a specific subtype (e.g. `subtype:axe`)
     - `name:` to search for items with a specific name (e.g. `name:axe`)
     - `gear:` to search for items that are part of an equipment set (e.g. `gear:tank`)
+    - `loc:` to search for items for a specific equipment location (e.g. `loc:cloak`)
     - `exp:` to search for items from a specific expansion (e.g. `exp:shadowlands`)
     
     For expansions, you can use the following expansions shortcuts (e.g. `exp:classic`):
