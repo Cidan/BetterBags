@@ -162,26 +162,72 @@ local function GridView(view, bag, dirtyItems)
   debug:StartProfile("Stacking Stage")
   ---@type table<number, Item>
   local stacks = {}
-
+  for bagid, bagdata in pairs(items.itemsByBagAndSlot) do
+    for slotid, data in pairs(bagdata) do
+      if not data.isItemEmpty then
+        local slotkey = view:GetSlotKey(data)
+        local button = view.itemsByBagAndSlot[slotkey]
+        local stackedItem = stacks[data.itemInfo.itemID] or button
+        if stackedItem ~= button and button ~= nil then
+          debug:Log("Merge", button.stackCount, button.data.itemInfo.itemLink, "->", stackedItem.stackCount, stackedItem.data.itemInfo.itemLink)
+          --debug:Log("Merge", button.data.itemInfo.itemGUID, "->", stackedItem.data.itemInfo.itemGUID)
+          --print("merging", slotkey, button.data.itemInfo.itemLink, "into", view:GetSlotKey(stackedItem.data))
+          stackedItem:MergeStacks(button)
+          view:GetSection(data.itemInfo.category):RemoveCell(slotkey)
+          button:Release()
+          view.itemsByBagAndSlot[slotkey] = nil
+        elseif data.itemInfo.itemID ~= nil and button ~= nil then
+          stacks[data.itemInfo.itemID] = button
+        end
+      end
+    end
+  end
+--[[
+  for slotkey, button in pairs(view.itemsByBagAndSlot) do
+    local data = button and button.data or nil
+    if data ~= nil then
+      local stackedItem = stacks[data.itemInfo.itemID] or button
+      if data.itemInfo.itemID == 2025 then
+        debug:Log("Merge", "Stacking", data.itemInfo.itemLink, "->", stackedItem.data.itemInfo.itemLink)
+      end
+      if stackedItem ~= button then
+        --debug:Log("Merge", #button.stacks, button.data.itemInfo.itemLink, "->", #stackedItem.stacks, stackedItem.data.itemInfo.itemLink)
+        --debug:Log("Merge", button.data.itemInfo.itemGUID, "->", stackedItem.data.itemInfo.itemGUID)
+        --print("merging", slotkey, button.data.itemInfo.itemLink, "into", view:GetSlotKey(stackedItem.data))
+        stackedItem:MergeStacks(button)
+        view:GetSection(data.itemInfo.category):RemoveCell(slotkey)
+        button:Release()
+        view.itemsByBagAndSlot[slotkey] = nil
+      elseif data.itemInfo.itemID ~= nil then
+        stacks[data.itemInfo.itemID] = button
+      end
+    end
+  end
+  --]]
+  --[[
   for _, section in pairs(view:GetAllSections()) do
     local allCells = section:GetKeys()
     for _, slotkey in pairs(allCells) do
       local button = view.itemsByBagAndSlot[slotkey]
       local data = button and button.data or nil
       local stackedItem = stacks[data.itemInfo.itemID] or button
-
+      if data.itemInfo.itemID == 2025 then
+        debug:Log("Merge", "Stacking", data.itemInfo.itemLink, "->", stackedItem.data.itemInfo.itemLink)
+      end
       if stackedItem ~= button then
-        print("merging", slotkey, button.data.itemInfo.itemLink, "into", view:GetSlotKey(stackedItem.data))
+        --debug:Log("Merge", #button.stacks, button.data.itemInfo.itemLink, "->", #stackedItem.stacks, stackedItem.data.itemInfo.itemLink)
+        --debug:Log("Merge", button.data.itemInfo.itemGUID, "->", stackedItem.data.itemInfo.itemGUID)
+        --print("merging", slotkey, button.data.itemInfo.itemLink, "into", view:GetSlotKey(stackedItem.data))
         stackedItem:MergeStacks(button)
         section:RemoveCell(slotkey)
         button:Release()
         view.itemsByBagAndSlot[slotkey] = nil
-      else
+      elseif data.itemInfo.itemID ~= nil then
         stacks[data.itemInfo.itemID] = button
       end
     end
   end
-
+  --]]
   for _, button in pairs(stacks) do
     if button:HasStacks() then
       button:UpdateCount()
@@ -194,12 +240,12 @@ local function GridView(view, bag, dirtyItems)
     if not view.defer then
       -- Remove the section if it's empty, otherwise draw it.
       if section:GetCellCount() == 0 then
-        debug:Log("RemoveSection", "Removed because empty", sectionName)
+        --debug:Log("RemoveSection", "Removed because empty", sectionName)
         view:RemoveSection(sectionName)
         section:ReleaseAllCells()
         section:Release()
       else
-        debug:Log("KeepSection", "Section kept because not empty", sectionName)
+        --debug:Log("KeepSection", "Section kept because not empty", sectionName)
         section:SetMaxCellWidth(sizeInfo.itemsPerRow)
         section:Draw(bag.kind, database:GetBagView(bag.kind), false)
       end
