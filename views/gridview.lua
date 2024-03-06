@@ -89,9 +89,6 @@ end
 
 --local stacks = {}
 
----@type table<number, Item>
-local stacks = {}
-
 ---@param view view
 ---@param bag Bag
 ---@param dirtyItems ItemData[]
@@ -99,7 +96,6 @@ local function GridView(view, bag, dirtyItems)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
-    wipe(stacks)
   end
 
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
@@ -118,6 +114,9 @@ local function GridView(view, bag, dirtyItems)
   else
     view.defer = false
   end
+
+  ---@type table<number, Item>
+  local stacks = {}
 
   debug:StartProfile('Reconcile Stage')
   -- Loop through all sections and reconcile the items.
@@ -162,12 +161,14 @@ local function GridView(view, bag, dirtyItems)
           --table.insert(stacks[data.itemInfo.itemID], button)
           -- Stack case
           local stackedItem = stacks[data.itemInfo.itemID] or button
-          if stackedItem ~= button and stackedItem.data ~= nil and button.data ~= nil and not stackedItem.data.isItemEmpty and not button.data.isItemEmpty and stackedItem.data.itemInfo.itemID == button.data.itemInfo.itemID and stackedItem.data.itemInfo.itemGUID ~= button.data.itemInfo.itemGUID then
-            stackedItem:AddToStack(data)
+          if stackedItem ~= button then
+            print("merging", slotkey, "into", view:GetSlotKey(stackedItem.data))
+            stackedItem:MergeStacks(button)
+            --stackedItem:AddToStack(data)
             section:RemoveCell(slotkey)
             button:Release()
             view.itemsByBagAndSlot[slotkey] = nil
-            stackedItem:UpdateCount()
+            --stackedItem:UpdateCount()
           else
             stacks[data.itemInfo.itemID] = button
           end
@@ -175,6 +176,14 @@ local function GridView(view, bag, dirtyItems)
       end
     end
   end
+
+  for _, button in pairs(stacks) do
+    if button:HasStacks() then
+      button:UpdateCount()
+    end
+  end
+
+  wipe(stacks)
   --[[
   for itemid, buttons in pairs(stacks) do
     if #buttons > 1 then

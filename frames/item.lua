@@ -278,6 +278,17 @@ function itemFrame.itemProto:ClearStacks()
   self:UpdateCount()
 end
 
+---@param item Item
+function itemFrame.itemProto:MergeStacks(item)
+  if not self:IsInStack(item.data.itemInfo.itemGUID) then
+    self:AddToStack(item.data)
+  end
+  for guid, data in pairs(item.stacks) do
+    if not self:IsInStack(guid) then
+      self:AddToStack(data)
+    end
+  end
+end
 
 ---@param data ItemData
 function itemFrame.itemProto:SetItem(data)
