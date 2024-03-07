@@ -155,7 +155,7 @@ function itemFrame.itemProto:UpdateSearch(text)
 end
 
 function itemFrame.itemProto:UpdateCooldown()
-  if self.data.isItemEmpty then return end
+  if self.data == nil or self.data.isItemEmpty then return end
   self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
 end
 
@@ -226,42 +226,32 @@ end
 
 function itemFrame.itemProto:UpdateCount()
   if self.data == nil or self.data.isItemEmpty then return end
-  ---@type string[]
-  local remove = {}
-  local count = self.data.itemInfo.currentItemCount
-  for guid, data in pairs(self.stacks) do
-    if data.isItemEmpty then
-      table.insert(remove, guid)
-    else
-      count = count + data.itemInfo.currentItemCount
-    end
-  end
-  for _, guid in pairs(remove) do
-    self:RemoveFromStack(guid)
-  end
-  SetItemButtonCount(self.button, count)
+  SetItemButtonCount(self.button, self.data.stackedCount)
 end
 
 ---@param data ItemData
 function itemFrame.itemProto:AddToStack(data)
+  if self.stacks[data.itemInfo.itemGUID] ~= nil then
+    return
+  end
   self.stacks[data.itemInfo.itemGUID] = data
   self.stackCount = self.stackCount + 1
 end
 
 function itemFrame.itemProto:RemoveFromStack(guid)
+  if self.stacks[guid] == nil then
+    return
+  end
   self.stacks[guid] = nil
   self.stackCount = self.stackCount - 1
 end
 
 function itemFrame.itemProto:IsInStack(guid)
-  return self.stacks[guid] and true or false
+  return self.stacks[guid] ~= nil
 end
 
 function itemFrame.itemProto:HasStacks()
-  for _, _ in pairs(self.stacks) do
-    return true
-  end
-  return false
+  return self.stackCount > 1
 end
 
 function itemFrame.itemProto:PromoteStack()
@@ -288,6 +278,7 @@ function itemFrame.itemProto:MergeStacks(item)
       self:AddToStack(data)
     end
   end
+  item:ClearStacks()
 end
 
 ---@param data ItemData
@@ -535,6 +526,16 @@ function itemFrame.itemProto:Wipe()
   self.frame:Hide()
   self.frame:SetParent(nil)
   self.frame:ClearAllPoints()
+end
+
+-- Unlink will remove and hide this item button
+-- but will not release it back to the pool nor
+-- release it's data.
+function itemFrame.itemProto:Unlink()
+  self.frame:ClearAllPoints()
+  self.frame:SetParent(nil)
+  self.frame:SetAlpha(1)
+  self.frame:Hide()
 end
 
 function itemFrame.itemProto:ClearItem()

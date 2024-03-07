@@ -40,6 +40,9 @@ local debug = addon:GetModule('Debug')
 ---@field kind BagKind
 ---@field newItemTime number
 ---@field previousItemID number
+---@field stacks table<string, string>
+---@field stackedOn string
+---@field stackedCount number
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -281,6 +284,13 @@ function items:GetExtraSlotInfo(kind)
   return kind == const.BAG_KIND.BACKPACK and self.slotInfo or self.bankSlotInfo
 end
 
+---@param data ItemData
+---@return string
+function items:GetSlotKey(data)
+  return data.bagid .. '_' .. data.slotid
+end
+
+
 ---@private
 function items:BackpackLoadFunction()
   ---@type ExtraSlotInfo
@@ -292,10 +302,13 @@ function items:BackpackLoadFunction()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
   }
+  ---@type table<number, ItemData>
+  local stacks = {}
 
   for bagid, bag in pairs(items.itemsByBagAndSlot) do
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
+      -- Check if the item as changed, and if so, add it to the dirty list.
       if items:HasItemChanged(bagid, slotid, data) then
         local previousItemID = data.itemInfo and data.itemInfo.itemID or nil
         debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
@@ -303,6 +316,22 @@ function items:BackpackLoadFunction()
         data.previousItemID = previousItemID
         table.insert(items.dirtyItems, data)
       end
+
+      -- Compute stacking data.
+      if not data.isItemEmpty then
+        local stackItem = stacks[data.itemInfo.itemID] or data
+        data.stackedCount = nil
+        data.stackedOn = nil
+        data.stacks = {}
+        if stackItem.itemInfo.itemGUID ~= data.itemInfo.itemGUID then
+          stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
+          data.stackedOn = items:GetSlotKey(stackItem)
+          stackItem.stackedCount = (stackItem.stackedCount or stackItem.itemInfo.currentItemCount) + data.itemInfo.currentItemCount
+        else
+          stacks[data.itemInfo.itemID] = data
+        end
+      end
+
       if data.isItemEmpty then
         if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
           extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
@@ -536,6 +565,10 @@ function items:AttachItemInfo(data, kind)
   if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()
   end
+
+  data.stacks = {}
+  data.stackedCount = nil
+  data.stackedOn = nil
 end
 
 ---@param itemID number

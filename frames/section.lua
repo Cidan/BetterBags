@@ -92,6 +92,12 @@ function sectionProto:ReleaseAllCells()
   end
 end
 
+function sectionProto:RemoveAllCells()
+  for _, cell in pairs(self.content.cells) do
+    cell:ClearItem()
+  end
+end
+
 function sectionProto:Wipe()
   self.content:Wipe()
   self.view = const.BAG_VIEW.SECTION_GRID

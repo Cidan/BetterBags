@@ -129,6 +129,8 @@ local function GridView(view, bag, dirtyItems)
         -- Remove item buttons that are empty or don't match the category.
         if data.isItemEmpty then
           if button:HasStacks() then
+            -- TODO(lobato): rework assignment
+            debug:Log("Promote")
             button:PromoteStack()
             section:RemoveCell(slotkey)
             section:AddCell(view:GetSlotKey(button.data), button)
@@ -140,8 +142,8 @@ local function GridView(view, bag, dirtyItems)
           else
             debug:Log("RemoveCell", "Removed because empty", slotkey, data.itemInfo.itemLink)
             section:RemoveCell(slotkey)
-            view.itemsByBagAndSlot[slotkey]:Release()
-            view.itemsByBagAndSlot[slotkey] = nil
+            view.itemsByBagAndSlot[slotkey]:ClearItem()
+            --view.itemsByBagAndSlot[slotkey] = nil
             bag.drawOnClose = false
           end
         elseif data.itemInfo.category ~= sectionName then
@@ -160,28 +162,43 @@ local function GridView(view, bag, dirtyItems)
   debug:EndProfile('Reconcile Stage')
 
   debug:StartProfile("Stacking Stage")
-  ---@type table<number, Item>
-  local stacks = {}
-  for bagid, bagdata in pairs(items.itemsByBagAndSlot) do
-    for slotid, data in pairs(bagdata) do
-      if not data.isItemEmpty then
-        local slotkey = view:GetSlotKey(data)
-        local button = view.itemsByBagAndSlot[slotkey]
-        local stackedItem = stacks[data.itemInfo.itemID] or button
-        if stackedItem ~= button and button ~= nil then
-          debug:Log("Merge", button.stackCount, button.data.itemInfo.itemLink, "->", stackedItem.stackCount, stackedItem.data.itemInfo.itemLink)
-          --debug:Log("Merge", button.data.itemInfo.itemGUID, "->", stackedItem.data.itemInfo.itemGUID)
-          --print("merging", slotkey, button.data.itemInfo.itemLink, "into", view:GetSlotKey(stackedItem.data))
-          stackedItem:MergeStacks(button)
-          view:GetSection(data.itemInfo.category):RemoveCell(slotkey)
-          button:Release()
-          view.itemsByBagAndSlot[slotkey] = nil
-        elseif data.itemInfo.itemID ~= nil and button ~= nil then
-          stacks[data.itemInfo.itemID] = button
+  for slotkey, item in pairs(view.itemsByBagAndSlot) do
+    local data = item.data
+    if data ~= nil and not data.isItemEmpty then
+      if data.stackedOn ~= nil then
+        --view:GetSection(data.itemInfo.category):RemoveCell(slotkey)
+        --item:Unlink()
+        print("found stack for", data.itemInfo.itemLink, "on", data.stackedOn)
+      end
+    end
+    item:UpdateCount()
+  end
+--[[
+  for slotkey, item in pairs(view.itemsByBagAndSlot) do
+    local data = item.data
+    if data ~= nil and not data.isItemEmpty then
+      local button = view.itemsByBagAndSlot[slotkey]
+      local stackedItem = stacks[data.itemInfo.itemID] or button
+      if button ~= nil then
+        button:ClearStacks()
+      end
+      if stackedItem ~= button and button ~= nil then
+        debug:Log("Merge", button.stackCount, button.data.itemInfo.itemLink, "->", stackedItem.stackCount, stackedItem.data.itemInfo.itemLink)
+        --debug:Log("Merge", button.data.itemInfo.itemGUID, "->", stackedItem.data.itemInfo.itemGUID)
+        --print("merging", slotkey, button.data.itemInfo.itemLink, "into", view:GetSlotKey(stackedItem.data))
+        stackedItem:MergeStacks(button)
+        view:GetSection(data.itemInfo.category):RemoveCell(slotkey)
+        button:Unlink()
+        --view.itemsByBagAndSlot[slotkey] = nil
+      elseif data.itemInfo.itemID ~= nil and button ~= nil then
+        if data.itemInfo.itemID == 2025 then
+          print("top stack item", button.stackCount, button.data.itemInfo.itemLink)
         end
+        stacks[data.itemInfo.itemID] = button
       end
     end
   end
+  ]]--
 --[[
   for slotkey, button in pairs(view.itemsByBagAndSlot) do
     local data = button and button.data or nil
@@ -228,11 +245,6 @@ local function GridView(view, bag, dirtyItems)
     end
   end
   --]]
-  for _, button in pairs(stacks) do
-    if button:HasStacks() then
-      button:UpdateCount()
-    end
-  end
   debug:EndProfile("Stacking Stage")
 
   debug:StartProfile('Section Draw Stage')
@@ -242,7 +254,7 @@ local function GridView(view, bag, dirtyItems)
       if section:GetCellCount() == 0 then
         --debug:Log("RemoveSection", "Removed because empty", sectionName)
         view:RemoveSection(sectionName)
-        section:ReleaseAllCells()
+        section:RemoveAllCells()
         section:Release()
       else
         --debug:Log("KeepSection", "Section kept because not empty", sectionName)
