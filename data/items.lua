@@ -114,6 +114,9 @@ function items:OnEnable()
   end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
+    if GameMenuFrame:IsShown() then
+      return
+    end
     addon.atBank = true
     self:RefreshBank()
   end)

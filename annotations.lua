@@ -277,6 +277,9 @@ function AceItemList:SetList(values) end
 ---@param button Button
 function ContainerFrame_UpdateCooldown(id, button) end
 
+---@type Frame
+GameMenuFrame = {}
+
 ----
 -- ConsolePort annotations
 ----

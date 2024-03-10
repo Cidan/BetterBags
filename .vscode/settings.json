@@ -103,7 +103,8 @@
     "select",
     "StaticPopup_Show",
     "tonumber",
-    "LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME"
+    "LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME",
+    "GameMenuFrame"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

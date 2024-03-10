@@ -56,6 +56,10 @@ end
 ---@param interactionType Enum.PlayerInteractionType
 function addon:OpenInteractionWindow(interactionType)
   if interactionEvents[interactionType] == nil then return end
+  if GameMenuFrame:IsShown() then
+    return
+  end
+  debug:Log("Interaction", "OpenInteractionWindow", interactionType)
   addon.atInteracting = true
   addon.backpackShouldOpen = true
   events:SendMessageLater('bags/OpenClose')
@@ -64,6 +68,7 @@ end
 ---@param interactionType Enum.PlayerInteractionType
 function addon:CloseInteractionWindow(interactionType)
   if interactionEvents[interactionType] == nil then return end
+  debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
   addon.backpackShouldClose = true
   events:SendMessage('bags/RefreshAll')
@@ -94,6 +99,9 @@ end
 
 function addon:OpenBank(interactingFrame)
   if interactingFrame ~= nil then return end
+  if GameMenuFrame:IsShown() then
+    return
+  end
   debug:Log('Hooks', 'OpenBank')
   addon.Bags.Bank:Show()
   addon.Bags.Backpack:Show()
