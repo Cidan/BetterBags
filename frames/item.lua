@@ -226,7 +226,8 @@ end
 
 function itemFrame.itemProto:UpdateCount()
   if self.data == nil or self.data.isItemEmpty then return end
-  SetItemButtonCount(self.button, self.data.stackedCount)
+  local count = self.data.stackedCount or self.data.itemInfo.currentItemCount
+  SetItemButtonCount(self.button, count)
 end
 
 ---@param data ItemData
