@@ -167,7 +167,53 @@ function config:GetBagOptions(kind)
           [const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY] = L:G("Alphabetically, then Quality"),
         }
       },
-
+      stacking = {
+        type = "group",
+        name = L:G("Stacking"),
+        order = 6,
+        inline = true,
+        args = {
+          mergeStacks = {
+            type = "toggle",
+            name = L:G("Merge Stacks"),
+            desc = L:G("Merge stacks of the same item into a single stack, i.e. 20x [Linen Cloth] + 20x [Linen Cloth] = 40x [Linen Cloth] in one stack."),
+            order = 1,
+            get = function()
+              return DB:GetStackingOptions(kind).mergeStacks
+            end,
+            set = function(_, value)
+              DB:SetMergeItems(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
+          mergeUnstackable = {
+            type = "toggle",
+            name = L:G("Merge Unstackable"),
+            desc = L:G("Merge unstackable items of the same kind into a single stack, such as armors, bags, etc."),
+            order = 2,
+            get = function()
+              return DB:GetStackingOptions(kind).mergeUnstackable
+            end,
+            set = function(_, value)
+              DB:SetMergeUnstackable(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
+          unmergeAtShop = {
+            type = "toggle",
+            name = L:G("Unmerge at Shop"),
+            desc = L:G("Unmerge all items when visiting a vendor."),
+            order = 3,
+            get = function()
+              return DB:GetStackingOptions(kind).unmergeAtShop
+            end,
+            set = function(_, value)
+              DB:SetUnmergeAtShop(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
+        }
+      },
       itemLevel = {
         type = "group",
         name = L:G("Item Level"),

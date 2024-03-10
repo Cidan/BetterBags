@@ -145,7 +145,7 @@ function bagFrame.bagProto:Sort()
   ---@type Item[]
   local lockList = {}
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    if item.data.itemInfo.isLocked then
+    if item.data and not item.data.isItemEmpty and item.data.itemInfo.isLocked then
       table.insert(lockList, item)
       item:Unlock()
     end
@@ -154,7 +154,7 @@ function bagFrame.bagProto:Sort()
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   items:RemoveNewItemFromAllItems()
   C_Container:SortBags()
-  items:RefreshAll()
+  --events:SendMessage('bags/FullRefreshAll')
 
   for _, item in pairs(lockList) do
     item:Lock()

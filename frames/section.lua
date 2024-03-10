@@ -125,6 +125,15 @@ function sectionProto:GetAllCells()
   return self.content.idToCell
 end
 
+---@return string[]
+function sectionProto:GetKeys()
+  local keys  = {}
+  for k, _ in pairs(self.content.idToCell) do
+    table.insert(keys, k)
+  end
+  return keys
+end
+
 function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end

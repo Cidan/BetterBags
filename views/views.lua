@@ -15,7 +15,7 @@ local views = addon:NewModule('Views')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class view
+---@class (exact) view
 ---@field sections table<string, Section>
 ---@field content Grid
 ---@field kind BagView

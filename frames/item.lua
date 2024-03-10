@@ -34,10 +34,18 @@ local items = addon:GetModule('Items')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class ItemStack
+---@field button Item
+---@field data? ItemData
+---@field children? table<string, ItemData>
+
 ---@class (exact) Item
 ---@field frame Frame
 ---@field button ItemButton|Button
 ---@field data ItemData
+---@field stacks table<string, ItemData>
+---@field stackCount number
+---@field stackid number
 ---@field isFreeSlot boolean
 ---@field kind BagKind
 ---@field masqueGroup string
@@ -147,7 +155,7 @@ function itemFrame.itemProto:UpdateSearch(text)
 end
 
 function itemFrame.itemProto:UpdateCooldown()
-  if self.data.isItemEmpty then return end
+  if self.data == nil or self.data.isItemEmpty then return end
   self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
 end
 
@@ -216,6 +224,64 @@ function itemFrame.itemProto:DrawItemLevel()
 
 end
 
+function itemFrame.itemProto:UpdateCount()
+  if self.data == nil or self.data.isItemEmpty then return end
+  local count = self.data.stackedCount or self.data.itemInfo.currentItemCount
+  SetItemButtonCount(self.button, count)
+end
+
+---@param data ItemData
+function itemFrame.itemProto:AddToStack(data)
+  if self.stacks[data.itemInfo.itemGUID] ~= nil then
+    return
+  end
+  self.stacks[data.itemInfo.itemGUID] = data
+  self.stackCount = self.stackCount + 1
+end
+
+function itemFrame.itemProto:RemoveFromStack(guid)
+  if self.stacks[guid] == nil then
+    return
+  end
+  self.stacks[guid] = nil
+  self.stackCount = self.stackCount - 1
+end
+
+function itemFrame.itemProto:IsInStack(guid)
+  return self.stacks[guid] ~= nil
+end
+
+function itemFrame.itemProto:HasStacks()
+  return self.stackCount > 1
+end
+
+function itemFrame.itemProto:PromoteStack()
+  for guid, data in pairs(self.stacks) do
+    self:RemoveFromStack(guid)
+    self:SetItem(data)
+    return
+  end
+end
+
+function itemFrame.itemProto:ClearStacks()
+  wipe(self.stacks)
+  self.stackCount = 1
+  self:UpdateCount()
+end
+
+---@param item Item
+function itemFrame.itemProto:MergeStacks(item)
+  if not self:IsInStack(item.data.itemInfo.itemGUID) then
+    self:AddToStack(item.data)
+  end
+  for guid, data in pairs(item.stacks) do
+    if not self:IsInStack(guid) and data ~= nil and not data.isItemEmpty then
+      self:AddToStack(data)
+    end
+  end
+  item:ClearStacks()
+end
+
 ---@param data ItemData
 function itemFrame.itemProto:SetItem(data)
   assert(data, 'item must be provided')
@@ -250,6 +316,7 @@ function itemFrame.itemProto:SetItem(data)
 
   local bound = data.itemInfo.isBound
 
+  self.stackid = data.itemInfo.itemID
   self.button.minDisplayCount = 1
   self:DrawItemLevel()
   self.button.ItemSlotBackground:Hide()
@@ -257,7 +324,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button:SetHasItem(data.itemInfo.itemIcon)
   self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound);
-  SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
+  self:UpdateCount()
   self:SetLock(data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
@@ -310,6 +377,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
     self.frame:SetID(bagid)
   end
 
+  self.stackCount = 1
   self.button.minDisplayCount = -1
 
   ClearItemButtonOverlay(self.button)
@@ -461,6 +529,16 @@ function itemFrame.itemProto:Wipe()
   self.frame:ClearAllPoints()
 end
 
+-- Unlink will remove and hide this item button
+-- but will not release it back to the pool nor
+-- release it's data.
+function itemFrame.itemProto:Unlink()
+  self.frame:ClearAllPoints()
+  self.frame:SetParent(nil)
+  self.frame:SetAlpha(1)
+  self.frame:Hide()
+end
+
 function itemFrame.itemProto:ClearItem()
   events:SendMessage('item/Clearing', self)
   self.kind = nil
@@ -488,6 +566,9 @@ function itemFrame.itemProto:ClearItem()
   self.LockTexture:Hide()
   self:ResetSize()
   self.data = nil
+  self.stacks = {}
+  self.stackCount = 1
+  self.stackid = nil
   self.isFreeSlot = false
   self.button.UpgradeIcon:SetShown(false)
 end
@@ -564,6 +645,8 @@ function itemFrame:_DoCreate()
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
   i.ilvlText = ilvlText
 
+  i.stacks = {}
+  i.stackCount = 1
   return i
 end
 
