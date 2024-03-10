@@ -323,7 +323,7 @@ function items:BackpackLoadFunction()
       end
 
       -- Compute stacking data.
-      if not data.isItemEmpty then
+      if not data.isItemEmpty and database:GetStackingOptions(const.BAG_KIND.BACKPACK).mergeStacks then
         local stackItem = stacks[data.itemInfo.itemID]
         if stackItem ~= nil then
           stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
@@ -331,6 +331,12 @@ function items:BackpackLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = {}
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+          if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
+            self:ClearNewItem(data)
+            self:ClearNewItem(stackItem)
+          end
+          --TODO(lobato): I don't know why dirty as a set doesn't just work here when
+          -- passing it into the event, and I'm too tired to figure it out right now.
           local key = items:GetSlotKey(data)
           if dirty[key] == nil then
             table.insert(items.dirtyItems, data)
@@ -416,10 +422,10 @@ function items:BankLoadFunction()
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
-      items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+      items:AttachItemInfo(data, const.BAG_KIND.BANK)
       table.insert(items.dirtyBankItems, data)
       -- Compute stacking data.
-      if not data.isItemEmpty then
+      if not data.isItemEmpty and database:GetStackingOptions(const.BAG_KIND.BANK).mergeStacks then
         local stackItem = stacks[data.itemInfo.itemID]
         if stackItem ~= nil then
           stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
@@ -427,6 +433,10 @@ function items:BankLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = {}
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+          if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
+            self:ClearNewItem(data)
+            self:ClearNewItem(stackItem)
+          end
         else
           data.stacks = {}
           data.stackedOn = nil
@@ -547,7 +557,16 @@ function items:IsNewItem(data)
   return false
 end
 
+---@param data ItemData
+function items:ClearNewItem(data)
+  if not data then return end
+  if data.isItemEmpty then return end
+  C_NewItems.RemoveNewItem(data.bagid, data.slotid)
+  self._newItemTimers[data.itemInfo.itemGUID] = nil
+end
+
 function items:ClearNewItems()
+  C_NewItems.ClearAll()
   wipe(self._newItemTimers)
 end
 
