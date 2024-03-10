@@ -57,29 +57,37 @@ local function OneBagView(view, bag, dirtyItems)
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
 
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
+
   for _, data in pairs(dirtyItems) do
-    local slotkey = view:GetSlotKey(data)
+      if data.stackedOn == nil or data.isItemEmpty then
+      local slotkey = view:GetSlotKey(data)
 
-    -- Create or get the item frame for this slot.
-    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-    if itemButton == nil then
-      itemButton = itemFrame:Create()
-      --debug:DrawBorder(itemButton.frame, 1, 1, 0)
-      view.itemsByBagAndSlot[slotkey] = itemButton
+      -- Create or get the item frame for this slot.
+      local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+      if itemButton == nil then
+        itemButton = itemFrame:Create()
+        --debug:DrawBorder(itemButton.frame, 1, 1, 0)
+        view.itemsByBagAndSlot[slotkey] = itemButton
+      end
+
+      -- Set the item data on the item frame.
+      itemButton:SetItem(data)
+      view.content:AddCell(slotkey, itemButton)
     end
-
-    -- Set the item data on the item frame.
-    itemButton:SetItem(data)
-    view.content:AddCell(slotkey, itemButton)
   end
+
   for slotkey, _ in pairs(view.content:GetAllCells()) do
     if slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
       local data = view.itemsByBagAndSlot[slotkey].data
-      if data.isItemEmpty then
+      if data.isItemEmpty or data.stackedOn ~= nil then
         view.content:RemoveCell(slotkey)
         view.itemsByBagAndSlot[slotkey]:Wipe()
       end
     end
+  end
+
+  for _, item in pairs(view.itemsByBagAndSlot) do
+    item:UpdateCount()
   end
 
   view.freeSlot = view.freeSlot or itemFrame:Create()
