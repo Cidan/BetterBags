@@ -39,7 +39,7 @@ local debug = addon:GetModule('Debug')
 ---@field isItemEmpty boolean
 ---@field kind BagKind
 ---@field newItemTime number
----@field stacks table<string, string>
+---@field stacks number
 ---@field stackedOn string
 ---@field stackedCount number
 local itemDataProto = {}
@@ -283,10 +283,11 @@ end
 function items:ShouldItemStack(kind, data)
   if data.isItemEmpty then return false end
   local stackOptions = database:GetStackingOptions(kind)
-  if stackOptions.unmergeAtShop then
-    --return false
+  if stackOptions.unmergeAtShop and addon.atInteracting and kind ~= const.BAG_KIND.BANK then
+    return false
   end
-  if stackOptions.mergeStacks and data.itemInfo.itemStackCount > 1 then
+
+  if stackOptions.mergeStacks and data.itemInfo.itemStackCount and data.itemInfo.itemStackCount > 1 then
     return true
   end
   if stackOptions.mergeUnstackable and data.itemInfo.itemStackCount == 1 then
@@ -344,10 +345,10 @@ function items:BackpackLoadFunction()
       if items:ShouldItemStack(const.BAG_KIND.BACKPACK, data) then
         local stackItem = stacks[data.itemInfo.itemID]
         if stackItem ~= nil then
-          stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
+          stackItem.stacks = stackItem.stacks + 1
           data.stackedOn = items:GetSlotKey(stackItem)
           data.stackedCount = data.itemInfo.currentItemCount
-          data.stacks = {}
+          data.stacks = 0
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
@@ -372,15 +373,24 @@ function items:BackpackLoadFunction()
             table.insert(items.dirtyItems, data)
             dirty[key] = data
           end
-          data.stacks = {}
+          data.stacks = 0
           data.stackedOn = nil
           data.stackedCount = data.itemInfo.currentItemCount
           stacks[data.itemInfo.itemID] = data
         end
+      elseif data.stackedOn ~= nil or (data.stacks ~= nil and data.stacks > 0) then
+        data.stackedOn = nil
+        data.stacks = 0
+        data.stackedCount = data.itemInfo.currentItemCount
+        local key = items:GetSlotKey(data)
+        if dirty[key] == nil then
+          table.insert(items.dirtyItems, data)
+          dirty[key] = data
+        end
       end
 
       if data.isItemEmpty then
-        data.stacks = {}
+        data.stacks = 0
         data.stackedOn = nil
         data.stackedCount = nil
         if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
@@ -446,17 +456,17 @@ function items:BankLoadFunction()
       if items:ShouldItemStack(const.BAG_KIND.BANK, data) then
         local stackItem = stacks[data.itemInfo.itemID]
         if stackItem ~= nil then
-          stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
+          stackItem.stacks = stackItem.stacks + 1
           data.stackedOn = items:GetSlotKey(stackItem)
           data.stackedCount = data.itemInfo.currentItemCount
-          data.stacks = {}
+          data.stacks = 0
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
             self:ClearNewItem(stackItem)
           end
         else
-          data.stacks = {}
+          data.stacks = 0
           data.stackedOn = nil
           data.stackedCount = data.itemInfo.currentItemCount
           stacks[data.itemInfo.itemID] = data
@@ -464,7 +474,7 @@ function items:BankLoadFunction()
       end
 
       if data.isItemEmpty then
-        data.stacks = {}
+        data.stacks = 0
         data.stackedOn = nil
         data.stackedCount = nil
         if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
@@ -519,6 +529,7 @@ function items:RefreshBag(bagid, bankBag)
     local data = setmetatable({}, {__index = itemDataProto})
     data.bagid = bagid
     data.slotid = slotid
+    data.stacks = 0
 
     --table.insert(dirty, data)
 
@@ -652,7 +663,7 @@ function items:AttachItemInfo(data, kind)
   if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()
   end
-
+  data.stacks = 0
 end
 
 ---@param itemID number

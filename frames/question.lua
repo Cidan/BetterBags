@@ -32,7 +32,7 @@ function question:_OnCreate()
 
   q.text = q.frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
   q.text:SetTextColor(1, 1, 1)
-  q.text:SetPoint('BOTTOM', q.input, 'TOP', 0, 10)
+  q.text:SetPoint('TOP', 0, -40)
   q.text:SetHeight(1000)
   q.text:SetWordWrap(true)
   q.text:SetJustifyH("CENTER")
@@ -54,6 +54,8 @@ function question:_OnReset(q)
   q.text:SetHeight(1000)
   q.yes:SetScript("OnClick", nil)
   q.no:SetScript("OnClick", nil)
+  q.yes:Show()
+  q.no:Show()
   q.input:ClearFocus()
   q.input:SetText("")
   q.input:SetScript("OnEscapePressed", nil)
@@ -63,7 +65,7 @@ end
 
 function questionProto:Resize()
   local height = self.text:GetStringHeight()
-  height = height + (self.input:IsShown() and 30 or 0)
+  height = height + (self.input:IsShown() and 50 or 20)
   height = height + self.yes:GetHeight() + 20
   height = height + 40 -- Header up top
   self.text:SetWidth(250)
@@ -99,6 +101,24 @@ function question:YesNo(title, text, yes, no)
   self.open = true
 end
 
+function question:Alert(title, text)
+  if self.open then return end
+  local q = self._pool:Acquire() --[[@as QuestionFrame]]
+  q.frame:SetTitle(title)
+  q.text:SetText(text)
+  q.yes:SetText("Okay")
+  q.no:Hide()
+  q.yes:SetScript("OnClick", function()
+    self._pool:Release(q)
+    self.open = false
+  end)
+  q.input:Hide()
+  q:Resize()
+  q.frame:SetPoint('CENTER')
+  q.frame:Show()
+  self.open = true
+end
+
 function question:AskForInput(title, text, onInput)
   if self.open then return end
   local q = self._pool:Acquire() --[[@as QuestionFrame]]
@@ -107,7 +127,9 @@ function question:AskForInput(title, text, onInput)
   q.yes:SetText("Okay")
   q.no:SetText("Cancel")
   q.yes:SetScript("OnClick", function()
-    xpcall(onInput, geterrorhandler(), q.input:GetText())
+    if q.input:GetText() ~= "" then
+      xpcall(onInput, geterrorhandler(), q.input:GetText())
+    end
     self._pool:Release(q)
     self.open = false
   end)
@@ -131,5 +153,3 @@ function question:AskForInput(title, text, onInput)
   q.frame:Show()
   self.open = true
 end
-
-question:Enable()
