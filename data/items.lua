@@ -409,13 +409,36 @@ function items:BankLoadFunction()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
   }
+
+  ---@type table<number, ItemData>
+  local stacks = {}
+
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
       items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
       table.insert(items.dirtyBankItems, data)
+      -- Compute stacking data.
+      if not data.isItemEmpty then
+        local stackItem = stacks[data.itemInfo.itemID]
+        if stackItem ~= nil then
+          stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
+          data.stackedOn = items:GetSlotKey(stackItem)
+          data.stackedCount = data.itemInfo.currentItemCount
+          data.stacks = {}
+          stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+        else
+          data.stacks = {}
+          data.stackedOn = nil
+          data.stackedCount = data.itemInfo.currentItemCount
+          stacks[data.itemInfo.itemID] = data
+        end
+      end
 
       if data.isItemEmpty then
+        data.stacks = {}
+        data.stackedOn = nil
+        data.stackedCount = nil
         if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
           extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
           extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
