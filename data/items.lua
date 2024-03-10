@@ -332,10 +332,6 @@ function items:BackpackLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           stacks[data.itemInfo.itemID] = data
         end
-      else
-        data.stackedCount = nil
-        data.stackedOn = nil
-        data.stacks = {}
       end
 
       if data.isItemEmpty then

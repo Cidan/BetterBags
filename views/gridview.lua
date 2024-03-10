@@ -105,7 +105,10 @@ local function GridView(view, bag, dirtyItems)
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
   debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
-    categoryChanged = drawDirtyItemUnstacked(view, data)
+    debug:Log("Draw", "Drawing dirty item", data.itemInfo and data.itemInfo.itemLink or nil, "in bag", data.bagid, "slot", data.slotid)
+    if data.stackedOn == nil or data.isItemEmpty then
+      categoryChanged = drawDirtyItemUnstacked(view, data)
+    end
   end
   debug:EndProfile('Dirty Item Stage')
 
