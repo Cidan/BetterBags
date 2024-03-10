@@ -310,6 +310,14 @@ function DB:SetMergeItems(kind, value)
   DB.data.profile.stacking[kind].mergeStacks = value
 end
 
+function DB:SetMergeUnstackable(kind, value)
+  DB.data.profile.stacking[kind].mergeUnstackable = value
+end
+
+function DB:SetUnmergeAtShop(kind, value)
+  DB.data.profile.stacking[kind].unmergeAtShop = value
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

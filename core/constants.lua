@@ -292,10 +292,14 @@ const.DATABASE_DEFAULTS = {
     inBagSearch = false,
     stacking = {
       [const.BAG_KIND.BACKPACK]  = {
-        mergeStacks = true
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
       },
       [const.BAG_KIND.BANK]  = {
-        mergeStacks = true
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
       }
     },
     itemLevel = {

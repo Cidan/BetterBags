@@ -278,6 +278,24 @@ function items:HasItemChanged(bagid, slotid, data)
 end
 
 ---@param kind BagKind
+---@param data ItemData
+---@return boolean
+function items:ShouldItemStack(kind, data)
+  if data.isItemEmpty then return false end
+  local stackOptions = database:GetStackingOptions(kind)
+  if stackOptions.unmergeAtShop then
+    --return false
+  end
+  if stackOptions.mergeStacks and data.itemInfo.itemStackCount > 1 then
+    return true
+  end
+  if stackOptions.mergeUnstackable and data.itemInfo.itemStackCount == 1 then
+    return true
+  end
+  return false
+end
+
+---@param kind BagKind
 ---@return ExtraSlotInfo
 function items:GetExtraSlotInfo(kind)
   return kind == const.BAG_KIND.BACKPACK and self.slotInfo or self.bankSlotInfo
@@ -323,7 +341,7 @@ function items:BackpackLoadFunction()
       end
 
       -- Compute stacking data.
-      if not data.isItemEmpty and database:GetStackingOptions(const.BAG_KIND.BACKPACK).mergeStacks then
+      if items:ShouldItemStack(const.BAG_KIND.BACKPACK, data) then
         local stackItem = stacks[data.itemInfo.itemID]
         if stackItem ~= nil then
           stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
@@ -425,7 +443,7 @@ function items:BankLoadFunction()
       items:AttachItemInfo(data, const.BAG_KIND.BANK)
       table.insert(items.dirtyBankItems, data)
       -- Compute stacking data.
-      if not data.isItemEmpty and database:GetStackingOptions(const.BAG_KIND.BANK).mergeStacks then
+      if items:ShouldItemStack(const.BAG_KIND.BANK, data) then
         local stackItem = stacks[data.itemInfo.itemID]
         if stackItem ~= nil then
           stackItem.stacks[data.itemInfo.itemGUID] = items:GetSlotKey(data)
