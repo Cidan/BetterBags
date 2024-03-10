@@ -105,8 +105,8 @@ local function GridView(view, bag, dirtyItems)
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
   debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
-    debug:Log("Draw", "Drawing dirty item", data.itemInfo and data.itemInfo.itemLink or nil, "in bag", data.bagid, "slot", data.slotid)
     if data.stackedOn == nil or data.isItemEmpty then
+      debug:Log("Draw", "Drawing dirty item", data.itemInfo and data.itemInfo.itemLink or nil, "in bag", data.bagid, "slot", data.slotid)
       categoryChanged = drawDirtyItemUnstacked(view, data)
     end
   end
@@ -130,7 +130,7 @@ local function GridView(view, bag, dirtyItems)
         section:RemoveCell(slotkey)
       elseif slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
         -- Remove item buttons that are empty or don't match the category.
-        if data.isItemEmpty then
+        if data.isItemEmpty or data.stackedOn ~= nil then
           if view.defer then
             view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
             bag.drawOnClose = true

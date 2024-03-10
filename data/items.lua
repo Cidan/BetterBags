@@ -304,6 +304,8 @@ function items:BackpackLoadFunction()
 
   ---@type table<number, ItemData>
   local stacks = {}
+
+  local dirty = {}
   for bagid, bag in pairs(items.itemsByBagAndSlot) do
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
@@ -315,6 +317,7 @@ function items:BackpackLoadFunction()
         data.slotid = slotid
         items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
         table.insert(items.dirtyItems, data)
+        dirty[self:GetSlotKey(data)] = data
       end
 
       -- Compute stacking data.
@@ -326,6 +329,17 @@ function items:BackpackLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = {}
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+          local key = items:GetSlotKey(data)
+          if dirty[key] == nil then
+            table.insert(items.dirtyItems, data)
+            dirty[key] = data
+          end
+
+          key = items:GetSlotKey(stackItem)
+          if dirty[key] == nil then
+            table.insert(items.dirtyItems, stackItem)
+            dirty[key] = stackItem
+          end
         else
           data.stacks = {}
           data.stackedOn = nil
