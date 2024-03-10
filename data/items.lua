@@ -471,6 +471,10 @@ function items:BankLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           stacks[data.itemInfo.itemID] = data
         end
+      elseif data.stackedOn ~= nil or (data.stacks ~= nil and data.stacks > 0) then
+        data.stackedOn = nil
+        data.stacks = 0
+        data.stackedCount = data.itemInfo.currentItemCount
       end
 
       if data.isItemEmpty then
