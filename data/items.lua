@@ -341,6 +341,11 @@ function items:BackpackLoadFunction()
             dirty[key] = stackItem
           end
         else
+          local key = items:GetSlotKey(data)
+          if data.stackedOn ~= nil and dirty[key] == nil then
+            table.insert(items.dirtyItems, data)
+            dirty[key] = data
+          end
           data.stacks = {}
           data.stackedOn = nil
           data.stackedCount = data.itemInfo.currentItemCount
