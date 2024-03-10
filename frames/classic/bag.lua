@@ -288,5 +288,12 @@ function bagFrame:Create(kind)
       b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
     end
   end)
+
+  events:RegisterMessage('bags/FullRefreshAll', function()
+    if b.currentView then
+      b.currentView.fullRefresh = true
+    end
+  end)
+
   return b
 end

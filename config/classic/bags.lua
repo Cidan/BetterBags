@@ -165,7 +165,27 @@ function config:GetBagOptions(kind)
           [const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY] = L:G("Alphabetically, then Quality"),
         }
       },
-
+      stacking = {
+        type = "group",
+        name = L:G("Stacking"),
+        order = 6,
+        inline = true,
+        args = {
+          mergeStacks = {
+            type = "toggle",
+            name = L:G("Merge Stacks"),
+            desc = L:G("Merge stacks of the same item into a single stack."),
+            order = 1,
+            get = function()
+              return DB:GetStackingOptions(kind).mergeStacks
+            end,
+            set = function(_, value)
+              DB:SetMergeItems(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
+        }
+      },
       itemLevel = {
         type = "group",
         name = L:G("Item Level"),
