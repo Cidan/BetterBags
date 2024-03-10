@@ -305,7 +305,9 @@ function items:BackpackLoadFunction()
   ---@type table<number, ItemData>
   local stacks = {}
 
+  ---@type table<string, ItemData>
   local dirty = {}
+
   for bagid, bag in pairs(items.itemsByBagAndSlot) do
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do

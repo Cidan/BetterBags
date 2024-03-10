@@ -165,7 +165,7 @@ local function GridView(view, bag, dirtyItems)
   debug:EndProfile('Reconcile Stage')
 
   debug:StartProfile("Stacking Stage")
-  for slotkey, item in pairs(view.itemsByBagAndSlot) do
+  for _, item in pairs(view.itemsByBagAndSlot) do
     item:UpdateCount()
   end
   debug:EndProfile("Stacking Stage")
