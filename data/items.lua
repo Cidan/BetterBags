@@ -278,11 +278,8 @@ end
 function items:HasItemChanged(bagid, slotid, data)
   local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
   local itemLocation = itemMixin:GetItemLocation()
-  local itemID = C_Container.GetContainerItemID(bagid, slotid)
-  local itemLink = nil
-  if itemID ~= nil then
-    _, itemLink = GetItemInfo(itemID)
-  end
+  local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
+
   local oldItemLink = data.itemInfo and data.itemInfo.itemLink or nil
   local oldStackCount = data.itemInfo and data.itemInfo.currentItemCount or 1
   if itemLink ~= oldItemLink then
@@ -708,8 +705,8 @@ function items:ParseItemLink(link)
 		relic1BonusIDs = relic1BonusIDs or {},
 		relic2BonusIDs = relic2BonusIDs or {},
 		relic3BonusIDs = relic3BonusIDs or {},
-		crafterGUID = crafterGUID,
-		extraEnchantID = extraEnchantID
+		crafterGUID = crafterGUID or "",
+		extraEnchantID = extraEnchantID or ""
 	}
 end
 

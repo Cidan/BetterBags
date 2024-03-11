@@ -102,10 +102,7 @@ local function GridView(view, bag, dirtyItems)
   local categoryChanged = false
   local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
-  local cnt = 0
-  for _, _ in pairs(dirtyItems) do
-    cnt = cnt + 1
-  end
+
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
   debug:StartProfile('Dirty Item Stage')
   for _, data in pairs(dirtyItems) do
@@ -139,7 +136,7 @@ local function GridView(view, bag, dirtyItems)
         -- Remove item buttons that are empty or don't match the category.
         if data.isItemEmpty or data.stackedOn ~= nil then
           if view.defer then
-            debug:Log("RemoveCell", "Removed because empty", slotkey, data.itemInfo.itemLink)
+            debug:Log("RemoveCell", "Removed because empty (defer)", slotkey, data.itemInfo.itemLink)
             view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
             bag.drawOnClose = true
           else
