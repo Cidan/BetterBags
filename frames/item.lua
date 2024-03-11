@@ -206,7 +206,7 @@ function itemFrame.itemProto:DrawItemLevel()
   local data = self.data
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   local ilvl = data.itemInfo.currentItemLevel
-  if (ilvlOpts.enabled and ilvl and ilvl > 1 and data.itemInfo.currentItemCount == 1) and
+  if (ilvlOpts.enabled and ilvl and ilvl > 1 and data.stackedCount == 1) and
     (data.itemInfo.classID == Enum.ItemClass.Armor or
     data.itemInfo.classID == Enum.ItemClass.Weapon or
     data.itemInfo.classID == Enum.ItemClass.Gem) then
