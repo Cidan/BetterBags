@@ -473,11 +473,13 @@ function items:BankLoadFunction()
 
   ---@type table<string, ItemData>
   local stacks = {}
-
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
       items:AttachItemInfo(data, const.BAG_KIND.BANK)
+      data.stackedCount = 0
+      data.stackedOn = nil
+      data.stacks = 0
       table.insert(items.dirtyBankItems, data)
       -- Compute stacking data.
       if items:ShouldItemStack(const.BAG_KIND.BANK, data) then
@@ -498,7 +500,7 @@ function items:BankLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           stacks[data.itemHash] = data
         end
-      elseif data.stackedOn ~= nil or (data.stacks ~= nil and data.stacks > 0) then
+      else
         data.stackedOn = nil
         data.stacks = 0
         data.stackedCount = data.itemInfo.currentItemCount

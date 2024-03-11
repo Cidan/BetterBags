@@ -143,6 +143,9 @@ function addon:OnEnable()
 
   events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
    debug:Log("init/OnInitialize/items", "Drawing bank")
+   if addon.Bags.Bank.currentView then
+    addon.Bags.Bank.currentView.fullRefresh = true
+   end
    addon.Bags.Bank:Draw(itemData)
 
   end)

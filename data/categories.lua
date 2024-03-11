@@ -134,8 +134,9 @@ function categories:GetCustomCategory(kind, data)
   if self.itemsWithNoCategory[itemID] then return nil end
 
   for _, func in pairs(self.categoryFunctions) do
-    local category = func(data)
-    if category then
+    local success, args = xpcall(func, geterrorhandler(), data)
+    if success and args ~= nil then
+      local category = select(1, args) --[[@as string]]
       local found = database:ItemCategoryExists(category)
       database:SaveItemToCategory(itemID, category)
       if not found then

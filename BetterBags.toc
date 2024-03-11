@@ -35,6 +35,7 @@ animations\fade.lua
 debug\debug.lua
 debug\frames.lua
 debug\profile.lua
+debug\items.lua
 
 core\events.lua
 core\localization.lua
