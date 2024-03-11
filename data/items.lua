@@ -708,8 +708,8 @@ function items:ParseItemLink(link)
 		relic1BonusIDs = relic1BonusIDs or {},
 		relic2BonusIDs = relic2BonusIDs or {},
 		relic3BonusIDs = relic3BonusIDs or {},
-		crafterGUID = crafterGUID,
-		extraEnchantID = extraEnchantID
+		crafterGUID = crafterGUID or "",
+		extraEnchantID = extraEnchantID or ""
 	}
 end
 

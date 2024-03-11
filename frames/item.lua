@@ -202,26 +202,34 @@ function itemFrame.itemProto:Unlock()
   database:SetItemLock(self.data.itemInfo.itemGUID, false)
 end
 
+function itemFrame.itemProto:ShowItemLevel()
+  local ilvlOpts = database:GetItemLevelOptions(self.kind)
+  local ilvl = self.data.itemInfo.currentItemLevel
+  self.ilvlText:SetText(tostring(ilvl))
+  if ilvlOpts.color then
+    local r, g, b = color:GetItemLevelColor(ilvl)
+    self.ilvlText:SetTextColor(r, g, b, 1)
+  else
+    self.ilvlText:SetTextColor(1, 1, 1, 1)
+  end
+  self.ilvlText:Show()
+end
+
 function itemFrame.itemProto:DrawItemLevel()
   local data = self.data
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
+  local mergeOpts = database:GetStackingOptions(self.kind)
   local ilvl = data.itemInfo.currentItemLevel
-  if (ilvlOpts.enabled and ilvl and ilvl > 1 and data.stackedCount == 1) and
-    (data.itemInfo.classID == Enum.ItemClass.Armor or
-    data.itemInfo.classID == Enum.ItemClass.Weapon or
-    data.itemInfo.classID == Enum.ItemClass.Gem) then
-      self.ilvlText:SetText(tostring(ilvl))
-      if ilvlOpts.color then
-        local r, g, b = color:GetItemLevelColor(ilvl)
-        self.ilvlText:SetTextColor(r, g, b, 1)
-      else
-        self.ilvlText:SetTextColor(1, 1, 1, 1)
+  self.ilvlText:Hide()
+  if (data.itemInfo.classID == Enum.ItemClass.Armor or
+  data.itemInfo.classID == Enum.ItemClass.Weapon or
+  data.itemInfo.classID == Enum.ItemClass.Gem) then
+    if (ilvlOpts.enabled and ilvl and ilvl > 1) then
+      if (not mergeOpts.mergeUnstackable or data.stackedCount == 1) then
+        self:ShowItemLevel()
       end
-      self.ilvlText:Show()
-  else
-    self.ilvlText:Hide()
+    end
   end
-
 end
 
 function itemFrame.itemProto:UpdateCount()
