@@ -112,6 +112,10 @@ local function BagView(view, bag, dirtyItems)
     end
   end
 
+  for _, item in pairs(view.itemsByBagAndSlot) do
+    item:UpdateCount()
+  end
+
   for sectionName, section in pairs(view:GetAllSections()) do
     if section:GetCellCount() == 0 then
       debug:Log("RemoveSection", "Removed because empty", sectionName)
