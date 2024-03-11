@@ -21,6 +21,27 @@ local L = addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class (exact) ItemLinkInfo
+---@field itemID number
+---@field enchantID string
+---@field gemID1 string
+---@field gemID2 string
+---@field gemID3 string
+---@field gemID4 string
+---@field suffixID string
+---@field uniqueID string
+---@field linkLevel string
+---@field specializationID string
+---@field modifiersMask string
+---@field itemContext string
+---@field bonusIDs string[]
+---@field modifierIDs string[]
+---@field relic1BonusIDs string[]
+---@field relic2BonusIDs string[]
+---@field relic3BonusIDs string[]
+---@field crafterGUID string
+---@field extraEnchantID string
+
 ---@class (exact) ExtraSlotInfo
 ---@field emptySlots number The number of empty normal slots across all bags.
 ---@field emptyReagentSlots number The number of empty reagent slots across all bags.
@@ -42,6 +63,8 @@ local debug = addon:GetModule('Debug')
 ---@field stacks number
 ---@field stackedOn string
 ---@field stackedCount number
+---@field itemLinkInfo ItemLinkInfo
+---@field itemHash string
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -324,7 +347,7 @@ function items:BackpackLoadFunction()
     emptySlotByBagAndSlot = {},
   }
 
-  ---@type table<number, ItemData>
+  ---@type table<string, ItemData>
   local stacks = {}
 
   ---@type table<string, ItemData>
@@ -346,7 +369,7 @@ function items:BackpackLoadFunction()
 
       -- Compute stacking data.
       if items:ShouldItemStack(const.BAG_KIND.BACKPACK, data) then
-        local stackItem = stacks[data.itemInfo.itemID]
+        local stackItem = stacks[data.itemHash]
         if stackItem ~= nil then
           stackItem.stacks = stackItem.stacks + 1
           data.stackedOn = items:GetSlotKey(stackItem)
@@ -379,7 +402,7 @@ function items:BackpackLoadFunction()
           data.stacks = 0
           data.stackedOn = nil
           data.stackedCount = data.itemInfo.currentItemCount
-          stacks[data.itemInfo.itemID] = data
+          stacks[data.itemHash] = data
         end
       elseif data.stackedOn ~= nil or (data.stacks ~= nil and data.stacks > 0) then
         data.stackedOn = nil
@@ -447,7 +470,7 @@ function items:BankLoadFunction()
     emptySlotByBagAndSlot = {},
   }
 
-  ---@type table<number, ItemData>
+  ---@type table<string, ItemData>
   local stacks = {}
 
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
@@ -457,7 +480,7 @@ function items:BankLoadFunction()
       table.insert(items.dirtyBankItems, data)
       -- Compute stacking data.
       if items:ShouldItemStack(const.BAG_KIND.BANK, data) then
-        local stackItem = stacks[data.itemInfo.itemID]
+        local stackItem = stacks[data.itemHash]
         if stackItem ~= nil then
           stackItem.stacks = stackItem.stacks + 1
           data.stackedOn = items:GetSlotKey(stackItem)
@@ -472,7 +495,7 @@ function items:BankLoadFunction()
           data.stacks = 0
           data.stackedOn = nil
           data.stackedCount = data.itemInfo.currentItemCount
-          stacks[data.itemInfo.itemID] = data
+          stacks[data.itemHash] = data
         end
       elseif data.stackedOn ~= nil or (data.stacks ~= nil and data.stacks > 0) then
         data.stackedOn = nil
@@ -606,6 +629,112 @@ function items:ClearNewItems()
   wipe(self._newItemTimers)
 end
 
+---@param link string
+---@return ItemLinkInfo
+function items:ParseItemLink(link)
+	-- Parse the first elements that have no variable length
+	local _, itemID, enchantID, gemID1, gemID2, gemID3, gemID4,
+	suffixID, uniqueID, linkLevel, specializationID, modifiersMask,
+	itemContext, rest = strsplit(":", link, 14) --[[@as string]]
+
+  ---@type string, string
+	local crafterGUID, extraEnchantID
+    ---@type string, string[]
+	  local numBonusIDs, bonusIDs
+      ---@type string, string[]
+      local numModifiers, modifierIDs
+    ---@type string, string[]
+	  local relic1NumBonusIDs, relic1BonusIDs
+        ---@type string, string[]
+	  local relic2NumBonusIDs, relic2BonusIDs
+        ---@type string, string[]
+	  local relic3NumBonusIDs, relic3BonusIDs
+  if rest ~= nil then
+	  numBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+
+	  if numBonusIDs ~= "" then
+	  	local splits = (tonumber(numBonusIDs))+1
+	  	bonusIDs = strsplittable(":", rest, splits)
+	  	rest = table.remove(bonusIDs, splits)
+	  end
+
+	  numModifiers, rest = strsplit(":", rest, 2) --[[@as string]]
+	  if numModifiers ~= "" then
+	  	local splits = (tonumber(numModifiers)*2)+1
+	  	modifierIDs = strsplittable(":", rest, splits)
+	  	rest = table.remove(modifierIDs, splits)
+	  end
+
+	  relic1NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+	  if relic1NumBonusIDs ~= "" then
+	  	local splits = (tonumber(relic1NumBonusIDs))+1
+	  	relic1BonusIDs = strsplittable(":", rest, splits)
+	  	rest = table.remove(relic1BonusIDs, splits)
+	  end
+
+	  relic2NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+	  if relic2NumBonusIDs ~= "" then
+	  	local splits = (tonumber(relic2NumBonusIDs))+1
+	  	relic2BonusIDs = strsplittable(":", rest, (tonumber(relic2NumBonusIDs))+1)
+	  	rest = table.remove(relic2BonusIDs, splits)
+	  end
+
+	  relic3NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+	  if relic3NumBonusIDs ~= "" then
+	  	local splits = (tonumber(relic3NumBonusIDs))+1
+	  	relic3BonusIDs = strsplittable(":", rest, (tonumber(relic3NumBonusIDs))+1)
+	  	rest = table.remove(relic3BonusIDs, splits)
+	  end
+
+    ---@type string, string
+	  crafterGUID, extraEnchantID = strsplit(":", rest, 3)
+  end
+
+	return {
+		itemID = tonumber(itemID),
+		enchantID = enchantID,
+		gemID1 = gemID1,
+		gemID2 = gemID2,
+		gemID3 = gemID3,
+		gemID4 = gemID4,
+		suffixID = suffixID,
+		uniqueID = uniqueID,
+		linkLevel = linkLevel,
+		specializationID = specializationID,
+		modifiersMask = modifiersMask,
+		itemContext = itemContext,
+		bonusIDs = bonusIDs or {},
+		modifierIDs = modifierIDs or {},
+		relic1BonusIDs = relic1BonusIDs or {},
+		relic2BonusIDs = relic2BonusIDs or {},
+		relic3BonusIDs = relic3BonusIDs or {},
+		crafterGUID = crafterGUID,
+		extraEnchantID = extraEnchantID
+	}
+end
+
+---@param data ItemData
+---@return string
+function items:GenerateItemHash(data)
+  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d",
+  data.itemLinkInfo.itemID,
+  data.itemLinkInfo.enchantID,
+  data.itemLinkInfo.gemID1,
+  data.itemLinkInfo.gemID2,
+  data.itemLinkInfo.gemID3,
+  data.itemLinkInfo.suffixID,
+  table.concat(data.itemLinkInfo.bonusIDs, ","),
+  table.concat(data.itemLinkInfo.modifierIDs, ","),
+  table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
+  table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
+  table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
+  data.itemLinkInfo.crafterGUID or "",
+  data.itemLinkInfo.extraEnchantID or "",
+  data.itemInfo.currentItemLevel
+)
+return hash
+end
+
 ---@param data ItemData
 ---@param kind BagKind
 function items:AttachItemInfo(data, kind)
@@ -613,6 +742,7 @@ function items:AttachItemInfo(data, kind)
   local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
   local bagid, slotid = data.bagid, data.slotid
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
+  local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
   data.kind = kind
   data.basic = false
   if itemID == nil then
@@ -621,11 +751,11 @@ function items:AttachItemInfo(data, kind)
     return
   end
   data.isItemEmpty = false
-  local itemName, itemLink, itemQuality,
+  local itemName, _, itemQuality,
   itemLevel, itemMinLevel, itemType, itemSubType,
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
-  setID, isCraftingReagent = GetItemInfo(itemID)
+  setID, isCraftingReagent = GetItemInfo(itemLink)
   itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
@@ -670,6 +800,9 @@ function items:AttachItemInfo(data, kind)
   if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()
   end
+
+  data.itemLinkInfo = self:ParseItemLink(itemLink)
+  data.itemHash = self:GenerateItemHash(data)
   data.stacks = 0
 end
 
