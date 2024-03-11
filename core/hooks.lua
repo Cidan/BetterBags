@@ -17,6 +17,7 @@ addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
 local interactionEvents = {
+  [Enum.PlayerInteractionType.TradePartner] = true,
   [Enum.PlayerInteractionType.Banker] = true,
   [Enum.PlayerInteractionType.Merchant] = true,
   [Enum.PlayerInteractionType.MailInfo] = true,
