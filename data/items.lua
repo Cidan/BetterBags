@@ -310,6 +310,10 @@ function items:ShouldItemStack(kind, data)
     return false
   end
 
+  if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return false
+  end
+
   if stackOptions.mergeStacks and data.itemInfo.itemStackCount and data.itemInfo.itemStackCount > 1 then
     return true
   end

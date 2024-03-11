@@ -220,16 +220,29 @@ function itemFrame.itemProto:DrawItemLevel()
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   local mergeOpts = database:GetStackingOptions(self.kind)
   local ilvl = data.itemInfo.currentItemLevel
-  self.ilvlText:Hide()
-  if (data.itemInfo.classID == Enum.ItemClass.Armor or
-  data.itemInfo.classID == Enum.ItemClass.Weapon or
-  data.itemInfo.classID == Enum.ItemClass.Gem) then
-    if (ilvlOpts.enabled and ilvl and ilvl > 1) then
-      if (not mergeOpts.mergeUnstackable or data.stackedCount == 1) then
-        self:ShowItemLevel()
-      end
-    end
+
+  if not ilvlOpts.enabled then
+    self.ilvlText:Hide()
+    return
   end
+
+  if (data.itemInfo.classID ~= Enum.ItemClass.Armor and
+  data.itemInfo.classID ~= Enum.ItemClass.Weapon) then
+    self.ilvlText:Hide()
+    return
+  end
+
+  if mergeOpts.mergeUnstackable and data.stackedCount and data.stackedCount > 1 then
+    self.ilvlText:Hide()
+    return
+  end
+
+  if not ilvl or ilvl < 2 then
+    self.ilvlText:Hide()
+    return
+  end
+
+  self:ShowItemLevel()
 end
 
 function itemFrame.itemProto:UpdateCount()
