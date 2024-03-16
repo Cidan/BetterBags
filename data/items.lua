@@ -377,6 +377,7 @@ function items:BackpackLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = 0
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+          stackItem.stacks = stackItem.stacks + 1
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
             self:ClearNewItem(stackItem)
@@ -490,6 +491,7 @@ function items:BankLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = 0
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+          stackItem.stacks = stackItem.stacks + 1
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
             self:ClearNewItem(stackItem)
