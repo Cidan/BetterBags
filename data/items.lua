@@ -391,6 +391,8 @@ function items:BackpackLoadFunction()
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
             self:ClearNewItem(stackItem)
+            data.itemInfo.category = self:GetCategory(data)
+            stackItem.itemInfo.category = self:GetCategory(stackItem)
           end
           --TODO(lobato): I don't know why dirty as a set doesn't just work here when
           -- passing it into the event, and I'm too tired to figure it out right now.

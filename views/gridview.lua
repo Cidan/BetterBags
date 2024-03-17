@@ -104,8 +104,6 @@ local function GridView(view, bag, slotInfo)
       if categoryChanged == false and change == true then
         categoryChanged = true
       end
-    else
-      debug:Log("Draw", "Skipping dirty item", data.itemInfo and data.itemInfo.itemLink or nil)
     end
   end
   debug:EndProfile('Dirty Item Stage')
@@ -162,12 +160,12 @@ local function GridView(view, bag, slotInfo)
   for sectionName, section in pairs(view:GetAllSections()) do
       -- Remove the section if it's empty, otherwise draw it.
       if section:GetCellCount() == 0 and not view.defer then
-        --debug:Log("RemoveSection", "Removed because empty", sectionName)
+        debug:Log("RemoveSection", "Removed because empty", sectionName)
         view:RemoveSection(sectionName)
         section:ReleaseAllCells()
         section:Release()
       else
-        --debug:Log("KeepSection", "Section kept because not empty", sectionName)
+        debug:Log("KeepSection", "Section kept because not empty", sectionName)
         section:SetMaxCellWidth(sizeInfo.itemsPerRow)
         section:Draw(bag.kind, database:GetBagView(bag.kind), false)
       end
