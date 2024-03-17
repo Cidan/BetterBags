@@ -47,14 +47,14 @@ end
 
 ---@param view view
 ---@param bag Bag
----@param dirtyItems ItemData[]
-local function OneBagView(view, bag, dirtyItems)
+---@param slotInfo ExtraSlotInfo
+local function OneBagView(view, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
   end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
-  local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
+  local dirtyItems = slotInfo.dirtyItems
 
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
 
@@ -91,9 +91,9 @@ local function OneBagView(view, bag, dirtyItems)
   end
 
   view.freeSlot = view.freeSlot or itemFrame:Create()
-  if extraSlotInfo.emptySlots > 0 then
-    local freeSlotBag, freeSlotID = view:ParseSlotKey(extraSlotInfo.freeSlotKey)
-    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, extraSlotInfo.emptySlots, false)
+  if slotInfo.emptySlots > 0 then
+    local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKey)
+    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, slotInfo.emptySlots, false)
   else
     view.freeSlot:SetFreeSlots(0, 0, 0, false)
   end
@@ -102,9 +102,9 @@ local function OneBagView(view, bag, dirtyItems)
   -- Only add the reagent free slot to the backbag view.
   if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
     view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
-    if extraSlotInfo.emptyReagentSlots > 0 then
-      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(extraSlotInfo.freeReagentSlotKey)
-      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, extraSlotInfo.emptyReagentSlots, true)
+    if slotInfo.emptyReagentSlots > 0 then
+      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(slotInfo.freeReagentSlotKey)
+      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, slotInfo.emptyReagentSlots, true)
     else
       view.freeReagentSlot:SetFreeSlots(0, 0, 0, true)
     end
