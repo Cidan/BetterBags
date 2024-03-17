@@ -79,8 +79,6 @@ local itemDataProto = {}
 ---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field slotInfo ExtraSlotInfo
 ---@field bankSlotInfo ExtraSlotInfo
----@field dirtyItems ItemData[]
----@field dirtyBankItems ItemData[]
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _container ContinuableContainer
 ---@field _bankContainer ContinuableContainer
@@ -91,8 +89,6 @@ local itemDataProto = {}
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
-  self.dirtyItems = {}
-  self.dirtyBankItems = {}
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
@@ -270,7 +266,6 @@ function items:RefreshBackpack()
   equipmentSets:Update()
   self._doingRefreshAll = true
   self._container = ContinuableContainer:Create()
-  wipe(self.dirtyItems)
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
@@ -497,7 +492,7 @@ function items:BankLoadFunction()
       data.stackedCount = 0
       data.stackedOn = nil
       data.stacks = 0
-      table.insert(items.dirtyBankItems, data)
+      table.insert(extraSlotInfo.dirtyItems, data)
       -- Compute stacking data.
       if items:ShouldItemStack(const.BAG_KIND.BANK, data) then
         local stackItem = stacks[data.itemHash]
@@ -511,6 +506,8 @@ function items:BankLoadFunction()
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
             self:ClearNewItem(stackItem)
+            data.itemInfo.category = self:GetCategory(data)
+            stackItem.itemInfo.category = self:GetCategory(stackItem)
           end
         else
           data.stacks = 0
@@ -541,11 +538,10 @@ function items:BankLoadFunction()
       end
     end
   end
-  self.bankSlotInfo = extraSlotInfo
+  self.bankSlotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
   if not self._bankFirstLoad then
-    events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
-    wipe(items.dirtyBankItems)
+    events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
     items._bankContainer = nil
     items._doingRefreshAll = false
   end
