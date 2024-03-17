@@ -71,6 +71,7 @@ local debug = addon:GetModule('Debug')
 ---@field itemLinkInfo ItemLinkInfo
 ---@field itemHash string
 ---@field bagName string
+---@field forceClear boolean
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -364,10 +365,15 @@ function items:BackpackLoadFunction()
     for slotid, data in pairs(bag) do
       -- Check if the item as changed, and if so, add it to the dirty list.
       if items:HasItemChanged(bagid, slotid, data) then
+        local wasStacked = data.stacks and data.stacks > 0
         wipe(data)
         data.bagid = bagid
         data.slotid = slotid
         items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+        if wasStacked then
+          debug:Log("Stacks", "Was Stacked", data.itemInfo.itemLink)
+          data.forceClear = true
+        end
         table.insert(extraSlotInfo.dirtyItems, data)
         dirty[self:GetSlotKey(data)] = data
       end
@@ -910,6 +916,7 @@ function items:AttachItemInfo(data, kind)
   data.itemLinkInfo = self:ParseItemLink(itemLink)
   data.itemHash = self:GenerateItemHash(data)
   data.itemInfo.category = self:GetCategory(data)
+  data.forceClear = false
   data.stacks = 0
 end
 
@@ -959,4 +966,5 @@ function items:AttachBasicItemInfo(itemID, data)
     currentItemLevel = 0 --[[@as number]],
     equipmentSet = nil,
   }
+  data.forceClear = false
 end

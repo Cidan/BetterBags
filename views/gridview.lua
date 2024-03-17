@@ -125,7 +125,7 @@ local function GridView(view, bag, slotInfo)
       elseif slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
         -- Remove item buttons that are empty or don't match the category.
         if data.isItemEmpty or data.stackedOn ~= nil then
-          if view.defer then
+          if view.defer and not data.forceClear then
             debug:Log("RemoveCell", "Removed because empty (defer)", slotkey, data.itemInfo.itemLink)
             view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
             bag.drawOnClose = true
@@ -138,10 +138,11 @@ local function GridView(view, bag, slotInfo)
           end
         elseif data.itemInfo.category ~= sectionName then
           if view.defer then
+            debug:Log("RemoveCell", "Removed because category mismatch (defer)", slotkey, data.itemInfo.itemLink)
             view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
             bag.drawOnClose = true
           else
-            debug:Log("RemoveCell", "Removed because category mismatch", slotkey)
+            debug:Log("RemoveCell", "Removed because category mismatch", slotkey, data.itemInfo.itemLink)
             section:RemoveCell(slotkey)
             bag.drawOnClose = false
           end
@@ -159,9 +160,8 @@ local function GridView(view, bag, slotInfo)
 
   debug:StartProfile('Section Draw Stage')
   for sectionName, section in pairs(view:GetAllSections()) do
-    if not view.defer then
       -- Remove the section if it's empty, otherwise draw it.
-      if section:GetCellCount() == 0 then
+      if section:GetCellCount() == 0 and not view.defer then
         --debug:Log("RemoveSection", "Removed because empty", sectionName)
         view:RemoveSection(sectionName)
         section:ReleaseAllCells()
@@ -171,7 +171,6 @@ local function GridView(view, bag, slotInfo)
         section:SetMaxCellWidth(sizeInfo.itemsPerRow)
         section:Draw(bag.kind, database:GetBagView(bag.kind), false)
       end
-    end
   end
   debug:EndProfile('Section Draw Stage')
 
