@@ -69,20 +69,13 @@ local function drawDirtyItemUnstacked(view, data)
     view.itemsByBagAndSlot[slotkey] = itemButton
   end
 
-  -- Get the previous category for this slotkey.
-  local previousCategory = itemButton.data and itemButton.data.itemInfo and itemButton.data.itemInfo.category
-
   -- Set the item data on the item frame.
   itemButton:SetItem(data)
 
   -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
   if (not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) then
-    local category = itemButton:GetCategory()
-    local section = view:GetOrCreateSection(category)
+    local section = view:GetOrCreateSection(data.itemInfo.category)
     section:AddCell(slotkey, itemButton)
-    if previousCategory ~= category then
-      categoryChanged = true
-    end
   end
   return categoryChanged
 end
@@ -91,16 +84,15 @@ end
 
 ---@param view view
 ---@param bag Bag
----@param dirtyItems ItemData[]
-local function GridView(view, bag, dirtyItems)
+---@param slotInfo ExtraSlotInfo
+local function GridView(view, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
   end
-
+  local dirtyItems = slotInfo.dirtyItems
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   local categoryChanged = false
-  local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
 
   debug:Log("Draw", "Rendering grid view for bag", bag.kind, "with", #dirtyItems, "dirty items")
@@ -112,15 +104,13 @@ local function GridView(view, bag, dirtyItems)
       if categoryChanged == false and change == true then
         categoryChanged = true
       end
+    else
+      debug:Log("Draw", "Skipping dirty item", data.itemInfo and data.itemInfo.itemLink or nil)
     end
   end
   debug:EndProfile('Dirty Item Stage')
 
-  if (extraSlotInfo.totalItems < view.itemCount and not categoryChanged) then
-    view.defer = true
-  else
-    view.defer = false
-  end
+  view.defer = slotInfo.deferDelete
 
   debug:StartProfile('Reconcile Stage')
   -- Loop through all sections and reconcile the items.
@@ -188,9 +178,9 @@ local function GridView(view, bag, dirtyItems)
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
   view.freeSlot = view.freeSlot or itemFrame:Create()
-  if extraSlotInfo.emptySlots > 0 then
-    local freeSlotBag, freeSlotID = view:ParseSlotKey(extraSlotInfo.freeSlotKey)
-    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, extraSlotInfo.emptySlots, false)
+  if slotInfo.emptySlots > 0 then
+    local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKey)
+    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, slotInfo.emptySlots, false)
   else
     view.freeSlot:SetFreeSlots(0, 0, 0, false)
   end
@@ -199,9 +189,9 @@ local function GridView(view, bag, dirtyItems)
   -- Only add the reagent free slot to the backbag view.
   if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
     view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
-    if extraSlotInfo.emptyReagentSlots > 0 then
-      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(extraSlotInfo.freeReagentSlotKey)
-      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, extraSlotInfo.emptyReagentSlots, true)
+    if slotInfo.emptyReagentSlots > 0 then
+      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(slotInfo.freeReagentSlotKey)
+      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, slotInfo.emptyReagentSlots, true)
     else
       view.freeReagentSlot:SetFreeSlots(0, 0, 0, true)
     end
@@ -236,7 +226,7 @@ local function GridView(view, bag, dirtyItems)
     const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
     bag.frame:SetHeight(bagHeight)
   end
-  view.itemCount = extraSlotInfo.totalItems
+  view.itemCount = slotInfo.totalItems
 end
 
 ---@param parent Frame

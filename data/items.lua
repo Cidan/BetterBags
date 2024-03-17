@@ -12,6 +12,9 @@ local const = addon:GetModule('Constants')
 ---@class EquipmentSets: AceModule
 local equipmentSets = addon:GetModule('EquipmentSets')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -49,6 +52,8 @@ local debug = addon:GetModule('Debug')
 ---@field freeSlotKey string The key of the first empty normal slot.
 ---@field freeReagentSlotKey string The key of the first empty reagent slot.
 ---@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
+---@field deferDelete? boolean If true, delete's should be deferred until the next refresh.
+---@field dirtyItems ItemData[] -- A list of dirty items that need to be refreshed.
 
 ---@class (exact) ItemData
 ---@field basic boolean
@@ -65,6 +70,7 @@ local debug = addon:GetModule('Debug')
 ---@field stackedCount number
 ---@field itemLinkInfo ItemLinkInfo
 ---@field itemHash string
+---@field bagName string
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -96,6 +102,7 @@ function items:OnInitialize()
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   self.bankSlotInfo = {
     emptySlots = 0,
@@ -104,10 +111,11 @@ function items:OnInitialize()
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   self._newItemTimers = {}
-  self._firstLoad = true
-  self._bankFirstLoad = true
+  self._firstLoad = false
+  self._bankFirstLoad = false
 end
 
 function items:OnEnable()
@@ -181,6 +189,7 @@ function items:FullRefreshAll()
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   self.bankSlotInfo = {
     emptySlots = 0,
@@ -189,6 +198,7 @@ function items:FullRefreshAll()
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   events:SendMessage('bags/RefreshAll')
 end
@@ -323,12 +333,6 @@ function items:ShouldItemStack(kind, data)
   return false
 end
 
----@param kind BagKind
----@return ExtraSlotInfo
-function items:GetExtraSlotInfo(kind)
-  return kind == const.BAG_KIND.BACKPACK and self.slotInfo or self.bankSlotInfo
-end
-
 ---@param data ItemData
 ---@return string
 function items:GetSlotKey(data)
@@ -346,6 +350,7 @@ function items:BackpackLoadFunction()
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
 
   ---@type table<string, ItemData>
@@ -359,12 +364,11 @@ function items:BackpackLoadFunction()
     for slotid, data in pairs(bag) do
       -- Check if the item as changed, and if so, add it to the dirty list.
       if items:HasItemChanged(bagid, slotid, data) then
-        debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
         wipe(data)
         data.bagid = bagid
         data.slotid = slotid
         items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
-        table.insert(items.dirtyItems, data)
+        table.insert(extraSlotInfo.dirtyItems, data)
         dirty[self:GetSlotKey(data)] = data
       end
 
@@ -386,19 +390,19 @@ function items:BackpackLoadFunction()
           -- passing it into the event, and I'm too tired to figure it out right now.
           local key = items:GetSlotKey(data)
           if dirty[key] == nil then
-            table.insert(items.dirtyItems, data)
+            table.insert(extraSlotInfo.dirtyItems, data)
             dirty[key] = data
           end
 
           key = items:GetSlotKey(stackItem)
           if dirty[key] == nil then
-            table.insert(items.dirtyItems, stackItem)
+            table.insert(extraSlotInfo.dirtyItems, stackItem)
             dirty[key] = stackItem
           end
         else
           local key = items:GetSlotKey(data)
           if data.stackedOn ~= nil and dirty[key] == nil then
-            table.insert(items.dirtyItems, data)
+            table.insert(extraSlotInfo.dirtyItems, data)
             dirty[key] = data
           end
           data.stacks = 0
@@ -412,7 +416,7 @@ function items:BackpackLoadFunction()
         data.stackedCount = data.itemInfo.currentItemCount
         local key = items:GetSlotKey(data)
         if dirty[key] == nil then
-          table.insert(items.dirtyItems, data)
+          table.insert(extraSlotInfo.dirtyItems, data)
           dirty[key] = data
         end
       end
@@ -435,16 +439,19 @@ function items:BackpackLoadFunction()
     end
   end
 
-  self.slotInfo = extraSlotInfo
+  if extraSlotInfo.totalItems < self.slotInfo.totalItems then
+    extraSlotInfo.deferDelete = true
+  end
+
+  self.slotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
   if not self._firstLoad then
     debug:EndProfile('Backpack Data Pipeline')
     events:SendMessageLater('items/RefreshBackpack/Done', function()
-      wipe(items.dirtyItems)
       items._container = nil
       items._doingRefreshAll = false
     end,
-    items.dirtyItems)
+    extraSlotInfo)
   end
 end
 
@@ -470,6 +477,7 @@ function items:BankLoadFunction()
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
 
   ---@type table<string, ItemData>
@@ -722,22 +730,115 @@ end
 ---@return string
 function items:GenerateItemHash(data)
   local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d",
-  data.itemLinkInfo.itemID,
-  data.itemLinkInfo.enchantID,
-  data.itemLinkInfo.gemID1,
-  data.itemLinkInfo.gemID2,
-  data.itemLinkInfo.gemID3,
-  data.itemLinkInfo.suffixID,
-  table.concat(data.itemLinkInfo.bonusIDs, ","),
-  table.concat(data.itemLinkInfo.modifierIDs, ","),
-  table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
-  table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
-  table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
-  data.itemLinkInfo.crafterGUID or "",
-  data.itemLinkInfo.extraEnchantID or "",
-  data.itemInfo.currentItemLevel
-)
-return hash
+    data.itemLinkInfo.itemID,
+    data.itemLinkInfo.enchantID,
+    data.itemLinkInfo.gemID1,
+    data.itemLinkInfo.gemID2,
+    data.itemLinkInfo.gemID3,
+    data.itemLinkInfo.suffixID,
+    table.concat(data.itemLinkInfo.bonusIDs, ","),
+    table.concat(data.itemLinkInfo.modifierIDs, ","),
+    table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
+    table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
+    table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
+    data.itemLinkInfo.crafterGUID or "",
+    data.itemLinkInfo.extraEnchantID or "",
+    data.itemInfo.currentItemLevel
+  )
+  return hash
+end
+
+---@param data ItemData
+---@return string
+function items:GetCategory(data)
+  if data.kind == const.BAG_KIND.BACKPACK and database:GetBagView(data.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    ---@type string
+    local bagname = data.bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(data.bagid)
+    local displayid = data.bagid == Enum.BagIndex.Keyring and 6 or data.bagid+1
+    return format("#%d: %s", displayid, bagname)
+  end
+
+  if data.kind == const.BAG_KIND.BANK and database:GetBagView(data.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    local id = data.bagid
+    if id == -1 then
+      return format("#%d: %s", 1, L:G('Bank'))
+    elseif id == -3 then
+      return format("#%d: %s", 1, L:G('Reagent Bank'))
+    else
+      return format("#%d: %s", id - 4, C_Container.GetBagName(id))
+    end
+  end
+
+  if data.isItemEmpty then return L:G('Empty Slot') end
+
+  if database:GetCategoryFilter(data.kind, "RecentItems") then
+    if items:IsNewItem(data) then
+      return L:G("Recent Items")
+    end
+  end
+
+  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else..
+  if data.itemInfo.equipmentSet and database:GetCategoryFilter(data.kind, "GearSet") then
+    return "Gear: " .. data.itemInfo.equipmentSet
+  end
+
+  -- Return the custom category if it exists next.
+  local customCategory = categories:GetCustomCategory(data.kind, data)
+  if customCategory then
+    return customCategory
+  end
+
+  if not data.kind then return L:G('Everything') end
+  -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
+  if data.containerInfo.quality == Enum.ItemQuality.Poor then
+    return L:G('Junk')
+  end
+
+  local category = ""
+
+  -- Add the type filter to the category if enabled, but not to trade goods
+  -- when the tradeskill filter is enabled. This makes it so trade goods are
+  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
+  if database:GetCategoryFilter(data.kind, "Type") and not
+  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
+  data.itemInfo.itemType then
+    category = category .. data.itemInfo.itemType --[[@as string]]
+  end
+
+  -- Add the subtype filter to the category if enabled, but same as with
+  -- the type filter we don't add it to trade goods when the tradeskill
+  -- filter is enabled.
+  if database:GetCategoryFilter(data.kind, "Subtype") and not
+  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
+  data.itemInfo.itemSubType then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. data.itemInfo.itemSubType
+  end
+
+  -- Add the tradeskill filter to the category if enabled.
+  if data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill") then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.TRADESKILL_MAP[data.itemInfo.subclassID]
+  end
+
+  -- Add the expansion filter to the category if enabled.
+  if database:GetCategoryFilter(data.kind, "Expansion") then
+    if not data.itemInfo.expacID then return L:G('Unknown') end
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.EXPANSION_MAP[data.itemInfo.expacID] --[[@as string]]
+  end
+
+  if category == "" then
+    category = L:G('Everything')
+  end
+
+  return category
 end
 
 ---@param data ItemData
@@ -808,6 +909,7 @@ function items:AttachItemInfo(data, kind)
 
   data.itemLinkInfo = self:ParseItemLink(itemLink)
   data.itemHash = self:GenerateItemHash(data)
+  data.itemInfo.category = self:GetCategory(data)
   data.stacks = 0
 end
 

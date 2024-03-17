@@ -29,10 +29,10 @@ local itemFrame = addon:GetModule('ItemFrame')
 views.viewProto = {}
 
 ---@param bag Bag
----@param dirtyItems ItemData[]
-function views.viewProto:Render(bag, dirtyItems)
+---@param slotInfo ExtraSlotInfo
+function views.viewProto:Render(bag, slotInfo)
   _ = bag
-  _ = dirtyItems
+  _ = slotInfo
   error('Render method not implemented')
 end
 
