@@ -759,24 +759,6 @@ end
 ---@param data ItemData
 ---@return string
 function items:GetCategory(data)
-  if data.kind == const.BAG_KIND.BACKPACK and database:GetBagView(data.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    ---@type string
-    local bagname = data.bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(data.bagid)
-    local displayid = data.bagid == Enum.BagIndex.Keyring and 6 or data.bagid+1
-    return format("#%d: %s", displayid, bagname)
-  end
-
-  if data.kind == const.BAG_KIND.BANK and database:GetBagView(data.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    local id = data.bagid
-    if id == -1 then
-      return format("#%d: %s", 1, L:G('Bank'))
-    elseif id == -3 then
-      return format("#%d: %s", 1, L:G('Reagent Bank'))
-    else
-      return format("#%d: %s", id - 4, C_Container.GetBagName(id))
-    end
-  end
-
   if data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(data.kind, "RecentItems") then
