@@ -24,6 +24,7 @@ local L = addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+-- ItemLinkInfo contains all the information parsed from an item link.
 ---@class (exact) ItemLinkInfo
 ---@field itemID number
 ---@field enchantID string
@@ -45,6 +46,7 @@ local debug = addon:GetModule('Debug')
 ---@field crafterGUID string
 ---@field extraEnchantID string
 
+-- ExtraSlotInfo contains refresh data for an entire bag view, bag or bank.
 ---@class (exact) ExtraSlotInfo
 ---@field emptySlots number The number of empty normal slots across all bags.
 ---@field emptyReagentSlots number The number of empty reagent slots across all bags.
@@ -53,8 +55,9 @@ local debug = addon:GetModule('Debug')
 ---@field freeReagentSlotKey string The key of the first empty reagent slot.
 ---@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
 ---@field deferDelete? boolean If true, delete's should be deferred until the next refresh.
----@field dirtyItems ItemData[] -- A list of dirty items that need to be refreshed.
+---@field dirtyItems ItemData[] A list of dirty items that need to be refreshed.
 
+-- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
 ---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
@@ -448,27 +451,18 @@ function items:BackpackLoadFunction()
 
   self.slotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
-  if not self._firstLoad then
-    debug:EndProfile('Backpack Data Pipeline')
-    events:SendMessageLater('items/RefreshBackpack/Done', function()
-      items._container = nil
-      items._doingRefreshAll = false
-    end,
-    extraSlotInfo)
-  end
+  debug:EndProfile('Backpack Data Pipeline')
+  events:SendMessageLater('items/RefreshBackpack/Done', function()
+    items._container = nil
+    items._doingRefreshAll = false
+  end,
+  extraSlotInfo)
 end
 
   -- Load item data in the background, and fire a message when
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
-  -- Call the data load function twice on first load, because the first load
-  -- sometimes does not complete, even though the container is marked as done.
-  -- This is a Blizzard bug.
-  if self._firstLoad then
-    self._firstLoad = false
-    self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
-  end
 end
 
 function items:BankLoadFunction()
@@ -540,24 +534,15 @@ function items:BankLoadFunction()
   end
   self.bankSlotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
-  if not self._bankFirstLoad then
-    events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
-    items._bankContainer = nil
-    items._doingRefreshAll = false
-  end
+  events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
+  items._bankContainer = nil
+  items._doingRefreshAll = false
 end
 
 -- Load item data in the background, and fire a message when
 -- all bags are done loading.
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
-  -- Call the data load function twice on first load, because the first load
-  -- sometimes does not complete, even though the container is marked as done.
-  -- This is a Blizzard bug.
-  if self._bankFirstLoad then
-    self._bankFirstLoad = false
-    self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
-  end
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
