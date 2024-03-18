@@ -569,6 +569,7 @@ function itemFrame:_DoCreate()
   i.button = button
   button:SetAllPoints(p)
   button:SetPassThroughButtons("MiddleButton")
+
   button:HookScript("OnEnter", function()
     i:OnEnter()
   end)
@@ -576,6 +577,7 @@ function itemFrame:_DoCreate()
   button:HookScript("OnLeave", function()
     i:OnLeave()
   end)
+
   i.frame = p
 
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);

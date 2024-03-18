@@ -148,8 +148,8 @@ end
 ---@param bagid number
 ---@param slotid number
 ---@param count number
----@param reagent boolean
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
+---@param name string
+function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
@@ -164,6 +164,8 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.button.minDisplayCount = -1
   self.button:SetID(slotid)
   self.frame:SetID(bagid)
+  self.freeSlotCount = count
+  self.isFreeSlot = true
 
   SetItemButtonCount(self.button, count)
   SetItemButtonQuality(self.button, false)
@@ -179,9 +181,8 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.LockTexture:Hide()
   self.button.UpgradeIcon:SetShown(false)
 
-  if reagent then
-    SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
-  end
+  self.freeSlotName = name
+  SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
 
   self.button.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
@@ -219,6 +220,9 @@ function itemFrame.itemProto:ClearItem()
   self.LockTexture:Hide()
   self:SetSize(37, 37)
   self.button.UpgradeIcon:SetShown(false)
+  self.freeSlotName = ""
+  self.freeSlotCount = 0
+  self.isFreeSlot = nil
   self.data = nil
 end
 
@@ -255,6 +259,11 @@ function itemFrame:_DoCreate()
   button:SetPassThroughButtons("MiddleButton")
   button:SetAllPoints(p)
   i.button = button
+
+  button:HookScript("OnLeave", function()
+    i:OnLeave()
+  end)
+
   i.frame = p
 
   i.LockTexture = button:CreateTexture(name.."LockButton", "OVERLAY")
@@ -279,7 +288,7 @@ function itemFrame:_DoCreate()
 
   button.GetInventorySlot = ButtonInventorySlot
   button.UpdateTooltip = function() i:UpdateTooltip() end
-  button:SetScript("OnEnter", function() i:UpdateTooltip() end)
+  button:SetScript("OnEnter", function() i:UpdateTooltip() i:OnEnter() end)
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
 

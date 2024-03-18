@@ -175,14 +175,16 @@ local function GridView(view, bag, slotInfo)
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
   for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-    local itemButton = view.itemsByBagAndSlot[name]
-    if itemButton == nil then
-      itemButton = itemFrame:Create()
-      view.itemsByBagAndSlot[name] = itemButton
+    if slotInfo.freeSlotKeys[name] ~= nil then
+      local itemButton = view.itemsByBagAndSlot[name]
+      if itemButton == nil then
+        itemButton = itemFrame:Create()
+        view.itemsByBagAndSlot[name] = itemButton
+      end
+      local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+      itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
+      freeSlotsSection:AddCell(name, itemButton)
     end
-    local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-    itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
-    freeSlotsSection:AddCell(name, itemButton)
   end
 
   -- Draw the free slots section.
