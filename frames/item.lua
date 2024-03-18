@@ -159,6 +159,8 @@ end
 
 function itemFrame.itemProto:OnEnter()
   if not self.isFreeSlot then return end
+  if not self.freeSlotName or self.freeSlotName == "" then return end
+
   itemFrame.emptyItemTooltip:SetOwner(self.frame, "ANCHOR_NONE")
   ContainerFrameItemButton_CalculateItemTooltipAnchors(self.frame, itemFrame.emptyItemTooltip)
   itemFrame.emptyItemTooltip:AddLine(self.freeSlotName)
