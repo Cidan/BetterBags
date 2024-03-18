@@ -48,11 +48,9 @@ local debug = addon:GetModule('Debug')
 
 -- ExtraSlotInfo contains refresh data for an entire bag view, bag or bank.
 ---@class (exact) ExtraSlotInfo
----@field emptySlots number The number of empty normal slots across all bags.
----@field emptyReagentSlots number The number of empty reagent slots across all bags.
+---@field emptySlots table<string, number> The number of empty normal slots across all bags.
+---@field freeSlotKeys table<string, string> The keys of the first empty slot per bag type.
 ---@field totalItems number The total number of valid items across all bags.
----@field freeSlotKey string The key of the first empty normal slot.
----@field freeReagentSlotKey string The key of the first empty reagent slot.
 ---@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
 ---@field deferDelete? boolean If true, delete's should be deferred until the next refresh.
 ---@field dirtyItems ItemData[] A list of dirty items that need to be refreshed.
@@ -96,7 +94,8 @@ function items:OnInitialize()
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
   self.slotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
@@ -105,7 +104,8 @@ function items:OnInitialize()
     dirtyItems = {},
   }
   self.bankSlotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
@@ -183,7 +183,8 @@ function items:FullRefreshAll()
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
   self.slotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
@@ -192,7 +193,8 @@ function items:FullRefreshAll()
     dirtyItems = {},
   }
   self.bankSlotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
@@ -343,8 +345,8 @@ end
 function items:BackpackLoadFunction()
   ---@type ExtraSlotInfo
   local extraSlotInfo = {
-    emptySlots = 0,
-    emptyReagentSlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     totalItems = 0,
     freeSlotKey = "",
     freeReagentSlotKey = "",
@@ -359,6 +361,22 @@ function items:BackpackLoadFunction()
   local dirty = {}
 
   for bagid, bag in pairs(items.itemsByBagAndSlot) do
+    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
+    local name = ""
+    if bagid == 0 then
+      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+    else
+      local invid = C_Container.ContainerIDToInventoryID(bagid)
+      local baglink = GetInventoryItemLink("player", invid)
+      if baglink ~= nil then
+        local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
+        name = GetItemSubClassInfo(class, subclass)
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+      end
+    end
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
       -- Check if the item as changed, and if so, add it to the dirty list.
@@ -431,13 +449,7 @@ function items:BackpackLoadFunction()
         data.stacks = 0
         data.stackedOn = nil
         data.stackedCount = nil
-        if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-          extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-          extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
-        elseif bagid ~= Enum.BagIndex.Keyring then
-          extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-          extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
-        end
+        extraSlotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
         extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
       else
         extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
@@ -468,7 +480,8 @@ end
 function items:BankLoadFunction()
   ---@type ExtraSlotInfo
   local extraSlotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
@@ -480,6 +493,22 @@ function items:BankLoadFunction()
   ---@type table<string, ItemData>
   local stacks = {}
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
+    local name = ""
+    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
+    if bagid == 0 then
+      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+    else
+      local invid = C_Container.ContainerIDToInventoryID(bagid)
+      local baglink = GetInventoryItemLink("player", invid)
+      if baglink ~= nil then
+        local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
+        name = GetItemSubClassInfo(class, subclass)
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+      end
+    end
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
       items:AttachItemInfo(data, const.BAG_KIND.BANK)
@@ -519,13 +548,7 @@ function items:BankLoadFunction()
         data.stacks = 0
         data.stackedOn = nil
         data.stackedCount = nil
-        if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-          extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-          extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
-        else
-          extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-          extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
-        end
+        extraSlotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
         extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
       else
         extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1

@@ -77,12 +77,10 @@ local function OneBagView(view, bag, slotInfo)
   end
 
   for slotkey, _ in pairs(view.content:GetAllCells()) do
-    if slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
-      local data = view.itemsByBagAndSlot[slotkey].data
-      if data.isItemEmpty or data.stackedOn ~= nil then
-        view.content:RemoveCell(slotkey)
-        view.itemsByBagAndSlot[slotkey]:Wipe()
-      end
+    local data = view.itemsByBagAndSlot[slotkey].data
+    if data.isItemEmpty or data.stackedOn ~= nil then
+      view.content:RemoveCell(slotkey)
+      view.itemsByBagAndSlot[slotkey]:Wipe()
     end
   end
 
@@ -90,26 +88,16 @@ local function OneBagView(view, bag, slotInfo)
     item:UpdateCount()
   end
 
-  view.freeSlot = view.freeSlot or itemFrame:Create()
-  if slotInfo.emptySlots > 0 then
-    local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKey)
-    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, slotInfo.emptySlots, false)
-  else
-    view.freeSlot:SetFreeSlots(0, 0, 0, false)
-  end
-  view.content:AddCell("freeSlot", view.freeSlot)
-
-  -- Only add the reagent free slot to the backbag view.
-  if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
-    view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
-    if slotInfo.emptyReagentSlots > 0 then
-      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(slotInfo.freeReagentSlotKey)
-      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, slotInfo.emptyReagentSlots, true)
-    else
-      view.freeReagentSlot:SetFreeSlots(0, 0, 0, true)
+  -- Get the free slots section and add the free slots to it.
+  for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+    local itemButton = view.itemsByBagAndSlot[name]
+    if itemButton == nil then
+      itemButton = itemFrame:Create()
+      view.itemsByBagAndSlot[name] = itemButton
     end
-
-    view.content:AddCell("freeReagentSlot", view.freeReagentSlot)
+    local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+    itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, false)
+    view.content:AddCell(name, itemButton)
   end
 
   view.content.maxCellWidth = sizeInfo.columnCount

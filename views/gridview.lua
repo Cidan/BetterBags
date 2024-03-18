@@ -174,25 +174,15 @@ local function GridView(view, bag, slotInfo)
 
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
-  view.freeSlot = view.freeSlot or itemFrame:Create()
-  if slotInfo.emptySlots > 0 then
-    local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKey)
-    view.freeSlot:SetFreeSlots(freeSlotBag, freeSlotID, slotInfo.emptySlots, false)
-  else
-    view.freeSlot:SetFreeSlots(0, 0, 0, false)
-  end
-  freeSlotsSection:AddCell('freeSlot', view.freeSlot)
-
-  -- Only add the reagent free slot to the backbag view.
-  if bag.kind == const.BAG_KIND.BACKPACK and addon.isRetail then
-    view.freeReagentSlot = view.freeReagentSlot or itemFrame:Create()
-    if slotInfo.emptyReagentSlots > 0 then
-      local freeReagentSlotBag, freeReagentSlotID = view:ParseSlotKey(slotInfo.freeReagentSlotKey)
-      view.freeReagentSlot:SetFreeSlots(freeReagentSlotBag, freeReagentSlotID, slotInfo.emptyReagentSlots, true)
-    else
-      view.freeReagentSlot:SetFreeSlots(0, 0, 0, true)
+  for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+    local itemButton = view.itemsByBagAndSlot[name]
+    if itemButton == nil then
+      itemButton = itemFrame:Create()
+      view.itemsByBagAndSlot[name] = itemButton
     end
-    freeSlotsSection:AddCell('freeReagentSlot', view.freeReagentSlot)
+    local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+    itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, false)
+    freeSlotsSection:AddCell(name, itemButton)
   end
 
   -- Draw the free slots section.
