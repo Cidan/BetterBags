@@ -188,7 +188,7 @@ local function GridView(view, bag, slotInfo)
   end
 
   -- Draw the free slots section.
-  freeSlotsSection:SetMaxCellWidth(2)
+  freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
   freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
 
   view.content.maxCellWidth = sizeInfo.columnCount
