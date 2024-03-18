@@ -137,6 +137,9 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 --]]
+  self.freeSlotName = ""
+  self.freeSlotCount = 0
+  self.isFreeSlot = nil
   self:SetAlpha(1)
   events:SendMessage('item/Updated', self)
   self.frame:Show()

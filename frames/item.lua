@@ -160,6 +160,7 @@ end
 function itemFrame.itemProto:OnEnter()
   if not self.isFreeSlot then return end
   if not self.freeSlotName or self.freeSlotName == "" then return end
+  if self.freeSlotCount == -1 then return end
 
   itemFrame.emptyItemTooltip:SetOwner(self.frame, "ANCHOR_NONE")
   ContainerFrameItemButton_CalculateItemTooltipAnchors(self.frame, itemFrame.emptyItemTooltip)
@@ -376,6 +377,9 @@ function itemFrame.itemProto:SetItem(data)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
 
+  self.freeSlotName = ""
+  self.freeSlotCount = 0
+  self.isFreeSlot = nil
   self:SetAlpha(1)
   events:SendMessage('item/Updated', self)
   self.frame:Show()

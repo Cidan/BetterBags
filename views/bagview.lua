@@ -108,7 +108,7 @@ local function BagView(view, bag, slotInfo)
           itemButton = itemFrame:Create()
           view.itemsByBagAndSlot[slotkey] = itemButton
         end
-        itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
+        itemButton:SetFreeSlots(bagid, slotid, -1, C_Container.GetBagName(bagid))
         local section = view:GetOrCreateSection(GetBagName(bagid))
         section:AddCell(slotkey, itemButton)
       end
