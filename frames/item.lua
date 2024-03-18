@@ -8,6 +8,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local const = addon:GetModule('Constants')
 
 ---@class ItemFrame: AceModule
+---@field emptyItemTooltip GameTooltip
 local itemFrame = addon:NewModule('ItemFrame')
 
 ---@class Events: AceModule
@@ -47,6 +48,8 @@ local debug = addon:GetModule('Debug')
 ---@field stackCount number
 ---@field stackid number
 ---@field isFreeSlot boolean
+---@field freeSlotName string
+---@field freeSlotCount number
 ---@field kind BagKind
 ---@field masqueGroup string
 ---@field ilvlText FontString
@@ -152,6 +155,20 @@ function itemFrame.itemProto:UpdateSearch(text)
     end
   end
   self.button:SetMatchesSearch(true)
+end
+
+function itemFrame.itemProto:OnEnter()
+  if not self.isFreeSlot then return end
+  itemFrame.emptyItemTooltip:SetOwner(self.frame, "ANCHOR_NONE")
+  ContainerFrameItemButton_CalculateItemTooltipAnchors(self.frame, itemFrame.emptyItemTooltip)
+  itemFrame.emptyItemTooltip:AddLine(self.freeSlotName)
+  itemFrame.emptyItemTooltip:AddLine("\n")
+  itemFrame.emptyItemTooltip:AddDoubleLine(L:G("Free Slots"), self.freeSlotCount, 1, 1, 1, 1, 1, 1)
+  itemFrame.emptyItemTooltip:Show()
+end
+
+function itemFrame.itemProto:OnLeave()
+  itemFrame.emptyItemTooltip:Hide()
 end
 
 function itemFrame.itemProto:UpdateCooldown()
@@ -382,8 +399,8 @@ end
 ---@param bagid number
 ---@param slotid number
 ---@param count number
----@param reagent boolean
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
+---@param name string
+function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
@@ -400,6 +417,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 
   self.stackCount = 1
   self.button.minDisplayCount = -1
+  self.freeSlotCount = count
 
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
@@ -415,11 +433,8 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.LockTexture:Hide()
   self.button.UpgradeIcon:SetShown(false)
 
-  if reagent then
-    SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
-  else
-    SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
-  end
+  self.freeSlotName = name
+  SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
@@ -493,6 +508,8 @@ function itemFrame.itemProto:ClearItem()
   self.stackCount = 1
   self.stackid = nil
   self.isFreeSlot = false
+  self.freeSlotName = ""
+  self.freeSlotCount = 0
   self.button.UpgradeIcon:SetShown(false)
 end
 
@@ -513,6 +530,10 @@ function itemFrame:OnEnable()
   for _, frame in pairs(frames) do
     frame:Release()
   end
+
+  self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
+  --self.emptyItemTooltip:CopyTooltip()
+  self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
 end
 
 ---@param i Item
@@ -546,6 +567,13 @@ function itemFrame:_DoCreate()
   i.button = button
   button:SetAllPoints(p)
   button:SetPassThroughButtons("MiddleButton")
+  button:HookScript("OnEnter", function()
+    i:OnEnter()
+  end)
+
+  button:HookScript("OnLeave", function()
+    i:OnLeave()
+  end)
   i.frame = p
 
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);

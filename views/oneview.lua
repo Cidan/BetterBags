@@ -96,7 +96,7 @@ local function OneBagView(view, bag, slotInfo)
       view.itemsByBagAndSlot[name] = itemButton
     end
     local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-    itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, false)
+    itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
     view.content:AddCell(name, itemButton)
   end
 

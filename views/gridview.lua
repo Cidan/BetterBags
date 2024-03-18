@@ -125,7 +125,7 @@ local function GridView(view, bag, slotInfo)
         if data.isItemEmpty or data.stackedOn ~= nil then
           if view.defer and not data.forceClear then
             debug:Log("RemoveCell", "Removed because empty (defer)", slotkey, data.itemInfo.itemLink)
-            view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
+            view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, "Recently Deleted")
             bag.drawOnClose = true
           else
             debug:Log("RemoveCell", "Removed because empty", slotkey, data.itemInfo.itemLink)
@@ -137,7 +137,7 @@ local function GridView(view, bag, slotInfo)
         elseif data.itemInfo.category ~= sectionName then
           if view.defer then
             debug:Log("RemoveCell", "Removed because category mismatch (defer)", slotkey, data.itemInfo.itemLink)
-            view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[data.bagid] ~= nil)
+            view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, "Recently Deleted")
             bag.drawOnClose = true
           else
             debug:Log("RemoveCell", "Removed because category mismatch", slotkey, data.itemInfo.itemLink)
@@ -181,7 +181,7 @@ local function GridView(view, bag, slotInfo)
       view.itemsByBagAndSlot[name] = itemButton
     end
     local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-    itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, false)
+    itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
     freeSlotsSection:AddCell(name, itemButton)
   end
 
