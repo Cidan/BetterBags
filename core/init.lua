@@ -109,6 +109,14 @@ function addon:HideBlizzardBags()
   BankFrame:SetScript("OnEvent", nil)
 end
 
+local function CheckKeyBindings()
+  if GetBindingKey("OPENALLBAGS") == nil then
+    question:Alert("No Binding Set", [[
+      Better Bags does not have a key binding set for opening all bags.
+      Please set a key binding for "Open All Bags" in the key bindings menu.
+    ]])
+  end
+end
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
   itemFrame:Enable()
@@ -173,10 +181,6 @@ function addon:OnEnable()
     -- the base UI/UX these screens refer to.
     C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
   end
-  if GetBindingKey("OPENALLBAGS") == nil then
-    question:Alert("No Binding Set", [[
-      Better Bags does not have a key binding set for opening all bags.
-      Please set a key binding for "Open All Bags" in the key bindings menu.
-    ]])
-  end
+
+  C_Timer.After(5, CheckKeyBindings)
 end

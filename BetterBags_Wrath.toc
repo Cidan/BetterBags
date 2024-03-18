@@ -46,8 +46,8 @@ core\database.lua
 core\hooks.lua
 
 data\equipmentsets.lua
-data\items.lua
 data\categories.lua
+data\items.lua
 
 util\color.lua
 util\resize.lua

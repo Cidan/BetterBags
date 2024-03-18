@@ -12,6 +12,9 @@ local const = addon:GetModule('Constants')
 ---@class EquipmentSets: AceModule
 local equipmentSets = addon:GetModule('EquipmentSets')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -21,6 +24,7 @@ local L = addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+-- ItemLinkInfo contains all the information parsed from an item link.
 ---@class (exact) ItemLinkInfo
 ---@field itemID number
 ---@field enchantID string
@@ -42,14 +46,16 @@ local debug = addon:GetModule('Debug')
 ---@field crafterGUID string
 ---@field extraEnchantID string
 
+-- ExtraSlotInfo contains refresh data for an entire bag view, bag or bank.
 ---@class (exact) ExtraSlotInfo
----@field emptySlots number The number of empty normal slots across all bags.
----@field emptyReagentSlots number The number of empty reagent slots across all bags.
+---@field emptySlots table<string, number> The number of empty normal slots across all bags.
+---@field freeSlotKeys table<string, string> The keys of the first empty slot per bag type.
 ---@field totalItems number The total number of valid items across all bags.
----@field freeSlotKey string The key of the first empty normal slot.
----@field freeReagentSlotKey string The key of the first empty reagent slot.
 ---@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
+---@field deferDelete? boolean If true, delete's should be deferred until the next refresh.
+---@field dirtyItems ItemData[] A list of dirty items that need to be refreshed.
 
+-- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
 ---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
@@ -65,6 +71,8 @@ local debug = addon:GetModule('Debug')
 ---@field stackedCount number
 ---@field itemLinkInfo ItemLinkInfo
 ---@field itemHash string
+---@field bagName string
+---@field forceClear boolean
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -72,8 +80,6 @@ local itemDataProto = {}
 ---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field slotInfo ExtraSlotInfo
 ---@field bankSlotInfo ExtraSlotInfo
----@field dirtyItems ItemData[]
----@field dirtyBankItems ItemData[]
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _container ContinuableContainer
 ---@field _bankContainer ContinuableContainer
@@ -84,30 +90,32 @@ local itemDataProto = {}
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
-  self.dirtyItems = {}
-  self.dirtyBankItems = {}
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
   self.slotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   self.bankSlotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   self._newItemTimers = {}
-  self._firstLoad = true
-  self._bankFirstLoad = true
+  self._firstLoad = false
+  self._bankFirstLoad = false
 end
 
 function items:OnEnable()
@@ -175,20 +183,24 @@ function items:FullRefreshAll()
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
   self.slotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   self.bankSlotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
   events:SendMessage('bags/RefreshAll')
 end
@@ -259,7 +271,6 @@ function items:RefreshBackpack()
   equipmentSets:Update()
   self._doingRefreshAll = true
   self._container = ContinuableContainer:Create()
-  wipe(self.dirtyItems)
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
@@ -323,12 +334,6 @@ function items:ShouldItemStack(kind, data)
   return false
 end
 
----@param kind BagKind
----@return ExtraSlotInfo
-function items:GetExtraSlotInfo(kind)
-  return kind == const.BAG_KIND.BACKPACK and self.slotInfo or self.bankSlotInfo
-end
-
 ---@param data ItemData
 ---@return string
 function items:GetSlotKey(data)
@@ -340,12 +345,13 @@ end
 function items:BackpackLoadFunction()
   ---@type ExtraSlotInfo
   local extraSlotInfo = {
-    emptySlots = 0,
-    emptyReagentSlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     totalItems = 0,
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
 
   ---@type table<string, ItemData>
@@ -355,16 +361,36 @@ function items:BackpackLoadFunction()
   local dirty = {}
 
   for bagid, bag in pairs(items.itemsByBagAndSlot) do
+    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
+    local name = ""
+    if bagid == 0 then
+      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+    else
+      local invid = C_Container.ContainerIDToInventoryID(bagid)
+      local baglink = GetInventoryItemLink("player", invid)
+      if baglink ~= nil then
+        local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
+        name = GetItemSubClassInfo(class, subclass)
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+      end
+    end
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
       -- Check if the item as changed, and if so, add it to the dirty list.
       if items:HasItemChanged(bagid, slotid, data) then
-        debug:Log("Dirty Item", data.itemInfo and data.itemInfo.itemLink)
+        local wasStacked = data.stacks and data.stacks > 0
         wipe(data)
         data.bagid = bagid
         data.slotid = slotid
         items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
-        table.insert(items.dirtyItems, data)
+        if wasStacked then
+          debug:Log("Stacks", "Was Stacked", data.itemInfo.itemLink)
+          data.forceClear = true
+        end
+        table.insert(extraSlotInfo.dirtyItems, data)
         dirty[self:GetSlotKey(data)] = data
       end
 
@@ -377,27 +403,30 @@ function items:BackpackLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = 0
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+          stackItem.stacks = stackItem.stacks + 1
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
             self:ClearNewItem(stackItem)
+            data.itemInfo.category = self:GetCategory(data)
+            stackItem.itemInfo.category = self:GetCategory(stackItem)
           end
           --TODO(lobato): I don't know why dirty as a set doesn't just work here when
           -- passing it into the event, and I'm too tired to figure it out right now.
           local key = items:GetSlotKey(data)
           if dirty[key] == nil then
-            table.insert(items.dirtyItems, data)
+            table.insert(extraSlotInfo.dirtyItems, data)
             dirty[key] = data
           end
 
           key = items:GetSlotKey(stackItem)
           if dirty[key] == nil then
-            table.insert(items.dirtyItems, stackItem)
+            table.insert(extraSlotInfo.dirtyItems, stackItem)
             dirty[key] = stackItem
           end
         else
           local key = items:GetSlotKey(data)
           if data.stackedOn ~= nil and dirty[key] == nil then
-            table.insert(items.dirtyItems, data)
+            table.insert(extraSlotInfo.dirtyItems, data)
             dirty[key] = data
           end
           data.stacks = 0
@@ -411,7 +440,7 @@ function items:BackpackLoadFunction()
         data.stackedCount = data.itemInfo.currentItemCount
         local key = items:GetSlotKey(data)
         if dirty[key] == nil then
-          table.insert(items.dirtyItems, data)
+          table.insert(extraSlotInfo.dirtyItems, data)
           dirty[key] = data
         end
       end
@@ -420,13 +449,7 @@ function items:BackpackLoadFunction()
         data.stacks = 0
         data.stackedOn = nil
         data.stackedCount = nil
-        if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-          extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-          extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
-        elseif bagid ~= Enum.BagIndex.Keyring then
-          extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-          extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
-        end
+        extraSlotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
         extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
       else
         extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
@@ -434,53 +457,65 @@ function items:BackpackLoadFunction()
     end
   end
 
-  self.slotInfo = extraSlotInfo
-  -- All items in all bags have finished loading, fire the all done event.
-  if not self._firstLoad then
-    debug:EndProfile('Backpack Data Pipeline')
-    events:SendMessageLater('items/RefreshBackpack/Done', function()
-      wipe(items.dirtyItems)
-      items._container = nil
-      items._doingRefreshAll = false
-    end,
-    items.dirtyItems)
+  if extraSlotInfo.totalItems < self.slotInfo.totalItems then
+    extraSlotInfo.deferDelete = true
   end
+
+  self.slotInfo = CopyTable(extraSlotInfo)
+  -- All items in all bags have finished loading, fire the all done event.
+  debug:EndProfile('Backpack Data Pipeline')
+  events:SendMessageLater('items/RefreshBackpack/Done', function()
+    items._container = nil
+    items._doingRefreshAll = false
+  end,
+  extraSlotInfo)
 end
 
   -- Load item data in the background, and fire a message when
   -- all bags are done loading.
 function items:ProcessContainer()
   self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
-  -- Call the data load function twice on first load, because the first load
-  -- sometimes does not complete, even though the container is marked as done.
-  -- This is a Blizzard bug.
-  if self._firstLoad then
-    self._firstLoad = false
-    self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
-  end
 end
 
 function items:BankLoadFunction()
   ---@type ExtraSlotInfo
   local extraSlotInfo = {
-    emptySlots = 0,
+    emptySlots = {},
+    freeSlotKeys = {},
     emptyReagentSlots = 0,
     totalItems = 0,
     freeSlotKey = "",
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
+    dirtyItems = {},
   }
 
   ---@type table<string, ItemData>
   local stacks = {}
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
+    local name = ""
+    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
+    if bagid == 0 then
+      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+    else
+      local invid = C_Container.ContainerIDToInventoryID(bagid)
+      local baglink = GetInventoryItemLink("player", invid)
+      if baglink ~= nil then
+        local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
+        name = GetItemSubClassInfo(class, subclass)
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+      end
+    end
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
       items:AttachItemInfo(data, const.BAG_KIND.BANK)
       data.stackedCount = 0
       data.stackedOn = nil
       data.stacks = 0
-      table.insert(items.dirtyBankItems, data)
+      table.insert(extraSlotInfo.dirtyItems, data)
       -- Compute stacking data.
       if items:ShouldItemStack(const.BAG_KIND.BANK, data) then
         local stackItem = stacks[data.itemHash]
@@ -490,9 +525,12 @@ function items:BankLoadFunction()
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = 0
           stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
+          stackItem.stacks = stackItem.stacks + 1
           if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
             self:ClearNewItem(data)
             self:ClearNewItem(stackItem)
+            data.itemInfo.category = self:GetCategory(data)
+            stackItem.itemInfo.category = self:GetCategory(stackItem)
           end
         else
           data.stacks = 0
@@ -510,40 +548,24 @@ function items:BankLoadFunction()
         data.stacks = 0
         data.stackedOn = nil
         data.stackedCount = nil
-        if const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-          extraSlotInfo.emptyReagentSlots = (extraSlotInfo.emptyReagentSlots or 0) + 1
-          extraSlotInfo.freeReagentSlotKey = bagid .. '_' .. slotid
-        else
-          extraSlotInfo.emptySlots = (extraSlotInfo.emptySlots or 0) + 1
-          extraSlotInfo.freeSlotKey = bagid .. '_' .. slotid
-        end
+        extraSlotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
         extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
       else
         extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
       end
     end
   end
-  self.bankSlotInfo = extraSlotInfo
+  self.bankSlotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
-  if not self._bankFirstLoad then
-    events:SendMessage('items/RefreshBank/Done', items.dirtyBankItems)
-    wipe(items.dirtyBankItems)
-    items._bankContainer = nil
-    items._doingRefreshAll = false
-  end
+  events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
+  items._bankContainer = nil
+  items._doingRefreshAll = false
 end
 
 -- Load item data in the background, and fire a message when
 -- all bags are done loading.
 function items:ProcessBankContainer()
   self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
-  -- Call the data load function twice on first load, because the first load
-  -- sometimes does not complete, even though the container is marked as done.
-  -- This is a Blizzard bug.
-  if self._bankFirstLoad then
-    self._bankFirstLoad = false
-    self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
-  end
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
@@ -720,22 +742,97 @@ end
 ---@return string
 function items:GenerateItemHash(data)
   local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d",
-  data.itemLinkInfo.itemID,
-  data.itemLinkInfo.enchantID,
-  data.itemLinkInfo.gemID1,
-  data.itemLinkInfo.gemID2,
-  data.itemLinkInfo.gemID3,
-  data.itemLinkInfo.suffixID,
-  table.concat(data.itemLinkInfo.bonusIDs, ","),
-  table.concat(data.itemLinkInfo.modifierIDs, ","),
-  table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
-  table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
-  table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
-  data.itemLinkInfo.crafterGUID or "",
-  data.itemLinkInfo.extraEnchantID or "",
-  data.itemInfo.currentItemLevel
-)
-return hash
+    data.itemLinkInfo.itemID,
+    data.itemLinkInfo.enchantID,
+    data.itemLinkInfo.gemID1,
+    data.itemLinkInfo.gemID2,
+    data.itemLinkInfo.gemID3,
+    data.itemLinkInfo.suffixID,
+    table.concat(data.itemLinkInfo.bonusIDs, ","),
+    table.concat(data.itemLinkInfo.modifierIDs, ","),
+    table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
+    table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
+    table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
+    data.itemLinkInfo.crafterGUID or "",
+    data.itemLinkInfo.extraEnchantID or "",
+    data.itemInfo.currentItemLevel
+  )
+  return hash
+end
+
+---@param data ItemData
+---@return string
+function items:GetCategory(data)
+  if data.isItemEmpty then return L:G('Empty Slot') end
+
+  if database:GetCategoryFilter(data.kind, "RecentItems") then
+    if items:IsNewItem(data) then
+      return L:G("Recent Items")
+    end
+  end
+
+  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else..
+  if data.itemInfo.equipmentSet and database:GetCategoryFilter(data.kind, "GearSet") then
+    return "Gear: " .. data.itemInfo.equipmentSet
+  end
+
+  -- Return the custom category if it exists next.
+  local customCategory = categories:GetCustomCategory(data.kind, data)
+  if customCategory then
+    return customCategory
+  end
+
+  if not data.kind then return L:G('Everything') end
+  -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
+  if data.containerInfo.quality == Enum.ItemQuality.Poor then
+    return L:G('Junk')
+  end
+
+  local category = ""
+
+  -- Add the type filter to the category if enabled, but not to trade goods
+  -- when the tradeskill filter is enabled. This makes it so trade goods are
+  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
+  if database:GetCategoryFilter(data.kind, "Type") and not
+  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
+  data.itemInfo.itemType then
+    category = category .. data.itemInfo.itemType --[[@as string]]
+  end
+
+  -- Add the subtype filter to the category if enabled, but same as with
+  -- the type filter we don't add it to trade goods when the tradeskill
+  -- filter is enabled.
+  if database:GetCategoryFilter(data.kind, "Subtype") and not
+  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
+  data.itemInfo.itemSubType then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. data.itemInfo.itemSubType
+  end
+
+  -- Add the tradeskill filter to the category if enabled.
+  if data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill") then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.TRADESKILL_MAP[data.itemInfo.subclassID]
+  end
+
+  -- Add the expansion filter to the category if enabled.
+  if database:GetCategoryFilter(data.kind, "Expansion") then
+    if not data.itemInfo.expacID then return L:G('Unknown') end
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.EXPANSION_MAP[data.itemInfo.expacID] --[[@as string]]
+  end
+
+  if category == "" then
+    category = L:G('Everything')
+  end
+
+  return category
 end
 
 ---@param data ItemData
@@ -806,6 +903,8 @@ function items:AttachItemInfo(data, kind)
 
   data.itemLinkInfo = self:ParseItemLink(itemLink)
   data.itemHash = self:GenerateItemHash(data)
+  data.itemInfo.category = self:GetCategory(data)
+  data.forceClear = false
   data.stacks = 0
 end
 
@@ -855,4 +954,5 @@ function items:AttachBasicItemInfo(itemID, data)
     currentItemLevel = 0 --[[@as number]],
     equipmentSet = nil,
   }
+  data.forceClear = false
 end

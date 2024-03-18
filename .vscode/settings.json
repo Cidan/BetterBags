@@ -104,7 +104,9 @@
     "StaticPopup_Show",
     "tonumber",
     "LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME",
-    "GameMenuFrame"
+    "GameMenuFrame",
+    "LE_SCRIPT_BINDING_TYPE_INTRINSIC_POSTCALL",
+    "LE_SCRIPT_BINDING_TYPE_INTRINSIC_PRECALL"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

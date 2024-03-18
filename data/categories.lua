@@ -6,9 +6,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 

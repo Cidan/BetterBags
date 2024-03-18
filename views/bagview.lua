@@ -27,6 +27,9 @@ local database = addon:GetModule('Database')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
 ---@param view view
 local function Wipe(view)
   view.content:Wipe()
@@ -42,17 +45,38 @@ local function Wipe(view)
   wipe(view.itemsByBagAndSlot)
 end
 
+---@param bagid number
+---@return string
+local function GetBagName(bagid)
+  local isBackpack = const.BACKPACK_BAGS[bagid] ~= nil
+  if isBackpack then
+    local bagname = bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(bagid)
+    local displayid = bagid == Enum.BagIndex.Keyring and 6 or bagid+1
+    return format("#%d: %s", displayid, bagname)
+  end
+
+    local id = bagid
+    if id == -1 then
+      return format("#%d: %s", 1, L:G('Bank'))
+    elseif id == -3 then
+      return format("#%d: %s", 1, L:G('Reagent Bank'))
+    else
+      return format("#%d: %s", id - 4, C_Container.GetBagName(id))
+    end
+
+end
+
 ---@param view view
 ---@param bag Bag
----@param dirtyItems ItemData[]
-local function BagView(view, bag, dirtyItems)
+---@param slotInfo ExtraSlotInfo
+local function BagView(view, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
   end
   -- Use the section grid sizing for this view type.
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_GRID)
-  local extraSlotInfo = items:GetExtraSlotInfo(bag.kind)
+  local dirtyItems = slotInfo.dirtyItems
 
   for _, data in pairs(dirtyItems) do
     local bagid = data.bagid
@@ -70,32 +94,12 @@ local function BagView(view, bag, dirtyItems)
 
     -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
     if (not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) then
-      local category = itemButton:GetCategory()
-      local section = view:GetOrCreateSection(category)
+      local section = view:GetOrCreateSection(GetBagName(bagid))
       section:AddCell(slotkey, itemButton)
     end
   end
 
-  for slotkey, itemButton in pairs(view.itemsByBagAndSlot) do
-    local data = itemButton.data
-    local name = C_Container.GetBagName(data.bagid)
-    local previousCategory = data.itemInfo and data.itemInfo.category
-    if name ~= nil then
-      local newCategory = itemButton:GetCategory()
-      if not data.isItemEmpty and previousCategory ~= newCategory then
-        debug:Log("BagSlotShow", "Category difference", previousCategory, "->", newCategory)
-        local section = view:GetOrCreateSection(newCategory)
-        section:AddCell(slotkey, itemButton)
-      end
-    else
-      debug:Log("MissingBag", "Removing slotkey from missing bag", slotkey, "bagid ->", data.bagid)
-      local section = view:GetOrCreateSection(previousCategory)
-      section:RemoveCell(slotkey)
-      view.itemsByBagAndSlot[slotkey]:Release()
-      view.itemsByBagAndSlot[slotkey] = nil
-    end
-  end
-  for bagid, emptyBagData in pairs(extraSlotInfo.emptySlotByBagAndSlot) do
+  for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
     for slotid, data in pairs(emptyBagData) do
       local slotkey = view:GetSlotKey(data)
       if C_Container.GetBagName(bagid) ~= nil then
@@ -105,8 +109,7 @@ local function BagView(view, bag, dirtyItems)
           view.itemsByBagAndSlot[slotkey] = itemButton
         end
         itemButton:SetFreeSlots(bagid, slotid, -1, const.BACKPACK_ONLY_REAGENT_BAGS[bagid] ~= nil)
-        local category = itemButton:GetCategory()
-        local section = view:GetOrCreateSection(category)
+        local section = view:GetOrCreateSection(GetBagName(bagid))
         section:AddCell(slotkey, itemButton)
       end
     end

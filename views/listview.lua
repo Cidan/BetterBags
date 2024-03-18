@@ -57,13 +57,14 @@ end
 
 ---@param view view
 ---@param bag Bag
----@param dirtyItems ItemData[]
-local function ListView(view, bag, dirtyItems)
+---@param slotInfo ExtraSlotInfo
+local function ListView(view, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
   end
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
+  local dirtyItems = slotInfo.dirtyItems
   for _, data in pairs(dirtyItems) do
     if data.stackedOn == nil or data.isItemEmpty then
       local slotkey = view:GetSlotKey(data)

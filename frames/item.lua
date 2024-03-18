@@ -8,6 +8,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local const = addon:GetModule('Constants')
 
 ---@class ItemFrame: AceModule
+---@field emptyItemTooltip GameTooltip
 local itemFrame = addon:NewModule('ItemFrame')
 
 ---@class Events: AceModule
@@ -47,6 +48,8 @@ local debug = addon:GetModule('Debug')
 ---@field stackCount number
 ---@field stackid number
 ---@field isFreeSlot boolean
+---@field freeSlotName string
+---@field freeSlotCount number
 ---@field kind BagKind
 ---@field masqueGroup string
 ---@field ilvlText FontString
@@ -152,6 +155,22 @@ function itemFrame.itemProto:UpdateSearch(text)
     end
   end
   self.button:SetMatchesSearch(true)
+end
+
+function itemFrame.itemProto:OnEnter()
+  if not self.isFreeSlot then return end
+  if not self.freeSlotName or self.freeSlotName == "" then return end
+
+  itemFrame.emptyItemTooltip:SetOwner(self.frame, "ANCHOR_NONE")
+  ContainerFrameItemButton_CalculateItemTooltipAnchors(self.frame, itemFrame.emptyItemTooltip)
+  itemFrame.emptyItemTooltip:AddLine(self.freeSlotName)
+  itemFrame.emptyItemTooltip:AddLine("\n")
+  itemFrame.emptyItemTooltip:AddDoubleLine(L:G("Free Slots"), self.freeSlotCount, 1, 1, 1, 1, 1, 1)
+  itemFrame.emptyItemTooltip:Show()
+end
+
+function itemFrame.itemProto:OnLeave()
+  itemFrame.emptyItemTooltip:Hide()
 end
 
 function itemFrame.itemProto:UpdateCooldown()
@@ -382,8 +401,8 @@ end
 ---@param bagid number
 ---@param slotid number
 ---@param count number
----@param reagent boolean
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
+---@param name string
+function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
@@ -400,6 +419,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
 
   self.stackCount = 1
   self.button.minDisplayCount = -1
+  self.freeSlotCount = count
 
   ClearItemButtonOverlay(self.button)
   self.button:SetHasItem(false)
@@ -415,11 +435,8 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   self.LockTexture:Hide()
   self.button.UpgradeIcon:SetShown(false)
 
-  if reagent then
-    SetItemButtonQuality(self.button, Enum.ItemQuality.Artifact, nil, false, false)
-  else
-    SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
-  end
+  self.freeSlotName = name
+  SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
 
   self.isFreeSlot = true
   self.button.ItemSlotBackground:Show()
@@ -427,104 +444,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, reagent)
   events:SendMessage('item/Updated', self)
   self.frame:Show()
   self.button:Show()
-end
-
-function itemFrame.itemProto:GetCategory()
-
-  if self.kind == const.BAG_KIND.BACKPACK and database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    ---@type string
-    local bagname = self.data.bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(self.data.bagid)
-    local displayid = self.data.bagid == Enum.BagIndex.Keyring and 6 or self.data.bagid+1
-    self.data.itemInfo.category = format("#%d: %s", displayid, bagname)
-    return self.data.itemInfo.category
-  end
-
-  if self.kind == const.BAG_KIND.BANK and database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    local id = self.data.bagid
-    if id == -1 then
-      self.data.itemInfo.category = format("#%d: %s", 1, L:G('Bank'))
-    elseif id == -3 then
-      self.data.itemInfo.category = format("#%d: %s", 1, L:G('Reagent Bank'))
-    else
-      self.data.itemInfo.category = format("#%d: %s", id - 4, C_Container.GetBagName(id))
-    end
-    return self.data.itemInfo.category
-  end
-
-  if self.data.isItemEmpty then return L:G('Empty Slot') end
-
-  if database:GetCategoryFilter(self.kind, "RecentItems") then
-    if items:IsNewItem(self.data) then
-      self.data.itemInfo.category = L:G("Recent Items")
-      return self.data.itemInfo.category
-    end
-  end
-
-  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else..
-  if self.data.itemInfo.equipmentSet and database:GetCategoryFilter(self.kind, "GearSet") then
-    self.data.itemInfo.category = "Gear: " .. self.data.itemInfo.equipmentSet
-    return self.data.itemInfo.category
-  end
-
-  -- Return the custom category if it exists next.
-  local customCategory = categories:GetCustomCategory(self.kind, self.data)
-  if customCategory then
-    self.data.itemInfo.category = customCategory
-    return customCategory
-  end
-
-  if not self.kind then return L:G('Everything') end
-  -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
-  if self.data.containerInfo.quality == Enum.ItemQuality.Poor then
-    self.data.itemInfo.category = L:G('Junk')
-    return self.data.itemInfo.category
-  end
-
-  local category = ""
-
-  -- Add the type filter to the category if enabled, but not to trade goods
-  -- when the tradeskill filter is enabled. This makes it so trade goods are
-  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
-  if database:GetCategoryFilter(self.kind, "Type") and not
-  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) and
-  self.data.itemInfo.itemType then
-    category = category .. self.data.itemInfo.itemType --[[@as string]]
-  end
-
-  -- Add the subtype filter to the category if enabled, but same as with
-  -- the type filter we don't add it to trade goods when the tradeskill
-  -- filter is enabled.
-  if database:GetCategoryFilter(self.kind, "Subtype") and not
-  (self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill")) and
-  self.data.itemInfo.itemSubType then
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. self.data.itemInfo.itemSubType
-  end
-
-  -- Add the tradeskill filter to the category if enabled.
-  if self.data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(self.kind, "TradeSkill") then
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. const.TRADESKILL_MAP[self.data.itemInfo.subclassID]
-  end
-
-  -- Add the expansion filter to the category if enabled.
-  if database:GetCategoryFilter(self.kind, "Expansion") then
-    if not self.data.itemInfo.expacID then return L:G('Unknown') end
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. const.EXPANSION_MAP[self.data.itemInfo.expacID] --[[@as string]]
-  end
-
-  if category == "" then
-    category = L:G('Everything')
-  end
-  self.data.itemInfo.category = category
-  return category
 end
 
 ---@return boolean
@@ -591,6 +510,8 @@ function itemFrame.itemProto:ClearItem()
   self.stackCount = 1
   self.stackid = nil
   self.isFreeSlot = false
+  self.freeSlotName = ""
+  self.freeSlotCount = 0
   self.button.UpgradeIcon:SetShown(false)
 end
 
@@ -611,6 +532,10 @@ function itemFrame:OnEnable()
   for _, frame in pairs(frames) do
     frame:Release()
   end
+
+  self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
+  --self.emptyItemTooltip:CopyTooltip()
+  self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
 end
 
 ---@param i Item
@@ -644,6 +569,15 @@ function itemFrame:_DoCreate()
   i.button = button
   button:SetAllPoints(p)
   button:SetPassThroughButtons("MiddleButton")
+
+  button:HookScript("OnEnter", function()
+    i:OnEnter()
+  end)
+
+  button:HookScript("OnLeave", function()
+    i:OnLeave()
+  end)
+
   i.frame = p
 
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
