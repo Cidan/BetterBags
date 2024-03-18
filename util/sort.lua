@@ -73,6 +73,9 @@ function sort.SortSectionsAlphabetically(a, b)
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
+  if a:GetFillWidth() then return false end
+  if b:GetFillWidth() then return true end
+
   if a.title:GetText() == L:G("Free Space") then return false end
   if b.title:GetText() == L:G("Free Space") then return true end
   return a.title:GetText() < b.title:GetText()
@@ -84,6 +87,9 @@ end
 function sort.SortSectionsBySizeDescending(a, b)
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
+
+  if a:GetFillWidth() then return false end
+  if b:GetFillWidth() then return true end
 
   if a.title:GetText() == L:G("Free Space") then return false end
   if b.title:GetText() == L:G("Free Space") then return true end
@@ -100,6 +106,9 @@ end
 function sort.SortSectionsBySizeAscending(a, b)
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
+
+  if a:GetFillWidth() then return false end
+  if b:GetFillWidth() then return true end
 
   if a.title:GetText() == L:G("Free Space") then return false end
   if b.title:GetText() == L:G("Free Space") then return true end

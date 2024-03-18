@@ -120,7 +120,7 @@ local function GridView(view, bag, slotInfo)
       if button == nil then
         debug:Log("RemoveCell", "Removed because not in itemsByBagAndSlot", slotkey)
         section:RemoveCell(slotkey)
-      elseif slotkey ~= 'freeSlot' and slotkey ~= 'freeReagentSlot' then
+      else
         -- Remove item buttons that are empty or don't match the category.
         if data.isItemEmpty or data.stackedOn ~= nil then
           if view.defer and not data.forceClear then
@@ -187,10 +187,8 @@ local function GridView(view, bag, slotInfo)
     end
   end
 
-  -- Draw the free slots section.
-  freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
+  freeSlotsSection:SetMaxCellWidth(2)
   freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
-
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))

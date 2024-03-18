@@ -82,6 +82,11 @@ function sectionProto:SetFillWidth(fill)
   self.fillWidth = fill
 end
 
+---@return boolean
+function sectionProto:GetFillWidth()
+  return self.fillWidth
+end
+
 function sectionProto:GetContent()
   return self.content
 end
@@ -158,9 +163,12 @@ function sectionProto:Grid(kind, view, freeSpaceShown)
     self.frame:Hide()
     return 0, 0
   end
+  if self.fillWidth then
+    w = math.max(w, self.title:GetTextWidth())
+  end
   self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
   self.frame:Show()
-  return w+12, h + self.title:GetHeight() + 6
+  return w + 12, h + self.title:GetHeight() + 6
 end
 
 -------

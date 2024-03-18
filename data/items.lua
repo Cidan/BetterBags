@@ -363,8 +363,8 @@ function items:BackpackLoadFunction()
   for bagid, bag in pairs(items.itemsByBagAndSlot) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
     local name = ""
-    if bagid == -2 then
-    elseif bagid == 0 then
+    if bagid == Enum.BagIndex.Keyring then
+    elseif bagid == Enum.BagIndex.Backpack then
       name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
