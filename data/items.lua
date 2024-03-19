@@ -479,7 +479,7 @@ function items:ProcessContainer()
   repeat
     loaded = self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
     count = count + 1
-  until loaded or count > 2
+  until loaded or count > 2 or self._container == nil
 end
 
 function items:BankLoadFunction()
@@ -573,7 +573,7 @@ function items:ProcessBankContainer()
   local loaded = false
   repeat
     loaded = self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
-  until loaded
+  until loaded or self._bankContainer == nil
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
