@@ -149,7 +149,6 @@ function items:OnEnable()
       return
     end
     addon.atBank = true
-    self:RefreshBank()
   end)
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
@@ -208,7 +207,7 @@ end
 ---@private
 function items:DoRefreshAll()
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
-  if addon.Bags.Bank.frame:IsShown() then
+  if addon.Bags.Bank.frame:IsShown() or addon.atBank then
     if addon.Bags.Bank.isReagentBank then
       self:RefreshReagentBank()
     else
@@ -475,7 +474,10 @@ end
   -- Load item data in the background, and fire a message when
   -- all bags are done loading.
 function items:ProcessContainer()
-  self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
+  local loaded = false
+  repeat
+    loaded = self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
+  until loaded
 end
 
 function items:BankLoadFunction()
@@ -566,7 +568,10 @@ end
 -- Load item data in the background, and fire a message when
 -- all bags are done loading.
 function items:ProcessBankContainer()
-  self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
+  local loaded = false
+  repeat
+    loaded = self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
+  until loaded
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
