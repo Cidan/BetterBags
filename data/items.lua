@@ -370,7 +370,7 @@ function items:BackpackLoadFunction()
     else
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
-      if baglink ~= nil and invid~= nil then
+      if baglink ~= nil and invid ~= nil then
         local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
         name = GetItemSubClassInfo(class, subclass)
         extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
@@ -500,10 +500,17 @@ function items:BankLoadFunction()
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
     local name = ""
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
-    if bagid == 0 then
+    if bagid == Enum.BagIndex.Bank then
+      -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
+      -- There are 4 extra slots in the bank bag in Classic that should not
+      -- exist. This is a Blizzard bug.
+      if addon.isClassic then
+        freeSlots = freeSlots - 4
+      end
       name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+      print(bagid, freeSlots)
     else
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
