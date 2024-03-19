@@ -475,9 +475,11 @@ end
   -- all bags are done loading.
 function items:ProcessContainer()
   local loaded = false
+  local count = 0
   repeat
     loaded = self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
-  until loaded
+    count = count + 1
+  until loaded or count > 2
 end
 
 function items:BankLoadFunction()
