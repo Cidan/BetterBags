@@ -370,7 +370,7 @@ function items:BackpackLoadFunction()
     else
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
-      if baglink ~= nil then
+      if baglink ~= nil and invid~= nil then
         local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
         name = GetItemSubClassInfo(class, subclass)
         extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
@@ -507,7 +507,7 @@ function items:BankLoadFunction()
     else
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
-      if baglink ~= nil then
+      if baglink ~= nil and invid ~= nil then
         local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
         name = GetItemSubClassInfo(class, subclass)
         extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
