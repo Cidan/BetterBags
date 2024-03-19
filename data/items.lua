@@ -510,7 +510,6 @@ function items:BankLoadFunction()
       name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
-      print(bagid, freeSlots)
     else
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
