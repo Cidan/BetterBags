@@ -208,8 +208,10 @@ end
 
 ---@param category string
 function DB:DeleteItemCategory(category)
-  for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
-    DB:DeleteItemFromCategory(itemID, category)
+  if DB.data.profile.customCategoryFilters[category] ~= nil then
+    for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
+      DB:DeleteItemFromCategory(itemID, category)
+    end
   end
   DB.data.profile.customCategoryFilters[category] = nil
 end
