@@ -201,7 +201,11 @@ function items:FullRefreshAll()
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
   }
-  events:SendMessage('bags/RefreshAll')
+  if InCombatLockdown() then
+    addon.Bags.Backpack.drawAfterCombat = true
+  else
+    events:SendMessage('bags/RefreshAll', true)
+  end
 end
 
 ---@private
