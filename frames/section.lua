@@ -45,10 +45,11 @@ local sectionProto = {}
 ---@param kind BagKind
 ---@param view BagView
 ---@param freeSpaceShown boolean
+---@param nosort? boolean
 ---@return number width
 ---@return number height
-function sectionProto:Draw(kind, view, freeSpaceShown)
-  return self:Grid(kind, view, freeSpaceShown)
+function sectionProto:Draw(kind, view, freeSpaceShown, nosort)
+  return self:Grid(kind, view, freeSpaceShown, nosort)
 end
 
 -- SetTitle will set the title of the section.
@@ -139,6 +140,11 @@ function sectionProto:GetKeys()
   return keys
 end
 
+---@return Cell[]|Item[]|Section[]
+function sectionProto:GetRawCells()
+  return self.content.cells
+end
+
 function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end
@@ -147,13 +153,16 @@ end
 ---@param kind BagKind
 ---@param view BagView
 ---@param freeSpaceShown boolean
+---@param nosort? boolean
 ---@return number width
 ---@return number height
-function sectionProto:Grid(kind, view, freeSpaceShown)
-  if freeSpaceShown then
-    self.content:Sort(sort.GetItemSortBySlot)
-  else
-    self.content:Sort(sort:GetItemSortFunction(kind, view))
+function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
+  if not nosort then
+    if freeSpaceShown then
+      self.content:Sort(sort.GetItemSortBySlot)
+    else
+      self.content:Sort(sort:GetItemSortFunction(kind, view))
+    end
   end
   local w, h = self.content:Draw()
   self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
