@@ -89,6 +89,7 @@ local itemDataProto = {}
 ---@field _newItemTimers table<string, number>
 ---@field _firstLoad boolean
 ---@field _bankFirstLoad boolean
+---@field _preSort boolean
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -120,6 +121,7 @@ function items:OnInitialize()
   self._newItemTimers = {}
   self._firstLoad = false
   self._bankFirstLoad = false
+  self._preSort = false
 end
 
 function items:OnEnable()
@@ -147,11 +149,13 @@ function items:OnEnable()
   events:RegisterMessage('bags/SortBackpack', function()
     self:RemoveNewItemFromAllItems()
     self:ClearItemCache()
+    self:PreSort()
     C_Container:SortBags()
   end)
 
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
     debug:Log("Items", "Group Bucket Event for Refresh* Fired")
+    self._preSort = false
     -- No total items means we're doing a full refresh (or the player bags are totally empty, which is rare).
     if InCombatLockdown() and self.slotInfo.totalItems == 0 then
       addon.Bags.Backpack.drawAfterCombat = true
@@ -185,6 +189,16 @@ end
 
 function items:RefreshAll()
   events:SendMessage('bags/RefreshAll')
+end
+
+---@private
+function items:PreSort()
+  self._preSort = true
+  C_Timer.After(0.6, function()
+    if self._preSort then
+      self:FullRefreshAll()
+    end
+  end)
 end
 
 ---@private
