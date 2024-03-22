@@ -310,11 +310,13 @@ const.DATABASE_DEFAULTS = {
         mergeStacks = true,
         mergeUnstackable = true,
         unmergeAtShop = true,
+        dontMergePartial = false,
       },
       [const.BAG_KIND.BANK]  = {
         mergeStacks = true,
         mergeUnstackable = true,
         unmergeAtShop = true,
+        dontMergePartial = false,
       }
     },
     itemLevel = {

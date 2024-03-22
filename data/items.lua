@@ -140,8 +140,21 @@ function items:OnEnable()
     end
   end)
 
+  events:RegisterMessage('bags/SortBackpack', function()
+    self:RemoveNewItemFromAllItems()
+    self:ClearItemCache()
+    C_Container:SortBags()
+  end)
+
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
-    self:DoRefreshAll()
+    debug:Log("Items", "Group Bucket Event for Refresh* Fired")
+    -- No total items means we're doing a full refresh (or the player bags are totally empty, which is rare).
+    if InCombatLockdown() and self.slotInfo.totalItems == 0 then
+      addon.Bags.Backpack.drawAfterCombat = true
+      print(L:G("BetterBags: Bags will refresh after combat ends."))
+    else
+      self:DoRefreshAll()
+    end
   end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
@@ -153,10 +166,6 @@ function items:OnEnable()
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
   end)
-end
-
-function items:Disable()
-  --events:UnregisterEvent('BAG_UPDATE')
 end
 
 function items:RemoveNewItemFromAllItems()
@@ -175,9 +184,7 @@ function items:RefreshAll()
 end
 
 ---@private
--- FullRefreshAll will wipe the item cache and refresh all items in all bags.
-function items:FullRefreshAll()
-  debug:Log('FullRefreshAll', "Full Refresh All triggered")
+function items:ClearItemCache()
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
@@ -201,8 +208,23 @@ function items:FullRefreshAll()
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
   }
+  if addon.Bags.Backpack.currentView then
+    addon.Bags.Backpack.currentView.fullRefresh = true
+  end
+  if addon.Bags.Bank.currentView then
+    addon.Bags.Bank.currentView.fullRefresh = true
+  end
+  debug:Log("Items", "Item Cache Cleared")
+end
+
+---@private
+-- FullRefreshAll will wipe the item cache and refresh all items in all bags.
+function items:FullRefreshAll()
+  debug:Log('FullRefreshAll', "Full Refresh All triggered")
+  self:ClearItemCache()
   if InCombatLockdown() then
     addon.Bags.Backpack.drawAfterCombat = true
+    print(L:G("BetterBags: Bags will refresh after combat ends."))
   else
     events:SendMessage('bags/RefreshAll', true)
   end
@@ -328,12 +350,22 @@ function items:ShouldItemStack(kind, data)
     return false
   end
 
+  if stackOptions.mergeStacks and
+  stackOptions.dontMergePartial and
+  data.itemInfo.itemStackCount and
+  data.itemInfo.itemStackCount > 1 and
+  data.itemInfo.itemStackCount ~= data.itemInfo.currentItemCount then
+    return false
+  end
+
   if stackOptions.mergeStacks and data.itemInfo.itemStackCount and data.itemInfo.itemStackCount > 1 then
     return true
   end
+
   if stackOptions.mergeUnstackable and data.itemInfo.itemStackCount == 1 then
     return true
   end
+
   return false
 end
 
@@ -911,9 +943,9 @@ function items:AttachItemInfo(data, kind)
     equipmentSet = equipmentSets:GetItemSet(bagid, slotid),
   }
 
-  if database:GetItemLock(data.itemInfo.itemGUID) then
-    data.itemInfo.isLocked = true
-  end
+  --if database:GetItemLock(data.itemInfo.itemGUID) then
+  --  data.itemInfo.isLocked = true
+  --end
 
   if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()

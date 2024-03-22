@@ -320,6 +320,10 @@ function DB:SetUnmergeAtShop(kind, value)
   DB.data.profile.stacking[kind].unmergeAtShop = value
 end
 
+function DB:SetDontMergePartial(kind, value)
+  DB.data.profile.stacking[kind].dontMergePartial = value
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

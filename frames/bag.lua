@@ -140,7 +140,7 @@ end
 
 function bagFrame.bagProto:Sort()
   if self.kind ~= const.BAG_KIND.BACKPACK then return end
-
+  --[[
   -- Unlock all locked items so they can be sorted.
   ---@type Item[]
   local lockList = {}
@@ -150,15 +150,14 @@ function bagFrame.bagProto:Sort()
       item:Unlock()
     end
   end
-
+  --]]
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-  items:RemoveNewItemFromAllItems()
-  C_Container:SortBags()
-  --events:SendMessage('bags/FullRefreshAll')
-
+  events:SendMessage('bags/SortBackpack')
+--[[
   for _, item in pairs(lockList) do
     item:Lock()
   end
+--]]
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -531,12 +530,6 @@ function bagFrame:Create(kind)
     else
       b.searchBox.frame:Hide()
       b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
-    end
-  end)
-
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    if b.currentView then
-      b.currentView.fullRefresh = true
     end
   end)
 

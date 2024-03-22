@@ -212,6 +212,19 @@ function config:GetBagOptions(kind)
               events:SendMessage('bags/FullRefreshAll')
             end,
           },
+          dontMergePartial = {
+            type = "toggle",
+            name = L:G("Don't Merge Partial"),
+            desc = L:G("Don't merge stacks of items that aren't full stacks."),
+            order = 3,
+            get = function()
+              return DB:GetStackingOptions(kind).dontMergePartial
+            end,
+            set = function(_, value)
+              DB:SetDontMergePartial(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
         }
       },
       itemLevel = {

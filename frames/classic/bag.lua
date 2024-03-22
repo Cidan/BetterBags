@@ -289,11 +289,5 @@ function bagFrame:Create(kind)
     end
   end)
 
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    if b.currentView then
-      b.currentView.fullRefresh = true
-    end
-  end)
-
   return b
 end
