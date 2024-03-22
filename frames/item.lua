@@ -158,6 +158,7 @@ function itemFrame.itemProto:UpdateSearch(text)
 end
 
 function itemFrame.itemProto:OnEnter()
+  debug:ShowItemTooltip(self)
   if not self.isFreeSlot then return end
   if not self.freeSlotName or self.freeSlotName == "" then return end
   if self.freeSlotCount == -1 then return end
@@ -171,6 +172,7 @@ function itemFrame.itemProto:OnEnter()
 end
 
 function itemFrame.itemProto:OnLeave()
+  debug:HideItemTooltip(self)
   itemFrame.emptyItemTooltip:Hide()
 end
 

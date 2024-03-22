@@ -7,11 +7,13 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field window DebugWindow
 ---@field enabled boolean
 ---@field profiles table<string, number>
+---@field tooltip GameTooltip
 local debug = addon:NewModule('Debug')
 
 function debug:OnInitialize()
   self.profiles = {}
   self.enabled = false
+  self.tooltip = CreateFrame('GameTooltip', 'BetterBagsTooltip', UIParent, 'GameTooltipTemplate') --[[@as GameTooltip]]
 end
 
 function debug:OnEnable()

@@ -54,6 +54,7 @@ local debug = addon:GetModule('Debug')
 ---@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
 ---@field deferDelete? boolean If true, delete's should be deferred until the next refresh.
 ---@field dirtyItems ItemData[] A list of dirty items that need to be refreshed.
+---@field itemsBySlotKey table<string, ItemData> A table of items by slot key.
 
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
@@ -73,6 +74,7 @@ local debug = addon:GetModule('Debug')
 ---@field itemHash string
 ---@field bagName string
 ---@field forceClear boolean
+---@field nextStack string
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -102,6 +104,7 @@ function items:OnInitialize()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
+    itemsBySlotKey = {},
   }
   self.bankSlotInfo = {
     emptySlots = {},
@@ -112,6 +115,7 @@ function items:OnInitialize()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
+    itemsBySlotKey = {},
   }
   self._newItemTimers = {}
   self._firstLoad = false
@@ -197,6 +201,7 @@ function items:ClearItemCache()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
+    itemsBySlotKey = {},
   }
   self.bankSlotInfo = {
     emptySlots = {},
@@ -207,6 +212,7 @@ function items:ClearItemCache()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
+    itemsBySlotKey = {},
   }
   if addon.Bags.Backpack.currentView then
     addon.Bags.Backpack.currentView.fullRefresh = true
@@ -387,6 +393,7 @@ function items:BackpackLoadFunction()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
+    itemsBySlotKey = {},
   }
 
   ---@type table<string, ItemData>
@@ -394,6 +401,9 @@ function items:BackpackLoadFunction()
 
   ---@type table<string, ItemData>
   local dirty = {}
+
+  ---@type table<string, ItemData>
+  local nextStacks = {}
 
   for bagid, bag in pairs(items.itemsByBagAndSlot) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
@@ -418,6 +428,7 @@ function items:BackpackLoadFunction()
       -- Check if the item as changed, and if so, add it to the dirty list.
       if items:HasItemChanged(bagid, slotid, data) then
         local wasStacked = data.stacks and data.stacks > 0
+        local oldHash = data.itemHash
         wipe(data)
         data.bagid = bagid
         data.slotid = slotid
@@ -425,16 +436,20 @@ function items:BackpackLoadFunction()
         if wasStacked then
           debug:Log("Stacks", "Was Stacked", data.itemInfo.itemLink)
           data.forceClear = true
+          nextStacks[oldHash] = data
         end
         table.insert(extraSlotInfo.dirtyItems, data)
         dirty[self:GetSlotKey(data)] = data
       end
+
+      extraSlotInfo.itemsBySlotKey[self:GetSlotKey(data)] = data
 
       -- Compute stacking data.
       if items:ShouldItemStack(const.BAG_KIND.BACKPACK, data) then
         local stackItem = stacks[data.itemHash]
         if stackItem ~= nil then
           stackItem.stacks = stackItem.stacks + 1
+          stackItem.nextStack = items:GetSlotKey(data)
           data.stackedOn = items:GetSlotKey(stackItem)
           data.stackedCount = data.itemInfo.currentItemCount
           data.stacks = 0
@@ -497,6 +512,12 @@ function items:BackpackLoadFunction()
     extraSlotInfo.deferDelete = true
   end
 
+  for itemhash, item in pairs(nextStacks) do
+    if stacks[itemhash] then
+      item.nextStack = items:GetSlotKey(stacks[itemhash])
+    end
+  end
+
   self.slotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
   debug:EndProfile('Backpack Data Pipeline')
@@ -529,6 +550,7 @@ function items:BankLoadFunction()
     freeReagentSlotKey = "",
     emptySlotByBagAndSlot = {},
     dirtyItems = {},
+    itemsBySlotKey = {},
   }
 
   ---@type table<string, ItemData>
