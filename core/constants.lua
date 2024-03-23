@@ -305,6 +305,7 @@ const.DATABASE_DEFAULTS = {
     showBagButton = true,
     debug = false,
     inBagSearch = false,
+    showKeybindWarning = true,
     stacking = {
       [const.BAG_KIND.BACKPACK]  = {
         mergeStacks = true,

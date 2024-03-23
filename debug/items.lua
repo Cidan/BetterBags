@@ -57,6 +57,7 @@ end
 
 ---@param item Item
 function debug:HideItemTooltip(item)
+  _ = item
   tooltipLines = 0
   self.tooltip:Hide()
 end

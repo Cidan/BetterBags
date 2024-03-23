@@ -324,6 +324,14 @@ function DB:SetDontMergePartial(kind, value)
   DB.data.profile.stacking[kind].dontMergePartial = value
 end
 
+function DB:GetShowKeybindWarning()
+  return DB.data.profile.showKeybindWarning
+end
+
+function DB:SetShowKeybindWarning(value)
+  DB.data.profile.showKeybindWarning = value
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

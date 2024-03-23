@@ -110,11 +110,13 @@ function addon:HideBlizzardBags()
 end
 
 local function CheckKeyBindings()
+  if not database:GetShowKeybindWarning() then return end
   if GetBindingKey("OPENALLBAGS") == nil then
     question:Alert("No Binding Set", [[
       Better Bags does not have a key binding set for opening all bags.
       Please set a key binding for "Open All Bags" in the key bindings menu.
     ]])
+    database:SetShowKeybindWarning(false)
   end
 end
 -- OnEnable is called when the addon is enabled.

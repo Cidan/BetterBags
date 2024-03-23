@@ -272,6 +272,12 @@ function AceItemList:SetList(values) end
 
 ---@class MoneyFrameButtonTemplate
 
+---@class DefaultPanelFlatTemplate
+
+---@class UIPanelButtonTemplate
+
+---@class InputBoxTemplate
+
 -- Legacy UpdateCooldown function for Classic.
 ---@param id number
 ---@param button Button

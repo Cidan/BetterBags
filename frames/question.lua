@@ -13,6 +13,7 @@ local question = addon:NewModule('Question')
 ---@field text FontString
 ---@field yes Button|UIPanelButtonTemplate
 ---@field no Button|UIPanelButtonTemplate
+---@field ok Button|UIPanelButtonTemplate
 ---@field input EditBox|InputBoxTemplate
 local questionProto = {}
 
@@ -39,11 +40,13 @@ function question:_OnCreate()
 
   q.yes = CreateFrame('Button', nil, q.frame, "UIPanelButtonTemplate")
   q.no = CreateFrame('Button', nil, q.frame, "UIPanelButtonTemplate")
+  q.ok = CreateFrame('Button', nil, q.frame, "UIPanelButtonTemplate")
   q.yes:SetWidth(100)
   q.no:SetWidth(100)
+  q.ok:SetWidth(100)
   q.yes:SetPoint("BOTTOMLEFT", 10, 10)
   q.no:SetPoint("BOTTOMRIGHT", -10, 10)
-
+  q.ok:SetPoint("BOTTOM", 0, 10)
   return q
 end
 
@@ -56,6 +59,7 @@ function question:_OnReset(q)
   q.no:SetScript("OnClick", nil)
   q.yes:Show()
   q.no:Show()
+  q.ok:Hide()
   q.input:ClearFocus()
   q.input:SetText("")
   q.input:SetScript("OnEscapePressed", nil)
@@ -106,12 +110,14 @@ function question:Alert(title, text)
   local q = self._pool:Acquire() --[[@as QuestionFrame]]
   q.frame:SetTitle(title)
   q.text:SetText(text)
-  q.yes:SetText("Okay")
   q.no:Hide()
-  q.yes:SetScript("OnClick", function()
+  q.yes:Hide()
+  q.ok:SetText("Okay")
+  q.ok:SetScript("OnClick", function()
     self._pool:Release(q)
     self.open = false
   end)
+  q.ok:Show()
   q.input:Hide()
   q:Resize()
   q.frame:SetPoint('CENTER')
