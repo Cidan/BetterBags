@@ -18,6 +18,8 @@ end
 
 local tooltipLines = 0
 
+---@param first string
+---@param second string
 function debug:AddTooltipDouble(first, second)
   if tooltipLines % 2 == 0 then
     self.tooltip:AddDoubleLine(first, second, 1, 1, 1, 1, 1, 1)
@@ -28,29 +30,47 @@ function debug:AddTooltipDouble(first, second)
 end
 
 function debug:AddTooltip(line)
-  self.tooltip:AddLine(line, 1, 1, 1)
+  if tooltipLines % 2 == 0 then
+    self.tooltip:AddLine(line, 1, 1, 1)
+  else
+    self.tooltip:AddLine(line, 0.8, 0.5, 0.8)
+  end
+  tooltipLines = tooltipLines + 1
+end
+
+---@param t table<any, any>
+---@param depth number
+function debug:WriteTooltip(t, depth)
+  local indent = string.rep("   ", depth)
+  if depth > 0 then
+    local pos = depth * 2
+    indent = ("%s%s%s"):format(indent:sub(1,pos-1), "|-", indent:sub(pos+1))
+  end
+  for k, v in pairs(t) do
+    if type(v) == "table" then
+      self:AddTooltip(indent .. k .. ":")
+      self:WriteTooltip(v, depth + 1)
+    elseif v == nil then
+      self:AddTooltipDouble(indent .. k, "nil")
+    elseif type(v) ~= "string" then
+      self:AddTooltipDouble(indent .. k, tostring(v))
+    else
+      self:AddTooltipDouble(indent .. k, v)
+    end
+  end
 end
 
 ---@param item Item
 function debug:ShowItemTooltip(item)
   if not self.enabled then return end
-  self.tooltip:SetOwner(item.button, 'ANCHOR_BOTTOM')
+  self.tooltip:SetOwner(UIParent, 'ANCHOR_LEFT', 30, 0)
   if item.data.isItemEmpty then
     self:AddTooltip("Empty")
   else
     self:AddTooltip(item.data.itemInfo.itemLink)
   end
 
-  ---@diagnostic disable: no-unknown
-  for k, v in pairs(item.data) do
-    if type(v) == "table" then
-      self:AddTooltipDouble(k, "[table]")
-    elseif v == nil then
-      self:AddTooltipDouble(k, "nil")
-    else
-      self:AddTooltipDouble(k, v)
-    end
-  end
+  self:WriteTooltip(item.data, 0)
 
   self.tooltip:Show()
 end

@@ -119,6 +119,7 @@ local function CheckKeyBindings()
     database:SetShowKeybindWarning(false)
   end
 end
+
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
   itemFrame:Enable()
