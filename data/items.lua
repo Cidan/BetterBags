@@ -572,7 +572,7 @@ function items:BankLoadFunction()
   for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
     local name = ""
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
-    if bagid == Enum.BagIndex.Bank or Enum.BagIndex.Reagentbank then
+    if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
       -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
       -- There are 4 extra slots in the bank bag in Classic that should not
       -- exist. This is a Blizzard bug.
