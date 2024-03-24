@@ -18,7 +18,7 @@ function debug:EndProfile(name)
   if not self.enabled then return end
   assert(name ~= nil, "name must not be nil")
   assert(type(name) == "string", "name must be a string")
-  assert(self.profiles[name] ~= nil, "profile does not exist")
+  assert(self.profiles[name] ~= nil, "profile " .. tostring(name) .. " does not exist")
   local start = self.profiles[name]
   local stop = debugprofilestop()
   self:Log("Profile", name, "took", stop - start, "ms")

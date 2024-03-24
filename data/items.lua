@@ -146,6 +146,13 @@ function items:OnEnable()
     end
   end)
 
+  events:RegisterMessage('bags/SortBackpackClassic', function()
+    self:RemoveNewItemFromAllItems()
+    self:ClearItemCache()
+    self:PreSort()
+    _G.SortBags()
+  end)
+
   events:RegisterMessage('bags/SortBackpack', function()
     self:RemoveNewItemFromAllItems()
     self:ClearItemCache()
@@ -534,7 +541,6 @@ function items:BackpackLoadFunction()
 
   self.slotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
-  debug:EndProfile('Backpack Data Pipeline')
   events:SendMessageLater('items/RefreshBackpack/Done', function()
     items._container = nil
     items._doingRefreshAll = false
@@ -551,6 +557,7 @@ function items:ProcessContainer()
     loaded = self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
     count = count + 1
   until loaded or count > 2 or self._container == nil
+  debug:EndProfile('Backpack Data Pipeline')
 end
 
 function items:BankLoadFunction()

@@ -66,6 +66,16 @@ function bagFrame.bagProto:SwitchToBank()
   self:Wipe()
 end
 
+function bagFrame.bagProto:Sort()
+  PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
+  if _G.SortBags ~= nil then
+    events:SendMessage('bags/SortBackpackClassic')
+  else
+    items:RemoveNewItemFromAllItems()
+    self:Refresh()
+  end
+end
+
 -------
 --- Bag Frame
 -------
@@ -184,7 +194,11 @@ function bagFrame:Create(kind)
     if kind == const.BAG_KIND.BACKPACK then
       GameTooltip:AddDoubleLine(L:G("Left Click"), L:G("Open Menu"), 1, 0.81, 0, 1, 1, 1)
       GameTooltip:AddDoubleLine(L:G("Shift Left Click"), L:G("Search Bags"), 1, 0.81, 0, 1, 1, 1)
-      GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Refresh Bags"), 1, 0.81, 0, 1, 1, 1)
+      if _G.SortBags ~= nil then
+        GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Sort Bags"), 1, 0.81, 0, 1, 1, 1)
+      else
+        GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Refresh Bags"), 1, 0.81, 0, 1, 1, 1)
+      end
     else
       GameTooltip:AddDoubleLine(L:G("Left Click"), L:G("Open Menu"), 1, 0.81, 0, 1, 1, 1)
       GameTooltip:AddDoubleLine(L:G("Shift Left Click"), L:G("Search Bags"), 1, 0.81, 0, 1, 1, 1)
@@ -224,9 +238,7 @@ function bagFrame:Create(kind)
         context:Show(b.menuList)
       end
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
-    PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-    items:RemoveNewItemFromAllItems()
-    b:Refresh()
+      b:Sort()
     end
   end)
 
