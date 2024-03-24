@@ -67,7 +67,9 @@ local debug = addon:GetModule('Debug')
 ---@field isItemEmpty boolean
 ---@field kind BagKind
 ---@field newItemTime number
----@field stacks number
+---@field stacks number Count of _additional_ bag slots represented by a view slot
+-- e.g. three unstackable items in a merge-unstackable view will have a single view slot
+-- with ItemData.stacks = 2
 ---@field stackedOn string
 ---@field stackedCount number
 ---@field itemLinkInfo ItemLinkInfo
