@@ -654,9 +654,11 @@ end
 -- all bags are done loading.
 function items:ProcessBankContainer()
   local loaded = false
+  local count = 0
   repeat
     loaded = self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
-  until loaded or self._bankContainer == nil
+    count = count + 1
+  until loaded or count > 2 or self._bankContainer == nil
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.
