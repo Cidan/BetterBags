@@ -324,6 +324,10 @@ function DB:SetDontMergePartial(kind, value)
   DB.data.profile.stacking[kind].dontMergePartial = value
 end
 
+function DB:SetShowBagSlotsUsed(kind, value)
+  DB.data.profile.stacking[kind].showBagSlotsUsed = value
+end
+
 function DB:GetShowKeybindWarning()
   return DB.data.profile.showKeybindWarning
 end

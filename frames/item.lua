@@ -270,9 +270,10 @@ function itemFrame.itemProto:DrawItemLevel()
 end
 
 function itemFrame.itemProto:UpdateCount()
+  local stackingOptions = database:GetStackingOptions(self.kind)
   if self.data == nil or self.data.isItemEmpty then return end
   local count = self.data.stackedCount or self.data.itemInfo.currentItemCount
-  if self.data.stacks > 0 then
+  if self.data.stacks > 0 and stackingOptions.showBagSlotsUsed then
     -- since ItemData stacks is effectively _additional_ stacks to the base one, take its value + 1
     self.stacksCountText:SetText(tostring(self.data.stacks + 1))
     self.stacksCountText:Show()
