@@ -225,6 +225,19 @@ function config:GetBagOptions(kind)
               events:SendMessage('bags/FullRefreshAll')
             end,
           },
+          showBagSlotsUsed = {
+            type = "toggle",
+            name = L:G("Show Bag Slots Used"),
+            desc = L:G("Shows the count of bag slots occupied by a merged unstackable."),
+            order = 5,
+            get = function()
+              return DB:GetStackingOptions(kind).showBagSlotsUsed
+            end,
+            set = function(_, value)
+              DB:SetShowBagSlotsUsed(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
         }
       },
       itemLevel = {

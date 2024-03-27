@@ -181,6 +181,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
   self.ilvlText:SetText("")
+  self.stacksCountText:Hide()
   self.LockTexture:Hide()
   self.button.UpgradeIcon:SetShown(false)
 
@@ -220,6 +221,7 @@ function itemFrame.itemProto:ClearItem()
   self.button.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
+  self.stacksCountText:SetText("")
   self.LockTexture:Hide()
   self:SetSize(37, 37)
   self.button.UpgradeIcon:SetShown(false)
@@ -294,8 +296,12 @@ function itemFrame:_DoCreate()
   button:SetScript("OnEnter", function() i:UpdateTooltip() i:OnEnter() end)
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
+  local stacksCountText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+  stacksCountText:SetPoint("TOPRIGHT", -4.8, -2)
+  stacksCountText:SetTextColor(0.8, 0.8, 0.8, 1)
 
   i.ilvlText = ilvlText
+  i.stacksCountText = stacksCountText
 
   return i
 end
