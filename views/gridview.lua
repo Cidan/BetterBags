@@ -149,11 +149,11 @@ local function GridView(view, bag, slotInfo)
           end
         elseif data.itemInfo.category ~= sectionName then
           if view.defer then
-            debug:Log("RemoveCell", "Removed because category mismatch (defer)", slotkey, data.itemInfo.itemLink)
+            debug:Log("RemoveCell", "Removed mismatch (defer)", slotkey, data.itemInfo.itemLink, data.itemInfo.category, "->", sectionName)
             view.itemsByBagAndSlot[slotkey]:SetFreeSlots(data.bagid, data.slotid, -1, "Recently Deleted")
             bag.drawOnClose = true
           else
-            debug:Log("RemoveCell", "Removed because category mismatch", slotkey, data.itemInfo.itemLink)
+            debug:Log("RemoveCell", "Removed mismatch", slotkey, data.itemInfo.itemLink, data.itemInfo.category, "->", sectionName)
             section:RemoveCell(slotkey)
             bag.drawOnClose = false
           end
