@@ -350,9 +350,17 @@ function items:HasItemChanged(bagid, slotid, data)
     return true
   end
 
-  if itemLocation and C_Item.DoesItemExist(itemLocation) and oldStackCount ~= C_Item.GetStackCount(itemLocation) then
-    debug:Log("ItemChange", itemLink, "count", oldStackCount, "->", C_Item.GetStackCount(itemLocation))
-    return true
+  if itemLocation and C_Item.DoesItemExist(itemLocation) then
+    if C_NewItems.IsNewItem(bagid, slotid) and not data.itemInfo.isNewItem then
+      C_NewItems.RemoveNewItem(bagid, slotid)
+      debug:Log("ItemChange", itemLink, "Item Marked as New (stripped)")
+      return true
+    end
+
+    if oldStackCount ~= C_Item.GetStackCount(itemLocation) then
+      debug:Log("ItemChange", itemLink, "count", oldStackCount, "->", C_Item.GetStackCount(itemLocation))
+      return true
+    end
   end
 
   if data.itemInfo and data.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(data) then
