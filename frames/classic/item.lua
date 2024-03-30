@@ -174,6 +174,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   SetItemButtonQuality(self.button, false)
   SetItemButtonDesaturated(self.button, false)
   SetItemButtonTexture(self.button, [[Interface\PaperDoll\UI-Backpack-EmptySlot]])
+  self:UpdateCooldown()
   self.button.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[Enum.ItemQuality.Common]))
   self.button.IconBorder:Show()
@@ -227,6 +228,7 @@ function itemFrame.itemProto:ClearItem()
   self.freeSlotCount = 0
   self.isFreeSlot = nil
   self.data = nil
+  self:UpdateCooldown()
 end
 
 function itemFrame.itemProto:UpdateTooltip()
