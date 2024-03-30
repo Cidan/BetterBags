@@ -69,7 +69,7 @@ end
 
 function questionProto:Resize()
   local height = self.text:GetStringHeight()
-  height = height + (self.input:IsShown() and 50 or 20)
+  height = height + (self.input:IsShown() and 50 or 50)
   height = height + self.yes:GetHeight() + 20
   height = height + 40 -- Header up top
   self.text:SetWidth(250)

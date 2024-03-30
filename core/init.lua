@@ -111,9 +111,9 @@ end
 
 local function CheckKeyBindings()
   if not database:GetShowKeybindWarning() then return end
-  if GetBindingKey("OPENALLBAGS") == nil then
+  if GetBindingKey("OPENALLBAGS") == nil or GetBindingKey("OPENALLBAGS") == "SHIFT-B" then
     question:Alert("No Binding Set", [[
-      Better Bags does not have a key binding set for opening all bags.
+      Better Bags does not have a key binding set for opening all bags, or the binding is currently set to shift+B, which you probably don't want.
       Please set a key binding for "Open All Bags" in the key bindings menu.
     ]])
     database:SetShowKeybindWarning(false)
