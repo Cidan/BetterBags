@@ -25,6 +25,7 @@ end
 function question:_OnCreate()
   local q = setmetatable({}, {__index = questionProto})
   q.frame = CreateFrame('Frame', nil, UIParent, "DefaultPanelFlatTemplate")
+  q.frame:SetFrameStrata("DIALOG")
 
   q.input = CreateFrame('EditBox', nil, q.frame, "InputBoxTemplate")
   q.input:SetWidth(200)
