@@ -952,19 +952,19 @@ function items:AttachItemInfo(data, kind)
     return
   end
   data.isItemEmpty = false
-  local itemName, _, itemQuality,
+  local _, _, _,
   itemLevel, itemMinLevel, itemType, itemSubType,
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
-  setID, isCraftingReagent = GetItemInfo(itemLink)
-  itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
+  setID, isCraftingReagent = GetItemInfo(itemID)
+  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),
-    itemName = itemName,
+    itemName = data.containerInfo.itemName,
     itemLink = itemLink,
     itemQuality = itemQuality,
     itemLevel = itemLevel,
@@ -984,7 +984,7 @@ function items:AttachItemInfo(data, kind)
     effectiveIlvl = effectiveIlvl --[[@as number]],
     isPreview = isPreview --[[@as boolean]],
     baseIlvl = baseIlvl --[[@as number]],
-    itemIcon = C_Item.GetItemIconByID(itemID),
+    itemIcon = data.containerInfo.iconFileID,
     isBound = C_Item.IsBound(itemLocation),
     isLocked = false,
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
