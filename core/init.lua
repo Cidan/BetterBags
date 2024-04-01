@@ -66,6 +66,32 @@ addon.Bags = {}
 
 addon.atBank = false
 
+local function CheckKeyBindings()
+  if InCombatLockdown() then
+    addon._bindingFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+    return
+  end
+  addon._bindingFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+  ClearOverrideBindings(addon._bindingFrame)
+  local bindings = {
+    "TOGGLEBACKPACK",
+    "TOGGLEREAGENTBAG",
+    "TOGGLEBAG1",
+    "TOGGLEBAG2",
+    "TOGGLEBAG3",
+    "TOGGLEBAG4"
+  }
+  for _, binding in pairs(bindings) do
+    local key, otherkey = GetBindingKey(binding)
+    if key ~= nil then
+      SetOverrideBinding(addon._bindingFrame, true, key, "OPENALLBAGS")
+    end
+    if otherkey ~= nil then
+      SetOverrideBinding(addon._bindingFrame, true, otherkey, "OPENALLBAGS")
+    end
+  end
+end
+
 -- OnInitialize is called when the addon is loaded.
 function addon:OnInitialize()
   -- Disable the bag tutorial screens, as Better Bags does not match
@@ -74,6 +100,10 @@ function addon:OnInitialize()
 		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
 		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
 	end
+  addon._bindingFrame = addon._bindingFrame or CreateFrame("Frame")
+  addon._bindingFrame:RegisterEvent("PLAYER_LOGIN")
+  addon._bindingFrame:RegisterEvent("UPDATE_BINDINGS")
+  addon._bindingFrame:SetScript("OnEvent", CheckKeyBindings)
 end
 
 -- HideBlizzardBags will hide the default Blizzard bag frames.
@@ -107,17 +137,6 @@ function addon:HideBlizzardBags()
   BankFrame:SetScript("OnHide", nil)
   BankFrame:SetScript("OnShow", nil)
   BankFrame:SetScript("OnEvent", nil)
-end
-
-local function CheckKeyBindings()
-  if not database:GetShowKeybindWarning() then return end
-  if GetBindingKey("OPENALLBAGS") == nil or GetBindingKey("OPENALLBAGS") == "SHIFT-B" then
-    question:Alert("No Binding Set", [[
-      Better Bags does not have a key binding set for opening all bags, or the binding is currently set to shift+B, which you probably don't want.
-      Please set a key binding for "Open All Bags" in the key bindings menu.
-    ]])
-    database:SetShowKeybindWarning(false)
-  end
 end
 
 -- OnEnable is called when the addon is enabled.
@@ -184,6 +203,4 @@ function addon:OnEnable()
     -- the base UI/UX these screens refer to.
     C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
   end
-
-  C_Timer.After(5, CheckKeyBindings)
 end
