@@ -93,7 +93,7 @@ local function BagView(view, bag, slotInfo)
     itemButton:SetItem(data)
 
     -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
-    if (not data.isItemEmpty and bagid ~= Enum.BagIndex.Keyring) then
+    if (not data.isItemEmpty) then
       local section = view:GetOrCreateSection(GetBagName(bagid))
       section:AddCell(slotkey, itemButton)
     end
