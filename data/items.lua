@@ -560,10 +560,13 @@ end
 function items:ProcessContainer()
   local loaded = false
   local count = 0
+  -- HACKFIX: Continuable containers always return false in Classic, even if
+  -- the callback is called.
+  local maxCount = addon.isClassic and 0 or 2
   repeat
     loaded = self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
     count = count + 1
-  until loaded or count > 2 or self._container == nil
+  until loaded or count > maxCount or self._container == nil
   debug:EndProfile('Backpack Data Pipeline')
 end
 

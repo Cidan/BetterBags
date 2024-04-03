@@ -106,7 +106,11 @@
     "LE_FRAME_TUTORIAL_MOUNT_EQUIPMENT_SLOT_FRAME",
     "GameMenuFrame",
     "LE_SCRIPT_BINDING_TYPE_INTRINSIC_POSTCALL",
-    "LE_SCRIPT_BINDING_TYPE_INTRINSIC_PRECALL"
+    "LE_SCRIPT_BINDING_TYPE_INTRINSIC_PRECALL",
+    "CharacterBag0Slot",
+    "CharacterBag1Slot",
+    "CharacterBag2Slot",
+    "CharacterBag3Slot"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",
