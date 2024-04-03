@@ -60,3 +60,9 @@ function addon:HideBlizzardBags()
   BankFrame:SetScript("OnShow", nil)
   BankFrame:SetScript("OnEvent", nil)
 end
+
+function addon:UpdateButtonHighlight()
+  for _, button in pairs(addon._buttons) do
+    button:SetChecked(addon.Bags.Backpack:IsShown())
+  end
+end

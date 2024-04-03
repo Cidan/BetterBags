@@ -286,6 +286,15 @@ function ContainerFrame_UpdateCooldown(id, button) end
 ---@type Frame
 GameMenuFrame = {}
 
+---@type CheckButton
+KeyRingButton = {}
+
+---@type Button
+CharacterReagentBag0Slot = {}
+
+---@class MainMenuBagButton: Button
+---@field SlotHighlightTexture Texture
+
 ----
 -- ConsolePort annotations
 ----

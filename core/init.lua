@@ -2,6 +2,7 @@
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
+---@field _buttons CheckButton[]|MainMenuBagButton[]
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@cast addon +AceHook-3.0
 
@@ -104,6 +105,26 @@ function addon:OnInitialize()
   addon._bindingFrame:RegisterEvent("PLAYER_LOGIN")
   addon._bindingFrame:RegisterEvent("UPDATE_BINDINGS")
   addon._bindingFrame:SetScript("OnEvent", CheckKeyBindings)
+  addon._buttons = {
+    MainMenuBarBackpackButton --[[@as MainMenuBagButton]],
+    _G["CharacterBag0Slot"],
+    _G["CharacterBag1Slot"],
+    _G["CharacterBag2Slot"],
+    _G["CharacterBag3Slot"],
+    KeyRingButton,
+  }
+
+  if CharacterReagentBag0Slot then
+    table.insert(addon._buttons, CharacterReagentBag0Slot)
+  end
+
+  for _, button in pairs(addon._buttons) do
+    button:HookScript("OnClick",
+    function()
+      addon:ToggleAllBags()
+    end)
+  end
+
 end
 
 -- HideBlizzardBags will hide the default Blizzard bag frames.
@@ -137,6 +158,12 @@ function addon:HideBlizzardBags()
   BankFrame:SetScript("OnHide", nil)
   BankFrame:SetScript("OnShow", nil)
   BankFrame:SetScript("OnEvent", nil)
+end
+
+function addon:UpdateButtonHighlight()
+  for _, button in pairs(addon._buttons) do
+    button.SlotHighlightTexture:SetShown(addon.Bags.Backpack:IsShown())
+  end
 end
 
 -- OnEnable is called when the addon is enabled.
