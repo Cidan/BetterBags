@@ -51,6 +51,9 @@ local function SetList(self, values)
   for k, _ in pairs(values.itemList) do
     table.insert(itemList, k)
   end
+  if self.label then
+    self.label = nil
+  end
   self:ReleaseChildren()
   self:SetFullWidth(true)
   self:SetRelativeWidth(1)
@@ -82,9 +85,19 @@ local function SetList(self, values)
     items:RefreshAll()
     label.frame:EnableMouse(true)
     label.frame:SetScript("OnReceiveDrag", rec)
+    label.frame:SetScript("OnMouseDown", rec)
+    label.frame:SetScript("OnEnter", function()
+      GameTooltip:SetOwner(label.frame, "ANCHOR_TOP")
+      GameTooltip:SetText(L:G("Drag an item here to add it to this category."))
+      GameTooltip:Show()
+    end)
+    label.frame:SetScript("OnLeave", function()
+      GameTooltip:Hide()
+    end)
     if self.parent then
       self.parent:DoLayout()
     end
+    self.label = label
     return
   end
 
@@ -159,6 +172,7 @@ function config:CreateItemListWidget()
   widget.frame:EnableMouse(true)
 
   local section = sectionFrame:Create()
+  section:DisableHeader()
   section:SetFillWidth(true)
   section:SetTitle("Items")
   section.frame:SetParent(widget.frame)

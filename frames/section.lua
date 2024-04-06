@@ -40,6 +40,7 @@ local grid = addon:GetModule('Grid')
 ---@field overlay Frame The overlay frame of the section, used as a drop zone.
 ---@field private content Grid The main content frame of the section.
 ---@field private fillWidth boolean
+---@field private headerDisabled boolean
 local sectionProto = {}
 
 ---@param kind BagKind
@@ -114,6 +115,14 @@ end
 ---@param alpha number
 function sectionProto:SetAlpha(alpha)
   self.frame:SetAlpha(alpha)
+end
+
+function sectionProto:DisableHeader()
+  self.headerDisabled = true
+end
+
+function sectionProto:EnableHeader()
+  self.headerDisabled = false
 end
 
 ---@param item Item|ItemRow
@@ -195,6 +204,7 @@ end
 
 ---@param f Section
 function sectionFrame:_DoReset(f)
+  f:EnableHeader()
   f:Wipe()
 end
 
@@ -253,17 +263,26 @@ function sectionFrame:_DoCreate()
   title:SetPoint("TOPLEFT", s.frame, "TOPLEFT", 6, 0)
   title:SetPoint("TOPRIGHT", s.frame, "TOPRIGHT", -6, 0)
   title:SetScript("OnEnter", function()
+    if s.headerDisabled then return end
     sectionFrame.currentTooltip = s
     s:onTitleMouseEnter()
   end)
 
   title:SetScript("OnLeave", function()
+    if s.headerDisabled then return end
     sectionFrame.currentTooltip = nil
     GameTooltip:Hide()
   end)
 
-  title:SetScript("OnClick", function() onTitleClickOrDrop(s) end)
-  title:SetScript("OnReceiveDrag", function() onTitleClickOrDrop(s) end)
+  title:SetScript("OnClick", function()
+    if s.headerDisabled then return end
+    onTitleClickOrDrop(s)
+  end)
+
+  title:SetScript("OnReceiveDrag", function()
+    if s.headerDisabled then return end
+    onTitleClickOrDrop(s)
+  end)
 
   s.title = title
 

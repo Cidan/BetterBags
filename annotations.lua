@@ -262,6 +262,7 @@ local OptionsTable = {}
 ---@field frame Frame
 ---@field section Section
 ---@field parent AceGUIFrame
+---@field label AceGUILabel
 local AceItemList = {}
 
 ---@param values CustomCategoryFilter
