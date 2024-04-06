@@ -22,6 +22,7 @@ const.BANK_BAGS = {
   [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
   [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
   [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
+  [Enum.BagIndex.BankBag_7 - 1] = Enum.BagIndex.BankBag_7 - 1,
 }
 
 
@@ -34,6 +35,7 @@ const.BANK_ONLY_BAGS = {
   [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
   [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
   [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
+  [Enum.BagIndex.BankBag_7 - 1] = Enum.BagIndex.BankBag_7 - 1,
 }
 const.BANK_ONLY_BAGS_LIST = {
   Enum.BagIndex.BankBag_1 - 1,
@@ -42,6 +44,7 @@ const.BANK_ONLY_BAGS_LIST = {
   Enum.BagIndex.BankBag_4 - 1,
   Enum.BagIndex.BankBag_5 - 1,
   Enum.BagIndex.BankBag_6 - 1,
+  Enum.BagIndex.BankBag_7 - 1,
 }
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
