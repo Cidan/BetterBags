@@ -305,7 +305,7 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor()
   ---@cast itemID number
   question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
   function(input)
-    categories:AddItemToCategory(itemID, input)
+    categories:AddItemToPersistentCategory(itemID, input)
     events:SendMessage('bags/FullRefreshAll')
   end)
   GameTooltip:Hide()

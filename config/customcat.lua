@@ -77,7 +77,7 @@ function config:GetCustomCategoryConfig()
             end,
             set = function(_, value)
               if value == "" then return end
-              categories:CreateCategory(value)
+              categories:CreatePersistentCategory(value)
             end,
           }
         }
