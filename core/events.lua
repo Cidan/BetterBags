@@ -74,22 +74,21 @@ end
 
 function events:BucketEvent(event, callback)
  --TODO(lobato): Refine this so that timers only run when an event is in the queue. 
-  if not self._bucketTimers[event] then
+  local bucketFunction = function()
+    for _, cb in pairs(self._bucketCallbacks[event]) do
+      xpcall(cb, geterrorhandler())
+    end
+    self._bucketTimers[event] = nil
     self._bucketCallbacks[event] = {}
-    self._bucketTimers[event] = C_Timer.NewTicker(0.5,
-      function()
-        if not self._eventQueue[event] then
-          return
-        end
-        for _, cb in pairs(self._bucketCallbacks[event]) do
-          cb()
-        end
-        self._eventQueue[event] = false
-      end)
-    self:RegisterEvent(event, function()
-      self._eventQueue[event] = true
-    end)
   end
+
+  self._bucketCallbacks[event] = {}
+  self:RegisterEvent(event, function()
+    if self._bucketTimers[event] then
+      self._bucketTimers[event]:Cancel()
+    end
+    self._bucketTimers[event] = C_Timer.NewTimer(0.5, bucketFunction)
+  end)
 
   table.insert(self._bucketCallbacks[event], callback)
 end
@@ -103,33 +102,34 @@ end
 function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   local joinedEvents = table.concat(groupEvents, '')
   joinedEvents = joinedEvents .. table.concat(groupMessages, '')
-  if not self._bucketTimers[joinedEvents] then
-    self._bucketCallbacks[joinedEvents] = {}
-    self._eventArguments[joinedEvents] = {}
-    self._bucketTimers[joinedEvents] = C_Timer.NewTicker(0.5,
-      function()
-        if not self._eventQueue[joinedEvents] then
-          return
-        end
-        for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
-          xpcall(cb, geterrorhandler(), self._eventArguments[joinedEvents])
-        end
-        self._eventQueue[joinedEvents] = false
-        self._eventArguments[joinedEvents] = {}
-      end)
-    for _, event in pairs(groupEvents) do
-      self:RegisterEvent(event, function(eventName, ...)
-        tinsert(self._eventArguments[joinedEvents], {eventName, ...})
-        self._eventQueue[joinedEvents] = true
-      end)
-    end
 
-    for _, event in pairs(groupMessages) do
-      self:RegisterMessage(event, function(eventName, ...)
-        tinsert(self._eventArguments[joinedEvents], {eventName, ...})
-        self._eventQueue[joinedEvents] = true
-      end)
+  local bucketFunction = function()
+    for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
+      xpcall(cb, geterrorhandler(), self._eventArguments[joinedEvents])
     end
+    self._eventArguments[joinedEvents] = {}
+  end
+
+  self._bucketCallbacks[joinedEvents] = {}
+  self._eventArguments[joinedEvents] = {}
+  for _, event in pairs(groupEvents) do
+    self:RegisterEvent(event, function(eventName, ...)
+      if self._bucketTimers[joinedEvents] then
+        self._bucketTimers[joinedEvents]:Cancel()
+      end
+      tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+      self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.5, bucketFunction)
+    end)
+  end
+
+  for _, event in pairs(groupMessages) do
+    self:RegisterMessage(event, function(eventName, ...)
+      if self._bucketTimers[joinedEvents] then
+        self._bucketTimers[joinedEvents]:Cancel()
+      end
+      tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+      self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.5, bucketFunction)
+    end)
   end
   table.insert(self._bucketCallbacks[joinedEvents], callback)
 end
