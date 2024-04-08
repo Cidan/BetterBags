@@ -100,10 +100,12 @@ end
 ---@param category string The name of the custom category to wipe.
 function categories:WipeCategory(category)
   database:WipeItemCategory(category)
-  for id, _ in pairs(self.ephemeralCategories[category].itemList) do
-    self.ephemeralCategoryByItemID[id] = nil
+  if self.ephemeralCategories[category] then
+    for id, _ in pairs(self.ephemeralCategories[category].itemList) do
+      self.ephemeralCategoryByItemID[id] = nil
+    end
+    wipe(self.ephemeralCategories[category].itemList)
   end
-  wipe(self.ephemeralCategories[category].itemList)
   events:SendMessage('categories/Changed')
 end
 
