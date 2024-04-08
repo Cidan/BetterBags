@@ -30,6 +30,9 @@ local L =  addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Database: AceModule
 local DB = addon:GetModule('Database')
 
@@ -123,7 +126,7 @@ local function SetList(self, values)
             ---@type CustomCategoryFilter
             local list = self:GetUserData("values")
             DB:DeleteItemFromCategory(v.itemInfo.itemID, list.name)
-            self:SetList(DB:GetItemCategory(list.name))
+            self:SetList(categories:GetMergedCategory(list.name))
             events:SendMessage('bags/FullRefreshAll')
           end
         }})
