@@ -61,7 +61,7 @@ function config:GetCustomCategoryOptions(kind)
     end,
     values = {}
   }
-  for category, _ in pairs(DB:GetAllItemCategories()) do
+  for category, _ in pairs(categories:GetAllCategories()) do
     if type(category) == "string" then
       options.values[category] = category
     else

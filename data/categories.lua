@@ -115,7 +115,10 @@ function categories:IsCategoryEnabled(kind, category)
   if self.ephemeralCategories[category] then
     return self.ephemeralCategories[category].enabled[kind]
   end
-  return database:GetItemCategory(category).enabled[kind]
+  if database:GetItemCategory(category).itemList then
+    return database:GetItemCategory(category).enabled[kind]
+  end
+  return false
 end
 
 -- ToggleCategory toggles the enabled state of a custom category.
@@ -128,7 +131,9 @@ function categories:ToggleCategory(kind, category)
     enabled = not self.ephemeralCategories[category].enabled[kind]
     self.ephemeralCategories[category].enabled[kind] = enabled
   end
-  database:SetItemCategoryEnabled(kind, category, enabled)
+  if database:GetItemCategory(category).itemList then
+    database:SetItemCategoryEnabled(kind, category, enabled)
+  end
 end
 
 ---@param kind BagKind
@@ -137,7 +142,9 @@ function categories:EnableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = true
   end
-  database:SetItemCategoryEnabled(kind, category, true)
+  if database:GetItemCategory(category).itemList then
+    database:SetItemCategoryEnabled(kind, category, true)
+  end
 end
 
 ---@param kind BagKind
@@ -146,7 +153,9 @@ function categories:DisableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = false
   end
-  database:SetItemCategoryEnabled(kind, category, false)
+  if database:GetItemCategory(category).itemList then
+    database:SetItemCategoryEnabled(kind, category, false)
+  end
 end
 
 ---@param kind BagKind
@@ -156,7 +165,9 @@ function categories:SetCategoryState(kind, category, enabled)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = enabled
   end
-  database:SetItemCategoryEnabled(kind, category, enabled)
+  if database:GetItemCategory(category).itemList then
+    database:SetItemCategoryEnabled(kind, category, enabled)
+  end
 end
 
 function categories:CreateCategory(category)
