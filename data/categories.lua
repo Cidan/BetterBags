@@ -57,6 +57,22 @@ function categories:GetAllCategories()
   return catList
 end
 
+-- GetMergedCategory returns a custom category by its name, merging ephemeral and persistent categories.
+---@param name string
+---@return CustomCategoryFilter
+function categories:GetMergedCategory(name)
+  local filter = database:GetItemCategory(name)
+  if not filter.itemList then
+    return self.ephemeralCategories[name]
+  end
+  if self.ephemeralCategories[name] then
+    for id, _ in pairs(self.ephemeralCategories[name].itemList) do
+      filter.itemList[id] = true
+    end
+  end
+  return filter
+end
+
 -- AddItemToCategory adds an item to a custom category by its ItemID.
 ---@param id number The ItemID of the item to add to a custom category.
 ---@param category string The name of the custom category to add the item to.
@@ -106,19 +122,30 @@ end
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:ToggleCategory(kind, category)
-  local enabled = not database:GetItemCategory(category).enabled[kind]
+  ---@type boolean
+  local enabled
+  if self.ephemeralCategories[category] then
+    enabled = not self.ephemeralCategories[category].enabled[kind]
+    self.ephemeralCategories[category].enabled[kind] = enabled
+  end
   database:SetItemCategoryEnabled(kind, category, enabled)
 end
 
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:EnableCategory(kind, category)
+  if self.ephemeralCategories[category] then
+    self.ephemeralCategories[category].enabled[kind] = true
+  end
   database:SetItemCategoryEnabled(kind, category, true)
 end
 
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:DisableCategory(kind, category)
+  if self.ephemeralCategories[category] then
+    self.ephemeralCategories[category].enabled[kind] = false
+  end
   database:SetItemCategoryEnabled(kind, category, false)
 end
 
@@ -126,6 +153,9 @@ end
 ---@param category string The name of the custom category to toggle.
 ---@param enabled boolean
 function categories:SetCategoryState(kind, category, enabled)
+  if self.ephemeralCategories[category] then
+    self.ephemeralCategories[category].enabled[kind] = enabled
+  end
   database:SetItemCategoryEnabled(kind, category, enabled)
 end
 

@@ -28,7 +28,7 @@ function config:CreateCustomCategoryConfig(category)
         name = L:G("Items"),
         dialogControl = "ItemList",
         order = 1,
-        values = DB:GetItemCategory(category)
+        values = categories:GetMergedCategory(category)
       },
       delete = {
         type = "execute",
@@ -85,7 +85,7 @@ function config:GetCustomCategoryConfig()
     },
   }
 
-  for category, _ in pairs(DB:GetAllItemCategories()) do
+  for category, _ in pairs(categories:GetAllCategories()) do
     options.args[category] = config:CreateCustomCategoryConfig(category)
   end
   return options
