@@ -30,12 +30,29 @@ function config:CreateCustomCategoryConfig(category)
         order = 1,
         values = categories:GetMergedCategory(category)
       },
+      rename = {
+        type = "input",
+        name = L:G("Rename Category"),
+        width = "double",
+        order = 2,
+        validate = function(_, newName)
+          if DB:ItemCategoryExists(newName) then
+            return L:G("A category with that name already exists.")
+          end
+          return true
+        end,
+        get = function() return "" end,
+        set = function(_, newName)
+          if newName == "" then return end
+          categories:RenameCategory(category, newName)
+        end,
+      },
       delete = {
         type = "execute",
         name = L:G("Delete Category"),
         confirm = true,
         confirmText = L:G("Are you sure you want to delete this category?"),
-        order = 2,
+        order = 3,
         func = function()
           categories:DeleteCategory(category)
         end,

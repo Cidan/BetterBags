@@ -172,6 +172,7 @@ function categories:SetCategoryState(kind, category, enabled)
   end
 end
 
+---@param category string The name of the custom category to create.
 function categories:CreateCategory(category)
   if self.ephemeralCategories[category] then return end
   self.ephemeralCategories[category] = {
@@ -191,6 +192,15 @@ function categories:CreatePersistentCategory(category)
   events:SendMessage('categories/Changed')
 end
 
+---@param category string The name of the custom category to rename.
+---@param newName string The new name of the category.
+function categories:RenameCategory(category, newName)
+  database:RenameCategory(category, newName)
+  events:SendMessage('categories/Changed')
+  items:RefreshAll()
+end
+
+---@param category string The name of the custom category to delete.
 function categories:DeleteCategory(category)
   if self.ephemeralCategories[category] then
     for id, _ in pairs(self.ephemeralCategories[category].itemList) do
