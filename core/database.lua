@@ -206,6 +206,10 @@ function DB:SetItemCategoryEnabled(kind, category, enabled)
   DB.data.profile.customCategoryFilters[category].enabled[kind] = enabled
 end
 
+function DB:SetEphemeralItemCategoryEnabled(kind, category, enabled)
+  DB.data.profile.ephemeralCategoryFilters[category].enabled[kind] = enabled
+end
+
 ---@param category string
 function DB:DeleteItemCategory(category)
   if DB.data.profile.customCategoryFilters[category] ~= nil then
@@ -214,6 +218,7 @@ function DB:DeleteItemCategory(category)
     end
   end
   DB.data.profile.customCategoryFilters[category] = nil
+  DB.data.profile.ephemeralCategoryFilters[category] = nil 
 end
 
 ---@param category string
@@ -240,6 +245,12 @@ function DB:GetItemCategory(category)
 end
 
 ---@param category string
+---@return CustomCategoryFilter
+function DB:GetEphemeralItemCategory(category)
+  return DB.data.profile.ephemeralCategoryFilters[category] or {}
+end
+
+---@param category string
 ---@return boolean
 function DB:ItemCategoryExists(category)
   return DB.data.profile.customCategoryFilters[category] ~= nil
@@ -257,6 +268,16 @@ function DB:CreateCategory(category)
   DB.data.profile.customCategoryFilters[category].itemList = DB.data.profile.customCategoryFilters[category].itemList or {}
   DB.data.profile.customCategoryFilters[category].name = category
   DB.data.profile.customCategoryFilters[category].enabled = DB.data.profile.customCategoryFilters[category].enabled or {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true
+  }
+end
+
+---@param category string
+function DB:CreateEpemeralCategory(category)
+  DB.data.profile.ephemeralCategoryFilters[category] = DB.data.profile.ephemeralCategoryFilters[category] or {}
+  DB.data.profile.ephemeralCategoryFilters[category].name = category
+  DB.data.profile.ephemeralCategoryFilters[category].enabled = DB.data.profile.ephemeralCategoryFilters[category].enabled or {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true
   }

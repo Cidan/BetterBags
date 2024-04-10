@@ -115,7 +115,7 @@ end
 ---@return boolean
 function categories:IsCategoryEnabled(kind, category)
   if self.ephemeralCategories[category] then
-    return self.ephemeralCategories[category].enabled[kind]
+    return database:GetEphemeralItemCategory(category).enabled[kind]
   end
   if database:GetItemCategory(category).itemList then
     return database:GetItemCategory(category).enabled[kind]
@@ -132,6 +132,7 @@ function categories:ToggleCategory(kind, category)
   if self.ephemeralCategories[category] then
     enabled = not self.ephemeralCategories[category].enabled[kind]
     self.ephemeralCategories[category].enabled[kind] = enabled
+    database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
   end
   if database:GetItemCategory(category).itemList then
     database:SetItemCategoryEnabled(kind, category, enabled)
@@ -143,6 +144,7 @@ end
 function categories:EnableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = true
+    database:SetEphemeralItemCategoryEnabled(kind, category, true)
   end
   if database:GetItemCategory(category).itemList then
     database:SetItemCategoryEnabled(kind, category, true)
@@ -154,6 +156,7 @@ end
 function categories:DisableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = false
+    database:SetEphemeralItemCategoryEnabled(kind, category, false)
   end
   if database:GetItemCategory(category).itemList then
     database:SetItemCategoryEnabled(kind, category, false)
@@ -166,6 +169,7 @@ end
 function categories:SetCategoryState(kind, category, enabled)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = enabled
+    database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
   end
   if database:GetItemCategory(category).itemList then
     database:SetItemCategoryEnabled(kind, category, enabled)
@@ -183,6 +187,7 @@ function categories:CreateCategory(category)
     itemList = {},
     readOnly = false,
   }
+  database:CreateEpemeralCategory(category)
   events:SendMessage('categories/Changed')
 end
 
@@ -220,7 +225,7 @@ function categories:GetCustomCategory(kind, data)
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
-  if filter and filter.enabled[kind] then
+  if filter and database:GetEphemeralItemCategory(filter.name).enabled[kind] then
     return filter.name
   end
   -- Check for items that had no category previously. This

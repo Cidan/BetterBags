@@ -450,6 +450,8 @@ const.DATABASE_DEFAULTS = {
     },
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
+    ---@type table<string, CustomCategoryFilter>
+    ephemeralCategoryFilters = {},
     ---@type table<number, string>
     customCategoryIndex = {},
     categoryFilters = {
