@@ -218,7 +218,7 @@ function DB:DeleteItemCategory(category)
     end
   end
   DB.data.profile.customCategoryFilters[category] = nil
-  DB.data.profile.ephemeralCategoryFilters[category] = nil 
+  DB.data.profile.ephemeralCategoryFilters[category] = nil
 end
 
 ---@param category string
