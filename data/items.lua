@@ -131,6 +131,7 @@ function items:OnEnable()
   end)
   local eventList = {
     'BAG_UPDATE_DELAYED',
+    'BAG_UPDATE',
     'PLAYERBANKSLOTS_CHANGED',
   }
 
