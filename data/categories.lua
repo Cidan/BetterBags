@@ -245,8 +245,6 @@ function categories:GetCustomCategory(kind, data)
       end
       if self:IsCategoryEnabled(kind, category) then
         return category
-      else
-        return nil
       end
     end
   end
