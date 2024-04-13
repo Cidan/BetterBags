@@ -25,6 +25,9 @@ local debug = addon:GetModule('Debug')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 -------
 --- Section Prototype
 -------
@@ -281,6 +284,39 @@ function sectionFrame:_DoCreate()
   title:SetScript("OnClick", function()
     if s.headerDisabled then return end
     onTitleClickOrDrop(s)
+  end)
+
+  title:SetScript("OnClick", function(_, e)
+    if s.headerDisabled then
+      return
+    end
+
+    if e ~= "RightButton" then
+      return
+    end
+
+    if (addon.atBank == false) then
+      return
+    end
+
+    local title = s.title:GetText()
+    local source = nil;
+
+    if (s.bagkind == const.BAG_KIND.BACKPACK) then
+      source = items.itemsByBagAndSlot;
+    else
+      source = items.bankItemsByBagAndSlot;
+    end
+
+    for bagid, bag in pairs(source) do
+      for slotid, data in pairs(bag) do
+        items:AttachItemInfo(data, s.bagkind)
+        data.itemInfo.category = items:GetCategory(data)
+        if (data.itemInfo.category == title) then
+          C_Container.UseContainerItem(bagid, slotid);
+        end
+      end
+    end
   end)
 
   title:SetScript("OnReceiveDrag", function()
