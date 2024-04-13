@@ -47,3 +47,8 @@ end
 function async:Do(fn, cb)
   self:DoWithDelay(0, fn, cb)
 end
+
+-- Yield is a small wrapper around coroutine.yield.
+function async:Yield()
+  coroutine.yield()
+end
