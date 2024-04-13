@@ -108,6 +108,14 @@ local function matchFilter(filter, data)
     data.itemInfo.itemName and (
     string.find(data.itemInfo.itemName:lower(), prefix, 1, true) or
     string.find(data.itemInfo.itemType:lower(), prefix, 1, true) or
+    (
+      data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
+      _G[data.itemInfo.itemEquipLoc] ~= nil and
+      _G[data.itemInfo.itemEquipLoc] ~= "" and
+      string.find(_G[data.itemInfo.itemEquipLoc]:lower(), prefix, 1, true)
+    ) or
+    string.find(data.itemInfo.itemType:lower(), prefix, 1, true) or
+    string.find(data.itemInfo.category:lower(), prefix, 1, true) or
     string.find(data.itemInfo.itemSubType:lower(), prefix, 1, true)) then
       return true
     end
