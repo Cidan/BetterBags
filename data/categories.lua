@@ -79,7 +79,7 @@ end
 function categories:AddItemToPersistentCategory(id, category)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
-  assert(GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
+  assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
   local found = database:ItemCategoryExists(category)
   database:SaveItemToCategory(id, category)
   if not found then
@@ -228,6 +228,7 @@ function categories:GetCustomCategory(kind, data)
   if filter and database:GetEphemeralItemCategory(filter.name).enabled[kind] then
     return filter.name
   end
+
   -- Check for items that had no category previously. This
   -- is a performance optimization to avoid calling all
   -- registered functions for every item.

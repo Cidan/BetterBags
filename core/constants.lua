@@ -461,6 +461,7 @@ const.DATABASE_DEFAULTS = {
         TradeSkill = false,
         RecentItems = true,
         GearSet = true,
+        EquipmentLocation = true,
       },
       [const.BAG_KIND.BANK] = {
         Type = true,
@@ -468,6 +469,7 @@ const.DATABASE_DEFAULTS = {
         TradeSkill = false,
         RecentItems = true,
         GearSet = true,
+        EquipmentLocation = true,
       },
     },
     ---@type table<string, boolean>

@@ -45,6 +45,7 @@ core\constants.lua
 core\classic\constants.lua
 core\database.lua
 core\hooks.lua
+core\async.lua
 
 data\equipmentsets.lua
 data\categories.lua
