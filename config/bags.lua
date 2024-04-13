@@ -103,7 +103,8 @@ function config:GetBagOptions(kind)
               ["Subtype"] = L:G("Subtype"),
               ["Expansion"] = L:G("Expansion"),
               ["TradeSkill"] = L:G("Trade Skill"),
-              ["GearSet"] = L:G("Gear Set")
+              ["GearSet"] = L:G("Gear Set"),
+              ["EquipmentLocation"] = L:G("Equipment Location"),
             }
           },
           customCategories = config:GetCustomCategoryOptions(kind),

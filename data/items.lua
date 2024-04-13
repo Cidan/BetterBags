@@ -447,7 +447,7 @@ function items:BackpackLoadFunction()
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
       if baglink ~= nil and invid ~= nil then
-        local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
+        local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
         name = GetItemSubClassInfo(class, subclass)
         extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
         extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
@@ -604,7 +604,7 @@ function items:BankLoadFunction()
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
       if baglink ~= nil and invid ~= nil then
-        local class, subclass = select(6, GetItemInfoInstant(baglink)) --[[@as number]]
+        local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
         name = GetItemSubClassInfo(class, subclass)
         extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
         extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
@@ -876,7 +876,7 @@ function items:GetCategory(data)
     end
   end
 
-  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else..
+  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
   if data.itemInfo.equipmentSet and database:GetCategoryFilter(data.kind, "GearSet") then
     return "Gear: " .. data.itemInfo.equipmentSet
   end
@@ -888,9 +888,17 @@ function items:GetCategory(data)
   end
 
   if not data.kind then return L:G('Everything') end
-  -- TODO(lobato): Handle cases such as new items here instead of in the layout engine.
+
   if data.containerInfo.quality == Enum.ItemQuality.Poor then
     return L:G('Junk')
+  end
+
+  -- Item Equipment location takes precedence filters below and does not bisect.
+  if database:GetCategoryFilter(data.kind, "EquipmentLocation") and
+  data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
+  _G[data.itemInfo.itemEquipLoc] ~= nil and
+  _G[data.itemInfo.itemEquipLoc] ~= "" then
+    return _G[data.itemInfo.itemEquipLoc]
   end
 
   local category = ""
