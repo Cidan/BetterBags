@@ -59,6 +59,10 @@ function sectionProto:SetTitle(text)
   self.title:SetText(text)
 end
 
+function sectionProto:SetBagKind(bagkind)
+    self.bagkind = bagkind
+end
+
 function sectionProto:AddCell(id, cell)
   if self.content:GetCell(id) ~= nil then return end
   self.content:AddCell(id, cell)

@@ -58,7 +58,7 @@ end
 ---@param view view
 ---@param data ItemData
 ---@return boolean
-local function drawDirtyItemUnstacked(view, data)
+local function drawDirtyItemUnstacked(view, data, bagkind)
   local categoryChanged = false
   local bagid = data.bagid
 
@@ -80,7 +80,7 @@ local function drawDirtyItemUnstacked(view, data)
 
   -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
   if (not data.isItemEmpty) then
-    local section = view:GetOrCreateSection(data.itemInfo.category)
+    local section = view:GetOrCreateSection(data.itemInfo.category, bagkind)
     section:AddCell(slotkey, itemButton)
   end
   return categoryChanged
@@ -106,7 +106,7 @@ local function GridView(view, bag, slotInfo)
   for _, data in pairs(dirtyItems) do
     if data.stackedOn == nil or data.isItemEmpty then
       debug:Log("Draw", "Drawing dirty item", data.itemInfo and data.itemInfo.itemLink or nil, "in bag", data.bagid, "slot", data.slotid)
-      local change = drawDirtyItemUnstacked(view, data)
+      local change = drawDirtyItemUnstacked(view, data, bag.kind)
       if categoryChanged == false and change == true then
         categoryChanged = true
       end

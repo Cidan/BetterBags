@@ -54,12 +54,13 @@ end
 -- creating it if it doesn't exist.
 ---@param category string
 ---@return Section
-function views.viewProto:GetOrCreateSection(category)
+function views.viewProto:GetOrCreateSection(category, bagkind)
   local section = self.sections[category]
   if section == nil then
     section = sectionFrame:Create()
     section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
+    section:SetBagKind(bagkind)
     self.content:AddCell(category, section)
     self.sections[category] = section
   elseif self.content:GetCell(category) == nil then
