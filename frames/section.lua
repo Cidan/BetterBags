@@ -231,6 +231,36 @@ local function onTitleClickOrDrop(section)
   events:SendMessage('bags/FullRefreshAll')
 end
 
+---@param section Section
+local function onTitleRightClick(section) 
+  if s.headerDisabled then
+    return
+  end
+
+  if (addon.atBank == false) then
+    return
+  end
+
+  local title = s.title:GetText()
+  local source = nil;
+
+  if (s.bagkind == const.BAG_KIND.BACKPACK) then
+    source = items.itemsByBagAndSlot;
+  else
+    source = items.bankItemsByBagAndSlot;
+  end
+
+  for bagid, bag in pairs(source) do
+    for slotid, data in pairs(bag) do
+      items:AttachItemInfo(data, s.bagkind)
+      data.itemInfo.category = items:GetCategory(data)
+      if (data.itemInfo.category == title) then
+        C_Container.UseContainerItem(bagid, slotid);
+      end
+    end
+  end
+end
+
 function sectionProto:onTitleMouseEnter()
   GameTooltip:SetOwner(self.title, "ANCHOR_TOPLEFT")
   GameTooltip:SetText(self.title:GetText())
@@ -285,42 +315,10 @@ function sectionFrame:_DoCreate()
 
   title:RegisterForClicks("RightButtonUp")
 
-  title:SetScript("OnClick", function()
+  title:SetScript("OnClick", function(_, e)
     if s.headerDisabled then return end
     onTitleClickOrDrop(s)
-  end)
-
-  title:SetScript("OnClick", function(_, e)
-    if s.headerDisabled then
-      return
-    end
-
-    if e ~= "RightButton" then
-      return
-    end
-
-    if (addon.atBank == false) then
-      return
-    end
-
-    local title = s.title:GetText()
-    local source = nil;
-
-    if (s.bagkind == const.BAG_KIND.BACKPACK) then
-      source = items.itemsByBagAndSlot;
-    else
-      source = items.bankItemsByBagAndSlot;
-    end
-
-    for bagid, bag in pairs(source) do
-      for slotid, data in pairs(bag) do
-        items:AttachItemInfo(data, s.bagkind)
-        data.itemInfo.category = items:GetCategory(data)
-        if (data.itemInfo.category == title) then
-          C_Container.UseContainerItem(bagid, slotid);
-        end
-      end
-    end
+    if (e == "RightButton") then onTitleRightClick(s) end
   end)
 
   title:SetScript("OnReceiveDrag", function()
