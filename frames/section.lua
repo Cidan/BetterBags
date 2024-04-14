@@ -62,8 +62,10 @@ function sectionProto:SetTitle(text)
   self.title:SetText(text)
 end
 
-function sectionProto:SetBagKind(bagkind)
-    self.bagkind = bagkind
+-- SetKind will set the bagkind of the section.
+---@param kind BagKind
+function sectionProto:SetKind(kind)
+    self.kind = kind
 end
 
 function sectionProto:AddCell(id, cell)
@@ -280,6 +282,8 @@ function sectionFrame:_DoCreate()
     sectionFrame.currentTooltip = nil
     GameTooltip:Hide()
   end)
+
+  title:RegisterForClicks("RightButtonUp")
 
   title:SetScript("OnClick", function()
     if s.headerDisabled then return end

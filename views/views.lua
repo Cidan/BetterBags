@@ -53,14 +53,15 @@ end
 -- GetOrCreateSection will get an existing section by category,
 -- creating it if it doesn't exist.
 ---@param category string
+---@param kind BagKind
 ---@return Section
-function views.viewProto:GetOrCreateSection(category, bagkind)
+function views.viewProto:GetOrCreateSection(category, kind)
   local section = self.sections[category]
   if section == nil then
     section = sectionFrame:Create()
     section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
-    section:SetBagKind(bagkind)
+    section:SetKind(kind)
     self.content:AddCell(category, section)
     self.sections[category] = section
   elseif self.content:GetCell(category) == nil then
