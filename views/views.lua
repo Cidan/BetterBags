@@ -53,7 +53,6 @@ end
 -- GetOrCreateSection will get an existing section by category,
 -- creating it if it doesn't exist.
 ---@param category string
----@param kind BagKind
 ---@return Section
 function views.viewProto:GetOrCreateSection(category)
   local section = self.sections[category]
