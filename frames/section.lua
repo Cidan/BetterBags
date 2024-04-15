@@ -231,19 +231,24 @@ end
 ---@param section Section
 local function onTitleRightClick(section)   
   if addon.atBank == false then return end
-  
-  -- CellData[] { bagid, slotid, itemInfo, etc }
+
   local items = {}
 
   for _, cell in pairs(section.content.cells) do
-    if not cell.data.isItemEmpty then
-      table.insert(items, cell.data)
+    if not cell.data.isItemEmpty then     
+      local item = {
+        itemId = cell.data.itemInfo.itemID,
+        bagid = cell.data.bagid,
+        slotid = cell.data.slotid
+      }
+      table.insert(items, item)
     end
   end
   
   async:Do(function()
     for _, item in pairs(items) do
-      C_Container.UseContainerItem(item.bagid, item.slotid)
+      local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
+      if itemId == item.itemId then C_Container.UseContainerItem(item.bagid, item.slotid) end
       async.Yield()
     end
   end)
