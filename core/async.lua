@@ -25,18 +25,16 @@ function async:DoWithDelay(delay, fn, cb)
   }
 
   task.worker = function()
-    if (coroutine.status(task.thread) ~= 'dead') then
-      local success, err = coroutine.resume(task.thread)
-      if not success then
-        error(err)
-      end
+    local success, err = coroutine.resume(task.thread)
+    if not success then
+      error(err)
     end
 
     if coroutine.status(task.thread) == 'dead' then
       if task.cb then
         task.cb()
-        return
       end
+      return
     end
     C_Timer.After(delay, task.worker)
   end
