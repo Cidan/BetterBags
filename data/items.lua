@@ -411,9 +411,9 @@ function items:GetSlotKey(data)
   return data.bagid .. '_' .. data.slotid
 end
 
-
 ---@private
-function items:BackpackLoadFunction()
+---@param kind BagKind
+function items:LoadItems(kind)
   ---@type ExtraSlotInfo
   local extraSlotInfo = {
     emptySlots = {},
@@ -426,6 +426,7 @@ function items:BackpackLoadFunction()
     itemsBySlotKey = {},
   }
 
+  local itemList = kind == const.BAG_KIND.BANK and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
   ---@type table<string, ItemData>
   local stacks = {}
 
@@ -435,7 +436,7 @@ function items:BackpackLoadFunction()
   ---@type table<string, ItemData>
   local nextStacks = {}
 
-  for bagid, bag in pairs(items.itemsByBagAndSlot) do
+  for bagid, bag in pairs(itemList) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
     local name = ""
     if bagid == Enum.BagIndex.Keyring then
@@ -462,7 +463,7 @@ function items:BackpackLoadFunction()
         wipe(data)
         data.bagid = bagid
         data.slotid = slotid
-        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+        items:AttachItemInfo(data, kind)
         if wasStacked then
           debug:Log("Stacks", "Was Stacked", data.itemInfo.itemLink)
           data.forceClear = true
@@ -475,7 +476,7 @@ function items:BackpackLoadFunction()
       extraSlotInfo.itemsBySlotKey[self:GetSlotKey(data)] = data
 
       -- Compute stacking data.
-      if items:ShouldItemStack(const.BAG_KIND.BACKPACK, data) then
+      if items:ShouldItemStack(kind, data) then
         local stackItem = stacks[data.itemHash]
         if stackItem ~= nil then
           stackItem.stacks = stackItem.stacks + 1
@@ -549,11 +550,7 @@ function items:BackpackLoadFunction()
 
   self.slotInfo = CopyTable(extraSlotInfo)
   -- All items in all bags have finished loading, fire the all done event.
-  events:SendMessageLater('items/RefreshBackpack/Done', function()
-    items._container = nil
-    items._doingRefreshAll = false
-  end,
-  extraSlotInfo)
+
 end
 
   -- Load item data in the background, and fire a message when
@@ -565,9 +562,19 @@ function items:ProcessContainer()
   -- the callback is called.
   local maxCount = addon.isClassic and 0 or 2
   repeat
-    loaded = self._container:ContinueOnLoad(function() self:BackpackLoadFunction() end)
+    loaded = self._container:ContinueOnLoad(function()
+      self:LoadItems(const.BAG_KIND.BACKPACK)
+    end)
     count = count + 1
   until loaded or count > maxCount or self._container == nil
+
+  -- Fire the container update event.
+  events:SendMessageLater('items/RefreshBackpack/Done', function()
+    items._container = nil
+    items._doingRefreshAll = false
+  end,
+  self.slotInfo)
+
   debug:EndProfile('Backpack Data Pipeline')
 end
 
