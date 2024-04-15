@@ -245,13 +245,11 @@ local function onTitleRightClick(section)
     end
   end
   
-  async:Do(function()
-    for _, item in pairs(items) do
-      local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
-      if itemId == item.itemId then C_Container.UseContainerItem(item.bagid, item.slotid) end
-      async.Yield()
-    end
+  async:Each(items, function(item)
+    local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
+    if itemId == item.itemId then C_Container.UseContainerItem(item.bagid, item.slotid) end
   end)
+
 end
 
 function sectionProto:onTitleMouseEnter()
