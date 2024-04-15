@@ -25,9 +25,11 @@ function async:DoWithDelay(delay, fn, cb)
   }
 
   task.worker = function()
-    local success, err = coroutine.resume(task.thread)
-    if not success then
-      error(err)
+    if (coroutine.status(task.thread) ~= 'dead') then
+      local success, err = coroutine.resume(task.thread)
+      if not success then
+        error(err)
+      end
     end
 
     if coroutine.status(task.thread) == 'dead' then
