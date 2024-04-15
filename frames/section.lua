@@ -310,8 +310,7 @@ function sectionFrame:_DoCreate()
     if s.headerDisabled then return end
     if e == "RightButton" then 
       onTitleRightClick(s) 
-    end
-    if e == "LeftButton" then
+    elseif e == "LeftButton" then
       onTitleClickOrDrop(s)
     end
   end)
