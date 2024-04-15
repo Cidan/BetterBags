@@ -229,12 +229,8 @@ local function onTitleClickOrDrop(section)
 end
 
 ---@param section Section
-local function onTitleRightClick(section) 
-  if section.headerDisabled then
-    return
-  end
-  
-  if (addon.atBank == false) then return end
+local function onTitleRightClick(section)   
+  if addon.atBank == false then return end
   
   -- CellData[] { bagid, slotid, itemInfo, etc }
   local items = {}
