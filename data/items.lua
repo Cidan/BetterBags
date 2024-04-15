@@ -80,8 +80,7 @@ local itemDataProto = {}
 ---@class (exact) Items: AceModule
 ---@field itemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
----@field slotInfo ExtraSlotInfo
----@field bankSlotInfo ExtraSlotInfo
+---@field slotInfo table<BagKind, ExtraSlotInfo>
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _container ContinuableContainer
 ---@field _bankContainer ContinuableContainer
@@ -96,28 +95,8 @@ function items:OnInitialize()
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
-  self.slotInfo = {
-    emptySlots = {},
-    freeSlotKeys = {},
-    emptyReagentSlots = 0,
-    totalItems = 0,
-    freeSlotKey = "",
-    freeReagentSlotKey = "",
-    emptySlotByBagAndSlot = {},
-    dirtyItems = {},
-    itemsBySlotKey = {},
-  }
-  self.bankSlotInfo = {
-    emptySlots = {},
-    freeSlotKeys = {},
-    emptyReagentSlots = 0,
-    totalItems = 0,
-    freeSlotKey = "",
-    freeReagentSlotKey = "",
-    emptySlotByBagAndSlot = {},
-    dirtyItems = {},
-    itemsBySlotKey = {},
-  }
+  self:ResetSlotInfo()
+
   self._newItemTimers = {}
   self._firstLoad = false
   self._bankFirstLoad = false
@@ -165,7 +144,7 @@ function items:OnEnable()
     debug:Log("Items", "Group Bucket Event for Refresh* Fired")
     self._preSort = false
     -- No total items means we're doing a full refresh (or the player bags are totally empty, which is rare).
-    if InCombatLockdown() and self.slotInfo.totalItems == 0 then
+    if InCombatLockdown() and self.slotInfo[const.BAG_KIND.BACKPACK].totalItems == 0 then
       addon.Bags.Backpack.drawAfterCombat = true
       print(L:G("BetterBags: Bags will refresh after combat ends."))
     else
@@ -182,6 +161,27 @@ function items:OnEnable()
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
   end)
+end
+
+---@param kind BagKind
+function items:WipeSlotInfo(kind)
+  self.slotInfo = self.slotInfo or {}
+  self.slotInfo[kind] = {
+    emptySlots = {},
+    freeSlotKeys = {},
+    emptyReagentSlots = 0,
+    totalItems = 0,
+    freeSlotKey = "",
+    freeReagentSlotKey = "",
+    emptySlotByBagAndSlot = {},
+    dirtyItems = {},
+    itemsBySlotKey = {},
+  }
+end
+
+function items:ResetSlotInfo()
+  self:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+  self:WipeSlotInfo(const.BAG_KIND.BANK)
 end
 
 function items:RemoveNewItemFromAllItems()
@@ -214,28 +214,7 @@ function items:ClearItemCache()
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
-  self.slotInfo = {
-    emptySlots = {},
-    freeSlotKeys = {},
-    emptyReagentSlots = 0,
-    totalItems = 0,
-    freeSlotKey = "",
-    freeReagentSlotKey = "",
-    emptySlotByBagAndSlot = {},
-    dirtyItems = {},
-    itemsBySlotKey = {},
-  }
-  self.bankSlotInfo = {
-    emptySlots = {},
-    freeSlotKeys = {},
-    emptyReagentSlots = 0,
-    totalItems = 0,
-    freeSlotKey = "",
-    freeReagentSlotKey = "",
-    emptySlotByBagAndSlot = {},
-    dirtyItems = {},
-    itemsBySlotKey = {},
-  }
+  self:ResetSlotInfo()
   if addon.Bags.Backpack.currentView then
     addon.Bags.Backpack.currentView.fullRefresh = true
   end
@@ -444,6 +423,16 @@ function items:LoadItems(kind)
       name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
       extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+    elseif bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
+      -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
+      -- There are 4 extra slots in the bank bag in Classic that should not
+      -- exist. This is a Blizzard bug.
+      if addon.isClassic then
+        freeSlots = freeSlots - 4
+      end
+      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
+      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
     else
       local invid = C_Container.ContainerIDToInventoryID(bagid)
       local baglink = GetInventoryItemLink("player", invid)
@@ -538,7 +527,7 @@ function items:LoadItems(kind)
     end
   end
 
-  if extraSlotInfo.totalItems < self.slotInfo.totalItems then
+  if extraSlotInfo.totalItems < self.slotInfo[kind].totalItems then
     extraSlotInfo.deferDelete = true
   end
 
@@ -548,7 +537,7 @@ function items:LoadItems(kind)
     end
   end
 
-  self.slotInfo = CopyTable(extraSlotInfo)
+  self.slotInfo[kind] = extraSlotInfo
   -- All items in all bags have finished loading, fire the all done event.
 
 end
@@ -567,14 +556,12 @@ function items:ProcessContainer()
     end)
     count = count + 1
   until loaded or count > maxCount or self._container == nil
-
-  -- Fire the container update event.
-  events:SendMessageLater('items/RefreshBackpack/Done', function()
-    items._container = nil
-    items._doingRefreshAll = false
-  end,
-  self.slotInfo)
-
+    -- Fire the container update event.
+    events:SendMessageLater('items/RefreshBackpack/Done', function()
+      items._container = nil
+      items._doingRefreshAll = false
+    end,
+    self.slotInfo[const.BAG_KIND.BACKPACK])
   debug:EndProfile('Backpack Data Pipeline')
 end
 
@@ -662,7 +649,7 @@ function items:BankLoadFunction()
       end
     end
   end
-  self.bankSlotInfo = CopyTable(extraSlotInfo)
+  self.slotInfo[const.BAG_KIND.BANK] = extraSlotInfo
   -- All items in all bags have finished loading, fire the all done event.
   events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
   items._bankContainer = nil
@@ -675,9 +662,14 @@ function items:ProcessBankContainer()
   local loaded = false
   local count = 0
   repeat
-    loaded = self._bankContainer:ContinueOnLoad(function() self:BankLoadFunction() end)
+    loaded = self._bankContainer:ContinueOnLoad(function()
+      self:LoadItems(const.BAG_KIND.BANK)
+    end)
     count = count + 1
   until loaded or count > 2 or self._bankContainer == nil
+  events:SendMessage('items/RefreshBank/Done', self.slotInfo[const.BAG_KIND.BANK])
+  items._bankContainer = nil
+  items._doingRefreshAll = false
 end
 
 --TODO(lobato): Completely eliminate the use of ItemMixin.

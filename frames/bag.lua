@@ -249,6 +249,7 @@ function bagFrame.bagProto:ToggleReagentBank()
   -- This should never happen, but just in case!
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = not self.isReagentBank
+  items:WipeSlotInfo(const.BAG_KIND.BANK)
   if self.isReagentBank then
     BankFrame.selectedTab = 2
     if self.searchBox.frame:IsShown() then
