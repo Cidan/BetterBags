@@ -65,12 +65,6 @@ function sectionProto:SetTitle(text)
   self.title:SetText(text)
 end
 
--- SetKind will set the bagkind of the section.
----@param kind BagKind
-function sectionProto:SetKind(kind)
-    self.kind = kind
-end
-
 function sectionProto:AddCell(id, cell)
   if self.content:GetCell(id) ~= nil then return end
   self.content:AddCell(id, cell)

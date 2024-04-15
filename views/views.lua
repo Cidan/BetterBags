@@ -55,13 +55,12 @@ end
 ---@param category string
 ---@param kind BagKind
 ---@return Section
-function views.viewProto:GetOrCreateSection(category, kind)
+function views.viewProto:GetOrCreateSection(category)
   local section = self.sections[category]
   if section == nil then
     section = sectionFrame:Create()
     section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
-    section:SetKind(kind)
     self.content:AddCell(category, section)
     self.sections[category] = section
   elseif self.content:GetCell(category) == nil then
