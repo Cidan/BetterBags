@@ -28,6 +28,9 @@ local grid = addon:GetModule('Grid')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Async: AceModule
+local async = addon:GetModule('Async')
+
 -------
 --- Section Prototype
 -------
@@ -248,9 +251,12 @@ local function onTitleRightClick(section)
     end
   end
   
-  for _, item in pairs(items) do
-    C_Container.UseContainerItem(item.bagid, item.slotid)
-  end
+  async:Do(function()
+    for _, item in pairs(items) do
+      C_Container.UseContainerItem(item.bagid, item.slotid)
+      async.Yield()
+    end
+  end)
 end
 
 function sectionProto:onTitleMouseEnter()
