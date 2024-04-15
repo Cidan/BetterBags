@@ -233,31 +233,23 @@ end
 
 ---@param section Section
 local function onTitleRightClick(section) 
-  if s.headerDisabled then
+  if section.headerDisabled then
     return
   end
+  
+  if (addon.atBank == false) then return end
+  
+  -- CellData[] { bagid, slotid, itemInfo, etc }
+  local items = {}
 
-  if (addon.atBank == false) then
-    return
-  end
-
-  local title = s.title:GetText()
-  local source = nil;
-
-  if (s.bagkind == const.BAG_KIND.BACKPACK) then
-    source = items.itemsByBagAndSlot;
-  else
-    source = items.bankItemsByBagAndSlot;
-  end
-
-  for bagid, bag in pairs(source) do
-    for slotid, data in pairs(bag) do
-      items:AttachItemInfo(data, s.bagkind)
-      data.itemInfo.category = items:GetCategory(data)
-      if (data.itemInfo.category == title) then
-        C_Container.UseContainerItem(bagid, slotid);
-      end
+  for _, cell in pairs(section.content.cells) do
+    if not cell.data.isItemEmpty then
+      table.insert(items, cell.data)
     end
+  end
+  
+  for _, item in pairs(items) do
+    C_Container.UseContainerItem(item.bagid, item.slotid)
   end
 end
 
