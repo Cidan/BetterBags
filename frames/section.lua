@@ -305,8 +305,12 @@ function sectionFrame:_DoCreate()
 
   title:SetScript("OnClick", function(_, e)
     if s.headerDisabled then return end
-    onTitleClickOrDrop(s)
-    if (e == "RightButton") then onTitleRightClick(s) end
+    if e == "RightButton" then 
+      onTitleRightClick(s) 
+    end
+    if e == "LeftButton" then
+      onTitleClickOrDrop(s)
+    end
   end)
 
   title:SetScript("OnReceiveDrag", function()
