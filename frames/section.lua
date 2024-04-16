@@ -248,20 +248,35 @@ end
 local function onTitleRightClick(section)   
   if addon.atBank == false then return end
 
-  local items = {}
+  local kind = section:DetectKind()
+  local title = section.title:GetText()
 
-  for _, cell in pairs(section.content.cells) do
-    if not cell.data.isItemEmpty then     
-      local item = {
-        itemId = cell.data.itemInfo.itemID,
-        bagid = cell.data.bagid,
-        slotid = cell.data.slotid
-      }
-      table.insert(items, item)
+  local source = nil
+
+  if (kind == const.BAG_KIND.BACKPACK) then
+    source = items.itemsByBagAndSlot;
+  else
+    source = items.bankItemsByBagAndSlot;
+  end
+
+  local list = {}
+
+  for bagid, bag in pairs(source) do
+    for slotid, data in pairs(bag) do
+      items:AttachItemInfo(data, kind)
+      data.itemInfo.category = items:GetCategory(data)
+      if (data.itemInfo.category == title) then
+        local item = {
+          itemId = data.itemInfo.itemID,
+          bagid = data.bagid,
+          slotid = data.slotid
+        }
+        table.insert(list, item)
+      end
     end
   end
   
-  async:Each(items, function(item)
+  async:Each(list, function(item)
     local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
     if itemId == item.itemId then C_Container.UseContainerItem(item.bagid, item.slotid) end
   end)
