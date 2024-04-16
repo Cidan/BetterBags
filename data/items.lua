@@ -290,11 +290,6 @@ function items:RefreshBank()
 
   --- Process the item container.
   self:ProcessContainer(const.BAG_KIND.BANK, container)
-
-  -- Show the bank frame if it's not already shown.
-  if not addon.Bags.Bank:IsShown() and addon.atBank then
-    addon.Bags.Bank:Show()
-  end
 end
 
 -- RefreshBackback will refresh all bags' contents entirely and update
@@ -320,6 +315,8 @@ function items:RefreshBackpack()
   self:ProcessContainer(const.BAG_KIND.BACKPACK, container)
 end
 
+-- HasItemChanged will determine if an item has changed since the last time a bag refresh
+-- was done.
 ---@param bagid number
 ---@param slotid number
 ---@param data ItemData
@@ -357,6 +354,7 @@ function items:HasItemChanged(bagid, slotid, data)
   return false
 end
 
+-- ShouldItemStack will determine if an item should stack with another item in a virtual stack.
 ---@param kind BagKind
 ---@param data ItemData
 ---@return boolean
@@ -396,6 +394,7 @@ function items:GetSlotKey(data)
   return data.bagid .. '_' .. data.slotid
 end
 
+--- LoadItems will load all items in a given bag kind and update the item database.
 ---@private
 ---@param kind BagKind
 function items:LoadItems(kind)

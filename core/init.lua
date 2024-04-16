@@ -200,6 +200,10 @@ function addon:OnEnable()
 
   events:RegisterMessage('items/RefreshBank/Done', function(_, args)
    debug:Log("init/OnInitialize/items", "Drawing bank")
+     -- Show the bank frame if it's not already shown.
+    if not addon.Bags.Bank:IsShown() and addon.atBank then
+      addon.Bags.Bank:Show()
+    end
    addon.Bags.Bank:Draw(args[1])
   end)
 
