@@ -82,10 +82,7 @@ local itemDataProto = {}
 ---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field slotInfo table<BagKind, ExtraSlotInfo>
 ---@field previousItemGUID table<number, table<number, string>>
----@field _doingRefreshAll boolean
 ---@field _newItemTimers table<string, number>
----@field _firstLoad boolean
----@field _bankFirstLoad boolean
 ---@field _preSort boolean
 local items = addon:NewModule('Items')
 
@@ -96,8 +93,6 @@ function items:OnInitialize()
   self:ResetSlotInfo()
 
   self._newItemTimers = {}
-  self._firstLoad = false
-  self._bankFirstLoad = false
   self._preSort = false
 end
 
@@ -291,14 +286,9 @@ end
 -- RefreshBackback will refresh all bags' contents entirely and update
 -- the item database.
 function items:RefreshBackpack()
-  if self._doingRefreshAll then
-    return
-  end
-
   debug:StartProfile('Backpack Data Pipeline')
 
   equipmentSets:Update()
-  self._doingRefreshAll = true
   local container = ContinuableContainer:Create()
 
   -- Loop through all the bags and schedule each item for a refresh.
@@ -560,13 +550,10 @@ function items:ProcessContainer(kind, container)
   until loaded or count > maxCount
   local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-  events:SendMessageLater(ev,
-    function()
-      items._doingRefreshAll = false
-    end,
-    self.slotInfo[kind]
-  )
-  debug:EndProfile('Backpack Data Pipeline')
+  events:SendMessageLater(ev, nil, self.slotInfo[kind])
+  if kind == const.BAG_KIND.BACKPACK then
+    debug:EndProfile('Backpack Data Pipeline')
+  end
 end
 
 -- StageBagForUpdate will scan a bag for items and add them
