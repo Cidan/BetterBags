@@ -546,8 +546,6 @@ function items:LoadItems(kind)
   end
 
   self.slotInfo[kind] = extraSlotInfo
-  -- All items in all bags have finished loading, fire the all done event.
-
 end
 
   -- Load item data in the background, and fire a message when
@@ -573,97 +571,6 @@ function items:ProcessContainer()
   debug:EndProfile('Backpack Data Pipeline')
 end
 
-function items:BankLoadFunction()
-  ---@type ExtraSlotInfo
-  local extraSlotInfo = {
-    emptySlots = {},
-    freeSlotKeys = {},
-    emptyReagentSlots = 0,
-    totalItems = 0,
-    freeSlotKey = "",
-    freeReagentSlotKey = "",
-    emptySlotByBagAndSlot = {},
-    dirtyItems = {},
-    itemsBySlotKey = {},
-  }
-
-  ---@type table<string, ItemData>
-  local stacks = {}
-  for bagid, bag in pairs(items.bankItemsByBagAndSlot) do
-    local name = ""
-    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
-    if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
-      -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
-      -- There are 4 extra slots in the bank bag in Classic that should not
-      -- exist. This is a Blizzard bug.
-      if addon.isClassic then
-        freeSlots = freeSlots - 4
-      end
-      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
-      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
-      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
-    else
-      local invid = C_Container.ContainerIDToInventoryID(bagid)
-      local baglink = GetInventoryItemLink("player", invid)
-      if baglink ~= nil and invid ~= nil then
-        local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-        name = GetItemSubClassInfo(class, subclass)
-        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
-        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
-      end
-    end
-    extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
-    for slotid, data in pairs(bag) do
-      items:AttachItemInfo(data, const.BAG_KIND.BANK)
-      data.stackedCount = 0
-      data.stackedOn = nil
-      data.stacks = 0
-      table.insert(extraSlotInfo.dirtyItems, data)
-      -- Compute stacking data.
-      if items:ShouldItemStack(const.BAG_KIND.BANK, data) then
-        local stackItem = stacks[data.itemHash]
-        if stackItem ~= nil then
-          stackItem.stacks = stackItem.stacks + 1
-          data.stackedOn = items:GetSlotKey(stackItem)
-          data.stackedCount = data.itemInfo.currentItemCount
-          data.stacks = 0
-          stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
-          if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
-            self:ClearNewItem(data)
-            self:ClearNewItem(stackItem)
-            data.itemInfo.category = self:GetCategory(data)
-            stackItem.itemInfo.category = self:GetCategory(stackItem)
-          end
-        else
-          data.stacks = 0
-          data.stackedOn = nil
-          data.stackedCount = data.itemInfo.currentItemCount
-          stacks[data.itemHash] = data
-        end
-      else
-        data.stackedOn = nil
-        data.stacks = 0
-        data.stackedCount = data.itemInfo.currentItemCount
-      end
-
-      if data.isItemEmpty then
-        data.stacks = 0
-        data.stackedOn = nil
-        data.stackedCount = nil
-        extraSlotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
-        extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
-      else
-        extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
-      end
-    end
-  end
-  self.slotInfo[const.BAG_KIND.BANK] = extraSlotInfo
-  -- All items in all bags have finished loading, fire the all done event.
-  --events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
-  --items._bankContainer = nil
-  --items._doingRefreshAll = false
-end
-
 -- Load item data in the background, and fire a message when
 -- all bags are done loading.
 function items:ProcessBankContainer()
@@ -671,7 +578,6 @@ function items:ProcessBankContainer()
   local count = 0
   repeat
     loaded = self._bankContainer:ContinueOnLoad(function()
-      --self:BankLoadFunction()
       self:LoadItems(const.BAG_KIND.BANK)
     end)
     count = count + 1
