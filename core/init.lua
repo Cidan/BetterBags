@@ -180,9 +180,9 @@ end
 
 ---@return MovementFlow
 function addon:GetMovementFlow()
-  if (addon.atBank) then return const.MOVEMENT_FLOW.BANK end
-  if (addon:AtSendMail()) then return const.MOVEMENT_FLOW.SENDMAIL end
-  if (addon:AtTradeWindow()) then return const.MOVEMENT_FLOW.TRADE end
+  if addon.atBank then return const.MOVEMENT_FLOW.BANK end
+  if addon:AtSendMail() then return const.MOVEMENT_FLOW.SENDMAIL end
+  if addon:AtTradeWindow() then return const.MOVEMENT_FLOW.TRADE end
   return const.MOVEMENT_FLOW.UNDEFINED
 end
 
