@@ -651,9 +651,9 @@ function items:BankLoadFunction()
   end
   self.slotInfo[const.BAG_KIND.BANK] = extraSlotInfo
   -- All items in all bags have finished loading, fire the all done event.
-  events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
-  items._bankContainer = nil
-  items._doingRefreshAll = false
+  --events:SendMessage('items/RefreshBank/Done', extraSlotInfo)
+  --items._bankContainer = nil
+  --items._doingRefreshAll = false
 end
 
 -- Load item data in the background, and fire a message when
@@ -663,7 +663,8 @@ function items:ProcessBankContainer()
   local count = 0
   repeat
     loaded = self._bankContainer:ContinueOnLoad(function()
-      self:LoadItems(const.BAG_KIND.BANK)
+      self:BankLoadFunction()
+      --self:LoadItems(const.BAG_KIND.BANK)
     end)
     count = count + 1
   until loaded or count > 2 or self._bankContainer == nil
