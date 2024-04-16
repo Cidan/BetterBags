@@ -22,6 +22,7 @@ local const = addon:GetModule('Constants')
 ---@field frame Frame
 ---@field category string
 ---@field helpText HelpText[]
+---@field private pluginOptions table<string, AceConfig.OptionsTable>
 local config = addon:NewModule('Config')
 
 ---@class Events: AceModule
@@ -116,6 +117,44 @@ function config:GetGeneralOptions()
   return options
 end
 
+-- AddPluginConfig adds a plugin's configuration to the BetterBags configuration.
+---@param name string
+---@param opts AceConfig.OptionsTable
+function config:AddPluginConfig(name, opts)
+  assert(self.pluginOptions[name] == nil, "Plugin option already exists, did you call AddPluginConfig twice?")
+  self.pluginOptions[name] = opts
+end
+
+---@return AceConfig.OptionsTable
+function config:GetPluginsOptions()
+  local options = {
+    type = "group",
+    name = L:G("Plugins"),
+    order = 100,
+    args = {
+      header = {
+        name = L:G("Plugins"),
+        type = "group",
+        inline = true,
+        order = 0,
+        args = {
+          help = {
+            type = "description",
+            name = L:G("Plugin configuration options can be accessed on the left by expanding the 'Plugins' menu option."),
+            order = 0,
+          }
+        }
+      },
+    },
+  }
+
+  for name, opts in pairs(self.pluginOptions) do
+    options.args[name] = opts
+  end
+
+  return options
+end
+
 function config:GetOptions()
   ---@type AceConfig.OptionsTable
   local options = {
@@ -127,6 +166,7 @@ function config:GetOptions()
       backpack = self:GetBagOptions(const.BAG_KIND.BACKPACK),
       bank = self:GetBagOptions(const.BAG_KIND.BANK),
       help = self:GenerateHelp(),
+      plugins = self:GetPluginsOptions(),
     }
   }
   return options
@@ -139,6 +179,7 @@ end
 
 function config:OnEnable()
   self.helpText = {}
+  self.pluginOptions = {}
   self:CreateAllHelp()
   GUI:RegisterWidgetType("ItemList", config.CreateItemListWidget, 1)
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
