@@ -149,7 +149,11 @@ function config:GetPluginsOptions()
   }
 
   for name, opts in pairs(self.pluginOptions) do
-    options.args[name] = opts
+    options.args[name] = {
+      name = name,
+      type = 'group',
+      args = opts,
+    }
   end
 
   return options
@@ -179,7 +183,6 @@ end
 
 function config:OnEnable()
   self.helpText = {}
-  self.pluginOptions = {}
   self:CreateAllHelp()
   GUI:RegisterWidgetType("ItemList", config.CreateItemListWidget, 1)
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
@@ -201,4 +204,8 @@ function config:OnEnable()
     DB:SetDebugMode(not DB:GetDebugMode())
     events:SendMessage('config/DebugMode', DB:GetDebugMode())
   end)
+end
+
+function config:OnInitialize()
+  self.pluginOptions = {}
 end
