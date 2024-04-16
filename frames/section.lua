@@ -246,7 +246,8 @@ end
 
 ---@param section Section
 local function onTitleRightClick(section)   
-  if addon.atBank == false then return end
+  local flow = addon:GetMovementFlow()
+  if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
 
   local kind = section:DetectKind()
   local title = section.title:GetText()
