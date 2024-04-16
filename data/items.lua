@@ -117,11 +117,7 @@ function items:OnEnable()
   end
 
   events:RegisterMessage('bags/FullRefreshAll', function()
-    if InCombatLockdown() then
-      addon.Bags.Backpack.drawAfterCombat = true
-    else
-      self:FullRefreshAll()
-    end
+    self:WipeAndRefreshAll()
   end)
 
   events:RegisterMessage('bags/SortBackpackClassic', function()
@@ -203,7 +199,7 @@ function items:PreSort()
   self._preSort = true
   C_Timer.After(0.6, function()
     if self._preSort then
-      self:FullRefreshAll()
+      self:WipeAndRefreshAll()
     end
   end)
 end
@@ -234,13 +230,13 @@ end
 
 ---@private
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
-function items:FullRefreshAll()
-  debug:Log('FullRefreshAll', "Full Refresh All triggered")
-  self:ClearItemCache()
+function items:WipeAndRefreshAll()
+  debug:Log('WipeAndRefreshAll', "Wipe And Refresh All triggered")
   if InCombatLockdown() then
     addon.Bags.Backpack.drawAfterCombat = true
     print(L:G("BetterBags: Bags will refresh after combat ends."))
   else
+    self:ClearItemCache()
     events:SendMessage('bags/RefreshAll', true)
   end
 end
