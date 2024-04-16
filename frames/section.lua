@@ -160,6 +160,22 @@ function sectionProto:GetRawCells()
   return self.content.cells
 end
 
+---@return BagKind
+function sectionProto:DetectKind()  
+  local cell = self.content.cells[1]
+  local bagid = cell.data.bagid
+  
+  if bagid == 0 then return const.BAG_KIND.BACKPACK end
+  if bagid >= 1 and bagid <= NUM_BAG_SLOTS then return const.BAG_KIND.BACKPACK end
+
+  if bagid == BANK_CONTAINER then return const.BAG_KIND.BANK end
+  if bagid >= NUM_BAG_SLOTS + 1 and bagid <= NUM_BAG_SLOTS + NUM_BANKBAGSLOTS then return const.BAG_KIND.BANK end
+  
+  if bagid == KEYRING_CONTAINER then return const.BAG_KIND.KEYRING end
+
+  return nil
+end
+
 function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end
