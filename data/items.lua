@@ -82,8 +82,6 @@ local itemDataProto = {}
 ---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field slotInfo table<BagKind, ExtraSlotInfo>
 ---@field previousItemGUID table<number, table<number, string>>
----@field _container ContinuableContainer
----@field _bankContainer ContinuableContainer
 ---@field _doingRefreshAll boolean
 ---@field _newItemTimers table<string, number>
 ---@field _firstLoad boolean
@@ -261,21 +259,21 @@ function items:DoRefreshAll()
 end
 
 function items:RefreshReagentBank()
-  self._bankContainer = ContinuableContainer:Create()
+  local container = ContinuableContainer:Create()
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
     self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
-    self:RefreshBag(i, true)
+    self:StageBagForUpdate(i, const.BAG_KIND.BANK, container)
   end
 
   --- Process the item container.
-  self:ProcessBankContainer()
+  self:ProcessContainer(const.BAG_KIND.BANK, container)
 end
 
 function items:RefreshBank()
   equipmentSets:Update()
-  self._bankContainer = ContinuableContainer:Create()
+  local container = ContinuableContainer:Create()
   -- This is a small hack to force the bank bag quality data to be cached
   -- before the bank bag frame is drawn.
   for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -287,11 +285,11 @@ function items:RefreshBank()
   for i in pairs(const.BANK_BAGS) do
     self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
-    self:RefreshBag(i, true)
+    self:StageBagForUpdate(i, const.BAG_KIND.BANK, container)
   end
 
   --- Process the item container.
-  self:ProcessBankContainer()
+  self:ProcessContainer(const.BAG_KIND.BANK, container)
 
   -- Show the bank frame if it's not already shown.
   if not addon.Bags.Bank:IsShown() and addon.atBank then
@@ -310,16 +308,16 @@ function items:RefreshBackpack()
 
   equipmentSets:Update()
   self._doingRefreshAll = true
-  self._container = ContinuableContainer:Create()
+  local container = ContinuableContainer:Create()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
     self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
-    self:RefreshBag(i, false)
+    self:StageBagForUpdate(i, const.BAG_KIND.BACKPACK, container)
   end
   --- Process the item container.
-  self:ProcessContainer()
+  self:ProcessContainer(const.BAG_KIND.BACKPACK, container)
 end
 
 ---@param bagid number
@@ -548,54 +546,43 @@ function items:LoadItems(kind)
   self.slotInfo[kind] = extraSlotInfo
 end
 
-  -- Load item data in the background, and fire a message when
-  -- all bags are done loading.
-function items:ProcessContainer()
+-- ProcessContainer will load all items in the container and fire
+-- a message when all items are done loading.
+---@private
+---@param kind BagKind
+---@param container ContinuableContainer
+function items:ProcessContainer(kind, container)
   local loaded = false
   local count = 0
   -- HACKFIX: Continuable containers always return false in Classic, even if
   -- the callback is called.
   local maxCount = addon.isClassic and 0 or 2
   repeat
-    loaded = self._container:ContinueOnLoad(function()
-      self:LoadItems(const.BAG_KIND.BACKPACK)
+    loaded = container:ContinueOnLoad(function()
+      self:LoadItems(kind)
     end)
     count = count + 1
-  until loaded or count > maxCount or self._container == nil
-    -- Fire the container update event.
-    events:SendMessageLater('items/RefreshBackpack/Done', function()
-      items._container = nil
+  until loaded or count > maxCount
+  local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
+
+  events:SendMessageLater(ev,
+    function()
       items._doingRefreshAll = false
     end,
-    self.slotInfo[const.BAG_KIND.BACKPACK])
+    self.slotInfo[kind]
+  )
   debug:EndProfile('Backpack Data Pipeline')
 end
 
--- Load item data in the background, and fire a message when
--- all bags are done loading.
-function items:ProcessBankContainer()
-  local loaded = false
-  local count = 0
-  repeat
-    loaded = self._bankContainer:ContinueOnLoad(function()
-      self:LoadItems(const.BAG_KIND.BANK)
-    end)
-    count = count + 1
-  until loaded or count > 2 or self._bankContainer == nil
-  events:SendMessage('items/RefreshBank/Done', self.slotInfo[const.BAG_KIND.BANK])
-  items._bankContainer = nil
-  items._doingRefreshAll = false
-end
-
---TODO(lobato): Completely eliminate the use of ItemMixin.
--- RefreshBag will refresh a bag's contents entirely and update the
--- item database.
+-- StageBagForUpdate will scan a bag for items and add them
+-- to the provided container for data fetching.
 ---@private
 ---@param bagid number
----@param bankBag boolean
-function items:RefreshBag(bagid, bankBag)
+---@param kind BagKind
+---@param container ContinuableContainer
+function items:StageBagForUpdate(bagid, kind, container)
   local size = C_Container.GetContainerNumSlots(bagid)
-  local index = bankBag and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
+  local index = kind == const.BAG_KIND.BANK and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
   --local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
   -- Loop through every container slot and create an item for it.
   for slotid = 1, size do
@@ -610,11 +597,7 @@ function items:RefreshBag(bagid, bankBag)
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
     if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
-      if bankBag then
-        self._bankContainer:AddContinuable(itemMixin)
-      else
-        self._container:AddContinuable(itemMixin)
-      end
+      container:AddContinuable(itemMixin)
     elseif itemMixin:IsItemEmpty() then
       data.isItemEmpty = true
     end

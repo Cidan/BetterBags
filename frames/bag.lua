@@ -287,6 +287,7 @@ function bagFrame.bagProto:SwitchToBank()
   else
     self.frame:SetTitle(L:G("Bank"))
   end
+  items:ClearBankCache()
   self:Wipe()
 end
 

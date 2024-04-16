@@ -198,10 +198,9 @@ function addon:OnEnable()
     addon.Bags.Backpack:Draw(args[1])
    end)
 
-  events:RegisterMessage('items/RefreshBank/Done', function(_, itemData)
+  events:RegisterMessage('items/RefreshBank/Done', function(_, args)
    debug:Log("init/OnInitialize/items", "Drawing bank")
-   addon.Bags.Bank:Draw(itemData)
-
+   addon.Bags.Bank:Draw(args[1])
   end)
 
   events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
