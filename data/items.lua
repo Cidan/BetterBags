@@ -769,16 +769,17 @@ function items:ParseItemLink(link)
 
   ---@type string, string
 	local crafterGUID, extraEnchantID
-    ---@type string, string[]
-	  local numBonusIDs, bonusIDs
-      ---@type string, string[]
-      local numModifiers, modifierIDs
-    ---@type string, string[]
-	  local relic1NumBonusIDs, relic1BonusIDs
-        ---@type string, string[]
-	  local relic2NumBonusIDs, relic2BonusIDs
-        ---@type string, string[]
-	  local relic3NumBonusIDs, relic3BonusIDs
+  ---@type string, string[]
+	local numBonusIDs, bonusIDs
+  ---@type string, string[]
+  local numModifiers, modifierIDs
+  ---@type string, string[]
+	local relic1NumBonusIDs, relic1BonusIDs
+  ---@type string, string[]
+	local relic2NumBonusIDs, relic2BonusIDs
+  ---@type string, string[]
+	local relic3NumBonusIDs, relic3BonusIDs
+
   if rest ~= nil then
 	  numBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
 
