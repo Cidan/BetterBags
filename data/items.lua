@@ -160,6 +160,7 @@ function items:OnEnable()
   end)
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
+    items:ClearBankCache()
   end)
 end
 
@@ -224,6 +225,15 @@ function items:ClearItemCache()
   debug:Log("Items", "Item Cache Cleared")
 end
 
+function items:ClearBankCache()
+  self.bankItemsByBagAndSlot = {}
+  self:WipeSlotInfo(const.BAG_KIND.BANK)
+  if addon.Bags.Bank.currentView then
+    addon.Bags.Bank.currentView.fullRefresh = true
+  end
+  debug:Log("Items", "Bank Cache Cleared")
+end
+
 ---@private
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
 function items:FullRefreshAll()
@@ -252,10 +262,9 @@ end
 
 function items:RefreshReagentBank()
   self._bankContainer = ContinuableContainer:Create()
-  self.bankItemsByBagAndSlot = {}
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
-    self.bankItemsByBagAndSlot[i] = {}
+    self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -267,7 +276,6 @@ end
 function items:RefreshBank()
   equipmentSets:Update()
   self._bankContainer = ContinuableContainer:Create()
-  self.bankItemsByBagAndSlot = {}
   -- This is a small hack to force the bank bag quality data to be cached
   -- before the bank bag frame is drawn.
   for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -277,7 +285,7 @@ function items:RefreshBank()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
-    self.bankItemsByBagAndSlot[i] = {}
+    self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
     self.previousItemGUID[i] = self.previousItemGUID[i] or {}
     self:RefreshBag(i, true)
   end
@@ -663,8 +671,8 @@ function items:ProcessBankContainer()
   local count = 0
   repeat
     loaded = self._bankContainer:ContinueOnLoad(function()
-      self:BankLoadFunction()
-      --self:LoadItems(const.BAG_KIND.BANK)
+      --self:BankLoadFunction()
+      self:LoadItems(const.BAG_KIND.BANK)
     end)
     count = count + 1
   until loaded or count > 2 or self._bankContainer == nil

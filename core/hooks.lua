@@ -116,4 +116,5 @@ function addon:CloseBank(interactingFrame)
   if interactingFrame ~= nil then return end
   addon.Bags.Bank:Hide()
   addon.Bags.Bank:SwitchToBank()
+  events:SendMessage('bags/BankClosed')
 end
