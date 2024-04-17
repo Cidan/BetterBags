@@ -21,11 +21,6 @@ local ItemLoader = {}
 ---@field private loadCount number
 local loader = addon:NewModule('Loader')
 
-local function isItemLinkValid(itemLink)
-  if itemLink == nil then return true end
-  return string.match(itemLink, [[|h[(.*)]|h|r]]) ~= nil
-end
-
 function loader:OnInitialize()
   self.loaders = {}
   self.loadCount = 1
@@ -66,9 +61,7 @@ function ItemLoader:Load(callback)
     for itemID, location in pairs(self.locations) do
       itemID = itemID
       location:ContinueOnItemLoad(function()
-        local bagid, slotid = location:GetItemLocation():GetBagAndSlot()
-        local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
-        if isItemLinkValid(itemLink) then
+        if location:IsItemDataCached() then
           self.locations[itemID] = nil
         end
       end)
