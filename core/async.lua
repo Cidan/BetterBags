@@ -83,6 +83,18 @@ function async:Batch(count, list, fn, cb)
   end, cb)
 end
 
+-- Until will call function fn until it returns true, once per frame, then call cb.
+-- Do not call async:Yield() in fn, as it will be called automatically.
+---@param fn fun(): boolean
+---@param cb fun()
+function async:Until(fn, cb)
+  self:Do(function()
+    while not fn() do
+      self:Yield()
+    end
+  end, cb)
+end
+
 -- Yield is a small wrapper around coroutine.yield.
 function async:Yield()
   coroutine.yield()

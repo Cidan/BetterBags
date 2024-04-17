@@ -18,6 +18,9 @@ local categories = addon:GetModule('Categories')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Loader: AceModule
+local loader = addon:GetModule('Loader')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -250,7 +253,7 @@ function items:DoRefreshAll()
 end
 
 function items:RefreshReagentBank()
-  local container = ContinuableContainer:Create()
+  local container = loader:New()
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
     self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
@@ -264,7 +267,7 @@ end
 
 function items:RefreshBank()
   equipmentSets:Update()
-  local container = ContinuableContainer:Create()
+  local container = loader:New()
   -- This is a small hack to force the bank bag quality data to be cached
   -- before the bank bag frame is drawn.
   for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -289,7 +292,7 @@ function items:RefreshBackpack()
   debug:StartProfile('Backpack Data Pipeline')
 
   equipmentSets:Update()
-  local container = ContinuableContainer:Create()
+  local container = loader:New()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
@@ -535,25 +538,17 @@ end
 -- a message when all items are done loading.
 ---@private
 ---@param kind BagKind
----@param container ContinuableContainer
+---@param container ItemLoader
 function items:ProcessContainer(kind, container)
-  local loaded = false
-  local count = 0
-  -- HACKFIX: Continuable containers always return false in Classic, even if
-  -- the callback is called.
-  local maxCount = addon.isClassic and 0 or 2
-  repeat
-    loaded = container:ContinueOnLoad(function()
-      self:LoadItems(kind)
-    end)
-    count = count + 1
-  until loaded or count > maxCount
-  local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
+  container:Load(function()
+    self:LoadItems(kind)
+    local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-  events:SendMessageLater(ev, nil, self.slotInfo[kind])
-  if kind == const.BAG_KIND.BACKPACK then
-    debug:EndProfile('Backpack Data Pipeline')
-  end
+    events:SendMessageLater(ev, nil, self.slotInfo[kind])
+    if kind == const.BAG_KIND.BACKPACK then
+      debug:EndProfile('Backpack Data Pipeline')
+    end
+  end)
 end
 
 -- StageBagForUpdate will scan a bag for items and add them
@@ -561,7 +556,7 @@ end
 ---@private
 ---@param bagid number
 ---@param kind BagKind
----@param container ContinuableContainer
+---@param container ItemLoader
 function items:StageBagForUpdate(bagid, kind, container)
   local size = C_Container.GetContainerNumSlots(bagid)
   local index = kind == const.BAG_KIND.BANK and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
@@ -579,7 +574,7 @@ function items:StageBagForUpdate(bagid, kind, container)
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
     if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
-      container:AddContinuable(itemMixin)
+      container:Add(itemMixin)
     elseif itemMixin:IsItemEmpty() then
       data.isItemEmpty = true
     end
