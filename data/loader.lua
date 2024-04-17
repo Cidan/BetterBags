@@ -10,7 +10,7 @@ local events = addon:GetModule('Events')
 local async = addon:GetModule('Async')
 
 ---@class (exact) ItemLoader
----@field private locations table<number, ItemLocationMixin>
+---@field private locations table<number, ItemMixin>
 ---@field private callback fun()
 ---@field private id number
 local ItemLoader = {}
@@ -52,14 +52,17 @@ function ItemLoader:Add(itemMixin)
   local itemID = itemMixin:GetItemID()
   if itemID == nil then return end
 
-  self.locations[itemID] = itemLocation
+  self.locations[itemID] = itemMixin
 
 end
 
 function ItemLoader:Load(callback)
   async:Until(function()
-    for _, location in pairs(self.locations) do
-      C_Item.RequestLoadItemData(location)
+    for itemID, location in pairs(self.locations) do
+      itemID = itemID
+      location:ContinueOnItemLoad(function()
+        self.locations[itemID] = nil
+      end)
     end
     if next(self.locations) == nil then
       loader.loaders[self.id] = nil
