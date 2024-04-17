@@ -43,19 +43,23 @@ function ItemLoader:Add(itemMixin)
   if itemLocation == nil then return end
   local itemID = itemMixin:GetItemID()
   if itemID == nil then return end
-
   self.locations[itemID] = itemMixin
+  itemMixin:ContinueOnItemLoad(function()
+    if itemMixin:IsItemDataCached() then
+      self.locations[itemID] = nil
+    end
+  end)
 end
 
 function ItemLoader:Load(callback)
   async:Until(function()
     for itemID, location in pairs(self.locations) do
-      itemID = itemID
-      location:ContinueOnItemLoad(function()
-        if location:IsItemDataCached() then
-          self.locations[itemID] = nil
-        end
-      end)
+      local l = location:GetItemLocation()
+      if l == nil then
+        self.locations[itemID] = nil
+      else
+        C_Item.RequestLoadItemData(l)
+      end
     end
     if next(self.locations) == nil then
       loader.loaders[self.id] = nil
