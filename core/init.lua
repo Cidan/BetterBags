@@ -1,4 +1,4 @@
----@diagnostic disable: duplicate-set-field,duplicate-doc-field
+---@diagnostic disable: duplicate-set-field,duplicate-doc-field,deprecated
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
@@ -166,8 +166,20 @@ function addon:UpdateButtonHighlight()
   end
 end
 
+local function applyCompat()
+  if not addon.isWrath then return end
+  if not C_Item.GetItemInfoInstant then
+    C_Item.GetItemInfoInstant = GetItemInfoInstant
+  end
+  if not C_Item.GetItemInfo then
+    C_Item.GetItemInfo = GetItemInfo
+  end
+end
+
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
+  -- Hackfix for WotLK
+  applyCompat()
   itemFrame:Enable()
   sectionFrame:Enable()
   masque:Enable()

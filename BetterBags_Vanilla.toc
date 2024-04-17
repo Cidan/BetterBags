@@ -47,6 +47,7 @@ core\database.lua
 core\hooks.lua
 core\async.lua
 
+data\loader.lua
 data\equipmentsets.lua
 data\categories.lua
 data\items.lua

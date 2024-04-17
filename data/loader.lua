@@ -24,8 +24,10 @@ local loader = addon:NewModule('Loader')
 function loader:OnInitialize()
   self.loaders = {}
   self.loadCount = 1
-  events:RegisterEvent('ITEM_DATA_LOAD_RESULT', function(event, ...)
+  events:RegisterEvent('ITEM_DATA_LOAD_RESULT', function(_, ...)
     local itemID, success = select(1, ...)
+    ---@cast itemID number
+    ---@cast success boolean
     for _, itemLoader in pairs(self.loaders) do
       itemLoader:OnEvent(itemID, success)
     end
