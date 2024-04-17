@@ -24,14 +24,6 @@ local loader = addon:NewModule('Loader')
 function loader:OnInitialize()
   self.loaders = {}
   self.loadCount = 1
-  events:RegisterEvent('ITEM_DATA_LOAD_RESULT', function(_, ...)
-    local itemID, success = select(1, ...)
-    ---@cast itemID number
-    ---@cast success boolean
-    for _, itemLoader in pairs(self.loaders) do
-      itemLoader:OnEvent(itemID, success)
-    end
-  end)
 end
 
 ---@return ItemLoader
@@ -53,7 +45,6 @@ function ItemLoader:Add(itemMixin)
   if itemID == nil then return end
 
   self.locations[itemID] = itemMixin
-
 end
 
 function ItemLoader:Load(callback)
@@ -72,12 +63,4 @@ function ItemLoader:Load(callback)
     end
     return false
   end, callback)
-end
-
----@package
----@param itemID number
----@param success boolean
-function ItemLoader:OnEvent(itemID, success)
-  if self.locations[itemID] == nil or not success then return end
-  self.locations[itemID] = nil
 end
