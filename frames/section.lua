@@ -280,6 +280,7 @@ local function onTitleRightClick(section)
       if (data.itemInfo.category == title) then
         local item = {
           itemId = data.itemInfo.itemID,
+          count = data.itemInfo.currentItemCount,
           bagid = data.bagid,
           slotid = data.slotid
         }
@@ -289,7 +290,10 @@ local function onTitleRightClick(section)
   end
 
   table.sort(list, function(a, b)
-    return idOrder[a.itemId] < idOrder[b.itemId]
+    local ia = idOrder[a.itemId] 
+    local ib = idOrder[b.itemId]
+    if ia ~= ib then return ia < ib end
+    return a.count > b.count
   end)
   
   async:Each(list, function(item)
