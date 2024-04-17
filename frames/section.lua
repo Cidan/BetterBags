@@ -252,6 +252,17 @@ local function onTitleRightClick(section)
   local kind = section:DetectKind()
   local title = section.title:GetText()
 
+  -- getting the itemId order the section is using so we can move them in the same order
+  local idOrder = {}
+
+  local order = 1
+  for _, cell in pairs(section.content.cells) do
+    if not cell.data.isItemEmpty then
+      idOrder[cell.data.itemInfo.itemID] = order
+      order = order + 1
+    end
+  end
+
   local source = nil
 
   if (kind == const.BAG_KIND.BACKPACK) then
@@ -276,6 +287,10 @@ local function onTitleRightClick(section)
       end
     end
   end
+
+  table.sort(list, function(a, b)
+    return idOrder[a.itemId] < idOrder[b.itemId]
+  end)
   
   async:Each(list, function(item)
     -- safecheking: does the bag/slot still hold 'this' item?
