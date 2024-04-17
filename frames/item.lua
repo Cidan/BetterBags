@@ -53,6 +53,7 @@ local debug = addon:GetModule('Debug')
 ---@field kind BagKind
 ---@field masqueGroup string
 ---@field ilvlText FontString
+---@field stacksCountText FontString for tracking the bag slots represented by a view slot
 ---@field IconTexture Texture
 ---@field Count FontString
 ---@field Stock FontString
@@ -217,6 +218,7 @@ function itemFrame.itemProto:Lock()
   SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
   self.LockTexture:Show()
   self.ilvlText:Hide()
+  self.stacksCountText:Hide()
   database:SetItemLock(self.data.itemInfo.itemGUID, true)
 end
 
@@ -276,8 +278,16 @@ function itemFrame.itemProto:DrawItemLevel()
 end
 
 function itemFrame.itemProto:UpdateCount()
+  local stackingOptions = database:GetStackingOptions(self.kind)
   if self.data == nil or self.data.isItemEmpty then return end
   local count = self.data.stackedCount or self.data.itemInfo.currentItemCount
+  if self.data.stacks > 0 and stackingOptions.showBagSlotsUsed then
+    -- since ItemData stacks is effectively _additional_ stacks to the base one, take its value + 1
+    self.stacksCountText:SetText(tostring(self.data.stacks + 1))
+    self.stacksCountText:Show()
+  else
+    self.stacksCountText:Hide()
+  end
   SetItemButtonCount(self.button, count)
 end
 
@@ -447,6 +457,8 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   self.button:UpdateCooldown(false)
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
+  self.stacksCountText:SetText("")
+  self.stacksCountText:Hide()
   self.LockTexture:Hide()
   self.button.UpgradeIcon:SetShown(false)
 
@@ -519,6 +531,8 @@ function itemFrame.itemProto:ClearItem()
   self.button:Enable()
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
+  self.stacksCountText:SetText("")
+  self.stacksCountText:Hide()
   self.LockTexture:Hide()
   self:ResetSize()
   self.data = nil
@@ -615,6 +629,11 @@ function itemFrame:_DoCreate()
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
   i.ilvlText = ilvlText
+  
+  local stacksCountText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+  stacksCountText:SetPoint("TOPRIGHT", -4.8, -2)
+  stacksCountText:SetTextColor(0.8, 0.8, 0.8, 1)
+  i.stacksCountText = stacksCountText
 
   i.stacks = {}
   i.stackCount = 1

@@ -312,12 +312,14 @@ const.DATABASE_DEFAULTS = {
         mergeUnstackable = true,
         unmergeAtShop = true,
         dontMergePartial = false,
+        showBagSlotsUsed = false,
       },
       [const.BAG_KIND.BANK]  = {
         mergeStacks = true,
         mergeUnstackable = true,
         unmergeAtShop = true,
         dontMergePartial = false,
+        showBagSlotsUsed = false,
       }
     },
     itemLevel = {
