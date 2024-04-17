@@ -573,7 +573,7 @@ function items:StageBagForUpdate(bagid, kind, container)
 
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
-    if not itemMixin:IsItemEmpty() and not itemMixin:IsItemDataCached() then
+    if not itemMixin:IsItemEmpty() then
       container:Add(itemMixin)
     elseif itemMixin:IsItemEmpty() then
       data.isItemEmpty = true

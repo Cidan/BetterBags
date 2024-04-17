@@ -71,6 +71,6 @@ end
 ---@param itemID number
 ---@param success boolean
 function ItemLoader:OnEvent(itemID, success)
-  if self.locations[itemID] == nil then return end
+  if self.locations[itemID] == nil or not success then return end
   self.locations[itemID] = nil
 end
