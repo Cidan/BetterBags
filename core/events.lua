@@ -87,7 +87,7 @@ function events:BucketEvent(event, callback)
     if self._bucketTimers[event] then
       self._bucketTimers[event]:Cancel()
     end
-    self._bucketTimers[event] = C_Timer.NewTimer(0.5, bucketFunction)
+    self._bucketTimers[event] = C_Timer.NewTimer(0.2, bucketFunction)
   end)
 
   table.insert(self._bucketCallbacks[event], callback)
@@ -118,7 +118,7 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
         self._bucketTimers[joinedEvents]:Cancel()
       end
       tinsert(self._eventArguments[joinedEvents], {eventName, ...})
-      self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.5, bucketFunction)
+      self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.2, bucketFunction)
     end)
   end
 
@@ -128,7 +128,7 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
         self._bucketTimers[joinedEvents]:Cancel()
       end
       tinsert(self._eventArguments[joinedEvents], {eventName, ...})
-      self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.5, bucketFunction)
+      self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.2, bucketFunction)
     end)
   end
   table.insert(self._bucketCallbacks[joinedEvents], callback)
