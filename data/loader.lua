@@ -16,6 +16,7 @@ local debug = addon:GetModule('Debug')
 ---@field private locations table<number, ItemMixin>
 ---@field private callback fun()
 ---@field private id number
+---@field private mixinCache ItemMixin[]
 local ItemLoader = {}
 
 ---@class (exact) Loader: AceModule
@@ -42,6 +43,7 @@ end
 
 ---@param itemMixin ItemMixin
 function ItemLoader:Add(itemMixin)
+  table.insert(self.mixinCache, itemMixin)
   local itemLocation = itemMixin:GetItemLocation()
   if itemLocation == nil then return end
   local itemID = itemMixin:GetItemID()
@@ -69,7 +71,7 @@ function ItemLoader:Load(callback)
       end
     end
     if next(self.locations) == nil then
-      loader.loaders[self.id] = nil
+      --loader.loaders[self.id] = nil
       print("calling back")
       callback()
     else
