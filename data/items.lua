@@ -549,6 +549,9 @@ function items:ProcessContainer(kind, container)
     if kind == const.BAG_KIND.BACKPACK then
       debug:EndProfile('Backpack Data Pipeline')
     end
+    for _, mix in pairs(container.mixinCache) do
+      debug:Log("MixinCache", "MixinCache Item Link", mix:GetItemLink())
+    end
   end)
 end
 

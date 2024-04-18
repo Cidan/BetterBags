@@ -16,7 +16,7 @@ local debug = addon:GetModule('Debug')
 ---@field private locations table<number, ItemMixin>
 ---@field private callback fun()
 ---@field private id number
----@field private mixinCache ItemMixin[]
+---@field mixinCache ItemMixin[]
 local ItemLoader = {}
 
 ---@class (exact) Loader: AceModule
