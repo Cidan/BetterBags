@@ -447,11 +447,11 @@ function items:LoadItems(kind, dataCache)
       if items:HasItemChanged(dataCache[cacheKey], data) then
         local wasStacked = data.stacks and data.stacks > 0
         local oldHash = data.itemHash
-        wipe(data)
         if dataCache[cacheKey] ~= nil then
           bag[slotid] = dataCache[cacheKey]
           data = bag[slotid]
         else
+          wipe(data)
           data.bagid = bagid
           data.slotid = slotid
           items:AttachItemInfo(data, kind)

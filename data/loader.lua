@@ -80,7 +80,10 @@ function ItemLoader:Load(callback)
       return true
     end
     return false
-  end, callback)
+  end, function()
+    callback()
+    wipe(self.data)
+  end)
 end
 
 ---@return table<string, ItemData>
