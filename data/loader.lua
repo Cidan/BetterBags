@@ -9,6 +9,9 @@ local events = addon:GetModule('Events')
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class (exact) ItemLoader
 ---@field private locations table<number, ItemMixin>
 ---@field private callback fun()
@@ -48,7 +51,7 @@ function ItemLoader:Add(itemMixin)
     if itemMixin:IsItemDataCached() then
       local bagid, slotid = itemMixin:GetItemLocation():GetBagAndSlot()
       C_Container.GetContainerItemLink(bagid, slotid)
-      print("item was cached, removing from loader", itemMixin:GetItemLink(), C_Container.GetContainerItemLink(bagid, slotid))
+      debug:Log("AsyncDebug", "Item Was Cached, Removing From Loader", itemMixin:GetItemLink(), C_Container.GetContainerItemLink(bagid, slotid))
       self.locations[itemID] = nil
     end
   end)
