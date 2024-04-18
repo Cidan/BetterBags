@@ -18,9 +18,6 @@ local categories = addon:GetModule('Categories')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Loader: AceModule
-local loader = addon:GetModule('Loader')
-
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -253,7 +250,7 @@ function items:DoRefreshAll()
 end
 
 function items:RefreshReagentBank()
-  local container = loader:New()
+  local container = self:NewLoader(const.BAG_KIND.BANK)
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
     self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
@@ -267,7 +264,7 @@ end
 
 function items:RefreshBank()
   equipmentSets:Update()
-  local container = loader:New()
+  local container = self:NewLoader(const.BAG_KIND.BANK)
   -- This is a small hack to force the bank bag quality data to be cached
   -- before the bank bag frame is drawn.
   for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -292,7 +289,7 @@ function items:RefreshBackpack()
   debug:StartProfile('Backpack Data Pipeline')
 
   equipmentSets:Update()
-  local container = loader:New()
+  local container = self:NewLoader(const.BAG_KIND.BACKPACK)
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
@@ -386,7 +383,8 @@ end
 --- LoadItems will load all items in a given bag kind and update the item database.
 ---@private
 ---@param kind BagKind
-function items:LoadItems(kind)
+---@param dataCache table<string, ItemData>
+function items:LoadItems(kind, dataCache)
   ---@type ExtraSlotInfo
   local extraSlotInfo = {
     emptySlots = {},
@@ -446,7 +444,12 @@ function items:LoadItems(kind)
         wipe(data)
         data.bagid = bagid
         data.slotid = slotid
-        items:AttachItemInfo(data, kind)
+        if dataCache[self:GetSlotKey(data)] ~= nil then
+          bag[slotid] = dataCache[self:GetSlotKey(data)]
+          data = bag[slotid]
+        else
+          items:AttachItemInfo(data, kind)
+        end
         if wasStacked then
           debug:Log("Stacks", "Was Stacked", data.itemInfo.itemLink)
           data.forceClear = true
@@ -542,15 +545,12 @@ end
 function items:ProcessContainer(kind, container)
   container:Load(function()
     debug:Log("AsyncDebug", "All items cached, loading items", kind)
-    self:LoadItems(kind)
+    self:LoadItems(kind, container:GetDataCache())
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
     events:SendMessageLater(ev, nil, self.slotInfo[kind])
     if kind == const.BAG_KIND.BACKPACK then
       debug:EndProfile('Backpack Data Pipeline')
-    end
-    for _, mix in pairs(container.mixinCache) do
-      debug:Log("MixinCache", "MixinCache Item Link", mix:GetItemLink())
     end
   end)
 end
