@@ -303,36 +303,34 @@ end
 
 -- HasItemChanged will determine if an item has changed since the last time a bag refresh
 -- was done.
----@param bagid number
----@param slotid number
----@param data ItemData
+---@param newData ItemData
+---@param oldData ItemData
 ---@return boolean
-function items:HasItemChanged(bagid, slotid, data)
-  local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
-  local itemLocation = itemMixin:GetItemLocation()
-  local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
+function items:HasItemChanged(newData, oldData)
 
-  local oldItemLink = data.itemInfo and data.itemInfo.itemLink or nil
-  local oldStackCount = data.itemInfo and data.itemInfo.currentItemCount or 1
+  local itemLink = newData and newData.itemInfo and newData.itemInfo.itemLink or nil
+  local oldItemLink = oldData.itemInfo and oldData.itemInfo.itemLink or nil
+  local oldStackCount = oldData.itemInfo and oldData.itemInfo.currentItemCount or 1
+
   if itemLink ~= oldItemLink then
     debug:Log("ItemChange", oldItemLink, "->", itemLink)
     return true
   end
 
-  if itemLocation and C_Item.DoesItemExist(itemLocation) then
-    if C_NewItems.IsNewItem(bagid, slotid) and not data.itemInfo.isNewItem then
-      C_NewItems.RemoveNewItem(bagid, slotid)
+  if newData and not newData.isItemEmpty then
+    if C_NewItems.IsNewItem(newData.bagid, newData.slotid) and not oldData.itemInfo.isNewItem then
+      C_NewItems.RemoveNewItem(newData.bagid, newData.slotid)
       debug:Log("ItemChange", itemLink, "Item Marked as New (stripped)")
       return true
     end
 
-    if oldStackCount ~= C_Item.GetStackCount(itemLocation) then
-      debug:Log("ItemChange", itemLink, "count", oldStackCount, "->", C_Item.GetStackCount(itemLocation))
+    if oldStackCount ~= newData.itemInfo.itemStackCount then
+      debug:Log("ItemChange", itemLink, "count", oldStackCount, "->", newData.itemInfo.itemStackCount)
       return true
     end
   end
 
-  if data.itemInfo and data.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(data) then
+  if oldData.itemInfo and oldData.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(oldData) then
     debug:Log("ItemChange", itemLink, "Not Recent Item")
     return true
   end
@@ -378,6 +376,13 @@ end
 ---@return string
 function items:GetSlotKey(data)
   return data.bagid .. '_' .. data.slotid
+end
+
+---@param bagid number
+---@param slotid number
+---@return string
+function items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  return bagid .. '_' .. slotid
 end
 
 --- LoadItems will load all items in a given bag kind and update the item database.
@@ -437,17 +442,18 @@ function items:LoadItems(kind, dataCache)
     end
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
     for slotid, data in pairs(bag) do
+      local cacheKey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
       -- Check if the item as changed, and if so, add it to the dirty list.
-      if items:HasItemChanged(bagid, slotid, data) then
+      if items:HasItemChanged(dataCache[cacheKey], data) then
         local wasStacked = data.stacks and data.stacks > 0
         local oldHash = data.itemHash
         wipe(data)
-        data.bagid = bagid
-        data.slotid = slotid
-        if dataCache[self:GetSlotKey(data)] ~= nil then
-          bag[slotid] = dataCache[self:GetSlotKey(data)]
+        if dataCache[cacheKey] ~= nil then
+          bag[slotid] = dataCache[cacheKey]
           data = bag[slotid]
         else
+          data.bagid = bagid
+          data.slotid = slotid
           items:AttachItemInfo(data, kind)
         end
         if wasStacked then
