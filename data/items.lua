@@ -541,6 +541,7 @@ end
 ---@param container ItemLoader
 function items:ProcessContainer(kind, container)
   container:Load(function()
+    print("okay, now i'm loading the container", kind)
     self:LoadItems(kind)
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
