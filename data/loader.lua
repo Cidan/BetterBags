@@ -36,6 +36,7 @@ function loader:New()
   setmetatable(itemLoader, {__index = ItemLoader})
   itemLoader.locations = {}
   itemLoader.id = self.loadCount
+  itemLoader.mixinCache = {}
   self.loaders[itemLoader.id] = itemLoader
   self.loadCount = self.loadCount + 1
   return itemLoader
