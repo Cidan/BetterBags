@@ -58,7 +58,8 @@ function ItemLoader:Add(itemMixin)
 end
 
 function ItemLoader:Load(callback)
-  repeat
+  local task = {}
+  task.loadFunc = function()
     for itemID, location in pairs(self.locations) do
       local l = location:GetItemLocation()
       if l == nil then
@@ -67,8 +68,16 @@ function ItemLoader:Load(callback)
         C_Item.RequestLoadItemData(l)
       end
     end
-  until next(self.locations) == nil
-  callback()
+    if next(self.locations) == nil then
+      loader.loaders[self.id] = nil
+      print("calling back")
+      callback()
+    else
+      print("next frame")
+      C_Timer.After(0, task.loadFunc)
+    end
+  end
+  task.loadFunc()
   --[[
   async:Until(function()
     for itemID, location in pairs(self.locations) do
