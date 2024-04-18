@@ -50,9 +50,20 @@ end
 function ItemLoader:Add(itemMixin)
   local itemLocation = itemMixin:GetItemLocation()
   if itemLocation == nil then return end
+
+  if itemMixin:IsItemEmpty() then
+    local data = {}
+    ---@cast data +ItemData
+    data.bagid, data.slotid = itemMixin:GetItemLocation():GetBagAndSlot()
+    items:AttachItemInfo(data, self.kind)
+    self.data[items:GetSlotKey(data)] = data
+    return
+  end
+
   local itemID = itemMixin:GetItemID()
   if itemID == nil then return end
   self.locations[itemID] = itemMixin
+
   itemMixin:ContinueOnItemLoad(function()
     if itemMixin:IsItemDataCached() then
       local data = {}

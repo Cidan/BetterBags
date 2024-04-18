@@ -82,6 +82,7 @@ local itemDataProto = {}
 ---@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
 ---@field slotInfo table<BagKind, ExtraSlotInfo>
 ---@field previousItemGUID table<number, table<number, string>>
+---@field private previousItems table<number, table<string, ItemData>>
 ---@field _newItemTimers table<string, number>
 ---@field _preSort boolean
 local items = addon:NewModule('Items')
@@ -90,6 +91,10 @@ function items:OnInitialize()
   self.itemsByBagAndSlot = {}
   self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
+  self.previousItems = {
+    [const.BAG_KIND.BACKPACK] = {},
+    [const.BAG_KIND.BANK] = {},
+  }
   self:ResetSlotInfo()
 
   self._newItemTimers = {}
@@ -403,6 +408,7 @@ function items:LoadItems(kind, dataCache)
   }
 
   local itemList = kind == const.BAG_KIND.BANK and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
+  
   ---@type table<string, ItemData>
   local stacks = {}
 
@@ -441,54 +447,50 @@ function items:LoadItems(kind, dataCache)
       end
     end
     extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
-    for slotid, data in pairs(bag) do
+    for slotid, _ in pairs(bag) do
       local cacheKey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
+      local previousData = self.previousItems[kind][cacheKey] or {
+        isItemEmpty = true,
+      }
+      local newData = dataCache[cacheKey]
       -- Check if the item as changed, and if so, add it to the dirty list.
-      if items:HasItemChanged(dataCache[cacheKey], data) then
-        local wasStacked = data.stacks and data.stacks > 0
-        local oldHash = data.itemHash
-        if dataCache[cacheKey] ~= nil then
-          bag[slotid] = dataCache[cacheKey]
-          data = bag[slotid]
-        else
-          wipe(data)
-          data.bagid = bagid
-          data.slotid = slotid
-          items:AttachItemInfo(data, kind)
-        end
+      if items:HasItemChanged(newData, previousData) then
+        local wasStacked = previousData.stacks and previousData.stacks > 0
+        local oldHash = previousData.itemHash
+        itemList[bagid][slotid] = newData
         if wasStacked then
-          debug:Log("Stacks", "Was Stacked", data.itemInfo.itemLink)
-          data.forceClear = true
-          nextStacks[oldHash] = data
+          debug:Log("Stacks", "Was Stacked", newData.itemInfo.itemLink)
+          newData.forceClear = true
+          nextStacks[oldHash] = newData
         end
-        table.insert(extraSlotInfo.dirtyItems, data)
-        dirty[self:GetSlotKey(data)] = data
+        table.insert(extraSlotInfo.dirtyItems, newData)
+        dirty[self:GetSlotKey(newData)] = newData
       end
 
-      extraSlotInfo.itemsBySlotKey[self:GetSlotKey(data)] = data
+      extraSlotInfo.itemsBySlotKey[self:GetSlotKey(newData)] = newData
 
       -- Compute stacking data.
-      if items:ShouldItemStack(kind, data) then
-        local stackItem = stacks[data.itemHash]
+      if items:ShouldItemStack(kind, newData) then
+        local stackItem = stacks[newData.itemHash]
         if stackItem ~= nil then
           stackItem.stacks = stackItem.stacks + 1
-          stackItem.nextStack = items:GetSlotKey(data)
-          data.stackedOn = items:GetSlotKey(stackItem)
-          data.stackedCount = data.itemInfo.currentItemCount
-          data.stacks = 0
-          stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
-          if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
-            self:ClearNewItem(data)
+          stackItem.nextStack = items:GetSlotKey(newData)
+          newData.stackedOn = items:GetSlotKey(stackItem)
+          newData.stackedCount = newData.itemInfo.currentItemCount
+          newData.stacks = 0
+          stackItem.stackedCount = stackItem.stackedCount + newData.itemInfo.currentItemCount
+          if not self:IsNewItem(stackItem) or not self:IsNewItem(newData) then
+            self:ClearNewItem(newData)
             self:ClearNewItem(stackItem)
-            data.itemInfo.category = self:GetCategory(data)
+            newData.itemInfo.category = self:GetCategory(newData)
             stackItem.itemInfo.category = self:GetCategory(stackItem)
           end
           --TODO(lobato): I don't know why dirty as a set doesn't just work here when
           -- passing it into the event, and I'm too tired to figure it out right now.
-          local key = items:GetSlotKey(data)
+          local key = items:GetSlotKey(newData)
           if dirty[key] == nil then
-            table.insert(extraSlotInfo.dirtyItems, data)
-            dirty[key] = data
+            table.insert(extraSlotInfo.dirtyItems, newData)
+            dirty[key] = newData
           end
 
           key = items:GetSlotKey(stackItem)
@@ -497,33 +499,33 @@ function items:LoadItems(kind, dataCache)
             dirty[key] = stackItem
           end
         else
-          local key = items:GetSlotKey(data)
-          if data.stackedOn ~= nil and dirty[key] == nil then
-            table.insert(extraSlotInfo.dirtyItems, data)
-            dirty[key] = data
+          local key = items:GetSlotKey(newData)
+          if newData.stackedOn ~= nil and dirty[key] == nil then
+            table.insert(extraSlotInfo.dirtyItems, newData)
+            dirty[key] = newData
           end
-          data.stacks = 0
-          data.stackedOn = nil
-          data.stackedCount = data.itemInfo.currentItemCount
-          stacks[data.itemHash] = data
+          newData.stacks = 0
+          newData.stackedOn = nil
+          newData.stackedCount = newData.itemInfo.currentItemCount
+          stacks[newData.itemHash] = newData
         end
-      elseif data.stackedOn ~= nil or (data.stacks ~= nil and data.stacks > 0) then
-        data.stackedOn = nil
-        data.stacks = 0
-        data.stackedCount = data.itemInfo.currentItemCount
-        local key = items:GetSlotKey(data)
+      elseif newData.stackedOn ~= nil or (newData.stacks ~= nil and newData.stacks > 0) then
+        newData.stackedOn = nil
+        newData.stacks = 0
+        newData.stackedCount = newData.itemInfo.currentItemCount
+        local key = items:GetSlotKey(newData)
         if dirty[key] == nil then
-          table.insert(extraSlotInfo.dirtyItems, data)
-          dirty[key] = data
+          table.insert(extraSlotInfo.dirtyItems, newData)
+          dirty[key] = newData
         end
       end
 
-      if data.isItemEmpty then
-        data.stacks = 0
-        data.stackedOn = nil
-        data.stackedCount = nil
+      if newData.isItemEmpty then
+        newData.stacks = 0
+        newData.stackedOn = nil
+        newData.stackedCount = nil
         extraSlotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
-        extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
+        extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = newData
       else
         extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
       end
@@ -541,6 +543,7 @@ function items:LoadItems(kind, dataCache)
   end
 
   self.slotInfo[kind] = extraSlotInfo
+  self.previousItems[kind] = dataCache
 end
 
 -- ProcessContainer will load all items in the container and fire
@@ -582,11 +585,7 @@ function items:StageBagForUpdate(bagid, kind, container)
 
     -- If this is an actual item, add it to the callback container
     -- so data is fetched from the server.
-    if not itemMixin:IsItemEmpty() then
-      container:Add(itemMixin)
-    elseif itemMixin:IsItemEmpty() then
-      data.isItemEmpty = true
-    end
+    container:Add(itemMixin)
 
     if index[bagid][slotid] then
       index[bagid][slotid].isItemEmpty = data.isItemEmpty
@@ -834,6 +833,7 @@ end
 
 ---@param data ItemData
 ---@param kind BagKind
+---@return ItemData
 function items:AttachItemInfo(data, kind)
   local itemMixin = Item:CreateFromBagAndSlot(data.bagid, data.slotid) --[[@as ItemMixin]]
   local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
@@ -845,7 +845,7 @@ function items:AttachItemInfo(data, kind)
   if itemID == nil then
     data.isItemEmpty = true
     data.itemInfo = {} --[[@as table]]
-    return
+    return data
   end
   data.isItemEmpty = false
   local _, _, _,
@@ -903,6 +903,7 @@ function items:AttachItemInfo(data, kind)
   data.itemInfo.category = self:GetCategory(data)
   data.forceClear = false
   data.stacks = 0
+  return data
 end
 
 ---@param itemID number
