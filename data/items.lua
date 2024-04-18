@@ -550,7 +550,6 @@ end
 ---@param container ItemLoader
 function items:ProcessContainer(kind, container)
   container:Load(function()
-    debug:Log("AsyncDebug", "All items cached, loading items", kind)
     self:LoadItems(kind, container:GetDataCache())
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
@@ -841,7 +840,6 @@ function items:AttachItemInfo(data, kind)
   local bagid, slotid = data.bagid, data.slotid
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
   local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
-  debug:Log("ItemAttach", "Attaching Item Info", data.bagid, data.slotid, itemLink)
   data.kind = kind
   data.basic = false
   if itemID == nil then
