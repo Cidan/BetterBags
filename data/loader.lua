@@ -46,6 +46,7 @@ function ItemLoader:Add(itemMixin)
   self.locations[itemID] = itemMixin
   itemMixin:ContinueOnItemLoad(function()
     if itemMixin:IsItemDataCached() then
+      print("item was cached, removing from loader", itemMixin:GetItemLink())
       self.locations[itemID] = nil
     end
   end)
