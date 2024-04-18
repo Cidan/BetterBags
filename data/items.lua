@@ -832,6 +832,7 @@ function items:AttachItemInfo(data, kind)
   local bagid, slotid = data.bagid, data.slotid
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
   local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
+  debug:Log("ItemAttach", "Attaching Item Info", data.bagid, data.slotid, itemLink)
   data.kind = kind
   data.basic = false
   if itemID == nil then

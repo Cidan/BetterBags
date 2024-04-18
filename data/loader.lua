@@ -51,7 +51,7 @@ function ItemLoader:Add(itemMixin)
     if itemMixin:IsItemDataCached() then
       local bagid, slotid = itemMixin:GetItemLocation():GetBagAndSlot()
       C_Container.GetContainerItemLink(bagid, slotid)
-      debug:Log("AsyncDebug", "Item Was Cached, Removing From Loader", itemMixin:GetItemLink(), C_Container.GetContainerItemLink(bagid, slotid))
+      debug:Log("AsyncDebug", "Item Was Cached, Removing From Loader", bagid, slotid, itemMixin:GetItemLink(), C_Container.GetContainerItemLink(bagid, slotid))
       self.locations[itemID] = nil
     end
   end)
