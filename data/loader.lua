@@ -58,6 +58,18 @@ function ItemLoader:Add(itemMixin)
 end
 
 function ItemLoader:Load(callback)
+  repeat
+    for itemID, location in pairs(self.locations) do
+      local l = location:GetItemLocation()
+      if l == nil then
+        self.locations[itemID] = nil
+      else
+        C_Item.RequestLoadItemData(l)
+      end
+    end
+  until next(self.locations) == nil
+  callback()
+  --[[
   async:Until(function()
     for itemID, location in pairs(self.locations) do
       local l = location:GetItemLocation()
@@ -73,4 +85,5 @@ function ItemLoader:Load(callback)
     end
     return false
   end, callback)
+  ]]--
 end
