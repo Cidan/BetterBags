@@ -63,6 +63,7 @@ function bagFrame.bagProto:SwitchToBank()
   self.isReagentBank = false
   BankFrame.selectedTab = 1
   --self.frame:SetTitle(L:G("Bank"))
+  items:ClearBankCache()
   self:Wipe()
 end
 
