@@ -60,6 +60,13 @@ local function OneBagView(view, bag, slotInfo)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
+  --- Handle removed items.
+  for _, item in pairs(removed) do
+    local slotkey = item.slotkey
+    view.content:RemoveCell(slotkey)
+    view.itemsByBagAndSlot[slotkey]:Wipe()
+  end
+
   --- Handle new added items.
   for _, item in pairs(added) do
     local slotkey = item.slotkey
@@ -71,13 +78,6 @@ local function OneBagView(view, bag, slotInfo)
     itemButton:SetItem(item)
     view.content:AddCell(slotkey, itemButton)
     itemButton:UpdateCount()
-  end
-
-  --- Handle removed items.
-  for _, item in pairs(removed) do
-    local slotkey = item.slotkey
-    view.content:RemoveCell(slotkey)
-    view.itemsByBagAndSlot[slotkey]:Wipe()
   end
 
   --- Handle changed items.
