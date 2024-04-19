@@ -378,35 +378,32 @@ function items:LoadItems(kind, dataCache)
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
     local previousItem = slotInfo:GetPreviousItemByBagAndSlot(bagid, slotid)
     local name = ""
+    local invid = C_Container.ContainerIDToInventoryID(bagid)
+    local baglink = GetInventoryItemLink("player", invid)
+
+    if baglink ~= nil and invid ~= nil then
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      name = GetItemSubClassInfo(class, subclass)
+    else
+      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+    end
 
     -- Process bag free slots.
     if not processedBags[bagid] then
-      -- Parse bag and free slot information.
-      if bagid == Enum.BagIndex.Keyring then
-      elseif bagid == Enum.BagIndex.Backpack then
-        name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
-        slotInfo.emptySlots[name] = slotInfo.emptySlots[name] or 0
-        slotInfo.emptySlots[name] = slotInfo.emptySlots[name] + freeSlots
-      elseif bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
+      if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
         -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
         -- There are 4 extra slots in the bank bag in Classic that should not
         -- exist. This is a Blizzard bug.
         if addon.isClassic then
           freeSlots = freeSlots - 4
         end
-        name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      end
+
+      if bagid ~= Enum.BagIndex.Keyring then
         slotInfo.emptySlots[name] = slotInfo.emptySlots[name] or 0
         slotInfo.emptySlots[name] = slotInfo.emptySlots[name] + freeSlots
-      else
-        local invid = C_Container.ContainerIDToInventoryID(bagid)
-        local baglink = GetInventoryItemLink("player", invid)
-        if baglink ~= nil and invid ~= nil then
-          local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-          name = GetItemSubClassInfo(class, subclass)
-          slotInfo.emptySlots[name] = slotInfo.emptySlots[name] or 0
-          slotInfo.emptySlots[name] = slotInfo.emptySlots[name] + freeSlots
-        end
       end
+
       processedBags[bagid] = true
     end
     -- End Process Bag Free Slots
@@ -420,6 +417,13 @@ function items:LoadItems(kind, dataCache)
       end
       table.insert(slotInfo.dirtyItems, currentItem)
       dirty[currentItem.slotkey] = currentItem
+    end
+
+    -- Store empty slot data
+    if currentItem.isItemEmpty then
+      slotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
+      slotInfo.emptySlotByBagAndSlot[bagid] = slotInfo.emptySlotByBagAndSlot[bagid] or {}
+      slotInfo.emptySlotByBagAndSlot[bagid][slotid] = currentItem
     end
   end
   --[[
