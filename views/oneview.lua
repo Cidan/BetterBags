@@ -129,7 +129,7 @@ end
 function views:NewOneBag(parent)
   local view = setmetatable({}, {__index = views.viewProto})
   view.itemsByBagAndSlot = {}
-  view.deferedItems = {}
+  view.deferredItems = {}
   view.kind = const.BAG_VIEW.ONE_BAG
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
