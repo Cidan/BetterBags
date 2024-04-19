@@ -208,7 +208,7 @@ function bagFrame.bagProto:Draw(slotInfo)
     return
   end
 
-  if self.currentView and self.currentView:GetKind() ~=  view:GetKind() then
+  if self.currentView and self.currentView:GetBagView() ~=  view:GetBagView() then
     self.currentView:Wipe()
     self.currentView:GetContent():Hide()
   end
@@ -361,10 +361,10 @@ function bagFrame:Create(kind)
   b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
 
   b.views = {
-    [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f),
-    [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f),
-    [const.BAG_VIEW.LIST] = views:NewList(f),
-    [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f),
+    [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f, b.kind),
+    [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
+    [const.BAG_VIEW.LIST] = views:NewList(f, b.kind),
+    [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
   }
 
   -- Register the bag frame so that window positions are saved.

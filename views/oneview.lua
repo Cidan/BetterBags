@@ -43,6 +43,7 @@ local function Wipe(view)
     item:Release()
   end
   view:ClearDeferredItems()
+  view:WipeStacks()
   wipe(view.itemsByBagAndSlot)
 end
 
@@ -64,30 +65,41 @@ local function OneBagView(view, bag, slotInfo)
   --- Handle removed items.
   for _, item in pairs(removed) do
     local slotkey = item.slotkey
-    view.itemsByBagAndSlot[slotkey]:SetFreeSlots(item.bagid, item.slotid, -1, "Recently Deleted")
-    view:AddDeferredItem(slotkey)
-    bag.drawOnClose = true
+    if not view:StackRemove(slotkey) then
+      local itemButton = view:GetOrCreateItemButton(slotkey)
+      itemButton:SetFreeSlots(item.bagid, item.slotid, -1, "Recently Deleted")
+      view:AddDeferredItem(slotkey)
+      bag.drawOnClose = true
+    end
   end
 
-  --- Handle new added items.
+  --- Handle added items.
   for _, item in pairs(added) do
     local slotkey = item.slotkey
-    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-    if itemButton == nil then
-      itemButton = itemFrame:Create()
-      view.itemsByBagAndSlot[slotkey] = itemButton
-    end
+    --[[
+    local itemButton = view:GetOrCreateItemButton(slotkey)
     itemButton:SetItem(item)
     view.content:AddCell(slotkey, itemButton)
     itemButton:UpdateCount()
+    ]]--
+
+    local itemButton = view:StackAdd(item)
+    if itemButton == nil then
+      itemButton = view:GetOrCreateItemButton(slotkey)
+      itemButton:SetItem(item)
+      itemButton:UpdateCount()
+    end
+    view.content:AddCell(slotkey, itemButton)
   end
 
   --- Handle changed items.
   for _, item in pairs(changed) do
     local slotkey = item.slotkey
-    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-    itemButton:SetItem(item)
-    itemButton:UpdateCount()
+    if not view:StackChange(slotkey) then
+      local itemButton = view:GetOrCreateItemButton(slotkey)
+      itemButton:SetItem(item)
+      itemButton:UpdateCount()
+    end
   end
 
   -- Get the free slots section and add the free slots to it.
@@ -125,10 +137,12 @@ local function OneBagView(view, bag, slotInfo)
 end
 
 ---@param parent Frame
+---@param kind BagKind
 ---@return View
-function views:NewOneBag(parent)
+function views:NewOneBag(parent, kind)
   local view = views:NewBlankView()
-  view.kind = const.BAG_VIEW.ONE_BAG
+  view.bagview = const.BAG_VIEW.ONE_BAG
+  view.kind = kind
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)

@@ -154,11 +154,15 @@ local function BagView(view, bag, slotInfo)
   bag.frame:SetHeight(bagHeight)
 end
 
-function views:NewBagView(parent)
+---@param parent Frame
+---@param kind BagKind
+---@return View
+function views:NewBagView(parent, kind)
   local view = setmetatable({}, {__index = views.viewProto})
   view.itemFrames = {}
   view.itemCount = 0
-  view.kind = const.BAG_VIEW.SECTION_ALL_BAGS
+  view.bagkind = const.BAG_VIEW.SECTION_ALL_BAGS
+  view.kind = kind
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)

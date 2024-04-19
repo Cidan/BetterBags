@@ -820,6 +820,7 @@ function items:AttachItemInfo(data, kind)
   data.itemInfo.category = self:GetCategory(data)
   data.forceClear = false
   data.stacks = 0
+  data.stackedCount = data.itemInfo.currentItemCount
   return data
 end
 

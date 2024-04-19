@@ -240,11 +240,13 @@ local function GridView(view, bag, slotInfo)
 end
 
 ---@param parent Frame
+---@param kind BagKind
 ---@return View
-function views:NewGrid(parent)
+function views:NewGrid(parent, kind)
   local view = views:NewBlankView()
   view.itemCount = 0
-  view.kind = const.BAG_VIEW.SECTION_GRID
+  view.bagview = const.BAG_VIEW.SECTION_GRID
+  view.kind = kind
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)

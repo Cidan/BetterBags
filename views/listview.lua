@@ -134,11 +134,13 @@ local function ListView(view, bag, slotInfo)
 end
 
 ---@param parent Frame
+---@param kind BagKind
 ---@return View
-function views:NewList(parent)
+function views:NewList(parent, kind)
   local view = views:NewBlankView()
   view.itemCount = 0
-  view.kind = const.BAG_VIEW.LIST
+  view.bagview = const.BAG_VIEW.LIST
+  view.kind = kind
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)

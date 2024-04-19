@@ -9,16 +9,20 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Views: AceModule
-local views = addon:NewModule('Views')
+---@class Database: AceModule
+local database = addon:GetModule('Database')
 
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Views: AceModule
+local views = addon:NewModule('Views')
+
 ---@class (exact) View
 ---@field sections table<string, Section>
 ---@field content Grid
----@field kind BagView
+---@field bagview BagView
+---@field kind BagKind
 ---@field itemsByBagAndSlot table<string, Item>
 ---@field freeSlot Item
 ---@field freeReagentSlot Item
@@ -27,6 +31,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@field itemFrames Item[]
 ---@field fullRefresh boolean
 ---@field deferredItems string[]
+---@field private stacks table<string, Item>
 views.viewProto = {}
 
 ---@param bag Bag
@@ -41,14 +46,31 @@ function views.viewProto:Wipe()
   error('Wipe method not implemented')
 end
 
+function views.viewProto:WipeStacks()
+  wipe(self.stacks)
+end
+
 ---@return BagView
-function views.viewProto:GetKind()
-  return self.kind
+function views.viewProto:GetBagView()
+  return self.bagview
 end
 
 ---@return Grid
 function views.viewProto:GetContent()
   return self.content
+end
+
+-- GetOrCreateItemButton will get an existing item button by slotkey,
+-- creating it if it doesn't exist.
+---@param slotkey string
+---@return Item
+function views.viewProto:GetOrCreateItemButton(slotkey)
+  local item = self.itemsByBagAndSlot[slotkey]
+  if item == nil then
+    item = self:GetItemFrame()
+    self.itemsByBagAndSlot[slotkey] = item
+  end
+  return item
 end
 
 -- GetOrCreateSection will get an existing section by category,
@@ -144,11 +166,51 @@ function views.viewProto:UpdateListSize(bag)
   _ = bag
 end
 
+function views.viewProto:StackRemove(slotkey)
+  return false
+end
+
+---@param item ItemData
+---@return Item?
+function views.viewProto:StackAdd(item)
+  local opts = database:GetStackingOptions(self.kind)
+  -- If we're not merging stacks, return nil.
+  if not opts.mergeStacks then return nil end
+
+  -- If we're not merging at the shop and we're at the shop, return nil.
+  if opts.unmergeAtShop and addon.atInteracting then return nil end
+
+  -- If we're not merging partial stacks and this is a partial stack, return nil.
+  if opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount then return nil end
+
+  local itemButton = self.stacks[item.itemHash]
+
+  -- If a stack was found, update it and return the stack button.
+  if itemButton then
+    itemButton.data.stackedCount = itemButton.data.stackedCount + item.itemInfo.currentItemCount
+    -- TODO: Track the stack in the item button.
+    return itemButton
+  end
+
+  -- No stack was found, create a new stack.
+  itemButton = self:GetOrCreateItemButton(item.slotkey)
+  itemButton:SetItem(item)
+  itemButton:UpdateCount()
+  self.stacks[item.itemHash] = itemButton
+  return itemButton
+end
+
+function views.viewProto:StackChange(slotkey)
+  return false
+end
+
 ---@return View
 function views:NewBlankView()
-  local view = setmetatable({}, {__index = views.viewProto}) --[[@as View]]
-  view.sections = {}
-  view.itemsByBagAndSlot = {}
-  view.deferredItems = {}
+  local view = setmetatable({
+    sections = {},
+    itemsByBagAndSlot = {},
+    deferredItems = {},
+    stacks = {}
+  }, {__index = views.viewProto}) --[[@as View]]
   return view
 end
