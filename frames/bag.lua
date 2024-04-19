@@ -199,7 +199,7 @@ function bagFrame.bagProto:Search(text)
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
----@param slotInfo ExtraSlotInfo
+---@param slotInfo SlotInfo
 function bagFrame.bagProto:Draw(slotInfo)
   local view = self.views[database:GetBagView(self.kind)]
 

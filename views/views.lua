@@ -29,7 +29,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 views.viewProto = {}
 
 ---@param bag Bag
----@param slotInfo ExtraSlotInfo
+---@param slotInfo SlotInfo
 function views.viewProto:Render(bag, slotInfo)
   _ = bag
   _ = slotInfo

@@ -93,7 +93,6 @@ function ItemLoader:Load(callback)
     return false
   end, function()
     callback()
-    wipe(self.data)
   end)
 end
 

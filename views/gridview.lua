@@ -90,7 +90,7 @@ end
 
 ---@param view view
 ---@param bag Bag
----@param slotInfo ExtraSlotInfo
+---@param slotInfo SlotInfo
 local function GridView(view, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
