@@ -156,8 +156,6 @@ end
 
 function views:NewBagView(parent)
   local view = setmetatable({}, {__index = views.viewProto})
-  view.sections = {}
-  view.itemsByBagAndSlot = {}
   view.itemFrames = {}
   view.itemCount = 0
   view.kind = const.BAG_VIEW.SECTION_ALL_BAGS
