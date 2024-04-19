@@ -53,39 +53,39 @@ local function OneBagView(view, bag, slotInfo)
     view:Wipe()
     view.fullRefresh = false
   end
+
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
-  local dirtyItems = slotInfo.dirtyItems
 
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
 
-  for _, data in pairs(dirtyItems) do
-      if data.stackedOn == nil or data.isItemEmpty then
-      local slotkey = view:GetSlotKey(data)
+  local added, removed, changed = slotInfo:GetChangeset()
 
-      -- Create or get the item frame for this slot.
-      local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-      if itemButton == nil then
-        itemButton = itemFrame:Create()
-        --debug:DrawBorder(itemButton.frame, 1, 1, 0)
-        view.itemsByBagAndSlot[slotkey] = itemButton
-      end
-
-      -- Set the item data on the item frame.
-      itemButton:SetItem(data)
-      view.content:AddCell(slotkey, itemButton)
+  --- Handle new added items.
+  for _, item in pairs(added) do
+    local slotkey = item.slotkey
+    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+    if itemButton == nil then
+      itemButton = itemFrame:Create()
+      view.itemsByBagAndSlot[slotkey] = itemButton
     end
+    itemButton:SetItem(item)
+    view.content:AddCell(slotkey, itemButton)
+    itemButton:UpdateCount()
   end
 
-  for slotkey, _ in pairs(view.content:GetAllCells()) do
-    local data = view.itemsByBagAndSlot[slotkey].data
-    if data.isItemEmpty or data.stackedOn ~= nil then
-      view.content:RemoveCell(slotkey)
-      view.itemsByBagAndSlot[slotkey]:Wipe()
-    end
+  --- Handle removed items.
+  for _, item in pairs(removed) do
+    local slotkey = item.slotkey
+    view.content:RemoveCell(slotkey)
+    view.itemsByBagAndSlot[slotkey]:Wipe()
   end
 
-  for _, item in pairs(view.itemsByBagAndSlot) do
-    item:UpdateCount()
+  --- Handle changed items.
+  for _, item in pairs(changed) do
+    local slotkey = item.slotkey
+    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+    itemButton:SetItem(item)
+    itemButton:UpdateCount()
   end
 
   -- Get the free slots section and add the free slots to it.

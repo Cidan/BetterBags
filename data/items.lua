@@ -267,6 +267,51 @@ function items:RefreshBackpack()
   self:ProcessContainer(const.BAG_KIND.BACKPACK, container)
 end
 
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
+function items:ItemAdded(newData, oldData)
+  if newData.isItemEmpty then return false end
+  if not oldData or (oldData and oldData.isItemEmpty) then return true end
+  return false
+end
+
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
+function items:ItemRemoved(newData, oldData)
+  if not oldData or (oldData and oldData.isItemEmpty) then return false end
+  if newData.isItemEmpty then return true end
+  return false
+end
+
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
+function items:ItemChanged(newData, oldData)
+  -- Item hash does not match.
+  if oldData and newData.itemHash ~= oldData.itemHash then
+    return true
+  end
+
+  -- Item was marked as new when it wasn't before.
+  if C_NewItems.IsNewItem(newData.bagid, newData.slotid) and oldData and oldData.itemInfo and not oldData.itemInfo.isNewItem then
+    return true
+  end
+
+  -- Item count changed.
+  if oldData and oldData.itemInfo and oldData.itemInfo.currentItemCount ~= newData.itemInfo.currentItemCount then
+    return true
+  end
+
+  -- Item is no longer in the recent items category.
+  if oldData and oldData.itemInfo and oldData.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(oldData) then
+    return true
+  end
+
+  return false
+end
+
 -- HasItemChanged will determine if an item has changed since the last time a bag refresh
 -- was done.
 ---@param newData ItemData
@@ -406,6 +451,14 @@ function items:LoadItems(kind, dataCache)
     -- End Process Bag Free Slots
 
     -- Process item changes.
+    if items:ItemAdded(currentItem, previousItem) then
+      table.insert(slotInfo.addedItems, currentItem)
+    elseif items:ItemRemoved(currentItem, previousItem) then
+      table.insert(slotInfo.removedItems, previousItem)
+    elseif items:ItemChanged(currentItem, previousItem) then
+      table.insert(slotInfo.updatedItems, currentItem)
+    end
+
     if items:HasItemChanged(currentItem, previousItem) then
       table.insert(slotInfo.dirtyItems, currentItem)
     end

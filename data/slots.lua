@@ -20,6 +20,9 @@ local items = addon:GetModule('Items')
 ---@field dirtyItems ItemData[] A list of dirty items that need to be refreshed.
 ---@field itemsBySlotKey table<string, ItemData> A table of items by slot key.
 ---@field previousItemsBySlotKey table<string, ItemData> A table of items by slot key from the previous refresh.
+---@field addedItems ItemData[] A list of items that were added since the last refresh.
+---@field removedItems ItemData[] A list of items that were removed since the last refresh.
+---@field updatedItems ItemData[] A list of items that were updated since the last refresh.
 local SlotInfo = {}
 
 function items:NewSlotInfo()
@@ -31,6 +34,9 @@ function items:NewSlotInfo()
       dirtyItems = {},
       itemsBySlotKey = {},
       previousItemsBySlotKey = {},
+      addedItems = {},
+      removedItems = {},
+      updatedItems = {},
       deferDelete = false
     }, {__index = SlotInfo})
 end
@@ -59,6 +65,11 @@ function SlotInfo:GetPreviousItems()
   return self.previousItemsBySlotKey
 end
 
+---@return ItemData[], ItemData[], ItemData[]
+function SlotInfo:GetChangeset()
+  return self.addedItems, self.removedItems, self.updatedItems
+end
+
 ---@param newItems table<string, ItemData>
 function SlotInfo:Update(newItems)
   self.previousItemsBySlotKey = self.itemsBySlotKey
@@ -67,6 +78,9 @@ function SlotInfo:Update(newItems)
   self.totalItems = 0
   self.emptySlots = {}
   self.freeSlotKeys = {}
+  self.addedItems = {}
+  self.removedItems = {}
+  self.updatedItems = {}
   self.emptySlotByBagAndSlot = {}
   self.dirtyItems = {}
   self.deferDelete = false
@@ -81,5 +95,8 @@ function SlotInfo:Wipe()
   self.dirtyItems = {}
   self.itemsBySlotKey = {}
   self.previousItemsBySlotKey = {}
+  self.addedItems = {}
+  self.removedItems = {}
+  self.updatedItems = {}
   self.deferDelete = false
 end
