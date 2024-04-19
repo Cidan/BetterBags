@@ -872,3 +872,19 @@ function items:AttachBasicItemInfo(itemID, data)
   }
   data.forceClear = false
 end
+
+---@param slotkey string
+---@return BagKind
+function items:GetBagKindFromSlotKey(slotkey)
+  local bagid = string.split('_', slotkey) --[[@as string]]
+  if const.BANK_BAGS[tonumber(bagid)] then
+    return const.BAG_KIND.BANK
+  end
+  return const.BAG_KIND.BACKPACK
+end
+
+---@param slotkey string
+---@return ItemData
+function items:GetItemDataFromSlotKey(slotkey)
+  return self.slotInfo[self:GetBagKindFromSlotKey(slotkey)].itemsBySlotKey[slotkey]
+end

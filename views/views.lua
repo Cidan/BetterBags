@@ -15,6 +15,9 @@ local database = addon:GetModule('Database')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -22,8 +25,9 @@ local debug = addon:GetModule('Debug')
 local views = addon:NewModule('Views')
 
 ---@class (exact) Stack
----@field item Item
----@field subItems table<string, ItemData>
+---@field item string
+---@field subItems table<string, boolean>
+local stackProto = {}
 
 ---@class (exact) View
 ---@field sections table<string, Section>
@@ -39,6 +43,7 @@ local views = addon:NewModule('Views')
 ---@field fullRefresh boolean
 ---@field deferredItems string[]
 ---@field private stacks table<string, Stack>
+---@field private slotToStackHash table<string, string>
 ---@field WipeHandler fun(view: View)
 views.viewProto = {}
 
@@ -55,6 +60,7 @@ function views.viewProto:Wipe()
   self.WipeHandler(self)
   self:ClearDeferredItems()
   wipe(self.stacks)
+  wipe(self.slotToStackHash)
 end
 
 function views.viewProto:WipeStacks()
@@ -190,6 +196,7 @@ function views.viewProto:NewButton(item)
   opts.unmergeAtShop and addon.atInteracting or
   opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount then
     local itemButton = self:GetOrCreateItemButton(item.slotkey)
+    itemButton:SetItem(item)
     return itemButton, true
   end
 
@@ -197,25 +204,85 @@ function views.viewProto:NewButton(item)
 
   -- If a stack was found, update it and return the stack button.
   if stack then
-    stack.subItems[item.slotkey] = item
-    stack.item.data.stackedCount = stack.item.data.itemInfo.currentItemCount
-    for _, subItem in pairs(stack.subItems) do
-      stack.item.data.stackedCount = stack.item.data.stackedCount + subItem.itemInfo.currentItemCount
-    end
-    debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", stack.item.data.slotkey)
-    return stack.item, false
+    local itemButton = self:GetOrCreateItemButton(stack.item)
+    stack:AddItem(item.slotkey)
+    stack:UpdateCount()
+    itemButton:UpdateCount()
+    debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", stack.item)
+    return itemButton, false
   end
 
   -- No stack was found, create a new stack.
   local itemButton = self:GetOrCreateItemButton(item.slotkey)
-  self.stacks[item.itemHash] = {
-    item = itemButton,
+  self.stacks[item.itemHash] = setmetatable({
+    item = item.slotkey,
     subItems = {}
-  }
+  }, {__index = stackProto})
+  self.slotToStackHash[item.slotkey] = item.itemHash
+  itemButton:SetItem(item)
+
   return itemButton, true
 end
 
-function views.viewProto:StackChange(slotkey)
+---@param item ItemData
+---@return boolean
+function views.viewProto:ChangeButton(item)
+  --[[
+    if the item is part of the stack but not the stack item itself, update the count.
+    if the item is the stack item, update the count and the item.
+    if the item is not part of the stack, return false.
+  ]]--
+  --local stack = self.stacks[item.itemHash]
+  local itemButton = self:GetOrCreateItemButton(item.slotkey)
+  itemButton:SetItem(item)
+
+  local stack = self.stacks[item.itemHash]
+  if stack then
+  end
+  -- This item no longer belongs to the stack it was in.
+  --if self.slotToStackHash[item.slotkey] ~= item.itemHash then
+  --  local stack = self.stacks[self.slotToStackHash[item.slotkey]]
+  --  if stack.item.slotkey == item.slotkey then
+  --    stack:Promote()
+  --  else
+  --    stack:RemoveItem(item)
+  --  end
+  --  stack:UpdateCount()
+  --  itemButton:UpdateCount()
+  --end
+--
+  --local stack = self.stacks[item.itemHash]
+  if stack then
+    print("stack found")
+    stack:UpdateCount()
+    itemButton:UpdateCount()
+  end
+  --[[
+  if stack and stack.subItems[item.slotkey] then
+    debug:Log("Stacked", "Stack Count Change", item.itemInfo.itemLink, item.slotkey)
+    stack:UpdateCount()
+    return false
+  end
+  if stack and stack.item.slotkey == item.slotkey then
+    debug:Log("Stacked", "Stack Count Change", item.itemInfo.itemLink, item.slotkey)
+    stack:UpdateCount()
+    return true
+  end
+  --]]
+  --[[
+  -- If the item is part of a stack, update the count.
+  if stack and stack.subItems[item.slotkey] then
+    stack.item.data.stackedCount = stack.item.data.itemInfo.currentItemCount
+    for _, subItem in pairs(stack.subItems) do
+      stack.item.data.stackedCount = stack.item.data.stackedCount + subItem.itemInfo.currentItemCount
+    end
+    return true
+  elseif stack and stack.item.data.slotkey == item.slotkey then
+    stack.item.data.stackedCount = item.itemInfo.currentItemCount
+    stack.item:SetItem(item)
+    return false
+  end
+  --]]
   return false
 end
 
@@ -225,7 +292,47 @@ function views:NewBlankView()
     sections = {},
     itemsByBagAndSlot = {},
     deferredItems = {},
-    stacks = {}
+    stacks = {},
+    slotToStackHash = {}
   }, {__index = views.viewProto}) --[[@as View]]
   return view
+end
+
+---@param slotkey string
+function stackProto:AddItem(slotkey)
+  self.subItems[slotkey] = true
+end
+
+---@param item ItemData
+function stackProto:RemoveItem(item)
+  self.subItems[item.slotkey] = nil
+end
+
+---@param slotkey string
+function stackProto:RemoveItemBySlotKey(slotkey)
+  self.subItems[slotkey] = nil
+end
+
+function stackProto:Promote()
+  local slotkey = next(self.subItems)
+  if slotkey then
+    self.item = slotkey
+    self.subItems[slotkey] = nil
+  else
+    self.item = nil
+  end
+end
+
+function stackProto:UpdateCount()
+  if not self.item then return end
+  local itemData = items:GetItemDataFromSlotKey(self.item)
+  itemData.stackedCount = itemData.itemInfo.currentItemCount
+  for subItemSlotKey in pairs(self.subItems) do
+    local subItemData = items:GetItemDataFromSlotKey(subItemSlotKey)
+    itemData.stackedCount = itemData.stackedCount + subItemData.itemInfo.currentItemCount
+  end
+end
+
+function stackProto:GetBackingItemData()
+  items:GetItemDataFromSlotKey(self.item)
 end
