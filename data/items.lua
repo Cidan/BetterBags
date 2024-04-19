@@ -407,11 +407,6 @@ function items:LoadItems(kind, dataCache)
 
     -- Process item changes.
     if items:HasItemChanged(currentItem, previousItem) then
-      if previousItem and previousItem.stacks and previousItem.stacks > 0 then
-        debug:Log("Stacks", "Was Stacked", currentItem.itemInfo.itemLink)
-        currentItem.forceClear = true
-        nextStacks[previousItem.itemHash] = currentItem
-      end
       table.insert(slotInfo.dirtyItems, currentItem)
     end
 
@@ -428,6 +423,7 @@ function items:LoadItems(kind, dataCache)
     end
   end
 
+  -- Set the defer delete flag if the total items count has decreased.
   if slotInfo.totalItems < slotInfo.previousTotalItems then
     slotInfo.deferDelete = true
   end
