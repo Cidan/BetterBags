@@ -446,10 +446,13 @@ function items:LoadItems(kind, dataCache)
 
     -- Process item changes.
     if items:ItemAdded(currentItem, previousItem) then
+      debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
       table.insert(slotInfo.addedItems, currentItem)
     elseif items:ItemRemoved(currentItem, previousItem) then
+      debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
       table.insert(slotInfo.removedItems, previousItem)
     elseif items:ItemChanged(currentItem, previousItem) then
+      debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
       table.insert(slotInfo.updatedItems, currentItem)
     end
 

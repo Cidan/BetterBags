@@ -26,6 +26,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@field itemCount number
 ---@field itemFrames Item[]
 ---@field fullRefresh boolean
+---@field deferredItems string[]
 views.viewProto = {}
 
 ---@param bag Bag
@@ -122,6 +123,20 @@ function views.viewProto:SetPoints()
   self.content:GetContainer():ClearAllPoints()
   self.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+end
+
+---@param slotkey string
+function views.viewProto:AddDeferredItem(slotkey)
+  tinsert(self.deferredItems, slotkey)
+end
+
+---@return string[]
+function views.viewProto:GetDeferredItems()
+  return self.deferredItems
+end
+
+function views.viewProto:ClearDeferredItems()
+  wipe(self.deferredItems)
 end
 
 ---@param bag Bag

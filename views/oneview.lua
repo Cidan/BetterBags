@@ -63,8 +63,9 @@ local function OneBagView(view, bag, slotInfo)
   --- Handle removed items.
   for _, item in pairs(removed) do
     local slotkey = item.slotkey
-    view.content:RemoveCell(slotkey)
-    view.itemsByBagAndSlot[slotkey]:Wipe()
+    view.itemsByBagAndSlot[slotkey]:SetFreeSlots(item.bagid, item.slotid, -1, "Recently Deleted")
+    view:AddDeferredItem(slotkey)
+    bag.drawOnClose = true
   end
 
   --- Handle new added items.
@@ -102,16 +103,23 @@ local function OneBagView(view, bag, slotInfo)
     end
   end
 
-  view.content.maxCellWidth = sizeInfo.columnCount
-  -- Sort the items.
-  view.content:Sort(sort:GetItemSortFunction(bag.kind, const.BAG_VIEW.ONE_BAG))
-  local w, h = view.content:Draw()
-  view.content:HideScrollBar()
-  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
-  local bagHeight = h +
-  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-  bag.frame:SetHeight(bagHeight)
+  if not slotInfo.deferDelete then
+    for _, slotkey in pairs(view:GetDeferredItems()) do
+      view.content:RemoveCell(slotkey)
+      view.itemsByBagAndSlot[slotkey]:Wipe()
+    end
+    view:ClearDeferredItems()
+    view.content.maxCellWidth = sizeInfo.columnCount
+    -- Sort the items.
+    view.content:Sort(sort:GetItemSortFunction(bag.kind, const.BAG_VIEW.ONE_BAG))
+    local w, h = view.content:Draw()
+    view.content:HideScrollBar()
+    bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+    local bagHeight = h +
+    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+    bag.frame:SetHeight(bagHeight)
+  end
 end
 
 ---@param parent Frame
@@ -119,6 +127,7 @@ end
 function views:NewOneBag(parent)
   local view = setmetatable({}, {__index = views.viewProto})
   view.itemsByBagAndSlot = {}
+  view.deferedItems = {}
   view.kind = const.BAG_VIEW.ONE_BAG
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
