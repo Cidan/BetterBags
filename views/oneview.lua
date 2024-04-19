@@ -28,7 +28,7 @@ local debug = addon:GetModule('Debug')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
----@param view view
+---@param view View
 local function Wipe(view)
   view.content:Wipe()
   if view.freeSlot ~= nil then
@@ -46,7 +46,7 @@ local function Wipe(view)
   wipe(view.itemsByBagAndSlot)
 end
 
----@param view view
+---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function OneBagView(view, bag, slotInfo)
@@ -125,11 +125,9 @@ local function OneBagView(view, bag, slotInfo)
 end
 
 ---@param parent Frame
----@return view
+---@return View
 function views:NewOneBag(parent)
-  local view = setmetatable({}, {__index = views.viewProto})
-  view.itemsByBagAndSlot = {}
-  view.deferredItems = {}
+  local view = views:NewBlankView()
   view.kind = const.BAG_VIEW.ONE_BAG
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()

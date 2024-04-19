@@ -73,7 +73,7 @@ local search = addon:GetModule('Search')
 --- kind (i.e. bank, backpack).
 ---@class (exact) Bag
 ---@field kind BagKind
----@field currentView view
+---@field currentView View
 ---@field frame Frame The fancy frame of the bag.
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
@@ -91,7 +91,7 @@ local search = addon:GetModule('Search')
 ---@field menuList MenuList[]
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
----@field views table<BagView, view>
+---@field views table<BagView, View>
 ---@field searchBox SearchFrame
 bagFrame.bagProto = {}
 

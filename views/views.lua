@@ -15,7 +15,7 @@ local views = addon:NewModule('Views')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class (exact) view
+---@class (exact) View
 ---@field sections table<string, Section>
 ---@field content Grid
 ---@field kind BagView
@@ -142,4 +142,13 @@ end
 ---@param bag Bag
 function views.viewProto:UpdateListSize(bag)
   _ = bag
+end
+
+---@return View
+function views:NewBlankView()
+  local view = setmetatable({}, {__index = views.viewProto}) --[[@as View]]
+  view.sections = {}
+  view.itemsByBagAndSlot = {}
+  view.deferredItems = {}
+  return view
 end

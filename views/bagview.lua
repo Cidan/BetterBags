@@ -30,7 +30,7 @@ local sort = addon:GetModule('Sort')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
----@param view view
+---@param view View
 local function Wipe(view)
   view.content:Wipe()
   view.itemCount = 0
@@ -66,7 +66,7 @@ local function GetBagName(bagid)
 
 end
 
----@param view view
+---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function BagView(view, bag, slotInfo)

@@ -31,7 +31,7 @@ local L =  addon:GetModule('Localization')
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
----@param view view
+---@param view View
 local function Wipe(view)
   debug:Log("Wipe", "Grid View Wipe")
   view.content:Wipe()
@@ -55,7 +55,7 @@ local function Wipe(view)
   wipe(view.itemsByBagAndSlot)
 end
 
----@param view view
+---@param view View
 ---@param data ItemData
 ---@return boolean
 local function drawDirtyItemUnstacked(view, data)
@@ -88,7 +88,7 @@ end
 
 --local stacks = {}
 
----@param view view
+---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function GridView(view, bag, slotInfo)
@@ -240,11 +240,9 @@ local function GridView(view, bag, slotInfo)
 end
 
 ---@param parent Frame
----@return view
+---@return View
 function views:NewGrid(parent)
-  local view = setmetatable({}, {__index = views.viewProto})
-  view.sections = {}
-  view.itemsByBagAndSlot = {}
+  local view = views:NewBlankView()
   view.itemCount = 0
   view.kind = const.BAG_VIEW.SECTION_GRID
   view.content = grid:Create(parent)

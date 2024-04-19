@@ -25,7 +25,7 @@ local debug = addon:GetModule('Debug')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
----@param view view
+---@param view View
 local function Wipe(view)
   view.content:Wipe()
   view.freeSlot = nil
@@ -43,7 +43,7 @@ end
 
 --TODO(lobato): Move the -35 below to constants.
 
----@param view view
+---@param view View
 ---@param bag Bag
 local function UpdateListSize(view, bag)
   local w, _ = bag.frame:GetSize()
@@ -55,7 +55,7 @@ local function UpdateListSize(view, bag)
   end
 end
 
----@param view view
+---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function ListView(view, bag, slotInfo)
@@ -134,11 +134,9 @@ local function ListView(view, bag, slotInfo)
 end
 
 ---@param parent Frame
----@return view
+---@return View
 function views:NewList(parent)
-  local view = setmetatable({}, {__index = views.viewProto})
-  view.sections = {}
-  view.itemsByBagAndSlot = {}
+  local view = views:NewBlankView()
   view.itemCount = 0
   view.kind = const.BAG_VIEW.LIST
   view.content = grid:Create(parent)
