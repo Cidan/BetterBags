@@ -15,6 +15,9 @@ local database = addon:GetModule('Database')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
 
@@ -171,33 +174,31 @@ function views.viewProto:StackRemove(slotkey)
 end
 
 ---@param item ItemData
----@return Item?
-function views.viewProto:StackAdd(item)
+---@return Item, boolean
+function views.viewProto:NewButton(item)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
-  if not opts.mergeStacks then return nil end
-
-  -- If we're not merging at the shop and we're at the shop, return nil.
-  if opts.unmergeAtShop and addon.atInteracting then return nil end
-
-  -- If we're not merging partial stacks and this is a partial stack, return nil.
-  if opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount then return nil end
+  if not opts.mergeStacks or
+  opts.unmergeAtShop and addon.atInteracting or
+  opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount then
+    local itemButton = self:GetOrCreateItemButton(item.slotkey)
+    return itemButton, true
+  end
 
   local itemButton = self.stacks[item.itemHash]
 
   -- If a stack was found, update it and return the stack button.
   if itemButton then
     itemButton.data.stackedCount = itemButton.data.stackedCount + item.itemInfo.currentItemCount
+    debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", itemButton.data.slotkey)
     -- TODO: Track the stack in the item button.
-    return itemButton
+    return itemButton, false
   end
 
   -- No stack was found, create a new stack.
   itemButton = self:GetOrCreateItemButton(item.slotkey)
-  itemButton:SetItem(item)
-  itemButton:UpdateCount()
   self.stacks[item.itemHash] = itemButton
-  return itemButton
+  return itemButton, true
 end
 
 function views.viewProto:StackChange(slotkey)

@@ -456,9 +456,9 @@ function items:LoadItems(kind, dataCache)
       table.insert(slotInfo.updatedItems, currentItem)
     end
 
-    if items:HasItemChanged(currentItem, previousItem) then
-      table.insert(slotInfo.dirtyItems, currentItem)
-    end
+    --if items:HasItemChanged(currentItem, previousItem) then
+    --  table.insert(slotInfo.dirtyItems, currentItem)
+    --end
 
     -- Store empty slot data
     if currentItem.isItemEmpty then

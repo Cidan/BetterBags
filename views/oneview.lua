@@ -83,13 +83,14 @@ local function OneBagView(view, bag, slotInfo)
     itemButton:UpdateCount()
     ]]--
 
-    local itemButton = view:StackAdd(item)
-    if itemButton == nil then
-      itemButton = view:GetOrCreateItemButton(slotkey)
+    local itemButton, isNew = view:NewButton(item)
+    if isNew then
       itemButton:SetItem(item)
       itemButton:UpdateCount()
+      view.content:AddCell(slotkey, itemButton)
+    else
+      itemButton:UpdateCount()
     end
-    view.content:AddCell(slotkey, itemButton)
   end
 
   --- Handle changed items.
