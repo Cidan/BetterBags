@@ -30,7 +30,8 @@ function items:NewSlotInfo()
       emptySlotByBagAndSlot = {},
       dirtyItems = {},
       itemsBySlotKey = {},
-      previousItemsBySlotKey = {}
+      previousItemsBySlotKey = {},
+      deferDelete = false
     }, {__index = SlotInfo})
 end
 
@@ -63,10 +64,12 @@ function SlotInfo:Update(newItems)
   self.previousItemsBySlotKey = self.itemsBySlotKey
   self.itemsBySlotKey = newItems
   self.previousTotalItems = self.totalItems
+  self.totalItems = 0
   self.emptySlots = {}
   self.freeSlotKeys = {}
   self.emptySlotByBagAndSlot = {}
   self.dirtyItems = {}
+  self.deferDelete = false
 end
 
 function SlotInfo:Wipe()
@@ -78,4 +81,5 @@ function SlotInfo:Wipe()
   self.dirtyItems = {}
   self.itemsBySlotKey = {}
   self.previousItemsBySlotKey = {}
+  self.deferDelete = false
 end

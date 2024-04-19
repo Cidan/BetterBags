@@ -364,9 +364,6 @@ function items:LoadItems(kind, dataCache)
   local stacks = {}
 
   ---@type table<string, ItemData>
-  local dirty = {}
-
-  ---@type table<string, ItemData>
   local nextStacks = {}
 
   ---@type table<number, boolean>
@@ -416,7 +413,6 @@ function items:LoadItems(kind, dataCache)
         nextStacks[previousItem.itemHash] = currentItem
       end
       table.insert(slotInfo.dirtyItems, currentItem)
-      dirty[currentItem.slotkey] = currentItem
     end
 
     -- Store empty slot data
@@ -425,6 +421,15 @@ function items:LoadItems(kind, dataCache)
       slotInfo.emptySlotByBagAndSlot[bagid] = slotInfo.emptySlotByBagAndSlot[bagid] or {}
       slotInfo.emptySlotByBagAndSlot[bagid][slotid] = currentItem
     end
+
+    -- Increment the total items count.
+    if not currentItem.isItemEmpty then
+      slotInfo.totalItems = slotInfo.totalItems + 1
+    end
+  end
+
+  if slotInfo.totalItems < slotInfo.previousTotalItems then
+    slotInfo.deferDelete = true
   end
   --[[
   for slotkey, item in pairs(self.slotInfo[kind].itemsBySlotKey) do
