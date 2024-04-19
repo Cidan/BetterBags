@@ -42,6 +42,7 @@ local function Wipe(view)
   for _, item in pairs(view.itemsByBagAndSlot) do
     item:Release()
   end
+  view:ClearDeferredItems()
   wipe(view.itemsByBagAndSlot)
 end
 
@@ -104,6 +105,7 @@ local function OneBagView(view, bag, slotInfo)
   end
 
   if not slotInfo.deferDelete then
+    -- Handle items that were removed from the view.
     for _, slotkey in pairs(view:GetDeferredItems()) do
       view.content:RemoveCell(slotkey)
       view.itemsByBagAndSlot[slotkey]:Wipe()
