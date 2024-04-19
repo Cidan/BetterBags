@@ -42,8 +42,6 @@ local function Wipe(view)
   for _, item in pairs(view.itemsByBagAndSlot) do
     item:Release()
   end
-  view:ClearDeferredItems()
-  view:WipeStacks()
   wipe(view.itemsByBagAndSlot)
 end
 
@@ -151,6 +149,6 @@ function views:NewOneBag(parent, kind)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
   view.Render = OneBagView
-  view.Wipe = Wipe
+  view.WipeHandler = Wipe
   return view
 end

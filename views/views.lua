@@ -21,6 +21,10 @@ local debug = addon:GetModule('Debug')
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
 
+---@class (exact) Stack
+---@field item Item
+---@field subItems table<string, ItemData>
+
 ---@class (exact) View
 ---@field sections table<string, Section>
 ---@field content Grid
@@ -34,7 +38,8 @@ local views = addon:NewModule('Views')
 ---@field itemFrames Item[]
 ---@field fullRefresh boolean
 ---@field deferredItems string[]
----@field private stacks table<string, Item>
+---@field private stacks table<string, Stack>
+---@field WipeHandler fun(view: View)
 views.viewProto = {}
 
 ---@param bag Bag
@@ -46,7 +51,10 @@ function views.viewProto:Render(bag, slotInfo)
 end
 
 function views.viewProto:Wipe()
-  error('Wipe method not implemented')
+  assert(self.WipeHandler, 'WipeHandler not set')
+  self.WipeHandler(self)
+  self:ClearDeferredItems()
+  wipe(self.stacks)
 end
 
 function views.viewProto:WipeStacks()
@@ -185,19 +193,25 @@ function views.viewProto:NewButton(item)
     return itemButton, true
   end
 
-  local itemButton = self.stacks[item.itemHash]
+  local stack = self.stacks[item.itemHash]
 
   -- If a stack was found, update it and return the stack button.
-  if itemButton then
-    itemButton.data.stackedCount = itemButton.data.stackedCount + item.itemInfo.currentItemCount
-    debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", itemButton.data.slotkey)
-    -- TODO: Track the stack in the item button.
-    return itemButton, false
+  if stack then
+    stack.subItems[item.slotkey] = item
+    stack.item.data.stackedCount = stack.item.data.itemInfo.currentItemCount
+    for _, subItem in pairs(stack.subItems) do
+      stack.item.data.stackedCount = stack.item.data.stackedCount + subItem.itemInfo.currentItemCount
+    end
+    debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", stack.item.data.slotkey)
+    return stack.item, false
   end
 
   -- No stack was found, create a new stack.
-  itemButton = self:GetOrCreateItemButton(item.slotkey)
-  self.stacks[item.itemHash] = itemButton
+  local itemButton = self:GetOrCreateItemButton(item.slotkey)
+  self.stacks[item.itemHash] = {
+    item = itemButton,
+    subItems = {}
+  }
   return itemButton, true
 end
 
