@@ -25,14 +25,14 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class ItemRowFrame: AceModule
 local item = addon:GetModule('ItemRowFrame')
 
----@param data ItemData
-function item.itemRowProto:SetItem(data)
-  self.data = data
+---@param slotkey string
+function item.itemRowProto:SetItem(slotkey)
+  self.slotkey = slotkey
   self.button:SetSize(20, 20)
-  self.button:SetItem(data)
+  self.button:SetItem(slotkey)
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
-
+  local data = self.button:GetItemData()
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
     self.rowButton:SetID(slotid)

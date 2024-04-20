@@ -226,7 +226,7 @@ function bagFrame.bagProto:Draw(slotInfo)
     self.slots:Draw()
     self.slots:Show()
   end
-  events:SendMessage('bag/Rendered', self)
+  events:SendMessage('bag/Rendered', self, slotInfo)
 end
 
 function bagFrame.bagProto:KeepBagInBounds()

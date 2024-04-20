@@ -75,8 +75,8 @@ local function OneBagView(view, bag, slotInfo)
   for _, item in pairs(added) do
     local slotkey = item.slotkey
 
-    local itemButton, isNew = view:NewButton(item)
-    if isNew then
+    local itemButton = view:NewButton(item)
+    if itemButton then
       view.content:AddCell(slotkey, itemButton)
     end
   end

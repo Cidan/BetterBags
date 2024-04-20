@@ -43,7 +43,7 @@ local debug = addon:GetModule('Debug')
 ---@class (exact) Item
 ---@field frame Frame
 ---@field button ItemButton|Button
----@field data ItemData
+---@field slotkey string
 ---@field stacks table<string, ItemData>
 ---@field stackCount number
 ---@field stackid number
@@ -151,13 +151,14 @@ end
 
 ---@param text? string
 function itemFrame.itemProto:UpdateSearch(text)
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
   if not text or text == "" then
     self.button:SetMatchesSearch(true)
     return
   end
   local filters = parseQuery(string.lower(text))
   for _, filter in pairs(filters) do
-    if not matchFilter(filter, self.data) then
+    if not matchFilter(filter, data) then
       self.button:SetMatchesSearch(false)
       return
     end
@@ -185,13 +186,15 @@ function itemFrame.itemProto:OnLeave()
 end
 
 function itemFrame.itemProto:UpdateCooldown()
-  if self.data == nil or self.data.isItemEmpty then return end
-  self.button:UpdateCooldown(self.data.itemInfo.itemIcon)
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if data.isItemEmpty then return end
+  self.button:UpdateCooldown(data.itemInfo.itemIcon)
 end
 
 function itemFrame.itemProto:ToggleLock()
-  if self.data.isItemEmpty or self.data.basic then return end
-  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if data.isItemEmpty or data.basic then return end
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
   if C_Item.IsLocked(itemLocation) then
     self:Unlock()
   else
@@ -200,7 +203,8 @@ function itemFrame.itemProto:ToggleLock()
 end
 
 function itemFrame.itemProto:SetLock(lock)
-  if self.data.isItemEmpty or self.data.basic then return end
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if data.isItemEmpty or data.basic then return end
   if lock then
     self:Lock()
   else
@@ -209,32 +213,35 @@ function itemFrame.itemProto:SetLock(lock)
 end
 
 function itemFrame.itemProto:Lock()
-  if self.data.isItemEmpty or self.data.basic then return end
-  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if data.isItemEmpty or data.basic then return end
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
   if itemLocation == nil or (itemLocation.IsValid and not itemLocation:IsValid()) then return end
   C_Item.LockItem(itemLocation)
-  self.data.itemInfo.isLocked = true
-  SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  data.itemInfo.isLocked = true
+  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self.LockTexture:Show()
   self.ilvlText:Hide()
-  database:SetItemLock(self.data.itemInfo.itemGUID, true)
+  database:SetItemLock(data.itemInfo.itemGUID, true)
 end
 
 function itemFrame.itemProto:Unlock()
-  if self.data.isItemEmpty or self.data.basic then return end
-  local itemLocation = ItemLocation:CreateFromBagAndSlot(self.data.bagid, self.data.slotid)
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if data.isItemEmpty or data.basic then return end
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
   if itemLocation == nil or (itemLocation.IsValid and not itemLocation:IsValid()) then return end
   C_Item.UnlockItem(itemLocation)
-  self.data.itemInfo.isLocked = false
-  SetItemButtonDesaturated(self.button, self.data.itemInfo.isLocked)
+  data.itemInfo.isLocked = false
+  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self.LockTexture:Hide()
   self:DrawItemLevel()
-  database:SetItemLock(self.data.itemInfo.itemGUID, false)
+  database:SetItemLock(data.itemInfo.itemGUID, false)
 end
 
 function itemFrame.itemProto:ShowItemLevel()
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
-  local ilvl = self.data.itemInfo.currentItemLevel
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  local ilvl = data.itemInfo.currentItemLevel
   self.ilvlText:SetText(tostring(ilvl))
   if ilvlOpts.color then
     local r, g, b = color:GetItemLevelColor(ilvl)
@@ -246,9 +253,9 @@ function itemFrame.itemProto:ShowItemLevel()
 end
 
 function itemFrame.itemProto:DrawItemLevel()
-  local data = self.data
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   local mergeOpts = database:GetStackingOptions(self.kind)
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
   local ilvl = data.itemInfo.currentItemLevel
 
   if not ilvlOpts.enabled then
@@ -276,67 +283,21 @@ function itemFrame.itemProto:DrawItemLevel()
 end
 
 function itemFrame.itemProto:UpdateCount()
-  if self.data == nil or self.data.isItemEmpty then return end
-  local count = self.data.stackedCount or self.data.itemInfo.currentItemCount
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if data.isItemEmpty then return end
+  local count = data.stackedCount or data.itemInfo.currentItemCount
   SetItemButtonCount(self.button, count)
 end
 
----@param data ItemData
-function itemFrame.itemProto:AddToStack(data)
-  if self.stacks[data.itemInfo.itemGUID] ~= nil then
-    return
-  end
-  self.stacks[data.itemInfo.itemGUID] = data
-  self.stackCount = self.stackCount + 1
+function itemFrame.itemProto:GetItemData()
+  return items:GetItemDataFromSlotKey(self.slotkey)
 end
 
-function itemFrame.itemProto:RemoveFromStack(guid)
-  if self.stacks[guid] == nil then
-    return
-  end
-  self.stacks[guid] = nil
-  self.stackCount = self.stackCount - 1
-end
-
-function itemFrame.itemProto:IsInStack(guid)
-  return self.stacks[guid] ~= nil
-end
-
-function itemFrame.itemProto:HasStacks()
-  return self.stackCount > 1
-end
-
-function itemFrame.itemProto:PromoteStack()
-  for guid, data in pairs(self.stacks) do
-    self:RemoveFromStack(guid)
-    self:SetItem(data)
-    return
-  end
-end
-
-function itemFrame.itemProto:ClearStacks()
-  wipe(self.stacks)
-  self.stackCount = 1
-  self:UpdateCount()
-end
-
----@param item Item
-function itemFrame.itemProto:MergeStacks(item)
-  if not self:IsInStack(item.data.itemInfo.itemGUID) then
-    self:AddToStack(item.data)
-  end
-  for guid, data in pairs(item.stacks) do
-    if not self:IsInStack(guid) and data ~= nil and not data.isItemEmpty then
-      self:AddToStack(data)
-    end
-  end
-  item:ClearStacks()
-end
-
----@param data ItemData
-function itemFrame.itemProto:SetItem(data)
-  assert(data, 'item must be provided')
-  self.data = data
+---@param slotkey string
+function itemFrame.itemProto:SetItem(slotkey)
+  assert(slotkey, 'item must be provided')
+  self.slotkey = slotkey
+  local data = items:GetItemDataFromSlotKey(slotkey)
   local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
   if bagid and slotid then
@@ -422,7 +383,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-  self.data = {bagid = bagid, slotid = slotid, isItemEmpty = true, itemInfo = {}} --[[@as table]]
+
   if count == 0 then
     self.button:Disable()
   else
@@ -463,10 +424,11 @@ end
 
 ---@return boolean
 function itemFrame.itemProto:IsNewItem()
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
   if self.button.NewItemTexture:IsShown() then
     return true
   end
-  return self.data.itemInfo.isNewItem
+  return data.itemInfo.isNewItem
 end
 
 ---@param alpha number
@@ -521,7 +483,7 @@ function itemFrame.itemProto:ClearItem()
   self.ilvlText:Hide()
   self.LockTexture:Hide()
   self:ResetSize()
-  self.data = nil
+  self.slotkey = ""
   self.stacks = {}
   self.stackCount = 1
   self.stackid = nil

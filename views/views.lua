@@ -188,7 +188,7 @@ function views.viewProto:StackRemove(slotkey)
 end
 
 ---@param item ItemData
----@return Item, boolean
+---@return Item?
 function views.viewProto:NewButton(item)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
@@ -196,8 +196,8 @@ function views.viewProto:NewButton(item)
   opts.unmergeAtShop and addon.atInteracting or
   opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount then
     local itemButton = self:GetOrCreateItemButton(item.slotkey)
-    itemButton:SetItem(item)
-    return itemButton, true
+    itemButton:SetItem(item.slotkey)
+    return itemButton
   end
 
   local stack = self.stacks[item.itemHash]
@@ -209,7 +209,7 @@ function views.viewProto:NewButton(item)
     stack:UpdateCount()
     itemButton:UpdateCount()
     debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", stack.item)
-    return itemButton, false
+    return nil
   end
 
   -- No stack was found, create a new stack.
@@ -219,9 +219,9 @@ function views.viewProto:NewButton(item)
     subItems = {}
   }, {__index = stackProto})
   self.slotToStackHash[item.slotkey] = item.itemHash
-  itemButton:SetItem(item)
+  itemButton:SetItem(item.slotkey)
 
-  return itemButton, true
+  return itemButton
 end
 
 ---@param item ItemData
@@ -233,11 +233,14 @@ function views.viewProto:ChangeButton(item)
     if the item is not part of the stack, return false.
   ]]--
   --local stack = self.stacks[item.itemHash]
-  local itemButton = self:GetOrCreateItemButton(item.slotkey)
-  itemButton:SetItem(item)
-
   local stack = self.stacks[item.itemHash]
+  print(stack.item)
   if stack then
+    stack:UpdateCount()
+    local itemButton = self:GetOrCreateItemButton(stack.item)
+    itemButton:SetItem(stack.item)
+    --itemButton:SetItem(stack:GetBackingItemData())
+    print("updated", itemButton:GetItemData().slotkey, item.slotkey)
   end
   -- This item no longer belongs to the stack it was in.
   --if self.slotToStackHash[item.slotkey] ~= item.itemHash then
@@ -252,11 +255,6 @@ function views.viewProto:ChangeButton(item)
   --end
 --
   --local stack = self.stacks[item.itemHash]
-  if stack then
-    print("stack found")
-    stack:UpdateCount()
-    itemButton:UpdateCount()
-  end
   --[[
   if stack and stack.subItems[item.slotkey] then
     debug:Log("Stacked", "Stack Count Change", item.itemInfo.itemLink, item.slotkey)
@@ -333,6 +331,7 @@ function stackProto:UpdateCount()
   end
 end
 
+---@return ItemData
 function stackProto:GetBackingItemData()
-  items:GetItemDataFromSlotKey(self.item)
+  return items:GetItemDataFromSlotKey(self.item)
 end

@@ -28,6 +28,9 @@ local equipmentSets = addon:GetModule('EquipmentSets')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -62,10 +65,11 @@ function itemFrame.itemProto:SetSize(width, height)
   self.IconTexture:SetSize(width, height)
 end
 
----@param data ItemData
-function itemFrame.itemProto:SetItem(data)
-  assert(data, 'item must be provided')
-  self.data = data
+---@param slotkey string
+function itemFrame.itemProto:SetItem(slotkey)
+  assert(slotkey, 'item must be provided')
+  self.slotkey = slotkey
+  local data = items:GetItemDataFromSlotKey(slotkey)
   --local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
   if bagid ~= nil and slotid ~= nil then
@@ -158,7 +162,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-  self.data = {bagid = bagid, slotid = slotid, isItemEmpty = true, itemInfo = {}} --[[@as table]]
   if count == 0 then
     self.button:Disable()
   else
@@ -227,7 +230,7 @@ function itemFrame.itemProto:ClearItem()
   self.freeSlotName = ""
   self.freeSlotCount = 0
   self.isFreeSlot = nil
-  self.data = nil
+  self.slotkey = ""
   self:UpdateCooldown()
 end
 

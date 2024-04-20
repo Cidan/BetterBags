@@ -31,7 +31,7 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field button Item
 ---@field rowButton ItemButton|Button
 ---@field text FontString
----@field data ItemData
+---@field slotkey string
 item.itemRowProto = {}
 
 function item.itemRowProto:Unlock()
@@ -40,14 +40,16 @@ end
 function item.itemRowProto:Lock()
 end
 
----@param data ItemData
-function item.itemRowProto:SetItem(data)
-  self.data = data
+---@param slotkey string
+function item.itemRowProto:SetItem(slotkey)
+  self.slotkey = slotkey
   self.button:SetSize(20, 20)
-  self.button:SetItem(data)
+  self.button:GetItemData()
+  self.button:SetItem(slotkey)
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
 
+  local data = self.button:GetItemData()
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
     self.rowButton:SetID(slotid)
@@ -110,12 +112,12 @@ function item.itemRowProto:ClearItem()
     ---@cast s ItemButton
     s.HighlightTexture:Show()
   end)
-  self.data = nil
+  self.slotkey = ""
 end
 
 ---@return string
 function item.itemRowProto:GetCategory()
-  return self.button.data.itemInfo.category
+  return self.button:GetItemData().itemInfo.category
 end
 
 ---@return boolean
@@ -125,7 +127,7 @@ end
 
 ---@return string
 function item.itemRowProto:GetGUID()
-  return self.data.itemInfo.itemGUID
+  return self.button:GetItemData().itemInfo.itemGUID
 end
 
 function item.itemRowProto:Release()
