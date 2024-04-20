@@ -151,6 +151,7 @@ end
 
 ---@param text? string
 function itemFrame.itemProto:UpdateSearch(text)
+  if self.slotkey == nil then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if not text or text == "" then
     self.button:SetMatchesSearch(true)
@@ -186,6 +187,7 @@ function itemFrame.itemProto:OnLeave()
 end
 
 function itemFrame.itemProto:UpdateCooldown()
+  if self.slotkey == nil then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if data.isItemEmpty then return end
   self.button:UpdateCooldown(data.itemInfo.itemIcon)
@@ -378,6 +380,7 @@ end
 ---@param count number
 ---@param name string
 function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
+  self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else

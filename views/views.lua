@@ -234,13 +234,18 @@ function views.viewProto:ChangeButton(item)
   ]]--
   --local stack = self.stacks[item.itemHash]
   local stack = self.stacks[item.itemHash]
-  print(stack.item)
-  if stack then
+
+  -- If there's no stack, just update the item.
+  if stack == nil then
+    local itemButton = self:GetOrCreateItemButton(item.slotkey)
+    itemButton:SetItem(item.slotkey)
+    return true
+  end
+
+  if stack and stack.item == item.slotkey then
     stack:UpdateCount()
     local itemButton = self:GetOrCreateItemButton(stack.item)
     itemButton:SetItem(stack.item)
-    --itemButton:SetItem(stack:GetBackingItemData())
-    print("updated", itemButton:GetItemData().slotkey, item.slotkey)
   end
   -- This item no longer belongs to the stack it was in.
   --if self.slotToStackHash[item.slotkey] ~= item.itemHash then

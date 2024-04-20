@@ -157,6 +157,7 @@ end
 ---@param count number
 ---@param name string
 function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
+  self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else

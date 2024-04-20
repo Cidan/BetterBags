@@ -878,10 +878,8 @@ end
 function items:GetBagKindFromSlotKey(slotkey)
   local bagid = string.split('_', slotkey) --[[@as string]]
   if const.BANK_BAGS[tonumber(bagid)] then
-    print("returning kind bank")
     return const.BAG_KIND.BANK
   end
-  print("Returning kind backpack")
   return const.BAG_KIND.BACKPACK
 end
 
