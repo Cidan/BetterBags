@@ -73,17 +73,18 @@ local function OneBagView(view, bag, slotInfo)
 
   --- Handle added items.
   for _, item in pairs(added) do
-    local slotkey = item.slotkey
-
     local itemButton = view:NewButton(item)
     if itemButton then
-      view.content:AddCell(slotkey, itemButton)
+      view.content:AddCell(itemButton:GetItemData().slotkey, itemButton)
     end
   end
 
   --- Handle changed items.
   for _, item in pairs(changed) do
-    view:ChangeButton(item)
+    local itemButton = view:ChangeButton(item)
+    if itemButton then
+      view.content:AddCell(itemButton:GetItemData().slotkey, itemButton)
+    end
   end
 
   view:ProcessStacks()

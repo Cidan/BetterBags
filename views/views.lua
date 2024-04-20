@@ -223,22 +223,23 @@ function views.viewProto:NewButton(item)
 end
 
 ---@param item ItemData
----@return boolean
+---@return Item?
 function views.viewProto:ChangeButton(item)
   local stack = self.stacks[item.itemHash]
 
+  ---@type Item
+  local itemButton
+
   -- If there's no stack, just update the item.
   if stack == nil then
-    local itemButton = self:GetOrCreateItemButton(item.slotkey)
+    itemButton = self:GetOrCreateItemButton(item.slotkey)
     itemButton:SetItem(item.slotkey)
-    return true
+    return nil
   end
 
-  -- The item has a stack, but it's not the head item nor the display item,
+  -- The item has a stack, but it's not the display item nor a sub item,
   -- which means the item was swapped. Create a new stack for this item,
   -- and move all the correct sub-items to the new stack.
-  -- TODO(lobato): Check for when a sub item changes, i.e. enchanted, sockets, ilvl, etc,
-  -- as we need to create a new stack but not copy the sub items.
   if stack.item ~= item.slotkey and not stack:HasSubItem(item.slotkey) then
     local newStack = views:NewStack(item.slotkey)
     for subItemSlotKey in pairs(stack.subItems) do
@@ -249,10 +250,24 @@ function views.viewProto:ChangeButton(item)
       end
     end
     self.stacks[item.itemHash] = newStack
+
+    -- If there were any sub items left over, promote the stack,
+    -- and create it's button. This covers the case where an item was mutated.
+    if next(stack.subItems) ~= nil then
+      stack:Promote()
+      local promotedItemData = items:GetItemDataFromSlotKey(stack.item)
+      self.stacks[promotedItemData.itemHash] = stack
+      itemButton = self:GetOrCreateItemButton(stack.item)
+      itemButton:SetItem(stack.item)
+      stack:MarkDirty()
+    end
     newStack:MarkDirty()
+  elseif stack.item == item.slotkey then
+    -- The display item itself changed, mark the stack as dirty for an update.
+    stack:MarkDirty()
   end
 
-  return false
+  return itemButton
 end
 
 function views.viewProto:ProcessStacks()
