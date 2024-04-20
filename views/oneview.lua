@@ -83,16 +83,10 @@ local function OneBagView(view, bag, slotInfo)
 
   --- Handle changed items.
   for _, item in pairs(changed) do
-    local slotkey = item.slotkey
     view:ChangeButton(item)
-    --[[
-    if not view:StackChange(slotkey) then
-      local itemButton = view:GetOrCreateItemButton(slotkey)
-      itemButton:SetItem(item)
-      itemButton:UpdateCount()
-    end
-    ]]--
   end
+
+  view:ProcessStacks()
 
   -- Get the free slots section and add the free slots to it.
   for name, freeSlotCount in pairs(slotInfo.emptySlots) do

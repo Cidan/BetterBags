@@ -27,6 +27,7 @@ local views = addon:NewModule('Views')
 ---@class (exact) Stack
 ---@field item string
 ---@field subItems table<string, boolean>
+---@field dirty boolean
 local stackProto = {}
 
 ---@class (exact) View
@@ -214,10 +215,7 @@ function views.viewProto:NewButton(item)
 
   -- No stack was found, create a new stack.
   local itemButton = self:GetOrCreateItemButton(item.slotkey)
-  self.stacks[item.itemHash] = setmetatable({
-    item = item.slotkey,
-    subItems = {}
-  }, {__index = stackProto})
+  self.stacks[item.itemHash] = views:NewStack(item.slotkey)
   self.slotToStackHash[item.slotkey] = item.itemHash
   itemButton:SetItem(item.slotkey)
 
@@ -227,12 +225,6 @@ end
 ---@param item ItemData
 ---@return boolean
 function views.viewProto:ChangeButton(item)
-  --[[
-    if the item is part of the stack but not the stack item itself, update the count.
-    if the item is the stack item, update the count and the item.
-    if the item is not part of the stack, return false.
-  ]]--
-  --local stack = self.stacks[item.itemHash]
   local stack = self.stacks[item.itemHash]
 
   -- If there's no stack, just update the item.
@@ -242,51 +234,29 @@ function views.viewProto:ChangeButton(item)
     return true
   end
 
-  if stack and stack.item == item.slotkey then
-    stack:UpdateCount()
-    local itemButton = self:GetOrCreateItemButton(stack.item)
-    itemButton:SetItem(stack.item)
-  end
-  -- This item no longer belongs to the stack it was in.
-  --if self.slotToStackHash[item.slotkey] ~= item.itemHash then
-  --  local stack = self.stacks[self.slotToStackHash[item.slotkey]]
-  --  if stack.item.slotkey == item.slotkey then
-  --    stack:Promote()
-  --  else
-  --    stack:RemoveItem(item)
-  --  end
-  --  stack:UpdateCount()
-  --  itemButton:UpdateCount()
-  --end
---
-  --local stack = self.stacks[item.itemHash]
-  --[[
-  if stack and stack.subItems[item.slotkey] then
-    debug:Log("Stacked", "Stack Count Change", item.itemInfo.itemLink, item.slotkey)
-    stack:UpdateCount()
-    return false
-  end
-  if stack and stack.item.slotkey == item.slotkey then
-    debug:Log("Stacked", "Stack Count Change", item.itemInfo.itemLink, item.slotkey)
-    stack:UpdateCount()
-    return true
-  end
-  --]]
-  --[[
-  -- If the item is part of a stack, update the count.
-  if stack and stack.subItems[item.slotkey] then
-    stack.item.data.stackedCount = stack.item.data.itemInfo.currentItemCount
-    for _, subItem in pairs(stack.subItems) do
-      stack.item.data.stackedCount = stack.item.data.stackedCount + subItem.itemInfo.currentItemCount
-    end
-    return true
-  elseif stack and stack.item.data.slotkey == item.slotkey then
-    stack.item.data.stackedCount = item.itemInfo.currentItemCount
-    stack.item:SetItem(item)
-    return false
-  end
-  --]]
+  stack:MarkDirty()
   return false
+end
+
+function views.viewProto:ProcessStacks()
+  for _, stack in pairs(self.stacks) do
+    if stack.dirty then
+      stack:Process(self)
+    end
+  end
+
+end
+
+---@param itemHash string
+---@return Stack
+function views.viewProto:GetStack(itemHash)
+  return self.stacks[itemHash]
+end
+
+---@param slotkey string
+---@param itemHash string
+function views.viewProto:SetItemHashStack(slotkey, itemHash)
+  self.slotToStackHash[slotkey] = itemHash
 end
 
 ---@return View
@@ -302,17 +272,22 @@ function views:NewBlankView()
 end
 
 ---@param slotkey string
+---@return Stack
+function views:NewStack(slotkey)
+  return setmetatable({
+    item = slotkey,
+    subItems = {},
+    dirty = false
+  }, {__index = stackProto})
+end
+
+---@param slotkey string
 function stackProto:AddItem(slotkey)
   self.subItems[slotkey] = true
 end
 
----@param item ItemData
-function stackProto:RemoveItem(item)
-  self.subItems[item.slotkey] = nil
-end
-
 ---@param slotkey string
-function stackProto:RemoveItemBySlotKey(slotkey)
+function stackProto:RemoveItem(slotkey)
   self.subItems[slotkey] = nil
 end
 
@@ -339,4 +314,39 @@ end
 ---@return ItemData
 function stackProto:GetBackingItemData()
   return items:GetItemDataFromSlotKey(self.item)
+end
+
+function stackProto:MarkDirty()
+  self.dirty = true
+end
+
+---@param view View
+function stackProto:Process(view)
+  self.dirty = false
+
+  local newStack = views:NewStack(self.item)
+  ---@type Stack[]
+  local stacksToUpdate = {}
+  local myData = items:GetItemDataFromSlotKey(self.item)
+
+  for subItemSlotKey in pairs(self.subItems) do
+    local subitem = items:GetItemDataFromSlotKey(subItemSlotKey)
+    local stack = view:GetStack(subitem.itemHash)
+    if subitem.itemHash ~= myData.itemHash then
+      debug:Log("StackUpdate", "Removing", subitem.itemInfo.itemLink, "from", myData.itemInfo.itemLink)
+      --self:RemoveItem(subItemSlotKey)
+      debug:Log("StackUpdate", "Adding", subitem.itemInfo.itemLink, "to", items:GetItemDataFromSlotKey(stack.item).itemInfo.itemLink)
+      --stack:AddItem(subItemSlotKey)
+      table.insert(stacksToUpdate, stack)
+    end
+  end
+
+  for _, stack in ipairs(stacksToUpdate) do
+    stack:UpdateCount()
+    view:GetOrCreateItemButton(stack.item):SetItem(stack.item)
+  end
+
+  self:UpdateCount()
+  view:GetOrCreateItemButton(self.item):SetItem(self.item)
+  view:SetItemHashStack(self.item, myData.itemHash)
 end
