@@ -234,7 +234,24 @@ function views.viewProto:ChangeButton(item)
     return true
   end
 
-  stack:MarkDirty()
+  -- The item has a stack, but it's not the head item nor the display item,
+  -- which means the item was swapped. Create a new stack for this item,
+  -- and move all the correct sub-items to the new stack.
+  -- TODO(lobato): Check for when a sub item changes, i.e. enchanted, sockets, ilvl, etc,
+  -- as we need to create a new stack but not copy the sub items.
+  if stack.item ~= item.slotkey and not stack:HasSubItem(item.slotkey) then
+    local newStack = views:NewStack(item.slotkey)
+    for subItemSlotKey in pairs(stack.subItems) do
+      local subitemData = items:GetItemDataFromSlotKey(subItemSlotKey)
+      if subitemData.itemHash == item.itemHash then
+        newStack:AddItem(subItemSlotKey)
+        stack:RemoveItem(subItemSlotKey)
+      end
+    end
+    self.stacks[item.itemHash] = newStack
+    newStack:MarkDirty()
+  end
+
   return false
 end
 
@@ -311,6 +328,10 @@ function stackProto:UpdateCount()
   end
 end
 
+function stackProto:HasSubItem(slotkey)
+  return self.subItems[slotkey] ~= nil
+end
+
 ---@return ItemData
 function stackProto:GetBackingItemData()
   return items:GetItemDataFromSlotKey(self.item)
@@ -324,29 +345,6 @@ end
 function stackProto:Process(view)
   self.dirty = false
 
-  local newStack = views:NewStack(self.item)
-  ---@type Stack[]
-  local stacksToUpdate = {}
-  local myData = items:GetItemDataFromSlotKey(self.item)
-
-  for subItemSlotKey in pairs(self.subItems) do
-    local subitem = items:GetItemDataFromSlotKey(subItemSlotKey)
-    local stack = view:GetStack(subitem.itemHash)
-    if subitem.itemHash ~= myData.itemHash then
-      debug:Log("StackUpdate", "Removing", subitem.itemInfo.itemLink, "from", myData.itemInfo.itemLink)
-      --self:RemoveItem(subItemSlotKey)
-      debug:Log("StackUpdate", "Adding", subitem.itemInfo.itemLink, "to", items:GetItemDataFromSlotKey(stack.item).itemInfo.itemLink)
-      --stack:AddItem(subItemSlotKey)
-      table.insert(stacksToUpdate, stack)
-    end
-  end
-
-  for _, stack in ipairs(stacksToUpdate) do
-    stack:UpdateCount()
-    view:GetOrCreateItemButton(stack.item):SetItem(stack.item)
-  end
-
   self:UpdateCount()
   view:GetOrCreateItemButton(self.item):SetItem(self.item)
-  view:SetItemHashStack(self.item, myData.itemHash)
 end
