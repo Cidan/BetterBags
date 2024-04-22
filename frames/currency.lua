@@ -73,35 +73,27 @@ function CurrencyFrame:GetCurrencyItem(index, info)
   if not item then
     item = self:CreateCurrencyItem(index, info.isHeader)
     item.frame:SetSize(232, 30)
-    item.frame:SetScript('OnEnter', function()
-      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
-      GameTooltip:SetCurrencyToken(item.index)
-      GameTooltip:AddLine(" ")
-      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
-      GameTooltip:Show()
-    end)
-    item.frame:SetScript('OnEnter', function()
-      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
-      GameTooltip:SetCurrencyToken(item.index)
-      GameTooltip:AddLine(" ")
-      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
-      GameTooltip:Show()
-    end)
-    item.frame:SetScript('OnLeave', function()
-      GameTooltip:Hide()
-    end)
-    item.frame:SetScript('OnMouseDown', function()
-      local refinfo = C_CurrencyInfo.GetCurrencyListInfo(item.index)
-      if refinfo.isHeader then
-        return
-      end
-      if refinfo.isShowInBackpack then
-        C_CurrencyInfo.SetCurrencyBackpack(item.index, false)
-      else
-        C_CurrencyInfo.SetCurrencyBackpack(item.index, true)
-      end
-      self:Update()
-    end)
+    if not info.isHeader then
+      item.frame:SetScript('OnEnter', function()
+        GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
+        GameTooltip:SetCurrencyToken(item.index)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
+        GameTooltip:Show()
+      end)
+      item.frame:SetScript('OnLeave', function()
+        GameTooltip:Hide()
+      end)
+      item.frame:SetScript('OnMouseDown', function()
+        local refinfo = C_CurrencyInfo.GetCurrencyListInfo(item.index)
+        if refinfo.isShowInBackpack then
+          C_CurrencyInfo.SetCurrencyBackpack(item.index, false)
+        else
+          C_CurrencyInfo.SetCurrencyBackpack(item.index, true)
+        end
+        self:Update()
+      end)
+    end
     item.frame:Show()
     self.currencyItems[info.name] = item
     self.content:AddCell(info.name, item)
