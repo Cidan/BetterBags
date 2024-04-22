@@ -44,7 +44,7 @@ local stackProto = {}
 ---@field itemCount number
 ---@field itemFrames Item[]
 ---@field fullRefresh boolean
----@field deferredItems string[]
+---@field deferredItems table<string, boolean>
 ---@field private stacks table<string, Stack>
 ---@field private slotToStack table<string, Stack>
 ---@field WipeHandler fun(view: View)
@@ -177,16 +177,20 @@ end
 
 ---@param slotkey string
 function views.viewProto:AddDeferredItem(slotkey)
-  tinsert(self.deferredItems, slotkey)
+  self.deferredItems[slotkey] = true
 end
 
----@return string[]
+---@return table<string, boolean>
 function views.viewProto:GetDeferredItems()
   return self.deferredItems
 end
 
 function views.viewProto:ClearDeferredItems()
   wipe(self.deferredItems)
+end
+
+function views.viewProto:RemoveDeferredItem(slotkey)
+  self.deferredItems[slotkey] = nil
 end
 
 ---@param bag Bag
@@ -201,13 +205,13 @@ function views.viewProto:RemoveButton(item)
     self:ReindexSlot(item.slotkey)
     return
   end
-  stack:RemoveItem(item.slotkey, self)
   stack:MarkDirty()
 end
 
 ---@param item ItemData
 ---@return Item?
 function views.viewProto:NewButton(item)
+  self:RemoveDeferredItem(item.slotkey)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
   if not opts.mergeStacks or
@@ -287,6 +291,7 @@ function views.viewProto:ProcessStacks()
     if stack.dirty then
       stack:Process(self)
       if stack:IsStackEmpty() then
+        print("clearing empty stack")
         self.stacks[stack.hash] = nil
       end
     end

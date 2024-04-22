@@ -117,7 +117,7 @@ local function OneBagView(view, bag, slotInfo)
 
   if not slotInfo.deferDelete then
     -- Handle items that were removed from the view.
-    for _, slotkey in pairs(view:GetDeferredItems()) do
+    for slotkey, _ in pairs(view:GetDeferredItems()) do
       view.content:RemoveCell(slotkey)
       view.itemsByBagAndSlot[slotkey]:Wipe()
     end
