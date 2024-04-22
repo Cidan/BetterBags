@@ -312,6 +312,14 @@ function items:ItemChanged(newData, oldData)
   return false
 end
 
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
+function items:ItemHashChanged(newData, oldData)
+  if newData.isItemEmpty and not oldData then return false end
+  return newData.itemHash ~= oldData.itemHash
+end
+
 ---@param data ItemData
 ---@return string
 function items:GetSlotKey(data)

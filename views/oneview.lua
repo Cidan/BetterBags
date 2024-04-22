@@ -81,12 +81,16 @@ local function OneBagView(view, bag, slotInfo)
   --- Handle removed items.
   for _, item in pairs(removed) do
     local slotkey = item.slotkey
+    view:RemoveButton(item)
+
+    --[[
     if not view:StackRemove(slotkey) then
       local itemButton = view:GetOrCreateItemButton(slotkey)
       itemButton:SetFreeSlots(item.bagid, item.slotid, -1, "Recently Deleted")
       view:AddDeferredItem(slotkey)
       bag.drawOnClose = true
     end
+    ]]--
   end
 
   --- Handle added items.

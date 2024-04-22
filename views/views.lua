@@ -194,8 +194,15 @@ function views.viewProto:UpdateListSize(bag)
   _ = bag
 end
 
-function views.viewProto:StackRemove(slotkey)
-  return false
+---@param item ItemData
+function views.viewProto:RemoveButton(item)
+  local stack = self.stacks[item.itemHash]
+  if not stack then
+    self:ReindexSlot(item.slotkey)
+    return
+  end
+  stack:RemoveItem(item.slotkey, self)
+  stack:MarkDirty()
 end
 
 ---@param item ItemData
@@ -269,12 +276,9 @@ function views.viewProto:ChangeButton(item)
       end
     end
     self.slotToStack[item.slotkey] = stack
-  elseif stack.item == item.slotkey then
-    -- The display item itself changed, mark the stack as dirty for an update.
-    print("marking stack dirty cuz change")
-    stack:MarkDirty()
   else
-    print("uncaught case")
+    -- The display item itself changed, mark the stack as dirty for an update.
+    stack:MarkDirty()
   end
 
   return itemButton
