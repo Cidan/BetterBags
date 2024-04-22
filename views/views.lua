@@ -263,12 +263,10 @@ function views.viewProto:ChangeButton(item)
       if oldStack.item == item.slotkey then
         -- bug: enchant an item, stack.swap is set, when it should be stack:additem
         -- resulting in missing item.
-        print("doing a swap")
         stack.swap = item.slotkey
         stack:MarkDirty()
         oldStack:MarkDirty()
       else
-        print("removing from old stack")
         oldStack:RemoveItem(item.slotkey, self)
         oldStack:MarkDirty()
         stack:AddItem(item.slotkey)
@@ -277,7 +275,7 @@ function views.viewProto:ChangeButton(item)
     end
     self.slotToStack[item.slotkey] = stack
   else
-    -- The display item itself changed, mark the stack as dirty for an update.
+    -- The display item or subitem changed, mark the stack as dirty for an update.
     stack:MarkDirty()
   end
 
