@@ -247,39 +247,21 @@ function views.viewProto:ChangeButton(item)
     local oldStack = self.slotToStack[item.slotkey]
     if oldStack and oldStack:IsInStack(item.slotkey) then
       if oldStack.item == item.slotkey then
+        -- bug: enchant an item, stack.swap is set, when it should be stack:additem
+        -- resulting in missing item.
+        print("doing a swap")
         stack.swap = item.slotkey
         stack:MarkDirty()
+        oldStack:MarkDirty()
       else
+        print("removing from old stack")
         oldStack:RemoveItem(item.slotkey)
         oldStack:MarkDirty()
         stack:AddItem(item.slotkey)
         stack:MarkDirty()
       end
-      self.slotToStack[item.slotkey] = stack
     end
---  elseif true then
---    local newStack = views:NewStack(item.slotkey)
---    for subItemSlotKey in pairs(stack.subItems) do
---      local subitemData = items:GetItemDataFromSlotKey(subItemSlotKey)
---      if subitemData.itemHash == item.itemHash then
---        newStack:AddItem(subItemSlotKey)
---        stack:RemoveItem(subItemSlotKey)
---      end
---    end
---    self.stacks[item.itemHash] = newStack
---
---    -- If there were any sub items left over, promote the stack,
---    -- and create it's button. This covers the case where an item was mutated.
---    if next(stack.subItems) ~= nil then
---      stack:Promote()
---      local promotedItemData = items:GetItemDataFromSlotKey(stack.item)
---      self.stacks[promotedItemData.itemHash] = stack
---      itemButton = self:GetOrCreateItemButton(stack.item)
---      itemButton:SetItem(stack.item)
---      stack:MarkDirty()
---    end
---    DevTool:AddData(newStack, "New Stack")
---    newStack:MarkDirty()
+    self.slotToStack[item.slotkey] = stack
   elseif stack.item == item.slotkey then
     -- The display item itself changed, mark the stack as dirty for an update.
     print("marking stack dirty cuz change")
@@ -345,6 +327,7 @@ function stackProto:RemoveItem(slotkey)
 end
 
 function stackProto:Promote()
+  --TODO(lobato): Handle when there are no more items to promote, i.e. delete.
   local slotkey = next(self.subItems)
   if slotkey then
     self.item = slotkey
@@ -387,6 +370,18 @@ function stackProto:Process(view)
   if self.swap then
     self.item = self.swap
     self.swap = nil
+  else
+    local data = items:GetItemDataFromSlotKey(self.item)
+    if data.itemHash ~= self.hash then
+      -- bug: promoting the stack causes a new item button to be created
+      -- but never added to the view, and the old button is never removed.
+      -- need to somehow update the old item button with the new data
+      -- but also need to change it's index in the content/whatever view higher
+      -- up the stack, i.e. view.content:AddCell(slotkey, itemButton), slotkey is now
+      -- wrong.
+      print("hash does not match, promoting stack")
+      self:Promote()
+    end
   end
   self:UpdateCount()
   view:GetOrCreateItemButton(self.item):SetItem(self.item)
