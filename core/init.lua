@@ -124,7 +124,21 @@ function addon:OnInitialize()
       addon:ToggleAllBags()
     end)
   end
+end
 
+
+---@param bagid number
+---@return Bag
+function addon:GetBagFromBagID(bagid)
+  if const.BACKPACK_BAGS[bagid] then
+    return addon.Bags.Backpack
+  elseif const.BANK_BAGS[bagid] then
+    return addon.Bags.Bank
+  elseif const.REAGENTBANK_BAGS[bagid] then
+    return addon.Bags.Bank
+  else
+    error("invalid bagid")
+  end
 end
 
 -- HideBlizzardBags will hide the default Blizzard bag frames.

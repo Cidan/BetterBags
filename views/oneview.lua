@@ -46,6 +46,24 @@ local function Wipe(view)
 end
 
 ---@param view View
+---@param oldSlotKey string
+---@param newSlotKey? string
+local function ReindexSlot(view, oldSlotKey, newSlotKey)
+  local cell = view.content:GetCell(oldSlotKey) --[[@as Item]]
+  view.content:RemoveCell(oldSlotKey)
+  if newSlotKey then
+    cell:SetItem(newSlotKey)
+    view.content:AddCell(newSlotKey, cell)
+  else
+    -- If the slot is being removed, mark it as removed.
+    local bagid, slotid = view:ParseSlotKey(oldSlotKey)
+    cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+    view:AddDeferredItem(oldSlotKey)
+    addon:GetBagFromBagID(bagid).drawOnClose = true
+  end
+end
+
+---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function OneBagView(view, bag, slotInfo)
@@ -138,5 +156,6 @@ function views:NewOneBag(parent, kind)
   view.content:Hide()
   view.Render = OneBagView
   view.WipeHandler = Wipe
+  view.ReindexSlot = ReindexSlot
   return view
 end

@@ -58,6 +58,14 @@ function views.viewProto:Render(bag, slotInfo)
   error('Render method not implemented')
 end
 
+---@param oldSlotKey string
+---@param newSlotKey? string
+function views.viewProto:ReindexSlot(oldSlotKey, newSlotKey)
+  _ = oldSlotKey
+  _ = newSlotKey
+  error('ReindexSlot method not implemented')
+end
+
 function views.viewProto:Wipe()
   assert(self.WipeHandler, 'WipeHandler not set')
   self.WipeHandler(self)
@@ -241,7 +249,6 @@ function views.viewProto:ChangeButton(item)
 
   -- The item hash has a stack, but this item isn't in it. Add it to the
   -- stack.
-  -- TODO(lobato): Fixed the "item in a stack changed but remained in the same slot" case.
   if not stack:IsInStack(item.slotkey) then
     debug:Inspect(item.itemInfo.itemLink .. " not in stack: " .. item.slotkey .. " " .. stack.item, stack)
     local oldStack = self.slotToStack[item.slotkey]
@@ -255,7 +262,7 @@ function views.viewProto:ChangeButton(item)
         oldStack:MarkDirty()
       else
         print("removing from old stack")
-        oldStack:RemoveItem(item.slotkey)
+        oldStack:RemoveItem(item.slotkey, self)
         oldStack:MarkDirty()
         stack:AddItem(item.slotkey)
         stack:MarkDirty()
@@ -277,6 +284,9 @@ function views.viewProto:ProcessStacks()
   for _, stack in pairs(self.stacks) do
     if stack.dirty then
       stack:Process(self)
+      if stack:IsStackEmpty() then
+        self.stacks[stack.hash] = nil
+      end
     end
   end
 
@@ -318,21 +328,28 @@ function stackProto:AddItem(slotkey)
 end
 
 ---@param slotkey string
-function stackProto:RemoveItem(slotkey)
+---@param view View
+function stackProto:RemoveItem(slotkey, view)
   if self.item == slotkey then
-    self:Promote()
+    self:Promote(view)
   else
     self.subItems[slotkey] = nil
   end
 end
 
-function stackProto:Promote()
+---@param view View
+function stackProto:Promote(view)
   --TODO(lobato): Handle when there are no more items to promote, i.e. delete.
+  --TODO(lobato): test delete case
   local slotkey = next(self.subItems)
   if slotkey then
+    local oldSlotKey = self.item
     self.item = slotkey
     self.subItems[slotkey] = nil
+    self:UpdateCount()
+    view:ReindexSlot(oldSlotKey, slotkey)
   else
+    view:ReindexSlot(self.item)
     self.item = nil
   end
 end
@@ -373,16 +390,15 @@ function stackProto:Process(view)
   else
     local data = items:GetItemDataFromSlotKey(self.item)
     if data.itemHash ~= self.hash then
-      -- bug: promoting the stack causes a new item button to be created
-      -- but never added to the view, and the old button is never removed.
-      -- need to somehow update the old item button with the new data
-      -- but also need to change it's index in the content/whatever view higher
-      -- up the stack, i.e. view.content:AddCell(slotkey, itemButton), slotkey is now
-      -- wrong.
       print("hash does not match, promoting stack")
-      self:Promote()
+      self:Promote(view)
+      return
     end
   end
   self:UpdateCount()
   view:GetOrCreateItemButton(self.item):SetItem(self.item)
+end
+
+function stackProto:IsStackEmpty()
+  return self.item == nil and next(self.subItems) == nil
 end
