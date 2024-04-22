@@ -25,9 +25,11 @@ local debug = addon:GetModule('Debug')
 local views = addon:NewModule('Views')
 
 ---@class (exact) Stack
----@field item string
----@field subItems table<string, boolean>
----@field dirty boolean
+---@field item string The slotkey of the item that is rendered.
+---@field swap string The slotkey of the item to swap with when marked dirty.
+---@field subItems table<string, boolean> All the sub items in this stack that are not rendered.
+---@field hash string The item hash for this stack.
+---@field dirty boolean If the stack needs to be updated.
 local stackProto = {}
 
 ---@class (exact) View
@@ -44,7 +46,7 @@ local stackProto = {}
 ---@field fullRefresh boolean
 ---@field deferredItems string[]
 ---@field private stacks table<string, Stack>
----@field private slotToStackHash table<string, string>
+---@field private slotToStack table<string, Stack>
 ---@field WipeHandler fun(view: View)
 views.viewProto = {}
 
@@ -61,7 +63,7 @@ function views.viewProto:Wipe()
   self.WipeHandler(self)
   self:ClearDeferredItems()
   wipe(self.stacks)
-  wipe(self.slotToStackHash)
+  wipe(self.slotToStack)
 end
 
 function views.viewProto:WipeStacks()
@@ -216,7 +218,7 @@ function views.viewProto:NewButton(item)
   -- No stack was found, create a new stack.
   local itemButton = self:GetOrCreateItemButton(item.slotkey)
   self.stacks[item.itemHash] = views:NewStack(item.slotkey)
-  self.slotToStackHash[item.slotkey] = item.itemHash
+  self.slotToStack[item.slotkey] = self.stacks[item.itemHash]
   itemButton:SetItem(item.slotkey)
 
   return itemButton
@@ -237,34 +239,53 @@ function views.viewProto:ChangeButton(item)
     return nil
   end
 
-  -- The item has a stack, but it's not the display item nor a sub item,
-  -- which means the item was swapped. Create a new stack for this item,
-  -- and move all the correct sub-items to the new stack.
-  if stack.item ~= item.slotkey and not stack:HasSubItem(item.slotkey) then
-    local newStack = views:NewStack(item.slotkey)
-    for subItemSlotKey in pairs(stack.subItems) do
-      local subitemData = items:GetItemDataFromSlotKey(subItemSlotKey)
-      if subitemData.itemHash == item.itemHash then
-        newStack:AddItem(subItemSlotKey)
-        stack:RemoveItem(subItemSlotKey)
+  -- The item hash has a stack, but this item isn't in it. Add it to the
+  -- stack.
+  -- TODO(lobato): Fixed the "item in a stack changed but remained in the same slot" case.
+  if not stack:IsInStack(item.slotkey) then
+    debug:Inspect(item.itemInfo.itemLink .. " not in stack: " .. item.slotkey .. " " .. stack.item, stack)
+    local oldStack = self.slotToStack[item.slotkey]
+    if oldStack and oldStack:IsInStack(item.slotkey) then
+      if oldStack.item == item.slotkey then
+        stack.swap = item.slotkey
+        stack:MarkDirty()
+      else
+        oldStack:RemoveItem(item.slotkey)
+        oldStack:MarkDirty()
+        stack:AddItem(item.slotkey)
+        stack:MarkDirty()
       end
+      self.slotToStack[item.slotkey] = stack
     end
-    self.stacks[item.itemHash] = newStack
-
-    -- If there were any sub items left over, promote the stack,
-    -- and create it's button. This covers the case where an item was mutated.
-    if next(stack.subItems) ~= nil then
-      stack:Promote()
-      local promotedItemData = items:GetItemDataFromSlotKey(stack.item)
-      self.stacks[promotedItemData.itemHash] = stack
-      itemButton = self:GetOrCreateItemButton(stack.item)
-      itemButton:SetItem(stack.item)
-      stack:MarkDirty()
-    end
-    newStack:MarkDirty()
+--  elseif true then
+--    local newStack = views:NewStack(item.slotkey)
+--    for subItemSlotKey in pairs(stack.subItems) do
+--      local subitemData = items:GetItemDataFromSlotKey(subItemSlotKey)
+--      if subitemData.itemHash == item.itemHash then
+--        newStack:AddItem(subItemSlotKey)
+--        stack:RemoveItem(subItemSlotKey)
+--      end
+--    end
+--    self.stacks[item.itemHash] = newStack
+--
+--    -- If there were any sub items left over, promote the stack,
+--    -- and create it's button. This covers the case where an item was mutated.
+--    if next(stack.subItems) ~= nil then
+--      stack:Promote()
+--      local promotedItemData = items:GetItemDataFromSlotKey(stack.item)
+--      self.stacks[promotedItemData.itemHash] = stack
+--      itemButton = self:GetOrCreateItemButton(stack.item)
+--      itemButton:SetItem(stack.item)
+--      stack:MarkDirty()
+--    end
+--    DevTool:AddData(newStack, "New Stack")
+--    newStack:MarkDirty()
   elseif stack.item == item.slotkey then
     -- The display item itself changed, mark the stack as dirty for an update.
+    print("marking stack dirty cuz change")
     stack:MarkDirty()
+  else
+    print("uncaught case")
   end
 
   return itemButton
@@ -285,12 +306,6 @@ function views.viewProto:GetStack(itemHash)
   return self.stacks[itemHash]
 end
 
----@param slotkey string
----@param itemHash string
-function views.viewProto:SetItemHashStack(slotkey, itemHash)
-  self.slotToStackHash[slotkey] = itemHash
-end
-
 ---@return View
 function views:NewBlankView()
   local view = setmetatable({
@@ -298,7 +313,7 @@ function views:NewBlankView()
     itemsByBagAndSlot = {},
     deferredItems = {},
     stacks = {},
-    slotToStackHash = {}
+    slotToStack = {}
   }, {__index = views.viewProto}) --[[@as View]]
   return view
 end
@@ -306,9 +321,11 @@ end
 ---@param slotkey string
 ---@return Stack
 function views:NewStack(slotkey)
+  local data = items:GetItemDataFromSlotKey(slotkey)
   return setmetatable({
     item = slotkey,
     subItems = {},
+    hash = data.itemHash,
     dirty = false
   }, {__index = stackProto})
 end
@@ -320,7 +337,11 @@ end
 
 ---@param slotkey string
 function stackProto:RemoveItem(slotkey)
-  self.subItems[slotkey] = nil
+  if self.item == slotkey then
+    self:Promote()
+  else
+    self.subItems[slotkey] = nil
+  end
 end
 
 function stackProto:Promote()
@@ -347,6 +368,10 @@ function stackProto:HasSubItem(slotkey)
   return self.subItems[slotkey] ~= nil
 end
 
+function stackProto:IsInStack(slotkey)
+  return self.item == slotkey or self.subItems[slotkey] ~= nil
+end
+
 ---@return ItemData
 function stackProto:GetBackingItemData()
   return items:GetItemDataFromSlotKey(self.item)
@@ -359,7 +384,10 @@ end
 ---@param view View
 function stackProto:Process(view)
   self.dirty = false
-
+  if self.swap then
+    self.item = self.swap
+    self.swap = nil
+  end
   self:UpdateCount()
   view:GetOrCreateItemButton(self.item):SetItem(self.item)
 end

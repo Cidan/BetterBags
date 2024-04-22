@@ -323,3 +323,11 @@ PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --
 
 -- Sort bags for classic.
 function SortBags() end
+
+--- DevTool
+---@class DevTool
+_G.DevTool = {}
+
+---@param value any
+---@param tag string
+function _G.DevTool:AddData(value, tag) end
