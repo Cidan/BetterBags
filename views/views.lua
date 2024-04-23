@@ -202,9 +202,11 @@ end
 function views.viewProto:RemoveButton(item)
   local stack = self.stacks[item.itemHash]
   if not stack then
+    print("removing item with no stack")
     self:ReindexSlot(item.slotkey)
     return
   end
+  print("remove: marking stack dirty")
   stack:MarkDirty()
 end
 
@@ -226,6 +228,8 @@ function views.viewProto:NewButton(item)
 
   -- If a stack was found, update it and return the stack button.
   if stack then
+    print("new button: stack was found", item.slotkey)
+    debug:Inspect("bad item", item)
     local itemButton = self:GetOrCreateItemButton(stack.item)
     stack:AddItem(item.slotkey)
     stack:UpdateCount()
@@ -350,12 +354,14 @@ function stackProto:Promote(view)
   --TODO(lobato): test delete case
   local slotkey = next(self.subItems)
   if slotkey then
+    print("promoting")
     local oldSlotKey = self.item
     self.item = slotkey
     self.subItems[slotkey] = nil
     self:UpdateCount()
     view:ReindexSlot(oldSlotKey, slotkey)
   else
+    print("hit this else??")
     view:ReindexSlot(self.item)
     self.item = nil
   end

@@ -14,7 +14,7 @@ local columnFrame = addon:NewModule('ColumnFrame')
 
 ---@class Column
 ---@field frame Frame
----@field idToCell table<string, Cell|Item|Section>
+---@field idToCell table<string, BagButton|Cell|Item|Section>
 ---@field cells Cell[]|Item[]|Section[]
 ---@field minimumWidth number
 ---@field spacing number
@@ -23,7 +23,7 @@ local columnProto = {}
 -- AddCell adds a cell to this column at the given position, or
 -- at the end of the column if no position is given.
 ---@param id string
----@param cell Cell|Item|Section
+---@param cell BagButton|Cell|Item|Section
 ---@param position? number
 function columnProto:AddCell(id, cell, position)
   cell.frame:SetParent(self.frame)
