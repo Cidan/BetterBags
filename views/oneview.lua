@@ -51,9 +51,10 @@ end
 local function ReindexSlot(view, oldSlotKey, newSlotKey)
   local cell = view.content:GetCell(oldSlotKey) --[[@as Item]]
   if newSlotKey then
-    print("reindexing slot")
-    cell:SetItem(newSlotKey)
+    print("reindexing slot from", oldSlotKey, "to", newSlotKey)
     view.content:RekeyCell(oldSlotKey, newSlotKey)
+    cell:SetItem(newSlotKey)
+    print("After set it's set to", cell.slotkey, "should be", newSlotKey)
   else
     -- If the slot is being removed, mark it as removed.
     local bagid, slotid = view:ParseSlotKey(oldSlotKey)
@@ -93,10 +94,7 @@ local function OneBagView(view, bag, slotInfo)
 
   --- Handle changed items.
   for _, item in pairs(changed) do
-    local itemButton = view:ChangeButton(item)
-    if itemButton then
-      view.content:AddCell(itemButton:GetItemData().slotkey, itemButton)
-    end
+    view:ChangeButton(item)
   end
 
   view:ProcessStacks()

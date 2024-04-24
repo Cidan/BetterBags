@@ -20,9 +20,9 @@ local items = addon:GetModule('Items')
 ---@field dirtyItems ItemData[] A list of dirty items that need to be refreshed.
 ---@field itemsBySlotKey table<string, ItemData> A table of items by slot key.
 ---@field previousItemsBySlotKey table<string, ItemData> A table of items by slot key from the previous refresh.
----@field addedItems ItemData[] A list of items that were added since the last refresh.
----@field removedItems ItemData[] A list of items that were removed since the last refresh.
----@field updatedItems ItemData[] A list of items that were updated since the last refresh.
+---@field addedItems table<string, ItemData> A list of items that were added since the last refresh.
+---@field removedItems table<string, ItemData> A list of items that were removed since the last refresh.
+---@field updatedItems table<string, ItemData> A list of items that were updated since the last refresh.
 local SlotInfo = {}
 
 function items:NewSlotInfo()

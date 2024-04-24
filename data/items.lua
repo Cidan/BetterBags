@@ -289,11 +289,6 @@ end
 ---@param oldData ItemData
 ---@return boolean
 function items:ItemChanged(newData, oldData)
-  -- Item hash does not match.
-  if oldData and newData.itemHash ~= oldData.itemHash then
-    return true
-  end
-
   -- Item was marked as new when it wasn't before.
   if C_NewItems.IsNewItem(newData.bagid, newData.slotid) and oldData and oldData.itemInfo and not oldData.itemInfo.isNewItem then
     return true
@@ -385,13 +380,17 @@ function items:LoadItems(kind, dataCache)
     -- Process item changes.
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
-      table.insert(slotInfo.addedItems, currentItem)
+     slotInfo.addedItems[currentItem.slotkey] = currentItem
     elseif items:ItemRemoved(currentItem, previousItem) then
       debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
-      table.insert(slotInfo.removedItems, previousItem)
+      slotInfo.removedItems[previousItem.slotkey] = previousItem
+    elseif items:ItemHashChanged(currentItem, previousItem) then
+      debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
+      slotInfo.removedItems[previousItem.slotkey] = previousItem
     elseif items:ItemChanged(currentItem, previousItem) then
       debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
-      table.insert(slotInfo.updatedItems, currentItem)
+      slotInfo.updatedItems[currentItem.slotkey] = currentItem
     end
 
     --if items:HasItemChanged(currentItem, previousItem) then

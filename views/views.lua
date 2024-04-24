@@ -229,10 +229,11 @@ function views.viewProto:NewButton(item)
   -- If a stack was found, update it and return the stack button.
   if stack then
     print("new button: stack was found", item.slotkey)
-    debug:Inspect("bad item", item)
-    local itemButton = self:GetOrCreateItemButton(stack.item)
     stack:AddItem(item.slotkey)
     stack:UpdateCount()
+    print("DEBUG slotkey", item.slotkey)
+    local itemButton = self:GetOrCreateItemButton(stack.item)
+    debug:Inspect("item outside update count", items:GetItemDataFromSlotKey(itemButton.slotkey) or "nil value")
     itemButton:UpdateCount()
     debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", stack.item)
     return nil
@@ -248,46 +249,15 @@ function views.viewProto:NewButton(item)
 end
 
 ---@param item ItemData
----@return Item?
 function views.viewProto:ChangeButton(item)
   local stack = self.stacks[item.itemHash]
-
-  ---@type Item
-  local itemButton
-
   -- If there's no stack, just update the item.
   if stack == nil then
-    itemButton = self:GetOrCreateItemButton(item.slotkey)
+    local itemButton = self:GetOrCreateItemButton(item.slotkey)
     itemButton:SetItem(item.slotkey)
-    return nil
+    return
   end
-
-  -- The item hash has a stack, but this item isn't in it. Add it to the
-  -- stack.
-  if not stack:IsInStack(item.slotkey) then
-    debug:Inspect(item.itemInfo.itemLink .. " not in stack: " .. item.slotkey .. " " .. stack.item, stack)
-    local oldStack = self.slotToStack[item.slotkey]
-    if oldStack and oldStack:IsInStack(item.slotkey) then
-      if oldStack.item == item.slotkey then
-        -- bug: enchant an item, stack.swap is set, when it should be stack:additem
-        -- resulting in missing item.
-        stack.swap = item.slotkey
-        stack:MarkDirty()
-        oldStack:MarkDirty()
-      else
-        oldStack:RemoveItem(item.slotkey, self)
-        oldStack:MarkDirty()
-        stack:AddItem(item.slotkey)
-        stack:MarkDirty()
-      end
-    end
-    self.slotToStack[item.slotkey] = stack
-  else
-    -- The display item or subitem changed, mark the stack as dirty for an update.
-    stack:MarkDirty()
-  end
-
-  return itemButton
+  stack:MarkDirty()
 end
 
 function views.viewProto:ProcessStacks()
@@ -354,12 +324,16 @@ function stackProto:Promote(view)
   --TODO(lobato): test delete case
   local slotkey = next(self.subItems)
   if slotkey then
-    print("promoting")
+    print("promoting from", self.item, "to", slotkey)
     local oldSlotKey = self.item
     self.item = slotkey
     self.subItems[slotkey] = nil
     self:UpdateCount()
     view:ReindexSlot(oldSlotKey, slotkey)
+    view.itemsByBagAndSlot[slotkey] = view.itemsByBagAndSlot[oldSlotKey]
+    view.itemsByBagAndSlot[oldSlotKey] = nil
+    local theItem = view:GetOrCreateItemButton(self.item)
+    print("reindex updated", self.item, "to ", theItem.slotkey)
   else
     print("hit this else??")
     view:ReindexSlot(self.item)
@@ -397,16 +371,11 @@ end
 ---@param view View
 function stackProto:Process(view)
   self.dirty = false
-  if self.swap then
-    self.item = self.swap
-    self.swap = nil
-  else
-    local data = items:GetItemDataFromSlotKey(self.item)
-    if data.itemHash ~= self.hash then
-      print("hash does not match, promoting stack")
-      self:Promote(view)
-      return
-    end
+  local data = items:GetItemDataFromSlotKey(self.item)
+  if data.itemHash ~= self.hash then
+    print("hash does not match, promoting stack", data.itemHash, self.hash)
+    self:Promote(view)
+    return
   end
   self:UpdateCount()
   view:GetOrCreateItemButton(self.item):SetItem(self.item)
