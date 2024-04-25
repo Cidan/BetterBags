@@ -189,7 +189,7 @@ end
 function itemFrame.itemProto:UpdateCooldown()
   if self.slotkey == nil then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if data.isItemEmpty then return end
+  if not data or data.isItemEmpty then return end
   self.button:UpdateCooldown(data.itemInfo.itemIcon)
 end
 
