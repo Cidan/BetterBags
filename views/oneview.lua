@@ -51,10 +51,8 @@ end
 local function ReindexSlot(view, oldSlotKey, newSlotKey)
   local cell = view.content:GetCell(oldSlotKey) --[[@as Item]]
   if newSlotKey then
-    print("reindexing slot from", oldSlotKey, "to", newSlotKey)
     view.content:RekeyCell(oldSlotKey, newSlotKey)
     cell:SetItem(newSlotKey)
-    print("After set it's set to", cell.slotkey, "should be", newSlotKey)
   else
     -- If the slot is being removed, mark it as removed.
     local bagid, slotid = view:ParseSlotKey(oldSlotKey)

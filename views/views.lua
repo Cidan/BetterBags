@@ -202,11 +202,9 @@ end
 function views.viewProto:RemoveButton(item)
   local stack = self.stacks[item.itemHash]
   if not stack then
-    print("removing item with no stack")
     self:ReindexSlot(item.slotkey)
     return
   end
-  print("remove: marking stack dirty")
   stack:MarkDirty()
 end
 
@@ -228,12 +226,9 @@ function views.viewProto:NewButton(item)
 
   -- If a stack was found, update it and return the stack button.
   if stack then
-    print("new button: stack was found", item.slotkey)
     stack:AddItem(item.slotkey)
     stack:UpdateCount()
-    print("DEBUG slotkey", item.slotkey)
     local itemButton = self:GetOrCreateItemButton(stack.item)
-    debug:Inspect("item outside update count", items:GetItemDataFromSlotKey(itemButton.slotkey) or "nil value")
     itemButton:UpdateCount()
     debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", stack.item)
     return nil
@@ -265,7 +260,6 @@ function views.viewProto:ProcessStacks()
     if stack.dirty then
       stack:Process(self)
       if stack:IsStackEmpty() then
-        print("clearing empty stack")
         self.stacks[stack.hash] = nil
       end
     end
@@ -324,7 +318,6 @@ function stackProto:Promote(view)
   --TODO(lobato): test delete case
   local slotkey = next(self.subItems)
   if slotkey then
-    print("promoting from", self.item, "to", slotkey)
     local oldSlotKey = self.item
     self.item = slotkey
     self.subItems[slotkey] = nil
@@ -332,10 +325,7 @@ function stackProto:Promote(view)
     view:ReindexSlot(oldSlotKey, slotkey)
     view.itemsByBagAndSlot[slotkey] = view.itemsByBagAndSlot[oldSlotKey]
     view.itemsByBagAndSlot[oldSlotKey] = nil
-    local theItem = view:GetOrCreateItemButton(self.item)
-    print("reindex updated", self.item, "to ", theItem.slotkey)
   else
-    print("hit this else??")
     view:ReindexSlot(self.item)
     self.item = nil
   end
@@ -373,7 +363,6 @@ function stackProto:Process(view)
   self.dirty = false
   local data = items:GetItemDataFromSlotKey(self.item)
   if data.itemHash ~= self.hash then
-    print("hash does not match, promoting stack", data.itemHash, self.hash)
     self:Promote(view)
     return
   end
