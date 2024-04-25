@@ -49,11 +49,13 @@ end
 ---@param oldSlotKey string
 ---@param newSlotKey? string
 local function ReindexSlot(view, oldSlotKey, newSlotKey)
+  print("calling reindex", oldSlotKey, "->", newSlotKey)
   local cell = view.content:GetCell(oldSlotKey) --[[@as Item]]
   if newSlotKey then
     view.content:RekeyCell(oldSlotKey, newSlotKey)
     cell:SetItem(newSlotKey)
   else
+    print("recent delete", oldSlotKey)
     -- If the slot is being removed, mark it as removed.
     local bagid, slotid = view:ParseSlotKey(oldSlotKey)
     cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
@@ -77,6 +79,7 @@ local function OneBagView(view, bag, slotInfo)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
+  print("start remove")
   --- Handle removed items.
   for _, item in pairs(removed) do
     view:RemoveButton(item)
@@ -86,6 +89,7 @@ local function OneBagView(view, bag, slotInfo)
   -- when items are added.
   view:ProcessStacks()
 
+  print("Start add")
   --- Handle added items.
   for _, item in pairs(added) do
     local itemButton = view:AddButton(item)
@@ -116,8 +120,10 @@ local function OneBagView(view, bag, slotInfo)
   end
 
   if not slotInfo.deferDelete then
+    print("doing defer")
     -- Handle items that were removed from the view.
     for slotkey, _ in pairs(view:GetDeferredItems()) do
+      print("removing cell", slotkey)
       view.content:RemoveCell(slotkey)
       view.itemsByBagAndSlot[slotkey]:Wipe()
     end

@@ -211,7 +211,7 @@ end
 ---@param item ItemData
 ---@return Item?
 function views.viewProto:AddButton(item)
-  self:RemoveDeferredItem(item.slotkey)
+  print("removing defer for", item.slotkey)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
   if not opts.mergeStacks or
@@ -219,6 +219,7 @@ function views.viewProto:AddButton(item)
   opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount then
     local itemButton = self:GetOrCreateItemButton(item.slotkey)
     itemButton:SetItem(item.slotkey)
+    self:RemoveDeferredItem(item.slotkey)
     return itemButton
   end
 
@@ -226,6 +227,7 @@ function views.viewProto:AddButton(item)
 
   -- If a stack was found, update it and return the stack button.
   if stack then
+    print("added to stack", item.slotkey)
     stack:AddItem(item.slotkey)
     stack:UpdateCount()
     local itemButton = self:GetOrCreateItemButton(stack.item)
@@ -234,6 +236,8 @@ function views.viewProto:AddButton(item)
     return nil
   end
 
+  self:RemoveDeferredItem(item.slotkey)
+  print("created new stack for", item.slotkey)
   -- No stack was found, create a new stack.
   local itemButton = self:GetOrCreateItemButton(item.slotkey)
   self.stacks[item.itemHash] = views:NewStack(item.slotkey)
@@ -326,6 +330,9 @@ function stackProto:Promote(view)
     view.itemsByBagAndSlot[slotkey] = view.itemsByBagAndSlot[oldSlotKey]
     view.itemsByBagAndSlot[oldSlotKey] = nil
   else
+    local data = items:GetItemDataFromSlotKey(self.item)
+    local itemButton = view.itemsByBagAndSlot[self.item]
+    print("hit the else cases in promote", data.itemInfo.itemLink, slotkey, self.item)
     view:ReindexSlot(self.item)
     self.item = nil
   end

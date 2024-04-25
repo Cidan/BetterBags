@@ -448,6 +448,7 @@ function itemFrame.itemProto:Wipe()
   self.frame:Hide()
   self.frame:SetParent(nil)
   self.frame:ClearAllPoints()
+  self:ClearItem()
 end
 
 -- Unlink will remove and hide this item button
