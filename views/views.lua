@@ -210,7 +210,7 @@ end
 
 ---@param item ItemData
 ---@return Item?
-function views.viewProto:NewButton(item)
+function views.viewProto:AddButton(item)
   self:RemoveDeferredItem(item.slotkey)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.

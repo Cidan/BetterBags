@@ -82,9 +82,13 @@ local function OneBagView(view, bag, slotInfo)
     view:RemoveButton(item)
   end
 
+  -- Process deleted items right away so that state is correct for
+  -- when items are added.
+  view:ProcessStacks()
+
   --- Handle added items.
   for _, item in pairs(added) do
-    local itemButton = view:NewButton(item)
+    local itemButton = view:AddButton(item)
     if itemButton then
       view.content:AddCell(itemButton:GetItemData().slotkey, itemButton)
     end
