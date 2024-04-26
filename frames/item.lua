@@ -286,8 +286,7 @@ end
 
 function itemFrame.itemProto:UpdateCount()
   local data = items:GetItemDataFromSlotKey(self.slotkey)
-  debug:Inspect("item in update count", data)
-  if data.isItemEmpty then return end
+  if not data or data.isItemEmpty then return end
   local count = data.stackedCount or data.itemInfo.currentItemCount
   SetItemButtonCount(self.button, count)
 end

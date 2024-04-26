@@ -222,7 +222,8 @@ function views.viewProto:AddButton(item)
   if (not opts.mergeStacks) or
   (opts.unmergeAtShop and addon.atInteracting) or
   (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-  (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+  (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
+  self.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
     local itemButton = self:GetOrCreateItemButton(item.slotkey)
     itemButton:SetItem(item.slotkey)
     self:RemoveDeferredItem(item.slotkey)

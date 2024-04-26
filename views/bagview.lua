@@ -76,28 +76,50 @@ local function BagView(view, bag, slotInfo)
   end
   -- Use the section grid sizing for this view type.
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_GRID)
-  local dirtyItems = slotInfo.dirtyItems
 
-  for _, data in pairs(dirtyItems) do
-    local bagid = data.bagid
-    local slotkey = view:GetSlotKey(data)
+  local added, removed, changed = slotInfo:GetChangeset()
 
-    -- Create or get the item frame for this slot.
-    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-    if itemButton == nil then
-      itemButton = itemFrame:Create()
-      view.itemsByBagAndSlot[slotkey] = itemButton
-    end
+  for _, item in pairs(removed) do
+    view:RemoveButton(item)
+  end
 
-    -- Set the item data on the item frame.
-    itemButton:SetItem(data)
+  view:ProcessStacks()
 
-    -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
-    if (not data.isItemEmpty) then
-      local section = view:GetOrCreateSection(GetBagName(bagid))
-      section:AddCell(slotkey, itemButton)
+  for _, item in pairs(added) do
+    local itemButton = view:AddButton(item)
+    if itemButton then
+      local section = view:GetOrCreateSection(GetBagName(item.bagid))
+      section:AddCell(itemButton:GetItemData().slotkey, itemButton)
     end
   end
+
+  for _, item in pairs(changed) do
+    view:ChangeButton(item)
+  end
+
+  view:ProcessStacks()
+--  local dirtyItems = slotInfo.dirtyItems
+--
+--  for _, data in pairs(dirtyItems) do
+--    local bagid = data.bagid
+--    local slotkey = view:GetSlotKey(data)
+--
+--    -- Create or get the item frame for this slot.
+--    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+--    if itemButton == nil then
+--      itemButton = itemFrame:Create()
+--      view.itemsByBagAndSlot[slotkey] = itemButton
+--    end
+--
+--    -- Set the item data on the item frame.
+--    itemButton:SetItem(data)
+--
+--    -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
+--    if (not data.isItemEmpty) then
+--      local section = view:GetOrCreateSection(GetBagName(bagid))
+--      section:AddCell(slotkey, itemButton)
+--    end
+--  end
 
   for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
     for slotid, data in pairs(emptyBagData) do
@@ -158,10 +180,10 @@ end
 ---@param kind BagKind
 ---@return View
 function views:NewBagView(parent, kind)
-  local view = setmetatable({}, {__index = views.viewProto})
+  local view = views:NewBlankView()
   view.itemFrames = {}
   view.itemCount = 0
-  view.bagkind = const.BAG_VIEW.SECTION_ALL_BAGS
+  view.bagview = const.BAG_VIEW.SECTION_ALL_BAGS
   view.kind = kind
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
