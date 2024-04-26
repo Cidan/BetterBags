@@ -46,7 +46,7 @@ function addon.OnUpdate()
     addon.Bags.Backpack:Show()
     addon:UpdateButtonHighlight()
     if addon.atInteracting then
-      events:SendMessage('bags/RefreshAll')
+      events:SendMessage('bags/FullRefreshAll')
     end
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
@@ -74,7 +74,7 @@ function addon:CloseInteractionWindow(interactionType)
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
   addon.backpackShouldClose = true
-  events:SendMessage('bags/RefreshAll')
+  events:SendMessage('bags/FullRefreshAll')
   events:SendMessageLater('bags/OpenClose')
 end
 
