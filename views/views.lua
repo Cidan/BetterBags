@@ -254,6 +254,22 @@ end
 ---@param item ItemData
 function views.viewProto:ChangeButton(item)
   local stack = self.stacks[item.itemHash]
+  local opts = database:GetStackingOptions(self.kind)
+
+  -- Check if we need to unstack an item.
+  if (not opts.mergeStacks) or
+  (opts.unmergeAtShop and addon.atInteracting) or
+  (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+  (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+    if stack and stack:IsInStack(item.slotkey) then
+      stack:MarkDirty()
+    else
+      local itemButton = self:GetOrCreateItemButton(item.slotkey)
+      itemButton:SetItem(item.slotkey)
+    end
+    return
+  end
+
   -- If there's no stack, just update the item.
   if stack == nil then
     local itemButton = self:GetOrCreateItemButton(item.slotkey)
