@@ -67,6 +67,39 @@ local function GetBagName(bagid)
 end
 
 ---@param view View
+---@param oldSlotKey string
+---@param newSlotKey? string
+local function ReindexSlot(view, oldSlotKey, newSlotKey)
+  local cell = view.itemsByBagAndSlot[oldSlotKey] --[[@as Item]]
+  local oldBagid = view:ParseSlotKey(oldSlotKey)
+  if newSlotKey then
+    local newBagid = view:ParseSlotKey(newSlotKey)
+    local oldSection = view:GetOrCreateSection(GetBagName(oldBagid))
+    local newSection = view:GetOrCreateSection(GetBagName(newBagid))
+    oldSection:RemoveCell(oldSlotKey)
+    newSection:AddCell(newSlotKey, cell)
+    cell:SetItem(newSlotKey)
+  else
+    -- If the slot is being removed, mark it as removed.
+    local bagid, slotid = view:ParseSlotKey(oldSlotKey)
+    cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+    view:AddDeferredItem(oldSlotKey)
+    addon:GetBagFromBagID(bagid).drawOnClose = true
+  end
+end
+
+
+---@param view View
+---@param newSlotKey string
+local function AddSlot(view, newSlotKey)
+  local itemButton = view:GetOrCreateItemButton(newSlotKey)
+  local newBagid = view:ParseSlotKey(newSlotKey)
+  local newSection = view:GetOrCreateSection(GetBagName(newBagid))
+  newSection:AddCell(newSlotKey, itemButton)
+  itemButton:SetItem(newSlotKey)
+end
+
+---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function BagView(view, bag, slotInfo)
@@ -98,28 +131,6 @@ local function BagView(view, bag, slotInfo)
   end
 
   view:ProcessStacks()
---  local dirtyItems = slotInfo.dirtyItems
---
---  for _, data in pairs(dirtyItems) do
---    local bagid = data.bagid
---    local slotkey = view:GetSlotKey(data)
---
---    -- Create or get the item frame for this slot.
---    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
---    if itemButton == nil then
---      itemButton = itemFrame:Create()
---      view.itemsByBagAndSlot[slotkey] = itemButton
---    end
---
---    -- Set the item data on the item frame.
---    itemButton:SetItem(data)
---
---    -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
---    if (not data.isItemEmpty) then
---      local section = view:GetOrCreateSection(GetBagName(bagid))
---      section:AddCell(slotkey, itemButton)
---    end
---  end
 
   for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
     for slotid, data in pairs(emptyBagData) do
@@ -192,6 +203,9 @@ function views:NewBagView(parent, kind)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
   view.Render = BagView
-  view.Wipe = Wipe
+  view.WipeHandler = Wipe
+  view.ReindexSlot = ReindexSlot
+  view.AddSlot = AddSlot
+
   return view
 end
