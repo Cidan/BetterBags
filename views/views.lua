@@ -213,9 +213,10 @@ end
 function views.viewProto:AddButton(item)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
-  if not opts.mergeStacks or
-  opts.unmergeAtShop and addon.atInteracting or
-  opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount then
+  if (not opts.mergeStacks) or
+  (opts.unmergeAtShop and addon.atInteracting) or
+  (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+  (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
     local itemButton = self:GetOrCreateItemButton(item.slotkey)
     itemButton:SetItem(item.slotkey)
     self:RemoveDeferredItem(item.slotkey)
@@ -367,6 +368,7 @@ function stackProto:Process(view)
     self:Promote(view)
     return
   end
+  -- TODO(lobato): fix don't merge partial here.
   self:UpdateCount()
   view:GetOrCreateItemButton(self.item):SetItem(self.item)
 end
