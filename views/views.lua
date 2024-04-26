@@ -66,6 +66,12 @@ function views.viewProto:ReindexSlot(oldSlotKey, newSlotKey)
   error('ReindexSlot method not implemented')
 end
 
+---@param newSlotKey string
+function views.viewProto:AddSlot(newSlotKey)
+  _ = newSlotKey
+  error('AddSlot method not implemented')
+end
+
 function views.viewProto:Wipe()
   assert(self.WipeHandler, 'WipeHandler not set')
   self.WipeHandler(self)
@@ -347,6 +353,10 @@ function stackProto:HasSubItem(slotkey)
   return self.subItems[slotkey] ~= nil
 end
 
+function stackProto:HasAnySubItems()
+  return next(self.subItems) ~= nil
+end
+
 function stackProto:IsInStack(slotkey)
   return self.item == slotkey or self.subItems[slotkey] ~= nil
 end
@@ -364,12 +374,20 @@ end
 function stackProto:Process(view)
   self.dirty = false
   local data = items:GetItemDataFromSlotKey(self.item)
+  local opts = database:GetStackingOptions(view.kind)
   if data.itemHash ~= self.hash then
     self:Promote(view)
     return
   end
   -- TODO(lobato): fix don't merge partial here.
   self:UpdateCount()
+  if (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount) and self:HasAnySubItems() then
+    local newSlot = self.item
+    self:Promote(view)
+    -- TODO(lobato): Move stackedCount out of the data object.
+    data.stackedCount = nil
+    view:AddSlot(newSlot)
+  end
   view:GetOrCreateItemButton(self.item):SetItem(self.item)
 end
 

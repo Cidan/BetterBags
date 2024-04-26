@@ -63,6 +63,14 @@ local function ReindexSlot(view, oldSlotKey, newSlotKey)
 end
 
 ---@param view View
+---@param newSlotKey string
+local function AddSlot(view, newSlotKey)
+  local itemButton = view:GetOrCreateItemButton(newSlotKey)
+  itemButton:SetItem(newSlotKey)
+  view.content:AddCell(newSlotKey, itemButton)
+end
+
+---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function OneBagView(view, bag, slotInfo)
@@ -147,5 +155,6 @@ function views:NewOneBag(parent, kind)
   view.Render = OneBagView
   view.WipeHandler = Wipe
   view.ReindexSlot = ReindexSlot
+  view.AddSlot = AddSlot
   return view
 end
