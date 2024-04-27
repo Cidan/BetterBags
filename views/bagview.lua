@@ -83,7 +83,6 @@ local function ReindexSlot(view, oldSlotKey, newSlotKey)
     -- If the slot is being removed, mark it as removed.
     local bagid, slotid = view:ParseSlotKey(oldSlotKey)
     cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
-    view:AddDeferredItem(oldSlotKey)
     addon:GetBagFromBagID(bagid).drawOnClose = true
   end
 end

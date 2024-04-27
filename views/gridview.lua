@@ -55,6 +55,41 @@ local function Wipe(view)
   wipe(view.itemsByBagAndSlot)
 end
 
+---@param view View
+---@param oldSlotKey string
+---@param newSlotKey? string
+local function ReindexSlot(view, oldSlotKey, newSlotKey)
+  local cell = view.itemsByBagAndSlot[oldSlotKey] --[[@as Item]]
+  if newSlotKey then
+    local oldSection = view:GetSlotSection(oldSlotKey)
+    local newSection = view:GetSlotSection(newSlotKey)
+    oldSection:RemoveCell(oldSlotKey)
+    newSection:AddCell(newSlotKey, cell)
+    view:RemoveSlotSection(oldSlotKey)
+    view:SetSlotSection(newSlotKey, newSection)
+    cell:SetItem(newSlotKey)
+  else
+    local data = cell:GetItemData()
+    if data and not data.isItemEmpty then
+      local slotKeyCat = view:GetSlotSection(oldSlotKey).title:GetText()
+      local dataCat = data.itemInfo.category
+      if slotKeyCat ~= dataCat then
+        local oldSection = view:GetSlotSection(oldSlotKey)
+        local newSection = view:GetOrCreateSection(dataCat)
+        oldSection:RemoveCell(oldSlotKey)
+        newSection:AddCell(oldSlotKey, cell)
+        view:RemoveSlotSection(oldSlotKey)
+        view:SetSlotSection(oldSlotKey, newSection)
+      end
+    else
+      local bagid, slotid = view:ParseSlotKey(oldSlotKey)
+      cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+      view:AddDeferredItem(oldSlotKey)
+      addon:GetBagFromBagID(bagid).drawOnClose = true
+    end
+    -- TODO(lobato): Add deferred sections 
+  end
+end
 --local stacks = {}
 
 ---@param view View
@@ -80,6 +115,7 @@ local function GridView(view, bag, slotInfo)
     if itemButton then
       local section = view:GetOrCreateSection(item.itemInfo.category)
       section:AddCell(itemButton:GetItemData().slotkey, itemButton)
+      view:SetSlotSection(itemButton:GetItemData().slotkey, section)
     end
   end
 
@@ -88,6 +124,15 @@ local function GridView(view, bag, slotInfo)
   end
 
   view:ProcessStacks()
+
+  if not view.defer then
+    for slotkey, _ in pairs(view:GetDeferredItems()) do
+      local section = view:GetSlotSection(slotkey)
+      section:RemoveCell(slotkey)
+      view.itemsByBagAndSlot[slotkey]:Wipe()
+    end
+    view:ClearDeferredItems()
+  end
 
   debug:StartProfile('Section Draw Stage')
   for sectionName, section in pairs(view:GetAllSections()) do
@@ -167,5 +212,6 @@ function views:NewGrid(parent, kind)
   view.content:Hide()
   view.Render = GridView
   view.WipeHandler = Wipe
+  view.ReindexSlot = ReindexSlot
   return view
 end

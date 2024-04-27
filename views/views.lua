@@ -34,6 +34,7 @@ local stackProto = {}
 
 ---@class (exact) View
 ---@field sections table<string, Section>
+---@field slotToSection table<string, Section>
 ---@field content Grid
 ---@field bagview BagView
 ---@field kind BagKind
@@ -78,6 +79,7 @@ function views.viewProto:Wipe()
   self:ClearDeferredItems()
   wipe(self.stacks)
   wipe(self.slotToStack)
+  wipe(self.slotToSection)
 end
 
 function views.viewProto:WipeStacks()
@@ -179,6 +181,23 @@ function views.viewProto:SetPoints()
   self.content:GetContainer():ClearAllPoints()
   self.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+end
+
+---@param slotkey string
+---@param section Section
+function views.viewProto:SetSlotSection(slotkey, section)
+  self.slotToSection[slotkey] = section
+end
+
+---@param slotkey string
+---@return Section
+function views.viewProto:GetSlotSection(slotkey)
+  return self.slotToSection[slotkey]
+end
+
+---@param slotkey string
+function views.viewProto:RemoveSlotSection(slotkey)
+  self.slotToSection[slotkey] = nil
 end
 
 ---@param slotkey string
@@ -305,7 +324,8 @@ function views:NewBlankView()
     itemsByBagAndSlot = {},
     deferredItems = {},
     stacks = {},
-    slotToStack = {}
+    slotToStack = {},
+    slotToSection = {}
   }, {__index = views.viewProto}) --[[@as View]]
   return view
 end
