@@ -24,6 +24,9 @@ local L = addon:GetModule('Localization')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+-- A slot key is a string that represents a bag and slot id.
+---@alias SlotKey string
+
 -- ItemLinkInfo contains all the information parsed from an item link.
 ---@class (exact) ItemLinkInfo
 ---@field itemID number
@@ -386,8 +389,11 @@ function items:LoadItems(kind, dataCache)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
     elseif items:ItemHashChanged(currentItem, previousItem) then
       debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
-      slotInfo.addedItems[currentItem.slotkey] = currentItem
-      slotInfo.removedItems[previousItem.slotkey] = previousItem
+      if slotInfo.swappedItems[previousItem.itemInfo.itemGUID] then
+        slotInfo.swappedItems[previousItem.itemInfo.itemGUID].b = currentItem.slotkey
+      else
+        slotInfo.swappedItems[currentItem.itemInfo.itemGUID] = {a = currentItem.slotkey}
+      end
     elseif items:ItemChanged(currentItem, previousItem) then
       debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
       slotInfo.updatedItems[currentItem.slotkey] = currentItem

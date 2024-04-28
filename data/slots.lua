@@ -9,6 +9,10 @@ local debug = addon:GetModule('Debug')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class (exact) SwapSet
+---@field a string
+---@field b? string
+
 -- SlotInfo contains refresh data for an entire bag view, bag or bank.
 ---@class (exact) SlotInfo
 ---@field emptySlots table<string, number> The number of empty normal slots across all bags.
@@ -23,6 +27,7 @@ local items = addon:GetModule('Items')
 ---@field addedItems table<string, ItemData> A list of items that were added since the last refresh.
 ---@field removedItems table<string, ItemData> A list of items that were removed since the last refresh.
 ---@field updatedItems table<string, ItemData> A list of items that were updated since the last refresh.
+---@field swappedItems table<string, SwapSet> A list of items that were swapped since the last refresh.
 local SlotInfo = {}
 
 function items:NewSlotInfo()
@@ -37,6 +42,7 @@ function items:NewSlotInfo()
       addedItems = {},
       removedItems = {},
       updatedItems = {},
+      swappedItems = {},
       deferDelete = false
     }, {__index = SlotInfo})
 end
@@ -65,9 +71,9 @@ function SlotInfo:GetPreviousItems()
   return self.previousItemsBySlotKey
 end
 
----@return ItemData[], ItemData[], ItemData[]
+---@return ItemData[], ItemData[], ItemData[], table<string, SwapSet>
 function SlotInfo:GetChangeset()
-  return self.addedItems, self.removedItems, self.updatedItems
+  return self.addedItems, self.removedItems, self.updatedItems, self.swappedItems
 end
 
 ---@param newItems table<string, ItemData>

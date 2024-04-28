@@ -60,16 +60,22 @@ end
 ---@param newSlotKey? string
 local function ReindexSlot(view, oldSlotKey, newSlotKey)
   local cell = view.itemsByBagAndSlot[oldSlotKey] --[[@as Item]]
+  local data = cell:GetItemData()
   if newSlotKey then
     local oldSection = view:GetSlotSection(oldSlotKey)
     local newSection = view:GetSlotSection(newSlotKey)
-    oldSection:RemoveCell(oldSlotKey)
-    newSection:AddCell(newSlotKey, cell)
-    view:RemoveSlotSection(oldSlotKey)
-    view:SetSlotSection(newSlotKey, newSection)
+    if newSection == nil then
+      newSection = view:GetOrCreateSection(data.itemInfo.category)
+    end
+    if oldSection == newSection then
+      oldSection:RekeyCell(oldSlotKey, newSlotKey)
+    else
+      oldSection:RemoveCell(oldSlotKey)
+      newSection:AddCell(newSlotKey, cell)
+      view:RemoveSlotSection(oldSlotKey)
+    end
     cell:SetItem(newSlotKey)
   else
-    local data = cell:GetItemData()
     if data and not data.isItemEmpty then
       local slotKeyCat = view:GetSlotSection(oldSlotKey).title:GetText()
       local dataCat = data.itemInfo.category
@@ -85,6 +91,7 @@ local function ReindexSlot(view, oldSlotKey, newSlotKey)
       local bagid, slotid = view:ParseSlotKey(oldSlotKey)
       cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
       view:AddDeferredItem(oldSlotKey)
+      view:RemoveSlotSection(oldSlotKey)
       addon:GetBagFromBagID(bagid).drawOnClose = true
     end
     -- TODO(lobato): Add deferred sections 
@@ -103,7 +110,7 @@ local function GridView(view, bag, slotInfo)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
 
-  local added, removed, changed = slotInfo:GetChangeset()
+  local added, removed, changed, swapped = slotInfo:GetChangeset()
 
   for _, item in pairs(removed) do
     view:RemoveButton(item)
@@ -117,6 +124,12 @@ local function GridView(view, bag, slotInfo)
       section:AddCell(itemButton:GetItemData().slotkey, itemButton)
       view:SetSlotSection(itemButton:GetItemData().slotkey, section)
     end
+  end
+
+  view:ProcessStacks()
+
+  for _, swapset in pairs(swapped) do
+    print("swapped", swapset.a, swapset.b)
   end
 
   for _, item in pairs(changed) do
