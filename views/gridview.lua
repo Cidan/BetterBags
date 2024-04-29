@@ -141,7 +141,8 @@ local function GridView(view, bag, slotInfo)
   for _, item in pairs(removed) do
     local newSlotKey = view:RemoveButton(item)
 
-    -- Clear if the item is empty, otherwise reindex it.
+    -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
+    -- place due to the deleted being the head of a stack.
     if not newSlotKey then
       ClearButton(view, item)
     else

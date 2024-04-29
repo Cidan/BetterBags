@@ -388,7 +388,7 @@ function stackProto:RemoveItem(slotkey)
 
   self.subItems[slotkey] = nil
   self:UpdateCount()
-  return slotkey
+  return self.item
 end
 
 function stackProto:Promote()
