@@ -41,6 +41,58 @@ local function Wipe(view)
   wipe(view.itemsByBagAndSlot)
 end
 
+-- DeleteButton deletes a button entirely from the frame and releases it.
+---@param view View
+---@param item ItemData
+local function DeleteButton(view, item)
+  local section = view:GetSlotSection(item.slotkey)
+  section:RemoveCell(item.slotkey)
+  view.itemsByBagAndSlot[item.slotkey]:Wipe()
+  view:RemoveDeferredItem(item.slotkey)
+  view:RemoveSlotSection(item.slotkey)
+end
+
+-- CreateButton creates a button for an item and adds it to the view.
+---@param view View
+---@param item ItemData
+local function CreateButton(view, item)
+  debug:Log("CreateButton", "Creating button for item", item.slotkey)
+  view:RemoveDeferredItem(item.slotkey)
+  local oldSection = view:GetSlotSection(item.slotkey)
+  if oldSection then
+    oldSection:RemoveCell(item.slotkey)
+  end
+  local itemButton = view:GetOrCreateItemButton(item.slotkey, function() return itemRowFrame:Create() end)
+  itemButton:SetItem(item.slotkey)
+  local section = view:GetOrCreateSection(item.itemInfo.category)
+  section:AddCell(itemButton:GetItemData().slotkey, itemButton)
+  view:SetSlotSection(itemButton:GetItemData().slotkey, section)
+end
+
+---@param view View
+---@param slotkey string
+local function UpdateButton(view, slotkey)
+  view:RemoveDeferredItem(slotkey)
+  local itemButton = view:GetOrCreateItemButton(slotkey, function() return itemRowFrame:Create() end)
+  itemButton:SetItem(slotkey)
+end
+
+-- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
+-- button position and section to prevent a sort from happening.
+---@param view View
+---@param oldSlotKey string
+---@param newSlotKey string
+local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
+  local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
+  local oldSlotSection = view:GetSlotSection(oldSlotKey)
+  oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
+  oldSlotCell:SetItem(newSlotKey)
+  view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
+  view.itemsByBagAndSlot[oldSlotKey] = nil
+  view:SetSlotSection(newSlotKey, oldSlotSection)
+  view:RemoveSlotSection(oldSlotKey)
+end
+
 --TODO(lobato): Move the -35 below to constants.
 
 ---@param view View
@@ -64,37 +116,47 @@ local function ListView(view, bag, slotInfo)
     view.fullRefresh = false
   end
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
-  local dirtyItems = slotInfo.dirtyItems
-  for _, data in pairs(dirtyItems) do
-    if data.stackedOn == nil or data.isItemEmpty then
-      local slotkey = view:GetSlotKey(data)
 
-      local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as ItemRow]]
-      if itemButton == nil then
-        itemButton = itemRowFrame:Create()
-        itemButton.rowButton:SetScript("OnMouseWheel", function(_, delta)
-          view.content:GetContainer():OnMouseWheel(delta)
-        end)
-        --itemButton:AddToMasqueGroup(bag.kind)
-        view.itemsByBagAndSlot[slotkey] = itemButton --[[@as Item]]
-      end
+  local added, removed, changed = slotInfo:GetChangeset()
 
-      itemButton:SetItem(data)
+  for _, item in pairs(removed) do
+    local newSlotKey = view:RemoveButton(item)
 
-      if not data.isItemEmpty then
-        local category = itemButton:GetCategory()
-        local section = view:GetOrCreateSection(category)
-        section:GetContent():GetContainer():SetScript("OnMouseWheel", function(_, delta)
-          view.content:GetContainer():OnMouseWheel(delta)
-        end)
-        section:AddCell(slotkey, itemButton)
-      end
+    -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
+    -- place due to the deleted being the head of a stack.
+    if not newSlotKey then
+      DeleteButton(view, item)
+    else
+      UpdateDeletedSlot(view, item.slotkey, newSlotKey)
     end
+  end
+
+  for _, item in pairs(added) do
+    local updateKey = view:AddButton(item)
+    if not updateKey then
+      CreateButton(view, item)
+    else
+      UpdateButton(view, updateKey)
+    end
+  end
+
+  for _, item in pairs(changed) do
+    UpdateButton(view, view:ChangeButton(item))
+  end
+
+  if not slotInfo.deferDelete then
+    for slotkey, _ in pairs(view:GetDeferredItems()) do
+      local section = view:GetSlotSection(slotkey)
+      section:RemoveCell(slotkey)
+      view.itemsByBagAndSlot[slotkey]:Wipe()
+      view:RemoveSlotSection(slotkey)
+    end
+    view:ClearDeferredItems()
   end
 
   for sectionName, section in pairs(view:GetAllSections()) do
     for slotkey, _ in pairs(section:GetAllCells()) do
-      local data = view.itemsByBagAndSlot[slotkey].data
+      local data = view.itemsByBagAndSlot[slotkey]:GetItemData()
       if data.isItemEmpty or data.stackedOn ~= nil then
         section:RemoveCell(slotkey)
         view.itemsByBagAndSlot[slotkey]:Wipe()
@@ -111,12 +173,7 @@ local function ListView(view, bag, slotInfo)
       section:Draw(bag.kind, database:GetBagView(bag.kind), bag.slots:IsShown())
     end
   end
-  --[[
-  for _, item in pairs(view.itemsByBagAndSlot) do
-    -- TODO(lobato): Implement UpdateCount
-    --item:UpdateCount()
-  end
-  ]]--
+
   view.content.maxCellWidth = 1
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.LIST))
   local w, h = view.content:Draw()
@@ -148,7 +205,7 @@ function views:NewList(parent, kind)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
   view.Render = ListView
-  view.Wipe = Wipe
+  view.WipeHandler = Wipe
   view.UpdateListSize = UpdateListSize
   return view
 end

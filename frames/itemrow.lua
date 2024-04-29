@@ -22,6 +22,9 @@ local debug = addon:GetModule('Debug')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')
 
@@ -40,16 +43,35 @@ end
 function item.itemRowProto:Lock()
 end
 
+function item.itemRowProto:GetItemData()
+  return self.button:GetItemData()
+end
+
+---@param data ItemData
+function item.itemRowProto:SetStaticItemFromData(data)
+  self:SetItemFromData(data, true)
+end
+
 ---@param slotkey string
 function item.itemRowProto:SetItem(slotkey)
-  self.slotkey = slotkey
+  local data = items:GetItemDataFromSlotKey(slotkey)
+  self:SetItemFromData(data)
+end
+
+---@param data ItemData
+---@param static? boolean
+function item.itemRowProto:SetItemFromData(data, static)
+  self.slotkey = data.slotkey
   self.button:SetSize(20, 20)
   self.button:GetItemData()
-  self.button:SetItem(slotkey)
+  if static then
+    self.button:SetStaticItemFromData(data)
+  else
+    self.button:SetItemFromData(data)
+  end
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
 
-  local data = self.button:GetItemData()
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
     self.rowButton:SetID(slotid)

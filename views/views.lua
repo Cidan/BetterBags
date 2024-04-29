@@ -97,11 +97,12 @@ end
 -- GetOrCreateItemButton will get an existing item button by slotkey,
 -- creating it if it doesn't exist.
 ---@param slotkey string
+---@param createFunc? fun(): Item|ItemRow
 ---@return Item
-function views.viewProto:GetOrCreateItemButton(slotkey)
+function views.viewProto:GetOrCreateItemButton(slotkey, createFunc)
   local item = self.itemsByBagAndSlot[slotkey]
   if item == nil then
-    item = self:GetItemFrame()
+    item = self:GetItemFrame(createFunc)
     self.itemsByBagAndSlot[slotkey] = item
   end
   return item
@@ -159,10 +160,11 @@ function views.viewProto:ParseSlotKey(slotkey)
   return tonumber(bagid) --[[@as number]], tonumber(slotid) --[[@as number]]
 end
 
+---@param createFunc? fun(): Item
 ---@return Item
-function views.viewProto:GetItemFrame()
+function views.viewProto:GetItemFrame(createFunc)
   self.itemFrames = self.itemFrames or {}
-  local i = itemFrame:Create()
+  local i = createFunc and createFunc() or itemFrame:Create()
   tinsert(self.itemFrames, i)
   return i
 end

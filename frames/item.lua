@@ -44,6 +44,7 @@ local debug = addon:GetModule('Debug')
 ---@field frame Frame
 ---@field button ItemButton|Button
 ---@field slotkey string
+---@field staticData ItemData
 ---@field stacks table<string, ItemData>
 ---@field stackCount number
 ---@field stackid number
@@ -205,6 +206,8 @@ function itemFrame.itemProto:ToggleLock()
 end
 
 function itemFrame.itemProto:SetLock(lock)
+  if not self.slotkey then return end
+  if not self.kind then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if data.isItemEmpty or data.basic then return end
   if lock then
@@ -255,6 +258,8 @@ function itemFrame.itemProto:ShowItemLevel()
 end
 
 function itemFrame.itemProto:DrawItemLevel()
+  if not self.slotkey then return end
+  if not self.kind then return end
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
   local mergeOpts = database:GetStackingOptions(self.kind)
   local data = items:GetItemDataFromSlotKey(self.slotkey)
@@ -285,22 +290,40 @@ function itemFrame.itemProto:DrawItemLevel()
 end
 
 function itemFrame.itemProto:UpdateCount()
+  if not self.slotkey then return end
+  if not self.kind then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if not data or data.isItemEmpty then return end
   local count = data.stackedCount or data.itemInfo.currentItemCount
   SetItemButtonCount(self.button, count)
 end
 
+---@return ItemData
 function itemFrame.itemProto:GetItemData()
+  if self.staticData then
+    return self.staticData
+  end
   return items:GetItemDataFromSlotKey(self.slotkey)
+end
+
+---@param data ItemData
+function itemFrame.itemProto:SetStaticItemFromData(data)
+  self.staticData = data
+  self:SetItemFromData(data)
 end
 
 ---@param slotkey string
 function itemFrame.itemProto:SetItem(slotkey)
   assert(slotkey, 'item must be provided')
-  self.slotkey = slotkey
   local data = items:GetItemDataFromSlotKey(slotkey)
-  local tooltipOwner = GameTooltip:GetOwner();
+  self:SetItemFromData(data)
+end
+
+---@param data ItemData
+function itemFrame.itemProto:SetItemFromData(data)
+  assert(data, 'data must be provided')
+  self.slotkey = data.slotkey
+  local tooltipOwner = GameTooltip:GetOwner()
   local bagid, slotid = data.bagid, data.slotid
   if bagid and slotid then
     self.button:SetID(slotid)
@@ -494,6 +517,7 @@ function itemFrame.itemProto:ClearItem()
   self.isFreeSlot = false
   self.freeSlotName = ""
   self.freeSlotCount = 0
+  self.staticData = nil
   self.button.UpgradeIcon:SetShown(false)
 end
 
