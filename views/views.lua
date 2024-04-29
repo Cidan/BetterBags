@@ -221,6 +221,11 @@ function views.viewProto:UpdateListSize(bag)
   _ = bag
 end
 
+-- RemoveButton removes an item from a stack if it's in a stack,
+-- promoting the first sub item to the main item if the item was the main item.
+-- If the stack is empty after removal, the stack is removed.
+-- Returns the slotkey of the main stack view item if the item was removed from a stack, or nil if
+-- the item was not in a stack.
 ---@param item ItemData
 ---@return string?
 function views.viewProto:RemoveButton(item)
