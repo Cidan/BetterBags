@@ -389,21 +389,13 @@ function items:LoadItems(kind, dataCache)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
     elseif items:ItemHashChanged(currentItem, previousItem) then
       debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
-      --slotInfo.removedItems[previousItem.slotkey] = previousItem
-      --slotInfo.addedItems[currentItem.slotkey] = currentItem
-      if slotInfo.swappedItems[previousItem.itemInfo.itemGUID] then
-        slotInfo.swappedItems[previousItem.itemInfo.itemGUID].b = currentItem.slotkey
-      else
-        slotInfo.swappedItems[currentItem.itemInfo.itemGUID] = {a = currentItem.slotkey}
-      end
+      slotInfo.removedItems[previousItem.slotkey] = previousItem
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
     elseif items:ItemChanged(currentItem, previousItem) then
       debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
       slotInfo.updatedItems[currentItem.slotkey] = currentItem
     end
 
-    --if items:HasItemChanged(currentItem, previousItem) then
-    --  table.insert(slotInfo.dirtyItems, currentItem)
-    --end
 
     -- Store empty slot data
     if currentItem.isItemEmpty then

@@ -120,7 +120,7 @@ local function GridView(view, bag, slotInfo)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
   view.content.compactStyle = database:GetBagCompaction(bag.kind)
 
-  local added, removed, changed, swapped = slotInfo:GetChangeset()
+  local added, removed, changed = slotInfo:GetChangeset()
 
   for _, item in pairs(removed) do
     local newSlotKey = view:RemoveButton(item)
@@ -141,10 +141,6 @@ local function GridView(view, bag, slotInfo)
     else
       UpdateButton(view, updateKey)
     end
-  end
-
-  for _, swapset in pairs(swapped) do
-    print("swapped", swapset.a, swapset.b)
   end
 
   for _, item in pairs(changed) do

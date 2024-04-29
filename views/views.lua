@@ -294,20 +294,6 @@ function views.viewProto:GetStack(itemHash)
   return self.stacks[itemHash]
 end
 
----@param swapset SwapSet
-function views.viewProto:SwapItems(swapset)
-  if swapset.a ~= nil and swapset.b ~= nil then
-    local stackA = self.stacks[swapset.a]
-    local stackB = self.stacks[swapset.b] --[[@as Stack]]
-    if stackA and stackB then
-      stackA:RemoveItem(swapset.a, self)
-      stackB:RemoveItem(swapset.b, self)
-      stackA:AddItem(swapset.b)
-      stackB:AddItem(swapset.a)
-    end
-  end
-end
-
 ---@return View
 function views:NewBlankView()
   local view = setmetatable({

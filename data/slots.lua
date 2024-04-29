@@ -27,7 +27,6 @@ local items = addon:GetModule('Items')
 ---@field addedItems table<string, ItemData> A list of items that were added since the last refresh.
 ---@field removedItems table<string, ItemData> A list of items that were removed since the last refresh.
 ---@field updatedItems table<string, ItemData> A list of items that were updated since the last refresh.
----@field swappedItems table<string, SwapSet> A list of items that were swapped since the last refresh.
 local SlotInfo = {}
 
 function items:NewSlotInfo()
@@ -42,7 +41,6 @@ function items:NewSlotInfo()
       addedItems = {},
       removedItems = {},
       updatedItems = {},
-      swappedItems = {},
       deferDelete = false
     }, {__index = SlotInfo})
 end
@@ -71,9 +69,9 @@ function SlotInfo:GetPreviousItems()
   return self.previousItemsBySlotKey
 end
 
----@return ItemData[], ItemData[], ItemData[], table<string, SwapSet>
+---@return ItemData[], ItemData[], ItemData[]
 function SlotInfo:GetChangeset()
-  return self.addedItems, self.removedItems, self.updatedItems, self.swappedItems
+  return self.addedItems, self.removedItems, self.updatedItems
 end
 
 ---@param newItems table<string, ItemData>
