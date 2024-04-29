@@ -303,7 +303,7 @@ function items:ItemChanged(newData, oldData)
   end
 
   -- Item is no longer in the recent items category.
-  if oldData and oldData.itemInfo and oldData.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(oldData) then
+  if oldData and oldData.itemInfo and oldData.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(oldData.slotkey) then
     return true
   end
 
@@ -476,11 +476,12 @@ function items:GetItemData(itemList, callback)
   end)
 end
 
----@param data ItemData
+---@param slotkey string
 ---@return boolean
-function items:IsNewItem(data)
-  if not data then return false end
-  if data.isItemEmpty then return false end
+function items:IsNewItem(slotkey)
+  if not slotkey then return false end
+  local data = self:GetItemDataFromSlotKey(slotkey)
+  if not data or data.isItemEmpty then return false end
   if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
     C_NewItems.IsNewItem(data.bagid, data.slotid) then
     return true
@@ -489,9 +490,10 @@ function items:IsNewItem(data)
   return false
 end
 
----@param data ItemData
-function items:ClearNewItem(data)
-  if not data then return end
+---@param slotkey string
+function items:ClearNewItem(slotkey)
+  if not slotkey then return end
+  local data = self:GetItemDataFromSlotKey(slotkey)
   if data.isItemEmpty then return end
   C_NewItems.RemoveNewItem(data.bagid, data.slotid)
   self._newItemTimers[data.itemInfo.itemGUID] = nil
@@ -615,7 +617,7 @@ function items:GetCategory(data)
   if data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(data.kind, "RecentItems") then
-    if items:IsNewItem(data) then
+    if items:IsNewItem(data.slotkey) then
       return L:G("Recent Items")
     end
   end
