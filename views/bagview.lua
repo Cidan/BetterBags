@@ -66,6 +66,59 @@ local function GetBagName(bagid)
 
 end
 
+-- ClearButton clears a button and makes it empty while preserving the slot,
+-- but does not release it, while also adding it to the deferred items list.
+---@param view View
+---@param item ItemData
+local function ClearButton(view, item)
+  local cell = view.itemsByBagAndSlot[item.slotkey]
+  local bagid, slotid = view:ParseSlotKey(item.slotkey)
+  cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  view:AddDeferredItem(item.slotkey)
+  addon:GetBagFromBagID(bagid).drawOnClose = true
+end
+
+-- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
+-- button position and section to prevent a sort from happening.
+---@param view View
+---@param oldSlotKey string
+---@param newSlotKey string
+local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
+  local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
+  local oldSlotSection = view:GetSlotSection(oldSlotKey)
+  oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
+  oldSlotCell:SetItem(newSlotKey)
+  view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
+  view.itemsByBagAndSlot[oldSlotKey] = nil
+  view:SetSlotSection(newSlotKey, oldSlotSection)
+  view:RemoveSlotSection(oldSlotKey)
+end
+
+-- CreateButton creates a button for an item and adds it to the view.
+---@param view View
+---@param item ItemData
+local function CreateButton(view, item)
+  debug:Log("CreateButton", "Creating button for item", item.slotkey)
+  view:RemoveDeferredItem(item.slotkey)
+  local oldSection = view:GetSlotSection(item.slotkey)
+  if oldSection then
+    oldSection:RemoveCell(item.slotkey)
+  end
+  local itemButton = view:GetOrCreateItemButton(item.slotkey)
+  itemButton:SetItem(item.slotkey)
+  local section = view:GetOrCreateSection(GetBagName(item.bagid))
+  section:AddCell(itemButton:GetItemData().slotkey, itemButton)
+  view:SetSlotSection(itemButton:GetItemData().slotkey, section)
+end
+
+---@param view View
+---@param slotkey string
+local function UpdateButton(view, slotkey)
+  view:RemoveDeferredItem(slotkey)
+  local itemButton = view:GetOrCreateItemButton(slotkey)
+  itemButton:SetItem(slotkey)
+end
+
 ---@param view View
 ---@param oldSlotKey string
 ---@param newSlotKey? string
@@ -112,24 +165,27 @@ local function BagView(view, bag, slotInfo)
   local added, removed, changed = slotInfo:GetChangeset()
 
   for _, item in pairs(removed) do
-    view:RemoveButton(item)
+    local newSlotKey = view:RemoveButton(item)
+    if not newSlotKey then
+      ClearButton(view, item)
+    else
+      UpdateDeletedSlot(view, item.slotkey, newSlotKey)
+    end
   end
 
-  view:ProcessStacks()
 
   for _, item in pairs(added) do
-    local itemButton = view:AddButton(item)
-    if itemButton then
-      local section = view:GetOrCreateSection(GetBagName(item.bagid))
-      section:AddCell(itemButton:GetItemData().slotkey, itemButton)
+    local updateKey = view:AddButton(item)
+    if not updateKey then
+      CreateButton(view, item)
+    else
+      UpdateButton(view, updateKey)
     end
   end
 
   for _, item in pairs(changed) do
-    view:ChangeButton(item)
+    UpdateButton(view, view:ChangeButton(item))
   end
-
-  view:ProcessStacks()
 
   for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
     for slotid, data in pairs(emptyBagData) do
