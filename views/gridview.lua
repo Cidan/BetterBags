@@ -179,13 +179,6 @@ local function GridView(view, bag, slotInfo)
   end
 
   for _, swapset in pairs(swapped) do
-    -- If swapset.a is set but not b, this means the item
-    -- hash changed, i.e. it was enchanted or similar.
-    if swapset.a and not swapset.b then
-      local data = items:GetItemDataFromSlotKey(swapset.a)
-      local stack = view:GetStack(data.itemHash)
-
-    end
     print("swapped", swapset.a, swapset.b)
   end
 
