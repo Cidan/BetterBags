@@ -178,6 +178,14 @@ end
 ---@return ItemRow
 function item:_DoCreate()
   local i = setmetatable({}, { __index = item.itemRowProto })
+
+  -- Backwards compatibility for item data.
+  i.data = setmetatable({}, { __index = function(_, key)
+    local d = i.button:GetItemData()
+    if d == nil then return nil end
+    return i.button:GetItemData()[key]
+  end})
+
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsRowItemButton%d", buttonCount)
