@@ -63,7 +63,6 @@ end
 function item.itemRowProto:SetItemFromData(data, static)
   self.slotkey = data.slotkey
   self.button:SetSize(20, 20)
-  self.button:GetItemData()
   if static then
     self.button:SetStaticItemFromData(data)
   else

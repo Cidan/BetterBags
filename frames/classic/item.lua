@@ -65,11 +65,10 @@ function itemFrame.itemProto:SetSize(width, height)
   self.IconTexture:SetSize(width, height)
 end
 
----@param slotkey string
-function itemFrame.itemProto:SetItem(slotkey)
-  assert(slotkey, 'item must be provided')
-  self.slotkey = slotkey
-  local data = items:GetItemDataFromSlotKey(slotkey)
+---@param data ItemData
+function itemFrame.itemProto:SetItemFromData(data)
+  assert(data, 'data must be provided')
+  self.slotkey = data.slotkey
   --local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
   if bagid ~= nil and slotid ~= nil then
@@ -112,7 +111,7 @@ function itemFrame.itemProto:SetItem(slotkey)
   self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
   self.button.IconBorder:SetBlendMode("BLEND")
   self.button.IconBorder:Show()
-  SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
+  self:UpdateCount()
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self.IconQuestTexture:Hide()
   self:SetLock(data.itemInfo.isLocked)
@@ -232,6 +231,7 @@ function itemFrame.itemProto:ClearItem()
   self.freeSlotCount = 0
   self.isFreeSlot = nil
   self.slotkey = ""
+  self.staticData = nil
   self:UpdateCooldown()
 end
 
