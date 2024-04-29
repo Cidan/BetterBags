@@ -224,13 +224,13 @@ function views.viewProto:UpdateListSize(bag)
 end
 
 ---@param item ItemData
+---@return string?
 function views.viewProto:RemoveButton(item)
   local stack = self.stacks[item.itemHash]
   if not stack then
-    self:ReindexSlot(item.slotkey)
-    return
+    return nil
   end
-  stack:MarkDirty()
+  return stack:RemoveItem(item.slotkey)
 end
 
 ---@param item ItemData
@@ -317,6 +317,20 @@ function views.viewProto:GetStack(itemHash)
   return self.stacks[itemHash]
 end
 
+---@param swapset SwapSet
+function views.viewProto:SwapItems(swapset)
+  if swapset.a ~= nil and swapset.b ~= nil then
+    local stackA = self.stacks[swapset.a]
+    local stackB = self.stacks[swapset.b] --[[@as Stack]]
+    if stackA and stackB then
+      stackA:RemoveItem(swapset.a, self)
+      stackB:RemoveItem(swapset.b, self)
+      stackA:AddItem(swapset.b)
+      stackB:AddItem(swapset.a)
+    end
+  end
+end
+
 ---@return View
 function views:NewBlankView()
   local view = setmetatable({
@@ -344,34 +358,54 @@ end
 
 ---@param slotkey string
 function stackProto:AddItem(slotkey)
-  self.subItems[slotkey] = true
-end
-
----@param slotkey string
----@param view View
-function stackProto:RemoveItem(slotkey, view)
-  if self.item == slotkey then
-    self:Promote(view)
+  if self.item == nil then
+    self.item = slotkey
   else
-    self.subItems[slotkey] = nil
+    self.subItems[slotkey] = true
   end
 end
 
----@param view View
-function stackProto:Promote(view)
+-- RemoveItem removes an item from the stack. If the item was the main item,
+-- the first sub item is promoted to the main item. If the item was a sub item,
+-- it is removed from the stack. Returns the slotkey of the main item, or nil if the
+-- stack is now empty.
+---@param slotkey string
+---@return string?
+function stackProto:RemoveItem(slotkey)
+  if self.item == slotkey then
+    self.item = nil
+    local nextkey = next(self.subItems)
+    if nextkey then
+      self.item = nextkey
+      self.subItems[nextkey] = nil
+      self:UpdateCount()
+      return nextkey
+    end
+    return nil
+  end
+
+  assert(self.subItems[slotkey], "Slotkey not found in stack")
+
+  self.subItems[slotkey] = nil
+  self:UpdateCount()
+  return slotkey
+end
+
+function stackProto:Promote()
   --TODO(lobato): Handle when there are no more items to promote, i.e. delete.
   --TODO(lobato): test delete case
   local slotkey = next(self.subItems)
   if slotkey then
-    local oldSlotKey = self.item
+    --local oldSlotKey = self.item
     self.item = slotkey
     self.subItems[slotkey] = nil
-    self:UpdateCount()
-    view:ReindexSlot(oldSlotKey, slotkey)
-    view.itemsByBagAndSlot[slotkey] = view.itemsByBagAndSlot[oldSlotKey]
-    view.itemsByBagAndSlot[oldSlotKey] = nil
+    --self:UpdateCount()
+    --view:ReindexSlot(oldSlotKey, slotkey)
+    --view.itemsByBagAndSlot[slotkey] = view.itemsByBagAndSlot[oldSlotKey]
+    --view.itemsByBagAndSlot[oldSlotKey] = nil
   else
-    view:ReindexSlot(self.item)
+    --view:ReindexSlot(self.item)
+    --view.itemsByBagAndSlot[self.item] = nil
     self.item = nil
   end
 end
@@ -413,14 +447,14 @@ function stackProto:Process(view)
   local data = items:GetItemDataFromSlotKey(self.item)
   local opts = database:GetStackingOptions(view.kind)
   if data.itemHash ~= self.hash then
-    self:Promote(view)
+    self:Promote()
     return
   end
   -- TODO(lobato): fix don't merge partial here.
   self:UpdateCount()
   if (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount) and self:HasAnySubItems() then
     local newSlot = self.item
-    self:Promote(view)
+    self:Promote()
     -- TODO(lobato): Move stackedCount out of the data object.
     data.stackedCount = nil
     view:AddSlot(newSlot)

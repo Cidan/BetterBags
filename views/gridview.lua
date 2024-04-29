@@ -55,48 +55,74 @@ local function Wipe(view)
   wipe(view.itemsByBagAndSlot)
 end
 
+-- ClearButton clears a button and makes it empty while preserving the slot,
+-- but does not release it, while also adding it to the deferred items list.
+---@param view View
+---@param item ItemData
+local function ClearButton(view, item)
+  local cell = view.itemsByBagAndSlot[item.slotkey]
+  local bagid, slotid = view:ParseSlotKey(item.slotkey)
+  cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  view:AddDeferredItem(item.slotkey)
+  --view:RemoveSlotSection(item.slotkey)
+  addon:GetBagFromBagID(bagid).drawOnClose = true
+end
+
+-- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
+-- button position and section to prevent a sort from happening.
 ---@param view View
 ---@param oldSlotKey string
----@param newSlotKey? string
-local function ReindexSlot(view, oldSlotKey, newSlotKey)
-  local cell = view.itemsByBagAndSlot[oldSlotKey] --[[@as Item]]
-  local data = cell:GetItemData()
-  if newSlotKey then
-    local oldSection = view:GetSlotSection(oldSlotKey)
-    local newSection = view:GetSlotSection(newSlotKey)
-    if newSection == nil then
-      newSection = view:GetOrCreateSection(data.itemInfo.category)
-    end
-    if oldSection == newSection then
-      oldSection:RekeyCell(oldSlotKey, newSlotKey)
-    else
-      oldSection:RemoveCell(oldSlotKey)
-      newSection:AddCell(newSlotKey, cell)
-      view:RemoveSlotSection(oldSlotKey)
-    end
-    cell:SetItem(newSlotKey)
-  else
-    if data and not data.isItemEmpty then
-      local slotKeyCat = view:GetSlotSection(oldSlotKey).title:GetText()
-      local dataCat = data.itemInfo.category
-      if slotKeyCat ~= dataCat then
-        local oldSection = view:GetSlotSection(oldSlotKey)
-        local newSection = view:GetOrCreateSection(dataCat)
-        oldSection:RemoveCell(oldSlotKey)
-        newSection:AddCell(oldSlotKey, cell)
-        view:RemoveSlotSection(oldSlotKey)
-        view:SetSlotSection(oldSlotKey, newSection)
-      end
-    else
-      local bagid, slotid = view:ParseSlotKey(oldSlotKey)
-      cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
-      view:AddDeferredItem(oldSlotKey)
-      view:RemoveSlotSection(oldSlotKey)
-      addon:GetBagFromBagID(bagid).drawOnClose = true
-    end
-    -- TODO(lobato): Add deferred sections 
-  end
+---@param newSlotKey string
+local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
+  local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
+  local oldSlotSection = view:GetSlotSection(oldSlotKey)
+  oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
+  oldSlotCell:SetItem(newSlotKey)
+  view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
+  view.itemsByBagAndSlot[oldSlotKey] = nil
+  view:SetSlotSection(newSlotKey, oldSlotSection)
+  view:RemoveSlotSection(oldSlotKey)
 end
+
+--local function ReindexSlot(view, oldSlotKey, newSlotKey)
+--  local cell = view.itemsByBagAndSlot[oldSlotKey] --[[@as Item]]
+--  local data = cell:GetItemData()
+--  if newSlotKey then
+--    local oldSection = view:GetSlotSection(oldSlotKey)
+--    local newSection = view:GetSlotSection(newSlotKey)
+--    if newSection == nil then
+--      newSection = view:GetOrCreateSection(data.itemInfo.category)
+--    end
+--    if oldSection == newSection then
+--      oldSection:RekeyCell(oldSlotKey, newSlotKey)
+--    else
+--      oldSection:RemoveCell(oldSlotKey)
+--      newSection:AddCell(newSlotKey, cell)
+--      view:RemoveSlotSection(oldSlotKey)
+--    end
+--    cell:SetItem(newSlotKey)
+--  else
+--    if data and not data.isItemEmpty then
+--      local slotKeyCat = view:GetSlotSection(oldSlotKey).title:GetText()
+--      local dataCat = data.itemInfo.category
+--      if slotKeyCat ~= dataCat then
+--        local oldSection = view:GetSlotSection(oldSlotKey)
+--        local newSection = view:GetOrCreateSection(dataCat)
+--        oldSection:RemoveCell(oldSlotKey)
+--        newSection:AddCell(oldSlotKey, cell)
+--        view:RemoveSlotSection(oldSlotKey)
+--        view:SetSlotSection(oldSlotKey, newSection)
+--      end
+--    else
+--      local bagid, slotid = view:ParseSlotKey(oldSlotKey)
+--      cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+--      view:AddDeferredItem(oldSlotKey)
+--      view:RemoveSlotSection(oldSlotKey)
+--      addon:GetBagFromBagID(bagid).drawOnClose = true
+--    end
+--    -- TODO(lobato): Add deferred sections 
+--  end
+--end
 --local stacks = {}
 
 ---@param view View
@@ -113,9 +139,15 @@ local function GridView(view, bag, slotInfo)
   local added, removed, changed, swapped = slotInfo:GetChangeset()
 
   for _, item in pairs(removed) do
-    view:RemoveButton(item)
+    local newSlotKey = view:RemoveButton(item)
+
+    -- Clear if the item is empty, otherwise reindex it.
+    if not newSlotKey then
+      ClearButton(view, item)
+    else
+      UpdateDeletedSlot(view, item.slotkey, newSlotKey)
+    end
   end
-  view:ProcessStacks()
 
   for _, item in pairs(added) do
     local itemButton = view:AddButton(item)
@@ -129,6 +161,13 @@ local function GridView(view, bag, slotInfo)
   view:ProcessStacks()
 
   for _, swapset in pairs(swapped) do
+    -- If swapset.a is set but not b, this means the item
+    -- hash changed, i.e. it was enchanted or similar.
+    if swapset.a and not swapset.b then
+      local data = items:GetItemDataFromSlotKey(swapset.a)
+      local stack = view:GetStack(data.itemHash)
+
+    end
     print("swapped", swapset.a, swapset.b)
   end
 
@@ -138,7 +177,7 @@ local function GridView(view, bag, slotInfo)
 
   view:ProcessStacks()
 
-  if not view.defer then
+  if not slotInfo.deferDelete then
     for slotkey, _ in pairs(view:GetDeferredItems()) do
       local section = view:GetSlotSection(slotkey)
       section:RemoveCell(slotkey)
@@ -150,7 +189,7 @@ local function GridView(view, bag, slotInfo)
   debug:StartProfile('Section Draw Stage')
   for sectionName, section in pairs(view:GetAllSections()) do
       -- Remove the section if it's empty, otherwise draw it.
-    if not view.defer then
+    if not slotInfo.deferDelete then
       if section:GetCellCount() == 0 then
         debug:Log("RemoveSection", "Removed because empty", sectionName)
         view:RemoveSection(sectionName)
@@ -186,7 +225,7 @@ local function GridView(view, bag, slotInfo)
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
 
-  if not view.defer then
+  if not slotInfo.deferDelete then
     debug:StartProfile('Content Draw Stage')
     local w, h = view.content:Draw()
     debug:EndProfile('Content Draw Stage')
@@ -225,6 +264,5 @@ function views:NewGrid(parent, kind)
   view.content:Hide()
   view.Render = GridView
   view.WipeHandler = Wipe
-  view.ReindexSlot = ReindexSlot
   return view
 end
