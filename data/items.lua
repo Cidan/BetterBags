@@ -331,6 +331,37 @@ function items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   return bagid .. '_' .. slotid
 end
 
+-- UpdateFreeSlots updates the current free slot count for a given bag kind.
+---@param kind BagKind
+function items:UpdateFreeSlots(kind)
+  local baglist = kind == const.BAG_KIND.BANK and const.BANK_BAGS or const.BACKPACK_BAGS
+  for bagid in pairs(baglist) do
+    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
+    local name = ""
+    local invid = C_Container.ContainerIDToInventoryID(bagid)
+    local baglink = GetInventoryItemLink("player", invid)
+    if baglink ~= nil and invid ~= nil then
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      name = GetItemSubClassInfo(class, subclass)
+    else
+      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+    end
+    if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
+      -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
+      -- There are 4 extra slots in the bank bag in Classic that should not
+      -- exist. This is a Blizzard bug.
+      if addon.isClassic then
+        freeSlots = freeSlots - 4
+      end
+    end
+
+    if bagid ~= Enum.BagIndex.Keyring then
+      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] or 0
+      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] + freeSlots
+    end
+  end
+end
+
 --- LoadItems will load all items in a given bag kind and update the item database.
 ---@private
 ---@param kind BagKind
@@ -339,17 +370,15 @@ function items:LoadItems(kind, dataCache)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(dataCache)
+  self:UpdateFreeSlots(kind)
   local slotInfo = self.slotInfo[kind]
 
-  ---@type table<number, boolean>
-  local processedBags = {}
   -- Loop through all the items in the bag and update slot info properties.
   for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
-    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
-    local previousItem = slotInfo:GetPreviousItemByBagAndSlot(bagid, slotid)
     local name = ""
+    local previousItem = slotInfo:GetPreviousItemByBagAndSlot(bagid, slotid)
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
 
@@ -359,26 +388,6 @@ function items:LoadItems(kind, dataCache)
     else
       name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
     end
-
-    -- Process bag free slots.
-    if not processedBags[bagid] then
-      if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
-        -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
-        -- There are 4 extra slots in the bank bag in Classic that should not
-        -- exist. This is a Blizzard bug.
-        if addon.isClassic then
-          freeSlots = freeSlots - 4
-        end
-      end
-
-      if bagid ~= Enum.BagIndex.Keyring then
-        slotInfo.emptySlots[name] = slotInfo.emptySlots[name] or 0
-        slotInfo.emptySlots[name] = slotInfo.emptySlots[name] + freeSlots
-      end
-
-      processedBags[bagid] = true
-    end
-    -- End Process Bag Free Slots
 
     -- Process item changes.
     if items:ItemAdded(currentItem, previousItem) then

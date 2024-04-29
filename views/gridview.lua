@@ -179,13 +179,13 @@ local function GridView(view, bag, slotInfo)
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
   for name, freeSlotCount in pairs(slotInfo.emptySlots) do
     if slotInfo.freeSlotKeys[name] ~= nil then
-      local itemButton = view.itemsByBagAndSlot[name]
-      if itemButton == nil then
-        itemButton = itemFrame:Create()
-        view.itemsByBagAndSlot[name] = itemButton
-      end
+      local itemButton = view:GetOrCreateItemButton(name)
       local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
       itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
+      freeSlotsSection:AddCell(name, itemButton)
+    else
+      local itemButton = view:GetOrCreateItemButton(name)
+      itemButton:SetFreeSlots(-1, -1, freeSlotCount, name)
       freeSlotsSection:AddCell(name, itemButton)
     end
   end
