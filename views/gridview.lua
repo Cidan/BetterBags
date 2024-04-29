@@ -139,7 +139,6 @@ local function GridView(view, bag, slotInfo)
     if not updateKey then
       CreateButton(view, item)
     else
-      items:ClearNewItem(item.slotkey)
       UpdateButton(view, updateKey)
     end
   end
