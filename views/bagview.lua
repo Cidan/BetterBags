@@ -119,27 +119,6 @@ local function UpdateButton(view, slotkey)
   itemButton:SetItem(slotkey)
 end
 
----@param view View
----@param oldSlotKey string
----@param newSlotKey? string
-local function ReindexSlot(view, oldSlotKey, newSlotKey)
-  local cell = view.itemsByBagAndSlot[oldSlotKey] --[[@as Item]]
-  local oldBagid = view:ParseSlotKey(oldSlotKey)
-  if newSlotKey then
-    local newBagid = view:ParseSlotKey(newSlotKey)
-    local oldSection = view:GetOrCreateSection(GetBagName(oldBagid))
-    local newSection = view:GetOrCreateSection(GetBagName(newBagid))
-    oldSection:RemoveCell(oldSlotKey)
-    newSection:AddCell(newSlotKey, cell)
-    cell:SetItem(newSlotKey)
-  else
-    -- If the slot is being removed, mark it as removed.
-    local bagid, slotid = view:ParseSlotKey(oldSlotKey)
-    cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
-    addon:GetBagFromBagID(bagid).drawOnClose = true
-  end
-end
-
 
 ---@param view View
 ---@param newSlotKey string
@@ -259,7 +238,6 @@ function views:NewBagView(parent, kind)
   view.content:Hide()
   view.Render = BagView
   view.WipeHandler = Wipe
-  view.ReindexSlot = ReindexSlot
   view.AddSlot = AddSlot
 
   return view

@@ -45,29 +45,47 @@ local function Wipe(view)
   wipe(view.itemsByBagAndSlot)
 end
 
+-- ClearButton clears a button and makes it empty while preserving the slot,
+-- but does not release it, while also adding it to the deferred items list.
 ---@param view View
----@param oldSlotKey string
----@param newSlotKey? string
-local function ReindexSlot(view, oldSlotKey, newSlotKey)
-  local cell = view.content:GetCell(oldSlotKey) --[[@as Item]]
-  if newSlotKey then
-    view.content:RekeyCell(oldSlotKey, newSlotKey)
-    cell:SetItem(newSlotKey)
-  else
-    -- If the slot is being removed, mark it as removed.
-    local bagid, slotid = view:ParseSlotKey(oldSlotKey)
-    cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
-    view:AddDeferredItem(oldSlotKey)
-    addon:GetBagFromBagID(bagid).drawOnClose = true
-  end
+---@param item ItemData
+local function ClearButton(view, item)
+  local cell = view.itemsByBagAndSlot[item.slotkey]
+  local bagid, slotid = view:ParseSlotKey(item.slotkey)
+  cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  view:AddDeferredItem(item.slotkey)
+  addon:GetBagFromBagID(bagid).drawOnClose = true
+end
+
+-- CreateButton creates a button for an item and adds it to the view.
+---@param view View
+---@param item ItemData
+local function CreateButton(view, item)
+  debug:Log("CreateButton", "Creating button for item", item.slotkey)
+  view:RemoveDeferredItem(item.slotkey)
+  local itemButton = view:GetOrCreateItemButton(item.slotkey)
+  itemButton:SetItem(item.slotkey)
+  view.content:AddCell(item.slotkey, itemButton)
 end
 
 ---@param view View
+---@param slotkey string
+local function UpdateButton(view, slotkey)
+  view:RemoveDeferredItem(slotkey)
+  local itemButton = view:GetOrCreateItemButton(slotkey)
+  itemButton:SetItem(slotkey)
+end
+
+-- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
+-- button position and section to prevent a sort from happening.
+---@param view View
+---@param oldSlotKey string
 ---@param newSlotKey string
-local function AddSlot(view, newSlotKey)
-  local itemButton = view:GetOrCreateItemButton(newSlotKey)
-  itemButton:SetItem(newSlotKey)
-  view.content:AddCell(newSlotKey, itemButton)
+local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
+  local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
+  oldSlotCell:SetItem(newSlotKey)
+  view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
+  view.itemsByBagAndSlot[oldSlotKey] = nil
 end
 
 ---@param view View
@@ -85,29 +103,30 @@ local function OneBagView(view, bag, slotInfo)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
-  --- Handle removed items.
   for _, item in pairs(removed) do
-    view:RemoveButton(item)
-  end
+    local newSlotKey = view:RemoveButton(item)
 
-  -- Process deleted items right away so that state is correct for
-  -- when items are added.
-  view:ProcessStacks()
-
-  --- Handle added items.
-  for _, item in pairs(added) do
-    local itemButton = view:AddButton(item)
-    if itemButton then
-      view.content:AddCell(itemButton:GetItemData().slotkey, itemButton)
+    -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
+    -- place due to the deleted being the head of a stack.
+    if not newSlotKey then
+      ClearButton(view, item)
+    else
+      UpdateDeletedSlot(view, item.slotkey, newSlotKey)
     end
   end
 
-  --- Handle changed items.
-  for _, item in pairs(changed) do
-    view:ChangeButton(item)
+  for _, item in pairs(added) do
+    local updateKey = view:AddButton(item)
+    if not updateKey then
+      CreateButton(view, item)
+    else
+      UpdateButton(view, updateKey)
+    end
   end
 
-  view:ProcessStacks()
+  for _, item in pairs(changed) do
+    UpdateButton(view, view:ChangeButton(item))
+  end
 
   -- Get the free slots section and add the free slots to it.
   for name, freeSlotCount in pairs(slotInfo.emptySlots) do
@@ -154,7 +173,5 @@ function views:NewOneBag(parent, kind)
   view.content:Hide()
   view.Render = OneBagView
   view.WipeHandler = Wipe
-  view.ReindexSlot = ReindexSlot
-  view.AddSlot = AddSlot
   return view
 end
