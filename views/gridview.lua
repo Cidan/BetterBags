@@ -64,7 +64,6 @@ local function ClearButton(view, item)
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
   view:AddDeferredItem(item.slotkey)
-  --view:RemoveSlotSection(item.slotkey)
   addon:GetBagFromBagID(bagid).drawOnClose = true
 end
 
@@ -73,6 +72,11 @@ end
 ---@param item ItemData
 local function CreateButton(view, item)
   debug:Log("CreateButton", "Creating button for item", item.slotkey)
+  view:RemoveDeferredItem(item.slotkey)
+  local oldSection = view:GetSlotSection(item.slotkey)
+  if oldSection then
+    oldSection:RemoveCell(item.slotkey)
+  end
   local itemButton = view:GetOrCreateItemButton(item.slotkey)
   itemButton:SetItem(item.slotkey)
   local section = view:GetOrCreateSection(item.itemInfo.category)
@@ -83,8 +87,9 @@ end
 ---@param view View
 ---@param slotkey string
 local function UpdateButton(view, slotkey)
+  view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey)
-  itemButton:UpdateCount()
+  itemButton:SetItem(slotkey)
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
@@ -103,46 +108,6 @@ local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
   view:RemoveSlotSection(oldSlotKey)
 end
 
---local function ReindexSlot(view, oldSlotKey, newSlotKey)
---  local cell = view.itemsByBagAndSlot[oldSlotKey] --[[@as Item]]
---  local data = cell:GetItemData()
---  if newSlotKey then
---    local oldSection = view:GetSlotSection(oldSlotKey)
---    local newSection = view:GetSlotSection(newSlotKey)
---    if newSection == nil then
---      newSection = view:GetOrCreateSection(data.itemInfo.category)
---    end
---    if oldSection == newSection then
---      oldSection:RekeyCell(oldSlotKey, newSlotKey)
---    else
---      oldSection:RemoveCell(oldSlotKey)
---      newSection:AddCell(newSlotKey, cell)
---      view:RemoveSlotSection(oldSlotKey)
---    end
---    cell:SetItem(newSlotKey)
---  else
---    if data and not data.isItemEmpty then
---      local slotKeyCat = view:GetSlotSection(oldSlotKey).title:GetText()
---      local dataCat = data.itemInfo.category
---      if slotKeyCat ~= dataCat then
---        local oldSection = view:GetSlotSection(oldSlotKey)
---        local newSection = view:GetOrCreateSection(dataCat)
---        oldSection:RemoveCell(oldSlotKey)
---        newSection:AddCell(oldSlotKey, cell)
---        view:RemoveSlotSection(oldSlotKey)
---        view:SetSlotSection(oldSlotKey, newSection)
---      end
---    else
---      local bagid, slotid = view:ParseSlotKey(oldSlotKey)
---      cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
---      view:AddDeferredItem(oldSlotKey)
---      view:RemoveSlotSection(oldSlotKey)
---      addon:GetBagFromBagID(bagid).drawOnClose = true
---    end
---    -- TODO(lobato): Add deferred sections 
---  end
---end
---local stacks = {}
 
 ---@param view View
 ---@param bag Bag
@@ -191,6 +156,7 @@ local function GridView(view, bag, slotInfo)
       local section = view:GetSlotSection(slotkey)
       section:RemoveCell(slotkey)
       view.itemsByBagAndSlot[slotkey]:Wipe()
+      view:RemoveSlotSection(slotkey)
     end
     view:ClearDeferredItems()
   end

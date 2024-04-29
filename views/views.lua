@@ -47,7 +47,6 @@ local stackProto = {}
 ---@field fullRefresh boolean
 ---@field deferredItems table<string, boolean>
 ---@field private stacks table<string, Stack>
----@field private slotToStack table<string, Stack>
 ---@field WipeHandler fun(view: View)
 views.viewProto = {}
 
@@ -78,7 +77,6 @@ function views.viewProto:Wipe()
   self.WipeHandler(self)
   self:ClearDeferredItems()
   wipe(self.stacks)
-  wipe(self.slotToStack)
   wipe(self.slotToSection)
 end
 
@@ -230,7 +228,11 @@ function views.viewProto:RemoveButton(item)
   if not stack then
     return nil
   end
-  return stack:RemoveItem(item.slotkey)
+  local updateKey = stack:RemoveItem(item.slotkey)
+  if stack:IsStackEmpty() then
+    self.stacks[item.itemHash] = nil
+  end
+  return updateKey
 end
 
 -- AddButton adds an item to a stack if stacking options are enabled for this item.
@@ -264,7 +266,6 @@ function views.viewProto:AddButton(item)
 
   -- No stack was found, create a new stack.
   self.stacks[item.itemHash] = views:NewStack(item.slotkey)
-  self.slotToStack[item.slotkey] = self.stacks[item.itemHash]
   return nil
 end
 
@@ -280,18 +281,6 @@ function views.viewProto:ChangeButton(item)
     return stack.item
   end
   return item.slotkey
-end
-
-function views.viewProto:ProcessStacks()
-  for _, stack in pairs(self.stacks) do
-    if stack.dirty then
-      stack:Process(self)
-      if stack:IsStackEmpty() then
-        self.stacks[stack.hash] = nil
-      end
-    end
-  end
-
 end
 
 ---@param itemHash string
@@ -321,7 +310,6 @@ function views:NewBlankView()
     itemsByBagAndSlot = {},
     deferredItems = {},
     stacks = {},
-    slotToStack = {},
     slotToSection = {}
   }, {__index = views.viewProto}) --[[@as View]]
   return view
@@ -379,25 +367,6 @@ function stackProto:RemoveItem(slotkey)
   return self.item
 end
 
-function stackProto:Promote()
-  --TODO(lobato): Handle when there are no more items to promote, i.e. delete.
-  --TODO(lobato): test delete case
-  local slotkey = next(self.subItems)
-  if slotkey then
-    --local oldSlotKey = self.item
-    self.item = slotkey
-    self.subItems[slotkey] = nil
-    --self:UpdateCount()
-    --view:ReindexSlot(oldSlotKey, slotkey)
-    --view.itemsByBagAndSlot[slotkey] = view.itemsByBagAndSlot[oldSlotKey]
-    --view.itemsByBagAndSlot[oldSlotKey] = nil
-  else
-    --view:ReindexSlot(self.item)
-    --view.itemsByBagAndSlot[self.item] = nil
-    self.item = nil
-  end
-end
-
 function stackProto:UpdateCount()
   if not self.item then return end
   local itemData = items:GetItemDataFromSlotKey(self.item)
@@ -423,31 +392,6 @@ end
 ---@return ItemData
 function stackProto:GetBackingItemData()
   return items:GetItemDataFromSlotKey(self.item)
-end
-
-function stackProto:MarkDirty()
-  self.dirty = true
-end
-
----@param view View
-function stackProto:Process(view)
-  self.dirty = false
-  local data = items:GetItemDataFromSlotKey(self.item)
-  local opts = database:GetStackingOptions(view.kind)
-  if data.itemHash ~= self.hash then
-    self:Promote()
-    return
-  end
-  -- TODO(lobato): fix don't merge partial here.
-  self:UpdateCount()
-  if (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount) and self:HasAnySubItems() then
-    local newSlot = self.item
-    self:Promote()
-    -- TODO(lobato): Move stackedCount out of the data object.
-    data.stackedCount = nil
-    view:AddSlot(newSlot)
-  end
-  view:GetOrCreateItemButton(self.item):SetItem(self.item)
 end
 
 function stackProto:IsStackEmpty()
