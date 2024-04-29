@@ -389,6 +389,8 @@ function items:LoadItems(kind, dataCache)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
     elseif items:ItemHashChanged(currentItem, previousItem) then
       debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
+      --slotInfo.removedItems[previousItem.slotkey] = previousItem
+      --slotInfo.addedItems[currentItem.slotkey] = currentItem
       if slotInfo.swappedItems[previousItem.itemInfo.itemGUID] then
         slotInfo.swappedItems[previousItem.itemInfo.itemGUID].b = currentItem.slotkey
       else

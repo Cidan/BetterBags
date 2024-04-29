@@ -68,6 +68,25 @@ local function ClearButton(view, item)
   addon:GetBagFromBagID(bagid).drawOnClose = true
 end
 
+-- CreateButton creates a button for an item and adds it to the view.
+---@param view View
+---@param item ItemData
+local function CreateButton(view, item)
+  debug:Log("CreateButton", "Creating button for item", item.slotkey)
+  local itemButton = view:GetOrCreateItemButton(item.slotkey)
+  itemButton:SetItem(item.slotkey)
+  local section = view:GetOrCreateSection(item.itemInfo.category)
+  section:AddCell(itemButton:GetItemData().slotkey, itemButton)
+  view:SetSlotSection(itemButton:GetItemData().slotkey, section)
+end
+
+---@param view View
+---@param slotkey string
+local function UpdateButton(view, slotkey)
+  local itemButton = view:GetOrCreateItemButton(slotkey)
+  itemButton:UpdateCount()
+end
+
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
 -- button position and section to prevent a sort from happening.
 ---@param view View
@@ -151,15 +170,13 @@ local function GridView(view, bag, slotInfo)
   end
 
   for _, item in pairs(added) do
-    local itemButton = view:AddButton(item)
-    if itemButton then
-      local section = view:GetOrCreateSection(item.itemInfo.category)
-      section:AddCell(itemButton:GetItemData().slotkey, itemButton)
-      view:SetSlotSection(itemButton:GetItemData().slotkey, section)
+    local updateKey = view:AddButton(item)
+    if not updateKey then
+      CreateButton(view, item)
+    else
+      UpdateButton(view, updateKey)
     end
   end
-
-  view:ProcessStacks()
 
   for _, swapset in pairs(swapped) do
     -- If swapset.a is set but not b, this means the item
@@ -173,10 +190,8 @@ local function GridView(view, bag, slotInfo)
   end
 
   for _, item in pairs(changed) do
-    view:ChangeButton(item)
+    UpdateButton(view, view:ChangeButton(item))
   end
-
-  view:ProcessStacks()
 
   if not slotInfo.deferDelete then
     for slotkey, _ in pairs(view:GetDeferredItems()) do

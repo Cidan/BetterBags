@@ -233,8 +233,11 @@ function views.viewProto:RemoveButton(item)
   return stack:RemoveItem(item.slotkey)
 end
 
+-- AddButton adds an item to a stack if stacking options are enabled for this item.
+-- Returns the slotkey of the item base item if the item was added to a stack, or nil if it was
+-- added as a new item or stack.
 ---@param item ItemData
----@return Item?
+---@return string?
 function views.viewProto:AddButton(item)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
@@ -243,60 +246,40 @@ function views.viewProto:AddButton(item)
   (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
   (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
   self.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-    local itemButton = self:GetOrCreateItemButton(item.slotkey)
-    itemButton:SetItem(item.slotkey)
-    self:RemoveDeferredItem(item.slotkey)
-    return itemButton
+    return nil
   end
 
   local stack = self.stacks[item.itemHash]
 
   -- If a stack was found, update it and return the stack button.
   if stack then
-    stack:AddItem(item.slotkey)
+    local added = stack:AddItem(item.slotkey)
     stack:UpdateCount()
-    local itemButton = self:GetOrCreateItemButton(stack.item)
-    itemButton:UpdateCount()
-    debug:Log("Stacked", "Stacking", item.itemInfo.itemLink, item.slotkey, "->", stack.item)
-    return nil
+    if added then
+      return nil
+    else
+      return stack.item
+    end
   end
 
-  self:RemoveDeferredItem(item.slotkey)
   -- No stack was found, create a new stack.
-  local itemButton = self:GetOrCreateItemButton(item.slotkey)
   self.stacks[item.itemHash] = views:NewStack(item.slotkey)
   self.slotToStack[item.slotkey] = self.stacks[item.itemHash]
-  itemButton:SetItem(item.slotkey)
-
-  return itemButton
+  return nil
 end
 
+-- ChangeButton updates the item in the stack if it exists.
+-- Returns the slotkey of the item base item if the item was updated in a stack, or the slotkey
+-- of the item if it was not in a stack.
 ---@param item ItemData
+---@return string
 function views.viewProto:ChangeButton(item)
   local stack = self.stacks[item.itemHash]
-  local opts = database:GetStackingOptions(self.kind)
-
-  -- Check if we need to unstack an item.
-  if (not opts.mergeStacks) or
-  (opts.unmergeAtShop and addon.atInteracting) or
-  (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-  (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
-    if stack and stack:IsInStack(item.slotkey) then
-      stack:MarkDirty()
-    else
-      local itemButton = self:GetOrCreateItemButton(item.slotkey)
-      itemButton:SetItem(item.slotkey)
-    end
-    return
+  if stack then
+    stack:UpdateCount()
+    return stack.item
   end
-
-  -- If there's no stack, just update the item.
-  if stack == nil then
-    local itemButton = self:GetOrCreateItemButton(item.slotkey)
-    itemButton:SetItem(item.slotkey)
-    return
-  end
-  stack:MarkDirty()
+  return item.slotkey
 end
 
 function views.viewProto:ProcessStacks()
@@ -356,13 +339,18 @@ function views:NewStack(slotkey)
   }, {__index = stackProto})
 end
 
+-- AddItem adds an item to the stack. If the stack has no main item, the item is added as the main item.
+-- If the stack already has a main item, the item is added as a sub item.
+-- Returns true if the item was added as the main item, false if it was added as a sub item.
 ---@param slotkey string
+---@return boolean
 function stackProto:AddItem(slotkey)
   if self.item == nil then
     self.item = slotkey
-  else
-    self.subItems[slotkey] = true
+    return true
   end
+  self.subItems[slotkey] = true
+  return false
 end
 
 -- RemoveItem removes an item from the stack. If the item was the main item,
