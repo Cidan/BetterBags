@@ -125,16 +125,16 @@ end
 function sort.SortItemsByQualityThenAlpha(a, b)
   if a.isFreeSlot then return false end
   if b.isFreeSlot then return true end
-
-  if invalidData(a.data, b.data) then return false end
-  if a.data.itemInfo.itemQuality ~= b.data.itemInfo.itemQuality then
-    return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
-  elseif a.data.itemInfo.itemName ~= b.data.itemInfo.itemName then
-    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
-  elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
-    return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
   end
-  return a.data.itemInfo.itemGUID < b.data.itemInfo.itemGUID
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
 ---@param a Item
@@ -143,21 +143,22 @@ end
 function sort.SortItemsByAlphaThenQuality(a, b)
   if a.isFreeSlot then return false end
   if b.isFreeSlot then return true end
-
-  if invalidData(a.data, b.data) then return false end
-  if a.data.itemInfo.itemName ~= b.data.itemInfo.itemName then
-    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
-  elseif a.data.itemInfo.itemQuality ~= b.data.itemInfo.itemQuality then
-    return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
-  elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
-    return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
   end
-  return a.data.itemInfo.itemGUID < b.data.itemInfo.itemGUID
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
 ---@param a Item
 ---@param b Item
 ---@return boolean
 function sort.GetItemSortBySlot(a, b)
-  return a.data.slotid < b.data.slotid
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  return aData.slotid < bData.slotid
 end

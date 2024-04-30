@@ -1,4 +1,4 @@
-## Interface: 30403
+## Interface: 40400
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -46,10 +46,11 @@ core\database.lua
 core\hooks.lua
 core\async.lua
 
-data\loader.lua
 data\equipmentsets.lua
 data\categories.lua
 data\items.lua
+data\loader.lua
+data\slots.lua
 
 util\color.lua
 util\resize.lua

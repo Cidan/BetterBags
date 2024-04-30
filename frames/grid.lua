@@ -98,6 +98,19 @@ function gridProto:RemoveCell(id)
   --assert(false, 'cell not found')
 end
 
+function gridProto:RekeyCell(oldID, newID)
+  local cell = self.idToCell[oldID]
+  if cell == nil then
+    return
+  end
+  local column = self.cellToColumn[cell] --[[@as Column]]
+  column:RemoveCell(oldID)
+  column:AddCell(newID, cell)
+  self.idToCell[newID] = cell
+  self.cellToID[cell] = newID
+  self.idToCell[oldID] = nil
+end
+
 function gridProto:GetCell(id)
   return self.idToCell[id]
 end

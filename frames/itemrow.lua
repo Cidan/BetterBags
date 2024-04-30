@@ -22,6 +22,9 @@ local debug = addon:GetModule('Debug')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')
 
@@ -31,7 +34,7 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field button Item
 ---@field rowButton ItemButton|Button
 ---@field text FontString
----@field data ItemData
+---@field slotkey string
 item.itemRowProto = {}
 
 function item.itemRowProto:Unlock()
@@ -40,11 +43,31 @@ end
 function item.itemRowProto:Lock()
 end
 
+function item.itemRowProto:GetItemData()
+  return self.button:GetItemData()
+end
+
 ---@param data ItemData
-function item.itemRowProto:SetItem(data)
-  self.data = data
+function item.itemRowProto:SetStaticItemFromData(data)
+  self:SetItemFromData(data, true)
+end
+
+---@param slotkey string
+function item.itemRowProto:SetItem(slotkey)
+  local data = items:GetItemDataFromSlotKey(slotkey)
+  self:SetItemFromData(data)
+end
+
+---@param data ItemData
+---@param static? boolean
+function item.itemRowProto:SetItemFromData(data, static)
+  self.slotkey = data.slotkey
   self.button:SetSize(20, 20)
-  self.button:SetItem(data)
+  if static then
+    self.button:SetStaticItemFromData(data)
+  else
+    self.button:SetItemFromData(data)
+  end
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
 
@@ -110,12 +133,12 @@ function item.itemRowProto:ClearItem()
     ---@cast s ItemButton
     s.HighlightTexture:Show()
   end)
-  self.data = nil
+  self.slotkey = ""
 end
 
 ---@return string
 function item.itemRowProto:GetCategory()
-  return self.button.data.itemInfo.category
+  return self.button:GetItemData().itemInfo.category
 end
 
 ---@return boolean
@@ -125,7 +148,7 @@ end
 
 ---@return string
 function item.itemRowProto:GetGUID()
-  return self.data.itemInfo.itemGUID
+  return self.button:GetItemData().itemInfo.itemGUID
 end
 
 function item.itemRowProto:Release()
@@ -155,6 +178,14 @@ end
 ---@return ItemRow
 function item:_DoCreate()
   local i = setmetatable({}, { __index = item.itemRowProto })
+
+  -- Backwards compatibility for item data.
+  i.data = setmetatable({}, { __index = function(_, key)
+    local d = i.button:GetItemData()
+    if d == nil then return nil end
+    return i.button:GetItemData()[key]
+  end})
+
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsRowItemButton%d", buttonCount)

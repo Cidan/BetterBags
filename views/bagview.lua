@@ -30,7 +30,7 @@ local sort = addon:GetModule('Sort')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
----@param view view
+---@param view View
 local function Wipe(view)
   view.content:Wipe()
   view.itemCount = 0
@@ -66,9 +66,73 @@ local function GetBagName(bagid)
 
 end
 
----@param view view
+-- ClearButton clears a button and makes it empty while preserving the slot,
+-- but does not release it, while also adding it to the deferred items list.
+---@param view View
+---@param item ItemData
+local function ClearButton(view, item)
+  local cell = view.itemsByBagAndSlot[item.slotkey]
+  local bagid, slotid = view:ParseSlotKey(item.slotkey)
+  cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  view:AddDeferredItem(item.slotkey)
+  addon:GetBagFromBagID(bagid).drawOnClose = true
+end
+
+-- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
+-- button position and section to prevent a sort from happening.
+---@param view View
+---@param oldSlotKey string
+---@param newSlotKey string
+local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
+  local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
+  local oldSlotSection = view:GetSlotSection(oldSlotKey)
+  oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
+  oldSlotCell:SetItem(newSlotKey)
+  view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
+  view.itemsByBagAndSlot[oldSlotKey] = nil
+  view:SetSlotSection(newSlotKey, oldSlotSection)
+  view:RemoveSlotSection(oldSlotKey)
+end
+
+-- CreateButton creates a button for an item and adds it to the view.
+---@param view View
+---@param item ItemData
+local function CreateButton(view, item)
+  debug:Log("CreateButton", "Creating button for item", item.slotkey)
+  view:RemoveDeferredItem(item.slotkey)
+  local oldSection = view:GetSlotSection(item.slotkey)
+  if oldSection then
+    oldSection:RemoveCell(item.slotkey)
+  end
+  local itemButton = view:GetOrCreateItemButton(item.slotkey)
+  itemButton:SetItem(item.slotkey)
+  local section = view:GetOrCreateSection(GetBagName(item.bagid))
+  section:AddCell(itemButton:GetItemData().slotkey, itemButton)
+  view:SetSlotSection(itemButton:GetItemData().slotkey, section)
+end
+
+---@param view View
+---@param slotkey string
+local function UpdateButton(view, slotkey)
+  view:RemoveDeferredItem(slotkey)
+  local itemButton = view:GetOrCreateItemButton(slotkey)
+  itemButton:SetItem(slotkey)
+end
+
+
+---@param view View
+---@param newSlotKey string
+local function AddSlot(view, newSlotKey)
+  local itemButton = view:GetOrCreateItemButton(newSlotKey)
+  local newBagid = view:ParseSlotKey(newSlotKey)
+  local newSection = view:GetOrCreateSection(GetBagName(newBagid))
+  newSection:AddCell(newSlotKey, itemButton)
+  itemButton:SetItem(newSlotKey)
+end
+
+---@param view View
 ---@param bag Bag
----@param slotInfo ExtraSlotInfo
+---@param slotInfo SlotInfo
 local function BagView(view, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
@@ -76,27 +140,30 @@ local function BagView(view, bag, slotInfo)
   end
   -- Use the section grid sizing for this view type.
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_GRID)
-  local dirtyItems = slotInfo.dirtyItems
 
-  for _, data in pairs(dirtyItems) do
-    local bagid = data.bagid
-    local slotkey = view:GetSlotKey(data)
+  local added, removed, changed = slotInfo:GetChangeset()
 
-    -- Create or get the item frame for this slot.
-    local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-    if itemButton == nil then
-      itemButton = itemFrame:Create()
-      view.itemsByBagAndSlot[slotkey] = itemButton
+  for _, item in pairs(removed) do
+    local newSlotKey = view:RemoveButton(item)
+    if not newSlotKey then
+      ClearButton(view, item)
+    else
+      UpdateDeletedSlot(view, item.slotkey, newSlotKey)
     end
+  end
 
-    -- Set the item data on the item frame.
-    itemButton:SetItem(data)
 
-    -- Add the item to the correct category section, skipping the keyring unless we're showing bag slots.
-    if (not data.isItemEmpty) then
-      local section = view:GetOrCreateSection(GetBagName(bagid))
-      section:AddCell(slotkey, itemButton)
+  for _, item in pairs(added) do
+    local updateKey = view:AddButton(item)
+    if not updateKey then
+      CreateButton(view, item)
+    else
+      UpdateButton(view, updateKey)
     end
+  end
+
+  for _, item in pairs(changed) do
+    UpdateButton(view, view:ChangeButton(item))
   end
 
   for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
@@ -154,13 +221,15 @@ local function BagView(view, bag, slotInfo)
   bag.frame:SetHeight(bagHeight)
 end
 
-function views:NewBagView(parent)
-  local view = setmetatable({}, {__index = views.viewProto})
-  view.sections = {}
-  view.itemsByBagAndSlot = {}
+---@param parent Frame
+---@param kind BagKind
+---@return View
+function views:NewBagView(parent, kind)
+  local view = views:NewBlankView()
   view.itemFrames = {}
   view.itemCount = 0
-  view.kind = const.BAG_VIEW.SECTION_ALL_BAGS
+  view.bagview = const.BAG_VIEW.SECTION_ALL_BAGS
+  view.kind = kind
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
@@ -168,6 +237,8 @@ function views:NewBagView(parent)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
   view.Render = BagView
-  view.Wipe = Wipe
+  view.WipeHandler = Wipe
+  view.AddSlot = AddSlot
+
   return view
 end

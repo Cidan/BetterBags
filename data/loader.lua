@@ -9,37 +9,38 @@ local events = addon:GetModule('Events')
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class (exact) ItemLoader
 ---@field private locations table<number, ItemMixin>
 ---@field private callback fun()
 ---@field private id number
+---@field private kind BagKind
+---@field private data table<string, ItemData>
 local ItemLoader = {}
 
----@class (exact) Loader: AceModule
----@field private eventFrame Frame
+---@class Items: AceModule
 ---@field private loaders ItemLoader[]
 ---@field private loadCount number
-local loader = addon:NewModule('Loader')
+local items = addon:GetModule('Items')
 
-function loader:OnInitialize()
-  self.loaders = {}
-  self.loadCount = 1
-  events:RegisterEvent('ITEM_DATA_LOAD_RESULT', function(_, ...)
-    local itemID, success = select(1, ...)
-    ---@cast itemID number
-    ---@cast success boolean
-    for _, itemLoader in pairs(self.loaders) do
-      itemLoader:OnEvent(itemID, success)
-    end
-  end)
-end
-
+---@param kind BagKind
 ---@return ItemLoader
-function loader:New()
+function items:NewLoader(kind)
+  if not self.loaders then
+    self.loaders = {}
+    self.loadCount = 1
+  end
   local itemLoader = {}
   setmetatable(itemLoader, {__index = ItemLoader})
   itemLoader.locations = {}
   itemLoader.id = self.loadCount
+  itemLoader.kind = kind
+  itemLoader.data = {}
   self.loaders[itemLoader.id] = itemLoader
   self.loadCount = self.loadCount + 1
   return itemLoader
@@ -49,33 +50,53 @@ end
 function ItemLoader:Add(itemMixin)
   local itemLocation = itemMixin:GetItemLocation()
   if itemLocation == nil then return end
+
+  if itemMixin:IsItemEmpty() then
+    local data = {}
+    ---@cast data +ItemData
+    data.bagid, data.slotid = itemMixin:GetItemLocation():GetBagAndSlot()
+    items:AttachItemInfo(data, self.kind)
+    self.data[items:GetSlotKey(data)] = data
+    return
+  end
+
   local itemID = itemMixin:GetItemID()
   if itemID == nil then return end
-
   self.locations[itemID] = itemMixin
 
+  itemMixin:ContinueOnItemLoad(function()
+    if itemMixin:IsItemDataCached() then
+      local data = {}
+      ---@cast data +ItemData
+      data.bagid, data.slotid = itemMixin:GetItemLocation():GetBagAndSlot()
+      items:AttachItemInfo(data, self.kind)
+      self.data[items:GetSlotKey(data)] = data
+      self.locations[itemID] = nil
+    end
+  end)
 end
 
 function ItemLoader:Load(callback)
   async:Until(function()
     for itemID, location in pairs(self.locations) do
-      itemID = itemID
-      location:ContinueOnItemLoad(function()
+      local l = location:GetItemLocation()
+      if l == nil then
         self.locations[itemID] = nil
-      end)
+      else
+        C_Item.RequestLoadItemData(l)
+      end
     end
     if next(self.locations) == nil then
-      loader.loaders[self.id] = nil
+      items.loaders[self.id] = nil
       return true
     end
     return false
-  end, callback)
+  end, function()
+    callback()
+  end)
 end
 
----@package
----@param itemID number
----@param success boolean
-function ItemLoader:OnEvent(itemID, success)
-  if self.locations[itemID] == nil or not success then return end
-  self.locations[itemID] = nil
+---@return table<string, ItemData>
+function ItemLoader:GetDataCache()
+  return self.data
 end

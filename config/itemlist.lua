@@ -109,7 +109,7 @@ local function SetList(self, values)
     self:PauseLayout()
     for _, v in pairs(itemData) do
       local item = itemRowFrame:Create()
-      item:SetItem(v)
+      item:SetStaticItemFromData(v)
       item.button.frame:SetPoint("LEFT", item.frame, "LEFT", 4, 0)
 
       local fn = function(_, b)

@@ -28,6 +28,9 @@ local equipmentSets = addon:GetModule('EquipmentSets')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -63,9 +66,9 @@ function itemFrame.itemProto:SetSize(width, height)
 end
 
 ---@param data ItemData
-function itemFrame.itemProto:SetItem(data)
-  assert(data, 'item must be provided')
-  self.data = data
+function itemFrame.itemProto:SetItemFromData(data)
+  assert(data, 'data must be provided')
+  self.slotkey = data.slotkey
   --local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
   if bagid ~= nil and slotid ~= nil then
@@ -108,7 +111,7 @@ function itemFrame.itemProto:SetItem(data)
   self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
   self.button.IconBorder:SetBlendMode("BLEND")
   self.button.IconBorder:Show()
-  SetItemButtonCount(self.button, data.itemInfo.currentItemCount)
+  self:UpdateCount()
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self.IconQuestTexture:Hide()
   self:SetLock(data.itemInfo.isLocked)
@@ -153,12 +156,12 @@ end
 ---@param count number
 ---@param name string
 function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
+  self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
-  self.data = {bagid = bagid, slotid = slotid, isItemEmpty = true, itemInfo = {}} --[[@as table]]
   if count == 0 then
     self.button:Disable()
   else
@@ -227,7 +230,8 @@ function itemFrame.itemProto:ClearItem()
   self.freeSlotName = ""
   self.freeSlotCount = 0
   self.isFreeSlot = nil
-  self.data = nil
+  self.slotkey = ""
+  self.staticData = nil
   self:UpdateCooldown()
 end
 
@@ -242,6 +246,14 @@ end
 ---@return Item
 function itemFrame:_DoCreate()
   local i = setmetatable({}, { __index = itemFrame.itemProto })
+
+  -- Backwards compatibility for item data.
+  i.data = setmetatable({}, { __index = function(_, key)
+    local d = items:GetItemDataFromSlotKey(i.slotkey)
+    if d == nil then return nil end
+    return d[key]
+  end})
+
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsItemButton%d", buttonCount)

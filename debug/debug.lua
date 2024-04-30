@@ -118,4 +118,22 @@ function debug:Log(category, ...)
   if not self.enabled then return end
   self.window:AddLogLine(category, debug:Format(...))
 end
+
+---@param tag string
+---@param value any
+function debug:Inspect(tag, value)
+  if self.enabled and _G.DevTool then
+    -- DevTool does a JIT expansion of values when inspecting
+    -- a value in the UI. This is a problem because the state
+    -- of the value may change between the time it is inspected
+    -- and the time it is viewed. To avoid this, we make a deep copy
+    -- of the value if it is a table.
+    if type(value) == "table" then
+      _G.DevTool:AddData(CopyTable(value), tag)
+    else
+      _G.DevTool:AddData(value, tag)
+    end
+  end
+end
+
 debug:Enable()

@@ -73,7 +73,7 @@ local search = addon:GetModule('Search')
 --- kind (i.e. bank, backpack).
 ---@class (exact) Bag
 ---@field kind BagKind
----@field currentView view
+---@field currentView View
 ---@field frame Frame The fancy frame of the bag.
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
@@ -91,7 +91,7 @@ local search = addon:GetModule('Search')
 ---@field menuList MenuList[]
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
----@field views table<BagView, view>
+---@field views table<BagView, View>
 ---@field searchBox SearchFrame
 bagFrame.bagProto = {}
 
@@ -199,7 +199,7 @@ function bagFrame.bagProto:Search(text)
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
----@param slotInfo ExtraSlotInfo
+---@param slotInfo SlotInfo
 function bagFrame.bagProto:Draw(slotInfo)
   local view = self.views[database:GetBagView(self.kind)]
 
@@ -208,7 +208,7 @@ function bagFrame.bagProto:Draw(slotInfo)
     return
   end
 
-  if self.currentView and self.currentView:GetKind() ~=  view:GetKind() then
+  if self.currentView and self.currentView:GetBagView() ~=  view:GetBagView() then
     self.currentView:Wipe()
     self.currentView:GetContent():Hide()
   end
@@ -226,7 +226,7 @@ function bagFrame.bagProto:Draw(slotInfo)
     self.slots:Draw()
     self.slots:Show()
   end
-  events:SendMessage('bag/Rendered', self)
+  events:SendMessage('bag/Rendered', self, slotInfo)
 end
 
 function bagFrame.bagProto:KeepBagInBounds()
@@ -361,10 +361,10 @@ function bagFrame:Create(kind)
   b.frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
 
   b.views = {
-    [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f),
-    [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f),
-    [const.BAG_VIEW.LIST] = views:NewList(f),
-    [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f),
+    [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f, b.kind),
+    [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
+    [const.BAG_VIEW.LIST] = views:NewList(f, b.kind),
+    [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
   }
 
   -- Register the bag frame so that window positions are saved.
