@@ -22,7 +22,6 @@ const.BANK_BAGS = {
   [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
   [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
   [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
-  [Enum.BagIndex.BankBag_7 - 1] = Enum.BagIndex.BankBag_7 - 1,
 }
 
 -- BANK_ONLY_BAGS contains all the bags that are part of the bank, excluding
@@ -34,7 +33,6 @@ const.BANK_ONLY_BAGS = {
   [Enum.BagIndex.BankBag_4 - 1] = Enum.BagIndex.BankBag_4 - 1,
   [Enum.BagIndex.BankBag_5 - 1] = Enum.BagIndex.BankBag_5 - 1,
   [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
-  [Enum.BagIndex.BankBag_7 - 1] = Enum.BagIndex.BankBag_7 - 1,
 }
 
 const.BANK_ONLY_BAGS_LIST = {
@@ -44,8 +42,13 @@ const.BANK_ONLY_BAGS_LIST = {
   Enum.BagIndex.BankBag_4 - 1,
   Enum.BagIndex.BankBag_5 - 1,
   Enum.BagIndex.BankBag_6 - 1,
-  Enum.BagIndex.BankBag_7 - 1,
 }
+
+if addon.isWrath then
+  const.BANK_BAGS[Enum.BagIndex.BankBag_7 - 1] = Enum.BagIndex.BankBag_7 - 1
+  const.BANK_ONLY_BAGS[Enum.BagIndex.BankBag_7 - 1] = Enum.BagIndex.BankBag_7 - 1
+  table.insert(const.BANK_ONLY_BAGS_LIST, Enum.BagIndex.BankBag_7 - 1)
+end
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
 -- the main backpack bag.
@@ -55,6 +58,7 @@ const.BACKPACK_BAGS = {
   [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
   [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
+  [Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring,
 }
 
 -- BACKPACK_ONLY_BAGS contains all the bags that are part of the backpack, excluding
@@ -64,6 +68,7 @@ const.BACKPACK_ONLY_BAGS = {
   [Enum.BagIndex.Bag_2] = Enum.BagIndex.Bag_2,
   [Enum.BagIndex.Bag_3] = Enum.BagIndex.Bag_3,
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
+  [Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring,
 }
 
 const.BACKPACK_ONLY_BAGS_LIST = {

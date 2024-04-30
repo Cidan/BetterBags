@@ -70,7 +70,9 @@ function item.itemRowProto:SetItemFromData(data, static)
     GameTooltip:Show()
   end)
 
-  events:SendMessage('item/UpdatedRow', self)
+  if self.slotkey ~= nil then
+    events:SendMessage('item/UpdatedRow', self)
+  end
   self.frame:Show()
   self.rowButton:Show()
 end

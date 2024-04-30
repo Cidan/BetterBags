@@ -377,7 +377,9 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.freeSlotCount = 0
   self.isFreeSlot = nil
   self:SetAlpha(1)
-  events:SendMessage('item/Updated', self)
+  if self.slotkey ~= nil then
+    events:SendMessage('item/Updated', self)
+  end
   self.frame:Show()
   self.button:Show()
 end
