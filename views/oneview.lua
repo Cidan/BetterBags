@@ -137,7 +137,7 @@ local function OneBagView(view, bag, slotInfo)
       view.content:AddCell(name, itemButton)
     else
       local itemButton = view:GetOrCreateItemButton(name)
-      itemButton:SetFreeSlots(-1, -1, freeSlotCount, name)
+      itemButton:SetFreeSlots(1, 1, freeSlotCount, name)
       view.content:AddCell(name, itemButton)
     end
   end

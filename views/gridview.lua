@@ -185,7 +185,7 @@ local function GridView(view, bag, slotInfo)
       freeSlotsSection:AddCell(name, itemButton)
     else
       local itemButton = view:GetOrCreateItemButton(name)
-      itemButton:SetFreeSlots(-1, -1, freeSlotCount, name)
+      itemButton:SetFreeSlots(1, 1, freeSlotCount, name)
       freeSlotsSection:AddCell(name, itemButton)
     end
   end
