@@ -123,28 +123,34 @@ local function GridView(view, bag, slotInfo)
   local added, removed, changed = slotInfo:GetChangeset()
 
   for _, item in pairs(removed) do
-    local newSlotKey = view:RemoveButton(item)
+    if item.bagid ~= Enum.BagIndex.Keyring then
+      local newSlotKey = view:RemoveButton(item)
 
-    -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
-    -- place due to the deleted being the head of a stack.
-    if not newSlotKey then
-      ClearButton(view, item)
-    else
-      UpdateDeletedSlot(view, item.slotkey, newSlotKey)
+      -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
+      -- place due to the deleted being the head of a stack.
+      if not newSlotKey then
+        ClearButton(view, item)
+      else
+        UpdateDeletedSlot(view, item.slotkey, newSlotKey)
+      end
     end
   end
 
   for _, item in pairs(added) do
-    local updateKey = view:AddButton(item)
-    if not updateKey then
-      CreateButton(view, item)
-    else
-      UpdateButton(view, updateKey)
+    if item.bagid ~= Enum.BagIndex.Keyring then
+      local updateKey = view:AddButton(item)
+      if not updateKey then
+        CreateButton(view, item)
+      else
+        UpdateButton(view, updateKey)
+      end
     end
   end
 
   for _, item in pairs(changed) do
-    UpdateButton(view, view:ChangeButton(item))
+    if item.bagid ~= Enum.BagIndex.Keyring then
+      UpdateButton(view, view:ChangeButton(item))
+    end
   end
 
   if not slotInfo.deferDelete then
