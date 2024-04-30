@@ -1,4 +1,4 @@
-## Interface: 30403
+## Interface: 40400
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
