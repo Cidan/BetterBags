@@ -41,7 +41,7 @@ debug\items.lua
 core\events.lua
 core\localization.lua
 core\constants.lua
-core\era\constants.lua
+core\classic\constants.lua
 core\database.lua
 core\hooks.lua
 core\async.lua
