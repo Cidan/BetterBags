@@ -145,6 +145,7 @@ end
 
 ---@param kind BagKind
 function items:WipeSlotInfo(kind)
+  debug:Inspect("wiping slot info", kind)
   self.slotInfo = self.slotInfo or {}
   self.slotInfo[kind] = self:NewSlotInfo()
 end
@@ -369,6 +370,7 @@ end
 function items:LoadItems(kind, dataCache)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
+  debug:Inspect("LoadItems: "..kind, dataCache)
   self.slotInfo[kind]:Update(dataCache)
   self:UpdateFreeSlots(kind)
   local slotInfo = self.slotInfo[kind]
@@ -825,7 +827,7 @@ end
 ---@return BagKind
 function items:GetBagKindFromSlotKey(slotkey)
   local bagid = string.split('_', slotkey) --[[@as string]]
-  if const.BANK_BAGS[tonumber(bagid)] then
+  if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] then
     return const.BAG_KIND.BANK
   end
   return const.BAG_KIND.BACKPACK
