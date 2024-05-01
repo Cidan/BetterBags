@@ -89,7 +89,7 @@ frames\era\bag.lua
 config\config.lua
 config\era\config.lua
 config\help.lua
-config\era\bags.lua
+config\classic\bags.lua
 config\itemlist.lua
 config\customcat.lua
 
