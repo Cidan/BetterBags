@@ -73,6 +73,7 @@ local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
 ---@field private slotInfo table<BagKind, SlotInfo>
+---@field doingRefresh boolean
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _newItemTimers table<string, number>
 ---@field _preSort boolean
@@ -84,6 +85,7 @@ function items:OnInitialize()
 
   self._newItemTimers = {}
   self._preSort = false
+  self.doingRefresh = false
 end
 
 function items:OnEnable()
@@ -214,6 +216,11 @@ end
 
 ---@private
 function items:DoRefreshAll()
+  if items.doingRefresh then
+    events:SendMessageLater('bags/RefreshAll')
+    return
+  end
+  items.doingRefresh = true
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() or addon.atBank then
     if addon.Bags.Bank.isReagentBank then
@@ -440,6 +447,7 @@ function items:ProcessContainer(kind, container)
     events:SendMessageLater(ev, nil, self.slotInfo[kind])
     if kind == const.BAG_KIND.BACKPACK then
       debug:EndProfile('Backpack Data Pipeline')
+      items.doingRefresh = false
     end
   end)
 end
