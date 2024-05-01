@@ -10,13 +10,17 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field a any
 local callbackProto = {}
 
+---@class EventArg
+---@field eventName string
+---@field args any[]
+
 ---@class Events: AceModule
 ---@field _eventHandler AceEvent-3.0
 ---@field _messageMap table<string, {fn: fun(...), cbs: Callback[]}>
 ---@field _eventMap table<string, {fn: fun(...), cbs: Callback[]}>
 ---@field _bucketTimers table<string, cbObject>
 ---@field _eventQueue table<string, boolean>
----@field _eventArguments any[]
+---@field _eventArguments table<string, EventArg[]>
 ---@field _bucketCallbacks table<string, fun(...)[]>
 local events = addon:NewModule('Events')
 
@@ -98,7 +102,7 @@ end
 -- called at most once every 0.5 seconds.
 ---@param groupEvents string[]
 ---@param groupMessages string[]
----@param callback fun(eventData: eventData)
+---@param callback fun(eventData: EventArg[])
 function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   local joinedEvents = table.concat(groupEvents, '')
   joinedEvents = joinedEvents .. table.concat(groupMessages, '')
@@ -117,7 +121,9 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
       if self._bucketTimers[joinedEvents] then
         self._bucketTimers[joinedEvents]:Cancel()
       end
-      tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+      tinsert(self._eventArguments[joinedEvents], {
+        eventName = eventName, args = {...}}
+      )
       self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.2, bucketFunction)
     end)
   end
@@ -127,7 +133,9 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
       if self._bucketTimers[joinedEvents] then
         self._bucketTimers[joinedEvents]:Cancel()
       end
-      tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+      tinsert(self._eventArguments[joinedEvents], {
+        eventName = eventName, args = {...}}
+      )
       self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.2, bucketFunction)
     end)
   end

@@ -179,11 +179,11 @@ end
 
 function bagFrame.bagProto:DoRefresh()
   if self.kind == const.BAG_KIND.BACKPACK then
-    items:RefreshBackpack()
+    items:RefreshBackpack(false)
   elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
-    items:RefreshBank()
+    items:RefreshBank(false)
   else
-    items:RefreshReagentBank()
+    items:RefreshReagentBank(false)
   end
 end
 
@@ -261,7 +261,7 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshReagentBank()
+    items:RefreshReagentBank(true)
   else
     BankFrame.selectedTab = 1
     if self.searchBox.frame:IsShown() then
@@ -273,7 +273,7 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshBank()
+    items:RefreshBank(true)
   end
 end
 
