@@ -312,6 +312,9 @@ end
 ---@return Stack
 function views:NewStack(slotkey)
   local data = items:GetItemDataFromSlotKey(slotkey)
+  if data == nil then
+    error("data is nil: " .. slotkey)
+  end
   return setmetatable({
     item = slotkey,
     subItems = {},

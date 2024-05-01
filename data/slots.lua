@@ -75,7 +75,11 @@ function SlotInfo:GetChangeset()
 end
 
 ---@param newItems table<string, ItemData>
-function SlotInfo:Update(newItems)
+---@param wipe boolean
+function SlotInfo:Update(newItems, wipe)
+  if wipe then
+    self:Wipe()
+  end
   self.previousItemsBySlotKey = self.itemsBySlotKey
   self.itemsBySlotKey = newItems
   self.previousTotalItems = self.totalItems
