@@ -209,7 +209,7 @@ function items:WipeAndRefreshAll()
     addon.Bags.Backpack.drawAfterCombat = true
     print(L:G("BetterBags: Bags will refresh after combat ends."))
   else
-    self:ClearItemCache()
+    --self:ClearItemCache()
     events:SendMessage('bags/RefreshAll', true)
   end
 end
@@ -377,6 +377,7 @@ end
 function items:LoadItems(kind, dataCache)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
+  self:WipeSlotInfo(kind)
   debug:Inspect("LoadItems: "..kind, dataCache)
   self.slotInfo[kind]:Update(dataCache)
   self:UpdateFreeSlots(kind)
