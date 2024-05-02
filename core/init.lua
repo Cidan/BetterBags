@@ -222,6 +222,7 @@ function addon:OnEnable()
   events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
     debug:Log("init/OnInitialize/items", "Drawing bag")
     addon.Bags.Backpack:Draw(args[1])
+    events:SendMessage('bags/Draw/Backpack/Done')
    end)
 
   events:RegisterMessage('items/RefreshBank/Done', function(_, args)
@@ -231,6 +232,7 @@ function addon:OnEnable()
       addon.Bags.Bank:Show()
     end
    addon.Bags.Bank:Draw(args[1])
+   events:SendMessage('bags/Draw/Bank/Done')
   end)
 
   events:RegisterEvent('PLAYER_REGEN_ENABLED', function()

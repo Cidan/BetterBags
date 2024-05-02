@@ -45,6 +45,16 @@ function masque:OnEnable()
     item.button.IconBorder:SetBlendMode("BLEND")
   end)
 
+  events:RegisterMessage('bags/Draw/Backpack/Done', function()
+    local group = self.groups["Backpack"]
+    group:ReSkin(true)
+  end)
+
+  events:RegisterMessage('bags/Draw/Bank/Done', function()
+    local group = self.groups["Bank"]
+    group:ReSkin(true)
+  end)
+
   events:RegisterMessage('item/Clearing', function(_, item)
     ---@cast item Item
     local group = item.kind == 'Bank' and self.groups["Bank"] or self.groups["Backpack"]

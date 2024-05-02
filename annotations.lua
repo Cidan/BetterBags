@@ -60,6 +60,7 @@ MasqueGroup = {}
 
 function MasqueGroup:AddButton(group, button) end
 function MasqueGroup:RemoveButton(group, button) end
+function MasqueGroup:ReSkin(boolean) end
 
 ---@class Masque
 Masque = {}
