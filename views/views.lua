@@ -282,6 +282,12 @@ end
 ---@param item ItemData
 ---@return string
 function views.viewProto:ChangeButton(item)
+  local opts = database:GetStackingOptions(self.kind)
+  -- If we're not merging stacks, return nil.
+  if (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) then
+    return item.slotkey
+  end
+
   local stack = self.stacks[item.itemHash]
   if stack then
     stack:UpdateCount()
@@ -312,9 +318,6 @@ end
 ---@return Stack
 function views:NewStack(slotkey)
   local data = items:GetItemDataFromSlotKey(slotkey)
-  if data == nil then
-    error("data is nil: " .. slotkey)
-  end
   return setmetatable({
     item = slotkey,
     subItems = {},
