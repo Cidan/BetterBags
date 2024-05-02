@@ -409,7 +409,9 @@ function items:LoadItems(kind, wipe, dataCache)
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
 
-    if baglink ~= nil and invid ~= nil then
+    if bagid == Enum.BagIndex.Keyring then
+      name = L:G("Keyring")
+    elseif baglink ~= nil and invid ~= nil then
       local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
       name = GetItemSubClassInfo(class, subclass)
     else
