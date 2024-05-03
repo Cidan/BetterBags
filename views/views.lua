@@ -77,6 +77,7 @@ function views.viewProto:Wipe()
   assert(self.WipeHandler, 'WipeHandler not set')
   self.WipeHandler(self)
   self:ClearDeferredItems()
+  self:ClearDirtySections()
   wipe(self.stacks)
   wipe(self.slotToSection)
 end
