@@ -56,12 +56,13 @@ function itemButton:GetHighlightTexture() end
 ContinuableContainer = {}
 
 ---@class MasqueGroup
+---@field Buttons ItemButton[]
 MasqueGroup = {}
 
 function MasqueGroup:AddButton(group, button) end
 function MasqueGroup:RemoveButton(group, button) end
 function MasqueGroup:ReSkin(boolean) end
-
+function MasqueGroup:RegisterCallback(func, obj) end
 ---@class Masque
 Masque = {}
 

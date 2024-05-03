@@ -223,16 +223,24 @@ function addon:OnEnable()
     debug:Log("init/OnInitialize/items", "Drawing bag")
     addon.Bags.Backpack:Draw(args[1])
     events:SendMessage('bags/Draw/Backpack/Done')
+    if not addon.Bags.Backpack.loaded then
+      addon.Bags.Backpack.loaded = true
+      events:SendMessage('bags/Draw/Backpack/Loaded')
+    end
    end)
 
   events:RegisterMessage('items/RefreshBank/Done', function(_, args)
-   debug:Log("init/OnInitialize/items", "Drawing bank")
+    debug:Log("init/OnInitialize/items", "Drawing bank")
      -- Show the bank frame if it's not already shown.
     if not addon.Bags.Bank:IsShown() and addon.atBank then
       addon.Bags.Bank:Show()
     end
-   addon.Bags.Bank:Draw(args[1])
-   events:SendMessage('bags/Draw/Bank/Done')
+    addon.Bags.Bank:Draw(args[1])
+    events:SendMessage('bags/Draw/Bank/Done')
+    if not addon.Bags.Bank.loaded then
+      addon.Bags.Bank.loaded = true
+      events:SendMessage('bags/Draw/Bank/Loaded')
+    end
   end)
 
   events:RegisterEvent('PLAYER_REGEN_ENABLED', function()

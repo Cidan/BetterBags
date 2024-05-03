@@ -93,6 +93,7 @@ local search = addon:GetModule('Search')
 ---@field toReleaseSections Section[]
 ---@field views table<BagView, View>
 ---@field searchBox SearchFrame
+---@field loaded boolean
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
