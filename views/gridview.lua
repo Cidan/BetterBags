@@ -179,16 +179,20 @@ local function GridView(view, bag, slotInfo)
     local dirtySections = view:GetDirtySections()
     for sectionName in pairs(dirtySections) do
       local section = view:GetSection(sectionName)
-      -- Remove the section if it's empty, otherwise draw it.
-      if section:GetCellCount() == 0 then
-        debug:Log("Section", "Removing section", sectionName)
-        view:RemoveSection(sectionName)
-        section:ReleaseAllCells()
-        section:Release()
+      if section ~= nil then
+        -- Remove the section if it's empty, otherwise draw it.
+        if section:GetCellCount() == 0 then
+          debug:Log("Section", "Removing section", sectionName)
+          view:RemoveSection(sectionName)
+          section:ReleaseAllCells()
+          section:Release()
+        else
+          debug:Log("Section", "Drawing section", sectionName)
+          section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+          section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+        end
       else
-        debug:Log("Section", "Drawing section", sectionName)
-        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-        section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+        debug:Log("Section", "Section not found", sectionName)
       end
     end
     view:ClearDirtySections()
