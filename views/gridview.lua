@@ -179,6 +179,11 @@ local function GridView(view, bag, slotInfo)
     local dirtySections = view:GetDirtySections()
     for sectionName in pairs(dirtySections) do
       local section = view:GetSection(sectionName)
+      -- We need to check for the section here, as a section
+      -- may have been added to dirty items when it doesn't
+      -- exist yet. This happens when a new item's "new item"
+      -- status expires, it's category is no longer a new item
+      -- but the actual category hasn't been drawn yet.
       if section ~= nil then
         -- Remove the section if it's empty, otherwise draw it.
         if section:GetCellCount() == 0 then
@@ -191,8 +196,6 @@ local function GridView(view, bag, slotInfo)
           section:SetMaxCellWidth(sizeInfo.itemsPerRow)
           section:Draw(bag.kind, database:GetBagView(bag.kind), false)
         end
-      else
-        debug:Log("Section", "Section not found", sectionName)
       end
     end
     view:ClearDirtySections()
