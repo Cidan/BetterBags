@@ -153,7 +153,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   end
   if wasNew then
     events:SendMessage('item/NewButton', self)
-  end 
+  end
   self.frame:Show()
   self.button:Show()
 end

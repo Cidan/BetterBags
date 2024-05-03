@@ -73,10 +73,11 @@ local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
 ---@field private slotInfo table<BagKind, SlotInfo>
----@field doingRefresh boolean
+---@field _doingRefresh boolean
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _newItemTimers table<string, number>
 ---@field _preSort boolean
+---@field _refreshQueueEvent EventArg[]
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -85,7 +86,7 @@ function items:OnInitialize()
 
   self._newItemTimers = {}
   self._preSort = false
-  self.doingRefresh = false
+  self._doingRefresh = false
 end
 
 function items:OnEnable()
@@ -102,6 +103,20 @@ function items:OnEnable()
   if addon.isRetail then
     table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   end
+
+  events:RegisterMessage('bags/Draw/Backpack/Done', function ()
+    self._doingRefresh = false
+    if self._refreshQueueEvent then
+      local wipe = false
+      for _, eventArg in pairs(self._refreshQueueEvent) do
+        if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
+          wipe = true
+        end
+      end
+      self._refreshQueueEvent = nil
+      events:SendMessageLater('bags/RefreshAll', nil, wipe)
+    end
+  end)
 
   events:RegisterMessage('bags/FullRefreshAll', function()
     self:WipeAndRefreshAll()
@@ -137,7 +152,14 @@ function items:OnEnable()
       addon.Bags.Backpack.drawAfterCombat = true
       print(L:G("BetterBags: Bags will refresh after combat ends."))
     else
-      self:DoRefreshAll(wipe)
+      if self._doingRefresh then
+        if self._refreshQueueEvent == nil then
+          self._refreshQueueEvent = eventData
+        end
+      else
+        self._doingRefresh = true
+        self:DoRefreshAll(wipe)
+      end
     end
   end)
 
@@ -468,7 +490,6 @@ function items:ProcessContainer(kind, wipe, container)
     events:SendMessageLater(ev, nil, self.slotInfo[kind])
     if kind == const.BAG_KIND.BACKPACK then
       debug:EndProfile('Backpack Data Pipeline')
-      items.doingRefresh = false
     end
   end)
 end
