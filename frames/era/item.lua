@@ -69,6 +69,10 @@ end
 function itemFrame.itemProto:SetItemFromData(data)
   assert(data, 'data must be provided')
   self.slotkey = data.slotkey
+  local wasNew = false
+  if self.kind == nil then
+    wasNew = true
+  end
   --local tooltipOwner = GameTooltip:GetOwner();
   local bagid, slotid = data.bagid, data.slotid
   if bagid ~= nil and slotid ~= nil then
@@ -147,6 +151,9 @@ function itemFrame.itemProto:SetItemFromData(data)
   if self.slotkey ~= nil then
     events:SendMessage('item/Updated', self)
   end
+  if wasNew then
+    events:SendMessage('item/NewButton', self)
+  end 
   self.frame:Show()
   self.button:Show()
 end
