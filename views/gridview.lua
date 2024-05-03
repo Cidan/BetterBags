@@ -189,24 +189,6 @@ local function GridView(view, bag, slotInfo)
     end
     view:ClearDirtySections()
   end
-
---[[
-  for sectionName, section in pairs(view:GetAllSections()) do
-      -- Remove the section if it's empty, otherwise draw it.
-    if not slotInfo.deferDelete then
-      if section:GetCellCount() == 0 then
-        debug:Log("RemoveSection", "Removed because empty", sectionName)
-        view:RemoveSection(sectionName)
-        section:ReleaseAllCells()
-        section:Release()
-      else
-        debug:Log("KeepSection", "Section kept because not empty", sectionName)
-        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-        section:Draw(bag.kind, database:GetBagView(bag.kind), false)
-      end
-    end
-  end
-  ]]--
   debug:EndProfile('Section Draw Stage')
 
   -- Get the free slots section and add the free slots to it.

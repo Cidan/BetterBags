@@ -105,6 +105,7 @@ end
 
 function sectionProto:Wipe()
   self.content:Wipe()
+  self.frame:Hide()
   self.view = const.BAG_VIEW.SECTION_GRID
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
