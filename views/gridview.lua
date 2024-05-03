@@ -64,6 +64,7 @@ local function ClearButton(view, item)
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
   view:AddDeferredItem(item.slotkey)
+  view:AddDirtySection(item.itemInfo.category)
   addon:GetBagFromBagID(bagid).drawOnClose = true
 end
 
@@ -81,6 +82,7 @@ local function CreateButton(view, item)
   itemButton:SetItem(item.slotkey)
   local section = view:GetOrCreateSection(item.itemInfo.category)
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
+  view:AddDirtySection(item.itemInfo.category)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
 end
 
@@ -90,6 +92,8 @@ local function UpdateButton(view, slotkey)
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey)
   itemButton:SetItem(slotkey)
+  local data = itemButton:GetItemData()
+  view:AddDirtySection(data.itemInfo.category)
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
@@ -106,6 +110,9 @@ local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
   view.itemsByBagAndSlot[oldSlotKey] = nil
   view:SetSlotSection(newSlotKey, oldSlotSection)
   view:RemoveSlotSection(oldSlotKey)
+  view:AddDirtySection(oldSlotCell:GetItemData().itemInfo.category)
+  local newData = items:GetItemDataFromSlotKey(newSlotKey)
+  view:AddDirtySection(newData.itemInfo.category)
 end
 
 
@@ -164,6 +171,26 @@ local function GridView(view, bag, slotInfo)
   end
 
   debug:StartProfile('Section Draw Stage')
+  if not slotInfo.deferDelete then
+    local dirtySections = view:GetDirtySections()
+    for sectionName in pairs(dirtySections) do
+      local section = view:GetSection(sectionName)
+      -- Remove the section if it's empty, otherwise draw it.
+      if section:GetCellCount() == 0 then
+        debug:Log("Section", "Removing section", sectionName)
+        view:RemoveSection(sectionName)
+        section:ReleaseAllCells()
+        section:Release()
+      else
+        debug:Log("Section", "Drawing section", sectionName)
+        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+        section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+      end
+    end
+    view:ClearDirtySections()
+  end
+
+--[[
   for sectionName, section in pairs(view:GetAllSections()) do
       -- Remove the section if it's empty, otherwise draw it.
     if not slotInfo.deferDelete then
@@ -179,6 +206,7 @@ local function GridView(view, bag, slotInfo)
       end
     end
   end
+  ]]--
   debug:EndProfile('Section Draw Stage')
 
   -- Get the free slots section and add the free slots to it.

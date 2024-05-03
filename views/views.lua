@@ -46,8 +46,7 @@ local stackProto = {}
 ---@field itemFrames Item[]
 ---@field fullRefresh boolean
 ---@field deferredItems table<string, boolean>
----@field sectionsToDelete table<string, boolean>
----@field sectionsToUpdate table<string, boolean>
+---@field dirtySections table<string, boolean>
 ---@field private stacks table<string, Stack>
 ---@field WipeHandler fun(view: View)
 views.viewProto = {}
@@ -203,28 +202,17 @@ function views.viewProto:RemoveSlotSection(slotkey)
 end
 
 ---@param title string
-function views.viewProto:AddSectionToDelete(title)
-  self.sectionsToDelete[title] = true
+function views.viewProto:AddDirtySection(title)
+  self.dirtySections[title] = true
 end
 
----@param title string
-function views.viewProto:AddSectionToUpdate(title)
-  self.sectionsToUpdate[title] = true
+function views.viewProto:ClearDirtySections()
+  wipe(self.dirtySections)
 end
 
----@param title string
-function views.viewProto:RemoveSectionToDelete(title)
-  self.sectionsToDelete[title] = nil
-end
-
----@param title string
-function views.viewProto:RemoveSectionToUpdate(title)
-  self.sectionsToUpdate[title] = nil
-end
-
----@return table<string, boolean>, table<string, boolean>
-function views.viewProto:GetSectionChangeset()
-  return self.sectionsToDelete, self.sectionsToUpdate
+---@return table<string, boolean>
+function views.viewProto:GetDirtySections()
+  return self.dirtySections
 end
 
 ---@param slotkey string
@@ -336,7 +324,8 @@ function views:NewBlankView()
     itemsByBagAndSlot = {},
     deferredItems = {},
     stacks = {},
-    slotToSection = {}
+    slotToSection = {},
+    dirtySections = {},
   }, {__index = views.viewProto}) --[[@as View]]
   return view
 end

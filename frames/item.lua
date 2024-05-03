@@ -412,6 +412,10 @@ end
 ---@param count number
 ---@param name string
 function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
+  local wasNew = false
+  if self.kind == nil then
+    wasNew = true
+  end
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
@@ -453,6 +457,9 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   self.button.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
   events:SendMessage('item/Updated', self)
+  if wasNew then
+    events:SendMessage('item/NewButton', self)
+  end
   self.frame:Show()
   self.button:Show()
 end
