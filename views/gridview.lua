@@ -64,6 +64,10 @@ local function ClearButton(view, item)
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
   view:AddDeferredItem(item.slotkey)
+  local section = view:GetSlotSection(item.slotkey)
+  if section then
+    view:AddDirtySection(section.title:GetText())
+  end
   view:AddDirtySection(item.itemInfo.category)
   addon:GetBagFromBagID(bagid).drawOnClose = true
 end
