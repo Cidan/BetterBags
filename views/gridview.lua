@@ -104,6 +104,10 @@ end
 local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
   local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
   local oldSlotSection = view:GetSlotSection(oldSlotKey)
+  if not oldSlotSection then
+    UpdateButton(view, newSlotKey)
+    return
+  end
   oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
   oldSlotCell:SetItem(newSlotKey)
   view.itemsByBagAndSlot[newSlotKey] = oldSlotCell

@@ -124,8 +124,8 @@ function items:OnEnable()
 
   events:RegisterMessage('bags/SortBackpackClassic', function()
     self:RemoveNewItemFromAllItems()
-    self:ClearItemCache()
-    self:PreSort()
+    --self:ClearItemCache()
+    --self:PreSort()
     _G.SortBags()
   end)
 
