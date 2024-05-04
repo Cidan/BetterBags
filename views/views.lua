@@ -249,7 +249,7 @@ end
 ---@return string?
 function views.viewProto:RemoveButton(item)
   local stack = self.stacks[item.itemHash]
-  if not stack then
+  if not stack or not stack:IsInStack(item.slotkey) then
     return nil
   end
   local updateKey = stack:RemoveItem(item.slotkey)
@@ -296,8 +296,10 @@ end
 -- ChangeButton updates the item in the stack if it exists.
 -- Returns the slotkey of the item base item if the item was updated in a stack, or the slotkey
 -- of the item if it was not in a stack.
+-- The second return is the slotkey of the item that should be removed from the view,
+-- if the item was merged into a stack.
 ---@param item ItemData
----@return string
+---@return string, string?
 function views.viewProto:ChangeButton(item)
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
@@ -307,6 +309,11 @@ function views.viewProto:ChangeButton(item)
 
   local stack = self.stacks[item.itemHash]
   if stack then
+    if not stack:IsInStack(item.slotkey) then
+      stack:AddItem(item.slotkey)
+      stack:UpdateCount()
+      return stack.item, item.slotkey
+    end
     stack:UpdateCount()
     return stack.item
   end
@@ -377,7 +384,7 @@ function stackProto:RemoveItem(slotkey)
     return nil
   end
 
-  assert(self.subItems[slotkey], "Slotkey not found in stack")
+  assert(self.subItems[slotkey], "Slotkey not found in stack" .. slotkey)
 
   self.subItems[slotkey] = nil
   self:UpdateCount()

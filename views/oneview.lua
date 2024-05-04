@@ -50,6 +50,7 @@ end
 ---@param view View
 ---@param item ItemData
 local function ClearButton(view, item)
+  debug:Log("ClearButton", "Clearing button for item", item.slotkey)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
@@ -71,6 +72,7 @@ end
 ---@param view View
 ---@param slotkey string
 local function UpdateButton(view, slotkey)
+  debug:Log("UpdateButton", "Updating button for item", slotkey)
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey)
   itemButton:SetItem(slotkey)
@@ -130,7 +132,14 @@ local function OneBagView(view, bag, slotInfo)
 
   for _, item in pairs(changed) do
     if item.bagid ~= Enum.BagIndex.Keyring then
-      UpdateButton(view, view:ChangeButton(item))
+      local updateKey, removeKey = view:ChangeButton(item)
+      UpdateButton(view, updateKey)
+      if updateKey ~= item.slotkey then
+        UpdateButton(view, item.slotkey)
+      end
+      if removeKey then
+        ClearButton(view, items:GetItemDataFromSlotKey(removeKey))
+      end
     end
   end
 

@@ -93,6 +93,7 @@ end
 ---@param view View
 ---@param slotkey string
 local function UpdateButton(view, slotkey)
+  debug:Log("UpdateButton", "Updating button for item", slotkey)
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey)
   itemButton:SetItem(slotkey)
@@ -164,7 +165,14 @@ local function GridView(view, bag, slotInfo)
 
   for _, item in pairs(changed) do
     if item.bagid ~= Enum.BagIndex.Keyring then
-      UpdateButton(view, view:ChangeButton(item))
+      local updateKey, removeKey = view:ChangeButton(item)
+      UpdateButton(view, updateKey)
+      if updateKey ~= item.slotkey then
+        UpdateButton(view, item.slotkey)
+      end
+      if removeKey then
+        ClearButton(view, items:GetItemDataFromSlotKey(removeKey))
+      end
     end
   end
 

@@ -350,6 +350,15 @@ end
 ---@param newData ItemData
 ---@param oldData ItemData
 ---@return boolean
+function items:ItemGUIDChanged(newData, oldData)
+  if newData.isItemEmpty then return false end
+  if not oldData then return false end
+  return newData.itemInfo.itemGUID ~= oldData.itemInfo.itemGUID
+end
+
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
 function items:ItemHashChanged(newData, oldData)
   if newData.isItemEmpty and not oldData then return false end
   return newData.itemHash ~= oldData.itemHash
@@ -449,6 +458,10 @@ function items:LoadItems(kind, wipe, dataCache)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
     elseif items:ItemHashChanged(currentItem, previousItem) then
       debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
+      slotInfo.removedItems[previousItem.slotkey] = previousItem
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
+    elseif items:ItemGUIDChanged(currentItem, previousItem) then
+      debug:Log("ItemGUIDChanged", currentItem.itemInfo.itemLink)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
       slotInfo.addedItems[currentItem.slotkey] = currentItem
     elseif items:ItemChanged(currentItem, previousItem) then
