@@ -71,9 +71,6 @@ function bagFrame.bagProto:Sort()
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   if _G.SortBags ~= nil then
     events:SendMessage('bags/SortBackpackClassic')
-  else
-    items:RemoveNewItemFromAllItems()
-    self:Refresh()
   end
 end
 
@@ -197,8 +194,6 @@ function bagFrame:Create(kind)
       GameTooltip:AddDoubleLine(L:G("Shift Left Click"), L:G("Search Bags"), 1, 0.81, 0, 1, 1, 1)
       if _G.SortBags ~= nil then
         GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Sort Bags"), 1, 0.81, 0, 1, 1, 1)
-      else
-        GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Refresh Bags"), 1, 0.81, 0, 1, 1, 1)
       end
     else
       GameTooltip:AddDoubleLine(L:G("Left Click"), L:G("Open Menu"), 1, 0.81, 0, 1, 1, 1)
