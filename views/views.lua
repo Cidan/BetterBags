@@ -204,6 +204,7 @@ end
 
 ---@param title string
 function views.viewProto:AddDirtySection(title)
+  if not title then return end
   self.dirtySections[title] = true
 end
 
