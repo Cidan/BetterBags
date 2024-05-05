@@ -22,6 +22,7 @@ const.BAG_KIND = {
   UNDEFINED = -1,
   BACKPACK = 0,
   BANK = 1,
+  REAGENT_BANK = 2,
 }
 
 -- BANK_BAGS contains all the bags that are part of the bank, including

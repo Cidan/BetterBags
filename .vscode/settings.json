@@ -111,7 +111,8 @@
     "CharacterBag1Slot",
     "CharacterBag2Slot",
     "CharacterBag3Slot",
-    "CharacterReagentBag0Slot"
+    "CharacterReagentBag0Slot",
+    "REAGENT_BANK"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

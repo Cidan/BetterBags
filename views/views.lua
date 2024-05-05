@@ -298,16 +298,17 @@ end
 -- of the item if it was not in a stack.
 -- The second return is the slotkey of the item that should be removed from the view,
 -- if the item was merged into a stack.
+-- The third return is the slotkey of the item that should be added to the view.
 ---@param item ItemData
----@return string, string?
+---@return string, string?, string?
 function views.viewProto:ChangeButton(item)
+  local stack = self.stacks[item.itemHash]
   local opts = database:GetStackingOptions(self.kind)
   -- If we're not merging stacks, return nil.
   if (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) then
     return item.slotkey
   end
 
-  local stack = self.stacks[item.itemHash]
   if stack then
     if not stack:IsInStack(item.slotkey) then
       stack:AddItem(item.slotkey)
@@ -399,6 +400,13 @@ function stackProto:UpdateCount()
     local subItemData = items:GetItemDataFromSlotKey(subItemSlotKey)
     itemData.stackedCount = itemData.stackedCount + subItemData.itemInfo.currentItemCount
   end
+end
+
+---@return number
+function stackProto:GetStackCount()
+  if not self.item then return 0 end
+  local itemData = items:GetItemDataFromSlotKey(self.item)
+  return itemData.stackedCount
 end
 
 function stackProto:HasSubItem(slotkey)

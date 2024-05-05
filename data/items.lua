@@ -267,7 +267,7 @@ function items:RefreshReagentBank(wipe)
   end
 
   --- Process the item container.
-  self:ProcessContainer(const.BAG_KIND.BANK, wipe, container)
+  self:ProcessContainer(const.BAG_KIND.REAGENT_BANK, wipe, container)
 end
 
 ---@param wipe boolean
@@ -380,7 +380,16 @@ end
 -- UpdateFreeSlots updates the current free slot count for a given bag kind.
 ---@param kind BagKind
 function items:UpdateFreeSlots(kind)
-  local baglist = kind == const.BAG_KIND.BANK and const.BANK_BAGS or const.BACKPACK_BAGS
+  ---@type table<number, number>
+  local baglist
+  if kind == const.BAG_KIND.BANK then
+    baglist = const.BANK_BAGS
+  elseif kind == const.BAG_KIND.REAGENT_BANK then
+    baglist = const.REAGENTBANK_BAGS
+    kind = const.BAG_KIND.BANK
+  else
+    baglist = const.BACKPACK_BAGS
+  end
   for bagid in pairs(baglist) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
     local name = ""
@@ -413,7 +422,8 @@ end
 ---@param kind BagKind
 ---@param wipe boolean
 ---@param dataCache table<string, ItemData>
-function items:LoadItems(kind, wipe, dataCache)
+---@param reagent? boolean
+function items:LoadItems(kind, wipe, dataCache, reagent)
   -- Wipe the data if needed before loading the new data.
   if wipe then
     self:WipeSlotInfo(kind)
@@ -428,7 +438,7 @@ function items:LoadItems(kind, wipe, dataCache)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(dataCache, wipe)
-  self:UpdateFreeSlots(kind)
+  self:UpdateFreeSlots(reagent and const.BAG_KIND.REAGENT_BANK or kind)
   local slotInfo = self.slotInfo[kind]
 
   -- Loop through all the items in the bag and update slot info properties.
@@ -497,7 +507,12 @@ end
 ---@param container ItemLoader
 function items:ProcessContainer(kind, wipe, container)
   container:Load(function()
-    self:LoadItems(kind, wipe, container:GetDataCache())
+    if kind == const.BAG_KIND.REAGENT_BANK then
+      kind = const.BAG_KIND.BANK
+      self:LoadItems(kind, wipe, container:GetDataCache(), true)
+    else
+      self:LoadItems(kind, wipe, container:GetDataCache())
+    end
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
     events:SendMessageLater(ev, nil, self.slotInfo[kind])
