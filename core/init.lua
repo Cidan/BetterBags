@@ -182,15 +182,7 @@ end
 
 local function applyCompat()
   if not addon.isCata then return end
-  if not C_CurrencyInfo.SetCurrencyBackpack then
-    C_CurrencyInfo.SetCurrencyBackpack = SetCurrencyBackpack
-  end
-  if not C_CurrencyInfo.GetCurrencyListInfo then
-    C_CurrencyInfo.GetCurrencyListInfo = GetCurrencyListInfo
-  end
-  if not C_CurrencyInfo.GetCurrencyListSize then
-    C_CurrencyInfo.GetCurrencyListSize = GetCurrencyListSize
-  end
+  -- No compats right now :) 
 end
 
 -- OnEnable is called when the addon is enabled.
