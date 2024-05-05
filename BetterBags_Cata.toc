@@ -62,7 +62,7 @@ frames\search.lua
 frames\slider.lua
 frames\money.lua
 frames\era\money.lua
-frames\era\context.lua
+frames\classic\context.lua
 frames\column.lua
 frames\grid.lua
 frames\item.lua
@@ -84,7 +84,7 @@ views\listview.lua
 views\bagview.lua
 
 frames\bag.lua
-frames\era\bag.lua
+frames\classic\bag.lua
 
 config\config.lua
 config\era\config.lua

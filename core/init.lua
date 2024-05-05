@@ -181,18 +181,21 @@ function addon:UpdateButtonHighlight()
 end
 
 local function applyCompat()
-  if not addon.isWrath then return end
-  if not C_Item.GetItemInfoInstant then
-    C_Item.GetItemInfoInstant = GetItemInfoInstant
+  if not addon.isCata then return end
+  if not C_CurrencyInfo.SetCurrencyBackpack then
+    C_CurrencyInfo.SetCurrencyBackpack = SetCurrencyBackpack
   end
-  if not C_Item.GetItemInfo then
-    C_Item.GetItemInfo = GetItemInfo
+  if not C_CurrencyInfo.GetCurrencyListInfo then
+    C_CurrencyInfo.GetCurrencyListInfo = GetCurrencyListInfo
+  end
+  if not C_CurrencyInfo.GetCurrencyListSize then
+    C_CurrencyInfo.GetCurrencyListSize = GetCurrencyListSize
   end
 end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  -- Hackfix for WotLK
+  -- Hackfix for Cata
   applyCompat()
   itemFrame:Enable()
   sectionFrame:Enable()

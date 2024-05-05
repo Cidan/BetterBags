@@ -333,3 +333,14 @@ _G.DevTool = {}
 ---@param value any
 ---@param tag string
 function _G.DevTool:AddData(value, tag) end
+
+---@param index number
+---@param backpack boolean
+function SetCurrencyBackpack(index, backpack) end
+
+---@param index number
+---@return CurrencyInfo
+function GetCurrencyListInfo(index) end
+
+---@return number
+function GetCurrencyListSize() end
