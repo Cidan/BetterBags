@@ -366,7 +366,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(self.button, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound);
   self:UpdateCount()
-  self:SetLock(data.itemInfo.isLocked)
+  --self:SetLock(data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
   self.button:UpdateNewItem(data.itemInfo.itemQuality)

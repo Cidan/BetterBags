@@ -118,7 +118,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   self:UpdateCount()
   SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
   self.IconQuestTexture:Hide()
-  self:SetLock(data.itemInfo.isLocked)
+  --self:SetLock(data.itemInfo.isLocked)
   if data.bagid ~= nil then
     ContainerFrame_UpdateCooldown(data.bagid, self.button)
   end
