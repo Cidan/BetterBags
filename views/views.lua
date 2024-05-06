@@ -398,7 +398,9 @@ function stackProto:UpdateCount()
   itemData.stackedCount = itemData.itemInfo.currentItemCount
   for subItemSlotKey in pairs(self.subItems) do
     local subItemData = items:GetItemDataFromSlotKey(subItemSlotKey)
-    itemData.stackedCount = itemData.stackedCount + subItemData.itemInfo.currentItemCount
+    if not subItemData.isItemEmpty then
+      itemData.stackedCount = itemData.stackedCount + subItemData.itemInfo.currentItemCount
+    end
   end
 end
 
