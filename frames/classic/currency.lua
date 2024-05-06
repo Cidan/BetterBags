@@ -64,6 +64,29 @@ function CurrencyFrame:IsShown()
   return self.frame:IsShown()
 end
 
+---@param ref number
+---@return CurrencyInfo
+local function getCurrencyInfo(ref)
+  local name, isHeader, isExpanded,
+  isUnused, isWatched, count, icon,
+  maximum, hasWeeklyLimit,
+  currentWeeklyAmount, unknown, itemID = GetCurrencyListInfo(ref)
+  return {
+    name = name,
+    isHeader = isHeader,
+    isHeaderExpanded = isExpanded,
+    isTypeUnused = isUnused,
+    isShowInBackpack = isWatched,
+    quantity = count,
+    iconFileID = icon,
+    maxQuantity = maximum,
+    canEarnPerWeek = hasWeeklyLimit,
+    quantityEarnedThisWeek = currentWeeklyAmount,
+    unknown = unknown,
+    itemID = itemID
+  }
+end
+
 ---@param index number
 ---@param info CurrencyInfo
 ---@return CurrencyItem|nil
@@ -91,14 +114,14 @@ function CurrencyFrame:GetCurrencyItem(index, info)
       GameTooltip:Hide()
     end)
     item.frame:SetScript('OnMouseDown', function()
-      local refinfo = GetCurrencyListInfo(item.index)
+      local refinfo = getCurrencyInfo(item.index)
       if refinfo.isHeader then
         return
       end
       if refinfo.isShowInBackpack then
-        SetCurrencyBackpack(item.index, false)
+        SetCurrencyBackpack(item.index, 0)
       else
-        SetCurrencyBackpack(item.index, true)
+        SetCurrencyBackpack(item.index, 1)
       end
       self:Update()
     end)
@@ -120,7 +143,7 @@ function CurrencyFrame:Update()
   local showCount = 0
   repeat
     local ref = index
-    local info = GetCurrencyListInfo(ref)
+    local info = getCurrencyInfo(ref)
     local item = self:GetCurrencyItem(ref, info)
     if item then
       item.icon:SetTexture(info.iconFileID)

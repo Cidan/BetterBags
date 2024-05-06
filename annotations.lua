@@ -335,7 +335,7 @@ _G.DevTool = {}
 function _G.DevTool:AddData(value, tag) end
 
 ---@param index number
----@param backpack boolean
+---@param backpack number
 function SetCurrencyBackpack(index, backpack) end
 
 ---@param index number
