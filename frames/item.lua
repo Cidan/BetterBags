@@ -100,7 +100,7 @@ end
 ---@return boolean
 local function matchFilter(filter, data)
   if filter == "" then return true end
-  if data.isItemEmpty then return false end
+  if not data or data.isItemEmpty then return false end
   ---@type string, string
   local prefix, value = strsplit(":", filter, 2)
   -- If no prefix is provided, assume the filter is a name or type filter.
