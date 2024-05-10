@@ -86,7 +86,7 @@ function addon:ToggleAllBags(interactingFrame)
   else
     addon.backpackShouldOpen = true
   end
-  events:SendMessageLater('bags/OpenClose')
+  events:SendMessage('bags/OpenClose')
 end
 
 function addon:CloseSpecialWindows(interactingFrame)

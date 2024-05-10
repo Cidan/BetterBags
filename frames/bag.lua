@@ -100,7 +100,7 @@ function bagFrame.bagProto:Show()
   if self.frame:IsShown() then
     return
   end
-  addon.ForceShowBlizzardBags()
+  --addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
   self.frame:Show()
 end

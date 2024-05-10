@@ -67,6 +67,11 @@ addon.Bags = {}
 
 addon.atBank = false
 
+-- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
+function BetterBags_ToggleBags()
+  addon:ToggleAllBags()
+end
+
 local function CheckKeyBindings()
   if InCombatLockdown() then
     addon._bindingFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -80,15 +85,16 @@ local function CheckKeyBindings()
     "TOGGLEBAG1",
     "TOGGLEBAG2",
     "TOGGLEBAG3",
-    "TOGGLEBAG4"
+    "TOGGLEBAG4",
+    "OPENALLBAGS"
   }
   for _, binding in pairs(bindings) do
     local key, otherkey = GetBindingKey(binding)
     if key ~= nil then
-      SetOverrideBinding(addon._bindingFrame, true, key, "OPENALLBAGS")
+      SetOverrideBinding(addon._bindingFrame, true, key, "BETTERBAGS_TOGGLEBAGS")
     end
     if otherkey ~= nil then
-      SetOverrideBinding(addon._bindingFrame, true, otherkey, "OPENALLBAGS")
+      SetOverrideBinding(addon._bindingFrame, true, otherkey, "BETTERBAGS_TOGGLEBAGS")
     end
   end
 end
