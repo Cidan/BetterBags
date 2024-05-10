@@ -335,7 +335,7 @@ const.DATABASE_DEFAULTS = {
     },
     compaction = {
       [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.SIMPLE,
-      [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.NONE,
+      [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.SIMPLE,
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
@@ -376,8 +376,8 @@ const.DATABASE_DEFAULTS = {
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
-          columnCount = 15,
-          itemsPerRow = 5,
+          columnCount = 1,
+          itemsPerRow = 15,
           scale = 100,
           width = 700,
           height = 500,
@@ -394,8 +394,8 @@ const.DATABASE_DEFAULTS = {
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
-          columnCount = 5,
-          itemsPerRow = 5,
+          columnCount = 1,
+          itemsPerRow = 15,
           scale = 100,
           width = 700,
           height = 500,
@@ -430,8 +430,8 @@ const.DATABASE_DEFAULTS = {
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
-          columnCount = 5,
-          itemsPerRow = 5,
+          columnCount = 1,
+          itemsPerRow = 15,
           scale = 100,
           width = 700,
           height = 500,
