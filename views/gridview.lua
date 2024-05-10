@@ -267,6 +267,7 @@ function views:NewGrid(parent, kind)
   view.bagview = const.BAG_VIEW.SECTION_GRID
   view.kind = kind
   view.content = grid:Create(parent)
+  view.content:SortVertical()
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
   view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)

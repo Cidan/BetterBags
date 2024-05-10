@@ -40,6 +40,7 @@ local cellProto = {}
 ---@field compactStyle GridCompactStyle
 ---@field private scrollable boolean
 ---@field package scrollBox WowScrollBox
+---@field private sortVertical boolean
 local gridProto = {}
 
 function gridProto:Show()
@@ -142,10 +143,19 @@ function gridProto:HideScrollBar()
   self.bar:SetAttribute("nodeignore", true)
 end
 
+function gridProto:SortVertical()
+  self.sortVertical = true
+end
+
+function gridProto:SortHorizontal()
+  self.sortVertical = false
+end
+
 function gridProto:ShowScrollBar()
   self.bar:SetAttribute("nodeignore", false)
   self.bar:SetAlpha(1)
 end
+
 -- Sort will sort the cells in this grid using the given function.
 ---@param fn fun(a: `T`, b: `T`):boolean
 function gridProto:Sort(fn)
@@ -163,31 +173,49 @@ function gridProto:stage()
 
   local width = 0 ---@type number
   local height = 0
-
+  local currentColumn = 0
   -- Do not compact the cells at all and draw them in their ordered
   -- rows and columns.
   if self.compactStyle == const.GRID_COMPACT_STYLE.SIMPLE or
   self.compactStyle == const.GRID_COMPACT_STYLE.NONE then
     for i, cell in ipairs(self.cells) do
       cell.frame:ClearAllPoints()
-      -- Get the current column for a given cell order, left to right.
-      local column = self.columns[i % self.maxCellWidth]
+
+      ---@type number
+      local columnKey
+      if self.sortVertical then
+        -- Calculate a column key such that all cells in the cell list are
+        -- distributed equally among however many columns are defined by self.maxCellWidth, i.e. depth first.
+        if self.columns[currentColumn] and #self.columns[currentColumn].cells > #self.cells / self.maxCellWidth then
+          currentColumn = currentColumn + 1
+        end
+        columnKey = currentColumn
+      else
+        -- Get the current column for a given cell order, left to right, i.e. bredth first.
+        columnKey = i % self.maxCellWidth
+      end
+      local column = self.columns[columnKey]
       if column == nil then
         -- Create the column if it doesn't exist and position it within
         -- the grid.
         column = columnFrame:Create()
         column.spacing = self.spacing
         column.frame:SetParent(self.inner)
-        self.columns[i % self.maxCellWidth] = column
-        if i == 1 then
-          if #self.headers > 0 and self.headers[#self.headers]:GetCellCount() > 0 then
-            column.frame:SetPoint("TOPLEFT", self.headers[#self.headers].frame, "BOTTOMLEFT", 0, -4)
-          else
+        self.columns[columnKey] = column
+        if self.sortVertical then
+          if columnKey == 0 then
             column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
+          else
+            local previousColumn = self.columns[columnKey - 1]
+            column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
           end
         else
-          local previousColumn = self.columns[i - 1]
-          column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
+          if i == 1 then
+            column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
+          else
+            local previousColumn = self.columns[i - 1]
+            column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
+          end
         end
       end
       -- Add the cell to the column.
@@ -220,19 +248,10 @@ function gridProto:render(width, height)
 end
 
 -- Draw will draw the grid.
----@param callback? fun(width: number, height: number)
 ---@return number width
 ---@return number height
-function gridProto:Draw(callback)
-  if not callback then
-    return self:render(self:stage())
-  end
-  local width, height = self:stage()
-  C_Timer.After(0, function()
-    width, height = self:render(width, height)
-    callback(width, height)
-  end)
-  return 0,0
+function gridProto:Draw()
+  return self:render(self:stage())
 end
 
 -- Clear will remove and release all columns from the grid,
@@ -312,6 +331,7 @@ function grid:Create(parent)
   g.maxCellWidth = 5
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   g.spacing = 4
+  g:SortHorizontal()
   g.bar:Show()
   -- Fixes a bug where the frame is not visble when anchored to the parent.
   g.frame:SetSize(1,1)

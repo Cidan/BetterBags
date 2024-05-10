@@ -315,24 +315,6 @@ function config:GetBagOptions(kind)
               end)
             end,
           },
-          sectionsPerRow = {
-            type = "range",
-            name = L:G("Sections Per Row"),
-            desc = L:G("Set the number of sections per row in this bag."),
-            order = 1,
-            min = 1,
-            max = 20,
-            step = 1,
-            get = function()
-              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
-            end,
-            set = function(_, value)
-              DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
-              bucket:Later("setSectionsPerRow", 0.2, function()
-                events:SendMessage('bags/FullRefreshAll')
-              end)
-            end,
-          },
           opacity = {
             type = "range",
             name = L:G("Opacity"),
@@ -349,11 +331,29 @@ function config:GetBagOptions(kind)
               DB:SetBagViewSizeOpacity(kind, DB:GetBagView(kind), value)
             end,
           },
+          sectionsPerRow = {
+            type = "range",
+            name = L:G("Columns"),
+            desc = L:G("Set the number of columns sections will fit into."),
+            order = 2,
+            min = 1,
+            max = 20,
+            step = 1,
+            get = function()
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
+            end,
+            set = function(_, value)
+              DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
+              bucket:Later("setSectionsPerRow", 0.2, function()
+                events:SendMessage('bags/FullRefreshAll')
+              end)
+            end,
+          },
           scale = {
             type = "range",
             name = L:G("Scale"),
             desc = L:G("Set the scale of this bag."),
-            order = 2,
+            order = 3,
             min = 60,
             max = 160,
             step = 1,
