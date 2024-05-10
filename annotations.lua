@@ -344,3 +344,27 @@ function GetCurrencyListInfo(index) end
 
 ---@return number
 function GetCurrencyListSize() end
+
+
+--- WagoAnalytics
+---@class WagoAnalytics
+local WagoAnalytics = {}
+
+---@param id string
+function WagoAnalytics:Register(id) end
+
+---@param label string
+---@param enabled boolean
+function WagoAnalytics:Switch(label, enabled) end
+
+---@param counter string
+---@param amount? number
+function WagoAnalytics:IncrementCounter(counter, amount) end
+
+---@param counter string
+---@param amount? number
+function WagoAnalytics:DecrementCounter(counter, amount) end
+
+---@param counter string
+---@param amount number
+function WagoAnalytics:SetCounter(counter, amount) end
