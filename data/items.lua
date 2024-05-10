@@ -397,9 +397,9 @@ function items:UpdateFreeSlots(kind)
     local baglink = GetInventoryItemLink("player", invid)
     if baglink ~= nil and invid ~= nil then
       local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-      name = GetItemSubClassInfo(class, subclass)
+      name = C_Item.GetItemSubClassInfo(class, subclass)
     else
-      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
     end
     if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
       -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
@@ -454,9 +454,9 @@ function items:LoadItems(kind, wipe, dataCache, reagent)
       name = L:G("Keyring")
     elseif baglink ~= nil and invid ~= nil then
       local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-      name = GetItemSubClassInfo(class, subclass)
+      name = C_Item.GetItemSubClassInfo(class, subclass)
     else
-      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
     end
 
     -- Process item changes.
@@ -795,9 +795,9 @@ function items:AttachItemInfo(data, kind)
   itemLevel, itemMinLevel, itemType, itemSubType,
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
-  setID, isCraftingReagent = GetItemInfo(itemID)
+  setID, isCraftingReagent = C_Item.GetItemInfo(itemID)
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
-  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
+  local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
   data.itemInfo = {
