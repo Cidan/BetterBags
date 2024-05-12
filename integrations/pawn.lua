@@ -33,7 +33,7 @@ local function onItemUpdateClassic(item)
   if data.isItemEmpty or not data.slotid or not data.bagid then
     item.button.UpgradeIcon:SetShown(false)
   else
-    local isUpgrade = PawnShouldItemLinkHaveUpgradeArrow(data.itemInfo.itemLink)
+    local isUpgrade = PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(data.itemInfo.itemLink)
     item.button.UpgradeIcon:SetShown(isUpgrade or false)
   end
 end
