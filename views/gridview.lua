@@ -124,7 +124,6 @@ local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
   view:AddDirtySection(newData.itemInfo.category)
 end
 
-
 ---@param view View
 ---@param bag Bag
 ---@param slotInfo SlotInfo
@@ -238,6 +237,9 @@ local function GridView(view, bag, slotInfo)
   if not slotInfo.deferDelete then
     debug:StartProfile('Content Draw Stage')
     local w, h = view.content:Draw()
+    for _, section in pairs(view.sections) do
+      debug:WalkAndFixAnchorGraph(section.frame)
+    end
     debug:EndProfile('Content Draw Stage')
     -- Reposition the content frame if the recent items section is empty.
     if w < 160 then
@@ -277,3 +279,4 @@ function views:NewGrid(parent, kind)
   view.WipeHandler = Wipe
   return view
 end
+

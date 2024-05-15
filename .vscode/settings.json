@@ -112,7 +112,9 @@
     "CharacterBag2Slot",
     "CharacterBag3Slot",
     "CharacterReagentBag0Slot",
-    "REAGENT_BANK"
+    "REAGENT_BANK",
+    "GREEN_FONT_COLOR",
+    "LIGHTGRAY_FONT_COLOR"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",
