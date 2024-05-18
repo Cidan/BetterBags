@@ -211,6 +211,9 @@ function addon:OnEnable()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
 
+  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
+  table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+
   consoleport:Enable()
 
   self:SecureHook('ToggleAllBags')

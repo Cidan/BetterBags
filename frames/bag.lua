@@ -168,6 +168,11 @@ function bagFrame.bagProto:Wipe()
   end
 end
 
+---@return string
+function bagFrame.bagProto:GetName()
+  return self.frame:GetName()
+end
+
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
 function bagFrame.bagProto:Refresh()
