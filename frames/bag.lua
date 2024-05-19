@@ -313,6 +313,8 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor()
   ---@cast itemID number
   question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
   function(input)
+    if input == nil then return end
+    if input == "" then return end
     categories:AddItemToPersistentCategory(itemID, input)
     events:SendMessage('bags/FullRefreshAll')
   end)
