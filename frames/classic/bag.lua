@@ -92,6 +92,7 @@ function bagFrame:Create(kind)
   b.toRelease = {}
   b.toReleaseSections = {}
   b.kind = kind
+  local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsClassicBagPortrait
@@ -123,6 +124,7 @@ function bagFrame:Create(kind)
   ButtonFrameTemplate_HidePortrait(b.frame)
   ButtonFrameTemplate_HideButtonBar(b.frame)
   b.frame.Inset:Hide()
+  b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()

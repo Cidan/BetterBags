@@ -145,6 +145,9 @@ function DB:SetFirstTimeMenu(value)
   DB.data.profile.firstTimeMenu = value
 end
 
+---@param kind BagKind
+---@param view BagView
+---@param opacity number
 function DB:SetBagViewSizeOpacity(kind, view, opacity)
   DB.data.profile.size[view][kind].opacity = opacity
 end
