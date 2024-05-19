@@ -369,7 +369,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   --self:SetLock(data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
-  self.button:UpdateNewItem(data.itemInfo.itemQuality)
+  self:UpdateNewItem(data.itemInfo.itemQuality)
   self.button:UpdateJunkItem(data.itemInfo.itemQuality, noValue)
   self.button:UpdateItemContextMatching()
   self.button:UpdateCooldown(data.itemInfo.itemIcon)
@@ -389,6 +389,38 @@ function itemFrame.itemProto:SetItemFromData(data)
   end
   self.frame:Show()
   self.button:Show()
+end
+
+function itemFrame.itemProto:UpdateNewItem(quality)
+	if(not self.button.BattlepayItemTexture and not self.NewItemTexture) then
+		return
+	end
+
+	if items:IsNewItem(self:GetItemData()) then
+		if C_Container.IsBattlePayItem(self.button:GetBagID(), self.button:GetID()) then
+			self.button.NewItemTexture:Hide()
+			self.button.BattlepayItemTexture:Show();
+		else
+			if (quality and NEW_ITEM_ATLAS_BY_QUALITY[quality]) then
+				self.button.NewItemTexture:SetAtlas(NEW_ITEM_ATLAS_BY_QUALITY[quality]);
+			else
+				self.button.NewItemTexture:SetAtlas("bags-glow-white");
+			end
+			self.button.BattlepayItemTexture:Hide();
+			self.button.NewItemTexture:Show();
+		end
+		if (not self.button.flashAnim:IsPlaying() and not self.button.newitemglowAnim:IsPlaying()) then
+			self.button.flashAnim:Play();
+			self.button.newitemglowAnim:Play();
+		end
+	else
+		self.button.BattlepayItemTexture:Hide();
+		self.button.NewItemTexture:Hide();
+		if (self.button.flashAnim:IsPlaying() or self.button.newitemglowAnim:IsPlaying()) then
+			self.button.flashAnim:Stop();
+			self.button.newitemglowAnim:Stop();
+		end
+	end
 end
 
 function itemFrame.itemProto:ResetSize()

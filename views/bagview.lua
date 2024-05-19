@@ -200,7 +200,7 @@ local function BagView(view, bag, slotInfo)
   end
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
-  view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
+  view.content:Sort(sort.SortSectionsAlphabetically)
   debug:StartProfile('Content Draw Stage')
   local w, h = view.content:Draw()
   debug:EndProfile('Content Draw Stage')

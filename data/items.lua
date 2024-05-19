@@ -78,6 +78,7 @@ local itemDataProto = {}
 ---@field _newItemTimers table<string, number>
 ---@field _preSort boolean
 ---@field _refreshQueueEvent EventArg[]
+---@field _firstLoad table<BagKind, boolean>
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -87,6 +88,11 @@ function items:OnInitialize()
   self._newItemTimers = {}
   self._preSort = false
   self._doingRefresh = false
+  self._firstLoad = {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true,
+    [const.BAG_KIND.REAGENT_BANK] = true,
+  }
 end
 
 function items:OnEnable()
@@ -132,6 +138,9 @@ function items:OnEnable()
   events:RegisterMessage('bags/SortBackpack', function()
     self:RemoveNewItemFromAllItems()
     self:ClearItemCache()
+    self._firstLoad[const.BAG_KIND.BACKPACK] = true
+    self._firstLoad[const.BAG_KIND.BANK] = true
+    self._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
     self:PreSort()
     C_Container:SortBags()
   end)
@@ -462,7 +471,10 @@ function items:LoadItems(kind, wipe, dataCache, reagent)
     -- Process item changes.
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
-     slotInfo.addedItems[currentItem.slotkey] = currentItem
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
+      if not wipe and addon.isRetail then
+        self:MarkItemAsNew(currentItem)
+      end
     elseif items:ItemRemoved(currentItem, previousItem) then
       debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
@@ -507,6 +519,10 @@ end
 ---@param container ItemLoader
 function items:ProcessContainer(kind, wipe, container)
   container:Load(function()
+    if not wipe and self._firstLoad[kind] == true then
+      self._firstLoad[kind] = false
+      wipe = true
+    end
     if kind == const.BAG_KIND.REAGENT_BANK then
       kind = const.BAG_KIND.BANK
       self:LoadItems(kind, wipe, container:GetDataCache(), true)
@@ -580,6 +596,15 @@ end
 function items:ClearNewItems()
   C_NewItems.ClearAll()
   wipe(self._newItemTimers)
+end
+
+---@param data ItemData
+function items:MarkItemAsNew(data)
+  if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
+    self._newItemTimers[data.itemInfo.itemGUID] = time()
+    data.itemInfo.isNewItem = true
+    data.itemInfo.category = self:GetCategory(data)
+  end
 end
 
 ---@param link string

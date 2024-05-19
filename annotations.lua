@@ -10,6 +10,8 @@
 ---@field BattlepayItemTexture Texture
 ---@field IconBorder Texture
 ---@field UpgradeIcon Texture
+---@field flashAnim AnimationGroup
+---@field newitemglowAnim AnimationGroup
 local itemButton = {}
 
 ---@param bagid number
@@ -43,6 +45,9 @@ function itemButton:SetMatchesSearch(matchesSearch) end
 function itemButton:SetItemButtonQuality(quality) end
 
 function itemButton:HasItem() end
+
+---@return Enum.BagIndex
+function itemButton:GetBagID() end
 
 ---@class Button
 local Button = {}
