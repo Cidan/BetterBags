@@ -369,7 +369,9 @@ function itemFrame.itemProto:SetItemFromData(data)
   --self:SetLock(data.itemInfo.isLocked)
   self.button:UpdateExtended()
   self.button:UpdateQuestItem(isQuestItem, questID, isActive)
-  self:UpdateNewItem(data.itemInfo.itemQuality)
+  if not self.staticData then
+    self:UpdateNewItem(data.itemInfo.itemQuality)
+  end
   self.button:UpdateJunkItem(data.itemInfo.itemQuality, noValue)
   self.button:UpdateItemContextMatching()
   self.button:UpdateCooldown(data.itemInfo.itemIcon)
