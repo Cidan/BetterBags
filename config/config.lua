@@ -85,7 +85,7 @@ function config:GetGeneralOptions()
         width = "full",
         order = 2,
         name = L:G("Show Blizzard Bag Button"),
-                desc = L:G("Show or hide the default Blizzard bag button."),
+        desc = L:G("Show or hide the default Blizzard bag button."),
         disabled = function()
           return select(4, C_AddOns.GetAddOnInfo('Bartender4'))
         end,
@@ -99,7 +99,7 @@ function config:GetGeneralOptions()
           end
           DB:SetShowBagButton(value)
         end,
-            },
+      },
       showBagButtonDisabled = {
         type = "description",
         name = L:G("|cffThis option is disabled because Bartender4 is installed."),
