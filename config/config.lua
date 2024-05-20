@@ -85,10 +85,13 @@ function config:GetGeneralOptions()
         width = "full",
         order = 2,
         name = L:G("Show Blizzard Bag Button"),
-        desc = L:G("Show or hide the default Blizzard bag button."),
+                desc = L:G("Show or hide the default Blizzard bag button."),
+        disabled = function()
+          return select(4, C_AddOns.GetAddOnInfo('Bartender4'))
+        end,
         get = DB.GetShowBagButton,
         set = function(_, value)
-          local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame	
+          local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
           if value then
             BagsBar:SetParent(UIParent)
           else
@@ -96,6 +99,14 @@ function config:GetGeneralOptions()
           end
           DB:SetShowBagButton(value)
         end,
+            },
+      showBagButtonDisabled = {
+        type = "description",
+        name = L:G("|cffThis option is disabled because Bartender4 is installed."),
+        hidden = function()
+          return not select(4, C_AddOns.GetAddOnInfo('Bartender4'))
+        end,
+        order = 2.5,
       },
       newItemTime = {
         type = "range",

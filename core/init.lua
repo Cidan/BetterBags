@@ -125,7 +125,7 @@ function addon:OnInitialize()
   end
 
   for _, button in pairs(addon._buttons) do
-    button:HookScript("OnClick",
+    button:SetScript("OnClick",
     function()
       addon:ToggleAllBags()
     end)
@@ -156,23 +156,24 @@ function addon:HideBlizzardBags()
     _G["ContainerFrame"..i]:SetParent(sneakyFrame)
   end
 
-  MainMenuBarBackpackButton:SetScript("OnClick", function()
-    self:ToggleAllBags()
-  end)
 
-  BagBarExpandToggle:SetParent(sneakyFrame)
-  for i = 0, 3 do
-    local bagButton = _G["CharacterBag"..i.."Slot"] --[[@as Button]]
-    bagButton:SetParent(sneakyFrame)
-  end
-  for i = 0, 0 do
-    local bagButton = _G["CharacterReagentBag"..i.."Slot"] --[[@as Button]]
-    bagButton:SetParent(sneakyFrame)
-  end
-
-  if not database:GetShowBagButton() then
-    BagsBar:SetParent(sneakyFrame)
-  end
+	if not select(4, C_AddOns.GetAddOnInfo("Bartender4")) then
+		MainMenuBarBackpackButton:SetScript("OnClick", function()
+			self:ToggleAllBags()
+		end)
+		BagBarExpandToggle:SetParent(sneakyFrame)
+		for i = 0, 3 do
+			local bagButton = _G["CharacterBag"..i.."Slot"] --[[@as Button]]
+			bagButton:SetParent(sneakyFrame)
+		end
+		for i = 0, 0 do
+			local bagButton = _G["CharacterReagentBag"..i.."Slot"] --[[@as Button]]
+			bagButton:SetParent(sneakyFrame)
+		end
+		if not database:GetShowBagButton() then
+			BagsBar:SetParent(sneakyFrame)
+		end
+	end
 
   BankFrame:SetParent(sneakyFrame)
   BankFrame:SetScript("OnHide", nil)
