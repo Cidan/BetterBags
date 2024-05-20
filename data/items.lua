@@ -467,7 +467,6 @@ function items:LoadItems(kind, wipe, dataCache, reagent)
     else
       name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
     end
-
     -- Process item changes.
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
@@ -519,7 +518,7 @@ end
 ---@param container ItemLoader
 function items:ProcessContainer(kind, wipe, container)
   container:Load(function()
-    if not wipe and self._firstLoad[kind] == true then
+    if self._firstLoad[kind] == true then
       self._firstLoad[kind] = false
       wipe = true
     end
