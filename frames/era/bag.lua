@@ -31,8 +31,8 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
@@ -156,7 +156,7 @@ function bagFrame:Create(kind)
   end
 
   -- Setup the context menu.
-  b.menuList = context:CreateContextMenu(b)
+  b.menuList = contextMenu:CreateContextMenu(b)
 
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
@@ -231,7 +231,7 @@ function bagFrame:Create(kind)
       elseif CursorHasItem() and GetCursorInfo() == "item" then
         b:CreateCategoryForItemInCursor()
       else
-        context:Show(b.menuList)
+        contextMenu:Show(b.menuList)
       end
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
       b:Sort()

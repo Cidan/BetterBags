@@ -393,6 +393,15 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.button:Show()
 end
 
+function itemFrame.itemProto:FlashItem()
+  self.button.NewItemTexture:SetAtlas("bags-glow-white")
+  self.button.NewItemTexture:Show()
+  if (not self.button.flashAnim:IsPlaying() and not self.button.newitemglowAnim:IsPlaying()) then
+    self.button.flashAnim:Play();
+    self.button.newitemglowAnim:Play()
+  end
+end
+
 function itemFrame.itemProto:UpdateNewItem(quality)
 	if(not self.button.BattlepayItemTexture and not self.NewItemTexture) then
 		return

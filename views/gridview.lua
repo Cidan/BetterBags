@@ -158,6 +158,7 @@ local function GridView(view, bag, slotInfo)
         CreateButton(view, item)
       else
         UpdateButton(view, updateKey)
+        --view.itemsByBagAndSlot[updateKey]:FlashItem()
       end
     end
   end

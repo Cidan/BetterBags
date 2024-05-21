@@ -4,9 +4,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Context: AceModule
+---@class ContextMenu: AceModule
 ---@field frame Frame
-local context = addon:NewModule('Context')
+local contextMenu = addon:NewModule('ContextMenu')
 
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
@@ -48,26 +48,27 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field tooltipOnButton? boolean
 local menuListProto = {}
 
-function context:OnInitialize()
+function contextMenu:OnInitialize()
   --self:CreateContext()
 end
 
-function context:OnEnable()
+function contextMenu:OnEnable()
   local frame = LibDD:Create_UIDropDownMenu("BetterBagsContextMenu", UIParent)
   LibDD:EasyMenu_Initialize(frame, 4, {})
   self.frame = frame
 end
 
 ---@param menuList MenuList[]
-function context:Show(menuList)
+function contextMenu:Show(menuList)
   LibDD:EasyMenu(menuList, self.frame, 'cursor', 0, 0, 'MENU')
   events:SendMessage('context/show')
 end
 
-function context:Hide()
+function contextMenu:Hide()
   LibDD:HideDropDownMenu(1)
   events:SendMessage('context/hide')
 end
+
 --[[
 local function addDivider(menuList)
   table.insert(menuList, {
@@ -102,7 +103,7 @@ end
 
 ---@param bag Bag
 ---@return MenuList[]
-function context:CreateContextMenu(bag)
+function contextMenu:CreateContextMenu(bag)
   ---@type MenuList[]
   local menuList = {}
 
@@ -136,12 +137,12 @@ function context:CreateContextMenu(bag)
         tooltipTitle = L:G("One Bag"),
         tooltipText = L:G("This view will display all items in a single bag, regardless of category."),
         func = function()
-          context:Hide()
+          contextMenu:Hide()
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.ONE_BAG)
           else
-            database:SetPreviousView(bag.kind, const.BAG_VIEW.ONE_BAG)
             database:SetBagView(bag.kind, const.BAG_VIEW.ONE_BAG)
+            database:SetPreviousView(bag.kind, const.BAG_VIEW.ONE_BAG)
             events:SendMessage('bags/FullRefreshAll')
           end
         end
@@ -158,7 +159,7 @@ function context:CreateContextMenu(bag)
         tooltipTitle = L:G("Section Grid"),
         tooltipText = L:G("This view will display items in sections, which are categorized by type, expansion, trade skill, and more."),
         func = function()
-          context:Hide()
+          contextMenu:Hide()
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.SECTION_GRID)
           else
@@ -180,7 +181,7 @@ function context:CreateContextMenu(bag)
         tooltipTitle = L:G("List"),
         tooltipText = L:G("This view will display items in a list, which is categorized by type, expansion, trade skill, and more."),
         func = function()
-          context:Hide()
+          contextMenu:Hide()
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.LIST)
           else
@@ -193,6 +194,19 @@ function context:CreateContextMenu(bag)
     }
   })
 
+  if bag.kind == const.BAG_KIND.BANK then
+    table.insert(menuList, {
+      text = L:G("Deposit All Reagents"),
+      notCheckable = true,
+      tooltipTitle = L:G("Deposit All Reagents"),
+      tooltipText = L:G("Click to deposit all reagents into your reagent bank."),
+      func = function()
+        PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
+        DepositReagentBank()
+      end
+    })
+  end
+
   -- Show bag slot toggle.
   table.insert(menuList, {
     text = L:G("Show Bags"),
@@ -200,6 +214,10 @@ function context:CreateContextMenu(bag)
     tooltipTitle = L:G("Show Bags"),
     tooltipText = L:G("Click to toggle the display of the bag slots."),
     func = function()
+      if InCombatLockdown() then
+        print("BetterBags: "..L:G("Cannot toggle bag slots in combat."))
+        return
+      end
       if bag.slots:IsShown() then
         bag.slots:Hide()
       else
@@ -209,13 +227,53 @@ function context:CreateContextMenu(bag)
     end
   })
 
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    -- Show bag slot toggle.
+    table.insert(menuList, {
+      text = L:G("Show Currencies"),
+      checked = function() return bag.currencyFrame:IsShown() end,
+      tooltipTitle = L:G("Show Currencies"),
+      tooltipText = L:G("Click to toggle the display of the currencies side panel."),
+      func = function()
+        if bag.currencyFrame:IsShown() then
+          bag.currencyFrame:Hide()
+        else
+          bag.currencyFrame:Show()
+        end
+      end
+    })
+  end
+
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    -- Show the Blizzard bag button toggle.
+    table.insert(menuList, {
+      text = L:G("Show Bag Button"),
+      tooltipTitle = L:G("Show Bag Button"),
+      tooltipText = L:G("Click to toggle the display of the Blizzard bag button."),
+      checked = function()
+        local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
+        return BagsBar:GetParent() ~= sneakyFrame
+      end,
+      func = function()
+        local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
+        local isShown = BagsBar:GetParent() ~= sneakyFrame
+        if isShown then
+          BagsBar:SetParent(sneakyFrame)
+        else
+          BagsBar:SetParent(UIParent)
+        end
+        database:SetShowBagButton(not isShown)
+      end
+    })
+  end
+
   table.insert(menuList, {
     text = L:G("Open Options Screen"),
     notCheckable = true,
     tooltipTitle = L:G("Open Options Screen"),
     tooltipText = L:G("Click to open the options screen."),
     func = function()
-      context:Hide()
+      contextMenu:Hide()
       events:SendMessage('config/Open')
     end
   })
@@ -224,7 +282,7 @@ function context:CreateContextMenu(bag)
     text = L:G("Close Menu"),
     notCheckable = true,
     func = function()
-      context:Hide()
+      contextMenu:Hide()
     end
   })
   enableTooltips(menuList)

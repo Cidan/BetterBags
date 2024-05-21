@@ -31,8 +31,8 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
@@ -60,6 +60,9 @@ local Window = LibStub('LibWindow-1.1')
 
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
 
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
@@ -183,16 +186,6 @@ function bagFrame.bagProto:Refresh()
   end
 end
 
-function bagFrame.bagProto:DoRefresh()
-  if self.kind == const.BAG_KIND.BACKPACK then
-    items:RefreshBackpack(false)
-  elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
-    items:RefreshBank(false)
-  else
-    items:RefreshReagentBank(false)
-  end
-end
-
 -- Search will search all items in the bag for the given text.
 -- If a match is found for an item, it will be highlighted, while
 -- items that don't match will dim.
@@ -252,6 +245,7 @@ function bagFrame.bagProto:OnResize()
 end
 
 function bagFrame.bagProto:ToggleReagentBank()
+  local ctx = context:New()
   -- This should never happen, but just in case!
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = not self.isReagentBank
@@ -267,7 +261,8 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshReagentBank(true)
+    ctx:Set('wipe', true)
+    items:RefreshReagentBank(ctx)
   else
     BankFrame.selectedTab = 1
     if self.searchBox.frame:IsShown() then
@@ -279,7 +274,8 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshBank(true)
+    ctx:Set('wipe', true)
+    items:RefreshBank(ctx)
   end
 end
 
@@ -305,7 +301,7 @@ function bagFrame.bagProto:OnCooldown()
 end
 
 function bagFrame.bagProto:UpdateContextMenu()
-  self.menuList = context:CreateContextMenu(self)
+  self.menuList = contextMenu:CreateContextMenu(self)
 end
 
 function bagFrame.bagProto:CreateCategoryForItemInCursor()
@@ -395,7 +391,7 @@ function bagFrame:Create(kind)
   end
 
   -- Setup the context menu.
-  b.menuList = context:CreateContextMenu(b)
+  b.menuList = contextMenu:CreateContextMenu(b)
 
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
@@ -469,7 +465,7 @@ function bagFrame:Create(kind)
       elseif CursorHasItem() and GetCursorInfo() == "item" then
         b:CreateCategoryForItemInCursor()
       else
-        context:Show(b.menuList)
+        contextMenu:Show(b.menuList)
       end
 
     elseif e == "RightButton" and kind == const.BAG_KIND.BANK then

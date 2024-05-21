@@ -366,6 +366,19 @@ function stackProto:AddItem(slotkey)
   return false
 end
 
+function stackProto:UpdateNewItemTracking()
+  local isNewStack = items:IsNewItem(items:GetItemDataFromSlotKey(self.item))
+  for subSlotkey in pairs(self.subItems) do
+    if items:IsNewItem(items:GetItemDataFromSlotKey(subSlotkey))then
+      isNewStack = true
+      break
+    end
+  end
+  if isNewStack then
+    items:MarkItemSlotAsNew(self.item)
+  end
+end
+
 -- RemoveItem removes an item from the stack. If the item was the main item,
 -- the first sub item is promoted to the main item. If the item was a sub item,
 -- it is removed from the stack. Returns the slotkey of the main item, or nil if the

@@ -36,8 +36,8 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
@@ -198,7 +198,7 @@ function addon:OnEnable()
   itemFrame:Enable()
   sectionFrame:Enable()
   masque:Enable()
-  context:Enable()
+  contextMenu:Enable()
   items:Enable()
   config:Enable()
   categories:Enable()
