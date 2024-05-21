@@ -138,6 +138,9 @@ local function ListView(view, ctx, bag, slotInfo)
       CreateButton(view, item)
     else
       UpdateButton(view, updateKey)
+      if ctx:GetBool('wipe') == false then
+        view.itemsByBagAndSlot[updateKey]:FlashItem()
+      end
     end
   end
 
