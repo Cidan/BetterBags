@@ -244,6 +244,10 @@ end
 
 ---@param slotkey string
 function views.viewProto:FlashStack(slotkey)
+  -- HACKFIX: Disable this for non retail clients due to
+  -- a lack of stable sort API.
+  if not addon.isRetail then return end
+
   local item = items:GetItemDataFromSlotKey(slotkey)
   local stack = self.stacks[item.itemHash]
   if not stack then return end
