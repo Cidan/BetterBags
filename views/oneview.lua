@@ -69,13 +69,17 @@ local function CreateButton(view, item)
   view.content:AddCell(item.slotkey, itemButton)
 end
 
+---@param ctx Context
 ---@param view View
 ---@param slotkey string
-local function UpdateButton(view, slotkey)
+local function UpdateButton(ctx, view, slotkey)
   debug:Log("UpdateButton", "Updating button for item", slotkey)
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey)
   itemButton:SetItem(slotkey)
+  if ctx:GetBool('wipe') == false then
+    view:FlashStack(slotkey)
+  end
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
@@ -126,9 +130,9 @@ local function OneBagView(view, ctx, bag, slotInfo)
       if not updateKey then
         CreateButton(view, item)
       else
-        UpdateButton(view, updateKey)
+        UpdateButton(ctx, view, updateKey)
         if ctx:GetBool('wipe') == false then
-          view.itemsByBagAndSlot[updateKey]:FlashItem()
+          view:FlashStack(updateKey)
         end
       end
     end
@@ -137,9 +141,9 @@ local function OneBagView(view, ctx, bag, slotInfo)
   for _, item in pairs(changed) do
     if item.bagid ~= Enum.BagIndex.Keyring then
       local updateKey, removeKey = view:ChangeButton(item)
-      UpdateButton(view, updateKey)
+      UpdateButton(ctx, view, updateKey)
       if updateKey ~= item.slotkey then
-        UpdateButton(view, item.slotkey)
+        UpdateButton(ctx, view, item.slotkey)
       end
       if removeKey then
         ClearButton(view, items:GetItemDataFromSlotKey(removeKey))

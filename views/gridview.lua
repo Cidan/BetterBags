@@ -90,27 +90,32 @@ local function CreateButton(view, item)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
 end
 
+---@param ctx Context
 ---@param view View
 ---@param slotkey string
-local function UpdateButton(view, slotkey)
+local function UpdateButton(ctx, view, slotkey)
   debug:Log("UpdateButton", "Updating button for item", slotkey)
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey)
   itemButton:SetItem(slotkey)
+  if ctx:GetBool('wipe') == false then
+    view:FlashStack(slotkey)
+  end
   local data = itemButton:GetItemData()
   view:AddDirtySection(data.itemInfo.category)
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
 -- button position and section to prevent a sort from happening.
+---@param ctx Context
 ---@param view View
 ---@param oldSlotKey string
 ---@param newSlotKey string
-local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
+local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
   local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
   local oldSlotSection = view:GetSlotSection(oldSlotKey)
   if not oldSlotSection then
-    UpdateButton(view, newSlotKey)
+    UpdateButton(ctx, view, newSlotKey)
     return
   end
   oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
@@ -147,7 +152,7 @@ local function GridView(view, ctx, bag, slotInfo)
       if not newSlotKey then
         ClearButton(view, item)
       else
-        UpdateDeletedSlot(view, item.slotkey, newSlotKey)
+        UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
       end
     end
   end
@@ -158,10 +163,7 @@ local function GridView(view, ctx, bag, slotInfo)
       if not updateKey then
         CreateButton(view, item)
       else
-        UpdateButton(view, updateKey)
-        if ctx:GetBool('wipe') == false then
-          view.itemsByBagAndSlot[updateKey]:FlashItem()
-        end
+        UpdateButton(ctx, view, updateKey)
       end
     end
   end
@@ -169,9 +171,9 @@ local function GridView(view, ctx, bag, slotInfo)
   for _, item in pairs(changed) do
     if item.bagid ~= Enum.BagIndex.Keyring then
       local updateKey, removeKey = view:ChangeButton(item)
-      UpdateButton(view, updateKey)
+      UpdateButton(ctx, view, updateKey)
       if updateKey ~= item.slotkey then
-        UpdateButton(view, item.slotkey)
+        UpdateButton(ctx, view, item.slotkey)
       end
       if removeKey then
         ClearButton(view, items:GetItemDataFromSlotKey(removeKey))

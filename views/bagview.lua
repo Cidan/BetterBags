@@ -161,7 +161,7 @@ local function BagView(view, ctx, bag, slotInfo)
     else
       UpdateButton(view, updateKey)
       if ctx:GetBool('wipe') == false then
-        view.itemsByBagAndSlot[updateKey]:FlashItem()
+        view:FlashStack(updateKey)
       end
     end
   end

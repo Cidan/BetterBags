@@ -242,6 +242,21 @@ function views.viewProto:UpdateListSize(bag)
   _ = bag
 end
 
+---@param slotkey string
+function views.viewProto:FlashStack(slotkey)
+  local item = items:GetItemDataFromSlotKey(slotkey)
+  local stack = self.stacks[item.itemHash]
+  if not stack then return end
+  for subItemSlotKey in pairs(stack.subItems) do
+    items:ClearNewItem(subItemSlotKey)
+    if self.itemsByBagAndSlot[subItemSlotKey] then
+      self.itemsByBagAndSlot[subItemSlotKey]:ClearFlashItem()
+    end
+  end
+  local itemButton = self:GetOrCreateItemButton(slotkey)
+  itemButton:FlashItem()
+end
+
 -- RemoveButton removes an item from a stack if it's in a stack,
 -- promoting the first sub item to the main item if the item was the main item.
 -- If the stack is empty after removal, the stack is removed.
@@ -366,19 +381,6 @@ function stackProto:AddItem(slotkey)
   end
   self.subItems[slotkey] = true
   return false
-end
-
-function stackProto:UpdateNewItemTracking()
-  local isNewStack = items:IsNewItem(items:GetItemDataFromSlotKey(self.item))
-  for subSlotkey in pairs(self.subItems) do
-    if items:IsNewItem(items:GetItemDataFromSlotKey(subSlotkey))then
-      isNewStack = true
-      break
-    end
-  end
-  if isNewStack then
-    items:MarkItemSlotAsNew(self.item)
-  end
 end
 
 -- RemoveItem removes an item from the stack. If the item was the main item,

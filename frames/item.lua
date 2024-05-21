@@ -397,8 +397,17 @@ function itemFrame.itemProto:FlashItem()
   self.button.NewItemTexture:SetAtlas("bags-glow-white")
   self.button.NewItemTexture:Show()
   if (not self.button.flashAnim:IsPlaying() and not self.button.newitemglowAnim:IsPlaying()) then
-    self.button.flashAnim:Play();
+    self.button.flashAnim:Play()
     self.button.newitemglowAnim:Play()
+  end
+end
+
+function itemFrame.itemProto:ClearFlashItem()
+  self.button.BattlepayItemTexture:Hide()
+  self.button.NewItemTexture:Hide()
+  if (self.button.flashAnim:IsPlaying() or self.button.newitemglowAnim:IsPlaying()) then
+    self.button.flashAnim:Stop()
+    self.button.newitemglowAnim:Stop()
   end
 end
 
