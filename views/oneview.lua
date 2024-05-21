@@ -131,9 +131,6 @@ local function OneBagView(view, ctx, bag, slotInfo)
         CreateButton(view, item)
       else
         UpdateButton(ctx, view, updateKey)
-        if ctx:GetBool('wipe') == false then
-          view:FlashStack(updateKey)
-        end
       end
     end
   end

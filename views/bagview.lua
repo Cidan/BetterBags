@@ -135,6 +135,7 @@ end
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function BagView(view, ctx, bag, slotInfo)
+  _ = ctx
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
@@ -160,9 +161,6 @@ local function BagView(view, ctx, bag, slotInfo)
       CreateButton(view, item)
     else
       UpdateButton(view, updateKey)
-      if ctx:GetBool('wipe') == false then
-        view:FlashStack(updateKey)
-      end
     end
   end
 

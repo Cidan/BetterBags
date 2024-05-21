@@ -247,6 +247,8 @@ function views.viewProto:FlashStack(slotkey)
   local item = items:GetItemDataFromSlotKey(slotkey)
   local stack = self.stacks[item.itemHash]
   if not stack then return end
+  items:ClearNewItem(slotkey)
+  items:ClearNewItem(stack.item)
   for subItemSlotKey in pairs(stack.subItems) do
     items:ClearNewItem(subItemSlotKey)
     if self.itemsByBagAndSlot[subItemSlotKey] then
