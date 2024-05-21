@@ -125,9 +125,10 @@ local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
 end
 
 ---@param view View
+---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-local function GridView(view, bag, slotInfo)
+local function GridView(view, ctx, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
@@ -158,7 +159,9 @@ local function GridView(view, bag, slotInfo)
         CreateButton(view, item)
       else
         UpdateButton(view, updateKey)
-        --view.itemsByBagAndSlot[updateKey]:FlashItem()
+        if ctx:GetBool('wipe') == false then
+          view.itemsByBagAndSlot[updateKey]:FlashItem()
+        end
       end
     end
   end

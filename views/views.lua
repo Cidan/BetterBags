@@ -51,9 +51,11 @@ local stackProto = {}
 ---@field WipeHandler fun(view: View)
 views.viewProto = {}
 
+---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-function views.viewProto:Render(bag, slotInfo)
+function views.viewProto:Render(ctx, bag, slotInfo)
+  _ = ctx
   _ = bag
   _ = slotInfo
   error('Render method not implemented')

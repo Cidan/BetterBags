@@ -225,7 +225,7 @@ function addon:OnEnable()
 
   events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:Draw(args[1])
+    addon.Bags.Backpack:Draw(args[1], args[2])
     events:SendMessage('bags/Draw/Backpack/Done')
     if not addon.Bags.Backpack.loaded then
       addon.Bags.Backpack.loaded = true
@@ -239,7 +239,7 @@ function addon:OnEnable()
     if not addon.Bags.Bank:IsShown() and addon.atBank then
       addon.Bags.Bank:Show()
     end
-    addon.Bags.Bank:Draw(args[1])
+    addon.Bags.Bank:Draw(args[1], args[2])
     events:SendMessage('bags/Draw/Bank/Done')
     if not addon.Bags.Bank.loaded then
       addon.Bags.Bank.loaded = true

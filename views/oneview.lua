@@ -91,9 +91,10 @@ local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
 end
 
 ---@param view View
+---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-local function OneBagView(view, bag, slotInfo)
+local function OneBagView(view, ctx, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false

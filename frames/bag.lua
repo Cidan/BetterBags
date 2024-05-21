@@ -198,8 +198,9 @@ function bagFrame.bagProto:Search(text)
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
+---@param ctx Context
 ---@param slotInfo SlotInfo
-function bagFrame.bagProto:Draw(slotInfo)
+function bagFrame.bagProto:Draw(ctx, slotInfo)
   local view = self.views[database:GetBagView(self.kind)]
 
   if view == nil then
@@ -213,7 +214,7 @@ function bagFrame.bagProto:Draw(slotInfo)
   end
 
   debug:StartProfile('Bag Render')
-  view:Render(self, slotInfo)
+  view:Render(ctx, self, slotInfo)
   debug:EndProfile('Bag Render')
   view:GetContent():Show()
   self.currentView = view
