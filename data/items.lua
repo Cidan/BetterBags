@@ -52,12 +52,17 @@ local debug = addon:GetModule('Debug')
 ---@field crafterGUID string
 ---@field extraEnchantID string
 
+---@class (exact) AppearanceInfo
+---@field itemAppearanceID number
+---@field itemModifiedAppearanceID number
+
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
 ---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
+---@field appearanceInfo AppearanceInfo
 ---@field bagid number
 ---@field slotid number
 ---@field slotkey string
@@ -707,7 +712,7 @@ end
 ---@param data ItemData
 ---@return string
 function items:GenerateItemHash(data)
-  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d",
+  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d",
     data.itemLinkInfo.itemID,
     data.itemLinkInfo.enchantID,
     data.itemLinkInfo.gemID1,
@@ -721,7 +726,8 @@ function items:GenerateItemHash(data)
     table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
     data.itemLinkInfo.crafterGUID or "",
     data.itemLinkInfo.extraEnchantID or "",
-    data.itemInfo.currentItemLevel
+    data.itemInfo.currentItemLevel,
+    data.appearanceInfo.itemModifiedAppearanceID or data.appearanceInfo.itemAppearanceID
   )
   return hash
 end
@@ -837,6 +843,11 @@ function items:AttachItemInfo(data, kind)
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+  local appearanceID, itemModifiedAppearanceID = C_TransmogCollection.GetItemInfo(itemLink)
+  data.appearanceInfo = {
+    itemAppearanceID = appearanceID,
+    itemModifiedAppearanceID = itemModifiedAppearanceID,
+  }
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),
