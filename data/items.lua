@@ -477,7 +477,7 @@ function items:LoadItems(ctx, kind, dataCache, reagent)
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
       slotInfo.addedItems[currentItem.slotkey] = currentItem
-      if not ctx:GetBool('wipe') and addon.isRetail then
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
         self:MarkItemAsNew(currentItem)
       end
     elseif items:ItemRemoved(currentItem, previousItem) then

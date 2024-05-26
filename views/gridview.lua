@@ -98,7 +98,7 @@ local function UpdateButton(ctx, view, slotkey)
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey)
   itemButton:SetItem(slotkey)
-  if ctx:GetBool('wipe') == false then
+  if ctx:GetBool('wipe') == false and database:GetShowNewItemFlash(view.kind) then
     view:FlashStack(slotkey)
   end
   local data = itemButton:GetItemData()
