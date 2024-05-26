@@ -306,11 +306,6 @@ function itemFrame:_DoCreate()
   i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
   i.LockTexture:Hide()
 
-  --p:RegisterForClicks("MiddleButtonUp")
-  --p:SetScript("OnClick", function()
-  --  i:ToggleLock()
-  --end)
-
   button.SetMatchesSearch = function(me, match)
     if match then
       me.searchOverlay:Hide()

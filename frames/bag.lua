@@ -144,24 +144,8 @@ end
 
 function bagFrame.bagProto:Sort()
   if self.kind ~= const.BAG_KIND.BACKPACK then return end
-  --[[
-  -- Unlock all locked items so they can be sorted.
-  ---@type Item[]
-  local lockList = {}
-  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    if item.data and not item.data.isItemEmpty and item.data.itemInfo.isLocked then
-      table.insert(lockList, item)
-      item:Unlock()
-    end
-  end
-  --]]
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   events:SendMessage('bags/SortBackpack')
---[[
-  for _, item in pairs(lockList) do
-    item:Lock()
-  end
---]]
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -299,6 +283,18 @@ function bagFrame.bagProto:OnCooldown()
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
     item:UpdateCooldown()
   end
+end
+
+function bagFrame.bagProto:OnLock(bagid, slotid)
+  if not self.currentView then return end
+  local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  self.currentView:GetOrCreateItemButton(slotkey):Lock()
+end
+
+function bagFrame.bagProto:OnUnlock(bagid, slotid)
+  if not self.currentView then return end
+  local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  self.currentView:GetOrCreateItemButton(slotkey):Unlock()
 end
 
 function bagFrame.bagProto:UpdateContextMenu()
@@ -529,6 +525,14 @@ function bagFrame:Create(kind)
   if b.kind == const.BAG_KIND.BACKPACK then
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
   end
+
+  events:RegisterEvent('ITEM_LOCKED', function(_, bagid, slotid)
+    b:OnLock(bagid, slotid)
+  end)
+
+  events:RegisterEvent('ITEM_UNLOCKED', function(_, bagid, slotid)
+    b:OnUnlock(bagid, slotid)
+  end)
 
   events:RegisterMessage('search/SetInFrame', function (_, shown)
     if shown then
