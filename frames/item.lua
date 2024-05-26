@@ -337,6 +337,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
+  self:Unlock()
 
   self.freeSlotName = ""
   self.freeSlotCount = 0

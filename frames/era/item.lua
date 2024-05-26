@@ -203,6 +203,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
 
   self.freeSlotName = name
   SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
+  self:Unlock()
 
   self.button.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
