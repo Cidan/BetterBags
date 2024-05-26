@@ -708,6 +708,7 @@ end
 ---@param data ItemData
 ---@return string
 function items:GenerateItemHash(data)
+  local stackOpts = database:GetStackingOptions(data.kind)
   local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d",
     data.itemLinkInfo.itemID,
     data.itemLinkInfo.enchantID,
@@ -723,7 +724,7 @@ function items:GenerateItemHash(data)
     data.itemLinkInfo.crafterGUID or "",
     data.itemLinkInfo.extraEnchantID or "",
     data.itemInfo.currentItemLevel,
-    data.transmogInfo and data.transmogInfo.appearanceID or 0
+    stackOpts.dontMergeTransmog and data.transmogInfo and data.transmogInfo.appearanceID or 0
   )
   return hash
 end
@@ -839,7 +840,6 @@ function items:AttachItemInfo(data, kind)
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
-  local appearanceID, itemModifiedAppearanceID = C_TransmogCollection.GetItemInfo(itemLink)
   data.transmogInfo = C_Item.GetCurrentItemTransmogInfo(itemLocation)
   data.itemInfo = {
     itemID = itemID,

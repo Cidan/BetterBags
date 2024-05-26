@@ -258,6 +258,19 @@ function config:GetBagOptions(kind)
               events:SendMessage('bags/FullRefreshAll')
             end,
           },
+          dontMergeTransmog = {
+            type = "toggle",
+            name = L:G("Don't Merge Transmog"),
+            desc = L:G("Don't merge stacks of items that have different transmogs on them."),
+            order = 3,
+            get = function()
+              return DB:GetStackingOptions(kind).dontMergeTransmog
+            end,
+            set = function(_, value)
+              DB:SetDontMergeTransmog(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
         }
       },
       itemLevel = {

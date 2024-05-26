@@ -372,6 +372,10 @@ function DB:SetDontMergePartial(kind, value)
   DB.data.profile.stacking[kind].dontMergePartial = value
 end
 
+function DB:SetDontMergeTransmog(kind, value)
+  DB.data.profile.stacking[kind].dontMergeTransmog = value
+end
+
 function DB:GetShowKeybindWarning()
   return DB.data.profile.showKeybindWarning
 end
