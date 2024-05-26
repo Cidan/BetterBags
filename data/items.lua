@@ -52,13 +52,16 @@ local debug = addon:GetModule('Debug')
 ---@field crafterGUID string
 ---@field extraEnchantID string
 
+---@class (exact) TransmogInfo
+---@field transmogInfoMixin? ItemTransmogInfoMixin
+
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
 ---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
----@field transmogInfo? ItemTransmogInfoMixin
+---@field transmogInfo TransmogInfo
 ---@field bagid number
 ---@field slotid number
 ---@field slotkey string
@@ -728,7 +731,7 @@ function items:GenerateItemHash(data)
     data.itemLinkInfo.crafterGUID or "",
     data.itemLinkInfo.extraEnchantID or "",
     data.itemInfo.currentItemLevel,
-    stackOpts.dontMergeTransmog and data.transmogInfo and data.transmogInfo.appearanceID or 0
+    stackOpts.dontMergeTransmog and data.transmogInfo.transmogInfoMixin and data.transmogInfo.transmogInfoMixin.appearanceID or 0
   )
   return hash
 end
@@ -844,11 +847,13 @@ function items:AttachItemInfo(data, kind)
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
-  data.transmogInfo = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
-    appearanceID = 0,
-    secondaryAppearanceID = 0,
-    appliedAppearanceID = 0,
-    appliedSecondaryAppearanceID = 0,
+  data.transmogInfo = {
+    transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
+      appearanceID = 0,
+      secondaryAppearanceID = 0,
+      appliedAppearanceID = 0,
+      appliedSecondaryAppearanceID = 0,
+    }
   }
   data.itemInfo = {
     itemID = itemID,
