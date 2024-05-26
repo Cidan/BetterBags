@@ -840,7 +840,12 @@ function items:AttachItemInfo(data, kind)
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
-  data.transmogInfo = C_Item.GetCurrentItemTransmogInfo(itemLocation)
+  data.transmogInfo = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
+    appearanceID = 0,
+    secondaryAppearanceID = 0,
+    appliedAppearanceID = 0,
+    appliedSecondaryAppearanceID = 0,
+  }
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),
