@@ -287,12 +287,14 @@ end
 
 function bagFrame.bagProto:OnLock(bagid, slotid)
   if not self.currentView then return end
+  if slotid == nil then return end
   local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   self.currentView:GetOrCreateItemButton(slotkey):Lock()
 end
 
 function bagFrame.bagProto:OnUnlock(bagid, slotid)
   if not self.currentView then return end
+  if slotid == nil then return end
   local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   self.currentView:GetOrCreateItemButton(slotkey):Unlock()
 end

@@ -294,6 +294,14 @@ function bagFrame:Create(kind)
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
   end
 
+  events:RegisterEvent('ITEM_LOCKED', function(_, bagid, slotid)
+    b:OnLock(bagid, slotid)
+  end)
+
+  events:RegisterEvent('ITEM_UNLOCKED', function(_, bagid, slotid)
+    b:OnUnlock(bagid, slotid)
+  end)
+
   events:RegisterMessage('search/SetInFrame', function (_, shown)
     if shown then
       b.searchBox.frame:Show()
