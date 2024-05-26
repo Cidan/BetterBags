@@ -24,6 +24,7 @@ local interactionEvents = {
   [Enum.PlayerInteractionType.Auctioneer] = true,
   [Enum.PlayerInteractionType.GuildBanker] = true,
   [Enum.PlayerInteractionType.VoidStorageBanker] = true,
+  [Enum.PlayerInteractionType.ScrappingMachine] = true,
 }
 
 function addon.ForceHideBlizzardBags()

@@ -40,6 +40,7 @@ debug\profile.lua
 debug\items.lua
 debug\analytics.lua
 
+core\context.lua
 core\events.lua
 core\localization.lua
 core\constants.lua
