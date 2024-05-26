@@ -127,6 +127,8 @@ function items:OnEnable()
       end
       self._refreshQueueEvent = nil
       events:SendMessageLater('bags/RefreshAll', nil, wipe)
+    else
+      self._preSort = false
     end
   end)
 
@@ -142,6 +144,8 @@ function items:OnEnable()
   end)
 
   events:RegisterMessage('bags/SortBackpack', function()
+    -- TODO(lobato): Queue this up instead of dropping the sort to the ground.
+    if self._doingRefresh then return end
     self:RemoveNewItemFromAllItems()
     self:ClearItemCache()
     self._firstLoad[const.BAG_KIND.BACKPACK] = true
@@ -162,7 +166,6 @@ function items:OnEnable()
     end
 
     debug:Log("RefreshAll", "Wipe: ", ctx:GetBool("wipe"))
-    self._preSort = false
 
     if InCombatLockdown() and ctx:GetBool("wipe") then
       addon.Bags.Backpack.drawAfterCombat = true
@@ -218,6 +221,7 @@ end
 
 ---@private
 function items:PreSort()
+  if self._preSort then return end
   self._preSort = true
   C_Timer.After(0.6, function()
     if self._preSort then
