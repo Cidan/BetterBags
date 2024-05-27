@@ -27,11 +27,13 @@ end
 
 ---@param bag Bag
 local function onBagRendered(_, bag, _)
-  items:PreLoadAllEquipmentSlots(function()
-    for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
-      onItemUpdate(item)
-    end
-  end)
+  if not PawnGetItemData then
+    items:PreLoadAllEquipmentSlots(function()
+      for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
+        onItemUpdate(item)
+      end
+    end)
+  end
 end
 
 function simpleItemLevel:OnEnable()
