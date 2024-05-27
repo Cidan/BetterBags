@@ -41,6 +41,7 @@ debug\profile.lua
 debug\items.lua
 debug\analytics.lua
 
+core\context.lua
 core\events.lua
 core\localization.lua
 core\constants.lua
@@ -65,7 +66,7 @@ frames\search.lua
 frames\slider.lua
 frames\money.lua
 frames\era\money.lua
-frames\era\context.lua
+frames\era\contextmenu.lua
 frames\column.lua
 frames\grid.lua
 frames\item.lua

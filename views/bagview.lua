@@ -131,9 +131,11 @@ local function AddSlot(view, newSlotKey)
 end
 
 ---@param view View
+---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-local function BagView(view, bag, slotInfo)
+local function BagView(view, ctx, bag, slotInfo)
+  _ = ctx
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false

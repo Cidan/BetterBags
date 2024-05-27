@@ -34,6 +34,30 @@ function DB:GetBagView(kind)
 end
 
 ---@param kind BagKind
+---@return boolean
+function DB:GetMarkRecentItems(kind)
+  return DB.data.profile.newItems[kind].markRecentItems
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetMarkRecentItems(kind, value)
+  DB.data.profile.newItems[kind].markRecentItems = value
+end
+
+---@param kind BagKind
+---@return boolean
+function DB:GetShowNewItemFlash(kind)
+  return DB.data.profile.newItems[kind].showNewItemFlash
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetShowNewItemFlash(kind, value)
+  DB.data.profile.newItems[kind].showNewItemFlash = value
+end
+
+---@param kind BagKind
 ---@param view BagView
 function DB:SetBagView(kind, view)
   DB.data.profile.views[kind] = view
@@ -346,6 +370,10 @@ end
 
 function DB:SetDontMergePartial(kind, value)
   DB.data.profile.stacking[kind].dontMergePartial = value
+end
+
+function DB:SetDontMergeTransmog(kind, value)
+  DB.data.profile.stacking[kind].dontMergeTransmog = value
 end
 
 function DB:GetShowKeybindWarning()

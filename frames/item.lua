@@ -194,53 +194,12 @@ function itemFrame.itemProto:UpdateCooldown()
   self.button:UpdateCooldown(data.itemInfo.itemIcon)
 end
 
-function itemFrame.itemProto:ToggleLock()
-  local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if data.isItemEmpty or data.basic then return end
-  local itemLocation = ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
-  if C_Item.IsLocked(itemLocation) then
-    self:Unlock()
-  else
-    self:Lock()
-  end
-end
-
-function itemFrame.itemProto:SetLock(lock)
-  if not self.slotkey then return end
-  if not self.kind then return end
-  local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if data.isItemEmpty or data.basic then return end
-  if lock then
-    self:Lock()
-  else
-    self:Unlock()
-  end
-end
-
 function itemFrame.itemProto:Lock()
-  local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if data.isItemEmpty or data.basic then return end
-  local itemLocation = ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
-  if itemLocation == nil or (itemLocation.IsValid and not itemLocation:IsValid()) then return end
-  C_Item.LockItem(itemLocation)
-  data.itemInfo.isLocked = true
-  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
-  self.LockTexture:Show()
-  self.ilvlText:Hide()
-  database:SetItemLock(data.itemInfo.itemGUID, true)
+  SetItemButtonDesaturated(self.button, true)
 end
 
 function itemFrame.itemProto:Unlock()
-  local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if data.isItemEmpty or data.basic then return end
-  local itemLocation = ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
-  if itemLocation == nil or (itemLocation.IsValid and not itemLocation:IsValid()) then return end
-  C_Item.UnlockItem(itemLocation)
-  data.itemInfo.isLocked = false
-  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
-  self.LockTexture:Hide()
-  self:DrawItemLevel()
-  database:SetItemLock(data.itemInfo.itemGUID, false)
+  SetItemButtonDesaturated(self.button, false)
 end
 
 function itemFrame.itemProto:ShowItemLevel()
@@ -378,6 +337,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.button:SetReadable(readable)
   self.button:CheckUpdateTooltip(tooltipOwner)
   self.button:SetMatchesSearch(not isFiltered)
+  self:Unlock()
 
   self.freeSlotName = ""
   self.freeSlotCount = 0
@@ -391,6 +351,24 @@ function itemFrame.itemProto:SetItemFromData(data)
   end
   self.frame:Show()
   self.button:Show()
+end
+
+function itemFrame.itemProto:FlashItem()
+  self.button.NewItemTexture:SetAtlas("bags-glow-white")
+  self.button.NewItemTexture:Show()
+  if (not self.button.flashAnim:IsPlaying() and not self.button.newitemglowAnim:IsPlaying()) then
+    self.button.flashAnim:Play()
+    self.button.newitemglowAnim:Play()
+  end
+end
+
+function itemFrame.itemProto:ClearFlashItem()
+  self.button.BattlepayItemTexture:Hide()
+  self.button.NewItemTexture:Hide()
+  if (self.button.flashAnim:IsPlaying() or self.button.newitemglowAnim:IsPlaying()) then
+    self.button.flashAnim:Stop()
+    self.button.newitemglowAnim:Stop()
+  end
 end
 
 function itemFrame.itemProto:UpdateNewItem(quality)
@@ -654,11 +632,6 @@ function itemFrame:_DoCreate()
   i.LockTexture:SetSize(32,32)
   i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
   i.LockTexture:Hide()
-
-  --p:RegisterForClicks("MiddleButtonUp")
-  --p:SetScript("OnClick", function()
-  --  i:ToggleLock()
-  --end)
 
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)

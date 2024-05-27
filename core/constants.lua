@@ -305,18 +305,30 @@ const.DATABASE_DEFAULTS = {
     debug = false,
     inBagSearch = false,
     showKeybindWarning = true,
+    newItems = {
+      [const.BAG_KIND.BACKPACK] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.BANK] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+    },
     stacking = {
       [const.BAG_KIND.BACKPACK]  = {
         mergeStacks = true,
         mergeUnstackable = true,
         unmergeAtShop = true,
         dontMergePartial = false,
+        dontMergeTransmog = false,
       },
       [const.BAG_KIND.BANK]  = {
         mergeStacks = true,
         mergeUnstackable = true,
         unmergeAtShop = true,
         dontMergePartial = false,
+        dontMergeTransmog = false,
       }
     },
     itemLevel = {

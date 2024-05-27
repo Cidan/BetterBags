@@ -51,9 +51,11 @@ local stackProto = {}
 ---@field WipeHandler fun(view: View)
 views.viewProto = {}
 
+---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-function views.viewProto:Render(bag, slotInfo)
+function views.viewProto:Render(ctx, bag, slotInfo)
+  _ = ctx
   _ = bag
   _ = slotInfo
   error('Render method not implemented')
@@ -238,6 +240,27 @@ end
 ---@param bag Bag
 function views.viewProto:UpdateListSize(bag)
   _ = bag
+end
+
+---@param slotkey string
+function views.viewProto:FlashStack(slotkey)
+  -- HACKFIX: Disable this for non retail clients due to
+  -- a lack of stable sort API.
+  if not addon.isRetail then return end
+
+  local item = items:GetItemDataFromSlotKey(slotkey)
+  local stack = self.stacks[item.itemHash]
+  if not stack then return end
+  items:ClearNewItem(slotkey)
+  items:ClearNewItem(stack.item)
+  for subItemSlotKey in pairs(stack.subItems) do
+    items:ClearNewItem(subItemSlotKey)
+    if self.itemsByBagAndSlot[subItemSlotKey] then
+      self.itemsByBagAndSlot[subItemSlotKey]:ClearFlashItem()
+    end
+  end
+  local itemButton = self:GetOrCreateItemButton(slotkey)
+  itemButton:FlashItem()
 end
 
 -- RemoveButton removes an item from a stack if it's in a stack,

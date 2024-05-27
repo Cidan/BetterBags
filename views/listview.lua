@@ -69,12 +69,16 @@ local function CreateButton(view, item)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
 end
 
+---@param ctx Context
 ---@param view View
 ---@param slotkey string
-local function UpdateButton(view, slotkey)
+local function UpdateButton(ctx, view, slotkey)
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(slotkey, function() return itemRowFrame:Create() end)
   itemButton:SetItem(slotkey)
+  if ctx:GetBool('wipe') == false and database:GetShowNewItemFlash(view.kind) then
+    view:FlashStack(slotkey)
+  end
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
@@ -108,9 +112,10 @@ local function UpdateListSize(view, bag)
 end
 
 ---@param view View
+---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-local function ListView(view, bag, slotInfo)
+local function ListView(view, ctx, bag, slotInfo)
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
@@ -136,12 +141,12 @@ local function ListView(view, bag, slotInfo)
     if not updateKey then
       CreateButton(view, item)
     else
-      UpdateButton(view, updateKey)
+      UpdateButton(ctx, view, updateKey)
     end
   end
 
   for _, item in pairs(changed) do
-    UpdateButton(view, view:ChangeButton(item))
+    UpdateButton(ctx, view, view:ChangeButton(item))
   end
 
   if not slotInfo.deferDelete then

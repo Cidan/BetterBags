@@ -80,7 +80,7 @@ function ItemLoader:Load(callback)
   async:Until(function()
     for itemID, location in pairs(self.locations) do
       local l = location:GetItemLocation()
-      if l == nil then
+      if l == nil or (l.IsValid and not l:IsValid()) then
         self.locations[itemID] = nil
       else
         C_Item.RequestLoadItemData(l)

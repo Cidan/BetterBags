@@ -203,6 +203,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
 
   self.freeSlotName = name
   SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
+  self:Unlock()
 
   self.button.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
@@ -305,11 +306,6 @@ function itemFrame:_DoCreate()
   i.LockTexture:SetSize(32,32)
   i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
   i.LockTexture:Hide()
-
-  --p:RegisterForClicks("MiddleButtonUp")
-  --p:SetScript("OnClick", function()
-  --  i:ToggleLock()
-  --end)
 
   button.SetMatchesSearch = function(me, match)
     if match then

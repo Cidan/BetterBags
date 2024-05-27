@@ -31,8 +31,8 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
@@ -60,6 +60,9 @@ local Window = LibStub('LibWindow-1.1')
 
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
 
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
@@ -141,24 +144,8 @@ end
 
 function bagFrame.bagProto:Sort()
   if self.kind ~= const.BAG_KIND.BACKPACK then return end
-  --[[
-  -- Unlock all locked items so they can be sorted.
-  ---@type Item[]
-  local lockList = {}
-  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    if item.data and not item.data.isItemEmpty and item.data.itemInfo.isLocked then
-      table.insert(lockList, item)
-      item:Unlock()
-    end
-  end
-  --]]
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   events:SendMessage('bags/SortBackpack')
---[[
-  for _, item in pairs(lockList) do
-    item:Lock()
-  end
---]]
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -183,16 +170,6 @@ function bagFrame.bagProto:Refresh()
   end
 end
 
-function bagFrame.bagProto:DoRefresh()
-  if self.kind == const.BAG_KIND.BACKPACK then
-    items:RefreshBackpack(false)
-  elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
-    items:RefreshBank(false)
-  else
-    items:RefreshReagentBank(false)
-  end
-end
-
 -- Search will search all items in the bag for the given text.
 -- If a match is found for an item, it will be highlighted, while
 -- items that don't match will dim.
@@ -205,8 +182,9 @@ function bagFrame.bagProto:Search(text)
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
+---@param ctx Context
 ---@param slotInfo SlotInfo
-function bagFrame.bagProto:Draw(slotInfo)
+function bagFrame.bagProto:Draw(ctx, slotInfo)
   local view = self.views[database:GetBagView(self.kind)]
 
   if view == nil then
@@ -220,7 +198,7 @@ function bagFrame.bagProto:Draw(slotInfo)
   end
 
   debug:StartProfile('Bag Render')
-  view:Render(self, slotInfo)
+  view:Render(ctx, self, slotInfo)
   debug:EndProfile('Bag Render')
   view:GetContent():Show()
   self.currentView = view
@@ -252,6 +230,7 @@ function bagFrame.bagProto:OnResize()
 end
 
 function bagFrame.bagProto:ToggleReagentBank()
+  local ctx = context:New()
   -- This should never happen, but just in case!
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = not self.isReagentBank
@@ -267,7 +246,8 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshReagentBank(true)
+    ctx:Set('wipe', true)
+    items:RefreshReagentBank(ctx)
   else
     BankFrame.selectedTab = 1
     if self.searchBox.frame:IsShown() then
@@ -279,7 +259,8 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshBank(true)
+    ctx:Set('wipe', true)
+    items:RefreshBank(ctx)
   end
 end
 
@@ -304,8 +285,22 @@ function bagFrame.bagProto:OnCooldown()
   end
 end
 
+function bagFrame.bagProto:OnLock(bagid, slotid)
+  if not self.currentView then return end
+  if slotid == nil then return end
+  local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  self.currentView:GetOrCreateItemButton(slotkey):Lock()
+end
+
+function bagFrame.bagProto:OnUnlock(bagid, slotid)
+  if not self.currentView then return end
+  if slotid == nil then return end
+  local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  self.currentView:GetOrCreateItemButton(slotkey):Unlock()
+end
+
 function bagFrame.bagProto:UpdateContextMenu()
-  self.menuList = context:CreateContextMenu(self)
+  self.menuList = contextMenu:CreateContextMenu(self)
 end
 
 function bagFrame.bagProto:CreateCategoryForItemInCursor()
@@ -395,7 +390,7 @@ function bagFrame:Create(kind)
   end
 
   -- Setup the context menu.
-  b.menuList = context:CreateContextMenu(b)
+  b.menuList = contextMenu:CreateContextMenu(b)
 
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
@@ -469,7 +464,7 @@ function bagFrame:Create(kind)
       elseif CursorHasItem() and GetCursorInfo() == "item" then
         b:CreateCategoryForItemInCursor()
       else
-        context:Show(b.menuList)
+        contextMenu:Show(b.menuList)
       end
 
     elseif e == "RightButton" and kind == const.BAG_KIND.BANK then
@@ -532,6 +527,14 @@ function bagFrame:Create(kind)
   if b.kind == const.BAG_KIND.BACKPACK then
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
   end
+
+  events:RegisterEvent('ITEM_LOCKED', function(_, bagid, slotid)
+    b:OnLock(bagid, slotid)
+  end)
+
+  events:RegisterEvent('ITEM_UNLOCKED', function(_, bagid, slotid)
+    b:OnUnlock(bagid, slotid)
+  end)
 
   events:RegisterMessage('search/SetInFrame', function (_, shown)
     if shown then
