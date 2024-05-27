@@ -9,46 +9,8 @@ local events = addon:GetModule('Events')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
-
 ---@class Pawn: AceModule
 local pawn = addon:NewModule('Pawn')
-
-local slots = {
-  INVSLOT_AMMO,
-  INVSLOT_BACK,
-  INVSLOT_BODY,
-  INVSLOT_CHEST,
-  INVSLOT_FEET,
-  INVSLOT_FINGER1,
-  INVSLOT_FINGER2,
-  INVSLOT_HAND,
-  INVSLOT_HEAD,
-  INVSLOT_LEGS,
-  INVSLOT_MAINHAND,
-  INVSLOT_NECK,
-  INVSLOT_OFFHAND,
-  INVSLOT_RANGED,
-  INVSLOT_SHOULDER,
-  INVSLOT_TABARD,
-  INVSLOT_TRINKET1,
-  INVSLOT_TRINKET2,
-  INVSLOT_WAIST,
-  INVSLOT_WRIST,
-}
-
-local function PreLoadAllEquipmentSlots(cb)
-  local continuableContainer = ContinuableContainer:Create()
-  for _, slot in pairs(slots) do
-    local location = ItemLocation:CreateFromEquipmentSlot(slot)
-    local item = Item:CreateFromItemLocation(location)
-    if not item:IsItemEmpty() then
-      continuableContainer:AddContinuable(item)
-    end
-  end
-  continuableContainer:ContinueOnLoad(cb)
-end
 
 ---@param item Item
 local function onItemUpdateRetail(item)
@@ -79,7 +41,7 @@ end
 
 ---@param bag Bag
 local function onBagRendered(_, bag, _)
-  PreLoadAllEquipmentSlots(function()
+  items:PreLoadAllEquipmentSlots(function()
     for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
       if addon.isRetail then
         onItemUpdateRetail(item)

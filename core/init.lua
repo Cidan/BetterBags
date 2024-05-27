@@ -57,6 +57,9 @@ local pawn = addon:GetModule('Pawn')
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
 
+---@class SimpleItemLevel: AceModule
+local simpleItemLevel = addon:GetModule('SimpleItemLevel')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -198,6 +201,7 @@ function addon:OnEnable()
   itemFrame:Enable()
   sectionFrame:Enable()
   masque:Enable()
+  simpleItemLevel:Enable()
   contextMenu:Enable()
   items:Enable()
   config:Enable()

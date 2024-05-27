@@ -326,6 +326,15 @@ PawnIsItemAnUpgrade = _G['PawnIsItemAnUpgrade'] --[[@as fun(itemData: table): bo
 PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --[[@as fun(itemLink: string): boolean]]
 PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string, level?: boolean): boolean]]
 
+--- SimpleItemLevel API Globals
+---@class SimpleItemLevel
+SimpleItemLevel = {}
+SimpleItemLevel.API = {}
+
+---@param itemLink string
+---@return boolean
+function SimpleItemLevel.API.ItemIsUpgrade(itemLink) end
+
 --- SortBags
 
 -- Sort bags for classic.

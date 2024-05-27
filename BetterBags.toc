@@ -90,5 +90,6 @@ config\customcat.lua
 integrations\consoleport.lua
 integrations\pawn.lua
 integrations\masque.lua
+integrations\simpleitemlevel.lua
 
 core\init.lua
