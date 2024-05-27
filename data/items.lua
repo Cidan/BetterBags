@@ -54,6 +54,8 @@ local debug = addon:GetModule('Debug')
 
 ---@class (exact) TransmogInfo
 ---@field transmogInfoMixin? ItemTransmogInfoMixin
+---@field itemAppearanceID number
+---@field itemModifiedAppearanceID number
 
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
@@ -847,14 +849,19 @@ function items:AttachItemInfo(data, kind)
   local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+
+  local itemAppearanceID, itemModifiedAppearanceID = C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
   data.transmogInfo = {
     transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
       appearanceID = 0,
       secondaryAppearanceID = 0,
       appliedAppearanceID = 0,
       appliedSecondaryAppearanceID = 0,
-    }
+    },
+    itemAppearanceID = itemAppearanceID,
+    itemModifiedAppearanceID = itemModifiedAppearanceID,
   }
+
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),
