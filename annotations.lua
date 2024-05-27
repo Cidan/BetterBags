@@ -324,7 +324,16 @@ PawnVersion = _G['PawnVersion'] --[[@as number]]
 PawnGetItemData = _G['PawnGetItemData'] --[[@as fun(itemLink: string): table]]
 PawnIsItemAnUpgrade = _G['PawnIsItemAnUpgrade'] --[[@as fun(itemData: table): boolean]]
 PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --[[@as fun(itemLink: string): boolean]]
-PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string): boolean]]
+PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string, level?: boolean): boolean]]
+
+--- SimpleItemLevel API Globals
+---@class SimpleItemLevel
+SimpleItemLevel = {}
+SimpleItemLevel.API = {}
+
+---@param itemLink string
+---@return boolean
+function SimpleItemLevel.API.ItemIsUpgrade(itemLink) end
 
 --- SortBags
 

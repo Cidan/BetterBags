@@ -976,3 +976,16 @@ end
 function items:GetItemDataFromSlotKey(slotkey)
   return self.slotInfo[self:GetBagKindFromSlotKey(slotkey)].itemsBySlotKey[slotkey]
 end
+
+---@param cb function
+function items:PreLoadAllEquipmentSlots(cb)
+  local continuableContainer = ContinuableContainer:Create()
+  for _, slot in pairs(const.EQUIPMENT_SLOTS) do
+    local location = ItemLocation:CreateFromEquipmentSlot(slot)
+    local item = Item:CreateFromItemLocation(location)
+    if not item:IsItemEmpty() then
+      continuableContainer:AddContinuable(item)
+    end
+  end
+  continuableContainer:ContinueOnLoad(cb)
+end
