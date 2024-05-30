@@ -142,6 +142,8 @@ function items:OnEnable()
   end)
 
   events:RegisterMessage('bags/SortBackpackClassic', function()
+    if self._doingRefresh then return end
+    if InCombatLockdown() then return end
     self:RemoveNewItemFromAllItems()
     --self:ClearItemCache()
     --self:PreSort()
@@ -151,6 +153,7 @@ function items:OnEnable()
   events:RegisterMessage('bags/SortBackpack', function()
     -- TODO(lobato): Queue this up instead of dropping the sort to the ground.
     if self._doingRefresh then return end
+    if InCombatLockdown() then return end
     self:RemoveNewItemFromAllItems()
     self:ClearItemCache()
     self._firstLoad[const.BAG_KIND.BACKPACK] = true
