@@ -41,6 +41,10 @@ end
 
 ---@param bag Bag
 local function onBagRendered(_, bag, _)
+  if InCombatLockdown() then
+    addon.Bags.Backpack.drawAfterCombat = true
+    return
+  end
   items:PreLoadAllEquipmentSlots(function()
     for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
       if addon.isRetail then
