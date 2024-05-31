@@ -28,14 +28,6 @@ function refresh:OnInitialize()
   self.isUpdateRunning = false
 end
 
-function refresh:RefreshBackpack()
-end
-
----@param bagid number
-function refresh:UpdateBag(_, bagid)
-  print("update bag called", bagid)
-end
-
 -- StartUpdate will start the bag update process if it's not already running.
 function refresh:StartUpdate()
   if self.isUpdateRunning then
@@ -46,6 +38,11 @@ function refresh:StartUpdate()
     end)
     return
   end
+
+  if InCombatLockdown() then
+    return
+  end
+
   local ctx = context:New()
   self.isUpdateRunning = true
   local updateBackpack = false
@@ -76,19 +73,21 @@ function refresh:StartUpdate()
 
   ctx:Timeout(5, function()
     self.isUpdateRunning = false
+    items._preSort = false
   end)
-
-  if updateBackpack then
-    items:RefreshBackpack(ctx)
-  end
 
   if updateBank then
     local bankCtx = ctx:Copy()
     items:RefreshBank(bankCtx)
   end
 
-  print("would have updated backpack", updateBackpack)
-  print("would have updated bank", updateBank)
+  if updateBackpack then
+    items:RefreshBackpack(ctx)
+  else
+    self.isUpdateRunning = false
+    ctx:Cancel()
+  end
+
 end
 
 function refresh:OnEnable()
@@ -109,6 +108,7 @@ function refresh:OnEnable()
     self:StartUpdate()
   end)
 
+  -- Register when bank slots change for any reason.
   events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
     local ctx = context:New()
     ctx:Set("wipe", true)
@@ -116,6 +116,7 @@ function refresh:OnEnable()
     self:StartUpdate()
   end)
 
+  -- Register when equipment sets change.
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
     local ctx = context:New()
     ctx:Set("wipe", true)
@@ -123,6 +124,7 @@ function refresh:OnEnable()
     self:StartUpdate()
   end)
 
+  -- Register when reagent bank slots change, only in retail.
   if addon.isRetail then
     events:RegisterEvent('PLAYERREAGENTBANKSLOTS_CHANGED', function()
       local ctx = context:New()
@@ -132,6 +134,61 @@ function refresh:OnEnable()
     end)
   end
 
+  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
+    self:StartUpdate()
+  end)
+
+  -- Register when the backpack is manually refreshed.
+  events:RegisterMessage('bags/RefreshBackpack', function(_, shouldWipe)
+    local ctx = context:New()
+    ctx:Set("wipe", shouldWipe)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
+    self:StartUpdate()
+  end)
+
+  -- Register when the bank is manually refreshed.
+  events:RegisterMessage('bags/RefreshBank', function (_, shouldWipe)
+    local ctx = context:New()
+    ctx:Set("wipe", shouldWipe)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
+    self:StartUpdate()
+  end)
+
+  -- Register when everything should be refreshed, manually.
+  events:RegisterMessage('bags/RefreshAll', function(_, shouldWipe)
+    local ctx = context:New()
+    ctx:Set("wipe", shouldWipe)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
+    self:StartUpdate()
+  end)
+
+  -- Register when then backpack should be sorted.
+  events:RegisterMessage('bags/SortBackpack', function()
+    -- TODO(lobato): Queue this up instead of dropping the sort to the ground.
+    if self.isUpdateRunning then return end
+    if InCombatLockdown() then return end
+    items:RemoveNewItemFromAllItems()
+    items:ClearItemCache()
+    items._firstLoad[const.BAG_KIND.BACKPACK] = true
+    items._firstLoad[const.BAG_KIND.BANK] = true
+    items._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
+    items:PreSort()
+    C_Container:SortBags()
+  end)
+
+  -- Register when the classic backpack should be sorted.
+  events:RegisterMessage('bags/SortBackpackClassic', function()
+    if self.isUpdateRunning then return end
+    if InCombatLockdown() then return end
+    items:RemoveNewItemFromAllItems()
+    _G.SortBags()
+  end)
+
+  -- Register when all bags should be wiped and reloaded.
+  events:RegisterMessage('bags/FullRefreshAll', function()
+    items:WipeAndRefreshAll()
+  end)
+
   -- Register for when bags are done drawing.
   events:RegisterMessage('bags/Draw/Backpack/Done', function(_, ctx)
     -- Cancel the context as the bag has been drawn.
@@ -140,30 +197,10 @@ function refresh:OnEnable()
 
     -- If there are more updates in the queue, start the next one with a new context.
     self.isUpdateRunning = false
+    items._preSort = false
     if next(self.UpdateQueue) ~= nil then
       self:StartUpdate()
     end
-  end)
-
-  events:RegisterMessage('bags/RefreshBackpack', function(_, shouldWipe)
-    local ctx = context:New()
-    ctx:Set("wipe", shouldWipe)
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
-    self:StartUpdate()
-  end)
-
-  events:RegisterMessage('bags/RefreshBank', function (_, shouldWipe)
-    local ctx = context:New()
-    ctx:Set("wipe", shouldWipe)
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
-    self:StartUpdate()
-  end)
-
-  events:RegisterMessage('bags/RefreshAll', function(_, shouldWipe)
-    local ctx = context:New()
-    ctx:Set("wipe", shouldWipe)
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
-    self:StartUpdate()
   end)
 
 end

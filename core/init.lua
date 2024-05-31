@@ -255,17 +255,6 @@ function addon:OnEnable()
     end
   end)
 
-  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
-    if addon.Bags.Backpack.drawAfterCombat then
-      addon.Bags.Backpack.drawAfterCombat = false
-      events:SendMessage('bags/FullRefreshAll')
-    end
-    if addon.Bags.Bank.drawAfterCombat then
-      addon.Bags.Bank.drawAfterCombat = false
-      events:SendMessage('bags/FullRefreshAll')
-    end
-  end)
-
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 
   --This tutorial bitfield change does not persist when set in OnInitialize()

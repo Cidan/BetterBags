@@ -106,11 +106,6 @@ end
 
 function items:OnEnable()
 
---  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
---    local ctx = context:New()
---    ctx:Set('wipe', true)
---    self:DoRefreshAll(ctx)
---  end)
   local eventList = {
     --'BAG_UPDATE_DELAYED',
     --'BAG_UPDATE',
@@ -139,31 +134,6 @@ function items:OnEnable()
     end
   end)
 ]]--  
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    self:WipeAndRefreshAll()
-  end)
-
-  events:RegisterMessage('bags/SortBackpackClassic', function()
-    if self._doingRefresh then return end
-    if InCombatLockdown() then return end
-    self:RemoveNewItemFromAllItems()
-    --self:ClearItemCache()
-    --self:PreSort()
-    _G.SortBags()
-  end)
-
-  events:RegisterMessage('bags/SortBackpack', function()
-    -- TODO(lobato): Queue this up instead of dropping the sort to the ground.
-    if self._doingRefresh then return end
-    if InCombatLockdown() then return end
-    self:RemoveNewItemFromAllItems()
-    self:ClearItemCache()
-    self._firstLoad[const.BAG_KIND.BACKPACK] = true
-    self._firstLoad[const.BAG_KIND.BANK] = true
-    self._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
-    self:PreSort()
-    C_Container:SortBags()
-  end)
 
   events:GroupBucketEvent(eventList, {}, function(eventData)
     debug:Log("Items", "Group Bucket Event for Refresh* Fired")
