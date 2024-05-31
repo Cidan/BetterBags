@@ -330,6 +330,10 @@ const.DATABASE_DEFAULTS = {
     debug = false,
     inBagSearch = false,
     showKeybindWarning = true,
+    showFullSectionNames = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+    },
     newItems = {
       [const.BAG_KIND.BACKPACK] = {
         markRecentItems = false,
