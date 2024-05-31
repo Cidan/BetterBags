@@ -39,16 +39,17 @@ function refresh:StartUpdate()
     return
   end
 
-  if InCombatLockdown() then
-    return
-  end
-
   local ctx = context:New()
   self.isUpdateRunning = true
   local updateBackpack = false
   local updateBank = false
   for _, event in pairs(self.UpdateQueue) do
     if event.ctx:GetBool("wipe") then
+      -- Prevent full wipes from happening in combat.
+      -- This function will be called again when combat ends automatically.
+      if InCombatLockdown() then
+        return
+      end
       ctx:Set("wipe", true)
     end
     if event.eventName == 'BAG_UPDATE_DELAYED' then
