@@ -165,7 +165,7 @@ function items:OnEnable()
     C_Container:SortBags()
   end)
 
-  events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function(eventData)
+  events:GroupBucketEvent(eventList, {'bags/RefreshBackpack', 'bags/RefreshBank'}, function(eventData)
     debug:Log("Items", "Group Bucket Event for Refresh* Fired")
     local ctx = context:New()
 

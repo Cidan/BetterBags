@@ -148,6 +148,10 @@ function refresh:OnEnable()
 
   events:RegisterMessage('bags/RefreshAll', function(_, shouldWipe)
     print("got refresh all message with wipe of", shouldWipe)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}})
+    local ctx = context:New()
+    ctx:Set("wipe", shouldWipe)
+    self:StartUpdate(ctx)
   end)
 
 end
