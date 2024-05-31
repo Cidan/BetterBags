@@ -49,16 +49,19 @@ function refresh:StartUpdate(ctx)
     if event.eventName == 'BAG_UPDATE_DELAYED' then
       updateBackpack = true
       updateBank = true
+    elseif event.eventName == 'EQUIPMENT_SETS_CHANGED' then
+      updateBackpack = true
+      updateBank = true
     elseif event.eventName == 'PLAYERBANKSLOTS_CHANGED' then
       updateBank = true
     elseif event.eventName == 'PLAYERREAGENTBANKSLOTS_CHANGED' then
       updateBank = true
-    elseif const.BACKPACK_BAGS[event.args[1]] then
-      updateBackpack = true
     elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
     elseif const.REAGENTBANK_BAGS[event.args[1]] then
       updateBank = true
+    elseif const.BACKPACK_BAGS[event.args[1]] then
+      updateBackpack = true
     end
   end
   wipe(self.UpdateQueue)
@@ -98,6 +101,13 @@ function refresh:OnEnable()
 
   events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
     table.insert(refresh.UpdateQueue, {eventName = 'PLAYERBANKSLOTS_CHANGED', args = {}})
+    local ctx = context:New()
+    ctx:Set("wipe", true)
+    self:StartUpdate(ctx)
+  end)
+
+  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
+    table.insert(refresh.UpdateQueue, {eventName = 'EQUIPMENT_SETS_CHANGED', args = {}})
     local ctx = context:New()
     ctx:Set("wipe", true)
     self:StartUpdate(ctx)

@@ -106,11 +106,11 @@ end
 
 function items:OnEnable()
 
-  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    local ctx = context:New()
-    ctx:Set('wipe', true)
-    self:DoRefreshAll(ctx)
-  end)
+--  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
+--    local ctx = context:New()
+--    ctx:Set('wipe', true)
+--    self:DoRefreshAll(ctx)
+--  end)
   local eventList = {
     --'BAG_UPDATE_DELAYED',
     --'BAG_UPDATE',
