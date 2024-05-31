@@ -105,81 +105,13 @@ function items:OnInitialize()
 end
 
 function items:OnEnable()
-
-  local eventList = {
-    --'BAG_UPDATE_DELAYED',
-    --'BAG_UPDATE',
-    --'PLAYERBANKSLOTS_CHANGED',
-  }
-
-  --if addon.isRetail then
-  --  table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
-  --end
---[[
-  events:RegisterMessage('bags/Draw/Backpack/Done', function(_, ctx)
-    ---@cast ctx Context
-    ctx:Cancel()
-    self._doingRefresh = false
-    if self._refreshQueueEvent then
-      local wipe = false
-      for _, eventArg in pairs(self._refreshQueueEvent) do
-        if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
-          wipe = true
-        end
-      end
-      self._refreshQueueEvent = nil
-      events:SendMessageLater('bags/RefreshAll', nil, wipe)
-    else
-      self._preSort = false
-    end
-  end)
-]]--  
-
-  events:GroupBucketEvent(eventList, {}, function(eventData)
-    debug:Log("Items", "Group Bucket Event for Refresh* Fired")
-    local ctx = context:New()
-
-    -- Set a 5 second timeout for the entire refresh loop.
-    -- This ensures that if the refresh loop crashes (i.e. script ran too long)
-    -- that we clean up state and allow the refresh loop to run again.
-    -- This timeout will not run if the refresh loop completes successfully,
-    -- as the context is cancelled when the refresh loop completes.
-    ctx:Timeout(5, function()
-      self._doingRefresh = false
-      self._refreshQueueEvent = nil
-      self._preSort = false
-    end)
-    ctx:Set("wipe", false)
-
-    for _, eventArg in pairs(eventData) do
-      if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
-        ctx:Set("wipe", true)
-      end
-    end
-
-    debug:Log("RefreshAll", "Wipe: ", ctx:GetBool("wipe"))
-
-    if InCombatLockdown() and ctx:GetBool("wipe") then
-      addon.Bags.Backpack.drawAfterCombat = true
-      print(L:G("BetterBags: Bags will refresh after combat ends."))
-    else
-      if self._doingRefresh then
-        if self._refreshQueueEvent == nil then
-          self._refreshQueueEvent = eventData
-        end
-      else
-        self._doingRefresh = true
-        self:DoRefreshAll(ctx)
-      end
-    end
-  end)
-
   events:RegisterEvent('BANKFRAME_OPENED', function()
     if GameMenuFrame:IsShown() then
       return
     end
     addon.atBank = true
   end)
+
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
     items:ClearBankCache()
