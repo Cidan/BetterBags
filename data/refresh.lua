@@ -72,7 +72,9 @@ function refresh:StartUpdate()
   end
   wipe(self.UpdateQueue)
 
-  ctx:Timeout(5, function()
+  -- This timer runs during loading screens, which can cause the context
+  -- to be cancelled before the draw even happens.
+  ctx:Timeout(30, function()
     self.isUpdateRunning = false
     items._preSort = false
   end)
@@ -162,6 +164,9 @@ function refresh:OnEnable()
     table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
     self:StartUpdate()
   end)
+
+  --TODO(lobato): Move all wipe actions into the event queue, so that
+  -- pre-sort logic only happens when it needs to.
 
   -- Register when then backpack should be sorted.
   events:RegisterMessage('bags/SortBackpack', function()
