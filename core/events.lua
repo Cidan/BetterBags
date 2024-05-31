@@ -76,6 +76,35 @@ function events:RegisterEvent(event, callback, arg)
   table.insert(self._eventMap[event].cbs, {cb = callback, a = arg})
 end
 
+-- CatchUntil will group all events that fire as caughtEvent,
+-- until finalEvent is fired. Once finalEvent is fired, the callback
+-- will be called with all the caughtEvent arguments that were fired,
+-- and the finalEvent arguments. If finalEvent is fired without any
+-- caughtEvents being fired, the callback will be called with the
+-- finalEvent arguments.
+---@param caughtEvent string
+---@param finalEvent string
+---@param callback fun(caughtEvents: EventArg[], finalArgs: EventArg)
+function events:CatchUntil(caughtEvent, finalEvent, callback)
+  local caughtEvents = {}
+  local finalArgs = nil
+  local caughtFunction = function(eventName, ...)
+    table.insert(caughtEvents, {
+      eventName = eventName, args = {...}
+    })
+  end
+  local finalFunction = function(eventName, ...)
+    finalArgs = {
+      eventName = eventName, args = {...}
+    }
+    callback(CopyTable(caughtEvents), CopyTable(finalArgs))
+    caughtEvents = {}
+    finalArgs = nil
+  end
+  self:RegisterEvent(caughtEvent, caughtFunction)
+  self:RegisterEvent(finalEvent, finalFunction)
+end
+
 function events:BucketEvent(event, callback)
  --TODO(lobato): Refine this so that timers only run when an event is in the queue. 
   local bucketFunction = function()

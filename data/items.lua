@@ -112,8 +112,8 @@ function items:OnEnable()
     self:DoRefreshAll(ctx)
   end)
   local eventList = {
-    'BAG_UPDATE_DELAYED',
-    'BAG_UPDATE',
+    --'BAG_UPDATE_DELAYED',
+    --'BAG_UPDATE',
     'PLAYERBANKSLOTS_CHANGED',
   }
 

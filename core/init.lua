@@ -60,6 +60,9 @@ local question = addon:GetModule('Question')
 ---@class SimpleItemLevel: AceModule
 local simpleItemLevel = addon:GetModule('SimpleItemLevel')
 
+---@class Refresh: AceModule
+local refresh = addon:GetModule('Refresh')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -210,6 +213,7 @@ function addon:OnEnable()
   search:Enable()
   pawn:Enable()
   question:Enable()
+  refresh:Enable()
 
   self:HideBlizzardBags()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
