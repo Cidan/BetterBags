@@ -48,6 +48,7 @@ function refresh:StartUpdate()
       -- Prevent full wipes from happening in combat.
       -- This function will be called again when combat ends automatically.
       if InCombatLockdown() then
+        self.isUpdateRunning = false
         return
       end
       ctx:Set("wipe", true)
