@@ -121,7 +121,9 @@ function items:OnEnable()
     table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   end
 
-  events:RegisterMessage('bags/Draw/Backpack/Done', function ()
+  events:RegisterMessage('bags/Draw/Backpack/Done', function(_, ctx)
+    ---@cast ctx Context
+    ctx:Cancel()
     self._doingRefresh = false
     if self._refreshQueueEvent then
       local wipe = false
@@ -166,7 +168,18 @@ function items:OnEnable()
   events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function(eventData)
     debug:Log("Items", "Group Bucket Event for Refresh* Fired")
     local ctx = context:New()
+
+    -- Set a 5 second timeout for the entire refresh loop.
+    -- This ensures that if the refresh loop crashes (i.e. script ran too long)
+    -- that we clean up state and allow the refresh loop to run again.
+    -- This timeout will not run if the refresh loop completes successfully,
+    -- as the context is cancelled when the refresh loop completes.
+    ctx:Timeout(5, function()
+      self._doingRefresh = false
+      self._refreshQueueEvent = nil
+    end)
     ctx:Set("wipe", false)
+
     for _, eventArg in pairs(eventData) do
       if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
         ctx:Set("wipe", true)

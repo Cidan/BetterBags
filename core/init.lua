@@ -230,7 +230,7 @@ function addon:OnEnable()
   events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
     debug:Log("init/OnInitialize/items", "Drawing bag")
     addon.Bags.Backpack:Draw(args[1], args[2])
-    events:SendMessage('bags/Draw/Backpack/Done')
+    events:SendMessage('bags/Draw/Backpack/Done', args[1])
     if not addon.Bags.Backpack.loaded then
       addon.Bags.Backpack.loaded = true
       events:SendMessage('bags/Draw/Backpack/Loaded')

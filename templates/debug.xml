@@ -12,7 +12,7 @@
             <Anchor point="LEFT"/>
           </Anchors>
           <Size>
-            <AbsDimension x="30" y="20"/>
+            <AbsDimension x="50" y="20"/>
           </Size>
         </FontString>
         <FontString inherits="GameFontNormalLarge" parentKey="Category">
