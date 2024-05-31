@@ -71,7 +71,7 @@ function refresh:StartUpdate()
       end
     elseif event.eventName == 'BAG_SORT_CLASSIC' then
       if not InCombatLockdown() then
-        sortBackpack = true
+        sortBackpackClassic = true
       end
     elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
