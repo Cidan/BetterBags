@@ -49,6 +49,10 @@ function refresh:StartUpdate(ctx)
     if event.eventName == 'BAG_UPDATE_DELAYED' then
       updateBackpack = true
       updateBank = true
+    elseif event.eventName == 'PLAYERBANKSLOTS_CHANGED' then
+      updateBank = true
+    elseif event.eventName == 'PLAYERREAGENTBANKSLOTS_CHANGED' then
+      updateBank = true
     elseif const.BACKPACK_BAGS[event.args[1]] then
       updateBackpack = true
     elseif const.BANK_BAGS[event.args[1]] then
@@ -91,6 +95,22 @@ function refresh:OnEnable()
 
     self:StartUpdate(ctx)
   end)
+
+  events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+    table.insert(refresh.UpdateQueue, {eventName = 'PLAYERBANKSLOTS_CHANGED', args = {}})
+    local ctx = context:New()
+    ctx:Set("wipe", true)
+    self:StartUpdate(ctx)
+  end)
+
+  if addon.isRetail then
+    events:RegisterEvent('PLAYERREAGENTBANKSLOTS_CHANGED', function()
+      table.insert(refresh.UpdateQueue, {eventName = 'PLAYERREAGENTBANKSLOTS_CHANGED', args = {}})
+      local ctx = context:New()
+      ctx:Set("wipe", true)
+      self:StartUpdate(ctx)
+    end)
+  end
 
   -- Register for when bags are done drawing.
   events:RegisterMessage('bags/Draw/Backpack/Done', function(_, ctx)

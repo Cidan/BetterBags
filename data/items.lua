@@ -114,12 +114,12 @@ function items:OnEnable()
   local eventList = {
     --'BAG_UPDATE_DELAYED',
     --'BAG_UPDATE',
-    'PLAYERBANKSLOTS_CHANGED',
+    --'PLAYERBANKSLOTS_CHANGED',
   }
 
-  if addon.isRetail then
-    table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
-  end
+  --if addon.isRetail then
+  --  table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
+  --end
 
   events:RegisterMessage('bags/Draw/Backpack/Done', function(_, ctx)
     ---@cast ctx Context
