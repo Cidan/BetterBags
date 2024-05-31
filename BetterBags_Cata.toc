@@ -54,6 +54,7 @@ data\categories.lua
 data\items.lua
 data\loader.lua
 data\slots.lua
+data\refresh.lua
 
 util\color.lua
 util\resize.lua

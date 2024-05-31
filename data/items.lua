@@ -105,97 +105,13 @@ function items:OnInitialize()
 end
 
 function items:OnEnable()
-
-  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    local ctx = context:New()
-    ctx:Set('wipe', true)
-    self:DoRefreshAll(ctx)
-  end)
-  local eventList = {
-    'BAG_UPDATE_DELAYED',
-    'BAG_UPDATE',
-    'PLAYERBANKSLOTS_CHANGED',
-  }
-
-  if addon.isRetail then
-    table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
-  end
-
-  events:RegisterMessage('bags/Draw/Backpack/Done', function ()
-    self._doingRefresh = false
-    if self._refreshQueueEvent then
-      local wipe = false
-      for _, eventArg in pairs(self._refreshQueueEvent) do
-        if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
-          wipe = true
-        end
-      end
-      self._refreshQueueEvent = nil
-      events:SendMessageLater('bags/RefreshAll', nil, wipe)
-    else
-      self._preSort = false
-    end
-  end)
-
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    self:WipeAndRefreshAll()
-  end)
-
-  events:RegisterMessage('bags/SortBackpackClassic', function()
-    if self._doingRefresh then return end
-    if InCombatLockdown() then return end
-    self:RemoveNewItemFromAllItems()
-    --self:ClearItemCache()
-    --self:PreSort()
-    _G.SortBags()
-  end)
-
-  events:RegisterMessage('bags/SortBackpack', function()
-    -- TODO(lobato): Queue this up instead of dropping the sort to the ground.
-    if self._doingRefresh then return end
-    if InCombatLockdown() then return end
-    self:RemoveNewItemFromAllItems()
-    self:ClearItemCache()
-    self._firstLoad[const.BAG_KIND.BACKPACK] = true
-    self._firstLoad[const.BAG_KIND.BANK] = true
-    self._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
-    self:PreSort()
-    C_Container:SortBags()
-  end)
-
-  events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function(eventData)
-    debug:Log("Items", "Group Bucket Event for Refresh* Fired")
-    local ctx = context:New()
-    ctx:Set("wipe", false)
-    for _, eventArg in pairs(eventData) do
-      if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
-        ctx:Set("wipe", true)
-      end
-    end
-
-    debug:Log("RefreshAll", "Wipe: ", ctx:GetBool("wipe"))
-
-    if InCombatLockdown() and ctx:GetBool("wipe") then
-      addon.Bags.Backpack.drawAfterCombat = true
-      print(L:G("BetterBags: Bags will refresh after combat ends."))
-    else
-      if self._doingRefresh then
-        if self._refreshQueueEvent == nil then
-          self._refreshQueueEvent = eventData
-        end
-      else
-        self._doingRefresh = true
-        self:DoRefreshAll(ctx)
-      end
-    end
-  end)
-
   events:RegisterEvent('BANKFRAME_OPENED', function()
     if GameMenuFrame:IsShown() then
       return
     end
     addon.atBank = true
   end)
+
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
     items:ClearBankCache()
@@ -263,13 +179,8 @@ end
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
 function items:WipeAndRefreshAll()
   debug:Log('WipeAndRefreshAll', "Wipe And Refresh All triggered")
-  if InCombatLockdown() then
-    addon.Bags.Backpack.drawAfterCombat = true
-    print(L:G("BetterBags: Bags will refresh after combat ends."))
-  else
-    --self:ClearItemCache()
-    events:SendMessage('bags/RefreshAll', true)
-  end
+  --self:ClearItemCache()
+  events:SendMessage('bags/RefreshAll', true)
 end
 
 ---@private
@@ -277,10 +188,11 @@ end
 function items:DoRefreshAll(ctx)
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() or addon.atBank then
+    local bankContext = ctx:Copy()
     if addon.Bags.Bank.isReagentBank then
-      self:RefreshReagentBank(ctx)
+      self:RefreshReagentBank(bankContext)
     else
-      self:RefreshBank(ctx)
+      self:RefreshBank(bankContext)
     end
   end
   self:RefreshBackpack(ctx)

@@ -60,6 +60,9 @@ local question = addon:GetModule('Question')
 ---@class SimpleItemLevel: AceModule
 local simpleItemLevel = addon:GetModule('SimpleItemLevel')
 
+---@class Refresh: AceModule
+local refresh = addon:GetModule('Refresh')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -210,6 +213,7 @@ function addon:OnEnable()
   search:Enable()
   pawn:Enable()
   question:Enable()
+  refresh:Enable()
 
   self:HideBlizzardBags()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
@@ -230,7 +234,7 @@ function addon:OnEnable()
   events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
     debug:Log("init/OnInitialize/items", "Drawing bag")
     addon.Bags.Backpack:Draw(args[1], args[2])
-    events:SendMessage('bags/Draw/Backpack/Done')
+    events:SendMessage('bags/Draw/Backpack/Done', args[1])
     if not addon.Bags.Backpack.loaded then
       addon.Bags.Backpack.loaded = true
       events:SendMessage('bags/Draw/Backpack/Loaded')
@@ -248,17 +252,6 @@ function addon:OnEnable()
     if not addon.Bags.Bank.loaded then
       addon.Bags.Bank.loaded = true
       events:SendMessage('bags/Draw/Bank/Loaded')
-    end
-  end)
-
-  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
-    if addon.Bags.Backpack.drawAfterCombat then
-      addon.Bags.Backpack.drawAfterCombat = false
-      events:SendMessage('bags/FullRefreshAll')
-    end
-    if addon.Bags.Bank.drawAfterCombat then
-      addon.Bags.Bank.drawAfterCombat = false
-      events:SendMessage('bags/FullRefreshAll')
     end
   end)
 

@@ -384,6 +384,18 @@ function DB:SetShowKeybindWarning(value)
   DB.data.profile.showKeybindWarning = value
 end
 
+---@param kind BagKind
+---@return boolean
+function DB:GetShowFullSectionNames(kind)
+  return DB.data.profile.showFullSectionNames[kind]
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetShowFullSectionNames(kind, value)
+  DB.data.profile.showFullSectionNames[kind] = value
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

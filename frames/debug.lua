@@ -49,9 +49,15 @@ function debugWindow:Create()
   self.frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
   self.frame.ScrollBox:SetDataProvider(self.provider)
 
-  self.frame.ClosePanelButton:SetScript("OnClick", function()
-    database:SetDebugMode(false)
-    events:SendMessage('config/DebugMode', false)
+  self.frame.ClosePanelButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
+
+  self.frame.ClosePanelButton:SetScript("OnClick", function(_, e)
+    if e == "LeftButton" then
+      database:SetDebugMode(false)
+      events:SendMessage('config/DebugMode', false)
+    elseif e == "RightButton" then
+      events:SendMessage('debug/ClearLog')
+    end
   end)
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
@@ -66,6 +72,12 @@ function debugWindow:Create()
     else
       self.frame:Hide()
     end
+  end)
+
+  events:RegisterMessage('debug/ClearLog', function()
+    self.provider:Flush()
+    self.cells = {}
+    self.rows = 0
   end)
 
   if database:GetDebugMode() then
