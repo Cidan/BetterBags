@@ -9,6 +9,9 @@ local events = addon:GetModule('Events')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class SimpleItemLevel: AceModule
 local simpleItemLevel = addon:NewModule('SimpleItemLevel')
 
@@ -27,6 +30,7 @@ end
 
 ---@param bag Bag
 local function onBagRendered(_, bag, _)
+  if bag.kind ~= const.BAG_KIND.BACKPACK then return end
   if not PawnGetItemData then
     items:PreLoadAllEquipmentSlots(function()
       for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do

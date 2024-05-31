@@ -91,3 +91,17 @@ function context:Timeout(seconds, callback)
     callback()
   end)
 end
+
+-- Copy creates a copy of the context and returns it.
+-- It does not copy any Timeouts.
+---@return Context
+function context:Copy()
+  if self.done then
+    error("context has been cancelled")
+  end
+  local newContext = context:New()
+  for key, value in pairs(self.keys) do
+    newContext:Set(key, value)
+  end
+  return newContext
+end

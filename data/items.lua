@@ -291,10 +291,11 @@ end
 function items:DoRefreshAll(ctx)
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() or addon.atBank then
+    local bankContext = ctx:Copy()
     if addon.Bags.Bank.isReagentBank then
-      self:RefreshReagentBank(ctx)
+      self:RefreshReagentBank(bankContext)
     else
-      self:RefreshBank(ctx)
+      self:RefreshBank(bankContext)
     end
   end
   self:RefreshBackpack(ctx)
