@@ -120,7 +120,7 @@ function items:OnEnable()
   --if addon.isRetail then
   --  table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
   --end
-
+--[[
   events:RegisterMessage('bags/Draw/Backpack/Done', function(_, ctx)
     ---@cast ctx Context
     ctx:Cancel()
@@ -138,7 +138,7 @@ function items:OnEnable()
       self._preSort = false
     end
   end)
-
+]]--  
   events:RegisterMessage('bags/FullRefreshAll', function()
     self:WipeAndRefreshAll()
   end)
@@ -165,7 +165,7 @@ function items:OnEnable()
     C_Container:SortBags()
   end)
 
-  events:GroupBucketEvent(eventList, {'bags/RefreshBackpack', 'bags/RefreshBank'}, function(eventData)
+  events:GroupBucketEvent(eventList, {}, function(eventData)
     debug:Log("Items", "Group Bucket Event for Refresh* Fired")
     local ctx = context:New()
 

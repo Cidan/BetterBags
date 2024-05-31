@@ -12,6 +12,7 @@ local callbackProto = {}
 
 ---@class EventArg
 ---@field eventName string
+---@field ctx? Context
 ---@field args any[]
 
 ---@class Events: AceModule

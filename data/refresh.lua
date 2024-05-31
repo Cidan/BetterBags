@@ -37,15 +37,23 @@ function refresh:UpdateBag(_, bagid)
 end
 
 -- StartUpdate will start the bag update process if it's not already running.
----@param ctx Context
-function refresh:StartUpdate(ctx)
+function refresh:StartUpdate()
   if self.isUpdateRunning then
+    -- This is a safety check to ensure that the update process is
+    -- never missed in the event of the update queue being interrupted.
+    C_Timer.After(0, function()
+      self:StartUpdate()
+    end)
     return
   end
+  local ctx = context:New()
   self.isUpdateRunning = true
   local updateBackpack = false
   local updateBank = false
   for _, event in pairs(self.UpdateQueue) do
+    if event.ctx:GetBool("wipe") then
+      ctx:Set("wipe", true)
+    end
     if event.eventName == 'BAG_UPDATE_DELAYED' then
       updateBackpack = true
       updateBank = true
@@ -65,6 +73,10 @@ function refresh:StartUpdate(ctx)
     end
   end
   wipe(self.UpdateQueue)
+
+  ctx:Timeout(5, function()
+    self.isUpdateRunning = false
+  end)
 
   if updateBackpack then
     items:RefreshBackpack(ctx)
@@ -86,72 +98,72 @@ function refresh:OnEnable()
     -- If the event list is empty, we never got the BAG_UPDATE event, and need to insert
     -- a BAG_UPDATE_DELAYED event to trigger the update.
     if #eventList == 0 then
-      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}})
+      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = context:New()})
     else
       for _, event in pairs(eventList) do
+        event.ctx = context:New()
         table.insert(refresh.UpdateQueue, event)
       end
     end
-    -- Create the update context and start the update process.
-    local ctx = context:New()
-    ctx:Set("wipe", false)
 
-    self:StartUpdate(ctx)
+    self:StartUpdate()
   end)
 
   events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
-    table.insert(refresh.UpdateQueue, {eventName = 'PLAYERBANKSLOTS_CHANGED', args = {}})
     local ctx = context:New()
     ctx:Set("wipe", true)
-    self:StartUpdate(ctx)
+    table.insert(refresh.UpdateQueue, {eventName = 'PLAYERBANKSLOTS_CHANGED', args = {}, ctx = ctx})
+    self:StartUpdate()
   end)
 
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    table.insert(refresh.UpdateQueue, {eventName = 'EQUIPMENT_SETS_CHANGED', args = {}})
     local ctx = context:New()
     ctx:Set("wipe", true)
-    self:StartUpdate(ctx)
+    table.insert(refresh.UpdateQueue, {eventName = 'EQUIPMENT_SETS_CHANGED', args = {}, ctx = ctx})
+    self:StartUpdate()
   end)
 
   if addon.isRetail then
     events:RegisterEvent('PLAYERREAGENTBANKSLOTS_CHANGED', function()
-      table.insert(refresh.UpdateQueue, {eventName = 'PLAYERREAGENTBANKSLOTS_CHANGED', args = {}})
       local ctx = context:New()
       ctx:Set("wipe", true)
-      self:StartUpdate(ctx)
+      table.insert(refresh.UpdateQueue, {eventName = 'PLAYERREAGENTBANKSLOTS_CHANGED', args = {}, ctx = ctx})
+      self:StartUpdate()
     end)
   end
 
   -- Register for when bags are done drawing.
   events:RegisterMessage('bags/Draw/Backpack/Done', function(_, ctx)
     -- Cancel the context as the bag has been drawn.
-    -- TODO(lobato): Uncomment this when context cancel is removed from Items codepath.
-    -----@cast ctx Context
-    --ctx:Cancel()
+    ---@cast ctx Context
+    ctx:Cancel()
 
     -- If there are more updates in the queue, start the next one with a new context.
     self.isUpdateRunning = false
     if next(self.UpdateQueue) ~= nil then
-      local newCtx = context:New()
-      ctx:Set("wipe", false)
-      self:StartUpdate(newCtx)
+      self:StartUpdate()
     end
   end)
 
   events:RegisterMessage('bags/RefreshBackpack', function(_, shouldWipe)
-    print("got refresh backpack message with wipe of", shouldWipe)
+    local ctx = context:New()
+    ctx:Set("wipe", shouldWipe)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
+    self:StartUpdate()
   end)
 
   events:RegisterMessage('bags/RefreshBank', function (_, shouldWipe)
-    print("got refresh bank message with wipe of", shouldWipe)
+    local ctx = context:New()
+    ctx:Set("wipe", shouldWipe)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
+    self:StartUpdate()
   end)
 
   events:RegisterMessage('bags/RefreshAll', function(_, shouldWipe)
-    print("got refresh all message with wipe of", shouldWipe)
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}})
     local ctx = context:New()
     ctx:Set("wipe", shouldWipe)
-    self:StartUpdate(ctx)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
+    self:StartUpdate()
   end)
 
 end
