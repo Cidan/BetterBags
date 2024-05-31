@@ -43,6 +43,8 @@ function refresh:StartUpdate()
   self.isUpdateRunning = true
   local updateBackpack = false
   local updateBank = false
+  local sortBackpack = false
+  local sortBackpackClassic = false
   for _, event in pairs(self.UpdateQueue) do
     if event.ctx:GetBool("wipe") then
       -- Prevent full wipes from happening in combat.
@@ -63,6 +65,14 @@ function refresh:StartUpdate()
       updateBank = true
     elseif event.eventName == 'PLAYERREAGENTBANKSLOTS_CHANGED' then
       updateBank = true
+    elseif event.eventName == 'BAG_SORT' then
+      if not InCombatLockdown() then
+        sortBackpack = true
+      end
+    elseif event.eventName == 'BAG_SORT_CLASSIC' then
+      if not InCombatLockdown() then
+        sortBackpack = true
+      end
     elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
     elseif const.REAGENTBANK_BAGS[event.args[1]] then
@@ -73,12 +83,24 @@ function refresh:StartUpdate()
   end
   wipe(self.UpdateQueue)
 
-  -- This timer runs during loading screens, which can cause the context
-  -- to be cancelled before the draw even happens.
-  ctx:Timeout(30, function()
+  if sortBackpack then
     self.isUpdateRunning = false
-    items._preSort = false
-  end)
+    items:RemoveNewItemFromAllItems()
+    items:ClearItemCache()
+    items._firstLoad[const.BAG_KIND.BACKPACK] = true
+    items._firstLoad[const.BAG_KIND.BANK] = true
+    items._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
+    items:PreSort()
+    C_Container:SortBags()
+    return
+  end
+
+  if sortBackpackClassic then
+    self.isUpdateRunning = false
+    items:RemoveNewItemFromAllItems()
+    _G.SortBags()
+    return
+  end
 
   if updateBank then
     local bankCtx = ctx:Copy()
@@ -86,6 +108,12 @@ function refresh:StartUpdate()
   end
 
   if updateBackpack then
+    -- This timer runs during loading screens, which can cause the context
+    -- to be cancelled before the draw even happens.
+    ctx:Timeout(30, function()
+      self.isUpdateRunning = false
+      items._preSort = false
+    end)
     items:RefreshBackpack(ctx)
   else
     self.isUpdateRunning = false
@@ -171,24 +199,14 @@ function refresh:OnEnable()
 
   -- Register when then backpack should be sorted.
   events:RegisterMessage('bags/SortBackpack', function()
-    -- TODO(lobato): Queue this up instead of dropping the sort to the ground.
-    if self.isUpdateRunning then return end
-    if InCombatLockdown() then return end
-    items:RemoveNewItemFromAllItems()
-    items:ClearItemCache()
-    items._firstLoad[const.BAG_KIND.BACKPACK] = true
-    items._firstLoad[const.BAG_KIND.BANK] = true
-    items._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
-    items:PreSort()
-    C_Container:SortBags()
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_SORT', args = {const.BAG_KIND.BACKPACK}, ctx = context:New()})
+    self:StartUpdate()
   end)
 
   -- Register when the classic backpack should be sorted.
   events:RegisterMessage('bags/SortBackpackClassic', function()
-    if self.isUpdateRunning then return end
-    if InCombatLockdown() then return end
-    items:RemoveNewItemFromAllItems()
-    _G.SortBags()
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_SORT_CLASSIC', args = {const.BAG_KIND.BACKPACK}, ctx = context:New()})
+    self:StartUpdate()
   end)
 
   -- Register when all bags should be wiped and reloaded.

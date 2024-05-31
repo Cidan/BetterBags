@@ -560,7 +560,7 @@ function itemFrame:OnEnable()
   -- the bag frame.
   ---@type Item[]
   local frames = {}
-  for i = 1, 600 do
+  for i = 1, 700 do
     frames[i] = self:Create()
   end
   for _, frame in pairs(frames) do
