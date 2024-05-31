@@ -177,6 +177,7 @@ function items:OnEnable()
     ctx:Timeout(5, function()
       self._doingRefresh = false
       self._refreshQueueEvent = nil
+      self._preSort = false
     end)
     ctx:Set("wipe", false)
 
