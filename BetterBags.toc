@@ -28,6 +28,7 @@ libs/WagoAnalytics/Shim.lua
 
 templates\container.xml
 templates\debug.xml
+templates\sectionconfig.xml
 
 core\boot.lua
 

@@ -64,6 +64,6 @@ function sectionConfig:Create(parent)
   sc.frame = CreateFrame("Frame", nil, parent, "BackdropTemplate") --[[@as Frame]]
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
-  sc.content:SetupDataSource("BetterBagsDebugListButton", initSectionItem)
+  sc.content:SetupDataSource("BetterBagsSectionConfigListButton", initSectionItem)
   return sc
 end
