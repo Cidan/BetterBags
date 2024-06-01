@@ -186,6 +186,15 @@ function DataProviderMixin:InsertTable(tbl) end
 function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
 ---@return number
 function DataProviderMixin:GetSize() end
+---@param elementData table
+---@return number
+function DataProviderMixin:FindIndex(elementData) end
+function DataProviderMixin:RemoveIndex(index) end
+
+---@class ScrollBoxDragBehavior
+local ScrollBoxDragBehavior = {}
+---@param reorderable boolean
+function ScrollBoxDragBehavior:SetReorderable(reorderable) end
 
 ---@class Frame
 ---@field scrollable boolean

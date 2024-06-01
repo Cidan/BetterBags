@@ -40,21 +40,6 @@ end
 
 function sectionConfigFrame:AddSection(name)
   self.content:AddToStart({ title = name })
-  --[[
-  section.frame:SetSize(360, 20)
-  section.frame:EnableMouse(true)
-  section.frame:SetMovable(true)
-  section.frame:SetScript("OnMouseDown", function()
-    section.frame:SetParent(UIParent)
-    section.frame:StartMoving(true)
-  end)
-  section.label:SetPoint("LEFT", 10, 0)
-  section.label:SetText(name)
-  debug:DrawBorder(section.frame, 1, 0, 0, true)
-  --]]
-  --self.content:AddCell(name, section)
-  --self.content:Draw()
-  --self.content:ShowScrollBar()
 end
 
 ---@param parent Frame
@@ -65,5 +50,6 @@ function sectionConfig:Create(parent)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
   sc.content:SetupDataSource("BetterBagsSectionConfigListButton", initSectionItem)
+  sc.content:SetCanReorder(true)
   return sc
 end

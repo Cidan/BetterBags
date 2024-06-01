@@ -8,6 +8,8 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field ScrollBox WowScrollBox
 ---@field ScrollBar MinimalScrollBar
 ---@field provider DataProviderMixin
+---@field package canReorder boolean
+---@field private dragBehavior ScrollBoxDragBehavior
 local listFrame = {}
 
 -- SetupDataSource readies the list frame to accept items.
@@ -20,10 +22,16 @@ local listFrame = {}
 ---@param elementFactory fun(button: Frame, elementData: table) A function that initializes each item in the list.
 function listFrame:SetupDataSource(itemTemplate, elementFactory)
   local view = CreateScrollBoxListLinearView()
-  view:SetElementInitializer(itemTemplate, elementFactory)
+
+  view:SetElementInitializer(itemTemplate, function(f, data)
+    ---@cast f Frame
+    elementFactory(f, data)
+  end)
+
   view:SetPadding(4, 4, 8, 4, 0)
   view:SetExtent(20)
   ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
+  self.dragBehavior = ScrollUtil.InitDefaultLinearDragBehavior(self.ScrollBox)
   self.ScrollBox:SetDataProvider(self.provider)
 end
 
@@ -37,6 +45,13 @@ end
 ---@param data table
 function listFrame:AddToStart(data)
   self.provider:InsertAtIndex(data, self.provider:GetSize()+1)
+end
+
+-- CanReorder will set whether or not the list can be reordered by clicking on an item.
+---@param canReorder boolean
+function listFrame:SetCanReorder(canReorder)
+  self.canReorder = canReorder
+  self.dragBehavior:SetReorderable(canReorder)
 end
 
 ---@class List: AceModule
@@ -63,5 +78,6 @@ function list:Create(parent)
 
   l.provider = CreateDataProvider() --[[@as DataProviderMixin]]
 
+  l.canReorder = false
   return l
 end
