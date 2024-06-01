@@ -35,6 +35,13 @@ function sectionConfigFrame:AddSection(name)
   local section = setmetatable({}, { __index = sectionConfigItem })
   section.frame = CreateFrame("Frame", nil, self.frame, "BackdropTemplate") --[[@as Frame]]
   section.frame:SetSize(360, 20)
+  section.frame:EnableMouse(true)
+  section.frame:SetMovable(true)
+  section.frame:SetScript("OnMouseDown", function()
+    section.frame:ClearAllPoints()
+    section.frame:SetParent(UIParent)
+    section.frame:StartMoving(true)
+  end)
   section.label = section.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight") --[[@as FontString]]
   section.label:SetPoint("LEFT", 10, 0)
   section.label:SetText(name)
