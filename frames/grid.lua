@@ -29,12 +29,12 @@ local cellProto = {}
 ---@field package bar EventFrame|MinimalScrollBar
 ---@field package box WowScrollBox
 ---@field package view Frame
----@field cells Cell[]|Item[]|Section[]
----@field idToCell table<string, Cell|Item|Section|BagButton>
----@field cellToID table<Cell|Item|Section|BagButton, string>
+---@field cells Cell[]|Item[]|Section[]|any[]
+---@field idToCell table<string, Cell|Item|Section|BagButton|any>
+---@field cellToID table<Cell|Item|Section|BagButton|any, string>
 ---@field headers Section[]
 ---@field columns Column[]
----@field cellToColumn table<Cell|Item|Section, Column>
+---@field cellToColumn table<Cell|Item|Section|any, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
 ---@field spacing number
 ---@field compactStyle GridCompactStyle
@@ -70,7 +70,7 @@ end
 
 -- AddCell will add a cell to this grid.
 ---@param id string
----@param cell Cell|Section|Item|BagButton
+---@param cell Cell|Section|Item|BagButton|any
 function gridProto:AddCell(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')

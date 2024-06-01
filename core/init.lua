@@ -63,6 +63,9 @@ local simpleItemLevel = addon:GetModule('SimpleItemLevel')
 ---@class Refresh: AceModule
 local refresh = addon:GetModule('Refresh')
 
+---@class SectionConfig: AceModule
+local sectionConfig = addon:GetModule('SectionConfig')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -266,5 +269,25 @@ function addon:OnEnable()
     -- Disable the reagent bag tutorial, as Better Bags does not match
     -- the base UI/UX these screens refer to.
     C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
+  end
+  local sc = sectionConfig:Create(UIParent)
+  sc.frame:SetPoint("CENTER")
+  sc.frame:SetBackdrop({
+    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+    tile = true,
+    tileSize = 16,
+    edgeSize = 16,
+    insets = {
+      left = 4,
+      right = 4,
+      top = 4,
+      bottom = 4
+    }
+  })
+  sc.frame:SetBackdropColor(0, 0, 0, 0.8)
+  sc.frame:SetSize(400, 800)
+  for i = 1, 100 do
+    sc:AddSection(format("doot%d", i))
   end
 end
