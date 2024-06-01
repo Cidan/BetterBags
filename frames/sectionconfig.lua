@@ -36,9 +36,10 @@ local sectionConfigFrame = {}
 function sectionConfigFrame:initSectionItem(button, elementData)
   button.Category:SetText(elementData.title)
   button.Category:SetPoint("LEFT", button.RowNumber, "RIGHT", 10, 0)
+
   button:SetScript("OnMouseDown", function(_, key)
     if key == "RightButton" then
-      print("right clicked")
+      print("right clicked on ", elementData.title)
       events:SendMessage('config/SectionSelected', elementData.title)
     end
   end)
