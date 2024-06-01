@@ -4,6 +4,7 @@
     <Size>
       <AbsDimension y="35"/>
     </Size>
+    <HighlightTexture inherits="UIPanelButtonHighlightTexture"/>
     <Layers>
       <Layer level="OVERLAY">
         <FontString name="$parentRowNumber" inherits="GameFontHighlightLarge" parentKey="RowNumber">
