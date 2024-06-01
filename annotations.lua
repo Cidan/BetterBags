@@ -184,6 +184,8 @@ function DataProviderMixin:EnumerateEntireRange() end
 function DataProviderMixin:Insert(...) end
 function DataProviderMixin:InsertTable(tbl) end
 function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
+---@return number
+function DataProviderMixin:GetSize() end
 
 ---@class Frame
 ---@field scrollable boolean

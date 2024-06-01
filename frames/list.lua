@@ -27,9 +27,16 @@ function listFrame:SetupDataSource(itemTemplate, elementFactory)
   self.ScrollBox:SetDataProvider(self.provider)
 end
 
+-- AddToEnd will add an item to the end of the list.
 ---@param data table
-function listFrame:Add(data)
+function listFrame:AddToEnd(data)
   self.provider:InsertAtIndex(data, 1)
+end
+
+-- AddToStart will add an item to the start of the list.
+---@param data table
+function listFrame:AddToStart(data)
+  self.provider:InsertAtIndex(data, self.provider:GetSize()+1)
 end
 
 ---@class List: AceModule

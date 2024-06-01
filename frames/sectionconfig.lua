@@ -39,7 +39,7 @@ local function initSectionItem(button, elementData)
 end
 
 function sectionConfigFrame:AddSection(name)
-  self.content:Add({ title = name })
+  self.content:AddToStart({ title = name })
   --[[
   section.frame:SetSize(360, 20)
   section.frame:EnableMouse(true)
