@@ -31,15 +31,32 @@ local sectionConfigItem = {}
 ---@field content ListFrame
 local sectionConfigFrame = {}
 
----@param button BetterBagsDebugListButton
+---@param button BetterBagsSectionConfigListButton
 ---@param elementData table
-local function initSectionItem(button, elementData)
+function sectionConfigFrame:initSectionItem(button, elementData)
   button.Category:SetText(elementData.title)
   button.Category:SetPoint("LEFT", button.RowNumber, "RIGHT", 10, 0)
+  button:SetScript("OnMouseDown", function(_, key)
+    if key == "RightButton" then
+      print("right clicked")
+      events:SendMessage('config/SectionSelected', elementData.title)
+    end
+  end)
+end
+
+---@param button BetterBagsSectionConfigListButton
+---@param elementData table
+function sectionConfigFrame:resetSectionItem(button, elementData)
+  _ = elementData
+  _ = button
 end
 
 function sectionConfigFrame:AddSection(name)
   self.content:AddToStart({ title = name })
+end
+
+function sectionConfigFrame:Wipe()
+  self.content:Wipe()
 end
 
 ---@param parent Frame
@@ -49,8 +66,16 @@ function sectionConfig:Create(parent)
   sc.frame = CreateFrame("Frame", nil, parent, "BackdropTemplate") --[[@as Frame]]
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
-  sc.content:SetupDataSource("BetterBagsSectionConfigListButton", initSectionItem)
+  sc.content:SetupDataSource("BetterBagsSectionConfigListButton", function(f, data)
+    ---@cast f BetterBagsSectionConfigListButton
+    sc:initSectionItem(f, data)
+  end,
+  function(f, data)
+    ---@cast f BetterBagsSectionConfigListButton
+    sc:resetSectionItem(f, data)
+  end)
   sc.content:SetCanReorder(true, function()
+    --events:SendMessage('bags/FullRefreshAll')
     print("element was moved")
   end)
   return sc

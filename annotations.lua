@@ -103,6 +103,10 @@ BagBarExpandToggle = {}
 ---@field Category FontString
 ---@field Message FontString
 
+---@class BetterBagsSectionConfigListButton: Button
+---@field RowNumber FontString
+---@field Category FontString
+
 ---@class ScrollingFlatPanelTemplate: Frame
 ---@field ScrollBox WowScrollBox
 ---@field ScrollBar MinimalScrollBar
@@ -190,6 +194,7 @@ function DataProviderMixin:GetSize() end
 ---@return number
 function DataProviderMixin:FindIndex(elementData) end
 function DataProviderMixin:RemoveIndex(index) end
+function DataProviderMixin:Flush() end
 
 ---@class ScrollBoxDragBehavior
 local ScrollBoxDragBehavior = {}

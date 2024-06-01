@@ -20,11 +20,12 @@ local listFrame = {}
 -- The element data is the data that you pass to any of the Add methods on the list.
 ---@param itemTemplate string The name of the template to use for each item in the list.
 ---@param elementFactory fun(button: Frame, elementData: table) A function that initializes each item in the list.
-function listFrame:SetupDataSource(itemTemplate, elementFactory)
+---@param elementResetter fun(button: Frame, elementData: table) A function that resets elements in the list.
+function listFrame:SetupDataSource(itemTemplate, elementFactory, elementResetter)
   local view = CreateScrollBoxListLinearView()
 
   view:SetElementInitializer(itemTemplate, elementFactory)
-
+  view:SetElementResetter(elementResetter)
   view:SetPadding(4, 4, 8, 4, 0)
   view:SetExtent(20)
   ScrollUtil.InitScrollBoxListWithScrollBar(self.ScrollBox, self.ScrollBar, view)
@@ -42,6 +43,16 @@ end
 ---@param data table
 function listFrame:AddToStart(data)
   self.provider:InsertAtIndex(data, self.provider:GetSize()+1)
+end
+
+---@param data table
+---@return boolean
+function listFrame:HasItem(data)
+  return self.provider:FindIndex(data) and true or false
+end
+
+function listFrame:Wipe()
+  self.provider:Flush()
 end
 
 -- CanReorder will set whether or not the list can be reordered by clicking on an item.
