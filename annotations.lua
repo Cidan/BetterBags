@@ -177,6 +177,14 @@ function WowScrollBox:GetUpperShadowTexture() end
 function WowScrollBox:GetLowerShadowTexture() end
 function WowScrollBox:SetDataProvider(provider) end
 
+---@class DataProviderMixin
+local DataProviderMixin = {}
+function DataProviderMixin:Enumerate(indexBegin, indexEnd) end
+function DataProviderMixin:EnumerateEntireRange() end
+function DataProviderMixin:Insert(...) end
+function DataProviderMixin:InsertTable(tbl) end
+function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
+
 ---@class Frame
 ---@field scrollable boolean
 local frameProto = {}

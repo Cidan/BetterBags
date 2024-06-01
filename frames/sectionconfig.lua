@@ -15,8 +15,8 @@ local const = addon:GetModule('Constants')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
+---@class List: AceModule
+local list = addon:GetModule('List')
 
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
@@ -28,28 +28,33 @@ local sectionConfigItem = {}
 
 ---@class SectionConfigFrame
 ---@field frame Frame
----@field content Grid
+---@field content ListFrame
 local sectionConfigFrame = {}
 
+---@param button BetterBagsDebugListButton
+---@param elementData table
+local function initSectionItem(button, elementData)
+  button.Category:SetText(elementData.title)
+  button.Category:SetPoint("LEFT", button.RowNumber, "RIGHT", 10, 0)
+end
+
 function sectionConfigFrame:AddSection(name)
-  local section = setmetatable({}, { __index = sectionConfigItem })
-  section.frame = CreateFrame("Frame", nil, self.frame, "BackdropTemplate") --[[@as Frame]]
+  self.content:Add({ title = name })
+  --[[
   section.frame:SetSize(360, 20)
   section.frame:EnableMouse(true)
   section.frame:SetMovable(true)
   section.frame:SetScript("OnMouseDown", function()
-    self.content:RemoveCell(name)
-    self.content:Draw()
     section.frame:SetParent(UIParent)
     section.frame:StartMoving(true)
   end)
-  section.label = section.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight") --[[@as FontString]]
   section.label:SetPoint("LEFT", 10, 0)
   section.label:SetText(name)
   debug:DrawBorder(section.frame, 1, 0, 0, true)
-  self.content:AddCell(name, section)
-  self.content:Draw()
-  self.content:ShowScrollBar()
+  --]]
+  --self.content:AddCell(name, section)
+  --self.content:Draw()
+  --self.content:ShowScrollBar()
 end
 
 ---@param parent Frame
@@ -57,10 +62,8 @@ end
 function sectionConfig:Create(parent)
   local sc = setmetatable({}, { __index = sectionConfigFrame })
   sc.frame = CreateFrame("Frame", nil, parent, "BackdropTemplate") --[[@as Frame]]
-  sc.content = grid:Create(sc.frame)
-  sc.content:GetContainer():SetPoint("TOPLEFT", 10, -10)
-  sc.content:GetContainer():SetPoint("BOTTOMRIGHT", -10, 10)
-
-  sc.content.maxCellWidth = 1
+  sc.content = list:Create(sc.frame)
+  sc.content.frame:SetAllPoints()
+  sc.content:SetupDataSource("BetterBagsDebugListButton", initSectionItem)
   return sc
 end
