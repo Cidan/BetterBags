@@ -23,10 +23,7 @@ local listFrame = {}
 function listFrame:SetupDataSource(itemTemplate, elementFactory)
   local view = CreateScrollBoxListLinearView()
 
-  view:SetElementInitializer(itemTemplate, function(f, data)
-    ---@cast f Frame
-    elementFactory(f, data)
-  end)
+  view:SetElementInitializer(itemTemplate, elementFactory)
 
   view:SetPadding(4, 4, 8, 4, 0)
   view:SetExtent(20)
@@ -49,9 +46,11 @@ end
 
 -- CanReorder will set whether or not the list can be reordered by clicking on an item.
 ---@param canReorder boolean
-function listFrame:SetCanReorder(canReorder)
+---@param cb fun(elementData: table, currentIndex: number, newIndex: number)
+function listFrame:SetCanReorder(canReorder, cb)
   self.canReorder = canReorder
   self.dragBehavior:SetReorderable(canReorder)
+  self.provider:RegisterCallback(DataProviderMixin.Event.OnMove, cb)
 end
 
 ---@class List: AceModule

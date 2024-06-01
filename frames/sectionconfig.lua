@@ -50,6 +50,8 @@ function sectionConfig:Create(parent)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
   sc.content:SetupDataSource("BetterBagsSectionConfigListButton", initSectionItem)
-  sc.content:SetCanReorder(true)
+  sc.content:SetCanReorder(true, function()
+    print("element was moved")
+  end)
   return sc
 end
