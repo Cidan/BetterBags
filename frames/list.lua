@@ -63,6 +63,11 @@ function listFrame:GetAllItems()
   return self.provider:GetCollection()
 end
 
+---@return number
+function listFrame:GetSize()
+  return self.provider:GetSize()
+end
+
 ---@param index number
 ---@return table
 function listFrame:GetIndex(index)

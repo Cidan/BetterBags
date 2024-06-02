@@ -41,18 +41,22 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   if fakeDatabase[elementData.title] then
     button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
   else
-        button.Enabled:SetTexture("")
+      button.Enabled:SetTexture("")
     --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
   end
   button:SetScript("OnMouseDown", function(_, key)
     if key == "RightButton" then
       if fakeDatabase[elementData.title] then
+        local lastEnabled = self:GetLastEnabledItem()
         fakeDatabase[elementData.title] = false
         button.Enabled:SetTexture("")
+        self.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled)
         --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
       else
-        fakeDatabase[elementData.title] = true
         button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
+        local lastEnabled = self:GetLastEnabledItem()
+        fakeDatabase[elementData.title] = true
+        self.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled + 1)
       end
       --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
       print("right clicked on ", elementData.title)
@@ -81,14 +85,14 @@ end
 
 ---@return number
 function sectionConfigFrame:GetLastEnabledItem()
+  local enabledIndex = 0
   local itemList = self.content:GetAllItems()
   for index, item in pairs(itemList) do
-    print("fakeDatabase", item.title, fakeDatabase[item.title])
     if fakeDatabase[item.title] then
-      return index
+      enabledIndex = index
     end
   end
-  return 1
+  return enabledIndex
 end
 
 ---@param parent Frame
@@ -106,19 +110,23 @@ function sectionConfig:Create(parent)
     ---@cast f BetterBagsSectionConfigListButton
     sc:resetSectionItem(f, data)
   end)
-  sc.content:SetCanReorder(true, function(ev, elementData, currentIndex, newIndex)
+  sc.content:SetCanReorder(true, function(_, elementData, _, newIndex)
     if fakeDatabase[elementData.title] then
       if newIndex ~= 1 then
         local previousIndex = sc.content:GetIndex(newIndex - 1)
-        local nextIndex = sc.content:GetIndex(newIndex + 1)
         if not fakeDatabase[previousIndex.title] then
           sc.content.provider:MoveElementDataToIndex(elementData, 1)
           return
         end
       end
+    else
+      local nextIndex = sc.content:GetIndex(newIndex + 1)
+      if nextIndex and fakeDatabase[nextIndex.title] then
+        local lastEnabled = sc:GetLastEnabledItem()
+        sc.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled)
+        return
+      end
     end
-    local lastItem = sc:GetLastEnabledItem()
-    print("reorder", elementData.title, currentIndex, newIndex, lastItem)
     events:SendMessage('bags/FullRefreshAll')
   end)
   return sc
