@@ -104,7 +104,11 @@ function refresh:StartUpdate()
 
   if updateBank then
     local bankCtx = ctx:Copy()
-    items:RefreshBank(bankCtx)
+    if addon.Bags.Bank.isReagentBank then
+      items:RefreshReagentBank(bankCtx)
+    else
+      items:RefreshBank(bankCtx)
+    end
   end
 
   if updateBackpack then
@@ -143,7 +147,7 @@ function refresh:OnEnable()
   -- Register when bank slots change for any reason.
   events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
     local ctx = context:New()
-    ctx:Set("wipe", true)
+    ctx:Set("wipe", false)
     table.insert(refresh.UpdateQueue, {eventName = 'PLAYERBANKSLOTS_CHANGED', args = {}, ctx = ctx})
     self:StartUpdate()
   end)
@@ -160,7 +164,7 @@ function refresh:OnEnable()
   if addon.isRetail then
     events:RegisterEvent('PLAYERREAGENTBANKSLOTS_CHANGED', function()
       local ctx = context:New()
-      ctx:Set("wipe", true)
+      ctx:Set("wipe", false)
       table.insert(refresh.UpdateQueue, {eventName = 'PLAYERREAGENTBANKSLOTS_CHANGED', args = {}, ctx = ctx})
       self:StartUpdate()
     end)
