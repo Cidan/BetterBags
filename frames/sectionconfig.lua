@@ -79,7 +79,16 @@ function sectionConfigFrame:Wipe()
   self.content:Wipe()
 end
 
+---@return number
 function sectionConfigFrame:GetLastEnabledItem()
+  local itemList = self.content:GetAllItems()
+  for index, item in pairs(itemList) do
+    print("fakeDatabase", item.title, fakeDatabase[item.title])
+    if fakeDatabase[item.title] then
+      return index
+    end
+  end
+  return 1
 end
 
 ---@param parent Frame
@@ -98,7 +107,18 @@ function sectionConfig:Create(parent)
     sc:resetSectionItem(f, data)
   end)
   sc.content:SetCanReorder(true, function(ev, elementData, currentIndex, newIndex)
-    print("reorder", elementData.title, currentIndex, newIndex)
+    if fakeDatabase[elementData.title] then
+      if newIndex ~= 1 then
+        local previousIndex = sc.content:GetIndex(newIndex - 1)
+        local nextIndex = sc.content:GetIndex(newIndex + 1)
+        if not fakeDatabase[previousIndex.title] then
+          sc.content.provider:MoveElementDataToIndex(elementData, 1)
+          return
+        end
+      end
+    end
+    local lastItem = sc:GetLastEnabledItem()
+    print("reorder", elementData.title, currentIndex, newIndex, lastItem)
     events:SendMessage('bags/FullRefreshAll')
   end)
   return sc

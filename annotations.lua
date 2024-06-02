@@ -184,7 +184,6 @@ function WowScrollBox:SetDataProvider(provider) end
 ---@class DataProviderMixin: CallbackRegistryMixin
 local DataProviderMixin = {}
 function DataProviderMixin:Enumerate(indexBegin, indexEnd) end
-function DataProviderMixin:EnumerateEntireRange() end
 function DataProviderMixin:Insert(...) end
 function DataProviderMixin:InsertTable(tbl) end
 function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
@@ -198,6 +197,16 @@ function DataProviderMixin:Flush() end
 ---@param predicate fun(elementData: table<any, any>): boolean
 ---@return boolean
 function DataProviderMixin:ContainsByPredicate(predicate) end
+---@return fun(), table[]
+function DataProviderMixin:EnumerateEntireRange() end
+---@return table[]
+function DataProviderMixin:GetCollection() end
+---@param index number
+---@return table
+function DataProviderMixin:Find(index) end
+---@param elementData table
+---@param newIndex number
+function DataProviderMixin:MoveElementDataToIndex(elementData, newIndex) end
 
 ---@class ScrollBoxDragBehavior
 local ScrollBoxDragBehavior = {}

@@ -58,6 +58,17 @@ function listFrame:HasItem(data)
   end)
 end
 
+---@return table[]
+function listFrame:GetAllItems()
+  return self.provider:GetCollection()
+end
+
+---@param index number
+---@return table
+function listFrame:GetIndex(index)
+  return self.provider:Find(index)
+end
+
 function listFrame:Wipe()
   self.provider:Flush()
 end
