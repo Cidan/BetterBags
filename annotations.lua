@@ -104,7 +104,7 @@ BagBarExpandToggle = {}
 ---@field Message FontString
 
 ---@class BetterBagsSectionConfigListButton: Button
----@field RowNumber FontString
+---@field Enabled Texture
 ---@field Category FontString
 
 ---@class ScrollingFlatPanelTemplate: Frame

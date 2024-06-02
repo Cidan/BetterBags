@@ -290,7 +290,6 @@ function addon:OnEnable()
   sc.frame:SetSize(400, 800)
 
   events:RegisterMessage('bags/Draw/Backpack/Done', function()
-    --sc:Wipe()
     for name in pairs(addon.Bags.Backpack.currentView.sections) do
       sc:AddSection(name)
     end

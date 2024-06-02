@@ -7,19 +7,18 @@
     <HighlightTexture inherits="UIPanelButtonHighlightTexture"/>
     <Layers>
       <Layer level="OVERLAY">
-        <FontString name="$parentRowNumber" inherits="GameFontHighlightLarge" parentKey="RowNumber">
-          <Color r="1" g="1" b="1" />
+        <Texture name="$parentEnabled" parentKey="Enabled">
           <Anchors>
             <Anchor point="LEFT"/>
           </Anchors>
           <Size>
-            <AbsDimension x="50" y="35"/>
+            <AbsDimension x="24" y="24"/>
           </Size>
-        </FontString>
+        </Texture>
         <FontString inherits="GameFontNormalLarge" parentKey="Category">
           <Color r="1" g="1" b="1" />
           <Anchors>
-            <Anchor point="LEFT" relativeTo="$parentRowNumber" relativePoint="RIGHT"/>
+            <Anchor point="LEFT" relativeTo="$parentEnabled" relativePoint="RIGHT"/>
           </Anchors>
           <Size>
             <AbsDimension y="35"/>

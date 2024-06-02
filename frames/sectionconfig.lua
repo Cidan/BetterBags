@@ -31,14 +31,28 @@ local sectionConfigItem = {}
 ---@field content ListFrame
 local sectionConfigFrame = {}
 
+local fakeDatabase = {}
+
 ---@param button BetterBagsSectionConfigListButton
 ---@param elementData table
 function sectionConfigFrame:initSectionItem(button, elementData)
   button.Category:SetText(elementData.title)
-  button.Category:SetPoint("LEFT", button.RowNumber, "RIGHT", 10, 0)
-
+  button.Category:SetPoint("LEFT", button.Enabled, "RIGHT", 10, 0)
+  if fakeDatabase[elementData.title] then
+    button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
+  else
+    button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
+  end
   button:SetScript("OnMouseDown", function(_, key)
     if key == "RightButton" then
+      if fakeDatabase[elementData.title] then
+        fakeDatabase[elementData.title] = false
+        button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
+      else
+        fakeDatabase[elementData.title] = true
+        button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
+      end
+      --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
       print("right clicked on ", elementData.title)
       events:SendMessage('config/SectionSelected', elementData.title)
     end
@@ -79,8 +93,7 @@ function sectionConfig:Create(parent)
     sc:resetSectionItem(f, data)
   end)
   sc.content:SetCanReorder(true, function()
-    --events:SendMessage('bags/FullRefreshAll')
-    print("element was moved")
+    events:SendMessage('bags/FullRefreshAll')
   end)
   return sc
 end
