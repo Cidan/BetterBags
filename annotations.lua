@@ -195,6 +195,9 @@ function DataProviderMixin:GetSize() end
 function DataProviderMixin:FindIndex(elementData) end
 function DataProviderMixin:RemoveIndex(index) end
 function DataProviderMixin:Flush() end
+---@param predicate fun(elementData: table<any, any>): boolean
+---@return boolean
+function DataProviderMixin:ContainsByPredicate(predicate) end
 
 ---@class ScrollBoxDragBehavior
 local ScrollBoxDragBehavior = {}

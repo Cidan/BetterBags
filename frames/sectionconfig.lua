@@ -53,6 +53,9 @@ function sectionConfigFrame:resetSectionItem(button, elementData)
 end
 
 function sectionConfigFrame:AddSection(name)
+  if self.content:HasItem({ title = name }) then
+    return
+  end
   self.content:AddToStart({ title = name })
 end
 

@@ -48,7 +48,14 @@ end
 ---@param data table
 ---@return boolean
 function listFrame:HasItem(data)
-  return self.provider:FindIndex(data) and true or false
+  return self.provider:ContainsByPredicate(function(elementData)
+    for k, v in pairs(elementData) do
+      if data[k] ~= v then
+        return false
+      end
+    end
+    return true
+  end)
 end
 
 function listFrame:Wipe()
