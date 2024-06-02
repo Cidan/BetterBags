@@ -64,7 +64,7 @@ end
 
 -- CanReorder will set whether or not the list can be reordered by clicking on an item.
 ---@param canReorder boolean
----@param cb fun(elementData: table, currentIndex: number, newIndex: number)
+---@param cb fun(event: number, elementData: table, currentIndex: number, newIndex: number)
 function listFrame:SetCanReorder(canReorder, cb)
   self.canReorder = canReorder
   self.dragBehavior:SetReorderable(canReorder)

@@ -41,13 +41,15 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   if fakeDatabase[elementData.title] then
     button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
   else
-    button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
+        button.Enabled:SetTexture("")
+    --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
   end
   button:SetScript("OnMouseDown", function(_, key)
     if key == "RightButton" then
       if fakeDatabase[elementData.title] then
         fakeDatabase[elementData.title] = false
-        button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
+        button.Enabled:SetTexture("")
+        --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
       else
         fakeDatabase[elementData.title] = true
         button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
@@ -77,6 +79,9 @@ function sectionConfigFrame:Wipe()
   self.content:Wipe()
 end
 
+function sectionConfigFrame:GetLastEnabledItem()
+end
+
 ---@param parent Frame
 ---@return SectionConfigFrame
 function sectionConfig:Create(parent)
@@ -92,7 +97,8 @@ function sectionConfig:Create(parent)
     ---@cast f BetterBagsSectionConfigListButton
     sc:resetSectionItem(f, data)
   end)
-  sc.content:SetCanReorder(true, function()
+  sc.content:SetCanReorder(true, function(ev, elementData, currentIndex, newIndex)
+    print("reorder", elementData.title, currentIndex, newIndex)
     events:SendMessage('bags/FullRefreshAll')
   end)
   return sc
