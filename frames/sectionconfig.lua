@@ -31,36 +31,34 @@ local sectionConfigItem = {}
 ---@field content ListFrame
 local sectionConfigFrame = {}
 
-local fakeDatabase = {}
+---@type table<string, number>
+addon.fakeDatabase = {}
 
 ---@param button BetterBagsSectionConfigListButton
 ---@param elementData table
 function sectionConfigFrame:initSectionItem(button, elementData)
   button.Category:SetText(elementData.title)
   button.Category:SetPoint("LEFT", button.Enabled, "RIGHT", 10, 0)
-  if fakeDatabase[elementData.title] then
+  if addon.fakeDatabase[elementData.title] then
     button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
   else
       button.Enabled:SetTexture("")
-    --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
   end
   button:SetScript("OnMouseDown", function(_, key)
     if key == "RightButton" then
-      if fakeDatabase[elementData.title] then
+      if addon.fakeDatabase[elementData.title] then
         local lastEnabled = self:GetLastEnabledItem()
-        fakeDatabase[elementData.title] = false
+        addon.fakeDatabase[elementData.title] = nil
         button.Enabled:SetTexture("")
         self.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled)
         --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
       else
         button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
         local lastEnabled = self:GetLastEnabledItem()
-        fakeDatabase[elementData.title] = true
+        addon.fakeDatabase[elementData.title] = lastEnabled == 0 and 1 or lastEnabled + 1
         self.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled + 1)
       end
-      --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
-      print("right clicked on ", elementData.title)
-      events:SendMessage('config/SectionSelected', elementData.title)
+      events:SendMessage('bags/FullRefreshAll')
     end
   end)
 end
@@ -88,7 +86,7 @@ function sectionConfigFrame:GetLastEnabledItem()
   local enabledIndex = 0
   local itemList = self.content:GetAllItems()
   for index, item in pairs(itemList) do
-    if fakeDatabase[item.title] then
+    if addon.fakeDatabase[item.title] then
       enabledIndex = index
     end
   end
@@ -111,21 +109,26 @@ function sectionConfig:Create(parent)
     sc:resetSectionItem(f, data)
   end)
   sc.content:SetCanReorder(true, function(_, elementData, _, newIndex)
-    if fakeDatabase[elementData.title] then
+    if addon.fakeDatabase[elementData.title] then
       if newIndex ~= 1 then
         local previousIndex = sc.content:GetIndex(newIndex - 1)
-        if not fakeDatabase[previousIndex.title] then
+        if not addon.fakeDatabase[previousIndex.title] then
+          addon.fakeDatabase[elementData.title] = 1
           sc.content.provider:MoveElementDataToIndex(elementData, 1)
           return
         end
       end
     else
       local nextIndex = sc.content:GetIndex(newIndex + 1)
-      if nextIndex and fakeDatabase[nextIndex.title] then
+      if nextIndex and addon.fakeDatabase[nextIndex.title] then
         local lastEnabled = sc:GetLastEnabledItem()
+        addon.fakeDatabase[nextIndex.title] = lastEnabled == 0 and 1 or lastEnabled
         sc.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled)
         return
       end
+    end
+    if addon.fakeDatabase[elementData.title] then
+      addon.fakeDatabase[elementData.title] = newIndex
     end
     events:SendMessage('bags/FullRefreshAll')
   end)

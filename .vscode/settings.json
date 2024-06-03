@@ -135,7 +135,8 @@
     "GetInventoryItemLink",
     "time",
     "ItemLocation",
-    "strsplittable"
+    "strsplittable",
+    "GetText"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

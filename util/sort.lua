@@ -68,8 +68,23 @@ end
 
 ---@param a Section
 ---@param b Section
+---@return boolean, boolean
+function sort.SortSectionsByPriority(a, b)
+  local aTitle, bTitle = a.title:GetText(), b.title:GetText()
+  if not addon.fakeDatabase[aTitle] and not addon.fakeDatabase[bTitle] then return false, false end
+  if addon.fakeDatabase[aTitle] and not addon.fakeDatabase[bTitle] then return true, true end
+  if not addon.fakeDatabase[aTitle] and addon.fakeDatabase[bTitle] then return true, false end
+
+  return true, addon.fakeDatabase[aTitle] < addon.fakeDatabase[bTitle]
+end
+
+---@param a Section
+---@param b Section
 ---@return boolean
 function sort.SortSectionsAlphabetically(a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
