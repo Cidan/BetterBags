@@ -66,23 +66,26 @@ function sort:GetItemSortFunction(kind, view)
   return function() end
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean, boolean
-function sort.SortSectionsByPriority(a, b)
+function sort.SortSectionsByPriority(kind, a, b)
   local aTitle, bTitle = a.title:GetText(), b.title:GetText()
-  if not addon.fakeDatabase[aTitle] and not addon.fakeDatabase[bTitle] then return false, false end
-  if addon.fakeDatabase[aTitle] and not addon.fakeDatabase[bTitle] then return true, true end
-  if not addon.fakeDatabase[aTitle] and addon.fakeDatabase[bTitle] then return true, false end
+  local pinnedItems = database:GetCustomSectionSort(kind)
+  if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end
+  if pinnedItems[aTitle] and not pinnedItems[bTitle] then return true, true end
+  if not pinnedItems[aTitle] and pinnedItems[bTitle] then return true, false end
 
-  return true, addon.fakeDatabase[aTitle] < addon.fakeDatabase[bTitle]
+  return true, pinnedItems[aTitle] < pinnedItems[bTitle]
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsAlphabetically(a, b)
-  local shouldSort, sortResult = sort.SortSectionsByPriority(a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(const.BAG_KIND.BACKPACK, a, b)
   if shouldSort then return sortResult end
 
   if a.title:GetText() == L:G("Recent Items") then return true end
@@ -96,11 +99,12 @@ function sort.SortSectionsAlphabetically(a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeDescending(a, b)
-  local shouldSort, sortResult = sort.SortSectionsByPriority(a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(const.BAG_KIND.BACKPACK, a, b)
   if shouldSort then return sortResult end
 
   if a.title:GetText() == L:G("Recent Items") then return true end
@@ -118,11 +122,12 @@ function sort.SortSectionsBySizeDescending(a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeAscending(a, b)
-  local shouldSort, sortResult = sort.SortSectionsByPriority(a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(const.BAG_KIND.BACKPACK, a, b)
   if shouldSort then return sortResult end
 
   if a.title:GetText() == L:G("Recent Items") then return true end

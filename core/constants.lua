@@ -406,6 +406,12 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
     },
+    customSectionSort = {
+      ---@type table<string, number>
+      [const.BAG_KIND.BACKPACK] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.BANK] = {},
+    },
     size = {
       [const.BAG_VIEW.ONE_BAG] = {
         [const.BAG_KIND.BACKPACK] = {
