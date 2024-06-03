@@ -30,6 +30,11 @@ local database = addon:GetModule('Database')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
 
+---@class SectionConfigElement
+---@field title string
+---@field header? boolean
+---@field index? number
+
 ---@class SectionConfigItem
 ---@field frame Frame
 ---@field label FontString
@@ -184,13 +189,16 @@ end
 
 function sectionConfigFrame:LoadPinnedItems()
   local pinnedList = database:GetCustomSectionSort(self.kind)
-  ---@type table<number, string>
+  ---@type SectionConfigElement[]
   local sortedList = {}
   for title, index in pairs(pinnedList) do
-    table.insert(sortedList, index, title)
+    table.insert(sortedList, { title = title, index = index })
   end
-  for _, title in ipairs(sortedList) do
-    self.content.provider:Insert({title = title})
+  table.sort(sortedList, function(a, b)
+    return a.index < b.index
+  end)
+  for _, element in ipairs(sortedList) do
+    self.content.provider:Insert({title = element.title})
   end
 end
 
