@@ -82,7 +82,11 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   if categories:IsCategoryEnabled(self.kind, elementData.title) then
     button:SetBackdropColor(1, 1, 0, .2)
   else
-    button:SetBackdropColor(0, 0, 0, 0)
+    if elementData.header then
+      button:SetBackdropColor(0, 0, 0, .3)
+    else
+      button:SetBackdropColor(0, 0, 0, 0)
+    end
   end
 
   if not elementData.header then
@@ -111,6 +115,8 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     button:SetScript("OnLeave", function()
       GameTooltip:Hide()
     end)
+  else
+    button:SetScript("OnEnter", nil)
   end
   -- Set the text and icon for the button.
   button.Category:SetText(elementData.title)
@@ -166,13 +172,27 @@ function sectionConfigFrame:Wipe()
   self.content:Wipe()
 end
 
-function sectionConfigFrame:Show()
+---@param callback? fun()
+function sectionConfigFrame:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeIn.callback = function()
+      self.fadeIn.callback = nil
+      callback()
+    end
+  end
   self.fadeIn:Play()
 end
 
-function sectionConfigFrame:Hide()
+---@param callback? fun()
+function sectionConfigFrame:Hide(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeOut.callback = function()
+      self.fadeOut.callback = nil
+      callback()
+    end
+  end
   self.fadeOut:Play()
 end
 

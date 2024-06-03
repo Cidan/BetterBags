@@ -1,5 +1,8 @@
 ---@meta
 
+---@class AnimationGroup
+---@field callback fun()
+
 ---@class ItemButton: Button
 ---@field bagID number
 ---@field NewItemTexture Texture
