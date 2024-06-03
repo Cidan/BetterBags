@@ -1,30 +1,8 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
-  <Button name="BetterBagsSectionConfigListButton" virtual="true">
+  <Button name="BetterBagsSectionConfigListButton" inherits="BackdropTemplate" virtual="true">
     <Size>
       <AbsDimension y="35"/>
     </Size>
-    <HighlightTexture inherits="UIPanelButtonHighlightTexture"/>
-    <Layers>
-      <Layer level="OVERLAY">
-        <Texture name="$parentEnabled" parentKey="Enabled">
-          <Anchors>
-            <Anchor point="LEFT"/>
-          </Anchors>
-          <Size>
-            <AbsDimension x="24" y="24"/>
-          </Size>
-        </Texture>
-        <FontString inherits="GameFontNormalLarge" parentKey="Category">
-          <Color r="1" g="1" b="1" />
-          <Anchors>
-            <Anchor point="LEFT" relativeTo="$parentEnabled" relativePoint="RIGHT"/>
-          </Anchors>
-          <Size>
-            <AbsDimension y="35"/>
-          </Size>
-        </FontString>
-      </Layer>
-    </Layers>
   </Button>
 </Ui>

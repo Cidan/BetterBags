@@ -244,6 +244,21 @@ function contextMenu:CreateContextMenu(bag)
     })
   end
 
+  -- Show bag slot toggle.
+  table.insert(menuList, {
+    text = L:G("Configure Categories"),
+    checked = function() return bag.sectionConfigFrame:IsShown() end,
+    tooltipTitle = L:G("Configure Categories"),
+    tooltipText = L:G("Click to toggle the display of the category configuration side panel."),
+    func = function()
+      if bag.sectionConfigFrame:IsShown() then
+        bag.sectionConfigFrame:Hide()
+      else
+        bag.sectionConfigFrame:Show()
+      end
+    end
+  })
+
   if bag.kind == const.BAG_KIND.BACKPACK then
     -- Show the Blizzard bag button toggle.
     table.insert(menuList, {

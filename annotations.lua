@@ -106,6 +106,7 @@ BagBarExpandToggle = {}
 ---@class BetterBagsSectionConfigListButton: Button
 ---@field Enabled Texture
 ---@field Category FontString
+---@field Init boolean
 
 ---@class ScrollingFlatPanelTemplate: Frame
 ---@field ScrollBox WowScrollBox

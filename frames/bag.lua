@@ -504,7 +504,6 @@ function bagFrame:Create(kind)
   end
 
   b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
-  b.sectionConfigFrame.frame:Show()
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
