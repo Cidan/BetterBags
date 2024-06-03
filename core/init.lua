@@ -290,7 +290,13 @@ function addon:OnEnable()
   sc.frame:SetSize(400, 800)
 
   events:RegisterMessage('bags/Draw/Backpack/Done', function()
+    ---@type string[]
+    local names = {}
     for name in pairs(addon.Bags.Backpack.currentView.sections) do
+      table.insert(names, name)
+    end
+    table.sort(names)
+    for _, name in ipairs(names) do
       sc:AddSection(name)
     end
   end)
