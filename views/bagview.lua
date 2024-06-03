@@ -52,7 +52,7 @@ local function GetBagName(bagid)
   if isBackpack then
     local bagname = bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(bagid)
     local displayid = bagid == Enum.BagIndex.Keyring and 6 or bagid+1
-    return format("#%d: %s", displayid, bagname)
+    return format("#%d: %s", displayid, bagname or "Unknown")
   end
 
     local id = bagid
