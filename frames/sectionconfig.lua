@@ -239,31 +239,6 @@ function sectionConfig:Create(kind, parent)
       return
     end
     sc:UpdatePinnedItems()
-    -- TODO(lobato): Detect which header the item was moved into and
-    -- toggle it's pinned state.
-    --[[
-    if addon.fakeDatabase[elementData.title] then
-      if newIndex ~= 1 then
-        local previousIndex = sc.content:GetIndex(newIndex - 1)
-        if not addon.fakeDatabase[previousIndex.title] then
-          addon.fakeDatabase[elementData.title] = 1
-          sc.content.provider:MoveElementDataToIndex(elementData, 1)
-          return
-        end
-      end
-    else
-      local nextIndex = sc.content:GetIndex(newIndex + 1)
-      if nextIndex and addon.fakeDatabase[nextIndex.title] then
-        local lastEnabled = sc:GetLastEnabledItem()
-        addon.fakeDatabase[nextIndex.title] = lastEnabled == 0 and 1 or lastEnabled
-        sc.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled)
-        return
-      end
-    end
-    if addon.fakeDatabase[elementData.title] then
-      addon.fakeDatabase[elementData.title] = newIndex
-    end
-    --]]
     events:SendMessage('bags/FullRefreshAll')
   end)
 

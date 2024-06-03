@@ -39,11 +39,17 @@ end
 function sort:GetSectionSortFunction(kind, view)
   local sortType = database:GetSectionSortType(kind, view)
   if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
-    return self.SortSectionsAlphabetically
+    return function(a, b)
+      return self.SortSectionsAlphabetically(kind, a, b)
+    end
   elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
-    return self.SortSectionsBySizeAscending
+    return function(a, b)
+      return self.SortSectionsBySizeAscending(kind, a, b)
+    end
   elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
-    return self.SortSectionsBySizeDescending
+    return function(a, b)
+      return self.SortSectionsBySizeDescending(kind, a, b)
+    end
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end
@@ -84,8 +90,8 @@ end
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsAlphabetically(a, b)
-  local shouldSort, sortResult = sort.SortSectionsByPriority(const.BAG_KIND.BACKPACK, a, b)
+function sort.SortSectionsAlphabetically(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
   if shouldSort then return sortResult end
 
   if a.title:GetText() == L:G("Recent Items") then return true end
@@ -103,8 +109,8 @@ end
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsBySizeDescending(a, b)
-  local shouldSort, sortResult = sort.SortSectionsByPriority(const.BAG_KIND.BACKPACK, a, b)
+function sort.SortSectionsBySizeDescending(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
   if shouldSort then return sortResult end
 
   if a.title:GetText() == L:G("Recent Items") then return true end
@@ -126,8 +132,8 @@ end
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsBySizeAscending(a, b)
-  local shouldSort, sortResult = sort.SortSectionsByPriority(const.BAG_KIND.BACKPACK, a, b)
+function sort.SortSectionsBySizeAscending(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
   if shouldSort then return sortResult end
 
   if a.title:GetText() == L:G("Recent Items") then return true end
