@@ -135,23 +135,6 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       end
       events:SendMessage('bags/FullRefreshAll')
     end
-    --[[
-    if key == "RightButton" then
-      if addon.fakeDatabase[elementData.title] then
-        local lastEnabled = self:GetLastEnabledItem()
-        addon.fakeDatabase[elementData.title] = nil
-        button.Enabled:SetTexture("")
-        self.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled)
-        --button.Enabled:SetTexture("Interface\\raidframe\\readycheck-notready")
-      else
-        button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
-        local lastEnabled = self:GetLastEnabledItem()
-        addon.fakeDatabase[elementData.title] = lastEnabled == 0 and 1 or lastEnabled + 1
-        self.content.provider:MoveElementDataToIndex(elementData, lastEnabled == 0 and 1 or lastEnabled + 1)
-      end
-      events:SendMessage('bags/FullRefreshAll')
-    end
-    ]]--
   end)
 end
 
@@ -192,17 +175,22 @@ function sectionConfigFrame:UpdatePinnedItems()
   database:ClearCustomSectionSort(self.kind)
   local index, elementData = next(itemList)
   repeat
-    if elementData.title ~= "Pinned" then
+    if elementData.title ~= "Pinned" and not elementData.header then
       database:SetCustomSectionSort(self.kind, elementData.title, index - 1)
     end
     index, elementData = next(itemList, index)
-  until elementData.title == "Automatically Sorted"
+  until elementData.title == "Automatically Sorted" and elementData.header
 end
 
 function sectionConfigFrame:LoadPinnedItems()
   local pinnedList = database:GetCustomSectionSort(self.kind)
+  ---@type table<number, string>
+  local sortedList = {}
   for title, index in pairs(pinnedList) do
-    self.content.provider:InsertAtIndex({ title = title }, index + 1)
+    table.insert(sortedList, index, title)
+  end
+  for _, title in ipairs(sortedList) do
+    self.content.provider:Insert({title = title})
   end
 end
 
@@ -272,8 +260,8 @@ function sectionConfig:Create(kind, parent)
   end)
 
   sc.content:AddToStart({ title = "Pinned", header = true })
-  sc.content:AddToStart({ title = "Automatically Sorted", header = true })
   sc:LoadPinnedItems()
+  sc.content:AddToStart({ title = "Automatically Sorted", header = true })
 
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()
