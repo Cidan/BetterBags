@@ -260,7 +260,7 @@ function contextMenu:CreateContextMenu(bag)
       if bag.sectionConfigFrame:IsShown() then
         bag.sectionConfigFrame:Hide()
       else
-        if bag.currencyFrame:IsShown() then
+        if bag.currencyFrame and bag.currencyFrame:IsShown() then
           bag.currencyFrame:Hide(function()
             bag.sectionConfigFrame:Show()
           end)
