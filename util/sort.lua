@@ -100,6 +100,9 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeDescending(a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
@@ -119,6 +122,9 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeAscending(a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
