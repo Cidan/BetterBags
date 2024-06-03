@@ -2,7 +2,7 @@
 ..\FrameXML\UI.xsd">
   <Button name="BetterBagsSectionConfigListButton" inherits="BackdropTemplate" virtual="true">
     <Size>
-      <AbsDimension y="35"/>
+      <AbsDimension y="30"/>
     </Size>
   </Button>
 </Ui>

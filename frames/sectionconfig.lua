@@ -35,6 +35,7 @@ local sectionConfigItem = {}
 ---@class SectionConfigFrame
 ---@field frame Frame
 ---@field content ListFrame
+---@field package kind BagKind
 ---@field package fadeIn AnimationGroup
 ---@field package fadeOut AnimationGroup
 local sectionConfigFrame = {}
@@ -45,25 +46,25 @@ addon.fakeDatabase = {}
 ---@param button BetterBagsSectionConfigListButton
 ---@param elementData table
 function sectionConfigFrame:initSectionItem(button, elementData)
-  -- Initial setup.
+
+  -- Initial setup, create the button here.
   if not button.Init then
     button.Init = true
-    button:SetHeight(35)
+    button:SetHeight(30)
     button.Enabled = button:CreateTexture(nil, "OVERLAY")
     button.Enabled:SetSize(24, 24)
     button.Enabled:SetPoint("LEFT", button, "LEFT", 0, 0)
     button.Category = button:CreateFontString(nil, "OVERLAY")
-    button.Category:SetHeight(35)
+    button.Category:SetHeight(30)
     button.Category:SetPoint("LEFT", button.Enabled, "RIGHT", 0, 0)
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
     })
     button:SetBackdropColor(0, 0, 0, 0)
-    button:SetHighlightTexture("Interface/QuestFrame/UI-QuestTitleHighlight", "ADD")
   end
 
-
+  -- Set the category font info for the button depending on if it's a header or not.
   if elementData.header then
     button.Category:SetFontObject("GameFontNormal")
     button.Category:SetTextColor(1, .81960791349411, 0, 1)
@@ -72,14 +73,57 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     button.Category:SetTextColor(1, 1, 1)
   end
 
+  -- Set the backdrop initial state.
+  if categories:IsCategoryEnabled(self.kind, elementData.title) then
+    button:SetBackdropColor(1, 1, 0, .2)
+  else
+    button:SetBackdropColor(0, 0, 0, 0)
+  end
+
+  if not elementData.header then
+    button:SetScript("OnEnter", function()
+      GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+      GameTooltip:AddLine(elementData.title, 1, .81960791349411, 0, true)
+      GameTooltip:AddLine("Left click to enable or disable items from being added to this category, right click to hide or show this category and all it's items entirely.", 1, 1, 1, true)
+      GameTooltip:AddLine("", 1, 1, 1, true)
+      GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
+      GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
+      GameTooltip:Show()
+    end)
+
+    button:SetScript("OnLeave", function()
+      GameTooltip:Hide()
+    end)
+  end
+  -- Set the text and icon for the button.
   button.Category:SetText(elementData.title)
 
+  -- TODO(lobato): Instead of a check, have an X for hiding the category.
+  --[[
   if addon.fakeDatabase[elementData.title] then
     button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
   else
       button.Enabled:SetTexture("")
   end
+  --]]
   button:SetScript("OnMouseDown", function(_, key)
+    -- Headers can't be clicked.
+    if elementData.header then
+      return
+    end
+
+    -- Toggle the category from containing items.
+    if key == "LeftButton" then
+      if categories:IsCategoryEnabled(self.kind, elementData.title) then
+        categories:DisableCategory(self.kind, elementData.title)
+        button:SetBackdropColor(0, 0, 0, 0)
+      else
+        categories:EnableCategory(self.kind, elementData.title)
+        button:SetBackdropColor(1, 1, 0, .2)
+      end
+      events:SendMessage('bags/FullRefreshAll')
+    end
+    --[[
     if key == "RightButton" then
       if addon.fakeDatabase[elementData.title] then
         local lastEnabled = self:GetLastEnabledItem()
@@ -95,6 +139,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       end
       events:SendMessage('bags/FullRefreshAll')
     end
+    ]]--
   end)
 end
 
@@ -153,6 +198,7 @@ function sectionConfig:Create(kind, parent)
   sc.frame:SetWidth(300)
   sc.frame:SetTitle("Configure Categories")
   sc.frame:Hide()
+  sc.kind = kind
   sc.fadeIn, sc.fadeOut = animations:AttachFadeAndSlideLeft(sc.frame)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
@@ -177,7 +223,9 @@ function sectionConfig:Create(kind, parent)
       sc.content.provider:InsertAtIndex(elementData, currentIndex)
       return
     end
-
+    -- TODO(lobato): Detect which header the item was moved into and
+    -- toggle it's pinned state.
+    --[[
     if addon.fakeDatabase[elementData.title] then
       if newIndex ~= 1 then
         local previousIndex = sc.content:GetIndex(newIndex - 1)
@@ -199,6 +247,7 @@ function sectionConfig:Create(kind, parent)
     if addon.fakeDatabase[elementData.title] then
       addon.fakeDatabase[elementData.title] = newIndex
     end
+    --]]
     events:SendMessage('bags/FullRefreshAll')
   end)
 
