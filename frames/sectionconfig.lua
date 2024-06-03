@@ -129,18 +129,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       return
     end
 
-    -- If the category doesn't exist, don't do anything. This is likely
-    -- a category that is dynamic, i.e. based on item type, etc.
-    if not categories:DoesCategoryExist(elementData.title) then
-      return
-    end
-
     -- Toggle the category from containing items.
     if key == "LeftButton" then
       if IsShiftKeyDown() then
         self.content.provider:MoveElementDataToIndex(elementData, 2)
         self:UpdatePinnedItems()
-      else
+      elseif categories:DoesCategoryExist(elementData.title) then
         if categories:IsCategoryEnabled(self.kind, elementData.title) then
           categories:DisableCategory(self.kind, elementData.title)
           button:SetBackdropColor(0, 0, 0, 0)
