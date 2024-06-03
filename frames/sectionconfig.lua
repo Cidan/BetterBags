@@ -84,10 +84,16 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     button:SetScript("OnEnter", function()
       GameTooltip:SetOwner(button, "ANCHOR_LEFT")
       GameTooltip:AddLine(elementData.title, 1, .81960791349411, 0, true)
-      GameTooltip:AddLine("Left click to enable or disable items from being added to this category, right click to hide or show this category and all it's items entirely.", 1, 1, 1, true)
-      GameTooltip:AddLine("", 1, 1, 1, true)
-      GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
-      GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
+      if categories:DoesCategoryExist(elementData.title) then
+        GameTooltip:AddLine([[
+        Left click to enable or disable items from being added to this category, right click to hide or show this category and all it's items entirely.
+        Drag this category to Pinned to keep it at the top of your bags, or to Automatically Sorted to have it sorted with the rest of your items.]], 1, 1, 1, true)
+        GameTooltip:AddLine("\n", 1, 1, 1, true)
+        GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
+        GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
+      else
+        GameTooltip:AddLine("Dynamic categories can't be disabled individually (yet), but can be reordered!", 1, 1, 1, true)
+      end
       GameTooltip:Show()
     end)
 
@@ -109,6 +115,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   button:SetScript("OnMouseDown", function(_, key)
     -- Headers can't be clicked.
     if elementData.header then
+      return
+    end
+
+    -- If the category doesn't exist, don't do anything. This is likely
+    -- a category that is dynamic, i.e. based on item type, etc.
+    if not categories:DoesCategoryExist(elementData.title) then
       return
     end
 
