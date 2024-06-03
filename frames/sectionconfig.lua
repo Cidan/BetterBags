@@ -100,14 +100,14 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         GameTooltip:AddLine("\n", 1, 1, 1, true)
         GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
         GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
-        GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
+        --GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
       else
         GameTooltip:AddLine([[
           Dynamic categories can't be enabled or disabled (yet).
           Drag this category to Pinned to keep it at the top of your bags, or to Automatically Sorted to have it sorted with the rest of your items.]], 1, 1, 1, true)
           GameTooltip:AddLine("\n", 1, 1, 1, true)
           GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
-          GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
+          --GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
       end
       GameTooltip:Show()
     end)
