@@ -206,7 +206,6 @@ function sectionConfigFrame:UpdatePinnedItems()
   local index, elementData = next(itemList)
   repeat
     if elementData.title ~= "Pinned" then
-      print(index, elementData.title)
       addon.fakeDatabase[elementData.title] = index - 1
       table.insert(pinnedItems, elementData)
     end
