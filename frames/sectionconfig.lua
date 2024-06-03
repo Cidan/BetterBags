@@ -263,6 +263,12 @@ function sectionConfig:Create(kind, parent)
       sc.content.provider:InsertAtIndex(elementData, currentIndex)
       return
     end
+
+    if newIndex == 1 then
+      sc.content.provider:RemoveIndex(newIndex)
+      sc.content.provider:InsertAtIndex(elementData, 2)
+    end
+
     sc:UpdatePinnedItems()
     events:SendMessage('bags/FullRefreshAll')
   end)
