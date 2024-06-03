@@ -18,6 +18,9 @@ local debug = addon:GetModule('Debug')
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
 
@@ -93,11 +96,15 @@ function sectionConfigFrame:GetLastEnabledItem()
   return enabledIndex
 end
 
+---@param kind BagKind
 ---@param parent Frame
 ---@return SectionConfigFrame
-function sectionConfig:Create(parent)
+function sectionConfig:Create(kind, parent)
   local sc = setmetatable({}, { __index = sectionConfigFrame })
-  sc.frame = CreateFrame("Frame", nil, parent, "BackdropTemplate") --[[@as Frame]]
+  sc.frame = CreateFrame("Frame", nil, parent, "DefaultPanelTemplate") --[[@as Frame]]
+  sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
+  sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
+  sc.frame:SetWidth(300)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
   sc.content:SetupDataSource("BetterBagsSectionConfigListButton", function(f, data)
@@ -132,5 +139,22 @@ function sectionConfig:Create(parent)
     end
     events:SendMessage('bags/FullRefreshAll')
   end)
+
+  local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
+  events:RegisterMessage(drawEvent, function()
+    ---@type string[]
+    local names = {}
+    for sName in pairs(kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.currentView.sections or addon.Bags.Bank.currentView.sections) do
+      table.insert(names, sName)
+    end
+    for sName in pairs(categories:GetAllCategories()) do
+      table.insert(names, sName)
+    end
+    table.sort(names)
+    for _, sName in ipairs(names) do
+      sc:AddSection(sName)
+    end
+  end)
+
   return sc
 end

@@ -270,34 +270,4 @@ function addon:OnEnable()
     -- the base UI/UX these screens refer to.
     C_CVar.SetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_EQUIP_REAGENT_BAG --[[@as number]], true)
   end
-
-  local sc = sectionConfig:Create(UIParent)
-  sc.frame:SetPoint("CENTER")
-  sc.frame:SetBackdrop({
-    bgFile = "Interface/FrameGeneral/UI-Background-Rock",
-    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-    tile = true,
-    tileSize = 16,
-    edgeSize = 16,
-    insets = {
-      left = 4,
-      right = 4,
-      top = 4,
-      bottom = 4
-    }
-  })
-  sc.frame:SetBackdropColor(0, 0, 0, 0.8)
-  sc.frame:SetSize(400, 800)
-
-  events:RegisterMessage('bags/Draw/Backpack/Done', function()
-    ---@type string[]
-    local names = {}
-    for name in pairs(addon.Bags.Backpack.currentView.sections) do
-      table.insert(names, name)
-    end
-    table.sort(names)
-    for _, name in ipairs(names) do
-      sc:AddSection(name)
-    end
-  end)
 end
