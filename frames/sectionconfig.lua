@@ -237,6 +237,8 @@ function sectionConfig:Create(kind, parent)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
   sc.frame:SetTitle("Configure Categories")
+  sc.frame:SetIgnoreParentScale(true)
+  sc.frame:SetScale(UIParent:GetScale())
   sc.frame:Hide()
   sc.kind = kind
   sc.fadeIn, sc.fadeOut = animations:AttachFadeAndSlideLeft(sc.frame)
