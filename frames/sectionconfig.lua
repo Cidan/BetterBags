@@ -112,7 +112,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       button.Enabled:SetTexture("")
   end
   --]]
-  button:SetScript("OnMouseDown", function(_, key)
+  button:SetScript("OnMouseUp", function(_, key)
     -- Headers can't be clicked.
     if elementData.header then
       return
@@ -199,6 +199,21 @@ function sectionConfigFrame:IsShown()
   return self.frame:IsShown()
 end
 
+function sectionConfigFrame:UpdatePinnedItems()
+  local itemList = self.content:GetAllItems()
+  wipe(addon.fakeDatabase)
+  local pinnedItems = {}
+  local index, elementData = next(itemList)
+  repeat
+    if elementData.title ~= "Pinned" then
+      print(index, elementData.title)
+      addon.fakeDatabase[elementData.title] = index - 1
+      table.insert(pinnedItems, elementData)
+    end
+    index, elementData = next(itemList, index)
+  until elementData.title == "Automatically Sorted"
+end
+
 ---@param kind BagKind
 ---@param parent Frame
 ---@return SectionConfigFrame
@@ -235,6 +250,7 @@ function sectionConfig:Create(kind, parent)
       sc.content.provider:InsertAtIndex(elementData, currentIndex)
       return
     end
+    sc:UpdatePinnedItems()
     -- TODO(lobato): Detect which header the item was moved into and
     -- toggle it's pinned state.
     --[[
