@@ -77,6 +77,7 @@ end
 ---@param b Section
 ---@return boolean, boolean
 function sort.SortSectionsByPriority(kind, a, b)
+  if not a or not b then return false, false end
   local aTitle, bTitle = a.title:GetText(), b.title:GetText()
   local pinnedItems = database:GetCustomSectionSort(kind)
   if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end

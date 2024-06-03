@@ -91,13 +91,19 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       GameTooltip:AddLine(elementData.title, 1, .81960791349411, 0, true)
       if categories:DoesCategoryExist(elementData.title) then
         GameTooltip:AddLine([[
-        Left click to enable or disable items from being added to this category, right click to hide or show this category and all it's items entirely.
+        Left click to enable or disable items from being added to this category.
         Drag this category to Pinned to keep it at the top of your bags, or to Automatically Sorted to have it sorted with the rest of your items.]], 1, 1, 1, true)
         GameTooltip:AddLine("\n", 1, 1, 1, true)
         GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
+        GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
         GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
       else
-        GameTooltip:AddLine("Dynamic categories can't be disabled individually (yet), but can be reordered!", 1, 1, 1, true)
+        GameTooltip:AddLine([[
+          Dynamic categories can't be enabled or disabled (yet).
+          Drag this category to Pinned to keep it at the top of your bags, or to Automatically Sorted to have it sorted with the rest of your items.]], 1, 1, 1, true)
+          GameTooltip:AddLine("\n", 1, 1, 1, true)
+          GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
+          GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
       end
       GameTooltip:Show()
     end)
@@ -131,12 +137,17 @@ function sectionConfigFrame:initSectionItem(button, elementData)
 
     -- Toggle the category from containing items.
     if key == "LeftButton" then
-      if categories:IsCategoryEnabled(self.kind, elementData.title) then
-        categories:DisableCategory(self.kind, elementData.title)
-        button:SetBackdropColor(0, 0, 0, 0)
+      if IsShiftKeyDown() then
+        self.content.provider:MoveElementDataToIndex(elementData, 2)
+        self:UpdatePinnedItems()
       else
-        categories:EnableCategory(self.kind, elementData.title)
-        button:SetBackdropColor(1, 1, 0, .2)
+        if categories:IsCategoryEnabled(self.kind, elementData.title) then
+          categories:DisableCategory(self.kind, elementData.title)
+          button:SetBackdropColor(0, 0, 0, 0)
+        else
+          categories:EnableCategory(self.kind, elementData.title)
+          button:SetBackdropColor(1, 1, 0, .2)
+        end
       end
       events:SendMessage('bags/FullRefreshAll')
     end
@@ -250,8 +261,11 @@ function sectionConfig:Create(kind, parent)
   events:RegisterMessage(drawEvent, function()
     ---@type string[]
     local names = {}
-    for sName in pairs(kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack.currentView.sections or addon.Bags.Bank.currentView.sections) do
-      table.insert(names, sName)
+    local bag = kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank
+    if bag.currentView.bagview == const.BAG_VIEW.SECTION_GRID or bag.currentView.bagview == const.BAG_VIEW.LIST then
+      for sName in pairs(bag.currentView.sections) do
+        table.insert(names, sName)
+      end
     end
     for sName in pairs(categories:GetAllCategories()) do
       table.insert(names, sName)
