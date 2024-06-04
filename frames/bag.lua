@@ -569,15 +569,17 @@ function bagFrame:Create(kind)
     end
   end)
 
-  b.Tabs = {}
-  b:AddTab("Bank")
-  b:AddTab("Reagents")
-  b:AddTab("Warbank 1")
-  b:AddTab("Warbank 2")
-  b:AddTab("Warbank 3")
-  b:AddTab("Warbank 4")
-  b:AddTab("Warbank 5")
-  PanelTemplates_SetNumTabs(b, #b.Tabs)
-  PanelTemplates_SetTab(b, 1)
+  if kind == const.BAG_KIND.BANK then
+    b.Tabs = {}
+    b:AddTab("Bank")
+    b:AddTab("Reagents")
+    b:AddTab("Warbank 1")
+    b:AddTab("Warbank 2")
+    b:AddTab("Warbank 3")
+    b:AddTab("Warbank 4")
+    b:AddTab("Warbank 5")
+    PanelTemplates_SetNumTabs(b, #b.Tabs)
+    PanelTemplates_SetTab(b, 1)
+  end
   return b
 end
