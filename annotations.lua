@@ -219,6 +219,10 @@ local ScrollBoxDragBehavior = {}
 ---@param reorderable boolean
 function ScrollBoxDragBehavior:SetReorderable(reorderable) end
 
+---@class C_Bank
+---@field CloseBankFrame fun()
+C_Bank = {}
+
 ---@class Frame
 ---@field scrollable boolean
 local frameProto = {}
