@@ -234,7 +234,6 @@ local function GridView(view, ctx, bag, slotInfo)
     end
   end
 
-  freeSlotsSection:SetMaxCellWidth(2)
   freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
