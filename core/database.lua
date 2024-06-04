@@ -34,6 +34,30 @@ function DB:GetBagView(kind)
 end
 
 ---@param kind BagKind
+---@return boolean
+function DB:GetMarkRecentItems(kind)
+  return DB.data.profile.newItems[kind].markRecentItems
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetMarkRecentItems(kind, value)
+  DB.data.profile.newItems[kind].markRecentItems = value
+end
+
+---@param kind BagKind
+---@return boolean
+function DB:GetShowNewItemFlash(kind)
+  return DB.data.profile.newItems[kind].showNewItemFlash
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetShowNewItemFlash(kind, value)
+  DB.data.profile.newItems[kind].showNewItemFlash = value
+end
+
+---@param kind BagKind
 ---@param view BagView
 function DB:SetBagView(kind, view)
   DB.data.profile.views[kind] = view
@@ -145,6 +169,9 @@ function DB:SetFirstTimeMenu(value)
   DB.data.profile.firstTimeMenu = value
 end
 
+---@param kind BagKind
+---@param view BagView
+---@param opacity number
 function DB:SetBagViewSizeOpacity(kind, view, opacity)
   DB.data.profile.size[view][kind].opacity = opacity
 end
@@ -283,6 +310,24 @@ function DB:CreateEpemeralCategory(category)
   }
 end
 
+---@param kind BagKind
+function DB:ClearCustomSectionSort(kind)
+  DB.data.profile.customSectionSort[kind] = {}
+end
+
+---@param kind BagKind
+---@param category string
+---@param sort number
+function DB:SetCustomSectionSort(kind, category, sort)
+  DB.data.profile.customSectionSort[kind][category] = sort
+end
+
+---@param kind BagKind
+---@return table<string, number>
+function DB:GetCustomSectionSort(kind)
+  return DB.data.profile.customSectionSort[kind]
+end
+
 ---@param guid string
 ---@param locked boolean
 function DB:SetItemLock(guid, locked)
@@ -345,12 +390,28 @@ function DB:SetDontMergePartial(kind, value)
   DB.data.profile.stacking[kind].dontMergePartial = value
 end
 
+function DB:SetDontMergeTransmog(kind, value)
+  DB.data.profile.stacking[kind].dontMergeTransmog = value
+end
+
 function DB:GetShowKeybindWarning()
   return DB.data.profile.showKeybindWarning
 end
 
 function DB:SetShowKeybindWarning(value)
   DB.data.profile.showKeybindWarning = value
+end
+
+---@param kind BagKind
+---@return boolean
+function DB:GetShowFullSectionNames(kind)
+  return DB.data.profile.showFullSectionNames[kind]
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetShowFullSectionNames(kind, value)
+  DB.data.profile.showFullSectionNames[kind] = value
 end
 
 function DB:Migrate()

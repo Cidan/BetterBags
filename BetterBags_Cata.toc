@@ -9,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -24,6 +24,7 @@ libs\LibSharedMedia-3.0\lib.xml
 libs\LibWindow-1.1\LibWindow-1.1.lua
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
+libs/WagoAnalytics/Shim.lua
 
 templates\era\container.xml
 templates\era\debug.xml
@@ -37,7 +38,9 @@ debug\debug.lua
 debug\frames.lua
 debug\profile.lua
 debug\items.lua
+debug\analytics.lua
 
+core\context.lua
 core\events.lua
 core\localization.lua
 core\constants.lua
@@ -51,6 +54,7 @@ data\categories.lua
 data\items.lua
 data\loader.lua
 data\slots.lua
+data\refresh.lua
 
 util\color.lua
 util\resize.lua
@@ -62,7 +66,7 @@ frames\search.lua
 frames\slider.lua
 frames\money.lua
 frames\era\money.lua
-frames\classic\context.lua
+frames\classic\contextmenu.lua
 frames\column.lua
 frames\grid.lua
 frames\item.lua
@@ -96,6 +100,7 @@ config\customcat.lua
 integrations\consoleport.lua
 integrations\pawn.lua
 integrations\masque.lua
+integrations\simpleitemlevel.lua
 
 core\init.lua
 core\era\init.lua

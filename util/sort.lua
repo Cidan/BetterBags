@@ -39,11 +39,17 @@ end
 function sort:GetSectionSortFunction(kind, view)
   local sortType = database:GetSectionSortType(kind, view)
   if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
-    return self.SortSectionsAlphabetically
+    return function(a, b)
+      return self.SortSectionsAlphabetically(kind, a, b)
+    end
   elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
-    return self.SortSectionsBySizeAscending
+    return function(a, b)
+      return self.SortSectionsBySizeAscending(kind, a, b)
+    end
   elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
-    return self.SortSectionsBySizeDescending
+    return function(a, b)
+      return self.SortSectionsBySizeDescending(kind, a, b)
+    end
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end
@@ -66,10 +72,29 @@ function sort:GetItemSortFunction(kind, view)
   return function() end
 end
 
+---@param kind BagKind
+---@param a Section
+---@param b Section
+---@return boolean, boolean
+function sort.SortSectionsByPriority(kind, a, b)
+  if not a or not b then return false, false end
+  local aTitle, bTitle = a.title:GetText(), b.title:GetText()
+  local pinnedItems = database:GetCustomSectionSort(kind)
+  if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end
+  if pinnedItems[aTitle] and not pinnedItems[bTitle] then return true, true end
+  if not pinnedItems[aTitle] and pinnedItems[bTitle] then return true, false end
+
+  return true, pinnedItems[aTitle] < pinnedItems[bTitle]
+end
+
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsAlphabetically(a, b)
+function sort.SortSectionsAlphabetically(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
@@ -81,10 +106,14 @@ function sort.SortSectionsAlphabetically(a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsBySizeDescending(a, b)
+function sort.SortSectionsBySizeDescending(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
@@ -100,10 +129,14 @@ function sort.SortSectionsBySizeDescending(a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsBySizeAscending(a, b)
+function sort.SortSectionsBySizeAscending(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 

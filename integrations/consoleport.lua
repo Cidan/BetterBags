@@ -7,8 +7,8 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class Config: AceModule
 local config = addon:GetModule('Config')

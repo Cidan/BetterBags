@@ -50,13 +50,27 @@ end
 ---@field private currencyItems CurrencyItem[]
 local CurrencyFrame = {}
 
-function CurrencyFrame:Show()
+---@param callback? fun()
+function CurrencyFrame:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeIn.callback = function()
+      self.fadeIn.callback = nil
+      callback()
+    end
+  end
   self.fadeIn:Play()
 end
 
-function CurrencyFrame:Hide()
+---@param callback? fun()
+function CurrencyFrame:Hide(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeOut.callback = function()
+      self.fadeOut.callback = nil
+      callback()
+    end
+  end
   self.fadeOut:Play()
 end
 

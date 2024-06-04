@@ -21,7 +21,8 @@ local function onItemUpdateRetail(item)
   if data.isItemEmpty or not bagid or not slotid then
     item.button.UpgradeIcon:SetShown(false)
   else
-    item.button.UpgradeIcon:SetShown(PawnIsContainerItemAnUpgrade(bagid, slotid) or false)
+    local isUpgrade = PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(data.itemInfo.itemLink, true)
+    item.button.UpgradeIcon:SetShown(isUpgrade or false)
   end
 end
 
@@ -33,20 +34,26 @@ local function onItemUpdateClassic(item)
   if data.isItemEmpty or not data.slotid or not data.bagid then
     item.button.UpgradeIcon:SetShown(false)
   else
-    local isUpgrade = PawnShouldItemLinkHaveUpgradeArrow(data.itemInfo.itemLink)
+    local isUpgrade = PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(data.itemInfo.itemLink, true)
     item.button.UpgradeIcon:SetShown(isUpgrade or false)
   end
 end
 
 ---@param bag Bag
 local function onBagRendered(_, bag, _)
-  for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
-    if addon.isRetail then
-      onItemUpdateRetail(item)
-    else
-      onItemUpdateClassic(item)
-    end
+  if InCombatLockdown() then
+    addon.Bags.Backpack.drawAfterCombat = true
+    return
   end
+  items:PreLoadAllEquipmentSlots(function()
+    for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
+      if addon.isRetail then
+        onItemUpdateRetail(item)
+      else
+        onItemUpdateClassic(item)
+      end
+    end
+  end)
 end
 
 function pawn:OnEnable()

@@ -52,7 +52,7 @@ local function GetBagName(bagid)
   if isBackpack then
     local bagname = bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(bagid)
     local displayid = bagid == Enum.BagIndex.Keyring and 6 or bagid+1
-    return format("#%d: %s", displayid, bagname)
+    return format("#%d: %s", displayid, bagname or "Unknown")
   end
 
     local id = bagid
@@ -131,9 +131,11 @@ local function AddSlot(view, newSlotKey)
 end
 
 ---@param view View
+---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-local function BagView(view, bag, slotInfo)
+local function BagView(view, ctx, bag, slotInfo)
+  _ = ctx
   if view.fullRefresh then
     view:Wipe()
     view.fullRefresh = false
@@ -200,7 +202,9 @@ local function BagView(view, bag, slotInfo)
   end
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
-  view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
+  view.content:Sort(function(a, b)
+    return sort.SortSectionsAlphabetically(view.kind, a, b)
+  end)
   debug:StartProfile('Content Draw Stage')
   local w, h = view.content:Draw()
   debug:EndProfile('Content Draw Stage')

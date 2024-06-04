@@ -294,11 +294,25 @@ function config:GetBagOptions(kind)
         order = 8,
         inline = true,
         args = {
+          showFullSectionNames = {
+            type = "toggle",
+            name = L:G("Show Full Section Names"),
+            desc = L:G("Show the full section in the bag window without truncating it with '...'"),
+            order = 0,
+            width = "full",
+            get = function()
+              return DB:GetShowFullSectionNames(kind)
+            end,
+            set = function(_, value)
+              DB:SetShowFullSectionNames(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
           itemsPerRow = {
             type = "range",
             name = L:G("Items Per Row"),
             desc = L:G("Set the number of items per row in this bag."),
-            order = 0,
+            order = 1,
             min = 3,
             max = 20,
             step = 1,
@@ -316,7 +330,7 @@ function config:GetBagOptions(kind)
             type = "range",
             name = L:G("Sections Per Row"),
             desc = L:G("Set the number of sections per row in this bag."),
-            order = 1,
+            order = 2,
             min = 1,
             max = 20,
             step = 1,
@@ -334,7 +348,7 @@ function config:GetBagOptions(kind)
             type = "range",
             name = L:G("Opacity"),
             desc = L:G("Set the opacity of this bag."),
-            order = 1,
+            order = 3,
             min = 60,
             max = 100,
             step = 1,
@@ -350,7 +364,7 @@ function config:GetBagOptions(kind)
             type = "range",
             name = L:G("Scale"),
             desc = L:G("Set the scale of this bag."),
-            order = 2,
+            order = 4,
             min = 60,
             max = 160,
             step = 1,

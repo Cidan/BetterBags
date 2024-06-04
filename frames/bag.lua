@@ -31,8 +31,8 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
@@ -61,8 +61,14 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
+
+---@class SectionConfig: AceModule
+local sectionConfig = addon:GetModule('SectionConfig')
 
 -------
 --- Bag Prototype
@@ -78,6 +84,7 @@ local search = addon:GetModule('Search')
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
 ---@field currencyFrame CurrencyFrame The currency frame.
+---@field sectionConfigFrame SectionConfigFrame The section config frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
 ---@field slots bagSlots
@@ -100,7 +107,7 @@ function bagFrame.bagProto:Show()
   if self.frame:IsShown() then
     return
   end
-  addon.ForceShowBlizzardBags()
+  --addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
   self.frame:Show()
 end
@@ -141,24 +148,8 @@ end
 
 function bagFrame.bagProto:Sort()
   if self.kind ~= const.BAG_KIND.BACKPACK then return end
-  --[[
-  -- Unlock all locked items so they can be sorted.
-  ---@type Item[]
-  local lockList = {}
-  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    if item.data and not item.data.isItemEmpty and item.data.itemInfo.isLocked then
-      table.insert(lockList, item)
-      item:Unlock()
-    end
-  end
-  --]]
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   events:SendMessage('bags/SortBackpack')
---[[
-  for _, item in pairs(lockList) do
-    item:Lock()
-  end
---]]
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -168,6 +159,11 @@ function bagFrame.bagProto:Wipe()
   end
 end
 
+---@return string
+function bagFrame.bagProto:GetName()
+  return self.frame:GetName()
+end
+
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
 function bagFrame.bagProto:Refresh()
@@ -175,16 +171,6 @@ function bagFrame.bagProto:Refresh()
     events:SendMessage('bags/RefreshBackpack')
   else
     events:SendMessage('bags/RefreshBank')
-  end
-end
-
-function bagFrame.bagProto:DoRefresh()
-  if self.kind == const.BAG_KIND.BACKPACK then
-    items:RefreshBackpack(false)
-  elseif self.kind == const.BAG_KIND.BANK and not self.isReagentBank then
-    items:RefreshBank(false)
-  else
-    items:RefreshReagentBank(false)
   end
 end
 
@@ -200,8 +186,9 @@ function bagFrame.bagProto:Search(text)
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
+---@param ctx Context
 ---@param slotInfo SlotInfo
-function bagFrame.bagProto:Draw(slotInfo)
+function bagFrame.bagProto:Draw(ctx, slotInfo)
   local view = self.views[database:GetBagView(self.kind)]
 
   if view == nil then
@@ -215,7 +202,7 @@ function bagFrame.bagProto:Draw(slotInfo)
   end
 
   debug:StartProfile('Bag Render')
-  view:Render(self, slotInfo)
+  view:Render(ctx, self, slotInfo)
   debug:EndProfile('Bag Render')
   view:GetContent():Show()
   self.currentView = view
@@ -247,6 +234,7 @@ function bagFrame.bagProto:OnResize()
 end
 
 function bagFrame.bagProto:ToggleReagentBank()
+  local ctx = context:New()
   -- This should never happen, but just in case!
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = not self.isReagentBank
@@ -262,7 +250,8 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshReagentBank(true)
+    ctx:Set('wipe', true)
+    items:RefreshReagentBank(ctx)
   else
     BankFrame.selectedTab = 1
     if self.searchBox.frame:IsShown() then
@@ -274,7 +263,8 @@ function bagFrame.bagProto:ToggleReagentBank()
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
-    items:RefreshBank(true)
+    ctx:Set('wipe', true)
+    items:RefreshBank(ctx)
   end
 end
 
@@ -299,8 +289,22 @@ function bagFrame.bagProto:OnCooldown()
   end
 end
 
+function bagFrame.bagProto:OnLock(bagid, slotid)
+  if not self.currentView then return end
+  if slotid == nil then return end
+  local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  self.currentView:GetOrCreateItemButton(slotkey):Lock()
+end
+
+function bagFrame.bagProto:OnUnlock(bagid, slotid)
+  if not self.currentView then return end
+  if slotid == nil then return end
+  local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  self.currentView:GetOrCreateItemButton(slotkey):Unlock()
+end
+
 function bagFrame.bagProto:UpdateContextMenu()
-  self.menuList = context:CreateContextMenu(self)
+  self.menuList = contextMenu:CreateContextMenu(self)
 end
 
 function bagFrame.bagProto:CreateCategoryForItemInCursor()
@@ -308,6 +312,8 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor()
   ---@cast itemID number
   question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
   function(input)
+    if input == nil then return end
+    if input == "" then return end
     categories:AddItemToPersistentCategory(itemID, input)
     events:SendMessage('bags/FullRefreshAll')
   end)
@@ -388,7 +394,7 @@ function bagFrame:Create(kind)
   end
 
   -- Setup the context menu.
-  b.menuList = context:CreateContextMenu(b)
+  b.menuList = contextMenu:CreateContextMenu(b)
 
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
@@ -462,7 +468,7 @@ function bagFrame:Create(kind)
       elseif CursorHasItem() and GetCursorInfo() == "item" then
         b:CreateCategoryForItemInCursor()
       else
-        context:Show(b.menuList)
+        contextMenu:Show(b.menuList)
       end
 
     elseif e == "RightButton" and kind == const.BAG_KIND.BANK then
@@ -496,6 +502,9 @@ function bagFrame:Create(kind)
     currencyFrame:Hide()
     b.currencyFrame = currencyFrame
   end
+
+  b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
+
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
   b.frame:EnableMouse(true)
@@ -525,6 +534,14 @@ function bagFrame:Create(kind)
   if b.kind == const.BAG_KIND.BACKPACK then
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
   end
+
+  events:RegisterEvent('ITEM_LOCKED', function(_, bagid, slotid)
+    b:OnLock(bagid, slotid)
+  end)
+
+  events:RegisterEvent('ITEM_UNLOCKED', function(_, bagid, slotid)
+    b:OnUnlock(bagid, slotid)
+  end)
 
   events:RegisterMessage('search/SetInFrame', function (_, shown)
     if shown then

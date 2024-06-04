@@ -18,6 +18,9 @@ local categories = addon:GetModule('Categories')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -49,12 +52,18 @@ local debug = addon:GetModule('Debug')
 ---@field crafterGUID string
 ---@field extraEnchantID string
 
+---@class (exact) TransmogInfo
+---@field transmogInfoMixin? ItemTransmogInfoMixin
+---@field itemAppearanceID number
+---@field itemModifiedAppearanceID number
+
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
 ---@field basic boolean
 ---@field itemInfo ExpandedItemInfo
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
+---@field transmogInfo TransmogInfo
 ---@field bagid number
 ---@field slotid number
 ---@field slotkey string
@@ -78,6 +87,7 @@ local itemDataProto = {}
 ---@field _newItemTimers table<string, number>
 ---@field _preSort boolean
 ---@field _refreshQueueEvent EventArg[]
+---@field _firstLoad table<BagKind, boolean>
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -87,88 +97,21 @@ function items:OnInitialize()
   self._newItemTimers = {}
   self._preSort = false
   self._doingRefresh = false
+  self._firstLoad = {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true,
+    [const.BAG_KIND.REAGENT_BANK] = true,
+  }
 end
 
 function items:OnEnable()
-
-  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:DoRefreshAll(true)
-  end)
-  local eventList = {
-    'BAG_UPDATE_DELAYED',
-    'BAG_UPDATE',
-    'PLAYERBANKSLOTS_CHANGED',
-  }
-
-  if addon.isRetail then
-    table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
-  end
-
-  events:RegisterMessage('bags/Draw/Backpack/Done', function ()
-    self._doingRefresh = false
-    if self._refreshQueueEvent then
-      local wipe = false
-      for _, eventArg in pairs(self._refreshQueueEvent) do
-        if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
-          wipe = true
-        end
-      end
-      self._refreshQueueEvent = nil
-      events:SendMessageLater('bags/RefreshAll', nil, wipe)
-    end
-  end)
-
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    self:WipeAndRefreshAll()
-  end)
-
-  events:RegisterMessage('bags/SortBackpackClassic', function()
-    self:RemoveNewItemFromAllItems()
-    --self:ClearItemCache()
-    --self:PreSort()
-    _G.SortBags()
-  end)
-
-  events:RegisterMessage('bags/SortBackpack', function()
-    self:RemoveNewItemFromAllItems()
-    self:ClearItemCache()
-    self:PreSort()
-    C_Container:SortBags()
-  end)
-
-  events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function(eventData)
-    debug:Log("Items", "Group Bucket Event for Refresh* Fired")
-    local wipe = false
-    for _, eventArg in pairs(eventData) do
-      if eventArg.eventName == "bags/RefreshAll" and eventArg.args[1] then
-        wipe = true
-      end
-    end
-
-    debug:Log("RefreshAll", "Wipe: ", wipe)
-    self._preSort = false
-
-    if InCombatLockdown() and wipe then
-      addon.Bags.Backpack.drawAfterCombat = true
-      print(L:G("BetterBags: Bags will refresh after combat ends."))
-    else
-      if self._doingRefresh then
-        if self._refreshQueueEvent == nil then
-          self._refreshQueueEvent = eventData
-        end
-      else
-        self._doingRefresh = true
-        self:DoRefreshAll(wipe)
-      end
-    end
-  end)
-
   events:RegisterEvent('BANKFRAME_OPENED', function()
     if GameMenuFrame:IsShown() then
       return
     end
     addon.atBank = true
   end)
+
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
     items:ClearBankCache()
@@ -202,6 +145,7 @@ end
 
 ---@private
 function items:PreSort()
+  if self._preSort then return end
   self._preSort = true
   C_Timer.After(0.6, function()
     if self._preSort then
@@ -235,31 +179,27 @@ end
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
 function items:WipeAndRefreshAll()
   debug:Log('WipeAndRefreshAll', "Wipe And Refresh All triggered")
-  if InCombatLockdown() then
-    addon.Bags.Backpack.drawAfterCombat = true
-    print(L:G("BetterBags: Bags will refresh after combat ends."))
-  else
-    --self:ClearItemCache()
-    events:SendMessage('bags/RefreshAll', true)
-  end
+  --self:ClearItemCache()
+  events:SendMessage('bags/RefreshAll', true)
 end
 
 ---@private
----@param wipe boolean
-function items:DoRefreshAll(wipe)
+---@param ctx Context
+function items:DoRefreshAll(ctx)
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() or addon.atBank then
+    local bankContext = ctx:Copy()
     if addon.Bags.Bank.isReagentBank then
-      self:RefreshReagentBank(wipe)
+      self:RefreshReagentBank(bankContext)
     else
-      self:RefreshBank(wipe)
+      self:RefreshBank(bankContext)
     end
   end
-  self:RefreshBackpack(wipe)
+  self:RefreshBackpack(ctx)
 end
 
----@param wipe boolean
-function items:RefreshReagentBank(wipe)
+---@param ctx Context
+function items:RefreshReagentBank(ctx)
   local container = self:NewLoader(const.BAG_KIND.BANK)
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
@@ -267,11 +207,11 @@ function items:RefreshReagentBank(wipe)
   end
 
   --- Process the item container.
-  self:ProcessContainer(const.BAG_KIND.REAGENT_BANK, wipe, container)
+  self:ProcessContainer(ctx, const.BAG_KIND.REAGENT_BANK, container)
 end
 
----@param wipe boolean
-function items:RefreshBank(wipe)
+---@param ctx Context
+function items:RefreshBank(ctx)
   equipmentSets:Update()
   local container = self:NewLoader(const.BAG_KIND.BANK)
   -- This is a small hack to force the bank bag quality data to be cached
@@ -287,13 +227,13 @@ function items:RefreshBank(wipe)
   end
 
   --- Process the item container.
-  self:ProcessContainer(const.BAG_KIND.BANK, wipe, container)
+  self:ProcessContainer(ctx, const.BAG_KIND.BANK, container)
 end
 
 -- RefreshBackback will refresh all bags' contents entirely and update
 -- the item database.
----@param wipe boolean
-function items:RefreshBackpack(wipe)
+---@param ctx Context
+function items:RefreshBackpack(ctx)
   debug:StartProfile('Backpack Data Pipeline')
 
   equipmentSets:Update()
@@ -304,7 +244,7 @@ function items:RefreshBackpack(wipe)
     self:StageBagForUpdate(i, container)
   end
   --- Process the item container.
-  self:ProcessContainer(const.BAG_KIND.BACKPACK, wipe, container)
+  self:ProcessContainer(ctx, const.BAG_KIND.BACKPACK, container)
 end
 
 ---@param newData ItemData
@@ -419,13 +359,13 @@ end
 
 --- LoadItems will load all items in a given bag kind and update the item database.
 ---@private
+---@param ctx Context
 ---@param kind BagKind
----@param wipe boolean
 ---@param dataCache table<string, ItemData>
 ---@param reagent? boolean
-function items:LoadItems(kind, wipe, dataCache, reagent)
+function items:LoadItems(ctx, kind, dataCache, reagent)
   -- Wipe the data if needed before loading the new data.
-  if wipe then
+  if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
     if addon.Bags.Backpack.currentView and kind == const.BAG_KIND.BACKPACK then
       addon.Bags.Backpack.currentView.fullRefresh = true
@@ -437,7 +377,7 @@ function items:LoadItems(kind, wipe, dataCache, reagent)
 
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
-  self.slotInfo[kind]:Update(dataCache, wipe)
+  self.slotInfo[kind]:Update(ctx, dataCache)
   self:UpdateFreeSlots(reagent and const.BAG_KIND.REAGENT_BANK or kind)
   local slotInfo = self.slotInfo[kind]
 
@@ -458,11 +398,13 @@ function items:LoadItems(kind, wipe, dataCache, reagent)
     else
       name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
     end
-
     -- Process item changes.
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
-     slotInfo.addedItems[currentItem.slotkey] = currentItem
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
+        self:MarkItemAsNew(currentItem)
+      end
     elseif items:ItemRemoved(currentItem, previousItem) then
       debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
@@ -502,20 +444,24 @@ end
 -- ProcessContainer will load all items in the container and fire
 -- a message when all items are done loading.
 ---@private
+---@param ctx Context
 ---@param kind BagKind
----@param wipe boolean
 ---@param container ItemLoader
-function items:ProcessContainer(kind, wipe, container)
+function items:ProcessContainer(ctx, kind, container)
   container:Load(function()
+    if self._firstLoad[kind] == true then
+      self._firstLoad[kind] = false
+      ctx:Set('wipe', true)
+    end
     if kind == const.BAG_KIND.REAGENT_BANK then
       kind = const.BAG_KIND.BANK
-      self:LoadItems(kind, wipe, container:GetDataCache(), true)
+      self:LoadItems(ctx, kind, container:GetDataCache(), true)
     else
-      self:LoadItems(kind, wipe, container:GetDataCache())
+      self:LoadItems(ctx, kind, container:GetDataCache())
     end
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-    events:SendMessageLater(ev, nil, self.slotInfo[kind])
+    events:SendMessageLater(ev, nil, ctx, self.slotInfo[kind])
     if kind == const.BAG_KIND.BACKPACK then
       debug:EndProfile('Backpack Data Pipeline')
     end
@@ -574,12 +520,28 @@ function items:ClearNewItem(slotkey)
   local data = self:GetItemDataFromSlotKey(slotkey)
   if data.isItemEmpty then return end
   C_NewItems.RemoveNewItem(data.bagid, data.slotid)
+  data.itemInfo.category = self:GetCategory(data)
   self._newItemTimers[data.itemInfo.itemGUID] = nil
 end
 
 function items:ClearNewItems()
   C_NewItems.ClearAll()
   wipe(self._newItemTimers)
+end
+
+---@param data ItemData
+function items:MarkItemAsNew(data)
+  if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
+    self._newItemTimers[data.itemInfo.itemGUID] = time()
+    data.itemInfo.isNewItem = true
+    data.itemInfo.category = self:GetCategory(data)
+  end
+end
+
+---@param slotkey string
+function items:MarkItemSlotAsNew(slotkey)
+  local data = self:GetItemDataFromSlotKey(slotkey)
+  self:MarkItemAsNew(data)
 end
 
 ---@param link string
@@ -670,7 +632,8 @@ end
 ---@param data ItemData
 ---@return string
 function items:GenerateItemHash(data)
-  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d",
+  local stackOpts = database:GetStackingOptions(data.kind)
+  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d",
     data.itemLinkInfo.itemID,
     data.itemLinkInfo.enchantID,
     data.itemLinkInfo.gemID1,
@@ -684,7 +647,8 @@ function items:GenerateItemHash(data)
     table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
     data.itemLinkInfo.crafterGUID or "",
     data.itemLinkInfo.extraEnchantID or "",
-    data.itemInfo.currentItemLevel
+    data.itemInfo.currentItemLevel,
+    stackOpts.dontMergeTransmog and data.transmogInfo.transmogInfoMixin and data.transmogInfo.transmogInfoMixin.appearanceID or 0
   )
   return hash
 end
@@ -800,6 +764,19 @@ function items:AttachItemInfo(data, kind)
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+
+  local itemAppearanceID, itemModifiedAppearanceID = C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
+  data.transmogInfo = {
+    transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
+      appearanceID = 0,
+      secondaryAppearanceID = 0,
+      appliedAppearanceID = 0,
+      appliedSecondaryAppearanceID = 0,
+    },
+    itemAppearanceID = itemAppearanceID,
+    itemModifiedAppearanceID = itemModifiedAppearanceID,
+  }
+
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),
@@ -913,4 +890,17 @@ end
 ---@return ItemData
 function items:GetItemDataFromSlotKey(slotkey)
   return self.slotInfo[self:GetBagKindFromSlotKey(slotkey)].itemsBySlotKey[slotkey]
+end
+
+---@param cb function
+function items:PreLoadAllEquipmentSlots(cb)
+  local continuableContainer = ContinuableContainer:Create()
+  for _, slot in pairs(const.EQUIPMENT_SLOTS) do
+    local location = ItemLocation:CreateFromEquipmentSlot(slot)
+    local item = Item:CreateFromItemLocation(location)
+    if not item:IsItemEmpty() then
+      continuableContainer:AddContinuable(item)
+    end
+  end
+  continuableContainer:ContinueOnLoad(cb)
 end

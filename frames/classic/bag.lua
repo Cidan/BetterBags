@@ -31,8 +31,8 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
@@ -92,6 +92,7 @@ function bagFrame:Create(kind)
   b.toRelease = {}
   b.toReleaseSections = {}
   b.kind = kind
+  local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsClassicBagPortrait
@@ -123,6 +124,7 @@ function bagFrame:Create(kind)
   ButtonFrameTemplate_HidePortrait(b.frame)
   ButtonFrameTemplate_HideButtonBar(b.frame)
   b.frame.Inset:Hide()
+  b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()
@@ -156,7 +158,7 @@ function bagFrame:Create(kind)
   end
 
   -- Setup the context menu.
-  b.menuList = context:CreateContextMenu(b)
+  b.menuList = contextMenu:CreateContextMenu(b)
 
   -- Create the invisible menu button.
   local bagButton = CreateFrame("Button")
@@ -231,7 +233,7 @@ function bagFrame:Create(kind)
       elseif CursorHasItem() and GetCursorInfo() == "item" then
         b:CreateCategoryForItemInCursor()
       else
-        context:Show(b.menuList)
+        contextMenu:Show(b.menuList)
       end
     elseif e == "RightButton" and kind == const.BAG_KIND.BACKPACK then
       b:Sort()
@@ -291,6 +293,14 @@ function bagFrame:Create(kind)
   if b.kind == const.BAG_KIND.BACKPACK then
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
   end
+
+  events:RegisterEvent('ITEM_LOCKED', function(_, bagid, slotid)
+    b:OnLock(bagid, slotid)
+  end)
+
+  events:RegisterEvent('ITEM_UNLOCKED', function(_, bagid, slotid)
+    b:OnUnlock(bagid, slotid)
+  end)
 
   events:RegisterMessage('search/SetInFrame', function (_, shown)
     if shown then

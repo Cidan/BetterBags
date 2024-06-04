@@ -36,8 +36,8 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
@@ -57,6 +57,15 @@ local pawn = addon:GetModule('Pawn')
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
 
+---@class SimpleItemLevel: AceModule
+local simpleItemLevel = addon:GetModule('SimpleItemLevel')
+
+---@class Refresh: AceModule
+local refresh = addon:GetModule('Refresh')
+
+---@class SectionConfig: AceModule
+local sectionConfig = addon:GetModule('SectionConfig')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -66,6 +75,11 @@ local debug = addon:GetModule('Debug')
 addon.Bags = {}
 
 addon.atBank = false
+
+-- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
+function BetterBags_ToggleBags()
+  addon:ToggleAllBags()
+end
 
 local function CheckKeyBindings()
   if InCombatLockdown() then
@@ -80,15 +94,16 @@ local function CheckKeyBindings()
     "TOGGLEBAG1",
     "TOGGLEBAG2",
     "TOGGLEBAG3",
-    "TOGGLEBAG4"
+    "TOGGLEBAG4",
+    "OPENALLBAGS"
   }
   for _, binding in pairs(bindings) do
     local key, otherkey = GetBindingKey(binding)
     if key ~= nil then
-      SetOverrideBinding(addon._bindingFrame, true, key, "OPENALLBAGS")
+      SetOverrideBinding(addon._bindingFrame, true, key, "BETTERBAGS_TOGGLEBAGS")
     end
     if otherkey ~= nil then
-      SetOverrideBinding(addon._bindingFrame, true, otherkey, "OPENALLBAGS")
+      SetOverrideBinding(addon._bindingFrame, true, otherkey, "BETTERBAGS_TOGGLEBAGS")
     end
   end
 end
@@ -192,7 +207,8 @@ function addon:OnEnable()
   itemFrame:Enable()
   sectionFrame:Enable()
   masque:Enable()
-  context:Enable()
+  simpleItemLevel:Enable()
+  contextMenu:Enable()
   items:Enable()
   config:Enable()
   categories:Enable()
@@ -200,10 +216,14 @@ function addon:OnEnable()
   search:Enable()
   pawn:Enable()
   question:Enable()
+  refresh:Enable()
 
   self:HideBlizzardBags()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
+
+  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
+  table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
 
   consoleport:Enable()
 
@@ -216,8 +236,8 @@ function addon:OnEnable()
 
   events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:Draw(args[1])
-    events:SendMessage('bags/Draw/Backpack/Done')
+    addon.Bags.Backpack:Draw(args[1], args[2])
+    events:SendMessage('bags/Draw/Backpack/Done', args[1])
     if not addon.Bags.Backpack.loaded then
       addon.Bags.Backpack.loaded = true
       events:SendMessage('bags/Draw/Backpack/Loaded')
@@ -230,22 +250,11 @@ function addon:OnEnable()
     if not addon.Bags.Bank:IsShown() and addon.atBank then
       addon.Bags.Bank:Show()
     end
-    addon.Bags.Bank:Draw(args[1])
+    addon.Bags.Bank:Draw(args[1], args[2])
     events:SendMessage('bags/Draw/Bank/Done')
     if not addon.Bags.Bank.loaded then
       addon.Bags.Bank.loaded = true
       events:SendMessage('bags/Draw/Bank/Loaded')
-    end
-  end)
-
-  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
-    if addon.Bags.Backpack.drawAfterCombat then
-      addon.Bags.Backpack.drawAfterCombat = false
-      events:SendMessage('bags/FullRefreshAll')
-    end
-    if addon.Bags.Bank.drawAfterCombat then
-      addon.Bags.Bank.drawAfterCombat = false
-      events:SendMessage('bags/FullRefreshAll')
     end
   end)
 

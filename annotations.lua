@@ -1,5 +1,8 @@
 ---@meta
 
+---@class AnimationGroup
+---@field callback fun()
+
 ---@class ItemButton: Button
 ---@field bagID number
 ---@field NewItemTexture Texture
@@ -10,6 +13,8 @@
 ---@field BattlepayItemTexture Texture
 ---@field IconBorder Texture
 ---@field UpgradeIcon Texture
+---@field flashAnim AnimationGroup
+---@field newitemglowAnim AnimationGroup
 local itemButton = {}
 
 ---@param bagid number
@@ -43,6 +48,9 @@ function itemButton:SetMatchesSearch(matchesSearch) end
 function itemButton:SetItemButtonQuality(quality) end
 
 function itemButton:HasItem() end
+
+---@return Enum.BagIndex
+function itemButton:GetBagID() end
 
 ---@class Button
 local Button = {}
@@ -97,6 +105,11 @@ BagBarExpandToggle = {}
 ---@field RowNumber FontString
 ---@field Category FontString
 ---@field Message FontString
+
+---@class BetterBagsSectionConfigListButton: Button
+---@field Enabled Texture
+---@field Category FontString
+---@field Init boolean
 
 ---@class ScrollingFlatPanelTemplate: Frame
 ---@field ScrollBox WowScrollBox
@@ -171,6 +184,40 @@ function WowScrollBox:GetUpperShadowTexture() end
 ---@return Texture
 function WowScrollBox:GetLowerShadowTexture() end
 function WowScrollBox:SetDataProvider(provider) end
+
+---@class DataProviderMixin: CallbackRegistryMixin
+local DataProviderMixin = {}
+function DataProviderMixin:Enumerate(indexBegin, indexEnd) end
+function DataProviderMixin:Insert(...) end
+function DataProviderMixin:InsertTable(tbl) end
+function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
+---@return number
+function DataProviderMixin:GetSize() end
+---@param elementData table
+---@return number
+function DataProviderMixin:FindIndex(elementData) end
+function DataProviderMixin:RemoveIndex(index) end
+function DataProviderMixin:Flush() end
+---@param predicate fun(elementData: table<any, any>): boolean
+---@return boolean
+function DataProviderMixin:ContainsByPredicate(predicate) end
+---@return fun(), table[]
+function DataProviderMixin:EnumerateEntireRange() end
+---@return table[]
+function DataProviderMixin:GetCollection() end
+---@param index number
+---@return table
+function DataProviderMixin:Find(index) end
+---@param elementData table
+---@param newIndex number
+function DataProviderMixin:MoveElementDataToIndex(elementData, newIndex) end
+---@return number
+function DataProviderMixin:GetSize() end
+
+---@class ScrollBoxDragBehavior
+local ScrollBoxDragBehavior = {}
+---@param reorderable boolean
+function ScrollBoxDragBehavior:SetReorderable(reorderable) end
 
 ---@class Frame
 ---@field scrollable boolean
@@ -319,7 +366,16 @@ PawnVersion = _G['PawnVersion'] --[[@as number]]
 PawnGetItemData = _G['PawnGetItemData'] --[[@as fun(itemLink: string): table]]
 PawnIsItemAnUpgrade = _G['PawnIsItemAnUpgrade'] --[[@as fun(itemData: table): boolean]]
 PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --[[@as fun(itemLink: string): boolean]]
+PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string, level?: boolean): boolean]]
 
+--- SimpleItemLevel API Globals
+---@class SimpleItemLevel
+SimpleItemLevel = {}
+SimpleItemLevel.API = {}
+
+---@param itemLink string
+---@return boolean
+function SimpleItemLevel.API.ItemIsUpgrade(itemLink) end
 
 --- SortBags
 
@@ -344,3 +400,27 @@ function GetCurrencyListInfo(index) end
 
 ---@return number
 function GetCurrencyListSize() end
+
+
+--- WagoAnalytics
+---@class WagoAnalytics
+local WagoAnalytics = {}
+
+---@param id string
+function WagoAnalytics:Register(id) end
+
+---@param label string
+---@param enabled boolean
+function WagoAnalytics:Switch(label, enabled) end
+
+---@param counter string
+---@param amount? number
+function WagoAnalytics:IncrementCounter(counter, amount) end
+
+---@param counter string
+---@param amount? number
+function WagoAnalytics:DecrementCounter(counter, amount) end
+
+---@param counter string
+---@param amount number
+function WagoAnalytics:SetCounter(counter, amount) end

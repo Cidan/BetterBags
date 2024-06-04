@@ -22,6 +22,9 @@ local sort = addon:GetModule('Sort')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -186,7 +189,7 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
     self.frame:Hide()
     return 0, 0
   end
-  if self.fillWidth then
+  if self.fillWidth or database:GetShowFullSectionNames(kind) then
     w = math.max(w, self.title:GetTextWidth())
   end
   self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)

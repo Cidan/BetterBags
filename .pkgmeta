@@ -16,7 +16,9 @@ externals:
   libs/AceGUI-3.0-SharedMediaWidgets: https://repos.wowace.com/wow/ace-gui-3-0-shared-media-widgets/trunk/AceGUI-3.0-SharedMediaWidgets
   libs/LibWindow-1.1: https://repos.curseforge.com/wow/libwindow-1-1/trunk/LibWindow-1.1
   libs/LibUIDropDownMenu: https://repos.wowace.com/wow/libuidropdownmenu/trunk/LibUIDropDownMenu
-
+  libs/WagoAnalytics:
+    url: https://github.com/wagoio/WagoAnalyticsShim.git
+    branch: main
 ignore:
   - install-deps.sh
   - annotations.lua
