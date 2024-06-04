@@ -1,5 +1,8 @@
 ---@meta
 
+---@class AnimationGroup
+---@field callback fun()
+
 ---@class ItemButton: Button
 ---@field bagID number
 ---@field NewItemTexture Texture
@@ -103,6 +106,11 @@ BagBarExpandToggle = {}
 ---@field Category FontString
 ---@field Message FontString
 
+---@class BetterBagsSectionConfigListButton: Button
+---@field Enabled Texture
+---@field Category FontString
+---@field Init boolean
+
 ---@class ScrollingFlatPanelTemplate: Frame
 ---@field ScrollBox WowScrollBox
 ---@field ScrollBar MinimalScrollBar
@@ -176,6 +184,40 @@ function WowScrollBox:GetUpperShadowTexture() end
 ---@return Texture
 function WowScrollBox:GetLowerShadowTexture() end
 function WowScrollBox:SetDataProvider(provider) end
+
+---@class DataProviderMixin: CallbackRegistryMixin
+local DataProviderMixin = {}
+function DataProviderMixin:Enumerate(indexBegin, indexEnd) end
+function DataProviderMixin:Insert(...) end
+function DataProviderMixin:InsertTable(tbl) end
+function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
+---@return number
+function DataProviderMixin:GetSize() end
+---@param elementData table
+---@return number
+function DataProviderMixin:FindIndex(elementData) end
+function DataProviderMixin:RemoveIndex(index) end
+function DataProviderMixin:Flush() end
+---@param predicate fun(elementData: table<any, any>): boolean
+---@return boolean
+function DataProviderMixin:ContainsByPredicate(predicate) end
+---@return fun(), table[]
+function DataProviderMixin:EnumerateEntireRange() end
+---@return table[]
+function DataProviderMixin:GetCollection() end
+---@param index number
+---@return table
+function DataProviderMixin:Find(index) end
+---@param elementData table
+---@param newIndex number
+function DataProviderMixin:MoveElementDataToIndex(elementData, newIndex) end
+---@return number
+function DataProviderMixin:GetSize() end
+
+---@class ScrollBoxDragBehavior
+local ScrollBoxDragBehavior = {}
+---@param reorderable boolean
+function ScrollBoxDragBehavior:SetReorderable(reorderable) end
 
 ---@class Frame
 ---@field scrollable boolean

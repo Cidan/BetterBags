@@ -28,6 +28,7 @@ libs/WagoAnalytics/Shim.lua
 
 templates\container.xml
 templates\debug.xml
+templates\sectionconfig.xml
 
 core\boot.lua
 
@@ -73,6 +74,8 @@ frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
 frames\debug.lua
+frames\list.lua
+frames\sectionconfig.lua
 
 views\views.lua
 views\gridview.lua

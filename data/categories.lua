@@ -163,6 +163,16 @@ function categories:DisableCategory(kind, category)
   end
 end
 
+-- DoesCategoryExist returns true if a custom category exists.
+---@param category string
+---@return boolean
+function categories:DoesCategoryExist(category)
+  if self.ephemeralCategories[category] == nil and not database:ItemCategoryExists(category) then
+    return false
+  end
+  return true
+end
+
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 ---@param enabled boolean

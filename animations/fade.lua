@@ -23,6 +23,9 @@ function animations:AttachFadeGroup(region, nohide)
   fadeInGroup:SetScript('OnFinished', function()
     region:SetAlpha(1)
     region:Show()
+    if fadeInGroup.callback then
+      fadeInGroup.callback()
+    end
   end)
 
   local fadeOutGroup = region:CreateAnimationGroup()
@@ -36,6 +39,9 @@ function animations:AttachFadeGroup(region, nohide)
       region:Hide()
     else
       region:SetAlpha(0)
+    end
+    if fadeOutGroup.callback then
+      fadeOutGroup.callback()
     end
   end)
   return fadeInGroup, fadeOutGroup
