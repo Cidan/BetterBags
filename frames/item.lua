@@ -551,7 +551,9 @@ end
 
 function itemFrame:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-  self._pool:SetResetDisallowedIfNew()
+  if self._pool.SetResetDisallowedIfNew then
+    self._pool:SetResetDisallowedIfNew()
+  end
 end
 
 function itemFrame:OnEnable()
