@@ -321,22 +321,6 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor()
   ClearCursor()
 end
 
-function bagFrame.bagProto:AddTab(name)
-  self.tabPadding = 2
-  self.minTabWidth = 10
-  self.maxTabWidth = 200
-  local tab = CreateFrame('Button', self.frame:GetName() .. name .. "TabButton", self.frame, "PanelTabButtonTemplate")
-  tab:SetText(name)
-  tab:SetID(#self.Tabs + 1)
-  tab:SetPoint("TOPLEFT", self.frame, "BOTTOMLEFT", 4, 2)
-  tab:SetScript("OnClick", function()
-    PlaySound(SOUNDKIT.IG_CHARACTER_INFO_TAB)
-    PanelTemplates_SetTab(self, tab:GetID())
-  end)
-  self.Tabs[tab:GetID()] = tab
-  tab:Show()
-end
-
 -------
 --- Bag Frame
 -------
@@ -569,17 +553,5 @@ function bagFrame:Create(kind)
     end
   end)
 
-  if kind == const.BAG_KIND.BANK then
-    b.Tabs = {}
-    b:AddTab("Bank")
-    b:AddTab("Reagents")
-    b:AddTab("Warbank 1")
-    b:AddTab("Warbank 2")
-    b:AddTab("Warbank 3")
-    b:AddTab("Warbank 4")
-    b:AddTab("Warbank 5")
-    PanelTemplates_SetNumTabs(b, #b.Tabs)
-    PanelTemplates_SetTab(b, 1)
-  end
   return b
 end
