@@ -58,6 +58,9 @@ local currency = addon:GetModule('Currency')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
+---@class SectionConfig: AceModule
+local sectionConfig = addon:GetModule('SectionConfig')
+
 function bagFrame.bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
@@ -256,6 +259,8 @@ function bagFrame:Create(kind)
     b.frame:SetTitle("")
   end
   b.searchBox = searchBox
+
+  b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)

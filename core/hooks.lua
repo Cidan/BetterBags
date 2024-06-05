@@ -98,7 +98,11 @@ function addon:CloseSpecialWindows(interactingFrame)
   addon.Bags.Bank:Hide()
   addon.Bags.Bank:SwitchToBank()
   events:SendMessage('addon/CloseSpecialWindows')
-  CloseBankFrame()
+  if C_Bank then
+    C_Bank.CloseBankFrame()
+  else
+    CloseBankFrame()
+  end
   events:SendMessageLater('bags/OpenClose')
 end
 

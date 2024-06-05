@@ -49,7 +49,7 @@ local function Wipe(view)
     section:Release()
   end
   for _, item in pairs(view.itemsByBagAndSlot) do
-    item:Release()
+    --item:Release()
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
@@ -234,7 +234,6 @@ local function GridView(view, ctx, bag, slotInfo)
     end
   end
 
-  freeSlotsSection:SetMaxCellWidth(2)
   freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
