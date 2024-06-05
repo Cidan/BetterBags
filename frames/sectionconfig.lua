@@ -210,6 +210,9 @@ end
 ---@param callback? fun()
 function sectionConfigFrame:Hide(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if self.itemList:IsShown() then
+    self.itemList:Hide()
+  end
   if callback then
     self.fadeOut.callback = function()
       self.fadeOut.callback = nil

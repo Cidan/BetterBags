@@ -9,8 +9,20 @@ local list = addon:GetModule('List')
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
+---@class ItemRowFrame: AceModule
+local itemRowFrame = addon:GetModule('ItemRowFrame')
+
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:NewModule('SectionItemList')
+
+---@class BetterBagsSectionConfigItemFrame: Frame
+---@field item ItemRow
 
 ---@class SectionItemListElement
 ---@field name string
@@ -50,6 +62,26 @@ function sectionItemListFrame:IsShown()
   return self.frame:IsShown()
 end
 
+---@param frame BetterBagsSectionConfigItemFrame
+---@param elementData table
+function sectionItemListFrame:initSectionItem(frame, elementData)
+  if frame.item == nil then
+    frame.item = itemRowFrame:Create()
+    frame.item.frame:SetParent(frame)
+    frame.item.frame:SetPoint("LEFT", frame, "LEFT", 4, 0)
+  end
+  frame.item:SetStaticItemFromData(elementData.data)
+end
+
+---@param frame BetterBagsSectionConfigItemFrame
+---@param elementData table
+function sectionItemListFrame:resetSectionItem(frame, elementData)
+  _ = elementData
+  if frame.item then
+    frame.item:ClearItem()
+  end
+end
+
 ---@param category string
 function sectionItemListFrame:ShowCategory(category)
   if self:IsShown() then
@@ -58,8 +90,30 @@ function sectionItemListFrame:ShowCategory(category)
     end)
     return
   end
-  -- TODO(lobato): Render stuff.
-  self:Show()
+
+  self.content:Wipe()
+  self.frame:SetTitle(category)
+
+  local itemDataList = categories:GetMergedCategory(category)
+
+  -- This is a dynamic category, do nothing for now.
+  if itemDataList == nil then
+    self:Show()
+    return
+  end
+
+  local itemIDs = {}
+  for id in pairs(itemDataList.itemList) do
+    table.insert(itemIDs, id)
+  end
+
+  items:GetItemData(itemIDs, function(itemData)
+    ---@cast itemData +ItemData[]
+    for _, data in pairs(itemData) do
+      self.content:AddToEnd({data = data})
+    end
+    self:Show()
+  end)
 end
 
 ---@param parent Frame
@@ -73,6 +127,16 @@ function sectionItemList:Create(parent)
   sc.fadeIn, sc.fadeOut = animations:AttachFadeAndSlideLeft(sc.frame)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
+
+  -- Setup the create and destroy functions for items on the list.
+  sc.content:SetupDataSource("BetterBagsSectionConfigItemFrame", function(f, data)
+    ---@cast f BetterBagsSectionConfigItemFrame
+    sc:initSectionItem(f, data)
+  end,
+  function(f, data)
+    ---@cast f BetterBagsSectionConfigItemFrame
+    sc:resetSectionItem(f, data)
+  end)
 
   sc.frame:Hide()
   return sc
