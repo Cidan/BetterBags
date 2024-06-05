@@ -27,6 +27,9 @@ local animations = addon:GetModule('Animations')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class SectionItemList: AceModule
+local sectionItemList = addon:GetModule('SectionItemList')
+
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
 
@@ -46,6 +49,7 @@ local sectionConfigItem = {}
 ---@field package kind BagKind
 ---@field package fadeIn AnimationGroup
 ---@field package fadeOut AnimationGroup
+---@field package itemList SectionItemListFrame
 local sectionConfigFrame = {}
 
 ---@param button BetterBagsSectionConfigListButton
@@ -80,6 +84,9 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   else
     button.Category:SetFontObject("Game12Font")
     button.Category:SetTextColor(1, 1, 1)
+    button.Expand:SetScript("OnClick", function()
+      self.itemList:ShowCategory(elementData.title)
+    end)
     button.Expand:Show()
   end
 
@@ -294,6 +301,9 @@ function sectionConfig:Create(kind, parent)
   sc.content:AddToStart({ title = "Pinned", header = true })
   sc:LoadPinnedItems()
   sc.content:AddToStart({ title = "Automatically Sorted", header = true })
+
+  -- Create the pop out item list.
+  sc.itemList = sectionItemList:Create(sc.frame)
 
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()
