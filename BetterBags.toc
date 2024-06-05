@@ -1,4 +1,4 @@
-## Interface: 100207
+## Interface: 100207,110000
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -73,9 +73,9 @@ frames\section.lua
 frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
-frames\debug.lua
 frames\list.lua
 frames\sectionconfig.lua
+frames\debug.lua
 
 views\views.lua
 views\gridview.lua
