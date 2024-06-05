@@ -56,26 +56,31 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   if not button.Init then
     button.Init = true
     button:SetHeight(30)
-    button.Enabled = button:CreateTexture(nil, "OVERLAY")
-    button.Enabled:SetSize(24, 24)
-    button.Enabled:SetPoint("LEFT", button, "LEFT", 0, 0)
+    button.Expand = CreateFrame("Button", nil, button)
+    button.Expand:SetSize(24, 24)
+    button.Expand:SetPoint("LEFT", button, "LEFT", 0, 0)
     button.Category = button:CreateFontString(nil, "OVERLAY")
     button.Category:SetHeight(30)
-    button.Category:SetPoint("LEFT", button.Enabled, "RIGHT", 0, 0)
+    button.Category:SetPoint("LEFT", button.Expand, "RIGHT", 5, 0)
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
     })
     button:SetBackdropColor(0, 0, 0, 0)
+    button.Expand:SetNormalTexture("Interface\\glues\\common\\glue-leftarrow-button-up")
+    button.Expand:SetPushedTexture("Interface\\glues\\common\\glue-leftarrow-button-down")
+    button.Expand:SetHighlightTexture("Interface\\glues\\common\\glue-leftarrow-button-highlight", "ADD")
   end
 
   -- Set the category font info for the button depending on if it's a header or not.
   if elementData.header then
     button.Category:SetFontObject("GameFontNormal")
     button.Category:SetTextColor(1, .81960791349411, 0, 1)
+    button.Expand:Hide()
   else
     button.Category:SetFontObject("Game12Font")
     button.Category:SetTextColor(1, 1, 1)
+    button.Expand:Show()
   end
 
   -- Set the backdrop initial state.
@@ -90,6 +95,17 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   end
 
   if not elementData.header then
+
+    button.Expand:SetScript("OnEnter", function()
+      GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+      GameTooltip:AddLine("Open the sidebar for configuring items in this category.", 1, .81960791349411, 0, true)
+      GameTooltip:Show()
+    end)
+
+    button.Expand:SetScript("OnLeave", function()
+      GameTooltip:Hide()
+    end)
+
     button:SetScript("OnEnter", function()
       GameTooltip:SetOwner(button, "ANCHOR_LEFT")
       GameTooltip:AddLine(elementData.title, 1, .81960791349411, 0, true)

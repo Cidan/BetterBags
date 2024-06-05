@@ -107,7 +107,7 @@ BagBarExpandToggle = {}
 ---@field Message FontString
 
 ---@class BetterBagsSectionConfigListButton: Button
----@field Enabled Texture
+---@field Expand Button
 ---@field Category FontString
 ---@field Init boolean
 
