@@ -136,6 +136,12 @@ function sectionItemListFrame:resetSectionItem(frame, elementData)
   end
 end
 
+---@param category string
+---@return boolean
+function sectionItemListFrame:IsCategory(category)
+  return self.currentCategory == category
+end
+
 function sectionItemListFrame:Redraw()
   self:ShowCategory(self.currentCategory)
 end

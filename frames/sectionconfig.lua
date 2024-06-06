@@ -27,6 +27,15 @@ local animations = addon:GetModule('Animations')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
+
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
+---@class Question: AceModule
+local question = addon:GetModule('Question')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:GetModule('SectionItemList')
 
@@ -135,6 +144,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         GameTooltip:AddLine("\n", 1, 1, 1, true)
         GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
         GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
+        GameTooltip:AddDoubleLine("Right Click", "Open Menu")
         --GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
       else
         GameTooltip:AddLine([[
@@ -156,8 +166,38 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the text and icon for the button.
   button.Category:SetText(elementData.title)
 
+  button:SetScript("OnMouseDown", function(_, b)
+    if b == "LeftButton" then
+      return
+    end
+    if elementData.header then
+      return
+    end
+    contextMenu:Show({{
+      text = L:G("Delete Category"),
+      notCheckable = true,
+      hasArrow = false,
+      func = function()
+        question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", elementData.title), function()
+          self.content.provider:Remove(elementData)
+          if self.itemList:IsShown() and self.itemList:IsCategory(elementData.title) then
+            self.itemList:Hide(function()
+              categories:DeleteCategory(elementData.title)
+            end)
+          else
+            categories:DeleteCategory(elementData.title)
+          end
+        end, function()
+        end)
+      end
+    }})
+  end)
+
   -- Script handler for dropping items into a category.
   button:SetScript("OnReceiveDrag", function()
+    if elementData.header then
+      return
+    end
     self:OnReceiveDrag(elementData.title)
   end)
 
@@ -194,6 +234,9 @@ end
 function sectionConfigFrame:resetSectionItem(button, elementData)
   _ = elementData
   _ = button
+  button:SetScript("OnMouseDown", nil)
+  button:SetScript("OnMouseUp", nil)
+  button:SetScript("OnReceiveDrag", nil)
 end
 
 function sectionConfigFrame:AddSection(name)

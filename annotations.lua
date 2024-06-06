@@ -213,6 +213,7 @@ function DataProviderMixin:Find(index) end
 function DataProviderMixin:MoveElementDataToIndex(elementData, newIndex) end
 ---@return number
 function DataProviderMixin:GetSize() end
+function DataProviderMixin:Remove(...) end
 
 ---@class ScrollBoxDragBehavior
 local ScrollBoxDragBehavior = {}
