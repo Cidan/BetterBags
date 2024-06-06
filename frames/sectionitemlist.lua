@@ -153,6 +153,9 @@ function sectionItemListFrame:ShowCategory(category)
       self:ShowCategory(category)
     end)
     return
+  elseif self:IsShown() and self.currentCategory == category then
+    self:Hide()
+    return
   end
 
   self.frame:SetTitle(category)
