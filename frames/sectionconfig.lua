@@ -52,6 +52,18 @@ local sectionConfigItem = {}
 ---@field package itemList SectionItemListFrame
 local sectionConfigFrame = {}
 
+---@param category string
+---@return boolean
+function sectionConfigFrame:OnReceiveDrag(category)
+  local kind, id = GetCursorInfo()
+  if kind ~= "item" or not tonumber(id) then return false end
+  ClearCursor()
+  local itemid = tonumber(id) --[[@as number]]
+  database:SaveItemToCategory(itemid, category)
+  events:SendMessage('bags/FullRefreshAll')
+  return true
+end
+
 ---@param button BetterBagsSectionConfigListButton
 ---@param elementData table
 function sectionConfigFrame:initSectionItem(button, elementData)
@@ -144,14 +156,11 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the text and icon for the button.
   button.Category:SetText(elementData.title)
 
-  -- TODO(lobato): Instead of a check, have an X for hiding the category.
-  --[[
-  if addon.fakeDatabase[elementData.title] then
-    button.Enabled:SetTexture("Interface\\raidframe\\readycheck-ready")
-  else
-      button.Enabled:SetTexture("")
-  end
-  --]]
+  -- Script handler for dropping items into a category.
+  button:SetScript("OnReceiveDrag", function()
+    self:OnReceiveDrag(elementData.title)
+  end)
+
   button:SetScript("OnMouseUp", function(_, key)
     -- Headers can't be clicked.
     if elementData.header then
@@ -160,6 +169,9 @@ function sectionConfigFrame:initSectionItem(button, elementData)
 
     -- Toggle the category from containing items.
     if key == "LeftButton" then
+      if self:OnReceiveDrag(elementData.title) then
+        return
+      end
       if IsShiftKeyDown() then
         self.content.provider:MoveElementDataToIndex(elementData, 2)
         self:UpdatePinnedItems()
@@ -324,6 +336,9 @@ function sectionConfig:Create(kind, parent)
     table.sort(names)
     for _, sName in ipairs(names) do
       sc:AddSection(sName)
+    end
+    if sc.itemList:IsShown() then
+      sc.itemList:Redraw()
     end
   end)
 

@@ -18,6 +18,18 @@ local categories = addon:GetModule('Categories')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:NewModule('SectionItemList')
 
@@ -32,6 +44,7 @@ local sectionItemList = addon:NewModule('SectionItemList')
 ---@field content ListFrame
 ---@field package fadeIn AnimationGroup
 ---@field package fadeOut AnimationGroup
+---@field private currentCategory string
 local sectionItemListFrame = {}
 
 ---@param callback? fun()
@@ -62,6 +75,32 @@ function sectionItemListFrame:IsShown()
   return self.frame:IsShown()
 end
 
+function sectionItemListFrame:OnReceiveDrag()
+  local kind, id = GetCursorInfo()
+  if kind ~= "item" or not tonumber(id) then return end
+  ClearCursor()
+  local itemid = tonumber(id) --[[@as number]]
+  database:SaveItemToCategory(itemid, self.currentCategory)
+  events:SendMessage('bags/FullRefreshAll')
+end
+
+function sectionItemListFrame:OnItemClick(b, elementData)
+  if b == "LeftButton" then
+    self:OnReceiveDrag()
+    return
+  end
+  ClearCursor()
+  contextMenu:Show({{
+    text = L:G("Remove"),
+    notCheckable = true,
+    hasArrow = false,
+    func = function()
+      database:DeleteItemFromCategory(elementData.data.itemInfo.itemID, elementData.category)
+      events:SendMessage('bags/FullRefreshAll')
+    end
+  }})
+end
+
 ---@param frame BetterBagsSectionConfigItemFrame
 ---@param elementData table
 function sectionItemListFrame:initSectionItem(frame, elementData)
@@ -70,6 +109,20 @@ function sectionItemListFrame:initSectionItem(frame, elementData)
     frame.item.frame:SetParent(frame)
     frame.item.frame:SetPoint("LEFT", frame, "LEFT", 4, 0)
   end
+
+  local click = function(_, b)
+    self:OnItemClick(b, elementData)
+  end
+
+  local drag = function()
+    self:OnReceiveDrag()
+  end
+
+  frame.item.rowButton:SetScript("OnReceiveDrag", drag)
+  frame.item.button.button:SetScript("OnReceiveDrag", drag)
+
+  frame.item.rowButton:SetScript("OnMouseDown", click)
+  frame.item.button.button:SetScript("OnMouseDown", click)
   frame.item:SetStaticItemFromData(elementData.data)
 end
 
@@ -79,25 +132,31 @@ function sectionItemListFrame:resetSectionItem(frame, elementData)
   _ = elementData
   if frame.item then
     frame.item:ClearItem()
+    frame.item.rowButton:SetScript("OnMouseDown", nil)
   end
+end
+
+function sectionItemListFrame:Redraw()
+  self:ShowCategory(self.currentCategory)
 end
 
 ---@param category string
 function sectionItemListFrame:ShowCategory(category)
-  if self:IsShown() then
+  if self:IsShown() and self.currentCategory ~= category then
     self:Hide(function()
       self:ShowCategory(category)
     end)
     return
   end
 
-  self.content:Wipe()
   self.frame:SetTitle(category)
+  self.currentCategory = category
 
   local itemDataList = categories:GetMergedCategory(category)
 
   -- This is a dynamic category, do nothing for now.
   if itemDataList == nil then
+    self.content:Wipe()
     self:Show()
     return
   end
@@ -108,11 +167,14 @@ function sectionItemListFrame:ShowCategory(category)
   end
 
   items:GetItemData(itemIDs, function(itemData)
+    self.content:Wipe()
     ---@cast itemData +ItemData[]
     for _, data in pairs(itemData) do
-      self.content:AddToEnd({data = data})
+      self.content:AddToEnd({data = data, category = category})
     end
-    self:Show()
+    if not self:IsShown() then
+      self:Show()
+    end
   end)
 end
 
@@ -124,10 +186,16 @@ function sectionItemList:Create(parent)
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
+  sc.frame:EnableMouse(true)
+  sc.frame:SetScript("OnReceiveDrag", function()
+    sc:OnReceiveDrag()
+  end)
+  sc.frame:SetScript("OnMouseDown", function()
+    sc:OnReceiveDrag()
+  end)
   sc.fadeIn, sc.fadeOut = animations:AttachFadeAndSlideLeft(sc.frame)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
-
   -- Setup the create and destroy functions for items on the list.
   sc.content:SetupDataSource("BetterBagsSectionConfigItemFrame", function(f, data)
     ---@cast f BetterBagsSectionConfigItemFrame
