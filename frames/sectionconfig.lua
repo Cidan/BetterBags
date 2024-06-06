@@ -109,6 +109,13 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       self.itemList:ShowCategory(elementData.title)
     end)
     button.Expand:Show()
+    if not categories:DoesCategoryExist(elementData.title) then
+      button.Expand:Disable()
+      button.Expand:GetNormalTexture():SetDesaturated(true)
+    else
+      button.Expand:Enable()
+      button.Expand:GetNormalTexture():SetDesaturated(false)
+    end
   end
 
   -- Set the backdrop initial state.
@@ -123,7 +130,6 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   end
 
   if not elementData.header then
-
     button.Expand:SetScript("OnEnter", function()
       GameTooltip:SetOwner(button, "ANCHOR_LEFT")
       GameTooltip:AddLine("Open the sidebar for configuring items in this category.", 1, .81960791349411, 0, true)
@@ -166,68 +172,70 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the text and icon for the button.
   button.Category:SetText(elementData.title)
 
-  button:SetScript("OnMouseDown", function(_, b)
-    if b == "LeftButton" then
-      return
-    end
-    if elementData.header then
-      return
-    end
-    contextMenu:Show({{
-      text = L:G("Delete Category"),
-      notCheckable = true,
-      hasArrow = false,
-      func = function()
-        question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", elementData.title), function()
-          self.content.provider:Remove(elementData)
-          self:UpdatePinnedItems()
-          if self.itemList:IsShown() and self.itemList:IsCategory(elementData.title) then
-            self.itemList:Hide(function()
-              categories:DeleteCategory(elementData.title)
-            end)
-          else
-            categories:DeleteCategory(elementData.title)
-          end
-        end, function()
-        end)
-      end
-    }})
-  end)
-
-  -- Script handler for dropping items into a category.
-  button:SetScript("OnReceiveDrag", function()
-    if elementData.header then
-      return
-    end
-    self:OnReceiveDrag(elementData.title)
-  end)
-
-  button:SetScript("OnMouseUp", function(_, key)
-    -- Headers can't be clicked.
-    if elementData.header then
-      return
-    end
-
-    -- Toggle the category from containing items.
-    if key == "LeftButton" then
-      if self:OnReceiveDrag(elementData.title) then
+  if categories:DoesCategoryExist(elementData.title) then
+    button:SetScript("OnMouseDown", function(_, b)
+      if b == "LeftButton" then
         return
       end
-      if IsShiftKeyDown() then
-        self.content.provider:MoveElementDataToIndex(elementData, 2)
-        self:UpdatePinnedItems()
-      elseif categories:DoesCategoryExist(elementData.title) then
-        if categories:IsCategoryEnabled(self.kind, elementData.title) then
-          categories:DisableCategory(self.kind, elementData.title)
-          button:SetBackdropColor(0, 0, 0, 0)
-        else
-          categories:EnableCategory(self.kind, elementData.title)
-          button:SetBackdropColor(1, 1, 0, .2)
-        end
+      if elementData.header then
+        return
       end
-      events:SendMessage('bags/FullRefreshAll')
-    end
-  end)
+      contextMenu:Show({{
+        text = L:G("Delete Category"),
+        notCheckable = true,
+        hasArrow = false,
+        func = function()
+          question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", elementData.title), function()
+            self.content.provider:Remove(elementData)
+            self:UpdatePinnedItems()
+            if self.itemList:IsShown() and self.itemList:IsCategory(elementData.title) then
+              self.itemList:Hide(function()
+                categories:DeleteCategory(elementData.title)
+              end)
+            else
+              categories:DeleteCategory(elementData.title)
+            end
+          end, function()
+          end)
+        end
+      }})
+    end)
+
+    -- Script handler for dropping items into a category.
+    button:SetScript("OnReceiveDrag", function()
+      if elementData.header then
+        return
+      end
+      self:OnReceiveDrag(elementData.title)
+    end)
+
+    button:SetScript("OnMouseUp", function(_, key)
+      -- Headers can't be clicked.
+      if elementData.header then
+        return
+      end
+
+      -- Toggle the category from containing items.
+      if key == "LeftButton" then
+        if self:OnReceiveDrag(elementData.title) then
+          return
+        end
+        if IsShiftKeyDown() then
+          self.content.provider:MoveElementDataToIndex(elementData, 2)
+          self:UpdatePinnedItems()
+        elseif categories:DoesCategoryExist(elementData.title) then
+          if categories:IsCategoryEnabled(self.kind, elementData.title) then
+            categories:DisableCategory(self.kind, elementData.title)
+            button:SetBackdropColor(0, 0, 0, 0)
+          else
+            categories:EnableCategory(self.kind, elementData.title)
+            button:SetBackdropColor(1, 1, 0, .2)
+          end
+        end
+        events:SendMessage('bags/FullRefreshAll')
+      end
+    end)
+  end
 end
 
 ---@param button BetterBagsSectionConfigListButton
