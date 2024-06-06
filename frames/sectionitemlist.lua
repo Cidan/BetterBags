@@ -143,17 +143,18 @@ function sectionItemListFrame:IsCategory(category)
 end
 
 function sectionItemListFrame:Redraw()
-  self:ShowCategory(self.currentCategory)
+  self:ShowCategory(self.currentCategory, true)
 end
 
 ---@param category string
-function sectionItemListFrame:ShowCategory(category)
+---@param redraw? boolean
+function sectionItemListFrame:ShowCategory(category, redraw)
   if self:IsShown() and self.currentCategory ~= category then
     self:Hide(function()
       self:ShowCategory(category)
     end)
     return
-  elseif self:IsShown() and self.currentCategory == category then
+  elseif self:IsShown() and self.currentCategory == category and not redraw then
     self:Hide()
     return
   end
