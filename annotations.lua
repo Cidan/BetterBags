@@ -107,7 +107,7 @@ BagBarExpandToggle = {}
 ---@field Message FontString
 
 ---@class BetterBagsSectionConfigListButton: Button
----@field Enabled Texture
+---@field Expand Button
 ---@field Category FontString
 ---@field Init boolean
 
@@ -213,6 +213,7 @@ function DataProviderMixin:Find(index) end
 function DataProviderMixin:MoveElementDataToIndex(elementData, newIndex) end
 ---@return number
 function DataProviderMixin:GetSize() end
+function DataProviderMixin:Remove(...) end
 
 ---@class ScrollBoxDragBehavior
 local ScrollBoxDragBehavior = {}

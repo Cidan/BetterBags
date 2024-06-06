@@ -5,4 +5,9 @@
       <AbsDimension y="30"/>
     </Size>
   </Button>
+  <Frame name="BetterBagsSectionConfigItemFrame" inherits="BackdropTemplate" virtual="true">
+    <Size>
+      <AbsDimension y="32"/>
+    </Size>
+  </Frame>
 </Ui>
