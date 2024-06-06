@@ -180,6 +180,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       func = function()
         question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", elementData.title), function()
           self.content.provider:Remove(elementData)
+          self:UpdatePinnedItems()
           if self.itemList:IsShown() and self.itemList:IsCategory(elementData.title) then
             self.itemList:Hide(function()
               categories:DeleteCategory(elementData.title)
