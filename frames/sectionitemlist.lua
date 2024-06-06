@@ -108,6 +108,7 @@ function sectionItemListFrame:initSectionItem(frame, elementData)
     frame.item = itemRowFrame:Create()
     frame.item.frame:SetParent(frame)
     frame.item.frame:SetPoint("LEFT", frame, "LEFT", 4, 0)
+    frame.item.frame:SetPoint("RIGHT", frame, "RIGHT", -9, 0)
   end
 
   local click = function(_, b)
