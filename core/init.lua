@@ -66,6 +66,9 @@ local refresh = addon:GetModule('Refresh')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -221,6 +224,9 @@ function addon:OnEnable()
   self:HideBlizzardBags()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
+
+  -- Apply themes globally -- do not instantiate new windows after this call.
+  themes:Enable()
 
   table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
   table.insert(UISpecialFrames, addon.Bags.Bank:GetName())

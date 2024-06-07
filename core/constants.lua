@@ -110,6 +110,13 @@ const.ITEM_BAG_FAMILY = {
   [1024] = L:G("Mining Bag"),
 }
 
+---@enum WindowKind
+const.WINDOW_KIND = {
+  UNDEFINED = 0,
+  PORTRAIT = 1,
+  SIMPLE = 2,
+}
+
 ---@enum BagView
 const.BAG_VIEW = {
   UNDEFINED = 0,

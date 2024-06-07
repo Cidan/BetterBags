@@ -1,14 +1,17 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
 
+  <!-- The default bag template. -->
   <Frame name="BetterBagsBagPortraitTemplate" inherits="PortraitFrameTexturedBaseTemplate" mixin="PortraitFrameMixin" virtual="true">
     <KeyValues>
 		  <KeyValue key="layoutType" value="HeldBagLayout" type="string"/>
     </KeyValues>
     <Frames>
       <Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButtonDefaultAnchors"/>
+      <Frame parentKey="Backdrop" inherits="BackdropTemplate" mixin="BackdropTemplateMixin" />
     </Frames>
   </Frame>
+
   <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
   </Frame>
   <Frame name="BetterBagsSearchPanelTemplate" inherits="SimplePanelTemplate" virtual="true">

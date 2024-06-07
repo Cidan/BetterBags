@@ -181,7 +181,7 @@ function sectionItemListFrame:ShowCategory(category, redraw)
     self.content:Wipe()
     ---@cast itemData +ItemData[]
     for _, data in pairs(itemData) do
-      self.content:AddToEnd({data = data, category = category})
+      self.content:AddToStart({data = data, category = category})
     end
     if not self:IsShown() then
       self:Show()

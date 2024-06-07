@@ -70,6 +70,9 @@ local search = addon:GetModule('Search')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 -------
 --- Bag Prototype
 -------
@@ -351,6 +354,8 @@ function bagFrame:Create(kind)
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsBagPortraitTemplate
   local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
+  -- Register this window with the theme system.
+  themes:RegisterWindow(const.WINDOW_KIND.PORTRAIT, f)
 
   -- Setup the main frame defaults.
   b.frame = f
