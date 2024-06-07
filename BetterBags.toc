@@ -49,6 +49,8 @@ core\hooks.lua
 core\async.lua
 
 themes\themes.lua
+themes\default.lua
+themes\simpledark.lua
 
 data\equipmentsets.lua
 data\categories.lua

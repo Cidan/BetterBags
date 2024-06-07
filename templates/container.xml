@@ -8,7 +8,7 @@
     </KeyValues>
     <Frames>
       <Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButtonDefaultAnchors"/>
-      <Frame parentKey="Backdrop" inherits="BackdropTemplate" mixin="BackdropTemplateMixin" />
+      <Frame parentKey="Backdrop" inherits="BackdropTemplate" mixin="BackdropTemplateMixin" frameStrata="BACKGROUND" setAllPoints="true"/>
     </Frames>
   </Frame>
 
