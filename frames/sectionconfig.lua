@@ -338,7 +338,7 @@ function sectionConfig:Create(kind, parent)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
 
-  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, sc.frame)
+  themes:RegisterSimpleWindow(sc.frame)
   -- Setup the create and destroy functions for items on the list.
   sc.content:SetupDataSource("BetterBagsSectionConfigListButton", function(f, data)
     ---@cast f BetterBagsSectionConfigListButton

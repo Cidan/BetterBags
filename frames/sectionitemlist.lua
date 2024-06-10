@@ -211,7 +211,7 @@ function sectionItemList:Create(parent)
     sc:OnReceiveDrag()
   end)
 
-  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, sc.frame)
+  themes:RegisterSimpleWindow(sc.frame)
 
   sc.fadeIn, sc.fadeOut = animations:AttachFadeAndSlideLeft(sc.frame)
   sc.content = list:Create(sc.frame)

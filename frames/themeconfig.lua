@@ -87,7 +87,7 @@ function themeConfig:Create(parent)
   tc.frame:SetScale(UIParent:GetScale())
   tc.frame:Hide()
 
-  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, tc.frame)
+  themes:RegisterSimpleWindow(tc.frame)
 
   tc.fadeIn, tc.fadeOut = animations:AttachFadeAndSlideLeft(tc.frame)
   tc.content = list:Create(tc.frame)

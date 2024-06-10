@@ -115,6 +115,7 @@ const.WINDOW_KIND = {
   UNDEFINED = 0,
   PORTRAIT = 1,
   SIMPLE = 2,
+  FLAT = 3,
 }
 
 ---@enum BagView

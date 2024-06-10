@@ -19,6 +19,9 @@ local defaultTheme = {
     frame.Bg:Show()
     frame.TopTileStreaks:Show()
     frame.Backdrop:Hide()
+    frame.PortraitContainer.CircleMask:SetTexture([[Interface\CharacterFrame\TempPortraitAlphaMask]])
+    frame.PortraitContainer.CircleMask:SetPoint("TOPLEFT", frame.PortraitContainer.portrait, "TOPLEFT", 2, 0)
+    frame.PortraitContainer.CircleMask:SetPoint("BOTTOMRIGHT", frame.PortraitContainer.portrait, "BOTTOMRIGHT", -2, 4)
     frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
     frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
   end,
@@ -32,8 +35,20 @@ local defaultTheme = {
     frame.Bg:Show()
     frame.TopTileStreaks:Show()
   end,
+  Flat = function(frame)
+    frame.Backdrop:Hide()
+    NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "ButtonFrameTemplateNoPortrait")
+    frame.NineSlice:Show()
+    frame.Bg:Show()
+  end,
   Opacity = function(frame, alpha)
     frame.Bg:SetAlpha(alpha / 100)
+  end,
+  MenuButton = function (button)
+    local parent = button:GetParent() --[[@as PortraitContainer]]
+    button:SetWidth(40)
+    button:SetHeight(40)
+    button:SetPoint("TOPLEFT", parent.portrait, "TOPLEFT", -1, 2)
   end
 }
 

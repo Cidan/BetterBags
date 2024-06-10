@@ -152,13 +152,17 @@ local SearchBox = {}
 
 ---@class BetterBagsBagPortraitTemplate
 ---@field Bg Texture
----@field PortraitContainer Frame
+---@field PortraitContainer PortraitContainer
 ---@field CloseButton Button
 ---@field SearchBox SearchBox
 ---@field Backdrop BackdropTemplate
 ---@field NineSlice NineSlicePanelTemplate
 ---@field TopTileStreaks Texture
 local BetterBagsBagPortraitTemplate = {}
+
+---@class PortraitContainer: Frame
+---@field portrait Texture
+---@field CircleMask MaskTexture
 
 ---@class BetterBagsBagDefaultPanelTemplate
 ---@field Bg Texture

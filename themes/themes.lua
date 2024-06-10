@@ -15,11 +15,14 @@ local db = addon:GetModule('Database')
 ---@field Description string A description of the theme used by this theme in the theme selection window.
 ---@field Portrait fun(frame: BetterBagsBagPortraitTemplate) A function that applies the theme to a portrait frame.
 ---@field Simple fun(frame: Frame) A function that applies the theme to a simple frame.
+---@field Flat fun(frame: Frame) A function that applies the theme to a flat frame.
 ---@field Opacity fun(frame: Frame, opacity: number) A callback that is called when the user changes the opacity of the frame. You should use this to change the alpha of your backdrops.
+---@field MenuButton fun(button: Button) A function that applies the theme to a menu button.
 
 ---@class Themes: AceModule
 ---@field themes table<string, Theme>
 ---@field windows table<WindowKind, Frame[]>
+---@field menuButtons Button[]
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -28,8 +31,10 @@ themes.themes = {}
 function themes:OnInitialize()
   self.windows = {
     [const.WINDOW_KIND.PORTRAIT] = {},
-    [const.WINDOW_KIND.SIMPLE] = {}
+    [const.WINDOW_KIND.SIMPLE] = {},
+    [const.WINDOW_KIND.FLAT] = {}
   }
+  self.menuButtons = {}
 end
 
 function themes:OnEnable()
@@ -58,19 +63,45 @@ function themes:ApplyTheme(key)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
   end
+
   for _, frame in pairs(self.windows[const.WINDOW_KIND.SIMPLE]) do
     theme.Simple(frame)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
   end
+
+  for _, frame in pairs(self.windows[const.WINDOW_KIND.FLAT]) do
+    theme.Flat(frame)
+  end
+
+  for _, button in pairs(self.menuButtons) do
+    theme.MenuButton(button)
+  end
+
   db:SetTheme(key)
 end
 
--- RegisterWindow is used to register a window frame to be themed by themes.
----@param kind WindowKind
+-- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.
 ---@param frame Frame
-function themes:RegisterWindow(kind, frame)
-  table.insert(self.windows[kind], frame)
+function themes:RegisterPortraitWindow(frame)
+  table.insert(self.windows[const.WINDOW_KIND.PORTRAIT], frame)
+end
+
+-- RegisterSimpleWindow is used to register a protrait window frame to be themed by themes.
+---@param frame Frame
+function themes:RegisterSimpleWindow(frame)
+  table.insert(self.windows[const.WINDOW_KIND.SIMPLE], frame)
+end
+
+-- RegisterFlatWindow is used to register a protrait window frame to be themed by themes.
+---@param frame Frame
+function themes:RegisterFlatWindow(frame)
+  table.insert(self.windows[const.WINDOW_KIND.FLAT], frame)
+end
+
+---@param button Button
+function themes:RegisterMenuButton(button)
+  table.insert(self.menuButtons, button)
 end
 
 ---@return table<string, Theme>

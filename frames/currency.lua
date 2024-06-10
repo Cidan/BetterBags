@@ -241,7 +241,7 @@ function currency:Create(parent)
   frame:SetWidth(260)
   frame:SetTitle("Currencies")
 
-  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, frame)
+  themes:RegisterSimpleWindow(frame)
 
   b.fadeIn, b.fadeOut = animations:AttachFadeAndSlideLeft(frame)
   b.frame = frame

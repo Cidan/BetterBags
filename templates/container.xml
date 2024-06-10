@@ -20,6 +20,9 @@
   </Frame>
 
   <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
+    <Frames>
+      <Frame parentKey="Backdrop" inherits="BackdropTemplate" mixin="BackdropTemplateMixin" frameStrata="BACKGROUND" setAllPoints="true"/>
+    </Frames>
   </Frame>
   <Frame name="BetterBagsSearchPanelTemplate" inherits="SimplePanelTemplate" virtual="true">
   </Frame>

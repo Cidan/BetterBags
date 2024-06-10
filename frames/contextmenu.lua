@@ -239,15 +239,6 @@ function contextMenu:CreateContextMenu(bag)
           bag.currencyFrame:Hide()
         else
           bag.windowGrouping:Show('currencyConfig')
-          --[[
-          if bag.sectionConfigFrame:IsShown() then
-            bag.sectionConfigFrame:Hide(function()
-              bag.currencyFrame:Show()
-            end)
-          else
-            bag.currencyFrame:Show()
-          end
-          ]]--
         end
       end
     })

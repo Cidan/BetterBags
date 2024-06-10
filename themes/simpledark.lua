@@ -14,6 +14,10 @@ local simpleDark = {
     frame.NineSlice:Hide()
     frame.Bg:Hide()
     frame.TopTileStreaks:Hide()
+    frame.PortraitContainer.CircleMask:SetTexture([[Interface\Common\Common-IconMask]])
+    frame.PortraitContainer.CircleMask:SetPoint("TOPLEFT", frame.PortraitContainer.portrait, "TOPLEFT", 2, -2)
+    frame.PortraitContainer.CircleMask:SetPoint("BOTTOMRIGHT", frame.PortraitContainer.portrait, "BOTTOMRIGHT", -2, 1)
+    frame:SetPortraitTextureSizeAndOffset(30, 4, -7)
     frame.Backdrop:SetBackdrop({
       bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
       edgeFile = 'Interface\\Tooltips\\UI-Tooltip-Border',
@@ -38,8 +42,23 @@ local simpleDark = {
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
   end,
+  Flat = function (frame)
+    frame.NineSlice:Hide()
+    frame.Bg:Hide()
+    frame.Backdrop:SetBackdrop({
+      bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+      edgeFile = 'Interface\\Tooltips\\UI-Tooltip-Border',
+      edgeSize = 16,
+      insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+    frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
+    frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    frame.Backdrop:Show()
+  end,
   Opacity = function(frame, alpha)
     frame.Backdrop:SetBackdropColor(0, 0, 0, alpha / 100)
+  end,
+  MenuButton = function (button)
   end
 }
 

@@ -363,7 +363,7 @@ function bagFrame:Create(kind)
   ---@class Frame: BetterBagsBagPortraitTemplate
   local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
   -- Register this window with the theme system.
-  themes:RegisterWindow(const.WINDOW_KIND.PORTRAIT, f)
+  themes:RegisterPortraitWindow(f)
 
   -- Setup the main frame defaults.
   b.frame = f
@@ -422,7 +422,8 @@ function bagFrame:Create(kind)
   --bagButton:SetHighlightTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
   bagButton:SetWidth(40)
   bagButton:SetHeight(40)
-  bagButton:SetPoint("TOPLEFT", b.frame.PortraitContainer, "TOPLEFT", -6, 2)
+  bagButton:SetPoint("TOPLEFT", b.frame.PortraitContainer.portrait, "TOPLEFT", -1, 2)
+  themes:RegisterMenuButton(bagButton)
   local highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
   highlightTex:SetTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
   highlightTex:SetAllPoints()
