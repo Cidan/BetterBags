@@ -112,6 +112,7 @@ local windowGroup = addon:GetModule('WindowGroup')
 ---@field searchBox SearchFrame
 ---@field loaded boolean
 ---@field windowGrouping WindowGrouping
+---@field sideAnchor Frame
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
@@ -367,6 +368,10 @@ function bagFrame:Create(kind)
 
   -- Setup the main frame defaults.
   b.frame = f
+  b.sideAnchor = CreateFrame("Frame", nil, b.frame)
+  b.sideAnchor:SetWidth(1)
+  b.sideAnchor:SetPoint("TOPRIGHT", b.frame, "TOPLEFT")
+  b.sideAnchor:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMLEFT")
   f.Owner = b
   b.frame:SetParent(UIParent)
   b.frame:SetToplevel(true)
@@ -518,16 +523,16 @@ function bagFrame:Create(kind)
   b.searchBox = searchBox
 
   if kind == const.BAG_KIND.BACKPACK then
-    local currencyFrame = currency:Create(b.frame)
+    local currencyFrame = currency:Create(b.sideAnchor, b.frame)
     currencyFrame:Hide()
     b.currencyFrame = currencyFrame
 
-    b.themeConfigFrame = themeConfig:Create(b.frame)
+    b.themeConfigFrame = themeConfig:Create(b.sideAnchor)
     b.windowGrouping:AddWindow('themeConfig', b.themeConfigFrame)
     b.windowGrouping:AddWindow('currencyConfig', b.currencyFrame)
   end
 
-  b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
+  b.sectionConfigFrame = sectionConfig:Create(kind, b.sideAnchor)
   b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)
 
   -- Enable dragging of the bag frame.

@@ -4,6 +4,9 @@ local gw = GW2_ADDON
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
+
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
@@ -20,7 +23,9 @@ local function newPanelButton(panel, texture, tooltip, onClick)
   local button = CreateFrame("Button", nil, panel)
   button:SetSize(32, 32)
   button:SetNormalTexture(texture)
+  button:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
   button:SetHighlightTexture(texture)
+  button:GetHighlightTexture():SetTexCoord(0, 1, 0, 1)
   button:SetScript("OnClick", onClick)
   button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -83,7 +88,7 @@ local gw2Theme = {
       leftSide:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 25)
       leftSide:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 25)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/textures/icons/BagMicroButton-Up", "Show Bags", function()
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/BagMicroButton-Up", "Show Bags", function()
         if frame.Owner.slots:IsShown() then
           frame.Owner.slots:Hide()
         else
@@ -91,9 +96,25 @@ local gw2Theme = {
           frame.Owner.slots:Show()
         end
       end)
+
+      newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/StoreMicroButton-Up", "Show Currency", function()
+        if frame.Owner.currencyFrame:IsShown() then
+          frame.Owner.currencyFrame:Hide()
+        else
+          frame.Owner.currencyFrame:Show()
+        end
+      end)
+
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/MainMenuMicroButton-Up", "Open Settings", function()
+        contextMenu:Show(frame.Owner.menuList)
+      end)
+
     else
       decoration:Show()
     end
+    frame.Owner.sideAnchor:ClearAllPoints()
+    frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", -35, 0)
+    frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", -35, 0)
     frame.CloseButton:GwSkinButton(true)
     frame.TitleContainer:Hide()
     frame.NineSlice:Hide()

@@ -222,8 +222,9 @@ function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
 end
 
 ---@param parent Frame
+---@param iconParent Frame
 ---@return CurrencyFrame
-function currency:Create(parent)
+function currency:Create(parent, iconParent)
   ---@class CurrencyFrame
   local b = {}
   setmetatable(b, {__index = CurrencyFrame})
@@ -253,7 +254,7 @@ function currency:Create(parent)
   g.spacing = 0
   b.content = g
 
-  b.iconGrid = self:CreateIconGrid(parent)
+  b.iconGrid = self:CreateIconGrid(iconParent)
   b:Update()
   events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
     b:Update()

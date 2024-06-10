@@ -48,10 +48,8 @@ core\database.lua
 core\hooks.lua
 core\async.lua
 
+# The Theme API loads earlier than actual themes.
 themes\themes.lua
-themes\default.lua
-themes\simpledark.lua
-themes\gw2.lua
 
 data\equipmentsets.lua
 data\categories.lua
@@ -92,6 +90,10 @@ views\listview.lua
 views\bagview.lua
 
 frames\bag.lua
+
+themes\default.lua
+themes\simpledark.lua
+themes\gw2.lua
 
 config\config.lua
 config\help.lua
