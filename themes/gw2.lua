@@ -13,12 +13,15 @@ local gw2Theme = {
   Description = "A theme using the GW2_UI style.",
   Available = gw ~= nil,
   Portrait = function(frame)
+    frame.Backdrop:GwStripTextures()
     frame.Backdrop:ClearBackdrop()
     gw.CreateFrameHeaderWithBody(frame.Backdrop, frame.TitleContainer.TitleText, "Interface/AddOns/GW2_UI/textures/bag/bagicon", {})
+    frame.CloseButton:GwSkinButton(true)
     frame.NineSlice:Hide()
     frame.Backdrop:Show()
     frame.Bg:Hide()
     frame.TopTileStreaks:Hide()
+    frame.PortraitContainer:Hide()
     --frame.PortraitContainer:Hide()
   end,
   Simple = function(frame)
@@ -28,6 +31,21 @@ local gw2Theme = {
   Opacity = function(frame, alpha)
   end,
   SectionFont = function(font)
+  end,
+  Reset = function(windows, sectionFonts)
+    for kind, frames in pairs(windows) do
+      for _, frame in ipairs(frames) do
+        if frame.Backdrop.GwStripTextures then
+          if frame.Backdrop.gwHeader then
+            frame.Backdrop.gwHeader:Hide()
+          end
+          frame.Backdrop:GwStripTextures()
+        end
+        if frame.CloseButton then
+          frame.CloseButton:GwStripTextures(nil, true)
+        end
+      end
+    end
   end
 }
 

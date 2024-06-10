@@ -51,6 +51,8 @@ local defaultTheme = {
   end,
   SectionFont = function(font)
     font:SetFontObject("GameFontNormal")
+  end,
+  Reset = function(windows, sectionFonts)
   end
 }
 

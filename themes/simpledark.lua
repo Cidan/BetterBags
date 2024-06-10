@@ -64,6 +64,8 @@ local simpleDark = {
   end,
   SectionFont = function(font)
     font:SetFontObject("GameFontWhite")
+  end,
+  Reset = function(windows, sectionFonts)
   end
 }
 
