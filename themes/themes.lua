@@ -17,12 +17,12 @@ local db = addon:GetModule('Database')
 ---@field Simple fun(frame: Frame) A function that applies the theme to a simple frame.
 ---@field Flat fun(frame: Frame) A function that applies the theme to a flat frame.
 ---@field Opacity fun(frame: Frame, opacity: number) A callback that is called when the user changes the opacity of the frame. You should use this to change the alpha of your backdrops.
----@field MenuButton fun(button: Button) A function that applies the theme to a menu button.
+---@field SectionFont fun(font: FontString) A function that applies the theme to a section font.
 
 ---@class Themes: AceModule
 ---@field themes table<string, Theme>
 ---@field windows table<WindowKind, Frame[]>
----@field menuButtons Button[]
+---@field sectionFonts table<string, FontString>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -34,7 +34,7 @@ function themes:OnInitialize()
     [const.WINDOW_KIND.SIMPLE] = {},
     [const.WINDOW_KIND.FLAT] = {}
   }
-  self.menuButtons = {}
+  self.sectionFonts = {}
 end
 
 function themes:OnEnable()
@@ -58,24 +58,29 @@ end
 function themes:ApplyTheme(key)
   assert(self.themes[key], 'Theme does not exist.')
   local theme = self.themes[key]
+
+  -- Apply all portrait themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
     theme.Portrait(frame)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
   end
 
+  -- Apply all simple frame themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.SIMPLE]) do
     theme.Simple(frame)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
   end
 
+  -- Apply all flat frame themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.FLAT]) do
     theme.Flat(frame)
   end
 
-  for _, button in pairs(self.menuButtons) do
-    theme.MenuButton(button)
+  -- Apply all section fonts.
+  for _, font in pairs(self.sectionFonts) do
+    theme.SectionFont(font)
   end
 
   db:SetTheme(key)
@@ -99,9 +104,10 @@ function themes:RegisterFlatWindow(frame)
   table.insert(self.windows[const.WINDOW_KIND.FLAT], frame)
 end
 
----@param button Button
-function themes:RegisterMenuButton(button)
-  table.insert(self.menuButtons, button)
+-- RegisterSectionFont is used to register a font to be used in the section headers.
+---@param font FontString
+function themes:RegisterSectionFont(font)
+  table.insert(self.sectionFonts, font)
 end
 
 ---@return table<string, Theme>

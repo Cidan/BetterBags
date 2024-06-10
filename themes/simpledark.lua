@@ -27,6 +27,7 @@ local simpleDark = {
     frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
+    frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
   end,
   Simple = function(frame)
     frame.NineSlice:Hide()
@@ -41,6 +42,7 @@ local simpleDark = {
     frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
+    frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
   end,
   Flat = function (frame)
     frame.NineSlice:Hide()
@@ -54,11 +56,13 @@ local simpleDark = {
     frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
+    frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
   end,
   Opacity = function(frame, alpha)
     frame.Backdrop:SetBackdropColor(0, 0, 0, alpha / 100)
   end,
-  MenuButton = function (button)
+  SectionFont = function(font)
+    font:SetFontObject("GameFontWhite")
   end
 }
 

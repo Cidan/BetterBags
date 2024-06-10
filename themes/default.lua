@@ -24,6 +24,8 @@ local defaultTheme = {
     frame.PortraitContainer.CircleMask:SetPoint("BOTTOMRIGHT", frame.PortraitContainer.portrait, "BOTTOMRIGHT", -2, 4)
     frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
     frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
+    frame.TitleContainer.TitleText:SetFontObject("GameFontNormal")
+    -- <Color r="1.0" g="0.82" b="0"/>
   end,
   Simple = function(frame)
     frame.Backdrop:Hide()
@@ -34,21 +36,20 @@ local defaultTheme = {
     frame.NineSlice:Show()
     frame.Bg:Show()
     frame.TopTileStreaks:Show()
+    frame.TitleContainer.TitleText:SetFontObject("GameFontNormal")
   end,
   Flat = function(frame)
     frame.Backdrop:Hide()
     NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "ButtonFrameTemplateNoPortrait")
     frame.NineSlice:Show()
     frame.Bg:Show()
+    frame.TitleContainer.TitleText:SetFontObject("GameFontNormal")
   end,
   Opacity = function(frame, alpha)
     frame.Bg:SetAlpha(alpha / 100)
   end,
-  MenuButton = function (button)
-    local parent = button:GetParent() --[[@as PortraitContainer]]
-    button:SetWidth(40)
-    button:SetHeight(40)
-    button:SetPoint("TOPLEFT", parent.portrait, "TOPLEFT", -1, 2)
+  SectionFont = function(font)
+    font:SetFontObject("GameFontNormal")
   end
 }
 
