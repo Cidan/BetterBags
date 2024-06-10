@@ -29,9 +29,9 @@ local themeConfigFrame = {}
 function themeConfigFrame:initThemeItem(f, data)
   f:SetHeight(20)
   f:SetNormalFontObject("GameFontHighlight")
-  f:SetText(data.name)
+  f:SetText(data.theme.Name)
   f:SetScript("OnClick", function()
-    themes:ApplyTheme(data.name)
+    themes:ApplyTheme(data.theme.key)
     --[[
     data.Enabled = not data.Enabled
     if data.Enabled then
@@ -105,8 +105,8 @@ function themeConfig:Create(parent)
     tc:resetThemeItem(f, data)
   end)
 
-  for _, themeName in ipairs(themes:GetAllThemes()) do
-    tc.content:AddToStart({name = themeName})
+  for _, theme in pairs(themes:GetAllThemes()) do
+    tc.content:AddToStart({theme = theme})
   end
   return tc
 end

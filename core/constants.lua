@@ -337,6 +337,7 @@ const.DATABASE_DEFAULTS = {
     debug = false,
     inBagSearch = false,
     showKeybindWarning = true,
+    theme = 'Default',
     showFullSectionNames = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,

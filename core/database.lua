@@ -414,6 +414,16 @@ function DB:SetShowFullSectionNames(kind, value)
   DB.data.profile.showFullSectionNames[kind] = value
 end
 
+---@param key string
+function DB:SetTheme(key)
+  DB.data.profile.theme = key
+end
+
+---@return string
+function DB:GetTheme()
+  return DB.data.profile.theme
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.
