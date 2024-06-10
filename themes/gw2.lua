@@ -101,7 +101,7 @@ local gw2Theme = {
         if frame.Owner.currencyFrame:IsShown() then
           frame.Owner.currencyFrame:Hide()
         else
-          frame.Owner.currencyFrame:Show()
+          frame.Owner.windowGrouping:Show("currencyConfig")
         end
       end)
 

@@ -30,6 +30,10 @@ local simpleDark = {
     frame.Backdrop:Show()
     frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
     frame.TitleContainer:Show()
+    frame.PortraitContainer:Show()
+    frame.Owner.sideAnchor:ClearAllPoints()
+    frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT")
+    frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT")
   end,
   Simple = function(frame)
     frame.NineSlice:Hide()

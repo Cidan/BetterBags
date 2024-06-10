@@ -37,6 +37,10 @@ local defaultTheme = {
     frame.TitleContainer:Show()
     resetCloseButton(frame.CloseButton)
     frame.CloseButton:Show()
+    frame.PortraitContainer:Show()
+    frame.Owner.sideAnchor:ClearAllPoints()
+    frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT")
+    frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT")
     -- <Color r="1.0" g="0.82" b="0"/>
   end,
   Simple = function(frame)
