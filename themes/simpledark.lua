@@ -8,6 +8,8 @@ local themes = addon:GetModule('Themes')
 
 ---@type Theme
 local simpleDark = {
+  Name = 'Simple Dark',
+  Description = 'A simple dark theme.',
   Portrait = function(frame)
     frame.NineSlice:Hide()
     frame.Bg:Hide()

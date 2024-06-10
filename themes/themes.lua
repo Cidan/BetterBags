@@ -7,8 +7,10 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local const = addon:GetModule('Constants')
 
 ---@class Theme
----@field Portrait fun(frame: BetterBagsBagPortraitTemplate)
----@field Simple fun(frame: Frame)
+---@field Name string The display name used by this theme in the theme selection window.
+---@field Description string A description of the theme used by this theme in the theme selection window.
+---@field Portrait fun(frame: BetterBagsBagPortraitTemplate) A function that applies the theme to a portrait frame.
+---@field Simple fun(frame: Frame) A function that applies the theme to a simple frame.
 
 ---@class Themes: AceModule
 ---@field themes table<string, Theme>

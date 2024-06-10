@@ -70,6 +70,9 @@ local search = addon:GetModule('Search')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
+---@class ThemeConfig: AceModule
+local themeConfig = addon:GetModule('ThemeConfig')
+
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
@@ -88,6 +91,7 @@ local themes = addon:GetModule('Themes')
 ---@field recentItems Section The recent items section.
 ---@field currencyFrame CurrencyFrame The currency frame.
 ---@field sectionConfigFrame SectionConfigFrame The section config frame.
+---@field themeConfigFrame ThemeConfigFrame The theme config frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
 ---@field slots bagSlots
@@ -512,6 +516,8 @@ function bagFrame:Create(kind)
     local currencyFrame = currency:Create(b.frame)
     currencyFrame:Hide()
     b.currencyFrame = currencyFrame
+
+    b.themeConfigFrame = themeConfig:Create(b.frame)
   end
 
   b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)

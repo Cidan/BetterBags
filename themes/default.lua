@@ -8,6 +8,8 @@ local themes = addon:GetModule('Themes')
 
 ---@type Theme
 local defaultTheme = {
+  Name = 'Default',
+  Description = 'The default theme.',
   Portrait = function (frame)
     NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "HeldBagLayout")
     frame.NineSlice:Show()

@@ -16,4 +16,6 @@
   </Frame>
   <Frame name="BetterBagsSearchPanelTemplate" inherits="SimplePanelTemplate" virtual="true">
   </Frame>
+
+  <Button name="BetterBagsPlainTextListButton" virtual="true" />
 </Ui>
