@@ -136,7 +136,8 @@
     "time",
     "ItemLocation",
     "strsplittable",
-    "GetText"
+    "GetText",
+    "BACKGROUND"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

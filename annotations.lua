@@ -159,6 +159,7 @@ local SearchBox = {}
 ---@field NineSlice NineSlicePanelTemplate
 ---@field TopTileStreaks Texture
 ---@field TitleContainer TitleContainer
+---@field Owner Bag
 local BetterBagsBagPortraitTemplate = {}
 
 ---@class PortraitContainer: Frame

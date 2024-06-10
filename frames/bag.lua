@@ -367,6 +367,7 @@ function bagFrame:Create(kind)
 
   -- Setup the main frame defaults.
   b.frame = f
+  f.Owner = b
   b.frame:SetParent(UIParent)
   b.frame:SetToplevel(true)
   if b.kind == const.BAG_KIND.BACKPACK then
