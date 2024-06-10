@@ -41,6 +41,7 @@ end
 ---@param f BetterBagsPlainTextListButton
 ---@param data table
 function themeConfigFrame:resetThemeItem(f, data)
+  _ = data
   f:SetText('')
   f:SetScript("OnClick", nil)
 end

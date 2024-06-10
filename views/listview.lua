@@ -34,9 +34,6 @@ local function Wipe(view)
     section:ReleaseAllCells()
     section:Release()
   end
-  for _, item in pairs(view.itemsByBagAndSlot) do
-    --item:Release()
-  end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
 end

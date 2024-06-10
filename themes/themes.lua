@@ -13,6 +13,7 @@ local db = addon:GetModule('Database')
 ---@field key? string The key used to identify this theme. This will be set by the Themes module when registering the theme, you do not need to provide this.
 ---@field Name string The display name used by this theme in the theme selection window.
 ---@field Description string A description of the theme used by this theme in the theme selection window.
+---@field Available boolean Whether or not this theme is available to the user.
 ---@field Portrait fun(frame: BetterBagsBagPortraitTemplate) A function that applies the theme to a portrait frame.
 ---@field Simple fun(frame: Frame) A function that applies the theme to a simple frame.
 ---@field Flat fun(frame: Frame) A function that applies the theme to a flat frame.
@@ -112,7 +113,14 @@ end
 
 ---@return table<string, Theme>
 function themes:GetAllThemes()
-  return self.themes
+  ---@type table<string, Theme>
+  local list = {}
+  for key, theme in pairs(self.themes) do
+    if theme.Available then
+      list[key] = theme
+    end
+  end
+  return list
 end
 
 function themes:UpdateOpacity()

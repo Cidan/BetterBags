@@ -10,6 +10,7 @@ local themes = addon:GetModule('Themes')
 local defaultTheme = {
   Name = 'Default',
   Description = 'The default theme.',
+  Available = true,
   Portrait = function (frame)
     NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "HeldBagLayout")
     frame.Bg:SetTexture([[Interface\FrameGeneral\UI-Background-Rock]])

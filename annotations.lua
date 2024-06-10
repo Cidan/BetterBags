@@ -457,3 +457,9 @@ function WagoAnalytics:DecrementCounter(counter, amount) end
 ---@param counter string
 ---@param amount number
 function WagoAnalytics:SetCounter(counter, amount) end
+
+
+--- GuildWars2 API
+---@class GuildWars2
+GW2_ADDON = {}
+function GW2_ADDON.CreateFrameHeaderWithBody(frame, titletext, icon, details) end
