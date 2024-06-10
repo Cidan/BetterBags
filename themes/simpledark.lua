@@ -34,6 +34,8 @@ local simpleDark = {
     frame.Owner.sideAnchor:ClearAllPoints()
     frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT")
     frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT")
+    themes:resetCloseButton(frame.CloseButton)
+    frame.CloseButton:Show()
   end,
   Simple = function(frame)
     frame.NineSlice:Hide()
@@ -49,6 +51,9 @@ local simpleDark = {
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
     frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
+    frame.TitleContainer:Show()
+    themes:resetCloseButton(frame.CloseButton)
+    frame.CloseButton:Show()
   end,
   Flat = function (frame)
     frame.NineSlice:Hide()

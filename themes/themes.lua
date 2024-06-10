@@ -140,3 +140,11 @@ function themes:UpdateOpacity()
     theme.Opacity(frame, sizeInfo.opacity)
   end
 end
+
+---@param button Button
+function themes:resetCloseButton(button)
+  button:SetDisabledAtlas("RedButton-Exit-Disabled")
+  button:SetNormalAtlas("RedButton-Exit")
+  button:SetPushedAtlas("RedButton-exit-pressed")
+  button:SetHighlightAtlas("RedButton-Highlight", "ADD")
+end

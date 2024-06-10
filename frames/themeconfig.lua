@@ -79,7 +79,7 @@ end
 ---@return ThemeConfigFrame
 function themeConfig:Create(parent)
   local tc = setmetatable({}, {__index = themeConfigFrame}) --[[@as ThemeConfigFrame]]
-  tc.frame = CreateFrame("Frame", nil, parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
+  tc.frame = CreateFrame("Frame", parent:GetName().."ThemeConfig", parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
   tc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   tc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   tc.frame:SetWidth(300)

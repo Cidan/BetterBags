@@ -325,7 +325,7 @@ end
 ---@return SectionConfigFrame
 function sectionConfig:Create(kind, parent)
   local sc = setmetatable({}, { __index = sectionConfigFrame })
-  sc.frame = CreateFrame("Frame", nil, parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
+  sc.frame = CreateFrame("Frame", parent:GetName().."SectionConfig", parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)

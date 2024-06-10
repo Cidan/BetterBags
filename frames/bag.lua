@@ -368,7 +368,7 @@ function bagFrame:Create(kind)
 
   -- Setup the main frame defaults.
   b.frame = f
-  b.sideAnchor = CreateFrame("Frame", nil, b.frame)
+  b.sideAnchor = CreateFrame("Frame", f:GetName().."LeftAnchor", b.frame)
   b.sideAnchor:SetWidth(1)
   b.sideAnchor:SetPoint("TOPRIGHT", b.frame, "TOPLEFT")
   b.sideAnchor:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMLEFT")
@@ -516,6 +516,12 @@ function bagFrame:Create(kind)
   local searchBox = search:CreateBox(kind, b.frame)
   searchBox.frame:SetPoint("TOP", b.frame, "TOP", 0, -2)
   searchBox.frame:SetSize(150, 20)
+  --[[
+      searchBox.frame:SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.SEARCH_LEFT_INSET, const.OFFSETS.SEARCH_TOP_INSET)
+  searchBox.frame:SetPoint("TOPRIGHT", b.frame, "TOPRIGHT", const.OFFSETS.SEARCH_RIGHT_INSET, const.OFFSETS.SEARCH_TOP_INSET)
+  searchBox.frame:SetHeight(30)
+
+  ]]
   if database:GetInBagSearch() then
     searchBox.frame:Show()
     b.frame:SetTitle("")

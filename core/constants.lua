@@ -162,6 +162,13 @@ const.EXPANSION_TYPE = {
 }
 
 const.OFFSETS = {
+  -- The left inset for the search box.
+  SEARCH_LEFT_INSET = 46,
+  -- The right inset for the search box.
+  SEARCH_RIGHT_INSET = -46,
+  -- The top inset for the search box.
+  SEARCH_TOP_INSET = -30,
+
   -- This is the offset from the top of the bag window to the start of the
   -- content frame.
   BAG_TOP_INSET = -42,

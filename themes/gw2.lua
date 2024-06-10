@@ -143,7 +143,37 @@ local gw2Theme = {
     frame.TopTileStreaks:Hide()
     frame.PortraitContainer:Hide()
   end,
+  -- The simple panel template, i.e. left config panels.
   Simple = function(frame)
+    local decoration = decoratorFrames[frame:GetName()]
+    if not decoration then
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame)
+      decoratorFrames[frame:GetName()] = decoration
+      local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
+      table.insert(titles, font)
+      table.insert(buttons, frame.CloseButton)
+
+      decoration:SetAllPoints()
+      decoration:SetFrameStrata("BACKGROUND")
+
+      gw.CreateFrameHeaderWithBody(decoration, font, "", {})
+
+      decoration.gwHeader:ClearAllPoints()
+      decoration.gwHeader:SetPoint("BOTTOMLEFT", decoration, "TOPLEFT", 0, -25)
+      decoration.gwHeader:SetPoint("BOTTOMRIGHT", decoration, "TOPRIGHT", 0, -25)
+
+      font:ClearAllPoints()
+      font:SetPoint("BOTTOMLEFT", decoration.gwHeader, "BOTTOMLEFT", 35, 10)
+      font:SetText(frame.TitleContainer.TitleText:GetText())
+    else
+      decoration:Show()
+    end
+    frame.CloseButton:GwSkinButton(true)
+    frame.TitleContainer:Hide()
+    frame.NineSlice:Hide()
+    frame.Backdrop:Hide()
+    frame.Bg:Hide()
+    frame.TopTileStreaks:Hide()
   end,
   Flat = function(frame)
   end,
