@@ -29,6 +29,7 @@ local simpleDark = {
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
     frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
+    frame.TitleContainer:Show()
   end,
   Simple = function(frame)
     frame.NineSlice:Hide()

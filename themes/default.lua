@@ -6,6 +6,14 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@param button Button
+local function resetCloseButton(button)
+  button:SetDisabledAtlas("RedButton-Exit-Disabled")
+  button:SetNormalAtlas("RedButton-Exit")
+  button:SetPushedAtlas("RedButton-exit-pressed")
+  button:SetHighlightAtlas("RedButton-Highlight", "ADD")
+end
+
 ---@type Theme
 local defaultTheme = {
   Name = 'Default',
@@ -26,6 +34,9 @@ local defaultTheme = {
     frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
     frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
     frame.TitleContainer.TitleText:SetFontObject("GameFontNormal")
+    frame.TitleContainer:Show()
+    resetCloseButton(frame.CloseButton)
+    frame.CloseButton:Show()
     -- <Color r="1.0" g="0.82" b="0"/>
   end,
   Simple = function(frame)

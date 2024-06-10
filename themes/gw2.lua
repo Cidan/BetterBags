@@ -7,21 +7,41 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@type table<string, Frame>
+local decoratorFrames = {}
+
+---@type Button[]
+local buttons = {}
+
+---@type FontString[]
+local titles = {}
+
 ---@type Theme
 local gw2Theme = {
   Name = "Guild Wars 2",
   Description = "A theme using the GW2_UI style.",
   Available = gw ~= nil,
   Portrait = function(frame)
-    frame.Backdrop:GwStripTextures()
-    frame.Backdrop:ClearBackdrop()
-    gw.CreateFrameHeaderWithBody(frame.Backdrop, frame.TitleContainer.TitleText, "Interface/AddOns/GW2_UI/textures/bag/bagicon", {})
+    local decoration = decoratorFrames[frame:GetName()]
+    if not decoration then
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame)
+      decoration:SetAllPoints()
+      decoration:SetFrameStrata("BACKGROUND")
+      local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
+      font:SetText(frame.TitleContainer.TitleText:GetText())
+      table.insert(titles, font)
+      gw.CreateFrameHeaderWithBody(decoration, font, "Interface/AddOns/GW2_UI/textures/bag/bagicon", {})
+      table.insert(buttons, frame.CloseButton)
+      decoratorFrames[frame:GetName()] = decoration
+    else
+      decoration:Show()
+    end
     frame.CloseButton:GwSkinButton(true)
+    frame.TitleContainer:Hide()
     frame.NineSlice:Hide()
-    frame.Backdrop:Show()
+    frame.Backdrop:Hide()
     frame.Bg:Hide()
     frame.TopTileStreaks:Hide()
-    frame.PortraitContainer:Hide()
     --frame.PortraitContainer:Hide()
   end,
   Simple = function(frame)
@@ -33,18 +53,12 @@ local gw2Theme = {
   SectionFont = function(font)
   end,
   Reset = function(windows, sectionFonts)
-    for kind, frames in pairs(windows) do
-      for _, frame in ipairs(frames) do
-        if frame.Backdrop.GwStripTextures then
-          if frame.Backdrop.gwHeader then
-            frame.Backdrop.gwHeader:Hide()
-          end
-          frame.Backdrop:GwStripTextures()
-        end
-        if frame.CloseButton then
-          frame.CloseButton:GwStripTextures(nil, true)
-        end
-      end
+    for _, frame in pairs(decoratorFrames) do
+      frame:Hide()
+    end
+    for _, button in pairs(buttons) do
+      button:GwStripTextures()
+      button.isSkinned = false
     end
   end
 }
