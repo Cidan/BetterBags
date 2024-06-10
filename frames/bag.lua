@@ -76,6 +76,9 @@ local themeConfig = addon:GetModule('ThemeConfig')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class WindowGroup: AceModule
+local windowGroup = addon:GetModule('WindowGroup')
+
 -------
 --- Bag Prototype
 -------
@@ -108,6 +111,7 @@ local themes = addon:GetModule('Themes')
 ---@field views table<BagView, View>
 ---@field searchBox SearchFrame
 ---@field loaded boolean
+---@field windowGrouping WindowGrouping
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
@@ -353,7 +357,7 @@ function bagFrame:Create(kind)
   b.toRelease = {}
   b.toReleaseSections = {}
   b.kind = kind
-  local sizeInfo = database:GetBagSizeInfo(b.kind, database:GetBagView(b.kind))
+  b.windowGrouping = windowGroup:Create()
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsBagPortraitTemplate
@@ -518,9 +522,12 @@ function bagFrame:Create(kind)
     b.currencyFrame = currencyFrame
 
     b.themeConfigFrame = themeConfig:Create(b.frame)
+    b.windowGrouping:AddWindow('themeConfig', b.themeConfigFrame)
+    b.windowGrouping:AddWindow('currencyConfig', b.currencyFrame)
   end
 
   b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
+  b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)

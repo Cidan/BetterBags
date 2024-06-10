@@ -63,6 +63,7 @@ util\color.lua
 util\resize.lua
 util\sort.lua
 util\bucket.lua
+util\windowgroup.lua
 
 frames\question.lua
 frames\search.lua

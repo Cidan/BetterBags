@@ -238,6 +238,8 @@ function contextMenu:CreateContextMenu(bag)
         if bag.currencyFrame:IsShown() then
           bag.currencyFrame:Hide()
         else
+          bag.windowGrouping:Show('currencyConfig')
+          --[[
           if bag.sectionConfigFrame:IsShown() then
             bag.sectionConfigFrame:Hide(function()
               bag.currencyFrame:Show()
@@ -245,6 +247,7 @@ function contextMenu:CreateContextMenu(bag)
           else
             bag.currencyFrame:Show()
           end
+          ]]--
         end
       end
     })
@@ -260,13 +263,7 @@ function contextMenu:CreateContextMenu(bag)
       if bag.sectionConfigFrame:IsShown() then
         bag.sectionConfigFrame:Hide()
       else
-        if bag.currencyFrame and bag.currencyFrame:IsShown() then
-          bag.currencyFrame:Hide(function()
-            bag.sectionConfigFrame:Show()
-          end)
-        else
-          bag.sectionConfigFrame:Show()
-        end
+        bag.windowGrouping:Show('sectionConfig')
       end
     end
   })
@@ -282,17 +279,7 @@ function contextMenu:CreateContextMenu(bag)
         if bag.themeConfigFrame:IsShown() then
           bag.themeConfigFrame:Hide()
         else
-          if bag.currencyFrame and bag.currencyFrame:IsShown() then
-            bag.currencyFrame:Hide(function()
-              bag.themeConfigFrame:Show()
-            end)
-          elseif bag.sectionConfigFrame:IsShown() then
-            bag.sectionConfigFrame:Hide(function()
-              bag.themeConfigFrame:Show()
-            end)
-          else
-            bag.themeConfigFrame:Show()
-          end
+          bag.windowGrouping:Show('themeConfig')
         end
       end
     })
