@@ -9,6 +9,9 @@ local animations = addon:GetModule('Animations')
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:NewModule('ThemeConfig')
 
@@ -26,14 +29,17 @@ local themeConfigFrame = {}
 function themeConfigFrame:initThemeItem(f, data)
   f:SetHeight(20)
   f:SetNormalFontObject("GameFontHighlight")
-  f:SetText(data.Name)
+  f:SetText(data.name)
   f:SetScript("OnClick", function()
+    themes:ApplyTheme(data.name)
+    --[[
     data.Enabled = not data.Enabled
     if data.Enabled then
       f:SetNormalFontObject("GameFontHighlight")
     else
       f:SetNormalFontObject("GameFontDisable")
     end
+    ]]--
   end)
 end
 
@@ -44,6 +50,35 @@ function themeConfigFrame:resetThemeItem(f, data)
   f:SetScript("OnClick", nil)
 end
 
+---@param callback? fun()
+function themeConfigFrame:Show(callback)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeIn.callback = function()
+      self.fadeIn.callback = nil
+      callback()
+    end
+  end
+  self.fadeIn:Play()
+end
+
+---@param callback? fun()
+function themeConfigFrame:Hide(callback)
+  PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeOut.callback = function()
+      self.fadeOut.callback = nil
+      callback()
+    end
+  end
+  self.fadeOut:Play()
+end
+
+function themeConfigFrame:IsShown()
+  return self.frame:IsShown()
+end
+
+
 ---@param parent Frame
 ---@return ThemeConfigFrame
 function themeConfig:Create(parent)
@@ -52,7 +87,7 @@ function themeConfig:Create(parent)
   tc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   tc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   tc.frame:SetWidth(300)
-  tc.frame:SetTitle("Configure Categories")
+  tc.frame:SetTitle("Theme Configuration")
   tc.frame:SetIgnoreParentScale(true)
   tc.frame:SetScale(UIParent:GetScale())
   tc.frame:Hide()
@@ -69,5 +104,9 @@ function themeConfig:Create(parent)
     ---@cast f BetterBagsPlainTextListButton
     tc:resetThemeItem(f, data)
   end)
+
+  for _, themeName in ipairs(themes:GetAllThemes()) do
+    tc.content:AddToStart({name = themeName})
+  end
   return tc
 end

@@ -53,3 +53,12 @@ end
 function themes:RegisterWindow(kind, frame)
   table.insert(self.windows[kind], frame)
 end
+
+---@return string[]
+function themes:GetAllThemes()
+  local result = {}
+  for name, _ in pairs(self.themes) do
+    table.insert(result, name)
+  end
+  return result
+end

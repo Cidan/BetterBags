@@ -17,5 +17,9 @@
   <Frame name="BetterBagsSearchPanelTemplate" inherits="SimplePanelTemplate" virtual="true">
   </Frame>
 
-  <Button name="BetterBagsPlainTextListButton" virtual="true" />
+  <Button name="BetterBagsPlainTextListButton" virtual="true">
+      <Size>
+      <AbsDimension y="30"/>
+    </Size>
+  </Button>
 </Ui>
