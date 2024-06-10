@@ -19,6 +19,9 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
@@ -230,13 +233,15 @@ function currency:Create(parent)
   b.loaded = false
 
   ---CURRENCY_DISPLAY_UPDATE
-  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "DefaultPanelTemplate") --[[@as Frame]]
+  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
   frame:Hide()
   frame:SetParent(parent)
   frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   frame:SetWidth(260)
   frame:SetTitle("Currencies")
+
+  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, frame)
 
   b.fadeIn, b.fadeOut = animations:AttachFadeAndSlideLeft(frame)
   b.frame = frame

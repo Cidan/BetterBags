@@ -36,6 +36,9 @@ local L =  addon:GetModule('Localization')
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:GetModule('SectionItemList')
 
@@ -322,7 +325,7 @@ end
 ---@return SectionConfigFrame
 function sectionConfig:Create(kind, parent)
   local sc = setmetatable({}, { __index = sectionConfigFrame })
-  sc.frame = CreateFrame("Frame", nil, parent, "DefaultPanelTemplate") --[[@as Frame]]
+  sc.frame = CreateFrame("Frame", nil, parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
@@ -335,6 +338,7 @@ function sectionConfig:Create(kind, parent)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
 
+  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, sc.frame)
   -- Setup the create and destroy functions for items on the list.
   sc.content:SetupDataSource("BetterBagsSectionConfigListButton", function(f, data)
     ---@cast f BetterBagsSectionConfigListButton

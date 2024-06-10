@@ -30,6 +30,12 @@ local L =  addon:GetModule('Localization')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:NewModule('SectionItemList')
 
@@ -193,7 +199,7 @@ end
 ---@return SectionItemListFrame
 function sectionItemList:Create(parent)
   local sc = setmetatable({}, {__index = sectionItemListFrame})
-  sc.frame = CreateFrame("Frame", nil, parent, "DefaultPanelTemplate") --[[@as Frame]]
+  sc.frame = CreateFrame("Frame", nil, parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
@@ -204,6 +210,9 @@ function sectionItemList:Create(parent)
   sc.frame:SetScript("OnMouseDown", function()
     sc:OnReceiveDrag()
   end)
+
+  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, sc.frame)
+
   sc.fadeIn, sc.fadeOut = animations:AttachFadeAndSlideLeft(sc.frame)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()

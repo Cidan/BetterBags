@@ -10,11 +10,12 @@ local const = addon:GetModule('Constants')
 local db = addon:GetModule('Database')
 
 ---@class Theme
----@field key? string The key used to identify this theme.
+---@field key? string The key used to identify this theme. This will be set by the Themes module when registering the theme, you do not need to provide this.
 ---@field Name string The display name used by this theme in the theme selection window.
 ---@field Description string A description of the theme used by this theme in the theme selection window.
 ---@field Portrait fun(frame: BetterBagsBagPortraitTemplate) A function that applies the theme to a portrait frame.
 ---@field Simple fun(frame: Frame) A function that applies the theme to a simple frame.
+---@field Opacity fun(frame: Frame, opacity: number) A callback that is called when the user changes the opacity of the frame. You should use this to change the alpha of your backdrops.
 
 ---@class Themes: AceModule
 ---@field themes table<string, Theme>
@@ -54,6 +55,13 @@ function themes:ApplyTheme(key)
   local theme = self.themes[key]
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
     theme.Portrait(frame)
+    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
+    theme.Opacity(frame, sizeInfo.opacity)
+  end
+  for _, frame in pairs(self.windows[const.WINDOW_KIND.SIMPLE]) do
+    theme.Simple(frame)
+    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
+    theme.Opacity(frame, sizeInfo.opacity)
   end
   db:SetTheme(key)
 end
@@ -68,4 +76,16 @@ end
 ---@return table<string, Theme>
 function themes:GetAllThemes()
   return self.themes
+end
+
+function themes:UpdateOpacity()
+  local theme = self.themes[db:GetTheme()]
+  for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
+    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
+    theme.Opacity(frame, sizeInfo.opacity)
+  end
+  for _, frame in pairs(self.windows[const.WINDOW_KIND.SIMPLE]) do
+    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
+    theme.Opacity(frame, sizeInfo.opacity)
+  end
 end

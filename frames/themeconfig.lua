@@ -12,6 +12,9 @@ local list = addon:GetModule('List')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:NewModule('ThemeConfig')
 
@@ -32,14 +35,6 @@ function themeConfigFrame:initThemeItem(f, data)
   f:SetText(data.theme.Name)
   f:SetScript("OnClick", function()
     themes:ApplyTheme(data.theme.key)
-    --[[
-    data.Enabled = not data.Enabled
-    if data.Enabled then
-      f:SetNormalFontObject("GameFontHighlight")
-    else
-      f:SetNormalFontObject("GameFontDisable")
-    end
-    ]]--
   end)
 end
 
@@ -83,7 +78,7 @@ end
 ---@return ThemeConfigFrame
 function themeConfig:Create(parent)
   local tc = setmetatable({}, {__index = themeConfigFrame}) --[[@as ThemeConfigFrame]]
-  tc.frame = CreateFrame("Frame", nil, parent, "DefaultPanelTemplate") --[[@as Frame]]
+  tc.frame = CreateFrame("Frame", nil, parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
   tc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   tc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   tc.frame:SetWidth(300)
@@ -91,6 +86,8 @@ function themeConfig:Create(parent)
   tc.frame:SetIgnoreParentScale(true)
   tc.frame:SetScale(UIParent:GetScale())
   tc.frame:Hide()
+
+  themes:RegisterWindow(const.WINDOW_KIND.SIMPLE, tc.frame)
 
   tc.fadeIn, tc.fadeOut = animations:AttachFadeAndSlideLeft(tc.frame)
   tc.content = list:Create(tc.frame)

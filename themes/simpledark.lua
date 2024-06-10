@@ -13,18 +13,33 @@ local simpleDark = {
   Portrait = function(frame)
     frame.NineSlice:Hide()
     frame.Bg:Hide()
+    frame.TopTileStreaks:Hide()
     frame.Backdrop:SetBackdrop({
       bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
       edgeFile = 'Interface\\Tooltips\\UI-Tooltip-Border',
       edgeSize = 16,
       insets = {left = 4, right = 4, top = 4, bottom = 4}
     })
-    frame.Backdrop:SetBackdropColor(0, 0, 0, 0.8)
+    frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
   end,
   Simple = function(frame)
     frame.NineSlice:Hide()
+    frame.Bg:Hide()
+    frame.TopTileStreaks:Hide()
+    frame.Backdrop:SetBackdrop({
+      bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+      edgeFile = 'Interface\\Tooltips\\UI-Tooltip-Border',
+      edgeSize = 16,
+      insets = {left = 4, right = 4, top = 4, bottom = 4}
+    })
+    frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
+    frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    frame.Backdrop:Show()
+  end,
+  Opacity = function(frame, alpha)
+    frame.Backdrop:SetBackdropColor(0, 0, 0, alpha / 100)
   end
 }
 

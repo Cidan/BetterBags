@@ -157,7 +157,16 @@ local SearchBox = {}
 ---@field SearchBox SearchBox
 ---@field Backdrop BackdropTemplate
 ---@field NineSlice NineSlicePanelTemplate
+---@field TopTileStreaks Texture
 local BetterBagsBagPortraitTemplate = {}
+
+---@class BetterBagsBagDefaultPanelTemplate
+---@field Bg Texture
+---@field CloseButton Button
+---@field Backdrop BackdropTemplate
+---@field NineSlice NineSlicePanelTemplate
+---@field TopTileStreaks Texture
+local BetterBagsBagDefaultPanelTemplate = {}
 
 ---@class NineSlicePanelTemplate: Frame
 local NineSlicePanelTemplate = {}
@@ -166,6 +175,7 @@ function NineSlicePanelMixin:GetFrameLayoutTextureKit() end
 ---@class BackdropTemplate
 local BackdropTemplate = {}
 function BackdropTemplate:Show() end
+function BackdropTemplate:Hide() end
 
 function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
