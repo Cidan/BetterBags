@@ -97,11 +97,31 @@ local gw2Theme = {
         end
       end)
 
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/CollectionsMicroButton-Up", "Sort Bags", function()
+        frame.Owner:Sort()
+      end)
+
       newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/StoreMicroButton-Up", "Show Currency", function()
         if frame.Owner.currencyFrame:IsShown() then
           frame.Owner.currencyFrame:Hide()
         else
           frame.Owner.windowGrouping:Show("currencyConfig")
+        end
+      end)
+
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/QuestLogMicroButton-Up", "Show Categories", function()
+        if frame.Owner.sectionConfigFrame:IsShown() then
+          frame.Owner.sectionConfigFrame:Hide()
+        else
+          frame.Owner.windowGrouping:Show("sectionConfig")
+        end
+      end)
+
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/EJMicroButton-Up", "Show Themes", function()
+        if frame.Owner.themeConfigFrame:IsShown() then
+          frame.Owner.themeConfigFrame:Hide()
+        else
+          frame.Owner.windowGrouping:Show("themeConfig")
         end
       end)
 
