@@ -103,10 +103,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the category font info for the button depending on if it's a header or not.
   if elementData.header then
     button.Category:SetFontObject("GameFontNormal")
+    button.Category:GetFontObject():SetFont(UNIT_NAME_FONT, 12, "")
     button.Category:SetTextColor(1, .81960791349411, 0, 1)
     button.Expand:Hide()
   else
     button.Category:SetFontObject("Game12Font")
+    button.Category:GetFontObject():SetFont(UNIT_NAME_FONT, 12, "")
     button.Category:SetTextColor(1, 1, 1)
     button.Expand:SetScript("OnClick", function()
       self.itemList:ShowCategory(elementData.title)

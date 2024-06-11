@@ -31,7 +31,9 @@ local themeConfigFrame = {}
 ---@param data table
 function themeConfigFrame:initThemeItem(f, data)
   f:SetHeight(20)
-  f:SetNormalFontObject("GameFontHighlight")
+  f:SetNormalFontObject("GameFontNormal")
+  f:GetNormalFontObject():SetFont(UNIT_NAME_FONT, 12, "")
+  f:GetNormalFontObject():SetTextColor(1, 1, 1)
   f:SetText(data.theme.Name)
   f:SetScript("OnClick", function()
     themes:ApplyTheme(data.theme.key)

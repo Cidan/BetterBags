@@ -210,8 +210,10 @@ function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
 
   if header then
     item.name = item.frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    item.name:SetFont(UNIT_NAME_FONT, 12, "")
   else
     item.name = item.frame:CreateFontString(nil, "ARTWORK", "Game12Font")
+    item.name:SetFont(UNIT_NAME_FONT, 12, "")
   end
   item.name:SetPoint("LEFT", item.icon, "RIGHT", 5, 0)
 
