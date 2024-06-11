@@ -98,7 +98,7 @@ function bagFrame:Create(kind)
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsClassicBagPortrait
-  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsClassicBagPortraitTemplate")
+  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
   --Mixin(f, PortraitFrameMixin)
   -- Setup the main frame defaults.
   b.frame = f
