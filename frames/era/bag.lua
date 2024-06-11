@@ -61,6 +61,9 @@ local search = addon:GetModule('Search')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 function bagFrame.bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
@@ -99,6 +102,10 @@ function bagFrame:Create(kind)
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsClassicBagPortrait
   local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
+
+  -- Register this window with the theme system.
+  --themes:RegisterPortraitWindow(f)
+
   --Mixin(f, PortraitFrameMixin)
   -- Setup the main frame defaults.
   b.frame = f
@@ -110,6 +117,7 @@ function bagFrame:Create(kind)
   else
     b.frame:SetFrameStrata("HIGH")
   end
+  f.Owner = b
 
   -- Create a custom portrait texture.
   local portraitSize = 48
