@@ -25,7 +25,8 @@ local defaultTheme = {
     frame.PortraitContainer.CircleMask:SetPoint("BOTTOMRIGHT", frame.PortraitContainer.portrait, "BOTTOMRIGHT", -2, 4)
     frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
     frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
-    frame.TitleContainer.TitleText:SetFontObject("GameFontNormal")
+    frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+    frame.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
     frame.TitleContainer:Show()
     themes:resetCloseButton(frame.CloseButton)
     frame.CloseButton:Show()
@@ -44,7 +45,8 @@ local defaultTheme = {
     frame.NineSlice:Show()
     frame.Bg:Show()
     frame.TopTileStreaks:Show()
-    frame.TitleContainer.TitleText:SetFontObject("GameFontNormal")
+    frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+    frame.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
     frame.TitleContainer:Show()
     themes:resetCloseButton(frame.CloseButton)
     frame.CloseButton:Show()
@@ -54,13 +56,15 @@ local defaultTheme = {
     NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "ButtonFrameTemplateNoPortrait")
     frame.NineSlice:Show()
     frame.Bg:Show()
-    frame.TitleContainer.TitleText:SetFontObject("GameFontNormal")
+    frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+    frame.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
   end,
   Opacity = function(frame, alpha)
     frame.Bg:SetAlpha(alpha / 100)
   end,
   SectionFont = function(font)
-    font:SetFontObject("GameFontNormal")
+    font:SetFont(UNIT_NAME_FONT, 12, "")
+    font:SetTextColor(1, 0.82, 0)
   end,
   Reset = function(windows, sectionFonts)
   end

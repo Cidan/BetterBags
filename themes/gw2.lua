@@ -147,7 +147,7 @@ local gw2Theme = {
   Simple = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame)
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate")
       decoratorFrames[frame:GetName()] = decoration
       local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
       table.insert(titles, font)
@@ -156,14 +156,11 @@ local gw2Theme = {
       decoration:SetAllPoints()
       decoration:SetFrameStrata("BACKGROUND")
 
-      gw.CreateFrameHeaderWithBody(decoration, font, "", {})
-
-      decoration.gwHeader:ClearAllPoints()
-      decoration.gwHeader:SetPoint("BOTTOMLEFT", decoration, "TOPLEFT", 0, -25)
-      decoration.gwHeader:SetPoint("BOTTOMRIGHT", decoration, "TOPRIGHT", 0, -25)
-
+      decoration:SetBackdrop(gw.BackdropTemplates.Default)
       font:ClearAllPoints()
-      font:SetPoint("BOTTOMLEFT", decoration.gwHeader, "BOTTOMLEFT", 35, 10)
+      font:SetFont(DAMAGE_TEXT_FONT, 16, "")
+      font:SetTextColor(255 / 255, 241 / 255, 209 / 255)
+      font:SetPoint("TOP", decoration, "TOP", 0, -5)
       font:SetText(frame.TitleContainer.TitleText:GetText())
     else
       decoration:Show()
@@ -180,7 +177,8 @@ local gw2Theme = {
   Opacity = function(frame, alpha)
   end,
   SectionFont = function(font)
-    font:SetFontObject("GameFontWhite")
+    font:SetFont(UNIT_NAME_FONT, 12, "")
+    font:SetTextColor(1, 1, 1)
   end,
   Reset = function(windows, sectionFonts)
     for _, frame in pairs(decoratorFrames) do

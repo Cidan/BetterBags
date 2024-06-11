@@ -28,7 +28,8 @@ local simpleDark = {
     frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
-    frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
+    frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+    frame.TitleContainer.TitleText:SetTextColor(1, 1, 1)
     frame.TitleContainer:Show()
     frame.PortraitContainer:Show()
     frame.Owner.sideAnchor:ClearAllPoints()
@@ -50,7 +51,8 @@ local simpleDark = {
     frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
-    frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
+    frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+    frame.TitleContainer.TitleText:SetTextColor(1, 1, 1)
     frame.TitleContainer:Show()
     themes:resetCloseButton(frame.CloseButton)
     frame.CloseButton:Show()
@@ -67,13 +69,15 @@ local simpleDark = {
     frame.Backdrop:SetBackdropColor(0, 0, 0, 1)
     frame.Backdrop:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
     frame.Backdrop:Show()
-    frame.TitleContainer.TitleText:SetFontObject("GameFontWhite")
+    frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+    frame.TitleContainer.TitleText:SetTextColor(1, 1, 1)
   end,
   Opacity = function(frame, alpha)
     frame.Backdrop:SetBackdropColor(0, 0, 0, alpha / 100)
   end,
   SectionFont = function(font)
-    font:SetFontObject("GameFontWhite")
+    font:SetFont(UNIT_NAME_FONT, 12, "")
+    font:SetTextColor(1, 1, 1)
   end,
   Reset = function(windows, sectionFonts)
   end
