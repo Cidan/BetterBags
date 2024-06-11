@@ -7,6 +7,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
@@ -106,13 +109,15 @@ local gw2Theme = {
         frame.Owner:Sort()
       end)
 
-      newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/StoreMicroButton-Up", "Show Currency", function()
-        if frame.Owner.currencyFrame:IsShown() then
-          frame.Owner.currencyFrame:Hide()
-        else
-          frame.Owner.windowGrouping:Show("currencyConfig")
-        end
-      end)
+      if frame.Owner.kind == const.BAG_KIND.BACKPACK then
+        newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/StoreMicroButton-Up", "Show Currency", function()
+          if frame.Owner.currencyFrame:IsShown() then
+            frame.Owner.currencyFrame:Hide()
+          else
+            frame.Owner.windowGrouping:Show("currencyConfig")
+          end
+        end)
+      end
 
       newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/QuestLogMicroButton-Up", "Show Categories", function()
         if frame.Owner.sectionConfigFrame:IsShown() then
@@ -122,13 +127,15 @@ local gw2Theme = {
         end
       end)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/EJMicroButton-Up", "Show Themes", function()
-        if frame.Owner.themeConfigFrame:IsShown() then
-          frame.Owner.themeConfigFrame:Hide()
-        else
-          frame.Owner.windowGrouping:Show("themeConfig")
-        end
-      end)
+      if frame.Owner.kind == const.BAG_KIND.BACKPACK then
+        newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/EJMicroButton-Up", "Show Themes", function()
+          if frame.Owner.themeConfigFrame:IsShown() then
+            frame.Owner.themeConfigFrame:Hide()
+          else
+            frame.Owner.windowGrouping:Show("themeConfig")
+          end
+        end)
+      end
 
       newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/MainMenuMicroButton-Up", "Open Settings", function()
         contextMenu:Show(frame.Owner.menuList)
@@ -177,7 +184,33 @@ local gw2Theme = {
     frame.Bg:Hide()
     frame.TopTileStreaks:Hide()
   end,
-  Flat = function(_)
+  Flat = function(frame)
+    local decoration = decoratorFrames[frame:GetName()]
+    if not decoration then
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate") --[[@as DecorationFrame]]
+      decoratorFrames[frame:GetName()] = decoration
+      local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
+      table.insert(titles, font)
+      --table.insert(buttons, frame.CloseButton)
+
+      decoration:SetAllPoints()
+      decoration:SetFrameStrata("BACKGROUND")
+
+      decoration:SetBackdrop(gw.BackdropTemplates.Default)
+      font:ClearAllPoints()
+      font:SetFont(DAMAGE_TEXT_FONT, 16, "")
+      font:SetTextColor(255 / 255, 241 / 255, 209 / 255)
+      font:SetPoint("TOP", decoration, "TOP", 0, -5)
+      font:SetText(frame.TitleContainer.TitleText:GetText())
+    else
+      decoration:Show()
+    end
+    --frame.CloseButton:GwSkinButton(true)
+    frame.TitleContainer:Hide()
+    frame.NineSlice:Hide()
+    frame.Backdrop:Hide()
+    frame.Bg:Hide()
+    --frame.TopTileStreaks:Hide()
   end,
   Opacity = function(_, _)
   end,

@@ -71,6 +71,7 @@ local simpleDark = {
     frame.Backdrop:Show()
     frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
     frame.TitleContainer.TitleText:SetTextColor(1, 1, 1)
+    frame.TitleContainer:Show()
   end,
   Opacity = function(frame, alpha)
     frame.Backdrop:SetBackdropColor(0, 0, 0, alpha / 100)

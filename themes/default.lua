@@ -58,6 +58,7 @@ local defaultTheme = {
     frame.Bg:Show()
     frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
     frame.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
+    frame.TitleContainer:Show()
   end,
   Opacity = function(frame, alpha)
     frame.Bg:SetAlpha(alpha / 100)
