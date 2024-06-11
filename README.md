@@ -7,7 +7,7 @@
 [![Wago BetterBags](https://img.shields.io/badge/Wago-BetterBags-C1272D.svg?style=flat)](https://addons.wago.io/addons/betterbags/versions?stability=stable)
 
 
-<img src="https://github.com/Raenore/BetterBags/assets/172234435/3a612f24-9c26-4dbf-82bb-4154a8238817" alt="BetterBags Logo">
+<img src="https://i.imgur.com/AyITAAV.png" alt="BetterBags Logo">
 
 BetterBags is a bag replacement addon for World of Warcraft, inspired by AdiBags.  
 It has a fresh, clean look, updated to the 2024 World of Warcraft art style.
@@ -41,10 +41,10 @@ The War Within Beta (Warbank support coming soon!)
 	</tr>
 	<tr>
 		<td align="middle">
-			<a href="https://github.com/Raenore/BetterBags/assets/172234435/0151323d-541c-4807-b847-127ca4547d37" target="_blank"><img src="https://github.com/Raenore/BetterBags/assets/172234435/0151323d-541c-4807-b847-127ca4547d37" alt="Configure Categories in Retail, allows you to pin and enable (highlighted) and disable a category."></a></td>
+			<a href="https://i.imgur.com/vJmB95P.png" target="_blank"><img src="https://i.imgur.com/vJmB95P.png" alt="Configure Categories in Retail, allows you to pin and enable (highlighted) and disable a category."></a></td>
 		</td>
 		<td align="middle">	
-			<a href="https://github.com/Raenore/BetterBags/assets/172234435/859077e2-c393-4f26-8fac-db525a0657be" target="_blank"><img src="https://github.com/Raenore/BetterBags/assets/172234435/859077e2-c393-4f26-8fac-db525a0657be" alt="Extensive View options that can be fine-tuned by the user."></a></td>
+			<a href="https://i.imgur.com/COhpLdo.png" target="_blank"><img src="https://i.imgur.com/COhpLdo.png" alt="Extensive View options that can be fine-tuned by the user."></a></td>
 		</td>
 	</tr>
 	<tr>
@@ -77,7 +77,7 @@ BetterBags offers its users three powerful and distinctly different bag views, w
 A simple and clean one bag window that holds all your items.
 
 <div align="center" style="text-align:center">
-<img src="https://github.com/Raenore/BetterBags/assets/172234435/19f324fc-659b-43b1-bccc-cd2c46f5c895" alt="One Bag View in Retail.">
+<img src="https://i.imgur.com/Gu5a3x9.png" alt="One Bag View in Retail.">
 
 *One Bag View in Retail.*
 </div>
@@ -93,7 +93,7 @@ The Section Grid offers
 - Multiple stacking options for fine-tuning your own experience.
 
 <div align="center" style="text-align:center">
-<img src="https://github.com/Raenore/BetterBags/assets/172234435/e7e80038-d9ec-4f6a-ac65-da238c69731a" alt="Section Grid View in Retail.">
+<img src="https://i.imgur.com/JLlOHxR.png" alt="Section Grid View in Retail.">
 
 *Section Grid View in Retail.*
 </div>
@@ -102,7 +102,7 @@ The Section Grid offers
 The List view provides a simple scrolling list with items sorted into the same distinct categories as the Section Grid view.
 
 <div align="center" style="text-align:center">
-<img src="https://github.com/Raenore/BetterBags/assets/172234435/5a4aff43-2f04-44ff-9bcd-c47c5f356627" alt="List View in Retail.">  
+<img src="https://i.imgur.com/Q8NbPwp.png" alt="List View in Retail.">  
 
 *List View in Retail.*
 </div>
@@ -116,7 +116,7 @@ Plugins have the following options:
 - Localization module, which allows the plugin author to localize their text.
 
 <div align="center" style="text-align:center">
-<img src="https://github.com/Raenore/BetterBags/assets/172234435/b263e4ea-d6df-4c57-ba5b-5a1114e47f03" alt="Plugin System (BetterBags - Appearances) in Retail">
+<img src="https://i.imgur.com/B6KTWAJ.png" alt="Plugin System (BetterBags - Appearances) in Retail">
 
 *Plugin System (<a href="https://www.curseforge.com/wow/addons/betterbags-appearances">BetterBags - Appearances</a>) in Retail.*
 </div>
@@ -130,7 +130,7 @@ These can be further fine-tuned by:
 - Flashing new items in the stack to help the user find updated stacks more quickly.
 
 <div align="center" style="text-align:center">
-<img src="https://github.com/Raenore/BetterBags/assets/172234435/99b11142-34e7-44b9-bd3a-08630f48cfc2" alt="Recent Items in Retail">
+<img src="https://i.imgur.com/svPb2eT.gif" alt="Recent Items in Retail">
 
 *Recent Items in Retail.*
 </div>
@@ -144,7 +144,7 @@ Search allows you to find items by:
 - Category name. This will highlight all items that belong to that category even if they are currently sorted in another.
 
 <div align="center" style="text-align:center">
-<img src="https://github.com/Raenore/BetterBags/assets/172234435/a53d0562-f9f6-441c-9d30-e5db68b90078" alt="Armor Type Search in Retail.">
+<img src="https://i.imgur.com/dKNAizb.png" alt="Armor Type Search in Retail.">
 
 *Armor Type Search in Retail.*
 </div>
