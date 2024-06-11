@@ -41,7 +41,7 @@ end
 
 function themes:OnEnable()
   local theme = db:GetTheme()
-  if self.themes[theme] then
+  if self.themes[theme] and self.themes[theme].Available then
     self:ApplyTheme(theme)
   else
     self:ApplyTheme('Default')
