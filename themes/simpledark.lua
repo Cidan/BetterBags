@@ -79,7 +79,7 @@ local simpleDark = {
     font:SetFont(UNIT_NAME_FONT, 12, "")
     font:SetTextColor(1, 1, 1)
   end,
-  Reset = function(windows, sectionFonts)
+  Reset = function(_, _)
   end
 }
 

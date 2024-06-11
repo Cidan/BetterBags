@@ -66,7 +66,7 @@ local defaultTheme = {
     font:SetFont(UNIT_NAME_FONT, 12, "")
     font:SetTextColor(1, 0.82, 0)
   end,
-  Reset = function(windows, sectionFonts)
+  Reset = function(_, _)
   end
 }
 

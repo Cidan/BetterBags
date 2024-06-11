@@ -10,7 +10,7 @@ local contextMenu = addon:GetModule('ContextMenu')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@type table<string, Frame>
+---@type table<string, DecorationFrame>
 local decoratorFrames = {}
 
 ---@type Button[]
@@ -19,6 +19,11 @@ local buttons = {}
 ---@type FontString[]
 local titles = {}
 
+---@param panel DecorationFrame
+---@param texture string
+---@param tooltip string
+---@param onClick fun()
+---@return Button
 local function newPanelButton(panel, texture, tooltip, onClick)
   local button = CreateFrame("Button", nil, panel)
   button:SetSize(32, 32)
@@ -53,7 +58,7 @@ local gw2Theme = {
   Portrait = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame)
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame) --[[@as DecorationFrame]]
       decoration.panelButtons = {}
       decoratorFrames[frame:GetName()] = decoration
       local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
@@ -147,7 +152,7 @@ local gw2Theme = {
   Simple = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate")
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate") --[[@as DecorationFrame]]
       decoratorFrames[frame:GetName()] = decoration
       local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
       table.insert(titles, font)
@@ -172,15 +177,15 @@ local gw2Theme = {
     frame.Bg:Hide()
     frame.TopTileStreaks:Hide()
   end,
-  Flat = function(frame)
+  Flat = function(_)
   end,
-  Opacity = function(frame, alpha)
+  Opacity = function(_, _)
   end,
   SectionFont = function(font)
     font:SetFont(UNIT_NAME_FONT, 12, "")
     font:SetTextColor(1, 1, 1)
   end,
-  Reset = function(windows, sectionFonts)
+  Reset = function(_, _)
     for _, frame in pairs(decoratorFrames) do
       frame:Hide()
     end

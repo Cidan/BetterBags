@@ -53,6 +53,7 @@ function itemButton:HasItem() end
 function itemButton:GetBagID() end
 
 ---@class Button
+---@field isSkinned boolean
 local Button = {}
 
 function Button:RegisterForClicks(...) end
@@ -161,6 +162,8 @@ local SearchBox = {}
 ---@field TitleContainer TitleContainer
 ---@field Owner Bag
 local BetterBagsBagPortraitTemplate = {}
+---@return string
+function BetterBagsBagPortraitTemplate:GetName() end
 
 ---@class PortraitContainer: Frame
 ---@field portrait Texture
@@ -334,6 +337,8 @@ _G.EXPANSION_NAME9 = "Dragonflight"
 _G.BANK_BAG_PURCHASE = "Purchasable Bag Slot"
 _G.COSTS_LABEL = "Cost:"
 
+_G.UNIT_NAME_FONT = ""
+_G.DAMAGE_TEXT_FONT = ""
 
 ---@class AceConfig.OptionsTable
 ---@field values? table<any, any>
@@ -460,7 +465,19 @@ function WagoAnalytics:DecrementCounter(counter, amount) end
 function WagoAnalytics:SetCounter(counter, amount) end
 
 
+---@class DecorationFrame: Frame
+---@field panelButtons Button[]
+---@field gwHeader GuildWarsHeader
+
 --- GuildWars2 API
 ---@class GuildWars2
 GW2_ADDON = {}
+
+GW2_ADDON.BackdropTemplates = {}
 function GW2_ADDON.CreateFrameHeaderWithBody(frame, titletext, icon, details) end
+
+function Button:GwSkinButton(x) end
+function Button:GwStripTextures() end
+
+---@class GuildWarsHeader: Frame
+---@field windowIcon Texture
