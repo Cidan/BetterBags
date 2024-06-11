@@ -63,6 +63,7 @@ end
 ---@param text string The text to set the title to.
 function sectionProto:SetTitle(text)
   self.title:SetText(text)
+  themes:UpdateSectionFont(self.title:GetFontString())
 end
 
 function sectionProto:AddCell(id, cell)

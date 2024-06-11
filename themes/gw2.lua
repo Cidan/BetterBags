@@ -180,6 +180,7 @@ local gw2Theme = {
   Opacity = function(frame, alpha)
   end,
   SectionFont = function(font)
+    font:SetFontObject("GameFontWhite")
   end,
   Reset = function(windows, sectionFonts)
     for _, frame in pairs(decoratorFrames) do

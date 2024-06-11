@@ -141,6 +141,12 @@ function themes:UpdateOpacity()
   end
 end
 
+---@param font FontString
+function themes:UpdateSectionFont(font)
+  local theme = self.themes[db:GetTheme()]
+  theme.SectionFont(font)
+end
+
 ---@param button Button
 function themes:resetCloseButton(button)
   button:SetDisabledAtlas("RedButton-Exit-Disabled")
