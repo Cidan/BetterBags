@@ -3,7 +3,7 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class PortraitFrameTexturedBaseTemplate: PortraitFrameMixin
+---@class PortraitFrameTexturedBaseTemplate
 ---@field Bg Texture
 ---@field PortraitContainer PortraitContainer
 ---@field CloseButton Button
@@ -30,7 +30,6 @@ local defaultTheme = {
       decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "PortraitFrameTexturedBaseTemplate")
       decoration:SetAllPoints()
       decoration:SetFrameLevel(499)
-      --decoration:SetFrameStrata("BACKGROUND")
       NineSliceUtil.ApplyLayoutByName(decoration.NineSlice, "HeldBagLayout")
       Mixin(decoration, PortraitFrameMixin)
       decoration:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
@@ -41,7 +40,7 @@ local defaultTheme = {
       decoration.NineSlice:SetFrameLevel(1000)
       decoration.PortraitContainer:SetFrameLevel(900)
 
-      themes.SetupBagButton(frame.Owner, decoration)
+      themes.SetupBagButton(frame.Owner, decoration --[[@as Frame]])
       decoratorFrames[frame:GetName()] = decoration
     else
       decoration:Show()
