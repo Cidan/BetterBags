@@ -64,20 +64,6 @@ local defaultTheme = {
     else
       decoration:Show()
     end
-    --inherits="DefaultPanelTemplate"
-    --frame.Backdrop:Hide()
-    --NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "ButtonFrameTemplateNoPortrait")
-    --frame.Bg:SetTexture([[Interface\FrameGeneral\UI-Background-Rock]])
-    --frame.Bg:SetHorizTile(true)
-    --frame.Bg:SetVertTile(true)
-    --frame.NineSlice:Show()
-    --frame.Bg:Show()
-    --frame.TopTileStreaks:Show()
-    --frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
-    --frame.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
-    --frame.TitleContainer:Show()
-    --themes:resetCloseButton(frame.CloseButton)
-    --frame.CloseButton:Show()
   end,
   Flat = function(frame)
     --frame.Backdrop:Hide()
@@ -89,7 +75,10 @@ local defaultTheme = {
     --frame.TitleContainer:Show()
   end,
   Opacity = function(frame, alpha)
-    --frame.Bg:SetAlpha(alpha / 100)
+    local decoration = decoratorFrames[frame:GetName()]
+    if decoration then
+      decoration.Bg:SetAlpha(alpha / 100)
+    end
   end,
   SectionFont = function(font)
     font:SetFont(UNIT_NAME_FONT, 12, "")
