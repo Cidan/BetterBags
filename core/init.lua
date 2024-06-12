@@ -228,6 +228,8 @@ function addon:OnEnable()
   -- Apply themes globally -- do not instantiate new windows after this call.
   themes:Enable()
 
+  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
+
   table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
   table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
 

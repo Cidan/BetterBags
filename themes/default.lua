@@ -34,8 +34,14 @@ local defaultTheme = {
       Mixin(decoration, PortraitFrameMixin)
       decoration:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
       decoration:SetPortraitTextureSizeAndOffset(38, -5, 0)
+      decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+      decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
+      decoration.TitleContainer:SetFrameLevel(1001)
       decoration.NineSlice:SetFrameLevel(1000)
       decoration.PortraitContainer:SetFrameLevel(900)
+
+      themes.SetupBagButton(frame.Owner, decoration)
+      decoratorFrames[frame:GetName()] = decoration
     else
       decoration:Show()
     end
@@ -74,6 +80,12 @@ local defaultTheme = {
     font:SetTextColor(1, 0.82, 0)
   end,
   Reset = function()
+  end,
+  SetTitle = function(frame, title)
+    local decoration = decoratorFrames[frame:GetName()]
+    if decoration then
+      decoration:SetTitle(title)
+    end
   end
 }
 
