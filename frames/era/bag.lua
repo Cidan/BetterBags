@@ -104,7 +104,7 @@ function bagFrame:Create(kind)
   local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
 
   -- Register this window with the theme system.
-  --themes:RegisterPortraitWindow(f)
+  themes:RegisterPortraitWindow(f)
 
   --Mixin(f, PortraitFrameMixin)
   -- Setup the main frame defaults.
@@ -131,9 +131,16 @@ function bagFrame:Create(kind)
 
   b.frame:Hide()
   b.frame:SetSize(200, 200)
-  ButtonFrameTemplate_HidePortrait(b.frame)
-  ButtonFrameTemplate_HideButtonBar(b.frame)
-  b.frame.Inset:Hide()
+  b.frame.CloseButton = b.frame.DefaultDecoration.CloseButton
+  b.frame.PortraitFrame = b.frame.DefaultDecoration.PortraitFrame
+  b.frame.TitleContainer = b.frame.DefaultDecoration.TitleContainer
+  b.frame.Bg = b.frame.DefaultDecoration.Bg
+  ButtonFrameTemplate_HidePortrait(b.frame.DefaultDecoration)
+  ButtonFrameTemplate_HideButtonBar(b.frame.DefaultDecoration)
+  b.frame.DefaultDecoration.Inset:Hide()
+  b.frame.SetTitle = function(_, title)
+    b.frame.DefaultDecoration:SetTitle(title)
+  end
   b.frame:SetTitle(L:G(kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
   b.frame.CloseButton:SetScript("OnClick", function()
     b:Hide()

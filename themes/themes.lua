@@ -154,3 +154,43 @@ function themes:resetCloseButton(button)
   button:SetPushedAtlas("RedButton-exit-pressed")
   button:SetHighlightAtlas("RedButton-Highlight", "ADD")
 end
+
+---@param frame BetterBagsBagPortraitTemplate
+local function showClassicDefault(frame)
+  frame.DefaultDecoration:Show()
+end
+
+---@param frame BetterBagsBagPortraitTemplate
+local function showRetailDefault(frame)
+  NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "HeldBagLayout")
+  frame.Bg:SetTexture([[Interface\FrameGeneral\UI-Background-Rock]])
+  frame.Bg:SetHorizTile(true)
+  frame.Bg:SetVertTile(true)
+  frame.NineSlice:Show()
+  frame.Bg:Show()
+  frame.TopTileStreaks:Show()
+  frame.Backdrop:Hide()
+  frame.PortraitContainer.CircleMask:SetTexture([[Interface\CharacterFrame\TempPortraitAlphaMask]])
+  frame.PortraitContainer.CircleMask:SetPoint("TOPLEFT", frame.PortraitContainer.portrait, "TOPLEFT", 2, 0)
+  frame.PortraitContainer.CircleMask:SetPoint("BOTTOMRIGHT", frame.PortraitContainer.portrait, "BOTTOMRIGHT", -2, 4)
+  frame:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
+  frame:SetPortraitTextureSizeAndOffset(38, -5, 0)
+  frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+  frame.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
+  frame.TitleContainer:Show()
+  themes:resetCloseButton(frame.CloseButton)
+  frame.CloseButton:Show()
+  frame.PortraitContainer:Show()
+  frame.Owner.sideAnchor:ClearAllPoints()
+  frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT")
+  frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT")
+end
+
+---@param frame BetterBagsBagPortraitTemplate
+function themes.ShowDefaultDecoration(frame)
+  if addon.isRetail then
+    showRetailDefault(frame)
+  else
+    showClassicDefault(frame)
+  end
+end

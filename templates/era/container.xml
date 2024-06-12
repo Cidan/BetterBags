@@ -1,8 +1,10 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
 
-  <Frame name="BetterBagsBagPortraitTemplate" virtual="true" inherits="ButtonFrameTemplate">
-    <Size x="256" y="256"/>
+  <Frame name="BetterBagsBagPortraitTemplate" virtual="true">
+		<Frames>
+			<Frame name="$parentDefault" frameStrata="BACKGROUND" parentKey="DefaultDecoration" inherits="ButtonFrameTemplate" setAllPoints="true"/>
+		</Frames>
   </Frame>
   <Frame name="BetterBagsBagDefaultPanelTemplate" inherits="DefaultPanelTemplate" virtual="true">
     <Frames>

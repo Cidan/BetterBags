@@ -151,7 +151,14 @@ function LibUIDropDownMenu:HideDropDownMenu(level) end
 ---@field Instructions FontString
 local SearchBox = {}
 
+---@class ButtonFrameTemplate: Frame
+---@field Bg Texture
+---@field PortraitContainer PortraitContainer
+---@field CloseButton Button
+---@field TitleContainer TitleContainer
+
 ---@class BetterBagsBagPortraitTemplate
+---@field DefaultDecoration ButtonFrameTemplate
 ---@field Bg Texture
 ---@field PortraitContainer PortraitContainer
 ---@field CloseButton Button
