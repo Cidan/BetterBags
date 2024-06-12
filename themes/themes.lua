@@ -183,7 +183,6 @@ function themes.SetupBagButton(bag, decoration)
 
   local bagButton = CreateFrame("Button", nil, decoration)
   bagButton:EnableMouse(true)
-  bagButton:SetHighlightTexture([[Interface\AddOns\BetterBags\Textures\glow.png]])
   bagButton:SetWidth(40)
   bagButton:SetHeight(40)
   bagButton:SetPoint("TOPLEFT", decoration.PortraitContainer.portrait, "TOPLEFT", -1, 2)
