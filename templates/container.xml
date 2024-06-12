@@ -6,12 +6,6 @@
   </Frame>
 
   <Frame name="BetterBagsBagDefaultPanelTemplate" virtual="true">
-  <!--
-    <Frames>
-      <Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButtonDefaultAnchors"/>
-      <Frame name="$parentBackdrop" parentKey="Backdrop" inherits="BackdropTemplate" mixin="BackdropTemplateMixin" frameStrata="BACKGROUND" setAllPoints="true"/>
-    </Frames>
-    -->
   </Frame>
 
   <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
