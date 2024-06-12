@@ -29,6 +29,7 @@ local db = addon:GetModule('Database')
 ---@field themes table<string, Theme>
 ---@field windows table<WindowKind, Frame[]>
 ---@field sectionFonts table<string, FontString>
+---@field titles table<string, string>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -41,6 +42,7 @@ function themes:OnInitialize()
     [const.WINDOW_KIND.FLAT] = {}
   }
   self.sectionFonts = {}
+  self.titles = {}
 end
 
 function themes:OnEnable()
@@ -108,8 +110,10 @@ end
 
 -- RegisterSimpleWindow is used to register a protrait window frame to be themed by themes.
 ---@param frame Frame
-function themes:RegisterSimpleWindow(frame)
+---@param title string
+function themes:RegisterSimpleWindow(frame, title)
   table.insert(self.windows[const.WINDOW_KIND.SIMPLE], frame)
+  self.titles[frame:GetName()] = title
 end
 
 -- RegisterFlatWindow is used to register a protrait window frame to be themed by themes.

@@ -22,6 +22,9 @@ local debug = addon:GetModule('Debug')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
@@ -242,9 +245,8 @@ function currency:Create(parent, iconParent)
   frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   frame:SetWidth(260)
-  frame:SetTitle("Currencies")
 
-  themes:RegisterSimpleWindow(frame)
+  themes:RegisterSimpleWindow(frame, L:G("Currencies"))
 
   b.fadeIn, b.fadeOut = animations:AttachFadeAndSlideLeft(frame)
   b.frame = frame

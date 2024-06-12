@@ -15,6 +15,9 @@ local themes = addon:GetModule('Themes')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:NewModule('ThemeConfig')
 
@@ -85,12 +88,11 @@ function themeConfig:Create(parent)
   tc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   tc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   tc.frame:SetWidth(300)
-  tc.frame:SetTitle("Theme Configuration")
   tc.frame:SetIgnoreParentScale(true)
   tc.frame:SetScale(UIParent:GetScale())
   tc.frame:Hide()
 
-  themes:RegisterSimpleWindow(tc.frame)
+  themes:RegisterSimpleWindow(tc.frame, L:G("Theme Configuraiton"))
 
   tc.fadeIn, tc.fadeOut = animations:AttachFadeAndSlideLeft(tc.frame)
   tc.content = list:Create(tc.frame)

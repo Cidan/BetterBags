@@ -331,7 +331,6 @@ function sectionConfig:Create(kind, parent)
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
-  sc.frame:SetTitle("Configure Categories")
   sc.frame:SetIgnoreParentScale(true)
   sc.frame:SetScale(UIParent:GetScale())
   sc.frame:Hide()
@@ -340,7 +339,7 @@ function sectionConfig:Create(kind, parent)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
 
-  themes:RegisterSimpleWindow(sc.frame)
+  themes:RegisterSimpleWindow(sc.frame, L:G("Configure Categories"))
   -- Setup the create and destroy functions for items on the list.
   sc.content:SetupDataSource("BetterBagsSectionConfigListButton", function(f, data)
     ---@cast f BetterBagsSectionConfigListButton
