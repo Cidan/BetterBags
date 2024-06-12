@@ -8,10 +8,7 @@
   <Frame name="BetterBagsBagDefaultPanelTemplate" virtual="true">
   </Frame>
 
-  <Frame name="BetterBagsBagSlotPanelTemplate" inherits="DefaultPanelFlatTemplate" virtual="true">
-    <Frames>
-      <Frame name="$parentBackdrop" parentKey="Backdrop" inherits="BackdropTemplate" mixin="BackdropTemplateMixin" frameStrata="BACKGROUND" setAllPoints="true"/>
-    </Frames>
+  <Frame name="BetterBagsBagSlotPanelTemplate" virtual="true">
   </Frame>
   <Frame name="BetterBagsSearchPanelTemplate" inherits="SimplePanelTemplate" virtual="true">
   </Frame>

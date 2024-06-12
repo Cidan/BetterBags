@@ -13,7 +13,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field TopTileStreaks Texture
 ---@field TitleContainer TitleContainer
 
----@type table<string, Frame|PortraitFrameTexturedBaseTemplate|DefaultPanelTemplate>
+---@type table<string, Frame|PortraitFrameTexturedBaseTemplate|DefaultPanelTemplate|DefaultPanelFlatTemplate>
 local decoratorFrames = {}
 
 ---@class Themes: AceModule
@@ -46,7 +46,6 @@ local defaultTheme = {
     else
       decoration:Show()
     end
-    --themes.ShowDefaultDecoration(frame)
   end,
   Simple = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
@@ -66,6 +65,17 @@ local defaultTheme = {
     end
   end,
   Flat = function(frame)
+    local decoration = decoratorFrames[frame:GetName()]
+    if not decoration then
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelFlatTemplate")
+      decoration:SetAllPoints()
+      if themes.titles[frame:GetName()] then
+        decoration:SetTitle(themes.titles[frame:GetName()])
+      end
+      decoratorFrames[frame:GetName()] = decoration
+    else
+      decoration:Show()
+    end
     --frame.Backdrop:Hide()
     --NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "ButtonFrameTemplateNoPortrait")
     --frame.NineSlice:Show()

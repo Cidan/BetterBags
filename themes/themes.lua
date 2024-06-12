@@ -118,8 +118,10 @@ end
 
 -- RegisterFlatWindow is used to register a protrait window frame to be themed by themes.
 ---@param frame Frame
-function themes:RegisterFlatWindow(frame)
+---@param title string
+function themes:RegisterFlatWindow(frame, title)
   table.insert(self.windows[const.WINDOW_KIND.FLAT], frame)
+  self.titles[frame:GetName()] = title
 end
 
 -- RegisterSectionFont is used to register a font to be used in the section headers.

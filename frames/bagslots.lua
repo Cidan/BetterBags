@@ -103,9 +103,8 @@ function BagSlots:CreatePanel(kind)
   local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BetterBagsBagSlotPanelTemplate")
   b.frame = f
 
-  themes:RegisterFlatWindow(f)
+  themes:RegisterFlatWindow(f, L:G("Equipped Bags"))
 
-  b.frame:SetTitle(L:G("Equipped Bags"))
   b.content = grid:Create(b.frame)
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
