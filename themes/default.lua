@@ -29,7 +29,8 @@ local defaultTheme = {
     if not decoration then
       decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "PortraitFrameTexturedBaseTemplate")
       decoration:SetAllPoints()
-      decoration:SetFrameStrata("BACKGROUND")
+      decoration:SetFrameLevel(499)
+      --decoration:SetFrameStrata("BACKGROUND")
       NineSliceUtil.ApplyLayoutByName(decoration.NineSlice, "HeldBagLayout")
       Mixin(decoration, PortraitFrameMixin)
       decoration:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])

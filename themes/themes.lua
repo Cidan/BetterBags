@@ -221,7 +221,6 @@ function themes.SetupBagButton(bag, decoration)
   bagButton:SetWidth(40)
   bagButton:SetHeight(40)
   bagButton:SetPoint("TOPLEFT", decoration.PortraitContainer.portrait, "TOPLEFT", -1, 2)
-  bagButton:SetFrameStrata("BACKGROUND")
   bagButton:SetFrameLevel(950)
 
   local highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
