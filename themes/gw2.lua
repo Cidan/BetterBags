@@ -218,7 +218,7 @@ local gw2Theme = {
     font:SetFont(UNIT_NAME_FONT, 12, "")
     font:SetTextColor(1, 1, 1)
   end,
-  Reset = function(_, _)
+  Reset = function()
     for _, frame in pairs(decoratorFrames) do
       frame:Hide()
     end

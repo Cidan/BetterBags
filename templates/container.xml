@@ -2,7 +2,8 @@
 ..\FrameXML\UI.xsd">
 
   <!-- The default bag template. -->
-  <Frame name="BetterBagsBagPortraitTemplate" inherits="PortraitFrameTexturedBaseTemplate" mixin="PortraitFrameMixin" virtual="true">
+  <Frame name="BetterBagsBagPortraitTemplate" virtual="true">
+  <!--
     <KeyValues>
 		  <KeyValue key="layoutType" value="HeldBagLayout" type="string"/>
     </KeyValues>
@@ -10,6 +11,7 @@
       <Button name="$parentCloseButton" parentKey="CloseButton" inherits="UIPanelCloseButtonDefaultAnchors"/>
       <Frame name="$parentBackdrop" parentKey="Backdrop" inherits="BackdropTemplate" mixin="BackdropTemplateMixin" frameStrata="BACKGROUND" setAllPoints="true"/>
     </Frames>
+    -->
   </Frame>
 
   <Frame name="BetterBagsBagDefaultPanelTemplate" inherits="DefaultPanelTemplate" virtual="true">

@@ -19,7 +19,7 @@ local db = addon:GetModule('Database')
 ---@field Flat fun(frame: Frame) A function that applies the theme to a flat frame.
 ---@field Opacity fun(frame: Frame, opacity: number) A callback that is called when the user changes the opacity of the frame. You should use this to change the alpha of your backdrops.
 ---@field SectionFont fun(font: FontString) A function that applies the theme to a section font.
----@field Reset fun(windows: table<WindowKind, Frame[]>, sectionFonts: table<string, FontString>) A function that resets the theme to its default state and removes any special styling.
+---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
 ---@field themes table<string, Theme>
@@ -62,7 +62,9 @@ function themes:ApplyTheme(key)
 
   -- Reset the old theme.
   local oldTheme = db:GetTheme()
-  self.themes[oldTheme].Reset(self.windows, self.sectionFonts)
+  if self.themes[oldTheme] then
+    self.themes[oldTheme].Reset()
+  end
 
   local theme = self.themes[key]
 

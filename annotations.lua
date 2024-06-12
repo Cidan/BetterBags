@@ -158,7 +158,6 @@ local SearchBox = {}
 ---@field TitleContainer TitleContainer
 
 ---@class BetterBagsBagPortraitTemplate
----@field DefaultDecoration ButtonFrameTemplate
 ---@field Bg Texture
 ---@field PortraitContainer PortraitContainer
 ---@field CloseButton Button
