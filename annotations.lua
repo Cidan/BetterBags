@@ -472,8 +472,6 @@ function WagoAnalytics:SetCounter(counter, amount) end
 
 
 ---@class DecorationFrame: Frame
----@field panelButtons Button[]
----@field gwHeader GuildWarsHeader
 
 --- GuildWars2 API
 ---@class GuildWars2

@@ -6,7 +6,10 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@type table<string, Frame|any>
+---@class SimpleDarkDecoration: Frame
+---@field title FontString
+
+---@type table<string, SimpleDarkDecoration>
 local decoratorFrames = {}
 
 ---@type Theme
@@ -18,7 +21,7 @@ local simpleDark = {
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
       -- Backdrop
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate")
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate") --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration:SetBackdrop({
@@ -59,7 +62,7 @@ local simpleDark = {
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
       -- Backdrop
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate")
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate") --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration:SetBackdrop({
@@ -98,7 +101,7 @@ local simpleDark = {
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
       -- Backdrop
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate")
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate") --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration:SetBackdrop({

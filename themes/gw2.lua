@@ -13,16 +13,15 @@ local const = addon:GetModule('Constants')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@type table<string, DecorationFrame>
+---@class GuildWarsDecoration: Frame
+---@field panelButtons Button[]
+---@field gwHeader GuildWarsHeader
+---@field title FontString
+
+---@type table<string, GuildWarsDecoration>
 local decoratorFrames = {}
 
----@type Button[]
-local buttons = {}
-
----@type FontString[]
-local titles = {}
-
----@param panel DecorationFrame
+---@param panel GuildWarsDecoration
 ---@param texture string
 ---@param tooltip string
 ---@param onClick fun()
@@ -61,16 +60,14 @@ local gw2Theme = {
   Portrait = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame) --[[@as DecorationFrame]]
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame) --[[@as GuildWarsDecoration]]
       decoration.panelButtons = {}
-      local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
-      table.insert(titles, font)
-      table.insert(buttons, frame.CloseButton)
+      decoration.title = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
 
       decoration:SetAllPoints()
       decoration:SetFrameStrata("BACKGROUND")
 
-      gw.CreateFrameHeaderWithBody(decoration, font, "Interface/AddOns/GW2_UI/textures/bag/bagicon", {})
+      gw.CreateFrameHeaderWithBody(decoration, decoration.title, "Interface/AddOns/GW2_UI/textures/bag/bagicon", {})
 
       decoration.gwHeader:ClearAllPoints()
       decoration.gwHeader:SetPoint("BOTTOMLEFT", decoration, "TOPLEFT", 0, -25)
@@ -79,9 +76,16 @@ local gw2Theme = {
       decoration.gwHeader.windowIcon:ClearAllPoints()
       decoration.gwHeader.windowIcon:SetPoint("CENTER", decoration, "TOPLEFT", -16, 0)
 
-      font:ClearAllPoints()
-      font:SetPoint("BOTTOMLEFT", decoration.gwHeader, "BOTTOMLEFT", 35, 10)
-      --font:SetText(frame.TitleContainer.TitleText:GetText())
+      decoration.title:ClearAllPoints()
+      decoration.title:SetPoint("BOTTOMLEFT", decoration.gwHeader, "BOTTOMLEFT", 35, 10)
+      decoration.title:SetText(themes.titles[frame:GetName()])
+
+      local close = CreateFrame("Button", nil, decoration.gwHeader, "UIPanelCloseButtonNoScripts")
+      close:SetPoint("TOPRIGHT", decoration.gwHeader, "TOPRIGHT", -5, -25)
+      close:SetScript("OnClick", function()
+        frame.Owner:Hide()
+      end)
+      close:GwSkinButton(true)
 
       local footer = decoration:CreateTexture(decoration:GetName().."Footer", "BACKGROUND", nil, 7)
       footer:SetTexture("Interface/AddOns/GW2_UI/textures/bag/bagfooter")
@@ -146,75 +150,55 @@ local gw2Theme = {
     frame.Owner.sideAnchor:ClearAllPoints()
     frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", -35, 0)
     frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", -35, 0)
-    --[[
-    frame.CloseButton:GwSkinButton(true)
-    frame.TitleContainer:Hide()
-    frame.NineSlice:Hide()
-    frame.Backdrop:Hide()
-    frame.Bg:Hide()
-    frame.TopTileStreaks:Hide()
-    frame.PortraitContainer:Hide()
-    --]]
     decoratorFrames[frame:GetName()] = decoration
   end,
   -- The simple panel template, i.e. left config panels.
   Simple = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate") --[[@as DecorationFrame]]
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate") --[[@as GuildWarsDecoration]]
       decoratorFrames[frame:GetName()] = decoration
-      local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
-      table.insert(titles, font)
-      table.insert(buttons, frame.CloseButton)
+      decoration.title = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
 
       decoration:SetAllPoints()
       decoration:SetFrameStrata("BACKGROUND")
 
       decoration:SetBackdrop(gw.BackdropTemplates.Default)
-      font:ClearAllPoints()
-      font:SetFont(DAMAGE_TEXT_FONT, 16, "")
-      font:SetTextColor(255 / 255, 241 / 255, 209 / 255)
-      font:SetPoint("TOP", decoration, "TOP", 0, -5)
-      --font:SetText(frame.TitleContainer.TitleText:GetText())
+      decoration.title:ClearAllPoints()
+      decoration.title:SetFont(DAMAGE_TEXT_FONT, 16, "")
+      decoration.title:SetTextColor(255 / 255, 241 / 255, 209 / 255)
+      decoration.title:SetPoint("TOP", decoration, "TOP", 0, -5)
+      decoration.title:SetText(themes.titles[frame:GetName()])
+
+      local close = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonNoScripts")
+      close:SetPoint("TOPRIGHT", decoration.gwHeader, "TOPRIGHT", -5, -25)
+      close:SetScript("OnClick", function()
+        frame.Owner:Hide()
+      end)
+      close:GwSkinButton(true)
     else
       decoration:Show()
     end
-    --[[
-    frame.CloseButton:GwSkinButton(true)
-    frame.TitleContainer:Hide()
-    frame.NineSlice:Hide()
-    frame.Backdrop:Hide()
-    frame.Bg:Hide()
-    frame.TopTileStreaks:Hide()
-    ]]--
   end,
   Flat = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate") --[[@as DecorationFrame]]
+      decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame, "BackdropTemplate") --[[@as GuildWarsDecoration]]
       decoratorFrames[frame:GetName()] = decoration
-      local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
-      table.insert(titles, font)
-      --table.insert(buttons, frame.CloseButton)
+      decoration.title = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
 
       decoration:SetAllPoints()
       decoration:SetFrameStrata("BACKGROUND")
 
       decoration:SetBackdrop(gw.BackdropTemplates.Default)
-      font:ClearAllPoints()
-      font:SetFont(DAMAGE_TEXT_FONT, 16, "")
-      font:SetTextColor(255 / 255, 241 / 255, 209 / 255)
-      font:SetPoint("TOP", decoration, "TOP", 0, -5)
-      --font:SetText(frame.TitleContainer.TitleText:GetText())
+      decoration.title:ClearAllPoints()
+      decoration.title:SetFont(DAMAGE_TEXT_FONT, 16, "")
+      decoration.title:SetTextColor(255 / 255, 241 / 255, 209 / 255)
+      decoration.title:SetPoint("TOP", decoration, "TOP", 0, -5)
+      decoration.title:SetText(themes.titles[frame:GetName()])
     else
       decoration:Show()
     end
-    --frame.CloseButton:GwSkinButton(true)
-    --frame.TitleContainer:Hide()
-    --frame.NineSlice:Hide()
-    --frame.Backdrop:Hide()
-    --frame.Bg:Hide()
-    --frame.TopTileStreaks:Hide()
   end,
   Opacity = function(_, _)
   end,
@@ -225,7 +209,7 @@ local gw2Theme = {
   SetTitle = function(frame, title)
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
-      --decoration.gwHeader.TitleText:SetText(title)
+      decoration.title:SetText(title)
     end
   end,
   Reset = function()

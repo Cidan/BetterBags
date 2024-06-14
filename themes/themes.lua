@@ -173,6 +173,7 @@ end
 function themes:SetTitle(frame, title)
   local theme = self.themes[db:GetTheme()]
   theme.SetTitle(frame, title)
+  self.titles[frame:GetName()] = title
 end
 
 ---@param bag Bag
