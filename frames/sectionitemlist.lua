@@ -166,7 +166,7 @@ function sectionItemListFrame:ShowCategory(category, redraw)
     return
   end
 
-  self.frame:SetTitle(category)
+  themes:SetTitle(self.frame, category)
   self.currentCategory = category
 
   local itemDataList = categories:GetMergedCategory(category)

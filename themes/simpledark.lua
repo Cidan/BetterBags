@@ -85,7 +85,7 @@ local simpleDark = {
       local close = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonNoScripts")
       close:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", 1, 0)
       close:SetScript("OnClick", function()
-        frame.Owner:Hide()
+        frame:Hide()
       end)
 
       if themes.titles[frame:GetName()] then
