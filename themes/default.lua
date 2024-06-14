@@ -27,20 +27,15 @@ local defaultTheme = {
   Portrait = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "PortraitFrameTexturedBaseTemplate")
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelTemplate")
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      NineSliceUtil.ApplyLayoutByName(decoration.NineSlice, "HeldBagLayout")
-      Mixin(decoration, PortraitFrameMixin)
-      decoration:SetPortraitToAsset([[Interface\Icons\INV_Misc_Bag_07]])
-      decoration:SetPortraitTextureSizeAndOffset(38, -5, 0)
       decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
       decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
-      decoration.CloseButton = CreateFrame("Button", nil, frame, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
+      decoration.CloseButton = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
       decoration.CloseButton:SetFrameLevel(1001)
       decoration.TitleContainer:SetFrameLevel(1001)
       decoration.NineSlice:SetFrameLevel(1000)
-      decoration.PortraitContainer:SetFrameLevel(900)
       themes.SetupBagButton(frame.Owner, decoration --[[@as Frame]])
       decoratorFrames[frame:GetName()] = decoration
     else
@@ -69,6 +64,8 @@ local defaultTheme = {
     if not decoration then
       decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelFlatTemplate")
       decoration:SetAllPoints()
+      decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
+      decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
       if themes.titles[frame:GetName()] then
         decoration:SetTitle(themes.titles[frame:GetName()])
       end
@@ -76,13 +73,6 @@ local defaultTheme = {
     else
       decoration:Show()
     end
-    --frame.Backdrop:Hide()
-    --NineSliceUtil.ApplyLayoutByName(frame.NineSlice, "ButtonFrameTemplateNoPortrait")
-    --frame.NineSlice:Show()
-    --frame.Bg:Show()
-    --frame.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
-    --frame.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
-    --frame.TitleContainer:Show()
   end,
   Opacity = function(frame, alpha)
     local decoration = decoratorFrames[frame:GetName()]

@@ -189,6 +189,7 @@ function bagFrame:Create(kind)
   highlightTex:SetPoint("CENTER", portrait, "CENTER", 2, 0)
   highlightTex:SetAlpha(0)
   highlightTex:SetDrawLayer("OVERLAY", 7)
+
   local anig = highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
   local ani = anig:CreateAnimation("Alpha")
   ani:SetFromAlpha(0)
