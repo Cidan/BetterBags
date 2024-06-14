@@ -63,7 +63,6 @@ local gw2Theme = {
     if not decoration then
       decoration = CreateFrame("Frame", frame:GetName() .. "GW2", frame) --[[@as DecorationFrame]]
       decoration.panelButtons = {}
-      decoratorFrames[frame:GetName()] = decoration
       local font = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
       table.insert(titles, font)
       table.insert(buttons, frame.CloseButton)
@@ -82,7 +81,7 @@ local gw2Theme = {
 
       font:ClearAllPoints()
       font:SetPoint("BOTTOMLEFT", decoration.gwHeader, "BOTTOMLEFT", 35, 10)
-      font:SetText(frame.TitleContainer.TitleText:GetText())
+      --font:SetText(frame.TitleContainer.TitleText:GetText())
 
       local footer = decoration:CreateTexture(decoration:GetName().."Footer", "BACKGROUND", nil, 7)
       footer:SetTexture("Interface/AddOns/GW2_UI/textures/bag/bagfooter")
@@ -147,6 +146,7 @@ local gw2Theme = {
     frame.Owner.sideAnchor:ClearAllPoints()
     frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", -35, 0)
     frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", -35, 0)
+    --[[
     frame.CloseButton:GwSkinButton(true)
     frame.TitleContainer:Hide()
     frame.NineSlice:Hide()
@@ -154,6 +154,8 @@ local gw2Theme = {
     frame.Bg:Hide()
     frame.TopTileStreaks:Hide()
     frame.PortraitContainer:Hide()
+    --]]
+    decoratorFrames[frame:GetName()] = decoration
   end,
   -- The simple panel template, i.e. left config panels.
   Simple = function(frame)
@@ -173,16 +175,18 @@ local gw2Theme = {
       font:SetFont(DAMAGE_TEXT_FONT, 16, "")
       font:SetTextColor(255 / 255, 241 / 255, 209 / 255)
       font:SetPoint("TOP", decoration, "TOP", 0, -5)
-      font:SetText(frame.TitleContainer.TitleText:GetText())
+      --font:SetText(frame.TitleContainer.TitleText:GetText())
     else
       decoration:Show()
     end
+    --[[
     frame.CloseButton:GwSkinButton(true)
     frame.TitleContainer:Hide()
     frame.NineSlice:Hide()
     frame.Backdrop:Hide()
     frame.Bg:Hide()
     frame.TopTileStreaks:Hide()
+    ]]--
   end,
   Flat = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
@@ -201,15 +205,15 @@ local gw2Theme = {
       font:SetFont(DAMAGE_TEXT_FONT, 16, "")
       font:SetTextColor(255 / 255, 241 / 255, 209 / 255)
       font:SetPoint("TOP", decoration, "TOP", 0, -5)
-      font:SetText(frame.TitleContainer.TitleText:GetText())
+      --font:SetText(frame.TitleContainer.TitleText:GetText())
     else
       decoration:Show()
     end
     --frame.CloseButton:GwSkinButton(true)
-    frame.TitleContainer:Hide()
-    frame.NineSlice:Hide()
-    frame.Backdrop:Hide()
-    frame.Bg:Hide()
+    --frame.TitleContainer:Hide()
+    --frame.NineSlice:Hide()
+    --frame.Backdrop:Hide()
+    --frame.Bg:Hide()
     --frame.TopTileStreaks:Hide()
   end,
   Opacity = function(_, _)
@@ -218,13 +222,15 @@ local gw2Theme = {
     font:SetFont(UNIT_NAME_FONT, 12, "")
     font:SetTextColor(1, 1, 1)
   end,
+  SetTitle = function(frame, title)
+    local decoration = decoratorFrames[frame:GetName()]
+    if decoration then
+      --decoration.gwHeader.TitleText:SetText(title)
+    end
+  end,
   Reset = function()
     for _, frame in pairs(decoratorFrames) do
       frame:Hide()
-    end
-    for _, button in pairs(buttons) do
-      button:GwStripTextures()
-      button.isSkinned = false
     end
   end
 }

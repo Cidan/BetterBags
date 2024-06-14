@@ -13,7 +13,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field TopTileStreaks Texture
 ---@field TitleContainer TitleContainer
 
----@type table<string, Frame|PortraitFrameTexturedBaseTemplate|DefaultPanelTemplate|DefaultPanelFlatTemplate>
+---@type table<string, Frame|any>
 local decoratorFrames = {}
 
 ---@class Themes: AceModule

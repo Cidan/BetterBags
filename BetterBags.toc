@@ -93,7 +93,7 @@ frames\bag.lua
 
 themes\default.lua
 themes\simpledark.lua
-#themes\gw2.lua
+themes\gw2.lua
 
 config\config.lua
 config\help.lua

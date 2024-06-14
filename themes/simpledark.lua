@@ -6,7 +6,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@type table<string, Frame>
+---@type table<string, Frame|any>
 local decoratorFrames = {}
 
 ---@type Theme
