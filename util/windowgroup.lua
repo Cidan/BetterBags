@@ -18,7 +18,10 @@ function windowGrouping:AddWindow(name, frame)
 end
 
 function windowGrouping:Show(name)
-  if self.windows[name]:IsShown() then return end
+  if self.windows[name]:IsShown() then
+    self.windows[name]:Hide()
+    return
+  end
   local started = false
   for frameName, frame in pairs(self.windows) do
     if frameName ~= name then

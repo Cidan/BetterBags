@@ -33,6 +33,9 @@ local defaultTheme = {
       decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
       decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
       decoration.CloseButton = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
+      decoration.CloseButton:SetScript("OnClick", function()
+        frame.Owner:Hide()
+      end)
       decoration.CloseButton:SetFrameLevel(1001)
       decoration.TitleContainer:SetFrameLevel(1001)
       decoration.NineSlice:SetFrameLevel(1000)
@@ -51,7 +54,10 @@ local defaultTheme = {
       decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelTemplate")
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration.CloseButton = CreateFrame("Button", nil, frame, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
+      decoration.CloseButton = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
+      decoration.CloseButton:SetScript("OnClick", function()
+        frame:Hide()
+      end)
       decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
       decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
       if themes.titles[frame:GetName()] then
