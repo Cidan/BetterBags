@@ -101,7 +101,7 @@ frames\era\bag.lua
 
 themes\default.lua
 themes\simpledark.lua
-#themes\gw2.lua
+themes\gw2.lua
 
 config\config.lua
 config\era\config.lua

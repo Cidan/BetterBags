@@ -217,17 +217,7 @@ function contextMenu:CreateContextMenu(bag)
       tooltipTitle = L:G("Show Currencies"),
       tooltipText = L:G("Click to toggle the display of the currencies side panel."),
       func = function()
-        if bag.currencyFrame:IsShown() then
-          bag.currencyFrame:Hide()
-        else
-          if bag.sectionConfigFrame:IsShown() then
-            bag.sectionConfigFrame:Hide(function()
-              bag.currencyFrame:Show()
-            end)
-          else
-            bag.currencyFrame:Show()
-          end
-        end
+        bag.windowGrouping:Show('currencyConfig')
       end
     })
   end
@@ -239,20 +229,22 @@ function contextMenu:CreateContextMenu(bag)
     tooltipTitle = L:G("Configure Categories"),
     tooltipText = L:G("Click to toggle the display of the category configuration side panel."),
     func = function()
-      if bag.sectionConfigFrame:IsShown() then
-        bag.sectionConfigFrame:Hide()
-      else
-        if bag.currencyFrame and bag.currencyFrame:IsShown() then
-          bag.currencyFrame:Hide(function()
-            bag.sectionConfigFrame:Show()
-          end)
-        else
-          bag.sectionConfigFrame:Show()
-        end
-      end
+      bag.windowGrouping:Show("sectionConfig")
     end
   })
 
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    -- Show theme selection window.
+    table.insert(menuList, {
+      text = L:G("Themes"),
+      checked = function() return bag.themeConfigFrame:IsShown() end,
+      tooltipTitle = L:G("Themes"),
+      tooltipText = L:G("Click to toggle the display of the theme configuration side panel."),
+      func = function()
+        bag.windowGrouping:Show('themeConfig')
+      end
+    })
+  end
   table.insert(menuList, {
     text = L:G("Open Options Screen"),
     notCheckable = true,
