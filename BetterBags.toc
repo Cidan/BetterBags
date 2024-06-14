@@ -9,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, WagoAnalytics
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, WagoAnalytics, GW2_UI
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -48,6 +48,9 @@ core\database.lua
 core\hooks.lua
 core\async.lua
 
+# The Theme API loads earlier than actual themes.
+themes\themes.lua
+
 data\equipmentsets.lua
 data\categories.lua
 data\items.lua
@@ -59,6 +62,7 @@ util\color.lua
 util\resize.lua
 util\sort.lua
 util\bucket.lua
+util\windowgroup.lua
 
 frames\question.lua
 frames\search.lua
@@ -76,6 +80,7 @@ frames\currency.lua
 frames\list.lua
 frames\sectionitemlist.lua
 frames\sectionconfig.lua
+frames\themeconfig.lua
 frames\debug.lua
 
 views\views.lua
@@ -85,6 +90,10 @@ views\listview.lua
 views\bagview.lua
 
 frames\bag.lua
+
+themes\default.lua
+themes\simpledark.lua
+themes\gw2.lua
 
 config\config.lua
 config\help.lua

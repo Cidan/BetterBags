@@ -35,6 +35,9 @@ local animations = addon:GetModule('Animations')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@param kind BagKind
 ---@return bagSlots
 function BagSlots:CreatePanel(kind)
@@ -43,13 +46,14 @@ function BagSlots:CreatePanel(kind)
   setmetatable(b, {__index = BagSlots.bagSlotProto})
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BetterBagsBagSlotPanelTemplate")
+  local f = CreateFrame("Frame", name .. "BagSlots", UIParent)
   b.frame = f
 
-  ButtonFrameTemplate_HidePortrait(b.frame)
-  ButtonFrameTemplate_HideButtonBar(b.frame)
-  b.frame.Inset:Hide()
-  b.frame:SetTitle(L:G("Equipped Bags"))
+  themes:RegisterSimpleWindow(f, L:G("Equipped Bags"))
+  --ButtonFrameTemplate_HidePortrait(b.frame)
+  --ButtonFrameTemplate_HideButtonBar(b.frame)
+  --b.frame.Inset:Hide()
+  --b.frame:SetTitle(L:G("Equipped Bags"))
 
   b.content = grid:Create(b.frame)
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, -30)

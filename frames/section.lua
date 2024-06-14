@@ -25,6 +25,9 @@ local debug = addon:GetModule('Debug')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -60,6 +63,7 @@ end
 ---@param text string The text to set the title to.
 function sectionProto:SetTitle(text)
   self.title:SetText(text)
+  themes:UpdateSectionFont(self.title:GetFontString())
 end
 
 function sectionProto:AddCell(id, cell)
@@ -294,6 +298,8 @@ function sectionFrame:_DoCreate()
   end)
 
   s.title = title
+
+  themes:RegisterSectionFont(title:GetFontString())
 
   local content = grid:Create(s.frame)
   content:Show()

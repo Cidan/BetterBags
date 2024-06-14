@@ -136,7 +136,10 @@
     "time",
     "ItemLocation",
     "strsplittable",
-    "GetText"
+    "GetText",
+    "BACKGROUND",
+    "UNIT_NAME_FONT",
+    "DAMAGE_TEXT_FONT"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",

@@ -110,6 +110,14 @@ const.ITEM_BAG_FAMILY = {
   [1024] = L:G("Mining Bag"),
 }
 
+---@enum WindowKind
+const.WINDOW_KIND = {
+  UNDEFINED = 0,
+  PORTRAIT = 1,
+  SIMPLE = 2,
+  FLAT = 3,
+}
+
 ---@enum BagView
 const.BAG_VIEW = {
   UNDEFINED = 0,
@@ -154,6 +162,13 @@ const.EXPANSION_TYPE = {
 }
 
 const.OFFSETS = {
+  -- The left inset for the search box.
+  SEARCH_LEFT_INSET = 46,
+  -- The right inset for the search box.
+  SEARCH_RIGHT_INSET = -46,
+  -- The top inset for the search box.
+  SEARCH_TOP_INSET = -30,
+
   -- This is the offset from the top of the bag window to the start of the
   -- content frame.
   BAG_TOP_INSET = -42,
@@ -330,6 +345,7 @@ const.DATABASE_DEFAULTS = {
     debug = false,
     inBagSearch = false,
     showKeybindWarning = true,
+    theme = 'Default',
     showFullSectionNames = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,

@@ -53,6 +53,7 @@ function itemButton:HasItem() end
 function itemButton:GetBagID() end
 
 ---@class Button
+---@field isSkinned boolean
 local Button = {}
 
 function Button:RegisterForClicks(...) end
@@ -150,12 +151,49 @@ function LibUIDropDownMenu:HideDropDownMenu(level) end
 ---@field Instructions FontString
 local SearchBox = {}
 
+---@class ButtonFrameTemplate: Frame
+---@field Bg Texture
+---@field PortraitContainer PortraitContainer
+---@field CloseButton Button
+---@field TitleContainer TitleContainer
+
 ---@class BetterBagsBagPortraitTemplate
 ---@field Bg Texture
----@field PortraitContainer Frame
+---@field PortraitContainer PortraitContainer
 ---@field CloseButton Button
 ---@field SearchBox SearchBox
+---@field Backdrop BackdropTemplate
+---@field NineSlice NineSlicePanelTemplate
+---@field TopTileStreaks Texture
+---@field TitleContainer TitleContainer
+---@field Owner Bag
 local BetterBagsBagPortraitTemplate = {}
+---@return string
+function BetterBagsBagPortraitTemplate:GetName() end
+
+---@class PortraitContainer: Frame
+---@field portrait Texture
+---@field CircleMask MaskTexture
+
+---@class TitleContainer: Frame
+---@field TitleText FontString
+
+---@class BetterBagsBagDefaultPanelTemplate
+---@field Bg Texture
+---@field CloseButton Button
+---@field Backdrop BackdropTemplate
+---@field NineSlice NineSlicePanelTemplate
+---@field TopTileStreaks Texture
+local BetterBagsBagDefaultPanelTemplate = {}
+
+---@class NineSlicePanelTemplate: Frame
+local NineSlicePanelTemplate = {}
+function NineSlicePanelMixin:GetFrameLayoutTextureKit() end
+
+---@class BackdropTemplate
+local BackdropTemplate = {}
+function BackdropTemplate:Show() end
+function BackdropTemplate:Hide() end
 
 function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
@@ -305,6 +343,8 @@ _G.EXPANSION_NAME9 = "Dragonflight"
 _G.BANK_BAG_PURCHASE = "Purchasable Bag Slot"
 _G.COSTS_LABEL = "Cost:"
 
+_G.UNIT_NAME_FONT = ""
+_G.DAMAGE_TEXT_FONT = ""
 
 ---@class AceConfig.OptionsTable
 ---@field values? table<any, any>
@@ -429,3 +469,19 @@ function WagoAnalytics:DecrementCounter(counter, amount) end
 ---@param counter string
 ---@param amount number
 function WagoAnalytics:SetCounter(counter, amount) end
+
+
+---@class DecorationFrame: Frame
+
+--- GuildWars2 API
+---@class GuildWars2
+GW2_ADDON = {}
+
+GW2_ADDON.BackdropTemplates = {}
+function GW2_ADDON.CreateFrameHeaderWithBody(frame, titletext, icon, details) end
+
+function Button:GwSkinButton(x) end
+function Button:GwStripTextures() end
+
+---@class GuildWarsHeader: Frame
+---@field windowIcon Texture

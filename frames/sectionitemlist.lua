@@ -30,6 +30,12 @@ local L =  addon:GetModule('Localization')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:NewModule('SectionItemList')
 
@@ -160,7 +166,7 @@ function sectionItemListFrame:ShowCategory(category, redraw)
     return
   end
 
-  self.frame:SetTitle(category)
+  themes:SetTitle(self.frame, category)
   self.currentCategory = category
 
   local itemDataList = categories:GetMergedCategory(category)
@@ -181,7 +187,7 @@ function sectionItemListFrame:ShowCategory(category, redraw)
     self.content:Wipe()
     ---@cast itemData +ItemData[]
     for _, data in pairs(itemData) do
-      self.content:AddToEnd({data = data, category = category})
+      self.content:AddToStart({data = data, category = category})
     end
     if not self:IsShown() then
       self:Show()
@@ -193,7 +199,7 @@ end
 ---@return SectionItemListFrame
 function sectionItemList:Create(parent)
   local sc = setmetatable({}, {__index = sectionItemListFrame})
-  sc.frame = CreateFrame("Frame", nil, parent, "DefaultPanelTemplate") --[[@as Frame]]
+  sc.frame = CreateFrame("Frame", parent:GetName().."SectionList", parent) --[[@as Frame]]
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
@@ -204,6 +210,9 @@ function sectionItemList:Create(parent)
   sc.frame:SetScript("OnMouseDown", function()
     sc:OnReceiveDrag()
   end)
+
+  themes:RegisterSimpleWindow(sc.frame, L:G("Items"))
+
   sc.fadeIn, sc.fadeOut = animations:AttachFadeAndSlideLeft(sc.frame)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()

@@ -19,6 +19,12 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
@@ -207,8 +213,10 @@ function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
 
   if header then
     item.name = item.frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    item.name:SetFont(UNIT_NAME_FONT, 12, "")
   else
     item.name = item.frame:CreateFontString(nil, "ARTWORK", "Game12Font")
+    item.name:SetFont(UNIT_NAME_FONT, 12, "")
   end
   item.name:SetPoint("LEFT", item.icon, "RIGHT", 5, 0)
 
@@ -219,8 +227,9 @@ function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
 end
 
 ---@param parent Frame
+---@param iconParent Frame
 ---@return CurrencyFrame
-function currency:Create(parent)
+function currency:Create(parent, iconParent)
   ---@class CurrencyFrame
   local b = {}
   setmetatable(b, {__index = CurrencyFrame})
@@ -230,13 +239,14 @@ function currency:Create(parent)
   b.loaded = false
 
   ---CURRENCY_DISPLAY_UPDATE
-  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "DefaultPanelTemplate") --[[@as Frame]]
+  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent) --[[@as Frame]]
   frame:Hide()
   frame:SetParent(parent)
   frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   frame:SetWidth(260)
-  frame:SetTitle("Currencies")
+
+  themes:RegisterSimpleWindow(frame, L:G("Currencies"))
 
   b.fadeIn, b.fadeOut = animations:AttachFadeAndSlideLeft(frame)
   b.frame = frame
@@ -248,7 +258,7 @@ function currency:Create(parent)
   g.spacing = 0
   b.content = g
 
-  b.iconGrid = self:CreateIconGrid(parent)
+  b.iconGrid = self:CreateIconGrid(iconParent)
   b:Update()
   events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
     b:Update()

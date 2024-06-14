@@ -238,13 +238,7 @@ function contextMenu:CreateContextMenu(bag)
         if bag.currencyFrame:IsShown() then
           bag.currencyFrame:Hide()
         else
-          if bag.sectionConfigFrame:IsShown() then
-            bag.sectionConfigFrame:Hide(function()
-              bag.currencyFrame:Show()
-            end)
-          else
-            bag.currencyFrame:Show()
-          end
+          bag.windowGrouping:Show('currencyConfig')
         end
       end
     })
@@ -260,18 +254,27 @@ function contextMenu:CreateContextMenu(bag)
       if bag.sectionConfigFrame:IsShown() then
         bag.sectionConfigFrame:Hide()
       else
-        if bag.currencyFrame and bag.currencyFrame:IsShown() then
-          bag.currencyFrame:Hide(function()
-            bag.sectionConfigFrame:Show()
-          end)
-        else
-          bag.sectionConfigFrame:Show()
-        end
+        bag.windowGrouping:Show('sectionConfig')
       end
     end
   })
 
   if bag.kind == const.BAG_KIND.BACKPACK then
+      -- Show theme selection window.
+    table.insert(menuList, {
+      text = L:G("Themes"),
+      checked = function() return bag.themeConfigFrame:IsShown() end,
+      tooltipTitle = L:G("Themes"),
+      tooltipText = L:G("Click to toggle the display of the theme configuration side panel."),
+      func = function()
+        if bag.themeConfigFrame:IsShown() then
+          bag.themeConfigFrame:Hide()
+        else
+          bag.windowGrouping:Show('themeConfig')
+        end
+      end
+    })
+
     -- Show the Blizzard bag button toggle.
     table.insert(menuList, {
       text = L:G("Show Bag Button"),

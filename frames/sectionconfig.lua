@@ -36,6 +36,9 @@ local L =  addon:GetModule('Localization')
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:GetModule('SectionItemList')
 
@@ -100,10 +103,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the category font info for the button depending on if it's a header or not.
   if elementData.header then
     button.Category:SetFontObject("GameFontNormal")
+    button.Category:GetFontObject():SetFont(UNIT_NAME_FONT, 12, "")
     button.Category:SetTextColor(1, .81960791349411, 0, 1)
     button.Expand:Hide()
   else
     button.Category:SetFontObject("Game12Font")
+    button.Category:GetFontObject():SetFont(UNIT_NAME_FONT, 12, "")
     button.Category:SetTextColor(1, 1, 1)
     button.Expand:SetScript("OnClick", function()
       self.itemList:ShowCategory(elementData.title)
@@ -322,11 +327,10 @@ end
 ---@return SectionConfigFrame
 function sectionConfig:Create(kind, parent)
   local sc = setmetatable({}, { __index = sectionConfigFrame })
-  sc.frame = CreateFrame("Frame", nil, parent, "DefaultPanelTemplate") --[[@as Frame]]
+  sc.frame = CreateFrame("Frame", parent:GetName().."SectionConfig", parent) --[[@as Frame]]
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
-  sc.frame:SetTitle("Configure Categories")
   sc.frame:SetIgnoreParentScale(true)
   sc.frame:SetScale(UIParent:GetScale())
   sc.frame:Hide()
@@ -335,6 +339,7 @@ function sectionConfig:Create(kind, parent)
   sc.content = list:Create(sc.frame)
   sc.content.frame:SetAllPoints()
 
+  themes:RegisterSimpleWindow(sc.frame, L:G("Configure Categories"))
   -- Setup the create and destroy functions for items on the list.
   sc.content:SetupDataSource("BetterBagsSectionConfigListButton", function(f, data)
     ---@cast f BetterBagsSectionConfigListButton
