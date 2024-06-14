@@ -104,8 +104,10 @@ end
 
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.
 ---@param frame Frame
-function themes:RegisterPortraitWindow(frame)
+---@param title string
+function themes:RegisterPortraitWindow(frame, title)
   table.insert(self.windows[const.WINDOW_KIND.PORTRAIT], frame)
+  self.titles[frame:GetName()] = title
 end
 
 -- RegisterSimpleWindow is used to register a protrait window frame to be themed by themes.

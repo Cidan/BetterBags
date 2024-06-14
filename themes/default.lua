@@ -36,6 +36,9 @@ local defaultTheme = {
       decoration.CloseButton:SetFrameLevel(1001)
       decoration.TitleContainer:SetFrameLevel(1001)
       decoration.NineSlice:SetFrameLevel(1000)
+      if themes.titles[frame:GetName()] then
+        decoration:SetTitle(themes.titles[frame:GetName()])
+      end
       themes.SetupBagButton(frame.Owner, decoration --[[@as Frame]])
       decoratorFrames[frame:GetName()] = decoration
     else

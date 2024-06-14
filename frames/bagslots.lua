@@ -100,7 +100,7 @@ function BagSlots:CreatePanel(kind)
   setmetatable(b, {__index = BagSlots.bagSlotProto})
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BetterBagsBagSlotPanelTemplate")
+  local f = CreateFrame("Frame", name .. "BagSlots", UIParent)
   b.frame = f
 
   themes:RegisterFlatWindow(f, L:G("Equipped Bags"))

@@ -199,7 +199,7 @@ end
 ---@return SectionItemListFrame
 function sectionItemList:Create(parent)
   local sc = setmetatable({}, {__index = sectionItemListFrame})
-  sc.frame = CreateFrame("Frame", parent:GetName().."SectionList", parent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
+  sc.frame = CreateFrame("Frame", parent:GetName().."SectionList", parent) --[[@as Frame]]
   sc.frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)

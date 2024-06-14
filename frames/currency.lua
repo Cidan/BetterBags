@@ -239,7 +239,7 @@ function currency:Create(parent, iconParent)
   b.loaded = false
 
   ---CURRENCY_DISPLAY_UPDATE
-  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "BetterBagsBagDefaultPanelTemplate") --[[@as Frame]]
+  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent) --[[@as Frame]]
   frame:Hide()
   frame:SetParent(parent)
   frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)

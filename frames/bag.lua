@@ -366,10 +366,10 @@ function bagFrame:Create(kind)
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsBagPortraitTemplate
-  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil, "BetterBagsBagPortraitTemplate")
+  local f = CreateFrame("Frame", "BetterBagsBag"..name, nil)
 
   -- Register this window with the theme system.
-  themes:RegisterPortraitWindow(f)
+  themes:RegisterPortraitWindow(f, name)
 
   -- Setup the main frame defaults.
   b.frame = f
