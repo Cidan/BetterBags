@@ -213,34 +213,33 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       end
       self:OnReceiveDrag(elementData.title)
     end)
+  end
+  button:SetScript("OnMouseUp", function(_, key)
+    -- Headers can't be clicked.
+    if elementData.header then
+      return
+    end
 
-    button:SetScript("OnMouseUp", function(_, key)
-      -- Headers can't be clicked.
-      if elementData.header then
+    -- Toggle the category from containing items.
+    if key == "LeftButton" then
+      if self:OnReceiveDrag(elementData.title) then
         return
       end
-
-      -- Toggle the category from containing items.
-      if key == "LeftButton" then
-        if self:OnReceiveDrag(elementData.title) then
-          return
+      if IsShiftKeyDown() then
+        self.content.provider:MoveElementDataToIndex(elementData, 2)
+        self:UpdatePinnedItems()
+      elseif categories:DoesCategoryExist(elementData.title) then
+        if categories:IsCategoryEnabled(self.kind, elementData.title) then
+          categories:DisableCategory(self.kind, elementData.title)
+          button:SetBackdropColor(0, 0, 0, 0)
+        else
+          categories:EnableCategory(self.kind, elementData.title)
+          button:SetBackdropColor(1, 1, 0, .2)
         end
-        if IsShiftKeyDown() then
-          self.content.provider:MoveElementDataToIndex(elementData, 2)
-          self:UpdatePinnedItems()
-        elseif categories:DoesCategoryExist(elementData.title) then
-          if categories:IsCategoryEnabled(self.kind, elementData.title) then
-            categories:DisableCategory(self.kind, elementData.title)
-            button:SetBackdropColor(0, 0, 0, 0)
-          else
-            categories:EnableCategory(self.kind, elementData.title)
-            button:SetBackdropColor(1, 1, 0, .2)
-          end
-        end
-        events:SendMessage('bags/FullRefreshAll')
       end
-    end)
-  end
+      events:SendMessage('bags/FullRefreshAll')
+    end
+  end)
 end
 
 ---@param button BetterBagsSectionConfigListButton
