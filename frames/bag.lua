@@ -113,6 +113,7 @@ local windowGroup = addon:GetModule('WindowGroup')
 ---@field loaded boolean
 ---@field windowGrouping WindowGrouping
 ---@field sideAnchor Frame
+---@field previousSize number
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
@@ -242,7 +243,11 @@ function bagFrame.bagProto:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.LIST and self.currentView ~= nil then
     self.currentView:UpdateListSize(self)
   end
+  if self.previousSize and database:GetBagView(self.kind) ~= const.BAG_VIEW.LIST then
+    self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", self.frame:GetLeft(), self.previousSize)
+  end
   self:KeepBagInBounds()
+  self.previousSize = self.frame:GetBottom()
 end
 
 function bagFrame.bagProto:SetTitle(text)
@@ -473,11 +478,13 @@ function bagFrame:Create(kind)
   b.frame:SetScript("OnDragStop", function(drag)
     drag:StopMovingOrSizing()
     Window.SavePosition(b.frame)
+    b.previousSize = b.frame:GetBottom()
   end)
 
   b.frame:SetScript("OnSizeChanged", function()
     b:OnResize()
   end)
+
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
 

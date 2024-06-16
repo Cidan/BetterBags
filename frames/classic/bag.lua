@@ -202,6 +202,7 @@ function bagFrame:Create(kind)
   b.frame:SetScript("OnDragStop", function(drag)
     drag:StopMovingOrSizing()
     Window.SavePosition(b.frame)
+    b.previousSize = b.frame:GetBottom()
   end)
 
   b.frame:SetScript("OnSizeChanged", function()
