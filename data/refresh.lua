@@ -114,7 +114,7 @@ function refresh:StartUpdate()
   if updateBackpack then
     -- This timer runs during loading screens, which can cause the context
     -- to be cancelled before the draw even happens.
-    ctx:Timeout(30, function()
+    ctx:Timeout(60, function()
       self.isUpdateRunning = false
       items._preSort = false
     end)

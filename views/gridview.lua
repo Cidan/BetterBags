@@ -59,7 +59,9 @@ end
 local function ClearButton(view, item)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
-  cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  if cell then
+    cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  end
   view:AddDeferredItem(item.slotkey)
   local section = view:GetSlotSection(item.slotkey)
   if section then

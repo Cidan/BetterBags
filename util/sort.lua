@@ -51,8 +51,8 @@ function sort:GetSectionSortFunction(kind, view)
       return self.SortSectionsBySizeDescending(kind, a, b)
     end
   end
-  assert(false, "Unknown sort type: " .. sortType)
-  return function() end
+  -- Return the default sort in case of an unknown sort type.
+  return self:GetSectionSortFunction(kind, const.SECTION_SORT_TYPE.ALPHABETICALLY)
 end
 
 ---@param kind BagKind

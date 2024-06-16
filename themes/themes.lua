@@ -12,6 +12,10 @@ local L = addon:GetModule('Localization')
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
+---@class BagButton: Button
+---@field portrait Texture
+---@field highlightTex Texture
+
 ---@class Theme
 ---@field key? string The key used to identify this theme. This will be set by the Themes module when registering the theme, you do not need to provide this.
 ---@field Name string The display name used by this theme in the theme selection window.
@@ -178,13 +182,14 @@ end
 
 ---@param bag Bag
 ---@param decoration Frame
+---@return BagButton
 function themes.SetupBagButton(bag, decoration)
   -- JIT include the context menu, due to load order.
 
   ---@class ContextMenu: AceModule
   local contextMenu = addon:GetModule('ContextMenu')
 
-  local bagButton = CreateFrame("Button", nil, decoration)
+  local bagButton = CreateFrame("Button", nil, decoration) --[[@as BagButton]]
   bagButton:SetFrameStrata("HIGH")
   bagButton:EnableMouse(true)
   bagButton:SetWidth(40)
@@ -193,22 +198,22 @@ function themes.SetupBagButton(bag, decoration)
   bagButton:SetFrameLevel(950)
 
   local portraitSize = 48
-  local portrait = bagButton:CreateTexture()
-  portrait:SetTexture([[Interface\Containerframe\Bagslots2x]])
-  portrait:SetTexCoord(0, 0.2, 0, 1)
-  portrait:SetSize(portraitSize, portraitSize * 1.25)
-  portrait:SetPoint("CENTER", bagButton, "CENTER", 0, 0)
-  portrait:SetDrawLayer("OVERLAY", 7)
+  bagButton.portrait = bagButton:CreateTexture()
+  bagButton.portrait:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  bagButton.portrait:SetTexCoord(0, 0.2, 0, 1)
+  bagButton.portrait:SetSize(portraitSize, portraitSize * 1.25)
+  bagButton.portrait:SetPoint("CENTER", bagButton, "CENTER", 0, 0)
+  bagButton.portrait:SetDrawLayer("OVERLAY", 7)
 
-  local highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
-  highlightTex:SetTexture([[Interface\Containerframe\Bagslots2x]])
-  highlightTex:SetSize(portraitSize, portraitSize * 1.25)
-  highlightTex:SetTexCoord(0.2, 0.4, 0, 1)
-  highlightTex:SetPoint("CENTER", bagButton, "CENTER", 2, 0)
-  highlightTex:SetAlpha(0)
-  highlightTex:SetDrawLayer("OVERLAY", 7)
+  bagButton.highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
+  bagButton.highlightTex:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  bagButton.highlightTex:SetSize(portraitSize, portraitSize * 1.25)
+  bagButton.highlightTex:SetTexCoord(0.2, 0.4, 0, 1)
+  bagButton.highlightTex:SetPoint("CENTER", bagButton, "CENTER", 2, 0)
+  bagButton.highlightTex:SetAlpha(0)
+  bagButton.highlightTex:SetDrawLayer("OVERLAY", 7)
 
-  local anig = highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
+  local anig = bagButton.highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
   local ani = anig:CreateAnimation("Alpha")
   ani:SetFromAlpha(0)
   ani:SetToAlpha(1)
@@ -222,7 +227,7 @@ function themes.SetupBagButton(bag, decoration)
   bagButton:SetScript("OnEnter", function()
     if not db:GetFirstTimeMenu() then
       anig:Stop()
-      highlightTex:SetAlpha(1)
+      bagButton.highlightTex:SetAlpha(1)
       anig:Play()
     end
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
@@ -249,7 +254,7 @@ function themes.SetupBagButton(bag, decoration)
     GameTooltip:Hide()
     if not db:GetFirstTimeMenu() then
       anig:Stop()
-      highlightTex:SetAlpha(0)
+      bagButton.highlightTex:SetAlpha(0)
       anig:Restart(true)
     end
   end)
@@ -259,7 +264,7 @@ function themes.SetupBagButton(bag, decoration)
     if e == "LeftButton" then
       if db:GetFirstTimeMenu() then
         db:SetFirstTimeMenu(false)
-        highlightTex:SetAlpha(1)
+        bagButton.highlightTex:SetAlpha(1)
         anig:SetLooping("NONE")
         anig:Restart()
       end
@@ -277,4 +282,5 @@ function themes.SetupBagButton(bag, decoration)
       bag:Sort()
     end
   end)
+  return bagButton
 end
