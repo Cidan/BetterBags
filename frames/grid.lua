@@ -180,7 +180,6 @@ function gridProto:stage(options)
   local rowWidth = 0
   local h = 0
   local rowStart = cells[1]
-  local rowEnd = cells[1]
   for i, cell in ipairs(cells) do
     cell.frame:SetParent(self.inner)
     cell.frame:ClearAllPoints()
@@ -197,7 +196,6 @@ function gridProto:stage(options)
         rowWidth = cell.frame:GetWidth()
         w = math.max(w, rowWidth)
         relativeToPoint = "BOTTOMLEFT"
-        rowEnd = cells[i - 1]
         rowStart = cell
       else
         local previousCell = cells[i - 1]
@@ -212,7 +210,6 @@ function gridProto:stage(options)
       rowWidth = cell.frame:GetWidth()
       w = rowWidth
       rowStart = cell
-      currentRowWidth = cells[1].frame:GetWidth()
     end
     cell.frame:SetPoint("TOPLEFT", relativeToFrame, relativeToPoint, spacingX, spacingY)
     cell.frame:Show()

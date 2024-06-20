@@ -199,8 +199,14 @@ function CurrencyFrame:Update()
     ---@cast b CurrencyItem
     return a.index < b.index
   end)
-  self.content:Draw()
-  local w, h = self.iconGrid:Draw()
+  self.content:Draw({
+    cells = self.content.cells,
+    maxWidthPerRow = 1,
+  })
+  local w, h = self.iconGrid:Draw({
+    cells = self.iconGrid.cells,
+    maxWidthPerRow = 1024,
+  })
   self.iconGrid:GetContainer():SetSize(w, h)
 end
 

@@ -172,7 +172,10 @@ local function OneBagView(view, ctx, bag, slotInfo)
     view.content.maxCellWidth = sizeInfo.columnCount
     -- Sort the items.
     view.content:Sort(sort:GetItemSortFunction(bag.kind, const.BAG_VIEW.ONE_BAG))
-    local w, h = view.content:Draw()
+    local w, h = view.content:Draw({
+      cells = view.content.cells,
+      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow),
+    })
     view.content:HideScrollBar()
     bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
     local bagHeight = h +
