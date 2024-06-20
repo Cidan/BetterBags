@@ -179,7 +179,6 @@ function gridProto:stage(options)
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
         -- Get the first cell in the previous row.
-        --local previousCell = cells[i - (options.maxItemsPerRow == 1 and 1 or (options.maxItemsPerRow - 1))]
         relativeToFrame = rowStart.frame
         h = h + cell.frame:GetHeight()
         rowWidth = cell.frame:GetWidth()
@@ -211,70 +210,6 @@ function gridProto:stage(options)
   end
   self.inner:SetSize(w, h)
   return w, h
-  --[[
-  for _, column in pairs(self.columns) do
-    column:RemoveAll()
-    column:Release()
-  end
-  wipe(self.cellToColumn)
-  wipe(self.columns)
-
-  local width = 0 ---@type number
-  local height = 0
-  local currentColumn = 0
-  -- Do not compact the cells at all and draw them in their ordered
-  -- rows and columns.
-  if self.compactStyle == const.GRID_COMPACT_STYLE.SIMPLE or
-  self.compactStyle == const.GRID_COMPACT_STYLE.NONE then
-    for i, cell in ipairs(self.cells) do
-      cell.frame:ClearAllPoints()
-
-      ---@type number
-      local columnKey
-      if self.sortVertical then
-        -- Calculate a column key such that all cells in the cell list are
-        -- distributed equally among however many columns are defined by self.maxCellWidth, i.e. depth first.
-        if self.columns[currentColumn] and #self.columns[currentColumn].cells > #self.cells / self.maxCellWidth then
-          currentColumn = currentColumn + 1
-        end
-        columnKey = currentColumn
-      else
-        -- Get the current column for a given cell order, left to right, i.e. bredth first.
-        columnKey = i % self.maxCellWidth
-      end
-      local column = self.columns[columnKey]
-      if column == nil then
-        -- Create the column if it doesn't exist and position it within
-        -- the grid.
-        column = columnFrame:Create()
-        column.spacing = self.spacing
-        column.frame:SetParent(self.inner)
-        self.columns[columnKey] = column
-        if self.sortVertical then
-          if columnKey == 0 then
-            column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
-          else
-            local previousColumn = self.columns[columnKey - 1]
-            column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
-          end
-        else
-          if i == 1 then
-            column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
-          else
-            local previousColumn = self.columns[i - 1]
-            column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
-          end
-        end
-      end
-      -- Add the cell to the column.
-      column:AddCell(self.cellToID[cell], cell)
-      self.cellToColumn[cell] = column
-      cell.frame:Show()
-    end
-  elseif self.compactStyle == const.GRID_COMPACT_STYLE.COMPACT then
-  end
-  return width, height
-  ]]--
 end
 
 -- Draw will draw the grid.
