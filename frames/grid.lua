@@ -6,9 +6,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class ColumnFrame: AceModule
-local columnFrame = addon:GetModule('ColumnFrame')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -33,8 +30,6 @@ local cellProto = {}
 ---@field idToCell table<string, Cell|Item|Section|BagButton|any>
 ---@field cellToID table<Cell|Item|Section|BagButton|any, string>
 ---@field headers Section[]
----@field columns Column[]
----@field cellToColumn table<Cell|Item|Section|any, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
 ---@field spacing number
 ---@field compactStyle GridCompactStyle
@@ -92,9 +87,6 @@ function gridProto:RemoveCell(id)
   for i, c in ipairs(self.cells) do
     if c == self.idToCell[id] then
       table.remove(self.cells, i)
-      for _, column in pairs(self.columns) do
-        column:RemoveCell(id)
-      end
       self.cellToID[self.idToCell[id]] = nil
       self.idToCell[id] = nil
       return
@@ -108,9 +100,6 @@ function gridProto:RekeyCell(oldID, newID)
   if cell == nil then
     return
   end
-  local column = self.cellToColumn[cell] --[[@as Column]]
-  column:RemoveCell(oldID)
-  column:AddCell(newID, cell)
   self.idToCell[newID] = cell
   self.cellToID[cell] = newID
   self.idToCell[oldID] = nil
@@ -299,12 +288,6 @@ end
 -- Clear will remove and release all columns from the grid,
 -- but will not release cells.
 function gridProto:Clear()
-  for _, column in pairs(self.columns) do
-    column:RemoveAll()
-    column:Release()
-  end
-  wipe(self.cellToColumn)
-  wipe(self.columns)
   wipe(self.cells)
   wipe(self.idToCell)
   wipe(self.cellToID)
@@ -313,11 +296,6 @@ end
 -- Wipe completely removes all cells and columns from the grid
 -- and releases all cells and columns.
 function gridProto:Wipe()
-  for _, column in pairs(self.columns) do
-    column:Release()
-  end
-  wipe(self.cellToColumn)
-  wipe(self.columns)
   wipe(self.cells)
   wipe(self.idToCell)
   wipe(self.cellToID)
