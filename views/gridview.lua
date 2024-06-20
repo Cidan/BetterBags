@@ -138,7 +138,6 @@ local function GridView(view, ctx, bag, slotInfo)
     view.fullRefresh = false
   end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
-  view.content.compactStyle = database:GetBagCompaction(bag.kind)
 
   local added, removed, changed = slotInfo:GetChangeset()
 

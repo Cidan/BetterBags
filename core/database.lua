@@ -137,18 +137,6 @@ function DB:SetBagViewFrameSize(kind, view, width, height)
   DB.data.profile.size[view][kind].height = height
 end
 
----@param kind BagKind
----@return GridCompactStyle
-function DB:GetBagCompaction(kind)
-  return DB.data.profile.compaction[kind]
-end
-
----@param kind BagKind
----@param style GridCompactStyle
-function DB:SetBagCompaction(kind, style)
-  DB.data.profile.compaction[kind] = style
-end
-
 function DB:GetItemLevelOptions(kind)
   return DB.data.profile.itemLevel[kind]
 end
@@ -436,6 +424,25 @@ function DB:Migrate()
         [const.BAG_KIND.BACKPACK] = value,
         [const.BAG_KIND.BANK] = value
       }
+    end
+  end
+
+  --[[
+    Migration away from columns and compaction.
+    Do not remove before Q1'25.
+  ]]
+  if DB.data.profile.compaction ~= nil then
+    DB.data.profile.compaction = nil
+    for _, bagView in pairs(const.BAG_VIEW) do
+      for _, bagKind in pairs(const.BAG_KIND) do
+        local t = DB.data.profile.size[bagView][bagKind]
+        if t then
+          if t.columnCount ~= nil and t.itemsPerRow ~= nil then
+            t.itemsPerRow = t.columnCount * t.itemsPerRow
+          end
+          t.columnCount = nil
+        end
+      end
     end
   end
 end
