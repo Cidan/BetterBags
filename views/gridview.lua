@@ -240,7 +240,10 @@ local function GridView(view, ctx, bag, slotInfo)
 
   if not slotInfo.deferDelete then
     debug:StartProfile('Content Draw Stage')
-    local w, h = view.content:Draw()
+    local w, h = view.content:Draw({
+      cells = view.content.cells,
+      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+    })
     for _, section in pairs(view.sections) do
       debug:WalkAndFixAnchorGraph(section.frame)
     end
