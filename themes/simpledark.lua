@@ -3,11 +3,15 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
 ---@class SimpleDarkDecoration: Frame
 ---@field title FontString
+---@field search SearchFrame
 
 ---@type table<string, SimpleDarkDecoration>
 local decoratorFrames = {}
@@ -50,6 +54,11 @@ local simpleDark = {
       close:SetScript("OnClick", function()
         frame.Owner:Hide()
       end)
+
+      local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
+      searchBox.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
+      searchBox.frame:SetSize(150, 20)
+      decoration.search = searchBox
 
       themes.SetupBagButton(frame.Owner, decoration --[[@as Frame]])
       -- Save the decoration frame for reuse.
@@ -149,6 +158,12 @@ local simpleDark = {
   Reset = function()
     for _, frame in pairs(decoratorFrames) do
       frame:Hide()
+    end
+  end,
+  ToggleSearch = function (frame, shown)
+    local decoration = decoratorFrames[frame:GetName()]
+    if decoration then
+      decoration.search:SetShown(shown)
     end
   end
 }

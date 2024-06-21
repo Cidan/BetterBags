@@ -16,7 +16,7 @@ local db = addon:GetModule('Database')
 ---@field portrait Texture
 ---@field highlightTex Texture
 
----@class Theme
+---@class (exact) Theme
 ---@field key? string The key used to identify this theme. This will be set by the Themes module when registering the theme, you do not need to provide this.
 ---@field Name string The display name used by this theme in the theme selection window.
 ---@field Description string A description of the theme used by this theme in the theme selection window.
@@ -27,6 +27,7 @@ local db = addon:GetModule('Database')
 ---@field Opacity fun(frame: Frame, opacity: number) A callback that is called when the user changes the opacity of the frame. You should use this to change the alpha of your backdrops.
 ---@field SectionFont fun(font: FontString) A function that applies the theme to a section font.
 ---@field SetTitle fun(frame: Frame, title: string) A function that sets the title of the frame.
+---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -84,6 +85,7 @@ function themes:ApplyTheme(key)
     theme.Portrait(frame)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
+    theme.ToggleSearch(frame, db:GetInBagSearch())
   end
 
   -- Apply all simple frame themes.
@@ -104,6 +106,14 @@ function themes:ApplyTheme(key)
   end
 
   db:SetTheme(key)
+end
+
+-- SetSearchState will show or hide the search bar for the given frame.
+---@param frame Frame
+---@param shown boolean
+function themes:SetSearchState(frame, shown)
+  local theme = self.themes[db:GetTheme()]
+  theme.ToggleSearch(frame, shown)
 end
 
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.

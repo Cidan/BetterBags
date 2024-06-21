@@ -10,6 +10,9 @@ local contextMenu = addon:GetModule('ContextMenu')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
@@ -17,6 +20,7 @@ local themes = addon:GetModule('Themes')
 ---@field panelButtons Button[]
 ---@field gwHeader GuildWarsHeader
 ---@field title FontString
+---@field search SearchFrame
 
 ---@type table<string, GuildWarsDecoration>
 local decoratorFrames = {}
@@ -79,6 +83,11 @@ local gw2Theme = {
       decoration.title:ClearAllPoints()
       decoration.title:SetPoint("BOTTOMLEFT", decoration.gwHeader, "BOTTOMLEFT", 35, 10)
       decoration.title:SetText(themes.titles[frame:GetName()])
+
+      local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
+      searchBox.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
+      searchBox.frame:SetSize(150, 20)
+      decoration.search = searchBox
 
       local close = CreateFrame("Button", nil, decoration.gwHeader, "UIPanelCloseButtonNoScripts")
       close:SetPoint("TOPRIGHT", decoration.gwHeader, "TOPRIGHT", -5, -25)
@@ -215,6 +224,12 @@ local gw2Theme = {
   Reset = function()
     for _, frame in pairs(decoratorFrames) do
       frame:Hide()
+    end
+  end,
+  ToggleSearch = function (frame, shown)
+    local decoration = decoratorFrames[frame:GetName()]
+    if decoration then
+      decoration.search:SetShown(shown)
     end
   end
 }
