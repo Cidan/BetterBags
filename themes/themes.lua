@@ -29,6 +29,7 @@ local db = addon:GetModule('Database')
 ---@field SetTitle fun(frame: Frame, title: string) A function that sets the title of the frame.
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
+---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -96,6 +97,14 @@ function themes:ApplyTheme(key)
         frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 8)
       end
     end
+
+    local offset = 0
+    if theme.OffsetSidebar then
+      offset = theme.OffsetSidebar()
+    end
+    frame.Owner.sideAnchor:ClearAllPoints()
+    frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", offset, 0)
+    frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", offset, 0)
   end
 
   -- Apply all simple frame themes.

@@ -156,9 +156,6 @@ local gw2Theme = {
     else
       decoration:Show()
     end
-    frame.Owner.sideAnchor:ClearAllPoints()
-    frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", -35, 0)
-    frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", -35, 0)
     decoratorFrames[frame:GetName()] = decoration
   end,
   -- The simple panel template, i.e. left config panels.
@@ -231,6 +228,13 @@ local gw2Theme = {
     if decoration then
       decoration.search:SetShown(shown)
     end
+  end,
+  PositionBagSlots = function (frame, bagSlotWindow)
+    bagSlotWindow:ClearAllPoints()
+    bagSlotWindow:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 8, 16)
+  end,
+  OffsetSidebar = function()
+    return -35
   end
 }
 
