@@ -61,10 +61,6 @@ function refresh:StartUpdate()
     elseif event.eventName == 'EQUIPMENT_SETS_CHANGED' then
       updateBackpack = true
       updateBank = true
-    elseif event.eventName == 'PLAYERBANKSLOTS_CHANGED' then
-      updateBank = true
-    elseif event.eventName == 'PLAYERREAGENTBANKSLOTS_CHANGED' then
-      updateBank = true
     elseif event.eventName == 'BAG_SORT' then
       if not InCombatLockdown() then
         sortBackpack = true
@@ -102,6 +98,7 @@ function refresh:StartUpdate()
     return
   end
 
+  print("firing update, queue was wiped.")
   if updateBank and addon.atBank then
     local bankCtx = ctx:Copy()
     if addon.Bags.Bank.isReagentBank then
@@ -148,7 +145,7 @@ function refresh:OnEnable()
   events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
     local ctx = context:New()
     ctx:Set("wipe", false)
-    table.insert(refresh.UpdateQueue, {eventName = 'PLAYERBANKSLOTS_CHANGED', args = {}, ctx = ctx})
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
     self:StartUpdate()
   end)
 
@@ -165,7 +162,7 @@ function refresh:OnEnable()
     events:RegisterEvent('PLAYERREAGENTBANKSLOTS_CHANGED', function()
       local ctx = context:New()
       ctx:Set("wipe", false)
-      table.insert(refresh.UpdateQueue, {eventName = 'PLAYERREAGENTBANKSLOTS_CHANGED', args = {}, ctx = ctx})
+      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
       self:StartUpdate()
     end)
   end
