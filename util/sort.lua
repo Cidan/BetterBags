@@ -193,5 +193,7 @@ end
 ---@return boolean
 function sort.GetItemSortBySlot(a, b)
   local aData, bData = a:GetItemData(), b:GetItemData()
+  if not aData then return false end
+  if not bData then return true end
   return aData.slotid < bData.slotid
 end

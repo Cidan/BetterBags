@@ -28,6 +28,8 @@ local db = addon:GetModule('Database')
 ---@field SectionFont fun(font: FontString) A function that applies the theme to a section font.
 ---@field SetTitle fun(frame: Frame, title: string) A function that sets the title of the frame.
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
+---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
+---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -86,6 +88,23 @@ function themes:ApplyTheme(key)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
     theme.ToggleSearch(frame, db:GetInBagSearch())
+    -- Apply bagslots positioning if the theme has a custom function for it.
+    if frame.Owner.slots then
+      if theme.PositionBagSlots then
+        theme.PositionBagSlots(frame, frame.Owner.slots.frame)
+      else
+        frame.Owner.slots.frame:ClearAllPoints()
+        frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 14)
+      end
+    end
+
+    local offset = 0
+    if theme.OffsetSidebar then
+      offset = theme.OffsetSidebar()
+    end
+    frame.Owner.sideAnchor:ClearAllPoints()
+    frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", offset, 0)
+    frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", offset, 0)
   end
 
   -- Apply all simple frame themes.
@@ -204,8 +223,8 @@ function themes.SetupBagButton(bag, decoration)
   bagButton:EnableMouse(true)
   bagButton:SetWidth(40)
   bagButton:SetHeight(40)
-  bagButton:SetPoint("TOPLEFT", decoration, "TOPLEFT", -10, 10)
-  bagButton:SetFrameLevel(950)
+  bagButton:SetPoint("TOPLEFT", decoration, "TOPLEFT", -10, 7)
+  bagButton:SetFrameLevel(1001)
 
   local portraitSize = 48
   bagButton.portrait = bagButton:CreateTexture()
@@ -218,7 +237,7 @@ function themes.SetupBagButton(bag, decoration)
   bagButton.highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
   bagButton.highlightTex:SetTexture([[Interface\Containerframe\Bagslots2x]])
   bagButton.highlightTex:SetSize(portraitSize, portraitSize * 1.25)
-  bagButton.highlightTex:SetTexCoord(0.2, 0.4, 0, 1)
+  bagButton.highlightTex:SetTexCoord(0.2, 0.3992, 0, 1)
   bagButton.highlightTex:SetPoint("CENTER", bagButton, "CENTER", 2, 0)
   bagButton.highlightTex:SetAlpha(0)
   bagButton.highlightTex:SetDrawLayer("OVERLAY", 7)
