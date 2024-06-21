@@ -132,8 +132,7 @@ end
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function BagView(view, ctx, bag, slotInfo)
-  _ = ctx
-  if view.fullRefresh then
+  if view.fullRefresh or ctx:GetBool('wipe') then
     view:Wipe()
     view.fullRefresh = false
   end

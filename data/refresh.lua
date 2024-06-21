@@ -143,9 +143,15 @@ function refresh:OnEnable()
   -- Register when bank slots change for any reason.
   events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
     local ctx = context:New()
-    ctx:Set("wipe", false)
+    ctx:Set("wipe", true)
     table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
-    self:StartUpdate()
+  end)
+
+  -- Register when the bag slots change for any reason.
+  events:RegisterEvent('BAG_CONTAINER_UPDATE', function()
+    local ctx = context:New()
+    ctx:Set("wipe", true)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
   end)
 
   -- Register when equipment sets change.
