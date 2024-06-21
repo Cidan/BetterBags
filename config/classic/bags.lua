@@ -108,26 +108,6 @@ function config:GetBagOptions(kind)
           customCategories = config:GetCustomCategoryOptions(kind),
         }
       },
-
-      itemCompaction = {
-        type = "select",
-        name = L:G("Item Compaction"),
-        desc = L:G("If Simple is selected, item sections will be sorted from left to right, however if a section can fit in the same row as the section above it, the section will move up."),
-        order = 3,
-        style = "radio",
-        get = function()
-          return DB:GetBagCompaction(kind)
-        end,
-        set = function(_, value)
-          DB:SetBagCompaction(kind, value)
-          events:SendMessage('bags/FullRefreshAll')
-        end,
-        values =  {
-          [const.GRID_COMPACT_STYLE.NONE] = L:G("None"),
-          [const.GRID_COMPACT_STYLE.SIMPLE] = L:G("Simple"),
-        }
-      },
-
       sectionSorting = {
         type = "select",
         name = L:G("Section Sorting"),
@@ -341,24 +321,6 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               config:GetBag(kind).frame.Bg:SetAlpha(value / 100)
               DB:SetBagViewSizeOpacity(kind, DB:GetBagView(kind), value)
-            end,
-          },
-          sectionsPerRow = {
-            type = "range",
-            name = L:G("Columns"),
-            desc = L:G("Set the number of columns sections will fit into."),
-            order = 3,
-            min = 1,
-            max = 20,
-            step = 1,
-            get = function()
-              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
-            end,
-            set = function(_, value)
-              DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
-              bucket:Later("setSectionsPerRow", 0.2, function()
-                events:SendMessage('bags/FullRefreshAll')
-              end)
             end,
           },
           scale = {

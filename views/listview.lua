@@ -178,7 +178,10 @@ local function ListView(view, ctx, bag, slotInfo)
 
   view.content.maxCellWidth = 1
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.LIST))
-  local w, h = view.content:Draw()
+  local w, h = view.content:Draw({
+    cells = view.content.cells,
+    maxWidthPerRow = 1,
+  })
 
   if w < 160 then
   w = 160

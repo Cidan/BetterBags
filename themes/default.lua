@@ -3,7 +3,10 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class PortraitFrameTexturedBaseTemplate
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
+---@class DefaultThemeTemplate: Frame
 ---@field Bg Texture
 ---@field PortraitContainer PortraitContainer
 ---@field CloseButton Button
@@ -12,8 +15,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field NineSlice NineSlicePanelTemplate
 ---@field TopTileStreaks Texture
 ---@field TitleContainer TitleContainer
+---@field search SearchFrame
 
----@type table<string, Frame|any>
+---@type table<string, DefaultThemeTemplate>
 local decoratorFrames = {}
 
 ---@class Themes: AceModule
@@ -27,7 +31,7 @@ local defaultTheme = {
   Portrait = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelTemplate")
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelTemplate") --[[@as DefaultThemeTemplate]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
@@ -36,6 +40,12 @@ local defaultTheme = {
       decoration.CloseButton:SetScript("OnClick", function()
         frame.Owner:Hide()
       end)
+
+      local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
+      searchBox.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
+      searchBox.frame:SetSize(150, 20)
+      decoration.search = searchBox
+
       decoration.CloseButton:SetFrameLevel(1001)
       decoration.TitleContainer:SetFrameLevel(1001)
       decoration.NineSlice:SetFrameLevel(1000)
@@ -51,7 +61,7 @@ local defaultTheme = {
   Simple = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelTemplate")
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelTemplate") --[[@as DefaultThemeTemplate]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration.CloseButton = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
@@ -71,7 +81,7 @@ local defaultTheme = {
   Flat = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelFlatTemplate")
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelFlatTemplate") --[[@as DefaultThemeTemplate]]
       decoration:SetAllPoints()
       decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
       decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
@@ -102,6 +112,12 @@ local defaultTheme = {
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
       decoration:SetTitle(title)
+    end
+  end,
+  ToggleSearch = function (frame, shown)
+    local decoration = decoratorFrames[frame:GetName()]
+    if decoration then
+      decoration.search:SetShown(shown)
     end
   end
 }

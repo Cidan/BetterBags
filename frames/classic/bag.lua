@@ -169,14 +169,6 @@ function bagFrame:Create(kind)
     search:Create(b.frame)
   end
 
-  local searchBox = search:CreateBox(kind, b.frame)
-  searchBox.frame:SetPoint("TOP", b.frame, "TOP", 0, -2)
-  searchBox.frame:SetSize(150, 20)
-  if database:GetInBagSearch() then
-    searchBox.frame:Show()
-  end
-  b.searchBox = searchBox
-
   if kind == const.BAG_KIND.BACKPACK then
     local currencyFrame = currency:Create(b.frame)
     currencyFrame:Hide()
@@ -202,6 +194,7 @@ function bagFrame:Create(kind)
   b.frame:SetScript("OnDragStop", function(drag)
     drag:StopMovingOrSizing()
     Window.SavePosition(b.frame)
+    b.previousSize = b.frame:GetBottom()
   end)
 
   b.frame:SetScript("OnSizeChanged", function()
@@ -229,11 +222,7 @@ function bagFrame:Create(kind)
   end)
 
   events:RegisterMessage('search/SetInFrame', function (_, shown)
-    if shown then
-      b.searchBox.frame:Show()
-    else
-      b.searchBox.frame:Hide()
-    end
+    themes:SetSearchState(b.frame, shown)
   end)
 
   return b

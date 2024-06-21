@@ -51,7 +51,10 @@ function BagSlots.bagSlotProto:Draw()
   for _, cell in ipairs(self.content.cells) do
     cell:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED, false)
   end
-  local w, h = self.content:Draw()
+  local w, h = self.content:Draw({
+    cells = self.content.cells,
+    maxWidthPerRow = 1024,
+  })
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
   self.frame:SetHeight(h + 42)
 end

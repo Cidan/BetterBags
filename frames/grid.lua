@@ -6,9 +6,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class ColumnFrame: AceModule
-local columnFrame = addon:GetModule('ColumnFrame')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -33,8 +30,6 @@ local cellProto = {}
 ---@field idToCell table<string, Cell|Item|Section|BagButton|any>
 ---@field cellToID table<Cell|Item|Section|BagButton|any, string>
 ---@field headers Section[]
----@field columns Column[]
----@field cellToColumn table<Cell|Item|Section|any, Column>
 ---@field maxCellWidth number The maximum number of cells per row.
 ---@field spacing number
 ---@field compactStyle GridCompactStyle
@@ -42,6 +37,10 @@ local cellProto = {}
 ---@field package scrollBox WowScrollBox
 ---@field private sortVertical boolean
 local gridProto = {}
+
+---@class (exact) RenderOptions
+---@field cells Cell[] The cells to render in this grid.
+---@field maxWidthPerRow number The maximum width of a row before it wraps.
 
 function gridProto:Show()
   self.frame:Show()
@@ -88,9 +87,6 @@ function gridProto:RemoveCell(id)
   for i, c in ipairs(self.cells) do
     if c == self.idToCell[id] then
       table.remove(self.cells, i)
-      for _, column in pairs(self.columns) do
-        column:RemoveCell(id)
-      end
       self.cellToID[self.idToCell[id]] = nil
       self.idToCell[id] = nil
       return
@@ -104,9 +100,6 @@ function gridProto:RekeyCell(oldID, newID)
   if cell == nil then
     return
   end
-  local column = self.cellToColumn[cell] --[[@as Column]]
-  column:RemoveCell(oldID)
-  column:AddCell(newID, cell)
   self.idToCell[newID] = cell
   self.cellToID[cell] = newID
   self.idToCell[oldID] = nil
@@ -163,106 +156,73 @@ function gridProto:Sort(fn)
 end
 
 ---@return number, number
-function gridProto:stage()
-  for _, column in pairs(self.columns) do
-    column:RemoveAll()
-    column:Release()
-  end
-  wipe(self.cellToColumn)
-  wipe(self.columns)
-
-  local width = 0 ---@type number
-  local height = 0
-  local currentColumn = 0
-  -- Do not compact the cells at all and draw them in their ordered
-  -- rows and columns.
-  if self.compactStyle == const.GRID_COMPACT_STYLE.SIMPLE or
-  self.compactStyle == const.GRID_COMPACT_STYLE.NONE then
-    for i, cell in ipairs(self.cells) do
-      cell.frame:ClearAllPoints()
-
-      ---@type number
-      local columnKey
-      if self.sortVertical then
-        -- Calculate a column key such that all cells in the cell list are
-        -- distributed equally among however many columns are defined by self.maxCellWidth, i.e. depth first.
-        if self.columns[currentColumn] and #self.columns[currentColumn].cells > #self.cells / self.maxCellWidth then
-          currentColumn = currentColumn + 1
-        end
-        columnKey = currentColumn
-      else
-        -- Get the current column for a given cell order, left to right, i.e. bredth first.
-        columnKey = i % self.maxCellWidth
-      end
-      local column = self.columns[columnKey]
-      if column == nil then
-        -- Create the column if it doesn't exist and position it within
-        -- the grid.
-        column = columnFrame:Create()
-        column.spacing = self.spacing
-        column.frame:SetParent(self.inner)
-        self.columns[columnKey] = column
-        if self.sortVertical then
-          if columnKey == 0 then
-            column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
-          else
-            local previousColumn = self.columns[columnKey - 1]
-            column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
-          end
-        else
-          if i == 1 then
-            column.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", 0, 0)
-          else
-            local previousColumn = self.columns[i - 1]
-            column.frame:SetPoint("TOPLEFT", previousColumn.frame, "TOPRIGHT", self.spacing, 0)
-          end
-        end
-      end
-      -- Add the cell to the column.
-      column:AddCell(self.cellToID[cell], cell)
-      self.cellToColumn[cell] = column
-      cell.frame:Show()
-    end
-  elseif self.compactStyle == const.GRID_COMPACT_STYLE.COMPACT then
-  end
-  return width, height
+function gridProto:stageSimple()
+  return 1,1
 end
 
----@param width number
----@param height number
+---@param options RenderOptions
 ---@return number, number
-function gridProto:render(width, height)
-  -- Draw all the columns and their cells.
-  for _, column in pairs(self.columns) do
-    local w, h = column:Draw(self.compactStyle)
-    width = width + w + 4
-    height = math.max(height, h)
+function gridProto:stage(options)
+  if not options then return 0, 0 end
+  local cells = options.cells
+  local w = 0
+  local rowWidth = 0
+  local h = 0
+  local rowStart = cells[1]
+  for i, cell in ipairs(cells) do
+    cell.frame:SetParent(self.inner)
+    cell.frame:ClearAllPoints()
+    local relativeToFrame = self.inner
+    local relativeToPoint = "TOPLEFT"
+    local spacingX = 0
+    local spacingY = 0
+    if i ~= 1 then
+      if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
+        -- Get the first cell in the previous row.
+        relativeToFrame = rowStart.frame
+        h = h + cell.frame:GetHeight()
+        rowWidth = cell.frame:GetWidth()
+        w = math.max(w, rowWidth)
+        relativeToPoint = "BOTTOMLEFT"
+        rowStart = cell
+      else
+        local previousCell = cells[i - 1]
+        relativeToFrame = previousCell.frame
+        relativeToPoint = "TOPRIGHT"
+        spacingX = self.spacing
+        rowWidth = rowWidth + cell.frame:GetWidth() + spacingX
+        w = math.max(w, rowWidth)
+      end
+    else
+      h = h + cell.frame:GetHeight()
+      rowWidth = cell.frame:GetWidth()
+      w = rowWidth
+      rowStart = cell
+    end
+    cell.frame:SetPoint("TOPLEFT", relativeToFrame, relativeToPoint, spacingX, spacingY)
+    cell.frame:Show()
   end
 
+  w = w + self.spacing
   -- Remove the last 4 pixels of padding.
-  if width > 4 then
-    width = width - 4 ---@type number
+  if w > 4 then
+    w = w - 4 ---@type number
   end
-  self.inner:SetSize(width, height)
-  return width, height
+  self.inner:SetSize(w, h)
+  return w, h
 end
 
 -- Draw will draw the grid.
+---@param options RenderOptions
 ---@return number width
 ---@return number height
-function gridProto:Draw()
-  return self:render(self:stage())
+function gridProto:Draw(options)
+  return self:stage(options)
 end
 
 -- Clear will remove and release all columns from the grid,
 -- but will not release cells.
 function gridProto:Clear()
-  for _, column in pairs(self.columns) do
-    column:RemoveAll()
-    column:Release()
-  end
-  wipe(self.cellToColumn)
-  wipe(self.columns)
   wipe(self.cells)
   wipe(self.idToCell)
   wipe(self.cellToID)
@@ -271,11 +231,6 @@ end
 -- Wipe completely removes all cells and columns from the grid
 -- and releases all cells and columns.
 function gridProto:Wipe()
-  for _, column in pairs(self.columns) do
-    column:Release()
-  end
-  wipe(self.cellToColumn)
-  wipe(self.columns)
   wipe(self.cells)
   wipe(self.idToCell)
   wipe(self.cellToID)

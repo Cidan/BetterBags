@@ -72,7 +72,6 @@ frames\slider.lua
 frames\money.lua
 frames\era\money.lua
 frames\era\contextmenu.lua
-frames\column.lua
 frames\grid.lua
 frames\item.lua
 frames\era\item.lua

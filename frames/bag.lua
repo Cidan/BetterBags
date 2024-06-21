@@ -109,10 +109,10 @@ local windowGroup = addon:GetModule('WindowGroup')
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
 ---@field views table<BagView, View>
----@field searchBox SearchFrame
 ---@field loaded boolean
 ---@field windowGrouping WindowGrouping
 ---@field sideAnchor Frame
+---@field previousSize number
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
@@ -242,7 +242,11 @@ function bagFrame.bagProto:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.LIST and self.currentView ~= nil then
     self.currentView:UpdateListSize(self)
   end
+  --if self.previousSize and database:GetBagView(self.kind) ~= const.BAG_VIEW.LIST then
+    --self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", self.frame:GetLeft(), self.previousSize)
+  --end
   self:KeepBagInBounds()
+  self.previousSize = self.frame:GetBottom()
 end
 
 function bagFrame.bagProto:SetTitle(text)
@@ -257,12 +261,7 @@ function bagFrame.bagProto:ToggleReagentBank()
   items:ClearBankCache()
   if self.isReagentBank then
     BankFrame.selectedTab = 2
-    if self.searchBox.frame:IsShown() then
-      self:SetTitle("")
-      self.searchBox.helpText:SetText(L:G("Search Reagent Bank"))
-    else
-      self:SetTitle(L:G("Reagent Bank"))
-    end
+    self:SetTitle(L:G("Reagent Bank"))
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
@@ -270,12 +269,7 @@ function bagFrame.bagProto:ToggleReagentBank()
     items:RefreshReagentBank(ctx)
   else
     BankFrame.selectedTab = 1
-    if self.searchBox.frame:IsShown() then
-      self:SetTitle("")
-      self.searchBox.helpText:SetText(L:G("Search Bank"))
-    else
-      self:SetTitle(L:G("Bank"))
-    end
+    self:SetTitle(L:G("Bank"))
     self.currentItemCount = -1
     --self:ClearRecentItems()
     self:Wipe()
@@ -288,12 +282,7 @@ function bagFrame.bagProto:SwitchToBank()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1
-  if self.searchBox.frame:IsShown() then
-    self:SetTitle("")
-    self.searchBox.helpText:SetText(L:G("Search Bank"))
-  else
-    self:SetTitle(L:G("Bank"))
-  end
+  self:SetTitle(L:G("Bank"))
   items:ClearBankCache()
   self:Wipe()
 end
@@ -434,20 +423,6 @@ function bagFrame:Create(kind)
     search:Create(b.frame)
   end
 
-  local searchBox = search:CreateBox(kind, b.frame)
-  searchBox.frame:SetPoint("TOP", b.frame, "TOP", 0, -2)
-  searchBox.frame:SetSize(150, 20)
-  --[[
-      searchBox.frame:SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.SEARCH_LEFT_INSET, const.OFFSETS.SEARCH_TOP_INSET)
-  searchBox.frame:SetPoint("TOPRIGHT", b.frame, "TOPRIGHT", const.OFFSETS.SEARCH_RIGHT_INSET, const.OFFSETS.SEARCH_TOP_INSET)
-  searchBox.frame:SetHeight(30)
-
-  ]]
-  if database:GetInBagSearch() then
-    searchBox.frame:Show()
-  end
-  b.searchBox = searchBox
-
   if kind == const.BAG_KIND.BACKPACK then
     local currencyFrame = currency:Create(b.sideAnchor, b.frame)
     currencyFrame:Hide()
@@ -473,11 +448,13 @@ function bagFrame:Create(kind)
   b.frame:SetScript("OnDragStop", function(drag)
     drag:StopMovingOrSizing()
     Window.SavePosition(b.frame)
+    b.previousSize = b.frame:GetBottom()
   end)
 
   b.frame:SetScript("OnSizeChanged", function()
     b:OnResize()
   end)
+
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
 
@@ -500,11 +477,7 @@ function bagFrame:Create(kind)
   end)
 
   events:RegisterMessage('search/SetInFrame', function (_, shown)
-    if shown then
-      b.searchBox.frame:Show()
-    else
-      b.searchBox.frame:Hide()
-    end
+    themes:SetSearchState(b.frame, shown)
   end)
 
   return b

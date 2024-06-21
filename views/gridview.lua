@@ -59,7 +59,9 @@ end
 local function ClearButton(view, item)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
-  cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  if cell then
+    cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  end
   view:AddDeferredItem(item.slotkey)
   local section = view:GetSlotSection(item.slotkey)
   if section then
@@ -136,7 +138,6 @@ local function GridView(view, ctx, bag, slotInfo)
     view.fullRefresh = false
   end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
-  view.content.compactStyle = database:GetBagCompaction(bag.kind)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
@@ -238,7 +239,10 @@ local function GridView(view, ctx, bag, slotInfo)
 
   if not slotInfo.deferDelete then
     debug:StartProfile('Content Draw Stage')
-    local w, h = view.content:Draw()
+    local w, h = view.content:Draw({
+      cells = view.content.cells,
+      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+    })
     for _, section in pairs(view.sections) do
       debug:WalkAndFixAnchorGraph(section.frame)
     end

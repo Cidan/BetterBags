@@ -203,7 +203,10 @@ local function BagView(view, ctx, bag, slotInfo)
     return sort.SortSectionsAlphabetically(view.kind, a, b)
   end)
   debug:StartProfile('Content Draw Stage')
-  local w, h = view.content:Draw()
+  local w, h = view.content:Draw({
+    cells = view.content.cells,
+    maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+  })
   debug:EndProfile('Content Draw Stage')
   -- Reposition the content frame if the recent items section is empty.
   if w < 160 then

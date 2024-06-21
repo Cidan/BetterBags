@@ -46,7 +46,30 @@ end
 function search.searchProto:Hide()
   if self.frame:IsShown() then
     self.textBox:ClearFocus()
-    self.fadeOutGroup:Play()
+    if self.fadeOutGroup then
+      self.fadeOutGroup:Play()
+    else
+      self.frame:Hide()
+    end
+  end
+end
+
+function search.searchProto:Show()
+  if not self.frame:IsShown() then
+    self.textBox:ClearFocus()
+    if self.fadeInGroup then
+      self.fadeInGroup:Play()
+    else
+      self.frame:Show()
+    end
+  end
+end
+
+function search.searchProto:SetShown(shown)
+  if shown then
+    self:Show()
+  else
+    self:Hide()
   end
 end
 

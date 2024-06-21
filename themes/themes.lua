@@ -12,7 +12,11 @@ local L = addon:GetModule('Localization')
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
----@class Theme
+---@class BagButton: Button
+---@field portrait Texture
+---@field highlightTex Texture
+
+---@class (exact) Theme
 ---@field key? string The key used to identify this theme. This will be set by the Themes module when registering the theme, you do not need to provide this.
 ---@field Name string The display name used by this theme in the theme selection window.
 ---@field Description string A description of the theme used by this theme in the theme selection window.
@@ -23,6 +27,7 @@ local db = addon:GetModule('Database')
 ---@field Opacity fun(frame: Frame, opacity: number) A callback that is called when the user changes the opacity of the frame. You should use this to change the alpha of your backdrops.
 ---@field SectionFont fun(font: FontString) A function that applies the theme to a section font.
 ---@field SetTitle fun(frame: Frame, title: string) A function that sets the title of the frame.
+---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -80,6 +85,7 @@ function themes:ApplyTheme(key)
     theme.Portrait(frame)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
+    theme.ToggleSearch(frame, db:GetInBagSearch())
   end
 
   -- Apply all simple frame themes.
@@ -100,6 +106,14 @@ function themes:ApplyTheme(key)
   end
 
   db:SetTheme(key)
+end
+
+-- SetSearchState will show or hide the search bar for the given frame.
+---@param frame Frame
+---@param shown boolean
+function themes:SetSearchState(frame, shown)
+  local theme = self.themes[db:GetTheme()]
+  theme.ToggleSearch(frame, shown)
 end
 
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.
@@ -178,13 +192,14 @@ end
 
 ---@param bag Bag
 ---@param decoration Frame
+---@return BagButton
 function themes.SetupBagButton(bag, decoration)
   -- JIT include the context menu, due to load order.
 
   ---@class ContextMenu: AceModule
   local contextMenu = addon:GetModule('ContextMenu')
 
-  local bagButton = CreateFrame("Button", nil, decoration)
+  local bagButton = CreateFrame("Button", nil, decoration) --[[@as BagButton]]
   bagButton:SetFrameStrata("HIGH")
   bagButton:EnableMouse(true)
   bagButton:SetWidth(40)
@@ -193,22 +208,22 @@ function themes.SetupBagButton(bag, decoration)
   bagButton:SetFrameLevel(950)
 
   local portraitSize = 48
-  local portrait = bagButton:CreateTexture()
-  portrait:SetTexture([[Interface\Containerframe\Bagslots2x]])
-  portrait:SetTexCoord(0, 0.2, 0, 1)
-  portrait:SetSize(portraitSize, portraitSize * 1.25)
-  portrait:SetPoint("CENTER", bagButton, "CENTER", 0, 0)
-  portrait:SetDrawLayer("OVERLAY", 7)
+  bagButton.portrait = bagButton:CreateTexture()
+  bagButton.portrait:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  bagButton.portrait:SetTexCoord(0, 0.2, 0, 1)
+  bagButton.portrait:SetSize(portraitSize, portraitSize * 1.25)
+  bagButton.portrait:SetPoint("CENTER", bagButton, "CENTER", 0, 0)
+  bagButton.portrait:SetDrawLayer("OVERLAY", 7)
 
-  local highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
-  highlightTex:SetTexture([[Interface\Containerframe\Bagslots2x]])
-  highlightTex:SetSize(portraitSize, portraitSize * 1.25)
-  highlightTex:SetTexCoord(0.2, 0.4, 0, 1)
-  highlightTex:SetPoint("CENTER", bagButton, "CENTER", 2, 0)
-  highlightTex:SetAlpha(0)
-  highlightTex:SetDrawLayer("OVERLAY", 7)
+  bagButton.highlightTex = bagButton:CreateTexture("BetterBagsBagButtonTextureHighlight", "BACKGROUND")
+  bagButton.highlightTex:SetTexture([[Interface\Containerframe\Bagslots2x]])
+  bagButton.highlightTex:SetSize(portraitSize, portraitSize * 1.25)
+  bagButton.highlightTex:SetTexCoord(0.2, 0.4, 0, 1)
+  bagButton.highlightTex:SetPoint("CENTER", bagButton, "CENTER", 2, 0)
+  bagButton.highlightTex:SetAlpha(0)
+  bagButton.highlightTex:SetDrawLayer("OVERLAY", 7)
 
-  local anig = highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
+  local anig = bagButton.highlightTex:CreateAnimationGroup("BetterBagsBagButtonTextureHighlightAnim")
   local ani = anig:CreateAnimation("Alpha")
   ani:SetFromAlpha(0)
   ani:SetToAlpha(1)
@@ -222,7 +237,7 @@ function themes.SetupBagButton(bag, decoration)
   bagButton:SetScript("OnEnter", function()
     if not db:GetFirstTimeMenu() then
       anig:Stop()
-      highlightTex:SetAlpha(1)
+      bagButton.highlightTex:SetAlpha(1)
       anig:Play()
     end
     GameTooltip:SetOwner(bagButton, "ANCHOR_LEFT")
@@ -249,7 +264,7 @@ function themes.SetupBagButton(bag, decoration)
     GameTooltip:Hide()
     if not db:GetFirstTimeMenu() then
       anig:Stop()
-      highlightTex:SetAlpha(0)
+      bagButton.highlightTex:SetAlpha(0)
       anig:Restart(true)
     end
   end)
@@ -259,7 +274,7 @@ function themes.SetupBagButton(bag, decoration)
     if e == "LeftButton" then
       if db:GetFirstTimeMenu() then
         db:SetFirstTimeMenu(false)
-        highlightTex:SetAlpha(1)
+        bagButton.highlightTex:SetAlpha(1)
         anig:SetLooping("NONE")
         anig:Restart()
       end
@@ -277,4 +292,5 @@ function themes.SetupBagButton(bag, decoration)
       bag:Sort()
     end
   end)
+  return bagButton
 end

@@ -51,6 +51,9 @@ local stackProto = {}
 ---@field WipeHandler fun(view: View)
 views.viewProto = {}
 
+function views:OnEnable()
+end
+
 ---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
