@@ -18,6 +18,9 @@ local const = addon:GetModule('Constants')
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
+---@class Fonts: AceModule
+local fonts = addon:GetModule('Fonts')
+
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:NewModule('ThemeConfig')
 
@@ -34,9 +37,7 @@ local themeConfigFrame = {}
 ---@param data table
 function themeConfigFrame:initThemeItem(f, data)
   f:SetHeight(20)
-  f:SetNormalFontObject("GameFontNormal")
-  f:GetNormalFontObject():SetFont(UNIT_NAME_FONT, 12, "")
-  f:GetNormalFontObject():SetTextColor(1, 1, 1)
+  f:SetNormalFontObject(fonts.UnitFrame12White)
   f:SetText(data.theme.Name)
   f:SetScript("OnClick", function()
     themes:ApplyTheme(data.theme.key)

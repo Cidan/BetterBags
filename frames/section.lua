@@ -274,7 +274,6 @@ function sectionFrame:_DoCreate()
   -- Create the section title.
   local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")
-  title:SetNormalFontObject("GameFontNormal")
   title:SetHeight(18)
   title:GetFontString():SetAllPoints()
   title:GetFontString():SetJustifyH("LEFT")

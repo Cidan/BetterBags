@@ -9,6 +9,9 @@ local search = addon:GetModule('Search')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Fonts: AceModule
+local fonts = addon:GetModule('Fonts')
+
 ---@class SimpleDarkDecoration: Frame
 ---@field title FontString
 ---@field search SearchFrame
@@ -53,9 +56,8 @@ local simpleDark = {
       decoration:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
       -- Title text
-      local title = decoration:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-      title:SetFont(UNIT_NAME_FONT, 12, "")
-      title:SetTextColor(1, 1, 1)
+      local title = decoration:CreateFontString(nil, "OVERLAY")
+      title:SetFontObject(fonts.UnitFrame12White)
       title:SetPoint("TOP", decoration, "TOP", 0, 0)
       title:SetHeight(30)
       decoration.title = title
@@ -108,9 +110,8 @@ local simpleDark = {
       decoration:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
       -- Title text
-      local title = decoration:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-      title:SetFont(UNIT_NAME_FONT, 12, "")
-      title:SetTextColor(1, 1, 1)
+      local title = decoration:CreateFontString(nil, "OVERLAY")
+      title:SetFontObject(fonts.UnitFrame12White)
       title:SetPoint("TOP", decoration, "TOP", 0, 0)
       title:SetHeight(30)
       decoration.title = title
@@ -148,9 +149,8 @@ local simpleDark = {
       decoration:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
       -- Title text
-      local title = decoration:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-      title:SetFont(UNIT_NAME_FONT, 12, "")
-      title:SetTextColor(1, 1, 1)
+      local title = decoration:CreateFontString(nil, "OVERLAY")
+      title:SetFontObject(fonts.UnitFrame12White)
       title:SetPoint("TOP", decoration, "TOP", 0, 0)
       title:SetHeight(30)
       decoration.title = title
@@ -175,8 +175,7 @@ local simpleDark = {
   -- The SetSectionFont function is called when the user updates the font for item sections
   -- such as "Reagent", "Recent Items", etc. This is also applied on load.
   SectionFont = function(font)
-    font:SetFont(UNIT_NAME_FONT, 12, "")
-    font:SetTextColor(1, 1, 1)
+    font:SetFontObject(fonts.UnitFrame12White)
   end,
   -- SetTitle is called when the title of a frame changes.
   SetTitle = function(frame, title)

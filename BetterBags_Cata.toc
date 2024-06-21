@@ -49,6 +49,7 @@ core\classic\constants.lua
 core\database.lua
 core\hooks.lua
 core\async.lua
+core\fonts.lua
 
 # The Theme API loads earlier than actual themes.
 themes\themes.lua

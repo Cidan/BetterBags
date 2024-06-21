@@ -25,6 +25,9 @@ local themes = addon:GetModule('Themes')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Fonts: AceModule
+local fonts = addon:GetModule('Fonts')
+
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
@@ -218,11 +221,11 @@ function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
   item.icon:SetPoint("LEFT", item.frame, "LEFT", 0, 0)
 
   if header then
-    item.name = item.frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    item.name:SetFont(UNIT_NAME_FONT, 12, "")
+    item.name = item.frame:CreateFontString(nil, "ARTWORK")
+    item.name:SetFontObject(fonts.UnitFrame12Yellow)
   else
-    item.name = item.frame:CreateFontString(nil, "ARTWORK", "Game12Font")
-    item.name:SetFont(UNIT_NAME_FONT, 12, "")
+    item.name = item.frame:CreateFontString(nil, "ARTWORK")
+    item.name:SetFontObject(fonts.UnitFrame12White)
   end
   item.name:SetPoint("LEFT", item.icon, "RIGHT", 5, 0)
 

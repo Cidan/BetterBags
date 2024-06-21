@@ -16,6 +16,9 @@ local search = addon:GetModule('Search')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Fonts: AceModule
+local fonts = addon:GetModule('Fonts')
+
 ---@class GuildWarsDecoration: Frame
 ---@field panelButtons Button[]
 ---@field gwHeader GuildWarsHeader
@@ -209,8 +212,7 @@ local gw2Theme = {
   Opacity = function(_, _)
   end,
   SectionFont = function(font)
-    font:SetFont(UNIT_NAME_FONT, 12, "")
-    font:SetTextColor(1, 1, 1)
+    font:SetFontObject(fonts.UnitFrame12White)
   end,
   SetTitle = function(frame, title)
     local decoration = decoratorFrames[frame:GetName()]

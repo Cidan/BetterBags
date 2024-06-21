@@ -23,6 +23,9 @@ local decoratorFrames = {}
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Fonts: AceModule
+local fonts = addon:GetModule('Fonts')
+
 ---@type Theme
 local defaultTheme = {
   Name = 'Default',
@@ -34,8 +37,7 @@ local defaultTheme = {
       decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelTemplate") --[[@as DefaultThemeTemplate]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
-      decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
+      decoration.TitleContainer.TitleText:SetFontObject(fonts.UnitFrame12Yellow)
       decoration.CloseButton = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
       decoration.CloseButton:SetScript("OnClick", function()
         frame.Owner:Hide()
@@ -68,8 +70,7 @@ local defaultTheme = {
       decoration.CloseButton:SetScript("OnClick", function()
         frame:Hide()
       end)
-      decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
-      decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
+      decoration.TitleContainer.TitleText:SetFontObject(fonts.UnitFrame12Yellow)
       if themes.titles[frame:GetName()] then
         decoration:SetTitle(themes.titles[frame:GetName()])
       end
@@ -83,8 +84,7 @@ local defaultTheme = {
     if not decoration then
       decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelFlatTemplate") --[[@as DefaultThemeTemplate]]
       decoration:SetAllPoints()
-      decoration.TitleContainer.TitleText:SetFont(UNIT_NAME_FONT, 12, "")
-      decoration.TitleContainer.TitleText:SetTextColor(1, 0.82, 0)
+      decoration.TitleContainer.TitleText:SetFontObject(fonts.UnitFrame12Yellow)
       if themes.titles[frame:GetName()] then
         decoration:SetTitle(themes.titles[frame:GetName()])
       end
@@ -100,8 +100,7 @@ local defaultTheme = {
     end
   end,
   SectionFont = function(font)
-    font:SetFont(UNIT_NAME_FONT, 12, "")
-    font:SetTextColor(1, 0.82, 0)
+    font:SetFontObject(fonts.UnitFrame12Yellow)
   end,
   Reset = function()
     for _, frame in pairs(decoratorFrames) do

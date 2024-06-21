@@ -25,6 +25,9 @@ local items = addon:GetModule('Items')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
@@ -319,8 +322,8 @@ function config:GetBagOptions(kind)
               return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).opacity
             end,
             set = function(_, value)
-              config:GetBag(kind).frame.Bg:SetAlpha(value / 100)
               DB:SetBagViewSizeOpacity(kind, DB:GetBagView(kind), value)
+              themes:UpdateOpacity()
             end,
           },
           scale = {
