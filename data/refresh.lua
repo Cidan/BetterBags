@@ -98,7 +98,6 @@ function refresh:StartUpdate()
     return
   end
 
-  print("firing update, queue was wiped.")
   if updateBank and addon.atBank then
     local bankCtx = ctx:Copy()
     if addon.Bags.Bank.isReagentBank then
