@@ -28,6 +28,7 @@ local db = addon:GetModule('Database')
 ---@field SectionFont fun(font: FontString) A function that applies the theme to a section font.
 ---@field SetTitle fun(frame: Frame, title: string) A function that sets the title of the frame.
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
+---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -86,6 +87,15 @@ function themes:ApplyTheme(key)
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
     theme.ToggleSearch(frame, db:GetInBagSearch())
+    -- Apply bagslots positioning if the theme has a custom function for it.
+    if frame.Owner.slots then
+      if theme.PositionBagSlots then
+        theme.PositionBagSlots(frame, frame.Owner.slots.frame)
+      else
+        frame.Owner.slots.frame:ClearAllPoints()
+        frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 8)
+      end
+    end
   end
 
   -- Apply all simple frame themes.
