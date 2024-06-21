@@ -94,7 +94,7 @@ function themes:ApplyTheme(key)
         theme.PositionBagSlots(frame, frame.Owner.slots.frame)
       else
         frame.Owner.slots.frame:ClearAllPoints()
-        frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 8)
+        frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 14)
       end
     end
 
@@ -223,7 +223,7 @@ function themes.SetupBagButton(bag, decoration)
   bagButton:EnableMouse(true)
   bagButton:SetWidth(40)
   bagButton:SetHeight(40)
-  bagButton:SetPoint("TOPLEFT", decoration, "TOPLEFT", -10, 10)
+  bagButton:SetPoint("TOPLEFT", decoration, "TOPLEFT", -10, 7)
   bagButton:SetFrameLevel(950)
 
   local portraitSize = 48
