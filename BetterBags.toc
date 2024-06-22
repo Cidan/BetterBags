@@ -9,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, WagoAnalytics, GW2_UI
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, WagoAnalytics, GW2_UI, ElvUI
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -94,6 +94,7 @@ frames\bag.lua
 themes\default.lua
 themes\simpledark.lua
 themes\gw2.lua
+themes\elvui.lua
 
 config\config.lua
 config\help.lua
