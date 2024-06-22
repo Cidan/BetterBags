@@ -42,6 +42,7 @@ local gridProto = {}
 ---@field cells Cell[] The cells to render in this grid.
 ---@field maxWidthPerRow number The maximum width of a row before it wraps.
 ---@field columns? number The number of columns to render. If not set, columns is 1.
+---@field header? Cell A Cell to render above all other items, ignoring columns.
 
 function gridProto:Show()
   self.frame:Show()
@@ -269,6 +270,15 @@ function gridProto:stage(options)
     h = math.max(h, columnHeight)
     currentOffset = currentOffset + columnWidth
   end
+  if options.header then
+    ---@type RenderOptions
+    local headerOptions = {
+      cells = {options.header},
+      maxWidthPerRow = w,
+    }
+    self:layoutSingleColumn({options.header}, headerOptions, 0)
+  end
+
   w = w + self.spacing
   -- Remove the last 4 pixels of padding.
   if w > 4 then
