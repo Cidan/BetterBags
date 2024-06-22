@@ -243,7 +243,9 @@ function bagFrame.bagProto:OnResize()
     self.currentView:UpdateListSize(self)
   end
   if self.previousSize and database:GetBagView(self.kind) ~= const.BAG_VIEW.LIST then
-    self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", self.frame:GetLeft(), self.previousSize)
+    local left = self.frame:GetLeft()
+    self.frame:ClearAllPoints()
+    self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, self.previousSize)
   end
   self:KeepBagInBounds()
   self.previousSize = self.frame:GetBottom()

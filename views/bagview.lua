@@ -192,7 +192,7 @@ local function BagView(view, ctx, bag, slotInfo)
       section:Release()
     else
       debug:Log("KeepSection", "Section kept because not empty", sectionName)
-      section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+      section:SetMaxCellWidth(12)
       section:Draw(bag.kind, database:GetBagView(bag.kind), true)
     end
   end
@@ -204,7 +204,7 @@ local function BagView(view, ctx, bag, slotInfo)
   debug:StartProfile('Content Draw Stage')
   local w, h = view.content:Draw({
     cells = view.content.cells,
-    maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+    maxWidthPerRow = ((37 + 4) * 1) + 16,
   })
   debug:EndProfile('Content Draw Stage')
   -- Reposition the content frame if the recent items section is empty.
