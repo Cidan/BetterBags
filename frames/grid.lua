@@ -41,6 +41,7 @@ local gridProto = {}
 ---@class (exact) RenderOptions
 ---@field cells Cell[] The cells to render in this grid.
 ---@field maxWidthPerRow number The maximum width of a row before it wraps.
+---@field columns? number The number of columns to render. If not set, columns is 1.
 
 function gridProto:Show()
   self.frame:Show()
@@ -158,6 +159,42 @@ end
 ---@return number, number
 function gridProto:stageSimple()
   return 1,1
+end
+
+-- calculateColumns takes a list of cells and a column count. It will then
+-- return a list of list of cells, where each list of cells is a column.
+-- The columns are divided evenly by the height of all the cell frames
+-- in a given column.
+---@param cells Cell[]
+---@param columnCount number
+---@return Cell[][]
+function gridProto:calculateColumns(cells, columnCount)
+  if columnCount == 1 then
+    return cells
+  end
+  local totalHeight = 0
+  ---@type Cell[][]
+  local columns = {}
+  for _, cell in ipairs(cells) do
+    totalHeight = totalHeight + cell.frame:GetHeight()
+  end
+  local splitAt = math.ceil(totalHeight / columnCount)
+
+  local currentHeight = 0
+  local currentColumn = 1
+  for _, cell in ipairs(cells) do
+    if currentHeight + cell.frame:GetHeight() > splitAt then
+      currentColumn = currentColumn + 1
+      currentHeight = 0
+    else
+      currentHeight = currentHeight + cell.frame:GetHeight()
+    end
+    if not columns[currentColumn] then
+      columns[currentColumn] = {}
+    end
+    table.insert(columns[currentColumn], cell)
+  end
+  return columns
 end
 
 ---@param options RenderOptions
