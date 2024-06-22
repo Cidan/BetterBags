@@ -243,6 +243,7 @@ local function GridView(view, ctx, bag, slotInfo)
       cells = view.content.cells,
       maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
       columns = sizeInfo.columnCount,
+      header = view:RemoveSectionFromGrid(L:G("Recent Items")),
     })
     for _, section in pairs(view.sections) do
       debug:WalkAndFixAnchorGraph(section.frame)

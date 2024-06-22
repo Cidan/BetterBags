@@ -146,6 +146,12 @@ function views.viewProto:RemoveSection(category)
   self.sections[category] = nil
 end
 
+---@param section string
+---@return Cell?
+function views.viewProto:RemoveSectionFromGrid(section)
+  return self.content:RemoveCell(section)
+end
+
 ---@return table<string, Section>
 function views.viewProto:GetAllSections()
   return self.sections

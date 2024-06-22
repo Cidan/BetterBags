@@ -84,16 +84,19 @@ end
 
 -- RemoveCell will removed a cell from this grid.
 ---@param id string|nil
+---@return Cell?
 function gridProto:RemoveCell(id)
   assert(id, 'id is required')
   for i, c in ipairs(self.cells) do
     if c == self.idToCell[id] then
+      local cell = self.cells[i]
       table.remove(self.cells, i)
       self.cellToID[self.idToCell[id]] = nil
       self.idToCell[id] = nil
-      return
+      return cell
     end
   end
+  return nil
   --assert(false, 'cell not found')
 end
 
@@ -213,8 +216,9 @@ end
 ---@param cells Cell[]
 ---@param options RenderOptions
 ---@param currentOffset number
+---@param topOffset number
 ---@return number, number
-function gridProto:layoutSingleColumn(cells, options, currentOffset)
+function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
   local w = 0
   local rowWidth = 0
   local h = 0
@@ -249,6 +253,7 @@ function gridProto:layoutSingleColumn(cells, options, currentOffset)
       w = rowWidth
       rowStart = cell
       spacingX = currentOffset
+      spacingY = topOffset
     end
     cell.frame:SetPoint("TOPLEFT", relativeToFrame, relativeToPoint, spacingX, spacingY)
     cell.frame:Show()
@@ -264,19 +269,29 @@ function gridProto:stage(options)
   local h = 0
   local columns = self:calculateColumns(options.cells, options)
   local currentOffset = 0
-  for _, column in ipairs(columns) do
-    local columnWidth, columnHeight = self:layoutSingleColumn(column, options, currentOffset)
-    w = w + columnWidth
-    h = math.max(h, columnHeight)
-    currentOffset = currentOffset + columnWidth
-  end
+  local topOffset = 0
+  local headerWidth = 0
+  local headerHeight = 0
   if options.header then
     ---@type RenderOptions
     local headerOptions = {
       cells = {options.header},
-      maxWidthPerRow = w,
+      maxWidthPerRow = options.maxWidthPerRow,
     }
-    self:layoutSingleColumn({options.header}, headerOptions, 0)
+    headerWidth, headerHeight = self:layoutSingleColumn({options.header}, headerOptions, 0, 0)
+    topOffset = -headerHeight
+  end
+
+  for _, column in ipairs(columns) do
+    local columnWidth, columnHeight = self:layoutSingleColumn(column, options, currentOffset, topOffset)
+    w = w + columnWidth
+    h = math.max(h, columnHeight)
+    currentOffset = currentOffset + columnWidth
+  end
+
+  h = h + headerHeight
+  if w == 0 then
+    w = headerWidth
   end
 
   w = w + self.spacing
