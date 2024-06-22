@@ -118,16 +118,19 @@ end
 -- GetOrCreateSection will get an existing section by category,
 -- creating it if it doesn't exist.
 ---@param category string
+---@param onlyCreate? boolean If true, only create the section, but don't add it to the view.
 ---@return Section
-function views.viewProto:GetOrCreateSection(category)
+function views.viewProto:GetOrCreateSection(category, onlyCreate)
   local section = self.sections[category]
   if section == nil then
     section = sectionFrame:Create()
     section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
-    self.content:AddCell(category, section)
+    if not onlyCreate then 
+      self.content:AddCell(category, section)
+    end
     self.sections[category] = section
-  elseif self.content:GetCell(category) == nil then
+  elseif self.content:GetCell(category) == nil and not onlyCreate then
     self.content:AddCell(category, section)
   end
   return section
@@ -141,6 +144,12 @@ end
 function views.viewProto:RemoveSection(category)
   self.content:RemoveCell(category)
   self.sections[category] = nil
+end
+
+---@param section string
+---@return Cell?
+function views.viewProto:RemoveSectionFromGrid(section)
+  return self.content:RemoveCell(section)
 end
 
 ---@return table<string, Section>

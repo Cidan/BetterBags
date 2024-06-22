@@ -41,6 +41,8 @@ local gridProto = {}
 ---@class (exact) RenderOptions
 ---@field cells Cell[] The cells to render in this grid.
 ---@field maxWidthPerRow number The maximum width of a row before it wraps.
+---@field columns? number The number of columns to render. If not set, columns is 1.
+---@field header? Cell A Cell to render above all other items, ignoring columns.
 
 function gridProto:Show()
   self.frame:Show()
@@ -82,16 +84,19 @@ end
 
 -- RemoveCell will removed a cell from this grid.
 ---@param id string|nil
+---@return Cell?
 function gridProto:RemoveCell(id)
   assert(id, 'id is required')
   for i, c in ipairs(self.cells) do
     if c == self.idToCell[id] then
+      local cell = self.cells[i]
       table.remove(self.cells, i)
       self.cellToID[self.idToCell[id]] = nil
       self.idToCell[id] = nil
-      return
+      return cell
     end
   end
+  return nil
   --assert(false, 'cell not found')
 end
 
@@ -160,11 +165,60 @@ function gridProto:stageSimple()
   return 1,1
 end
 
+-- calculateColumns takes a list of cells and a column count. It will then
+-- return a list of list of cells, where each list of cells is a column.
+-- The columns are divided evenly by the height of all the cell frames
+-- in a given column.
+---@param cells Cell[]
 ---@param options RenderOptions
+---@return Cell[][]
+function gridProto:calculateColumns(cells, options)
+  if not options.columns or options.columns == 1 then
+    return {[1] = cells}
+  end
+  --local rowWidth = 0
+  local totalHeight = 0
+  ---@type Cell[][]
+  local columns = {}
+  for _, cell in ipairs(cells) do
+    --TODO(lobato): Calculate total height based on compressed heights.
+    --if i ~= 1 then
+    --  if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
+    --    totalHeight = totalHeight + cell.frame:GetHeight()
+    --    rowWidth = cell.frame:GetWidth()
+    --  else
+    --    rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+    --  end
+    --else
+    --  totalHeight = totalHeight + cell.frame:GetHeight()
+    --end
+    totalHeight = totalHeight + cell.frame:GetHeight()
+  end
+
+  local splitAt = math.ceil(totalHeight / options.columns)
+  local currentHeight = 0
+  local currentColumn = 1
+  for _, cell in ipairs(cells) do
+    if currentHeight + cell.frame:GetHeight() > splitAt then
+      currentColumn = currentColumn + 1
+      currentHeight = 0
+    else
+      currentHeight = currentHeight + cell.frame:GetHeight()
+    end
+    if not columns[currentColumn] then
+      columns[currentColumn] = {}
+    end
+    table.insert(columns[currentColumn], cell)
+  end
+  return columns
+end
+
+---@param cells Cell[]
+---@param options RenderOptions
+---@param currentOffset number
+---@param topOffset number
 ---@return number, number
-function gridProto:stage(options)
-  if not options then return 0, 0 end
-  local cells = options.cells
+function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
   local w = 0
   local rowWidth = 0
   local h = 0
@@ -198,9 +252,46 @@ function gridProto:stage(options)
       rowWidth = cell.frame:GetWidth()
       w = rowWidth
       rowStart = cell
+      spacingX = currentOffset
+      spacingY = topOffset
     end
     cell.frame:SetPoint("TOPLEFT", relativeToFrame, relativeToPoint, spacingX, spacingY)
     cell.frame:Show()
+  end
+  return w, h
+end
+
+---@param options RenderOptions
+---@return number, number
+function gridProto:stage(options)
+  if not options then return 0, 0 end
+  local w = 0
+  local h = 0
+  local columns = self:calculateColumns(options.cells, options)
+  local currentOffset = 0
+  local topOffset = 0
+  local headerWidth = 0
+  local headerHeight = 0
+  if options.header then
+    ---@type RenderOptions
+    local headerOptions = {
+      cells = {options.header},
+      maxWidthPerRow = options.maxWidthPerRow,
+    }
+    headerWidth, headerHeight = self:layoutSingleColumn({options.header}, headerOptions, 0, 0)
+    topOffset = -headerHeight
+  end
+
+  for _, column in ipairs(columns) do
+    local columnWidth, columnHeight = self:layoutSingleColumn(column, options, currentOffset, topOffset)
+    w = w + columnWidth
+    h = math.max(h, columnHeight)
+    currentOffset = currentOffset + columnWidth
+  end
+
+  h = h + headerHeight
+  if w == 0 then
+    w = headerWidth
   end
 
   w = w + self.spacing
