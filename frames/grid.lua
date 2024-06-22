@@ -166,20 +166,32 @@ end
 -- The columns are divided evenly by the height of all the cell frames
 -- in a given column.
 ---@param cells Cell[]
----@param columnCount number
+---@param options RenderOptions
 ---@return Cell[][]
-function gridProto:calculateColumns(cells, columnCount)
-  if columnCount == 1 then
-    return cells
+function gridProto:calculateColumns(cells, options)
+  if not options.columns or options.columns == 1 then
+    return {[1] = cells}
   end
+  --local rowWidth = 0
   local totalHeight = 0
   ---@type Cell[][]
   local columns = {}
   for _, cell in ipairs(cells) do
+    --TODO(lobato): Calculate total height based on compressed heights.
+    --if i ~= 1 then
+    --  if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
+    --    totalHeight = totalHeight + cell.frame:GetHeight()
+    --    rowWidth = cell.frame:GetWidth()
+    --  else
+    --    rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+    --  end
+    --else
+    --  totalHeight = totalHeight + cell.frame:GetHeight()
+    --end
     totalHeight = totalHeight + cell.frame:GetHeight()
   end
-  local splitAt = math.ceil(totalHeight / columnCount)
 
+  local splitAt = math.ceil(totalHeight / options.columns)
   local currentHeight = 0
   local currentColumn = 1
   for _, cell in ipairs(cells) do
@@ -197,11 +209,11 @@ function gridProto:calculateColumns(cells, columnCount)
   return columns
 end
 
+---@param cells Cell[]
 ---@param options RenderOptions
+---@param currentOffset number
 ---@return number, number
-function gridProto:stage(options)
-  if not options then return 0, 0 end
-  local cells = options.cells
+function gridProto:layoutSingleColumn(cells, options, currentOffset)
   local w = 0
   local rowWidth = 0
   local h = 0
@@ -235,11 +247,28 @@ function gridProto:stage(options)
       rowWidth = cell.frame:GetWidth()
       w = rowWidth
       rowStart = cell
+      spacingX = currentOffset
     end
     cell.frame:SetPoint("TOPLEFT", relativeToFrame, relativeToPoint, spacingX, spacingY)
     cell.frame:Show()
   end
+  return w, h
+end
 
+---@param options RenderOptions
+---@return number, number
+function gridProto:stage(options)
+  if not options then return 0, 0 end
+  local w = 0
+  local h = 0
+  local columns = self:calculateColumns(options.cells, options)
+  local currentOffset = 0
+  for _, column in ipairs(columns) do
+    local columnWidth, columnHeight = self:layoutSingleColumn(column, options, currentOffset)
+    w = w + columnWidth
+    h = math.max(h, columnHeight)
+    currentOffset = currentOffset + columnWidth
+  end
   w = w + self.spacing
   -- Remove the last 4 pixels of padding.
   if w > 4 then

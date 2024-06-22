@@ -426,27 +426,6 @@ function DB:Migrate()
       }
     end
   end
-
-  --[[
-    Migration away from columns and compaction.
-    Do not remove before Q1'25.
-  ]]
-  if DB.data.profile.compaction ~= nil then
-    DB.data.profile.compaction = nil
-    for _, bagView in pairs(const.BAG_VIEW) do
-      for _, bagKind in pairs(const.BAG_KIND) do
-        if DB.data.profile.size[bagView] then
-        local t = DB.data.profile.size[bagView][bagKind]
-          if t then
-            if t.columnCount ~= nil and t.itemsPerRow ~= nil then
-              t.itemsPerRow = t.columnCount * t.itemsPerRow
-            end
-            t.columnCount = nil
-          end
-        end
-      end
-    end
-  end
 end
 
 DB:Enable()
