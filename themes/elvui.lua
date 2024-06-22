@@ -6,8 +6,15 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
-local E = unpack(ElvUI --[[@as ElvUI]]) --[[@as ElvUI]]
-local S = E:GetModule('Skins')
+---@type ElvUI
+local E
+---@type ElvUISkin
+local S
+
+if ElvUI then
+  E = unpack(ElvUI --[[@as ElvUI]]) --[[@as ElvUI]]
+  S = E:GetModule('Skins')
+end
 
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
