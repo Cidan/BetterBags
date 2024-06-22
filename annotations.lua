@@ -485,3 +485,19 @@ function Button:GwStripTextures() end
 
 ---@class GuildWarsHeader: Frame
 ---@field windowIcon Texture
+
+---@class ElvUI
+ElvUI = {}
+
+---@class ElvUISkin
+local ElvUISkin = {}
+
+---@param frame Frame
+function ElvUISkin:HandleEditBox(frame) end
+
+---@param frame Frame
+function ElvUISkin:HandleFrame(frame) end
+
+---@param name string
+---@return ElvUISkin
+function ElvUI:GetModule(name) end

@@ -15,6 +15,7 @@ local fonts = addon:GetModule('Fonts')
 ---@class SimpleDarkDecoration: Frame
 ---@field title FontString
 ---@field search SearchFrame
+---@field bg BackdropTemplate|Frame
 
 ---@type table<string, SimpleDarkDecoration>
 local decoratorFrames = {}
@@ -43,17 +44,19 @@ local simpleDark = {
     if not decoration then
       -- A decoration is just another frame that we "overlay" on top of the 'frame' provided by this function
       -- This decoration will be used to add a backdrop, title, and close button to the frame.
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate") --[[@as SimpleDarkDecoration]]
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame) --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration:SetBackdrop({
+      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", frame, "BackdropTemplate")
+      decoration.bg:SetAllPoints()
+      decoration.bg:SetFrameLevel(frame:GetFrameLevel() - 1)
+      decoration.bg:SetBackdrop({
         bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
-        edgeFile = 'Interface\\Tooltips\\UI-Tooltip-Border',
-        edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
+        edgeFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+        edgeSize = 1,
       })
-      decoration:SetBackdropColor(0, 0, 0, 1)
-      decoration:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+      decoration.bg:SetBackdropColor(0, 0, 0, 1)
+      decoration.bg:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
       -- Title text
       local title = decoration:CreateFontString(nil, "OVERLAY")
@@ -68,22 +71,30 @@ local simpleDark = {
         decoration.title:SetText(themes.titles[frame:GetName()])
       end
 
-      local close = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonNoScripts")
-      close:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", 1, 0)
+      local close = CreateFrame("Button", nil, decoration)
+      close:SetNormalTexture("Interface\\AddOns\\BetterBags\\textures\\close.png")
+      close:SetHighlightTexture("Interface\\AddOns\\BetterBags\\textures\\close.png")
+      close:SetSize(12, 12)
+      close:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -8, -8)
       close:SetScript("OnClick", function()
         -- frame.Owner is the bag construct itself in 'frames\bag.lua'. You can use this
         -- to access the bag construct's methods and properties if needed.
         frame.Owner:Hide()
       end)
+      close:SetFrameLevel(1001)
 
       local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      searchBox.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
+      searchBox.frame:SetPoint("TOP", decoration, "TOP", 0, -16)
       searchBox.frame:SetSize(150, 20)
       decoration.search = searchBox
 
       -- The bag button is abstracted here as it's a common element across all themes.
       -- This function does return the bag button, and you can modify it as you need.
-      themes.SetupBagButton(frame.Owner, decoration --[[@as Frame]])
+      local bagButton = themes.SetupBagButton(frame.Owner, decoration --[[@as Frame]])
+      bagButton:SetPoint("TOPLEFT", decoration, "TOPLEFT", 4, -6)
+      local w, h = bagButton.portrait:GetSize()
+      bagButton.portrait:SetSize((w / 10) * 8.5, (h / 10) * 8.5)
+      bagButton.highlightTex:SetSize((w / 10) * 8.5, (h / 10) * 8.5)
 
       -- Save the decoration frame for reuse.
       decoratorFrames[frame:GetName()] = decoration
@@ -97,17 +108,19 @@ local simpleDark = {
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
       -- Backdrop
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate") --[[@as SimpleDarkDecoration]]
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame) --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration:SetBackdrop({
+      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", frame, "BackdropTemplate")
+      decoration.bg:SetAllPoints()
+      decoration.bg:SetFrameLevel(frame:GetFrameLevel() - 1)
+      decoration.bg:SetBackdrop({
         bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
-        edgeFile = 'Interface\\Tooltips\\UI-Tooltip-Border',
-        edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
+        edgeFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+        edgeSize = 1,
       })
-      decoration:SetBackdropColor(0, 0, 0, 1)
-      decoration:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+      decoration.bg:SetBackdropColor(0, 0, 0, 1)
+      decoration.bg:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
       -- Title text
       local title = decoration:CreateFontString(nil, "OVERLAY")
@@ -116,11 +129,15 @@ local simpleDark = {
       title:SetHeight(30)
       decoration.title = title
 
-      local close = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonNoScripts")
-      close:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", 1, 0)
+      local close = CreateFrame("Button", nil, decoration)
+      close:SetNormalTexture("Interface\\AddOns\\BetterBags\\textures\\close.png")
+      close:SetHighlightTexture("Interface\\AddOns\\BetterBags\\textures\\close.png")
+      close:SetSize(12, 12)
+      close:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -8, -8)
       close:SetScript("OnClick", function()
         frame:Hide()
       end)
+      close:SetFrameLevel(1001)
 
       if themes.titles[frame:GetName()] then
         decoration.title:SetText(themes.titles[frame:GetName()])
@@ -136,17 +153,19 @@ local simpleDark = {
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
       -- Backdrop
-      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame, "BackdropTemplate") --[[@as SimpleDarkDecoration]]
+      decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame) --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration:SetBackdrop({
+      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", frame, "BackdropTemplate")
+      decoration.bg:SetAllPoints()
+      decoration.bg:SetFrameLevel(frame:GetFrameLevel() - 1)
+      decoration.bg:SetBackdrop({
         bgFile = 'Interface\\ChatFrame\\ChatFrameBackground',
-        edgeFile = 'Interface\\Tooltips\\UI-Tooltip-Border',
-        edgeSize = 16,
-        insets = {left = 4, right = 4, top = 4, bottom = 4}
+        edgeFile = 'Interface\\ChatFrame\\ChatFrameBackground',
+        edgeSize = 1,
       })
-      decoration:SetBackdropColor(0, 0, 0, 1)
-      decoration:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+      decoration.bg:SetBackdropColor(0, 0, 0, 1)
+      decoration.bg:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
 
       -- Title text
       local title = decoration:CreateFontString(nil, "OVERLAY")
@@ -169,7 +188,7 @@ local simpleDark = {
   Opacity = function(frame, alpha)
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
-      decoration:SetAlpha(alpha / 100)
+      decoration.bg:SetAlpha(alpha / 100)
     end
   end,
   -- The SetSectionFont function is called when the user updates the font for item sections
@@ -197,6 +216,11 @@ local simpleDark = {
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
       decoration.search:SetShown(shown)
+      if shown then
+        decoration.title:Hide()
+      else
+        decoration.title:Show()
+      end
     end
   end
 }
