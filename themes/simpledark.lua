@@ -47,7 +47,7 @@ local simpleDark = {
       decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame) --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", frame, "BackdropTemplate")
+      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", decoration, "BackdropTemplate")
       decoration.bg:SetAllPoints()
       decoration.bg:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration.bg:SetBackdrop({
@@ -111,7 +111,7 @@ local simpleDark = {
       decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame) --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", frame, "BackdropTemplate")
+      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", decoration, "BackdropTemplate")
       decoration.bg:SetAllPoints()
       decoration.bg:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration.bg:SetBackdrop({
@@ -156,7 +156,7 @@ local simpleDark = {
       decoration = CreateFrame("Frame", frame:GetName().."ThemeSimpleDark", frame) --[[@as SimpleDarkDecoration]]
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
-      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", frame, "BackdropTemplate")
+      decoration.bg = CreateFrame("Frame", decoration:GetName() .. "BG", decoration, "BackdropTemplate")
       decoration.bg:SetAllPoints()
       decoration.bg:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration.bg:SetBackdrop({
