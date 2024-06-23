@@ -689,10 +689,6 @@ function items:GetCategory(data)
     return _G[data.itemInfo.itemEquipLoc]
   end
 
-  if data.bagid == Enum.BagIndex.ReagentBag then
-    return L:G('Reagent')
-  end
-
   local category = ""
 
   -- Add the type filter to the category if enabled, but not to trade goods
