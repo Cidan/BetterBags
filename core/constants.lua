@@ -449,16 +449,16 @@ const.DATABASE_DEFAULTS = {
       },
       [const.BAG_VIEW.SECTION_GRID] = {
         [const.BAG_KIND.BACKPACK] = {
-          columnCount = 1,
-          itemsPerRow = 15,
+          columnCount = 2,
+          itemsPerRow = 7,
           scale = 100,
           width = 700,
           height = 500,
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
-          columnCount = 1,
-          itemsPerRow = 15,
+          columnCount = 2,
+          itemsPerRow = 7,
           scale = 100,
           width = 700,
           height = 500,

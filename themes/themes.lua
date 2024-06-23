@@ -30,6 +30,7 @@ local db = addon:GetModule('Database')
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
 ---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
+---@field ItemButton? fun(button: Item) A function that applies the theme to an item button.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
