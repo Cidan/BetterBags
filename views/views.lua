@@ -149,7 +149,12 @@ end
 ---@param section string
 ---@return Cell?
 function views.viewProto:RemoveSectionFromGrid(section)
-  return self.content:RemoveCell(section)
+  local cell = self.content:RemoveCell(section)
+  if cell then
+    return cell
+  end
+  cell = self.sections[section] --[[@as Cell?]]
+  return cell
 end
 
 ---@return table<string, Section>
