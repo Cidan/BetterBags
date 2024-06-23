@@ -142,9 +142,37 @@ local function matchFilter(filter, data)
     if string.find(const.BRIEF_EXPANSION_MAP[data.itemInfo.expacID]:lower(), value, 1, true) then
       return true
     end
+  elseif prefix == "stat" then
+    if string.find(data.itemInfo.itemType, L:G("Armor"), 1, true) or string.find(data.itemInfo.itemType, L:G("Weapon"), 1, true) then
+      if searchTooltipForValue(data.itemInfo.itemLink, value, 5) then
+        return true
+      end
+    end
   elseif prefix == "gear" and data.itemInfo.equipmentSet ~= nil then
     if string.find(data.itemInfo.equipmentSet:lower(), value, 1, true) then
       return true
+    end
+  end
+  return false
+end
+
+--searchTooltipForValue creates a tooltip with the provided items description, and will 
+--return a boolean stating whether the value is found in the tooltip or not
+--for a slight optimization we can skip an certain number of tooltip lines
+---@param itemLink string
+---@param value string
+---@param tooltipLinesToSkip integer
+---@return boolean
+function searchTooltipForValue(itemLink, value, tooltipLinesToSkip)
+  SearchTooltip = CreateFrame("GameTooltip", "SearchTooltip", nil, "GameTooltipTemplate") --[[@as GameTooltip]]
+  SearchTooltip:SetOwner(UIParent, "ANCHOR_NONE")
+  SearchTooltip:SetHyperlink(itemLink)
+  for i = 1+tooltipLinesToSkip, SearchTooltip:NumLines() do
+    local tooltipText = _G["SearchTooltipTextLeft" .. i]:GetText()
+    if tooltipText then
+      if string.find(tooltipText:lower(), value, 1, true) then
+        return true
+      end
     end
   end
   return false
