@@ -32,6 +32,9 @@ local L = addon:GetModule('Localization')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -299,6 +302,8 @@ function itemFrame.itemProto:SetItemFromData(data)
   else
     self.kind = const.BAG_KIND.BACKPACK
   end
+
+  themes:UpdateItemButton(self)
 
   -- TODO(lobato): Figure out what to do with empty items.
   if data.isItemEmpty then

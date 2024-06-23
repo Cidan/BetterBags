@@ -142,5 +142,9 @@ local theme = {
       end
     end
   end,
+  ItemButton = function (button)
+    --print("handle")
+    S:HandleItemButton(button.button)
+  end,
 }
 themes:RegisterTheme('elvui', theme)

@@ -166,6 +166,14 @@ function themes:RegisterSectionFont(font)
   table.insert(self.sectionFonts, font)
 end
 
+---@param button Item
+function themes:UpdateItemButton(button)
+  local theme = self.themes[db:GetTheme()]
+  if theme.ItemButton then
+    theme.ItemButton(button)
+  end
+end
+
 ---@return table<string, Theme>
 function themes:GetAllThemes()
   ---@type table<string, Theme>
