@@ -349,7 +349,7 @@ function config:GetBagOptions(kind)
             max = 20,
             step = 1,
             get = function()
-              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).itemsPerRow
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).itemsPerRow > 20 and 20 or DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).itemsPerRow
             end,
             set = function(_, value)
               DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
@@ -383,7 +383,7 @@ function config:GetBagOptions(kind)
             max = 20,
             step = 1,
             get = function()
-              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount > 20 and 20 or DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
             end,
             set = function(_, value)
               DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)

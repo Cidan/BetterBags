@@ -176,32 +176,40 @@ function gridProto:calculateColumns(cells, options)
   if not options.columns or options.columns == 1 then
     return {[1] = cells}
   end
-  --local rowWidth = 0
+  local rowWidth = 0
   local totalHeight = 0
   ---@type Cell[][]
   local columns = {}
-  for _, cell in ipairs(cells) do
-    --TODO(lobato): Calculate total height based on compressed heights.
-    --if i ~= 1 then
-    --  if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-    --    totalHeight = totalHeight + cell.frame:GetHeight()
-    --    rowWidth = cell.frame:GetWidth()
-    --  else
-    --    rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
-    --  end
-    --else
-    --  totalHeight = totalHeight + cell.frame:GetHeight()
-    --end
-    totalHeight = totalHeight + cell.frame:GetHeight()
+  for i, cell in ipairs(cells) do
+    if i ~= 1 then
+      if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
+        totalHeight = totalHeight + cell.frame:GetHeight()
+        rowWidth = cell.frame:GetWidth()
+      else
+        rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+      end
+    else
+      totalHeight = totalHeight + cell.frame:GetHeight()
+    end
   end
 
   local splitAt = math.ceil(totalHeight / options.columns)
   local currentHeight = 0
   local currentColumn = 1
-  for _, cell in ipairs(cells) do
-    if currentHeight + cell.frame:GetHeight() > splitAt then
-      currentColumn = currentColumn + 1
-      currentHeight = 0
+  rowWidth = 0
+  for i, cell in ipairs(cells) do
+    if i ~= 1 then
+      if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
+        if currentHeight + cell.frame:GetHeight() > splitAt then
+          currentColumn = currentColumn + 1
+          currentHeight = 0
+        else
+          currentHeight = currentHeight + cell.frame:GetHeight()
+        end
+        rowWidth = cell.frame:GetWidth()
+      else
+        rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+      end
     else
       currentHeight = currentHeight + cell.frame:GetHeight()
     end
