@@ -495,7 +495,11 @@ function Button:GwStripTextures() end
 ---@field windowIcon Texture
 
 ---@class ElvUI
-ElvUI = {}
+ElvUI = {
+  Media = {
+    Textures = {}
+  }
+}
 
 ---@class ElvUISkin
 local ElvUISkin = {}
@@ -505,6 +509,13 @@ function ElvUISkin:HandleEditBox(frame) end
 
 ---@param frame Frame
 function ElvUISkin:HandleFrame(frame) end
+
+---@param button ItemButton
+---@param outer boolean
+function ElvUISkin:HandleItemButton(button, outer) end
+
+---@param IconBorder Texture
+function ElvUISkin:HandleIconBorder(IconBorder) end
 
 ---@param name string
 ---@return ElvUISkin

@@ -1,3 +1,4 @@
+---@diagnostic disable: duplicate-set-field
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
@@ -186,32 +187,5 @@ local theme = {
     itemButtons[buttonName] = button
     return button
   end,
-  --ItemButton = function (button)
-  --  local frame = button.button
-  --  if frame.isSkinned then return end
-  --  local quest_overlay = frame:CreateTexture(nil, "OVERLAY")
-  --  quest_overlay:SetTexture(E.Media.Textures.BagQuestIcon)
-  --  quest_overlay:SetTexCoord(0, 1, 0, 1)
-  --  quest_overlay:SetAllPoints()
-  --  quest_overlay:Hide()
---
-  --  S:HandleItemButton(frame, true)
-  --  S:HandleIconBorder(frame.IconBorder)
-  --  if frame.IconQuestTexture then
-  --    local isShown = button.IconQuestTexture:IsShown()
-  --    button.IconQuestTexture:Hide()
-  --    button.IconQuestTexture.Show = function()
-  --      print("showing")
-  --      quest_overlay:Show()
-  --      --frame:SetBackdropBorderColor(1, 0.8, 0, 1)
-  --      --update_border_color(frame, 1, 0.8, 0, 1)
-  --    end
-  --    if isShown then
-  --      button.IconQuestTexture:Show()
-  --    else
-  --      button.IconQuestTexture:Hide()
-  --    end
-  --  end
-  --end,
 }
 themes:RegisterTheme('elvui', theme)

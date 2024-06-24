@@ -87,7 +87,6 @@ local children = {
   "HighlightTexture"
 }
 
-local noop = function() end
 -- parseQuery will parse a query string and return a set of boolean
 -- filters that can be matched against an item.
 ---@param query string
@@ -291,10 +290,6 @@ end
 ---@param data ItemData
 function itemFrame.itemProto:SetItemFromData(data)
   assert(data, 'data must be provided')
-  local wasNew = false
-  if self.kind == nil then
-    wasNew = true
-  end
   self.slotkey = data.slotkey
   local tooltipOwner = GameTooltip:GetOwner()
   local bagid, slotid = data.bagid, data.slotid
@@ -442,10 +437,6 @@ end
 ---@param name string
 function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   local decoration = themes:GetItemButton(self)
-  local wasNew = false
-  if self.kind == nil then
-    wasNew = true
-  end
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
