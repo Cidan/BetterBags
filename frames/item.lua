@@ -87,6 +87,7 @@ local children = {
   "HighlightTexture"
 }
 
+local noop = function() end
 -- parseQuery will parse a query string and return a set of boolean
 -- filters that can be matched against an item.
 ---@param query string
@@ -619,6 +620,11 @@ function itemFrame:_DoCreate()
   ---@class ItemButton
   local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
 
+  button.PushedTexture:SetAlpha(0)
+  button.NormalTexture:SetAlpha(0)
+  hooksecurefunc(button:GetNormalTexture(), "SetShown", function()
+    print("hook?")
+  end)
   -- Hide all the default textures on the clickable button.
   for _, child in pairs(children) do
     if _G[name..child] then

@@ -160,6 +160,29 @@ local theme = {
     S:HandleIconBorder(button.IconBorder)
     button:SetFrameLevel(item.button:GetFrameLevel() -1)
     button:Show()
+
+    button:GetNormalTexture():SetAlpha(0)
+    button:SetHighlightTexture(E.Media.Textures.White8x8)
+    button:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.3)
+    button:SetPushedTexture(E.Media.Textures.White8x8)
+    button:GetPushedTexture():SetVertexColor(1, 1, 1, 0.3)
+
+    local quest_overlay = button:CreateTexture(nil, "OVERLAY")
+    quest_overlay:SetTexture(E.Media.Textures.BagQuestIcon)
+    quest_overlay:SetTexCoord(0, 1, 0, 1)
+    quest_overlay:SetAllPoints()
+    quest_overlay:Hide()
+    if button.IconQuestTexture then
+      button.IconQuestTexture:Hide()
+      button.IconQuestTexture.Show = function()
+        quest_overlay:Show()
+        --button.IconBorder:SetVertexColor(1, 0.8, 0, 1)
+      end
+      button.IconQuestTexture.Hide = function()
+        quest_overlay:Hide()
+        --button.IconBorder:SetVertexColor(1, 1, 1, 1)
+      end
+    end
     itemButtons[buttonName] = button
     return button
   end,
