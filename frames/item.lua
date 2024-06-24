@@ -620,11 +620,23 @@ function itemFrame:_DoCreate()
   ---@class ItemButton
   local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
 
-  button.PushedTexture:SetAlpha(0)
-  button.NormalTexture:SetAlpha(0)
-  hooksecurefunc(button:GetNormalTexture(), "SetShown", function()
-    print("hook?")
+  -- Install special handlers for themed interaction textures.
+  button.PushedTexture:SetTexture("")
+  button.NormalTexture:SetTexture("")
+  button:HookScript("OnMouseDown", function()
+    themes:GetItemButton(i):GetPushedTexture():Show()
   end)
+  button:HookScript("OnMouseUp", function()
+    themes:GetItemButton(i):GetPushedTexture():Hide()
+  end)
+  button:HookScript("OnLeave", function()
+    themes:GetItemButton(i):GetHighlightTexture():Hide()
+    themes:GetItemButton(i):GetPushedTexture():Hide()
+  end)
+  button:HookScript("OnEnter", function()
+    themes:GetItemButton(i):GetHighlightTexture():Show()
+  end)
+
   -- Hide all the default textures on the clickable button.
   for _, child in pairs(children) do
     if _G[name..child] then
