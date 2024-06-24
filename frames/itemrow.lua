@@ -25,6 +25,9 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')
 
@@ -90,9 +93,9 @@ function item.itemRowProto:SetItemFromData(data, static)
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
   --self.button:SetSize(20, 20)
-  self.button.Count:Hide()
-  self.button.ilvlText:Hide()
-  self.button.LockTexture:Hide()
+  --self.button.Count:Hide()
+  --self.button.ilvlText:Hide()
+  --self.button.LockTexture:Hide()
 
   if bagid then
     self.frame:SetID(bagid)
