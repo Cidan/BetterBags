@@ -291,10 +291,12 @@ end
 function itemFrame.itemProto:SetItemFromData(data)
   assert(data, 'data must be provided')
   self.slotkey = data.slotkey
+  local decoration = themes:GetItemButton(self)
   local tooltipOwner = GameTooltip:GetOwner()
   local bagid, slotid = data.bagid, data.slotid
   if bagid and slotid then
     self.button:SetID(slotid)
+    decoration:SetID(slotid)
     self.frame:SetID(bagid)
     if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
       self.kind = const.BAG_KIND.BANK
@@ -310,7 +312,6 @@ function itemFrame.itemProto:SetItemFromData(data)
     return
   end
 
-  local decoration = themes:GetItemButton(self)
   local questInfo = data.questInfo
   local info = data.containerInfo
   local readable = info and info.isReadable;
@@ -449,6 +450,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   else
     self.button:Enable()
     self.button:SetID(slotid)
+    decoration:SetID(slotid)
     self.frame:SetID(bagid)
   end
 
@@ -544,6 +546,7 @@ function itemFrame.itemProto:ClearItem()
   decoration.ItemSlotBackground:Hide()
   self.frame:SetID(0)
   self.button:SetID(0)
+  decoration:SetID(0)
   self.button:Enable()
   self.ilvlText:SetText("")
   self.ilvlText:Hide()

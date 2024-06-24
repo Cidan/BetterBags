@@ -156,10 +156,9 @@ local theme = {
       button:Show()
       return button
     end
-    button = themes.CreateBlankItemButtonDecoration(item.button, "ElvUI", buttonName)
+    button = themes.CreateBlankItemButtonDecoration(item.frame, "ElvUI", buttonName)
     S:HandleItemButton(button, true)
     S:HandleIconBorder(button.IconBorder)
-    button:SetFrameLevel(item.button:GetFrameLevel() -1)
     button:Show()
 
     button:GetNormalTexture():SetAlpha(0)
@@ -184,6 +183,7 @@ local theme = {
         --button.IconBorder:SetVertexColor(1, 1, 1, 1)
       end
     end
+    E:RegisterCooldown(button.Cooldown, 'bags')
     itemButtons[buttonName] = button
     return button
   end,

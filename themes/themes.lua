@@ -262,7 +262,7 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
   button.ItemSlotBackground:SetAllPoints(button)
   button.ItemSlotBackground:Hide()
-  button:SetFrameLevel(parent:GetFrameLevel() -1)
+  button:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
   button.IconTexture = _G[buttonName.."Decoration"..theme.."IconTexture"]
   button:Show()
   return button
