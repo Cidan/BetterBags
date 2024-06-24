@@ -9,6 +9,9 @@ local const = addon:GetModule('Constants')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 

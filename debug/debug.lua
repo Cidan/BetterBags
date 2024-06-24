@@ -136,5 +136,3 @@ function debug:Inspect(tag, value, nocopy)
     end
   end
 end
-
-debug:Enable()

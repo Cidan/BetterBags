@@ -54,6 +54,7 @@ end
 
 function masque:OnEnable()
   if not Masque then return end
+  debug:Log("Masque", "Masque enabled.")
   self.groups = {}
   self.groups["Backpack"] = Masque:Group('BetterBags', 'Backpack')
   self.groups["Backpack"]:RegisterCallback(self.OnSkinChange, self)
@@ -62,14 +63,15 @@ function masque:OnEnable()
 
   events:RegisterMessage('item/NewButton', function(_, item, decoration)
     ---@cast item Item
+    if not item.kind then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    debug:Log("Masque", "Adding button to group")
     group:AddButton(decoration)
     self:ReapplyBlend(decoration)
   end)
 
   events:RegisterMessage('item/Clearing', function(_, item, decoration)
     ---@cast item Item
+    if not item.kind then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:RemoveButton(decoration)
   end)
