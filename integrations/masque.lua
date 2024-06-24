@@ -12,6 +12,9 @@ local debug = addon:GetModule('Debug')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class MasqueTheme: AceModule
 ---@field groups table<string, MasqueGroup>
 local masque = addon:NewModule('Masque')
@@ -38,6 +41,17 @@ function masque:RemoveButtonFromGroup(group, button)
   self.groups[group]:RemoveButton(button)
 end
 
+---@param group string
+---@return boolean
+function masque:IsGroupEnabled(group)
+  if not Masque then
+    return false
+  end
+  -- TODO(lobato): implement this
+  return false
+  --return not self.groups[group].db.Disabled
+end
+
 function masque:OnEnable()
   if not Masque then return end
   self.groups = {}
@@ -49,14 +63,14 @@ function masque:OnEnable()
   events:RegisterMessage('item/NewButton', function(_, item)
     ---@cast item Item
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    group:AddButton(item.button)
-    self:ReapplyBlend(item.button)
+    --group:AddButton(item.button)
+    --self:ReapplyBlend(item.button)
   end)
 
   events:RegisterMessage('item/Clearing', function(_, item)
     ---@cast item Item
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    group:RemoveButton(item.button)
+    --group:RemoveButton(item.button)
   end)
 
   events:RegisterMessage('bagbutton/Updated', function(_, bag)

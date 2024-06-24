@@ -30,7 +30,7 @@ local db = addon:GetModule('Database')
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
 ---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
----@field ItemButton? fun(button: Item) A function that applies the theme to an item button.
+---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -38,6 +38,7 @@ local db = addon:GetModule('Database')
 ---@field windows table<WindowKind, Frame[]>
 ---@field sectionFonts table<string, FontString>
 ---@field titles table<string, string>
+---@field itemButtons table<string, ItemButton>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -51,6 +52,7 @@ function themes:OnInitialize()
   }
   self.sectionFonts = {}
   self.titles = {}
+  self.itemButtons = {}
 end
 
 function themes:OnEnable()
@@ -216,6 +218,42 @@ function themes:SetTitle(frame, title)
   local theme = self.themes[db:GetTheme()]
   theme.SetTitle(frame, title)
   self.titles[frame:GetName()] = title
+end
+
+---@param item Item
+---@return ItemButton
+function themes:GetItemButton(item)
+  local theme = self.themes[db:GetTheme()]
+  if theme.ItemButton then
+    return theme.ItemButton(item)
+  end
+  local buttonName = item.button:GetName()
+  local button = self.itemButtons[buttonName]
+  if button then
+    return button
+  end
+  button = CreateFrame("ItemButton", buttonName.."Decoration", item.button, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
+  button:SetAllPoints()
+  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
+  button.ItemSlotBackground:SetAllPoints(button)
+  button.ItemSlotBackground:Hide()
+  button:Show()
+
+  self.itemButtons[buttonName] = button
+  return button
+end
+
+---@param parent Button|ItemButton
+---@param buttonName string
+---@return ItemButton
+function themes.CreateBlankItemButtonDecoration(parent, buttonName)
+  local button = CreateFrame("ItemButton", buttonName.."Decoration", parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
+  button:SetAllPoints()
+  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+  button.ItemSlotBackground:SetAllPoints(button)
+  button.ItemSlotBackground:Hide()
+  button:Show()
+  return button
 end
 
 ---@param bag Bag

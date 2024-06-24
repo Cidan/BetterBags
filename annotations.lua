@@ -15,6 +15,14 @@
 ---@field UpgradeIcon Texture
 ---@field flashAnim AnimationGroup
 ---@field newitemglowAnim AnimationGroup
+---@field IconOverlay Texture
+---@field ItemContextOverlay Texture
+---@field Cooldown Cooldown
+---@field UpdateTooltip function
+---@field LockTexture Texture
+---@field IconQuestTexture Texture
+---@field IconTexture Texture
+---@field ItemSlotBackground Texture
 local itemButton = {}
 
 ---@param bagid number

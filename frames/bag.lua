@@ -456,7 +456,7 @@ function bagFrame:Create(kind)
 
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
-  b.previousSize = b.frame:GetBottom() - b.frame:GetHeight()
+  b.previousSize = b.frame:GetBottom()
 
   b.frame:SetScript("OnSizeChanged", function()
     b:OnResize()
