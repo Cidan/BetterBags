@@ -124,6 +124,9 @@ local theme = {
     for _, frame in pairs(decoratorFrames) do
       frame:Hide()
     end
+    for _, button in pairs(itemButtons) do
+      button:Hide()
+    end
   end,
   SectionFont = function (font)
     font:SetFontObject("GameFontNormal")
@@ -148,10 +151,14 @@ local theme = {
   ItemButton = function(item)
     local buttonName = item.button:GetName()
     local button = itemButtons[buttonName]
-    if button then return button end
+    if button then
+      button:Show()
+      return button
+    end
     button = themes.CreateBlankItemButtonDecoration(item.button, buttonName)
     S:HandleItemButton(button, true)
     S:HandleIconBorder(button.IconBorder)
+    button:Show()
     itemButtons[buttonName] = button
     return button
   end,

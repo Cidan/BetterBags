@@ -60,17 +60,19 @@ function masque:OnEnable()
   self.groups["Bank"] = Masque:Group('BetterBags', 'Bank')
   self.groups["Bank"]:RegisterCallback(self.OnSkinChange, self)
 
-  events:RegisterMessage('item/NewButton', function(_, item)
+  events:RegisterMessage('item/NewButton', function(_, item, decoration)
     ---@cast item Item
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    --group:AddButton(item.button)
-    --self:ReapplyBlend(item.button)
+    print("got new button", item.kind, decoration)
+    group:AddButton(decoration)
+    self:ReapplyBlend(decoration)
   end)
 
-  events:RegisterMessage('item/Clearing', function(_, item)
+  events:RegisterMessage('item/Clearing', function(_, item, decoration)
     ---@cast item Item
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    --group:RemoveButton(item.button)
+    print("removing button", item.kind, decoration)
+    --group:RemoveButton(decoration)
   end)
 
   events:RegisterMessage('bagbutton/Updated', function(_, bag)

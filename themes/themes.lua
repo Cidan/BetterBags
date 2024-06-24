@@ -9,6 +9,9 @@ local const = addon:GetModule('Constants')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
@@ -127,7 +130,13 @@ function themes:ApplyTheme(key)
     theme.SectionFont(font)
   end
 
+  for _, button in pairs(self.itemButtons) do
+    button:Hide()
+  end
+
   db:SetTheme(key)
+  --TODO(lobato): Create a new message just for redrawing items.
+  events:SendMessage('bags/FullRefreshAll')
 end
 
 -- SetSearchState will show or hide the search bar for the given frame.
@@ -230,6 +239,7 @@ function themes:GetItemButton(item)
   local buttonName = item.button:GetName()
   local button = self.itemButtons[buttonName]
   if button then
+    button:Show()
     return button
   end
   button = CreateFrame("ItemButton", buttonName.."Decoration", item.button, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
@@ -239,6 +249,7 @@ function themes:GetItemButton(item)
   button.ItemSlotBackground:Hide()
   button:Show()
 
+  events:SendMessage('item/NewButton', item, button)
   self.itemButtons[buttonName] = button
   return button
 end

@@ -356,9 +356,9 @@ function itemFrame.itemProto:SetItemFromData(data)
   if self.slotkey ~= nil then
     events:SendMessage('item/Updated', self)
   end
-  if wasNew then
-    events:SendMessage('item/NewButton', self)
-  end
+  --if wasNew then
+  --  events:SendMessage('item/NewButton', self)
+  --end
   self.frame:Show()
   self.button:Show()
 end
@@ -485,9 +485,9 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   decoration.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
   events:SendMessage('item/Updated', self)
-  if wasNew then
-    events:SendMessage('item/NewButton', self)
-  end
+  --if wasNew then
+  --  events:SendMessage('item/NewButton', self)
+  --end
   self.frame:Show()
   self.button:Show()
 end
@@ -530,7 +530,7 @@ end
 
 function itemFrame.itemProto:ClearItem()
   local decoration = themes:GetItemButton(self)
-  events:SendMessage('item/Clearing', self)
+  events:SendMessage('item/Clearing', self, decoration)
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
