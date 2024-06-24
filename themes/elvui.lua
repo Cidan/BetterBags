@@ -158,6 +158,7 @@ local theme = {
     button = themes.CreateBlankItemButtonDecoration(item.button, buttonName)
     S:HandleItemButton(button, true)
     S:HandleIconBorder(button.IconBorder)
+    button:SetFrameLevel(item.button:GetFrameLevel() -1)
     button:Show()
     itemButtons[buttonName] = button
     return button

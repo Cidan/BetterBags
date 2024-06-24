@@ -247,6 +247,7 @@ function themes:GetItemButton(item)
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
   button.ItemSlotBackground:SetAllPoints(button)
   button.ItemSlotBackground:Hide()
+  button:SetFrameLevel(item.button:GetFrameLevel() -1)
   button:Show()
 
   events:SendMessage('item/NewButton', item, button)

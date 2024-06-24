@@ -63,7 +63,6 @@ function masque:OnEnable()
   events:RegisterMessage('item/NewButton', function(_, item, decoration)
     ---@cast item Item
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    print("got new button", item.kind, decoration)
     group:AddButton(decoration)
     self:ReapplyBlend(decoration)
   end)
@@ -71,8 +70,7 @@ function masque:OnEnable()
   events:RegisterMessage('item/Clearing', function(_, item, decoration)
     ---@cast item Item
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    print("removing button", item.kind, decoration)
-    --group:RemoveButton(decoration)
+    group:RemoveButton(decoration)
   end)
 
   events:RegisterMessage('bagbutton/Updated', function(_, bag)
