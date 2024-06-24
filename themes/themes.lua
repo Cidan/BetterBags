@@ -252,7 +252,7 @@ function themes:GetItemButton(item)
   return button
 end
 
----@param parent Button|ItemButton
+---@param parent Button|ItemButton|Frame
 ---@param theme string
 ---@param buttonName string
 ---@return ItemButton

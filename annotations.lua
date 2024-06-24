@@ -495,6 +495,7 @@ function Button:GwStripTextures() end
 ---@field windowIcon Texture
 
 ---@class ElvUI
+---@field RegisterCooldown fun(self: ElvUI, tex: Cooldown, b: string)
 ElvUI = {
   Media = {
     Textures = {}
