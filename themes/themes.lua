@@ -239,31 +239,28 @@ function themes:GetItemButton(item)
   local buttonName = item.button:GetName()
   local button = self.itemButtons[buttonName]
   if button then
+    events:SendMessage('item/NewButton', item, button)
     button:Show()
     return button
   end
-  button = CreateFrame("ItemButton", buttonName.."Decoration", item.button, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
-  button:SetAllPoints()
-  button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
-  button.ItemSlotBackground:SetAllPoints(button)
-  button.ItemSlotBackground:Hide()
-  button:SetFrameLevel(item.button:GetFrameLevel() -1)
-  button:Show()
-
+  button = themes.CreateBlankItemButtonDecoration(item.button, "default", buttonName)
   events:SendMessage('item/NewButton', item, button)
   self.itemButtons[buttonName] = button
   return button
 end
 
 ---@param parent Button|ItemButton
+---@param theme string
 ---@param buttonName string
 ---@return ItemButton
-function themes.CreateBlankItemButtonDecoration(parent, buttonName)
-  local button = CreateFrame("ItemButton", buttonName.."Decoration", parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
+function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
+  local button = CreateFrame("ItemButton", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
   button:SetAllPoints()
   button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
   button.ItemSlotBackground:SetAllPoints(button)
   button.ItemSlotBackground:Hide()
+  button:SetFrameLevel(parent:GetFrameLevel() -1)
+  button.IconTexture = _G[buttonName.."Decoration"..theme.."IconTexture"]
   button:Show()
   return button
 end

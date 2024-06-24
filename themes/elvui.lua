@@ -155,7 +155,7 @@ local theme = {
       button:Show()
       return button
     end
-    button = themes.CreateBlankItemButtonDecoration(item.button, buttonName)
+    button = themes.CreateBlankItemButtonDecoration(item.button, "ElvUI", buttonName)
     S:HandleItemButton(button, true)
     S:HandleIconBorder(button.IconBorder)
     button:SetFrameLevel(item.button:GetFrameLevel() -1)

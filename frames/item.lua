@@ -423,13 +423,14 @@ function itemFrame.itemProto:ResetSize()
 end
 
 function itemFrame.itemProto:SetSize(width, height)
+  print("setting size")
   local decoration = themes:GetItemButton(self)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
   decoration.IconBorder:SetSize(width, height)
   decoration.NormalTexture:SetSize(64/width, 64/height)
   decoration.IconQuestTexture:SetSize(width, height)
-  --decoration.IconTexture:SetSize(width, height)
+  decoration.IconTexture:SetSize(width, height)
   decoration.IconOverlay:SetSize(width, height)
 end
 
