@@ -239,8 +239,8 @@ function themes:GetItemButton(item)
   local buttonName = item.button:GetName()
   local button = self.itemButtons[buttonName]
   if button then
-    events:SendMessage('item/NewButton', item, button)
     button:Show()
+    events:SendMessage('item/NewButton', item, button)
     return button
   end
   button = themes.CreateBlankItemButtonDecoration(item.button, "default", buttonName)

@@ -423,7 +423,7 @@ function itemFrame.itemProto:ResetSize()
 end
 
 function itemFrame.itemProto:SetSize(width, height)
-  print("setting size")
+  debug:Log("Item", "Resizing item", width, height)
   local decoration = themes:GetItemButton(self)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)

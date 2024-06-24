@@ -63,6 +63,7 @@ function masque:OnEnable()
   events:RegisterMessage('item/NewButton', function(_, item, decoration)
     ---@cast item Item
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
+    debug:Log("Masque", "Adding button to group")
     group:AddButton(decoration)
     self:ReapplyBlend(decoration)
   end)
