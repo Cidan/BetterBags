@@ -71,7 +71,7 @@ local theme = {
       local w, h = bagButton.portrait:GetSize()
       bagButton.portrait:SetSize((w / 10) * 8.5, (h / 10) * 8.5)
       bagButton.highlightTex:SetSize((w / 10) * 8.5, (h / 10) * 8.5)
-      S:HandleEditBox(searchBox.frame)
+      S:HandleEditBox(searchBox.textBox)
       S:HandleFrame(decoration)
       decoratorFrames[frame:GetName()] = decoration
     else
