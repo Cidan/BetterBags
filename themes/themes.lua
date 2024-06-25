@@ -262,9 +262,6 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   if not addon.isClassic then
     button = CreateFrame("ItemButton", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
     button:SetAllPoints()
-    button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
-    button.ItemSlotBackground:SetAllPoints(button)
-    button.ItemSlotBackground:Hide()
   else
     button = CreateFrame("Button", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
     button:SetAllPoints()
@@ -276,6 +273,13 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
       end
     end
   end
+
+  if addon.isRetail then
+    button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+    button.ItemSlotBackground:SetAllPoints(button)
+    button.ItemSlotBackground:Hide()
+  end
+
   button:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
   button.IconTexture = _G[buttonName.."Decoration"..theme.."IconTexture"]
   if not button.IconQuestTexture then
