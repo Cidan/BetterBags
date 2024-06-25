@@ -162,8 +162,6 @@ local theme = {
     button = themes.CreateBlankItemButtonDecoration(item.frame, "ElvUI", buttonName)
     S:HandleItemButton(button, true)
     S:HandleIconBorder(button.IconBorder)
-    ---@cast button +ElvItemButton
-    button:SetTemplate(nil, true) --[[@as ElvItemButton]]
     button:Show()
 
     button:GetNormalTexture():SetAlpha(0)
@@ -171,11 +169,6 @@ local theme = {
     button:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.3)
     button:SetPushedTexture(E.Media.Textures.White8x8)
     button:GetPushedTexture():SetVertexColor(1, 1, 1, 0.3)
-
-    button.IconBorder:Hide()
-    button.IconBorder:SetTexture("")
-    button.IconBorder.Show = function() end
-    button.IconBorder.SetShown = function() end
 
     local quest_overlay = button:CreateTexture(nil, "OVERLAY")
     quest_overlay:SetTexture(E.Media.Textures.BagQuestIcon)
@@ -190,20 +183,10 @@ local theme = {
       end
       button.IconQuestTexture.Hide = function()
         quest_overlay:Hide()
-        button.IconBorder:SetVertexColor(1, 1, 1, 1)
+        --button.IconBorder:SetVertexColor(1, 1, 1, 1)
       end
     end
-    hooksecurefunc(button.IconBorder, "SetVertexColor", function(tex)
-      ---@cast tex Texture
-      local r, g, b, a = tex:GetVertexColor()
-			if not (r == 1 and g == 1 and b == 1) then
-				button:SetBackdropBorderColor(r, g, b, a)
-			else
-				button:SetBackdropBorderColor(unpack(E.media.bordercolor))
-			end
-    end)
     E:RegisterCooldown(button.Cooldown, 'bags')
-    button:SetBackdropBorderColor(0,0,0,0)
     itemButtons[buttonName] = button --[[@as ItemButton]]
     return button --[[@as ItemButton]]
   end,

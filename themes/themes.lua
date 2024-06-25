@@ -246,7 +246,7 @@ function themes:GetItemButton(item)
     events:SendMessage('item/NewButton', item, button)
     return button
   end
-  button = themes.CreateBlankItemButtonDecoration(item.button, "default", buttonName)
+  button = themes.CreateBlankItemButtonDecoration(item.frame, "default", buttonName)
   events:SendMessage('item/NewButton', item, button)
   self.itemButtons[buttonName] = button
   return button

@@ -67,7 +67,6 @@ local debug = addon:GetModule('Debug')
 ---@field ItemContextOverlay Texture
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
----@field LockTexture Texture
 ---@field IconQuestTexture Texture
 itemFrame.itemProto = {}
 
@@ -470,7 +469,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   decoration:UpdateCooldown(false)
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
-  self.LockTexture:Hide()
   decoration.UpgradeIcon:SetShown(false)
 
   self.freeSlotName = name
@@ -550,7 +548,6 @@ function itemFrame.itemProto:ClearItem()
   self.button:Enable()
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
-  self.LockTexture:Hide()
   self:ResetSize()
   self.slotkey = ""
   self.stacks = {}
@@ -658,13 +655,6 @@ function itemFrame:_DoCreate()
   end)
 
   i.frame = p
-
-  i.LockTexture = button:CreateTexture(name.."LockButton", "OVERLAY")
-  i.LockTexture:SetAtlas("UI-CharacterCreate-PadLock")
-  i.LockTexture:SetPoint("TOP")
-  i.LockTexture:SetSize(32,32)
-  i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
-  i.LockTexture:Hide()
 
   local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
   ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
