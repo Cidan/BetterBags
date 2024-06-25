@@ -352,9 +352,6 @@ function itemFrame.itemProto:SetItemFromData(data)
   if self.slotkey ~= nil then
     events:SendMessage('item/Updated', self)
   end
-  --if wasNew then
-  --  events:SendMessage('item/NewButton', self)
-  --end
   self.frame:Show()
   self.button:Show()
 end
@@ -478,9 +475,6 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   decoration.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
   events:SendMessage('item/Updated', self)
-  --if wasNew then
-  --  events:SendMessage('item/NewButton', self)
-  --end
   self.frame:Show()
   self.button:Show()
 end
@@ -633,9 +627,9 @@ function itemFrame:_DoCreate()
     if _G[name..child] then
       _G[name..child]:Hide() ---@type texture
     end
-    button.BattlepayItemTexture:Hide()
-    button.NewItemTexture:Hide()
   end
+  button.BattlepayItemTexture:Hide()
+  button.NewItemTexture:Hide()
 
   -- Small fix for missing texture
   i.IconOverlay = button['IconOverlay']

@@ -52,7 +52,6 @@ function item.itemRowProto:SetItemFromData(data, static)
 
   self.button.Count:Hide()
   self.button.ilvlText:Hide()
-  self.button.LockTexture:Hide()
 
 
   if bagid then
