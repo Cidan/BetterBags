@@ -242,11 +242,12 @@ function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
         -- Get the first cell in the previous row.
         relativeToFrame = rowStart.frame
-        h = h + cell.frame:GetHeight()
+        h = h + cell.frame:GetHeight() + self.spacing
         rowWidth = cell.frame:GetWidth()
         w = math.max(w, rowWidth)
         relativeToPoint = "BOTTOMLEFT"
         rowStart = cell
+        spacingY = -self.spacing
       else
         local previousCell = cells[i - 1]
         relativeToFrame = previousCell.frame

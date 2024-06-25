@@ -15,6 +15,14 @@
 ---@field UpgradeIcon Texture
 ---@field flashAnim AnimationGroup
 ---@field newitemglowAnim AnimationGroup
+---@field IconOverlay Texture
+---@field ItemContextOverlay Texture
+---@field Cooldown Cooldown
+---@field UpdateTooltip function
+---@field LockTexture Texture
+---@field IconQuestTexture Texture
+---@field IconTexture Texture
+---@field ItemSlotBackground Texture
 local itemButton = {}
 
 ---@param bagid number
@@ -487,7 +495,16 @@ function Button:GwStripTextures() end
 ---@field windowIcon Texture
 
 ---@class ElvUI
-ElvUI = {}
+---@field RegisterCooldown fun(self: ElvUI, tex: Cooldown, b: string)
+ElvUI = {
+  media = {
+    bordercolor = {}
+  },
+  Media = {
+    Textures = {},
+    bordercolor = {}
+  }
+}
 
 ---@class ElvUISkin
 local ElvUISkin = {}
@@ -497,6 +514,13 @@ function ElvUISkin:HandleEditBox(frame) end
 
 ---@param frame Frame
 function ElvUISkin:HandleFrame(frame) end
+
+---@param button ItemButton
+---@param outer boolean
+function ElvUISkin:HandleItemButton(button, outer) end
+
+---@param IconBorder Texture
+function ElvUISkin:HandleIconBorder(IconBorder) end
 
 ---@param name string
 ---@return ElvUISkin

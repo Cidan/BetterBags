@@ -1,3 +1,4 @@
+---@diagnostic disable: duplicate-set-field
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon
@@ -5,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
+
+---@class ElvItemButton: ItemButton
+---@field SetTemplate fun(self:ElvItemButton|ItemButton, template?: string, texture: boolean)
 
 ---@type ElvUI
 local E
@@ -25,6 +29,9 @@ local search = addon:GetModule('Search')
 
 ---@type table<string, ElvUIDecoration>
 local decoratorFrames = {}
+
+---@type table<string, ItemButton>
+local itemButtons = {}
 
 ---@type Theme
 local theme = {
@@ -121,6 +128,9 @@ local theme = {
     for _, frame in pairs(decoratorFrames) do
       frame:Hide()
     end
+    for _, button in pairs(itemButtons) do
+      button:Hide()
+    end
   end,
   SectionFont = function (font)
     font:SetFontObject("GameFontNormal")
@@ -141,6 +151,46 @@ local theme = {
         decoration.title:Show()
       end
     end
+  end,
+  ItemButton = function(item)
+    local buttonName = item.button:GetName()
+    local button = itemButtons[buttonName]
+    if button then
+      button:Show()
+      return button
+    end
+    button = themes.CreateBlankItemButtonDecoration(item.frame, "ElvUI", buttonName)
+    S:HandleItemButton(button, true)
+    S:HandleIconBorder(button.IconBorder)
+    button:Show()
+
+    button:GetNormalTexture():SetAlpha(0)
+    button:SetHighlightTexture(E.Media.Textures.White8x8)
+    button:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.3)
+    button:SetPushedTexture(E.Media.Textures.White8x8)
+    button:GetPushedTexture():SetVertexColor(1, 1, 1, 0.3)
+
+    local quest_overlay = button:CreateTexture(nil, "OVERLAY")
+    quest_overlay:SetTexture(E.Media.Textures.BagQuestIcon)
+    quest_overlay:SetTexCoord(0, 1, 0, 1)
+    quest_overlay:SetAllPoints()
+    quest_overlay:Hide()
+    if button.IconQuestTexture then
+      button.IconQuestTexture:Hide()
+      button.IconQuestTexture.Show = function()
+        quest_overlay:Show()
+        button.IconBorder:SetVertexColor(1, 0.8, 0, 1)
+      end
+      button.IconQuestTexture.Hide = function()
+        quest_overlay:Hide()
+        --button.IconBorder:SetVertexColor(1, 1, 1, 1)
+      end
+    end
+    if button.Cooldown then
+      E:RegisterCooldown(button.Cooldown, 'bags')
+    end
+    itemButtons[buttonName] = button --[[@as ItemButton]]
+    return button --[[@as ItemButton]]
   end,
 }
 themes:RegisterTheme('elvui', theme)

@@ -9,6 +9,12 @@ local const = addon:GetModule('Constants')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
@@ -30,6 +36,7 @@ local db = addon:GetModule('Database')
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
 ---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
+---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -37,6 +44,7 @@ local db = addon:GetModule('Database')
 ---@field windows table<WindowKind, Frame[]>
 ---@field sectionFonts table<string, FontString>
 ---@field titles table<string, string>
+---@field itemButtons table<string, ItemButton>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -50,6 +58,7 @@ function themes:OnInitialize()
   }
   self.sectionFonts = {}
   self.titles = {}
+  self.itemButtons = {}
 end
 
 function themes:OnEnable()
@@ -124,7 +133,13 @@ function themes:ApplyTheme(key)
     theme.SectionFont(font)
   end
 
+  for _, button in pairs(self.itemButtons) do
+    button:Hide()
+  end
+
   db:SetTheme(key)
+  --TODO(lobato): Create a new message just for redrawing items.
+  events:SendMessage('bags/FullRefreshAll')
 end
 
 -- SetSearchState will show or hide the search bar for the given frame.
@@ -163,6 +178,14 @@ end
 ---@param font FontString
 function themes:RegisterSectionFont(font)
   table.insert(self.sectionFonts, font)
+end
+
+---@param button Item
+function themes:UpdateItemButton(button)
+  local theme = self.themes[db:GetTheme()]
+  if theme.ItemButton then
+    theme.ItemButton(button)
+  end
 end
 
 ---@return table<string, Theme>
@@ -207,6 +230,64 @@ function themes:SetTitle(frame, title)
   local theme = self.themes[db:GetTheme()]
   theme.SetTitle(frame, title)
   self.titles[frame:GetName()] = title
+end
+
+---@param item Item
+---@return ItemButton
+function themes:GetItemButton(item)
+  local theme = self.themes[db:GetTheme()]
+  if theme.ItemButton then
+    return theme.ItemButton(item)
+  end
+  local buttonName = item.button:GetName()
+  local button = self.itemButtons[buttonName]
+  if button then
+    button:Show()
+    events:SendMessage('item/NewButton', item, button)
+    return button
+  end
+  button = themes.CreateBlankItemButtonDecoration(item.frame, "default", buttonName)
+  events:SendMessage('item/NewButton', item, button)
+  self.itemButtons[buttonName] = button
+  return button
+end
+
+---@param parent Button|ItemButton|Frame
+---@param theme string
+---@param buttonName string
+---@return ItemButton
+function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
+  ---@type ItemButton
+  local button
+  if not addon.isClassic then
+    button = CreateFrame("ItemButton", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
+    button:SetAllPoints()
+  else
+    button = CreateFrame("Button", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
+    button:SetAllPoints()
+    ---@diagnostic disable-next-line: duplicate-set-field
+    button.SetMatchesSearch = function(me, match)
+      if match then
+        me.searchOverlay:Hide()
+      else
+        me.searchOverlay:Show()
+      end
+    end
+  end
+
+  if addon.isRetail then
+    button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)
+    button.ItemSlotBackground:SetAllPoints(button)
+    button.ItemSlotBackground:Hide()
+  end
+
+  button:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
+  button.IconTexture = _G[buttonName.."Decoration"..theme.."IconTexture"]
+  if not button.IconQuestTexture then
+    button.IconQuestTexture = _G[buttonName.."Decoration"..theme.."IconQuestTexture"]
+  end
+  button:Show()
+  return button
 end
 
 ---@param bag Bag

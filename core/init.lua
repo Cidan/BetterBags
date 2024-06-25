@@ -210,9 +210,10 @@ end
 function addon:OnEnable()
   -- Hackfix for Cata
   applyCompat()
+  debug:Enable()
+  masque:Enable()
   itemFrame:Enable()
   sectionFrame:Enable()
-  masque:Enable()
   simpleItemLevel:Enable()
   contextMenu:Enable()
   items:Enable()

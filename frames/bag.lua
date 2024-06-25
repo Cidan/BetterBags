@@ -242,10 +242,11 @@ function bagFrame.bagProto:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.LIST and self.currentView ~= nil then
     self.currentView:UpdateListSize(self)
   end
-  if self.previousSize and database:GetBagView(self.kind) ~= const.BAG_VIEW.LIST then
+  --Window.RestorePosition(self.frame)
+  if self.previousSize and database:GetBagView(self.kind) ~= const.BAG_VIEW.LIST and self.loaded then
     local left = self.frame:GetLeft()
     self.frame:ClearAllPoints()
-    self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, self.previousSize)
+    self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, self.previousSize)--, left, self.previousSize * self.frame:GetScale())
   end
   self:KeepBagInBounds()
   self.previousSize = self.frame:GetBottom()
@@ -453,12 +454,13 @@ function bagFrame:Create(kind)
     b.previousSize = b.frame:GetBottom()
   end)
 
+  -- Load the bag position from settings.
+  Window.RestorePosition(b.frame)
+  b.previousSize = b.frame:GetBottom()
+
   b.frame:SetScript("OnSizeChanged", function()
     b:OnResize()
   end)
-
-  -- Load the bag position from settings.
-  Window.RestorePosition(b.frame)
 
   b.resizeHandle = resize:MakeResizable(b.frame, function()
     local fw, fh = b.frame:GetSize()

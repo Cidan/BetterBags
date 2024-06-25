@@ -126,7 +126,7 @@ function views.viewProto:GetOrCreateSection(category, onlyCreate)
     section = sectionFrame:Create()
     section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
-    if not onlyCreate then 
+    if not onlyCreate then
       self.content:AddCell(category, section)
     end
     self.sections[category] = section

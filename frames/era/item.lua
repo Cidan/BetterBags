@@ -31,6 +31,9 @@ local L = addon:GetModule('Localization')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -46,11 +49,13 @@ local children = {
   "NewItemTexture",
   "IconOverlay2",
   "ItemContextOverlay",
-  "IconBorder"
+  "IconBorder",
+  "HighlightTexture"
 }
 
 function itemFrame.itemProto:UpdateCooldown()
-  ContainerFrame_UpdateCooldown(self.frame:GetID(), self.button)
+  local decoration = themes:GetItemButton(self)
+  ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
 
 function itemFrame.itemProto:ResetSize()
@@ -58,25 +63,23 @@ function itemFrame.itemProto:ResetSize()
 end
 
 function itemFrame.itemProto:SetSize(width, height)
+  local decoration = themes:GetItemButton(self)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
-  self.button.IconBorder:SetSize(width, height)
-  self.IconQuestTexture:SetSize(width, height)
-  self.IconTexture:SetSize(width, height)
+  decoration.IconBorder:SetSize(width, height)
+  decoration.IconQuestTexture:SetSize(width, height)
+  decoration.IconTexture:SetSize(width, height)
 end
 
 ---@param data ItemData
 function itemFrame.itemProto:SetItemFromData(data)
   assert(data, 'data must be provided')
   self.slotkey = data.slotkey
-  local wasNew = false
-  if self.kind == nil then
-    wasNew = true
-  end
-  --local tooltipOwner = GameTooltip:GetOwner();
+  local decoration = themes:GetItemButton(self)
   local bagid, slotid = data.bagid, data.slotid
   if bagid ~= nil and slotid ~= nil then
     self.button:SetID(slotid)
+    decoration:SetID(slotid)
     self.frame:SetID(bagid)
     if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
       self.kind = const.BAG_KIND.BANK
@@ -109,18 +112,18 @@ function itemFrame.itemProto:SetItemFromData(data)
     self.ilvlText:Hide()
   end
 
-  self.button.minDisplayCount = 1
-  SetItemButtonTexture(self.button, data.itemInfo.itemIcon)
-  self.button.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
-  self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
-  self.button.IconBorder:SetBlendMode("BLEND")
-  self.button.IconBorder:Show()
+  decoration.minDisplayCount = 1
+  SetItemButtonTexture(decoration, data.itemInfo.itemIcon)
+  decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
+  decoration.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
+  decoration.IconBorder:SetBlendMode("BLEND")
+  decoration.IconBorder:Show()
   self:UpdateCount()
-  SetItemButtonDesaturated(self.button, data.itemInfo.isLocked)
-  self.IconQuestTexture:Hide()
+  SetItemButtonDesaturated(decoration, data.itemInfo.isLocked)
+  decoration.IconQuestTexture:Hide()
   --self:SetLock(data.itemInfo.isLocked)
   if data.bagid ~= nil then
-    ContainerFrame_UpdateCooldown(data.bagid, self.button)
+    ContainerFrame_UpdateCooldown(data.bagid, decoration)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
@@ -151,9 +154,6 @@ function itemFrame.itemProto:SetItemFromData(data)
   if self.slotkey ~= nil then
     events:SendMessage('item/Updated', self)
   end
-  if wasNew then
-    events:SendMessage('item/NewButton', self)
-  end
   self.frame:Show()
   self.button:Show()
 end
@@ -165,10 +165,7 @@ end
 ---@param count number
 ---@param name string
 function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
-  local wasNew = false
-  if self.kind == nil then
-    wasNew = true
-  end
+  local decoration = themes:GetItemButton(self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
@@ -182,68 +179,59 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   end
   self.button.minDisplayCount = -1
   self.button:SetID(slotid)
+  decoration:SetID(slotid)
   self.frame:SetID(bagid)
   self.freeSlotCount = count
   self.isFreeSlot = true
 
-  SetItemButtonCount(self.button, count)
-  SetItemButtonQuality(self.button, false)
-  SetItemButtonDesaturated(self.button, false)
-  SetItemButtonTexture(self.button, [[Interface\PaperDoll\UI-Backpack-EmptySlot]])
+  SetItemButtonCount(decoration, count)
+  SetItemButtonQuality(decoration, false)
+  SetItemButtonDesaturated(decoration, false)
+  SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]])
   self:UpdateCooldown()
-  self.button.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
-  self.button.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[Enum.ItemQuality.Common]))
-  self.button.IconBorder:Show()
-  self.IconQuestTexture:Hide()
-  self.button.BattlepayItemTexture:SetShown(false)
-  self.button.NewItemTexture:Hide()
+  decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
+  decoration.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[Enum.ItemQuality.Common]))
+  decoration.IconBorder:Show()
+  decoration.IconQuestTexture:Hide()
+  decoration.BattlepayItemTexture:SetShown(false)
+  decoration.NewItemTexture:Hide()
   self.ilvlText:SetText("")
-  self.LockTexture:Hide()
-  self.button.UpgradeIcon:SetShown(false)
+  decoration.UpgradeIcon:SetShown(false)
 
   self.freeSlotName = name
-  SetItemButtonQuality(self.button, Enum.ItemQuality.Common, nil, false, false)
+  SetItemButtonQuality(decoration, Enum.ItemQuality.Common, nil, false, false)
   self:Unlock()
 
-  self.button.IconBorder:SetBlendMode("BLEND")
+  decoration.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
   events:SendMessage('item/Updated', self)
-  if wasNew then
-    events:SendMessage('item/NewButton', self)
-  end
   self.frame:Show()
   self.button:Show()
 end
 
 
 function itemFrame.itemProto:ClearItem()
-  events:SendMessage('item/Clearing', self)
+  local decoration = themes:GetItemButton(self)
+  events:SendMessage('item/Clearing', self, decoration)
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
   self.frame:SetAlpha(1)
   self.frame:Hide()
-  --self.button:SetHasItem(false)
-  --self.button:SetItemButtonTexture(0)
- -- self.button:UpdateQuestItem(false, nil, nil)
-  --self.button:UpdateNewItem(false)
-  --self.button:UpdateJunkItem(false, false)
-  --self.button:UpdateItemContextMatching()
-  SetItemButtonQuality(self.button, false)
-  SetItemButtonCount(self.button, 0)
-  SetItemButtonDesaturated(self.button, false)
-  SetItemButtonTexture(self.button, 0)
-  self.button.BattlepayItemTexture:SetShown(false)
-  self.button.NewItemTexture:Hide()
-  --ClearItemButtonOverlay(self.button)
+  SetItemButtonQuality(decoration, false)
+  SetItemButtonCount(decoration, 0)
+  SetItemButtonDesaturated(decoration, false)
+  SetItemButtonTexture(decoration, 0)
+  decoration.BattlepayItemTexture:SetShown(false)
+  decoration.NewItemTexture:Hide()
   self.frame:SetID(0)
   self.button:SetID(0)
-  self.button.minDisplayCount = 1
+  decoration:SetID(0)
+  decoration.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
-  self.LockTexture:Hide()
   self:SetSize(37, 37)
-  self.button.UpgradeIcon:SetShown(false)
+  decoration.UpgradeIcon:SetShown(false)
   self.freeSlotName = ""
   self.freeSlotCount = 0
   self.isFreeSlot = nil
@@ -253,10 +241,11 @@ function itemFrame.itemProto:ClearItem()
 end
 
 function itemFrame.itemProto:UpdateTooltip()
-  if self.button:GetParent():GetID() == -1 then
-    BankFrameItemButton_OnEnter(self.button)
+  local decoration = themes:GetItemButton(self)
+  if decoration:GetParent():GetID() == -1 then
+    BankFrameItemButton_OnEnter(decoration)
   else
-    ContainerFrameItemButton_OnEnter(self.button)
+    ContainerFrameItemButton_OnEnter(decoration)
   end
 end
 
@@ -281,10 +270,31 @@ function itemFrame:_DoCreate()
 
   ---@class Button
   local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate") --[[@as Button]]
+
+  button:GetPushedTexture():SetTexture("")
+  button:GetNormalTexture():SetTexture("")
+
+  button:HookScript("OnMouseDown", function()
+    themes:GetItemButton(i):GetPushedTexture():Show()
+  end)
+  button:HookScript("OnMouseUp", function()
+    themes:GetItemButton(i):GetPushedTexture():Hide()
+  end)
+  button:HookScript("OnLeave", function()
+    themes:GetItemButton(i):GetHighlightTexture():Hide()
+    themes:GetItemButton(i):GetPushedTexture():Hide()
+  end)
+  button:HookScript("OnEnter", function()
+    themes:GetItemButton(i):GetHighlightTexture():Show()
+  end)
+
   -- Assign the global item button textures to the item button.
   for _, child in pairs(children) do
-    i[child] = _G[name..child] ---@type texture
+    if _G[name..child] then
+      _G[name..child]:Hide()
+    end
   end
+  button.BattlepayItemTexture:Hide()
 
   p:SetSize(37, 37)
   button:SetSize(37, 37)
@@ -299,21 +309,6 @@ function itemFrame:_DoCreate()
   end)
 
   i.frame = p
-
-  i.LockTexture = button:CreateTexture(name.."LockButton", "OVERLAY")
-  i.LockTexture:SetAtlas("UI-CharacterCreate-PadLock")
-  i.LockTexture:SetPoint("TOP")
-  i.LockTexture:SetSize(32,32)
-  i.LockTexture:SetVertexColor(255/255, 66/255, 66/255)
-  i.LockTexture:Hide()
-
-  button.SetMatchesSearch = function(me, match)
-    if match then
-      me.searchOverlay:Hide()
-    else
-      me.searchOverlay:Show()
-    end
-  end
 
   button.GetInventorySlot = ButtonInventorySlot
   button.UpdateTooltip = function() i:UpdateTooltip() end
