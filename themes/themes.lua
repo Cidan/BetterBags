@@ -265,6 +265,7 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   else
     button = CreateFrame("Button", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
     button:SetAllPoints()
+    ---@diagnostic disable-next-line: duplicate-set-field
     button.SetMatchesSearch = function(me, match)
       if match then
         me.searchOverlay:Hide()
