@@ -7,6 +7,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class ElvItemButton: ItemButton
+---@field SetTemplate fun(self:ElvItemButton|ItemButton, template?: string, texture: boolean)
+
 ---@type ElvUI
 local E
 ---@type ElvUISkin
@@ -159,6 +162,8 @@ local theme = {
     button = themes.CreateBlankItemButtonDecoration(item.frame, "ElvUI", buttonName)
     S:HandleItemButton(button, true)
     S:HandleIconBorder(button.IconBorder)
+    ---@cast button +ElvItemButton
+    button:SetTemplate(nil, true) --[[@as ElvItemButton]]
     button:Show()
 
     button:GetNormalTexture():SetAlpha(0)
@@ -166,6 +171,11 @@ local theme = {
     button:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.3)
     button:SetPushedTexture(E.Media.Textures.White8x8)
     button:GetPushedTexture():SetVertexColor(1, 1, 1, 0.3)
+
+    button.IconBorder:Hide()
+    button.IconBorder:SetTexture("")
+    button.IconBorder.Show = function() end
+    button.IconBorder.SetShown = function() end
 
     local quest_overlay = button:CreateTexture(nil, "OVERLAY")
     quest_overlay:SetTexture(E.Media.Textures.BagQuestIcon)
@@ -176,16 +186,26 @@ local theme = {
       button.IconQuestTexture:Hide()
       button.IconQuestTexture.Show = function()
         quest_overlay:Show()
-        --button.IconBorder:SetVertexColor(1, 0.8, 0, 1)
+        button.IconBorder:SetVertexColor(1, 0.8, 0, 1)
       end
       button.IconQuestTexture.Hide = function()
         quest_overlay:Hide()
-        --button.IconBorder:SetVertexColor(1, 1, 1, 1)
+        button.IconBorder:SetVertexColor(1, 1, 1, 1)
       end
     end
+    hooksecurefunc(button.IconBorder, "SetVertexColor", function(tex)
+      ---@cast tex Texture
+      local r, g, b, a = tex:GetVertexColor()
+			if not (r == 1 and g == 1 and b == 1) then
+				button:SetBackdropBorderColor(r, g, b, a)
+			else
+				button:SetBackdropBorderColor(unpack(E.media.bordercolor))
+			end
+    end)
     E:RegisterCooldown(button.Cooldown, 'bags')
-    itemButtons[buttonName] = button
-    return button
+    button:SetBackdropBorderColor(0,0,0,0)
+    itemButtons[buttonName] = button --[[@as ItemButton]]
+    return button --[[@as ItemButton]]
   end,
 }
 themes:RegisterTheme('elvui', theme)
