@@ -186,7 +186,9 @@ local theme = {
         --button.IconBorder:SetVertexColor(1, 1, 1, 1)
       end
     end
-    E:RegisterCooldown(button.Cooldown, 'bags')
+    if button.Cooldown then
+      E:RegisterCooldown(button.Cooldown, 'bags')
+    end
     itemButtons[buttonName] = button --[[@as ItemButton]]
     return button --[[@as ItemButton]]
   end,
