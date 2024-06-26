@@ -630,6 +630,7 @@ function itemFrame:_DoCreate()
   end
   button.BattlepayItemTexture:Hide()
   button.NewItemTexture:Hide()
+  button.ItemContextOverlay:SetAlpha(0)
 
   -- Small fix for missing texture
   i.IconOverlay = button['IconOverlay']
