@@ -95,7 +95,7 @@ end
 
 ---@param kind BagKind
 ---@param view BagView
----@return table 
+---@return SizeInfo
 function DB:GetBagSizeInfo(kind, view)
   return DB.data.profile.size[view][kind]
 end
