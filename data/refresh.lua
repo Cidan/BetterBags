@@ -69,6 +69,8 @@ function refresh:StartUpdate()
       if not InCombatLockdown() then
         sortBackpackClassic = true
       end
+    elseif event.eventName == 'BAG_UPDATE_BANK' then
+      updateBank = true
     elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
     elseif const.REAGENTBANK_BAGS[event.args[1]] then
@@ -141,10 +143,14 @@ function refresh:OnEnable()
   end)
 
   -- Register when bank slots change for any reason.
-  events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+  events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(_, slot)
     local ctx = context:New()
-    ctx:Set("wipe", true)
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
+    if slot > NUM_BANKGENERIC_SLOTS then
+      ctx:Set("wipe", true)
+    else
+      ctx:Set("wipe", false)
+    end
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_BANK', args = {}, ctx = ctx})
   end)
 
   -- Register when the bag slots change for any reason.

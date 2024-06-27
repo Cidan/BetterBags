@@ -95,7 +95,7 @@ end
 
 ---@param kind BagKind
 ---@param view BagView
----@return table 
+---@return SizeInfo
 function DB:GetBagSizeInfo(kind, view)
   return DB.data.profile.size[view][kind]
 end
@@ -424,6 +424,21 @@ function DB:Migrate()
         [const.BAG_KIND.BACKPACK] = value,
         [const.BAG_KIND.BANK] = value
       }
+    end
+  end
+
+  -- Fix the column count and items per row values from a previous bug.
+  -- Do not remove before Q1'25.
+  for _, bagView in pairs(const.BAG_VIEW) do
+    for _, bagKind in pairs(const.BAG_KIND) do
+      if DB.data.profile.size[bagView] then
+        local t = DB.data.profile.size[bagView][bagKind]
+        if t then
+          if t.itemsPerRow ~= nil and t.itemsPerRow > 30 or t.itemsPerRow < 1 then
+            t.itemsPerRow = 7
+          end
+        end
+      end
     end
   end
 end

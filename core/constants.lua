@@ -336,6 +336,14 @@ const.EQUIPMENT_SLOTS = {
 ---@field itemList table<number, boolean>
 ---@field readOnly boolean
 
+---@class SizeInfo
+---@field columnCount number
+---@field itemsPerRow number
+---@field scale number
+---@field width number
+---@field height number
+---@field opacity number
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
@@ -429,6 +437,7 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = {},
     },
     size = {
+      ---@type SizeInfo[]
       [const.BAG_VIEW.ONE_BAG] = {
         [const.BAG_KIND.BACKPACK] = {
           columnCount = 15,
