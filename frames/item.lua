@@ -352,6 +352,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   if self.slotkey ~= nil then
     events:SendMessage('item/Updated', self)
   end
+  decoration:SetFrameLevel(self.button:GetFrameLevel() - 1)
   self.frame:Show()
   self.button:Show()
 end
