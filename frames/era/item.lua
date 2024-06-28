@@ -300,7 +300,6 @@ function itemFrame:_DoCreate()
   button:SetSize(37, 37)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  button:SetPassThroughButtons("MiddleButton")
   button:SetAllPoints(p)
   i.button = button
 

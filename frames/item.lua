@@ -563,6 +563,9 @@ function itemFrame:OnInitialize()
 end
 
 function itemFrame:OnEnable()
+  self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
+  self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
+
   -- Pre-populate the pool with 600 items. This is done
   -- so that items acquired during combat do not taint
   -- the bag frame.
@@ -575,9 +578,6 @@ function itemFrame:OnEnable()
     frame:Release()
   end
 
-  self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
-  --self.emptyItemTooltip:CopyTooltip()
-  self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
 end
 
 ---@param i Item
@@ -640,7 +640,6 @@ function itemFrame:_DoCreate()
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   i.button = button
   button:SetAllPoints(p)
-  button:SetPassThroughButtons("MiddleButton")
 
   button:HookScript("OnEnter", function()
     i:OnEnter()
