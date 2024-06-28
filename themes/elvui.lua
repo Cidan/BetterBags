@@ -26,6 +26,7 @@ local search = addon:GetModule('Search')
 ---@class ElvUIDecoration: Frame
 ---@field title FontString
 ---@field search SearchFrame
+---@field backdrop Frame
 
 ---@type table<string, ElvUIDecoration>
 local decoratorFrames = {}
@@ -156,6 +157,7 @@ local theme = {
     local buttonName = item.button:GetName()
     local button = itemButtons[buttonName]
     if button then
+      button.backdrop:SetFrameLevel(0)
       button:Show()
       return button
     end
@@ -189,6 +191,7 @@ local theme = {
     if button.Cooldown then
       E:RegisterCooldown(button.Cooldown, 'bags')
     end
+    button.backdrop:SetFrameLevel(0)
     itemButtons[buttonName] = button --[[@as ItemButton]]
     return button --[[@as ItemButton]]
   end,

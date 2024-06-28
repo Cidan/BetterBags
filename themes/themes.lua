@@ -71,6 +71,16 @@ function themes:OnEnable()
   end
 end
 
+-- GetCurrentTheme returns the current active theme, or the default theme if the current theme is not available.
+---@return Theme
+function themes:GetCurrentTheme()
+  local theme = db:GetTheme()
+  if self.themes[theme] and self.themes[theme].Available then
+    return self.themes[theme]
+  end
+  return self.themes['Default']
+end
+
 ---@param key string
 ---@param themeTemplate Theme
 function themes:RegisterTheme(key, themeTemplate)
@@ -235,7 +245,7 @@ end
 ---@param item Item
 ---@return ItemButton
 function themes:GetItemButton(item)
-  local theme = self.themes[db:GetTheme()]
+  local theme = self:GetCurrentTheme()
   if theme.ItemButton then
     return theme.ItemButton(item)
   end

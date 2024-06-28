@@ -23,6 +23,7 @@
 ---@field IconQuestTexture Texture
 ---@field IconTexture Texture
 ---@field ItemSlotBackground Texture
+---@field backdrop Frame
 local itemButton = {}
 
 ---@param bagid number
