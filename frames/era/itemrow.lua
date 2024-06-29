@@ -50,10 +50,6 @@ function item.itemRowProto:SetItemFromData(data, static)
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
-  self.button.Count:Hide()
-  self.button.ilvlText:Hide()
-
-
   if bagid then
     self.frame:SetID(bagid)
   end
@@ -109,8 +105,8 @@ function item:_DoCreate()
   -- and setting them here will have no effect.
   local button = itemFrame:Create()
   i.button = button
-  i.button.NormalTexture:Hide()
-  i.button.NormalTexture:SetTexture(nil)
+  --i.button.NormalTexture:Hide()
+  --i.button.NormalTexture:SetTexture(nil)
 
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   text:SetParent(i.frame)
