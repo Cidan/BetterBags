@@ -241,11 +241,10 @@ function itemFrame.itemProto:ClearItem()
 end
 
 function itemFrame.itemProto:UpdateTooltip()
-  local decoration = themes:GetItemButton(self)
-  if decoration:GetParent():GetID() == -1 then
-    BankFrameItemButton_OnEnter(decoration)
+  if self.button:GetParent():GetID() == -1 then
+    BankFrameItemButton_OnEnter(self.button)
   else
-    ContainerFrameItemButton_OnEnter(decoration)
+    ContainerFrameItemButton_OnEnter(self.button)
   end
 end
 
