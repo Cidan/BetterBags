@@ -23,6 +23,14 @@ const.BAG_KIND = {
   REAGENT_BANK = 2,
 }
 
+---@enum MovementFlow
+const.MOVEMENT_FLOW = {
+  UNDEFINED = -1,
+  BANK = 0,
+  SENDMAIL = 1,
+  TRADE = 2
+}
+
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
 const.BANK_BAGS = {

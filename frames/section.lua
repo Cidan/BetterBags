@@ -31,6 +31,12 @@ local themes = addon:GetModule('Themes')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
+---@class Async: AceModule
+local async = addon:GetModule('Async')
+
 -------
 --- Section Prototype
 -------
@@ -167,6 +173,22 @@ function sectionProto:GetRawCells()
   return self.content.cells
 end
 
+---@return BagKind
+function sectionProto:DetectKind()  
+  local cell = self.content.cells[1]
+  local bagid = cell.data.bagid
+  
+  if bagid == 0 then return const.BAG_KIND.BACKPACK end
+  if bagid >= 1 and bagid <= NUM_BAG_SLOTS then return const.BAG_KIND.BACKPACK end
+
+  if bagid == BANK_CONTAINER then return const.BAG_KIND.BANK end
+  if bagid >= NUM_BAG_SLOTS + 1 and bagid <= NUM_BAG_SLOTS + NUM_BANKBAGSLOTS then return const.BAG_KIND.BANK end
+  
+  if bagid == KEYRING_CONTAINER then return const.BAG_KIND.KEYRING end
+
+  return nil
+end
+
 function sectionProto:Release()
   sectionFrame._pool:Release(self)
 end
@@ -239,6 +261,71 @@ local function onTitleClickOrDrop(section)
   events:SendMessage('bags/FullRefreshAll')
 end
 
+---@param section Section
+local function onTitleRightClick(section)   
+  local flow = addon:GetMovementFlow()
+  if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
+
+  local kind = section:DetectKind()
+  local title = section.title:GetText()
+
+  -- getting the itemId order the section is using so we can move them in the same order
+  local idOrder = {}
+
+  local order = 1
+  for _, cell in pairs(section.content.cells) do
+    if not cell.data.isItemEmpty then
+      idOrder[cell.data.itemInfo.itemID] = order
+      order = order + 1
+    end
+  end
+
+  local source = nil
+
+  if (kind == const.BAG_KIND.BACKPACK) then
+    source = items.itemsByBagAndSlot;
+  else
+    source = items.bankItemsByBagAndSlot;
+  end
+
+  local list = {}
+
+  for bagid, bag in pairs(source) do
+    for slotid, data in pairs(bag) do
+      items:AttachItemInfo(data, kind)
+      data.itemInfo.category = items:GetCategory(data)
+      if (data.itemInfo.category == title) then
+        local item = {
+          itemId = data.itemInfo.itemID,
+          count = data.itemInfo.currentItemCount,
+          bagid = data.bagid,
+          slotid = data.slotid
+        }
+        table.insert(list, item)
+      end
+    end
+  end
+
+  table.sort(list, function(a, b)
+    local ia = idOrder[a.itemId] 
+    local ib = idOrder[b.itemId]
+    if ia ~= ib then return ia < ib end
+    return a.count > b.count
+  end)
+  
+  async:Each(list, function(item)
+    -- safecheking: does the bag/slot still hold 'this' item?
+    local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
+    if itemId ~= item.itemId then return end
+    -- safechecking: are we on the same flow as we started?
+    local newFlow = addon:GetMovementFlow()
+    if newFlow ~= flow then return end
+    -- if everything seems ok, move the item
+    C_Container.UseContainerItem(item.bagid, item.slotid)
+  end)
+
+end
+
 function sectionProto:onTitleMouseEnter()
   GameTooltip:SetOwner(self.title, "ANCHOR_TOPLEFT")
   GameTooltip:SetText(self.title:GetText())
@@ -291,9 +378,15 @@ function sectionFrame:_DoCreate()
     GameTooltip:Hide()
   end)
 
-  title:SetScript("OnClick", function()
+  title:RegisterForClicks("RightButtonUp")
+
+  title:SetScript("OnClick", function(_, e)
     if s.headerDisabled then return end
-    onTitleClickOrDrop(s)
+    if e == "RightButton" then 
+      onTitleRightClick(s) 
+    elseif e == "LeftButton" then
+      onTitleClickOrDrop(s)
+    end
   end)
 
   title:SetScript("OnReceiveDrag", function()

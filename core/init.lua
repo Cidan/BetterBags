@@ -201,6 +201,28 @@ function addon:UpdateButtonHighlight()
   end
 end
 
+
+function addon:AtSendMail()   
+  local frame = _G["SendMailFrame"];
+  return frame ~= nil and frame:IsVisible()
+end
+
+function addon:AtTradeWindow()
+  local frame = _G["TradeFrame"];
+  return frame ~= nil and frame:IsVisible()
+end
+
+
+---@return MovementFlow
+function addon:GetMovementFlow()
+  if addon.atBank then return const.MOVEMENT_FLOW.BANK end
+  if addon:AtSendMail() then return const.MOVEMENT_FLOW.SENDMAIL end
+  if addon:AtTradeWindow() then return const.MOVEMENT_FLOW.TRADE end
+  return const.MOVEMENT_FLOW.UNDEFINED
+end
+
+
+
 local function applyCompat()
   if not addon.isCata then return end
   -- No compats right now :) 
