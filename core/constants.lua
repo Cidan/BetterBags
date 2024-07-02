@@ -344,6 +344,9 @@ const.EQUIPMENT_SLOTS = {
 ---@field height number
 ---@field opacity number
 
+---@class (exact) CategoryOptions
+---@field shown boolean
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
@@ -519,6 +522,8 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
     },
+    ---@type table<string, CategoryOptions>
+    categoryOptions = {},
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>

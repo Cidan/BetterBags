@@ -176,15 +176,16 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the text and icon for the button.
   button.Category:SetText(elementData.title)
 
-  if categories:DoesCategoryExist(elementData.title) then
-    button:SetScript("OnMouseDown", function(_, b)
-      if b == "LeftButton" then
-        return
-      end
-      if elementData.header then
-        return
-      end
-      contextMenu:Show({{
+  button:SetScript("OnMouseDown", function(_, b)
+    if b == "LeftButton" then
+      return
+    end
+    if elementData.header then
+      return
+    end
+    local menuOptions = {}
+    if categories:DoesCategoryExist(elementData.title) then
+      table.insert(menuOptions,{
         text = L:G("Delete Category"),
         notCheckable = true,
         hasArrow = false,
@@ -202,9 +203,22 @@ function sectionConfigFrame:initSectionItem(button, elementData)
           end, function()
           end)
         end
-      }})
-    end)
+      })
+    end
+    table.insert(menuOptions, {
+      text = L:G("Hide Category"),
+      hasArrow = false,
+      checked = function()
+        categories:IsCategoryShown(elementData.title)
+      end,
+      func = function()
+        categories:ToggleCategoryShown(elementData.title)
+      end
+    })
+    contextMenu:Show(menuOptions)
+  end)
 
+  if categories:DoesCategoryExist(elementData.title) then
     -- Script handler for dropping items into a category.
     button:SetScript("OnReceiveDrag", function()
       if elementData.header then

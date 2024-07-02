@@ -219,6 +219,31 @@ function categories:DeleteCategory(category)
   events:SendMessage('bags/FullRefreshAll')
 end
 
+---@param category string
+function categories:HideCategory(category)
+  database:GetCategoryOptions(category).shown = false
+  events:SendMessage('bags/FullRefreshAll')
+end
+
+---@param category string
+function categories:ShowCategory(category)
+  database:GetCategoryOptions(category).shown = true
+  events:SendMessage('bags/FullRefreshAll')
+end
+
+---@param category string
+---@return boolean
+function categories:IsCategoryShown(category)
+  return database:GetCategoryOptions(category).shown
+end
+
+---@param category string
+function categories:ToggleCategoryShown(category)
+  local options = database:GetCategoryOptions(category)
+  options.shown = not options.shown
+  events:SendMessage('bags/FullRefreshAll')
+end
+
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.
