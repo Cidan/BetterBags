@@ -173,8 +173,7 @@ function refresh:OnEnable()
     events:RegisterEvent('PLAYERREAGENTBANKSLOTS_CHANGED', function()
       local ctx = context:New()
       ctx:Set("wipe", false)
-      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
-      self:StartUpdate()
+      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_BANK', args = {}, ctx = ctx})
     end)
   end
 

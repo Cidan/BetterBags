@@ -183,17 +183,17 @@ function gridProto:calculateColumns(cells, options)
   for i, cell in ipairs(cells) do
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-        totalHeight = totalHeight + cell.frame:GetHeight()
+        totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
         rowWidth = cell.frame:GetWidth()
       else
         rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
       end
     else
-      totalHeight = totalHeight + cell.frame:GetHeight()
+      totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
     end
   end
 
-  local splitAt = math.ceil(totalHeight / options.columns)
+  local splitAt = math.ceil(totalHeight / options.columns) + 20
   local currentHeight = 0
   local currentColumn = 1
   rowWidth = 0

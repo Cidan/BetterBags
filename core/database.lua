@@ -298,6 +298,19 @@ function DB:CreateEpemeralCategory(category)
   }
 end
 
+---@param category string
+---@return CategoryOptions
+function DB:GetCategoryOptions(category)
+  local options = DB.data.profile.categoryOptions[category]
+  if not options then
+    options = {
+      shown = true,
+    }
+    DB.data.profile.categoryOptions[category] = options
+  end
+  return options
+end
+
 ---@param kind BagKind
 function DB:ClearCustomSectionSort(kind)
   DB.data.profile.customSectionSort[kind] = {}

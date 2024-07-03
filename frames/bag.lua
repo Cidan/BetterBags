@@ -131,6 +131,9 @@ function bagFrame.bagProto:Hide()
   addon.ForceHideBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
   self.frame:Hide()
+  if self.kind == const.BAG_KIND.BANK then
+    CloseBankFrame()
+  end
   if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
     debug:Log("draw", "Drawing bag on close")
     self.drawOnClose = false
