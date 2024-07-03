@@ -53,6 +53,13 @@ local sectionConfig = addon:NewModule('SectionConfig')
 ---@field header? boolean
 ---@field index? number
 
+---@class BetterBagsSectionConfigListButton: Button
+---@field Expand Button
+---@field Category FontString
+---@field Note FontString
+---@field Visible Button
+---@field Init boolean
+
 ---@class SectionConfigItem
 ---@field frame Frame
 ---@field label FontString
@@ -90,9 +97,17 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     button.Expand = CreateFrame("Button", nil, button)
     button.Expand:SetSize(24, 24)
     button.Expand:SetPoint("LEFT", button, "LEFT", 0, 0)
+    button.Visible = CreateFrame("Button", nil, button)
+    button.Visible:SetSize(20, 20)
+    button.Visible:SetPoint("LEFT", button.Expand, "RIGHT", 5, 0)
     button.Category = button:CreateFontString(nil, "OVERLAY")
     button.Category:SetHeight(30)
-    button.Category:SetPoint("LEFT", button.Expand, "RIGHT", 5, 0)
+    button.Category:SetPoint("LEFT", button.Visible, "RIGHT", 5, 0)
+    button.Note = button:CreateFontString(nil, "OVERLAY")
+    button.Note:SetHeight(30)
+    button.Note:SetPoint("RIGHT", button, "RIGHT", -10, 0)
+    button.Note:SetTextColor(0.8, 0.8, 0.8, 1)
+    button.Note:SetFontObject(fonts.UnitFrame12White)
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
@@ -101,18 +116,27 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     button.Expand:SetNormalTexture("Interface\\glues\\common\\glue-leftarrow-button-up")
     button.Expand:SetPushedTexture("Interface\\glues\\common\\glue-leftarrow-button-down")
     button.Expand:SetHighlightTexture("Interface\\glues\\common\\glue-leftarrow-button-highlight", "ADD")
+    button.Visible:SetNormalTexture("Interface\\Addons\\BetterBags\\textures\\visible.png")
+    button.Visible:SetHighlightTexture("Interface\\Addons\\BetterBags\\textures\\visible.png")
+    button.Visible:SetScript("OnEnter", function()
+      GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+      GameTooltip:AddLine("Show or hide this category in the bags.", 1, .81960791349411, 0, true)
+      GameTooltip:Show()
+    end)
   end
 
   -- Set the category font info for the button depending on if it's a header or not.
   if elementData.header then
     button.Category:SetFontObject(fonts.UnitFrame12Yellow)
     button.Expand:Hide()
+    button.Visible:Hide()
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
     button.Expand:SetScript("OnClick", function()
       self.itemList:ShowCategory(elementData.title)
     end)
     button.Expand:Show()
+    button.Visible:Show()
     if not categories:DoesCategoryExist(elementData.title) then
       button.Expand:Disable()
       button.Expand:GetNormalTexture():SetDesaturated(true)
@@ -120,6 +144,20 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       button.Expand:Enable()
       button.Expand:GetNormalTexture():SetDesaturated(false)
     end
+
+    if categories:IsCategoryShown(elementData.title) then
+      button.Visible:GetNormalTexture():SetVertexColor(1, 1, 1, 1)
+    else
+      button.Visible:GetNormalTexture():SetVertexColor(0.6, 0.1, 0.1, 1)
+    end
+    button.Visible:SetScript("OnClick", function()
+      categories:ToggleCategoryShown(elementData.title)
+      if categories:IsCategoryShown(elementData.title) then
+        button.Visible:GetNormalTexture():SetVertexColor(1, 1, 1, 1)
+      else
+        button.Visible:GetNormalTexture():SetVertexColor(0.6, 0.1, 0.1, 1)
+      end
+    end)
   end
 
   -- Set the backdrop initial state.
@@ -155,14 +193,14 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
         GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
         GameTooltip:AddDoubleLine("Right Click", "Open Menu")
-        --GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
+        GameTooltip:AddDoubleLine("Shift Right Click", "Hide or Show Category")
       else
         GameTooltip:AddLine([[
           Dynamic categories can't be enabled or disabled (yet).
           Drag this category to Pinned to keep it at the top of your bags, or to Automatically Sorted to have it sorted with the rest of your items.]], 1, 1, 1, true)
           GameTooltip:AddLine("\n", 1, 1, 1, true)
           GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
-          --GameTooltip:AddDoubleLine("Right Click", "Hide or Show Category")
+          GameTooltip:AddDoubleLine("Shift Right Click", "Hide or Show Category")
       end
       GameTooltip:Show()
     end)
@@ -177,7 +215,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   button.Category:SetText(elementData.title)
 
   button:SetScript("OnMouseDown", function(_, b)
-    if b == "LeftButton" then
+    if b ~= "RightButton" or IsShiftKeyDown() then
       return
     end
     if elementData.header then
@@ -205,16 +243,16 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         end
       })
     end
-    table.insert(menuOptions, {
-      text = L:G("Hide Category"),
-      hasArrow = false,
-      checked = function()
-        categories:IsCategoryShown(elementData.title)
-      end,
-      func = function()
-        categories:ToggleCategoryShown(elementData.title)
-      end
-    })
+--    table.insert(menuOptions, {
+--      text = L:G("Hide Category"),
+--      hasArrow = false,
+--      checked = function()
+--        return not categories:IsCategoryShown(elementData.title)
+--      end,
+--      func = function()
+--        categories:ToggleCategoryShown(elementData.title)
+--      end
+--    })
     contextMenu:Show(menuOptions)
   end)
 

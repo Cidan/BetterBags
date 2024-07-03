@@ -116,11 +116,6 @@ BagBarExpandToggle = {}
 ---@field Category FontString
 ---@field Message FontString
 
----@class BetterBagsSectionConfigListButton: Button
----@field Expand Button
----@field Category FontString
----@field Init boolean
-
 ---@class ScrollingFlatPanelTemplate: Frame
 ---@field ScrollBox WowScrollBox
 ---@field ScrollBar MinimalScrollBar
