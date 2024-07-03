@@ -166,7 +166,7 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    search:Create(b.frame)
+    b.searchFrame = search:Create(b.frame)
   end
 
   if kind == const.BAG_KIND.BACKPACK then

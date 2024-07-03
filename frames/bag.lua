@@ -113,6 +113,7 @@ local windowGroup = addon:GetModule('WindowGroup')
 ---@field windowGrouping WindowGrouping
 ---@field sideAnchor Frame
 ---@field previousSize number
+---@field searchFrame SearchFrame
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
@@ -133,6 +134,8 @@ function bagFrame.bagProto:Hide()
   self.frame:Hide()
   if self.kind == const.BAG_KIND.BANK then
     CloseBankFrame()
+  elseif self.kind == const.BAG_KIND.BACKPACK then
+    self.searchFrame:Hide()
   end
   if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
     debug:Log("draw", "Drawing bag on close")
@@ -426,7 +429,8 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    search:Create(b.frame)
+    print("search frame made")
+    b.searchFrame = search:Create(b.frame)
   end
 
   if kind == const.BAG_KIND.BACKPACK then
