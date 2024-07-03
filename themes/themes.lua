@@ -269,12 +269,10 @@ end
 function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   ---@type ItemButton
   local button
-  if not addon.isClassic then
+  if addon.isRetail then
     button = CreateFrame("ItemButton", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
-    button:SetAllPoints()
   else
     button = CreateFrame("Button", buttonName.."Decoration"..theme, parent, "ContainerFrameItemButtonTemplate") --[[@as ItemButton]]
-    button:SetAllPoints()
     ---@diagnostic disable-next-line: duplicate-set-field
     button.SetMatchesSearch = function(me, match)
       if match then
@@ -284,6 +282,7 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
       end
     end
   end
+  button:SetAllPoints()
 
   if addon.isRetail then
     button.ItemSlotBackground = button:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6)

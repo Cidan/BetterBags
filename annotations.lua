@@ -24,6 +24,7 @@
 ---@field IconTexture Texture
 ---@field ItemSlotBackground Texture
 ---@field backdrop Frame
+---@field searchOverlay Texture
 local itemButton = {}
 
 ---@param bagid number

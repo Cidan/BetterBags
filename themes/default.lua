@@ -44,7 +44,7 @@ local defaultTheme = {
       end)
 
       local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      searchBox.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
+      searchBox.frame:SetPoint("TOP", decoration, "TOP", 0, -2)
       searchBox.frame:SetSize(150, 20)
       decoration.search = searchBox
 
@@ -117,6 +117,11 @@ local defaultTheme = {
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
       decoration.search:SetShown(shown)
+      if shown then
+        decoration.TitleContainer:Hide()
+      else
+        decoration.TitleContainer:Show()
+      end
     end
   end
 }

@@ -45,6 +45,7 @@ end
 
 function search.searchProto:Hide()
   if self.frame:IsShown() then
+    self.textBox:SetText("")
     self.textBox:ClearFocus()
     if self.fadeOutGroup then
       self.fadeOutGroup:Play()
