@@ -171,12 +171,14 @@ local theme = {
     button:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.3)
     button:SetPushedTexture(E.Media.Textures.White8x8)
     button:GetPushedTexture():SetVertexColor(1, 1, 1, 0.3)
-    hooksecurefunc(button, 'SetItemButtonQuality', function(_, quality)
-      -- ElvUI Icon Borders are super edgy.
-      if quality == Enum.ItemQuality.Common then
-        button.IconBorder:SetVertexColor(0, 0, 0, 1)
-      end
-    end)
+    if button.SetItemButtonQuality then
+      hooksecurefunc(button, 'SetItemButtonQuality', function(_, quality)
+        -- ElvUI Icon Borders are super edgy.
+        if quality == Enum.ItemQuality.Common then
+          button.IconBorder:SetVertexColor(0, 0, 0, 1)
+        end
+      end)
+    end
     local quest_overlay = button:CreateTexture(nil, "OVERLAY")
     quest_overlay:SetTexture(E.Media.Textures.BagQuestIcon)
     quest_overlay:SetTexCoord(0, 1, 0, 1)
