@@ -193,7 +193,7 @@ function gridProto:calculateColumns(cells, options)
     end
   end
 
-  local splitAt = math.ceil(totalHeight / options.columns)
+  local splitAt = math.ceil(totalHeight / options.columns) + 20
   local currentHeight = 0
   local currentColumn = 1
   rowWidth = 0
