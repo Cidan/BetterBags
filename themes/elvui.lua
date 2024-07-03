@@ -165,6 +165,11 @@ local theme = {
     S:HandleItemButton(button, true)
     S:HandleIconBorder(button.IconBorder)
     button:Show()
+    if not addon.isRetail then
+      button.searchOverlay = button:CreateTexture(nil, "ARTWORK")
+      button.searchOverlay:SetColorTexture(0, 0, 0, 0.8)
+      button.searchOverlay:SetAllPoints()
+    end
 
     button:GetNormalTexture():SetAlpha(0)
     button:SetHighlightTexture(E.Media.Textures.White8x8)
@@ -192,7 +197,6 @@ local theme = {
       end
       button.IconQuestTexture.Hide = function()
         quest_overlay:Hide()
-        --button.IconBorder:SetVertexColor(1, 1, 1, 1)
       end
     end
     if button.Cooldown then
