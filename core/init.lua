@@ -202,13 +202,16 @@ function addon:UpdateButtonHighlight()
 end
 
 local function applyCompat()
-  if not addon.isCata then return end
-  -- No compats right now :) 
+  C_Timer.After(5, function()
+    if C_AddOns.IsAddOnLoaded("BetterBagsElvUISkin") then
+      question:Alert("Disable ElvUI Plugin", "The ElvUI BetterBags plugin you have installed is not compatible with BetterBags. It has been disabled -- please reload your UI to apply the changes.")
+      C_AddOns.DisableAddOn("BetterBagsElvUISkin")
+    end
+  end)
 end
 
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  -- Hackfix for Cata
   applyCompat()
   debug:Enable()
   masque:Enable()

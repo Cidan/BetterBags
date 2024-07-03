@@ -118,9 +118,9 @@ local defaultTheme = {
     if decoration then
       decoration.search:SetShown(shown)
       if shown then
-        decoration.TitleContainer:Hide()
+        decoration.TitleContainer.TitleText:Hide()
       else
-        decoration.TitleContainer:Show()
+        decoration.TitleContainer.TitleText:Show()
       end
     end
   end
