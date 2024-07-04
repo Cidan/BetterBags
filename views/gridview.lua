@@ -192,6 +192,8 @@ local function GridView(view, ctx, bag, slotInfo)
     view:ClearDeferredItems()
   end
 
+  ---@type Cell[]
+  local hiddenCells = {}
   debug:StartProfile('Section Draw Stage')
   if not slotInfo.deferDelete then
     local dirtySections = view:GetDirtySections()
@@ -203,12 +205,6 @@ local function GridView(view, ctx, bag, slotInfo)
       -- status expires, it's category is no longer a new item
       -- but the actual category hasn't been drawn yet.
       if section ~= nil then
-        if categories:IsCategoryShown(sectionName) == false then
-          view:RemoveSection(sectionName)
-          section.frame:Hide()
-        else
-          section.frame:Show()
-        end
         -- Remove the section if it's empty, otherwise draw it.
         if section:GetCellCount() == 0 then
           debug:Log("Section", "Removing section", sectionName)
@@ -223,6 +219,11 @@ local function GridView(view, ctx, bag, slotInfo)
       end
     end
     view:ClearDirtySections()
+  end
+  for sectionName, section in pairs(view:GetAllSections()) do
+    if categories:IsCategoryShown(sectionName) == false then
+      table.insert(hiddenCells, section)
+    end
   end
   debug:EndProfile('Section Draw Stage')
 
@@ -253,6 +254,7 @@ local function GridView(view, ctx, bag, slotInfo)
       maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
       columns = sizeInfo.columnCount,
       header = view:RemoveSectionFromGrid(L:G("Recent Items")),
+      mask = hiddenCells,
     })
     for _, section in pairs(view.sections) do
       debug:WalkAndFixAnchorGraph(section.frame)

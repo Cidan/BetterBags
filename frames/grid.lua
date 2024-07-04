@@ -43,6 +43,7 @@ local gridProto = {}
 ---@field maxWidthPerRow number The maximum width of a row before it wraps.
 ---@field columns? number The number of columns to render. If not set, columns is 1.
 ---@field header? Cell A Cell to render above all other items, ignoring columns.
+---@field mask? Cell[] A list of cells to hide and not render at all.
 
 function gridProto:Show()
   self.frame:Show()
@@ -165,22 +166,44 @@ function gridProto:stageSimple()
   return 1,1
 end
 
+---@param options RenderOptions
+---@return Cell[]
+function gridProto:calculateCellMask(options)
+  if not options.mask then return options.cells end
+
+  ---@type Cell[]
+  local result = {}
+  for _, cell in ipairs(options.cells) do
+    local found = false
+    for _, maskCell in ipairs(options.mask) do
+      if cell == maskCell then
+        found = true
+        break
+      end
+    end
+    if not found then
+      table.insert(result, cell)
+    end
+  end
+  return result
+end
+
 -- calculateColumns takes a list of cells and a column count. It will then
 -- return a list of list of cells, where each list of cells is a column.
 -- The columns are divided evenly by the height of all the cell frames
 -- in a given column.
----@param cells Cell[]
 ---@param options RenderOptions
 ---@return Cell[][]
-function gridProto:calculateColumns(cells, options)
+function gridProto:calculateColumns(options)
+  local maskedCells = self:calculateCellMask(options)
   if not options.columns or options.columns == 1 then
-    return {[1] = cells}
+    return {[1] = maskedCells}
   end
   local rowWidth = 0
   local totalHeight = 0
   ---@type Cell[][]
   local columns = {}
-  for i, cell in ipairs(cells) do
+  for i, cell in ipairs(maskedCells) do
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
         totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
@@ -197,7 +220,7 @@ function gridProto:calculateColumns(cells, options)
   local currentHeight = 0
   local currentColumn = 1
   rowWidth = 0
-  for i, cell in ipairs(cells) do
+  for i, cell in ipairs(maskedCells) do
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
         if currentHeight + cell.frame:GetHeight() > splitAt then
@@ -276,7 +299,7 @@ function gridProto:stage(options)
   if not options then return 0, 0 end
   local w = 0
   local h = 0
-  local columns = self:calculateColumns(options.cells, options)
+  local columns = self:calculateColumns(options)
   local currentOffset = 0
   local topOffset = 0
   local headerWidth = 0
