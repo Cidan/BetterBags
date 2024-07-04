@@ -79,6 +79,9 @@ local themes = addon:GetModule('Themes')
 ---@class WindowGroup: AceModule
 local windowGroup = addon:GetModule('WindowGroup')
 
+---@class Tabs: AceModule
+local tabs = addon:GetModule('Tabs')
+
 -------
 --- Bag Prototype
 -------
@@ -114,6 +117,7 @@ local windowGroup = addon:GetModule('WindowGroup')
 ---@field sideAnchor Frame
 ---@field previousSize number
 ---@field searchFrame SearchFrame
+---@field tabs Tab
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:Show()
@@ -429,7 +433,6 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    print("search frame made")
     b.searchFrame = search:Create(b.frame)
   end
 
@@ -441,6 +444,13 @@ function bagFrame:Create(kind)
     b.themeConfigFrame = themeConfig:Create(b.sideAnchor)
     b.windowGrouping:AddWindow('themeConfig', b.themeConfigFrame)
     b.windowGrouping:AddWindow('currencyConfig', b.currencyFrame)
+  end
+
+  if kind == const.BAG_KIND.BANK then
+    b.tabs = tabs:Create(b.frame)
+    b.tabs:AddTab("Bank")
+    b.tabs:AddTab("Reagent Bank")
+    b.tabs:SetTab("Bank") 
   end
 
   b.sectionConfigFrame = sectionConfig:Create(kind, b.sideAnchor)
