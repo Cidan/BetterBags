@@ -266,32 +266,39 @@ function bagFrame.bagProto:SetTitle(text)
   themes:SetTitle(self.frame, text)
 end
 
-function bagFrame.bagProto:ToggleReagentBank()
+function bagFrame.bagProto:SwitchToBank()
   local ctx = context:New()
+  self.isReagentBank = false
+  BankFrame.selectedTab = 1
+  self:SetTitle(L:G("Bank"))
+  self.currentItemCount = -1
+  self:Wipe()
+  ctx:Set('wipe', true)
+  items:RefreshBank(ctx)
+end
+
+function bagFrame.bagProto:SwitchToReagentBank()
+  local ctx = context:New()
+  self.isReagentBank = true
+  BankFrame.selectedTab = 2
+  self:SetTitle(L:G("Reagent Bank"))
+  self.currentItemCount = -1
+  self:Wipe()
+  ctx:Set('wipe', true)
+  items:RefreshReagentBank(ctx)
+end
+
+function bagFrame.bagProto:ToggleReagentBank()
   -- This should never happen, but just in case!
   if self.kind == const.BAG_KIND.BACKPACK then return end
-  self.isReagentBank = not self.isReagentBank
-  items:ClearBankCache()
   if self.isReagentBank then
-    BankFrame.selectedTab = 2
-    self:SetTitle(L:G("Reagent Bank"))
-    self.currentItemCount = -1
-    --self:ClearRecentItems()
-    self:Wipe()
-    ctx:Set('wipe', true)
-    items:RefreshReagentBank(ctx)
+    self:SwitchToBank()
   else
-    BankFrame.selectedTab = 1
-    self:SetTitle(L:G("Bank"))
-    self.currentItemCount = -1
-    --self:ClearRecentItems()
-    self:Wipe()
-    ctx:Set('wipe', true)
-    items:RefreshBank(ctx)
+    self:SwitchToReagentBank()
   end
 end
 
-function bagFrame.bagProto:SwitchToBank()
+function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1
@@ -452,7 +459,11 @@ function bagFrame:Create(kind)
     b.tabs:AddTab("Reagent Bank")
     b.tabs:SetTab("Bank")
     b.tabs:SetClickHandler(function(tabName)
-      b:ToggleReagentBank()
+      if tabName == "Bank" then
+        b:SwitchToBank()
+      else
+        b:SwitchToReagentBank()
+      end
     end)
   end
 

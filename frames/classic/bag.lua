@@ -70,7 +70,7 @@ local windowGroup = addon:GetModule('WindowGroup')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
-function bagFrame.bagProto:SwitchToBank()
+function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.isReagentBank = false
   BankFrame.selectedTab = 1

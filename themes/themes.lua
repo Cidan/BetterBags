@@ -357,7 +357,6 @@ function themes.SetupBagButton(bag, decoration)
     else
       GameTooltip:AddDoubleLine(L:G("Left Click"), L:G("Open Menu"), 1, 0.81, 0, 1, 1, 1)
       GameTooltip:AddDoubleLine(L:G("Shift Left Click"), L:G("Search Bags"), 1, 0.81, 0, 1, 1, 1)
-      GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Swap Between Bank/Reagent Bank"), 1, 0.81, 0, 1, 1, 1)
     end
 
     if CursorHasItem() then
@@ -394,10 +393,7 @@ function themes.SetupBagButton(bag, decoration)
       else
         contextMenu:Show(bag.menuList)
       end
-
-    elseif e == "RightButton" and bag.kind == const.BAG_KIND.BANK then
-      bag:ToggleReagentBank()
-    elseif e == "RightButton" and bag.kind == const.BAG_KIND.BACKPACK then
+    elseif e == "RightButton" then
       bag:Sort()
     end
   end)
