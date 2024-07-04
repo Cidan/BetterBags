@@ -37,6 +37,7 @@ local db = addon:GetModule('Database')
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
 ---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
 ---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
+---@field Tab? fun(frame: Frame) A function that applies the theme to a tab.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -195,6 +196,14 @@ function themes:UpdateItemButton(button)
   local theme = self.themes[db:GetTheme()]
   if theme.ItemButton then
     theme.ItemButton(button)
+  end
+end
+
+---@param button Button
+function themes:UpdateTab(button)
+  local theme = self.themes[db:GetTheme()]
+  if theme.Tab then
+    theme.Tab(button)
   end
 end
 
