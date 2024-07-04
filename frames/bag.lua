@@ -450,7 +450,10 @@ function bagFrame:Create(kind)
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab("Bank")
     b.tabs:AddTab("Reagent Bank")
-    b.tabs:SetTab("Bank") 
+    b.tabs:SetTab("Bank")
+    b.tabs:SetClickHandler(function(tabName)
+      b:ToggleReagentBank()
+    end)
   end
 
   b.sectionConfigFrame = sectionConfig:Create(kind, b.sideAnchor)

@@ -11,6 +11,7 @@ local tabs = addon:NewModule('Tabs')
 ---@field frame Frame
 ---@field tabs table<string, PanelTabButtonTemplate>
 ---@field tabIndex PanelTabButtonTemplate[]
+---@field selectedTab string
 local tabFrame = {}
 
 ---@param name string
@@ -24,6 +25,12 @@ function tabFrame:AddTab(name)
     anchorPoint = "TOPRIGHT"
   end
   tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
+  tab:SetScript("OnClick", function()
+    self:SetTab(name)
+    if self.clickHandler then
+      self.clickHandler(name)
+    end
+  end)
   self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
 end
@@ -36,6 +43,7 @@ function tabFrame:SetTab(name)
       self:DeselectTab(k)
     end
   end
+  self.selectedTab = name
 end
 
 ---@private
@@ -76,6 +84,10 @@ function tabFrame:SelectTab(name)
 	if tooltip:IsOwned(tab) then
 		tooltip:Hide();
 	end
+end
+
+function tabFrame:SetClickHandler(fn)
+  self.clickHandler = fn
 end
 
 ---@param parent Frame
