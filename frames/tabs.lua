@@ -98,6 +98,7 @@ function tabs:Create(parent)
   container.frame:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 0, 2)
   container.frame:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 2)
   container.frame:SetHeight(40)
+  container.frame:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
   container.tabs = {}
   container.tabIndex = {}
   return container
