@@ -36,7 +36,7 @@ local themeConfigFrame = {}
 ---@param f BetterBagsPlainTextListButton
 ---@param data table
 function themeConfigFrame:initThemeItem(f, data)
-  f:SetHeight(20)
+  f:SetHeight(30)
   f:SetNormalFontObject(fonts.UnitFrame12White)
   f:SetText(data.theme.Name)
   f:SetScript("OnClick", function()

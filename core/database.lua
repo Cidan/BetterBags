@@ -256,7 +256,8 @@ end
 ---@param category string
 ---@return CustomCategoryFilter
 function DB:GetItemCategory(category)
-  return DB.data.profile.customCategoryFilters[category] or {}
+  DB:CreateCategory(category)
+  return DB.data.profile.customCategoryFilters[category]
 end
 
 ---@param category string
