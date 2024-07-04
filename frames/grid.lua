@@ -299,7 +299,7 @@ function gridProto:stage(options)
   end
 
   h = h + headerHeight
-  if w == 0 then
+  if w == 0  or w < headerWidth then
     w = headerWidth
   end
 
