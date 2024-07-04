@@ -36,7 +36,6 @@ local tabFrame = {}
 ---@param name string
 function tabFrame:AddTab(name)
   local tab = CreateFrame("button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame)
-  tab:SetText(name)
   tab:SetNormalFontObject(GameFontNormalSmall)
   local anchorFrame = self.frame
   local anchorPoint = "TOPLEFT"
@@ -60,7 +59,8 @@ function tabFrame:ResizeTab(name)
   local TAB_SIDES_PADDING = 20
   local tab = self.tabs[name]
   local decoration = themes:GetTabButton(tab)
-	local textWidth = tab:GetTextWidth()
+  decoration.Text:SetText(name)
+	local textWidth = decoration.Text:GetStringWidth()
 	local width = textWidth + TAB_SIDES_PADDING
 	local sideWidths = decoration.Left:GetWidth() + decoration.Right:GetWidth()
 	local minWidth = sideWidths
@@ -71,7 +71,6 @@ function tabFrame:ResizeTab(name)
 	end
 	tab:SetWidth(width)
   tab:SetHeight(32)
-  decoration:SetWidth(width + 20)
   decoration:SetFrameLevel(tab:GetFrameLevel() - 1)
 end
 

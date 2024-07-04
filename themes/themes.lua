@@ -146,8 +146,14 @@ function themes:ApplyTheme(key)
     theme.SectionFont(font)
   end
 
+  -- Hide all item button decorations.
   for _, button in pairs(self.itemButtons) do
     button:Hide()
+  end
+
+  -- Hide all tab decorations.
+  for _, tab in pairs(self.tabs) do
+    tab:Hide()
   end
 
   db:SetTheme(key)
