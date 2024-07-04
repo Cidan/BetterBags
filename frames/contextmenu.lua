@@ -69,8 +69,7 @@ function contextMenu:Hide()
   events:SendMessage('context/hide')
 end
 
---[[
-local function addDivider(menuList)
+function contextMenu:AddDivider(menuList)
   table.insert(menuList, {
     text = "",
     isTitle = true,
@@ -90,7 +89,7 @@ local function addDivider(menuList)
     },
   })
 end
-]]--
+
 ---@param menu MenuList[]
 local function enableTooltips(menu)
   for _, m in ipairs(menu) do
