@@ -6,6 +6,12 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Tabs: AceModule
 local tabs = addon:NewModule('Tabs')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class PanelTabButtonTemplate: Button
 ---@field Text FontString
 ---@field Left Texture
@@ -21,16 +27,17 @@ local tabs = addon:NewModule('Tabs')
 
 ---@class (exact) Tab
 ---@field frame Frame
----@field tabs table<string, PanelTabButtonTemplate>
----@field tabIndex PanelTabButtonTemplate[]
+---@field tabs table<string, Button>
+---@field tabIndex Button[]
 ---@field selectedTab string
 ---@field clickHandler fun(name: string)
 local tabFrame = {}
 
 ---@param name string
 function tabFrame:AddTab(name)
-  local tab = CreateFrame("button", format("%sTab%d", self.frame:GetName(), #self.tabs), self.frame, "PanelTabButtonTemplate") --[[@as PanelTabButtonTemplate]]
-  tab.Text:SetText(name)
+  local tab = CreateFrame("button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame)
+  tab:SetText(name)
+  tab:SetNormalFontObject(GameFontNormalSmall)
   local anchorFrame = self.frame
   local anchorPoint = "TOPLEFT"
   if self.tabIndex[#self.tabIndex] then
@@ -46,6 +53,26 @@ function tabFrame:AddTab(name)
   end)
   self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
+  self:ResizeTab(name)
+end
+
+function tabFrame:ResizeTab(name)
+  local TAB_SIDES_PADDING = 20
+  local tab = self.tabs[name]
+  local decoration = themes:GetTabButton(tab)
+	local textWidth = tab:GetTextWidth()
+	local width = textWidth + TAB_SIDES_PADDING
+	local sideWidths = decoration.Left:GetWidth() + decoration.Right:GetWidth()
+	local minWidth = sideWidths
+
+	if minWidth and width < minWidth then
+		width = minWidth
+		textWidth = width - TAB_SIDES_PADDING
+	end
+	tab:SetWidth(width)
+  tab:SetHeight(32)
+  decoration:SetWidth(width + 20)
+  decoration:SetFrameLevel(tab:GetFrameLevel() - 1)
 end
 
 function tabFrame:SetTab(name)
@@ -62,39 +89,41 @@ end
 ---@private
 function tabFrame:DeselectTab(name)
   local tab = self.tabs[name]
-	tab.Left:Show()
-	tab.Middle:Show()
-	tab.Right:Show()
-	tab:Enable()
+  local decoration = themes:GetTabButton(tab)
+	decoration.Left:Show()
+	decoration.Middle:Show()
+	decoration.Right:Show()
+	decoration:Enable()
 
-	local offsetY = tab.deselectedTextY or 2
+	local offsetY = decoration.deselectedTextY or 2
 
-	tab.Text:SetPoint("CENTER", tab, "CENTER", (tab.deselectedTextX or 0), offsetY);
+	decoration.Text:SetPoint("CENTER", decoration, "CENTER", (decoration.deselectedTextX or 0), offsetY);
 
-	tab.LeftActive:Hide()
-	tab.MiddleActive:Hide()
-	tab.RightActive:Hide()
+	decoration.LeftActive:Hide()
+	decoration.MiddleActive:Hide()
+	decoration.RightActive:Hide()
 end
 
 ---@private
 function tabFrame:SelectTab(name)
   local tab = self.tabs[name]
-	tab.Left:Hide();
-	tab.Middle:Hide();
-	tab.Right:Hide();
-	tab:Disable();
-	tab:SetDisabledFontObject(GameFontHighlightSmall);
+  local decoration = themes:GetTabButton(tab)
+	decoration.Left:Hide()
+	decoration.Middle:Hide()
+	decoration.Right:Hide()
+	decoration:Disable()
+	decoration:SetDisabledFontObject(GameFontHighlightSmall);
 
-	local offsetY = tab.selectedTextY or -3;
+	local offsetY = decoration.selectedTextY or -3;
 
-	tab.Text:SetPoint("CENTER", tab, "CENTER", (tab.selectedTextX or 0), offsetY);
+	decoration.Text:SetPoint("CENTER", decoration, "CENTER", (decoration.selectedTextX or 0), offsetY);
 
-	tab.LeftActive:Show();
-	tab.MiddleActive:Show();
-	tab.RightActive:Show();
+	decoration.LeftActive:Show();
+	decoration.MiddleActive:Show();
+	decoration.RightActive:Show();
 
 	local tooltip = GetAppropriateTooltip();
-	if tooltip:IsOwned(tab) then
+	if tooltip:IsOwned(decoration) then
 		tooltip:Hide();
 	end
 end
