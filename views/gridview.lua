@@ -197,18 +197,18 @@ local function GridView(view, ctx, bag, slotInfo)
     local dirtySections = view:GetDirtySections()
     for sectionName in pairs(dirtySections) do
       local section = view:GetSection(sectionName)
-      if categories:IsCategoryShown(sectionName) == false then
-        view:RemoveSection(sectionName)
-        section.frame:Hide()
-      else
-        section.frame:Show()
-      end
       -- We need to check for the section here, as a section
       -- may have been added to dirty items when it doesn't
       -- exist yet. This happens when a new item's "new item"
       -- status expires, it's category is no longer a new item
       -- but the actual category hasn't been drawn yet.
       if section ~= nil then
+        if categories:IsCategoryShown(sectionName) == false then
+          view:RemoveSection(sectionName)
+          section.frame:Hide()
+        else
+          section.frame:Show()
+        end
         -- Remove the section if it's empty, otherwise draw it.
         if section:GetCellCount() == 0 then
           debug:Log("Section", "Removing section", sectionName)
