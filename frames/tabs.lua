@@ -5,13 +5,26 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Tabs: AceModule
 local tabs = addon:NewModule('Tabs')
+
 ---@class PanelTabButtonTemplate: Button
+---@field Text FontString
+---@field Left Texture
+---@field Middle Texture
+---@field Right Texture
+---@field LeftActive Texture
+---@field MiddleActive Texture
+---@field RightActive Texture
+---@field deselectedTextX number
+---@field deselectedTextY number
+---@field selectedTextX number
+---@field selectedTextY number
 
 ---@class (exact) Tab
 ---@field frame Frame
 ---@field tabs table<string, PanelTabButtonTemplate>
 ---@field tabIndex PanelTabButtonTemplate[]
 ---@field selectedTab string
+---@field clickHandler fun(name: string)
 local tabFrame = {}
 
 ---@param name string
