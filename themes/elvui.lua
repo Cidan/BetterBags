@@ -34,6 +34,9 @@ local decoratorFrames = {}
 ---@type table<string, ItemButton>
 local itemButtons = {}
 
+---@type table<string, PanelTabButtonTemplate>
+local tabs = {}
+
 ---@type Theme
 local theme = {
   Name = 'ElvUI',
@@ -132,6 +135,9 @@ local theme = {
     for _, button in pairs(itemButtons) do
       button:Hide()
     end
+    for _, tab in pairs(tabs) do
+      tab:Hide()
+    end
   end,
   SectionFont = function (font)
     font:SetFontObject("GameFontNormal")
@@ -205,6 +211,18 @@ local theme = {
     button.backdrop:SetFrameLevel(0)
     itemButtons[buttonName] = button --[[@as ItemButton]]
     return button --[[@as ItemButton]]
+  end,
+  Tab = function(tab)
+    local tabName = tab:GetName()
+    local decoration = tabs[tabName]
+    if decoration then
+      decoration:Show()
+      return decoration
+    end
+    decoration = themes.CreateDefaultTabDecoration(tab)
+    S:HandleTab(decoration)
+    tabs[tabName] = decoration
+    return decoration
   end,
 }
 themes:RegisterTheme('elvui', theme)

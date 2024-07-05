@@ -300,6 +300,7 @@ end
 
 function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
+  self.tabs:SetTab("Bank")
   self.isReagentBank = false
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
