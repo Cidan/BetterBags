@@ -519,6 +519,9 @@ function ElvUISkin:HandleItemButton(button, outer) end
 ---@param IconBorder Texture
 function ElvUISkin:HandleIconBorder(IconBorder) end
 
+---@param tab PanelTabButtonTemplate
+function ElvUISkin:HandleTab(tab) end
+
 ---@param name string
 ---@return ElvUISkin
 function ElvUI:GetModule(name) end
