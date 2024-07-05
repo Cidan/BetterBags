@@ -126,6 +126,14 @@ function bagFrame.bagProto:Show()
   end
   --addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
+  if self.kind == const.BAG_KIND.BANK then
+    local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
+    for _, data in pairs(tabData) do
+      if not self.tabs:TabExists(data.name) then
+        self.tabs:AddTab(data.name)
+      end
+    end
+  end
   self.frame:Show()
 end
 
@@ -286,6 +294,13 @@ function bagFrame.bagProto:SwitchToReagentBank()
   self:Wipe()
   ctx:Set('wipe', true)
   items:RefreshReagentBank(ctx)
+end
+
+function bagFrame.bagProto:SwitchToAccountBank(subtab)
+  local ctx = context:New()
+  self.isReagentBank = false
+  self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
+  BankFrame.selectedTab = 3
 end
 
 function bagFrame.bagProto:ToggleReagentBank()
@@ -458,12 +473,16 @@ function bagFrame:Create(kind)
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab("Bank")
     b.tabs:AddTab("Reagent Bank")
+
     b.tabs:SetTab("Bank")
+
     b.tabs:SetClickHandler(function(tabName)
       if tabName == "Bank" then
         b:SwitchToBank()
-      else
+      elseif tabName == "Reagent Bank" then
         b:SwitchToReagentBank()
+      else
+        b:SwitchToAccountBank(tabName)
       end
     end)
   end

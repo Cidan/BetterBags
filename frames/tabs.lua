@@ -46,7 +46,12 @@ function tabFrame:AddTab(name)
   tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
   self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
+  self:DeselectTab(name)
   self:ResizeTab(name)
+end
+
+function tabFrame:TabExists(name)
+  return self.tabs[name] ~= nil
 end
 
 function tabFrame:Reload()
