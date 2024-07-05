@@ -44,15 +44,16 @@ function tabFrame:AddTab(name)
     anchorPoint = "TOPRIGHT"
   end
   tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
-  tab:SetScript("OnClick", function()
-    self:SetTab(name)
-    if self.clickHandler then
-      self.clickHandler(name)
-    end
-  end)
   self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
   self:ResizeTab(name)
+end
+
+function tabFrame:Reload()
+  for name in pairs(self.tabs) do
+    self:ResizeTab(name)
+  end
+  self:SetTab(self.selectedTab)
 end
 
 function tabFrame:ResizeTab(name)
@@ -71,7 +72,13 @@ function tabFrame:ResizeTab(name)
 	end
 	tab:SetWidth(width)
   tab:SetHeight(32)
-  decoration:SetFrameLevel(tab:GetFrameLevel() - 1)
+  decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
+  decoration:SetScript("OnClick", function()
+    self:SetTab(name)
+    if self.clickHandler then
+      self.clickHandler(name)
+    end
+  end)
 end
 
 function tabFrame:SetTab(name)

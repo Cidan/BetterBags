@@ -103,6 +103,12 @@ function themes:ApplyTheme(key)
   end
 
   local theme = self.themes[key]
+  db:SetTheme(key)
+
+  -- Hide all tab decorations.
+  for _, tab in pairs(self.tabs) do
+    tab:Hide()
+  end
 
   -- Apply all portrait themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
@@ -127,6 +133,9 @@ function themes:ApplyTheme(key)
     frame.Owner.sideAnchor:ClearAllPoints()
     frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", offset, 0)
     frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", offset, 0)
+    if frame.Owner.tabs then
+      frame.Owner.tabs:Reload()
+    end
   end
 
   -- Apply all simple frame themes.
@@ -151,12 +160,7 @@ function themes:ApplyTheme(key)
     button:Hide()
   end
 
-  -- Hide all tab decorations.
-  for _, tab in pairs(self.tabs) do
-    tab:Hide()
-  end
 
-  db:SetTheme(key)
   --TODO(lobato): Create a new message just for redrawing items.
   events:SendMessage('bags/FullRefreshAll')
 end
