@@ -210,6 +210,15 @@ function items:RefreshReagentBank(ctx)
   self:ProcessContainer(ctx, const.BAG_KIND.REAGENT_BANK, container)
 end
 
+function items:RefreshAccountBank(ctx, id)
+  --local container = self:NewLoader(const.BAG_KIND.BANK)
+
+  --self:StageBagForUpdate(Enum.BagIndex.AccountBankTab_1, container)
+
+  --- Process the item container.
+  --self:ProcessContainer(ctx, const.BAG_KIND.BANK, container)
+end
+
 ---@param ctx Context
 function items:RefreshBank(ctx)
   equipmentSets:Update()

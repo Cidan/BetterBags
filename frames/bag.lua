@@ -145,7 +145,11 @@ function bagFrame.bagProto:Hide()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
   self.frame:Hide()
   if self.kind == const.BAG_KIND.BANK then
-    CloseBankFrame()
+    if C_Bank then
+      C_Bank.CloseBankFrame()
+    else
+      CloseBankFrame()
+    end
   elseif self.kind == const.BAG_KIND.BACKPACK then
     self.searchFrame:Hide()
   end
@@ -280,6 +284,7 @@ function bagFrame.bagProto:SwitchToBank()
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
   self.currentItemCount = -1
+  AccountBankPanel.selectedTabID = nil
   self:Wipe()
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
@@ -291,6 +296,7 @@ function bagFrame.bagProto:SwitchToReagentBank()
   BankFrame.selectedTab = 2
   self:SetTitle(L:G("Reagent Bank"))
   self.currentItemCount = -1
+  AccountBankPanel.selectedTabID = nil
   self:Wipe()
   ctx:Set('wipe', true)
   items:RefreshReagentBank(ctx)
@@ -301,6 +307,17 @@ function bagFrame.bagProto:SwitchToAccountBank(subtab)
   self.isReagentBank = false
   self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
   BankFrame.selectedTab = 3
+  local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
+  for _, data in pairs(tabData) do
+    if data.name == subtab then
+      AccountBankPanel.selectedTabID = data.ID
+      break
+    end
+  end
+  self.currentItemCount = -1
+  self:Wipe()
+  ctx:Set('wipe', true)
+  items:RefreshAccountBank(ctx, 1)
 end
 
 function bagFrame.bagProto:ToggleReagentBank()

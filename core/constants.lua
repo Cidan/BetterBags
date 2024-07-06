@@ -21,6 +21,11 @@ const.BAG_KIND = {
   BACKPACK = 0,
   BANK = 1,
   REAGENT_BANK = 2,
+  ACCOUNT_BANK_1 = Enum.BagIndex.AccountBankTab_1,
+  ACCOUNT_BANK_2 = Enum.BagIndex.AccountBankTab_2,
+  ACCOUNT_BANK_3 = Enum.BagIndex.AccountBankTab_3,
+  ACCOUNT_BANK_4 = Enum.BagIndex.AccountBankTab_4,
+  ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
 }
 
 -- BANK_BAGS contains all the bags that are part of the bank, including
