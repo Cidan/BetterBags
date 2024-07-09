@@ -365,6 +365,12 @@ const.DATABASE_DEFAULTS = {
     showFullSectionNames = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
+      [const.BAG_KIND.REAGENT_BANK] = false,
+      [const.BAG_KIND.ACCOUNT_BANK_1] = false,
+      [const.BAG_KIND.ACCOUNT_BANK_2] = false,
+      [const.BAG_KIND.ACCOUNT_BANK_3] = false,
+      [const.BAG_KIND.ACCOUNT_BANK_4] = false,
+      [const.BAG_KIND.ACCOUNT_BANK_5] = false,
     },
     newItems = {
       [const.BAG_KIND.BACKPACK] = {
@@ -372,6 +378,30 @@ const.DATABASE_DEFAULTS = {
         showNewItemFlash = false,
       },
       [const.BAG_KIND.BANK] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.REAGENT_BANK] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_1] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_2] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_3] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_4] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_5] = {
         markRecentItems = false,
         showNewItemFlash = false,
       },
@@ -390,7 +420,49 @@ const.DATABASE_DEFAULTS = {
         unmergeAtShop = true,
         dontMergePartial = false,
         dontMergeTransmog = false,
-      }
+      },
+      [const.BAG_KIND.REAGENT_BANK]  = {
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
+        dontMergePartial = false,
+        dontMergeTransmog = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_1]  = {
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
+        dontMergePartial = false,
+        dontMergeTransmog = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_2]  = {
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
+        dontMergePartial = false,
+        dontMergeTransmog = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_3]  = {
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
+        dontMergePartial = false,
+        dontMergeTransmog = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_4]  = {
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
+        dontMergePartial = false,
+        dontMergeTransmog = false,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_5]  = {
+        mergeStacks = true,
+        mergeUnstackable = true,
+        unmergeAtShop = true,
+        dontMergePartial = false,
+        dontMergeTransmog = false,
+      },
     },
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
@@ -400,15 +472,35 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = {
         enabled = true,
         color = true
-      }
+      },
+      [const.BAG_KIND.REAGENT_BANK] = {
+        enabled = true,
+        color = true
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_1] = {
+        enabled = true,
+        color = true
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_2] = {
+        enabled = true,
+        color = true
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_3] = {
+        enabled = true,
+        color = true
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_4] = {
+        enabled = true,
+        color = true
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_5] = {
+        enabled = true,
+        color = true
+      },
     },
     positions = {
       [const.BAG_KIND.BACKPACK] = {},
       [const.BAG_KIND.BANK] = {},
-    },
-    compaction = {
-      [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.SIMPLE,
-      [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.SIMPLE,
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
@@ -418,6 +510,42 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
       },
       [const.BAG_KIND.BANK] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.REAGENT_BANK] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_1] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_2] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_3] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_4] = {
+        [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_5] = {
         [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_GRID] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
         [const.BAG_VIEW.LIST] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
@@ -437,12 +565,60 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
+      [const.BAG_KIND.REAGENT_BANK] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_1] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_2] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_3] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_4] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_5] = {
+        [const.BAG_VIEW.ONE_BAG] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_GRID] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.LIST] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+        [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+      },
     },
     customSectionSort = {
       ---@type table<string, number>
       [const.BAG_KIND.BACKPACK] = {},
       ---@type table<string, number>
       [const.BAG_KIND.BANK] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.REAGENT_BANK] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.ACCOUNT_BANK_1] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.ACCOUNT_BANK_2] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.ACCOUNT_BANK_3] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.ACCOUNT_BANK_4] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.ACCOUNT_BANK_5] = {},
     },
     size = {
       ---@type SizeInfo[]
@@ -456,6 +632,54 @@ const.DATABASE_DEFAULTS = {
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.REAGENT_BANK] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_1] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_2] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_3] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_4] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_5] = {
           columnCount = 1,
           itemsPerRow = 15,
           scale = 100,
@@ -480,6 +704,54 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+        },
+        [const.BAG_KIND.REAGENT_BANK] = {
+          columnCount = 2,
+          itemsPerRow = 7,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_1] = {
+          columnCount = 2,
+          itemsPerRow = 7,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_2] = {
+          columnCount = 2,
+          itemsPerRow = 7,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_3] = {
+          columnCount = 2,
+          itemsPerRow = 7,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_4] = {
+          columnCount = 2,
+          itemsPerRow = 7,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_5] = {
+          columnCount = 2,
+          itemsPerRow = 7,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
         }
       },
       [const.BAG_VIEW.LIST] = {
@@ -494,6 +766,54 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_KIND.BANK] = {
           columnCount = 5,
           itemsPerRow = 5,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.REAGENT_BANK] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_1] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_2] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_3] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_4] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_5] = {
+          columnCount = 1,
+          itemsPerRow = 15,
           scale = 100,
           width = 700,
           height = 500,
@@ -516,16 +836,76 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+        },
+        [const.BAG_KIND.REAGENT_BANK] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_1] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_2] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_3] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_4] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
+        },
+        [const.BAG_KIND.ACCOUNT_BANK_5] = {
+          columnCount = 1,
+          itemsPerRow = 15,
+          scale = 100,
+          width = 700,
+          height = 500,
+          opacity = 89,
         }
       },
     },
     views = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.REAGENT_BANK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_1] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_2] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_3] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_4] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_5] = const.BAG_VIEW.SECTION_GRID,
     },
     previousViews = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.REAGENT_BANK] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_1] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_2] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_3] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_4] = const.BAG_VIEW.SECTION_GRID,
+      [const.BAG_KIND.ACCOUNT_BANK_5] = const.BAG_VIEW.SECTION_GRID,
     },
     ---@type table<string, CategoryOptions>
     categoryOptions = {},
@@ -545,6 +925,54 @@ const.DATABASE_DEFAULTS = {
         EquipmentLocation = true,
       },
       [const.BAG_KIND.BANK] = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+        RecentItems = true,
+        GearSet = true,
+        EquipmentLocation = true,
+      },
+      [const.BAG_KIND.REAGENT_BANK] = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+        RecentItems = true,
+        GearSet = true,
+        EquipmentLocation = true,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_1] = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+        RecentItems = true,
+        GearSet = true,
+        EquipmentLocation = true,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_2] = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+        RecentItems = true,
+        GearSet = true,
+        EquipmentLocation = true,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_3] = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+        RecentItems = true,
+        GearSet = true,
+        EquipmentLocation = true,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_4] = {
+        Type = true,
+        Expansion = false,
+        TradeSkill = false,
+        RecentItems = true,
+        GearSet = true,
+        EquipmentLocation = true,
+      },
+      [const.BAG_KIND.ACCOUNT_BANK_5] = {
         Type = true,
         Expansion = false,
         TradeSkill = false,

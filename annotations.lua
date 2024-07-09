@@ -351,6 +351,14 @@ _G.COSTS_LABEL = "Cost:"
 _G.UNIT_NAME_FONT = ""
 _G.DAMAGE_TEXT_FONT = ""
 
+-- These aren't the actual bag ENUM's, and are just placeholders.
+
+Enum.BagIndex.AccountBankTab_1 = 100
+Enum.BagIndex.AccountBankTab_2 = 101
+Enum.BagIndex.AccountBankTab_3 = 102
+Enum.BagIndex.AccountBankTab_4 = 103
+Enum.BagIndex.AccountBankTab_5 = 104
+
 ---@class AceConfig.OptionsTable
 ---@field values? table<any, any>
 ---[Documentation](http://www.wowace.com/addons/ace3/pages/ace-config-3-0-options-tables/)

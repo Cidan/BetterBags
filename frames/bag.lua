@@ -317,7 +317,7 @@ function bagFrame.bagProto:SwitchToAccountBank(subtab)
   self.currentItemCount = -1
   self:Wipe()
   ctx:Set('wipe', true)
-  items:RefreshAccountBank(ctx, 1)
+  items:RefreshAccountBank(ctx, const.BAG_KIND.ACCOUNT_BANK_1)
 end
 
 function bagFrame.bagProto:ToggleReagentBank()
