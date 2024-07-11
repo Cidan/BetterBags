@@ -136,9 +136,8 @@ end
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function GridView(view, ctx, bag, slotInfo)
-  if view.fullRefresh then
+  if ctx:GetBool('wipe') then
     view:Wipe()
-    view.fullRefresh = false
   end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 

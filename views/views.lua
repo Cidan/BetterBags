@@ -44,7 +44,6 @@ local stackProto = {}
 ---@field defer boolean
 ---@field itemCount number
 ---@field itemFrames Item[]
----@field fullRefresh boolean
 ---@field deferredItems table<string, boolean>
 ---@field dirtySections table<string, boolean>
 ---@field private stacks table<string, Stack>

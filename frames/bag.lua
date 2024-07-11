@@ -332,11 +332,13 @@ end
 
 function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
+  local ctx = context:New()
+  ctx:Set('wipe', true)
   self.tabs:SetTab("Bank")
   self.isReagentBank = false
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
-  items:ClearBankCache()
+  items:ClearBankCache(ctx)
   self:Wipe()
 end
 

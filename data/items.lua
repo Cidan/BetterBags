@@ -101,6 +101,11 @@ function items:OnInitialize()
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
     [const.BAG_KIND.REAGENT_BANK] = true,
+    [const.BAG_KIND.ACCOUNT_BANK_1] = true,
+    [const.BAG_KIND.ACCOUNT_BANK_2] = true,
+    [const.BAG_KIND.ACCOUNT_BANK_3] = true,
+    [const.BAG_KIND.ACCOUNT_BANK_4] = true,
+    [const.BAG_KIND.ACCOUNT_BANK_5] = true,
   }
 end
 
@@ -114,7 +119,7 @@ function items:OnEnable()
 
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
-    items:ClearBankCache()
+    --items:ClearBankCache()
   end)
 end
 
@@ -155,23 +160,18 @@ function items:PreSort()
 end
 
 ---@private
-function items:ClearItemCache()
+---@param ctx Context
+function items:ClearItemCache(ctx)
   self.previousItemGUID = {}
   self:ResetSlotInfo()
-  if addon.Bags.Backpack.currentView then
-    addon.Bags.Backpack.currentView.fullRefresh = true
-  end
-  if addon.Bags.Bank.currentView then
-    addon.Bags.Bank.currentView.fullRefresh = true
-  end
+  ctx:Set('wipe', true)
   debug:Log("Items", "Item Cache Cleared")
 end
 
-function items:ClearBankCache()
+---@param ctx Context
+function items:ClearBankCache(ctx)
   self:WipeSlotInfo(const.BAG_KIND.BANK)
-  if addon.Bags.Bank.currentView then
-    addon.Bags.Bank.currentView.fullRefresh = true
-  end
+  ctx:Set('wipe', true)
   debug:Log("Items", "Bank Cache Cleared")
 end
 
@@ -218,7 +218,7 @@ function items:RefreshAccountBank(ctx, kind)
   self:StageBagForUpdate(kind, container)
 
   --- Process the item container.
-  --self:ProcessContainer(ctx, const.BAG_KIND.BANK, container)
+  self:ProcessContainer(ctx, kind, container)
 end
 
 ---@param ctx Context
@@ -378,12 +378,6 @@ function items:LoadItems(ctx, kind, dataCache, reagent)
   -- Wipe the data if needed before loading the new data.
   if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
-    if addon.Bags.Backpack.currentView and kind == const.BAG_KIND.BACKPACK then
-      addon.Bags.Backpack.currentView.fullRefresh = true
-    end
-    if addon.Bags.Bank.currentView and kind == const.BAG_KIND.BANK then
-      addon.Bags.Bank.currentView.fullRefresh = true
-    end
   end
 
   -- Push the new slot info into the slot info table, and the old slot info

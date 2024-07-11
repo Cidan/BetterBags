@@ -132,9 +132,8 @@ end
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function BagView(view, ctx, bag, slotInfo)
-  if view.fullRefresh or ctx:GetBool('wipe') then
+  if ctx:GetBool('wipe') then
     view:Wipe()
-    view.fullRefresh = false
   end
   -- Use the section grid sizing for this view type.
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_GRID)

@@ -84,7 +84,7 @@ function refresh:StartUpdate()
   if sortBackpack then
     self.isUpdateRunning = false
     items:RemoveNewItemFromAllItems()
-    items:ClearItemCache()
+    items:ClearItemCache(ctx)
     items._firstLoad[const.BAG_KIND.BACKPACK] = true
     items._firstLoad[const.BAG_KIND.BANK] = true
     items._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
