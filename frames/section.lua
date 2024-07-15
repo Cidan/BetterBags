@@ -301,10 +301,16 @@ local function onTitleRightClick(section)
   async:Each(list, function(item)
     -- safecheking: does the bag/slot still hold 'this' item?
     local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
-    if itemId ~= item.itemId then return end
+    if itemId ~= item.itemId then 
+      -- print("Item "..item.itemId.." is not in bag/slot "..item.bagid.."/"..item.slotid..". Aborting.")
+      return 
+    end
     -- safechecking: are we on the same flow as we started?
     local newFlow = addon:GetMovementFlow()
-    if newFlow ~= flow then return end
+    if newFlow ~= flow then 
+      -- print("Flow changed from "..flow.." to "..newFlow..". Aborting.")
+      return 
+    end
     -- if everything seems ok, move the item
     C_Container.UseContainerItem(item.bagid, item.slotid)
   end)
