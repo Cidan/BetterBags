@@ -19,6 +19,15 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+---@class Fonts: AceModule
+local fonts = addon:GetModule('Fonts')
+
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
@@ -50,13 +59,27 @@ end
 ---@field private currencyItems CurrencyItem[]
 local CurrencyFrame = {}
 
-function CurrencyFrame:Show()
+---@param callback? fun()
+function CurrencyFrame:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeIn.callback = function()
+      self.fadeIn.callback = nil
+      callback()
+    end
+  end
   self.fadeIn:Play()
 end
 
-function CurrencyFrame:Hide()
+---@param callback? fun()
+function CurrencyFrame:Hide(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  if callback then
+    self.fadeOut.callback = function()
+      self.fadeOut.callback = nil
+      callback()
+    end
+  end
   self.fadeOut:Play()
 end
 
@@ -73,35 +96,27 @@ function CurrencyFrame:GetCurrencyItem(index, info)
   if not item then
     item = self:CreateCurrencyItem(index, info.isHeader)
     item.frame:SetSize(232, 30)
-    item.frame:SetScript('OnEnter', function()
-      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
-      GameTooltip:SetCurrencyToken(item.index)
-      GameTooltip:AddLine(" ")
-      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
-      GameTooltip:Show()
-    end)
-    item.frame:SetScript('OnEnter', function()
-      GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
-      GameTooltip:SetCurrencyToken(item.index)
-      GameTooltip:AddLine(" ")
-      GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
-      GameTooltip:Show()
-    end)
-    item.frame:SetScript('OnLeave', function()
-      GameTooltip:Hide()
-    end)
-    item.frame:SetScript('OnMouseDown', function()
-      local refinfo = C_CurrencyInfo.GetCurrencyListInfo(item.index)
-      if refinfo.isHeader then
-        return
-      end
-      if refinfo.isShowInBackpack then
-        C_CurrencyInfo.SetCurrencyBackpack(item.index, false)
-      else
-        C_CurrencyInfo.SetCurrencyBackpack(item.index, true)
-      end
-      self:Update()
-    end)
+    if not info.isHeader then
+      item.frame:SetScript('OnEnter', function()
+        GameTooltip:SetOwner(item.frame, "ANCHOR_RIGHT")
+        GameTooltip:SetCurrencyToken(item.index)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Click to add or remove this currency to and from your backpack.", 1, 1, 1, true)
+        GameTooltip:Show()
+      end)
+      item.frame:SetScript('OnLeave', function()
+        GameTooltip:Hide()
+      end)
+      item.frame:SetScript('OnMouseDown', function()
+        local refinfo = C_CurrencyInfo.GetCurrencyListInfo(item.index)
+        if refinfo.isShowInBackpack then
+          C_CurrencyInfo.SetCurrencyBackpack(item.index, false)
+        else
+          C_CurrencyInfo.SetCurrencyBackpack(item.index, true)
+        end
+        self:Update()
+      end)
+    end
     item.frame:Show()
     self.currencyItems[info.name] = item
     self.content:AddCell(info.name, item)
@@ -170,8 +185,14 @@ function CurrencyFrame:Update()
     ---@cast b CurrencyItem
     return a.index < b.index
   end)
-  self.content:Draw()
-  local w, h = self.iconGrid:Draw()
+  self.content:Draw({
+    cells = self.content.cells,
+    maxWidthPerRow = 1,
+  })
+  local w, h = self.iconGrid:Draw({
+    cells = self.iconGrid.cells,
+    maxWidthPerRow = 1024,
+  })
   self.iconGrid:GetContainer():SetSize(w, h)
 end
 
@@ -200,9 +221,11 @@ function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
   item.icon:SetPoint("LEFT", item.frame, "LEFT", 0, 0)
 
   if header then
-    item.name = item.frame:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    item.name = item.frame:CreateFontString(nil, "ARTWORK")
+    item.name:SetFontObject(fonts.UnitFrame12Yellow)
   else
-    item.name = item.frame:CreateFontString(nil, "ARTWORK", "Game12Font")
+    item.name = item.frame:CreateFontString(nil, "ARTWORK")
+    item.name:SetFontObject(fonts.UnitFrame12White)
   end
   item.name:SetPoint("LEFT", item.icon, "RIGHT", 5, 0)
 
@@ -213,8 +236,9 @@ function CurrencyFrame:CreateCurrencyItem(index, header, nobackdrop)
 end
 
 ---@param parent Frame
+---@param iconParent Frame
 ---@return CurrencyFrame
-function currency:Create(parent)
+function currency:Create(parent, iconParent)
   ---@class CurrencyFrame
   local b = {}
   setmetatable(b, {__index = CurrencyFrame})
@@ -224,13 +248,14 @@ function currency:Create(parent)
   b.loaded = false
 
   ---CURRENCY_DISPLAY_UPDATE
-  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent, "DefaultPanelTemplate") --[[@as Frame]]
+  local frame = CreateFrame('Frame', 'BetterBagsCurrencyFrame', UIParent) --[[@as Frame]]
   frame:Hide()
   frame:SetParent(parent)
   frame:SetPoint('BOTTOMRIGHT', parent, 'BOTTOMLEFT', -10, 0)
   frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   frame:SetWidth(260)
-  frame:SetTitle("Currencies")
+
+  themes:RegisterSimpleWindow(frame, L:G("Currencies"))
 
   b.fadeIn, b.fadeOut = animations:AttachFadeAndSlideLeft(frame)
   b.frame = frame
@@ -242,7 +267,7 @@ function currency:Create(parent)
   g.spacing = 0
   b.content = g
 
-  b.iconGrid = self:CreateIconGrid(parent)
+  b.iconGrid = self:CreateIconGrid(iconParent)
   b:Update()
   events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
     b:Update()

@@ -1,5 +1,8 @@
 ---@meta
 
+---@class AnimationGroup
+---@field callback fun()
+
 ---@class ItemButton: Button
 ---@field bagID number
 ---@field NewItemTexture Texture
@@ -10,6 +13,18 @@
 ---@field BattlepayItemTexture Texture
 ---@field IconBorder Texture
 ---@field UpgradeIcon Texture
+---@field flashAnim AnimationGroup
+---@field newitemglowAnim AnimationGroup
+---@field IconOverlay Texture
+---@field ItemContextOverlay Texture
+---@field Cooldown Cooldown
+---@field UpdateTooltip function
+---@field LockTexture Texture
+---@field IconQuestTexture Texture
+---@field IconTexture Texture
+---@field ItemSlotBackground Texture
+---@field backdrop Frame
+---@field searchOverlay Texture
 local itemButton = {}
 
 ---@param bagid number
@@ -44,7 +59,11 @@ function itemButton:SetItemButtonQuality(quality) end
 
 function itemButton:HasItem() end
 
+---@return Enum.BagIndex
+function itemButton:GetBagID() end
+
 ---@class Button
+---@field isSkinned boolean
 local Button = {}
 
 function Button:RegisterForClicks(...) end
@@ -56,11 +75,13 @@ function itemButton:GetHighlightTexture() end
 ContinuableContainer = {}
 
 ---@class MasqueGroup
+---@field Buttons ItemButton[]
 MasqueGroup = {}
 
 function MasqueGroup:AddButton(group, button) end
 function MasqueGroup:RemoveButton(group, button) end
-
+function MasqueGroup:ReSkin(boolean) end
+function MasqueGroup:RegisterCallback(func, obj) end
 ---@class Masque
 Masque = {}
 
@@ -135,12 +156,49 @@ function LibUIDropDownMenu:HideDropDownMenu(level) end
 ---@field Instructions FontString
 local SearchBox = {}
 
+---@class ButtonFrameTemplate: Frame
+---@field Bg Texture
+---@field PortraitContainer PortraitContainer
+---@field CloseButton Button
+---@field TitleContainer TitleContainer
+
 ---@class BetterBagsBagPortraitTemplate
 ---@field Bg Texture
----@field PortraitContainer Frame
+---@field PortraitContainer PortraitContainer
 ---@field CloseButton Button
 ---@field SearchBox SearchBox
+---@field Backdrop BackdropTemplate
+---@field NineSlice NineSlicePanelTemplate
+---@field TopTileStreaks Texture
+---@field TitleContainer TitleContainer
+---@field Owner Bag
 local BetterBagsBagPortraitTemplate = {}
+---@return string
+function BetterBagsBagPortraitTemplate:GetName() end
+
+---@class PortraitContainer: Frame
+---@field portrait Texture
+---@field CircleMask MaskTexture
+
+---@class TitleContainer: Frame
+---@field TitleText FontString
+
+---@class BetterBagsBagDefaultPanelTemplate
+---@field Bg Texture
+---@field CloseButton Button
+---@field Backdrop BackdropTemplate
+---@field NineSlice NineSlicePanelTemplate
+---@field TopTileStreaks Texture
+local BetterBagsBagDefaultPanelTemplate = {}
+
+---@class NineSlicePanelTemplate: Frame
+local NineSlicePanelTemplate = {}
+function NineSlicePanelMixin:GetFrameLayoutTextureKit() end
+
+---@class BackdropTemplate
+local BackdropTemplate = {}
+function BackdropTemplate:Show() end
+function BackdropTemplate:Hide() end
 
 function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
@@ -169,6 +227,45 @@ function WowScrollBox:GetUpperShadowTexture() end
 ---@return Texture
 function WowScrollBox:GetLowerShadowTexture() end
 function WowScrollBox:SetDataProvider(provider) end
+
+---@class DataProviderMixin: CallbackRegistryMixin
+local DataProviderMixin = {}
+function DataProviderMixin:Enumerate(indexBegin, indexEnd) end
+function DataProviderMixin:Insert(...) end
+function DataProviderMixin:InsertTable(tbl) end
+function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
+---@return number
+function DataProviderMixin:GetSize() end
+---@param elementData table
+---@return number
+function DataProviderMixin:FindIndex(elementData) end
+function DataProviderMixin:RemoveIndex(index) end
+function DataProviderMixin:Flush() end
+---@param predicate fun(elementData: table<any, any>): boolean
+---@return boolean
+function DataProviderMixin:ContainsByPredicate(predicate) end
+---@return fun(), table[]
+function DataProviderMixin:EnumerateEntireRange() end
+---@return table[]
+function DataProviderMixin:GetCollection() end
+---@param index number
+---@return table
+function DataProviderMixin:Find(index) end
+---@param elementData table
+---@param newIndex number
+function DataProviderMixin:MoveElementDataToIndex(elementData, newIndex) end
+---@return number
+function DataProviderMixin:GetSize() end
+function DataProviderMixin:Remove(...) end
+
+---@class ScrollBoxDragBehavior
+local ScrollBoxDragBehavior = {}
+---@param reorderable boolean
+function ScrollBoxDragBehavior:SetReorderable(reorderable) end
+
+---@class C_Bank
+---@field CloseBankFrame fun()
+C_Bank = {}
 
 ---@class Frame
 ---@field scrollable boolean
@@ -251,6 +348,8 @@ _G.EXPANSION_NAME9 = "Dragonflight"
 _G.BANK_BAG_PURCHASE = "Purchasable Bag Slot"
 _G.COSTS_LABEL = "Cost:"
 
+_G.UNIT_NAME_FONT = ""
+_G.DAMAGE_TEXT_FONT = ""
 
 ---@class AceConfig.OptionsTable
 ---@field values? table<any, any>
@@ -317,9 +416,112 @@ PawnVersion = _G['PawnVersion'] --[[@as number]]
 PawnGetItemData = _G['PawnGetItemData'] --[[@as fun(itemLink: string): table]]
 PawnIsItemAnUpgrade = _G['PawnIsItemAnUpgrade'] --[[@as fun(itemData: table): boolean]]
 PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --[[@as fun(itemLink: string): boolean]]
+PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string, level?: boolean): boolean]]
 
+--- SimpleItemLevel API Globals
+---@class SimpleItemLevel
+SimpleItemLevel = {}
+SimpleItemLevel.API = {}
+
+---@param itemLink string
+---@return boolean
+function SimpleItemLevel.API.ItemIsUpgrade(itemLink) end
 
 --- SortBags
 
 -- Sort bags for classic.
 function SortBags() end
+
+--- DevTool
+---@class DevTool
+_G.DevTool = {}
+
+---@param value any
+---@param tag string
+function _G.DevTool:AddData(value, tag) end
+
+---@param index number
+---@param backpack number
+function SetCurrencyBackpack(index, backpack) end
+
+---@param index number
+---@return CurrencyInfo
+function GetCurrencyListInfo(index) end
+
+---@return number
+function GetCurrencyListSize() end
+
+
+--- WagoAnalytics
+---@class WagoAnalytics
+local WagoAnalytics = {}
+
+---@param id string
+function WagoAnalytics:Register(id) end
+
+---@param label string
+---@param enabled boolean
+function WagoAnalytics:Switch(label, enabled) end
+
+---@param counter string
+---@param amount? number
+function WagoAnalytics:IncrementCounter(counter, amount) end
+
+---@param counter string
+---@param amount? number
+function WagoAnalytics:DecrementCounter(counter, amount) end
+
+---@param counter string
+---@param amount number
+function WagoAnalytics:SetCounter(counter, amount) end
+
+
+---@class DecorationFrame: Frame
+
+--- GuildWars2 API
+---@class GuildWars2
+GW2_ADDON = {}
+
+GW2_ADDON.BackdropTemplates = {}
+function GW2_ADDON.CreateFrameHeaderWithBody(frame, titletext, icon, details) end
+
+function Button:GwSkinButton(x) end
+function Button:GwStripTextures() end
+
+---@class GuildWarsHeader: Frame
+---@field windowIcon Texture
+
+---@class ElvUI
+---@field RegisterCooldown fun(self: ElvUI, tex: Cooldown, b: string)
+ElvUI = {
+  media = {
+    bordercolor = {}
+  },
+  Media = {
+    Textures = {},
+    bordercolor = {}
+  }
+}
+
+---@class ElvUISkin
+local ElvUISkin = {}
+
+---@param frame Frame
+function ElvUISkin:HandleEditBox(frame) end
+
+---@param frame Frame
+function ElvUISkin:HandleFrame(frame) end
+
+---@param button ItemButton
+---@param outer boolean
+function ElvUISkin:HandleItemButton(button, outer) end
+
+---@param IconBorder Texture
+function ElvUISkin:HandleIconBorder(IconBorder) end
+
+---@param tab PanelTabButtonTemplate
+function ElvUISkin:HandleTab(tab) end
+
+---@param name string
+---@return ElvUISkin
+function ElvUI:GetModule(name) end

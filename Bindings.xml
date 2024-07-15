@@ -2,4 +2,7 @@
  <Binding name="BETTERBAGS_TOGGLESEARCH" category="BetterBags">
   BetterBags_ToggleSearch()
  </Binding>
+ <Binding name="BETTERBAGS_TOGGLEBAGS" category="BetterBags">
+  BetterBags_ToggleBags()
+ </Binding>
 </Bindings>

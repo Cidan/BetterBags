@@ -21,8 +21,8 @@ local const = addon:GetModule('Constants')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule('ContextMenu')
 
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
@@ -109,7 +109,7 @@ local function SetList(self, values)
     self:PauseLayout()
     for _, v in pairs(itemData) do
       local item = itemRowFrame:Create()
-      item:SetItem(v)
+      item:SetStaticItemFromData(v)
       item.button.frame:SetPoint("LEFT", item.frame, "LEFT", 4, 0)
 
       local fn = function(_, b)
@@ -118,7 +118,7 @@ local function SetList(self, values)
           return
         end
         ClearCursor()
-        context:Show({{
+        contextMenu:Show({{
           text = L:G("Remove"),
           notCheckable = true,
           hasArrow = false,

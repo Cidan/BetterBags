@@ -22,6 +22,12 @@ local debug = addon:GetModule('Debug')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')
 
@@ -31,7 +37,7 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field button Item
 ---@field rowButton ItemButton|Button
 ---@field text FontString
----@field data ItemData
+---@field slotkey string
 item.itemRowProto = {}
 
 function item.itemRowProto:Unlock()
@@ -40,11 +46,31 @@ end
 function item.itemRowProto:Lock()
 end
 
+function item.itemRowProto:GetItemData()
+  return self.button:GetItemData()
+end
+
 ---@param data ItemData
-function item.itemRowProto:SetItem(data)
-  self.data = data
+function item.itemRowProto:SetStaticItemFromData(data)
+  self:SetItemFromData(data, true)
+end
+
+---@param slotkey string
+function item.itemRowProto:SetItem(slotkey)
+  local data = items:GetItemDataFromSlotKey(slotkey)
+  self:SetItemFromData(data)
+end
+
+---@param data ItemData
+---@param static? boolean
+function item.itemRowProto:SetItemFromData(data, static)
+  self.slotkey = data.slotkey
   self.button:SetSize(20, 20)
-  self.button:SetItem(data)
+  if static then
+    self.button:SetStaticItemFromData(data)
+  else
+    self.button:SetItemFromData(data)
+  end
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
 
@@ -67,9 +93,9 @@ function item.itemRowProto:SetItem(data)
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
 
   --self.button:SetSize(20, 20)
-  self.button.Count:Hide()
-  self.button.ilvlText:Hide()
-  self.button.LockTexture:Hide()
+  --self.button.Count:Hide()
+  --self.button.ilvlText:Hide()
+  --self.button.LockTexture:Hide()
 
   if bagid then
     self.frame:SetID(bagid)
@@ -86,7 +112,9 @@ function item.itemRowProto:SetItem(data)
     GameTooltip:Show()
   end)
 
-  events:SendMessage('item/UpdatedRow', self)
+  if self.slotkey ~= nil then
+    events:SendMessage('item/UpdatedRow', self)
+  end
   self.frame:Show()
   self.rowButton:Show()
 end
@@ -110,12 +138,12 @@ function item.itemRowProto:ClearItem()
     ---@cast s ItemButton
     s.HighlightTexture:Show()
   end)
-  self.data = nil
+  self.slotkey = ""
 end
 
 ---@return string
 function item.itemRowProto:GetCategory()
-  return self.button.data.itemInfo.category
+  return self.button:GetItemData().itemInfo.category
 end
 
 ---@return boolean
@@ -125,7 +153,7 @@ end
 
 ---@return string
 function item.itemRowProto:GetGUID()
-  return self.data.itemInfo.itemGUID
+  return self.button:GetItemData().itemInfo.itemGUID
 end
 
 function item.itemRowProto:Release()
@@ -144,7 +172,9 @@ local buttonCount = 0
 
 function item:OnInitialize()
   self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-  self._pool:SetResetDisallowedIfNew()
+  if self._pool.SetResetDisallowedIfNew then
+    self._pool:SetResetDisallowedIfNew()
+  end
 end
 
 ---@param i ItemRow
@@ -155,6 +185,14 @@ end
 ---@return ItemRow
 function item:_DoCreate()
   local i = setmetatable({}, { __index = item.itemRowProto })
+
+  -- Backwards compatibility for item data.
+  i.data = setmetatable({}, { __index = function(_, key)
+    local d = i.button:GetItemData()
+    if d == nil then return nil end
+    return i.button:GetItemData()[key]
+  end})
+
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsRowItemButton%d", buttonCount)
@@ -178,6 +216,7 @@ function item:_DoCreate()
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   text:SetParent(i.frame)
   text:SetPoint("LEFT", i.button.frame, "RIGHT", 5, 0)
+  text:SetPoint("RIGHT", i.frame, "RIGHT")
   text:SetHeight(16)
   text:SetWidth(310)
   text:SetTextHeight(28)

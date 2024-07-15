@@ -22,6 +22,12 @@ local sort = addon:GetModule('Sort')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -47,6 +53,7 @@ local async = addon:GetModule('Async')
 ---@field private content Grid The main content frame of the section.
 ---@field private fillWidth boolean
 ---@field private headerDisabled boolean
+---@field private maxItemsPerRow number
 local sectionProto = {}
 
 ---@param kind BagKind
@@ -63,6 +70,7 @@ end
 ---@param text string The text to set the title to.
 function sectionProto:SetTitle(text)
   self.title:SetText(text)
+  themes:UpdateSectionFont(self.title:GetFontString())
 end
 
 function sectionProto:AddCell(id, cell)
@@ -74,12 +82,16 @@ function sectionProto:RemoveCell(id)
   self.content:RemoveCell(id)
 end
 
+function sectionProto:RekeyCell(oldID, newID)
+  self.content:RekeyCell(oldID, newID)
+end
+
 function sectionProto:GetMaxCellWidth()
-  return self.content.maxCellWidth
+  return self.maxItemsPerRow
 end
 
 function sectionProto:SetMaxCellWidth(width)
-  self.content.maxCellWidth = width
+  self.maxItemsPerRow = width
 end
 
 function sectionProto:GetCellCount()
@@ -107,6 +119,7 @@ end
 
 function sectionProto:Wipe()
   self.content:Wipe()
+  self.frame:Hide()
   self.view = const.BAG_VIEW.SECTION_GRID
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
@@ -195,7 +208,10 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
       self.content:Sort(sort:GetItemSortFunction(kind, view))
     end
   end
-  local w, h = self.content:Draw()
+  local w, h = self.content:Draw({
+    cells = self.content.cells,
+    maxWidthPerRow = ((37 + 4) * self.maxItemsPerRow) + 16,
+  })
   self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
   self.content:Show()
@@ -203,7 +219,7 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
     self.frame:Hide()
     return 0, 0
   end
-  if self.fillWidth then
+  if self.fillWidth or database:GetShowFullSectionNames(kind) then
     w = math.max(w, self.title:GetTextWidth())
   end
   self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
@@ -227,6 +243,7 @@ end
 ---@param f Section
 function sectionFrame:_DoReset(f)
   f:EnableHeader()
+  f:GetContent():SortHorizontal()
   f:Wipe()
 end
 
@@ -340,10 +357,10 @@ function sectionFrame:_DoCreate()
   local f = CreateFrame("Frame", nil, nil, "BackdropTemplate")
   s.frame = f
 
+  s.maxItemsPerRow = 5
   -- Create the section title.
   local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")
-  title:SetNormalFontObject("GameFontNormal")
   title:SetHeight(18)
   title:GetFontString():SetAllPoints()
   title:GetFontString():SetJustifyH("LEFT")
@@ -378,6 +395,8 @@ function sectionFrame:_DoCreate()
   end)
 
   s.title = title
+
+  themes:RegisterSectionFont(title:GetFontString())
 
   local content = grid:Create(s.frame)
   content:Show()

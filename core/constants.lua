@@ -9,19 +9,18 @@ local L = addon:GetModule('Localization')
 ---@class Constants: AceModule
 local const = addon:NewModule('Constants')
 
-local WOW_PROJECT_WRATH_CLASSIC = 11
-
 -- Constants for detecting WoW version.
 addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 addon.isBCC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
-addon.isWrath = WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC
+addon.isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 
 ---@enum BagKind
 const.BAG_KIND = {
   UNDEFINED = -1,
   BACKPACK = 0,
   BANK = 1,
+  REAGENT_BANK = 2,
 }
 
 ---@enum MovementFlow
@@ -119,6 +118,14 @@ const.ITEM_BAG_FAMILY = {
   [1024] = L:G("Mining Bag"),
 }
 
+---@enum WindowKind
+const.WINDOW_KIND = {
+  UNDEFINED = 0,
+  PORTRAIT = 1,
+  SIMPLE = 2,
+  FLAT = 3,
+}
+
 ---@enum BagView
 const.BAG_VIEW = {
   UNDEFINED = 0,
@@ -163,6 +170,13 @@ const.EXPANSION_TYPE = {
 }
 
 const.OFFSETS = {
+  -- The left inset for the search box.
+  SEARCH_LEFT_INSET = 46,
+  -- The right inset for the search box.
+  SEARCH_RIGHT_INSET = -46,
+  -- The top inset for the search box.
+  SEARCH_TOP_INSET = -30,
+
   -- This is the offset from the top of the bag window to the start of the
   -- content frame.
   BAG_TOP_INSET = -42,
@@ -277,26 +291,51 @@ const.BRIEF_EXPANSION_MAP = {
 ---@class TradeSkillMap
 ---@type table<number, string>
 const.TRADESKILL_MAP = {
-	[ 0] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 0),   -- "Trade Goods (OBSOLETE)"
-	[ 1] = L:G("Engineering"),                                  -- "Parts"
-	[ 2] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 2),   -- "Explosives (OBSOLETE)"
-	[ 3] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 3),   -- "Devices (OBSOLETE)"
-	[ 4] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 4),   -- "Jewelcrafting"
-	[ 5] = L:G("Tailoring"),                                    -- "Cloth"
-	[ 6] = L:G("Leatherworking"),                               -- "Leather"
-	[ 7] = L:G("Mining"),                                       -- "Metal & Stone"
-	[ 8] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 8),   -- "Cooking"
-	[ 9] = L:G("Herbalism"),                                    -- "Herb"
-	[10] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 10), -- "Elemental"
-	[11] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 11), -- "Other"
-	[12] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 12), -- "Enchanting"
-	[13] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 13), -- "Materials (OBSOLETE)"
-	[14] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 14), -- "Item Enchantment (OBSOLETE)"
-	[15] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 15), -- "Weapon Enchantment - Obsolete"
-	[16] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 16), -- "Inscription"
-	[17] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 17), -- "Explosives and Devices (OBSOLETE)"
-	[18] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 18), -- "Optional Reagents"
-	[19] = GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 19), -- "Finishing Reagents"
+	[ 0] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 0),   -- "Trade Goods (OBSOLETE)"
+	[ 1] = L:G("Engineering"),                                         -- "Parts"
+	[ 2] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 2),   -- "Explosives (OBSOLETE)"
+	[ 3] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 3),   -- "Devices (OBSOLETE)"
+	[ 4] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 4),   -- "Jewelcrafting"
+	[ 5] = L:G("Tailoring"),                                           -- "Cloth"
+	[ 6] = L:G("Leatherworking"),                                      -- "Leather"
+	[ 7] = L:G("Mining"),                                              -- "Metal & Stone"
+	[ 8] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 8),   -- "Cooking"
+	[ 9] = L:G("Herbalism"),                                           -- "Herb"
+	[10] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 10),  -- "Elemental"
+	[11] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 11),  -- "Other"
+	[12] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 12),  -- "Enchanting"
+	[13] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 13),  -- "Materials (OBSOLETE)"
+	[14] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 14),  -- "Item Enchantment (OBSOLETE)"
+	[15] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 15),  -- "Weapon Enchantment - Obsolete"
+	[16] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 16),  -- "Inscription"
+	[17] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 17),  -- "Explosives and Devices (OBSOLETE)"
+	[18] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 18),  -- "Optional Reagents"
+	[19] = C_Item.GetItemSubClassInfo(Enum.ItemClass.Tradegoods, 19),  -- "Finishing Reagents"
+}
+
+---@class EquipmentSlotsMap
+---@type number[]
+const.EQUIPMENT_SLOTS = {
+  INVSLOT_AMMO,
+  INVSLOT_BACK,
+  INVSLOT_BODY,
+  INVSLOT_CHEST,
+  INVSLOT_FEET,
+  INVSLOT_FINGER1,
+  INVSLOT_FINGER2,
+  INVSLOT_HAND,
+  INVSLOT_HEAD,
+  INVSLOT_LEGS,
+  INVSLOT_MAINHAND,
+  INVSLOT_NECK,
+  INVSLOT_OFFHAND,
+  INVSLOT_RANGED,
+  INVSLOT_SHOULDER,
+  INVSLOT_TABARD,
+  INVSLOT_TRINKET1,
+  INVSLOT_TRINKET2,
+  INVSLOT_WAIST,
+  INVSLOT_WRIST,
 }
 
 ---@class CustomCategoryFilter
@@ -305,6 +344,17 @@ const.TRADESKILL_MAP = {
 ---@field itemList table<number, boolean>
 ---@field readOnly boolean
 
+---@class SizeInfo
+---@field columnCount number
+---@field itemsPerRow number
+---@field scale number
+---@field width number
+---@field height number
+---@field opacity number
+
+---@class (exact) CategoryOptions
+---@field shown boolean
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
@@ -312,20 +362,37 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     showBagButton = true,
     debug = false,
-    inBagSearch = false,
+    inBagSearch = true,
     showKeybindWarning = true,
+    theme = 'Default',
+    showFullSectionNames = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+    },
+    newItems = {
+      [const.BAG_KIND.BACKPACK] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+      [const.BAG_KIND.BANK] = {
+        markRecentItems = false,
+        showNewItemFlash = false,
+      },
+    },
     stacking = {
       [const.BAG_KIND.BACKPACK]  = {
         mergeStacks = true,
         mergeUnstackable = true,
         unmergeAtShop = true,
         dontMergePartial = false,
+        dontMergeTransmog = false,
       },
       [const.BAG_KIND.BANK]  = {
         mergeStacks = true,
         mergeUnstackable = true,
         unmergeAtShop = true,
         dontMergePartial = false,
+        dontMergeTransmog = false,
       }
     },
     itemLevel = {
@@ -344,7 +411,7 @@ const.DATABASE_DEFAULTS = {
     },
     compaction = {
       [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.SIMPLE,
-      [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.NONE,
+      [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.SIMPLE,
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
@@ -374,7 +441,14 @@ const.DATABASE_DEFAULTS = {
         [const.BAG_VIEW.SECTION_ALL_BAGS] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       },
     },
+    customSectionSort = {
+      ---@type table<string, number>
+      [const.BAG_KIND.BACKPACK] = {},
+      ---@type table<string, number>
+      [const.BAG_KIND.BANK] = {},
+    },
     size = {
+      ---@type SizeInfo[]
       [const.BAG_VIEW.ONE_BAG] = {
         [const.BAG_KIND.BACKPACK] = {
           columnCount = 15,
@@ -385,8 +459,8 @@ const.DATABASE_DEFAULTS = {
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
-          columnCount = 15,
-          itemsPerRow = 5,
+          columnCount = 1,
+          itemsPerRow = 15,
           scale = 100,
           width = 700,
           height = 500,
@@ -395,16 +469,16 @@ const.DATABASE_DEFAULTS = {
       },
       [const.BAG_VIEW.SECTION_GRID] = {
         [const.BAG_KIND.BACKPACK] = {
-          columnCount = 1,
-          itemsPerRow = 15,
+          columnCount = 2,
+          itemsPerRow = 7,
           scale = 100,
           width = 700,
           height = 500,
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
-          columnCount = 5,
-          itemsPerRow = 5,
+          columnCount = 2,
+          itemsPerRow = 7,
           scale = 100,
           width = 700,
           height = 500,
@@ -439,8 +513,8 @@ const.DATABASE_DEFAULTS = {
           opacity = 89,
         },
         [const.BAG_KIND.BANK] = {
-          columnCount = 5,
-          itemsPerRow = 5,
+          columnCount = 1,
+          itemsPerRow = 15,
           scale = 100,
           width = 700,
           height = 500,
@@ -456,6 +530,8 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = const.BAG_VIEW.SECTION_GRID,
       [const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID,
     },
+    ---@type table<string, CategoryOptions>
+    categoryOptions = {},
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>

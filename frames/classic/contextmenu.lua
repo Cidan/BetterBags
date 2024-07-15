@@ -4,9 +4,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Context: AceModule
+---@class ContextMenu: AceModule
 ---@field frame Frame
-local context = addon:NewModule('Context')
+local contextMenu = addon:NewModule('ContextMenu')
 
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
@@ -48,23 +48,23 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field tooltipOnButton? boolean
 local menuListProto = {}
 
-function context:OnInitialize()
+function contextMenu:OnInitialize()
   --self:CreateContext()
 end
 
-function context:OnEnable()
+function contextMenu:OnEnable()
   local frame = LibDD:Create_UIDropDownMenu("BetterBagsContextMenu", UIParent)
   LibDD:EasyMenu_Initialize(frame, 4, {})
   self.frame = frame
 end
 
 ---@param menuList MenuList[]
-function context:Show(menuList)
+function contextMenu:Show(menuList)
   LibDD:EasyMenu(menuList, self.frame, 'cursor', 0, 0, 'MENU')
   events:SendMessage('context/show')
 end
 
-function context:Hide()
+function contextMenu:Hide()
   LibDD:HideDropDownMenu(1)
   events:SendMessage('context/hide')
 end
@@ -102,7 +102,7 @@ end
 
 ---@param bag Bag
 ---@return MenuList[]
-function context:CreateContextMenu(bag)
+function contextMenu:CreateContextMenu(bag)
   ---@type MenuList[]
   local menuList = {}
 
@@ -136,7 +136,7 @@ function context:CreateContextMenu(bag)
         tooltipTitle = L:G("One Bag"),
         tooltipText = L:G("This view will display all items in a single bag, regardless of category."),
         func = function()
-          context:Hide()
+          contextMenu:Hide()
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.ONE_BAG)
           else
@@ -158,7 +158,7 @@ function context:CreateContextMenu(bag)
         tooltipTitle = L:G("Section Grid"),
         tooltipText = L:G("This view will display items in sections, which are categorized by type, expansion, trade skill, and more."),
         func = function()
-          context:Hide()
+          contextMenu:Hide()
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.SECTION_GRID)
           else
@@ -180,7 +180,7 @@ function context:CreateContextMenu(bag)
         tooltipTitle = L:G("List"),
         tooltipText = L:G("This view will display items in a list, which is categorized by type, expansion, trade skill, and more."),
         func = function()
-          context:Hide()
+          contextMenu:Hide()
           if database:GetBagView(bag.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
             database:SetPreviousView(bag.kind, const.BAG_VIEW.LIST)
           else
@@ -209,13 +209,49 @@ function context:CreateContextMenu(bag)
     end
   })
 
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    -- Show bag slot toggle.
+    table.insert(menuList, {
+      text = L:G("Show Currencies"),
+      checked = function() return bag.currencyFrame:IsShown() end,
+      tooltipTitle = L:G("Show Currencies"),
+      tooltipText = L:G("Click to toggle the display of the currencies side panel."),
+      func = function()
+        bag.windowGrouping:Show('currencyConfig')
+      end
+    })
+  end
+
+  -- Show bag slot toggle.
+  table.insert(menuList, {
+    text = L:G("Configure Categories"),
+    checked = function() return bag.sectionConfigFrame:IsShown() end,
+    tooltipTitle = L:G("Configure Categories"),
+    tooltipText = L:G("Click to toggle the display of the category configuration side panel."),
+    func = function()
+      bag.windowGrouping:Show("sectionConfig")
+    end
+  })
+
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    -- Show theme selection window.
+    table.insert(menuList, {
+      text = L:G("Themes"),
+      checked = function() return bag.themeConfigFrame:IsShown() end,
+      tooltipTitle = L:G("Themes"),
+      tooltipText = L:G("Click to toggle the display of the theme configuration side panel."),
+      func = function()
+        bag.windowGrouping:Show('themeConfig')
+      end
+    })
+  end
   table.insert(menuList, {
     text = L:G("Open Options Screen"),
     notCheckable = true,
     tooltipTitle = L:G("Open Options Screen"),
     tooltipText = L:G("Click to open the options screen."),
     func = function()
-      context:Hide()
+      contextMenu:Hide()
       events:SendMessage('config/Open')
     end
   })
@@ -224,7 +260,7 @@ function context:CreateContextMenu(bag)
     text = L:G("Close Menu"),
     notCheckable = true,
     func = function()
-      context:Hide()
+      contextMenu:Hide()
     end
   })
   enableTooltips(menuList)

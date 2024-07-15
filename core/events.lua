@@ -10,13 +10,18 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field a any
 local callbackProto = {}
 
+---@class EventArg
+---@field eventName string
+---@field ctx? Context
+---@field args any[]
+
 ---@class Events: AceModule
 ---@field _eventHandler AceEvent-3.0
 ---@field _messageMap table<string, {fn: fun(...), cbs: Callback[]}>
 ---@field _eventMap table<string, {fn: fun(...), cbs: Callback[]}>
 ---@field _bucketTimers table<string, cbObject>
 ---@field _eventQueue table<string, boolean>
----@field _eventArguments any[]
+---@field _eventArguments table<string, EventArg[]>
 ---@field _bucketCallbacks table<string, fun(...)[]>
 local events = addon:NewModule('Events')
 
@@ -72,6 +77,35 @@ function events:RegisterEvent(event, callback, arg)
   table.insert(self._eventMap[event].cbs, {cb = callback, a = arg})
 end
 
+-- CatchUntil will group all events that fire as caughtEvent,
+-- until finalEvent is fired. Once finalEvent is fired, the callback
+-- will be called with all the caughtEvent arguments that were fired,
+-- and the finalEvent arguments. If finalEvent is fired without any
+-- caughtEvents being fired, the callback will be called with the
+-- finalEvent arguments.
+---@param caughtEvent string
+---@param finalEvent string
+---@param callback fun(caughtEvents: EventArg[], finalArgs: EventArg)
+function events:CatchUntil(caughtEvent, finalEvent, callback)
+  local caughtEvents = {}
+  local finalArgs = nil
+  local caughtFunction = function(eventName, ...)
+    table.insert(caughtEvents, {
+      eventName = eventName, args = {...}
+    })
+  end
+  local finalFunction = function(eventName, ...)
+    finalArgs = {
+      eventName = eventName, args = {...}
+    }
+    callback(CopyTable(caughtEvents), CopyTable(finalArgs))
+    caughtEvents = {}
+    finalArgs = nil
+  end
+  self:RegisterEvent(caughtEvent, caughtFunction)
+  self:RegisterEvent(finalEvent, finalFunction)
+end
+
 function events:BucketEvent(event, callback)
  --TODO(lobato): Refine this so that timers only run when an event is in the queue. 
   local bucketFunction = function()
@@ -98,7 +132,7 @@ end
 -- called at most once every 0.5 seconds.
 ---@param groupEvents string[]
 ---@param groupMessages string[]
----@param callback fun(eventData: eventData)
+---@param callback fun(eventData: EventArg[])
 function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   local joinedEvents = table.concat(groupEvents, '')
   joinedEvents = joinedEvents .. table.concat(groupMessages, '')
@@ -117,7 +151,9 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
       if self._bucketTimers[joinedEvents] then
         self._bucketTimers[joinedEvents]:Cancel()
       end
-      tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+      tinsert(self._eventArguments[joinedEvents], {
+        eventName = eventName, args = {...}}
+      )
       self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.2, bucketFunction)
     end)
   end
@@ -127,7 +163,9 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
       if self._bucketTimers[joinedEvents] then
         self._bucketTimers[joinedEvents]:Cancel()
       end
-      tinsert(self._eventArguments[joinedEvents], {eventName, ...})
+      tinsert(self._eventArguments[joinedEvents], {
+        eventName = eventName, args = {...}}
+      )
       self._bucketTimers[joinedEvents] = C_Timer.NewTimer(0.2, bucketFunction)
     end)
   end

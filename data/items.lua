@@ -18,14 +18,17 @@ local categories = addon:GetModule('Categories')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Loader: AceModule
-local loader = addon:GetModule('Loader')
+---@class Context: AceModule
+local context = addon:GetModule('Context')
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
+
+-- A slot key is a string that represents a bag and slot id.
+---@alias SlotKey string
 
 -- ItemLinkInfo contains all the information parsed from an item link.
 ---@class (exact) ItemLinkInfo
@@ -49,15 +52,10 @@ local debug = addon:GetModule('Debug')
 ---@field crafterGUID string
 ---@field extraEnchantID string
 
--- ExtraSlotInfo contains refresh data for an entire bag view, bag or bank.
----@class (exact) ExtraSlotInfo
----@field emptySlots table<string, number> The number of empty normal slots across all bags.
----@field freeSlotKeys table<string, string> The keys of the first empty slot per bag type.
----@field totalItems number The total number of valid items across all bags.
----@field emptySlotByBagAndSlot table<number, table<number, ItemData>> A table of empty slots by bag and slot.
----@field deferDelete? boolean If true, delete's should be deferred until the next refresh.
----@field dirtyItems ItemData[] A list of dirty items that need to be refreshed.
----@field itemsBySlotKey table<string, ItemData> A table of items by slot key.
+---@class (exact) TransmogInfo
+---@field transmogInfoMixin? ItemTransmogInfoMixin
+---@field itemAppearanceID number
+---@field itemModifiedAppearanceID number
 
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
@@ -65,8 +63,10 @@ local debug = addon:GetModule('Debug')
 ---@field itemInfo ExpandedItemInfo
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
+---@field transmogInfo TransmogInfo
 ---@field bagid number
 ---@field slotid number
+---@field slotkey string
 ---@field isItemEmpty boolean
 ---@field kind BagKind
 ---@field newItemTime number
@@ -81,75 +81,37 @@ local debug = addon:GetModule('Debug')
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
----@field itemsByBagAndSlot table<number, table<number, ItemData>>
----@field bankItemsByBagAndSlot table<number, table<number, ItemData>>
----@field slotInfo table<BagKind, ExtraSlotInfo>
+---@field private slotInfo table<BagKind, SlotInfo>
+---@field _doingRefresh boolean
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _newItemTimers table<string, number>
 ---@field _preSort boolean
+---@field _refreshQueueEvent EventArg[]
+---@field _firstLoad table<BagKind, boolean>
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
-  self.itemsByBagAndSlot = {}
-  self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
   self:ResetSlotInfo()
 
   self._newItemTimers = {}
   self._preSort = false
+  self._doingRefresh = false
+  self._firstLoad = {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true,
+    [const.BAG_KIND.REAGENT_BANK] = true,
+  }
 end
 
 function items:OnEnable()
-
-  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:DoRefreshAll()
-  end)
-  local eventList = {
-    'BAG_UPDATE_DELAYED',
-    'BAG_UPDATE',
-    'PLAYERBANKSLOTS_CHANGED',
-  }
-
-  if addon.isRetail then
-    table.insert(eventList, 'PLAYERREAGENTBANKSLOTS_CHANGED')
-  end
-
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    self:WipeAndRefreshAll()
-  end)
-
-  events:RegisterMessage('bags/SortBackpackClassic', function()
-    self:RemoveNewItemFromAllItems()
-    self:ClearItemCache()
-    self:PreSort()
-    _G.SortBags()
-  end)
-
-  events:RegisterMessage('bags/SortBackpack', function()
-    self:RemoveNewItemFromAllItems()
-    self:ClearItemCache()
-    self:PreSort()
-    C_Container:SortBags()
-  end)
-
-  events:GroupBucketEvent(eventList, {'bags/RefreshAll', 'bags/RefreshBackpack', 'bags/RefreshBank'}, function()
-    debug:Log("Items", "Group Bucket Event for Refresh* Fired")
-    self._preSort = false
-    -- No total items means we're doing a full refresh (or the player bags are totally empty, which is rare).
-    if InCombatLockdown() and self.slotInfo[const.BAG_KIND.BACKPACK].totalItems == 0 then
-      addon.Bags.Backpack.drawAfterCombat = true
-      print(L:G("BetterBags: Bags will refresh after combat ends."))
-    else
-      self:DoRefreshAll()
-    end
-  end)
-
   events:RegisterEvent('BANKFRAME_OPENED', function()
     if GameMenuFrame:IsShown() then
       return
     end
     addon.atBank = true
   end)
+
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
     items:ClearBankCache()
@@ -158,18 +120,9 @@ end
 
 ---@param kind BagKind
 function items:WipeSlotInfo(kind)
+  debug:Inspect("wiping slot info", kind)
   self.slotInfo = self.slotInfo or {}
-  self.slotInfo[kind] = {
-    emptySlots = {},
-    freeSlotKeys = {},
-    emptyReagentSlots = 0,
-    totalItems = 0,
-    freeSlotKey = "",
-    freeReagentSlotKey = "",
-    emptySlotByBagAndSlot = {},
-    dirtyItems = {},
-    itemsBySlotKey = {},
-  }
+  self.slotInfo[kind] = self:NewSlotInfo()
 end
 
 function items:ResetSlotInfo()
@@ -178,11 +131,9 @@ function items:ResetSlotInfo()
 end
 
 function items:RemoveNewItemFromAllItems()
-  for _, bagid in pairs(self.itemsByBagAndSlot) do
-    for _, item in pairs(bagid) do
-      if C_NewItems.IsNewItem(item.bagid, item.slotid) then
-        C_NewItems.RemoveNewItem(item.bagid, item.slotid)
-      end
+  for _, item in pairs(self.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+    if C_NewItems.IsNewItem(item.bagid, item.slotid) then
+      C_NewItems.RemoveNewItem(item.bagid, item.slotid)
     end
   end
   wipe(self._newItemTimers)
@@ -194,6 +145,7 @@ end
 
 ---@private
 function items:PreSort()
+  if self._preSort then return end
   self._preSort = true
   C_Timer.After(0.6, function()
     if self._preSort then
@@ -204,8 +156,6 @@ end
 
 ---@private
 function items:ClearItemCache()
-  self.itemsByBagAndSlot = {}
-  self.bankItemsByBagAndSlot = {}
   self.previousItemGUID = {}
   self:ResetSlotInfo()
   if addon.Bags.Backpack.currentView then
@@ -218,7 +168,6 @@ function items:ClearItemCache()
 end
 
 function items:ClearBankCache()
-  self.bankItemsByBagAndSlot = {}
   self:WipeSlotInfo(const.BAG_KIND.BANK)
   if addon.Bags.Bank.currentView then
     addon.Bags.Bank.currentView.fullRefresh = true
@@ -230,44 +179,41 @@ end
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
 function items:WipeAndRefreshAll()
   debug:Log('WipeAndRefreshAll', "Wipe And Refresh All triggered")
-  if InCombatLockdown() then
-    addon.Bags.Backpack.drawAfterCombat = true
-    print(L:G("BetterBags: Bags will refresh after combat ends."))
-  else
-    self:ClearItemCache()
-    events:SendMessage('bags/RefreshAll', true)
-  end
+  --self:ClearItemCache()
+  events:SendMessage('bags/RefreshAll', true)
 end
 
 ---@private
-function items:DoRefreshAll()
+---@param ctx Context
+function items:DoRefreshAll(ctx)
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() or addon.atBank then
+    local bankContext = ctx:Copy()
     if addon.Bags.Bank.isReagentBank then
-      self:RefreshReagentBank()
+      self:RefreshReagentBank(bankContext)
     else
-      self:RefreshBank()
+      self:RefreshBank(bankContext)
     end
   end
-  self:RefreshBackpack()
+  self:RefreshBackpack(ctx)
 end
 
-function items:RefreshReagentBank()
-  local container = loader:New()
+---@param ctx Context
+function items:RefreshReagentBank(ctx)
+  local container = self:NewLoader(const.BAG_KIND.BANK)
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.REAGENTBANK_BAGS) do
-    self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
-    self.previousItemGUID[i] = self.previousItemGUID[i] or {}
-    self:StageBagForUpdate(i, const.BAG_KIND.BANK, container)
+    self:StageBagForUpdate(i, container)
   end
 
   --- Process the item container.
-  self:ProcessContainer(const.BAG_KIND.BANK, container)
+  self:ProcessContainer(ctx, const.BAG_KIND.REAGENT_BANK, container)
 end
 
-function items:RefreshBank()
+---@param ctx Context
+function items:RefreshBank(ctx)
   equipmentSets:Update()
-  local container = loader:New()
+  local container = self:NewLoader(const.BAG_KIND.BANK)
   -- This is a small hack to force the bank bag quality data to be cached
   -- before the bank bag frame is drawn.
   for _, bag in pairs(const.BANK_ONLY_BAGS) do
@@ -277,104 +223,85 @@ function items:RefreshBank()
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BANK_BAGS) do
-    self.bankItemsByBagAndSlot[i] = self.bankItemsByBagAndSlot[i] or {}
-    self.previousItemGUID[i] = self.previousItemGUID[i] or {}
-    self:StageBagForUpdate(i, const.BAG_KIND.BANK, container)
+    self:StageBagForUpdate(i, container)
   end
 
   --- Process the item container.
-  self:ProcessContainer(const.BAG_KIND.BANK, container)
+  self:ProcessContainer(ctx, const.BAG_KIND.BANK, container)
 end
 
 -- RefreshBackback will refresh all bags' contents entirely and update
 -- the item database.
-function items:RefreshBackpack()
+---@param ctx Context
+function items:RefreshBackpack(ctx)
   debug:StartProfile('Backpack Data Pipeline')
 
   equipmentSets:Update()
-  local container = loader:New()
+  local container = self:NewLoader(const.BAG_KIND.BACKPACK)
 
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
-    self.itemsByBagAndSlot[i] = self.itemsByBagAndSlot[i] or {}
-    self.previousItemGUID[i] = self.previousItemGUID[i] or {}
-    self:StageBagForUpdate(i, const.BAG_KIND.BACKPACK, container)
+    self:StageBagForUpdate(i, container)
   end
   --- Process the item container.
-  self:ProcessContainer(const.BAG_KIND.BACKPACK, container)
+  self:ProcessContainer(ctx, const.BAG_KIND.BACKPACK, container)
 end
 
--- HasItemChanged will determine if an item has changed since the last time a bag refresh
--- was done.
----@param bagid number
----@param slotid number
----@param data ItemData
+---@param newData ItemData
+---@param oldData ItemData
 ---@return boolean
-function items:HasItemChanged(bagid, slotid, data)
-  local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
-  local itemLocation = itemMixin:GetItemLocation()
-  local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
+function items:ItemAdded(newData, oldData)
+  if newData.isItemEmpty then return false end
+  if not oldData or (oldData and oldData.isItemEmpty) then return true end
+  return false
+end
 
-  local oldItemLink = data.itemInfo and data.itemInfo.itemLink or nil
-  local oldStackCount = data.itemInfo and data.itemInfo.currentItemCount or 1
-  if itemLink ~= oldItemLink then
-    debug:Log("ItemChange", oldItemLink, "->", itemLink)
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
+function items:ItemRemoved(newData, oldData)
+  if not oldData or (oldData and oldData.isItemEmpty) then return false end
+  if newData.isItemEmpty then return true end
+  return false
+end
+
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
+function items:ItemChanged(newData, oldData)
+  -- Item was marked as new when it wasn't before.
+  if C_NewItems.IsNewItem(newData.bagid, newData.slotid) and oldData and oldData.itemInfo and not oldData.itemInfo.isNewItem then
     return true
   end
 
-  if itemLocation and C_Item.DoesItemExist(itemLocation) then
-    if C_NewItems.IsNewItem(bagid, slotid) and not data.itemInfo.isNewItem then
-      C_NewItems.RemoveNewItem(bagid, slotid)
-      debug:Log("ItemChange", itemLink, "Item Marked as New (stripped)")
-      return true
-    end
-
-    if oldStackCount ~= C_Item.GetStackCount(itemLocation) then
-      debug:Log("ItemChange", itemLink, "count", oldStackCount, "->", C_Item.GetStackCount(itemLocation))
-      return true
-    end
+  -- Item count changed.
+  if oldData and oldData.itemInfo and oldData.itemInfo.currentItemCount ~= newData.itemInfo.currentItemCount then
+    return true
   end
 
-  if data.itemInfo and data.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(data) then
-    debug:Log("ItemChange", itemLink, "Not Recent Item")
+  -- Item is no longer in the recent items category.
+  if oldData and oldData.itemInfo and oldData.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(oldData) then
     return true
   end
 
   return false
 end
 
--- ShouldItemStack will determine if an item should stack with another item in a virtual stack.
----@param kind BagKind
----@param data ItemData
+---@param newData ItemData
+---@param oldData ItemData
 ---@return boolean
-function items:ShouldItemStack(kind, data)
-  if data.isItemEmpty then return false end
-  local stackOptions = database:GetStackingOptions(kind)
-  if stackOptions.unmergeAtShop and addon.atInteracting and kind ~= const.BAG_KIND.BANK then
-    return false
-  end
+function items:ItemGUIDChanged(newData, oldData)
+  if newData.isItemEmpty then return false end
+  if not oldData then return false end
+  return newData.itemInfo.itemGUID ~= oldData.itemInfo.itemGUID
+end
 
-  if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    return false
-  end
-
-  if stackOptions.mergeStacks and
-  stackOptions.dontMergePartial and
-  data.itemInfo.itemStackCount and
-  data.itemInfo.itemStackCount > 1 and
-  data.itemInfo.itemStackCount ~= data.itemInfo.currentItemCount then
-    return false
-  end
-
-  if stackOptions.mergeStacks and data.itemInfo.itemStackCount and data.itemInfo.itemStackCount > 1 then
-    return true
-  end
-
-  if stackOptions.mergeUnstackable and data.itemInfo.itemStackCount == 1 then
-    return true
-  end
-
-  return false
+---@param newData ItemData
+---@param oldData ItemData
+---@return boolean
+function items:ItemHashChanged(newData, oldData)
+  if newData.isItemEmpty and not oldData then return false end
+  return newData.itemHash ~= oldData.itemHash
 end
 
 ---@param data ItemData
@@ -383,168 +310,158 @@ function items:GetSlotKey(data)
   return data.bagid .. '_' .. data.slotid
 end
 
---- LoadItems will load all items in a given bag kind and update the item database.
----@private
+---@param bagid number
+---@param slotid number
+---@return string
+function items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  return bagid .. '_' .. slotid
+end
+
+-- UpdateFreeSlots updates the current free slot count for a given bag kind.
 ---@param kind BagKind
-function items:LoadItems(kind)
-  ---@type ExtraSlotInfo
-  local extraSlotInfo = {
-    emptySlots = {},
-    freeSlotKeys = {},
-    totalItems = 0,
-    freeSlotKey = "",
-    freeReagentSlotKey = "",
-    emptySlotByBagAndSlot = {},
-    dirtyItems = {},
-    itemsBySlotKey = {},
-  }
-
-  local itemList = kind == const.BAG_KIND.BANK and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
-  ---@type table<string, ItemData>
-  local stacks = {}
-
-  ---@type table<string, ItemData>
-  local dirty = {}
-
-  ---@type table<string, ItemData>
-  local nextStacks = {}
-
-  for bagid, bag in pairs(itemList) do
+function items:UpdateFreeSlots(kind)
+  ---@type table<number, number>
+  local baglist
+  if kind == const.BAG_KIND.BANK then
+    baglist = const.BANK_BAGS
+  elseif kind == const.BAG_KIND.REAGENT_BANK then
+    baglist = const.REAGENTBANK_BAGS
+    kind = const.BAG_KIND.BANK
+  else
+    baglist = const.BACKPACK_BAGS
+  end
+  for bagid in pairs(baglist) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
     local name = ""
-    if bagid == Enum.BagIndex.Keyring then
-    elseif bagid == Enum.BagIndex.Backpack then
-      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
-      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
-      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
-    elseif bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
+    local invid = C_Container.ContainerIDToInventoryID(bagid)
+    local baglink = GetInventoryItemLink("player", invid)
+    if baglink ~= nil and invid ~= nil then
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      name = C_Item.GetItemSubClassInfo(class, subclass)
+    else
+      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+    end
+    if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
       -- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
       -- There are 4 extra slots in the bank bag in Classic that should not
       -- exist. This is a Blizzard bug.
       if addon.isClassic then
         freeSlots = freeSlots - 4
       end
-      name = GetItemSubClassInfo(Enum.ItemClass.Container, 0)
-      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
-      extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
+    end
+
+    if bagid ~= Enum.BagIndex.Keyring then
+      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] or 0
+      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] + freeSlots
+    end
+  end
+end
+
+--- LoadItems will load all items in a given bag kind and update the item database.
+---@private
+---@param ctx Context
+---@param kind BagKind
+---@param dataCache table<string, ItemData>
+---@param reagent? boolean
+function items:LoadItems(ctx, kind, dataCache, reagent)
+  -- Wipe the data if needed before loading the new data.
+  if ctx:GetBool('wipe') then
+    self:WipeSlotInfo(kind)
+    if addon.Bags.Backpack.currentView and kind == const.BAG_KIND.BACKPACK then
+      addon.Bags.Backpack.currentView.fullRefresh = true
+    end
+    if addon.Bags.Bank.currentView and kind == const.BAG_KIND.BANK then
+      addon.Bags.Bank.currentView.fullRefresh = true
+    end
+  end
+
+  -- Push the new slot info into the slot info table, and the old slot info
+  -- to the previous slot info table.
+  self.slotInfo[kind]:Update(ctx, dataCache)
+  self:UpdateFreeSlots(reagent and const.BAG_KIND.REAGENT_BANK or kind)
+  local slotInfo = self.slotInfo[kind]
+
+  -- Loop through all the items in the bag and update slot info properties.
+  for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
+    local bagid = currentItem.bagid
+    local slotid = currentItem.slotid
+    local name = ""
+    local previousItem = slotInfo:GetPreviousItemByBagAndSlot(bagid, slotid)
+    local invid = C_Container.ContainerIDToInventoryID(bagid)
+    local baglink = GetInventoryItemLink("player", invid)
+
+    if bagid == Enum.BagIndex.Keyring then
+      name = L:G("Keyring")
+    elseif baglink ~= nil and invid ~= nil then
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      name = C_Item.GetItemSubClassInfo(class, subclass)
     else
-      local invid = C_Container.ContainerIDToInventoryID(bagid)
-      local baglink = GetInventoryItemLink("player", invid)
-      if baglink ~= nil and invid ~= nil then
-        local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-        name = GetItemSubClassInfo(class, subclass)
-        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] or 0
-        extraSlotInfo.emptySlots[name] = extraSlotInfo.emptySlots[name] + freeSlots
-      end
+      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
     end
-    extraSlotInfo.emptySlotByBagAndSlot[bagid] = extraSlotInfo.emptySlotByBagAndSlot[bagid] or {}
-    for slotid, data in pairs(bag) do
-      -- Check if the item as changed, and if so, add it to the dirty list.
-      if items:HasItemChanged(bagid, slotid, data) then
-        local wasStacked = data.stacks and data.stacks > 0
-        local oldHash = data.itemHash
-        wipe(data)
-        data.bagid = bagid
-        data.slotid = slotid
-        items:AttachItemInfo(data, kind)
-        if wasStacked then
-          debug:Log("Stacks", "Was Stacked", data.itemInfo.itemLink)
-          data.forceClear = true
-          nextStacks[oldHash] = data
-        end
-        table.insert(extraSlotInfo.dirtyItems, data)
-        dirty[self:GetSlotKey(data)] = data
+    -- Process item changes.
+    if items:ItemAdded(currentItem, previousItem) then
+      debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
+        self:MarkItemAsNew(currentItem)
       end
+    elseif items:ItemRemoved(currentItem, previousItem) then
+      debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
+      slotInfo.removedItems[previousItem.slotkey] = previousItem
+    elseif items:ItemHashChanged(currentItem, previousItem) then
+      debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
+      slotInfo.removedItems[previousItem.slotkey] = previousItem
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
+    elseif items:ItemGUIDChanged(currentItem, previousItem) then
+      debug:Log("ItemGUIDChanged", currentItem.itemInfo.itemLink)
+      slotInfo.removedItems[previousItem.slotkey] = previousItem
+      slotInfo.addedItems[currentItem.slotkey] = currentItem
+    elseif items:ItemChanged(currentItem, previousItem) then
+      debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
+      slotInfo.updatedItems[currentItem.slotkey] = currentItem
+    end
 
-      extraSlotInfo.itemsBySlotKey[self:GetSlotKey(data)] = data
 
-      -- Compute stacking data.
-      if items:ShouldItemStack(kind, data) then
-        local stackItem = stacks[data.itemHash]
-        if stackItem ~= nil then
-          stackItem.stacks = stackItem.stacks + 1
-          stackItem.nextStack = items:GetSlotKey(data)
-          data.stackedOn = items:GetSlotKey(stackItem)
-          data.stackedCount = data.itemInfo.currentItemCount
-          data.stacks = 0
-          stackItem.stackedCount = stackItem.stackedCount + data.itemInfo.currentItemCount
-          if not self:IsNewItem(stackItem) or not self:IsNewItem(data) then
-            self:ClearNewItem(data)
-            self:ClearNewItem(stackItem)
-            data.itemInfo.category = self:GetCategory(data)
-            stackItem.itemInfo.category = self:GetCategory(stackItem)
-          end
-          --TODO(lobato): I don't know why dirty as a set doesn't just work here when
-          -- passing it into the event, and I'm too tired to figure it out right now.
-          local key = items:GetSlotKey(data)
-          if dirty[key] == nil then
-            table.insert(extraSlotInfo.dirtyItems, data)
-            dirty[key] = data
-          end
+    -- Store empty slot data
+    if currentItem.isItemEmpty then
+      slotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
+      slotInfo.emptySlotByBagAndSlot[bagid] = slotInfo.emptySlotByBagAndSlot[bagid] or {}
+      slotInfo.emptySlotByBagAndSlot[bagid][slotid] = currentItem
+    end
 
-          key = items:GetSlotKey(stackItem)
-          if dirty[key] == nil then
-            table.insert(extraSlotInfo.dirtyItems, stackItem)
-            dirty[key] = stackItem
-          end
-        else
-          local key = items:GetSlotKey(data)
-          if data.stackedOn ~= nil and dirty[key] == nil then
-            table.insert(extraSlotInfo.dirtyItems, data)
-            dirty[key] = data
-          end
-          data.stacks = 0
-          data.stackedOn = nil
-          data.stackedCount = data.itemInfo.currentItemCount
-          stacks[data.itemHash] = data
-        end
-      elseif data.stackedOn ~= nil or (data.stacks ~= nil and data.stacks > 0) then
-        data.stackedOn = nil
-        data.stacks = 0
-        data.stackedCount = data.itemInfo.currentItemCount
-        local key = items:GetSlotKey(data)
-        if dirty[key] == nil then
-          table.insert(extraSlotInfo.dirtyItems, data)
-          dirty[key] = data
-        end
-      end
-
-      if data.isItemEmpty then
-        data.stacks = 0
-        data.stackedOn = nil
-        data.stackedCount = nil
-        extraSlotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
-        extraSlotInfo.emptySlotByBagAndSlot[bagid][slotid] = data
-      else
-        extraSlotInfo.totalItems = (extraSlotInfo.totalItems or 0) + 1
-      end
+    -- Increment the total items count.
+    if not currentItem.isItemEmpty then
+      slotInfo.totalItems = slotInfo.totalItems + 1
     end
   end
 
-  if extraSlotInfo.totalItems < self.slotInfo[kind].totalItems then
-    extraSlotInfo.deferDelete = true
+  -- Set the defer delete flag if the total items count has decreased.
+  if slotInfo.totalItems < slotInfo.previousTotalItems then
+    slotInfo.deferDelete = true
   end
-
-  for itemhash, item in pairs(nextStacks) do
-    if stacks[itemhash] then
-      item.nextStack = items:GetSlotKey(stacks[itemhash])
-    end
-  end
-
-  self.slotInfo[kind] = extraSlotInfo
 end
 
 -- ProcessContainer will load all items in the container and fire
 -- a message when all items are done loading.
 ---@private
+---@param ctx Context
 ---@param kind BagKind
 ---@param container ItemLoader
-function items:ProcessContainer(kind, container)
+function items:ProcessContainer(ctx, kind, container)
   container:Load(function()
-    self:LoadItems(kind)
+    if self._firstLoad[kind] == true then
+      self._firstLoad[kind] = false
+      ctx:Set('wipe', true)
+    end
+    if kind == const.BAG_KIND.REAGENT_BANK then
+      kind = const.BAG_KIND.BANK
+      self:LoadItems(ctx, kind, container:GetDataCache(), true)
+    else
+      self:LoadItems(ctx, kind, container:GetDataCache())
+    end
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-    events:SendMessageLater(ev, nil, self.slotInfo[kind])
+    events:SendMessageLater(ev, nil, ctx, self.slotInfo[kind])
     if kind == const.BAG_KIND.BACKPACK then
       debug:EndProfile('Backpack Data Pipeline')
     end
@@ -555,35 +472,13 @@ end
 -- to the provided container for data fetching.
 ---@private
 ---@param bagid number
----@param kind BagKind
 ---@param container ItemLoader
-function items:StageBagForUpdate(bagid, kind, container)
+function items:StageBagForUpdate(bagid, container)
   local size = C_Container.GetContainerNumSlots(bagid)
-  local index = kind == const.BAG_KIND.BANK and self.bankItemsByBagAndSlot or self.itemsByBagAndSlot
-  --local dirty = bankBag and self.dirtyBankItems or self.dirtyItems
   -- Loop through every container slot and create an item for it.
   for slotid = 1, size do
     local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
-    local data = setmetatable({}, {__index = itemDataProto})
-    data.bagid = bagid
-    data.slotid = slotid
-    data.stacks = 0
-
-    --table.insert(dirty, data)
-
-    -- If this is an actual item, add it to the callback container
-    -- so data is fetched from the server.
-    if not itemMixin:IsItemEmpty() then
-      container:Add(itemMixin)
-    elseif itemMixin:IsItemEmpty() then
-      data.isItemEmpty = true
-    end
-
-    if index[bagid][slotid] then
-      index[bagid][slotid].isItemEmpty = data.isItemEmpty
-    else
-      index[bagid][slotid] = data
-    end
+    container:Add(itemMixin)
   end
 end
 
@@ -610,8 +505,7 @@ end
 ---@param data ItemData
 ---@return boolean
 function items:IsNewItem(data)
-  if not data then return false end
-  if data.isItemEmpty then return false end
+  if not data or data.isItemEmpty then return false end
   if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
     C_NewItems.IsNewItem(data.bagid, data.slotid) then
     return true
@@ -620,17 +514,34 @@ function items:IsNewItem(data)
   return false
 end
 
----@param data ItemData
-function items:ClearNewItem(data)
-  if not data then return end
+---@param slotkey string
+function items:ClearNewItem(slotkey)
+  if not slotkey then return end
+  local data = self:GetItemDataFromSlotKey(slotkey)
   if data.isItemEmpty then return end
   C_NewItems.RemoveNewItem(data.bagid, data.slotid)
+  data.itemInfo.category = self:GetCategory(data)
   self._newItemTimers[data.itemInfo.itemGUID] = nil
 end
 
 function items:ClearNewItems()
   C_NewItems.ClearAll()
   wipe(self._newItemTimers)
+end
+
+---@param data ItemData
+function items:MarkItemAsNew(data)
+  if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
+    self._newItemTimers[data.itemInfo.itemGUID] = time()
+    data.itemInfo.isNewItem = true
+    data.itemInfo.category = self:GetCategory(data)
+  end
+end
+
+---@param slotkey string
+function items:MarkItemSlotAsNew(slotkey)
+  local data = self:GetItemDataFromSlotKey(slotkey)
+  self:MarkItemAsNew(data)
 end
 
 ---@param link string
@@ -721,7 +632,8 @@ end
 ---@param data ItemData
 ---@return string
 function items:GenerateItemHash(data)
-  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d",
+  local stackOpts = database:GetStackingOptions(data.kind)
+  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d",
     data.itemLinkInfo.itemID,
     data.itemLinkInfo.enchantID,
     data.itemLinkInfo.gemID1,
@@ -735,7 +647,8 @@ function items:GenerateItemHash(data)
     table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
     data.itemLinkInfo.crafterGUID or "",
     data.itemLinkInfo.extraEnchantID or "",
-    data.itemInfo.currentItemLevel
+    data.itemInfo.currentItemLevel,
+    stackOpts.dontMergeTransmog and data.transmogInfo.transmogInfoMixin and data.transmogInfo.transmogInfoMixin.appearanceID or 0
   )
   return hash
 end
@@ -825,29 +738,45 @@ end
 
 ---@param data ItemData
 ---@param kind BagKind
+---@return ItemData
 function items:AttachItemInfo(data, kind)
   local itemMixin = Item:CreateFromBagAndSlot(data.bagid, data.slotid) --[[@as ItemMixin]]
   local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
   local bagid, slotid = data.bagid, data.slotid
+  local slotkey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
   local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
   data.kind = kind
   data.basic = false
+  data.slotkey = slotkey
   if itemID == nil then
     data.isItemEmpty = true
     data.itemInfo = {} --[[@as table]]
-    return
+    return data
   end
   data.isItemEmpty = false
   local _, _, _,
   itemLevel, itemMinLevel, itemType, itemSubType,
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
-  setID, isCraftingReagent = GetItemInfo(itemID)
+  setID, isCraftingReagent = C_Item.GetItemInfo(itemID)
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
-  local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
+  local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+
+  local itemAppearanceID, itemModifiedAppearanceID = C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
+  data.transmogInfo = {
+    transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
+      appearanceID = 0,
+      secondaryAppearanceID = 0,
+      appliedAppearanceID = 0,
+      appliedSecondaryAppearanceID = 0,
+    },
+    itemAppearanceID = itemAppearanceID,
+    itemModifiedAppearanceID = itemModifiedAppearanceID,
+  }
+
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),
@@ -894,6 +823,8 @@ function items:AttachItemInfo(data, kind)
   data.itemInfo.category = self:GetCategory(data)
   data.forceClear = false
   data.stacks = 0
+  data.stackedCount = data.itemInfo.currentItemCount
+  return data
 end
 
 ---@param itemID number
@@ -943,4 +874,33 @@ function items:AttachBasicItemInfo(itemID, data)
     equipmentSet = nil,
   }
   data.forceClear = false
+end
+
+---@param slotkey string
+---@return BagKind
+function items:GetBagKindFromSlotKey(slotkey)
+  local bagid = string.split('_', slotkey) --[[@as string]]
+  if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] then
+    return const.BAG_KIND.BANK
+  end
+  return const.BAG_KIND.BACKPACK
+end
+
+---@param slotkey string
+---@return ItemData
+function items:GetItemDataFromSlotKey(slotkey)
+  return self.slotInfo[self:GetBagKindFromSlotKey(slotkey)].itemsBySlotKey[slotkey]
+end
+
+---@param cb function
+function items:PreLoadAllEquipmentSlots(cb)
+  local continuableContainer = ContinuableContainer:Create()
+  for _, slot in pairs(const.EQUIPMENT_SLOTS) do
+    local location = ItemLocation:CreateFromEquipmentSlot(slot)
+    local item = Item:CreateFromItemLocation(location)
+    if not item:IsItemEmpty() then
+      continuableContainer:AddContinuable(item)
+    end
+  end
+  continuableContainer:ContinueOnLoad(cb)
 end

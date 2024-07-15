@@ -26,13 +26,17 @@ local itemFrame = addon:GetModule('ItemFrame')
 local item = addon:GetModule('ItemRowFrame')
 
 ---@param data ItemData
-function item.itemRowProto:SetItem(data)
-  self.data = data
+---@param static? boolean
+function item.itemRowProto:SetItemFromData(data, static)
+  self.slotkey = data.slotkey
   self.button:SetSize(20, 20)
-  self.button:SetItem(data)
+  if static then
+    self.button:SetStaticItemFromData(data)
+  else
+    self.button:SetItemFromData(data)
+  end
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
-
   local bagid, slotid = data.bagid, data.slotid
   if slotid then
     self.rowButton:SetID(slotid)
@@ -45,11 +49,6 @@ function item.itemRowProto:SetItem(data)
   local quality = data.itemInfo.itemQuality
   self.text:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[quality]))
   self.rowButton.HighlightTexture:SetGradient("HORIZONTAL", CreateColor(unpack(const.ITEM_QUALITY_COLOR_HIGH[quality])), CreateColor(unpack(const.ITEM_QUALITY_COLOR_LOW[quality])))
-
-  self.button.Count:Hide()
-  self.button.ilvlText:Hide()
-  self.button.LockTexture:Hide()
-
 
   if bagid then
     self.frame:SetID(bagid)
@@ -66,7 +65,9 @@ function item.itemRowProto:SetItem(data)
     GameTooltip:Show()
   end)
 
-  events:SendMessage('item/UpdatedRow', self)
+  if self.slotkey ~= nil then
+    events:SendMessage('item/UpdatedRow', self)
+  end
   self.frame:Show()
   self.rowButton:Show()
 end
@@ -76,6 +77,14 @@ local buttonCount = 0
 ---@return ItemRow
 function item:_DoCreate()
   local i = setmetatable({}, { __index = item.itemRowProto })
+
+  -- Backwards compatibility for item data.
+  i.data = setmetatable({}, { __index = function(_, key)
+    local d = i.button:GetItemData()
+    if d == nil then return nil end
+    return i.button:GetItemData()[key]
+  end})
+
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsRowItemButton%d", buttonCount)
@@ -96,8 +105,8 @@ function item:_DoCreate()
   -- and setting them here will have no effect.
   local button = itemFrame:Create()
   i.button = button
-  i.button.NormalTexture:Hide()
-  i.button.NormalTexture:SetTexture(nil)
+  --i.button.NormalTexture:Hide()
+  --i.button.NormalTexture:SetTexture(nil)
 
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
   text:SetParent(i.frame)

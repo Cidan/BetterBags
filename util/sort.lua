@@ -39,14 +39,20 @@ end
 function sort:GetSectionSortFunction(kind, view)
   local sortType = database:GetSectionSortType(kind, view)
   if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
-    return self.SortSectionsAlphabetically
+    return function(a, b)
+      return self.SortSectionsAlphabetically(kind, a, b)
+    end
   elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
-    return self.SortSectionsBySizeAscending
+    return function(a, b)
+      return self.SortSectionsBySizeAscending(kind, a, b)
+    end
   elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
-    return self.SortSectionsBySizeDescending
+    return function(a, b)
+      return self.SortSectionsBySizeDescending(kind, a, b)
+    end
   end
-  assert(false, "Unknown sort type: " .. sortType)
-  return function() end
+  -- Return the default sort in case of an unknown sort type.
+  return self:GetSectionSortFunction(kind, const.SECTION_SORT_TYPE.ALPHABETICALLY)
 end
 
 ---@param kind BagKind
@@ -66,10 +72,29 @@ function sort:GetItemSortFunction(kind, view)
   return function() end
 end
 
+---@param kind BagKind
+---@param a Section
+---@param b Section
+---@return boolean, boolean
+function sort.SortSectionsByPriority(kind, a, b)
+  if not a or not b then return false, false end
+  local aTitle, bTitle = a.title:GetText(), b.title:GetText()
+  local pinnedItems = database:GetCustomSectionSort(kind)
+  if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end
+  if pinnedItems[aTitle] and not pinnedItems[bTitle] then return true, true end
+  if not pinnedItems[aTitle] and pinnedItems[bTitle] then return true, false end
+
+  return true, pinnedItems[aTitle] < pinnedItems[bTitle]
+end
+
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsAlphabetically(a, b)
+function sort.SortSectionsAlphabetically(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
@@ -81,10 +106,14 @@ function sort.SortSectionsAlphabetically(a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsBySizeDescending(a, b)
+function sort.SortSectionsBySizeDescending(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
@@ -100,10 +129,14 @@ function sort.SortSectionsBySizeDescending(a, b)
   return a.title:GetText() < b.title:GetText()
 end
 
+---@param kind BagKind
 ---@param a Section
 ---@param b Section
 ---@return boolean
-function sort.SortSectionsBySizeAscending(a, b)
+function sort.SortSectionsBySizeAscending(kind, a, b)
+  local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
   if a.title:GetText() == L:G("Recent Items") then return true end
   if b.title:GetText() == L:G("Recent Items") then return false end
 
@@ -125,16 +158,16 @@ end
 function sort.SortItemsByQualityThenAlpha(a, b)
   if a.isFreeSlot then return false end
   if b.isFreeSlot then return true end
-
-  if invalidData(a.data, b.data) then return false end
-  if a.data.itemInfo.itemQuality ~= b.data.itemInfo.itemQuality then
-    return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
-  elseif a.data.itemInfo.itemName ~= b.data.itemInfo.itemName then
-    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
-  elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
-    return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
   end
-  return a.data.itemInfo.itemGUID < b.data.itemInfo.itemGUID
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
 ---@param a Item
@@ -143,21 +176,24 @@ end
 function sort.SortItemsByAlphaThenQuality(a, b)
   if a.isFreeSlot then return false end
   if b.isFreeSlot then return true end
-
-  if invalidData(a.data, b.data) then return false end
-  if a.data.itemInfo.itemName ~= b.data.itemInfo.itemName then
-    return a.data.itemInfo.itemName < b.data.itemInfo.itemName
-  elseif a.data.itemInfo.itemQuality ~= b.data.itemInfo.itemQuality then
-    return a.data.itemInfo.itemQuality > b.data.itemInfo.itemQuality
-  elseif a.data.itemInfo.currentItemCount ~= b.data.itemInfo.currentItemCount then
-    return a.data.itemInfo.currentItemCount > b.data.itemInfo.currentItemCount
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
   end
-  return a.data.itemInfo.itemGUID < b.data.itemInfo.itemGUID
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
 ---@param a Item
 ---@param b Item
 ---@return boolean
 function sort.GetItemSortBySlot(a, b)
-  return a.data.slotid < b.data.slotid
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if not aData then return false end
+  if not bData then return true end
+  return aData.slotid < bData.slotid
 end

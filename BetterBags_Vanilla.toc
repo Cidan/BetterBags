@@ -9,7 +9,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, ElvUI
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -24,11 +24,12 @@ libs\LibSharedMedia-3.0\lib.xml
 libs\LibWindow-1.1\LibWindow-1.1.lua
 libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
 libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
+libs/WagoAnalytics/Shim.lua
 
-templates\classic\container.xml
-templates\classic\debug.xml
+templates\era\container.xml
+templates\era\debug.xml
 templates\debug.xml
-
+templates\sectionconfig.xml
 
 core\boot.lua
 
@@ -38,43 +39,56 @@ debug\debug.lua
 debug\frames.lua
 debug\profile.lua
 debug\items.lua
+debug\analytics.lua
 
+core\context.lua
 core\events.lua
 core\localization.lua
 core\constants.lua
-core\classic\constants.lua
+core\era\constants.lua
 core\database.lua
 core\hooks.lua
 core\async.lua
+core\fonts.lua
 
-data\loader.lua
+# The Theme API loads earlier than actual themes.
+themes\themes.lua
+
 data\equipmentsets.lua
 data\categories.lua
 data\items.lua
+data\loader.lua
+data\slots.lua
+data\refresh.lua
 
 util\color.lua
 util\resize.lua
 util\sort.lua
 util\bucket.lua
+util\windowgroup.lua
 
 frames\question.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua
-frames\classic\money.lua
-frames\classic\context.lua
-frames\column.lua
+frames\era\money.lua
+frames\era\contextmenu.lua
 frames\grid.lua
 frames\item.lua
-frames\classic\item.lua
+frames\era\item.lua
 frames\itemrow.lua
-frames\classic\itemrow.lua
+frames\era\itemrow.lua
 frames\section.lua
 frames\bagbutton.lua
-frames\classic\bagbutton.lua
+frames\era\bagbutton.lua
 frames\bagslots.lua
-frames\classic\bagslots.lua
+frames\era\bagslots.lua
 frames\currency.lua
+frames\list.lua
+frames\sectionitemlist.lua
+frames\sectionconfig.lua
+frames\themeconfig.lua
+frames\tabs.lua
 frames\debug.lua
 
 views\views.lua
@@ -84,18 +98,24 @@ views\listview.lua
 views\bagview.lua
 
 frames\bag.lua
-frames\classic\bag.lua
+frames\era\bag.lua
+
+themes\default.lua
+themes\simpledark.lua
+themes\gw2.lua
+themes\elvui.lua
 
 config\config.lua
-config\classic\config.lua
+config\era\config.lua
 config\help.lua
-config\classic\bags.lua
+config\era\bags.lua
 config\itemlist.lua
 config\customcat.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua
 integrations\masque.lua
+integrations\simpleitemlevel.lua
 
 core\init.lua
-core\classic\init.lua
+core\era\init.lua

@@ -34,6 +34,30 @@ function DB:GetBagView(kind)
 end
 
 ---@param kind BagKind
+---@return boolean
+function DB:GetMarkRecentItems(kind)
+  return DB.data.profile.newItems[kind].markRecentItems
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetMarkRecentItems(kind, value)
+  DB.data.profile.newItems[kind].markRecentItems = value
+end
+
+---@param kind BagKind
+---@return boolean
+function DB:GetShowNewItemFlash(kind)
+  return DB.data.profile.newItems[kind].showNewItemFlash
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetShowNewItemFlash(kind, value)
+  DB.data.profile.newItems[kind].showNewItemFlash = value
+end
+
+---@param kind BagKind
 ---@param view BagView
 function DB:SetBagView(kind, view)
   DB.data.profile.views[kind] = view
@@ -71,7 +95,7 @@ end
 
 ---@param kind BagKind
 ---@param view BagView
----@return table 
+---@return SizeInfo
 function DB:GetBagSizeInfo(kind, view)
   return DB.data.profile.size[view][kind]
 end
@@ -113,18 +137,6 @@ function DB:SetBagViewFrameSize(kind, view, width, height)
   DB.data.profile.size[view][kind].height = height
 end
 
----@param kind BagKind
----@return GridCompactStyle
-function DB:GetBagCompaction(kind)
-  return DB.data.profile.compaction[kind]
-end
-
----@param kind BagKind
----@param style GridCompactStyle
-function DB:SetBagCompaction(kind, style)
-  DB.data.profile.compaction[kind] = style
-end
-
 function DB:GetItemLevelOptions(kind)
   return DB.data.profile.itemLevel[kind]
 end
@@ -145,6 +157,9 @@ function DB:SetFirstTimeMenu(value)
   DB.data.profile.firstTimeMenu = value
 end
 
+---@param kind BagKind
+---@param view BagView
+---@param opacity number
 function DB:SetBagViewSizeOpacity(kind, view, opacity)
   DB.data.profile.size[view][kind].opacity = opacity
 end
@@ -241,7 +256,8 @@ end
 ---@param category string
 ---@return CustomCategoryFilter
 function DB:GetItemCategory(category)
-  return DB.data.profile.customCategoryFilters[category] or {}
+  DB:CreateCategory(category)
+  return DB.data.profile.customCategoryFilters[category]
 end
 
 ---@param category string
@@ -281,6 +297,37 @@ function DB:CreateEpemeralCategory(category)
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true
   }
+end
+
+---@param category string
+---@return CategoryOptions
+function DB:GetCategoryOptions(category)
+  local options = DB.data.profile.categoryOptions[category]
+  if not options then
+    options = {
+      shown = true,
+    }
+    DB.data.profile.categoryOptions[category] = options
+  end
+  return options
+end
+
+---@param kind BagKind
+function DB:ClearCustomSectionSort(kind)
+  DB.data.profile.customSectionSort[kind] = {}
+end
+
+---@param kind BagKind
+---@param category string
+---@param sort number
+function DB:SetCustomSectionSort(kind, category, sort)
+  DB.data.profile.customSectionSort[kind][category] = sort
+end
+
+---@param kind BagKind
+---@return table<string, number>
+function DB:GetCustomSectionSort(kind)
+  return DB.data.profile.customSectionSort[kind]
 end
 
 ---@param guid string
@@ -345,12 +392,38 @@ function DB:SetDontMergePartial(kind, value)
   DB.data.profile.stacking[kind].dontMergePartial = value
 end
 
+function DB:SetDontMergeTransmog(kind, value)
+  DB.data.profile.stacking[kind].dontMergeTransmog = value
+end
+
 function DB:GetShowKeybindWarning()
   return DB.data.profile.showKeybindWarning
 end
 
 function DB:SetShowKeybindWarning(value)
   DB.data.profile.showKeybindWarning = value
+end
+
+---@param kind BagKind
+---@return boolean
+function DB:GetShowFullSectionNames(kind)
+  return DB.data.profile.showFullSectionNames[kind]
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetShowFullSectionNames(kind, value)
+  DB.data.profile.showFullSectionNames[kind] = value
+end
+
+---@param key string
+function DB:SetTheme(key)
+  DB.data.profile.theme = key
+end
+
+---@return string
+function DB:GetTheme()
+  return DB.data.profile.theme
 end
 
 function DB:Migrate()
@@ -365,6 +438,21 @@ function DB:Migrate()
         [const.BAG_KIND.BACKPACK] = value,
         [const.BAG_KIND.BANK] = value
       }
+    end
+  end
+
+  -- Fix the column count and items per row values from a previous bug.
+  -- Do not remove before Q1'25.
+  for _, bagView in pairs(const.BAG_VIEW) do
+    for _, bagKind in pairs(const.BAG_KIND) do
+      if DB.data.profile.size[bagView] then
+        local t = DB.data.profile.size[bagView][bagKind]
+        if t then
+          if t.itemsPerRow ~= nil and t.itemsPerRow > 30 or t.itemsPerRow < 1 then
+            t.itemsPerRow = 7
+          end
+        end
+      end
     end
   end
 end

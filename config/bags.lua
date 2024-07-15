@@ -25,6 +25,9 @@ local events = addon:GetModule('Events')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
@@ -111,25 +114,6 @@ function config:GetBagOptions(kind)
         }
       },
 
-      itemCompaction = {
-        type = "select",
-        name = L:G("Item Compaction"),
-        desc = L:G("If Simple is selected, item sections will be sorted from left to right, however if a section can fit in the same row as the section above it, the section will move up."),
-        order = 3,
-        style = "radio",
-        get = function()
-          return DB:GetBagCompaction(kind)
-        end,
-        set = function(_, value)
-          DB:SetBagCompaction(kind, value)
-          events:SendMessage('bags/FullRefreshAll')
-        end,
-        values =  {
-          [const.GRID_COMPACT_STYLE.NONE] = L:G("None"),
-          [const.GRID_COMPACT_STYLE.SIMPLE] = L:G("Simple"),
-        }
-      },
-
       sectionSorting = {
         type = "select",
         name = L:G("Section Sorting"),
@@ -168,10 +152,42 @@ function config:GetBagOptions(kind)
           [const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY] = L:G("Alphabetically, then Quality"),
         }
       },
+      newItems = {
+        type = "group",
+        name = L:G("New Items"),
+        order = 6,
+        inline = true,
+        args = {
+          markRecentItems = {
+            type = "toggle",
+            name = L:G("Incoming items are recent"),
+            desc = L:G("If enabled, all new items added to the bag will be marked as recent, i.e. bank -> backpack."),
+            order = 1,
+            get = function()
+              return DB:GetMarkRecentItems(kind)
+            end,
+            set = function(_, value)
+              DB:SetMarkRecentItems(kind, value)
+            end,
+          },
+          showNewItemFlash = {
+            type = "toggle",
+            name = L:G("Flash new items in stacks"),
+            desc = L:G("If enabled, stacks that receive new items will flash to indicate the addition of a new item."),
+            order = 2,
+            get = function()
+              return DB:GetShowNewItemFlash(kind)
+            end,
+            set = function(_, value)
+              DB:SetShowNewItemFlash(kind, value)
+            end,
+          },
+        }
+      },
       stacking = {
         type = "group",
         name = L:G("Stacking"),
-        order = 6,
+        order = 7,
         inline = true,
         args = {
           mergeStacks = {
@@ -226,12 +242,25 @@ function config:GetBagOptions(kind)
               events:SendMessage('bags/FullRefreshAll')
             end,
           },
+          dontMergeTransmog = {
+            type = "toggle",
+            name = L:G("Don't Merge Transmog"),
+            desc = L:G("Don't merge stacks of items that have different transmogs on them."),
+            order = 3,
+            get = function()
+              return DB:GetStackingOptions(kind).dontMergeTransmog
+            end,
+            set = function(_, value)
+              DB:SetDontMergeTransmog(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
         }
       },
       itemLevel = {
         type = "group",
         name = L:G("Item Level"),
-        order = 6,
+        order = 8,
         inline = true,
         args = {
           enabled = {
@@ -267,7 +296,7 @@ function config:GetBagOptions(kind)
         type = "select",
         name = L:G("View"),
         desc = L:G("Select which view to use for this bag."),
-        order = 7,
+        order = 9,
         style = "radio",
         get = function()
           if DB:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
@@ -294,19 +323,33 @@ function config:GetBagOptions(kind)
       display = {
         type = "group",
         name = L:G("Display"),
-        order = 8,
+        order = 10,
         inline = true,
         args = {
+          showFullSectionNames = {
+            type = "toggle",
+            name = L:G("Show Full Section Names"),
+            desc = L:G("Show the full section in the bag window without truncating it with '...'"),
+            order = 0,
+            width = "full",
+            get = function()
+              return DB:GetShowFullSectionNames(kind)
+            end,
+            set = function(_, value)
+              DB:SetShowFullSectionNames(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
           itemsPerRow = {
             type = "range",
             name = L:G("Items Per Row"),
             desc = L:G("Set the number of items per row in this bag."),
-            order = 0,
+            order = 1,
             min = 3,
             max = 20,
             step = 1,
             get = function()
-              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).itemsPerRow
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).itemsPerRow > 20 and 20 or DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).itemsPerRow
             end,
             set = function(_, value)
               DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
@@ -315,16 +358,32 @@ function config:GetBagOptions(kind)
               end)
             end,
           },
+          opacity = {
+            type = "range",
+            name = L:G("Opacity"),
+            desc = L:G("Set the opacity of this bag."),
+            order = 2,
+            min = 60,
+            max = 100,
+            step = 1,
+            get = function()
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).opacity
+            end,
+            set = function(_, value)
+              DB:SetBagViewSizeOpacity(kind, DB:GetBagView(kind), value)
+              themes:UpdateOpacity()
+            end,
+          },
           sectionsPerRow = {
             type = "range",
-            name = L:G("Sections Per Row"),
-            desc = L:G("Set the number of sections per row in this bag."),
-            order = 1,
+            name = L:G("Columns"),
+            desc = L:G("Set the number of columns sections will fit into."),
+            order = 3,
             min = 1,
             max = 20,
             step = 1,
             get = function()
-              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
+              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount > 20 and 20 or DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).columnCount
             end,
             set = function(_, value)
               DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
@@ -333,27 +392,11 @@ function config:GetBagOptions(kind)
               end)
             end,
           },
-          opacity = {
-            type = "range",
-            name = L:G("Opacity"),
-            desc = L:G("Set the opacity of this bag."),
-            order = 1,
-            min = 60,
-            max = 100,
-            step = 1,
-            get = function()
-              return DB:GetBagSizeInfo(kind, DB:GetBagView(kind)).opacity
-            end,
-            set = function(_, value)
-              config:GetBag(kind).frame.Bg:SetAlpha(value / 100)
-              DB:SetBagViewSizeOpacity(kind, DB:GetBagView(kind), value)
-            end,
-          },
           scale = {
             type = "range",
             name = L:G("Scale"),
             desc = L:G("Set the scale of this bag."),
-            order = 2,
+            order = 4,
             min = 60,
             max = 160,
             step = 1,
