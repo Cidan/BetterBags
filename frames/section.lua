@@ -269,6 +269,9 @@ local function onTitleRightClick(section)
   local kind = section:DetectKind()
   local title = section.title:GetText()
 
+  -- starting up the list of items to move
+  local list = {}
+
   -- getting the itemId order the section is using so we can move them in the same order
   local idOrder = {}
 
@@ -277,32 +280,14 @@ local function onTitleRightClick(section)
     if not cell.data.isItemEmpty then
       idOrder[cell.data.itemInfo.itemID] = order
       order = order + 1
-    end
-  end
-
-  local source = nil
-
-  if (kind == const.BAG_KIND.BACKPACK) then
-    source = items.itemsByBagAndSlot;
-  else
-    source = items.bankItemsByBagAndSlot;
-  end
-
-  local list = {}
-
-  for bagid, bag in pairs(source) do
-    for slotid, data in pairs(bag) do
-      items:AttachItemInfo(data, kind)
-      data.itemInfo.category = items:GetCategory(data)
-      if (data.itemInfo.category == title) then
+      
         local item = {
-          itemId = data.itemInfo.itemID,
-          count = data.itemInfo.currentItemCount,
-          bagid = data.bagid,
-          slotid = data.slotid
+        itemId = cell.data.itemInfo.itemID,
+        count = cell.data.itemInfo.currentItemCount,
+        bagid = cell.data.bagid,
+        slotid = cell.data.slotid
         }
         table.insert(list, item)
-      end
     end
   end
 
