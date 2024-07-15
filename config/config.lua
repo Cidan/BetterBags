@@ -80,6 +80,19 @@ function config:GetGeneralOptions()
           events:SendMessage('search/SetInFrame', value)
         end,
       },
+      categorySell = {
+        type = "toggle",
+        width = "full",
+        order = 1,
+        name = L:G("Enable Category Sell"),
+        desc = L:G("If enabled, right-clicking a category header at a NPC shop will sell all its contents (limited to 10 stacks to allow buy-backs)."),
+        get = function()
+          return DB:GetCategorySell()
+        end,
+        set = function(_, value)
+          DB:SetCategorySell(value)
+        end,
+      },
       showBagButton = {
         type = "toggle",
         width = "full",

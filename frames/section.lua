@@ -37,6 +37,9 @@ local items = addon:GetModule('Items')
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
+---@class Database: AceModule
+local db = addon:GetModule('Database')
+
 -------
 --- Section Prototype
 -------
@@ -261,10 +264,26 @@ local function onTitleClickOrDrop(section)
   events:SendMessage('bags/FullRefreshAll')
 end
 
+local function debugtable(tab) 
+  print("=====================================")
+  print("SIZE:", #tab)
+  print("{")
+  if not tab then
+    print("nil")
+  else
+    for k,v in pairs(tab) do
+      print('"'..k..'" = '..tostring(v))
+    end
+  end
+  print("}")
+  print("=====================================")
+end
+
 ---@param section Section
 local function onTitleRightClick(section)   
   local flow = addon:GetMovementFlow()
   if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
+  if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
 
   local kind = section:DetectKind()
   local title = section.title:GetText()
@@ -281,13 +300,13 @@ local function onTitleRightClick(section)
       idOrder[cell.data.itemInfo.itemID] = order
       order = order + 1
       
-        local item = {
+      local item = {
         itemId = cell.data.itemInfo.itemID,
         count = cell.data.itemInfo.currentItemCount,
         bagid = cell.data.bagid,
         slotid = cell.data.slotid
-        }
-        table.insert(list, item)
+      }
+      table.insert(list, item)
     end
   end
 
@@ -297,6 +316,16 @@ local function onTitleRightClick(section)
     if ia ~= ib then return ia < ib end
     return a.count > b.count
   end)
+
+  if flow == const.MOVEMENT_FLOW.NPCSHOP then 
+    local newlist = {}    
+    for i=1, 10 do
+      if list[i] then
+        table.insert(newlist, list[i])
+      end
+    end
+    list = newlist
+  end
   
   async:Each(list, function(item)
     -- safecheking: does the bag/slot still hold 'this' item?

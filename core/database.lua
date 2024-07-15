@@ -372,6 +372,16 @@ function DB:GetInBagSearch()
   return DB.data.profile.inBagSearch
 end
 
+---@param enabled boolean
+function DB:SetCategorySell(enabled)
+  DB.data.profile.categorySell = enabled
+end
+
+---@return boolean
+function DB:GetCategorySell()
+  return DB.data.profile.categorySell
+end
+
 function DB:GetStackingOptions(kind)
   return DB.data.profile.stacking[kind]
 end
