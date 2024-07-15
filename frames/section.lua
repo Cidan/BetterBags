@@ -264,21 +264,6 @@ local function onTitleClickOrDrop(section)
   events:SendMessage('bags/FullRefreshAll')
 end
 
-local function debugtable(tab) 
-  print("=====================================")
-  print("SIZE:", #tab)
-  print("{")
-  if not tab then
-    print("nil")
-  else
-    for k,v in pairs(tab) do
-      print('"'..k..'" = '..tostring(v))
-    end
-  end
-  print("}")
-  print("=====================================")
-end
-
 ---@param section Section
 local function onTitleRightClick(section)   
   local flow = addon:GetMovementFlow()
