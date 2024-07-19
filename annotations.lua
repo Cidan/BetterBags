@@ -265,7 +265,14 @@ function ScrollBoxDragBehavior:SetReorderable(reorderable) end
 
 ---@class C_Bank
 ---@field CloseBankFrame fun()
+---@field FetchPurchasedBankTabData fun(bankType: BankType): BankTabData[]
 C_Bank = {}
+
+---@class BankTabData
+---@field ID number
+---@field bankType BankType
+---@field name string
+---@field icon number
 
 ---@class Frame
 ---@field scrollable boolean
@@ -351,13 +358,16 @@ _G.COSTS_LABEL = "Cost:"
 _G.UNIT_NAME_FONT = ""
 _G.DAMAGE_TEXT_FONT = ""
 
--- These aren't the actual bag ENUM's, and are just placeholders.
+Enum.BagIndex.AccountBankTab_1 = 13
+Enum.BagIndex.AccountBankTab_2 = 14
+Enum.BagIndex.AccountBankTab_3 = 15
+Enum.BagIndex.AccountBankTab_4 = 16
+Enum.BagIndex.AccountBankTab_5 = 17
 
-Enum.BagIndex.AccountBankTab_1 = 100
-Enum.BagIndex.AccountBankTab_2 = 101
-Enum.BagIndex.AccountBankTab_3 = 102
-Enum.BagIndex.AccountBankTab_4 = 103
-Enum.BagIndex.AccountBankTab_5 = 104
+---@enum BankType
+Enum.BankType = {
+  Account = 2,
+}
 
 ---@class AceConfig.OptionsTable
 ---@field values? table<any, any>
