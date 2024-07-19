@@ -29,8 +29,10 @@ local debug = addon:GetModule('Debug')
 ---@field frame Frame
 ---@field tabs table<string, Button>
 ---@field tabIndex Button[]
+---@field buttonToIndex table<Button, number>
+---@field buttonToName table<Button, string>
 ---@field selectedTab string
----@field clickHandler fun(name: string)
+---@field clickHandler fun(name: number): boolean?
 local tabFrame = {}
 
 ---@param name string
@@ -46,6 +48,8 @@ function tabFrame:AddTab(name)
   tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
   self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
+  self.buttonToIndex[tab] = #self.tabIndex
+  self.buttonToName[tab] = name
   self:DeselectTab(name)
   self:ResizeTab(name)
 end
@@ -61,6 +65,13 @@ function tabFrame:Reload()
   self:SetTab(self.selectedTab)
 end
 
+---@param index number
+---@return string
+function tabFrame:GetTabName(index)
+  return self.buttonToName[self.tabIndex[index]]
+end
+
+---@param name string
 function tabFrame:ResizeTab(name)
   local TAB_SIDES_PADDING = 20
   local tab = self.tabs[name]
@@ -79,10 +90,13 @@ function tabFrame:ResizeTab(name)
   tab:SetHeight(32)
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
   decoration:SetScript("OnClick", function()
-    self:SetTab(name)
     if self.clickHandler then
-      self.clickHandler(name)
+      if self.clickHandler(self.buttonToIndex[tab]) then
+        self:SetTab(name)
+      end
+      return
     end
+    self:SetTab(name)
   end)
 end
 
@@ -139,6 +153,7 @@ function tabFrame:SelectTab(name)
 	end
 end
 
+---@param fn fun(name: number): boolean?
 function tabFrame:SetClickHandler(fn)
   self.clickHandler = fn
 end
@@ -154,5 +169,7 @@ function tabs:Create(parent)
   container.frame:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
   container.tabs = {}
   container.tabIndex = {}
+  container.buttonToIndex = {}
+  container.buttonToName = {}
   return container
 end

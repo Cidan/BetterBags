@@ -120,20 +120,31 @@ local tabs = addon:GetModule('Tabs')
 ---@field tabs Tab
 bagFrame.bagProto = {}
 
+function bagFrame.bagProto:GenerateWarbankTabs()
+  local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
+  for _, data in pairs(tabData) do
+    if not self.tabs:TabExists(data.name) then
+      self.tabs:AddTab(data.name)
+    end
+  end
+  if C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Account) < 5 then
+    self.tabs:AddTab("Purchase Warbank Tab")
+    return
+  end
+
+end
+
 function bagFrame.bagProto:Show()
   if self.frame:IsShown() then
     return
   end
   --addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
+
   if self.kind == const.BAG_KIND.BANK then
-    local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
-    for _, data in pairs(tabData) do
-      if not self.tabs:TabExists(data.name) then
-        self.tabs:AddTab(data.name)
-      end
-    end
+    self:GenerateWarbankTabs()
   end
+
   self.frame:Show()
 end
 
@@ -302,22 +313,29 @@ function bagFrame.bagProto:SwitchToReagentBank()
   items:RefreshReagentBank(ctx)
 end
 
-function bagFrame.bagProto:SwitchToAccountBank(subtab)
+---@param tabIndex number
+---@return boolean
+function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
   local ctx = context:New()
   self.isReagentBank = false
-  self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
-  BankFrame.selectedTab = 3
+  if tabIndex - 2 > C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Account) then
+    StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account });
+    return false
+  end
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
-    if data.name == subtab then
+    if data.name == tabName then
       AccountBankPanel.selectedTabID = data.ID
       break
     end
   end
+  self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
+  BankFrame.selectedTab = 3
   self.currentItemCount = -1
   self:Wipe()
   ctx:Set('wipe', true)
   items:RefreshAccountBank(ctx, const.BAG_KIND.ACCOUNT_BANK_1)
+  return true
 end
 
 function bagFrame.bagProto:ToggleReagentBank()
@@ -495,13 +513,13 @@ function bagFrame:Create(kind)
 
     b.tabs:SetTab("Bank")
 
-    b.tabs:SetClickHandler(function(tabName)
-      if tabName == "Bank" then
+    b.tabs:SetClickHandler(function(tabIndex)
+      if tabIndex == 1 then
         b:SwitchToBank()
-      elseif tabName == "Reagent Bank" then
+      elseif tabName == 2 then
         b:SwitchToReagentBank()
       else
-        b:SwitchToAccountBank(tabName)
+        return b:SwitchToAccountBank(tabIndex)
       end
     end)
   end
