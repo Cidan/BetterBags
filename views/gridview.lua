@@ -261,7 +261,7 @@ local function GridView(view, ctx, bag, slotInfo)
     debug:EndProfile('Content Draw Stage')
     -- Reposition the content frame if the recent items section is empty.
     if w < 160 then
-      w = 160
+      w = 220
     end
     if h == 0 then
       h = 40
