@@ -127,11 +127,12 @@ function bagFrame.bagProto:GenerateWarbankTabs()
       self.tabs:AddTab(data.name)
     end
   end
-  if C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Account) < 5 then
-    self.tabs:AddTab("Purchase Warbank Tab")
-    return
+  if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
+    self.tabs:HideTab("Purchase Warbank Tab")
+  else
+    self.tabs:MoveToEnd("Purchase Warbank Tab")
+    self.tabs:ShowTab("Purchase Warbank Tab")
   end
-
 end
 
 function bagFrame.bagProto:Show()
@@ -318,10 +319,10 @@ end
 function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
   local ctx = context:New()
   self.isReagentBank = false
-  if tabIndex - 2 > C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Account) then
-    StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account });
-    return false
-  end
+  --if tabIndex - 2 > C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Account) then
+  --  StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account });
+  --  return false
+  --end
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if data.name == tabName then
@@ -510,6 +511,9 @@ function bagFrame:Create(kind)
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab("Bank")
     b.tabs:AddTab("Reagent Bank")
+    b.tabs:AddTab("Purchase Warbank Tab", function()
+      StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account });
+    end)
 
     b.tabs:SetTab("Bank")
 
@@ -521,6 +525,11 @@ function bagFrame:Create(kind)
       else
         return b:SwitchToAccountBank(tabIndex)
       end
+    end)
+    -- BANK_TAB_SETTINGS_UPDATED
+    -- BANK_TABS_CHANGED
+    events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function()
+      b:GenerateWarbankTabs()
     end)
   end
 

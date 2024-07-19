@@ -267,6 +267,7 @@ function ScrollBoxDragBehavior:SetReorderable(reorderable) end
 ---@field CloseBankFrame fun()
 ---@field FetchNumPurchasedBankTabs fun(bankType: BankType): number
 ---@field FetchPurchasedBankTabData fun(bankType: BankType): BankTabData[]
+---@field HasMaxBankTabs fun(bankType: BankType): boolean
 C_Bank = {}
 
 ---@class BankTabData
