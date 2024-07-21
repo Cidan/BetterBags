@@ -520,10 +520,10 @@ function bagFrame:Create(kind)
     b.tabs:SetClickHandler(function(tabIndex)
       if tabIndex == 1 then
         b:SwitchToBank()
-      elseif tabName == 2 then
+      elseif tabIndex == 2 then
         b:SwitchToReagentBank()
       else
-        return b:SwitchToAccountBank(tabIndex)
+        b:SwitchToAccountBank(tabIndex)
       end
     end)
     -- BANK_TAB_SETTINGS_UPDATED
