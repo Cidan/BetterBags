@@ -22,6 +22,18 @@ const.BAG_KIND = {
   BANK = 1,
 }
 
+-- BankTab is an enum for the different bank tabs.
+---@enum BankTab
+const.BANK_TAB = {
+  BANK = Enum.BagIndex.Bank,
+  REAGENT = Enum.BagIndex.Reagentbank,
+  ACCOUNT_BANK_1 = Enum.BagIndex.AccountBankTab_1,
+  ACCOUNT_BANK_2 = Enum.BagIndex.AccountBankTab_2,
+  ACCOUNT_BANK_3 = Enum.BagIndex.AccountBankTab_3,
+  ACCOUNT_BANK_4 = Enum.BagIndex.AccountBankTab_4,
+  ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
+}
+
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
 const.BANK_BAGS = {
