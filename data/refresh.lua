@@ -87,7 +87,6 @@ function refresh:StartUpdate()
     items:ClearItemCache(ctx)
     items._firstLoad[const.BAG_KIND.BACKPACK] = true
     items._firstLoad[const.BAG_KIND.BANK] = true
-    items._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
     items:PreSort()
     C_Container:SortBags()
     return

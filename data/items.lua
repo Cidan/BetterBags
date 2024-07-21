@@ -100,12 +100,6 @@ function items:OnInitialize()
   self._firstLoad = {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
-    [const.BAG_KIND.REAGENT_BANK] = true,
-    [const.BAG_KIND.ACCOUNT_BANK_1] = true,
-    [const.BAG_KIND.ACCOUNT_BANK_2] = true,
-    [const.BAG_KIND.ACCOUNT_BANK_3] = true,
-    [const.BAG_KIND.ACCOUNT_BANK_4] = true,
-    [const.BAG_KIND.ACCOUNT_BANK_5] = true,
   }
 end
 
