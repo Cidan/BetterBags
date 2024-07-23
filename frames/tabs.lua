@@ -25,17 +25,30 @@ local debug = addon:GetModule('Debug')
 ---@field selectedTextX number
 ---@field selectedTextY number
 
+---@class TabButton: Button
+---@field name string
+---@field index number
+---@field id? number
+---@field onClick? fun()
+
 ---@class (exact) Tab
 ---@field frame Frame
----@field tabs table<string, Button>
----@field tabIndex Button[]
+---@field tabs table<string, TabButton>
+---@field tabIndex TabButton[]
+---@field buttonToName table<TabButton, string>
 ---@field selectedTab string
----@field clickHandler fun(name: string)
+---@field clickHandler fun(name: number): boolean?
+---@field width number
 local tabFrame = {}
 
 ---@param name string
-function tabFrame:AddTab(name)
-  local tab = CreateFrame("button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame)
+---@param id? number
+---@param onClick? fun()
+function tabFrame:AddTab(name, id, onClick)
+  local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame) --[[@as TabButton]]
+  tab.onClick = onClick
+  tab.name = name
+  tab.id = id
   tab:SetNormalFontObject(GameFontNormalSmall)
   local anchorFrame = self.frame
   local anchorPoint = "TOPLEFT"
@@ -46,7 +59,15 @@ function tabFrame:AddTab(name)
   tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
   self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
+  tab.index = #self.tabIndex
+  self.buttonToName[tab] = name
+  self:DeselectTab(name)
   self:ResizeTab(name)
+  self:ReanchorTabs()
+end
+
+function tabFrame:TabExists(name)
+  return self.tabs[name] ~= nil
 end
 
 function tabFrame:Reload()
@@ -56,6 +77,44 @@ function tabFrame:Reload()
   self:SetTab(self.selectedTab)
 end
 
+function tabFrame:ReanchorTabs()
+  self.width = 0
+  for i, tab in ipairs(self.tabIndex) do
+    tab:ClearAllPoints()
+    if tab:IsShown() then
+      local anchorFrame = self.frame
+      local anchorPoint = "TOPLEFT"
+      if i > 1 then
+        anchorFrame = self.tabIndex[i - 1]
+        anchorPoint = "TOPRIGHT"
+      end
+      tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
+      self.width = self.width + tab:GetWidth() + 5
+    end
+  end
+end
+
+function tabFrame:MoveToEnd(name)
+  for i, tab in ipairs(self.tabIndex) do
+    if tab.name == name then
+      table.remove(self.tabIndex, i)
+      table.insert(self.tabIndex, tab)
+      break
+    end
+  end
+  for i, tab in ipairs(self.tabIndex) do
+    tab.index = i
+  end
+  self:ReanchorTabs()
+end
+
+---@param index number
+---@return string
+function tabFrame:GetTabName(index)
+  return self.buttonToName[self.tabIndex[index]]
+end
+
+---@param name string
 function tabFrame:ResizeTab(name)
   local TAB_SIDES_PADDING = 20
   local tab = self.tabs[name]
@@ -74,9 +133,14 @@ function tabFrame:ResizeTab(name)
   tab:SetHeight(32)
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
   decoration:SetScript("OnClick", function()
-    self:SetTab(name)
+    if tab.onClick then
+      tab.onClick()
+      return
+    end
     if self.clickHandler then
-      self.clickHandler(name)
+      if self.clickHandler(tab.id or tab.index) then
+        self:SetTab(name)
+      end
     end
   end)
 end
@@ -90,6 +154,16 @@ function tabFrame:SetTab(name)
     end
   end
   self.selectedTab = name
+end
+
+function tabFrame:ShowTab(name)
+  self.tabs[name]:Show()
+  self:ReanchorTabs()
+end
+
+function tabFrame:HideTab(name)
+  self.tabs[name]:Hide()
+  self:ReanchorTabs()
 end
 
 ---@private
@@ -134,6 +208,7 @@ function tabFrame:SelectTab(name)
 	end
 end
 
+---@param fn fun(name: number): boolean?
 function tabFrame:SetClickHandler(fn)
   self.clickHandler = fn
 end
@@ -147,7 +222,9 @@ function tabs:Create(parent)
   container.frame:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 2)
   container.frame:SetHeight(40)
   container.frame:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
+  container.width = 0
   container.tabs = {}
   container.tabIndex = {}
+  container.buttonToName = {}
   return container
 end

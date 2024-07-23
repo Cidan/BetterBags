@@ -100,7 +100,6 @@ function items:OnInitialize()
   self._firstLoad = {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
-    [const.BAG_KIND.REAGENT_BANK] = true,
   }
 end
 
@@ -114,13 +113,12 @@ function items:OnEnable()
 
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
-    items:ClearBankCache()
+    --items:ClearBankCache()
   end)
 end
 
 ---@param kind BagKind
 function items:WipeSlotInfo(kind)
-  debug:Inspect("wiping slot info", kind)
   self.slotInfo = self.slotInfo or {}
   self.slotInfo[kind] = self:NewSlotInfo()
 end
@@ -155,23 +153,18 @@ function items:PreSort()
 end
 
 ---@private
-function items:ClearItemCache()
+---@param ctx Context
+function items:ClearItemCache(ctx)
   self.previousItemGUID = {}
   self:ResetSlotInfo()
-  if addon.Bags.Backpack.currentView then
-    addon.Bags.Backpack.currentView.fullRefresh = true
-  end
-  if addon.Bags.Bank.currentView then
-    addon.Bags.Bank.currentView.fullRefresh = true
-  end
+  ctx:Set('wipe', true)
   debug:Log("Items", "Item Cache Cleared")
 end
 
-function items:ClearBankCache()
+---@param ctx Context
+function items:ClearBankCache(ctx)
   self:WipeSlotInfo(const.BAG_KIND.BANK)
-  if addon.Bags.Bank.currentView then
-    addon.Bags.Bank.currentView.fullRefresh = true
-  end
+  ctx:Set('wipe', true)
   debug:Log("Items", "Bank Cache Cleared")
 end
 
@@ -189,25 +182,20 @@ function items:DoRefreshAll(ctx)
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() or addon.atBank then
     local bankContext = ctx:Copy()
-    if addon.Bags.Bank.isReagentBank then
-      self:RefreshReagentBank(bankContext)
-    else
-      self:RefreshBank(bankContext)
-    end
+    self:RefreshBank(bankContext)
   end
   self:RefreshBackpack(ctx)
 end
 
 ---@param ctx Context
-function items:RefreshReagentBank(ctx)
-  local container = self:NewLoader(const.BAG_KIND.BANK)
-  -- Loop through all the bags and schedule each item for a refresh.
-  for i in pairs(const.REAGENTBANK_BAGS) do
-    self:StageBagForUpdate(i, container)
-  end
+---@param kind BagKind
+function items:RefreshAccountBank(ctx, kind)
+  local container = self:NewLoader(kind)
+
+  self:StageBagForUpdate(kind, container)
 
   --- Process the item container.
-  self:ProcessContainer(ctx, const.BAG_KIND.REAGENT_BANK, container)
+  self:ProcessContainer(ctx, kind, container)
 end
 
 ---@param ctx Context
@@ -221,9 +209,18 @@ function items:RefreshBank(ctx)
     GetInventoryItemQuality("player", id)
   end
 
-  -- Loop through all the bags and schedule each item for a refresh.
-  for i in pairs(const.BANK_BAGS) do
-    self:StageBagForUpdate(i, container)
+  if addon.Bags.Bank.bankTab == const.BANK_TAB.REAGENT then
+    ctx:Set('bagid', const.BANK_TAB.REAGENT)
+    self:StageBagForUpdate(const.BANK_TAB.REAGENT, container)
+  elseif addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+    ctx:Set('bagid', addon.Bags.Bank.bankTab)
+    self:StageBagForUpdate(addon.Bags.Bank.bankTab, container)
+  else
+    ctx:Set('bagid', const.BANK_TAB.BANK)
+    -- Loop through all the bags and schedule each item for a refresh.
+    for i in pairs(const.BANK_BAGS) do
+      self:StageBagForUpdate(i, container)
+    end
   end
 
   --- Process the item container.
@@ -318,15 +315,20 @@ function items:GetSlotKeyFromBagAndSlot(bagid, slotid)
 end
 
 -- UpdateFreeSlots updates the current free slot count for a given bag kind.
+---@param ctx Context
 ---@param kind BagKind
-function items:UpdateFreeSlots(kind)
+function items:UpdateFreeSlots(ctx, kind)
   ---@type table<number, number>
   local baglist
+  local tab = ctx:Get('bagid')
   if kind == const.BAG_KIND.BANK then
-    baglist = const.BANK_BAGS
-  elseif kind == const.BAG_KIND.REAGENT_BANK then
-    baglist = const.REAGENTBANK_BAGS
-    kind = const.BAG_KIND.BANK
+    if tab == const.BANK_TAB.REAGENT then
+      baglist = const.REAGENTBANK_BAGS
+    elseif tab == const.BANK_TAB.BANK then
+      baglist = const.BANK_BAGS
+    else
+      baglist = {[tab] = tab}
+    end
   else
     baglist = const.BACKPACK_BAGS
   end
@@ -362,23 +364,16 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@param dataCache table<string, ItemData>
----@param reagent? boolean
-function items:LoadItems(ctx, kind, dataCache, reagent)
+function items:LoadItems(ctx, kind, dataCache)
   -- Wipe the data if needed before loading the new data.
   if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
-    if addon.Bags.Backpack.currentView and kind == const.BAG_KIND.BACKPACK then
-      addon.Bags.Backpack.currentView.fullRefresh = true
-    end
-    if addon.Bags.Bank.currentView and kind == const.BAG_KIND.BANK then
-      addon.Bags.Bank.currentView.fullRefresh = true
-    end
   end
 
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(ctx, dataCache)
-  self:UpdateFreeSlots(reagent and const.BAG_KIND.REAGENT_BANK or kind)
+  self:UpdateFreeSlots(ctx, kind)
   local slotInfo = self.slotInfo[kind]
 
   -- Loop through all the items in the bag and update slot info properties.
@@ -453,12 +448,9 @@ function items:ProcessContainer(ctx, kind, container)
       self._firstLoad[kind] = false
       ctx:Set('wipe', true)
     end
-    if kind == const.BAG_KIND.REAGENT_BANK then
-      kind = const.BAG_KIND.BANK
-      self:LoadItems(ctx, kind, container:GetDataCache(), true)
-    else
-      self:LoadItems(ctx, kind, container:GetDataCache())
-    end
+
+    self:LoadItems(ctx, kind, container:GetDataCache())
+
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
     events:SendMessageLater(ev, nil, ctx, self.slotInfo[kind])
@@ -880,7 +872,7 @@ end
 ---@return BagKind
 function items:GetBagKindFromSlotKey(slotkey)
   local bagid = string.split('_', slotkey) --[[@as string]]
-  if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] then
+  if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
     return const.BAG_KIND.BANK
   end
   return const.BAG_KIND.BACKPACK

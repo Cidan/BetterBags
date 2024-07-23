@@ -70,12 +70,17 @@ local themes = addon:GetModule('Themes')
 ---@class WindowGroup: AceModule
 local windowGroup = addon:GetModule('WindowGroup')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
-  self.isReagentBank = false
+  self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
+  local ctx = context:New()
+  ctx:Set("wipe", true)
   --self.frame:SetTitle(L:G("Bank"))
-  items:ClearBankCache()
+  items:ClearBankCache(ctx)
   self:Wipe()
 end
 
@@ -99,7 +104,7 @@ function bagFrame:Create(kind)
   setmetatable(b, { __index = bagFrame.bagProto })
   b.currentItemCount = 0
   b.drawOnClose = false
-  b.isReagentBank = false
+  b.bankTab = const.BANK_TAB.BANK
   b.sections = {}
   b.toRelease = {}
   b.toReleaseSections = {}
@@ -271,6 +276,10 @@ function bagFrame:Create(kind)
   if kind == const.BAG_KIND.BACKPACK then
     b.themeConfigFrame = themeConfig:Create(b.sideAnchor)
     b.windowGrouping:AddWindow('themeConfig', b.themeConfigFrame)
+  end
+
+  if kind == const.BAG_KIND.BANK then
+    b.bankTab = const.BANK_TAB.BANK
   end
   b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
   b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)

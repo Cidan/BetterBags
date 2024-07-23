@@ -75,6 +75,8 @@ function refresh:StartUpdate()
       updateBank = true
     elseif const.REAGENTBANK_BAGS[event.args[1]] then
       updateBank = true
+    elseif const.ACCOUNT_BANK_BAGS[event.args[1]] then
+      updateBank = true
     elseif const.BACKPACK_BAGS[event.args[1]] then
       updateBackpack = true
     end
@@ -84,10 +86,9 @@ function refresh:StartUpdate()
   if sortBackpack then
     self.isUpdateRunning = false
     items:RemoveNewItemFromAllItems()
-    items:ClearItemCache()
+    items:ClearItemCache(ctx)
     items._firstLoad[const.BAG_KIND.BACKPACK] = true
     items._firstLoad[const.BAG_KIND.BANK] = true
-    items._firstLoad[const.BAG_KIND.REAGENT_BANK] = true
     items:PreSort()
     C_Container:SortBags()
     return
@@ -101,12 +102,7 @@ function refresh:StartUpdate()
   end
 
   if updateBank and addon.atBank then
-    local bankCtx = ctx:Copy()
-    if addon.Bags.Bank.isReagentBank then
-      items:RefreshReagentBank(bankCtx)
-    else
-      items:RefreshBank(bankCtx)
-    end
+    items:RefreshBank(ctx:Copy())
   end
 
   if updateBackpack then

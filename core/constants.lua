@@ -20,7 +20,18 @@ const.BAG_KIND = {
   UNDEFINED = -1,
   BACKPACK = 0,
   BANK = 1,
-  REAGENT_BANK = 2,
+}
+
+-- BankTab is an enum for the different bank tabs.
+---@enum BankTab
+const.BANK_TAB = {
+  BANK = Enum.BagIndex.Bank,
+  REAGENT = Enum.BagIndex.Reagentbank,
+  ACCOUNT_BANK_1 = Enum.BagIndex.AccountBankTab_1,
+  ACCOUNT_BANK_2 = Enum.BagIndex.AccountBankTab_2,
+  ACCOUNT_BANK_3 = Enum.BagIndex.AccountBankTab_3,
+  ACCOUNT_BANK_4 = Enum.BagIndex.AccountBankTab_4,
+  ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
 }
 
 -- BANK_BAGS contains all the bags that are part of the bank, including
@@ -61,6 +72,17 @@ const.BANK_ONLY_BAGS_LIST = {
 const.REAGENTBANK_BAGS = {
   [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
 }
+
+
+if addon.isRetail then
+  const.ACCOUNT_BANK_BAGS = {
+    [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
+    [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
+    [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
+    [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
+    [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
+  }
+end
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
 -- the main backpack bag.
@@ -385,7 +407,7 @@ const.DATABASE_DEFAULTS = {
         unmergeAtShop = true,
         dontMergePartial = false,
         dontMergeTransmog = false,
-      }
+      },
     },
     itemLevel = {
       [const.BAG_KIND.BACKPACK] = {
@@ -395,15 +417,11 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = {
         enabled = true,
         color = true
-      }
+      },
     },
     positions = {
       [const.BAG_KIND.BACKPACK] = {},
       [const.BAG_KIND.BANK] = {},
-    },
-    compaction = {
-      [const.BAG_KIND.BACKPACK] = const.GRID_COMPACT_STYLE.SIMPLE,
-      [const.BAG_KIND.BANK] = const.GRID_COMPACT_STYLE.SIMPLE,
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
@@ -438,6 +456,7 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = {},
       ---@type table<string, number>
       [const.BAG_KIND.BANK] = {},
+      ---@type table<string, number>
     },
     size = {
       ---@type SizeInfo[]
@@ -457,7 +476,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
-        }
+        },
       },
       [const.BAG_VIEW.SECTION_GRID] = {
         [const.BAG_KIND.BACKPACK] = {
@@ -475,7 +494,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
-        }
+        },
       },
       [const.BAG_VIEW.LIST] = {
         [const.BAG_KIND.BACKPACK] = {
@@ -493,7 +512,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
-        }
+        },
       },
       [const.BAG_VIEW.SECTION_ALL_BAGS] = {
         [const.BAG_KIND.BACKPACK] = {
@@ -511,7 +530,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
-        }
+        },
       },
     },
     views = {
