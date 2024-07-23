@@ -70,12 +70,17 @@ local themes = addon:GetModule('Themes')
 ---@class WindowGroup: AceModule
 local windowGroup = addon:GetModule('WindowGroup')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
+  local ctx = context:New()
+  ctx:Set("wipe", true)
   --self.frame:SetTitle(L:G("Bank"))
-  items:ClearBankCache()
+  items:ClearBankCache(ctx)
   self:Wipe()
 end
 
