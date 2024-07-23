@@ -183,25 +183,9 @@ function items:DoRefreshAll(ctx)
   if not addon.Bags.Bank or not addon.Bags.Backpack then return end
   if addon.Bags.Bank.frame:IsShown() or addon.atBank then
     local bankContext = ctx:Copy()
-    if addon.Bags.Bank.isReagentBank then
-      self:RefreshReagentBank(bankContext)
-    else
-      self:RefreshBank(bankContext)
-    end
+    self:RefreshBank(bankContext)
   end
   self:RefreshBackpack(ctx)
-end
-
----@param ctx Context
-function items:RefreshReagentBank(ctx)
-  local container = self:NewLoader(const.BAG_KIND.BANK)
-  -- Loop through all the bags and schedule each item for a refresh.
-  for i in pairs(const.REAGENTBANK_BAGS) do
-    self:StageBagForUpdate(i, container)
-  end
-
-  --- Process the item container.
-  self:ProcessContainer(ctx, const.BAG_KIND.REAGENT_BANK, container)
 end
 
 ---@param ctx Context
@@ -226,9 +210,15 @@ function items:RefreshBank(ctx)
     GetInventoryItemQuality("player", id)
   end
 
-  -- Loop through all the bags and schedule each item for a refresh.
-  for i in pairs(const.BANK_BAGS) do
-    self:StageBagForUpdate(i, container)
+  if addon.Bags.Bank.isReagentBank then
+    ctx:Set('bagid', const.BANK_TAB.REAGENT)
+    self:StageBagForUpdate(const.BANK_TAB.REAGENT, container)
+  else
+    ctx:Set('bagid', const.BANK_TAB.BANK)
+    -- Loop through all the bags and schedule each item for a refresh.
+    for i in pairs(const.BANK_BAGS) do
+      self:StageBagForUpdate(i, container)
+    end
   end
 
   --- Process the item container.
@@ -323,15 +313,18 @@ function items:GetSlotKeyFromBagAndSlot(bagid, slotid)
 end
 
 -- UpdateFreeSlots updates the current free slot count for a given bag kind.
+---@param ctx Context
 ---@param kind BagKind
-function items:UpdateFreeSlots(kind)
+function items:UpdateFreeSlots(ctx, kind)
   ---@type table<number, number>
   local baglist
+  local tab = ctx:Get('bagid')
   if kind == const.BAG_KIND.BANK then
-    baglist = const.BANK_BAGS
-  elseif kind == const.BAG_KIND.REAGENT_BANK then
-    baglist = const.REAGENTBANK_BAGS
-    kind = const.BAG_KIND.BANK
+    if tab == const.BANK_TAB.REAGENT then
+      baglist = const.REAGENTBANK_BAGS
+    elseif tab == const.BANK_TAB.BANK then
+      baglist = const.BANK_BAGS
+    end
   else
     baglist = const.BACKPACK_BAGS
   end
@@ -376,7 +369,7 @@ function items:LoadItems(ctx, kind, dataCache)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(ctx, dataCache)
-  self:UpdateFreeSlots(kind)
+  self:UpdateFreeSlots(ctx, kind)
   local slotInfo = self.slotInfo[kind]
 
   -- Loop through all the items in the bag and update slot info properties.

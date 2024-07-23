@@ -128,8 +128,9 @@ function tabFrame:ResizeTab(name)
       return
     end
     if self.clickHandler then
-      self.clickHandler(self.buttonToIndex[tab])
-      self:SetTab(name)
+      if self.clickHandler(self.buttonToIndex[tab]) then
+        self:SetTab(name)
+      end
     end
   end)
 end

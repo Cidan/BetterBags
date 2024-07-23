@@ -304,6 +304,10 @@ end
 
 function bagFrame.bagProto:SwitchToReagentBank()
   local ctx = context:New()
+  if not IsReagentBankUnlocked() then
+    StaticPopup_Show("CONFIRM_BUY_REAGENTBANK_TAB")
+    return false
+  end
   self.isReagentBank = true
   BankFrame.selectedTab = 2
   self:SetTitle(L:G("Reagent Bank"))
@@ -311,7 +315,8 @@ function bagFrame.bagProto:SwitchToReagentBank()
   AccountBankPanel.selectedTabID = nil
   self:Wipe()
   ctx:Set('wipe', true)
-  items:RefreshReagentBank(ctx)
+  items:RefreshBank(ctx)
+  return true
 end
 
 ---@param tabIndex number
@@ -337,16 +342,6 @@ function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
   ctx:Set('wipe', true)
   items:RefreshAccountBank(ctx, const.BAG_KIND.ACCOUNT_BANK_1)
   return true
-end
-
-function bagFrame.bagProto:ToggleReagentBank()
-  -- This should never happen, but just in case!
-  if self.kind == const.BAG_KIND.BACKPACK then return end
-  if self.isReagentBank then
-    self:SwitchToBank()
-  else
-    self:SwitchToReagentBank()
-  end
 end
 
 function bagFrame.bagProto:SwitchToBankAndWipe()
@@ -521,10 +516,11 @@ function bagFrame:Create(kind)
       if tabIndex == 1 then
         b:SwitchToBank()
       elseif tabIndex == 2 then
-        b:SwitchToReagentBank()
+        return b:SwitchToReagentBank()
       else
         b:SwitchToAccountBank(tabIndex)
       end
+      return true
     end)
     -- BANK_TAB_SETTINGS_UPDATED
     -- BANK_TABS_CHANGED
