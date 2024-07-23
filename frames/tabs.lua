@@ -27,24 +27,27 @@ local debug = addon:GetModule('Debug')
 
 ---@class TabButton: Button
 ---@field name string
+---@field index number
+---@field id? number
 ---@field onClick? fun()
 
 ---@class (exact) Tab
 ---@field frame Frame
 ---@field tabs table<string, TabButton>
 ---@field tabIndex TabButton[]
----@field buttonToIndex table<TabButton, number>
 ---@field buttonToName table<TabButton, string>
 ---@field selectedTab string
 ---@field clickHandler fun(name: number): boolean?
 local tabFrame = {}
 
 ---@param name string
+---@param id? number
 ---@param onClick? fun()
-function tabFrame:AddTab(name, onClick)
+function tabFrame:AddTab(name, id, onClick)
   local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame) --[[@as TabButton]]
   tab.onClick = onClick
   tab.name = name
+  tab.id = id
   tab:SetNormalFontObject(GameFontNormalSmall)
   local anchorFrame = self.frame
   local anchorPoint = "TOPLEFT"
@@ -55,7 +58,7 @@ function tabFrame:AddTab(name, onClick)
   tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
   self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
-  self.buttonToIndex[tab] = #self.tabIndex
+  tab.index = #self.tabIndex
   self.buttonToName[tab] = name
   self:DeselectTab(name)
   self:ResizeTab(name)
@@ -95,6 +98,9 @@ function tabFrame:MoveToEnd(name)
       break
     end
   end
+  for i, tab in ipairs(self.tabIndex) do
+    tab.index = i
+  end
   self:ReanchorTabs()
 end
 
@@ -128,7 +134,7 @@ function tabFrame:ResizeTab(name)
       return
     end
     if self.clickHandler then
-      if self.clickHandler(self.buttonToIndex[tab]) then
+      if self.clickHandler(tab.id or tab.index) then
         self:SetTab(name)
       end
     end
@@ -214,7 +220,6 @@ function tabs:Create(parent)
   container.frame:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
   container.tabs = {}
   container.tabIndex = {}
-  container.buttonToIndex = {}
   container.buttonToName = {}
   return container
 end

@@ -72,7 +72,7 @@ local windowGroup = addon:GetModule('WindowGroup')
 
 function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
-  self.isReagentBank = false
+  self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   --self.frame:SetTitle(L:G("Bank"))
   items:ClearBankCache()
@@ -99,7 +99,7 @@ function bagFrame:Create(kind)
   setmetatable(b, { __index = bagFrame.bagProto })
   b.currentItemCount = 0
   b.drawOnClose = false
-  b.isReagentBank = false
+  b.bankTab = const.BANK_TAB.BANK
   b.sections = {}
   b.toRelease = {}
   b.toReleaseSections = {}

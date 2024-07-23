@@ -101,7 +101,6 @@ local tabs = addon:GetModule('Tabs')
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
 ---@field slots bagSlots
----@field isReagentBank boolean
 ---@field decorator Texture
 ---@field bg Texture
 ---@field moneyFrame Money
@@ -118,13 +117,14 @@ local tabs = addon:GetModule('Tabs')
 ---@field previousSize number
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
+---@field bankTab BankTab
 bagFrame.bagProto = {}
 
 function bagFrame.bagProto:GenerateWarbankTabs()
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if not self.tabs:TabExists(data.name) then
-      self.tabs:AddTab(data.name)
+      self.tabs:AddTab(data.name, data.ID)
     end
   end
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
@@ -292,10 +292,11 @@ end
 
 function bagFrame.bagProto:SwitchToBank()
   local ctx = context:New()
-  self.isReagentBank = false
+  self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
   self.currentItemCount = -1
+  BankFrame.activeTabIndex = 1
   AccountBankPanel.selectedTabID = nil
   self:Wipe()
   ctx:Set('wipe', true)
@@ -308,10 +309,11 @@ function bagFrame.bagProto:SwitchToReagentBank()
     StaticPopup_Show("CONFIRM_BUY_REAGENTBANK_TAB")
     return false
   end
-  self.isReagentBank = true
+  self.bankTab = const.BANK_TAB.REAGENT
   BankFrame.selectedTab = 2
   self:SetTitle(L:G("Reagent Bank"))
   self.currentItemCount = -1
+  BankFrame.activeTabIndex = 1
   AccountBankPanel.selectedTabID = nil
   self:Wipe()
   ctx:Set('wipe', true)
@@ -323,24 +325,21 @@ end
 ---@return boolean
 function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
   local ctx = context:New()
-  self.isReagentBank = false
-  --if tabIndex - 2 > C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Account) then
-  --  StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account });
-  --  return false
-  --end
+  self.bankTab = tabIndex
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
-    if data.name == tabName then
+    if data.ID == tabIndex then
       AccountBankPanel.selectedTabID = data.ID
       break
     end
   end
   self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
-  BankFrame.selectedTab = 3
+  BankFrame.selectedTab = 1
+  BankFrame.activeTabIndex = 3
   self.currentItemCount = -1
   self:Wipe()
   ctx:Set('wipe', true)
-  items:RefreshAccountBank(ctx, const.BAG_KIND.ACCOUNT_BANK_1)
+  items:RefreshBank(ctx)
   return true
 end
 
@@ -349,8 +348,9 @@ function bagFrame.bagProto:SwitchToBankAndWipe()
   local ctx = context:New()
   ctx:Set('wipe', true)
   self.tabs:SetTab("Bank")
-  self.isReagentBank = false
+  self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
+  BankFrame.activeTabIndex = 1
   self:SetTitle(L:G("Bank"))
   items:ClearBankCache(ctx)
   self:Wipe()
@@ -415,7 +415,7 @@ function bagFrame:Create(kind)
   b.currentItemCount = 0
   b.drawOnClose = false
   b.drawAfterCombat = false
-  b.isReagentBank = false
+  b.bankTab = const.BANK_TAB.BANK
   b.sections = {}
   b.toRelease = {}
   b.toReleaseSections = {}
@@ -506,7 +506,7 @@ function bagFrame:Create(kind)
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab("Bank")
     b.tabs:AddTab("Reagent Bank")
-    b.tabs:AddTab("Purchase Warbank Tab", function()
+    b.tabs:AddTab("Purchase Warbank Tab", nil, function()
       StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account });
     end)
 

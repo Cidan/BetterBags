@@ -210,9 +210,14 @@ function items:RefreshBank(ctx)
     GetInventoryItemQuality("player", id)
   end
 
-  if addon.Bags.Bank.isReagentBank then
+  print("bagid", addon.Bags.Bank.bankTab)
+  if addon.Bags.Bank.bankTab == const.BANK_TAB.REAGENT then
     ctx:Set('bagid', const.BANK_TAB.REAGENT)
     self:StageBagForUpdate(const.BANK_TAB.REAGENT, container)
+  elseif addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+    print("bagid set")
+    ctx:Set('bagid', addon.Bags.Bank.bankTab)
+    self:StageBagForUpdate(addon.Bags.Bank.bankTab, container)
   else
     ctx:Set('bagid', const.BANK_TAB.BANK)
     -- Loop through all the bags and schedule each item for a refresh.
@@ -324,6 +329,8 @@ function items:UpdateFreeSlots(ctx, kind)
       baglist = const.REAGENTBANK_BAGS
     elseif tab == const.BANK_TAB.BANK then
       baglist = const.BANK_BAGS
+    else
+      baglist = {[tab] = tab}
     end
   else
     baglist = const.BACKPACK_BAGS
