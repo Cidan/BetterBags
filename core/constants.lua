@@ -73,14 +73,16 @@ const.REAGENTBANK_BAGS = {
   [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
 }
 
-const.ACCOUNT_BANK_BAGS = {
-  [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
-  [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
-  [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
-  [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
-  [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
 
-}
+if addon.isRetail then
+  const.ACCOUNT_BANK_BAGS = {
+    [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
+    [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
+    [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
+    [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
+    [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
+  }
+end
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
 -- the main backpack bag.

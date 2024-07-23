@@ -142,7 +142,7 @@ function bagFrame.bagProto:Show()
   --addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
 
-  if self.kind == const.BAG_KIND.BANK then
+  if self.kind == const.BAG_KIND.BANK and addon.isRetail then
     self:GenerateWarbankTabs()
   end
 

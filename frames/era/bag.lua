@@ -277,6 +277,10 @@ function bagFrame:Create(kind)
     b.themeConfigFrame = themeConfig:Create(b.sideAnchor)
     b.windowGrouping:AddWindow('themeConfig', b.themeConfigFrame)
   end
+
+  if kind == const.BAG_KIND.BANK then
+    b.bankTab = const.BANK_TAB.BANK
+  end
   b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
   b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)
 
