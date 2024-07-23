@@ -263,6 +263,9 @@ local function GridView(view, ctx, bag, slotInfo)
     if w < 160 then
       w = 220
     end
+    if bag.tabs and w < bag.tabs.width then
+      w = bag.tabs.width
+    end
     if h == 0 then
       h = 40
     end

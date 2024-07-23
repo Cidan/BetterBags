@@ -326,6 +326,8 @@ end
 function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
   local ctx = context:New()
   self.bankTab = tabIndex
+  BankFrame.selectedTab = 1
+  BankFrame.activeTabIndex = 3
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if data.ID == tabIndex then
@@ -334,8 +336,6 @@ function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
     end
   end
   self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
-  BankFrame.selectedTab = 1
-  BankFrame.activeTabIndex = 3
   self.currentItemCount = -1
   self:Wipe()
   ctx:Set('wipe', true)

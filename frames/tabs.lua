@@ -38,6 +38,7 @@ local debug = addon:GetModule('Debug')
 ---@field buttonToName table<TabButton, string>
 ---@field selectedTab string
 ---@field clickHandler fun(name: number): boolean?
+---@field width number
 local tabFrame = {}
 
 ---@param name string
@@ -62,6 +63,7 @@ function tabFrame:AddTab(name, id, onClick)
   self.buttonToName[tab] = name
   self:DeselectTab(name)
   self:ResizeTab(name)
+  self:ReanchorTabs()
 end
 
 function tabFrame:TabExists(name)
@@ -76,6 +78,7 @@ function tabFrame:Reload()
 end
 
 function tabFrame:ReanchorTabs()
+  self.width = 0
   for i, tab in ipairs(self.tabIndex) do
     tab:ClearAllPoints()
     if tab:IsShown() then
@@ -86,6 +89,7 @@ function tabFrame:ReanchorTabs()
         anchorPoint = "TOPRIGHT"
       end
       tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
+      self.width = self.width + tab:GetWidth() + 5
     end
   end
 end
@@ -218,6 +222,7 @@ function tabs:Create(parent)
   container.frame:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 2)
   container.frame:SetHeight(40)
   container.frame:SetFrameLevel(parent:GetFrameLevel() > 0 and parent:GetFrameLevel() - 1 or 0)
+  container.width = 0
   container.tabs = {}
   container.tabIndex = {}
   container.buttonToName = {}

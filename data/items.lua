@@ -873,10 +873,8 @@ end
 function items:GetBagKindFromSlotKey(slotkey)
   local bagid = string.split('_', slotkey) --[[@as string]]
   if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
-    print("returning bank")
     return const.BAG_KIND.BANK
   end
-  print("slotkey is", slotkey)
   return const.BAG_KIND.BACKPACK
 end
 
