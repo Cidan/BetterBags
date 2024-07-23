@@ -119,7 +119,6 @@ end
 
 ---@param kind BagKind
 function items:WipeSlotInfo(kind)
-  debug:Inspect("wiping slot info", kind)
   self.slotInfo = self.slotInfo or {}
   self.slotInfo[kind] = self:NewSlotInfo()
 end
@@ -210,12 +209,10 @@ function items:RefreshBank(ctx)
     GetInventoryItemQuality("player", id)
   end
 
-  print("bagid", addon.Bags.Bank.bankTab)
   if addon.Bags.Bank.bankTab == const.BANK_TAB.REAGENT then
     ctx:Set('bagid', const.BANK_TAB.REAGENT)
     self:StageBagForUpdate(const.BANK_TAB.REAGENT, container)
   elseif addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
-    print("bagid set")
     ctx:Set('bagid', addon.Bags.Bank.bankTab)
     self:StageBagForUpdate(addon.Bags.Bank.bankTab, container)
   else
@@ -875,9 +872,11 @@ end
 ---@return BagKind
 function items:GetBagKindFromSlotKey(slotkey)
   local bagid = string.split('_', slotkey) --[[@as string]]
-  if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] then
+  if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
+    print("returning bank")
     return const.BAG_KIND.BANK
   end
+  print("slotkey is", slotkey)
   return const.BAG_KIND.BACKPACK
 end
 
