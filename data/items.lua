@@ -367,8 +367,7 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@param dataCache table<string, ItemData>
----@param reagent? boolean
-function items:LoadItems(ctx, kind, dataCache, reagent)
+function items:LoadItems(ctx, kind, dataCache)
   -- Wipe the data if needed before loading the new data.
   if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
@@ -377,7 +376,7 @@ function items:LoadItems(ctx, kind, dataCache, reagent)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(ctx, dataCache)
-  self:UpdateFreeSlots(reagent and const.BAG_KIND.REAGENT_BANK or kind)
+  self:UpdateFreeSlots(kind)
   local slotInfo = self.slotInfo[kind]
 
   -- Loop through all the items in the bag and update slot info properties.
@@ -452,12 +451,9 @@ function items:ProcessContainer(ctx, kind, container)
       self._firstLoad[kind] = false
       ctx:Set('wipe', true)
     end
-    if kind == const.BAG_KIND.REAGENT_BANK then
-      kind = const.BAG_KIND.BANK
-      self:LoadItems(ctx, kind, container:GetDataCache(), true)
-    else
-      self:LoadItems(ctx, kind, container:GetDataCache())
-    end
+
+    self:LoadItems(ctx, kind, container:GetDataCache())
+
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
     events:SendMessageLater(ev, nil, ctx, self.slotInfo[kind])

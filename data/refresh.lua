@@ -100,12 +100,7 @@ function refresh:StartUpdate()
   end
 
   if updateBank and addon.atBank then
-    local bankCtx = ctx:Copy()
-    if addon.Bags.Bank.isReagentBank then
-      items:RefreshReagentBank(bankCtx)
-    else
-      items:RefreshBank(bankCtx)
-    end
+    items:RefreshBank(ctx:Copy())
   end
 
   if updateBackpack then
