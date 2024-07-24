@@ -113,9 +113,8 @@ end
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function ListView(view, ctx, bag, slotInfo)
-  if view.fullRefresh then
+  if ctx:GetBool('wipe') then
     view:Wipe()
-    view.fullRefresh = false
   end
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
 
@@ -185,6 +184,9 @@ local function ListView(view, ctx, bag, slotInfo)
 
   if w < 160 then
   w = 160
+  end
+  if bag.tabs and w < bag.tabs.width then
+    w = bag.tabs.width
   end
   if h == 0 then
   h = 40

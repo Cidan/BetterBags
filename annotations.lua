@@ -265,7 +265,16 @@ function ScrollBoxDragBehavior:SetReorderable(reorderable) end
 
 ---@class C_Bank
 ---@field CloseBankFrame fun()
+---@field FetchNumPurchasedBankTabs fun(bankType: BankType): number
+---@field FetchPurchasedBankTabData fun(bankType: BankType): BankTabData[]
+---@field HasMaxBankTabs fun(bankType: BankType): boolean
 C_Bank = {}
+
+---@class BankTabData
+---@field ID number
+---@field bankType BankType
+---@field name string
+---@field icon number
 
 ---@class Frame
 ---@field scrollable boolean
@@ -350,6 +359,22 @@ _G.COSTS_LABEL = "Cost:"
 
 _G.UNIT_NAME_FONT = ""
 _G.DAMAGE_TEXT_FONT = ""
+
+Enum.BagIndex.AccountBankTab_1 = 13
+Enum.BagIndex.AccountBankTab_2 = 14
+Enum.BagIndex.AccountBankTab_3 = 15
+Enum.BagIndex.AccountBankTab_4 = 16
+Enum.BagIndex.AccountBankTab_5 = 17
+
+---@enum BankType
+Enum.BankType = {
+  Account = 2,
+}
+
+---@class AccountBankPanel
+AccountBankPanel = {}
+
+ACCOUNT_BANK_PANEL_TITLE = ""
 
 ---@class AceConfig.OptionsTable
 ---@field values? table<any, any>

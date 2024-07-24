@@ -157,6 +157,8 @@ function addon:GetBagFromBagID(bagid)
     return addon.Bags.Bank
   elseif const.REAGENTBANK_BAGS[bagid] then
     return addon.Bags.Bank
+  elseif const.ACCOUNT_BANK_BAGS[bagid] then
+    return addon.Bags.Bank
   else
     error("invalid bagid")
   end

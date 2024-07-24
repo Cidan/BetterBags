@@ -136,9 +136,8 @@ end
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 local function GridView(view, ctx, bag, slotInfo)
-  if view.fullRefresh then
+  if ctx:GetBool('wipe') then
     view:Wipe()
-    view.fullRefresh = false
   end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
@@ -262,7 +261,10 @@ local function GridView(view, ctx, bag, slotInfo)
     debug:EndProfile('Content Draw Stage')
     -- Reposition the content frame if the recent items section is empty.
     if w < 160 then
-      w = 160
+      w = 220
+    end
+    if bag.tabs and w < bag.tabs.width then
+      w = bag.tabs.width
     end
     if h == 0 then
       h = 40

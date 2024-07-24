@@ -11,6 +11,18 @@ local const = addon:GetModule('Constants')
 
 _G.NUM_TOTAL_BAG_FRAMES = 5
 
+-- BankTab is an enum for the different bank tabs.
+---@enum BankTab
+const.BANK_TAB = {
+  BANK = Enum.BagIndex.Bank,
+  REAGENT = Enum.BagIndex.Reagentbank,
+  ACCOUNT_BANK_1 = 99,
+  ACCOUNT_BANK_2 = 99,
+  ACCOUNT_BANK_3 = 99,
+  ACCOUNT_BANK_4 = 99,
+  ACCOUNT_BANK_5 = 99,
+}
+
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
 -- The Enum.BagIndex values for bank bags is broken in Classic, so we have to subtract 1.
@@ -54,6 +66,8 @@ const.BACKPACK_BAGS = {
   [Enum.BagIndex.Bag_4] = Enum.BagIndex.Bag_4,
   [Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring,
 }
+
+const.ACCOUNT_BANK_BAGS = {}
 
 -- BACKPACK_ONLY_BAGS contains all the bags that are part of the backpack, excluding
 -- the main backpack bag.
