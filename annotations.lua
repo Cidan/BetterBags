@@ -262,6 +262,9 @@ function DataProviderMixin:Remove(...) end
 local ScrollBoxDragBehavior = {}
 ---@param reorderable boolean
 function ScrollBoxDragBehavior:SetReorderable(reorderable) end
+function ScrollBoxDragBehavior:SetDropPredicate(fn) end
+function ScrollBoxDragBehavior:SetDragPredicate(fn) end
+function ScrollBoxDragBehavior:SetFinalizeDrop(fn) end
 
 ---@class C_Bank
 ---@field CloseBankFrame fun()
