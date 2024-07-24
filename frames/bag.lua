@@ -127,6 +127,13 @@ function bagFrame.bagProto:GenerateWarbankTabs()
       self.tabs:AddTab(data.name, data.ID)
     end
   end
+
+  if not self.tabs:TabExists("Purchase Warbank Tab") then
+    self.tabs:AddTab("Purchase Warbank Tab", nil, function()
+      StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account })
+    end)
+  end
+
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
     self.tabs:HideTab("Purchase Warbank Tab")
   else
@@ -142,7 +149,7 @@ function bagFrame.bagProto:Show()
   --addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
 
-  if self.kind == const.BAG_KIND.BANK and addon.isRetail then
+  if self.kind == const.BAG_KIND.BANK and addon.isRetail and C_PlayerInfo.HasAccountInventoryLock() then
     self:GenerateWarbankTabs()
   end
 
@@ -506,9 +513,6 @@ function bagFrame:Create(kind)
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab("Bank")
     b.tabs:AddTab("Reagent Bank")
-    b.tabs:AddTab("Purchase Warbank Tab", nil, function()
-      StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account });
-    end)
 
     b.tabs:SetTab("Bank")
 
