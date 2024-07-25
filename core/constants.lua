@@ -307,6 +307,10 @@ const.BRIEF_EXPANSION_MAP = {
   [_G.LE_EXPANSION_DRAGONFLIGHT] = "dragonflight",
 }
 
+if addon.isRetail then
+  const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = "tww"
+end
+
 ---@class TradeSkillMap
 ---@type table<number, string>
 const.TRADESKILL_MAP = {
