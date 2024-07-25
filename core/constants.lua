@@ -366,6 +366,7 @@ const.EQUIPMENT_SLOTS = {
 ---@field enabled table<BagKind, boolean>
 ---@field itemList table<number, boolean>
 ---@field readOnly boolean
+---@field predicate? string
 
 ---@class SizeInfo
 ---@field columnCount number
