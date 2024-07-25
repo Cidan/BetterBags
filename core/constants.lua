@@ -295,8 +295,11 @@ const.EXPANSION_MAP = {
   [_G.LE_EXPANSION_BATTLE_FOR_AZEROTH] = _G.EXPANSION_NAME7,
   [_G.LE_EXPANSION_SHADOWLANDS] = _G.EXPANSION_NAME8,
   [_G.LE_EXPANSION_DRAGONFLIGHT] = _G.EXPANSION_NAME9,
-  [_G.LE_EXPANSION_WAR_WITHIN] = _G.EXPANSION_NAME10,
 }
+
+if addon.isRetail then
+  const.EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = _G.EXPANSION_NAME10
+end
 
 ---@class BriefExpansionMap
 ---@type table<number, string>
@@ -312,6 +315,10 @@ const.BRIEF_EXPANSION_MAP = {
   [_G.LE_EXPANSION_SHADOWLANDS] = "shadowlands",
   [_G.LE_EXPANSION_DRAGONFLIGHT] = "dragonflight",
 }
+
+if addon.isRetail then
+  const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = "tww"
+end
 
 ---@class TradeSkillMap
 ---@type table<number, string>

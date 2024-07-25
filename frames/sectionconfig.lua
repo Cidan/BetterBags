@@ -383,27 +383,57 @@ function sectionConfig:Create(kind, parent)
     ---@cast f BetterBagsSectionConfigListButton
     sc:resetSectionItem(f, data)
   end)
+  if addon.isRetail then
+    sc.content.dragBehavior:SetDropPredicate(function(_, contextData)
+      -- Nothing can go above the pinned header.
+      if contextData.elementData.header and
+      contextData.elementData.title == "Pinned" and
+      (contextData.area == DragIntersectionArea.Above or contextData.area == DragIntersectionArea.Inside) then
+        return false
+      end
 
-  -- Setup the callback for when an item is moved.
-  sc.content:SetCanReorder(true, function(_, elementData, currentIndex, newIndex)
+      -- Nothing can swap with the automatically sorted header.
+      if contextData.elementData.header and
+      contextData.elementData.title == "Automatically Sorted" and
+      (contextData.area == DragIntersectionArea.Inside) then
+        return false
+      end
+      return true
+    end)
 
-    -- Headers can never be moved.
-    if elementData.header then
-      -- Use the manual remove/insert to avoid an infinite loop.
-      sc.content.provider:RemoveIndex(newIndex)
-      sc.content.provider:InsertAtIndex(elementData, currentIndex)
-      return
-    end
+    sc.content.dragBehavior:SetDragPredicate(function(_, elementData)
+      if elementData.header then
+        return false
+      end
+      return true
+    end)
 
-    if newIndex == 1 then
-      sc.content.provider:RemoveIndex(newIndex)
-      sc.content.provider:InsertAtIndex(elementData, 2)
-    end
+    sc.content.dragBehavior:SetFinalizeDrop(function(_)
+      sc:UpdatePinnedItems()
+      events:SendMessage('bags/FullRefreshAll')
+    end)
 
-    sc:UpdatePinnedItems()
-    events:SendMessage('bags/FullRefreshAll')
-  end)
+    sc.content:SetCanReorder(true)
+  else
+    -- Setup the callback for when an item is moved.
+    sc.content:SetCanReorder(true, function(_, elementData, currentIndex, newIndex)
+      -- Headers can never be moved.
+      if elementData.header then
+        -- Use the manual remove/insert to avoid an infinite loop.
+        sc.content.provider:RemoveIndex(newIndex)
+        sc.content.provider:InsertAtIndex(elementData, currentIndex)
+        return
+      end
 
+      if newIndex == 1 then
+        sc.content.provider:RemoveIndex(newIndex)
+        sc.content.provider:InsertAtIndex(elementData, 2)
+      end
+
+      sc:UpdatePinnedItems()
+      events:SendMessage('bags/FullRefreshAll')
+    end)
+  end
   sc.content:AddToStart({ title = "Pinned", header = true })
   sc:LoadPinnedItems()
   sc.content:AddToStart({ title = "Automatically Sorted", header = true })

@@ -9,7 +9,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field ScrollBar MinimalScrollBar
 ---@field provider DataProviderMixin
 ---@field package canReorder boolean
----@field private dragBehavior ScrollBoxDragBehavior
+---@field dragBehavior ScrollBoxDragBehavior
 local listFrame = {}
 
 -- SetupDataSource readies the list frame to accept items.
@@ -80,11 +80,13 @@ end
 
 -- CanReorder will set whether or not the list can be reordered by clicking on an item.
 ---@param canReorder boolean
----@param cb fun(event: number, elementData: table, currentIndex: number, newIndex: number)
+---@param cb? fun(event: number, elementData: table, currentIndex: number, newIndex: number)
 function listFrame:SetCanReorder(canReorder, cb)
   self.canReorder = canReorder
   self.dragBehavior:SetReorderable(canReorder)
-  self.provider:RegisterCallback(DataProviderMixin.Event.OnMove, cb)
+  if cb then
+    self.provider:RegisterCallback(DataProviderMixin.Event.OnMove, cb)
+  end
 end
 
 ---@class List: AceModule
