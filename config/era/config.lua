@@ -48,7 +48,8 @@ function config:GetGeneralOptions()
         desc = L:G("The time, in minutes, to consider an item a new item."),
         min = 0,
         max = 240,
-        step = 5,
+        step = 1,
+        bigStep = 5,
         get = function()
           return DB:GetData().profile.newItemTime / 60
         end,
