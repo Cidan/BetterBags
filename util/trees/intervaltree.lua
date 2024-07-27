@@ -6,7 +6,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Trees: AceModule
 local trees = addon:GetModule('Trees')
 
----@class IntervalTreeNode
+---@class (exact) IntervalTreeNode
 ---@field value number
 ---@field left? IntervalTreeNode
 ---@field right? IntervalTreeNode
@@ -14,14 +14,16 @@ local trees = addon:GetModule('Trees')
 ---@field max number
 ---@field data? table<any, any>
 
----@class IntervalTree
----@field root IntervalTreeNode
+---@class (exact) IntervalTree
+---@field private root IntervalTreeNode
 trees.IntervalTree = {}
 
+-- Insert adds a new value to the tree. If the value already exists,
+-- the data table for the value will be appended to with the data
+-- provided.
 ---@param value number
 ---@param data table<any, any>
 function trees.IntervalTree:Insert(value, data)
-  -- Insert a new value into the tree
   if not self.root then
     self.root = { value = value, left = nil, right = nil, min = value, max = value, data = data }
   else
@@ -54,6 +56,8 @@ function trees.IntervalTree:InsertRecursive(node, value, data)
   end
 end
 
+-- LessThan will return a list of all nodes with values less than the
+-- provided value.
 ---@param value number
 ---@return IntervalTreeNode[]
 function trees.IntervalTree:LessThan(value)
@@ -79,6 +83,8 @@ function trees.IntervalTree:LessThanRecursive(node, value, result)
   end
 end
 
+-- GreaterThan will return a list of all nodes with values greater than
+-- the provided value.
 ---@param value number
 ---@return IntervalTreeNode[]
 function trees.IntervalTree:GreaterThan(value)
@@ -104,6 +110,8 @@ function trees.IntervalTree:GreaterThanRecursive(node, value, result)
   end
 end
 
+-- ExactMatch will return the node with the exact matching value, or nil
+-- if no such node exists.
 ---@param value number
 ---@return IntervalTreeNode?
 function trees.IntervalTree:ExactMatch(value)
@@ -129,8 +137,11 @@ function trees.IntervalTree:ExactMatchRecursive(node, value)
   return nil -- not found
 end
 
----@param value number
----@param key any
+-- RemoveData will remove the metadata for a given value and key.
+-- If the metadata table is empty after removing the key, the node
+-- will be removed from the tree.
+---@param value number The node value to remove metadata from.
+---@param key any The key to remove from the metadata table.
 function trees.IntervalTree:RemoveData(value, key)
   -- Remove metadata for a given value
   local node = self:ExactMatch(value)
@@ -143,6 +154,7 @@ function trees.IntervalTree:RemoveData(value, key)
   end
 end
 
+---@private
 ---@param node IntervalTreeNode
 function trees.IntervalTree:RemoveNode(node)
   -- Remove a node from the tree
@@ -199,6 +211,7 @@ function trees.IntervalTree:RemoveNodeRecursive(node, targetNode)
   end
 end
 
+---@private
 ---@param node IntervalTreeNode
 ---@return IntervalTreeNode?
 function trees.IntervalTree:FindParent(node)

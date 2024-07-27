@@ -74,8 +74,6 @@ end
 ---@param slotkey string
 function search:addNumberToIndex(index, value, slotkey)
   index.numbers:Insert(value, {[slotkey] = true})
-  --index.numbers[value] = index.numbers[value] or {}
-  --index.numbers[value][slotkey] = true
 end
 
 ---@private
@@ -83,8 +81,7 @@ end
 ---@param value number
 ---@param slotkey string
 function search:removeNumberFromIndex(index, value, slotkey)
-  --index.numbers[value] = index.numbers[value] or {}
-  --index.numbers[value][slotkey] = nil
+  index.numbers:RemoveData(value, slotkey)
 end
 
 ---@private
