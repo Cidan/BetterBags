@@ -55,6 +55,14 @@ function search:OnInitialize()
   }
 end
 
+-- Wipe will clear all data from the search index.
+function search:Wipe()
+  for _, index in pairs(self.indicies) do
+    index.ngrams = {}
+    index.numbers = trees.NewIntervalTree()
+  end
+end
+
 -- ParseQuery will parse a query string and return a set of boolean
 -- filters that can be matched against an item.
 ---@private
@@ -213,6 +221,7 @@ end
 ---@param item ItemData
 ---@return boolean
 function search:Find(query, item)
+  if not item then return false end
   local terms = self:ParseQuery(query)
   for _, term in ipairs(terms) do
     local slots = self:Match(term)

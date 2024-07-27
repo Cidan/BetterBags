@@ -160,6 +160,7 @@ end
 function items:ClearItemCache(ctx)
   self.previousItemGUID = {}
   self:ResetSlotInfo()
+  search:Wipe()
   ctx:Set('wipe', true)
   debug:Log("Items", "Item Cache Cleared")
 end
