@@ -84,6 +84,7 @@ function search:Remove(item)
   search:removeStringFromIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
+  search:removeStringFromIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
 end
 
 
@@ -111,13 +112,17 @@ function search:Match(term)
 
   -- If no prefix is provided, assume the filter is a default filter.
   if value == nil then
+    ---@type table<string, boolean>
+    local slots = {}
     for _, property in ipairs(self.defaultIndicies) do
       local index = self:GetIndex(property)
       if index then
-        return self:isStringInIndex(index, term)
+        for slotkey in pairs(self:isStringInIndex(index, term)) do
+          slots[slotkey] = true
+        end
       end
     end
-    return {}
+    return slots
   end
 
   local index = self:GetIndex(prefix)
