@@ -10,8 +10,8 @@ local contextMenu = addon:GetModule('ContextMenu')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
 
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
@@ -87,10 +87,10 @@ local gw2Theme = {
       decoration.title:SetPoint("BOTTOMLEFT", decoration.gwHeader, "BOTTOMLEFT", 35, 10)
       decoration.title:SetText(themes.titles[frame:GetName()])
 
-      local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      searchBox.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
-      searchBox.frame:SetSize(150, 20)
-      decoration.search = searchBox
+      local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
+      box.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
+      box.frame:SetSize(150, 20)
+      decoration.search = box
 
       local close = CreateFrame("Button", nil, decoration.gwHeader, "UIPanelCloseButtonNoScripts")
       close:SetPoint("TOPRIGHT", decoration.gwHeader, "TOPRIGHT", -5, -25)

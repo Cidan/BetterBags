@@ -64,8 +64,8 @@ local currency = addon:GetModule('Currency')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
 
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
@@ -260,7 +260,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
   view:GetContent():Show()
   self.currentView = view
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = search:GetText()
+  local text = searchBox:GetText()
   self:Search(text)
   self:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
@@ -496,7 +496,7 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    b.searchFrame = search:Create(b.frame)
+    b.searchFrame = searchBox:Create(b.frame)
   end
 
   if kind == const.BAG_KIND.BACKPACK then

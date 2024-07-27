@@ -5,19 +5,19 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class SearchIndex
 ---@field property string
----@field slots table<string, boolean>
+---@field ngrams table<string, table<string, boolean>>
 
 ---@class Search: AceModule
----@field private indicies table<string, table<any, SearchIndex>>
+---@field private indicies table<string, SearchIndex>
 local search = addon:NewModule('Search')
 
 function search:OnInitialize()
     self.indicies = {
-      name = {},
-      itemLevel = {},
-      rarity = {},
-      type = {},
-      subtype = {},
+      name = {property = 'name', ngrams = {}},
+      itemLevel = {property = 'itemLevel', ngrams = {}},
+      rarity = {property = 'rarity', ngrams = {}},
+      type = {property = 'type', ngrams = {}},
+      subtype = {property = 'subtype', ngrams = {}},
     }
 end
 
@@ -34,21 +34,73 @@ function search:ParseQuery(query)
   return filters
 end
 
----@param property string
----@param value any
----@return SearchIndex
-function search:GetIndex(property, value)
-  self.indicies[property][value] = self.indicies[property][value] or { property = property, slots = {} }
-  return self.indicies[property][value]
+-----@param property string
+-----@param value any
+-----@return SearchIndex
+--function search:CreateIndex(property, value)
+--  self.indicies[property][value] = self.indicies[property][value] or { property = property, slots = {} }
+--  return self.indicies[property][value]
+--end
+
+---@param index SearchIndex
+---@param value string
+---@param slotkey string
+function search:addStringToIndex(index, value, slotkey)
+  local prefix = ""
+  for i = 1, #value do
+    prefix = prefix .. value:sub(i, i)
+    index.ngrams[prefix] = index.ngrams[prefix] or {}
+    index.ngrams[prefix][slotkey] = true
+  end
 end
 
 ---@param item ItemData
 function search:Add(item)
-  local index = self:GetIndex('name', item.itemInfo.itemName)
-  index.slots[item.slotkey] = true
+  search:addStringToIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
+end
+
+---@param item ItemData
+function search:Remove(item)
+end
+
+--[[
+---@param property string
+---@param value any
+---@return SearchIndex?
+function search:GetIndex(property, value)
+  if not self.indicies[property] then return end
+  return self.indicies[property][value]
+end
+
+---@param property string
+---@param value any
+---@return SearchIndex?
+function search:MatchIndex(property, value)
+  if not self.indicies[property] then return end
+  local index = self.indicies[property][value]
+  if not index then return end
+  if string.find(index.)
+end
+]]--
+
+--[[
+--- Match will return a list of slot keys that match the given term.
+---@param term string
+---@return string[]
+function search:Match(term)
+    ---@type string, string
+    local prefix, value = strsplit(":", term, 2)
+    -- If no prefix is provided, assume the filter is a name or type filter.
+    if value == nil then
+    end
+    local index = self:GetIndex(prefix, value)
+    if prefix == "name" then
+
+    end
 end
 
 ---@param query string
 function search:Search(query)
   local terms = self:ParseQuery(query)
 end
+--]]

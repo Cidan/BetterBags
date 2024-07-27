@@ -21,6 +21,9 @@ local database = addon:GetModule('Database')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -400,6 +403,7 @@ function items:LoadItems(ctx, kind, dataCache)
       if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
         self:MarkItemAsNew(currentItem)
       end
+      search:Add(currentItem)
     elseif items:ItemRemoved(currentItem, previousItem) then
       debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
       slotInfo.removedItems[previousItem.slotkey] = previousItem

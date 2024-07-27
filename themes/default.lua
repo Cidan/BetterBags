@@ -3,8 +3,8 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
 
 ---@class DefaultThemeTemplate: Frame
 ---@field Bg Texture
@@ -43,10 +43,10 @@ local defaultTheme = {
         frame.Owner:Hide()
       end)
 
-      local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      searchBox.frame:SetPoint("TOP", decoration, "TOP", 0, -2)
-      searchBox.frame:SetSize(150, 20)
-      decoration.search = searchBox
+      local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
+      box.frame:SetPoint("TOP", decoration, "TOP", 0, -2)
+      box.frame:SetSize(150, 20)
+      decoration.search = box
 
       decoration.CloseButton:SetFrameLevel(1001)
       decoration.TitleContainer:SetFrameLevel(1001)
