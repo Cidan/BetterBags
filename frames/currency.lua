@@ -136,7 +136,7 @@ function CurrencyFrame:Update()
   repeat
     local ref = index
     local info = C_CurrencyInfo.GetCurrencyListInfo(ref)
-    if info.isHeader then
+    if info and info.isHeader then
       C_CurrencyInfo.ExpandCurrencyList(ref, true)
     end
     local item = self:GetCurrencyItem(ref, info)
