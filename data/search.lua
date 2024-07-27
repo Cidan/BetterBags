@@ -6,27 +6,39 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Trees: AceModule
+local trees = addon:GetModule('Trees')
+
 ---@class SearchIndex
 ---@field property string
 ---@field ngrams table<string, table<string, boolean>>
+---@field numbers IntervalTree
 
 ---@class Search: AceModule
 ---@field private indicies table<string, SearchIndex>
+---@field private indexLookup table<string, SearchIndex>
 ---@field private defaultIndicies string[]
 local search = addon:NewModule('Search')
 
-function search:OnInitialize()
-  self.indicies = {
-    name = {property = 'name', ngrams = {}},
-    itemLevel = {property = 'itemLevel', ngrams = {}},
-    rarity = {property = 'rarity', ngrams = {}},
-    type = {property = 'type', ngrams = {}},
-    subtype = {property = 'subtype', ngrams = {}},
-    category = {property = 'category', ngrams = {}},
-    equipmentLocation = {property = 'equipmentLocation', ngrams = {}},
-    expansion = {property = 'expansion', ngrams = {}},
-    equipmentSet = {property = 'equipmentSet', ngrams = {}},
+function search:CreateIndex(name)
+  self.indicies[name] = {
+    property = name,
+    ngrams = {},
+    numbers = trees.NewIntervalTree()
   }
+end
+
+function search:OnInitialize()
+  self.indicies = {}
+  self:CreateIndex('name')
+  self:CreateIndex('itemLevel')
+  self:CreateIndex('rarity')
+  self:CreateIndex('type')
+  self:CreateIndex('subtype')
+  self:CreateIndex('category')
+  self:CreateIndex('equipmentLocation')
+  self:CreateIndex('expansion')
+  self:CreateIndex('equipmentSet')
 
   self.defaultIndicies = {
     'name',
@@ -34,6 +46,12 @@ function search:OnInitialize()
     'category',
     'subtype',
     'equipmentLocation'
+  }
+
+  self.indexLookup = {
+    exp = self.indicies.expansion,
+    gear = self.indicies.equipmentLocation,
+    ilvl = self.indicies.itemLevel,
   }
 end
 
@@ -48,6 +66,25 @@ function search:ParseQuery(query)
       table.insert(filters, string.trim(filter))
   end
   return filters
+end
+
+---@private
+---@param index SearchIndex
+---@param value number
+---@param slotkey string
+function search:addNumberToIndex(index, value, slotkey)
+  index.numbers:Insert(value, {[slotkey] = true})
+  --index.numbers[value] = index.numbers[value] or {}
+  --index.numbers[value][slotkey] = true
+end
+
+---@private
+---@param index SearchIndex
+---@param value number
+---@param slotkey string
+function search:removeNumberFromIndex(index, value, slotkey)
+  --index.numbers[value] = index.numbers[value] or {}
+  --index.numbers[value][slotkey] = nil
 end
 
 ---@private
@@ -98,6 +135,8 @@ function search:Add(item)
   _G[item.itemInfo.itemEquipLoc] ~= "" then
     search:addStringToIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
+
+  search:addNumberToIndex(self.indicies.itemLevel, item.itemInfo.itemLevel, item.slotkey)
 end
 
 ---@param item ItemData
@@ -120,20 +159,26 @@ function search:Remove(item)
   _G[item.itemInfo.itemEquipLoc] ~= "" then
     search:removeStringFromIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
+
+  search:removeNumberFromIndex(self.indicies.itemLevel, item.itemInfo.itemLevel, item.slotkey)
 end
 
 
 ---@param property string
 ---@return SearchIndex?
 function search:GetIndex(property)
-  if not self.indicies[property] then return end
-  return self.indicies[property]
+  if not self.indicies[property] and not self.indexLookup[property] then return end
+  return self.indicies[property] or self.indexLookup[property]
 end
 
 ---@param index SearchIndex
----@param value string
+---@param value any
 ---@return table<string, boolean>
-function search:isStringInIndex(index, value)
+function search:isInIndex(index, value)
+  if type(tonumber(value)) == 'number' then
+    local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
+    return node and node.data or {}
+  end
   return index.ngrams[value] or {}
 end
 
@@ -152,7 +197,7 @@ function search:Match(term)
     for _, property in ipairs(self.defaultIndicies) do
       local index = self:GetIndex(property)
       if index then
-        for slotkey in pairs(self:isStringInIndex(index, term)) do
+        for slotkey in pairs(self:isInIndex(index, term)) do
           slots[slotkey] = true
         end
       end
@@ -162,7 +207,7 @@ function search:Match(term)
 
   local index = self:GetIndex(prefix)
   if index then
-    return self:isStringInIndex(index, value)
+    return self:isInIndex(index, value)
   end
   return {}
 end
