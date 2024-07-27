@@ -35,6 +35,9 @@ local items = addon:GetModule('Items')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -162,14 +165,18 @@ function itemFrame.itemProto:UpdateSearch(text)
     decoration:SetMatchesSearch(true)
     return
   end
-  local filters = parseQuery(string.lower(text))
-  for _, filter in pairs(filters) do
-    if not matchFilter(filter, data) then
-      decoration:SetMatchesSearch(false)
-      return
-    end
+  if search:Find(string.lower(text), data) then
+    decoration:SetMatchesSearch(true)
+    return
   end
-  decoration:SetMatchesSearch(true)
+--  local filters = parseQuery(string.lower(text))
+--  for _, filter in pairs(filters) do
+--    if not matchFilter(filter, data) then
+--      decoration:SetMatchesSearch(false)
+--      return
+--    end
+--  end
+  decoration:SetMatchesSearch(false)
 end
 
 function itemFrame.itemProto:OnEnter()
