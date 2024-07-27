@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class SearchIndex
 ---@field property string
 ---@field ngrams table<string, table<string, boolean>>
@@ -20,13 +23,17 @@ function search:OnInitialize()
     type = {property = 'type', ngrams = {}},
     subtype = {property = 'subtype', ngrams = {}},
     category = {property = 'category', ngrams = {}},
+    equipmentLocation = {property = 'equipmentLocation', ngrams = {}},
+    expansion = {property = 'expansion', ngrams = {}},
+    equipmentSet = {property = 'equipmentSet', ngrams = {}},
   }
 
   self.defaultIndicies = {
     'name',
     'type',
     'category',
-    'subtype'
+    'subtype',
+    'equipmentLocation'
   }
 end
 
@@ -77,6 +84,20 @@ function search:Add(item)
   search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:addStringToIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
   search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+
+  if item.itemInfo.equipmentSet ~= nil then
+    search:addStringToIndex(self.indicies.equipmentSet, item.itemInfo.equipmentSet, item.slotkey)
+  end
+
+  if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
+    search:addStringToIndex(self.indicies.expansion, const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID], item.slotkey)
+  end
+
+  if item.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
+  _G[item.itemInfo.itemEquipLoc] ~= nil and
+  _G[item.itemInfo.itemEquipLoc] ~= "" then
+    search:addStringToIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
+  end
 end
 
 ---@param item ItemData
@@ -85,6 +106,20 @@ function search:Remove(item)
   search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
   search:removeStringFromIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+
+  if item.itemInfo.equipmentSet ~= nil then
+    search:removeStringFromIndex(self.indicies.equipmentSet, item.itemInfo.equipmentSet, item.slotkey)
+  end
+
+  if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
+    search:removeStringFromIndex(self.indicies.expansion, const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID], item.slotkey)
+  end
+
+  if item.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
+  _G[item.itemInfo.itemEquipLoc] ~= nil and
+  _G[item.itemInfo.itemEquipLoc] ~= "" then
+    search:removeStringFromIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
+  end
 end
 
 
