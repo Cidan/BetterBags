@@ -407,17 +407,24 @@ function items:LoadItems(ctx, kind, dataCache)
     elseif items:ItemRemoved(currentItem, previousItem) then
       debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
+      search:Remove(previousItem)
     elseif items:ItemHashChanged(currentItem, previousItem) then
       debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
       slotInfo.addedItems[currentItem.slotkey] = currentItem
+      search:Remove(previousItem)
+      search:Add(currentItem)
     elseif items:ItemGUIDChanged(currentItem, previousItem) then
       debug:Log("ItemGUIDChanged", currentItem.itemInfo.itemLink)
       slotInfo.removedItems[previousItem.slotkey] = previousItem
       slotInfo.addedItems[currentItem.slotkey] = currentItem
+      search:Remove(previousItem)
+      search:Add(currentItem)
     elseif items:ItemChanged(currentItem, previousItem) then
       debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
       slotInfo.updatedItems[currentItem.slotkey] = currentItem
+      search:Remove(currentItem)
+      search:Add(currentItem)
     end
 
 

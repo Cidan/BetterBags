@@ -42,6 +42,7 @@ end
 --  return self.indicies[property][value]
 --end
 
+---@private
 ---@param index SearchIndex
 ---@param value string
 ---@param slotkey string
@@ -54,6 +55,19 @@ function search:addStringToIndex(index, value, slotkey)
   end
 end
 
+---@private
+---@param index SearchIndex
+---@param value string
+---@param slotkey string
+function search:removeStringFromIndex(index, value, slotkey)
+  local prefix = ""
+  for i = 1, #value do
+    prefix = prefix .. value:sub(i, i)
+    index.ngrams[prefix] = index.ngrams[prefix] or {}
+    index.ngrams[prefix][slotkey] = nil
+  end
+end
+
 ---@param item ItemData
 function search:Add(item)
   search:addStringToIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
@@ -61,6 +75,7 @@ end
 
 ---@param item ItemData
 function search:Remove(item)
+  search:removeStringFromIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
 end
 
 --[[
