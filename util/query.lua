@@ -1,0 +1,154 @@
+local addonName = ... ---@type string
+
+---@class BetterBags: AceAddon
+local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+
+---@class QueryParser: AceModule
+local QueryParser = addon:NewModule('QueryParser')
+
+---@private
+function QueryParser:Lexer(input)
+  local tokens = {}
+  local i = 1
+
+  local function peek(offset)
+      offset = offset or 0
+      return input:sub(i + offset, i + offset)
+  end
+
+  local function advance(count)
+      count = count or 1
+      i = i + count
+  end
+
+  local function is_whitespace(char)
+      return char:match("%s") ~= nil
+  end
+
+  local function is_alphanumeric(char)
+      return char:match("[%w]") ~= nil
+  end
+
+  local function read_word()
+      local value = ""
+      while i <= #input do
+          local char = peek()
+          if is_alphanumeric(char) or char == "_" then
+              value = value .. char
+              advance()
+          else
+              break
+          end
+      end
+      return value
+  end
+  while i <= #input do
+    local char = peek()
+
+    if is_whitespace(char) then
+        advance()
+    elseif char == "(" or char == ")" then
+        table.insert(tokens, {type = "paren", value = char})
+        advance()
+    elseif char == "=" or char == "<" or char == ">" then
+        if char == "<" and peek(1) == "=" then
+            table.insert(tokens, {type = "operator", value = "<="})
+            advance(2)
+        elseif char == ">" and peek(1) == "=" then
+            table.insert(tokens, {type = "operator", value = ">="})
+            advance(2)
+        else
+            table.insert(tokens, {type = "operator", value = char})
+            advance()
+        end
+    elseif is_alphanumeric(char) then
+        local word = read_word()
+        if word:upper() == "AND" or word:upper() == "OR" or word:upper() == "NOT" then
+            table.insert(tokens, {type = "logical", value = word:upper()})
+        else
+            table.insert(tokens, {type = "term", value = word})
+        end
+    else
+        error("Unexpected character: " .. char)
+    end
+  end
+
+  return tokens
+end
+
+---@private
+function QueryParser:Parser(tokens)
+  local i = 1
+
+  local function peek()
+    return tokens[i]
+  end
+
+  local function advance()
+    i = i + 1
+  end
+
+  local function debug_print(msg)
+    print("Debug: " .. msg)
+  end
+
+  local parse_expression, parse_term
+
+  parse_expression = function()
+    local left = parse_term()
+
+    while peek() and peek().type == "logical" do
+      local op = peek().value
+      advance()
+      local right = parse_term()
+      left = {type = "logical", operator = op, left = left, right = right}
+    end
+    return left
+  end
+
+  parse_term = function()
+    --debug_print("Parsing term, current token: " .. (peek() and peek().type or "nil"))
+    if peek() and peek().type == "paren" and peek().value == "(" then
+      advance()
+      local expr = parse_expression()
+      if peek() and peek().type == "paren" and peek().value == ")" then
+        advance()
+      else
+        --debug_print("Warning: Missing closing parenthesis")
+      end
+      return expr
+    elseif peek() and peek().type == "logical" and peek().value == "NOT" then
+      advance()
+      local expr = parse_term()
+      return {type = "logical", operator = "NOT", expression = expr}
+    elseif peek() and peek().type == "term" then
+      local term = peek().value
+      advance()
+      if peek() and peek().type == "operator" then
+        local op = peek().value
+        advance()
+        if not (peek() and peek().type == "term") then
+          --error("Expected term after operator")
+        end
+        local value = peek().value
+        advance()
+        return {type = "comparison", field = term, operator = op, value = value}
+      else
+        return {type = "term", value = term}
+      end
+    else
+      error("Unexpected token: " .. (peek() and peek().type or "nil"))
+    end
+  end
+
+  return parse_expression()
+end
+
+function QueryParser:Query(input)
+  local tokens = self:Lexer(input)
+  print("Tokens:")
+  for _, token in ipairs(tokens) do
+    print(string.format("  {type = %q, value = %q}", token.type, token.value))
+  end
+  return self:Parser(tokens)
+end

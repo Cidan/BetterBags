@@ -6,6 +6,12 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class QueryParser: AceModule
+local QueryParser = addon:GetModule('QueryParser')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Trees: AceModule
 local trees = addon:GetModule('Trees')
 
@@ -221,6 +227,8 @@ end
 ---@param item ItemData
 ---@return boolean
 function search:Find(query, item)
+  local ast = QueryParser:Query(query)
+  debug:Inspect("ast", ast)
   if not item then return false end
   local terms = self:ParseQuery(query)
   for _, term in ipairs(terms) do
@@ -235,6 +243,8 @@ end
 ---@param query string
 ---@return string[]
 function search:Search(query)
+  local ast = QueryParser:Query(query)
+  debug:Inspect("ast", ast)
   local slots = {}
   local terms = self:ParseQuery(query)
   for _, term in ipairs(terms) do

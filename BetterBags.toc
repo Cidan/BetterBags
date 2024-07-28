@@ -54,6 +54,7 @@ themes\themes.lua
 
 util\trees\trees.lua
 util\trees\intervaltree.lua
+util\query.lua
 
 data\search.lua
 data\equipmentsets.lua
