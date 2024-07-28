@@ -69,18 +69,6 @@ function search:Wipe()
   end
 end
 
--- ParseQuery will parse a query string and return a set of boolean
--- filters that can be matched against an item.
----@private
----@param query string
----@return string[]
-function search:ParseQuery(query)
-  local filters = {}
-  for filter in string.gmatch(query, "([^&]+)") do
-      table.insert(filters, string.trim(filter))
-  end
-  return filters
-end
 
 ---@private
 ---@param index SearchIndex
@@ -193,34 +181,20 @@ function search:isInIndex(index, value)
   return index.ngrams[value] or {}
 end
 
---- Match will return a list of slot keys that match the given term.
----@private
----@param term string
+---@param value any
 ---@return table<string, boolean>
-function search:Match(term)
-  ---@type string, string
-  local prefix, value = strsplit(":", term, 2)
-
-  -- If no prefix is provided, assume the filter is a default filter.
-  if value == nil then
-    ---@type table<string, boolean>
-    local slots = {}
-    for _, property in ipairs(self.defaultIndicies) do
-      local index = self:GetIndex(property)
-      if index then
-        for slotkey in pairs(self:isInIndex(index, term)) do
-          slots[slotkey] = true
-        end
+function search:DefaultSearch(value)
+  ---@type table<string, boolean>
+  local slots = {}
+  for _, property in ipairs(self.defaultIndicies) do
+    local index = self:GetIndex(property)
+    if index then
+      for slotkey in pairs(self:isInIndex(index, value)) do
+        slots[slotkey] = true
       end
     end
-    return slots
   end
-
-  local index = self:GetIndex(prefix)
-  if index then
-    return self:isInIndex(index, value)
-  end
-  return {}
+  return slots
 end
 
 ---@param query string
@@ -228,29 +202,99 @@ end
 ---@return boolean
 function search:Find(query, item)
   local ast = QueryParser:Query(query)
-  debug:Inspect("ast", ast)
-  if not item then return false end
-  local terms = self:ParseQuery(query)
-  for _, term in ipairs(terms) do
-    local slots = self:Match(term)
-    if slots[item.slotkey] then
-      return true
-    end
-  end
-  return false
+  local p, n = self:evaluate_query(ast)
+  return p[item.slotkey] and not n[item.slotkey]
 end
 
 ---@param query string
 ---@return string[]
 function search:Search(query)
-  local ast = QueryParser:Query(query)
-  debug:Inspect("ast", ast)
-  local slots = {}
-  local terms = self:ParseQuery(query)
-  for _, term in ipairs(terms) do
-    for slotkey in pairs(self:Match(term)) do
-      table.insert(slots, slotkey)
-    end
+  return {}
+--  local ast = QueryParser:Query(query)
+--  debug:Inspect("ast", ast)
+--  local slots = {}
+--  local terms = self:ParseQuery(query)
+--  for _, term in ipairs(terms) do
+--    for slotkey in pairs(self:Match(term)) do
+--      table.insert(slots, slotkey)
+--    end
+--  end
+--  return slots
+end
+
+--[[
+
+
+
+
+]]
+
+function search:evaluate_ast(node)
+  local function evaluate_condition(field, operator, value)
+      if operator == "=" then
+          return self:isInIndex(field, value)
+      elseif operator == ">=" then
+          return isGreaterOrEqual(field, value)
+      elseif operator == "<=" then
+          return isLessOrEqual(field, value)
+      elseif operator == ">" then
+          return isGreater(field, value)
+      elseif operator == "<" then
+          return isLess(field, value)
+      else
+          error("Unknown operator: " .. operator)
+      end
   end
-  return slots
+
+  local function combine_results(op, left, right)
+      local result = {}
+      if op == "AND" then
+          for k, v in pairs(left) do
+              if right[k] then
+                  result[k] = true
+              end
+          end
+      elseif op == "OR" then
+          for k, v in pairs(left) do result[k] = true end
+          for k, v in pairs(right) do result[k] = true end
+      end
+      return result
+  end
+
+  if node.type == "logical" then
+      if node.operator == "AND" or node.operator == "OR" then
+          local left = self:evaluate_ast(node.left)
+          local right = self:evaluate_ast(node.right)
+          return combine_results(node.operator, left, right)
+      elseif node.operator == "NOT" then
+          -- For NOT, we evaluate the right node (not expression)
+          local result = self:evaluate_ast(node.right)
+          -- We can't know the full set of possible results here,
+          -- so we'll return the negated results we do have
+          local negated = {}
+          for k, v in pairs(result) do
+              negated[k] = false
+          end
+          return negated
+      end
+  elseif node.type == "comparison" then
+      return evaluate_condition(node.field, node.operator, node.value)
+  elseif node.type == "term" then
+      return self:DefaultSearch(node.value)
+  else
+      error("Unknown node type: " .. node.type)
+  end
+end
+
+function search:evaluate_query(ast)
+  local result = self:evaluate_ast(ast)
+  local positive, negative = {}, {}
+  for k, v in pairs(result) do
+      if v then
+          positive[k] = true
+      else
+          negative[k] = true
+      end
+  end
+  return positive, negative
 end
