@@ -28,7 +28,7 @@ function QueryParser:Lexer(input)
 
   local function advance(count)
     count = count or 1
-    i = i + count
+    i = i + count --[[@as number]]
   end
 
   local function is_whitespace(char)
@@ -101,7 +101,10 @@ function QueryParser:Parser(tokens)
     i = i + 1
   end
 
-  local parse_expression, parse_term
+  ---@type fun(): QueryNode
+  local parse_expression
+  ---@type fun(): QueryNode
+  local parse_term
 
   parse_expression = function()
     local left = parse_term()
