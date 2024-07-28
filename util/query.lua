@@ -6,8 +6,18 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class QueryParser: AceModule
 local QueryParser = addon:NewModule('QueryParser')
 
+---@class QueryNode
+---@field type string
+---@field value? string
+---@field left? QueryNode
+---@field right? QueryNode
+---@field operator? string
+
 ---@private
+---@param input string
+---@return QueryNode[]
 function QueryParser:Lexer(input)
+  ---@type QueryNode[]
   local tokens = {}
   local i = 1
 
@@ -78,6 +88,8 @@ function QueryParser:Lexer(input)
 end
 
 ---@private
+---@param tokens QueryNode[]
+---@return QueryNode
 function QueryParser:Parser(tokens)
   local i = 1
 
