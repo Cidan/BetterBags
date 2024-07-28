@@ -69,7 +69,8 @@ function QueryParser:Lexer(input)
             table.insert(tokens, {type = "term", value = word})
         end
     else
-        error("Unexpected character: " .. char)
+      error("Unexpected character: " .. char)
+        --advance()
     end
   end
 
@@ -128,7 +129,7 @@ function QueryParser:Parser(tokens)
         local op = peek().value
         advance()
         if not (peek() and peek().type == "term") then
-          --error("Expected term after operator")
+          error("Expected term after operator")
         end
         local value = peek().value
         advance()
@@ -145,10 +146,10 @@ function QueryParser:Parser(tokens)
 end
 
 function QueryParser:Query(input)
-  local tokens = self:Lexer(input)
-  print("Tokens:")
-  for _, token in ipairs(tokens) do
-    print(string.format("  {type = %q, value = %q}", token.type, token.value))
-  end
-  return self:Parser(tokens)
+  local ok, ast = pcall(function()
+    local tokens = self:Lexer(input)
+    return self:Parser(tokens)
+  end)
+  if not ok then return end
+  return ast
 end
