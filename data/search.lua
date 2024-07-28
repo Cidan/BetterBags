@@ -287,6 +287,7 @@ function search:evaluate_ast(node)
 end
 
 function search:evaluate_query(ast)
+  if ast == nil then return {}, {} end
   local result = self:evaluate_ast(ast)
   local positive, negative = {}, {}
   for k, v in pairs(result) do
