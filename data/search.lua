@@ -135,7 +135,7 @@ function search:Add(item)
     search:addStringToIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:addNumberToIndex(self.indicies.itemLevel, item.itemInfo.itemLevel, item.slotkey)
+  search:addNumberToIndex(self.indicies.itemLevel, item.itemInfo.currentItemLevel, item.slotkey)
 end
 
 ---@param item ItemData
@@ -159,7 +159,7 @@ function search:Remove(item)
     search:removeStringFromIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:removeNumberFromIndex(self.indicies.itemLevel, item.itemInfo.itemLevel, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.itemLevel, item.itemInfo.currentItemLevel, item.slotkey)
 end
 
 
@@ -170,10 +170,12 @@ function search:GetIndex(property)
   return self.indicies[property] or self.indexLookup[property]
 end
 
----@param index SearchIndex
+---@param name string The name of the search index to lookup
 ---@param value any
 ---@return table<string, boolean>
-function search:isInIndex(index, value)
+function search:isInIndex(name, value)
+  local index = self:GetIndex(name)
+  if not index then return {} end
   if type(tonumber(value)) == 'number' then
     local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
     return node and node.data or {}
@@ -187,11 +189,8 @@ function search:DefaultSearch(value)
   ---@type table<string, boolean>
   local slots = {}
   for _, property in ipairs(self.defaultIndicies) do
-    local index = self:GetIndex(property)
-    if index then
-      for slotkey in pairs(self:isInIndex(index, value)) do
-        slots[slotkey] = true
-      end
+    for slotkey in pairs(self:isInIndex(property, value)) do
+      slots[slotkey] = true
     end
   end
   return slots
@@ -202,6 +201,7 @@ end
 ---@return boolean
 function search:Find(query, item)
   local ast = QueryParser:Query(query)
+  debug:Inspect("ast", ast)
   local p, n = self:evaluate_query(ast)
   return p[item.slotkey] and not n[item.slotkey]
 end
@@ -230,6 +230,10 @@ end
 ]]
 
 function search:evaluate_ast(node)
+  if node == nil then
+      error("Encountered nil node in AST")
+  end
+
   local function evaluate_condition(field, operator, value)
       if operator == "=" then
           return self:isInIndex(field, value)
@@ -261,25 +265,32 @@ function search:evaluate_ast(node)
       return result
   end
 
+  print("Evaluating node of type: " .. node.type)  -- Debug print
+
   if node.type == "logical" then
+      print("Logical operator: " .. node.operator)  -- Debug print
       if node.operator == "AND" or node.operator == "OR" then
           local left = self:evaluate_ast(node.left)
           local right = self:evaluate_ast(node.right)
           return combine_results(node.operator, left, right)
       elseif node.operator == "NOT" then
-          -- For NOT, we evaluate the right node (not expression)
-          local result = self:evaluate_ast(node.right)
-          -- We can't know the full set of possible results here,
-          -- so we'll return the negated results we do have
+          if node.expression == nil then
+              error("NOT node has no expression")
+          end
+          local result = self:evaluate_ast(node.expression)
           local negated = {}
           for k, v in pairs(result) do
               negated[k] = false
           end
           return negated
+      else
+          error("Unknown logical operator: " .. node.operator)
       end
   elseif node.type == "comparison" then
+      print("Comparison: " .. node.field .. " " .. node.operator .. " " .. node.value)  -- Debug print
       return evaluate_condition(node.field, node.operator, node.value)
   elseif node.type == "term" then
+      print("Term: " .. node.value)  -- Debug print
       return self:DefaultSearch(node.value)
   else
       error("Unknown node type: " .. node.type)
