@@ -77,8 +77,9 @@ function trees.IntervalTree:LessThanRecursive(node, value, result)
       table.insert(result, node)
       self:LessThanRecursive(node.left, value, result)
       self:LessThanRecursive(node.right, value, result)
-    elseif node.min < value then
+    else
       self:LessThanRecursive(node.left, value, result)
+      self:LessThanRecursive(node.right, value, result)
     end
   end
 end
@@ -104,8 +105,9 @@ function trees.IntervalTree:LessThanEqualRecursive(node, value, result)
       table.insert(result, node)
       self:LessThanEqualRecursive(node.left, value, result)
       self:LessThanEqualRecursive(node.right, value, result)
-    elseif node.min <= value then
+    else
       self:LessThanEqualRecursive(node.left, value, result)
+      self:LessThanEqualRecursive(node.right, value, result)
     end
   end
 end
