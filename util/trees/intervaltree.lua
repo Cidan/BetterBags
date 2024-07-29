@@ -83,6 +83,33 @@ function trees.IntervalTree:LessThanRecursive(node, value, result)
   end
 end
 
+-- LessThan will return a list of all nodes with values less than the
+-- provided value.
+---@param value number
+---@return IntervalTreeNode[]
+function trees.IntervalTree:LessThanEqual(value)
+  ---@type IntervalTreeNode[]
+  local result = {}
+  self:LessThanEqualRecursive(self.root, value, result)
+  return result
+end
+
+---@private
+---@param node IntervalTreeNode
+---@param value number
+---@param result IntervalTreeNode[]
+function trees.IntervalTree:LessThanEqualRecursive(node, value, result)
+  if node then
+    if node.max <= value then
+      table.insert(result, node)
+      self:LessThanEqualRecursive(node.left, value, result)
+      self:LessThanEqualRecursive(node.right, value, result)
+    elseif node.min <= value then
+      self:LessThanEqualRecursive(node.left, value, result)
+    end
+  end
+end
+
 -- GreaterThan will return a list of all nodes with values greater than
 -- the provided value.
 ---@param value number
@@ -104,12 +131,40 @@ function trees.IntervalTree:GreaterThanRecursive(node, value, result)
       table.insert(result, node)
       self:GreaterThanRecursive(node.left, value, result)
       self:GreaterThanRecursive(node.right, value, result)
-    elseif node.max > value then
+    else
       self:GreaterThanRecursive(node.right, value, result)
+      self:GreaterThanRecursive(node.left, value, result)
     end
   end
 end
 
+-- GreaterThan will return a list of all nodes with values greater than
+-- the provided value.
+---@param value number
+---@return IntervalTreeNode[]
+function trees.IntervalTree:GreaterThanEqual(value)
+  ---@type IntervalTreeNode[]
+  local result = {}
+  self:GreaterThanEqualRecursive(self.root, value, result)
+  return result
+end
+
+---@private
+---@param node IntervalTreeNode
+---@param value number
+---@param result IntervalTreeNode[]
+function trees.IntervalTree:GreaterThanEqualRecursive(node, value, result)
+  if node then
+    if node.min >= value then
+      table.insert(result, node)
+      self:GreaterThanEqualRecursive(node.left, value, result)
+      self:GreaterThanEqualRecursive(node.right, value, result)
+    else
+      self:GreaterThanEqualRecursive(node.right, value, result)
+      self:GreaterThanEqualRecursive(node.left, value, result)
+    end
+  end
+end
 -- ExactMatch will return the node with the exact matching value, or nil
 -- if no such node exists.
 ---@param value number
