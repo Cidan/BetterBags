@@ -465,9 +465,9 @@ function search:EvaluateAST(node)
               result[k] = true
             elseif left[k] == false or right[k] == false then
               result[k] = false
-            elseif left[k] == true and right[k] == nil and has_negative(right) then
+            elseif left[k] == true and right[k] == nil and right["___NEGATED___"] == true then
               result[k] = true
-            elseif left[k] == true and right[k] == nil and not has_negative(right) then
+            elseif left[k] == true and right[k] == nil and not right["___NEGATED___"] then
               result[k] = false
             else
               result[k] = true
@@ -478,9 +478,9 @@ function search:EvaluateAST(node)
               result[k] = true
             elseif right[k] == false or left[k] == false then
               result[k] = false
-            elseif right[k] == true and left[k] == nil and has_negative(left) then
+            elseif right[k] == true and left[k] == nil and left["___NEGATED___"] == true then
               result[k] = true
-            elseif right[k] == true and left[k] == nil and not has_negative(left) then
+            elseif right[k] == true and left[k] == nil and not left["___NEGATED___"] then
               result[k] = false
             else
               result[k] = true
@@ -508,6 +508,7 @@ function search:EvaluateAST(node)
           for k in pairs(result) do
               negated[k] = false
           end
+          negated["___NEGATED___"] = true
           return negated
       else
           error("Unknown logical operator: " .. node.operator)
