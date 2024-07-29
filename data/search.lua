@@ -19,6 +19,7 @@ local trees = addon:GetModule('Trees')
 ---@field property string
 ---@field ngrams table<string, table<string, boolean>>
 ---@field numbers IntervalTree
+---@field bools table<boolean, table<string, boolean>>
 
 ---@class Search: AceModule
 ---@field private indicies table<string, SearchIndex>
@@ -30,21 +31,39 @@ function search:CreateIndex(name)
   self.indicies[name] = {
     property = name,
     ngrams = {},
-    numbers = trees.NewIntervalTree()
+    numbers = trees.NewIntervalTree(),
+    bools = {}
   }
 end
 
 function search:OnInitialize()
   self.indicies = {}
+  -- String indexes
   self:CreateIndex('name')
-  self:CreateIndex('itemLevel')
-  self:CreateIndex('rarity')
   self:CreateIndex('type')
   self:CreateIndex('subtype')
   self:CreateIndex('category')
   self:CreateIndex('equipmentLocation')
   self:CreateIndex('expansion')
   self:CreateIndex('equipmentSet')
+  self:CreateIndex('bagName')
+
+  -- Number indexes
+  self:CreateIndex('level')
+  self:CreateIndex('rarity')
+  self:CreateIndex('id')
+  self:CreateIndex('quality')
+  self:CreateIndex('stackCount')
+  self:CreateIndex('class')
+  self:CreateIndex('subclass')
+  self:CreateIndex('bagid')
+  self:CreateIndex('slotid')
+
+  -- Boolean indexes
+  self:CreateIndex('reagent')
+  self:CreateIndex('bound')
+  self:CreateIndex('quest')
+  self:CreateIndex('activeQuest')
 
   self.defaultIndicies = {
     'name',
@@ -57,7 +76,8 @@ function search:OnInitialize()
   self.indexLookup = {
     exp = self.indicies.expansion,
     gear = self.indicies.equipmentLocation,
-    ilvl = self.indicies.itemLevel,
+    ilvl = self.indicies.level,
+    count = self.indicies.stackCount,
   }
 end
 
@@ -69,6 +89,23 @@ function search:Wipe()
   end
 end
 
+---@private
+---@param index SearchIndex
+---@param value boolean
+---@param slotkey string
+function search:addBoolToIndex(index, value, slotkey)
+  index.bools[value] = index.bools[value] or {}
+  index.bools[value][slotkey] = true
+end
+
+---@private
+---@param index SearchIndex
+---@param value boolean
+---@param slotkey string
+function search:removeBoolFromIndex(index, value, slotkey)
+  index.bools[value] = index.bools[value] or {}
+  index.bools[value][slotkey] = nil
+end
 
 ---@private
 ---@param index SearchIndex
@@ -120,6 +157,7 @@ function search:Add(item)
   search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:addStringToIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
   search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+  --search:addStringToIndex(self.indicies.bagName, item.bagName, item.slotkey)
 
   if item.itemInfo.equipmentSet ~= nil then
     search:addStringToIndex(self.indicies.equipmentSet, item.itemInfo.equipmentSet, item.slotkey)
@@ -135,7 +173,19 @@ function search:Add(item)
     search:addStringToIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:addNumberToIndex(self.indicies.itemLevel, item.itemInfo.currentItemLevel, item.slotkey)
+  search:addNumberToIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
+  search:addNumberToIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
+  search:addNumberToIndex(self.indicies.id, item.itemInfo.itemID, item.slotkey)
+  search:addNumberToIndex(self.indicies.stackCount, item.itemInfo.currentItemCount, item.slotkey)
+  search:addNumberToIndex(self.indicies.class, item.itemInfo.classID, item.slotkey)
+  search:addNumberToIndex(self.indicies.subclass, item.itemInfo.subclassID, item.slotkey)
+  search:addNumberToIndex(self.indicies.bagid, item.bagid, item.slotkey)
+  search:addNumberToIndex(self.indicies.slotid, item.slotid, item.slotkey)
+
+  search:addBoolToIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
+  search:addBoolToIndex(self.indicies.bound, item.itemInfo.isBound, item.slotkey)
+  search:addBoolToIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
+  search:addBoolToIndex(self.indicies.activeQuest, item.questInfo.isActive, item.slotkey)
 end
 
 ---@param item ItemData
@@ -144,6 +194,7 @@ function search:Remove(item)
   search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
   search:removeStringFromIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+  --search:removeStringFromIndex(self.indicies.bagName, item.bagName, item.slotkey)
 
   if item.itemInfo.equipmentSet ~= nil then
     search:removeStringFromIndex(self.indicies.equipmentSet, item.itemInfo.equipmentSet, item.slotkey)
@@ -159,9 +210,28 @@ function search:Remove(item)
     search:removeStringFromIndex(self.indicies.equipmentLocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:removeNumberFromIndex(self.indicies.itemLevel, item.itemInfo.currentItemLevel, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.id, item.itemInfo.itemID, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.stackCount, item.itemInfo.currentItemCount, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.class, item.itemInfo.classID, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.subclass, item.itemInfo.subclassID, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.bagid, item.bagid, item.slotkey)
+  search:removeNumberFromIndex(self.indicies.slotid, item.slotid, item.slotkey)
+
+  search:removeBoolFromIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
+  search:removeBoolFromIndex(self.indicies.bound, item.itemInfo.isBound, item.slotkey)
+  search:removeBoolFromIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
+  search:removeBoolFromIndex(self.indicies.activeQuest, item.questInfo.isActive, item.slotkey)
 end
 
+function search:StringToBoolean(value)
+  if value == "true" then
+    return true
+  elseif value == "false" then
+    return false
+  end
+end
 
 ---@param property string
 ---@return SearchIndex?
@@ -180,6 +250,12 @@ function search:isInIndex(name, value)
     local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
     return node and node.data or {}
   end
+
+  local b = self:StringToBoolean(value)
+  if b ~= nil then
+    return index.bools[b] or {}
+  end
+
   return index.ngrams[value] or {}
 end
 
