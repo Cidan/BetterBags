@@ -201,7 +201,6 @@ end
 ---@return boolean
 function search:Find(query, item)
   local ast = QueryParser:Query(query)
-  debug:Inspect("ast", ast)
   local p, n = self:evaluate_query(ast)
   return p[item.slotkey] and not n[item.slotkey]
 end
@@ -229,6 +228,8 @@ end
 
 ]]
 
+---@param node QueryNode
+---@return table<string, boolean>
 function search:evaluate_ast(node)
   if node == nil then
       error("Encountered nil node in AST")
@@ -250,25 +251,55 @@ function search:evaluate_ast(node)
       end
   end
 
+  local function has_negative(result)
+      for k, v in pairs(result) do
+          if not v then
+              return true
+          end
+      end
+      return false
+  end
+
+  ---@param op string
+  ---@param left table<string, boolean>
+  ---@param right table<string, boolean>
   local function combine_results(op, left, right)
       local result = {}
       if op == "AND" then
           for k, v in pairs(left) do
-              if right[k] then
-                  result[k] = true
-              end
+            if left[k] and right[k] then
+              result[k] = true
+            elseif left[k] == false or right[k] == false then
+              result[k] = false
+            elseif left[k] == true and right[k] == nil and has_negative(right) then
+              result[k] = true
+            elseif left[k] == true and right[k] == nil and not has_negative(right) then
+              result[k] = false
+            else
+              result[k] = true
+            end
+          end
+          for k, v in pairs(right) do
+            if right[k] and left[k] then
+              result[k] = true
+            elseif right[k] == false or left[k] == false then
+              result[k] = false
+            elseif right[k] == true and left[k] == nil and has_negative(left) then
+              result[k] = true
+            elseif right[k] == true and left[k] == nil and not has_negative(left) then
+              result[k] = false
+            else
+              result[k] = true
+            end
           end
       elseif op == "OR" then
-          for k, v in pairs(left) do result[k] = true end
-          for k, v in pairs(right) do result[k] = true end
+          for k, v in pairs(left) do result[k] = v end
+          for k, v in pairs(right) do result[k] = v end
       end
       return result
   end
 
-  print("Evaluating node of type: " .. node.type)  -- Debug print
-
   if node.type == "logical" then
-      print("Logical operator: " .. node.operator)  -- Debug print
       if node.operator == "AND" or node.operator == "OR" then
           local left = self:evaluate_ast(node.left)
           local right = self:evaluate_ast(node.right)
@@ -287,10 +318,8 @@ function search:evaluate_ast(node)
           error("Unknown logical operator: " .. node.operator)
       end
   elseif node.type == "comparison" then
-      print("Comparison: " .. node.field .. " " .. node.operator .. " " .. node.value)  -- Debug print
       return evaluate_condition(node.field, node.operator, node.value)
   elseif node.type == "term" then
-      print("Term: " .. node.value)  -- Debug print
       return self:DefaultSearch(node.value)
   else
       error("Unknown node type: " .. node.type)
