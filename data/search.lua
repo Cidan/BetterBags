@@ -386,8 +386,9 @@ function search:EvaluateAST(node)
               error("NOT node has no expression")
           end
           local result = self:EvaluateAST(node.expression)
+         ---@type table<string, boolean> 
           local negated = {}
-          for k, v in pairs(result) do
+          for k in pairs(result) do
               negated[k] = false
           end
           return negated

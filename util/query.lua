@@ -12,6 +12,8 @@ local QueryParser = addon:NewModule('QueryParser')
 ---@field left? QueryNode
 ---@field right? QueryNode
 ---@field operator? string
+---@field field? string
+---@field expression? QueryNode
 
 ---@private
 ---@param input string
