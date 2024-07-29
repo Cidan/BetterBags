@@ -201,16 +201,17 @@ end
 ---@return boolean
 function search:Find(query, item)
   local ast = QueryParser:Query(query)
-  local p, n = self:evaluate_query(ast)
+  local p, n = self:EvaluateQuery(ast)
   return p[item.slotkey] and not n[item.slotkey]
 end
 
 ---@param query string
 ---@return table<string, boolean>
 function search:Search(query)
+  ---@type table<string, boolean>
   local results = {}
   local ast = QueryParser:Query(query)
-  local p, n = self:evaluate_query(ast)
+  local p, n = self:EvaluateQuery(ast)
   for k, v in pairs(p) do
     if v and not n[k] then
       results[k] = true
@@ -227,6 +228,7 @@ function search:isLess(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
   if type(tonumber(value)) == 'number' then
+    ---@type table<string, boolean>
     local results = {}
     local nodes = index.numbers:LessThan(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
@@ -246,6 +248,7 @@ function search:isLessOrEqual(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
   if type(tonumber(value)) == 'number' then
+    ---@type table<string, boolean>
     local results = {}
     local nodes = index.numbers:LessThanEqual(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
@@ -265,6 +268,7 @@ function search:isGreater(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
   if type(tonumber(value)) == 'number' then
+    ---@type table<string, boolean>
     local results = {}
     local nodes = index.numbers:GreaterThan(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
@@ -284,6 +288,7 @@ function search:isGreaterOrEqual(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
   if type(tonumber(value)) == 'number' then
+    ---@type table<string, boolean>
     local results = {}
     local nodes = index.numbers:GreaterThanEqual(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
@@ -298,7 +303,7 @@ end
 
 ---@param node QueryNode
 ---@return table<string, boolean>
-function search:evaluate_ast(node)
+function search:EvaluateAST(node)
   if node == nil then
       error("Encountered nil node in AST")
   end
@@ -319,8 +324,10 @@ function search:evaluate_ast(node)
       end
   end
 
+  ---@param result table<string, boolean>
+  ---@return boolean
   local function has_negative(result)
-      for k, v in pairs(result) do
+      for _, v in pairs(result) do
           if not v then
               return true
           end
@@ -331,10 +338,12 @@ function search:evaluate_ast(node)
   ---@param op string
   ---@param left table<string, boolean>
   ---@param right table<string, boolean>
+  ---@return table<string, boolean>
   local function combine_results(op, left, right)
+      ---@type table<string, boolean>
       local result = {}
       if op == "AND" then
-          for k, v in pairs(left) do
+          for k in pairs(left) do
             if left[k] and right[k] then
               result[k] = true
             elseif left[k] == false or right[k] == false then
@@ -347,7 +356,7 @@ function search:evaluate_ast(node)
               result[k] = true
             end
           end
-          for k, v in pairs(right) do
+          for k in pairs(right) do
             if right[k] and left[k] then
               result[k] = true
             elseif right[k] == false or left[k] == false then
@@ -369,14 +378,14 @@ function search:evaluate_ast(node)
 
   if node.type == "logical" then
       if node.operator == "AND" or node.operator == "OR" then
-          local left = self:evaluate_ast(node.left)
-          local right = self:evaluate_ast(node.right)
+          local left = self:EvaluateAST(node.left)
+          local right = self:EvaluateAST(node.right)
           return combine_results(node.operator, left, right)
       elseif node.operator == "NOT" then
           if node.expression == nil then
               error("NOT node has no expression")
           end
-          local result = self:evaluate_ast(node.expression)
+          local result = self:EvaluateAST(node.expression)
           local negated = {}
           for k, v in pairs(result) do
               negated[k] = false
@@ -394,9 +403,12 @@ function search:evaluate_ast(node)
   end
 end
 
-function search:evaluate_query(ast)
+---@param ast? QueryNode
+---@return table<string, boolean>, table<string, boolean>
+function search:EvaluateQuery(ast)
   if ast == nil then return {}, {} end
-  local result = self:evaluate_ast(ast)
+  local result = self:EvaluateAST(ast)
+  ---@type table<string, boolean>, table<string, boolean>
   local positive, negative = {}, {}
   for k, v in pairs(result) do
       if v then
