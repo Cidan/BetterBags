@@ -363,6 +363,26 @@ _G.COSTS_LABEL = "Cost:"
 _G.UNIT_NAME_FONT = ""
 _G.DAMAGE_TEXT_FONT = ""
 
+-- Type fixes for quality constants.
+---@type string
+_G.ITEM_QUALITY0_DESC = _G.ITEM_QUALITY0_DESC
+---@type string
+_G.ITEM_QUALITY1_DESC = _G.ITEM_QUALITY1_DESC
+---@type string
+_G.ITEM_QUALITY2_DESC = _G.ITEM_QUALITY2_DESC
+---@type string
+_G.ITEM_QUALITY3_DESC = _G.ITEM_QUALITY3_DESC
+---@type string
+_G.ITEM_QUALITY4_DESC = _G.ITEM_QUALITY4_DESC
+---@type string
+_G.ITEM_QUALITY5_DESC = _G.ITEM_QUALITY5_DESC
+---@type string
+_G.ITEM_QUALITY6_DESC = _G.ITEM_QUALITY6_DESC
+---@type string
+_G.ITEM_QUALITY7_DESC = _G.ITEM_QUALITY7_DESC
+---@type string
+_G.ITEM_QUALITY8_DESC = _G.ITEM_QUALITY8_DESC
+
 Enum.BagIndex.AccountBankTab_1 = 13
 Enum.BagIndex.AccountBankTab_2 = 14
 Enum.BagIndex.AccountBankTab_3 = 15

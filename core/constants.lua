@@ -227,6 +227,29 @@ if not addon.isRetail then
   Enum.ItemQuality.WoWToken = 8
 end
 
+---@type table<string, Enum.ItemQuality>
+const.ITEM_QUALITY_TO_ENUM = {
+  ITEM_QUALITY0_DESC = Enum.ItemQuality.Poor,
+  ITEM_QUALITY1_DESC = Enum.ItemQuality.Common,
+  ITEM_QUALITY2_DESC = Enum.ItemQuality.Uncommon,
+  ITEM_QUALITY3_DESC = Enum.ItemQuality.Rare,
+  ITEM_QUALITY4_DESC = Enum.ItemQuality.Epic,
+  ITEM_QUALITY5_DESC = Enum.ItemQuality.Legendary,
+  ITEM_QUALITY6_DESC = Enum.ItemQuality.Artifact,
+  ITEM_QUALITY7_DESC = Enum.ItemQuality.Heirloom,
+  ITEM_QUALITY8_DESC = Enum.ItemQuality.WoWToken,
+}
+
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY0_DESC)] = Enum.ItemQuality.Poor
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY1_DESC)] = Enum.ItemQuality.Common
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY2_DESC)] = Enum.ItemQuality.Uncommon
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY3_DESC)] = Enum.ItemQuality.Rare
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY4_DESC)] = Enum.ItemQuality.Epic
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY5_DESC)] = Enum.ItemQuality.Legendary
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY6_DESC)] = Enum.ItemQuality.Artifact
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY7_DESC)] = Enum.ItemQuality.Heirloom
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY8_DESC)] = Enum.ItemQuality.WoWToken
+
 const.ITEM_QUALITY_COLOR = {
   [Enum.ItemQuality.Poor] = {0.62, 0.62, 0.62, 1},
   [Enum.ItemQuality.Common] = {1, 1, 1, 1},

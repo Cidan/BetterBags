@@ -377,6 +377,43 @@ function search:isGreaterOrEqual(name, value)
   return {}
 end
 
+---@private
+---@param operator string
+---@param value string|number
+---@return table<string, boolean>
+function search:isRarity(operator, value)
+  if type(tonumber(value)) == 'number' then
+    if operator == "=" then
+      return self:isInIndex('rarity', value)
+    elseif operator == ">=" then
+        return self:isGreaterOrEqual('rarity', value)
+    elseif operator == "<=" then
+        return self:isLessOrEqual('rarity', value)
+    elseif operator == ">" then
+        return self:isGreater('rarity', value)
+    elseif operator == "<" then
+        return self:isLess('rarity', value)
+    else
+        error("Unknown operator: " .. operator)
+    end
+  end
+  local rarity = const.ITEM_QUALITY_TO_ENUM[value] --[[@as Enum.ItemQuality]]
+  if not rarity then return {} end
+  if operator == "=" then
+    return self:isInIndex('rarity', rarity)
+  elseif operator == ">=" then
+      return self:isGreaterOrEqual('rarity', rarity)
+  elseif operator == "<=" then
+      return self:isLessOrEqual('rarity', rarity)
+  elseif operator == ">" then
+      return self:isGreater('rarity', rarity)
+  elseif operator == "<" then
+      return self:isLess('rarity', rarity)
+  else
+      error("Unknown operator: " .. operator)
+  end
+end
+
 ---@param node QueryNode
 ---@return table<string, boolean>
 function search:EvaluateAST(node)
@@ -385,6 +422,10 @@ function search:EvaluateAST(node)
   end
 
   local function evaluate_condition(field, operator, value)
+      -- Rarity is a special case, as it is an enum.
+      if field == "rarity" then
+        return self:isRarity(operator, value)
+      end
       if operator == "=" then
           return self:isInIndex(field, value)
       elseif operator == ">=" then

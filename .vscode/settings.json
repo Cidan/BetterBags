@@ -139,7 +139,16 @@
     "GetText",
     "BACKGROUND",
     "UNIT_NAME_FONT",
-    "DAMAGE_TEXT_FONT"
+    "DAMAGE_TEXT_FONT",
+    "ITEM_QUALITY0_DESC",
+    "ITEM_QUALITY1_DESC",
+    "ITEM_QUALITY2_DESC",
+    "ITEM_QUALITY3_DESC",
+    "ITEM_QUALITY4_DESC",
+    "ITEM_QUALITY5_DESC",
+    "ITEM_QUALITY6_DESC",
+    "ITEM_QUALITY7_DESC",
+    "ITEM_QUALITY8_DESC"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",
