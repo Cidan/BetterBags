@@ -344,6 +344,7 @@ _G.LE_EXPANSION_LEGION = 6
 _G.LE_EXPANSION_BATTLE_FOR_AZEROTH = 7
 _G.LE_EXPANSION_SHADOWLANDS = 8
 _G.LE_EXPANSION_DRAGONFLIGHT = 9
+_G.LE_EXPANSION_WAR_WITHIN = 10
 
 -- Write out all the expansion names.
 _G.EXPANSION_NAME0 = "Classic"
@@ -356,12 +357,33 @@ _G.EXPANSION_NAME6 = "Legion"
 _G.EXPANSION_NAME7 = "Battle for Azeroth"
 _G.EXPANSION_NAME8 = "Shadowlands"
 _G.EXPANSION_NAME9 = "Dragonflight"
+_G.EXPANSION_NAME10 = "The War Within"
 
 _G.BANK_BAG_PURCHASE = "Purchasable Bag Slot"
 _G.COSTS_LABEL = "Cost:"
 
 _G.UNIT_NAME_FONT = ""
 _G.DAMAGE_TEXT_FONT = ""
+
+-- Type fixes for quality constants.
+---@type string
+_G.ITEM_QUALITY0_DESC = _G.ITEM_QUALITY0_DESC
+---@type string
+_G.ITEM_QUALITY1_DESC = _G.ITEM_QUALITY1_DESC
+---@type string
+_G.ITEM_QUALITY2_DESC = _G.ITEM_QUALITY2_DESC
+---@type string
+_G.ITEM_QUALITY3_DESC = _G.ITEM_QUALITY3_DESC
+---@type string
+_G.ITEM_QUALITY4_DESC = _G.ITEM_QUALITY4_DESC
+---@type string
+_G.ITEM_QUALITY5_DESC = _G.ITEM_QUALITY5_DESC
+---@type string
+_G.ITEM_QUALITY6_DESC = _G.ITEM_QUALITY6_DESC
+---@type string
+_G.ITEM_QUALITY7_DESC = _G.ITEM_QUALITY7_DESC
+---@type string
+_G.ITEM_QUALITY8_DESC = _G.ITEM_QUALITY8_DESC
 
 Enum.BagIndex.AccountBankTab_1 = 13
 Enum.BagIndex.AccountBankTab_2 = 14

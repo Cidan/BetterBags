@@ -64,8 +64,8 @@ local currency = addon:GetModule('Currency')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
 
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
@@ -227,14 +227,18 @@ function bagFrame.bagProto:Refresh()
   end
 end
 
--- Search will search all items in the bag for the given text.
--- If a match is found for an item, it will be highlighted, while
--- items that don't match will dim.
----@param text? string
-function bagFrame.bagProto:Search(text)
+---@param results table<string, boolean>
+function bagFrame.bagProto:Search(results)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateSearch(text)
+    item:UpdateSearch(results[item.slotkey])
+  end
+end
+
+function bagFrame.bagProto:ResetSearch()
+  if not self.currentView then return end
+  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
+    item:UpdateSearch(true)
   end
 end
 
@@ -260,8 +264,8 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
   view:GetContent():Show()
   self.currentView = view
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = search:GetText()
-  self:Search(text)
+  --local text = searchBox:GetText()
+  --self:Search(text)
   self:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
     self.slots:Draw()
@@ -496,7 +500,7 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    b.searchFrame = search:Create(b.frame)
+    b.searchFrame = searchBox:Create(b.frame)
   end
 
   if kind == const.BAG_KIND.BACKPACK then

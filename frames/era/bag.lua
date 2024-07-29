@@ -55,8 +55,8 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
 
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
@@ -270,7 +270,7 @@ function bagFrame:Create(kind)
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    b.searchFrame = search:Create(b.frame)
+    b.searchFrame = searchBox:Create(b.frame)
   end
 
   if kind == const.BAG_KIND.BACKPACK then

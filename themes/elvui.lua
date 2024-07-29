@@ -20,8 +20,8 @@ if ElvUI then
   S = E:GetModule('Skins')
 end
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
 
 ---@class ElvUIDecoration: Frame
 ---@field title FontString
@@ -56,10 +56,10 @@ local theme = {
       decoration.CloseButton:SetSize(24,24)
       decoration.CloseButton:SetFrameLevel(1001)
 
-      local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      searchBox.frame:SetPoint("TOP", decoration, "TOP", 0, -14)
-      searchBox.frame:SetSize(150, 20)
-      decoration.search = searchBox
+      local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
+      box.frame:SetPoint("TOP", decoration, "TOP", 0, -14)
+      box.frame:SetSize(150, 20)
+      decoration.search = box
 
       local title = decoration:CreateFontString(nil, "OVERLAY", "GameFontWhite")
       title:SetPoint("TOP", decoration, "TOP", 0, 0)
@@ -75,7 +75,7 @@ local theme = {
       local w, h = bagButton.portrait:GetSize()
       bagButton.portrait:SetSize((w / 10) * 8.5, (h / 10) * 8.5)
       bagButton.highlightTex:SetSize((w / 10) * 8.5, (h / 10) * 8.5)
-      S:HandleEditBox(searchBox.textBox)
+      S:HandleEditBox(box.textBox)
       S:HandleFrame(decoration)
       decoratorFrames[frame:GetName()] = decoration
     else

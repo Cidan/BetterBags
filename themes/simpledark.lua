@@ -3,8 +3,8 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule('SearchBox')
 
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
@@ -83,10 +83,10 @@ local simpleDark = {
       end)
       close:SetFrameLevel(1001)
 
-      local searchBox = search:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      searchBox.frame:SetPoint("TOP", decoration, "TOP", 0, -16)
-      searchBox.frame:SetSize(150, 20)
-      decoration.search = searchBox
+      local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
+      box.frame:SetPoint("TOP", decoration, "TOP", 0, -16)
+      box.frame:SetSize(150, 20)
+      decoration.search = box
 
       -- The bag button is abstracted here as it's a common element across all themes.
       -- This function does return the bag button, and you can modify it as you need.

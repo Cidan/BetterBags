@@ -201,6 +201,28 @@ function categories:CreateCategory(category)
   events:SendMessage('categories/Changed')
 end
 
+-- CreateCategoryWithSearchPredicate will create a custom category
+-- with a search predicate that adds items to the category based on the
+-- search predicate. This is useful for creating categories that are
+-- based on item properties, such as item level, item quality, or item type.
+---@param category string
+---@param predicate string
+function categories:CreateCategoryWithSearchPredicate(category, predicate)
+  if self.ephemeralCategories[category] then return end
+  self.ephemeralCategories[category] = {
+    name = category,
+    enabled = {
+      [const.BAG_KIND.BACKPACK] = true,
+      [const.BAG_KIND.BANK] = true,
+    },
+    itemList = {},
+    readOnly = false,
+    predicate = predicate,
+  }
+  database:CreateEpemeralCategory(category)
+  events:SendMessage('categories/Changed')
+end
+
 function categories:CreatePersistentCategory(category)
   database:CreateCategory(category)
   events:SendMessage('categories/Changed')

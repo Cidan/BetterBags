@@ -13,8 +13,11 @@ local events = addon:GetModule('Events')
 local const = addon:GetModule('Constants')
 
 ---@class Search: AceModule
+local search = addon:GetModule('Search')
+
+---@class SearchBox: AceModule
 ---@field searchFrame SearchFrame
-local search = addon:NewModule('Search')
+local searchBox = addon:NewModule('SearchBox')
 
 ---@class (exact) SearchFrame
 ---@field frame Frame
@@ -23,15 +26,15 @@ local search = addon:NewModule('Search')
 ---@field textBox EditBox
 ---@field helpText FontString
 ---@field kind BagKind
-search.searchProto = {}
+searchBox.searchProto = {}
 
 -- BetterBags_ToggleSearch toggles the search view. This function is used in the
 -- search key bind.
 function BetterBags_ToggleSearch()
-  search.searchFrame:Toggle()
+  searchBox.searchFrame:Toggle()
 end
 
-function search.searchProto:Toggle()
+function searchBox.searchProto:Toggle()
   if self.frame:IsShown() then
     self.textBox:SetText("")
     self.textBox:ClearFocus()
@@ -43,7 +46,7 @@ function search.searchProto:Toggle()
   end
 end
 
-function search.searchProto:Hide()
+function searchBox.searchProto:Hide()
   if self.frame:IsShown() then
     self.textBox:SetText("")
     self.textBox:ClearFocus()
@@ -55,7 +58,7 @@ function search.searchProto:Hide()
   end
 end
 
-function search.searchProto:Show()
+function searchBox.searchProto:Show()
   if not self.frame:IsShown() then
     self.textBox:ClearFocus()
     if self.fadeInGroup then
@@ -66,7 +69,7 @@ function search.searchProto:Show()
   end
 end
 
-function search.searchProto:SetShown(shown)
+function searchBox.searchProto:SetShown(shown)
   if shown then
     self:Show()
   else
@@ -74,7 +77,7 @@ function search.searchProto:SetShown(shown)
   end
 end
 
-function search.searchProto:UpdateSearch()
+function searchBox.searchProto:UpdateSearch()
   local text = self.textBox:GetText()
   if text == "" then
     self.helpText:Show()
@@ -83,24 +86,40 @@ function search.searchProto:UpdateSearch()
   end
   if self.kind ~= nil then
     if self.kind == const.BAG_KIND.BACKPACK then
-      addon.Bags.Backpack:Search(text)
+      if text == "" then
+        addon.Bags.Backpack:ResetSearch()
+      else
+        local results = search:Search(text)
+        addon.Bags.Backpack:Search(results)
+      end
     else
-      addon.Bags.Bank:Search(text)
+      if text == "" then
+        addon.Bags.Bank:ResetSearch()
+      else
+        local results = search:Search(text)
+        addon.Bags.Bank:Search(results)
+      end
     end
   else
-    addon.Bags.Backpack:Search(text)
-    addon.Bags.Bank:Search(text)
+    if text == "" then
+      addon.Bags.Backpack:ResetSearch()
+      addon.Bags.Bank:ResetSearch()
+    else
+      local results = search:Search(text)
+      addon.Bags.Backpack:Search(results)
+      addon.Bags.Bank:Search(results)
+    end
   end
 end
 
-function search:GetText()
+function searchBox:GetText()
   return self.searchFrame.textBox:GetText()
 end
 
 ---@param parent Frame
 ---@return SearchFrame
-function search:Create(parent)
-  local sf = setmetatable({}, {__index = search.searchProto})
+function searchBox:Create(parent)
+  local sf = setmetatable({}, {__index = searchBox.searchProto})
   local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "BetterBagsSearchPanelTemplate") --[[@as Frame]]
   f:SetSize(400, 75)
   f:SetPoint("BOTTOM", parent, "TOP", 0, 10)
@@ -145,7 +164,7 @@ function search:Create(parent)
 
   sf.frame = f
   sf.textBox = textBox
-  search.searchFrame = sf
+  searchBox.searchFrame = sf
 
   events:RegisterMessage('addon/CloseSpecialWindows', function()
     sf:Hide()
@@ -156,8 +175,8 @@ end
 ---@param kind BagKind
 ---@param parent Frame
 ---@return SearchFrame
-function search:CreateBox(kind, parent)
-  local sf = setmetatable({}, {__index = search.searchProto})
+function searchBox:CreateBox(kind, parent)
+  local sf = setmetatable({}, {__index = searchBox.searchProto})
   sf.frame = CreateFrame("Frame", nil, parent) --[[@as Frame]]
   sf.frame:SetFrameLevel(2000)
   local textBox = CreateFrame("EditBox", nil, sf.frame, "BagSearchBoxTemplate") --[[@as SearchBox]]

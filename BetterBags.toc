@@ -52,6 +52,11 @@ core\fonts.lua
 # The Theme API loads earlier than actual themes.
 themes\themes.lua
 
+util\trees\trees.lua
+util\trees\intervaltree.lua
+util\query.lua
+
+data\search.lua
 data\equipmentsets.lua
 data\categories.lua
 data\items.lua

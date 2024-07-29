@@ -35,6 +35,9 @@ local items = addon:GetModule('Items')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -86,90 +89,11 @@ local children = {
   "HighlightTexture"
 }
 
--- parseQuery will parse a query string and return a set of boolean
--- filters that can be matched against an item.
----@param query string
----@return string[]
-local function parseQuery(query)
-  local filters = {}
-  for filter in string.gmatch(query, "([^&]+)") do
-      table.insert(filters, string.trim(filter))
-  end
-  return filters
-end
-
----@param filter string
----@param data ItemData
----@return boolean
-local function matchFilter(filter, data)
-  if filter == "" then return true end
-  if not data or data.isItemEmpty then return false end
-  ---@type string, string
-  local prefix, value = strsplit(":", filter, 2)
-  -- If no prefix is provided, assume the filter is a name or type filter.
-  if value == nil then
-    if
-    data.itemInfo.itemName and (
-    string.find(data.itemInfo.itemName:lower(), prefix, 1, true) or
-    string.find(data.itemInfo.itemType:lower(), prefix, 1, true) or
-    (
-      data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
-      _G[data.itemInfo.itemEquipLoc] ~= nil and
-      _G[data.itemInfo.itemEquipLoc] ~= "" and
-      string.find(_G[data.itemInfo.itemEquipLoc]:lower(), prefix, 1, true)
-    ) or
-    string.find(data.itemInfo.itemType:lower(), prefix, 1, true) or
-    string.find(data.itemInfo.category:lower(), prefix, 1, true) or
-    string.find(data.itemInfo.itemSubType:lower(), prefix, 1, true)) then
-      return true
-    end
-    return false
-  -- If the value exists but is empty, user is typing and we should not match.
-  elseif value == "" then return false end
-
-  -- If a prefix is provided, match against the prefix first. Prefix
-  -- keywords are exact matches.
-  if prefix == "type" then
-    if string.find(data.itemInfo.itemType:lower(), value, 1, true) then
-      return true
-    end
-  elseif prefix == "subtype" then
-    if string.find(data.itemInfo.itemSubType:lower(), value, 1, true) then
-      return true
-    end
-  elseif prefix == "name" then
-    if string.find(data.itemInfo.itemName:lower(), value, 1, true) then
-      return true
-    end
-  elseif prefix == "exp" and data.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[data.itemInfo.expacID] ~= nil then
-    if string.find(const.BRIEF_EXPANSION_MAP[data.itemInfo.expacID]:lower(), value, 1, true) then
-      return true
-    end
-  elseif prefix == "gear" and data.itemInfo.equipmentSet ~= nil then
-    if string.find(data.itemInfo.equipmentSet:lower(), value, 1, true) then
-      return true
-    end
-  end
-  return false
-end
-
----@param text? string
-function itemFrame.itemProto:UpdateSearch(text)
+---@param found? boolean
+function itemFrame.itemProto:UpdateSearch(found)
   if self.slotkey == nil then return end
   local decoration = themes:GetItemButton(self)
-  local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if not text or text == "" then
-    decoration:SetMatchesSearch(true)
-    return
-  end
-  local filters = parseQuery(string.lower(text))
-  for _, filter in pairs(filters) do
-    if not matchFilter(filter, data) then
-      decoration:SetMatchesSearch(false)
-      return
-    end
-  end
-  decoration:SetMatchesSearch(true)
+  decoration:SetMatchesSearch(found and true or false)
 end
 
 function itemFrame.itemProto:OnEnter()
