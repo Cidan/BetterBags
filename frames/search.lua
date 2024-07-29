@@ -86,9 +86,19 @@ function searchBox.searchProto:UpdateSearch()
   end
   if self.kind ~= nil then
     if self.kind == const.BAG_KIND.BACKPACK then
-      --addon.Bags.Backpack:Search(text)
+      if text == "" then
+        addon.Bags.Backpack:ResetSearch()
+      else
+        local results = search:Search(text)
+        addon.Bags.Backpack:Search(results)
+      end
     else
-      --addon.Bags.Bank:Search(text)
+      if text == "" then
+        addon.Bags.Bank:ResetSearch()
+      else
+        local results = search:Search(text)
+        addon.Bags.Bank:Search(results)
+      end
     end
   else
     if text == "" then
