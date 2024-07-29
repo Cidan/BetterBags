@@ -89,20 +89,11 @@ local children = {
   "HighlightTexture"
 }
 
----@param text? string
-function itemFrame.itemProto:UpdateSearch(text)
+---@param found? boolean
+function itemFrame.itemProto:UpdateSearch(found)
   if self.slotkey == nil then return end
   local decoration = themes:GetItemButton(self)
-  local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if not text or text == "" then
-    decoration:SetMatchesSearch(true)
-    return
-  end
-  if search:Find(string.lower(text), data) then
-    decoration:SetMatchesSearch(true)
-    return
-  end
-  decoration:SetMatchesSearch(false)
+  decoration:SetMatchesSearch(found and true or false)
 end
 
 function itemFrame.itemProto:OnEnter()

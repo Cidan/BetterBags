@@ -206,19 +206,17 @@ function search:Find(query, item)
 end
 
 ---@param query string
----@return string[]
+---@return table<string, boolean>
 function search:Search(query)
-  return {}
---  local ast = QueryParser:Query(query)
---  debug:Inspect("ast", ast)
---  local slots = {}
---  local terms = self:ParseQuery(query)
---  for _, term in ipairs(terms) do
---    for slotkey in pairs(self:Match(term)) do
---      table.insert(slots, slotkey)
---    end
---  end
---  return slots
+  local results = {}
+  local ast = QueryParser:Query(query)
+  local p, n = self:evaluate_query(ast)
+  for k, v in pairs(p) do
+    if v and not n[k] then
+      results[k] = true
+    end
+  end
+  return results
 end
 
 

@@ -12,6 +12,9 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class SearchBox: AceModule
 ---@field searchFrame SearchFrame
 local searchBox = addon:NewModule('SearchBox')
@@ -83,13 +86,19 @@ function searchBox.searchProto:UpdateSearch()
   end
   if self.kind ~= nil then
     if self.kind == const.BAG_KIND.BACKPACK then
-      addon.Bags.Backpack:Search(text)
+      --addon.Bags.Backpack:Search(text)
     else
-      addon.Bags.Bank:Search(text)
+      --addon.Bags.Bank:Search(text)
     end
   else
-    addon.Bags.Backpack:Search(text)
-    addon.Bags.Bank:Search(text)
+    if text == "" then
+      addon.Bags.Backpack:ResetSearch()
+      addon.Bags.Bank:ResetSearch()
+    else
+      local results = search:Search(text)
+      addon.Bags.Backpack:Search(results)
+      addon.Bags.Bank:Search(results)
+    end
   end
 end
 

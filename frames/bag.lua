@@ -227,14 +227,18 @@ function bagFrame.bagProto:Refresh()
   end
 end
 
--- Search will search all items in the bag for the given text.
--- If a match is found for an item, it will be highlighted, while
--- items that don't match will dim.
----@param text? string
-function bagFrame.bagProto:Search(text)
+---@param results table<string, boolean>
+function bagFrame.bagProto:Search(results)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateSearch(text)
+    item:UpdateSearch(results[item.slotkey])
+  end
+end
+
+function bagFrame.bagProto:ResetSearch()
+  if not self.currentView then return end
+  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
+    item:UpdateSearch(true)
   end
 end
 
@@ -260,8 +264,8 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
   view:GetContent():Show()
   self.currentView = view
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = searchBox:GetText()
-  self:Search(text)
+  --local text = searchBox:GetText()
+  --self:Search(text)
   self:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
     self.slots:Draw()
