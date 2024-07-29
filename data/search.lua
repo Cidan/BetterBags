@@ -227,6 +227,45 @@ end
 
 
 ]]
+---@param name string The name of the search index to lookup
+---@param value any
+---@return table<string, boolean>
+function search:isLess(name, value)
+  local index = self:GetIndex(name)
+  if not index then return {} end
+  if type(tonumber(value)) == 'number' then
+    local results = {}
+    local nodes = index.numbers:LessThan(tonumber(value)--[[@as number]])
+    for _, node in pairs(nodes) do
+      for k, v in pairs(node.data) do
+        results[k] = v
+      end
+    end
+    return results
+  end
+  return {}
+end
+
+---@param name string The name of the search index to lookup
+---@param value any
+---@return table<string, boolean>
+function search:isGreater(name, value)
+  local index = self:GetIndex(name)
+  if not index then return {} end
+  if type(tonumber(value)) == 'number' then
+    local results = {}
+    local nodes = index.numbers:GreaterThan(tonumber(value)--[[@as number]])
+    print(#nodes)
+    for _, node in pairs(nodes) do
+      for k, v in pairs(node.data) do
+       print(k, v)
+        results[k] = v
+      end
+    end
+    return results
+  end
+  return {}
+end
 
 ---@param node QueryNode
 ---@return table<string, boolean>
@@ -243,9 +282,9 @@ function search:evaluate_ast(node)
       elseif operator == "<=" then
           return isLessOrEqual(field, value)
       elseif operator == ">" then
-          return isGreater(field, value)
+          return self:isGreater(field, value)
       elseif operator == "<" then
-          return isLess(field, value)
+          return self:isLess(field, value)
       else
           error("Unknown operator: " .. operator)
       end
