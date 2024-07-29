@@ -64,6 +64,7 @@ end
 function debug:ShowItemTooltip(item)
   if not self.enabled then return end
   local data = item:GetItemData()
+  if not data then return end
   self.tooltip:SetOwner(UIParent, 'ANCHOR_LEFT', 30, 0)
   if data.isItemEmpty then
     self:AddTooltip("Empty")
