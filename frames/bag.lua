@@ -67,6 +67,9 @@ local context = addon:GetModule('Context')
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
@@ -264,8 +267,8 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
   view:GetContent():Show()
   self.currentView = view
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  --local text = searchBox:GetText()
-  --self:Search(text)
+  local text = searchBox:GetText()
+  self:Search(search:Search(text))
   self:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
     self.slots:Draw()
