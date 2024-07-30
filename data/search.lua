@@ -20,6 +20,7 @@ local trees = addon:GetModule('Trees')
 ---@field ngrams table<string, table<string, boolean>>
 ---@field numbers IntervalTree
 ---@field bools table<boolean, table<string, boolean>>
+---@field fullText table<string, table<string, boolean>>
 
 ---@class Search: AceModule
 ---@field private indicies table<string, SearchIndex>
@@ -32,7 +33,8 @@ function search:CreateIndex(name)
     property = name,
     ngrams = {},
     numbers = trees.NewIntervalTree(),
-    bools = {}
+    bools = {},
+    fullText = {}
   }
 end
 
@@ -135,6 +137,8 @@ function search:addStringToIndex(index, value, slotkey)
     index.ngrams[prefix] = index.ngrams[prefix] or {}
     index.ngrams[prefix][slotkey] = true
   end
+  index.fullText[value] = index.fullText[value] or {}
+  index.fullText[value][slotkey] = true
 end
 
 ---@private
@@ -149,6 +153,8 @@ function search:removeStringFromIndex(index, value, slotkey)
     index.ngrams[prefix] = index.ngrams[prefix] or {}
     index.ngrams[prefix][slotkey] = nil
   end
+  index.fullText[value] = index.fullText[value] or {}
+  index.fullText[value][slotkey] = nil
 end
 
 ---@param item ItemData
@@ -377,6 +383,24 @@ function search:isGreaterOrEqual(name, value)
   return {}
 end
 
+---@param name string The name of the search index to lookup
+---@param value any
+---@return table<string, boolean>
+function search:isFullTextMatch(name, value)
+  local index = self:GetIndex(name)
+  if not index then return {} end
+  ---@type table<string, boolean>
+  local results = {}
+  for text, slots in pairs(index.fullText or {}) do
+    if string.match(text, value) then
+      for k, v in pairs(slots) do
+        results[k] = v
+      end
+    end
+  end
+  return results
+end
+
 ---@private
 ---@param operator string
 ---@param value string|number
@@ -428,6 +452,8 @@ function search:EvaluateAST(node)
       end
       if operator == "=" then
           return self:isInIndex(field, value)
+      elseif operator == "%" then
+          return self:isFullTextMatch(field, value)
       elseif operator == ">=" then
           return self:isGreaterOrEqual(field, value)
       elseif operator == "<=" then
@@ -439,17 +465,6 @@ function search:EvaluateAST(node)
       else
           error("Unknown operator: " .. operator)
       end
-  end
-
-  ---@param result table<string, boolean>
-  ---@return boolean
-  local function has_negative(result)
-      for _, v in pairs(result) do
-          if not v then
-              return true
-          end
-      end
-      return false
   end
 
   ---@param op string

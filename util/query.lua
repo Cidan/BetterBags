@@ -84,13 +84,16 @@ function QueryParser:Lexer(input)
     elseif char == "(" or char == ")" then
       table.insert(tokens, {type = "paren", value = char})
       advance()
-    elseif char == "=" or char == "<" or char == ">" then
+    elseif char == "=" or char == "<" or char == ">" or char == "%" then
       if char == "<" and peek(1) == "=" then
         table.insert(tokens, {type = "operator", value = "<="})
         advance(2)
       elseif char == ">" and peek(1) == "=" then
         table.insert(tokens, {type = "operator", value = ">="})
         advance(2)
+      elseif char == "%" then
+        table.insert(tokens, {type = "operator", value = "%"})
+        advance(1)
       else
         table.insert(tokens, {type = "operator", value = char})
         advance()
