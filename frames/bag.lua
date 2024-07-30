@@ -268,7 +268,9 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
   self.currentView = view
   self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
   local text = searchBox:GetText()
-  self:Search(search:Search(text))
+  if text ~= "" and text ~= nil then
+    self:Search(search:Search(text))
+  end
   self:OnResize()
   if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
     self.slots:Draw()
