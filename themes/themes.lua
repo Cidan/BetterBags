@@ -405,6 +405,9 @@ function themes.SetupBagButton(bag, decoration)
     else
       GameTooltip:AddDoubleLine(L:G("Left Click"), L:G("Open Menu"), 1, 0.81, 0, 1, 1, 1)
       GameTooltip:AddDoubleLine(L:G("Shift Left Click"), L:G("Search Bags"), 1, 0.81, 0, 1, 1, 1)
+      if addon.isRetail then
+        GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Deposit Warbank Items"), 1, 0.81, 0, 1, 1, 1)
+      end
     end
 
     if CursorHasItem() then
@@ -442,7 +445,11 @@ function themes.SetupBagButton(bag, decoration)
         contextMenu:Show(bag.menuList)
       end
     elseif e == "RightButton" then
-      bag:Sort()
+      if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
+        C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
+      else
+        bag:Sort()
+      end
     end
   end)
   return bagButton

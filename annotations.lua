@@ -272,6 +272,7 @@ function ScrollBoxDragBehavior:SetFinalizeDrop(fn) end
 ---@field FetchPurchasedBankTabData fun(bankType: BankType): BankTabData[]
 ---@field HasMaxBankTabs fun(bankType: BankType): boolean
 ---@field FetchDepositedMoney fun(bankType: BankType): number
+---@field AutoDepositItemsIntoBank fun(bankType: BankType)
 C_Bank = {}
 
 ---@enum BagSlotFlags
