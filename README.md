@@ -213,9 +213,9 @@ Search allows you to find items by (based on the item below):
 - `<=` Items with a value less than or equal to the number on the right side.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/dKNAizb.png" alt="Armor Type Search in Retail.">
+<img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail.">
 
-*Armor Type Search in Retail.*
+*Complex Search in Retail.*
 </div>
 
 BetterBags also allows you to turn on a search bar in the header of the bag instead of the floating search box.
