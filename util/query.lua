@@ -56,6 +56,7 @@ function QueryParser:Lexer(input)
   end
 
   ---@param quote_char string
+  ---@return string
   local function read_quoted_string(quote_char)
     local value = ""
     advance() -- Skip the opening quote
