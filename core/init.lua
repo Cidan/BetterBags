@@ -81,6 +81,7 @@ local debug = addon:GetModule('Debug')
 addon.Bags = {}
 
 addon.atBank = false
+addon.atWarbank = false
 
 -- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
 function BetterBags_ToggleBags()

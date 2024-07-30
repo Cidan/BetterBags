@@ -102,6 +102,9 @@ function refresh:StartUpdate()
   end
 
   if updateBank and addon.atBank then
+    if addon.atWarbank and addon.Bags.Bank.bankTab < const.BANK_TAB.ACCOUNT_BANK_1 then
+      addon.Bags.Bank.bankTab = const.BANK_TAB.ACCOUNT_BANK_1
+    end
     items:RefreshBank(ctx:Copy())
   end
 

@@ -79,17 +79,19 @@ end
 
 function tabFrame:ReanchorTabs()
   self.width = 0
+  local tabCount = 1
   for i, tab in ipairs(self.tabIndex) do
     tab:ClearAllPoints()
     if tab:IsShown() then
       local anchorFrame = self.frame
       local anchorPoint = "TOPLEFT"
-      if i > 1 then
+      if tabCount > 1 then
         anchorFrame = self.tabIndex[i - 1]
         anchorPoint = "TOPRIGHT"
       end
       tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
       self.width = self.width + tab:GetWidth() + 5
+      tabCount = tabCount + 1
     end
   end
 end

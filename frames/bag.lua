@@ -165,6 +165,16 @@ function bagFrame.bagProto:GetWarbankTabDataByID(id)
   return {}
 end
 
+function bagFrame.bagProto:HideBankAndReagentTabs()
+  self.tabs:HideTab("Bank")
+  self.tabs:HideTab("Reagent Bank")
+end
+
+function bagFrame.bagProto:ShowBankAndReagentTabs()
+  self.tabs:ShowTab("Bank")
+  self.tabs:ShowTab("Reagent Bank")
+end
+
 function bagFrame.bagProto:Show()
   if self.frame:IsShown() then
     return
@@ -172,8 +182,14 @@ function bagFrame.bagProto:Show()
   --addon.ForceShowBlizzardBags()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
 
-  if self.kind == const.BAG_KIND.BANK and addon.isRetail and C_PlayerInfo.HasAccountInventoryLock() then
+  if self.kind == const.BAG_KIND.BANK and addon.isRetail then
     self:GenerateWarbankTabs()
+    if addon.atWarbank then
+      self:HideBankAndReagentTabs()
+      self.tabs:SetTab(self.tabs:GetTabNameByID(13))
+    else
+      self:ShowBankAndReagentTabs()
+    end
   end
 
   self.frame:Show()

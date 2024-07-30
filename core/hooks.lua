@@ -19,6 +19,7 @@ addon.backpackShouldClose = false
 local interactionEvents = {
   [Enum.PlayerInteractionType.TradePartner] = true,
   [Enum.PlayerInteractionType.Banker] = true,
+  [Enum.PlayerInteractionType.AccountBanker] = true,
   [Enum.PlayerInteractionType.Merchant] = true,
   [Enum.PlayerInteractionType.MailInfo] = true,
   [Enum.PlayerInteractionType.Auctioneer] = true,
@@ -65,6 +66,9 @@ function addon:OpenInteractionWindow(interactionType)
     return
   end
   debug:Log("Interaction", "OpenInteractionWindow", interactionType)
+  if interactionType == Enum.PlayerInteractionType.AccountBanker then
+    addon.atWarbank = true
+  end
   addon.atInteracting = true
   addon.backpackShouldOpen = true
   events:SendMessageLater('bags/OpenClose')
@@ -75,6 +79,7 @@ function addon:CloseInteractionWindow(interactionType)
   if interactionEvents[interactionType] == nil then return end
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
+  addon.atWarbank = false
   addon.backpackShouldClose = true
   events:SendMessage('bags/FullRefreshAll')
   events:SendMessageLater('bags/OpenClose')
