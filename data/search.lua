@@ -452,7 +452,7 @@ function search:EvaluateAST(node)
       end
       if operator == "=" then
           return self:isInIndex(field, value)
-      elseif operator == "%" then
+      elseif operator == "%=" then
           return self:isFullTextMatch(field, value)
       elseif operator == ">=" then
           return self:isGreaterOrEqual(field, value)

@@ -91,9 +91,9 @@ function QueryParser:Lexer(input)
       elseif char == ">" and peek(1) == "=" then
         table.insert(tokens, {type = "operator", value = ">="})
         advance(2)
-      elseif char == "%" then
-        table.insert(tokens, {type = "operator", value = "%"})
-        advance(1)
+      elseif char == "%" and peek(1) == "=" then
+        table.insert(tokens, {type = "operator", value = "%="})
+        advance(2)
       else
         table.insert(tokens, {type = "operator", value = char})
         advance()
