@@ -37,7 +37,7 @@ local db = addon:GetModule('Database')
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
 ---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
 ---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
----@field Tab? fun(tab: Button): PanelTabButtonTemplate A function that applies the theme to a tab.
+---@field Tab? fun(tab: Button): TabButton A function that applies the theme to a tab.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 
 ---@class Themes: AceModule
@@ -46,7 +46,7 @@ local db = addon:GetModule('Database')
 ---@field sectionFonts table<string, FontString>
 ---@field titles table<string, string>
 ---@field itemButtons table<string, ItemButton>
----@field tabs table<string, PanelTabButtonTemplate>
+---@field tabs table<number, TabButton>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -283,29 +283,30 @@ function themes:GetItemButton(item)
   return button
 end
 
----@param tab Button
----@return PanelTabButtonTemplate
+---@param tab TabButton
+---@return TabButton
 function themes:GetTabButton(tab)
   local theme = self:GetCurrentTheme()
   if theme.Tab then
     return theme.Tab(tab)
   end
-  local tabName = tab:GetName()
-  local decoration = self.tabs[tabName]
+  local tabIndex = tab.index
+  local decoration = self.tabs[tabIndex]
   if decoration then
     decoration:Show()
     return decoration
   end
   decoration = themes.CreateDefaultTabDecoration(tab)
-  self.tabs[tabName] = decoration
+  self.tabs[tabIndex] = decoration
   return decoration
 end
 
 ---@param tab Button
----@return PanelTabButtonTemplate
+---@return TabButton
 function themes.CreateDefaultTabDecoration(tab)
-  local decoration = CreateFrame("button", tab:GetName() .. "default", tab, "PanelTabButtonTemplate") --[[@as PanelTabButtonTemplate]]
+  local decoration = CreateFrame("button", tab:GetName() .. "default", tab, "PanelTabButtonTemplate") --[[@as TabButton]]
   decoration:SetPoint("TOPLEFT", tab, "TOPLEFT", 0, 0)
+  decoration:RegisterForClicks("LeftButtonDown", "RightButtonDown")
   return decoration
 end
 

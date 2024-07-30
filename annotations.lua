@@ -273,11 +273,26 @@ function ScrollBoxDragBehavior:SetFinalizeDrop(fn) end
 ---@field HasMaxBankTabs fun(bankType: BankType): boolean
 C_Bank = {}
 
+---@enum BagSlotFlags
+BagSlotFlags = {
+  DisableAutoSort = 1,
+  ClassEquipment = 2,
+  ClassConsumables = 4,
+  ClassProfessionGoods = 8,
+  ClassJunk = 16,
+  ClassQuestItems = 32,
+  ExcludeJunkSell = 64,
+  ClassReagents = 128,
+  ExpansionCurrent = 256,
+  ExpansionLegacy = 512,
+}
+
 ---@class BankTabData
 ---@field ID number
 ---@field bankType BankType
 ---@field name string
 ---@field icon number
+---@field depositFlags BagSlotFlags
 
 ---@class Frame
 ---@field scrollable boolean

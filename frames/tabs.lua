@@ -25,7 +25,7 @@ local debug = addon:GetModule('Debug')
 ---@field selectedTextX number
 ---@field selectedTextY number
 
----@class TabButton: Button
+---@class TabButton: PanelTabButtonTemplate
 ---@field name string
 ---@field index number
 ---@field id? number
@@ -37,7 +37,7 @@ local debug = addon:GetModule('Debug')
 ---@field tabIndex TabButton[]
 ---@field buttonToName table<TabButton, string>
 ---@field selectedTab string
----@field clickHandler fun(name: number): boolean?
+---@field clickHandler fun(name: number, button: string): boolean?
 ---@field width number
 local tabFrame = {}
 
@@ -114,6 +114,43 @@ function tabFrame:GetTabName(index)
   return self.buttonToName[self.tabIndex[index]]
 end
 
+---@param id number
+---@return string
+function tabFrame:GetTabNameByID(id)
+  for name, tab in pairs(self.tabs) do
+    if tab.id == id then
+      return name
+    end
+  end
+  return ""
+end
+
+---@param id number
+---@return boolean
+function tabFrame:TabExistsByID(id)
+  for _, tab in pairs(self.tabs) do
+    if tab.id == id then
+      return true
+    end
+  end
+  return false
+end
+
+---@param id number
+---@param name string
+function tabFrame:RenameTabByID(id, name)
+  for _, tab in pairs(self.tabs) do
+    if tab.id == id then
+      self.tabs[tab.name] = nil
+      tab.name = name
+      self.buttonToName[tab] = name
+      self.tabs[name] = tab
+      self:ResizeTab(name)
+      return
+    end
+  end
+end
+
 ---@param name string
 function tabFrame:ResizeTab(name)
   local TAB_SIDES_PADDING = 20
@@ -132,13 +169,13 @@ function tabFrame:ResizeTab(name)
 	tab:SetWidth(width)
   tab:SetHeight(32)
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
-  decoration:SetScript("OnClick", function()
+  decoration:SetScript("OnClick", function(_, button)
     if tab.onClick then
       tab.onClick()
       return
     end
     if self.clickHandler then
-      if self.clickHandler(tab.id or tab.index) then
+      if self.clickHandler(tab.id or tab.index, button) then
         self:SetTab(name)
       end
     end
@@ -208,7 +245,7 @@ function tabFrame:SelectTab(name)
 	end
 end
 
----@param fn fun(name: number): boolean?
+---@param fn fun(name: number, button: string): boolean?
 function tabFrame:SetClickHandler(fn)
   self.clickHandler = fn
 end
