@@ -55,6 +55,26 @@ function QueryParser:Lexer(input)
     return value
   end
 
+  ---@param quote_char string
+  local function read_quoted_string(quote_char)
+    local value = ""
+    advance() -- Skip the opening quote
+    while i <= #input do
+      local char = peek()
+      if char == quote_char then
+        advance() -- Skip the closing quote
+        break
+      elseif char == "\\" and peek(1) == quote_char then
+        value = value .. quote_char
+        advance(2) -- Skip the backslash and the escaped quote
+      else
+        value = value .. char
+        advance()
+      end
+    end
+    return value
+  end
+
   while i <= #input do
     local char = peek()
 
@@ -74,6 +94,9 @@ function QueryParser:Lexer(input)
         table.insert(tokens, {type = "operator", value = char})
         advance()
       end
+    elseif char == "'" or char == '"' then
+      local quoted_string = read_quoted_string(char)
+      table.insert(tokens, {type = "term", value = quoted_string})
     elseif is_alphanumeric(char) then
       local word = read_word()
       if word:upper() == "AND" or word:upper() == "OR" or word:upper() == "NOT" then
