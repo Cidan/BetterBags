@@ -190,6 +190,7 @@ function bagFrame.bagProto:Show()
     else
       self:ShowBankAndReagentTabs()
     end
+   self.moneyFrame:Update()
   end
 
   self.frame:Show()
@@ -531,6 +532,13 @@ function bagFrame:Create(kind)
     b.moneyFrame = moneyFrame
   end
 
+    -- ...except for warbank!
+  if kind == const.BAG_KIND.BANK then
+    local moneyFrame = money:Create(true)
+    moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", -4, 0)
+    moneyFrame.frame:SetParent(b.frame)
+    b.moneyFrame = moneyFrame
+  end
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 

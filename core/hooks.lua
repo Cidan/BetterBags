@@ -19,7 +19,6 @@ addon.backpackShouldClose = false
 local interactionEvents = {
   [Enum.PlayerInteractionType.TradePartner] = true,
   [Enum.PlayerInteractionType.Banker] = true,
-  [Enum.PlayerInteractionType.AccountBanker] = true,
   [Enum.PlayerInteractionType.Merchant] = true,
   [Enum.PlayerInteractionType.MailInfo] = true,
   [Enum.PlayerInteractionType.Auctioneer] = true,
@@ -28,6 +27,10 @@ local interactionEvents = {
   [Enum.PlayerInteractionType.ScrappingMachine] = true,
   [Enum.PlayerInteractionType.ItemUpgrade] = true,
 }
+
+if addon.isRetail then
+  interactionEvents[Enum.PlayerInteractionType.AccountBanker] = true
+end
 
 function addon.ForceHideBlizzardBags()
   for i = 1, NUM_TOTAL_BAG_FRAMES, 1 do

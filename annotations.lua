@@ -271,6 +271,7 @@ function ScrollBoxDragBehavior:SetFinalizeDrop(fn) end
 ---@field FetchNumPurchasedBankTabs fun(bankType: BankType): number
 ---@field FetchPurchasedBankTabData fun(bankType: BankType): BankTabData[]
 ---@field HasMaxBankTabs fun(bankType: BankType): boolean
+---@field FetchDepositedMoney fun(bankType: BankType): number
 C_Bank = {}
 
 ---@enum BagSlotFlags
@@ -405,6 +406,8 @@ Enum.BagIndex.AccountBankTab_2 = 14
 Enum.BagIndex.AccountBankTab_3 = 15
 Enum.BagIndex.AccountBankTab_4 = 16
 Enum.BagIndex.AccountBankTab_5 = 17
+
+Enum.PlayerInteractionType.AccountBanker = 68
 
 ---@enum BankType
 Enum.BankType = {
