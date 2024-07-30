@@ -411,7 +411,16 @@ Enum.BankType = {
   Account = 2,
 }
 
----@class AccountBankPanel
+---@class TabSettingsMenu: Frame
+TabSettingsMenu = {}
+function TabSettingsMenu:Show() end
+function TabSettingsMenu:Hide() end
+function TabSettingsMenu:SetSelectedTab(index) end
+function TabSettingsMenu:Update() end
+function TabSettingsMenu:GetBankFrame() end
+
+---@class AccountBankPanel: Frame
+---@field TabSettingsMenu TabSettingsMenu
 AccountBankPanel = {}
 
 ACCOUNT_BANK_PANEL_TITLE = ""

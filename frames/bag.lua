@@ -145,6 +145,12 @@ function bagFrame.bagProto:GenerateWarbankTabs()
     self.tabs:MoveToEnd("Purchase Warbank Tab")
     self.tabs:ShowTab("Purchase Warbank Tab")
   end
+  -- TODO(lobato): this
+  --self.currentView:UpdateWidth()
+  local w = self.tabs.width
+  if self.frame:GetWidth() + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET < w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET then
+    self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+  end
 end
 
 ---@param id number
@@ -535,7 +541,7 @@ function bagFrame:Create(kind)
   if kind == const.BAG_KIND.BANK then
     -- Move the settings menu to the bag frame.
     AccountBankPanel.TabSettingsMenu:SetParent(b.frame)
-    AccountBankPanel:ClearAllPoints()
+    AccountBankPanel.TabSettingsMenu:ClearAllPoints()
     AccountBankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMRIGHT", 10, 0)
 
     -- Adjust the settings function so the tab settings menu is populated correctly.
@@ -562,11 +568,13 @@ function bagFrame:Create(kind)
 
     b.tabs:SetClickHandler(function(tabIndex, button)
       if tabIndex == 1 then
+        AccountBankPanel.TabSettingsMenu:Hide()
         b:SwitchToBank()
       elseif tabIndex == 2 then
+        AccountBankPanel.TabSettingsMenu:Hide()
         return b:SwitchToReagentBank()
       else
-        if button == "RightButton" then
+        if button == "RightButton" or AccountBankPanel.TabSettingsMenu:IsShown() then
           AccountBankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
           AccountBankPanel.TabSettingsMenu:Show()
           AccountBankPanel.TabSettingsMenu:Update()

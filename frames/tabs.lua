@@ -25,7 +25,7 @@ local debug = addon:GetModule('Debug')
 ---@field selectedTextX number
 ---@field selectedTextY number
 
----@class TabButton: PanelTabButtonTemplate
+---@class TabButton: Button
 ---@field name string
 ---@field index number
 ---@field id? number
@@ -153,28 +153,21 @@ end
 
 ---@param name string
 function tabFrame:ResizeTab(name)
-  local TAB_SIDES_PADDING = 20
   local tab = self.tabs[name]
   local decoration = themes:GetTabButton(tab)
   decoration.Text:SetText(name)
-	local textWidth = decoration.Text:GetStringWidth()
-	local width = textWidth + TAB_SIDES_PADDING
-	local sideWidths = decoration.Left:GetWidth() + decoration.Right:GetWidth()
-	local minWidth = sideWidths
 
-	if minWidth and width < minWidth then
-		width = minWidth
-		textWidth = width - TAB_SIDES_PADDING
-	end
-	tab:SetWidth(width)
+  PanelTemplates_TabResize(decoration)
+	tab:SetWidth(decoration:GetWidth())
   tab:SetHeight(32)
+
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
   decoration:SetScript("OnClick", function(_, button)
     if tab.onClick then
       tab.onClick()
       return
     end
-    if self.clickHandler then
+    if self.clickHandler and (self.selectedTab ~= name or button == "RightButton") then
       if self.clickHandler(tab.id or tab.index, button) then
         self:SetTab(name)
       end
@@ -228,7 +221,7 @@ function tabFrame:SelectTab(name)
 	decoration.Left:Hide()
 	decoration.Middle:Hide()
 	decoration.Right:Hide()
-	decoration:Disable()
+	--decoration:Disable()
 	decoration:SetDisabledFontObject(GameFontHighlightSmall);
 
 	local offsetY = decoration.selectedTextY or -3;
