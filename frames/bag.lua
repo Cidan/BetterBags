@@ -126,7 +126,9 @@ bagFrame.bagProto = {}
 function bagFrame.bagProto:GenerateWarbankTabs()
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
-    if not self.tabs:TabExists(data.name) then
+    if self.tabs:TabExistsByID(data.ID) and self.tabs:GetTabNameByID(data.ID) ~= data.name then
+      self.tabs:RenameTabByID(data.ID, data.name)
+    elseif not self.tabs:TabExistsByID(data.ID) then
       self.tabs:AddTab(data.name, data.ID)
     end
   end
@@ -143,6 +145,24 @@ function bagFrame.bagProto:GenerateWarbankTabs()
     self.tabs:MoveToEnd("Purchase Warbank Tab")
     self.tabs:ShowTab("Purchase Warbank Tab")
   end
+  -- TODO(lobato): this
+  --self.currentView:UpdateWidth()
+  local w = self.tabs.width
+  if self.frame:GetWidth() + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET < w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET then
+    self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+  end
+end
+
+---@param id number
+---@return BankTabData
+function bagFrame.bagProto:GetWarbankTabDataByID(id)
+  local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
+  for _, data in pairs(tabData) do
+    if data.ID == id then
+      return data
+    end
+  end
+  return {}
 end
 
 function bagFrame.bagProto:Show()
@@ -519,18 +539,46 @@ function bagFrame:Create(kind)
   end
 
   if kind == const.BAG_KIND.BANK then
+    -- Move the settings menu to the bag frame.
+    AccountBankPanel.TabSettingsMenu:SetParent(b.frame)
+    AccountBankPanel.TabSettingsMenu:ClearAllPoints()
+    AccountBankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMRIGHT", 10, 0)
+
+    -- Adjust the settings function so the tab settings menu is populated correctly.
+    AccountBankPanel.TabSettingsMenu.GetBankFrame = function()
+      return {
+        GetTabData = function(_, id)
+          local bankTabData = b:GetWarbankTabDataByID(id)
+          return {
+            ID = id,
+            icon = bankTabData.icon,
+            name = b.tabs:GetTabNameByID(id),
+            depositFlags = bankTabData.depositFlags,
+            bankType = Enum.BankType.Account,
+          }
+        end
+      }
+    end
+
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab("Bank")
     b.tabs:AddTab("Reagent Bank")
 
     b.tabs:SetTab("Bank")
 
-    b.tabs:SetClickHandler(function(tabIndex)
+    b.tabs:SetClickHandler(function(tabIndex, button)
       if tabIndex == 1 then
+        AccountBankPanel.TabSettingsMenu:Hide()
         b:SwitchToBank()
       elseif tabIndex == 2 then
+        AccountBankPanel.TabSettingsMenu:Hide()
         return b:SwitchToReagentBank()
       else
+        if button == "RightButton" or AccountBankPanel.TabSettingsMenu:IsShown() then
+          AccountBankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
+          AccountBankPanel.TabSettingsMenu:Show()
+          AccountBankPanel.TabSettingsMenu:Update()
+        end
         b:SwitchToAccountBank(tabIndex)
       end
       return true
@@ -538,6 +586,9 @@ function bagFrame:Create(kind)
     -- BANK_TAB_SETTINGS_UPDATED
     -- BANK_TABS_CHANGED
     events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function()
+      b:GenerateWarbankTabs()
+    end)
+    events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function()
       b:GenerateWarbankTabs()
     end)
   end

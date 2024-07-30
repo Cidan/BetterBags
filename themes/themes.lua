@@ -46,7 +46,7 @@ local db = addon:GetModule('Database')
 ---@field sectionFonts table<string, FontString>
 ---@field titles table<string, string>
 ---@field itemButtons table<string, ItemButton>
----@field tabs table<string, PanelTabButtonTemplate>
+---@field tabs table<number, PanelTabButtonTemplate>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -283,21 +283,21 @@ function themes:GetItemButton(item)
   return button
 end
 
----@param tab Button
+---@param tab TabButton
 ---@return PanelTabButtonTemplate
 function themes:GetTabButton(tab)
   local theme = self:GetCurrentTheme()
   if theme.Tab then
     return theme.Tab(tab)
   end
-  local tabName = tab:GetName()
-  local decoration = self.tabs[tabName]
+  local tabIndex = tab.index
+  local decoration = self.tabs[tabIndex]
   if decoration then
     decoration:Show()
     return decoration
   end
   decoration = themes.CreateDefaultTabDecoration(tab)
-  self.tabs[tabName] = decoration
+  self.tabs[tabIndex] = decoration
   return decoration
 end
 
@@ -306,6 +306,7 @@ end
 function themes.CreateDefaultTabDecoration(tab)
   local decoration = CreateFrame("button", tab:GetName() .. "default", tab, "PanelTabButtonTemplate") --[[@as PanelTabButtonTemplate]]
   decoration:SetPoint("TOPLEFT", tab, "TOPLEFT", 0, 0)
+  decoration:RegisterForClicks("LeftButtonDown", "RightButtonDown")
   return decoration
 end
 

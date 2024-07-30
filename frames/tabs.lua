@@ -37,7 +37,7 @@ local debug = addon:GetModule('Debug')
 ---@field tabIndex TabButton[]
 ---@field buttonToName table<TabButton, string>
 ---@field selectedTab string
----@field clickHandler fun(name: number): boolean?
+---@field clickHandler fun(name: number, button: string): boolean?
 ---@field width number
 local tabFrame = {}
 
@@ -114,31 +114,61 @@ function tabFrame:GetTabName(index)
   return self.buttonToName[self.tabIndex[index]]
 end
 
+---@param id number
+---@return string
+function tabFrame:GetTabNameByID(id)
+  for name, tab in pairs(self.tabs) do
+    if tab.id == id then
+      return name
+    end
+  end
+  return ""
+end
+
+---@param id number
+---@return boolean
+function tabFrame:TabExistsByID(id)
+  for _, tab in pairs(self.tabs) do
+    if tab.id == id then
+      return true
+    end
+  end
+  return false
+end
+
+---@param id number
+---@param name string
+function tabFrame:RenameTabByID(id, name)
+  for _, tab in pairs(self.tabs) do
+    if tab.id == id then
+      self.tabs[tab.name] = nil
+      tab.name = name
+      self.buttonToName[tab] = name
+      self.tabs[name] = tab
+      self:ResizeTab(name)
+      return
+    end
+  end
+end
+
 ---@param name string
 function tabFrame:ResizeTab(name)
-  local TAB_SIDES_PADDING = 20
   local tab = self.tabs[name]
   local decoration = themes:GetTabButton(tab)
   decoration.Text:SetText(name)
-	local textWidth = decoration.Text:GetStringWidth()
-	local width = textWidth + TAB_SIDES_PADDING
-	local sideWidths = decoration.Left:GetWidth() + decoration.Right:GetWidth()
-	local minWidth = sideWidths
 
-	if minWidth and width < minWidth then
-		width = minWidth
-		textWidth = width - TAB_SIDES_PADDING
-	end
-	tab:SetWidth(width)
+  PanelTemplates_TabResize(decoration)
+	tab:SetWidth(decoration:GetWidth())
   tab:SetHeight(32)
+
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
-  decoration:SetScript("OnClick", function()
+  decoration:SetScript("OnClick", function(_, button)
     if tab.onClick then
       tab.onClick()
       return
     end
-    if self.clickHandler then
-      if self.clickHandler(tab.id or tab.index) then
+    if self.clickHandler and (self.selectedTab ~= name or button == "RightButton") then
+      if self.clickHandler(tab.id or tab.index, button) then
         self:SetTab(name)
       end
     end
@@ -191,7 +221,7 @@ function tabFrame:SelectTab(name)
 	decoration.Left:Hide()
 	decoration.Middle:Hide()
 	decoration.Right:Hide()
-	decoration:Disable()
+	--decoration:Disable()
 	decoration:SetDisabledFontObject(GameFontHighlightSmall);
 
 	local offsetY = decoration.selectedTextY or -3;
@@ -208,7 +238,7 @@ function tabFrame:SelectTab(name)
 	end
 end
 
----@param fn fun(name: number): boolean?
+---@param fn fun(name: number, button: string): boolean?
 function tabFrame:SetClickHandler(fn)
   self.clickHandler = fn
 end
