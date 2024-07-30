@@ -64,7 +64,7 @@ The War Within Beta
 - Items within categories have multiple sorting and stacking options (stack all, stack non-stackable, don't stack different transmogs).
 - Robust plugin system allows for custom categories, configurations for user fine-tuning and even localization.
 - Powerful recent items support with customizable duration (mark all new items as recent, flash all recent items).
-- Comprehensive Search that allows you to find an item by its armor type (i.e. `leather`), slot (`legs`), or its assigned category. 
+- Comprehensive Search that allows you to find an item most properties of an item (`Type`, `Subtype`, `iLvl`, and many more).
 - Integration support for [Pawn](https://www.curseforge.com/wow/addons/pawn) (upgrade arrows) and [Simple Item Levels](https://www.curseforge.com/wow/addons/simple-item-level) (item level coloring).
 
 More additions are being added all the time.
@@ -162,15 +162,60 @@ These can be further fine-tuned by:
 ## Search
 BetterBags offers a comprehensive Search option that can be toggled with a keybinding (`BetterBags > Search Bags`).
 
-Search allows you to find items by:
-- Armor type, i.e. `leather`. This will highlight all the items that are of the leather armor type.
-- Slot, i.e. `legs`. This will highlight all the items that are leg pieces.
-- Category name. This will highlight all items that belong to that category even if they are currently sorted in another.
+By default searches are done in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator. If you do not specify a search index, search will default to searching in all of `name`, `type`, `subtype`, `category`, and `equipmentLocation`.  
+Search allows you to find items by (based on the item below):
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/dKNAizb.png" alt="Armor Type Search in Retail.">
+<img src="https://i.imgur.com/m7CTReP.png" alt="Example Item in Retail.">
 
-*Armor Type Search in Retail.*
+*Example Item in Retail.*
+</div>
+
+### Strings
+- `name` (name = Silent Tormentor's Hood) The name of the item; the first line in the tooltip.
+- `type` (type = Armor) The type of the item. Some examples include Armor, Weapon, Consumable, and Reagent.
+- `subtype` (subtype = Leather) The subtype of the item. Some examples include Leather, Potion, Bag, and Bows. See the [Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding type and subtype.
+- `category` (category = Head) The category that the item is sorted into in BetterBags.
+- `equipmentLocation` or `slot` (slot = Head) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
+- `expansion` (expansion = Dragonflight) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW.
+- `equipmentSet` (None in the example) The equipment set(s) that a piece of gear is part of.
+
+### Numbers
+- `level` or `ilvl` (ilvl = 506) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
+- `rarity` (rarity = epic or rarity = 4) The rarity of the item. Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5.
+- `id` (id = 207133) The internal itemID of the item. A number uniquely identifying the item. Specific ItemIDs can be found in the url on the item's WoWHead page.
+- `stackCount` (stackCount = 1) The number of items in the stack for the item.
+- `class` (class = 4) The numeric representation of itemType.
+- `subclass` (subclass = 2) The numeric representation of itemSubtype. See the [Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding class and subclass.
+- `bagid` (bagid = 3) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 6-12 for bank bags, -3 for the reagent bank, -2 for the keyring (Classic only), and 13-17 for warbank tabs.
+- `slotid` (slotid = 6) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
+
+### Booleans
+- `reagent` (reagent = false) Is the item classified as a reagent?
+- `bound` (bound = true) Is the item bound to the character?
+- `quest` (quest = false) Is the item for a non-active quest?
+- `activeQuest` (activeQuest = false) Is the item for an active quest?
+
+### Logical Operators
+- `AND` (slot = Legs AND ilvl > 500 \[This will match leg pieces that are also greater than 500 ilvl.\]) The intersection of two terms. Items must match both sides of the AND.
+- `OR` (slot = Legs OR ilvl > 500 \[This will match items that are leg pieces or are greater than 500 ilvl.\] The union of two terms. Items can match either or both sides of the OR.
+- `NOT` (NOT slot = Legs \[This will match any item that cannot be equipped in the leg slot.\] The complement of a term. Items must not match the NOT.
+- `(` and `)` To group search terms.
+- `=` (type = Armor, ilvl = 506) Items with a value equal to the text or number on the right side. This will find any items starting with the value.
+- `%=` (slot %= Hand \[This will match any gear pieces that are slotted into any slot with `Hand` in the name. eg. Hands, Main Hand, Offhand\]) Items with the value in the full text of the field(s).
+- `"` or `'` (slot = "Main Hand") To search for a multi-word string.
+
+### Comparison Operators
+**Note: These only work on numerical fields. Rarity names can be used with these operators.**
+- `>` Items with a value greater than the number on the right side.
+- `<` Items with a value less than the number on the right side.
+- `>=` Items with a value greater than or equal to the number on the right side.
+- `<=` Items with a value less than or equal to the number on the right side.
+
+<div align="center" style="text-align:center">
+<img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail.">
+
+*Complex Search in Retail.*
 </div>
 
 BetterBags also allows you to turn on a search bar in the header of the bag instead of the floating search box.
