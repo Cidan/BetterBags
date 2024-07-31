@@ -127,6 +127,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   end
   self.button.BattlepayItemTexture:SetShown(false)
   self.button.NewItemTexture:Hide()
+  decoration:SetMatchesSearch(true)
   --self.button.UpgradeIcon:SetShown(IsContainerItemAnUpgrade(bagid, slotid) or false)
   --self.button:SetItemButtonTexture(data.itemInfo.itemIcon)
   --self.button.
