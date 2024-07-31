@@ -204,6 +204,16 @@ function contextMenu:CreateContextMenu(bag)
         DepositReagentBank()
       end
     })
+    table.insert(menuList, {
+      text = L:G("Clean Up Warbank"),
+      notCheckable = true,
+      tooltipTitle = L:G("Clean Up Warbank"),
+      tooltipText = L:G("Click to clean up your Warbanks and resort items into correct tabs."),
+      func = function()
+        PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
+        C_Container.SortAccountBankBags()
+      end
+    })
   end
 
   -- Show bag slot toggle.
