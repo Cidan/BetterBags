@@ -140,10 +140,10 @@ function bagFrame.bagProto:GenerateWarbankTabs()
   end
 
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
-    self.tabs:HideTab("Purchase Warbank Tab")
+    self.tabs:HideTabByName("Purchase Warbank Tab")
   else
     self.tabs:MoveToEnd("Purchase Warbank Tab")
-    self.tabs:ShowTab("Purchase Warbank Tab")
+    self.tabs:ShowTabByName("Purchase Warbank Tab")
   end
   -- TODO(lobato): this
   --self.currentView:UpdateWidth()
@@ -166,13 +166,13 @@ function bagFrame.bagProto:GetWarbankTabDataByID(id)
 end
 
 function bagFrame.bagProto:HideBankAndReagentTabs()
-  self.tabs:HideTab("Bank")
-  self.tabs:HideTab("Reagent Bank")
+  self.tabs:HideTabByIndex(1)
+  self.tabs:HideTabByIndex(2)
 end
 
 function bagFrame.bagProto:ShowBankAndReagentTabs()
-  self.tabs:ShowTab("Bank")
-  self.tabs:ShowTab("Reagent Bank")
+  self.tabs:ShowTabByIndex(1)
+  self.tabs:ShowTabByIndex(2)
 end
 
 function bagFrame.bagProto:Show()
@@ -186,7 +186,7 @@ function bagFrame.bagProto:Show()
     self:GenerateWarbankTabs()
     if addon.atWarbank then
       self:HideBankAndReagentTabs()
-      self.tabs:SetTab(self.tabs:GetTabNameByID(13))
+      self.tabs:SetTabByID(13)
     else
       self:ShowBankAndReagentTabs()
     end
@@ -400,7 +400,7 @@ function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   local ctx = context:New()
   ctx:Set('wipe', true)
-  self.tabs:SetTab("Bank")
+  self.tabs:SetTabByIndex(1)
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
@@ -588,7 +588,7 @@ function bagFrame:Create(kind)
     b.tabs:AddTab("Bank")
     b.tabs:AddTab("Reagent Bank")
 
-    b.tabs:SetTab("Bank")
+    b.tabs:SetTabByIndex(1)
 
     b.tabs:SetClickHandler(function(tabIndex, button)
       if tabIndex == 1 then

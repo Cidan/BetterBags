@@ -33,10 +33,9 @@ local debug = addon:GetModule('Debug')
 
 ---@class (exact) Tab
 ---@field frame Frame
----@field tabs table<string, TabButton>
 ---@field tabIndex TabButton[]
 ---@field buttonToName table<TabButton, string>
----@field selectedTab string
+---@field selectedTab number
 ---@field clickHandler fun(name: number, button: string): boolean?
 ---@field width number
 local tabFrame = {}
@@ -57,24 +56,36 @@ function tabFrame:AddTab(name, id, onClick)
     anchorPoint = "TOPRIGHT"
   end
   tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
-  self.tabs[name] = tab
   table.insert(self.tabIndex, tab)
   tab.index = #self.tabIndex
   self.buttonToName[tab] = name
-  self:DeselectTab(name)
-  self:ResizeTab(name)
+  self:DeselectTab(tab.index)
+  self:ResizeTabByIndex(tab.index)
   self:ReanchorTabs()
 end
 
+---@param name string
+---@return TabButton?
+function tabFrame:GetTabByName(name)
+  for _, tab in pairs(self.tabIndex) do
+    if tab.name == name then
+      return tab
+    end
+  end
+  return nil
+end
+
+---@param name string
+---@return boolean
 function tabFrame:TabExists(name)
-  return self.tabs[name] ~= nil
+  return self:GetTabByName(name) ~= nil
 end
 
 function tabFrame:Reload()
-  for name in pairs(self.tabs) do
-    self:ResizeTab(name)
+  for index in pairs(self.tabIndex) do
+    self:ResizeTabByIndex(index)
   end
-  self:SetTab(self.selectedTab)
+  self:SetTabByIndex(self.selectedTab)
 end
 
 function tabFrame:ReanchorTabs()
@@ -119,9 +130,9 @@ end
 ---@param id number
 ---@return string
 function tabFrame:GetTabNameByID(id)
-  for name, tab in pairs(self.tabs) do
+  for _, tab in pairs(self.tabIndex) do
     if tab.id == id then
-      return name
+      return tab.name
     end
   end
   return ""
@@ -130,7 +141,7 @@ end
 ---@param id number
 ---@return boolean
 function tabFrame:TabExistsByID(id)
-  for _, tab in pairs(self.tabs) do
+  for _, tab in pairs(self.tabIndex) do
     if tab.id == id then
       return true
     end
@@ -141,23 +152,21 @@ end
 ---@param id number
 ---@param name string
 function tabFrame:RenameTabByID(id, name)
-  for _, tab in pairs(self.tabs) do
+  for index, tab in pairs(self.tabIndex) do
     if tab.id == id then
-      self.tabs[tab.name] = nil
       tab.name = name
       self.buttonToName[tab] = name
-      self.tabs[name] = tab
-      self:ResizeTab(name)
+      self:ResizeTabByIndex(index)
       return
     end
   end
 end
 
----@param name string
-function tabFrame:ResizeTab(name)
-  local tab = self.tabs[name]
+---@param index number
+function tabFrame:ResizeTabByIndex(index)
+  local tab = self.tabIndex[index]
   local decoration = themes:GetTabButton(tab)
-  decoration.Text:SetText(name)
+  decoration.Text:SetText(tab.name)
 
   PanelTemplates_TabResize(decoration)
 	tab:SetWidth(decoration:GetWidth())
@@ -169,38 +178,66 @@ function tabFrame:ResizeTab(name)
       tab.onClick()
       return
     end
-    if self.clickHandler and (self.selectedTab ~= name or button == "RightButton") then
+    if self.clickHandler and (self.selectedTab ~= index or button == "RightButton") then
       if self.clickHandler(tab.id or tab.index, button) then
-        self:SetTab(name)
+        self:SetTabByIndex(index)
       end
     end
   end)
 end
 
-function tabFrame:SetTab(name)
-  for k in pairs(self.tabs) do
-    if k == name then
-      self:SelectTab(k)
-    else
-      self:DeselectTab(k)
+---@param id number
+function tabFrame:SetTabByID(id)
+  for index, tab in pairs(self.tabIndex) do
+    if tab.id == id then
+      self:SetTabByIndex(index)
+      return
     end
   end
-  self.selectedTab = name
 end
 
-function tabFrame:ShowTab(name)
-  self.tabs[name]:Show()
+---@param index number
+function tabFrame:SetTabByIndex(index)
+  for i in pairs(self.tabIndex) do
+    if i == index then
+      self:SelectTab(i)
+    else
+      self:DeselectTab(i)
+    end
+  end
+  self.selectedTab = index
+end
+
+---@param index number
+function tabFrame:ShowTabByIndex(index)
+  self.tabIndex[index]:Show()
   self:ReanchorTabs()
 end
 
-function tabFrame:HideTab(name)
-  self.tabs[name]:Hide()
+---@param name string
+function tabFrame:ShowTabByName(name)
+  local tab = self:GetTabByName(name)
+  if tab then tab:Show() end
+  self:ReanchorTabs()
+end
+
+---@param index number
+function tabFrame:HideTabByIndex(index)
+  self.tabIndex[index]:Hide()
+  self:ReanchorTabs()
+end
+
+---@param name string
+function tabFrame:HideTabByName(name)
+  local tab = self:GetTabByName(name)
+  if tab then tab:Hide() end
   self:ReanchorTabs()
 end
 
 ---@private
-function tabFrame:DeselectTab(name)
-  local tab = self.tabs[name]
+---@param index number
+function tabFrame:DeselectTab(index)
+  local tab = self.tabIndex[index]
   local decoration = themes:GetTabButton(tab)
 	decoration.Left:Show()
 	decoration.Middle:Show()
@@ -217,8 +254,9 @@ function tabFrame:DeselectTab(name)
 end
 
 ---@private
-function tabFrame:SelectTab(name)
-  local tab = self.tabs[name]
+---@param index number
+function tabFrame:SelectTab(index)
+  local tab = self.tabIndex[index]
   local decoration = themes:GetTabButton(tab)
 	decoration.Left:Hide()
 	decoration.Middle:Hide()
