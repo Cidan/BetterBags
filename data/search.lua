@@ -72,7 +72,7 @@ function search:OnInitialize()
     'type',
     'category',
     'subtype',
-    'equipmentLocation'
+    'equipmentlocation'
   }
 
   self.indexLookup = {
@@ -257,12 +257,12 @@ function search:isInIndex(name, value)
     return node and node.data or {}
   end
 
-  local b = self:StringToBoolean(value)
+  local b = self:StringToBoolean(string.lower(value))
   if b ~= nil then
     return index.bools[b] or {}
   end
 
-  return index.ngrams[value] or {}
+  return index.ngrams[string.lower(value)] or {}
 end
 
 ---@param value any
