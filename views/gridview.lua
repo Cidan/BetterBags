@@ -228,20 +228,34 @@ local function GridView(view, ctx, bag, slotInfo)
 
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
-  for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-    if slotInfo.freeSlotKeys[name] ~= nil then
-      local itemButton = view:GetOrCreateItemButton(name)
-      local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-      itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
-      freeSlotsSection:AddCell(name, itemButton)
-    else
-      local itemButton = view:GetOrCreateItemButton(name)
-      itemButton:SetFreeSlots(1, 1, freeSlotCount, name)
-      freeSlotsSection:AddCell(name, itemButton)
+  if database:GetShowAllFreeSpace(bag.kind) then
+    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+    freeSlotsSection:WipeOnlyContents()
+    for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
+      for slotid, item in pairs(data) do
+        local itemButton = view:GetOrCreateItemButton(item.slotkey)
+        itemButton:SetFreeSlots(bagid, slotid, 1, "Free Space", true)
+        freeSlotsSection:AddCell(item.slotkey, itemButton)
+      end
+    end
+  else
+    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
+    for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+      if slotInfo.freeSlotKeys[name] ~= nil then
+        local itemButton = view:GetOrCreateItemButton(name)
+        local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+        itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
+        freeSlotsSection:AddCell(name, itemButton)
+      else
+        local itemButton = view:GetOrCreateItemButton(name)
+        itemButton:SetFreeSlots(1, 1, freeSlotCount, name)
+        freeSlotsSection:AddCell(name, itemButton)
+      end
     end
   end
 
   freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
+
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
@@ -253,6 +267,7 @@ local function GridView(view, ctx, bag, slotInfo)
       maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
       columns = sizeInfo.columnCount,
       header = view:RemoveSectionFromGrid(L:G("Recent Items")),
+      footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
       mask = hiddenCells,
     })
     for _, section in pairs(view.sections) do

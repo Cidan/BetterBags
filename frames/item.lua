@@ -358,7 +358,8 @@ end
 ---@param slotid number
 ---@param count number
 ---@param name string
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
+---@param nocount? boolean
+function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name, nocount)
   local decoration = themes:GetItemButton(self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
@@ -383,7 +384,9 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   ClearItemButtonOverlay(decoration)
   decoration:SetHasItem(false)
   self.button:SetHasItem(false)
-  SetItemButtonCount(decoration, count)
+  if not nocount then
+    SetItemButtonCount(decoration, count)
+  end
   decoration:SetItemButtonTexture(0)
   decoration:UpdateQuestItem(false, nil, nil)
   decoration:UpdateNewItem(false)

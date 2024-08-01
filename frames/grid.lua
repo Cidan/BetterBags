@@ -30,6 +30,7 @@ local cellProto = {}
 ---@field idToCell table<string, Cell|Item|Section|BagButton|any>
 ---@field cellToID table<Cell|Item|Section|BagButton|any, string>
 ---@field headers Section[]
+---@field footers Section[]
 ---@field maxCellWidth number The maximum number of cells per row.
 ---@field spacing number
 ---@field compactStyle GridCompactStyle
@@ -43,6 +44,7 @@ local gridProto = {}
 ---@field maxWidthPerRow number The maximum width of a row before it wraps.
 ---@field columns? number The number of columns to render. If not set, columns is 1.
 ---@field header? Cell A Cell to render above all other items, ignoring columns.
+---@field footer? Cell A Cell to render below all other items, ignoring columns.
 ---@field mask? Cell[] A list of cells to hide and not render at all.
 
 function gridProto:Show()
@@ -304,6 +306,9 @@ function gridProto:stage(options)
   local topOffset = 0
   local headerWidth = 0
   local headerHeight = 0
+  local footerWidth = 0
+  local footerHeight = 0
+  local bottomColumnPosition = 0
   if options.header then
     ---@type RenderOptions
     local headerOptions = {
@@ -319,13 +324,28 @@ function gridProto:stage(options)
     w = w + columnWidth
     h = math.max(h, columnHeight)
     currentOffset = currentOffset + columnWidth
+    bottomColumnPosition = math.max(bottomColumnPosition, columnHeight)
   end
 
-  h = h + headerHeight
+  if options.footer then
+    ---@type RenderOptions
+    local footerOptions = {
+      cells = {options.footer},
+      maxWidthPerRow = options.maxWidthPerRow * 2,
+    }
+    footerWidth, footerHeight = self:layoutSingleColumn({options.footer}, footerOptions, 0, -bottomColumnPosition + topOffset)
+    --topOffset = -headerHeight
+  end
+
+  h = h + headerHeight + footerHeight
+
   if w == 0  or w < headerWidth then
     w = headerWidth
   end
 
+  if w == 0  or w < footerWidth then
+    w = footerWidth
+  end
   w = w + self.spacing
   -- Remove the last 4 pixels of padding.
   if w > 4 then
@@ -406,6 +426,7 @@ function grid:Create(parent)
   g.columns = {}
   g.cellToColumn = {}
   g.headers = {}
+  g.footers = {}
   g.maxCellWidth = 5
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   g.spacing = 4

@@ -426,6 +426,18 @@ function DB:GetTheme()
   return DB.data.profile.theme
 end
 
+---@param kind BagKind
+---@return boolean
+function DB:GetShowAllFreeSpace(kind)
+  return DB.data.profile.showAllFreeSpace[kind]
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetShowAllFreeSpace(kind, value)
+  DB.data.profile.showAllFreeSpace[kind] = value
+end
+
 function DB:Migrate()
   --[[
     Migration of the custom category filters from single filter to per-bag filter.
