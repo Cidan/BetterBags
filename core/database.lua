@@ -439,6 +439,14 @@ function DB:SetShowAllFreeSpace(kind, value)
 end
 
 function DB:Migrate()
+
+  --[[
+    Migration away from multi-view bags and bank to a single view.
+    Do not remove before Q1'25.
+  ]]--
+  DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+  DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
+
   --[[
     Migration of the custom category filters from single filter to per-bag filter.
     Do not remove before Q4'24.

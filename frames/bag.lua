@@ -507,9 +507,7 @@ function bagFrame:Create(kind)
   --end)
 
   b.views = {
-    [const.BAG_VIEW.ONE_BAG] = views:NewOneBag(f, b.kind),
     [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
-    [const.BAG_VIEW.LIST] = views:NewList(f, b.kind),
     [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
   }
 

@@ -205,7 +205,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
 
   decoration.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
-  events:SendMessage('item/Updated', self)
+  events:SendMessage('item/Updated', self, decoration)
   self.frame:Show()
   self.button:Show()
 end
