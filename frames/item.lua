@@ -275,7 +275,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.isFreeSlot = nil
   self:SetAlpha(1)
   if self.slotkey ~= nil then
-    events:SendMessage('item/Updated', self)
+    events:SendMessage('item/Updated', self, decoration)
   end
   decoration:SetFrameLevel(self.button:GetFrameLevel() - 1)
   self.frame:Show()
@@ -358,7 +358,8 @@ end
 ---@param slotid number
 ---@param count number
 ---@param name string
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
+---@param nocount? boolean
+function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name, nocount)
   local decoration = themes:GetItemButton(self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
@@ -383,7 +384,9 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   ClearItemButtonOverlay(decoration)
   decoration:SetHasItem(false)
   self.button:SetHasItem(false)
-  SetItemButtonCount(decoration, count)
+  if not nocount then
+    SetItemButtonCount(decoration, count)
+  end
   decoration:SetItemButtonTexture(0)
   decoration:UpdateQuestItem(false, nil, nil)
   decoration:UpdateNewItem(false)
@@ -396,12 +399,15 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name)
   decoration.UpgradeIcon:SetShown(false)
 
   self.freeSlotName = name
-  SetItemButtonQuality(decoration, Enum.ItemQuality.Common, nil, false, false)
-
+  if database:GetShowAllFreeSpace(self.kind) and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+    SetItemButtonQuality(decoration, Enum.ItemQuality.Artifact, nil, false, false)
+  else
+    SetItemButtonQuality(decoration, Enum.ItemQuality.Common, nil, false, false)
+  end
   self.isFreeSlot = true
   decoration.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
-  events:SendMessage('item/Updated', self)
+  events:SendMessage('item/Updated', self, decoration)
   self.frame:Show()
   self.button:Show()
 end
