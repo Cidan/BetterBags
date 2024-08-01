@@ -399,8 +399,11 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, name, nocount)
   decoration.UpgradeIcon:SetShown(false)
 
   self.freeSlotName = name
-  SetItemButtonQuality(decoration, Enum.ItemQuality.Common, nil, false, false)
-
+  if database:GetShowAllFreeSpace(self.kind) and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+    SetItemButtonQuality(decoration, Enum.ItemQuality.Artifact, nil, false, false)
+  else
+    SetItemButtonQuality(decoration, Enum.ItemQuality.Common, nil, false, false)
+  end
   self.isFreeSlot = true
   decoration.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)

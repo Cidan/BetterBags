@@ -238,6 +238,7 @@ local function GridView(view, ctx, bag, slotInfo)
         freeSlotsSection:AddCell(item.slotkey, itemButton)
       end
     end
+    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
   else
     freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
     for name, freeSlotCount in pairs(slotInfo.emptySlots) do
@@ -252,9 +253,9 @@ local function GridView(view, ctx, bag, slotInfo)
         freeSlotsSection:AddCell(name, itemButton)
       end
     end
+    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
   end
 
-  freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
 
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
