@@ -233,9 +233,11 @@ local function GridView(view, ctx, bag, slotInfo)
     freeSlotsSection:WipeOnlyContents()
     for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
       for slotid, item in pairs(data) do
-        local itemButton = view:GetOrCreateItemButton(item.slotkey)
-        itemButton:SetFreeSlots(bagid, slotid, 1, true)
-        freeSlotsSection:AddCell(item.slotkey, itemButton)
+        if not view:GetDeferredItems()[item.slotkey] then
+          local itemButton = view:GetOrCreateItemButton(item.slotkey)
+          itemButton:SetFreeSlots(bagid, slotid, 1, true)
+          freeSlotsSection:AddCell(item.slotkey, itemButton)
+        end
       end
     end
     freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
