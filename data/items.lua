@@ -85,6 +85,7 @@ local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
 ---@field private slotInfo table<BagKind, SlotInfo>
+---@field private searchCache table<string, string> A table of slotid's to categories.
 ---@field _doingRefresh boolean
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _newItemTimers table<string, number>
@@ -97,6 +98,7 @@ function items:OnInitialize()
   self.previousItemGUID = {}
   self:ResetSlotInfo()
 
+  self.searchCache = {}
   self._newItemTimers = {}
   self._preSort = false
   self._doingRefresh = false
@@ -446,6 +448,27 @@ function items:LoadItems(ctx, kind, dataCache)
   if slotInfo.totalItems < slotInfo.previousTotalItems then
     slotInfo.deferDelete = true
   end
+
+  -- Refresh the search cache.
+  self:RefreshSearchCache()
+
+  -- Get the categories for each item.
+  for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
+    currentItem.itemInfo.category = self:GetCategory(currentItem)
+  end
+end
+
+function items:RefreshSearchCache()
+  wipe(self.searchCache)
+  local categoryTable = database:GetAllSearchCategories()
+  for name, searchCategory in pairs(categoryTable) do
+    local results = search:Search(searchCategory.query)
+    for slotkey, match in pairs(results) do
+      if match then
+        self.searchCache[slotkey] = name
+      end
+    end
+  end
 end
 
 -- ProcessContainer will load all items in the container and fire
@@ -660,12 +683,17 @@ end
 ---@param data ItemData
 ---@return string
 function items:GetCategory(data)
-  if data.isItemEmpty then return L:G('Empty Slot') end
+  if not data or data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(data.kind, "RecentItems") then
     if items:IsNewItem(data) then
       return L:G("Recent Items")
     end
+  end
+
+  -- Search categories come before all.
+  if self.searchCache[data.slotkey] ~= nil then
+    return self.searchCache[data.slotkey]
   end
 
   -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
@@ -824,7 +852,6 @@ function items:AttachItemInfo(data, kind)
 
   data.itemLinkInfo = self:ParseItemLink(itemLink)
   data.itemHash = self:GenerateItemHash(data)
-  data.itemInfo.category = self:GetCategory(data)
   data.forceClear = false
   data.stacks = 0
   data.stackedCount = data.itemInfo.currentItemCount

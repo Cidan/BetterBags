@@ -12,6 +12,12 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class SearchCategory
+---@field name string The name of the category.
+---@field enabled table<BagKind, boolean> The enabled state of the category.
+---@field query string The search query for the category.
+---@field priority number The priority of the category. A higher number has a higher priority.
+
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
 ---@field private categoryFunctions table<string, fun(data: ItemData): string>
@@ -201,25 +207,13 @@ function categories:CreateCategory(category)
   events:SendMessage('categories/Changed')
 end
 
--- CreateCategoryWithSearchPredicate will create a custom category
--- with a search predicate that adds items to the category based on the
--- search predicate. This is useful for creating categories that are
+-- CreateSearchCategory will create a custom category
+-- with a search query that adds items to the category based on the
+-- search query results. This is useful for creating categories that are
 -- based on item properties, such as item level, item quality, or item type.
----@param category string
----@param predicate string
-function categories:CreateCategoryWithSearchPredicate(category, predicate)
-  if self.ephemeralCategories[category] then return end
-  self.ephemeralCategories[category] = {
-    name = category,
-    enabled = {
-      [const.BAG_KIND.BACKPACK] = true,
-      [const.BAG_KIND.BANK] = true,
-    },
-    itemList = {},
-    readOnly = false,
-    predicate = predicate,
-  }
-  database:CreateEpemeralCategory(category)
+---@param searchCategory SearchCategory
+function categories:CreateOrUpdateSearchCategory(searchCategory)
+  database:CreateOrUpdateSearchCategory(searchCategory)
   events:SendMessage('categories/Changed')
 end
 

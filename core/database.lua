@@ -299,6 +299,19 @@ function DB:CreateEpemeralCategory(category)
   }
 end
 
+---@param searchCategory SearchCategory
+function DB:CreateOrUpdateSearchCategory(searchCategory)
+  if not DB.data.profile.searchCategories then
+    DB.data.profile.searchCategories = {}
+  end
+  DB.data.profile.searchCategories[searchCategory.name] = searchCategory
+end
+
+---@return table<string, SearchCategory>
+function DB:GetAllSearchCategories()
+  return DB.data.profile.searchCategories
+end
+
 ---@param category string
 ---@return CategoryOptions
 function DB:GetCategoryOptions(category)

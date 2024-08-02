@@ -614,6 +614,8 @@ const.DATABASE_DEFAULTS = {
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>
     ephemeralCategoryFilters = {},
+    ---@type table<string, SearchCategory>
+    searchCategories = {},
     ---@type table<number, string>
     customCategoryIndex = {},
     categoryFilters = {
