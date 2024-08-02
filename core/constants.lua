@@ -227,6 +227,36 @@ if not addon.isRetail then
   Enum.ItemQuality.WoWToken = 8
 end
 
+const.BAG_SUBTYPES = {
+  ["Bag"] = 0,
+  ["Soul Bag"] = 1,
+  ["Herb Bag"] = 2,
+  ["Enchanting Bag"] = 3,
+  ["Engineering Bag"] = 4,
+  ["Gem Bag"] = 5,
+  ["Mining Bag"] = 6,
+  ["Leatherworking Bag"] = 7,
+  ["Inscription Bag"] = 8,
+  ["Tackle Box"] = 9,
+  ["Cooking Bag"] = 10,
+}
+
+---@type table<number, Enum.ItemQuality>
+const.BAG_SUBTYPE_TO_QUALITY = {
+  [0] = Enum.ItemQuality.Poor,
+  [1] = Enum.ItemQuality.Epic,
+  [2] = Enum.ItemQuality.Uncommon,
+  [3] = Enum.ItemQuality.Rare,
+  [4] = Enum.ItemQuality.Artifact,
+  [5] = Enum.ItemQuality.Heirloom,
+  [6] = Enum.ItemQuality.Common,
+  [7] = Enum.ItemQuality.Common,
+  [8] = Enum.ItemQuality.Common,
+  [9] = Enum.ItemQuality.Common,
+  [10] = Enum.ItemQuality.Common,
+  [99] = Enum.ItemQuality.Common
+}
+
 ---@type table<string, Enum.ItemQuality>
 const.ITEM_QUALITY_TO_ENUM = {
   ITEM_QUALITY0_DESC = Enum.ItemQuality.Poor,

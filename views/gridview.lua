@@ -63,7 +63,7 @@ local function ClearButton(view, item)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   if cell then
-    cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+    cell:SetFreeSlots(bagid, slotid, -1)
   end
   view:AddDeferredItem(item.slotkey)
   local section = view:GetSlotSection(item.slotkey)
@@ -234,7 +234,7 @@ local function GridView(view, ctx, bag, slotInfo)
     for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
       for slotid, item in pairs(data) do
         local itemButton = view:GetOrCreateItemButton(item.slotkey)
-        itemButton:SetFreeSlots(bagid, slotid, 1, "Free Space", true)
+        itemButton:SetFreeSlots(bagid, slotid, 1, true)
         freeSlotsSection:AddCell(item.slotkey, itemButton)
       end
     end
@@ -245,11 +245,11 @@ local function GridView(view, ctx, bag, slotInfo)
       if slotInfo.freeSlotKeys[name] ~= nil then
         local itemButton = view:GetOrCreateItemButton(name)
         local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-        itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount, name)
+        itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount)
         freeSlotsSection:AddCell(name, itemButton)
       else
         local itemButton = view:GetOrCreateItemButton(name)
-        itemButton:SetFreeSlots(1, 1, freeSlotCount, name)
+        itemButton:SetFreeSlots(1, 1, freeSlotCount)
         freeSlotsSection:AddCell(name, itemButton)
       end
     end

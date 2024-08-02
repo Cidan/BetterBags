@@ -70,7 +70,7 @@ end
 local function ClearButton(view, item)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
-  cell:SetFreeSlots(bagid, slotid, -1, "Recently Deleted")
+  cell:SetFreeSlots(bagid, slotid, -1)
   view:AddDeferredItem(item.slotkey)
   addon:GetBagFromBagID(bagid).drawOnClose = true
 end
@@ -172,7 +172,7 @@ local function BagView(view, ctx, bag, slotInfo)
           itemButton = itemFrame:Create()
           view.itemsByBagAndSlot[slotkey] = itemButton
         end
-        itemButton:SetFreeSlots(bagid, slotid, -1, C_Container.GetBagName(bagid))
+        itemButton:SetFreeSlots(bagid, slotid, -1)
         local section = view:GetOrCreateSection(GetBagName(bagid))
         section:AddCell(slotkey, itemButton)
       end
