@@ -299,6 +299,24 @@ function DB:CreateEpemeralCategory(category)
   }
 end
 
+---@param searchCategory SearchCategory
+function DB:CreateOrUpdateSearchCategory(searchCategory)
+  if not DB.data.profile.searchCategories then
+    DB.data.profile.searchCategories = {}
+  end
+  DB.data.profile.searchCategories[searchCategory.name] = searchCategory
+end
+
+---@param category string
+function DB:DeleteSearchCategory(category)
+  DB.data.profile.searchCategories[category] = nil
+end
+
+---@return table<string, SearchCategory>
+function DB:GetAllSearchCategories()
+  return DB.data.profile.searchCategories
+end
+
 ---@param category string
 ---@return CategoryOptions
 function DB:GetCategoryOptions(category)
@@ -441,11 +459,22 @@ end
 function DB:Migrate()
 
   --[[
+    Deletion of the old lockedItems table.
+    Do not remove before Q1'25.
+  ]]--
+  DB.data.profile.lockedItems = {}
+
+  --[[
     Migration away from multi-view bags and bank to a single view.
     Do not remove before Q1'25.
   ]]--
-  DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
-  DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
+  if DB:GetBagView(const.BAG_KIND.BACKPACK) ~= const.BAG_VIEW.SECTION_GRID and DB:GetBagView(const.BAG_KIND.BACKPACK) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+    DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.GRID)
+  end
+
+  if DB:GetBagView(const.BAG_KIND.BANK) ~= const.BAG_VIEW.SECTION_GRID and DB:GetBagView(const.BAG_KIND.BANK) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+    DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.GRID)
+  end
 
   --[[
     Migration of the custom category filters from single filter to per-bag filter.
