@@ -271,7 +271,7 @@ function search:DefaultSearch(value)
   ---@type table<string, boolean>
   local slots = {}
   for _, property in ipairs(self.defaultIndicies) do
-    for slotkey in pairs(self:isInIndex(property, value)) do
+    for slotkey in pairs(self:isFullTextMatch(property, value)) do
       slots[slotkey] = true
     end
   end

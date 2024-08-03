@@ -460,12 +460,12 @@ end
 
 function items:RefreshSearchCache()
   wipe(self.searchCache)
-  local categoryTable = database:GetAllSearchCategories()
-  for name, searchCategory in pairs(categoryTable) do
+  local categoryTable = categories:GetSortedSearchCategories()
+  for _, searchCategory in pairs(categoryTable) do
     local results = search:Search(searchCategory.query)
     for slotkey, match in pairs(results) do
       if match then
-        self.searchCache[slotkey] = name
+        self.searchCache[slotkey] = searchCategory.name
       end
     end
   end

@@ -14,9 +14,10 @@ local const = addon:GetModule('Constants')
 
 ---@class SearchCategory
 ---@field name string The name of the category.
----@field enabled table<BagKind, boolean> The enabled state of the category.
+---@field enabled? table<BagKind, boolean> The enabled state of the category.
 ---@field query string The search query for the category.
----@field priority number The priority of the category. A higher number has a higher priority.
+---@field priority? number The priority of the category. A higher number has a higher priority.
+---@field save? boolean If true, this category will be saved to the database and will persist between sessions.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -24,6 +25,7 @@ local const = addon:GetModule('Constants')
 ---@field private categoryCount number
 ---@field private ephemeralCategories table<string, CustomCategoryFilter>
 ---@field private ephemeralCategoryByItemID table<number, CustomCategoryFilter>
+---@field private ephemeralSearchCategories table<string, SearchCategory>
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
@@ -31,6 +33,7 @@ function categories:OnInitialize()
   self.itemsWithNoCategory = {}
   self.ephemeralCategories = {}
   self.ephemeralCategoryByItemID = {}
+  self.ephemeralSearchCategories = {}
   self.categoryCount = 0
 end
 
@@ -213,7 +216,55 @@ end
 -- based on item properties, such as item level, item quality, or item type.
 ---@param searchCategory SearchCategory
 function categories:CreateOrUpdateSearchCategory(searchCategory)
-  database:CreateOrUpdateSearchCategory(searchCategory)
+  if not searchCategory.priority then
+    searchCategory.priority = 99
+  end
+  if searchCategory.save then
+    database:CreateOrUpdateSearchCategory(searchCategory)
+  else
+    self.ephemeralSearchCategories[searchCategory.name] = searchCategory
+  end
+  events:SendMessage('categories/Changed')
+end
+
+---@return table<string, SearchCategory>
+function categories:GetAllSearchCategories()
+  ---@type table<string, SearchCategory>
+  local results = {}
+  local savedCategories = database:GetAllSearchCategories()
+  for name, searchCategory in pairs(savedCategories) do
+    results[name] = searchCategory
+  end
+  for name, searchCategory in pairs(self.ephemeralSearchCategories) do
+    results[name] = searchCategory
+  end
+  return results
+end
+
+-- Returns a reverse sorted list of search categories, by priority.
+---@return SearchCategory[]
+function categories:GetSortedSearchCategories()
+  ---@type SearchCategory[]
+  local results = {}
+  local savedCategories = database:GetAllSearchCategories()
+  for _, searchCategory in pairs(savedCategories) do
+    table.insert(results, searchCategory)
+  end
+  for _, searchCategory in pairs(self.ephemeralSearchCategories) do
+    table.insert(results, searchCategory)
+  end
+  table.sort(results, function(a, b)
+    return a.priority < b.priority
+  end)
+  return results
+end
+
+---@param category string
+function categories:DeleteSearchCategory(category)
+  if self.ephemeralSearchCategories[category] then
+    self.ephemeralSearchCategories[category] = nil
+  end
+  database:DeleteSearchCategory(category)
   events:SendMessage('categories/Changed')
 end
 
