@@ -454,8 +454,9 @@ function items:LoadItems(ctx, kind, dataCache)
 
   -- Get the categories for each item.
   for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
+    local oldCategory = currentItem.itemInfo.category
     currentItem.itemInfo.category = self:GetCategory(currentItem)
-    search:UpdateCategoryIndex(currentItem)
+    search:UpdateCategoryIndex(currentItem, oldCategory)
   end
 end
 
