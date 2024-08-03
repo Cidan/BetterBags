@@ -26,6 +26,9 @@ local searchBox = addon:NewModule('SearchBox')
 ---@field textBox EditBox
 ---@field helpText FontString
 ---@field kind BagKind
+---@field enterLabel FontString
+---@field enterLabelFadeIn AnimationGroup
+---@field enterLabelFadeOut AnimationGroup
 searchBox.searchProto = {}
 
 -- BetterBags_ToggleSearch toggles the search view. This function is used in the
@@ -102,9 +105,13 @@ function searchBox.searchProto:UpdateSearch()
     end
   else
     if text == "" then
+      self.enterLabelFadeOut:Play()
       addon.Bags.Backpack:ResetSearch()
       addon.Bags.Bank:ResetSearch()
     else
+      if not self.enterLabel:IsShown() then
+        self.enterLabelFadeIn:Play()
+      end
       local results = search:Search(text)
       addon.Bags.Backpack:Search(results)
       addon.Bags.Bank:Search(results)
@@ -129,6 +136,14 @@ function searchBox:Create(parent)
   f.Inset:Hide()
   f:Show()
 
+  local enterLabel = f:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+  enterLabel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 6)
+  enterLabel:SetText("[Enter] Create a new category...")
+  enterLabel:Hide()
+  sf.enterLabelFadeIn, sf.enterLabelFadeOut = animations:AttachFadeGroup(enterLabel)
+
+  sf.enterLabel = enterLabel
+
   local textBox = CreateFrame("EditBox", nil, f) --[[@as EditBox]]
   textBox:SetFontObject("GameFontNormalHuge")
   textBox:SetTextColor(1, 1, 1, 1)
@@ -145,6 +160,10 @@ function searchBox:Create(parent)
   end)
   textBox:SetScript("OnTextChanged", function()
     sf:UpdateSearch()
+  end)
+
+  textBox:SetScript("OnEnterPressed", function()
+    print("enter pressed...")
   end)
 
   local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK", "GameFontDisableLarge")
