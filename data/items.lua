@@ -463,7 +463,7 @@ end
 function items:RefreshSearchCache()
   wipe(self.searchCache)
   local categoryTable = categories:GetSortedSearchCategories()
-  for _, searchCategory in pairs(categoryTable) do
+  for _, searchCategory in ipairs(categoryTable) do
     local results = search:Search(searchCategory.query)
     for slotkey, match in pairs(results) do
       if match then
