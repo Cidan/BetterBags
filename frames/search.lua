@@ -29,6 +29,8 @@ local searchBox = addon:NewModule('SearchBox')
 ---@field enterLabel FontString
 ---@field enterLabelFadeIn AnimationGroup
 ---@field enterLabelFadeOut AnimationGroup
+---@field helpTextFadeIn AnimationGroup
+---@field helpTextFadeOut AnimationGroup
 searchBox.searchProto = {}
 
 -- BetterBags_ToggleSearch toggles the search view. This function is used in the
@@ -83,9 +85,19 @@ end
 function searchBox.searchProto:UpdateSearch()
   local text = self.textBox:GetText()
   if text == "" then
-    self.helpText:Show()
+    if self.helpTextFadeIn then
+      self.helpTextFadeIn:Play()
+    else
+      self.helpText:Show()
+    end
   else
-    self.helpText:Hide()
+    if self.helpTextFadeOut then
+      if self.helpText:IsShown() then
+        self.helpTextFadeOut:Play()
+      end
+    else
+      self.helpText:Hide()
+    end
   end
   if self.kind ~= nil then
     if self.kind == const.BAG_KIND.BACKPACK then
@@ -158,6 +170,7 @@ function searchBox:Create(parent)
     me:ClearFocus()
     sf:Toggle()
   end)
+
   textBox:SetScript("OnTextChanged", function()
     sf:UpdateSearch()
   end)
@@ -170,6 +183,7 @@ function searchBox:Create(parent)
   helpText:SetPoint("CENTER", textBox, "CENTER", 0, 0)
   helpText:SetText("Start typing to search your bags...")
   helpText:Show()
+  sf.helpTextFadeIn, sf.helpTextFadeOut = animations:AttachFadeGroup(helpText)
   sf.helpText = helpText
 
   sf.fadeInGroup, sf.fadeOutGroup = animations:AttachFadeAndSlideLeft(f)
