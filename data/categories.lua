@@ -254,7 +254,7 @@ function categories:GetSortedSearchCategories()
     table.insert(results, searchCategory)
   end
   table.sort(results, function(a, b)
-    return a.priority < b.priority
+    return a.priority > b.priority
   end)
   return results
 end
