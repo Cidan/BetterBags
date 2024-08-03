@@ -158,6 +158,12 @@ function search:removeStringFromIndex(index, value, slotkey)
 end
 
 ---@param item ItemData
+function search:UpdateCategoryIndex(item)
+  if item == nil or item.isItemEmpty or item.itemInfo.category == nil then return end
+  search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+end
+
+---@param item ItemData
 function search:Add(item)
   search:addStringToIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
