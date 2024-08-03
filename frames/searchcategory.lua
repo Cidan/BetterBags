@@ -45,6 +45,7 @@ function searchCategoryConfig:OnEnable()
   self.queryBox.EditBox:SetMaxLetters(1024)
   self.queryBox:Show()
 
+  self.frame:Hide()
 end
 
 ---@param searchCategory SearchCategory
@@ -52,4 +53,5 @@ function searchCategoryConfig:Open(searchCategory)
   self.nameBox:SetText(searchCategory.name)
   self.queryBox.EditBox:SetText(searchCategory.query)
   self.frame:Show()
+  self.nameBox:SetFocus()
 end

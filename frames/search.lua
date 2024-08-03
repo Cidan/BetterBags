@@ -15,6 +15,9 @@ local const = addon:GetModule('Constants')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
+---@class SearchCategoryConfig: AceModule
+local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+
 ---@class SearchBox: AceModule
 ---@field searchFrame SearchFrame
 local searchBox = addon:NewModule('SearchBox')
@@ -176,7 +179,10 @@ function searchBox:Create(parent)
   end)
 
   textBox:SetScript("OnEnterPressed", function()
-    print("enter pressed...")
+    searchCategoryConfig:Open({
+      name = "",
+      query = searchBox:GetText(),
+    })
   end)
 
   local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK", "GameFontDisableLarge")
