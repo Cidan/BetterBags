@@ -154,8 +154,10 @@ function categories:ToggleCategory(kind, category)
     enabled = not self.ephemeralCategories[category].enabled[kind]
     self.ephemeralCategories[category].enabled[kind] = enabled
     database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
+    return
   end
-  if database:GetItemCategory(category).itemList then
+  local filter = database:GetItemCategory(category)
+  if filter then
     database:SetItemCategoryEnabled(kind, category, enabled)
   end
 end
@@ -166,8 +168,10 @@ function categories:EnableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = true
     database:SetEphemeralItemCategoryEnabled(kind, category, true)
+    return
   end
-  if database:GetItemCategory(category).itemList then
+  local filter = database:GetItemCategory(category)
+  if filter then
     database:SetItemCategoryEnabled(kind, category, true)
   end
 end
@@ -178,8 +182,10 @@ function categories:DisableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = false
     database:SetEphemeralItemCategoryEnabled(kind, category, false)
+    return
   end
-  if database:GetItemCategory(category).itemList then
+  local filter = database:GetItemCategory(category)
+  if filter then
     database:SetItemCategoryEnabled(kind, category, false)
   end
 end
@@ -216,11 +222,15 @@ function categories:CreateCategory(category)
   if category.save then
     database:CreateOrUpdateCategory(category)
   else
+    local savedState = database:GetEphemeralItemCategory(category.name)
+    if savedState then
+      category.enabled = savedState.enabled
+    end
     self.ephemeralCategories[category.name] = category
     for id in pairs(category.itemList) do
       self.ephemeralCategoryByItemID[id] = category
     end
-    database:CreateOrUpdateEpemeralCategory(category)
+    database:CreateOrUpdateCategory(category)
   end
   events:SendMessage('categories/Changed')
 end

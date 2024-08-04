@@ -265,6 +265,10 @@ function DB:GetEphemeralItemCategory(category)
   return DB.data.profile.ephemeralCategoryFilters[category] or {}
 end
 
+function DB:GetAllEphemeralItemCategories()
+  return DB.data.profile.ephemeralCategoryFilters
+end
+
 ---@param category string
 ---@return boolean
 function DB:ItemCategoryExists(category)
@@ -279,16 +283,15 @@ end
 
 ---@param category CustomCategoryFilter
 function DB:CreateOrUpdateCategory(category)
-  DB.data.profile.customCategoryFilters[category.name] = category
-end
-
----@param category CustomCategoryFilter
-function DB:CreateOrUpdateEpemeralCategory(category)
-  DB.data.profile.ephemeralCategoryFilters[category.name] = {
-    name = category.name,
-    enabled = category.enabled,
-    itemList = {},
-  }
+  if category.save then
+    DB.data.profile.customCategoryFilters[category.name] = category
+  else
+    DB.data.profile.ephemeralCategoryFilters[category.name] = {
+      name = category.name,
+      enabled = category.enabled,
+      itemList = {},
+    }
+  end
 end
 
 ---@param category string
