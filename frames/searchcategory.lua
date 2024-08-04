@@ -9,6 +9,9 @@ local themes = addon:GetModule('Themes')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -16,11 +19,22 @@ local events = addon:GetModule('Events')
 ---@field frame Frame
 local searchCategoryConfig = addon:NewModule('SearchCategoryConfig')
 
+function searchCategoryConfig:CheckNameboxText()
+  local input = self.nameBox:GetText()
+  if input == "" then
+    self.errorText:SetText("Name cannot be empty")
+  elseif categories:DoesCategoryExist(input) then
+    self.errorText:SetText("This category name overwrites a previous item list based category. Please choose a different name.")
+  else
+    self.errorText:SetText("")
+  end
+end
+
 function searchCategoryConfig:OnEnable()
   self.frame = CreateFrame("Frame", addonName .. "SearchCategoryConfig", UIParent)
   themes:RegisterFlatWindow(self.frame, "Configure Search Category")
 
-  self.frame:SetSize(800, 600)
+  self.frame:SetSize(430, 380)
   self.frame:SetPoint("CENTER")
   self.frame:SetMovable(true)
   self.frame:EnableMouse(true)
@@ -28,6 +42,8 @@ function searchCategoryConfig:OnEnable()
   self.frame:RegisterForDrag("LeftButton")
   self.frame:SetScript("OnDragStart", self.frame.StartMoving)
   self.frame:SetScript("OnDragStop", self.frame.StopMovingOrSizing)
+
+  self.fadeInGroup, self.fadeOutGroup = animations:AttachFadeGroup(self.frame)
 
   self.nameBoxLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   self.nameBoxLabel:SetPoint("TOPLEFT", 20, -40)
@@ -38,6 +54,10 @@ function searchCategoryConfig:OnEnable()
   self.nameBox:SetPoint("TOPLEFT", self.nameBoxLabel, "BOTTOMLEFT", 2, -7)
   self.nameBox:SetAutoFocus(false)
   self.nameBox:SetFontObject("GameFontHighlight")
+
+  self.nameBox:SetScript("OnTextChanged", function()
+    self:CheckNameboxText()
+  end)
 
   self.queryBoxLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   self.queryBoxLabel:SetPoint("TOPLEFT", self.nameBox, "BOTTOMLEFT", -2, -20)
@@ -50,6 +70,42 @@ function searchCategoryConfig:OnEnable()
   self.queryBox.EditBox:SetFontObject("GameFontHighlight")
   self.queryBox.EditBox:SetMaxLetters(1024)
   self.queryBox:Show()
+
+  self.queryBox.EditBox:SetScript("OnTextChanged", function()
+    local input = self.queryBox.EditBox:GetText()
+    if input == "" then
+      self.errorText:SetText("Query cannot be empty")
+    else
+      self.errorText:SetText("")
+    end
+  end)
+
+  self.priorityBoxLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.priorityBoxLabel:SetPoint("TOPLEFT", self.queryBox, "BOTTOMLEFT", -2, -20)
+  self.priorityBoxLabel:SetText("Priority")
+
+  self.priorityBox = CreateFrame("EditBox", addonName .. "SearchCategoryConfigPriorityBox", self.frame, "InputBoxTemplate")
+  self.priorityBox:SetSize(200, 20)
+  self.priorityBox:SetPoint("TOPLEFT", self.priorityBoxLabel, "BOTTOMLEFT", 2, -7)
+  self.priorityBox:SetAutoFocus(false)
+  self.priorityBox:SetFontObject("GameFontHighlight")
+  self.priorityBox:SetNumeric(true)
+  self.priorityBox:SetMaxLetters(2)
+
+  self.priorityBox:SetScript("OnTextChanged", function()
+    local input = self.priorityBox:GetText()
+    if input == "" then
+      self.errorText:SetText("Priority cannot be empty")
+    else
+      self.errorText:SetText("")
+    end
+  end)
+
+  self.errorText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.errorText:SetPoint("TOPLEFT", self.priorityBox, "BOTTOMLEFT", 0, -20)
+  self.errorText:SetWidth(self.frame:GetWidth() - 40)
+  self.errorText:SetText("")
+  self.errorText:SetTextColor(1, 0, 0)
 
   self.saveButton = CreateFrame("Button", addonName .. "SearchCategoryConfigSaveButton", self.frame, "UIPanelButtonTemplate")
   self.saveButton:SetSize(100, 30)
@@ -64,23 +120,22 @@ function searchCategoryConfig:OnEnable()
   self.saveButton:SetScript("OnClick", function()
     local name = self.nameBox:GetText()
     local query = self.queryBox.EditBox:GetText()
-    if name == "" then
-      return
-    end
-    if query == "" then
+    if self.errorText:GetText() ~= "" and self.errorText:GetText() ~= nil then
+      print("error text is", self.errorText:GetText())
       return
     end
     categories:CreateOrUpdateSearchCategory({
       name = name,
       query = query,
+      priority = tonumber(self.priorityBox:GetText()) or 10,
       save = true,
     })
     events:SendMessage('bags/FullRefreshAll')
-    self.frame:Hide()
+    self.fadeOutGroup:Play()
   end)
 
   self.cancelButton:SetScript("OnClick", function()
-    self.frame:Hide()
+    self.fadeOutGroup:Play()
   end)
 
   self.frame:Hide()
@@ -90,6 +145,10 @@ end
 function searchCategoryConfig:Open(searchCategory)
   self.nameBox:SetText(searchCategory.name)
   self.queryBox.EditBox:SetText(searchCategory.query)
-  self.frame:Show()
-  self.nameBox:SetFocus()
+  self.priorityBox:SetText(tostring(searchCategory.priority) or "10")
+  self.fadeInGroup.callback = function()
+    self.nameBox:SetFocus()
+    self:CheckNameboxText()
+  end
+  self.fadeInGroup:Play()
 end

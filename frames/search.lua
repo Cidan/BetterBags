@@ -182,6 +182,7 @@ function searchBox:Create(parent)
     searchCategoryConfig:Open({
       name = "",
       query = searchBox:GetText(),
+      priority = 10,
     })
   end)
 
