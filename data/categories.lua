@@ -9,6 +9,9 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -105,6 +108,15 @@ function categories:AddItemToCategory(id, category)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
+
+  -- Backwards compatability for the old way of adding items to categories.
+  if not database:ItemCategoryExists(category) then
+    self:CreateCategory({
+      name = category,
+      itemList = {},
+    })
+  end
+
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].itemList[id] = true
     self.ephemeralCategoryByItemID[id] = self.ephemeralCategories[category]
@@ -219,11 +231,12 @@ function categories:CreateCategory(category)
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
   }
+
   if category.save then
     database:CreateOrUpdateCategory(category)
   else
     local savedState = database:GetEphemeralItemCategory(category.name)
-    if savedState then
+    if savedState and savedState.enabled then
       category.enabled = savedState.enabled
     end
     self.ephemeralCategories[category.name] = category
@@ -321,7 +334,8 @@ function categories:GetCustomCategory(kind, data)
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
-  if filter and database:GetEphemeralItemCategory(filter.name).enabled[kind] then
+
+  if filter and filter.enabled[kind] then
     return filter.name
   end
 
