@@ -73,7 +73,7 @@ local function SetList(self, values)
     local itemid = tonumber(id) --[[@as number]]
     local list = self:GetUserData("values")
     DB:SaveItemToCategory(itemid, list.name)
-    self:SetList(DB:GetItemCategory(list.name))
+    self:SetList(DB:GetItemCategory(list.name)--[[@as CustomCategoryFilter]])
     events:SendMessage('bags/FullRefreshAll')
   end
 
@@ -126,7 +126,7 @@ local function SetList(self, values)
             ---@type CustomCategoryFilter
             local list = self:GetUserData("values")
             DB:DeleteItemFromCategory(v.itemInfo.itemID, list.name)
-            self:SetList(categories:GetMergedCategory(list.name))
+            self:SetList(categories:GetMergedCategory(list.name)--[[@as CustomCategoryFilter]])
             events:SendMessage('bags/FullRefreshAll')
           end
         }})

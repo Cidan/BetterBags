@@ -454,6 +454,9 @@ function sectionConfig:Create(kind, parent)
     for sName in pairs(categories:GetAllCategories()) do
       table.insert(names, sName)
     end
+    for sName in pairs(categories:GetAllSearchCategories()) do
+      table.insert(names, sName)
+    end
     table.sort(names)
     for _, sName in ipairs(names) do
       sc:AddSection(sName)

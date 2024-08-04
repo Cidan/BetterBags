@@ -195,7 +195,7 @@ end
 ---@param itemID number
 ---@param category string
 function DB:SaveItemToCategory(itemID, category)
-  DB:CreateCategory(category)
+  assert(DB.data.profile.customCategoryFilters[category] ~= nil, "Category does not exist: " .. category)
   DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
   local previousCategory = DB.data.profile.customCategoryIndex[itemID]
   if previousCategory and previousCategory ~= category then
@@ -217,7 +217,7 @@ end
 ---@param category string
 ---@param enabled boolean
 function DB:SetItemCategoryEnabled(kind, category, enabled)
-  DB:CreateCategory(category)
+  assert(DB.data.profile.customCategoryFilters[category] ~= nil, "Category does not exist: " .. category)
   DB.data.profile.customCategoryFilters[category].enabled[kind] = enabled
 end
 
@@ -254,9 +254,8 @@ function DB:GetAllItemCategories()
 end
 
 ---@param category string
----@return CustomCategoryFilter
+---@return CustomCategoryFilter?
 function DB:GetItemCategory(category)
-  DB:CreateCategory(category)
   return DB.data.profile.customCategoryFilters[category]
 end
 
@@ -278,43 +277,24 @@ function DB:GetItemCategoryByItemID(itemID)
   return DB.data.profile.customCategoryFilters[DB.data.profile.customCategoryIndex[itemID]] or {}
 end
 
----@param category string
-function DB:CreateCategory(category)
-  DB.data.profile.customCategoryFilters[category] = DB.data.profile.customCategoryFilters[category] or {itemList = {}}
-  DB.data.profile.customCategoryFilters[category].itemList = DB.data.profile.customCategoryFilters[category].itemList or {}
-  DB.data.profile.customCategoryFilters[category].name = category
-  DB.data.profile.customCategoryFilters[category].enabled = DB.data.profile.customCategoryFilters[category].enabled or {
-    [const.BAG_KIND.BACKPACK] = true,
-    [const.BAG_KIND.BANK] = true
+---@param category CustomCategoryFilter
+function DB:CreateOrUpdateCategory(category)
+  DB.data.profile.customCategoryFilters[category.name] = category
+end
+
+---@param category CustomCategoryFilter
+function DB:CreateOrUpdateEpemeralCategory(category)
+  DB.data.profile.ephemeralCategoryFilters[category.name] = {
+    name = category.name,
+    enabled = category.enabled,
+    itemList = {},
   }
 end
 
 ---@param category string
-function DB:CreateEpemeralCategory(category)
-  DB.data.profile.ephemeralCategoryFilters[category] = DB.data.profile.ephemeralCategoryFilters[category] or {}
-  DB.data.profile.ephemeralCategoryFilters[category].name = category
-  DB.data.profile.ephemeralCategoryFilters[category].enabled = DB.data.profile.ephemeralCategoryFilters[category].enabled or {
-    [const.BAG_KIND.BACKPACK] = true,
-    [const.BAG_KIND.BANK] = true
-  }
-end
-
----@param searchCategory SearchCategory
-function DB:CreateOrUpdateSearchCategory(searchCategory)
-  if not DB.data.profile.searchCategories then
-    DB.data.profile.searchCategories = {}
-  end
-  DB.data.profile.searchCategories[searchCategory.name] = searchCategory
-end
-
----@param category string
-function DB:DeleteSearchCategory(category)
-  DB.data.profile.searchCategories[category] = nil
-end
-
----@return table<string, SearchCategory>
-function DB:GetAllSearchCategories()
-  return DB.data.profile.searchCategories
+---@return boolean
+function DB:IsSearchCategory(category)
+  return DB.data.profile.searchCategories[category] ~= nil
 end
 
 ---@param category string
