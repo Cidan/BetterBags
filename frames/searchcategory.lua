@@ -6,6 +6,12 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class SearchCategoryConfig: AceModule
 ---@field frame Frame
 local searchCategoryConfig = addon:NewModule('SearchCategoryConfig')
@@ -44,6 +50,38 @@ function searchCategoryConfig:OnEnable()
   self.queryBox.EditBox:SetFontObject("GameFontHighlight")
   self.queryBox.EditBox:SetMaxLetters(1024)
   self.queryBox:Show()
+
+  self.saveButton = CreateFrame("Button", addonName .. "SearchCategoryConfigSaveButton", self.frame, "UIPanelButtonTemplate")
+  self.saveButton:SetSize(100, 30)
+  self.saveButton:SetPoint("BOTTOMRIGHT", -20, 20)
+  self.saveButton:SetText("Save")
+
+  self.cancelButton = CreateFrame("Button", addonName .. "SearchCategoryConfigCancelButton", self.frame, "UIPanelButtonTemplate")
+  self.cancelButton:SetSize(100, 30)
+  self.cancelButton:SetPoint("RIGHT", self.saveButton, "LEFT", -10, 0)
+  self.cancelButton:SetText("Cancel")
+
+  self.saveButton:SetScript("OnClick", function()
+    local name = self.nameBox:GetText()
+    local query = self.queryBox.EditBox:GetText()
+    if name == "" then
+      return
+    end
+    if query == "" then
+      return
+    end
+    categories:CreateOrUpdateSearchCategory({
+      name = name,
+      query = query,
+      save = true,
+    })
+    events:SendMessage('bags/FullRefreshAll')
+    self.frame:Hide()
+  end)
+
+  self.cancelButton:SetScript("OnClick", function()
+    self.frame:Hide()
+  end)
 
   self.frame:Hide()
 end
