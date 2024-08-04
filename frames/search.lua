@@ -181,8 +181,11 @@ function searchBox:Create(parent)
   textBox:SetScript("OnEnterPressed", function()
     searchCategoryConfig:Open({
       name = "",
-      query = searchBox:GetText(),
+      itemList = {},
       priority = 10,
+      searchCategory = {
+        query = searchBox:GetText(),
+      }
     })
   end)
 

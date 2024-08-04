@@ -124,11 +124,14 @@ function searchCategoryConfig:OnEnable()
       print("error text is", self.errorText:GetText())
       return
     end
-    categories:CreateOrUpdateSearchCategory({
+    categories:CreateCategory({
       name = name,
-      query = query,
       priority = tonumber(self.priorityBox:GetText()) or 10,
       save = true,
+      itemList = {},
+      searchCategory = {
+        query = query,
+      }
     })
     events:SendMessage('bags/FullRefreshAll')
     self.fadeOutGroup:Play()
@@ -141,11 +144,11 @@ function searchCategoryConfig:OnEnable()
   self.frame:Hide()
 end
 
----@param searchCategory SearchCategory
-function searchCategoryConfig:Open(searchCategory)
-  self.nameBox:SetText(searchCategory.name)
-  self.queryBox.EditBox:SetText(searchCategory.query)
-  self.priorityBox:SetText(tostring(searchCategory.priority) or "10")
+---@param filter CustomCategoryFilter
+function searchCategoryConfig:Open(filter)
+  self.nameBox:SetText(filter.name)
+  self.queryBox.EditBox:SetText(filter.searchCategory.query)
+  self.priorityBox:SetText(tostring(filter.priority) or "10")
   self.fadeInGroup.callback = function()
     self.nameBox:SetFocus()
     self:CheckNameboxText()
