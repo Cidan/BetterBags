@@ -18,6 +18,7 @@ local events = addon:GetModule('Events')
 ---@class SearchCategoryConfig: AceModule
 ---@field frame Frame
 ---@field openedName string
+---@field queryBox InputScrollFrameTemplate
 local searchCategoryConfig = addon:NewModule('SearchCategoryConfig')
 
 function searchCategoryConfig:CheckNameboxText()
@@ -65,7 +66,7 @@ function searchCategoryConfig:OnEnable()
   self.queryBoxLabel:SetPoint("TOPLEFT", self.nameBox, "BOTTOMLEFT", -2, -20)
   self.queryBoxLabel:SetText("Search Query")
 
-  self.queryBox = CreateFrame("ScrollFrame", addonName .. "SearchCategoryConfigQueryBox", self.frame, "InputScrollFrameTemplate")
+  self.queryBox = CreateFrame("ScrollFrame", addonName .. "SearchCategoryConfigQueryBox", self.frame, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
   self.queryBox:SetSize(400, 100)
   self.queryBox.EditBox:SetSize(200, 300)
   self.queryBox:SetPoint("TOPLEFT", self.queryBoxLabel, "BOTTOMLEFT", 2, -7)
