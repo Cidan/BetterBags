@@ -45,6 +45,9 @@ local sectionItemList = addon:GetModule('SectionItemList')
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
 
+---@class SearchCategoryConfig: AceModule
+local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
 
@@ -118,11 +121,29 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the category font info for the button depending on if it's a header or not.
   if elementData.header then
     button.Category:SetFontObject(fonts.UnitFrame12Yellow)
+    button.Note:SetText("")
     button.Expand:Hide()
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
     button.Expand:SetScript("OnClick", function()
-      self.itemList:ShowCategory(elementData.title)
+      local filter = categories:GetCategoryByName(elementData.title)
+      if filter.searchCategory then
+        if self.itemList:IsShown() then
+          self.itemList:Hide(function()
+            searchCategoryConfig:Open(filter, self.frame)
+          end)
+        else
+          searchCategoryConfig:Open(filter, self.frame)
+        end
+      else
+        if searchCategoryConfig:IsShown() then
+          searchCategoryConfig:Close(function()
+            self.itemList:ShowCategory(elementData.title)
+          end)
+        else
+          self.itemList:ShowCategory(elementData.title)
+        end
+      end
     end)
     button.Expand:Show()
     if not categories:DoesCategoryExist(elementData.title) then
@@ -134,7 +155,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     end
 
     if categories:IsCategoryShown(elementData.title) then
-      button.Note:SetText("")
+      local filter = categories:GetCategoryByName(elementData.title)
+      if filter and filter.searchCategory then
+        button.Note:SetText(format("Priority: %d", filter.priority))
+      else
+        button.Note:SetText("")
+      end
     else
       button.Note:SetText("(hidden)")
     end
@@ -209,7 +235,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       func = function()
         categories:ToggleCategoryShown(elementData.title)
         if categories:IsCategoryShown(elementData.title) then
-          button.Note:SetText("")
+          local filter = categories:GetCategoryByName(elementData.title)
+          if filter and filter.searchCategory then
+            button.Note:SetText(format("Priority: %d", elementData.priority or filter.priority))
+          else
+            button.Note:SetText("")
+          end
         else
           button.Note:SetText("(hidden)")
         end
@@ -457,6 +488,16 @@ function sectionConfig:Create(kind, parent)
     table.sort(names)
     for _, sName in ipairs(names) do
       sc:AddSection(sName)
+    end
+    for index, elementData in sc.content.provider:EnumerateEntireRange() do
+      if not elementData.header and not categories:DoesCategoryExist(elementData.title) then
+        sc.content:RemoveAtIndex(index)
+      end
+      local filter = categories:GetCategoryByName(elementData.title)
+      if filter and filter.searchCategory then
+        sc.content:RemoveAtIndex(index)
+        sc.content:AddAtIndex(elementData, index)
+      end
     end
     if sc.itemList:IsShown() then
       sc.itemList:Redraw()

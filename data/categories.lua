@@ -9,15 +9,25 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
 ---@class SearchCategory
----@field name string The name of the category.
----@field enabled? table<BagKind, boolean> The enabled state of the category.
 ---@field query string The search query for the category.
+
+---@class CustomCategoryFilter
+---@field name string The name of this category as it appears for the user.
+---@field itemList table<number, boolean> The list of item IDs in this category.
+---@field enabled? table<BagKind, boolean> The enabled state of the category for each bag.
+---@field readOnly? boolean Currently unused.
+---@field save? boolean If true, this category is saved to disk.
+---@field searchCategory? SearchCategory If defined, this category is a search category.
+---@field note? string A note about the category.
+---@field color? number[] The RGB color of the category name.
 ---@field priority? number The priority of the category. A higher number has a higher priority.
----@field save? boolean If true, this category will be saved to the database and will persist between sessions.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -25,7 +35,6 @@ local const = addon:GetModule('Constants')
 ---@field private categoryCount number
 ---@field private ephemeralCategories table<string, CustomCategoryFilter>
 ---@field private ephemeralCategoryByItemID table<number, CustomCategoryFilter>
----@field private ephemeralSearchCategories table<string, SearchCategory>
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
@@ -33,7 +42,6 @@ function categories:OnInitialize()
   self.itemsWithNoCategory = {}
   self.ephemeralCategories = {}
   self.ephemeralCategoryByItemID = {}
-  self.ephemeralSearchCategories = {}
   self.categoryCount = 0
 end
 
@@ -68,41 +76,61 @@ end
 
 -- GetMergedCategory returns a custom category by its name, merging ephemeral and persistent categories.
 ---@param name string
----@return CustomCategoryFilter
+---@return CustomCategoryFilter?
 function categories:GetMergedCategory(name)
+  ---@type CustomCategoryFilter
+  local results = {
+    name = name,
+    itemList = {},
+  }
+
   local filter = database:GetItemCategory(name)
-  if not filter.itemList then
-    return self.ephemeralCategories[name]
-  end
-  if self.ephemeralCategories[name] then
-    for id, _ in pairs(self.ephemeralCategories[name].itemList) do
-      filter.itemList[id] = true
+
+  if filter then
+    for id, _ in pairs(filter.itemList) do
+      results.itemList[id] = true
     end
   end
-  return filter
+
+  if self.ephemeralCategories[name] then
+    for id, _ in pairs(self.ephemeralCategories[name].itemList) do
+      results.itemList[id] = true
+    end
+  end
+
+  return results
 end
 
--- AddItemToCategory adds an item to a custom category by its ItemID.
----@param id number The ItemID of the item to add to a custom category.
+-- AddItemToCategory adds an item to a custom category.
+---@param id number The ItemID of the item to add to the category.
 ---@param category string The name of the custom category to add the item to.
-function categories:AddItemToPersistentCategory(id, category)
+function categories:AddItemToCategory(id, category)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
-  local found = database:ItemCategoryExists(category)
-  database:SaveItemToCategory(id, category)
-  if not found then
-    self.categoryCount = self.categoryCount + 1
-    events:SendMessage('categories/Changed')
-  end
-end
 
-function categories:AddItemToCategory(id, category)
-  if not self.ephemeralCategories[category] then
-    self:CreateCategory(category)
+  -- Backwards compatability for the old way of adding items to categories.
+  if not database:ItemCategoryExists(category) then
+    self:CreateCategory({
+      name = category,
+      itemList = {},
+    })
   end
-  self.ephemeralCategories[category].itemList[id] = true
-  self.ephemeralCategoryByItemID[id] = self.ephemeralCategories[category]
+
+  if self.ephemeralCategories[category] then
+    if self.ephemeralCategories[category].searchCategory then
+      return
+    end
+    self.ephemeralCategories[category].itemList[id] = true
+    self.ephemeralCategoryByItemID[id] = self.ephemeralCategories[category]
+    return
+  end
+
+  assert(database:ItemCategoryExists(category), format("Attempted to add item %d to category %s, but the category does not exist.", id, category))
+  if database:GetItemCategory(category).searchCategory then
+    return
+  end
+  database:SaveItemToCategory(id, category)
 end
 
 -- WipeCategory removes all items from a custom category, but does not delete the category.
@@ -126,8 +154,10 @@ function categories:IsCategoryEnabled(kind, category)
   if self.ephemeralCategories[category] then
     return database:GetEphemeralItemCategory(category).enabled[kind]
   end
-  if database:GetItemCategory(category).itemList then
-    return database:GetItemCategory(category).enabled[kind]
+  if database:GetItemCategory(category) then
+    if database:GetItemCategory(category).itemList then
+      return database:GetItemCategory(category).enabled[kind]
+    end
   end
   return false
 end
@@ -142,8 +172,10 @@ function categories:ToggleCategory(kind, category)
     enabled = not self.ephemeralCategories[category].enabled[kind]
     self.ephemeralCategories[category].enabled[kind] = enabled
     database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
+    return
   end
-  if database:GetItemCategory(category).itemList then
+  local filter = database:GetItemCategory(category)
+  if filter then
     database:SetItemCategoryEnabled(kind, category, enabled)
   end
 end
@@ -154,8 +186,10 @@ function categories:EnableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = true
     database:SetEphemeralItemCategoryEnabled(kind, category, true)
+    return
   end
-  if database:GetItemCategory(category).itemList then
+  local filter = database:GetItemCategory(category)
+  if filter then
     database:SetItemCategoryEnabled(kind, category, true)
   end
 end
@@ -166,8 +200,10 @@ function categories:DisableCategory(kind, category)
   if self.ephemeralCategories[category] then
     self.ephemeralCategories[category].enabled[kind] = false
     database:SetEphemeralItemCategoryEnabled(kind, category, false)
+    return
   end
-  if database:GetItemCategory(category).itemList then
+  local filter = database:GetItemCategory(category)
+  if filter then
     database:SetItemCategoryEnabled(kind, category, false)
   end
 end
@@ -195,82 +231,66 @@ function categories:SetCategoryState(kind, category, enabled)
   end
 end
 
+---@param category CustomCategoryFilter
 function categories:CreateCategory(category)
-  if self.ephemeralCategories[category] then return end
-  self.ephemeralCategories[category] = {
-    name = category,
-    enabled = {
-      [const.BAG_KIND.BACKPACK] = true,
-      [const.BAG_KIND.BANK] = true,
-    },
-    itemList = {},
-    readOnly = false,
+  category.enabled = category.enabled or {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true,
   }
-  database:CreateEpemeralCategory(category)
-  events:SendMessage('categories/Changed')
-end
 
--- CreateSearchCategory will create a custom category
--- with a search query that adds items to the category based on the
--- search query results. This is useful for creating categories that are
--- based on item properties, such as item level, item quality, or item type.
----@param searchCategory SearchCategory
-function categories:CreateOrUpdateSearchCategory(searchCategory)
-  if not searchCategory.priority then
-    searchCategory.priority = 99
-  end
-  if searchCategory.save then
-    database:CreateOrUpdateSearchCategory(searchCategory)
+  if category.save then
+    database:CreateOrUpdateCategory(category)
   else
-    self.ephemeralSearchCategories[searchCategory.name] = searchCategory
+    local savedState = database:GetEphemeralItemCategory(category.name)
+    if savedState and savedState.enabled then
+      category.enabled = savedState.enabled
+    end
+    self.ephemeralCategories[category.name] = category
+    for id in pairs(category.itemList) do
+      self.ephemeralCategoryByItemID[id] = category
+    end
+    database:CreateOrUpdateCategory(category)
   end
   events:SendMessage('categories/Changed')
 end
 
----@return table<string, SearchCategory>
+---@param name string
+---@return CustomCategoryFilter
+function categories:GetCategoryByName(name)
+  return database:GetItemCategory(name) or self.ephemeralCategories[name]
+end
+
+---@return table<string, CustomCategoryFilter>
 function categories:GetAllSearchCategories()
-  ---@type table<string, SearchCategory>
+  ---@type table<string, CustomCategoryFilter>
   local results = {}
-  local savedCategories = database:GetAllSearchCategories()
+  local savedCategories = database:GetAllItemCategories()
   for name, searchCategory in pairs(savedCategories) do
-    results[name] = searchCategory
+    if searchCategory.searchCategory then
+      results[name] = searchCategory
+    end
   end
-  for name, searchCategory in pairs(self.ephemeralSearchCategories) do
-    results[name] = searchCategory
+  for name, searchCategory in pairs(self.ephemeralCategories) do
+    if searchCategory.searchCategory then
+      results[name] = searchCategory
+    end
   end
   return results
 end
 
 -- Returns a reverse sorted list of search categories, by priority.
----@return SearchCategory[]
+---@return CustomCategoryFilter[]
 function categories:GetSortedSearchCategories()
-  ---@type SearchCategory[]
+  ---@type CustomCategoryFilter[]
   local results = {}
-  local savedCategories = database:GetAllSearchCategories()
+  local savedCategories = categories:GetAllSearchCategories()
   for _, searchCategory in pairs(savedCategories) do
     table.insert(results, searchCategory)
   end
-  for _, searchCategory in pairs(self.ephemeralSearchCategories) do
-    table.insert(results, searchCategory)
-  end
   table.sort(results, function(a, b)
-    return a.priority < b.priority
+    return a.priority > b.priority
   end)
   return results
-end
-
----@param category string
-function categories:DeleteSearchCategory(category)
-  if self.ephemeralSearchCategories[category] then
-    self.ephemeralSearchCategories[category] = nil
-  end
-  database:DeleteSearchCategory(category)
-  events:SendMessage('categories/Changed')
-end
-
-function categories:CreatePersistentCategory(category)
-  database:CreateCategory(category)
-  events:SendMessage('categories/Changed')
 end
 
 function categories:DeleteCategory(category)
@@ -320,14 +340,14 @@ end
 function categories:GetCustomCategory(kind, data)
   local itemID = data.itemInfo.itemID
   if not itemID then return nil end
-
   local filter = database:GetItemCategoryByItemID(itemID)
   if filter.enabled and filter.enabled[kind] then
     return filter.name
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
-  if filter and database:GetEphemeralItemCategory(filter.name).enabled[kind] then
+
+  if filter and filter.enabled[kind] then
     return filter.name
   end
 

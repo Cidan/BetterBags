@@ -148,7 +148,8 @@
     "ITEM_QUALITY5_DESC",
     "ITEM_QUALITY6_DESC",
     "ITEM_QUALITY7_DESC",
-    "ITEM_QUALITY8_DESC"
+    "ITEM_QUALITY8_DESC",
+    "enabled"
   ],
   "Notes.notesLocation": ".notes",
   "Lua.diagnostics.ignoredFiles": "Disable",
