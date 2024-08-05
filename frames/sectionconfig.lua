@@ -89,14 +89,6 @@ function sectionConfigFrame:OnReceiveDrag(category)
   return true
 end
 
-function sectionConfigFrame:OnRefresh()
-  for index, elementData in self.content.provider:EnumerateEntireRange() do
-    if not elementData.header and not categories:DoesCategoryExist(elementData.title) then
-      self.content.provider:RemoveIndex(index)
-    end
-  end
-end
-
 ---@param button BetterBagsSectionConfigListButton
 ---@param elementData table
 function sectionConfigFrame:initSectionItem(button, elementData)
@@ -129,6 +121,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the category font info for the button depending on if it's a header or not.
   if elementData.header then
     button.Category:SetFontObject(fonts.UnitFrame12Yellow)
+    button.Note:SetText("")
     button.Expand:Hide()
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
@@ -162,7 +155,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     end
 
     if categories:IsCategoryShown(elementData.title) then
-      button.Note:SetText("")
+      local filter = categories:GetCategoryByName(elementData.title)
+      if filter and filter.searchCategory then
+        button.Note:SetText(format("Priority: %d", filter.priority))
+      else
+        button.Note:SetText("")
+      end
     else
       button.Note:SetText("(hidden)")
     end
@@ -237,7 +235,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       func = function()
         categories:ToggleCategoryShown(elementData.title)
         if categories:IsCategoryShown(elementData.title) then
-          button.Note:SetText("")
+          local filter = categories:GetCategoryByName(elementData.title)
+          if filter and filter.searchCategory then
+            button.Note:SetText(format("Priority: %d", elementData.priority or filter.priority))
+          else
+            button.Note:SetText("")
+          end
         else
           button.Note:SetText("(hidden)")
         end
@@ -469,10 +472,6 @@ function sectionConfig:Create(kind, parent)
   -- Create the pop out item list.
   sc.itemList = sectionItemList:Create(sc.frame)
 
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    sc:OnRefresh()
-  end)
-
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()
     ---@type string[]
@@ -486,12 +485,19 @@ function sectionConfig:Create(kind, parent)
     for sName in pairs(categories:GetAllCategories()) do
       table.insert(names, sName)
     end
-    for sName in pairs(categories:GetAllSearchCategories()) do
-      table.insert(names, sName)
-    end
     table.sort(names)
     for _, sName in ipairs(names) do
       sc:AddSection(sName)
+    end
+    for index, elementData in sc.content.provider:EnumerateEntireRange() do
+      if not elementData.header and not categories:DoesCategoryExist(elementData.title) then
+        sc.content:RemoveAtIndex(index)
+      end
+      local filter = categories:GetCategoryByName(elementData.title)
+      if filter and filter.searchCategory then
+        sc.content:RemoveAtIndex(index)
+        sc.content:AddAtIndex(elementData, index)
+      end
     end
     if sc.itemList:IsShown() then
       sc.itemList:Redraw()
