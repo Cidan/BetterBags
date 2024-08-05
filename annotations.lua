@@ -244,7 +244,7 @@ function DataProviderMixin:Flush() end
 ---@param predicate fun(elementData: table<any, any>): boolean
 ---@return boolean
 function DataProviderMixin:ContainsByPredicate(predicate) end
----@return fun(), table[]
+---@return fun(): number, table
 function DataProviderMixin:EnumerateEntireRange() end
 ---@return table[]
 function DataProviderMixin:GetCollection() end

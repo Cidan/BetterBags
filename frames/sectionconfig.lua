@@ -45,6 +45,9 @@ local sectionItemList = addon:GetModule('SectionItemList')
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
 
+---@class SearchCategoryConfig: AceModule
+local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
 
@@ -86,6 +89,14 @@ function sectionConfigFrame:OnReceiveDrag(category)
   return true
 end
 
+function sectionConfigFrame:OnRefresh()
+  for index, elementData in self.content.provider:EnumerateEntireRange() do
+    if not elementData.header and not categories:DoesCategoryExist(elementData.title) then
+      self.content.provider:RemoveIndex(index)
+    end
+  end
+end
+
 ---@param button BetterBagsSectionConfigListButton
 ---@param elementData table
 function sectionConfigFrame:initSectionItem(button, elementData)
@@ -122,7 +133,24 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
     button.Expand:SetScript("OnClick", function()
-      self.itemList:ShowCategory(elementData.title)
+      local filter = categories:GetCategoryByName(elementData.title)
+      if filter.searchCategory then
+        if self.itemList:IsShown() then
+          self.itemList:Hide(function()
+            searchCategoryConfig:Open(filter, self.frame)
+          end)
+        else
+          searchCategoryConfig:Open(filter, self.frame)
+        end
+      else
+        if searchCategoryConfig:IsShown() then
+          searchCategoryConfig:Close(function()
+            self.itemList:ShowCategory(elementData.title)
+          end)
+        else
+          self.itemList:ShowCategory(elementData.title)
+        end
+      end
     end)
     button.Expand:Show()
     if not categories:DoesCategoryExist(elementData.title) then
@@ -440,6 +468,10 @@ function sectionConfig:Create(kind, parent)
 
   -- Create the pop out item list.
   sc.itemList = sectionItemList:Create(sc.frame)
+
+  events:RegisterMessage('bags/FullRefreshAll', function()
+    sc:OnRefresh()
+  end)
 
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()

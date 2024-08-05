@@ -254,6 +254,12 @@ function categories:CreateCategory(category)
   events:SendMessage('categories/Changed')
 end
 
+---@param name string
+---@return CustomCategoryFilter
+function categories:GetCategoryByName(name)
+  return database:GetItemCategory(name) or self.ephemeralCategories[name]
+end
+
 ---@return table<string, CustomCategoryFilter>
 function categories:GetAllSearchCategories()
   ---@type table<string, CustomCategoryFilter>

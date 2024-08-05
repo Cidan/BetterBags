@@ -17,13 +17,14 @@ local events = addon:GetModule('Events')
 
 ---@class SearchCategoryConfig: AceModule
 ---@field frame Frame
+---@field openedName string
 local searchCategoryConfig = addon:NewModule('SearchCategoryConfig')
 
 function searchCategoryConfig:CheckNameboxText()
   local input = self.nameBox:GetText()
   if input == "" then
     self.errorText:SetText("Name cannot be empty")
-  elseif categories:DoesCategoryExist(input) then
+  elseif categories:DoesCategoryExist(input) and self.openedName ~= input then
     self.errorText:SetText("This category name overwrites a previous item list based category. Please choose a different name.")
   else
     self.errorText:SetText("")
@@ -42,6 +43,7 @@ function searchCategoryConfig:OnEnable()
   self.frame:RegisterForDrag("LeftButton")
   self.frame:SetScript("OnDragStart", self.frame.StartMoving)
   self.frame:SetScript("OnDragStop", self.frame.StopMovingOrSizing)
+  self.frame:SetFrameStrata("DIALOG")
 
   self.fadeInGroup, self.fadeOutGroup = animations:AttachFadeGroup(self.frame)
 
@@ -121,7 +123,6 @@ function searchCategoryConfig:OnEnable()
     local name = self.nameBox:GetText()
     local query = self.queryBox.EditBox:GetText()
     if self.errorText:GetText() ~= "" and self.errorText:GetText() ~= nil then
-      print("error text is", self.errorText:GetText())
       return
     end
     categories:CreateCategory({
@@ -133,25 +134,55 @@ function searchCategoryConfig:OnEnable()
         query = query,
       }
     })
+    if self.openedName ~= name and self.openedName ~= nil and self.openedName ~= "" then
+      categories:DeleteCategory(self.openedName)
+    end
+    self.openedName = nil
     events:SendMessage('bags/FullRefreshAll')
     self.fadeOutGroup:Play()
   end)
 
   self.cancelButton:SetScript("OnClick", function()
+    self.openedName = nil
     self.fadeOutGroup:Play()
   end)
 
   self.frame:Hide()
 end
 
+function searchCategoryConfig:IsShown()
+  return self.frame:IsShown()
+end
+
+function searchCategoryConfig:Close(callback)
+  self.fadeOutGroup.callback = function()
+    self.fadeOutGroup.callback = nil
+    callback()
+  end
+  self.fadeOutGroup:Play()
+end
+
 ---@param filter CustomCategoryFilter
-function searchCategoryConfig:Open(filter)
+---@param f? Frame
+function searchCategoryConfig:Open(filter, f)
+  if filter.name == self.openedName then
+    self.openedName = nil
+    self.fadeOutGroup:Play()
+    return
+  end
   self.nameBox:SetText(filter.name)
+  self.openedName = filter.name
   self.queryBox.EditBox:SetText(filter.searchCategory.query)
   self.priorityBox:SetText(tostring(filter.priority) or "10")
   self.fadeInGroup.callback = function()
     self.nameBox:SetFocus()
     self:CheckNameboxText()
+  end
+  self.frame:ClearAllPoints()
+  if f then
+    self.frame:SetPoint("TOPRIGHT", f, "TOPLEFT", -10, 0)
+  else
+    self.frame:SetPoint("CENTER")
   end
   self.fadeInGroup:Play()
 end
