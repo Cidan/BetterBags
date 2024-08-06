@@ -102,6 +102,15 @@ function searchBox.searchProto:UpdateSearch()
       self.helpText:Hide()
     end
   end
+
+  if text == "" then
+    self.enterLabelFadeOut:Play()
+  else
+    if not self.enterLabel:IsShown() then
+      self.enterLabelFadeIn:Play()
+    end
+  end
+
   if self.kind ~= nil then
     if self.kind == const.BAG_KIND.BACKPACK then
       if text == "" then
@@ -235,7 +244,27 @@ function searchBox:CreateBox(kind, parent)
   textBox:SetScript("OnTextChanged", function()
     sf:UpdateSearch()
   end)
+
+  textBox:SetScript("OnEnterPressed", function()
+    searchCategoryConfig:Open({
+      name = "",
+      itemList = {},
+      priority = 10,
+      searchCategory = {
+        query = textBox:GetText(),
+      }
+    })
+  end)
+
   textBox:SetAllPoints()
+
+  local enterLabel = textBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+  enterLabel:SetPoint("RIGHT", textBox, "RIGHT", -20, 0)
+  enterLabel:SetText("[Enter] Create a new category...")
+  enterLabel:Hide()
+  sf.enterLabelFadeIn, sf.enterLabelFadeOut = animations:AttachFadeGroup(enterLabel)
+
+  sf.enterLabel = enterLabel
 
   sf.kind = kind
   sf.helpText = textBox.Instructions

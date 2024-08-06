@@ -84,8 +84,8 @@ local simpleDark = {
       close:SetFrameLevel(1001)
 
       local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      box.frame:SetPoint("TOP", decoration, "TOP", 0, -16)
-      box.frame:SetSize(150, 20)
+      box.frame:SetPoint("TOPLEFT", decoration, "TOPLEFT", 20, -40)
+      box.frame:SetPoint("BOTTOMRIGHT", decoration, "TOPRIGHT", -10, -60)
       decoration.search = box
 
       -- The bag button is abstracted here as it's a common element across all themes.
@@ -216,11 +216,6 @@ local simpleDark = {
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
       decoration.search:SetShown(shown)
-      if shown then
-        decoration.title:Hide()
-      else
-        decoration.title:Show()
-      end
     end
   end
 }

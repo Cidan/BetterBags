@@ -134,6 +134,18 @@ end
 ---@param view View
 ---@param ctx Context
 ---@param bag Bag
+local function UpdateViewSize(view, ctx, bag)
+  local parent = view.content:GetContainer():GetParent()
+  if database:GetInBagSearch() then
+    view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET - 20)
+  else
+    view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  end
+end
+
+---@param view View
+---@param ctx Context
+---@param bag Bag
 ---@param slotInfo SlotInfo
 local function GridView(view, ctx, bag, slotInfo)
   if ctx:GetBool('wipe') then
@@ -287,6 +299,9 @@ local function GridView(view, ctx, bag, slotInfo)
     if h == 0 then
       h = 40
     end
+    if database:GetInBagSearch() then
+      h = h + 20
+    end
     view.content:HideScrollBar()
     --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
     -- than the screen space.
@@ -295,6 +310,7 @@ local function GridView(view, ctx, bag, slotInfo)
     const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
     const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
     bag.frame:SetHeight(bagHeight)
+    UpdateViewSize(view, ctx, bag)
   end
   view.itemCount = slotInfo.totalItems
 end
