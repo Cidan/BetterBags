@@ -378,7 +378,7 @@ function items:LoadItems(ctx, kind, dataCache)
   if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
   end
-
+  self:WipeSearchCache(kind)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(ctx, dataCache)
@@ -445,6 +445,9 @@ function items:LoadItems(ctx, kind, dataCache)
     if not currentItem.isItemEmpty then
       slotInfo.totalItems = slotInfo.totalItems + 1
     end
+    local oldCategory = currentItem.itemInfo.category
+    currentItem.itemInfo.category = self:GetCategory(currentItem)
+    search:UpdateCategoryIndex(currentItem, oldCategory)
   end
 
   -- Set the defer delete flag if the total items count has decreased.
@@ -457,15 +460,30 @@ function items:LoadItems(ctx, kind, dataCache)
 
   -- Get the categories for each item.
   for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
-    local oldCategory = currentItem.itemInfo.category
-    currentItem.itemInfo.category = self:GetCategory(currentItem)
-    search:UpdateCategoryIndex(currentItem, oldCategory)
+    local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
+    if newCategory then
+      local oldCategory = currentItem.itemInfo.category
+      currentItem.itemInfo.category = newCategory
+      search:UpdateCategoryIndex(currentItem, oldCategory)
+    end
   end
 end
 
 ---@param kind BagKind
-function items:RefreshSearchCache(kind)
+---@param slotkey string
+---@return string
+function items:GetSearchCategory(kind, slotkey)
+  return self.searchCache[kind][slotkey]
+end
+
+---@param kind BagKind
+function items:WipeSearchCache(kind)
   wipe(self.searchCache[kind])
+end
+
+---@param kind BagKind
+function items:RefreshSearchCache(kind)
+  self:WipeSearchCache(kind)
   local categoryTable = categories:GetSortedSearchCategories()
   for _, categoryFilter in ipairs(categoryTable) do
     if categoryFilter.enabled[kind] then

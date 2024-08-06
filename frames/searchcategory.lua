@@ -68,7 +68,7 @@ function searchCategoryConfig:OnEnable()
 
   self.queryBox = CreateFrame("ScrollFrame", addonName .. "SearchCategoryConfigQueryBox", self.frame, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
   self.queryBox:SetSize(400, 100)
-  self.queryBox.EditBox:SetSize(200, 300)
+  self.queryBox.EditBox:SetSize(390, 100)
   self.queryBox:SetPoint("TOPLEFT", self.queryBoxLabel, "BOTTOMLEFT", 2, -7)
   self.queryBox.EditBox:SetFontObject("GameFontHighlight")
   self.queryBox.EditBox:SetMaxLetters(1024)
