@@ -132,9 +132,7 @@ local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
 end
 
 ---@param view View
----@param ctx Context
----@param bag Bag
-local function UpdateViewSize(view, ctx, bag)
+local function UpdateViewSize(view)
   local parent = view.content:GetContainer():GetParent()
   if database:GetInBagSearch() then
     view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET - 20)
@@ -310,7 +308,7 @@ local function GridView(view, ctx, bag, slotInfo)
     const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
     const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
     bag.frame:SetHeight(bagHeight)
-    UpdateViewSize(view, ctx, bag)
+    UpdateViewSize(view)
   end
   view.itemCount = slotInfo.totalItems
 end
