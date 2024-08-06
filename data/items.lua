@@ -85,7 +85,7 @@ local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
 ---@field private slotInfo table<BagKind, SlotInfo>
----@field private searchCache table<string, string> A table of slotid's to categories.
+---@field private searchCache table<BagKind, table<string, string>> A table of slotid's to categories.
 ---@field _doingRefresh boolean
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _newItemTimers table<string, number>
@@ -98,7 +98,10 @@ function items:OnInitialize()
   self.previousItemGUID = {}
   self:ResetSlotInfo()
 
-  self.searchCache = {}
+  self.searchCache = {
+    [const.BAG_KIND.BACKPACK] = {},
+    [const.BAG_KIND.BANK] = {},
+  }
   self._newItemTimers = {}
   self._preSort = false
   self._doingRefresh = false
@@ -375,7 +378,7 @@ function items:LoadItems(ctx, kind, dataCache)
   if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
   end
-
+  self:WipeSearchCache(kind)
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(ctx, dataCache)
@@ -442,6 +445,9 @@ function items:LoadItems(ctx, kind, dataCache)
     if not currentItem.isItemEmpty then
       slotInfo.totalItems = slotInfo.totalItems + 1
     end
+    local oldCategory = currentItem.itemInfo.category
+    currentItem.itemInfo.category = self:GetCategory(currentItem)
+    search:UpdateCategoryIndex(currentItem, oldCategory)
   end
 
   -- Set the defer delete flag if the total items count has decreased.
@@ -450,24 +456,42 @@ function items:LoadItems(ctx, kind, dataCache)
   end
 
   -- Refresh the search cache.
-  self:RefreshSearchCache()
+  self:RefreshSearchCache(kind)
 
   -- Get the categories for each item.
   for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
-    local oldCategory = currentItem.itemInfo.category
-    currentItem.itemInfo.category = self:GetCategory(currentItem)
-    search:UpdateCategoryIndex(currentItem, oldCategory)
+    local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
+    if newCategory then
+      local oldCategory = currentItem.itemInfo.category
+      currentItem.itemInfo.category = newCategory
+      search:UpdateCategoryIndex(currentItem, oldCategory)
+    end
   end
 end
 
-function items:RefreshSearchCache()
-  wipe(self.searchCache)
+---@param kind BagKind
+---@param slotkey string
+---@return string
+function items:GetSearchCategory(kind, slotkey)
+  return self.searchCache[kind][slotkey]
+end
+
+---@param kind BagKind
+function items:WipeSearchCache(kind)
+  wipe(self.searchCache[kind])
+end
+
+---@param kind BagKind
+function items:RefreshSearchCache(kind)
+  self:WipeSearchCache(kind)
   local categoryTable = categories:GetSortedSearchCategories()
-  for _, searchCategory in pairs(categoryTable) do
-    local results = search:Search(searchCategory.query)
-    for slotkey, match in pairs(results) do
-      if match then
-        self.searchCache[slotkey] = searchCategory.name
+  for _, categoryFilter in ipairs(categoryTable) do
+    if categoryFilter.enabled[kind] then
+      local results = search:Search(categoryFilter.searchCategory.query)
+      for slotkey, match in pairs(results) do
+        if match then
+          self.searchCache[kind][slotkey] = categoryFilter.name
+        end
       end
     end
   end
@@ -694,8 +718,8 @@ function items:GetCategory(data)
   end
 
   -- Search categories come before all.
-  if self.searchCache[data.slotkey] ~= nil then
-    return self.searchCache[data.slotkey]
+  if self.searchCache[data.kind][data.slotkey] ~= nil then
+    return self.searchCache[data.kind][data.slotkey]
   end
 
   -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.

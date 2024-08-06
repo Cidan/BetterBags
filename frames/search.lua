@@ -15,6 +15,9 @@ local const = addon:GetModule('Constants')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
+---@class SearchCategoryConfig: AceModule
+local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+
 ---@class SearchBox: AceModule
 ---@field searchFrame SearchFrame
 local searchBox = addon:NewModule('SearchBox')
@@ -26,6 +29,11 @@ local searchBox = addon:NewModule('SearchBox')
 ---@field textBox EditBox
 ---@field helpText FontString
 ---@field kind BagKind
+---@field enterLabel FontString
+---@field enterLabelFadeIn AnimationGroup
+---@field enterLabelFadeOut AnimationGroup
+---@field helpTextFadeIn AnimationGroup
+---@field helpTextFadeOut AnimationGroup
 searchBox.searchProto = {}
 
 -- BetterBags_ToggleSearch toggles the search view. This function is used in the
@@ -80,10 +88,29 @@ end
 function searchBox.searchProto:UpdateSearch()
   local text = self.textBox:GetText()
   if text == "" then
-    self.helpText:Show()
+    if self.helpTextFadeIn then
+      self.helpTextFadeIn:Play()
+    else
+      self.helpText:Show()
+    end
   else
-    self.helpText:Hide()
+    if self.helpTextFadeOut then
+      if self.helpText:IsShown() then
+        self.helpTextFadeOut:Play()
+      end
+    else
+      self.helpText:Hide()
+    end
   end
+
+  if text == "" then
+    self.enterLabelFadeOut:Play()
+  else
+    if not self.enterLabel:IsShown() then
+      self.enterLabelFadeIn:Play()
+    end
+  end
+
   if self.kind ~= nil then
     if self.kind == const.BAG_KIND.BACKPACK then
       if text == "" then
@@ -102,9 +129,13 @@ function searchBox.searchProto:UpdateSearch()
     end
   else
     if text == "" then
+      self.enterLabelFadeOut:Play()
       addon.Bags.Backpack:ResetSearch()
       addon.Bags.Bank:ResetSearch()
     else
+      if not self.enterLabel:IsShown() then
+        self.enterLabelFadeIn:Play()
+      end
       local results = search:Search(text)
       addon.Bags.Backpack:Search(results)
       addon.Bags.Bank:Search(results)
@@ -129,6 +160,14 @@ function searchBox:Create(parent)
   f.Inset:Hide()
   f:Show()
 
+  local enterLabel = f:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+  enterLabel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 6)
+  enterLabel:SetText("[Enter] Create a new category...")
+  enterLabel:Hide()
+  sf.enterLabelFadeIn, sf.enterLabelFadeOut = animations:AttachFadeGroup(enterLabel)
+
+  sf.enterLabel = enterLabel
+
   local textBox = CreateFrame("EditBox", nil, f) --[[@as EditBox]]
   textBox:SetFontObject("GameFontNormalHuge")
   textBox:SetTextColor(1, 1, 1, 1)
@@ -143,14 +182,27 @@ function searchBox:Create(parent)
     me:ClearFocus()
     sf:Toggle()
   end)
+
   textBox:SetScript("OnTextChanged", function()
     sf:UpdateSearch()
+  end)
+
+  textBox:SetScript("OnEnterPressed", function()
+    searchCategoryConfig:Open({
+      name = "",
+      itemList = {},
+      priority = 10,
+      searchCategory = {
+        query = searchBox:GetText(),
+      }
+    })
   end)
 
   local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK", "GameFontDisableLarge")
   helpText:SetPoint("CENTER", textBox, "CENTER", 0, 0)
   helpText:SetText("Start typing to search your bags...")
   helpText:Show()
+  sf.helpTextFadeIn, sf.helpTextFadeOut = animations:AttachFadeGroup(helpText)
   sf.helpText = helpText
 
   sf.fadeInGroup, sf.fadeOutGroup = animations:AttachFadeAndSlideLeft(f)
@@ -192,7 +244,27 @@ function searchBox:CreateBox(kind, parent)
   textBox:SetScript("OnTextChanged", function()
     sf:UpdateSearch()
   end)
+
+  textBox:SetScript("OnEnterPressed", function()
+    searchCategoryConfig:Open({
+      name = "",
+      itemList = {},
+      priority = 10,
+      searchCategory = {
+        query = textBox:GetText(),
+      }
+    })
+  end)
+
   textBox:SetAllPoints()
+
+  local enterLabel = textBox:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+  enterLabel:SetPoint("RIGHT", textBox, "RIGHT", -20, 0)
+  enterLabel:SetText("[Enter] Create a new category...")
+  enterLabel:Hide()
+  sf.enterLabelFadeIn, sf.enterLabelFadeOut = animations:AttachFadeGroup(enterLabel)
+
+  sf.enterLabel = enterLabel
 
   sf.kind = kind
   sf.helpText = textBox.Instructions

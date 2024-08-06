@@ -72,6 +72,7 @@ util\sort.lua
 util\bucket.lua
 util\windowgroup.lua
 
+frames\searchcategory.lua
 frames\question.lua
 frames\search.lua
 frames\slider.lua

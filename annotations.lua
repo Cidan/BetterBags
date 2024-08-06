@@ -228,6 +228,9 @@ function WowScrollBox:GetUpperShadowTexture() end
 function WowScrollBox:GetLowerShadowTexture() end
 function WowScrollBox:SetDataProvider(provider) end
 
+---@class InputScrollFrameTemplate: Frame
+---@field EditBox EditBox
+
 ---@class DataProviderMixin: CallbackRegistryMixin
 local DataProviderMixin = {}
 function DataProviderMixin:Enumerate(indexBegin, indexEnd) end
@@ -244,7 +247,7 @@ function DataProviderMixin:Flush() end
 ---@param predicate fun(elementData: table<any, any>): boolean
 ---@return boolean
 function DataProviderMixin:ContainsByPredicate(predicate) end
----@return fun(), table[]
+---@return fun(): number, table
 function DataProviderMixin:EnumerateEntireRange() end
 ---@return table[]
 function DataProviderMixin:GetCollection() end

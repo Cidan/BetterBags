@@ -423,13 +423,6 @@ const.EQUIPMENT_SLOTS = {
   INVSLOT_WRIST,
 }
 
----@class CustomCategoryFilter
----@field name string
----@field enabled table<BagKind, boolean>
----@field itemList table<number, boolean>
----@field readOnly boolean
----@field predicate? string
-
 ---@class SizeInfo
 ---@field columnCount number
 ---@field itemsPerRow number
@@ -624,8 +617,6 @@ const.DATABASE_DEFAULTS = {
     customCategoryFilters = {},
     ---@type table<string, CustomCategoryFilter>
     ephemeralCategoryFilters = {},
-    ---@type table<string, SearchCategory>
-    searchCategories = {},
     ---@type table<number, string>
     customCategoryIndex = {},
     categoryFilters = {

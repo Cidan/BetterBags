@@ -447,7 +447,7 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor()
   function(input)
     if input == nil then return end
     if input == "" then return end
-    categories:AddItemToPersistentCategory(itemID, input)
+    categories:AddItemToCategory(itemID, input)
     events:SendMessage('bags/FullRefreshAll')
   end)
   GameTooltip:Hide()
@@ -646,6 +646,7 @@ function bagFrame:Create(kind)
     local fw, fh = b.frame:GetSize()
     database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
   end)
+  b.resizeHandle:Hide()
   b:KeepBagInBounds()
 
   if b.kind == const.BAG_KIND.BACKPACK then

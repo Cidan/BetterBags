@@ -130,6 +130,7 @@ end
 ---@param value string
 ---@param slotkey string
 function search:addStringToIndex(index, value, slotkey)
+  if value == nil or value == "" then return end
   local prefix = ""
   value = string.lower(value)
   for i = 1, #value do
@@ -146,6 +147,7 @@ end
 ---@param value string
 ---@param slotkey string
 function search:removeStringFromIndex(index, value, slotkey)
+  if value == nil or value == "" then return end
   local prefix = ""
   value = string.lower(value)
   for i = 1, #value do
@@ -482,40 +484,54 @@ function search:EvaluateAST(node)
   ---@param right table<string, boolean>
   ---@return table<string, boolean>
   local function combine_results(op, left, right)
-      ---@type table<string, boolean>
-      local result = {}
-      if op == "AND" then
-          for k in pairs(left) do
-            if left[k] and right[k] then
-              result[k] = true
-            elseif left[k] == false or right[k] == false then
-              result[k] = false
-            elseif left[k] == true and right[k] == nil and right["___NEGATED___"] == true then
-              result[k] = true
-            elseif left[k] == true and right[k] == nil and not right["___NEGATED___"] then
-              result[k] = false
-            else
-              result[k] = true
-            end
+    ---@type table<string, boolean>
+    local result = {}
+    if op == "AND" then
+      for k in pairs(left) do
+        if left[k] == true then
+          if right[k] == true or (right[k] == nil and right["___NEGATED___"] == true) then
+            result[k] = true
+          else
+            result[k] = false
           end
-          for k in pairs(right) do
-            if right[k] and left[k] then
-              result[k] = true
-            elseif right[k] == false or left[k] == false then
-              result[k] = false
-            elseif right[k] == true and left[k] == nil and left["___NEGATED___"] == true then
-              result[k] = true
-            elseif right[k] == true and left[k] == nil and not left["___NEGATED___"] then
-              result[k] = false
-            else
-              result[k] = true
-            end
+        elseif left[k] == false then
+          result[k] = false
+        elseif left[k] == nil and left["___NEGATED___"] == true then
+          if right[k] == false then
+            result[k] = true
+          else
+            result[k] = false
           end
-      elseif op == "OR" then
-          for k, v in pairs(left) do result[k] = v end
-          for k, v in pairs(right) do result[k] = v end
+        end
       end
-      return result
+      for k in pairs(right) do
+        if not result[k] then
+          if right[k] == true then
+            if left[k] == true or (left[k] == nil and left["___NEGATED___"] == true) then
+              result[k] = true
+            else
+              result[k] = false
+            end
+          elseif right[k] == false then
+              result[k] = false
+          elseif right[k] == nil and right["___NEGATED___"] == true then
+            if left[k] == false then
+              result[k] = true
+            else
+              result[k] = false
+            end
+          end
+        end
+      end
+    elseif op == "OR" then
+      for k, v in pairs(left) do result[k] = v end
+      for k, v in pairs(right) do
+        if result[k] == nil or (result[k] == false and v == true) then
+          result[k] = v
+        end
+      end
+    end
+    return result
   end
 
   if node.type == "logical" then
@@ -525,7 +541,7 @@ function search:EvaluateAST(node)
           return combine_results(node.operator, left, right)
       elseif node.operator == "NOT" then
           if node.expression == nil then
-              error("NOT node has no expression")
+              return {}
           end
           local result = self:EvaluateAST(node.expression)
          ---@type table<string, boolean> 
@@ -551,7 +567,9 @@ end
 ---@return table<string, boolean>, table<string, boolean>
 function search:EvaluateQuery(ast)
   if ast == nil then return {}, {} end
+  debug:Inspect("ast", ast)
   local result = self:EvaluateAST(ast)
+  debug:Inspect("ast result", result)
   ---@type table<string, boolean>, table<string, boolean>
   local positive, negative = {}, {}
   for k, v in pairs(result) do

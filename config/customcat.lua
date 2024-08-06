@@ -9,6 +9,9 @@ local categories = addon:GetModule('Categories')
 ---@class Database: AceModule
 local DB = addon:GetModule('Database')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
@@ -77,7 +80,15 @@ function config:GetCustomCategoryConfig()
             end,
             set = function(_, value)
               if value == "" then return end
-              categories:CreatePersistentCategory(value)
+              categories:CreateCategory({
+                name = value,
+                enabled = {
+                  [const.BAG_KIND.BACKPACK] = true,
+                  [const.BAG_KIND.BANK] = true,
+                },
+                itemList = {},
+                readOnly = false,
+              })
             end,
           }
         }

@@ -45,6 +45,19 @@ function listFrame:AddToStart(data)
   self.provider:InsertAtIndex(data, self.provider:GetSize()+1)
 end
 
+-- AddAtIndex will add an item to the list at the specified index.
+---@param data table
+---@param index number
+function listFrame:AddAtIndex(data, index)
+  self.provider:InsertAtIndex(data, index)
+end
+
+-- RemoveAtIndex will remove an item from the list at the specified index.
+---@param index number
+function listFrame:RemoveAtIndex(index)
+  self.provider:RemoveIndex(index)
+end
+
 ---@param data table
 ---@return boolean
 function listFrame:HasItem(data)

@@ -171,6 +171,7 @@ end
 function themes:SetSearchState(frame, shown)
   local theme = self.themes[db:GetTheme()]
   theme.ToggleSearch(frame, shown)
+  events:SendMessage('bags/FullRefreshAll')
 end
 
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.

@@ -72,6 +72,9 @@ local themes = addon:GetModule('Themes')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
+---@class SearchCategoryConfig: AceModule
+local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -257,6 +260,7 @@ function addon:OnEnable()
   question:Enable()
   refresh:Enable()
   views:Enable()
+  searchCategoryConfig:Enable()
 
   self:HideBlizzardBags()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
