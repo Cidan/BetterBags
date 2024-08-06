@@ -214,6 +214,7 @@ local function BagView(view, ctx, bag, slotInfo)
   local w, h = view.content:Draw({
     cells = view.content.cells,
     maxWidthPerRow = ((37 + 4) * 1) + 16,
+    columns = 2,
   })
   debug:EndProfile('Content Draw Stage')
   -- Reposition the content frame if the recent items section is empty.
