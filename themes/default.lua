@@ -44,8 +44,9 @@ local defaultTheme = {
       end)
 
       local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      box.frame:SetPoint("TOP", decoration, "TOP", 0, -2)
-      box.frame:SetSize(150, 20)
+      box.frame:SetPoint("TOPLEFT", decoration, "TOPLEFT", 20, -30)
+      box.frame:SetPoint("BOTTOMRIGHT", decoration, "TOPRIGHT", -10, -50)
+      --box.frame:SetSize(150, 20)
       decoration.search = box
 
       decoration.CloseButton:SetFrameLevel(1001)
@@ -117,11 +118,6 @@ local defaultTheme = {
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
       decoration.search:SetShown(shown)
-      if shown then
-        decoration.TitleContainer.TitleText:Hide()
-      else
-        decoration.TitleContainer.TitleText:Show()
-      end
     end
   end
 }

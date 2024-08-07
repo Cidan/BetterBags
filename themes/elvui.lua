@@ -57,8 +57,8 @@ local theme = {
       decoration.CloseButton:SetFrameLevel(1001)
 
       local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      box.frame:SetPoint("TOP", decoration, "TOP", 0, -14)
-      box.frame:SetSize(150, 20)
+      box.frame:SetPoint("TOPLEFT", decoration, "TOPLEFT", 10, -40)
+      box.frame:SetPoint("BOTTOMRIGHT", decoration, "TOPRIGHT", -10, -60)
       decoration.search = box
 
       local title = decoration:CreateFontString(nil, "OVERLAY", "GameFontWhite")
@@ -152,11 +152,6 @@ local theme = {
     local decoration = decoratorFrames[frame:GetName()]
     if decoration then
       decoration.search:SetShown(shown)
-      if shown then
-        decoration.title:Hide()
-      else
-        decoration.title:Show()
-      end
     end
   end,
   ItemButton = function(item)

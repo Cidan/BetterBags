@@ -130,6 +130,7 @@ end
 ---@param value string
 ---@param slotkey string
 function search:addStringToIndex(index, value, slotkey)
+  if value == nil or value == "" then return end
   local prefix = ""
   value = string.lower(value)
   for i = 1, #value do
@@ -146,6 +147,7 @@ end
 ---@param value string
 ---@param slotkey string
 function search:removeStringFromIndex(index, value, slotkey)
+  if value == nil or value == "" then return end
   local prefix = ""
   value = string.lower(value)
   for i = 1, #value do

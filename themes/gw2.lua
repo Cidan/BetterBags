@@ -88,8 +88,11 @@ local gw2Theme = {
       decoration.title:SetText(themes.titles[frame:GetName()])
 
       local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
-      box.frame:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -22, -2)
-      box.frame:SetSize(150, 20)
+      box.frame:SetPoint("TOPLEFT", decoration, "TOPLEFT", 0, -40)
+      box.frame:SetPoint("BOTTOMRIGHT", decoration, "TOPRIGHT", -10, -60)
+      box.frame:SetFrameStrata("HIGH")
+      box.frame:SetFrameLevel(decoration:GetFrameLevel() + 1)
+      gw.SkinBagSearchBox(box.textBox)
       decoration.search = box
 
       local close = CreateFrame("Button", nil, decoration.gwHeader, "UIPanelCloseButtonNoScripts")
