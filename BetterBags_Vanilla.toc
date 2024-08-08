@@ -44,6 +44,8 @@ debug\analytics.lua
 core\context.lua
 core\events.lua
 core\localization.lua
+core\localization.enUS.lua
+core\localization.zhCN.lua
 core\constants.lua
 core\era\constants.lua
 core\database.lua

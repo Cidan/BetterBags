@@ -16,7 +16,11 @@ L.data = {}
 ---@param key string
 ---@return string
 function L:G(key)
-  return self.data[key] or key
+  if self.data[key] and self.data[key] ~= true then
+    return self.data[key]
+  else
+    return key
+  end
 end
 
 -- S sets the localized string for the given key.
