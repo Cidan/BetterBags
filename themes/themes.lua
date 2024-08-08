@@ -39,6 +39,7 @@ local db = addon:GetModule('Database')
 ---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
 ---@field Tab? fun(tab: Button): PanelTabButtonTemplate A function that applies the theme to a tab.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
+---@field DisableMasque? boolean If set to true, Masque will not be used with this theme.
 
 ---@class Themes: AceModule
 ---@field themes table<string, Theme>
