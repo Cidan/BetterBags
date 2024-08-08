@@ -82,6 +82,7 @@ function config:GetCustomCategoryConfig()
               if value == "" then return end
               categories:CreateCategory({
                 name = value,
+                save = true,
                 enabled = {
                   [const.BAG_KIND.BACKPACK] = true,
                   [const.BAG_KIND.BANK] = true,

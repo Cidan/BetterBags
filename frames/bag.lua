@@ -447,7 +447,11 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor()
   function(input)
     if input == nil then return end
     if input == "" then return end
-    categories:AddItemToCategory(itemID, input)
+    categories:CreateCategory({
+      name = input,
+      itemList = {[itemID] = true},
+      save = true,
+    })
     events:SendMessage('bags/FullRefreshAll')
   end)
   GameTooltip:Hide()
