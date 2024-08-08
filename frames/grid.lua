@@ -313,7 +313,7 @@ function gridProto:stage(options)
     ---@type RenderOptions
     local headerOptions = {
       cells = {options.header},
-      maxWidthPerRow = options.maxWidthPerRow,
+      maxWidthPerRow = options.maxWidthPerRow * 2,
     }
     headerWidth, headerHeight = self:layoutSingleColumn({options.header}, headerOptions, 0, 0)
     topOffset = -headerHeight
