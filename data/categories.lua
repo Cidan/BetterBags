@@ -18,7 +18,7 @@ local const = addon:GetModule('Constants')
 ---@class SearchCategory
 ---@field query string The search query for the category.
 
----@class CustomCategoryFilter
+---@class (exact) CustomCategoryFilter
 ---@field name string The name of this category as it appears for the user.
 ---@field itemList table<number, boolean> The list of item IDs in this category.
 ---@field enabled? table<BagKind, boolean> The enabled state of the category for each bag.

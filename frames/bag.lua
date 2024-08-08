@@ -450,7 +450,7 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor()
     categories:CreateCategory({
       name = input,
       itemList = {[itemID] = true},
-      saved = true,
+      save = true,
     })
     events:SendMessage('bags/FullRefreshAll')
   end)
