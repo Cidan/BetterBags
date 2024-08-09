@@ -69,6 +69,7 @@ util\resize.lua
 util\sort.lua
 util\bucket.lua
 util\windowgroup.lua
+util\movementflow.lua
 
 frames\searchcategory.lua
 frames\question.lua

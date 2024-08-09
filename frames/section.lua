@@ -34,6 +34,9 @@ local grid = addon:GetModule('Grid')
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
+---@class movementFlow: AceModule
+local movementFlow = addon:GetModule('MovementFlow')
+
 -------
 --- Section Prototype
 -------
@@ -229,7 +232,7 @@ function sectionFrame:_DoReset(f)
 end
 
 ---@param section Section
-local function onTitleClickOrDrop(section)
+function sectionFrame:OnTitleClickOrDrop(section)
   if not CursorHasItem() then return end
   if not IsShiftKeyDown() then return end
   local cursorType, itemID = GetCursorInfo()
@@ -243,8 +246,8 @@ local function onTitleClickOrDrop(section)
 end
 
 ---@param section Section
-local function onTitleRightClick(section)
-  local flow = addon:GetMovementFlow()
+function sectionFrame:OnTitleRightClick(section)
+  local flow = movementFlow:GetMovementFlow()
   if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
   if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
 
@@ -300,7 +303,7 @@ local function onTitleRightClick(section)
       return
     end
     -- safechecking: are we on the same flow as we started?
-    local newFlow = addon:GetMovementFlow()
+    local newFlow = movementFlow:GetMovementFlow()
     if newFlow ~= flow then
       -- print("Flow changed from "..flow.." to "..newFlow..". Aborting.")
       return
@@ -367,15 +370,15 @@ function sectionFrame:_DoCreate()
   title:SetScript("OnClick", function(_, e)
     if s.headerDisabled then return end
     if e == "RightButton" then
-      onTitleRightClick(s)
+      sectionFrame:OnTitleRightClick(s)
     elseif e == "LeftButton" then
-      onTitleClickOrDrop(s)
+      sectionFrame:OnTitleClickOrDrop(s)
     end
   end)
 
   title:SetScript("OnReceiveDrag", function()
     if s.headerDisabled then return end
-    onTitleClickOrDrop(s)
+    sectionFrame:OnTitleClickOrDrop(s)
   end)
 
   s.title = title
