@@ -112,6 +112,7 @@ function itemFrame.itemProto:SetItemFromData(data)
     self.ilvlText:Hide()
   end
 
+  SetItemButtonQuality(decoration, data.itemInfo.itemQuality)
   decoration.minDisplayCount = 1
   SetItemButtonTexture(decoration, data.itemInfo.itemIcon)
   decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])

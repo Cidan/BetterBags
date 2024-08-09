@@ -65,6 +65,7 @@ function masque:OnEnable()
   events:RegisterMessage('item/NewButton', function(_, item, decoration)
     ---@cast item Item
     if not item.kind then return end
+    if themes:GetCurrentTheme().DisableMasque then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:AddButton(decoration)
     self:ReapplyBlend(decoration)
@@ -73,6 +74,7 @@ function masque:OnEnable()
   events:RegisterMessage('item/Updated', function(_, item, decoration)
     ---@cast item Item
     if not item.kind then return end
+    if themes:GetCurrentTheme().DisableMasque then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:AddButton(decoration)
     self:ReapplyBlend(decoration)
@@ -81,11 +83,13 @@ function masque:OnEnable()
   events:RegisterMessage('item/Clearing', function(_, item, decoration)
     ---@cast item Item
     if not item.kind then return end
+    if themes:GetCurrentTheme().DisableMasque then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:RemoveButton(decoration)
   end)
 
   events:RegisterMessage('bagbutton/Updated', function(_, bag)
+    if themes:GetCurrentTheme().DisableMasque then return end
     ---@cast bag BagButton
     local group = bag.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:AddButton(bag.frame)
@@ -93,6 +97,7 @@ function masque:OnEnable()
   end)
 
   events:RegisterMessage('bagbutton/Clearing', function(_, bag)
+    if themes:GetCurrentTheme().DisableMasque then return end
     ---@cast bag BagButton
     local group = bag.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:RemoveButton(bag.frame)

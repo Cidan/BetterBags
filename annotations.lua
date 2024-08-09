@@ -565,6 +565,7 @@ GW2_ADDON = {}
 
 GW2_ADDON.BackdropTemplates = {}
 function GW2_ADDON.CreateFrameHeaderWithBody(frame, titletext, icon, details) end
+function GW2_ADDON.SkinBagSearchBox(searchBox) end
 
 function Button:GwSkinButton(x) end
 function Button:GwStripTextures() end

@@ -222,7 +222,11 @@ local function GridView(view, ctx, bag, slotInfo)
           section:Release()
         else
           debug:Log("Section", "Drawing section", sectionName)
-          section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+          if sectionName == L:G("Recent Items") then
+            section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+          else
+            section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+          end
           section:Draw(bag.kind, database:GetBagView(bag.kind), false)
         end
       end

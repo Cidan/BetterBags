@@ -285,6 +285,9 @@ end
 function DB:CreateOrUpdateCategory(category)
   if category.save then
     DB.data.profile.customCategoryFilters[category.name] = category
+    for itemID, _ in pairs(category.itemList) do
+      DB.data.profile.customCategoryIndex[itemID] = category.name
+    end
   else
     DB.data.profile.ephemeralCategoryFilters[category.name] = {
       name = category.name,

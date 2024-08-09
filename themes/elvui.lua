@@ -42,6 +42,7 @@ local theme = {
   Name = 'ElvUI',
   Description = "An ElvUI Theme for BetterBags",
   Available = ElvUI and true or false,
+  DisableMasque = true,
   Portrait = function (frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
