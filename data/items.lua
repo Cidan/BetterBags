@@ -154,9 +154,7 @@ function items:PreSort()
   if self._preSort then return end
   self._preSort = true
   C_Timer.After(0.6, function()
-    if self._preSort then
-      self:WipeAndRefreshAll()
-    end
+    self:WipeAndRefreshAll()
   end)
 end
 
