@@ -48,12 +48,30 @@ end
 function anchorFrame:Activate()
   self.frame:SetClampedToScreen(true)
   self.frame:EnableMouse(true)
+  database:GetAnchorState(self.kind).enabled = true
   self:OnDragUpdate()
 end
 
 function anchorFrame:Deactivate()
   self.frame:SetClampedToScreen(false)
   self.frame:EnableMouse(false)
+  database:GetAnchorState(self.kind).enabled = false
+end
+
+function anchorFrame:ToggleActive()
+  if self:IsActive() then
+    self:Deactivate()
+  else
+    self:Activate()
+  end
+end
+
+function anchorFrame:ToggleShown()
+  if self.frame:IsShown() then
+    self:Hide()
+  else
+    self:Show()
+  end
 end
 
 ---@return boolean
@@ -63,10 +81,12 @@ end
 
 function anchorFrame:Show()
   self.frame:Show()
+  database:GetAnchorState(self.kind).shown = true
 end
 
 function anchorFrame:Hide()
   self.frame:Hide()
+  database:GetAnchorState(self.kind).shown = false
 end
 
 function anchorFrame:OnDragStart()

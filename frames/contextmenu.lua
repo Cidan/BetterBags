@@ -118,6 +118,31 @@ function contextMenu:CreateContextMenu(bag)
     notCheckable = true
   })
 
+  table.insert(menuList, {
+    text = L:G("Bag Anchor"),
+    notCheckable = true,
+    hasArrow = true,
+    menuList = {
+      {
+        text = L:G("Enable"),
+        notCheckable = false,
+        checked = function() return bag.anchor:IsActive() end,
+        func = function()
+          bag.anchor:ToggleActive()
+          contextMenu:Hide()
+        end
+      },
+      {
+        text = L:G("Show"),
+        notCheckable = false,
+        checked = function() return bag.anchor.frame:IsShown() end,
+        func = function()
+          bag.anchor:ToggleShown()
+          contextMenu:Hide()
+        end
+      }
+    }
+  })
 
   if bag.kind == const.BAG_KIND.BANK then
     table.insert(menuList, {
