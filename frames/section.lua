@@ -356,7 +356,7 @@ function sectionFrame:_DoCreate()
     GameTooltip:Hide()
   end)
 
-  title:RegisterForClicks("RightButtonUp")
+  title:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
   title:SetScript("OnClick", function(_, e)
     if s.headerDisabled then return end
