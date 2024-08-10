@@ -264,7 +264,7 @@ function sectionFrame:OnTitleRightClick(section)
       table.insert(list, data)
 
       -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
-      local stack = addon:GetBagFromBagID(cell.data.bagid).currentView:GetStack(cell.data.itemHash)
+      local stack = addon:GetBagFromBagID(data.bagid).currentView:GetStack(data.itemHash)
       if stack ~= nil then
         for subSlotKey in pairs(stack.subItems) do
           local subData = items:GetItemDataFromSlotKey(subSlotKey)
