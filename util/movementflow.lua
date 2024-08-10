@@ -11,19 +11,19 @@ local movementFlow = addon:NewModule('MovementFlow')
 
 ---@return boolean
 function movementFlow:AtSendMail()
-  local frame = _G["SendMailFrame"];
+  local frame = _G["SendMailFrame"] --[[@as Frame]]
   return frame ~= nil and frame:IsVisible()
 end
 
 ---@return boolean
 function movementFlow:AtTradeWindow()
-  local frame = _G["TradeFrame"];
+  local frame = _G["TradeFrame"] --[[@as Frame]]
   return frame ~= nil and frame:IsVisible()
 end
 
 ---@return boolean
 function movementFlow:AtNPCShopWindow()
-  local frame = _G["MerchantFrame"];
+  local frame = _G["MerchantFrame"] --[[@as Frame]]
   return frame ~= nil and frame:IsVisible()
 end
 
