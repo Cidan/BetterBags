@@ -34,7 +34,7 @@ const.BANK_TAB = {
   ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
 }
 
----@enum MovementFlow
+---@enum MovementFlowType
 const.MOVEMENT_FLOW = {
   UNDEFINED = -1,
   BANK = 0,

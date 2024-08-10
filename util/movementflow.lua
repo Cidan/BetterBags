@@ -6,7 +6,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class movementFlow: AceModule
+---@class MovementFlow: AceModule
 local movementFlow = addon:NewModule('MovementFlow')
 
 ---@return boolean
@@ -27,7 +27,7 @@ function movementFlow:AtNPCShopWindow()
   return frame ~= nil and frame:IsVisible()
 end
 
----@return MovementFlow
+---@return MovementFlowType
 function movementFlow:GetMovementFlow()
   if addon.atBank then return const.MOVEMENT_FLOW.BANK end
   if movementFlow:AtSendMail() then return const.MOVEMENT_FLOW.SENDMAIL end

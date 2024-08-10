@@ -37,7 +37,7 @@ local db = addon:GetModule('Database')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class movementFlow: AceModule
+---@class MovementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')
 
 -------
