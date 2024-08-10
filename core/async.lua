@@ -33,8 +33,8 @@ function async:DoWithDelay(delay, fn, cb)
     if coroutine.status(task.thread) == 'dead' then
       if task.cb then
         task.cb()
-        return
       end
+      return
     end
     C_Timer.After(delay, task.worker)
   end

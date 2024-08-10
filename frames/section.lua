@@ -31,6 +31,12 @@ local themes = addon:GetModule('Themes')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
+---@class Database: AceModule
+local db = addon:GetModule('Database')
+
+---@class movementFlow: AceModule
+local movementFlow = addon:GetModule('MovementFlow')
+
 -------
 --- Section Prototype
 -------
@@ -226,7 +232,7 @@ function sectionFrame:_DoReset(f)
 end
 
 ---@param section Section
-local function onTitleClickOrDrop(section)
+function sectionFrame:OnTitleClickOrDrop(section)
   if not CursorHasItem() then return end
   if not IsShiftKeyDown() then return end
   local cursorType, itemID = GetCursorInfo()
@@ -237,6 +243,74 @@ local function onTitleClickOrDrop(section)
   categories:AddItemToCategory(itemID, category)
   ClearCursor()
   events:SendMessage('bags/FullRefreshAll')
+end
+
+---@param section Section
+function sectionFrame:OnTitleRightClick(section)
+  local flow = movementFlow:GetMovementFlow()
+  if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
+  if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
+
+  -- starting up the list of items to move
+  local list = {}
+
+  for _, cell in pairs(section.content.cells) do
+    if not cell.data.isItemEmpty then
+
+      local item = {
+        itemId = cell.data.itemInfo.itemID,
+        bagid = cell.data.bagid,
+        slotid = cell.data.slotid
+      }
+
+      -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
+      local stack = addon:GetBagFromBagID(cell.data.bagid).currentView:GetStack(cell.data.itemHash)
+      if stack ~= nil then
+        for subItemHash in pairs(stack.subItems) do
+          local t = {}
+          for str in string.gmatch(subItemHash, "[^_]+") do
+            table.insert(t, str)
+          end
+          local subitem = {
+            itemId = cell.data.itemInfo.itemID,
+            bagid = t[1],
+            slotid = t[2]
+          }
+          table.insert(list, subitem)
+        end
+      end
+
+      table.insert(list, item)
+    end
+  end
+
+  -- Limit the selling amount to be able to buy back
+  if flow == const.MOVEMENT_FLOW.NPCSHOP then
+    local newlist = {}
+    for i=1, 10 do
+      if list[i] then
+        table.insert(newlist, list[i])
+      end
+    end
+    list = newlist
+  end
+
+  for _, item in pairs(list) do
+    -- safecheking: does the bag/slot still hold 'this' item?
+    local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
+    if itemId ~= item.itemId then
+      -- print("Item "..item.itemId.." is not in bag/slot "..item.bagid.."/"..item.slotid..". Aborting.")
+      return
+    end
+    -- safechecking: are we on the same flow as we started?
+    local newFlow = movementFlow:GetMovementFlow()
+    if newFlow ~= flow then
+      -- print("Flow changed from "..flow.." to "..newFlow..". Aborting.")
+      return
+    end
+    -- if everything seems ok, move the item
+    C_Container.UseContainerItem(item.bagid, item.slotid)
+  end
 end
 
 function sectionProto:onTitleMouseEnter()
@@ -291,14 +365,20 @@ function sectionFrame:_DoCreate()
     GameTooltip:Hide()
   end)
 
-  title:SetScript("OnClick", function()
+  title:RegisterForClicks("RightButtonUp")
+
+  title:SetScript("OnClick", function(_, e)
     if s.headerDisabled then return end
-    onTitleClickOrDrop(s)
+    if e == "RightButton" then
+      sectionFrame:OnTitleRightClick(s)
+    elseif e == "LeftButton" then
+      sectionFrame:OnTitleClickOrDrop(s)
+    end
   end)
 
   title:SetScript("OnReceiveDrag", function()
     if s.headerDisabled then return end
-    onTitleClickOrDrop(s)
+    sectionFrame:OnTitleClickOrDrop(s)
   end)
 
   s.title = title

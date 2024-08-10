@@ -34,6 +34,15 @@ const.BANK_TAB = {
   ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
 }
 
+---@enum MovementFlow
+const.MOVEMENT_FLOW = {
+  UNDEFINED = -1,
+  BANK = 0,
+  SENDMAIL = 1,
+  TRADE = 2,
+  NPCSHOP = 3
+}
+
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
 const.BANK_BAGS = {
@@ -433,6 +442,7 @@ const.DATABASE_DEFAULTS = {
     showBagButton = true,
     debug = false,
     inBagSearch = true,
+    categorySell = false,
     showKeybindWarning = true,
     theme = 'Default',
     showFullSectionNames = {
