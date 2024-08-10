@@ -12,6 +12,7 @@ local QueryParser = addon:GetModule('QueryParser')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+
 ---@class Trees: AceModule
 local trees = addon:GetModule('Trees')
 
@@ -275,6 +276,44 @@ function search:isInIndex(name, value)
   return index.ngrams[string.lower(value)] or {}
 end
 
+---@param name string The name of the search index to lookup
+---@param value any
+---@return table<string, boolean>
+function search:isNotInIndex(name, value)
+  local index = self:GetIndex(name)
+  if not index then return {} end
+  ---@type table<string, boolean>
+  local results = {
+    ["___NEGATED___"] = true
+  }
+  if type(tonumber(value)) == 'number' then
+    local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
+    if node then
+      for k in pairs(node.data) do
+        results[k] = false
+      end
+      return results
+    else
+      return results
+    end
+  end
+
+  local b = self:StringToBoolean(string.lower(value))
+  if b ~= nil then
+    for k in pairs(index.bools[b]) do
+      results[k] = false
+    end
+    return results
+  end
+
+  if index.ngrams[string.lower(value)] ~= nil then
+    for k in pairs(index.ngrams[string.lower(value)]) do
+      results[k] = false
+    end
+  end
+  return results
+end
+
 ---@param value any
 ---@return table<string, boolean>
 function search:DefaultSearch(value)
@@ -419,32 +458,36 @@ function search:isRarity(operator, value)
   if type(tonumber(value)) == 'number' then
     if operator == "=" then
       return self:isInIndex('rarity', value)
+    elseif operator == "!=" then
+      return self:isNotInIndex('rarity', value)
     elseif operator == ">=" then
-        return self:isGreaterOrEqual('rarity', value)
+      return self:isGreaterOrEqual('rarity', value)
     elseif operator == "<=" then
-        return self:isLessOrEqual('rarity', value)
+      return self:isLessOrEqual('rarity', value)
     elseif operator == ">" then
-        return self:isGreater('rarity', value)
+      return self:isGreater('rarity', value)
     elseif operator == "<" then
-        return self:isLess('rarity', value)
+      return self:isLess('rarity', value)
     else
-        error("Unknown operator: " .. operator)
+      error("Unknown operator: " .. operator)
     end
   end
   local rarity = const.ITEM_QUALITY_TO_ENUM[value] --[[@as Enum.ItemQuality]]
   if not rarity then return {} end
   if operator == "=" then
     return self:isInIndex('rarity', rarity)
+  elseif operator == "!=" then
+    return self:isNotInIndex('rarity', rarity)
   elseif operator == ">=" then
-      return self:isGreaterOrEqual('rarity', rarity)
+    return self:isGreaterOrEqual('rarity', rarity)
   elseif operator == "<=" then
-      return self:isLessOrEqual('rarity', rarity)
+    return self:isLessOrEqual('rarity', rarity)
   elseif operator == ">" then
-      return self:isGreater('rarity', rarity)
+    return self:isGreater('rarity', rarity)
   elseif operator == "<" then
-      return self:isLess('rarity', rarity)
+    return self:isLess('rarity', rarity)
   else
-      error("Unknown operator: " .. operator)
+    error("Unknown operator: " .. operator)
   end
 end
 
@@ -455,6 +498,10 @@ function search:EvaluateAST(node)
       error("Encountered nil node in AST")
   end
 
+  ---@param field string
+  ---@param operator string
+  ---@param value any
+  ---@return table<string, boolean>
   local function evaluate_condition(field, operator, value)
       value = string.lower(value)
       field = string.lower(field)
@@ -463,19 +510,21 @@ function search:EvaluateAST(node)
         return self:isRarity(operator, value)
       end
       if operator == "=" then
-          return self:isInIndex(field, value)
+        return self:isInIndex(field, value)
+      elseif operator == "!=" then
+        return self:isNotInIndex(field, value)
       elseif operator == "%=" then
-          return self:isFullTextMatch(field, value)
+        return self:isFullTextMatch(field, value)
       elseif operator == ">=" then
-          return self:isGreaterOrEqual(field, value)
+        return self:isGreaterOrEqual(field, value)
       elseif operator == "<=" then
-          return self:isLessOrEqual(field, value)
+        return self:isLessOrEqual(field, value)
       elseif operator == ">" then
-          return self:isGreater(field, value)
+        return self:isGreater(field, value)
       elseif operator == "<" then
-          return self:isLess(field, value)
+        return self:isLess(field, value)
       else
-          error("Unknown operator: " .. operator)
+        error("Unknown operator: " .. operator)
       end
   end
 
@@ -570,6 +619,7 @@ function search:EvaluateQuery(ast)
   debug:Inspect("ast", ast)
   local result = self:EvaluateAST(ast)
   debug:Inspect("ast result", result)
+
   ---@type table<string, boolean>, table<string, boolean>
   local positive, negative = {}, {}
   for k, v in pairs(result) do
@@ -578,6 +628,22 @@ function search:EvaluateQuery(ast)
       else
           negative[k] = true
       end
+  end
+
+  -- This is a special case where we want to return all items in the index that are not
+  -- in the result set, as this is a negation of the entire index.
+  if not ast.left and not ast.right and ast.operator == "!=" then
+    -- JIT load this module, as there is a circular dependency.
+    ---@class Items: AceModule
+    local items = addon:GetModule('Items')
+
+    for _, slotInfo in pairs(items:GetAllSlotInfo()) do
+      for k in pairs(slotInfo.itemsBySlotKey) do
+        if not negative[k] then
+          positive[k] = true
+        end
+      end
+    end
   end
   return positive, negative
 end

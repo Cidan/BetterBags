@@ -38,7 +38,7 @@ function QueryParser:Lexer(input)
   end
 
   local function is_alphanumeric(char)
-    return char:match("[^%s%c()=]+") ~= nil
+    return char:match("[^%s%c()=!]+") ~= nil
   end
 
   local function read_word()
@@ -84,7 +84,7 @@ function QueryParser:Lexer(input)
     elseif char == "(" or char == ")" then
       table.insert(tokens, {type = "paren", value = char})
       advance()
-    elseif char == "=" or char == "<" or char == ">" or char == "%" then
+    elseif char == "=" or char == "<" or char == ">" or char == "%" or char == "!" then
       if char == "<" and peek(1) == "=" then
         table.insert(tokens, {type = "operator", value = "<="})
         advance(2)
@@ -93,6 +93,9 @@ function QueryParser:Lexer(input)
         advance(2)
       elseif char == "%" and peek(1) == "=" then
         table.insert(tokens, {type = "operator", value = "%="})
+        advance(2)
+      elseif char == "!" and peek(1) == "=" then
+        table.insert(tokens, {type = "operator", value = "!="})
         advance(2)
       else
         table.insert(tokens, {type = "operator", value = char})

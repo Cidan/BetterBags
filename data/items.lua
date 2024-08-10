@@ -961,3 +961,8 @@ function items:PreLoadAllEquipmentSlots(cb)
   end
   continuableContainer:ContinueOnLoad(cb)
 end
+
+---@return table<BagKind, SlotInfo>
+function items:GetAllSlotInfo()
+  return self.slotInfo
+end
