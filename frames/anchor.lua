@@ -18,6 +18,7 @@ local anchor = addon:NewModule('Anchor')
 ---@field label FontString
 ---@field positionLabel FontString
 ---@field anchorPoint string
+---@field kind BagKind
 local anchorFrame = {}
 
 ---@param frame Frame
@@ -89,7 +90,19 @@ function anchorFrame:Load()
   -- Load the anchor position from settings.
   Window.RestorePosition(self.frame)
   local quadrant = GetFrameScreenQuadrant(self.frame)
-  -- TODO(lobato): if anchor is enabled, snap the bag to the anchor.
+  local state = database:GetAnchorState(self.kind)
+  if state.enabled then
+    self:Activate()
+    self.anchorFor:ClearAllPoints()
+    self.anchorFor:SetPoint(quadrant, self.frame, quadrant)
+  else
+    self:Deactivate()
+  end
+  if state.shown then
+    self:Show()
+  else
+    self:Hide()
+  end
   self.positionLabel:SetText(string.format("%dx %dy", self.frame:GetCenter()))
   self.anchorPoint = quadrant
 end
@@ -149,6 +162,7 @@ function anchor:New(kind, anchorFor, label)
   af.frame:Hide()
 
   af.anchorFor = anchorFor
+  af.kind = kind
 
   -- Register the anchor frame with the config system.
   Window.RegisterConfig(af.frame, database:GetAnchorPosition(kind))

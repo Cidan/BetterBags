@@ -28,9 +28,15 @@ function DB:GetBagPosition(kind)
 end
 
 ---@param kind BagKind
----@param position table
+---@return table
 function DB:GetAnchorPosition(kind)
   return DB.data.profile.anchorPositions[kind]
+end
+
+---@param kind BagKind
+---@return AnchorState
+function DB:GetAnchorState(kind)
+  return DB.data.profile.anchorState[kind]
 end
 
 ---@param kind BagKind
