@@ -34,6 +34,9 @@ local grid = addon:GetModule('Grid')
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
 ---@class movementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')
 
@@ -251,36 +254,24 @@ function sectionFrame:OnTitleRightClick(section)
   if flow == const.MOVEMENT_FLOW.UNDEFINED then return end
   if flow == const.MOVEMENT_FLOW.NPCSHOP and not db:GetCategorySell() then return end
 
-  -- starting up the list of items to move
+  -- This list contains all items to move.
+  ---@type ItemData[]
   local list = {}
 
-  for _, cell in pairs(section.content.cells) do
-    if not cell.data.isItemEmpty then
-
-      local item = {
-        itemId = cell.data.itemInfo.itemID,
-        bagid = cell.data.bagid,
-        slotid = cell.data.slotid
-      }
+  for _, cell in pairs(section:GetAllCells()) do
+    local data = cell:GetItemData()
+    if not data.isItemEmpty then
+      table.insert(list, data)
 
       -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
       local stack = addon:GetBagFromBagID(cell.data.bagid).currentView:GetStack(cell.data.itemHash)
       if stack ~= nil then
-        for subItemHash in pairs(stack.subItems) do
-          local t = {}
-          for str in string.gmatch(subItemHash, "[^_]+") do
-            table.insert(t, str)
-          end
-          local subitem = {
-            itemId = cell.data.itemInfo.itemID,
-            bagid = t[1],
-            slotid = t[2]
-          }
-          table.insert(list, subitem)
+        for subSlotKey in pairs(stack.subItems) do
+          local subData = items:GetItemDataFromSlotKey(subSlotKey)
+          table.insert(list, subData)
         end
       end
 
-      table.insert(list, item)
     end
   end
 
@@ -298,7 +289,7 @@ function sectionFrame:OnTitleRightClick(section)
   for _, item in pairs(list) do
     -- safecheking: does the bag/slot still hold 'this' item?
     local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
-    if itemId ~= item.itemId then
+    if itemId ~= item.itemInfo.itemID then
       -- print("Item "..item.itemId.." is not in bag/slot "..item.bagid.."/"..item.slotid..". Aborting.")
       return
     end
