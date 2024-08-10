@@ -9,6 +9,10 @@ local L = addon:GetModule('Localization')
 ---@class Constants: AceModule
 local const = addon:NewModule('Constants')
 
+---@class AnchorState
+---@field enabled boolean
+---@field shown boolean
+
 -- Constants for detecting WoW version.
 addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
@@ -492,6 +496,21 @@ const.DATABASE_DEFAULTS = {
     positions = {
       [const.BAG_KIND.BACKPACK] = {},
       [const.BAG_KIND.BANK] = {},
+    },
+    anchorPositions = {
+      [const.BAG_KIND.BACKPACK] = {},
+      [const.BAG_KIND.BANK] = {},
+    },
+    ---@type table<BagKind, AnchorState>
+    anchorState = {
+      [const.BAG_KIND.BACKPACK] = {
+        enabled = false,
+        shown = false,
+      },
+      [const.BAG_KIND.BANK] = {
+        enabled = false,
+        shown = false,
+      },
     },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
