@@ -647,7 +647,7 @@ function bagFrame:Create(kind)
     b:OnResize()
   end)
 
-  b.anchor = anchor:New(b.frame, name)
+  b.anchor = anchor:New(kind, b.frame, name)
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
   b.previousSize = b.frame:GetBottom()

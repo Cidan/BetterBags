@@ -493,6 +493,10 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = {},
       [const.BAG_KIND.BANK] = {},
     },
+    anchorPositions = {
+      [const.BAG_KIND.BACKPACK] = {},
+      [const.BAG_KIND.BANK] = {},
+    },
     sectionSort = {
       [const.BAG_KIND.BACKPACK] = {
         [const.BAG_VIEW.ONE_BAG] = const.SECTION_SORT_TYPE.ALPHABETICALLY,

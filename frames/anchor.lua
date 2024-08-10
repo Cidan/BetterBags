@@ -3,6 +3,12 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class LibWindow-1.1: AceAddon
+local Window = LibStub('LibWindow-1.1')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Anchor: AceModule
 local anchor = addon:NewModule('Anchor')
 
@@ -76,14 +82,25 @@ function anchorFrame:OnDragUpdate()
   self.anchorFor:SetPoint(quadrant, self.frame, quadrant)
   self.positionLabel:SetText(string.format("%dx %dy", self.frame:GetCenter()))
   self.anchorPoint = quadrant
+  Window.SavePosition(self.frame)
 end
 
+function anchorFrame:Load()
+  -- Load the anchor position from settings.
+  Window.RestorePosition(self.frame)
+  local quadrant = GetFrameScreenQuadrant(self.frame)
+  -- TODO(lobato): if anchor is enabled, snap the bag to the anchor.
+  self.positionLabel:SetText(string.format("%dx %dy", self.frame:GetCenter()))
+  self.anchorPoint = quadrant
+end
+
+---@param kind BagKind
 ---@param anchorFor Frame
 ---@param label string
 ---@return AnchorFrame
-function anchor:New(anchorFor, label)
+function anchor:New(kind, anchorFor, label)
   local af = setmetatable({}, { __index = anchorFrame })
-  af.frame = CreateFrame('Frame', nil, UIParent, "BackdropTemplate") --[[@as Frame]]
+  af.frame = CreateFrame('Frame', anchorFor:GetName() .. "Anchor", UIParent, "BackdropTemplate") --[[@as Frame]]
   af.frame:SetSize(72, 72)
   af.frame:SetPoint('CENTER', UIParent, 'CENTER')
   af.frame:SetBackdrop({
@@ -129,9 +146,13 @@ function anchor:New(anchorFor, label)
   af.positionLabel:SetText("")
 
   af.frame:SetFrameStrata("FULLSCREEN_DIALOG")
-  --af:Activate()
-  af.frame:Show()
+  af.frame:Hide()
+
   af.anchorFor = anchorFor
-  af.anchorPoint = "TOPLEFT"
+
+  -- Register the anchor frame with the config system.
+  Window.RegisterConfig(af.frame, database:GetAnchorPosition(kind))
+
+  af:Load()
   return af
 end
