@@ -12,6 +12,7 @@ local QueryParser = addon:GetModule('QueryParser')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+
 ---@class Trees: AceModule
 local trees = addon:GetModule('Trees')
 
@@ -612,6 +613,7 @@ function search:EvaluateQuery(ast)
   debug:Inspect("ast", ast)
   local result = self:EvaluateAST(ast)
   debug:Inspect("ast result", result)
+
   ---@type table<string, boolean>, table<string, boolean>
   local positive, negative = {}, {}
   for k, v in pairs(result) do
@@ -620,6 +622,22 @@ function search:EvaluateQuery(ast)
       else
           negative[k] = true
       end
+  end
+
+  -- This is a special case where we want to return all items in the index that are not
+  -- in the result set, as this is a negation of the entire index.
+  if not ast.left and not ast.right and ast.operator == "!=" then
+    -- JIT load this module, as there is a circular dependency.
+    ---@class Items: AceModule
+    local items = addon:GetModule('Items')
+
+    for _, slotInfo in pairs(items:GetAllSlotInfo()) do
+      for k in pairs(slotInfo.itemsBySlotKey) do
+        if not negative[k] then
+          positive[k] = true
+        end
+      end
+    end
   end
   return positive, negative
 end
