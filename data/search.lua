@@ -283,7 +283,9 @@ function search:isNotInIndex(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
   ---@type table<string, boolean>
-  local results = {}
+  local results = {
+    ["___NEGATED___"] = true
+  }
   if type(tonumber(value)) == 'number' then
     local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
     if node then
@@ -292,7 +294,7 @@ function search:isNotInIndex(name, value)
       end
       return results
     else
-      return {}
+      return results
     end
   end
 
@@ -496,6 +498,10 @@ function search:EvaluateAST(node)
       error("Encountered nil node in AST")
   end
 
+  ---@param field string
+  ---@param operator string
+  ---@param value any
+  ---@return table<string, boolean>
   local function evaluate_condition(field, operator, value)
       value = string.lower(value)
       field = string.lower(field)
