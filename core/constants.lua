@@ -38,13 +38,15 @@ const.BANK_TAB = {
   ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
 }
 
----@enum MovementFlow
+---@enum MovementFlowType
 const.MOVEMENT_FLOW = {
   UNDEFINED = -1,
   BANK = 0,
-  SENDMAIL = 1,
-  TRADE = 2,
-  NPCSHOP = 3
+  REAGENT = 1,
+  WARBANK = 2,
+  SENDMAIL = 3,
+  TRADE = 4,
+  NPCSHOP = 5
 }
 
 -- BANK_BAGS contains all the bags that are part of the bank, including
