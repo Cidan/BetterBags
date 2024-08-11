@@ -46,6 +46,8 @@ local gridProto = {}
 ---@field header? Cell A Cell to render above all other items, ignoring columns.
 ---@field footer? Cell A Cell to render below all other items, ignoring columns.
 ---@field mask? Cell[] A list of cells to hide and not render at all.
+---@field dynamic? boolean If true, the grid will calculate the number of columns such that the height of the grid does not exceed the percentage of the screen height.
+---@field dynamicHeight? number The percentage of the screen height to use when calculating the number of columns.
 
 function gridProto:Show()
   self.frame:Show()

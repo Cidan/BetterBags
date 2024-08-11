@@ -28,6 +28,7 @@ local const = addon:GetModule('Constants')
 ---@field note? string A note about the category.
 ---@field color? number[] The RGB color of the category name.
 ---@field priority? number The priority of the category. A higher number has a higher priority.
+---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -322,6 +323,12 @@ end
 ---@return boolean
 function categories:IsCategoryShown(category)
   return database:GetCategoryOptions(category).shown
+end
+
+---@param category string
+---@return boolean
+function categories:IsDynamicCategory(category)
+  return self.ephemeralCategories[category] and self.ephemeralCategories[category].dynamic or false
 end
 
 ---@param category string

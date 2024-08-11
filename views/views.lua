@@ -18,6 +18,9 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -129,6 +132,11 @@ function views.viewProto:GetOrCreateSection(category, onlyCreate)
       self.content:AddCell(category, section)
     end
     self.sections[category] = section
+    categories:CreateCategory({
+      name = category,
+      itemList = {},
+      dynamic = true,
+    })
   elseif self.content:GetCell(category) == nil and not onlyCreate then
     self.content:AddCell(category, section)
   end
