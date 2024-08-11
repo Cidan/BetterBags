@@ -27,6 +27,9 @@ local search = addon:GetModule('Search')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Binding: AceModule
+local binding = addon:GetModule("Binding")
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -67,6 +70,7 @@ local debug = addon:GetModule('Debug')
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
 ---@field transmogInfo TransmogInfo
+---@field bindingInfo BindingInfo
 ---@field bagid number
 ---@field slotid number
 ---@field slotkey string
@@ -832,6 +836,8 @@ function items:AttachItemInfo(data, kind)
     itemAppearanceID = itemAppearanceID,
     itemModifiedAppearanceID = itemModifiedAppearanceID,
   }
+
+  data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)
 
   data.itemInfo = {
     itemID = itemID,
