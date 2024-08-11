@@ -240,7 +240,7 @@ function categories:CreateCategory(category)
 
   if category.save then
     database:CreateOrUpdateCategory(category)
-  else
+  elseif self.ephemeralCategories[category.name] == nil then
     local savedState = database:GetEphemeralItemCategory(category.name)
     if savedState and savedState.enabled then
       category.enabled = savedState.enabled

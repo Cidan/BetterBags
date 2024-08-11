@@ -272,9 +272,9 @@ function DB:GetItemCategory(category)
 end
 
 ---@param category string
----@return CustomCategoryFilter
+---@return CustomCategoryFilter?
 function DB:GetEphemeralItemCategory(category)
-  return DB.data.profile.ephemeralCategoryFilters[category] or {}
+  return DB.data.profile.ephemeralCategoryFilters[category]
 end
 
 function DB:GetAllEphemeralItemCategories()
