@@ -336,6 +336,10 @@ function bagFrame.bagProto:OnResize()
   if self.anchor:IsActive() then
     self.frame:ClearAllPoints()
     self.frame:SetPoint(self.anchor.anchorPoint, self.anchor.frame, self.anchor.anchorPoint)
+    --- HACKFIX(lobato): This fixes a bug in the WoW rendering engine.
+    -- The frame needs to be polled in some way for it to render correctly in the pipeline,
+    -- otherwise relative frames will not always render correctly across the bottom edge.
+    self.frame:GetBottom()
     return
   end
   --Window.RestorePosition(self.frame)
