@@ -132,11 +132,13 @@ function views.viewProto:GetOrCreateSection(category, onlyCreate)
       self.content:AddCell(category, section)
     end
     self.sections[category] = section
-    categories:CreateCategory({
-      name = category,
-      itemList = {},
-      dynamic = true,
-    })
+    if self.bagview == const.BAG_VIEW.SECTION_GRID then
+      categories:CreateCategory({
+        name = category,
+        itemList = {},
+        dynamic = true,
+      })
+    end
   elseif self.content:GetCell(category) == nil and not onlyCreate then
     self.content:AddCell(category, section)
   end
