@@ -50,6 +50,7 @@ function search:OnInitialize()
   self:CreateIndex('expansion')
   self:CreateIndex('equipmentset')
   self:CreateIndex('bagName')
+  self:CreateIndex('guid')
 
   -- Number indexes
   self:CreateIndex('level')
@@ -174,6 +175,7 @@ function search:Add(item)
   search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:addStringToIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
   search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+  search:addStringToIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
   --search:addStringToIndex(self.indicies.bagName, item.bagName, item.slotkey)
 
   if item.itemInfo.equipmentSet ~= nil then
@@ -211,6 +213,7 @@ function search:Remove(item)
   search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
   search:removeStringFromIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+  search:removeStringFromIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
   --search:removeStringFromIndex(self.indicies.bagName, item.bagName, item.slotkey)
 
   if item.itemInfo.equipmentSet ~= nil then
