@@ -50,6 +50,11 @@ function categories:OnEnable()
   for _ in pairs(database:GetAllItemCategories()) do
     self.categoryCount = self.categoryCount + 1
   end
+  for _, category in pairs(database:GetAllEphemeralItemCategories()) do
+    if category.dynamic then
+      self.ephemeralCategories[category.name] = category
+    end
+  end
 end
 
 ---@return number
@@ -245,6 +250,7 @@ function categories:CreateCategory(category)
     local savedState = database:GetEphemeralItemCategory(category.name)
     if savedState and savedState.enabled then
       category.enabled = savedState.enabled
+      category.dynamic = savedState.dynamic
     end
     self.ephemeralCategories[category.name] = category
     for id in pairs(category.itemList) do

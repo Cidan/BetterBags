@@ -304,6 +304,7 @@ function DB:CreateOrUpdateCategory(category)
     DB.data.profile.ephemeralCategoryFilters[category.name] = {
       name = category.name,
       enabled = category.enabled,
+      dynamic = category.dynamic,
       itemList = {},
     }
   end

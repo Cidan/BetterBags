@@ -491,7 +491,7 @@ function sectionConfig:Create(kind, parent)
       sc:AddSection(sName)
     end
     for index, elementData in sc.content.provider:EnumerateEntireRange() do
-      if not elementData.header and not categories:DoesCategoryExist(elementData.title) and not bag.currentView.sections[elementData.title] then
+      if not elementData.header and not categories:DoesCategoryExist(elementData.title) and not bag.currentView.sections[elementData.title] and not categories:IsDynamicCategory(elementData.title) then
         sc.content:RemoveAtIndex(index)
       end
       local filter = categories:GetCategoryByName(elementData.title)
