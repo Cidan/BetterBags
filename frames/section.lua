@@ -37,7 +37,7 @@ local db = addon:GetModule('Database')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class movementFlow: AceModule
+---@class MovementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')
 
 -------
@@ -286,6 +286,11 @@ function sectionFrame:OnTitleRightClick(section)
     list = newlist
   end
 
+  local containerType = Enum.BankType.Character
+  if flow == const.MOVEMENT_FLOW.WARBANK then
+    containerType = Enum.BankType.Account
+  end
+
   for _, item in pairs(list) do
     -- safecheking: does the bag/slot still hold 'this' item?
     local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
@@ -300,7 +305,7 @@ function sectionFrame:OnTitleRightClick(section)
       return
     end
     -- if everything seems ok, move the item
-    C_Container.UseContainerItem(item.bagid, item.slotid)
+    C_Container.UseContainerItem(item.bagid, item.slotid, nil, containerType, flow == const.MOVEMENT_FLOW.REAGENT)
   end
 end
 
