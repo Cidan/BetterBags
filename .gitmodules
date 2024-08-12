@@ -1,0 +1,6 @@
+[submodule "src/vscode-wow-api"]
+	path = src/vscode-wow-api
+	url = https://github.com/Ketho/vscode-wow-api
+[submodule "annotations/wow-ui-source"]
+	path = annotations/wow-ui-source
+	url = https://github.com/Gethe/wow-ui-source
