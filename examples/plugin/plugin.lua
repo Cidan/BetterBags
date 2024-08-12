@@ -27,7 +27,7 @@ local config = addon:GetModule('Config')
 local L = addon:GetModule('Localization')
 
 -- Use this API for creating a custom category based on the item's ID. These categories are
--- persistant, such that if a user disables your addon, the categories will still exist.
+-- not persistant, such that if a user disables your addon, the categories will disappear.
 categories:AddItemToCategory(12345, L:G("My Category"))
 
 -- Use this API to delete all the items in a category. This will not delete the category itself,
@@ -35,6 +35,19 @@ categories:AddItemToCategory(12345, L:G("My Category"))
 -- make sure the user's categories are in a known state, i.e. on every load of your plugin,
 -- you wipe and then add all the items to the category.
 categories:WipeCategory(L:G("My Category"))
+
+-- This this API to explicitly create a category with the defined parameters. This option
+-- replaces the old Create* functions, and is the preferred way to create categories.
+categories:CreateCategory({
+  name = L:G("My Category"), -- The name of the category
+  itemList = {[12345] = true}, -- A list of item IDs that should be in this category
+  save = true, -- If set, this category will persist between sessions. Optional, default is false.
+  searchCategory = { -- If set, this will obviate the itemList and ignore it. Optional.
+    query = "type = armor or type = weapon" -- A search query that will be used to populate the category
+  },
+  note = L:G("Created by Cidan"), -- A free form note for future use. Optional.
+  priority = 1, -- The priority of the category. A lower number means it will be displayed first. Optional, and only works for search categories.
+})
 
 -- Use this API to register a function that will be called for every item in the player's bags.
 -- The function you provide will be given an ItemData table, which contains all properties of an item
