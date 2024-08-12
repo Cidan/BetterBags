@@ -81,7 +81,7 @@ function search:OnInitialize()
     exp = self.indicies.expansion,
     slot = self.indicies.equipmentlocation,
     ilvl = self.indicies.level,
-    count = self.indicies.stackCount,
+    count = self.indicies.stackcount,
   }
 end
 
