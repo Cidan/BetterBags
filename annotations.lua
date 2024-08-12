@@ -415,6 +415,8 @@ Enum.PlayerInteractionType.AccountBanker = 68
 
 ---@enum BankType
 Enum.BankType = {
+  Character = 0,
+  Guild = 1,
   Account = 2,
 }
 
