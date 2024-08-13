@@ -46,7 +46,6 @@ function binding.GetItemBinding(itemLocation, bindType)
     end
 
     if C_Container.GetContainerItemPurchaseInfo(bagID, slotID, false) then
-      print("refundable, bag:",bagID," slot: ",slotID)
       bindinginfo.binding = "refundable"
     end
 
@@ -54,7 +53,7 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = "quest"
     end
   end -- isBound
-  assert(bindinginfo.binding, (format("Binding module error. Unknown bindType:%d bag:%d slot:%d", bindType, itemLocation:GetBagAndSlot())))
+  assert(bindinginfo.binding, (format("Binding module error. Unknown bindType:%s bag:%s slot:%s", bindType, itemLocation:GetBagAndSlot())))
   return bindinginfo
 end
 
