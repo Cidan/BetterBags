@@ -62,6 +62,7 @@ local debug = addon:GetModule('Debug')
 ---@field transmogInfoMixin? ItemTransmogInfoMixin
 ---@field itemAppearanceID number
 ---@field itemModifiedAppearanceID number
+---@field hasTransmog boolean
 
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
@@ -835,6 +836,7 @@ function items:AttachItemInfo(data, kind)
     },
     itemAppearanceID = itemAppearanceID,
     itemModifiedAppearanceID = itemModifiedAppearanceID,
+    hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID)
   }
 
   data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)

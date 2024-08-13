@@ -86,7 +86,7 @@ function sectionItemListFrame:OnReceiveDrag()
   if kind ~= "item" or not tonumber(id) then return end
   ClearCursor()
   local itemid = tonumber(id) --[[@as number]]
-  database:SaveItemToCategory(itemid, self.currentCategory)
+  categories:AddPermanentItemToCategory(itemid, self.currentCategory)
   events:SendMessage('bags/FullRefreshAll')
 end
 

@@ -90,7 +90,7 @@ local gw2Theme = {
       local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])
       box.frame:SetPoint("TOPLEFT", decoration, "TOPLEFT", 0, -40)
       box.frame:SetPoint("BOTTOMRIGHT", decoration, "TOPRIGHT", -10, -60)
-      box.frame:SetFrameStrata("HIGH")
+      box.frame:SetFrameStrata("DIALOG")
       box.frame:SetFrameLevel(decoration:GetFrameLevel() + 1)
       gw.SkinBagSearchBox(box.textBox)
       decoration.search = box

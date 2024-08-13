@@ -28,6 +28,7 @@ local const = addon:GetModule('Constants')
 ---@field note? string A note about the category.
 ---@field color? number[] The RGB color of the category name.
 ---@field priority? number The priority of the category. A higher number has a higher priority.
+---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -48,6 +49,11 @@ end
 function categories:OnEnable()
   for _ in pairs(database:GetAllItemCategories()) do
     self.categoryCount = self.categoryCount + 1
+  end
+  for _, category in pairs(database:GetAllEphemeralItemCategories()) do
+    if category.dynamic then
+      self.ephemeralCategories[category.name] = category
+    end
   end
 end
 
@@ -101,6 +107,28 @@ function categories:GetMergedCategory(name)
   return results
 end
 
+function categories:AddPermanentItemToCategory(id, category)
+  assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
+  assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
+  assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
+
+  if not database:ItemCategoryExists(category) then
+    self:CreateCategory({
+      name = category,
+      itemList = {},
+      save = true,
+    })
+  end
+
+  if not self.ephemeralCategories[category] then
+    self.ephemeralCategories[category] = {
+      name = category,
+      itemList = {},
+    }
+  end
+  database:SaveItemToCategory(id, category)
+end
+
 -- AddItemToCategory adds an item to a custom category.
 ---@param id number The ItemID of the item to add to the category.
 ---@param category string The name of the custom category to add the item to.
@@ -110,7 +138,7 @@ function categories:AddItemToCategory(id, category)
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
 
   -- Backwards compatability for the old way of adding items to categories.
-  if not database:ItemCategoryExists(category) then
+  if not self.ephemeralCategories[category] then
     self:CreateCategory({
       name = category,
       itemList = {},
@@ -244,6 +272,7 @@ function categories:CreateCategory(category)
     local savedState = database:GetEphemeralItemCategory(category.name)
     if savedState and savedState.enabled then
       category.enabled = savedState.enabled
+      category.dynamic = savedState.dynamic
     end
     self.ephemeralCategories[category.name] = category
     for id in pairs(category.itemList) do
@@ -322,6 +351,12 @@ end
 ---@return boolean
 function categories:IsCategoryShown(category)
   return database:GetCategoryOptions(category).shown
+end
+
+---@param category string
+---@return boolean
+function categories:IsDynamicCategory(category)
+  return self.ephemeralCategories[category] and self.ephemeralCategories[category].dynamic or false
 end
 
 ---@param category string
