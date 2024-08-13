@@ -58,7 +58,7 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = const.BINDING_SCOPE.QUEST
     end
   end -- isBound
-  assert(bindinginfo.binding==const.BINDING_SCOPE.UNKNOWN, (format("Binding module error. Unknown bindType:%s bag:%s slot:%s", bindType, itemLocation:GetBagAndSlot())))
+  assert(bindinginfo.binding ~= const.BINDING_SCOPE.UNKNOWN, (format("Binding module error. Unknown bindType:%s bag:%s slot:%s", bindType, itemLocation:GetBagAndSlot())))
   return bindinginfo
 end
 
