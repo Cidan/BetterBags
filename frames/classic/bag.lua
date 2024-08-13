@@ -73,6 +73,9 @@ local sectionConfig = addon:GetModule('SectionConfig')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Anchor: AceModule
+local anchor = addon:GetModule('Anchor')
+
 function bagFrame.bagProto:SwitchToBankAndWipe()
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.bankTab = const.BANK_TAB.BANK
@@ -207,6 +210,8 @@ function bagFrame:Create(kind)
   b.frame:SetScript("OnSizeChanged", function()
     b:OnResize()
   end)
+
+  b.anchor = anchor:New(kind, b.frame, name)
   -- Load the bag position from settings.
   Window.RestorePosition(b.frame)
 

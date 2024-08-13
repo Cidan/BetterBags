@@ -286,25 +286,13 @@ function sectionFrame:OnTitleRightClick(section)
     list = newlist
   end
 
-  local containerType = Enum.BankType.Character
-  if flow == const.MOVEMENT_FLOW.WARBANK then
+  -- Only DF since warbank has Enum.BankType 
+  local containerType = nil
+  if Enum.BankType and flow == const.MOVEMENT_FLOW.WARBANK then
     containerType = Enum.BankType.Account
   end
 
   for _, item in pairs(list) do
-    -- safecheking: does the bag/slot still hold 'this' item?
-    local itemId = C_Container.GetContainerItemID(item.bagid, item.slotid)
-    if itemId ~= item.itemInfo.itemID then
-      -- print("Item "..item.itemId.." is not in bag/slot "..item.bagid.."/"..item.slotid..". Aborting.")
-      return
-    end
-    -- safechecking: are we on the same flow as we started?
-    local newFlow = movementFlow:GetMovementFlow()
-    if newFlow ~= flow then
-      -- print("Flow changed from "..flow.." to "..newFlow..". Aborting.")
-      return
-    end
-    -- if everything seems ok, move the item
     C_Container.UseContainerItem(item.bagid, item.slotid, nil, containerType, flow == const.MOVEMENT_FLOW.REAGENT)
   end
 end
