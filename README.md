@@ -255,10 +255,10 @@ To disable recent items, uncheck the `Recent Items` category in the config windo
 
 ## Move Categories
 Right-clicking on a category header in your bank or bags will move the entire contents of the category to whatever other window you currently have open.
-Supported windows include bags, all bank tabs, the mailbox, the trade window, and vendor windows.
+Supported windows include bags, all bank tabs, the mailbox, the trade window, and vendor windows. Selling items to vendors by right-clicking the header must be turned on in settings.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/9ahFi16.gif" alt="Move Category in Retail">
+<img src="https://i.imgur.com/b8BZTlX.gif" alt="Move Category in Retail">
 
 *Move Category in Retail.*
 </div>
@@ -283,8 +283,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `equipmentLocation` or `slot` (slot = Head) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
 - `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW.
 - `equipmentSet` (None in the example) The equipment set(s) that a piece of gear is part of.
-- `bagName` () The name of the bag that the item is located in.
-- `guid` () The globally unique identifier of the item. This string is unique to the specific instance of an item.
+- `guid` (guid = 'item-60-0-4000000C8EB6C663') The globally unique identifier of the item. This string is unique to the specific instance of an item.
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped).
 
 ### Numbers
