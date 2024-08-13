@@ -107,6 +107,28 @@ function categories:GetMergedCategory(name)
   return results
 end
 
+function categories:AddPermanentItemToCategory(id, category)
+  assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
+  assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
+  assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
+
+  if not database:ItemCategoryExists(category) then
+    self:CreateCategory({
+      name = category,
+      itemList = {},
+      save = true,
+    })
+  end
+
+  if not self.ephemeralCategories[category] then
+    self.ephemeralCategories[category] = {
+      name = category,
+      itemList = {},
+    }
+  end
+  database:SaveItemToCategory(id, category)
+end
+
 -- AddItemToCategory adds an item to a custom category.
 ---@param id number The ItemID of the item to add to the category.
 ---@param category string The name of the custom category to add the item to.
@@ -116,7 +138,7 @@ function categories:AddItemToCategory(id, category)
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
 
   -- Backwards compatability for the old way of adding items to categories.
-  if not database:ItemCategoryExists(category) then
+  if not self.ephemeralCategories[category] then
     self:CreateCategory({
       name = category,
       itemList = {},
