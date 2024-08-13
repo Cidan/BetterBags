@@ -12,7 +12,9 @@
 BetterBags is a bag replacement addon for World of Warcraft, inspired by AdiBags.  
 It has a fresh, clean look, updated to the 2024 World of Warcraft art style.
 
-It currently does not include all the features of AdiBags, but will slowly incorporate more and more changes over time.
+It currently includes most of the features of AdiBags and is being worked on daily.  
+One of the last major features currently missing is user selectable themes.  
+If you have any feedback, please let us know in the [Discord](https://discord.gg/a6DQuK8hV7).
 
 BetterBags currently supports the following versions of World of Warcraft:  
 Retail (including WoW: Remix and The War Within Pre-Patch)  
@@ -60,10 +62,13 @@ The War Within Beta
 # Summary
 - Items are organized into categories and displayed in a Section Grid.
 - Support for bags, bank, reagent bank, and Warband bank.
+- The bag and bank can be anchored to a location and grow in specified directions.
+- Dynamic number of columns. (TODO)
 - Customizable categories that hold items with multiple sorting options that can be pinned and toggled.
 - Search based categories where the items within the category are defined by a search function.
 - Items within categories have multiple sorting and stacking options (stack all, stack non-stackable, don't stack different transmogs).
 - Powerful recent items support with customizable duration (mark all new items as recent, flash all recent items).
+- Right-click category header to move or vendor all items currently in the category.
 - Comprehensive Search that allows you to find an item most properties of an item (`Type`, `Subtype`, `iLvl`, and many more).
 - Multiple built-in themes with plugin support for the creation of more themes.
 - Robust plugin system allows for custom categories, configurations for user fine-tuning and even localization.
@@ -99,6 +104,16 @@ This temporary view allows you to see your bags and the items within them how th
 <img src="https://i.imgur.com/4YAG0Rm.png" alt="Show Bags in Retail.">
 
 *Show Bags in Retail.*
+</div>
+
+### Bag Anchor
+By default, the bag and bank will grow from the bottom-left corner. Extending both up and right depending on the number of items per row and number of columns.
+A specific anchor can be turned on by left-clicking the bag icon in the top-left corner of the bag and bank. It will allow you to drag the anchor to a specific pixel and grow the bag from whichever corner the anchor is in. Selecting `Enable` will turn on the anchor. Selecting `Show` will allow you to manipulate the anchor and choose the location.
+
+<div align="center" style="text-align:center">
+<img src="https://i.imgur.com/ZiyLfvF.png" alt="Bag Anchor in Retail.">
+
+*Bag Anchor in Retail.*
 </div>
 
 ### Free Spaces
@@ -206,7 +221,7 @@ To purchase bank bag slots, turn on `Show Bags` and click on any red bag slot.
 
 ### Warbank Tabs
 To purchase Warbank tabs, click on the `Purchase Warbank Tab` button, then click purchase on the Blizzard pop-up.  
-Warbank tabs can be renamed and certain item types can be assigned to them by right-clicking on the tab at the bottom of the bank. This will bring up the Blizzard prompt to make any changes.
+Warbank tabs can be renamed and certain item types can be assigned to them by right-clicking on the tab at the bottom of the bank. This will bring up the Blizzard prompt to make any changes. Depositing items into the Warbank tabs will deposit them using Blizzard's rules for depositting items into the Warbank.
 
 <div align="center" style="text-align:center">
 <img src="https://i.imgur.com/98Hgf2I.png" alt="Editing Warbank Tab in Retail.">  
@@ -238,6 +253,16 @@ These can be further fine-tuned by:
 </div>
 
 To disable recent items, uncheck the `Recent Items` category in the config window and set the `New Item Duration` to 0. After hovering over the item and changing anything in the bags, it will stop flashing.
+
+## Move Categories
+Right-clicking on a category header in your bank or bags will move the entire contents of the category to whatever other window you currently have open.
+Supported windows include bags, all bank tabs, the mailbox, the trade window, and vendor windows.
+
+<div align="center" style="text-align:center">
+<img src="https://i.imgur.com/9ahFi16.gif" alt="Move Category in Retail">
+
+*Move Cateogry in Retail.*
+</div>
 
 ## Search
 BetterBags offers a comprehensive Search option that can be toggled with a keybinding (`BetterBags > Search Bags`).
@@ -406,13 +431,12 @@ BetterBags is constantly getting new features and updates.
 Github hosts both our [Progress Board](https://github.com/users/Cidan/projects/2) and means to [report bugs and request new features](https://github.com/Cidan/BetterBags/issues/new/choose).
 
 The following features are under active development:
-- Moving all items in a category by clicking on the category name.
 - Searching for BoE/BoA/WuE items.
 
 These features are planned for the long term:
-- Bag anchors.
 - Dynamic number of columns.
 - User customizable themes.
+- A new config system using a forms style like the search-based category window.
 - Reagent bag markers for items in the reagent bag.
 - Faster/smoother item updates.
 - And much more!
