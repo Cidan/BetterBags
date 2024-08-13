@@ -14,6 +14,7 @@ local binding = addon:NewModule('Binding')
 ---@param bindType Enum.ItemBind
 ---@return BindingInfo
 function binding.GetItemBinding(itemLocation, bindType)
+  local bagID,slotID = itemLocation:GetBagAndSlot()
   local bindinginfo = {}
   ---@cast bindinginfo +BindingInfo
 
@@ -39,8 +40,14 @@ function binding.GetItemBinding(itemLocation, bindType)
     if C_Bank and C_Bank.IsItemAllowedInBankType then
       bindinginfo.binding = "soulbound"
     end
+
     if C_Bank and C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, itemLocation) then
       bindinginfo.binding = "warbound"
+    end
+
+    if C_Container.GetContainerItemPurchaseInfo(bagID, slotID, false) then
+      print("refundable, bag:",bagID," slot: ",slotID)
+      bindinginfo.binding = "refundable"
     end
 
     if (bindType == 4) then
