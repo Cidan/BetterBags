@@ -198,7 +198,7 @@ function search:Add(item)
     search:addStringToIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:addStringToIndex(self.indicies.binding, item.bindingInfo.binding, item.slotkey)
+  search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
 
   search:addNumberToIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
   search:addNumberToIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
@@ -240,7 +240,7 @@ function search:Remove(item)
     search:removeStringFromIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:removeStringFromIndex(self.indicies.binding, item.itemInfo.binding, item.slotkey)
+  search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
 
   search:removeNumberFromIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
   search:removeNumberFromIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)

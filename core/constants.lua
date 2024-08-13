@@ -49,6 +49,37 @@ const.MOVEMENT_FLOW = {
   NPCSHOP = 5
 }
 
+---@enum BindingScope  -- similar. but distinct from ItemBind
+const.BINDING_SCOPE = {
+  UNKNOWN = -1,
+  NONBINDING = 0,
+  BOUND = 1,
+  BOE = 2,
+  BOU = 3,
+  QUEST = 4,
+  SOULBOUND = 5,
+  REFUNDABLE = 6,
+  ACCOUNT = 7,
+  BNET = 8,
+  WUE = 9,
+}
+
+---@class BindingMap
+---@type table<number, string>
+const.BINDING_MAP = {
+  [const.BINDING_SCOPE.UNKNOWN] = L:G(""),
+  [const.BINDING_SCOPE.NONBINDING] = L:G("nonbinding"),
+  [const.BINDING_SCOPE.BOUND] = L:G(""),
+  [const.BINDING_SCOPE.BOE] = L:G("boe"),
+  [const.BINDING_SCOPE.BOU] = L:G("bou"),
+  [const.BINDING_SCOPE.QUEST] = L:G("quest"),
+  [const.BINDING_SCOPE.SOULBOUND] = L:G("soulbound"),
+  [const.BINDING_SCOPE.REFUNDABLE] = L:G("refundable"),
+  [const.BINDING_SCOPE.ACCOUNT] = L:G("warbound"),
+  [const.BINDING_SCOPE.BNET] = L:G("bnet"),
+  [const.BINDING_SCOPE.WUE] = L:G("wue"),
+}
+
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
 const.BANK_BAGS = {
