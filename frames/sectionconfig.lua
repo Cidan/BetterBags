@@ -85,7 +85,7 @@ function sectionConfigFrame:OnReceiveDrag(category)
   if kind ~= "item" or not tonumber(id) then return false end
   ClearCursor()
   local itemid = tonumber(id) --[[@as number]]
-  database:SaveItemToCategory(itemid, category)
+  categories:AddPermanentItemToCategory(itemid, category)
   events:SendMessage('bags/FullRefreshAll')
   return true
 end
@@ -147,7 +147,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       end
     end)
     button.Expand:Show()
-    if not categories:DoesCategoryExist(elementData.title) or categories:IsDynamicCategory(elementData.title) then
+    if not categories:DoesCategoryExist(elementData.title) then
       button.Expand:Disable()
       button.Expand:GetNormalTexture():SetDesaturated(true)
     else

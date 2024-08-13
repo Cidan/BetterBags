@@ -243,7 +243,7 @@ function sectionFrame:OnTitleClickOrDrop(section)
   ---@cast itemID number
   if cursorType ~= "item" then return end
   local category = section.title:GetText()
-  categories:AddItemToCategory(itemID, category)
+  categories:AddPermanentItemToCategory(itemID, category)
   ClearCursor()
   events:SendMessage('bags/FullRefreshAll')
 end
