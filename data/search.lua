@@ -52,6 +52,7 @@ function search:OnInitialize()
   self:CreateIndex('expansion')
   self:CreateIndex('equipmentset')
   self:CreateIndex('bagName')
+  self:CreateIndex('guid')
   self:CreateIndex('binding')
 
   -- Number indexes
