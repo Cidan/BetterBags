@@ -284,7 +284,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW.
 - `equipmentSet` (None in the example) The equipment set(s) that a piece of gear is part of.
 - `guid` (guid = 'item-60-0-4000000C8EB6C663') The globally unique identifier of the item. This string is unique to the specific instance of an item.
-- `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped).
+- `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
 
 ### Numbers
 - `level` or `ilvl` (ilvl = 506) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
@@ -438,6 +438,7 @@ The following features are under active development:
 
 These features are planned for the long term:
 - User customizable themes.
+- Character specific profiles.
 - A new config system using a forms style like the search-based category window.
 - Reagent bag markers for items in the reagent bag.
 - Faster/smoother item updates.
