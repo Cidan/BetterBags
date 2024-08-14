@@ -13,11 +13,29 @@ local binding = addon:NewModule('Binding')
 ---@field binding BindingScope
 ---@field bound boolean
 
+---@param itemID number
+---@param itemLink string
+---@return Enum.ItemBind
+function binding.GetBindType(itemID,itemLink)
+  ---@type ItemInfo
+  local ItemInfo = itemLink -- itemLink has better information for items, but no information for pets
+  if ( strfind(itemLink, "battlepet:") ) then
+    ItemInfo = itemID
+  end
+  local bindType, _, _, _ = select(14,C_Item.GetItemInfo(ItemInfo ))
+  return bindType
+end
+
+---@param itemID number
 ---@param itemLocation ItemLocationMixin
----@param bindType Enum.ItemBind
+---@param itemLink string
 ---@return BindingInfo
-function binding.GetItemBinding(itemLocation, bindType)
+function binding.GetItemBinding(itemID, itemLocation, itemLink)
   local bagID,slotID = itemLocation:GetBagAndSlot()
+  ---@type Enum.ItemBind
+  local bindType = binding.GetBindType(itemID,itemLink)
+  assert(bindType, (format("Binding module error. Failed to lookup BindType. itemID: %s bag:%s slot:%s", itemID, bagID, slotID)))
+
   ---@type BindingInfo
   local bindinginfo = {
     binding = const.BINDING_SCOPE.UNKNOWN,
@@ -31,6 +49,8 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = const.BINDING_SCOPE.BOE
     elseif (bindType == 3) then
       bindinginfo.binding = const.BINDING_SCOPE.BOU
+    elseif (bindType == 8) then -- only Hoard of Draconic Delicacies uses this
+      bindinginfo.binding = const.BINDING_SCOPE.BNET
     end
     -- retail only Warbound until Equip
     if C_Item.IsBoundToAccountUntilEquip and C_Item.IsBoundToAccountUntilEquip(itemLocation) then
@@ -39,7 +59,10 @@ function binding.GetItemBinding(itemLocation, bindType)
     end
   else -- isBound
     bindinginfo.bound = true
-    bindinginfo.binding = const.BINDING_SCOPE.BOUND -- we don't register a bare keyword 'bound' as it is too common. Should expand after toolip scanning
+
+    if (bindType == 1) then
+      bindinginfo.binding = const.BINDING_SCOPE.BOUND -- we don't register a bare keyword 'bound' as it is too common. Should expand after toolip scanning
+    end
 
     -- on retail we can distingush Soulbound and Warbound
     if C_Bank and C_Bank.IsItemAllowedInBankType then
@@ -58,7 +81,8 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = const.BINDING_SCOPE.QUEST
     end
   end -- isBound
-  assert(bindinginfo.binding ~= const.BINDING_SCOPE.UNKNOWN, (format("Binding module error. Unknown bindType:%s bag:%s slot:%s", bindType, itemLocation:GetBagAndSlot())))
+
+  assert(bindinginfo.binding ~= const.BINDING_SCOPE.UNKNOWN, (format("Binding module error. Unknown Binding. bindType:%s itemID: %s bag:%s slot:%s", bindType, itemID, bagID, slotID)))
   return bindinginfo
 end
 
