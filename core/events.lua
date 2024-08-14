@@ -19,7 +19,7 @@ local callbackProto = {}
 ---@field _eventHandler AceEvent-3.0
 ---@field _messageMap table<string, {fn: fun(...), cbs: Callback[]}>
 ---@field _eventMap table<string, {fn: fun(...), cbs: Callback[]}>
----@field _bucketTimers table<string, cbObject>
+---@field _bucketTimers table<string, FunctionContainer>
 ---@field _eventQueue table<string, boolean>
 ---@field _eventArguments table<string, EventArg[]>
 ---@field _bucketCallbacks table<string, fun(...)[]>

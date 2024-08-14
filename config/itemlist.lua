@@ -172,14 +172,18 @@ function config:CreateItemListWidget()
   widget["SetDisabled"] = SetDisabled
   widget["SetItemValue"] = SetItemValue
 
+---@diagnostic disable-next-line: invisible
   widget.frame:EnableMouse(true)
 
   local section = sectionFrame:Create()
   section:DisableHeader()
   section:SetFillWidth(true)
   section:SetTitle("Items")
+---@diagnostic disable-next-line: invisible
   section.frame:SetParent(widget.frame)
+---@diagnostic disable-next-line: invisible
   section.frame:SetPoint("TOPLEFT", widget.frame, "TOPLEFT", 6, -6)
+---@diagnostic disable-next-line: invisible
   section.frame:SetPoint("BOTTOMRIGHT", widget.frame, "BOTTOMRIGHT", -6, 6)
   widget.section = section
 

@@ -278,6 +278,9 @@ function ScrollBoxDragBehavior:SetFinalizeDrop(fn) end
 ---@field AutoDepositItemsIntoBank fun(bankType: BankType)
 C_Bank = {}
 
+-- Backwards compatible function for Classic.
+function CloseBankFrame() end
+
 ---@enum BagSlotFlags
 BagSlotFlags = {
   DisableAutoSort = 1,
@@ -291,13 +294,6 @@ BagSlotFlags = {
   ExpansionCurrent = 256,
   ExpansionLegacy = 512,
 }
-
----@class BankTabData
----@field ID number
----@field bankType BankType
----@field name string
----@field icon number
----@field depositFlags BagSlotFlags
 
 ---@class Frame
 ---@field scrollable boolean
