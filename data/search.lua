@@ -198,7 +198,9 @@ function search:Add(item)
     search:addStringToIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
+  if item.bindingInfo ~= nil then
+    search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
+  end
 
   search:addNumberToIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
   search:addNumberToIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
@@ -212,7 +214,9 @@ function search:Add(item)
 
   search:addBoolToIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:addBoolToIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  search:addBoolToIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
+  if item.bindingInfo ~= nil then
+    search:addBoolToIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
+  end
   search:addBoolToIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
   search:addBoolToIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
 end
@@ -240,7 +244,9 @@ function search:Remove(item)
     search:removeStringFromIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
+  if item.bindingInfo ~= nil then
+    search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
+  end
 
   search:removeNumberFromIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
   search:removeNumberFromIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
@@ -254,7 +260,9 @@ function search:Remove(item)
 
   search:removeBoolFromIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:removeBoolFromIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  search:removeBoolFromIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
+  if item.bindingInfo ~= nil then
+    search:removeBoolFromIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
+  end
   search:removeBoolFromIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
   search:removeBoolFromIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
 end

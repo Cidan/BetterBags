@@ -29,12 +29,12 @@ end
 ---@param itemID number
 ---@param itemLocation ItemLocationMixin
 ---@param itemLink string
----@return BindingInfo
+---@return BindingInfo?
 function binding.GetItemBinding(itemID, itemLocation, itemLink)
   local bagID,slotID = itemLocation:GetBagAndSlot()
   ---@type Enum.ItemBind
   local bindType = binding.GetBindType(itemID,itemLink)
-  assert(bindType, (format("Binding module error. Failed to lookup BindType. itemID: %s bag:%s slot:%s", itemID, bagID, slotID)))
+  if not bindType then return nil end
 
   ---@type BindingInfo
   local bindinginfo = {

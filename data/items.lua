@@ -71,7 +71,7 @@ local debug = addon:GetModule('Debug')
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
 ---@field transmogInfo TransmogInfo
----@field bindingInfo BindingInfo
+---@field bindingInfo? BindingInfo
 ---@field bagid number
 ---@field slotid number
 ---@field slotkey string
