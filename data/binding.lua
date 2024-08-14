@@ -81,7 +81,7 @@ function binding.GetItemBinding(itemID, itemLocation, itemLink)
       bindinginfo.binding = const.BINDING_SCOPE.QUEST
     end
   end -- isBound
-  if bindingInfo.binding == const.BINDING_SCOPE.UNKNOWN then
+  if bindinginfo.binding == const.BINDING_SCOPE.UNKNOWN then
     return nil
   end
   return bindinginfo
