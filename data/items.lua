@@ -839,7 +839,7 @@ function items:AttachItemInfo(data, kind)
     hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID)
   }
 
-  data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)
+  data.bindingInfo = binding.GetItemBinding(itemID, itemLocation, itemLink)
 
   data.itemInfo = {
     itemID = itemID,
