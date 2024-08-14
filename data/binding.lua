@@ -17,7 +17,11 @@ local binding = addon:NewModule('Binding')
 ---@param bindType Enum.ItemBind
 ---@return BindingInfo
 function binding.GetItemBinding(itemLocation, bindType)
+  assert((itemLocation:IsValid() and itemLocation:HasAnyLocation()), "Binding module error. Invalid itemLocation.")
   local bagID,slotID = itemLocation:GetBagAndSlot()
+  local itemID = C_Item.GetItemID(itemLocation)
+  assert(itemID, (format("Binding module error. Unknown item. BindType: %s, bag:%s slot:%s", bindType, itemLocation:GetBagAndSlot())))
+
   ---@type BindingInfo
   local bindinginfo = {
     binding = const.BINDING_SCOPE.UNKNOWN,
@@ -58,7 +62,7 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = const.BINDING_SCOPE.QUEST
     end
   end -- isBound
-  assert(bindinginfo.binding ~= const.BINDING_SCOPE.UNKNOWN, (format("Binding module error. Unknown bindType:%s bag:%s slot:%s", bindType, itemLocation:GetBagAndSlot())))
+  assert(bindinginfo.binding ~= const.BINDING_SCOPE.UNKNOWN, (format("Binding module error. Unknown Binding. bindType:%s itemID: %s bag:%s slot:%s", bindType, itemID, itemLocation:GetBagAndSlot())))
   return bindinginfo
 end
 
