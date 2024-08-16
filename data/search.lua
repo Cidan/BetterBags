@@ -95,6 +95,8 @@ end
 function search:Wipe()
   for _, index in pairs(self.indicies) do
     index.ngrams = {}
+    index.fullText = {}
+    index.bools = {}
     index.numbers = trees.NewIntervalTree()
   end
 end
