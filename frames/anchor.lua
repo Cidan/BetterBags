@@ -161,6 +161,13 @@ function anchor:New(kind, anchorFor, label)
     if not af.frame:IsDragging() then return end
     af:OnDragUpdate()
   end)
+
+  af.frame:SetScript("OnMouseDown", function(_, button)
+    if button == "RightButton" then
+      af:Hide()
+    end
+  end)
+
   af.frame:SetBackdropColor(48 / 255, 168 / 255, 255 / 255, 1)
   af.frame:SetBackdropBorderColor(0, 0, 0, 1)
   af.frame:SetMovable(true)

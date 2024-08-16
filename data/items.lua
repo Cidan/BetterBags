@@ -466,8 +466,10 @@ function items:LoadItems(ctx, kind, dataCache)
     local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
     if newCategory then
       local oldCategory = currentItem.itemInfo.category
-      currentItem.itemInfo.category = newCategory
-      search:UpdateCategoryIndex(currentItem, oldCategory)
+      if oldCategory ~= L:G("Recent Items") then
+        currentItem.itemInfo.category = newCategory
+        search:UpdateCategoryIndex(currentItem, oldCategory)
+      end
     end
   end
 end

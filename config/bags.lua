@@ -325,11 +325,25 @@ function config:GetBagOptions(kind)
               events:SendMessage('bags/FullRefreshAll')
             end,
           },
+          showExtraGlowyButtons = {
+            type = "toggle",
+            name = L:G("Use Extra Glowy Item Buttons"),
+            desc = L:G("Use extra glowy item buttons for items in this bag."),
+            order = 2,
+            width = "full",
+            get = function()
+              return DB:GetExtraGlowyButtons(kind)
+            end,
+            set = function(_, value)
+              DB:SetExtraGlowyButtons(kind, value)
+              events:SendMessage('bags/FullRefreshAll')
+            end,
+          },
           itemsPerRow = {
             type = "range",
             name = L:G("Items Per Row"),
             desc = L:G("Set the number of items per row in this bag."),
-            order = 2,
+            order = 3,
             min = 3,
             max = 20,
             step = 1,
@@ -347,7 +361,7 @@ function config:GetBagOptions(kind)
             type = "range",
             name = L:G("Opacity"),
             desc = L:G("Set the opacity of this bag."),
-            order = 3,
+            order = 4,
             min = 60,
             max = 100,
             step = 1,
@@ -363,7 +377,7 @@ function config:GetBagOptions(kind)
             type = "range",
             name = L:G("Columns"),
             desc = L:G("Set the number of columns sections will fit into."),
-            order = 4,
+            order = 5,
             min = 1,
             max = 20,
             step = 1,
@@ -381,7 +395,7 @@ function config:GetBagOptions(kind)
             type = "range",
             name = L:G("Scale"),
             desc = L:G("Set the scale of this bag."),
-            order = 5,
+            order = 6,
             min = 60,
             max = 160,
             step = 1,

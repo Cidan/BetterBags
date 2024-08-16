@@ -191,6 +191,18 @@ function DB:SetSectionSortType(kind, view, sort)
 end
 
 ---@param kind BagKind
+---@return boolean
+function DB:GetExtraGlowyButtons(kind)
+  return DB.data.profile.extraGlowyButtons[kind]
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetExtraGlowyButtons(kind, value)
+  DB.data.profile.extraGlowyButtons[kind] = value
+end
+
+---@param kind BagKind
 ---@param view BagView
 ---@return ItemSortType
 function DB:GetItemSortType(kind, view)
