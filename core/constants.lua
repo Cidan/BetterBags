@@ -490,6 +490,10 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = false,
       [const.BAG_KIND.BANK] = false,
     },
+    extraGlowyButtons = {
+      [const.BAG_KIND.BACKPACK] = false,
+      [const.BAG_KIND.BANK] = false,
+    },
     newItems = {
       [const.BAG_KIND.BACKPACK] = {
         markRecentItems = false,

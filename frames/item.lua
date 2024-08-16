@@ -255,6 +255,15 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.button:SetHasItem(data.itemInfo.itemIcon)
   decoration:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
+  if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > Enum.ItemQuality.Common then
+    decoration.IconBorder:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
+    decoration.IconBorder:SetBlendMode("ADD")
+    decoration.IconBorder:SetTexCoord(14/64, 49/64, 15/64, 50/64)
+  else
+    decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
+    decoration.IconBorder:SetBlendMode("BLEND")
+    decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
+  end
   self:UpdateCount()
   --self:SetLock(data.itemInfo.isLocked)
   decoration:UpdateExtended()
@@ -434,6 +443,9 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, nocount)
   else
     SetItemButtonQuality(decoration, Enum.ItemQuality.Common, nil, false, false)
   end
+  decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
+  decoration.IconBorder:SetBlendMode("BLEND")
+  decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
   self.isFreeSlot = true
   decoration.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
