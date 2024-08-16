@@ -66,6 +66,7 @@ function search:OnInitialize()
   self:CreateIndex('bagid')
   self:CreateIndex('slotid')
   self:CreateIndex('bindtype')
+  self:CreateIndex('bonusid')
 
   -- Boolean indexes
   self:CreateIndex('reagent')
@@ -213,6 +214,10 @@ function search:Add(item)
   search:addNumberToIndex(self.indicies.bagid, item.bagid, item.slotkey)
   search:addNumberToIndex(self.indicies.slotid, item.slotid, item.slotkey)
   search:addNumberToIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
+  for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
+    local bonusNum = tonumber(bonusID)
+    if bonusNum then search:addNumberToIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
+  end
 
   search:addBoolToIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:addBoolToIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
@@ -259,6 +264,10 @@ function search:Remove(item)
   search:removeNumberFromIndex(self.indicies.bagid, item.bagid, item.slotkey)
   search:removeNumberFromIndex(self.indicies.slotid, item.slotid, item.slotkey)
   search:removeNumberFromIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
+  for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
+    local bonusNum = tonumber(bonusID)
+    if bonusNum then search:removeNumberFromIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
+  end
 
   search:removeBoolFromIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:removeBoolFromIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
