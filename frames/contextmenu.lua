@@ -140,6 +140,58 @@ function contextMenu:CreateContextMenu(bag)
           bag.anchor:ToggleShown()
           contextMenu:Hide()
         end
+      },
+      {
+        text = L:G("Manual Anchor"),
+        notCheckable = true,
+        hasArrow = true,
+        menuList = {
+          {
+            text = L:G("Top Left"),
+            notCheckable = false,
+            checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPLEFT' end,
+            func = function()
+              bag.anchor:SetStaticAnchorPoint('TOPLEFT')
+              contextMenu:Hide()
+            end
+          },
+          {
+            text = L:G("Top Right"),
+            notCheckable = false,
+            checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPRIGHT' end,
+            func = function()
+              bag.anchor:SetStaticAnchorPoint('TOPRIGHT')
+              contextMenu:Hide()
+            end
+          },
+          {
+            text = L:G("Bottom Left"),
+            notCheckable = false,
+            checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMLEFT' end,
+            func = function()
+              bag.anchor:SetStaticAnchorPoint('BOTTOMLEFT')
+              contextMenu:Hide()
+            end
+          },
+          {
+            text = L:G("Bottom Right"),
+            notCheckable = false,
+            checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMRIGHT' end,
+            func = function()
+              bag.anchor:SetStaticAnchorPoint('BOTTOMRIGHT')
+              contextMenu:Hide()
+            end
+          },
+          {
+            text = L:G("Automatic"),
+            notCheckable = false,
+            checked = function() return database:GetAnchorState(bag.kind).staticPoint == nil end,
+            func = function()
+              bag.anchor:SetStaticAnchorPoint(nil)
+              contextMenu:Hide()
+            end
+          }
+        }
       }
     }
   })

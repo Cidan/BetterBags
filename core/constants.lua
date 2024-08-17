@@ -12,6 +12,7 @@ local const = addon:NewModule('Constants')
 ---@class AnchorState
 ---@field enabled boolean
 ---@field shown boolean
+---@field staticPoint? string
 
 -- Constants for detecting WoW version.
 addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
