@@ -728,8 +728,8 @@ function items:GetCategory(data)
   end
 
   -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
-  if data.itemInfo.equipmentSet and database:GetCategoryFilter(data.kind, "GearSet") then
-    return "Gear: " .. data.itemInfo.equipmentSet
+  if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
+    return "Gear: " .. data.itemInfo.equipmentSets[1] -- Always use the first set, for now.
   end
 
   -- Return the custom category if it exists next.
@@ -873,7 +873,7 @@ function items:AttachItemInfo(data, kind)
     currentItemCount = C_Item.GetStackCount(itemLocation),
     category = "",
     currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
-    equipmentSet = equipmentSets:GetItemSet(bagid, slotid),
+    equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
   }
 
   --if database:GetItemLock(data.itemInfo.itemGUID) then
