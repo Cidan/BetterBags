@@ -1,4 +1,4 @@
-## Interface: 110000
+## Interface: 110002
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -43,6 +43,8 @@ debug\analytics.lua
 core\context.lua
 core\events.lua
 core\localization.lua
+core\translations.lua
+core\overrides.lua
 core\constants.lua
 core\database.lua
 core\hooks.lua

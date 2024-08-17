@@ -23,3 +23,6 @@ ignore:
   - install-deps.sh
   - annotations.lua
   - examples
+  - tools
+  - go.mod
+  - go.sum
