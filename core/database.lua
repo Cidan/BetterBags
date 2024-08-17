@@ -477,6 +477,30 @@ function DB:SetShowAllFreeSpace(kind, value)
   DB.data.profile.showAllFreeSpace[kind] = value
 end
 
+---@return boolean
+function DB:GetCreateCategoryForAllExpansions()
+  return DB.data.profile.createCategoryForAllExpansions
+end
+
+---@param enabled boolean
+function DB:SetCreateCategoryForAllExpansions(enabled)
+  DB.data.profile.createCategoryForAllExpansions = enabled
+end
+
+---@return string
+function DB:GetCreateCategoryForAllExpansionsType()
+  if DB.data.profile.createCategoryForAllExpansionsType == nil then
+    return "abbr"
+  else
+    return DB.data.profile.createCategoryForAllExpansionsType
+  end
+end
+
+---@param type string
+function DB:SetCreateCategoryForAllExpansionsType(type)
+  DB.data.profile.createCategoryForAllExpansionsType = type
+end
+
 function DB:Migrate()
 
   --[[
