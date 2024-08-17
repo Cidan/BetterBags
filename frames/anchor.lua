@@ -89,6 +89,14 @@ function anchorFrame:Hide()
   database:GetAnchorState(self.kind).shown = false
 end
 
+-- SetStaticAnchorPoint will set the anchor point to a specific anchor point on the frame.
+-- If nil, automatic anchoring will be used.
+---@param point? string
+function anchorFrame:SetStaticAnchorPoint(point)
+  database:GetAnchorState(self.kind).staticPoint = point
+  self:OnDragUpdate()
+end
+
 function anchorFrame:OnDragStart()
   self.frame:StartMoving()
 end
@@ -98,7 +106,9 @@ function anchorFrame:OnDragStop()
 end
 
 function anchorFrame:OnDragUpdate()
-  local quadrant = GetFrameScreenQuadrant(self.frame)
+  local state = database:GetAnchorState(self.kind)
+  if not state.enabled then return end
+  local quadrant = state.staticPoint or GetFrameScreenQuadrant(self.frame)
   self.anchorFor:ClearAllPoints()
   self.anchorFor:SetPoint(quadrant, self.frame, quadrant)
   self.positionLabel:SetText(string.format("%dx %dy", self.frame:GetCenter()))
@@ -109,8 +119,8 @@ end
 function anchorFrame:Load()
   -- Load the anchor position from settings.
   Window.RestorePosition(self.frame)
-  local quadrant = GetFrameScreenQuadrant(self.frame)
   local state = database:GetAnchorState(self.kind)
+  local quadrant = state.staticPoint or GetFrameScreenQuadrant(self.frame)
   if state.enabled then
     self:Activate()
     self.anchorFor:ClearAllPoints()
