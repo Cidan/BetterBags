@@ -75,7 +75,9 @@ function categories:GetAllCategories()
     catList[name] = filter
   end
   for name, filter in pairs(self.ephemeralCategories) do
-    catList[name] = filter
+    if catList[name] == nil then
+      catList[name] = filter
+    end
   end
   return catList
 end
