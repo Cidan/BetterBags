@@ -80,18 +80,81 @@ function config:GetCustomCategoryConfig()
             end,
             set = function(_, value)
               if value == "" then return end
-              categories:CreateCategory({
-                name = value,
-                save = true,
-                enabled = {
-                  [const.BAG_KIND.BACKPACK] = true,
-                  [const.BAG_KIND.BANK] = true,
-                },
-                itemList = {},
-                readOnly = false,
-              })
+
+              local newCategoryName = value
+
+              if DB:GetCreateCategoryForAllExpansions() then
+                for abbr, full in pairs(DB:GetAllExpansions()) do
+                  if DB:GetCreateCategoryForAllExpansionsType() == "abbr" then
+                    newCategoryName = value .. ' - ' .. abbr
+                  else
+                    newCategoryName = value .. ' - ' .. full
+                  end
+                  categories:CreateCategory({
+                    name = newCategoryName,
+                    save = true,
+                    enabled = {
+                      [const.BAG_KIND.BACKPACK] = true,
+                      [const.BAG_KIND.BANK] = true,
+                    },
+                    itemList = {},
+                    readOnly = false,
+                  })
+                end
+              else
+                categories:CreateCategory({
+                  name = newCategoryName,
+                  save = true,
+                  enabled = {
+                    [const.BAG_KIND.BACKPACK] = true,
+                    [const.BAG_KIND.BANK] = true,
+                  },
+                  itemList = {},
+                  readOnly = false,
+                })
+              end
             end,
-          }
+          },
+          createAllExpansions = {
+            type = "toggle",
+            width = "full",
+            order = 3,
+            name = L:G("Create Category For All Expansions"),
+            desc = L:G("If checked, the category will be created for every expansion."),
+            get = function()
+              return DB:GetCreateCategoryForAllExpansions()
+            end,
+            set = function(_, value)
+              DB:SetCreateCategoryForAllExpansions(value)
+            end,
+          },
+          createAllExpansionsHelp = {
+            type = "description",
+            name = L:G("If enabled, creates the custom category for each expansion.\n" ..
+            "For example, entering 'Alchemy' will create:\n\n" ..
+            "Alchemy - The Burning Crusade\n" ..
+            "Alchemy - Wrath of the Lich King\n" ..
+            "Alchemy - Cataclysm\n" ..
+            "etc."),
+            order = 4,
+          },
+          createAllExpansionsType = {
+            type = "select",
+            name = L:G("Set expansion name type to include in category name"),
+            desc = L:G("Set abbreviated or full expansion name."),
+            order = 5,
+            style = "radio",
+            get = function()
+              return DB:GetCreateCategoryForAllExpansionsType()
+            end,
+            set = function(_, value)
+              DB:SetCreateCategoryForAllExpansionsType(value)
+            end,
+            values = {
+              ["abbr"] = L:G("Abbreviated"),
+              ["full"] = L:G("Full"),
+            }
+          },
         }
       }
     },
