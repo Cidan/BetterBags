@@ -39,6 +39,7 @@ function equipmentSets:Update()
         end
         if (bank or bags) and slot ~= nil and bag ~= nil then
           self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
+          self.bagAndSlotToSet[bag][slot] = self.bagAndSlotToSet[bag][slot] or {}
           table.insert(self.bagAndSlotToSet[bag][slot], setName)
         end
       end
