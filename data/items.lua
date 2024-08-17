@@ -836,7 +836,7 @@ function items:AttachItemInfo(data, kind)
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
   setID, isCraftingReagent = C_Item.GetItemInfo(itemID)
-  bindType = self:GetBindTypeFromLink(itemLink) or bindType  --link overrides itemID if se
+  bindType = self:GetBindTypeFromLink(itemLink) or bindType  --link overrides itemID if set
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
