@@ -501,6 +501,22 @@ function DB:SetCreateCategoryForAllExpansionsType(type)
   DB.data.profile.createCategoryForAllExpansionsType = type
 end
 
+function DB:GetAllExpansions()
+  return {
+    ["WoW"] = "World of Warcraft",
+    ["TBC"] = "The Burning Crusade",
+    ["WotLK"] = "Wrath of the Lich King",
+    ["Cata"] = "Cataclysm",
+    ["MoP"] = "Mists of Pandaria",
+    ["WoD"] = "Warlords of Draenor",
+    ["Lgn"] = "Legion",
+    ["BfA"] = "Battle for Azeroth",
+    ["SL"] = "Shadowlands",
+    ["DF"] = "Dragonflight",
+    ["TWW"] = "The War Within",
+  }
+end
+
 function DB:Migrate()
 
   --[[
