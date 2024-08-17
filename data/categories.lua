@@ -263,6 +263,8 @@ end
 
 ---@param category CustomCategoryFilter
 function categories:CreateCategory(category)
+  if categories:DoesCategoryExist(category.name) then return end
+
   category.enabled = category.enabled or {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
