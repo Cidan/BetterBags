@@ -9,4 +9,7 @@
       <AbsDimension y="30"/>
     </Size>
   </Button>
+
+  <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="PanelTabButtonTemplate,SecureActionButtonTemplate">
+  </Button>
 </Ui>
