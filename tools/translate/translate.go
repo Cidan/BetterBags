@@ -7,12 +7,23 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"encoding/json"
 
 	"github.com/sashabaranov/go-openai"
 )
+
+type Translation struct {
+	Locale string
+	Text   string
+}
+
+type TranslationSet struct {
+	Term         string
+	Translations []Translation
+}
 
 var ignore_dirs = []string{".git", "libs", "tools"}
 var toTranslate = []string{}
@@ -147,19 +158,33 @@ local L = addon:GetModule('Localization')
 ]]--
 
 `
+
+	var sets []TranslationSet
 	for _, s := range outputs {
 		var translations map[string]map[string]string
-		fmt.Println(s)
 		if err := json.Unmarshal([]byte(s), &translations); err != nil {
 			panic(err)
 		}
 		for term, translation := range translations {
-			luaOutput += fmt.Sprintf(`L.data["%s"] = {`, term) + "\n"
+			set := TranslationSet{Term: term}
 			for locale, text := range translation {
-				luaOutput += fmt.Sprintf(`  ["%s"] = "%s",`, locale, text) + "\n"
+				set.Translations = append(set.Translations, Translation{Locale: locale, Text: text})
 			}
-			luaOutput += "}\n"
+			sort.Slice(set.Translations, func(i, j int) bool {
+				return set.Translations[i].Locale < set.Translations[j].Locale
+			})
+			sets = append(sets, set)
 		}
+	}
+	sort.Slice(sets, func(i, j int) bool {
+		return sets[i].Term < sets[j].Term
+	})
+	for _, set := range sets {
+		luaOutput += fmt.Sprintf(`L.data["%s"] = {`, set.Term) + "\n"
+		for _, translation := range set.Translations {
+			luaOutput += fmt.Sprintf(`  ["%s"] = "%s",`, translation.Locale, translation.Text) + "\n"
+		}
+		luaOutput += "}\n"
 	}
 	if err := os.WriteFile("core/translations.lua", []byte(luaOutput), 0644); err != nil {
 		panic(err)
