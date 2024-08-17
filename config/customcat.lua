@@ -84,7 +84,7 @@ function config:GetCustomCategoryConfig()
               local newCategoryName = value
 
               if DB:GetCreateCategoryForAllExpansions() then
-                for abbr, full in pairs(DB:GetAllExpansions()) do
+                for full, abbr in pairs(const.BRIEF_DISPLAY_EXPANSION_MAP) do
                   if DB:GetCreateCategoryForAllExpansionsType() == "abbr" then
                     newCategoryName = value .. ' - ' .. abbr
                   else
