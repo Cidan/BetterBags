@@ -30,6 +30,7 @@ local debug = addon:GetModule('Debug')
 ---@field index number
 ---@field id? number
 ---@field onClick? fun()
+---@field sabtClick? Button
 
 ---@class (exact) Tab
 ---@field frame Frame
@@ -43,8 +44,11 @@ local tabFrame = {}
 ---@param name string
 ---@param id? number
 ---@param onClick? fun()
-function tabFrame:AddTab(name, id, onClick)
+---@param sabtClick? Button
+function tabFrame:AddTab(name, id, onClick, sabtClick)
+  ---@type TabButton
   local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame) --[[@as TabButton]]
+  tab.sabtClick = sabtClick
   tab.onClick = onClick
   tab.name = name
   tab.id = id
@@ -173,17 +177,19 @@ function tabFrame:ResizeTabByIndex(index)
   tab:SetHeight(32)
 
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
-  decoration:SetScript("OnClick", function(_, button)
-    if tab.onClick then
-      tab.onClick()
-      return
-    end
-    if self.clickHandler and (self.selectedTab ~= index or button == "RightButton") then
-      if self.clickHandler(tab.id or tab.index, button) then
-        self:SetTabByIndex(index)
+  if not tab.sabtClick then
+    decoration:SetScript("OnClick", function(_, button)
+      if tab.onClick then
+        tab.onClick()
+        return
       end
-    end
-  end)
+      if self.clickHandler and (self.selectedTab ~= index or button == "RightButton") then
+        if self.clickHandler(tab.id or tab.index, button) then
+          self:SetTabByIndex(index)
+        end
+      end
+    end)
+  end
 end
 
 ---@param id number

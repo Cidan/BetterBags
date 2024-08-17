@@ -215,7 +215,7 @@ local theme = {
       decoration:Show()
       return decoration
     end
-    decoration = themes.CreateDefaultTabDecoration(tab)
+    decoration = themes.CreateDefaultTabDecoration(tab --[[@as TabButton]])
     S:HandleTab(decoration)
     tabs[tabName] = decoration
     return decoration

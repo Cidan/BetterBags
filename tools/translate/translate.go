@@ -102,6 +102,10 @@ func main() {
 						Content: `You are translation bot for World of Warcraft. You are to translate strings that are provided to you, one string per line,
 							into the languages provided. You must keep in mind the context of World of Warcraft and translate the strings within the context
 							of the game, taking care to understand the nuance of game specific lingo. All inputs are in American English.
+							It's important that you are consistent with the translations, so that the same string is translated the same way across all languages.
+							You must also be consistent with the capitalization of the strings. If the input string is in all caps, the output must also be in all caps, etc.
+							You must also be consistent with punctuation. If the input string has a period at the end, the output must also have a period at the end.
+							You must also be consistent within the language itself, for example, opposite values or meanings must be translated in a consistent way.
 							You are to output a JSON map with each key being input text. The value for each key is a JSON object, with a key for each language country code,
 							and the translated string as the value for the given country code.
 							The strings need to be translated into the following country codes:

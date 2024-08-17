@@ -428,6 +428,11 @@ function TabSettingsMenu:GetBankFrame() end
 ---@field TabSettingsMenu TabSettingsMenu
 AccountBankPanel = {}
 
+AccountBankPanel.PurchasePrompt = {}
+AccountBankPanel.PurchasePrompt.TabCostFrame = {}
+---@type Button
+AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton = {}
+
 ACCOUNT_BANK_PANEL_TITLE = ""
 
 ---@class AceConfig.OptionsTable

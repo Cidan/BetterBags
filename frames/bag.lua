@@ -138,10 +138,7 @@ function bagFrame.bagProto:GenerateWarbankTabs()
   end
 
   if not self.tabs:TabExists("Purchase Warbank Tab") then
-    self.tabs:AddTab("Purchase Warbank Tab", nil, function()
-      question:Alert("Nope", "Blizzard broke buying bank tabs in 11.0.2 from addons, and there's nothing we can do about it. Please use the default UI to purchase bank tabs.")
-      --StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, { bankType = Enum.BankType.Account })
-    end)
+    self.tabs:AddTab("Purchase Warbank Tab", nil, nil, AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
   end
 
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
