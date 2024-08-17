@@ -201,7 +201,7 @@ function search:Add(item)
     search:addStringToIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  if item.bindingInfo ~= nil then
+  if const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
     search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
   end
 
@@ -221,9 +221,7 @@ function search:Add(item)
 
   search:addBoolToIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:addBoolToIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  if item.bindingInfo ~= nil then
-    search:addBoolToIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
-  end
+  search:addBoolToIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
   search:addBoolToIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
   search:addBoolToIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
 end
@@ -251,7 +249,7 @@ function search:Remove(item)
     search:removeStringFromIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  if item.bindingInfo ~= nil then
+  if const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
     search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
   end
 
@@ -271,9 +269,7 @@ function search:Remove(item)
 
   search:removeBoolFromIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:removeBoolFromIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  if item.bindingInfo ~= nil then
-    search:removeBoolFromIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
-  end
+  search:removeBoolFromIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
   search:removeBoolFromIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
   search:removeBoolFromIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
 end
