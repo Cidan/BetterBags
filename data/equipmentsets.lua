@@ -4,7 +4,7 @@ local addonName = ... ---@type string
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class EquipmentSets: AceModule
----@field bagAndSlotToSet table<number, table<number, string>>
+---@field bagAndSlotToSet table<number, table<number, string[]>>
 local equipmentSets = addon:NewModule('EquipmentSets')
 
 ---@class Events: AceModule
@@ -39,7 +39,8 @@ function equipmentSets:Update()
         end
         if (bank or bags) and slot ~= nil and bag ~= nil then
           self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
-          self.bagAndSlotToSet[bag][slot] = setName
+          self.bagAndSlotToSet[bag][slot] = self.bagAndSlotToSet[bag][slot] or {}
+          table.insert(self.bagAndSlotToSet[bag][slot], setName)
         end
       end
     end
@@ -48,8 +49,8 @@ end
 
 ---@param bagid number
 ---@param slotid number
----@return string|nil
-function equipmentSets:GetItemSet(bagid, slotid)
+---@return string[]|nil
+function equipmentSets:GetItemSets(bagid, slotid)
   if not bagid or not slotid then return nil end
   return self.bagAndSlotToSet[bagid] and self.bagAndSlotToSet[bagid][slotid]
 end

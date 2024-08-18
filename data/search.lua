@@ -187,8 +187,10 @@ function search:Add(item)
   search:addStringToIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
   --search:addStringToIndex(self.indicies.bagName, item.bagName, item.slotkey)
 
-  if item.itemInfo.equipmentSet ~= nil then
-    search:addStringToIndex(self.indicies.equipmentset, item.itemInfo.equipmentSet, item.slotkey)
+  if item.itemInfo.equipmentSets ~= nil then
+    for _, set in ipairs(item.itemInfo.equipmentSets) do
+      search:addStringToIndex(self.indicies.equipmentset, set, item.slotkey)
+    end
   end
 
   if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
@@ -235,8 +237,10 @@ function search:Remove(item)
   search:removeStringFromIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
   --search:removeStringFromIndex(self.indicies.bagName, item.bagName, item.slotkey)
 
-  if item.itemInfo.equipmentSet ~= nil then
-    search:removeStringFromIndex(self.indicies.equipmentset, item.itemInfo.equipmentSet, item.slotkey)
+  if item.itemInfo.equipmentSets ~= nil then
+    for _, set in ipairs(item.itemInfo.equipmentSets) do
+      search:removeStringFromIndex(self.indicies.equipmentset, set, item.slotkey)
+    end
   end
 
   if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
@@ -470,10 +474,11 @@ end
 function search:isFullTextMatch(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
+  local lower = string.lower(value)
   ---@type table<string, boolean>
   local results = {}
   for text, slots in pairs(index.fullText or {}) do
-    if string.match(text, value) then
+    if string.find(text, lower, 1, true) then
       for k, v in pairs(slots) do
         results[k] = v
       end
