@@ -101,10 +101,16 @@ end
 
 function addon:CloseSpecialWindows(interactingFrame)
   if interactingFrame ~= nil then return end
+
+  ---@class Async: AceModule
+  local async = addon:GetModule('Async')
+
   debug:Log('Hooks', 'CloseSpecialWindows')
   addon.backpackShouldClose = true
-  addon.Bags.Bank:Hide()
-  addon.Bags.Bank:SwitchToBankAndWipe()
+  async:AfterCombat(function()
+    addon.Bags.Bank:Hide()
+    addon.Bags.Bank:SwitchToBankAndWipe()
+  end)
   events:SendMessage('addon/CloseSpecialWindows')
   if C_Bank then
     C_Bank.CloseBankFrame()
