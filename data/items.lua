@@ -74,6 +74,7 @@ local debug = addon:GetModule('Debug')
 ---@field bindingInfo BindingInfo
 ---@field bagid number
 ---@field slotid number
+---@field inventoryType number
 ---@field slotkey string
 ---@field isItemEmpty boolean
 ---@field kind BagKind
@@ -251,6 +252,10 @@ function items:RefreshBackpack(ctx)
   -- Loop through all the bags and schedule each item for a refresh.
   for i in pairs(const.BACKPACK_BAGS) do
     self:StageBagForUpdate(i, container)
+  end
+  for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+    local itemMixin = Item:CreateFromEquipmentSlot(i)
+    container:AddInventorySlot(itemMixin)
   end
   --- Process the item container.
   self:ProcessContainer(ctx, const.BAG_KIND.BACKPACK, container)
@@ -811,6 +816,70 @@ function items:GetBindTypeFromLink(itemLink)
   return bindType
 end
 
+---@param itemMixin ItemMixin
+---@return ItemData
+function items:GetEquipmentInfo(itemMixin)
+  local data = {}
+  ---@cast data +ItemData
+  local invType = itemMixin:GetInventoryType()
+  local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
+  local itemLink = itemMixin:GetItemLink() --[[@as string]]
+  local itemID = itemMixin:GetItemID() --[[@as number]]
+  local itemName, _, _,
+  itemLevel, itemMinLevel, itemType, itemSubType,
+  itemStackCount, itemEquipLoc, itemTexture,
+  sellPrice, classID, subclassID, bindType, expacID,
+  setID = C_Item.GetItemInfo(itemLink)
+  local itemAppearanceID, itemModifiedAppearanceID = C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
+  data.transmogInfo = {
+    transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
+      appearanceID = 0,
+      secondaryAppearanceID = 0,
+      appliedAppearanceID = 0,
+      appliedSecondaryAppearanceID = 0,
+    },
+    itemAppearanceID = itemAppearanceID,
+    itemModifiedAppearanceID = itemModifiedAppearanceID,
+    hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID)
+  }
+  data.inventoryType = invType --[[@as number]]
+  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
+  local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
+  data.itemInfo = {
+    itemID = itemID,
+    itemGUID = C_Item.GetItemGUID(itemLocation),
+    itemName = itemName,
+    itemLink = itemLink,
+    itemQuality = itemQuality,
+    itemLevel = itemLevel,
+    itemMinLevel = itemMinLevel,
+    itemType = itemType,
+    itemSubType = itemSubType,
+    itemStackCount = itemStackCount,
+    itemEquipLoc = itemEquipLoc,
+    itemTexture = itemTexture,
+    sellPrice = sellPrice,
+    classID = classID,
+    subclassID = subclassID,
+    bindType = bindType,
+    expacID = expacID,
+    setID = setID or 0,
+    isCraftingReagent = false,
+    effectiveIlvl = effectiveIlvl --[[@as number]],
+    isPreview = isPreview --[[@as boolean]],
+    baseIlvl = baseIlvl --[[@as number]],
+    itemIcon = 0,
+    isBound = C_Item.IsBound(itemLocation),
+    isLocked = false,
+    isNewItem = false,
+    currentItemCount = C_Item.GetStackCount(itemLocation),
+    category = "",
+    currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
+    equipmentSets = nil,
+  }
+  return data
+end
+
 ---@param data ItemData
 ---@param kind BagKind
 ---@return ItemData
@@ -888,10 +957,6 @@ function items:AttachItemInfo(data, kind)
     currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
     equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
   }
-
-  --if database:GetItemLock(data.itemInfo.itemGUID) then
-  --  data.itemInfo.isLocked = true
-  --end
 
   if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()

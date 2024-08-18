@@ -15,18 +15,20 @@ local const = addon:GetModule('Constants')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class (exact) ItemLoader
----@field private locations table<number, ItemMixin>
----@field private callback fun()
----@field private id number
----@field private kind BagKind
----@field private data table<string, ItemData>
-local ItemLoader = {}
-
 ---@class Items: AceModule
 ---@field private loaders ItemLoader[]
 ---@field private loadCount number
 local items = addon:GetModule('Items')
+
+--- ItemLoader for loading bag items.
+---@class (exact) ItemLoader
+---@field private locations table<string, ItemMixin>
+---@field private callback fun()
+---@field private id number
+---@field private kind BagKind
+---@field private data table<string, ItemData>
+---@field private equipmentData table<number, ItemData>
+local ItemLoader = {}
 
 ---@param kind BagKind
 ---@return ItemLoader
@@ -41,6 +43,7 @@ function items:NewLoader(kind)
   itemLoader.id = self.loadCount
   itemLoader.kind = kind
   itemLoader.data = {}
+  itemLoader.equipmentData = {}
   self.loaders[itemLoader.id] = itemLoader
   self.loadCount = self.loadCount + 1
   return itemLoader
@@ -60,9 +63,9 @@ function ItemLoader:Add(itemMixin)
     return
   end
 
-  local itemID = itemMixin:GetItemID()
-  if itemID == nil then return end
-  self.locations[itemID] = itemMixin
+  local itemGUID = itemMixin:GetItemGUID()
+  if itemGUID == nil then return end
+  self.locations[itemGUID] = itemMixin
 
   itemMixin:ContinueOnItemLoad(function()
     if itemMixin:IsItemDataCached() then
@@ -71,17 +74,33 @@ function ItemLoader:Add(itemMixin)
       data.bagid, data.slotid = itemMixin:GetItemLocation():GetBagAndSlot()
       items:AttachItemInfo(data, self.kind)
       self.data[items:GetSlotKey(data)] = data
-      self.locations[itemID] = nil
+      self.locations[itemGUID] = nil
+    end
+  end)
+end
+
+---@param itemMixin ItemMixin
+function ItemLoader:AddInventorySlot(itemMixin)
+ if itemMixin:IsItemEmpty() then return end
+  local itemGUID = itemMixin:GetItemGUID()
+  if itemGUID == nil then return end
+  self.locations[itemGUID] = itemMixin
+
+  itemMixin:ContinueOnItemLoad(function()
+    if itemMixin:IsItemDataCached() then
+      local data = items:GetEquipmentInfo(itemMixin)
+      self.equipmentData[data.inventoryType] = data
+      self.locations[itemGUID] = nil
     end
   end)
 end
 
 function ItemLoader:Load(callback)
   async:Until(function()
-    for itemID, location in pairs(self.locations) do
+    for itemGUID, location in pairs(self.locations) do
       local l = location:GetItemLocation()
       if l == nil or (l.IsValid and not l:IsValid()) then
-        self.locations[itemID] = nil
+        self.locations[itemGUID] = nil
       else
         C_Item.RequestLoadItemData(l)
       end
@@ -96,7 +115,7 @@ function ItemLoader:Load(callback)
   end)
 end
 
----@return table<string, ItemData>
+---@return table<string, ItemData>, table<number, ItemData>
 function ItemLoader:GetDataCache()
-  return self.data
+  return self.data, self.equipmentData
 end
