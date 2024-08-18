@@ -482,7 +482,7 @@ function search:isFullTextMatch(name, value)
   ---@type table<string, boolean>
   local results = {}
   for text, slots in pairs(index.fullText or {}) do
-    if string.match(text, lower) then
+    if string.find(text, lower, 1, true) then
       for k, v in pairs(slots) do
         results[k] = v
       end
