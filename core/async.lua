@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class Task
 ---@field fn fun()
 ---@field cb fun()
@@ -10,7 +13,21 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field worker fun()
 
 ---@class Async: AceModule
+---@field AfterCombatCallbacks fun()[]
 local async = addon:NewModule('Async')
+
+function async:OnInitialize()
+  self.AfterCombatCallbacks = {}
+end
+
+function async:OnEnable()
+  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
+    for _, cb in ipairs(self.AfterCombatCallbacks) do
+      cb()
+    end
+    wipe(self.AfterCombatCallbacks)
+  end)
+end
 
 -- DoWithDelay will run the coroutine function with a delay between each yield.
 -- You must call async:Yield() in your function to yield when you wait for the next frame. 
@@ -93,6 +110,17 @@ function async:Until(fn, cb)
       self:Yield()
     end
   end, cb)
+end
+
+-- AfterCombat will call function cb after the player leaves combat.
+-- If the player is already out of combat, cb will be called immediately.
+---@param cb fun()
+function async:AfterCombat(cb)
+  if InCombatLockdown() then
+    table.insert(self.AfterCombatCallbacks, cb)
+  else
+    cb()
+  end
 end
 
 -- Yield is a small wrapper around coroutine.yield.
