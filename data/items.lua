@@ -71,7 +71,7 @@ local debug = addon:GetModule('Debug')
 ---@field containerInfo ContainerItemInfo
 ---@field questInfo ItemQuestInfo
 ---@field transmogInfo TransmogInfo
----@field bindingInfo? BindingInfo
+---@field bindingInfo BindingInfo
 ---@field bagid number
 ---@field slotid number
 ---@field slotkey string
@@ -691,7 +691,7 @@ end
 ---@return string
 function items:GenerateItemHash(data)
   local stackOpts = database:GetStackingOptions(data.kind)
-  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d",
+  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d%d",
     data.itemLinkInfo.itemID,
     data.itemLinkInfo.enchantID,
     data.itemLinkInfo.gemID1,
@@ -705,6 +705,7 @@ function items:GenerateItemHash(data)
     table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
     data.itemLinkInfo.crafterGUID or "",
     data.itemLinkInfo.extraEnchantID or "",
+    data.bindingInfo.binding,
     data.itemInfo.currentItemLevel,
     stackOpts.dontMergeTransmog and data.transmogInfo.transmogInfoMixin and data.transmogInfo.transmogInfoMixin.appearanceID or 0
   )
@@ -799,6 +800,17 @@ function items:GetCategory(data)
   return category
 end
 
+---@param itemLink string
+---@return Enum.ItemBind?
+function items:GetBindTypeFromLink(itemLink)
+  -- itemLink has better information for items, but no information for pet or keystone links
+  local bindType = nil
+  if (strfind(itemLink, "item:")) then
+    bindType, _, _, _ = select(14, C_Item.GetItemInfo(itemLink))
+  end
+  return bindType
+end
+
 ---@param data ItemData
 ---@param kind BagKind
 ---@return ItemData
@@ -823,6 +835,7 @@ function items:AttachItemInfo(data, kind)
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
   setID, isCraftingReagent = C_Item.GetItemInfo(itemID)
+  bindType = self:GetBindTypeFromLink(itemLink) or bindType  --link overrides itemID if set
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
@@ -841,7 +854,7 @@ function items:AttachItemInfo(data, kind)
     hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID)
   }
 
-  data.bindingInfo = binding.GetItemBinding(itemID, itemLocation, itemLink)
+  data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)
 
   data.itemInfo = {
     itemID = itemID,

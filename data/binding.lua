@@ -13,29 +13,11 @@ local binding = addon:NewModule('Binding')
 ---@field binding BindingScope
 ---@field bound boolean
 
----@param itemID number
----@param itemLink string
----@return Enum.ItemBind
-function binding.GetBindType(itemID,itemLink)
-  ---@type ItemInfo
-  local ItemInfo = itemLink -- itemLink has better information for items, but no information for pets
-  if ( strfind(itemLink, "battlepet:") ) then
-    ItemInfo = itemID
-  end
-  local bindType, _, _, _ = select(14,C_Item.GetItemInfo(ItemInfo ))
-  return bindType
-end
-
----@param itemID number
 ---@param itemLocation ItemLocationMixin
----@param itemLink string
----@return BindingInfo?
-function binding.GetItemBinding(itemID, itemLocation, itemLink)
-  local bagID,slotID = itemLocation:GetBagAndSlot()
-  ---@type Enum.ItemBind
-  local bindType = binding.GetBindType(itemID,itemLink)
-  if not bindType then return nil end
-
+---@param bindType Enum.ItemBind
+---@return BindingInfo
+function binding.GetItemBinding(itemLocation, bindType)
+  local bagID, slotID = itemLocation:GetBagAndSlot()
   ---@type BindingInfo
   local bindinginfo = {
     binding = const.BINDING_SCOPE.UNKNOWN,
@@ -59,10 +41,7 @@ function binding.GetItemBinding(itemID, itemLocation, itemLink)
     end
   else -- isBound
     bindinginfo.bound = true
-
-    if (bindType == 1) then
-      bindinginfo.binding = const.BINDING_SCOPE.BOUND -- we don't register a bare keyword 'bound' as it is too common. Should expand after toolip scanning
-    end
+    bindinginfo.binding = const.BINDING_SCOPE.BOUND -- we don't register a bare keyword 'bound' as it is too common. Should expand after toolip scanning
 
     -- on retail we can distingush Soulbound and Warbound
     if C_Bank and C_Bank.IsItemAllowedInBankType then
@@ -81,9 +60,7 @@ function binding.GetItemBinding(itemID, itemLocation, itemLink)
       bindinginfo.binding = const.BINDING_SCOPE.QUEST
     end
   end -- isBound
-  if bindinginfo.binding == const.BINDING_SCOPE.UNKNOWN then
-    return nil
-  end
+
   return bindinginfo
 end
 
