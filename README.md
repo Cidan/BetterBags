@@ -96,6 +96,15 @@ The Section Grid offers:
 *Section Grid View in Retail.*
 </div>
 
+### Navigation
+Most options and other important information in BetterBags can be reached by left-clicking on the bag button in the top-left corner of the bag (or bank) and bringing up the menu. Hovering over the bag icon will bring up a list of mouse-clicks that can be done for various functions. Some of the important functions in the menu are described in the following sections. Any options not in the menu directly are instead in the options screen (access by choosing `Open Options Screen` in the menu or the slash command `/bb`).
+
+<div align="center" style="text-align:center">
+<img src="https://i.imgur.com/CYBu1p2.png" alt="Menu in Retail.">
+
+*Menu in Retail.*
+</div>
+
 ### Show Bags
 This temporary view allows you to see your bags and the items within them how they currently are. It also allows you to swap out which bags are equipped for both the backpack and the bank.
 
@@ -107,7 +116,8 @@ This temporary view allows you to see your bags and the items within them how th
 
 ### Bag Anchor
 By default, the bag and bank will grow from the bottom-left corner. Extending both up and right depending on the number of items per row and number of columns.
-A specific anchor can be turned on by left-clicking the bag icon in the top-left corner of the bag and bank. It will allow you to drag the anchor to a specific pixel and grow the bag from whichever corner the anchor is in. Selecting `Enable` will turn on the anchor. Selecting `Show` will allow you to manipulate the anchor and choose the location.
+A specific anchor can be turned on by left-clicking the bag icon in the top-left corner of the bag and bank. It will allow you to drag the anchor to a specific pixel and grow the bag from whichever corner the anchor is in. Selecting `Enable` will turn on the anchor. Selecting `Show` will allow you to manipulate the anchor and choose the location. `Manual Anchor` will allow you to choose which corner you want the bag to grow from. If you leave it on `Automatic`, the bag will grow away from the closest corner.  
+You can also enable and show the anchors with the slash command `/bbanchor`. To hide the anchor (but keep it enabled), simply right-click anywhere in the blue anchor.
 
 <div align="center" style="text-align:center">
 <img src="https://i.imgur.com/ZiyLfvF.png" alt="Bag Anchor in Retail.">
@@ -266,35 +276,36 @@ Supported windows include bags, all bank tabs, the mailbox, the trade window, an
 ## Search
 BetterBags offers a comprehensive Search option that can be toggled with a keybinding (`BetterBags > Search Bags`).
 
-If you do not specify a search index, search will default to searching in all of `name`, `type`, `subtype`, `category`, and `equipmentLocation` using full text searches. By using the `=` operator, searches will be done in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator.  
+When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, and `binding`. When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator.  
+If you would like to exclude items in gear sets from your searches, the easiest way to do so is add `and not category = "gear:"` to the end of your search. (eg. `slot = finger or slot = neck and not (category = 'gear:')` will highlight all rings and necklaces that are NOT part of a gear set)
 Search allows you to find items by the following indices (based on the item below):
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/m7CTReP.png" alt="Example Item in Retail.">
+<img src="https://i.imgur.com/Sc0JHZX.png" alt="Example Item in Retail.">
 
 *Example Item in Retail.*
 </div>
 
 ### Strings
-- `name` (name = Silent Tormentor's Hood) The name of the item; the first line in the tooltip.
+- `name` (name = "Tome of Unstable Power") The name of the item; the first line in the tooltip.
 - `type` (type = Armor) The type of the item. Some examples include Armor, Weapon, Consumable, and Reagent.
-- `subtype` (subtype = Leather) The subtype of the item. Some examples include Leather, Potion, Bag, and Bows. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding type and subtype.
-- `category` (category = Head) The category that the item is sorted into in BetterBags.
-- `equipmentLocation` or `slot` (slot = Head) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
+- `subtype` (subtype = Miscellaneous) The subtype of the item. Some examples include Leather, Potion, Bag, and Bows. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding type and subtype.
+- `category` (category = "Gear: MW DPS") The category that the item is sorted into in BetterBags.
+- `equipmentLocation` or `slot` (slot = Trinket) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
 - `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW.
-- `equipmentSet` (None in the example) The equipment set(s) that a piece of gear is part of.
-- `guid` (guid = 'item-60-0-4000000C8EB6C663') The globally unique identifier of the item. This string is unique to the specific instance of an item.
+- `equipmentSet` (equipmentSet = "MW DPS") The equipment set(s) that a piece of gear is part of.
+- `guid` (guid = 'item-60-0-4000000CAEA5CBE3') The globally unique identifier of the item. This string is unique to the specific instance of an item.
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
 
 ### Numbers
-- `level` or `ilvl` (ilvl = 506) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
+- `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
 - `rarity` (rarity = epic or rarity = 4) The rarity of the item. Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5.
-- `id` (id = 207133) The internal itemID of the item. A number uniquely identifying the base item. Specific ItemIDs can be found in the url on the item's WoWHead page.
-- `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
+- `id` (id = 212685) The internal itemID of the item. A number uniquely identifying the base item. Specific ItemIDs can be found in the url on the item's WoWHead page.
+- `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. **NOTE:** Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
 - `class` (class = 4) The numeric representation of itemType.
-- `subclass` (subclass = 2) The numeric representation of itemSubtype. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding class and subclass.
-- `bagid` (bagid = 3) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 6-12 for bank bags, -3 for the reagent bank, -2 for the keyring (Classic only), and 13-17 for warbank tabs.
-- `slotid` (slotid = 6) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
+- `subclass` (subclass = 0) The numeric representation of itemSubtype. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding class and subclass.
+- `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 6-12 for bank bags, -3 for the reagent bank, -2 for the keyring (Classic only), and 13-17 for warbank tabs.
+- `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
 - `bindtype` (bindtype = 1) The binding type of the item returned by GetItemInfo(). 1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Enum.ItemBind) for specifics.
 
 ### Booleans

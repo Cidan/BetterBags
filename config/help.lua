@@ -87,55 +87,75 @@ function config:CreateAllHelp()
     The BetterBags search engine is extremly comprehensive and supports many different search operators and grouping.
     You can search for items by a number of fields, such as name, type, subtype, expansion, and more, or combine multiple fields to create complex searches.
 
-    Logical Operators include:
-    - `AND` to combine multiple search terms (e.g. `axe AND sword`)
-    - `OR` to search for items that match any of the search terms (e.g. `axe OR sword`)
-    - `NOT` to exclude items that match a search term (e.g. `NOT axe`)
-    - `(` and `)` to group search terms (e.g. `(axe OR sword) AND epic`)
+    For a more complete breakdown of the available search terms, please visit the README at https://github.com/Cidan/BetterBags.
 
-    Comparison Operators include:
-    - `>` to search for items with a value greater than a number (e.g. `level > 10`)
-    - `<` to search for items with a value less than a number (e.g. `level < 10`)
-    - `=` to search for items with a value equal to a number or text (e.g. `level = 10 or name = axe`)
-    - `>=` to search for items with a value greater than or equal to a number (e.g. `level >= 10`)
-    - `<=` to search for items with a value less than or equal to a number (e.g. `level <= 10`)
 
-    The following fields are supported:
-    - `name` to search for items by name (e.g. `name = axe`)
-    - `type` to search for items by type (e.g. `type = weapon`)
-    - `subtype` to search for items by subtype (e.g. `subtype = axe`)
-    - `equipmentLocation` to search for items by equipment location (e.g. `equipmentLocation = head`)
-    - `expansion` to search for items by expansion (e.g. `expansion = classic`)
-    - `level` to search for items by level (e.g. `level > 10`)
-    - `rarity` to search for items by rarity (e.g. `rarity = rare`)
-    - `id` to search for items by id (e.g. `id = 12345`)
-    - `stackCount` to search for items by stack count (e.g. `stackCount > 10`)
-    - `class` to search for items by classID (e.g. `class = 10`)
-    - `subclass` to search for items by subclassID (e.g. `subclass = 10`)
-    - `bagid` to search for items by bagID (e.g. `bagid = 0`)
-    - `slotid` to search for items by slotID (e.g. `slotid = 0`)
-    - `reagent` to search for items by reagent (e.g. `reagent = true`)
-    - `bound` to search for items by bound status (e.g. `bound = true`)
-    - `quest` to search for items by quest status (e.g. `quest = true`)
-    - `activeQuest` to search for items by active quest status (e.g. `activeQuest = true`)
-  
-    For rarity, you can use numerical comparison operators on rarity names, for example:
-    - `rarity = poor`
-    - `rarity > common`
-    - `rarity >= uncommon`
-    - ...etc
-    
-    For expansions, you can use the following expansions shortcuts (e.g. `exp:classic`):
-    - `classic`
-    - `tbc`
-    - `wotlk`
-    - `cata`
-    - `mop`
-    - `wod`
-    - `legion`
-    - `bfa`
-    - `shadowlands`
-    - `dragonflight`
+    When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, and `binding`.
+    When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator.  
+
+    If you would like to exclude items in gear sets from your searches, the easiest way to do so is add `and not category = "gear:"` to the end of your search. (eg. `slot = finger or slot = neck and not (category = 'gear:')` will highlight all rings and necklaces that are NOT part of a gear set)
+
+
+Search allows you to find items by the following indices:
+
+Strings:
+    - `name` (name = "Tome of Unstable Power") The name of the item.
+    - `type` (type = Armor) The type of the item.
+    - `subtype` (subtype = Miscellaneous) The subtype of the item.
+    - `category` (category = "Gear: MW DPS") The category that the item is sorted
+          into in BetterBags.
+    - `equipmentLocation` or `slot` (slot = Trinket) The item slot that the gear is for.
+    - `expansion` or `exp` (expansion = DF) The expansion that the item is from.
+          Values are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW.
+    - `equipmentSet` (equipmentSet = "MW DPS") The equipment set(s) that a piece
+          of gear is part of.
+    - `guid` (guid = 'item-60-0-4000000CAEA5CBE3') The GUID of the item.
+    - `binding` (binding = boe) The text description of the binding type of the item.
+          Values include nonbinding, boe, bou, quest, soulbound, refundable,
+                warbound, bnet, or wue.
+          Note: soulbound and warbound are only available on Retail.
+
+Numbers:
+    - `level` or `ilvl` (ilvl = 528) The item level of the item.
+    - `rarity` (rarity = epic or rarity = 4) The rarity of the item.
+          Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5.
+    - `id` (id = 212685) The internal itemID of the item.
+    - `stackCount` or `count` (stackCount = 1) The number of items in the stack.
+          NOTE: Currently count only takes into account the stack size of the
+                "base" stack when using virtual stacks.
+    - `class` (class = 4) The numeric representation of itemType.
+    - `subclass` (subclass = 0) The numeric representation of itemSubtype.
+    - `bagid` (bagid = 2) The location of the bag containing the item.
+          BagID is 0 for the main backpack, 1-4 for the bags,
+                5 for a reagent bag (Retail only), -1 for the main bank window,
+                6-12 for bank bags, -3 for the reagent bank,
+                -2 for the keyring (Classic only), and 13-17 for warbank tabs.
+    - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it.
+    - `bindtype` (bindtype = 1) The binding type returned by GetItemInfo().
+          1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE.
+
+Booleans:
+    - `reagent` (reagent = false) Is the item classified as a reagent?
+    - `bound` (bound = true) Is the item bound to the character or warband?
+    - `isbound` (isbound = true) Is the item bound to the character or account?
+    - `quest` (quest = false) Is the item for a non-active quest?
+    - `activeQuest` (activeQuest = false) Is the item for an active quest?
+
+Logical Operators:
+    - `AND` (slot = Legs AND ilvl > 500) Items must match both sides of the AND.
+    - `OR` (slot = Legs OR ilvl > 500) Items can match either or both sides of the OR.
+    - `NOT` (NOT slot = Legs) Items must not match the NOT.
+    - `(` and `)` To group search terms.
+    - `=` (type = Armor, ilvl = 506) Items with a value equal to the right side.
+    - `%=` (slot %= Hand) Items with the value in the full text of the field(s).
+    - `"` or `'` (slot = "Main Hand") To search for a multi-word string.
+
+Comparison Operators:
+    Note: These only work on numerical fields. Rarity can be used with these.
+    - `>` Items with a value greater than the number on the right side.
+    - `<` Items with a value less than the number on the right side.
+    - `>=` Items with a value greater than or equal to the number on the right side.
+    - `<=` Items with a value less than or equal to the number on the right side.
   ]])
  })
 end
