@@ -805,7 +805,7 @@ end
 function items:GetBindTypeFromLink(itemLink)
   -- itemLink has better information for items, but no information for pet or keystone links
   local bindType = nil
-  if ( strfind(itemLink, "item:") ) then
+  if (strfind(itemLink, "item:")) then
     bindType, _, _, _ = select(14, C_Item.GetItemInfo(itemLink))
   end
   return bindType
