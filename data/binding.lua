@@ -17,7 +17,7 @@ local binding = addon:NewModule('Binding')
 ---@param bindType Enum.ItemBind
 ---@return BindingInfo
 function binding.GetItemBinding(itemLocation, bindType)
-  local bagID,slotID = itemLocation:GetBagAndSlot()
+  local bagID, slotID = itemLocation:GetBagAndSlot()
   ---@type BindingInfo
   local bindinginfo = {
     binding = const.BINDING_SCOPE.UNKNOWN,
