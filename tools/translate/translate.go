@@ -31,16 +31,40 @@ var toTranslate = []string{}
 // Look for any string inside of a function call that looks like: L:G("string") or L:G('string')
 var translationMatch = regexp.MustCompile(`L:G\(["'](.+?)["']\)`)
 
+// removeDuplicates removes duplicate elements from a slice of strings.
+// it also reads the term elements in cache/translations.json and removes them from the slice
 func removeDuplicates(elements []string) []string {
+	// Use map to record duplicates as we find them.
 	encountered := map[string]bool{}
+	// Create a slice for the keys.
 	result := []string{}
+
 	for v := range elements {
 		if encountered[elements[v]] {
 			// Do not add duplicate.
 		} else {
 			encountered[elements[v]] = true
-			result = append(result, elements[v])
 		}
+	}
+
+	if _, err := os.Stat("cache/translations.json"); err == nil {
+		// Read the term elements from cache/translations.json
+		termFile, err := os.ReadFile("cache/translations.json")
+		if err != nil {
+			panic(err)
+		}
+		var termElements []TranslationSet
+		if err := json.Unmarshal(termFile, &termElements); err != nil {
+			panic(err)
+		}
+		// Remove the term elements from the map
+		for _, term := range termElements {
+			delete(encountered, term.Term)
+		}
+	}
+	// Append the remaining elements to the result slice
+	for k := range encountered {
+		result = append(result, k)
 	}
 	return result
 }
@@ -160,6 +184,17 @@ local L = addon:GetModule('Localization')
 `
 
 	var sets []TranslationSet
+
+	if _, err := os.Stat("cache/translations.json"); err == nil {
+		termFile, err := os.ReadFile("cache/translations.json")
+		if err != nil {
+			panic(err)
+		}
+		if err := json.Unmarshal(termFile, &sets); err != nil {
+			panic(err)
+		}
+	}
+
 	for _, s := range outputs {
 		var translations map[string]map[string]string
 		if err := json.Unmarshal([]byte(s), &translations); err != nil {
@@ -179,6 +214,13 @@ local L = addon:GetModule('Localization')
 	sort.Slice(sets, func(i, j int) bool {
 		return sets[i].Term < sets[j].Term
 	})
+	data, err := json.Marshal(&sets)
+	if err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile("cache/translations.json", data, 0644); err != nil {
+		panic(err)
+	}
 	for _, set := range sets {
 		luaOutput += fmt.Sprintf(`L.data["%s"] = {`, set.Term) + "\n"
 		for _, translation := range set.Translations {
