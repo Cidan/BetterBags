@@ -75,6 +75,9 @@ local views = addon:GetModule('Views')
 ---@class SearchCategoryConfig: AceModule
 local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 
+---@class Async: AceModule
+local async = addon:GetModule('Async')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -235,6 +238,7 @@ function addon:OnEnable()
   refresh:Enable()
   views:Enable()
   searchCategoryConfig:Enable()
+  async:Enable()
 
   self:HideBlizzardBags()
   addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)

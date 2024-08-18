@@ -15,6 +15,9 @@ local debug = addon:GetModule('Debug')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Async: AceModule
+local async = addon:GetModule('Async')
+
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
@@ -295,7 +298,9 @@ function themes:GetTabButton(tab)
   local tabIndex = tab.index
   local decoration = self.tabs[tabIndex]
   if decoration then
-    decoration:Show()
+    async:AfterCombat(function()
+      decoration:Show()
+    end)
     return decoration
   end
   decoration = themes.CreateDefaultTabDecoration(tab)
