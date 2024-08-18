@@ -478,10 +478,11 @@ end
 function search:isFullTextMatch(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
+  local lower = string.lower(value)
   ---@type table<string, boolean>
   local results = {}
   for text, slots in pairs(index.fullText or {}) do
-    if string.match(text, value) then
+    if string.match(text, lower) then
       for k, v in pairs(slots) do
         results[k] = v
       end
