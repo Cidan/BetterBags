@@ -26,3 +26,4 @@ ignore:
   - tools
   - go.mod
   - go.sum
+  - cache 
