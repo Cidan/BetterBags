@@ -38,7 +38,7 @@ function QueryParser:Lexer(input)
   end
 
   local function is_alphanumeric(char)
-    return char:match("[^%s%c()=!]+") ~= nil
+    return char:match("[^%s%c()=!<>]+") ~= nil
   end
 
   local function read_word()
