@@ -207,7 +207,6 @@ function itemFrame.itemProto:UpdateUpgrade()
       end
     end
   end
- decoration.UpgradeIcon:SetScale(1.2)
 end
 
 ---@return ItemData
