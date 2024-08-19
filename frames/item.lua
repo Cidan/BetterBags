@@ -189,6 +189,25 @@ function itemFrame.itemProto:UpdateCount()
   SetItemButtonCount(decoration, count)
 end
 
+function itemFrame.itemProto:UpdateUpgrade()
+  local data = self:GetItemData()
+  local decoration = themes:GetItemButton(self)
+  if not data.inventorySlots then return end
+  if not self.staticData then
+    for _, slot in pairs(data.inventorySlots) do
+      local equippedItem = items:GetItemDataFromInventorySlot(slot)
+      if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
+        decoration.UpgradeIcon:SetShown(true)
+        break
+      elseif not equippedItem and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
+        decoration.UpgradeIcon:SetShown(true)
+        break
+      else
+        decoration.UpgradeIcon:SetShown(false)
+      end
+    end
+  end
+end
 ---@return ItemData
 function itemFrame.itemProto:GetItemData()
   if self.staticData then
@@ -277,20 +296,6 @@ function itemFrame.itemProto:SetItemFromData(data)
   decoration:SetReadable(readable)
   decoration:CheckUpdateTooltip(tooltipOwner)
   decoration:SetMatchesSearch(not isFiltered)
-  if not self.staticData then
-    for _, slot in pairs(data.inventorySlots) do
-      local equippedItem = items:GetItemDataFromInventorySlot(slot)
-      if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
-        decoration.UpgradeIcon:SetShown(true)
-        break
-      elseif not equippedItem and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
-        decoration.UpgradeIcon:SetShown(true)
-        break
-      else
-        decoration.UpgradeIcon:SetShown(false)
-      end
-    end
-  end
   self:Unlock()
 
   self.freeSlotName = ""
@@ -301,6 +306,7 @@ function itemFrame.itemProto:SetItemFromData(data)
     events:SendMessage('item/Updated', self, decoration)
   end
   decoration:SetFrameLevel(self.button:GetFrameLevel() - 1)
+  self:UpdateUpgrade()
   self.frame:Show()
   self.button:Show()
 end

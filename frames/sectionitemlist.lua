@@ -130,6 +130,9 @@ function sectionItemListFrame:initSectionItem(frame, elementData)
 
   frame.item.rowButton:SetScript("OnMouseDown", click)
   frame.item.button.button:SetScript("OnMouseDown", click)
+  items:GetItemData({elementData.id}, function(itemData)
+    frame.item:SetStaticItemFromData(itemData[1])
+  end)
   frame.item:SetStaticItemFromData(elementData.data)
 end
 
@@ -178,21 +181,14 @@ function sectionItemListFrame:ShowCategory(category, redraw)
     return
   end
 
-  local itemIDs = {}
-  for id in pairs(itemDataList.itemList) do
-    table.insert(itemIDs, id)
-  end
+  self.content:Wipe()
 
-  items:GetItemData(itemIDs, function(itemData)
-    self.content:Wipe()
-    ---@cast itemData +ItemData[]
-    for _, data in pairs(itemData) do
-      self.content:AddToStart({data = data, category = category})
-    end
-    if not self:IsShown() then
-      self:Show()
-    end
-  end)
+  for id in pairs(itemDataList.itemList) do
+    self.content:AddToStart({id = id, category = category})
+  end
+  if not self:IsShown() then
+    self:Show()
+  end
 end
 
 ---@param parent Frame

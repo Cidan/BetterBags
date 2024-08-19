@@ -315,6 +315,9 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
     self.slots:Draw()
     self.slots:Show()
   end
+  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
+    item:UpdateUpgrade()
+  end
   events:SendMessage('bag/Rendered', self, slotInfo)
 end
 
