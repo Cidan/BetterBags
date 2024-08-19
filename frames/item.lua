@@ -277,16 +277,18 @@ function itemFrame.itemProto:SetItemFromData(data)
   decoration:SetReadable(readable)
   decoration:CheckUpdateTooltip(tooltipOwner)
   decoration:SetMatchesSearch(not isFiltered)
-  for _, slot in pairs(data.inventorySlots) do
-    local equippedItem = items:GetItemDataFromInventorySlot(slot)
-    if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
-      decoration.UpgradeIcon:SetShown(true)
-      break
-    elseif not equippedItem and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
-      decoration.UpgradeIcon:SetShown(true)
-      break
-    else
-      decoration.UpgradeIcon:SetShown(false)
+  if not self.staticData then
+    for _, slot in pairs(data.inventorySlots) do
+      local equippedItem = items:GetItemDataFromInventorySlot(slot)
+      if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
+        decoration.UpgradeIcon:SetShown(true)
+        break
+      elseif not equippedItem and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
+        decoration.UpgradeIcon:SetShown(true)
+        break
+      else
+        decoration.UpgradeIcon:SetShown(false)
+      end
     end
   end
   self:Unlock()
