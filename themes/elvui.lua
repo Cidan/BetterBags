@@ -205,6 +205,7 @@ local theme = {
       E:RegisterCooldown(button.Cooldown, 'bags')
     end
     button.UpgradeIcon:SetTexture(E.Media.Textures.BagUpgradeIcon)
+    button.UpgradeIcon:SetScale(1.2)
     button.backdrop:SetFrameLevel(0)
     itemButtons[buttonName] = button --[[@as ItemButton]]
     return button --[[@as ItemButton]]
