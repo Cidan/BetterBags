@@ -203,9 +203,9 @@ function itemFrame.itemProto:UpdateUpgrade()
   for _, slot in pairs(data.inventorySlots) do
     local equippedItem = items:GetItemDataFromInventorySlot(slot)
 
-    -- If the item is an offhand, the offhand is empty, and the mainhand is a 2H weapon
+    -- If the item is an offhand and the mainhand is a 2H weapon
     -- don't show the upgrade icon.
-    if slot == INVSLOT_OFFHAND and not equippedItem then
+    if slot == INVSLOT_OFFHAND then
       local mainhand = items:GetItemDataFromInventorySlot(INVSLOT_MAINHAND)
       if mainhand and mainhand.itemInfo.itemEquipLoc == "INVTYPE_2HWEAPON" then
         decoration.UpgradeIcon:SetShown(false)
