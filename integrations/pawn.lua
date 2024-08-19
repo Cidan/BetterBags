@@ -60,6 +60,6 @@ function pawn:OnEnable()
   if not PawnIsContainerItemAnUpgrade and not PawnGetItemData then
     return
   end
-  --events:RegisterMessage('bag/Rendered', onBagRendered)
-  --print("BetterBags: Pawn integration enabled.")
+  events:RegisterMessage('bag/Rendered', onBagRendered)
+  print("BetterBags: Pawn integration enabled.")
 end
