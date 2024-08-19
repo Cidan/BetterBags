@@ -192,7 +192,7 @@ end
 function itemFrame.itemProto:UpdateUpgrade()
   local data = self:GetItemData()
   local decoration = themes:GetItemButton(self)
-  if not data.inventorySlots then return end
+  if not data or not data.inventorySlots then return end
   if not self.staticData then
     for _, slot in pairs(data.inventorySlots) do
       local equippedItem = items:GetItemDataFromInventorySlot(slot)
@@ -208,6 +208,7 @@ function itemFrame.itemProto:UpdateUpgrade()
     end
   end
 end
+
 ---@return ItemData
 function itemFrame.itemProto:GetItemData()
   if self.staticData then
