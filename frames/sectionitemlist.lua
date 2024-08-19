@@ -189,16 +189,6 @@ function sectionItemListFrame:ShowCategory(category, redraw)
   if not self:IsShown() then
     self:Show()
   end
---  items:GetItemData(itemIDs, function(itemData)
---    self.content:Wipe()
---    ---@cast itemData +ItemData[]
---    for _, data in pairs(itemData) do
---      self.content:AddToStart({data = data, category = category})
---    end
---    if not self:IsShown() then
---      self:Show()
---    end
---  end)
 end
 
 ---@param parent Frame
