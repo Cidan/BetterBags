@@ -75,6 +75,7 @@ local debug = addon:GetModule('Debug')
 ---@field bagid number
 ---@field slotid number
 ---@field inventoryType number
+---@field inventorySlots number[]
 ---@field slotkey string
 ---@field isItemEmpty boolean
 ---@field kind BagKind
@@ -92,6 +93,7 @@ local itemDataProto = {}
 ---@class (exact) Items: AceModule
 ---@field private slotInfo table<BagKind, SlotInfo>
 ---@field private searchCache table<BagKind, table<string, string>> A table of slotid's to categories.
+---@field private equipmentCache table<number, ItemData>
 ---@field _doingRefresh boolean
 ---@field previousItemGUID table<number, table<number, string>>
 ---@field _newItemTimers table<string, number>
@@ -115,6 +117,7 @@ function items:OnInitialize()
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
   }
+  self.equipmentCache = {}
 end
 
 function items:OnEnable()
@@ -381,12 +384,18 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@param dataCache table<string, ItemData>
-function items:LoadItems(ctx, kind, dataCache)
+---@param equipmentCache? table<number, ItemData>
+function items:LoadItems(ctx, kind, dataCache, equipmentCache)
   -- Wipe the data if needed before loading the new data.
   if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
   end
   self:WipeSearchCache(kind)
+
+  if equipmentCache then
+    self.equipmentCache = equipmentCache
+  end
+
   -- Push the new slot info into the slot info table, and the old slot info
   -- to the previous slot info table.
   self.slotInfo[kind]:Update(ctx, dataCache)
@@ -520,7 +529,11 @@ function items:ProcessContainer(ctx, kind, container)
       ctx:Set('wipe', true)
     end
 
-    self:LoadItems(ctx, kind, container:GetDataCache())
+    if kind == const.BAG_KIND.BACKPACK then
+      self:LoadItems(ctx, kind, container:GetDataCache(), container:GetEquipmentDataCache())
+    else
+      self:LoadItems(ctx, kind, container:GetDataCache(), nil)
+    end
 
     local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
@@ -843,6 +856,7 @@ function items:GetEquipmentInfo(itemMixin)
     hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID)
   }
   data.inventoryType = invType --[[@as number]]
+  data.inventorySlots = {itemMixin:GetItemLocation():GetEquipmentSlot()}
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
   data.itemInfo = {
@@ -907,6 +921,7 @@ function items:AttachItemInfo(data, kind)
   bindType = self:GetBindTypeFromLink(itemLink) or bindType  --link overrides itemID if set
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
+  local invType = itemMixin:GetInventoryType()
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
 
@@ -925,6 +940,8 @@ function items:AttachItemInfo(data, kind)
 
   data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)
 
+  data.inventoryType = invType --[[@as number]]
+  data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] and const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] or {0}
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),
@@ -1033,6 +1050,12 @@ end
 ---@return ItemData
 function items:GetItemDataFromSlotKey(slotkey)
   return self.slotInfo[self:GetBagKindFromSlotKey(slotkey)].itemsBySlotKey[slotkey]
+end
+
+---@param slot number
+---@return ItemData?
+function items:GetItemDataFromInventorySlot(slot)
+  return self.equipmentCache[slot]
 end
 
 ---@param cb function

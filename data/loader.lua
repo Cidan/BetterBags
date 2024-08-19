@@ -89,7 +89,7 @@ function ItemLoader:AddInventorySlot(itemMixin)
   itemMixin:ContinueOnItemLoad(function()
     if itemMixin:IsItemDataCached() then
       local data = items:GetEquipmentInfo(itemMixin)
-      self.equipmentData[data.inventoryType] = data
+      self.equipmentData[data.inventorySlots[1]] = data
       self.locations[itemGUID] = nil
     end
   end)
@@ -115,7 +115,12 @@ function ItemLoader:Load(callback)
   end)
 end
 
----@return table<string, ItemData>, table<number, ItemData>
+---@return table<string, ItemData>
 function ItemLoader:GetDataCache()
-  return self.data, self.equipmentData
+  return self.data
+end
+
+---@return table<number, ItemData>
+function ItemLoader:GetEquipmentDataCache()
+  return self.equipmentData
 end
