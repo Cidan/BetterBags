@@ -163,6 +163,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   if self.slotkey ~= nil then
     events:SendMessage('item/Updated', self, decoration)
   end
+  self:UpdateUpgrade()
   self.frame:Show()
   self.button:Show()
 end
