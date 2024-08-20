@@ -109,6 +109,8 @@ end
 ---@param cb fun()
 function async:StableIterate(delta, list, fn, cb)
   local framerate = GetFramerate()
+  -- Just in case :)
+  if framerate == 0 then framerate = 1 end
   local count = math.ceil((#list / (#list / framerate)) * delta)
   self:Batch(count, list, fn, cb)
 end
