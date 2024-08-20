@@ -31,6 +31,9 @@ local L =  addon:GetModule('Localization')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Async: AceModule
+local async = addon:GetModule('Async')
+
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 

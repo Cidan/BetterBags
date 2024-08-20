@@ -115,6 +115,28 @@ function async:StableIterate(delta, list, fn, cb)
   self:Batch(count, list, fn, cb)
 end
 
+-- Chain will call each function in the list, one after the other.
+-- The functions will be called one per frame via async:Do()
+---@param ... fun()
+function async:Chain(...)
+  local functions = {...}
+  local index = 1
+  local function executeNext()
+    if index <= #functions then
+      async:Do(
+        function()
+          functions[index]()
+        end,
+        function()
+          index = index + 1
+          executeNext()
+        end
+      )
+    end
+  end
+  executeNext()
+end
+
 -- Until will call function fn until it returns true, once per frame, then call cb.
 -- Do not call async:Yield() in fn, as it will be called automatically.
 ---@param fn fun(): boolean
