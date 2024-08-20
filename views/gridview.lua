@@ -148,7 +148,8 @@ end
 ---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-local function GridView(view, ctx, bag, slotInfo)
+---@param callback fun()
+local function GridView(view, ctx, bag, slotInfo, callback)
   if ctx:GetBool('wipe') then
     view:Wipe()
   end
@@ -174,36 +175,37 @@ local function GridView(view, ctx, bag, slotInfo)
     function()
       -- This works, but breaks because the context is cancelled by the scheduler.
 
-      --debug:StartProfile('Create Button Stage')
-      --local count = 10
-      -----@type ItemData[]
-      --local list = {}
-      --for _, item in pairs(added) do
-      --  table.insert(list, item)
-      --end
-      --for i = 1, #list, count do
-      --  for j = i, math.min(i + count - 1, #list) do
-      --    local item = list[j]
-      --    local updateKey = view:AddButton(item)
-      --    if not updateKey then
-      --      CreateButton(view, item)
-      --    else
-      --      UpdateButton(ctx, view, updateKey)
-      --    end
-      --  end
-      --  async:Yield()
-      --end
-
+      debug:StartProfile('Create Button Stage')
+      local count = 10
+      ---@type ItemData[]
+      local list = {}
       for _, item in pairs(added) do
-        local updateKey = view:AddButton(item)
-        if not updateKey then
-          debug:StartProfile('Create Button Stage')
-          CreateButton(view, item)
-          debug:EndProfile('Create Button Stage')
-        else
-          UpdateButton(ctx, view, updateKey)
-        end
+        table.insert(list, item)
       end
+      for i = 1, #list, count do
+        for j = i, math.min(i + count - 1, #list) do
+          local item = list[j]
+          local updateKey = view:AddButton(item)
+          if not updateKey then
+            CreateButton(view, item)
+          else
+            UpdateButton(ctx, view, updateKey)
+          end
+        end
+        async:Yield()
+      end
+      debug:EndProfile('Create Button Stage')
+
+      --for _, item in pairs(added) do
+      --  local updateKey = view:AddButton(item)
+      --  if not updateKey then
+      --    debug:StartProfile('Create Button Stage')
+      --    CreateButton(view, item)
+      --    debug:EndProfile('Create Button Stage')
+      --  else
+      --    UpdateButton(ctx, view, updateKey)
+      --  end
+      --end
     end,
     function()
       for _, item in pairs(changed) do
@@ -339,7 +341,8 @@ local function GridView(view, ctx, bag, slotInfo)
         UpdateViewSize(view)
       end
       view.itemCount = slotInfo.totalItems
-    end
+    end,
+    callback
   )
 end
 

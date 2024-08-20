@@ -287,7 +287,8 @@ end
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param ctx Context
 ---@param slotInfo SlotInfo
-function bagFrame.bagProto:Draw(ctx, slotInfo)
+---@param callback fun()
+function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
   local view = self.views[database:GetBagView(self.kind)]
 
   if view == nil then
@@ -301,22 +302,24 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
   end
 
   debug:StartProfile('Bag Render')
-  view:Render(ctx, self, slotInfo)
-  debug:EndProfile('Bag Render')
-  view:GetContent():Show()
-  self.currentView = view
-  self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-  local text = searchBox:GetText()
-  if text ~= "" and text ~= nil then
-    self:Search(search:Search(text))
-  end
-  self:OnResize()
-  if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
-    self.slots:Draw()
-    self.slots:Show()
-  end
-  events:SendMessage('bag/RedrawIcons', self)
-  events:SendMessage('bag/Rendered', self, slotInfo)
+  view:Render(ctx, self, slotInfo, function()
+    debug:EndProfile('Bag Render')
+    view:GetContent():Show()
+    self.currentView = view
+    self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
+    local text = searchBox:GetText()
+    if text ~= "" and text ~= nil then
+      self:Search(search:Search(text))
+    end
+    self:OnResize()
+    if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
+      self.slots:Draw()
+      self.slots:Show()
+    end
+    events:SendMessage('bag/RedrawIcons', self)
+    events:SendMessage('bag/Rendered', self, slotInfo)
+    callback()
+  end)
 end
 
 function bagFrame.bagProto:KeepBagInBounds()
