@@ -465,6 +465,16 @@ function DB:GetTheme()
   return DB.data.profile.theme
 end
 
+---@return string
+function DB:GetUpgradeIconProvider()
+  return DB.data.profile.upgradeIconProvider
+end
+
+---@param value string
+function DB:SetUpgradeIconProvider(value)
+  DB.data.profile.upgradeIconProvider = value
+end
+
 ---@param kind BagKind
 ---@return boolean
 function DB:GetShowAllFreeSpace(kind)

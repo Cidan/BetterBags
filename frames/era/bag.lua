@@ -332,5 +332,12 @@ function bagFrame:Create(kind)
     themes:SetSearchState(b.frame, shown)
   end)
 
+  events:RegisterMessage('bag/RedrawIcons', function()
+    if not b.currentView then return end
+    for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
+      item:UpdateUpgrade()
+    end
+  end)
+
   return b
 end

@@ -189,13 +189,18 @@ function itemFrame.itemProto:UpdateCount()
   SetItemButtonCount(decoration, count)
 end
 
-function itemFrame.itemProto:UpdateUpgrade()
+function itemFrame.itemProto:UpdateUpgrade()    
   local data = self:GetItemData()
   local decoration = themes:GetItemButton(self)
   if not data or not data.inventorySlots then return end
   if self.staticData then return end
 
   if not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
+    decoration.UpgradeIcon:SetShown(false)
+    return
+  end
+
+  if database:GetUpgradeIconProvider() == "None" then
     decoration.UpgradeIcon:SetShown(false)
     return
   end
@@ -207,7 +212,7 @@ function itemFrame.itemProto:UpdateUpgrade()
     -- don't show the upgrade icon.
     if slot == INVSLOT_OFFHAND then
       local mainhand = items:GetItemDataFromInventorySlot(INVSLOT_MAINHAND)
-      if mainhand and mainhand.itemInfo.itemEquipLoc == "INVTYPE_2HWEAPON" then
+      if mainhand and (mainhand.itemInfo.itemEquipLoc == "INVTYPE_2HWEAPON" or mainhand.itemInfo.itemEquipLoc == "INVTYPE_RANGED") then
         decoration.UpgradeIcon:SetShown(false)
         break
       end
