@@ -189,7 +189,7 @@ function itemFrame.itemProto:UpdateCount()
   SetItemButtonCount(decoration, count)
 end
 
-function itemFrame.itemProto:UpdateUpgrade()    
+function itemFrame.itemProto:UpdateUpgrade()
   local data = self:GetItemData()
   local decoration = themes:GetItemButton(self)
   if not data or not data.inventorySlots then return end
