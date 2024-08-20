@@ -175,7 +175,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     function()
       -- This works, but breaks because the context is cancelled by the scheduler.
 
-      debug:StartProfile('Create Button Stage')
+      debug:StartProfile('Create Button Stage %d', bag.kind)
       local count = 10
       ---@type ItemData[]
       local list = {}
@@ -194,7 +194,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         end
         async:Yield()
       end
-      debug:EndProfile('Create Button Stage')
+      debug:EndProfile('Create Button Stage %d', bag.kind)
 
       --for _, item in pairs(added) do
       --  local updateKey = view:AddButton(item)
@@ -231,7 +231,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       end
     end,
     function()
-      debug:StartProfile('Section Draw Stage')
+      debug:StartProfile('Section Draw Stage %d', bag.kind)
       if not slotInfo.deferDelete then
         local dirtySections = view:GetDirtySections()
         for sectionName in pairs(dirtySections) do
@@ -266,7 +266,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
           table.insert(hiddenCells, section)
         end
       end
-      debug:EndProfile('Section Draw Stage')
+      debug:EndProfile('Section Draw Stage %d', bag.kind)
     end,
     function()
       -- Get the free slots section and add the free slots to it.
@@ -304,7 +304,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       -- Sort the sections.
       view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
       if not slotInfo.deferDelete then
-        debug:StartProfile('Content Draw Stage')
+        debug:StartProfile('Content Draw Stage %d', bag.kind)
         local w, h = view.content:Draw({
           cells = view.content.cells,
           maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
@@ -316,7 +316,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         for _, section in pairs(view.sections) do
           debug:WalkAndFixAnchorGraph(section.frame)
         end
-        debug:EndProfile('Content Draw Stage')
+        debug:EndProfile('Content Draw Stage %d', bag.kind)
         -- Reposition the content frame if the recent items section is empty.
         if w < 160 then
           w = 220

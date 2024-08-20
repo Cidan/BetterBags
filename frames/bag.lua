@@ -301,9 +301,9 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     self.currentView:GetContent():Hide()
   end
 
-  debug:StartProfile('Bag Render')
+  debug:StartProfile('Bag Render %d', self.kind)
   view:Render(ctx, self, slotInfo, function()
-    debug:EndProfile('Bag Render')
+    debug:EndProfile('Bag Render %d', self.kind)
     view:GetContent():Show()
     self.currentView = view
     self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
