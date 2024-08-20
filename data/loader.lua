@@ -28,6 +28,7 @@ local items = addon:GetModule('Items')
 ---@field private kind BagKind
 ---@field private data table<string, ItemData>
 ---@field private equipmentData table<number, ItemData>
+---@field private mixins ItemMixin[]
 local ItemLoader = {}
 
 ---@param kind BagKind
@@ -44,6 +45,7 @@ function items:NewLoader(kind)
   itemLoader.kind = kind
   itemLoader.data = {}
   itemLoader.equipmentData = {}
+  itemLoader.mixins = {}
   self.loaders[itemLoader.id] = itemLoader
   self.loadCount = self.loadCount + 1
   return itemLoader
@@ -51,6 +53,30 @@ end
 
 ---@param itemMixin ItemMixin
 function ItemLoader:Add(itemMixin)
+  local itemLocation = itemMixin:GetItemLocation()
+  if itemLocation == nil then return end
+
+  table.insert(self.mixins, itemMixin)
+end
+
+---@param itemMixin ItemMixin
+function ItemLoader:AddInventorySlot(itemMixin)
+ if itemMixin:IsItemEmpty() then return end
+  local itemGUID = itemMixin:GetItemGUID()
+  if itemGUID == nil then return end
+  self.locations[itemGUID] = itemMixin
+
+  itemMixin:ContinueOnItemLoad(function()
+    if itemMixin:IsItemDataCached() then
+      local data = items:GetEquipmentInfo(itemMixin)
+      self.equipmentData[data.inventorySlots[1]] = data
+      self.locations[itemGUID] = nil
+    end
+  end)
+end
+
+---@param itemMixin ItemMixin
+function ItemLoader:ProcessMixin(itemMixin)
   local itemLocation = itemMixin:GetItemLocation()
   if itemLocation == nil then return end
 
@@ -79,39 +105,28 @@ function ItemLoader:Add(itemMixin)
   end)
 end
 
----@param itemMixin ItemMixin
-function ItemLoader:AddInventorySlot(itemMixin)
- if itemMixin:IsItemEmpty() then return end
-  local itemGUID = itemMixin:GetItemGUID()
-  if itemGUID == nil then return end
-  self.locations[itemGUID] = itemMixin
-
-  itemMixin:ContinueOnItemLoad(function()
-    if itemMixin:IsItemDataCached() then
-      local data = items:GetEquipmentInfo(itemMixin)
-      self.equipmentData[data.inventorySlots[1]] = data
-      self.locations[itemGUID] = nil
-    end
-  end)
-end
-
 function ItemLoader:Load(callback)
-  async:Until(function()
-    for itemGUID, location in pairs(self.locations) do
-      local l = location:GetItemLocation()
-      if l == nil or (l.IsValid and not l:IsValid()) then
-        self.locations[itemGUID] = nil
-      else
-        C_Item.RequestLoadItemData(l)
-      end
-    end
-    if next(self.locations) == nil then
-      items.loaders[self.id] = nil
-      return true
-    end
-    return false
+  async:Batch(#self.mixins / 2, self.mixins, function(itemMixin, _)
+    self:ProcessMixin(itemMixin)
   end, function()
-    callback()
+    async:Until(function()
+      for itemGUID, location in pairs(self.locations) do
+        local l = location:GetItemLocation()
+        if l == nil or (l.IsValid and not l:IsValid()) then
+          self.locations[itemGUID] = nil
+        else
+          C_Item.RequestLoadItemData(l)
+        end
+      end
+      if next(self.locations) == nil then
+        items.loaders[self.id] = nil
+        wipe(self.mixins)
+        return true
+      end
+      return false
+    end, function()
+      callback()
+    end)
   end)
 end
 
