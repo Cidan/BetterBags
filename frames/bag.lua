@@ -315,9 +315,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo)
     self.slots:Draw()
     self.slots:Show()
   end
-  for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateUpgrade()
-  end
+  events:SendMessage('bag/RedrawIcons', self)
   events:SendMessage('bag/Rendered', self, slotInfo)
 end
 
@@ -684,5 +682,11 @@ function bagFrame:Create(kind)
     themes:SetSearchState(b.frame, shown)
   end)
 
+  events:RegisterMessage('bag/RedrawIcons', function()
+    if not b.currentView then return end
+    for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
+      item:UpdateUpgrade()
+    end
+  end)
   return b
 end

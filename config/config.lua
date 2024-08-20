@@ -110,9 +110,27 @@ function config:GetGeneralOptions()
           DB:SetShowBagButton(value)
         end,
       },
+      upgradeIconProvider = {
+        type = "select",
+        width = "double",
+        order = 3,
+        name = L:G("Upgrade Icon Provider"),
+        desc = L:G("Select the provider for the upgrade icon."),
+        values = {
+          ["None"] = L:G("None"),
+          ["BetterBags"] = L:G("BetterBags"),
+        },
+        get = function()
+          return DB:GetUpgradeIconProvider()
+        end,
+        set = function(_, value)
+          DB:SetUpgradeIconProvider(value)
+          events:SendMessage('bag/RedrawIcons')
+        end,
+      },
       newItemTime = {
         type = "range",
-        order = 3,
+        order = 4,
         name = L:G("New Item Duration"),
         desc = L:G("The time, in minutes, to consider an item a new item."),
         min = 0,

@@ -510,6 +510,7 @@ const.DATABASE_DEFAULTS = {
     inBagSearch = true,
     categorySell = false,
     showKeybindWarning = true,
+    upgradeItemProvider = 'None',
     theme = 'Default',
     showFullSectionNames = {
       [const.BAG_KIND.BACKPACK] = false,

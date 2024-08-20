@@ -46,7 +46,7 @@ function consoleport:OnEnable()
   config.Open = function(me)
     ---@cast me +Config
     if addon.isClassic then
-      InterfaceOptionsFrame_OpenToCategory(me.frame)
+      Settings.OpenToCategory(me.frame)
     else
       Settings.OpenToCategory(me.category)
     end

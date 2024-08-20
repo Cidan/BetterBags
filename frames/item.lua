@@ -189,22 +189,43 @@ function itemFrame.itemProto:UpdateCount()
   SetItemButtonCount(decoration, count)
 end
 
-function itemFrame.itemProto:UpdateUpgrade()
+function itemFrame.itemProto:UpdateUpgrade()    
   local data = self:GetItemData()
   local decoration = themes:GetItemButton(self)
   if not data or not data.inventorySlots then return end
-  if not self.staticData then
-    for _, slot in pairs(data.inventorySlots) do
-      local equippedItem = items:GetItemDataFromInventorySlot(slot)
-      if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
-        decoration.UpgradeIcon:SetShown(true)
-        break
-      elseif not equippedItem and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
-        decoration.UpgradeIcon:SetShown(true)
-        break
-      else
+  if self.staticData then return end
+
+  if not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
+    decoration.UpgradeIcon:SetShown(false)
+    return
+  end
+
+  if database:GetUpgradeIconProvider() == "None" then
+    decoration.UpgradeIcon:SetShown(false)
+    return
+  end
+
+  for _, slot in pairs(data.inventorySlots) do
+    local equippedItem = items:GetItemDataFromInventorySlot(slot)
+
+    -- If the item is an offhand and the mainhand is a 2H weapon
+    -- don't show the upgrade icon.
+    if slot == INVSLOT_OFFHAND then
+      local mainhand = items:GetItemDataFromInventorySlot(INVSLOT_MAINHAND)
+      if mainhand and (mainhand.itemInfo.itemEquipLoc == "INVTYPE_2HWEAPON" or mainhand.itemInfo.itemEquipLoc == "INVTYPE_RANGED") then
         decoration.UpgradeIcon:SetShown(false)
+        break
       end
+    end
+
+    if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
+      decoration.UpgradeIcon:SetShown(true)
+      break
+    elseif not equippedItem and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
+      decoration.UpgradeIcon:SetShown(true)
+      break
+    else
+      decoration.UpgradeIcon:SetShown(false)
     end
   end
 end
