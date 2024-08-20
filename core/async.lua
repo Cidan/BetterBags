@@ -100,6 +100,19 @@ function async:Batch(count, list, fn, cb)
   end, cb)
 end
 
+-- StableIterate will adjust the iteration speed of the list based on the frame rate.
+-- Higher framerates will iterate faster, lower framerates will iterate slower.
+---@generic T
+---@param delta number
+---@param list `T`[]
+---@param fn fun(item: `T`, index: number)
+---@param cb fun()
+function async:StableIterate(delta, list, fn, cb)
+  local framerate = GetFramerate()
+  local count = math.ceil((#list / (#list / framerate)) * delta)
+  self:Batch(count, list, fn, cb)
+end
+
 -- Until will call function fn until it returns true, once per frame, then call cb.
 -- Do not call async:Yield() in fn, as it will be called automatically.
 ---@param fn fun(): boolean
