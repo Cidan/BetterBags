@@ -30,6 +30,9 @@ local L = addon:GetModule('Localization')
 ---@class Binding: AceModule
 local binding = addon:GetModule("Binding")
 
+---@class Async: AceModule
+local async = addon:GetModule('Async')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -386,7 +389,8 @@ end
 ---@param kind BagKind
 ---@param dataCache table<string, ItemData>
 ---@param equipmentCache? table<number, ItemData>
-function items:LoadItems(ctx, kind, dataCache, equipmentCache)
+---@param callback fun()
+function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
   -- Wipe the data if needed before loading the new data.
   if ctx:GetBool('wipe') then
     self:WipeSlotInfo(kind)
@@ -403,8 +407,13 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache)
   self:UpdateFreeSlots(ctx, kind)
   local slotInfo = self.slotInfo[kind]
 
-  -- Loop through all the items in the bag and update slot info properties.
-  for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
+  ---@type ItemData[]
+  local list = {}
+  for _, item in pairs(slotInfo:GetCurrentItems()) do
+    table.insert(list, item)
+  end
+
+  async:Batch(10, list, function (currentItem, _)
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
     local name = ""
@@ -450,8 +459,6 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache)
       search:Remove(currentItem)
       search:Add(currentItem)
     end
-
-
     -- Store empty slot data
     if currentItem.isItemEmpty then
       slotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
@@ -466,35 +473,36 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache)
     local oldCategory = currentItem.itemInfo.category
     currentItem.itemInfo.category = self:GetCategory(currentItem)
     search:UpdateCategoryIndex(currentItem, oldCategory)
-  end
-
-  for _, addedItem in pairs(slotInfo.addedItems) do
-    for _, removedItem in pairs(slotInfo.removedItems) do
-      if addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
-        self:ClearNewItem(addedItem.slotkey)
+  end, function()
+    for _, addedItem in pairs(slotInfo.addedItems) do
+      for _, removedItem in pairs(slotInfo.removedItems) do
+        if addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
+          self:ClearNewItem(addedItem.slotkey)
+        end
       end
     end
-  end
 
-  -- Set the defer delete flag if the total items count has decreased.
-  if slotInfo.totalItems < slotInfo.previousTotalItems then
-    slotInfo.deferDelete = true
-  end
+    -- Set the defer delete flag if the total items count has decreased.
+    if slotInfo.totalItems < slotInfo.previousTotalItems then
+      slotInfo.deferDelete = true
+    end
 
-  -- Refresh the search cache.
-  self:RefreshSearchCache(kind)
+    -- Refresh the search cache.
+    self:RefreshSearchCache(kind)
 
-  -- Get the categories for each item.
-  for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
-    local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
-    if newCategory then
-      local oldCategory = currentItem.itemInfo.category
-      if oldCategory ~= L:G("Recent Items") then
-        currentItem.itemInfo.category = newCategory
-        search:UpdateCategoryIndex(currentItem, oldCategory)
+    -- Get the categories for each item.
+    for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
+      local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
+      if newCategory then
+        local oldCategory = currentItem.itemInfo.category
+        if oldCategory ~= L:G("Recent Items") then
+          currentItem.itemInfo.category = newCategory
+          search:UpdateCategoryIndex(currentItem, oldCategory)
+        end
       end
     end
-  end
+    callback()
+  end)
 end
 
 ---@param kind BagKind
@@ -538,18 +546,14 @@ function items:ProcessContainer(ctx, kind, container)
       ctx:Set('wipe', true)
     end
 
-    if kind == const.BAG_KIND.BACKPACK then
-      self:LoadItems(ctx, kind, container:GetDataCache(), container:GetEquipmentDataCache())
-    else
-      self:LoadItems(ctx, kind, container:GetDataCache(), nil)
-    end
+    self:LoadItems(ctx, kind, container:GetDataCache(), const.BAG_KIND.BACKPACK and container:GetEquipmentDataCache() or nil, function()
+      local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-    local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
-
-    events:SendMessageLater(ev, nil, ctx, self.slotInfo[kind])
-    if kind == const.BAG_KIND.BACKPACK then
-      debug:EndProfile('Backpack Data Pipeline')
-    end
+      events:SendMessageLater(ev, nil, ctx, self.slotInfo[kind])
+      if kind == const.BAG_KIND.BACKPACK then
+        debug:EndProfile('Backpack Data Pipeline')
+      end
+    end)
   end)
 end
 
