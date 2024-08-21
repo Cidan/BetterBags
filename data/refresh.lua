@@ -85,6 +85,7 @@ function refresh:StartUpdate()
 
   if sortBackpack then
     self.isUpdateRunning = false
+    debug:Log('Sort', 'Sorting backpack')
     items:RemoveNewItemFromAllItems()
     C_Container:SortBags()
     return
