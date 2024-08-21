@@ -106,7 +106,7 @@ function ItemLoader:ProcessMixin(itemMixin)
 end
 
 function ItemLoader:Load(callback)
-  async:StableIterate(0.5, self.mixins, function(itemMixin, _)
+  async:Batch(10, self.mixins, function(itemMixin, _)
     self:ProcessMixin(itemMixin)
   end, function()
     async:Until(function()
