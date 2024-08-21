@@ -176,12 +176,13 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       -- This works, but breaks because the context is cancelled by the scheduler.
 
       debug:StartProfile('Create Button Stage %d', bag.kind)
-      local count = 10
       ---@type ItemData[]
       local list = {}
       for _, item in pairs(added) do
         table.insert(list, item)
       end
+      local count = 10
+      debug:Log("Item Add Batch", "Batching", count, "items")
       for i = 1, #list, count do
         for j = i, math.min(i + count - 1, #list) do
           local item = list[j]
@@ -300,6 +301,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         end
         freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
       end
+    end,
+    function()
       view.content.maxCellWidth = sizeInfo.columnCount
       -- Sort the sections.
       view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
