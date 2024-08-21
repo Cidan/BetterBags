@@ -150,6 +150,7 @@ function items:RemoveNewItemFromAllItems()
     if C_NewItems.IsNewItem(item.bagid, item.slotid) then
       C_NewItems.RemoveNewItem(item.bagid, item.slotid)
     end
+    item.itemInfo.isNewItem = false
   end
   wipe(self._newItemTimers)
 end
@@ -467,6 +468,14 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache)
     search:UpdateCategoryIndex(currentItem, oldCategory)
   end
 
+  for _, addedItem in pairs(slotInfo.addedItems) do
+    for _, removedItem in pairs(slotInfo.removedItems) do
+      if addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
+        self:ClearNewItem(addedItem.slotkey)
+      end
+    end
+  end
+
   -- Set the defer delete flag if the total items count has decreased.
   if slotInfo.totalItems < slotInfo.previousTotalItems then
     slotInfo.deferDelete = true
@@ -596,8 +605,9 @@ function items:ClearNewItem(slotkey)
   local data = self:GetItemDataFromSlotKey(slotkey)
   if data.isItemEmpty then return end
   C_NewItems.RemoveNewItem(data.bagid, data.slotid)
-  data.itemInfo.category = self:GetCategory(data)
+  data.itemInfo.isNewItem = false
   self._newItemTimers[data.itemInfo.itemGUID] = nil
+  data.itemInfo.category = self:GetCategory(data)
 end
 
 function items:ClearNewItems()

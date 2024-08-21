@@ -70,8 +70,8 @@ end
 --- Each will call function fn for each item in list, one call per frame.
 --- Do not call async:Yield() in fn, as it will be called automatically.
 ---@generic T
----@param list `T`[]
----@param fn fun(item: `T`, index: number)
+---@param list T[]
+---@param fn fun(item: T, index: number)
 ---@param cb fun()
 function async:Each(list, fn, cb)
   self:Do(function()
@@ -86,8 +86,8 @@ end
 -- Do not call async:Yield() in fn, as it will be called automatically.
 ---@generic T
 ---@param count number
----@param list `T`[]
----@param fn fun(item: `T`, index: number)
+---@param list T[]
+---@param fn fun(item: T, index: number)
 ---@param cb fun()
 function async:Batch(count, list, fn, cb)
   self:Do(function()
@@ -100,12 +100,45 @@ function async:Batch(count, list, fn, cb)
   end, cb)
 end
 
+-- Batch will call function fn for each item in list, with a batch size of count per frame.
+-- You must call async:Yield() in fn, as it will not be called automatically.
+---@generic T
+---@param count number
+---@param list T[]
+---@param fn fun(item: T, index: number)
+---@param cb fun()
+function async:BatchNoYield(count, list, fn, cb)
+  self:Do(function()
+    for i = 1, #list, count do
+      for j = i, math.min(i + count - 1, #list) do
+        fn(list[j], j)
+      end
+    end
+  end, cb)
+end
+
+-- RawBatch will call function fn for each item in list, with a batch size of count per frame.
+-- Yield is called for you, but not inside of a Do function, for each batch. You must call this
+-- from a coroutine.
+---@generic T
+---@param count number
+---@param list T[]
+---@param fn fun(item: T, index: number)
+function async:RawBatch(count, list, fn)
+  for i = 1, #list, count do
+    for j = i, math.min(i + count - 1, #list) do
+      fn(list[j], j)
+    end
+   async:Yield()
+  end
+end
+
 -- StableIterate will adjust the iteration speed of the list based on the frame rate.
 -- Higher framerates will iterate faster, lower framerates will iterate slower.
 ---@generic T
 ---@param delta number
----@param list `T`[]
----@param fn fun(item: `T`, index: number)
+---@param list T[]
+---@param fn fun(item: T, index: number)
 ---@param cb fun()
 function async:StableIterate(delta, list, fn, cb)
   local framerate = GetFramerate()

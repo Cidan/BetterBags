@@ -173,8 +173,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       end
     end,
     function()
-      -- This works, but breaks because the context is cancelled by the scheduler.
-
+      -- TODO(lobato): Abstract this code into a function. 
       debug:StartProfile('Create Button Stage %d', bag.kind)
       ---@type ItemData[]
       local list = {}
@@ -183,9 +182,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       end
       local count = 10
       debug:Log("Item Add Batch", "Batching", count, "items")
-      for i = 1, #list, count do
-        for j = i, math.min(i + count - 1, #list) do
-          local item = list[j]
+      async:RawBatch(
+        count,
+        list,
+        function(item, _)
           local updateKey = view:AddButton(item)
           if not updateKey then
             CreateButton(view, item)
@@ -193,20 +193,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
             UpdateButton(ctx, view, updateKey)
           end
         end
-        async:Yield()
-      end
+      )
       debug:EndProfile('Create Button Stage %d', bag.kind)
-
-      --for _, item in pairs(added) do
-      --  local updateKey = view:AddButton(item)
-      --  if not updateKey then
-      --    debug:StartProfile('Create Button Stage')
-      --    CreateButton(view, item)
-      --    debug:EndProfile('Create Button Stage')
-      --  else
-      --    UpdateButton(ctx, view, updateKey)
-      --  end
-      --end
     end,
     function()
       for _, item in pairs(changed) do
