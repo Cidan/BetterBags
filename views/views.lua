@@ -59,10 +59,12 @@ end
 ---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-function views.viewProto:Render(ctx, bag, slotInfo)
+---@param callback fun()
+function views.viewProto:Render(ctx, bag, slotInfo, callback)
   _ = ctx
   _ = bag
   _ = slotInfo
+  _ = callback
   error('Render method not implemented')
 end
 

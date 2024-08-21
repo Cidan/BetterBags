@@ -141,7 +141,8 @@ end
 ---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
-local function BagView(view, ctx, bag, slotInfo)
+---@param callback fun()
+local function BagView(view, ctx, bag, slotInfo, callback)
   if ctx:GetBool('wipe') then
     view:Wipe()
   end
@@ -239,6 +240,7 @@ local function BagView(view, ctx, bag, slotInfo)
   const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
   bag.frame:SetHeight(bagHeight)
   UpdateViewSize(view)
+  callback()
 end
 
 ---@param parent Frame
