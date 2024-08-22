@@ -85,7 +85,8 @@ function searchBox.searchProto:SetShown(shown)
   end
 end
 
-function searchBox.searchProto:UpdateSearch()
+---@param ctx Context
+function searchBox.searchProto:UpdateSearch(ctx)
   local text = self.textBox:GetText()
   if text == "" then
     if self.helpTextFadeIn then
@@ -114,31 +115,31 @@ function searchBox.searchProto:UpdateSearch()
   if self.kind ~= nil then
     if self.kind == const.BAG_KIND.BACKPACK then
       if text == "" then
-        addon.Bags.Backpack:ResetSearch()
+        addon.Bags.Backpack:ResetSearch(ctx)
       else
         local results = search:Search(text)
-        addon.Bags.Backpack:Search(results)
+        addon.Bags.Backpack:Search(ctx, results)
       end
     else
       if text == "" then
-        addon.Bags.Bank:ResetSearch()
+        addon.Bags.Bank:ResetSearch(ctx)
       else
         local results = search:Search(text)
-        addon.Bags.Bank:Search(results)
+        addon.Bags.Bank:Search(ctx, results)
       end
     end
   else
     if text == "" then
       self.enterLabelFadeOut:Play()
-      addon.Bags.Backpack:ResetSearch()
-      addon.Bags.Bank:ResetSearch()
+      addon.Bags.Backpack:ResetSearch(ctx)
+      addon.Bags.Bank:ResetSearch(ctx)
     else
       if not self.enterLabel:IsShown() then
         self.enterLabelFadeIn:Play()
       end
       local results = search:Search(text)
-      addon.Bags.Backpack:Search(results)
-      addon.Bags.Bank:Search(results)
+      addon.Bags.Backpack:Search(ctx, results)
+      addon.Bags.Bank:Search(ctx, results)
     end
   end
 end
@@ -183,8 +184,8 @@ function searchBox:Create(parent)
     sf:Toggle()
   end)
 
-  textBox:SetScript("OnTextChanged", function()
-    sf:UpdateSearch()
+  addon.SetScript(textBox, "OnTextChanged", function(ctx)
+    sf:UpdateSearch(ctx)
   end)
 
   textBox:SetScript("OnEnterPressed", function()
@@ -241,8 +242,8 @@ function searchBox:CreateBox(kind, parent)
     ---@cast me +EditBox
     me:ClearFocus()
   end)
-  textBox:SetScript("OnTextChanged", function()
-    sf:UpdateSearch()
+  addon.SetScript(textBox, "OnTextChanged", function(ctx)
+    sf:UpdateSearch(ctx)
   end)
 
   textBox:SetScript("OnEnterPressed", function()

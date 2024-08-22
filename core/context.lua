@@ -11,11 +11,15 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local context = addon:NewModule('Context')
 
 -- New creates a new context object.
+---@param event? string
 ---@return Context
-function context:New()
+function context:New(event)
   local obj = setmetatable({}, {__index = self})
   obj.keys = {}
   obj.done = false
+  if event ~= nil then
+    obj:Set('event', event)
+  end
   return obj
 end
 
@@ -56,6 +60,11 @@ function context:IsTrue(key)
     error("context has been cancelled")
   end
   return self.keys[key] == true
+end
+
+-- IsCancelled checks if the context has been cancelled.
+function context:IsCancelled()
+  return self.done
 end
 
 -- GetBool gets a boolean value from the context.
