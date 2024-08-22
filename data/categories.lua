@@ -109,13 +109,16 @@ function categories:GetMergedCategory(name)
   return results
 end
 
-function categories:AddPermanentItemToCategory(id, category)
+---@param ctx Context
+---@param id number The ItemID of the item to add to the category.
+---@param category string The name of the custom category to add the item to.
+function categories:AddPermanentItemToCategory(ctx, id, category)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
 
   if not database:ItemCategoryExists(category) then
-    self:CreateCategory({
+    self:CreateCategory(ctx, {
       name = category,
       itemList = {},
       save = true,
@@ -132,16 +135,17 @@ function categories:AddPermanentItemToCategory(id, category)
 end
 
 -- AddItemToCategory adds an item to a custom category.
+---@param ctx Context
 ---@param id number The ItemID of the item to add to the category.
 ---@param category string The name of the custom category to add the item to.
-function categories:AddItemToCategory(id, category)
+function categories:AddItemToCategory(ctx, id, category)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
 
   -- Backwards compatability for the old way of adding items to categories.
   if not self.ephemeralCategories[category] then
-    self:CreateCategory({
+    self:CreateCategory(ctx, {
       name = category,
       itemList = {},
     })
@@ -164,8 +168,9 @@ function categories:AddItemToCategory(id, category)
 end
 
 -- WipeCategory removes all items from a custom category, but does not delete the category.
+---@param ctx Context
 ---@param category string The name of the custom category to wipe.
-function categories:WipeCategory(category)
+function categories:WipeCategory(ctx, category)
   database:WipeItemCategory(category)
   if self.ephemeralCategories[category] then
     for id, _ in pairs(self.ephemeralCategories[category].itemList) do
@@ -173,7 +178,7 @@ function categories:WipeCategory(category)
     end
     wipe(self.ephemeralCategories[category].itemList)
   end
-  events:SendMessage('categories/Changed')
+  events:SendMessage('categories/Changed', ctx)
 end
 
 -- IsCategoryEnabled returns whether or not a custom category is enabled.
@@ -261,8 +266,9 @@ function categories:SetCategoryState(kind, category, enabled)
   end
 end
 
+---@param ctx Context
 ---@param category CustomCategoryFilter
-function categories:CreateCategory(category)
+function categories:CreateCategory(ctx, category)
   category.enabled = category.enabled or {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
@@ -282,7 +288,7 @@ function categories:CreateCategory(category)
     end
     database:CreateOrUpdateCategory(category)
   end
-  events:SendMessage('categories/Changed')
+  events:SendMessage('categories/Changed', ctx)
 end
 
 ---@param name string
@@ -324,7 +330,9 @@ function categories:GetSortedSearchCategories()
   return results
 end
 
-function categories:DeleteCategory(category)
+---@param ctx Context
+---@param category string
+function categories:DeleteCategory(ctx, category)
   if self.ephemeralCategories[category] then
     for id, _ in pairs(self.ephemeralCategories[category].itemList) do
       self.ephemeralCategoryByItemID[id] = nil
@@ -333,20 +341,22 @@ function categories:DeleteCategory(category)
   end
 
   database:DeleteItemCategory(category)
-  events:SendMessage('categories/Changed')
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('categories/Changed', ctx)
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
+---@param ctx Context
 ---@param category string
-function categories:HideCategory(category)
+function categories:HideCategory(ctx, category)
   database:GetCategoryOptions(category).shown = false
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
+---@param ctx Context
 ---@param category string
-function categories:ShowCategory(category)
+function categories:ShowCategory(ctx, category)
   database:GetCategoryOptions(category).shown = true
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
 ---@param category string
@@ -361,20 +371,22 @@ function categories:IsDynamicCategory(category)
   return self.ephemeralCategories[category] and self.ephemeralCategories[category].dynamic or false
 end
 
+---@param ctx Context
 ---@param category string
-function categories:ToggleCategoryShown(category)
+function categories:ToggleCategoryShown(ctx, category)
   local options = database:GetCategoryOptions(category)
   options.shown = not options.shown
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.
+---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
 ---@return string|nil
-function categories:GetCustomCategory(kind, data)
+function categories:GetCustomCategory(ctx, kind, data)
   local itemID = data.itemInfo.itemID
   if not itemID then return nil end
   local filter = database:GetItemCategoryByItemID(itemID)
@@ -398,10 +410,10 @@ function categories:GetCustomCategory(kind, data)
     if success and args ~= nil then
       local category = select(1, args) --[[@as string]]
       local found = self.ephemeralCategories[category] and true or false
-      self:AddItemToCategory(itemID, category)
+      self:AddItemToCategory(ctx, itemID, category)
       if not found then
         self.categoryCount = self.categoryCount + 1
-        events:SendMessage('categories/Changed')
+        events:SendMessage('categories/Changed', ctx)
       end
       if self:IsCategoryEnabled(kind, category) then
         return category
@@ -439,7 +451,8 @@ end
 -- and rerendered. This is a very expensive operation to call and should only be called once all,
 -- category functions have been registered or if some configuration changes and all items should be
 -- reprocessed and re-categorized.
-function categories:ReprocessAllItems()
+---@param ctx Context
+function categories:ReprocessAllItems(ctx)
   wipe(self.itemsWithNoCategory)
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end

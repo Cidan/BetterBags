@@ -114,3 +114,25 @@ function context:Copy()
   end
   return newContext
 end
+
+---@param obj any
+---@param script string
+---@param func fun(ctx: Context, ...)
+function addon.HookScript(obj, script, func)
+  obj:HookScript(script, function(...)
+    local ctx = context:New()
+    ctx:Set('event', script)
+    func(ctx, unpack(...))
+  end)
+end
+
+---@param obj any
+---@param script string
+---@param func fun(ctx: Context, ...)
+function addon.SetScript(obj, script, func)
+  obj:SetScript(script, function(...)
+    local ctx = context:New()
+    ctx:Set('event', script)
+    func(ctx, unpack(...))
+  end)
+end

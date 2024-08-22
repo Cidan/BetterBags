@@ -71,8 +71,9 @@ function itemFrame.itemProto:SetSize(width, height)
   decoration.IconTexture:SetSize(width, height)
 end
 
+---@param ctx Context
 ---@param data ItemData
-function itemFrame.itemProto:SetItemFromData(data)
+function itemFrame.itemProto:SetItemFromData(ctx, data)
   assert(data, 'data must be provided')
   self.slotkey = data.slotkey
   local decoration = themes:GetItemButton(self)
@@ -161,7 +162,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.isFreeSlot = nil
   self:SetAlpha(1)
   if self.slotkey ~= nil then
-    events:SendMessage('item/Updated', self, decoration)
+    events:SendMessage('item/Updated', ctx, self, decoration)
   end
   self:UpdateUpgrade()
   self.frame:Show()
@@ -169,10 +170,11 @@ function itemFrame.itemProto:SetItemFromData(data)
 end
 
 -- SetFreeSlots will set the item button to a free slot.
+---@param ctx Context
 ---@param bagid number
 ---@param slotid number
 ---@param count number
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count)
+function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count)
   local decoration = themes:GetItemButton(self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
@@ -215,15 +217,15 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count)
 
   decoration.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
-  events:SendMessage('item/Updated', self, decoration)
+  events:SendMessage('item/Updated', ctx, self, decoration)
   self.frame:Show()
   self.button:Show()
 end
 
-
-function itemFrame.itemProto:ClearItem()
+---@param ctx Context
+function itemFrame.itemProto:ClearItem(ctx)
   local decoration = themes:GetItemButton(self)
-  events:SendMessage('item/Clearing', self, decoration)
+  events:SendMessage('item/Clearing', ctx, self, decoration)
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)

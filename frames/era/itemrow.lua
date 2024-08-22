@@ -25,15 +25,16 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class ItemRowFrame: AceModule
 local item = addon:GetModule('ItemRowFrame')
 
+---@param ctx Context
 ---@param data ItemData
 ---@param static? boolean
-function item.itemRowProto:SetItemFromData(data, static)
+function item.itemRowProto:SetItemFromData(ctx, data, static)
   self.slotkey = data.slotkey
   self.button:SetSize(20, 20)
   if static then
-    self.button:SetStaticItemFromData(data)
+    self.button:SetStaticItemFromData(ctx, data)
   else
-    self.button:SetItemFromData(data)
+    self.button:SetItemFromData(ctx, data)
   end
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
@@ -66,7 +67,7 @@ function item.itemRowProto:SetItemFromData(data, static)
   end)
 
   if self.slotkey ~= nil then
-    events:SendMessage('item/UpdatedRow', self)
+    events:SendMessage('item/UpdatedRow', ctx, self)
   end
   self.frame:Show()
   self.rowButton:Show()

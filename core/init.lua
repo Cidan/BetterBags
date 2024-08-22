@@ -78,6 +78,9 @@ local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -91,7 +94,9 @@ addon.atWarbank = false
 
 -- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
 function BetterBags_ToggleBags()
-  addon:ToggleAllBags()
+  local ctx = context:New()
+  ctx:Set('event', 'BetterBags_ToggleBags')
+  addon:ToggleAllBags(ctx)
 end
 
 local function CheckKeyBindings()
@@ -147,9 +152,9 @@ function addon:OnInitialize()
   end
 
   for _, button in pairs(addon._buttons) do
-    button:HookScript("OnClick",
-    function()
-      addon:ToggleAllBags()
+    addon.HookScript(button, "OnClick",
+    function(ctx)
+      addon:ToggleAllBags(ctx)
     end)
   end
 end
@@ -181,7 +186,9 @@ function addon:HideBlizzardBags()
   end
 
   MainMenuBarBackpackButton:SetScript("OnClick", function()
-    self:ToggleAllBags()
+    local ctx = context:New()
+    ctx:Set('event', 'MainMenuBarBackpackButton_OnClick')
+    self:ToggleAllBags(ctx)
   end)
 
   BagBarExpandToggle:SetParent(sneakyFrame)
@@ -241,8 +248,10 @@ function addon:OnEnable()
   async:Enable()
 
   self:HideBlizzardBags()
-  addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
-  addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
+  local rootctx = context:New()
+  rootctx:Set('event', 'addon_enable')
+  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+  addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
 
   -- Apply themes globally -- do not instantiate new windows after this call.
   themes:Enable()

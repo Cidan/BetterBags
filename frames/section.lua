@@ -234,8 +234,9 @@ function sectionFrame:_DoReset(f)
   f:Wipe()
 end
 
+---@param ctx Context
 ---@param section Section
-function sectionFrame:OnTitleClickOrDrop(section)
+function sectionFrame:OnTitleClickOrDrop(ctx, section)
   if not CursorHasItem() then return end
   if not IsShiftKeyDown() then return end
   local cursorType, itemID = GetCursorInfo()
@@ -243,9 +244,9 @@ function sectionFrame:OnTitleClickOrDrop(section)
   ---@cast itemID number
   if cursorType ~= "item" then return end
   local category = section.title:GetText()
-  categories:AddPermanentItemToCategory(itemID, category)
+  categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
 ---@param section Section
@@ -351,18 +352,18 @@ function sectionFrame:_DoCreate()
 
   title:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-  title:SetScript("OnClick", function(_, e)
+  addon.SetScript(title, "OnClick", function(ctx, _, e)
     if s.headerDisabled then return end
     if e == "RightButton" then
       sectionFrame:OnTitleRightClick(s)
     elseif e == "LeftButton" then
-      sectionFrame:OnTitleClickOrDrop(s)
+      sectionFrame:OnTitleClickOrDrop(ctx, s)
     end
   end)
 
-  title:SetScript("OnReceiveDrag", function()
+  addon.SetScript(title, "OnReceiveDrag", function(ctx)
     if s.headerDisabled then return end
-    sectionFrame:OnTitleClickOrDrop(s)
+    sectionFrame:OnTitleClickOrDrop(ctx, s)
   end)
 
   s.title = title

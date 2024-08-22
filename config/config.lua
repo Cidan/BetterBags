@@ -13,6 +13,9 @@ local DB = addon:GetModule('Database')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class HelpText
 ---@field title string
 ---@field text string
@@ -27,9 +30,6 @@ local config = addon:NewModule('Config')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
-
-
-local GUI = LibStub('AceGUI-3.0')
 
 ---@param info table
 ---@return any, string, string
@@ -125,7 +125,9 @@ function config:GetGeneralOptions()
         end,
         set = function(_, value)
           DB:SetUpgradeIconProvider(value)
-          events:SendMessage('bag/RedrawIcons')
+          local ctx = context:New()
+          ctx:Set('event', 'on_click')
+          events:SendMessage('bag/RedrawIcons', ctx)
         end,
       },
       newItemTime = {
@@ -210,13 +212,14 @@ end
 
 function config:Open()
   LibStub("AceConfigDialog-3.0"):Open(addonName)
-  events:SendMessage('config/Opened')
+  local ctx = context:New()
+  ctx:Set('event', 'on_click')
+  events:SendMessage('config/Opened', ctx)
 end
 
 function config:OnEnable()
   self.helpText = {}
   self:CreateAllHelp()
-  GUI:RegisterWidgetType("ItemList", config.CreateItemListWidget, 1)
   LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
   self.frame, self.category = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
   LibStub("AceConfigDialog-3.0"):SetDefaultSize(addonName, 700, 800)
@@ -241,7 +244,9 @@ function config:OnEnable()
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()
     DB:SetDebugMode(not DB:GetDebugMode())
-    events:SendMessage('config/DebugMode', DB:GetDebugMode())
+    local ctx = context:New()
+    ctx:Set('event', 'on_click')
+    events:SendMessage('config/DebugMode', ctx, DB:GetDebugMode())
   end)
 end
 

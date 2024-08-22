@@ -34,13 +34,14 @@ core\boot.lua
 
 animations\fade.lua
 
+core\context.lua
+
 debug\debug.lua
 debug\frames.lua
 debug\profile.lua
 debug\items.lua
 debug\analytics.lua
 
-core\context.lua
 core\events.lua
 core\localization.lua
 core\translations.lua
@@ -109,7 +110,6 @@ themes\elvui.lua
 config\config.lua
 config\help.lua
 config\bags.lua
-config\itemlist.lua
 config\customcat.lua
 
 integrations\consoleport.lua

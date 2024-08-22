@@ -19,8 +19,9 @@ local BagButtonFrame = addon:GetModule('BagButton')
 local buttonCount = 0
 
 
+---@param ctx Context
 ---@param bag Enum.BagIndex
-function BagButtonFrame.bagButtonProto:SetBag(bag)
+function BagButtonFrame.bagButtonProto:SetBag(ctx, bag)
   self.bag = bag
   if const.BANK_ONLY_BAGS[bag] then
     self.kind = const.BAG_KIND.BANK
@@ -57,14 +58,15 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
     --self.frame.ItemSlotBackground:Show()
     self.empty = true
   end
-  events:SendMessage('bagbutton/Updated', self)
+  events:SendMessage('bagbutton/Updated', ctx, self)
   --SetItemButtonTexture(self.frame, icon)
   --SetItemButtonQuality(self.frame, GetInventoryItemQuality("player", self.invID))
   --SetItemButtonCount(self.frame, 1)
 end
 
-function BagButtonFrame.bagButtonProto:ClearBag()
-  events:SendMessage('bagbutton/Clearing', self)
+---@param ctx Context
+function BagButtonFrame.bagButtonProto:ClearBag(ctx)
+  events:SendMessage('bagbutton/Clearing', ctx, self)
   self.masqueGroup = nil
   self.invID = nil
   self.bag = nil

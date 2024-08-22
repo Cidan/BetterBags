@@ -198,7 +198,8 @@ function bagFrame.bagProto:Show()
   self.frame:Show()
 end
 
-function bagFrame.bagProto:Hide()
+---@param ctx Context
+function bagFrame.bagProto:Hide(ctx)
   if not self.frame:IsShown() then
     return
   end
@@ -217,13 +218,14 @@ function bagFrame.bagProto:Hide()
   if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
     debug:Log("draw", "Drawing bag on close")
     self.drawOnClose = false
-    self:Refresh()
+    self:Refresh(ctx)
   end
 end
 
-function bagFrame.bagProto:Toggle()
+---@param ctx Context
+function bagFrame.bagProto:Toggle(ctx)
   if self.frame:IsShown() then
-    self:Hide()
+    self:Hide(ctx)
   else
     self:Show()
   end
@@ -241,10 +243,11 @@ function bagFrame.bagProto:GetPosition()
   return x * scale, y * scale
 end
 
-function bagFrame.bagProto:Sort()
+---@param ctx Context
+function bagFrame.bagProto:Sort(ctx)
   if self.kind ~= const.BAG_KIND.BACKPACK then return end
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-  events:SendMessage('bags/SortBackpack')
+  events:SendMessage('bags/SortBackpack', ctx)
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -261,11 +264,12 @@ end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
-function bagFrame.bagProto:Refresh()
+---@param ctx Context
+function bagFrame.bagProto:Refresh(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then
-    events:SendMessage('bags/RefreshBackpack')
+    events:SendMessage('bags/RefreshBackpack', ctx)
   else
-    events:SendMessage('bags/RefreshBank')
+    events:SendMessage('bags/RefreshBank', ctx)
   end
 end
 
@@ -316,8 +320,8 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
       self.slots:Draw()
       self.slots:Show()
     end
-    events:SendMessage('bag/RedrawIcons', self)
-    events:SendMessage('bag/Rendered', self, slotInfo)
+    events:SendMessage('bag/RedrawIcons', ctx, self)
+    events:SendMessage('bag/Rendered', ctx, self, slotInfo)
     callback()
   end)
 end
@@ -455,19 +459,20 @@ function bagFrame.bagProto:UpdateContextMenu()
   self.menuList = contextMenu:CreateContextMenu(self)
 end
 
-function bagFrame.bagProto:CreateCategoryForItemInCursor()
+---@param ctx Context
+function bagFrame.bagProto:CreateCategoryForItemInCursor(ctx)
   local _, itemID, itemLink = GetCursorInfo()
   ---@cast itemID number
   question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
   function(input)
     if input == nil then return end
     if input == "" then return end
-    categories:CreateCategory({
+    categories:CreateCategory(ctx, {
       name = input,
       itemList = {[itemID] = true},
       save = true,
     })
-    events:SendMessage('bags/FullRefreshAll')
+    events:SendMessage('bags/FullRefreshAll', ctx)
   end)
   GameTooltip:Hide()
   ClearCursor()
@@ -478,9 +483,10 @@ end
 -------
 
 --- Create creates a new bag view.
+---@param ctx Context
 ---@param kind BagKind
 ---@return Bag
-function bagFrame:Create(kind)
+function bagFrame:Create(ctx, kind)
   ---@class Bag
   local b = {}
   setmetatable(b, { __index = bagFrame.bagProto })
@@ -559,7 +565,7 @@ function bagFrame:Create(kind)
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 
-  local slots = bagSlots:CreatePanel(kind)
+  local slots = bagSlots:CreatePanel(ctx, kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
   slots.frame:SetParent(b.frame)
   slots.frame:Hide()

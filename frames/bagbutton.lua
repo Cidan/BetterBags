@@ -25,14 +25,18 @@ local buttonCount = 0
 ---@field empty boolean
 ---@field kind BagKind
 ---@field canBuy boolean
+---@field package __releaseContext Context
 BagButtonFrame.bagButtonProto = {}
 
-function BagButtonFrame.bagButtonProto:Draw()
+---@param ctx Context
+function BagButtonFrame.bagButtonProto:Draw(ctx)
   if not self.bag then return end
-  self:SetBag(self.bag)
+  self:SetBag(ctx, self.bag)
 end
 
-function BagButtonFrame.bagButtonProto:Release()
+---@param ctx Context
+function BagButtonFrame.bagButtonProto:Release(ctx)
+  self.__releaseContext = ctx
   BagButtonFrame._pool:Release(self)
 end
 
@@ -46,8 +50,9 @@ function BagButtonFrame.bagButtonProto:CheckForPurchase()
   StaticPopup_Show("CONFIRM_BUY_BANK_SLOT")
 end
 
+---@param ctx Context
 ---@param bag Enum.BagIndex
-function BagButtonFrame.bagButtonProto:SetBag(bag)
+function BagButtonFrame.bagButtonProto:SetBag(ctx, bag)
   self.bag = bag
   if const.BANK_ONLY_BAGS[bag] then
     self.kind = const.BAG_KIND.BANK
@@ -84,11 +89,12 @@ function BagButtonFrame.bagButtonProto:SetBag(bag)
   SetItemButtonTexture(self.frame, icon)
   SetItemButtonQuality(self.frame, GetInventoryItemQuality("player", self.invID))
   SetItemButtonCount(self.frame, 1)
-  events:SendMessage('bagbutton/Updated', self)
+  events:SendMessage('bagbutton/Updated', ctx, self)
 end
 
-function BagButtonFrame.bagButtonProto:ClearBag()
-  events:SendMessage('bagbutton/Clearing', self)
+---@param ctx Context
+function BagButtonFrame.bagButtonProto:ClearBag(ctx)
+  events:SendMessage('bagbutton/Clearing', ctx, self)
   self.masqueGroup = nil
   self.invID = nil
   self.bag = nil
@@ -99,6 +105,7 @@ function BagButtonFrame.bagButtonProto:ClearBag()
   self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
   SetItemButtonTexture(self.frame, nil)
   SetItemButtonQuality(self.frame, nil)
+  self.__releaseContext = nil
 end
 
 function BagButtonFrame.bagButtonProto:OnEnter()
@@ -171,7 +178,7 @@ end
 
 ---@param b BagButton
 function BagButtonFrame:_DoReset(b)
-  b:ClearBag()
+  b:ClearBag(b.__releaseContext)
 end
 
 ---@return BagButton

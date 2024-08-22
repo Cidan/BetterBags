@@ -38,6 +38,9 @@ local themes = addon:GetModule('Themes')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -71,6 +74,7 @@ local debug = addon:GetModule('Debug')
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
+---@field package __releaseContext Context
 itemFrame.itemProto = {}
 
 local buttonCount = 0
@@ -238,21 +242,24 @@ function itemFrame.itemProto:GetItemData()
   return items:GetItemDataFromSlotKey(self.slotkey)
 end
 
+---@param ctx Context
 ---@param data ItemData
-function itemFrame.itemProto:SetStaticItemFromData(data)
+function itemFrame.itemProto:SetStaticItemFromData(ctx, data)
   self.staticData = data
-  self:SetItemFromData(data)
+  self:SetItemFromData(ctx, data)
 end
 
+---@param ctx Context
 ---@param slotkey string
-function itemFrame.itemProto:SetItem(slotkey)
+function itemFrame.itemProto:SetItem(ctx, slotkey)
   assert(slotkey, 'item must be provided')
   local data = items:GetItemDataFromSlotKey(slotkey)
-  self:SetItemFromData(data)
+  self:SetItemFromData(ctx, data)
 end
 
+---@param ctx Context
 ---@param data ItemData
-function itemFrame.itemProto:SetItemFromData(data)
+function itemFrame.itemProto:SetItemFromData(ctx, data)
   assert(data, 'data must be provided')
   self.slotkey = data.slotkey
   local decoration = themes:GetItemButton(self)
@@ -325,7 +332,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.isFreeSlot = nil
   self:SetAlpha(1)
   if self.slotkey ~= nil then
-    events:SendMessage('item/Updated', self, decoration)
+    events:SendMessage('item/Updated', ctx, self, decoration)
   end
   decoration:SetFrameLevel(self.button:GetFrameLevel() - 1)
   self:UpdateUpgrade()
@@ -436,11 +443,12 @@ function itemFrame.itemProto:GetBagTypeQuality(bagid)
 end
 
 -- SetFreeSlots will set the item button to a free slot.
+---@param ctx Context
 ---@param bagid number
 ---@param slotid number
 ---@param count number
 ---@param nocount? boolean
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, nocount)
+function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
   local decoration = themes:GetItemButton(self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
@@ -491,7 +499,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count, nocount)
   self.isFreeSlot = true
   decoration.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
-  events:SendMessage('item/Updated', self, decoration)
+  events:SendMessage('item/Updated', ctx, self, decoration)
   self.frame:Show()
   self.button:Show()
 end
@@ -511,15 +519,18 @@ function itemFrame.itemProto:SetAlpha(alpha)
   self.frame:SetAlpha(alpha)
 end
 
-function itemFrame.itemProto:Release()
+---@param ctx Context
+function itemFrame.itemProto:Release(ctx)
+  self.__releaseContext = ctx
   itemFrame._pool:Release(self)
 end
 
-function itemFrame.itemProto:Wipe()
+---@param ctx Context
+function itemFrame.itemProto:Wipe(ctx)
   self.frame:Hide()
   self.frame:SetParent(nil)
   self.frame:ClearAllPoints()
-  self:ClearItem()
+  self:ClearItem(ctx)
 end
 
 -- Unlink will remove and hide this item button
@@ -532,9 +543,10 @@ function itemFrame.itemProto:Unlink()
   self.frame:Hide()
 end
 
-function itemFrame.itemProto:ClearItem()
+---@param ctx Context
+function itemFrame.itemProto:ClearItem(ctx)
   local decoration = themes:GetItemButton(self)
-  events:SendMessage('item/Clearing', self, decoration)
+  events:SendMessage('item/Clearing', ctx, self, decoration)
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
@@ -583,6 +595,8 @@ function itemFrame:OnEnable()
   self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
   self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
 
+  local ctx = context:New()
+  ctx:Set('event', 'on_enable')
   -- Pre-populate the pool with 600 items. This is done
   -- so that items acquired during combat do not taint
   -- the bag frame.
@@ -592,14 +606,15 @@ function itemFrame:OnEnable()
     frames[i] = self:Create()
   end
   for _, frame in pairs(frames) do
-    frame:Release()
+    frame:Release(ctx)
   end
 
 end
 
 ---@param i Item
 function itemFrame:_DoReset(i)
-  i:ClearItem()
+  i:ClearItem(i.__releaseContext)
+  i.__releaseContext = nil
 end
 
 function itemFrame:_DoCreate()

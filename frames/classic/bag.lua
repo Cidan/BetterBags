@@ -87,10 +87,11 @@ function bagFrame.bagProto:SwitchToBankAndWipe()
   self:Wipe()
 end
 
-function bagFrame.bagProto:Sort()
+---@param ctx Context
+function bagFrame.bagProto:Sort(ctx)
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
   if _G.SortBags ~= nil then
-    events:SendMessage('bags/SortBackpackClassic')
+    events:SendMessage('bags/SortBackpackClassic', ctx)
   end
 end
 
@@ -99,9 +100,10 @@ end
 -------
 
 --- Create creates a new bag view.
+---@param ctx Context
 ---@param kind BagKind
 ---@return Bag
-function bagFrame:Create(kind)
+function bagFrame:Create(ctx, kind)
   ---@class Bag
   local b = {}
   setmetatable(b, { __index = bagFrame.bagProto })
@@ -165,7 +167,7 @@ function bagFrame:Create(kind)
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 
-  local slots = bagSlots:CreatePanel(kind)
+  local slots = bagSlots:CreatePanel(ctx, kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
   slots.frame:SetParent(b.frame)
   slots.frame:Hide()

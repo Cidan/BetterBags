@@ -120,13 +120,13 @@ function searchCategoryConfig:OnEnable()
   self.cancelButton:SetPoint("RIGHT", self.saveButton, "LEFT", -10, 0)
   self.cancelButton:SetText("Cancel")
 
-  self.saveButton:SetScript("OnClick", function()
+  addon.SetScript(self.saveButton, "OnClick", function(ctx)
     local name = self.nameBox:GetText()
     local query = self.queryBox.EditBox:GetText()
     if self.errorText:GetText() ~= "" and self.errorText:GetText() ~= nil then
       return
     end
-    categories:CreateCategory({
+    categories:CreateCategory(ctx, {
       name = name,
       priority = tonumber(self.priorityBox:GetText()) or 10,
       save = true,
@@ -136,10 +136,10 @@ function searchCategoryConfig:OnEnable()
       }
     })
     if self.openedName ~= name and self.openedName ~= nil and self.openedName ~= "" then
-      categories:DeleteCategory(self.openedName)
+      categories:DeleteCategory(ctx, self.openedName)
     end
     self.openedName = nil
-    events:SendMessage('bags/FullRefreshAll')
+    events:SendMessage('bags/FullRefreshAll', ctx)
     self.fadeOutGroup:Play()
   end)
 

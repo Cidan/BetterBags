@@ -216,8 +216,8 @@ function refresh:OnEnable()
   end)
 
   -- Register when all bags should be wiped and reloaded.
-  events:RegisterMessage('bags/FullRefreshAll', function()
-    items:WipeAndRefreshAll()
+  events:RegisterMessage('bags/FullRefreshAll', function(ctx)
+    items:WipeAndRefreshAll(ctx)
   end)
 
   -- Register for when bags are done drawing.

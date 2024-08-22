@@ -38,6 +38,7 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field rowButton ItemButton|Button
 ---@field text FontString
 ---@field slotkey string
+---@field package __releaseContext Context
 item.itemRowProto = {}
 
 function item.itemRowProto:Unlock()
@@ -50,26 +51,29 @@ function item.itemRowProto:GetItemData()
   return self.button:GetItemData()
 end
 
+---@param ctx Context
 ---@param data ItemData
-function item.itemRowProto:SetStaticItemFromData(data)
-  self:SetItemFromData(data, true)
+function item.itemRowProto:SetStaticItemFromData(ctx, data)
+  self:SetItemFromData(ctx, data, true)
 end
 
+---@param ctx Context
 ---@param slotkey string
-function item.itemRowProto:SetItem(slotkey)
+function item.itemRowProto:SetItem(ctx, slotkey)
   local data = items:GetItemDataFromSlotKey(slotkey)
-  self:SetItemFromData(data)
+  self:SetItemFromData(ctx, data)
 end
 
+---@param ctx Context
 ---@param data ItemData
 ---@param static? boolean
-function item.itemRowProto:SetItemFromData(data, static)
+function item.itemRowProto:SetItemFromData(ctx, data, static)
   self.slotkey = data.slotkey
   self.button:SetSize(20, 20)
   if static then
-    self.button:SetStaticItemFromData(data)
+    self.button:SetStaticItemFromData(ctx, data)
   else
-    self.button:SetItemFromData(data)
+    self.button:SetItemFromData(ctx, data)
   end
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
@@ -113,7 +117,7 @@ function item.itemRowProto:SetItemFromData(data, static)
   end)
 
   if self.slotkey ~= nil then
-    events:SendMessage('item/UpdatedRow', self)
+    events:SendMessage('item/UpdatedRow', ctx, self)
   end
   self.frame:Show()
   self.rowButton:Show()
@@ -125,9 +129,10 @@ function item.itemRowProto:Wipe()
   self.frame:ClearAllPoints()
 end
 
-function item.itemRowProto:ClearItem()
-  events:SendMessage('item/ClearingRow', self)
-  self.button:ClearItem()
+---@param ctx Context
+function item.itemRowProto:ClearItem(ctx)
+  events:SendMessage('item/ClearingRow', ctx, self)
+  self.button:ClearItem(ctx)
 
   self.rowButton:SetID(0)
   self.frame:SetID(0)
@@ -156,7 +161,9 @@ function item.itemRowProto:GetGUID()
   return self.button:GetItemData().itemInfo.itemGUID
 end
 
-function item.itemRowProto:Release()
+---@param ctx Context
+function item.itemRowProto:Release(ctx)
+  self.__releaseContext = ctx
   item._pool:Release(self)
 end
 
@@ -179,7 +186,8 @@ end
 
 ---@param i ItemRow
 function item:_DoReset(i)
-  i:ClearItem()
+  i:ClearItem(i.__releaseContext)
+  i.__releaseContext = nil
 end
 
 ---@return ItemRow

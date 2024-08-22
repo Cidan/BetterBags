@@ -9,6 +9,9 @@ local events = addon:GetModule('Events')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class DebugWindow: AceModule
 ---@field frame ScrollingFlatPanelTemplate
 ---@field rows number
@@ -25,7 +28,8 @@ local function initDebugListItem(button, elementData)
   button.Message:SetPoint("LEFT", button.Category, "RIGHT", 10, 0)
 end
 
-function debugWindow:Create()
+---@param ctx Context
+function debugWindow:Create(ctx)
   self.cells = {}
   self.rows = 0
   self.provider = CreateDataProvider()
@@ -52,11 +56,13 @@ function debugWindow:Create()
   self.frame.ClosePanelButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 
   self.frame.ClosePanelButton:SetScript("OnClick", function(_, e)
+    local ectx = context:New()
+    ectx:Set('event', 'DebugFrameCloseClick')
     if e == "LeftButton" then
       database:SetDebugMode(false)
-      events:SendMessage('config/DebugMode', false)
+      events:SendMessage('config/DebugMode', ectx, false)
     elseif e == "RightButton" then
-      events:SendMessage('debug/ClearLog')
+      events:SendMessage('debug/ClearLog', ectx)
     end
   end)
 
@@ -85,10 +91,13 @@ function debugWindow:Create()
   else
     self.frame:Hide()
   end
-  self:AddLogLine("Debug", "debug window created")
+  self:AddLogLine(ctx, "Debug", "debug window created")
 end
 
-function debugWindow:AddLogLine(title, message)
+---@param ctx Context
+---@param title string
+---@param message? string
+function debugWindow:AddLogLine(ctx, title, message)
   if not self.frame:IsVisible() then
     return
   end
@@ -98,5 +107,5 @@ function debugWindow:AddLogLine(title, message)
     message=message
   })
   self.rows = self.rows + 1
-  events:SendMessage('debug/LogAdded')
+  events:SendMessage('debug/LogAdded', ctx)
 end

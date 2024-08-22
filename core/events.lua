@@ -189,6 +189,9 @@ end
 ---@param ctx Context
 ---@param ... any
 function events:SendMessage(event, ctx, ...)
+  if type(ctx) ~= 'table' or not ctx.Event then
+    error('ctx must be passed into SendMessage and must be a Context object: ' .. event)
+  end
   local args = {...}
   table.insert(args, 1, ctx)
   self._eventHandler:SendMessage(event, unpack(args))

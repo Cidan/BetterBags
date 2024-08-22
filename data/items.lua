@@ -159,17 +159,9 @@ function items:RemoveNewItemFromAllItems()
   wipe(self._newItemTimers)
 end
 
-function items:RefreshAll()
-  events:SendMessage('bags/RefreshAll')
-end
-
----@private
-function items:PreSort()
-  if self._preSort then return end
-  self._preSort = true
-  C_Timer.After(0.6, function()
-    self:WipeAndRefreshAll()
-  end)
+---@param ctx Context
+function items:RefreshAll(ctx)
+  events:SendMessage('bags/RefreshAll', ctx)
 end
 
 ---@private
@@ -191,10 +183,12 @@ end
 
 ---@private
 -- FullRefreshAll will wipe the item cache and refresh all items in all bags.
-function items:WipeAndRefreshAll()
+---@param ctx Context
+function items:WipeAndRefreshAll(ctx)
   debug:Log('WipeAndRefreshAll', "Wipe And Refresh All triggered")
   --self:ClearItemCache()
-  events:SendMessage('bags/RefreshAll', true)
+  ctx:Set('wipe', true)
+  events:SendMessage('bags/RefreshAll', ctx)
 end
 
 ---@private
@@ -435,7 +429,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
       slotInfo.addedItems[currentItem.slotkey] = currentItem
       if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
-        self:MarkItemAsNew(currentItem)
+        self:MarkItemAsNew(ctx, currentItem)
       end
       search:Add(currentItem)
     elseif items:ItemRemoved(currentItem, previousItem) then
@@ -472,13 +466,13 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       slotInfo.totalItems = slotInfo.totalItems + 1
     end
     local oldCategory = currentItem.itemInfo.category
-    currentItem.itemInfo.category = self:GetCategory(currentItem)
+    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
     search:UpdateCategoryIndex(currentItem, oldCategory)
   end, function()
     for _, addedItem in pairs(slotInfo.addedItems) do
       for _, removedItem in pairs(slotInfo.removedItems) do
         if addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
-          self:ClearNewItem(addedItem.slotkey)
+          self:ClearNewItem(ctx, addedItem.slotkey)
         end
       end
     end
@@ -604,15 +598,16 @@ function items:IsNewItem(data)
   return false
 end
 
+---@param ctx Context
 ---@param slotkey string
-function items:ClearNewItem(slotkey)
+function items:ClearNewItem(ctx, slotkey)
   if not slotkey then return end
   local data = self:GetItemDataFromSlotKey(slotkey)
   if data.isItemEmpty then return end
   C_NewItems.RemoveNewItem(data.bagid, data.slotid)
   data.itemInfo.isNewItem = false
   self._newItemTimers[data.itemInfo.itemGUID] = nil
-  data.itemInfo.category = self:GetCategory(data)
+  data.itemInfo.category = self:GetCategory(ctx, data)
 end
 
 function items:ClearNewItems()
@@ -620,19 +615,21 @@ function items:ClearNewItems()
   wipe(self._newItemTimers)
 end
 
+---@param ctx Context
 ---@param data ItemData
-function items:MarkItemAsNew(data)
+function items:MarkItemAsNew(ctx, data)
   if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()
     data.itemInfo.isNewItem = true
-    data.itemInfo.category = self:GetCategory(data)
+    data.itemInfo.category = self:GetCategory(ctx, data)
   end
 end
 
+---@param ctx Context
 ---@param slotkey string
-function items:MarkItemSlotAsNew(slotkey)
+function items:MarkItemSlotAsNew(ctx, slotkey)
   local data = self:GetItemDataFromSlotKey(slotkey)
-  self:MarkItemAsNew(data)
+  self:MarkItemAsNew(ctx, data)
 end
 
 ---@param link string
@@ -745,9 +742,10 @@ function items:GenerateItemHash(data)
   return hash
 end
 
+---@param ctx Context
 ---@param data ItemData
 ---@return string
-function items:GetCategory(data)
+function items:GetCategory(ctx, data)
   if not data or data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(data.kind, "RecentItems") then
@@ -767,7 +765,7 @@ function items:GetCategory(data)
   end
 
   -- Return the custom category if it exists next.
-  local customCategory = categories:GetCustomCategory(data.kind, data)
+  local customCategory = categories:GetCustomCategory(ctx, data.kind, data)
   if customCategory then
     return customCategory
   end

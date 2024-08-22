@@ -38,6 +38,9 @@ local themes = addon:GetModule('Themes')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class bagSlots
 ---@field frame Frame
 ---@field content Grid
@@ -95,9 +98,10 @@ function BagSlots.bagSlotProto:IsShown()
   return self.frame:IsShown()
 end
 
+---@param ctx Context
 ---@param kind BagKind
 ---@return bagSlots
-function BagSlots:CreatePanel(kind)
+function BagSlots:CreatePanel(ctx, kind)
   ---@class bagSlots
   local b = {}
   setmetatable(b, {__index = BagSlots.bagSlotProto})
@@ -118,23 +122,26 @@ function BagSlots:CreatePanel(kind)
   local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS_LIST or const.BANK_ONLY_BAGS_LIST
   for i, bag in pairs(bags) do
     local iframe = bagButton:Create()
-    iframe:SetBag(bag)
+    iframe:SetBag(ctx, bag)
     b.content:AddCell(tostring(i), iframe)
   end
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
-  b.fadeInGroup:HookScript("OnFinished", function()
+
+  addon.HookScript(b.fadeInGroup, "OnFinished", function(ectx)
     if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
       return
     end
     database:SetPreviousView(kind, database:GetBagView(kind))
     database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
-    events:SendMessage('bags/FullRefreshAll')
+    events:SendMessage('bags/FullRefreshAll', ectx)
   end)
-  b.fadeOutGroup:HookScript("OnFinished", function()
+
+  addon.HookScript(b.fadeOutGroup, "OnFinished", function(ectx)
     database:SetBagView(kind, database:GetPreviousView(kind))
-    events:SendMessage('bags/FullRefreshAll')
+    events:SendMessage('bags/FullRefreshAll', ectx)
   end)
+
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function() b:Draw() end)
   events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function() b:Draw() end)
   b.kind = kind

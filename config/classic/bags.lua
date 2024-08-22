@@ -31,6 +31,9 @@ local themes = addon:GetModule('Themes')
 ---@class Config: AceModule
 local config = addon:GetModule('Config')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@param kind BagKind
 ---@return AceConfig.OptionsTable
 function config:GetCustomCategoryOptions(kind)
@@ -60,7 +63,9 @@ function config:GetCustomCategoryOptions(kind)
     end,
     set = function(_, value)
       categories:SetCategoryState(kind, value, not categories:IsCategoryEnabled(kind, value))
-      events:SendMessage('bags/FullRefreshAll')
+      local ctx = context:New()
+      ctx:Set('event', 'on_click')
+      events:SendMessage('bags/FullRefreshAll', ctx)
     end,
     values = {}
   }
@@ -98,7 +103,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetCategoryFilter(kind, value, not DB:GetCategoryFilter(kind, value))
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
             values = {
               ["RecentItems"] = L:G("Recent Items"),
@@ -122,7 +129,9 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetSectionSortType(kind, DB:GetBagView(kind), value)
-          events:SendMessage('bags/FullRefreshAll')
+          local ctx = context:New()
+          ctx:Set('event', 'on_click')
+          events:SendMessage('bags/FullRefreshAll', ctx)
         end,
         values = {
           [const.SECTION_SORT_TYPE.ALPHABETICALLY] = L:G("Alphabetically"),
@@ -142,7 +151,9 @@ function config:GetBagOptions(kind)
         end,
         set = function(_, value)
           DB:SetItemSortType(kind, DB:GetBagView(kind), value)
-          events:SendMessage('bags/FullRefreshAll')
+          local ctx = context:New()
+          ctx:Set('event', 'on_click')
+          events:SendMessage('bags/FullRefreshAll', ctx)
         end,
         values = {
           [const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY] = L:G("Quality, then Alphabetically"),
@@ -165,7 +176,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetMergeItems(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
           mergeUnstackable = {
@@ -178,7 +191,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetMergeUnstackable(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
           unmergeAtShop = {
@@ -191,7 +206,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetUnmergeAtShop(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
           dontMergePartial = {
@@ -204,7 +221,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetDontMergePartial(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
         }
@@ -225,7 +244,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetItemLevelEnabled(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
           color = {
@@ -238,7 +259,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetItemLevelColorEnabled(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
         }
@@ -260,7 +283,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetShowFullSectionNames(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
           showAllFreeSpace = {
@@ -274,7 +299,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetShowAllFreeSpace(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
           showExtraGlowyButtons = {
@@ -288,7 +315,9 @@ function config:GetBagOptions(kind)
             end,
             set = function(_, value)
               DB:SetExtraGlowyButtons(kind, value)
-              events:SendMessage('bags/FullRefreshAll')
+              local ctx = context:New()
+              ctx:Set('event', 'on_click')
+              events:SendMessage('bags/FullRefreshAll', ctx)
             end,
           },
           itemsPerRow = {
@@ -305,7 +334,9 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
               bucket:Later("setItemsPerRow", 0.2, function()
-                events:SendMessage('bags/FullRefreshAll')
+                local ctx = context:New()
+                ctx:Set('event', 'on_click')
+                events:SendMessage('bags/FullRefreshAll', ctx)
               end)
             end,
           },
@@ -339,7 +370,9 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
               bucket:Later("setSectionsPerRow", 0.2, function()
-                events:SendMessage('bags/FullRefreshAll')
+                local ctx = context:New()
+                ctx:Set('event', 'on_click')
+                events:SendMessage('bags/FullRefreshAll', ctx)
               end)
             end,
           },

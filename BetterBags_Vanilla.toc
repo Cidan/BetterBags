@@ -118,7 +118,6 @@ config\config.lua
 config\era\config.lua
 config\help.lua
 config\era\bags.lua
-config\itemlist.lua
 config\customcat.lua
 
 integrations\consoleport.lua
