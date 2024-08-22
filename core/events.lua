@@ -119,11 +119,17 @@ function events:CatchUntil(caughtEvent, finalEvent, callback)
   self:RegisterEvent(finalEvent, finalFunction)
 end
 
+---@param event string
+---@param callback fun(ctx: Context, ...)
 function events:BucketEvent(event, callback)
  --TODO(lobato): Refine this so that timers only run when an event is in the queue. 
   local bucketFunction = function()
     for _, cb in pairs(self._bucketCallbacks[event]) do
-      xpcall(cb, geterrorhandler())
+      xpcall(function(...)
+        local ctx = context:New()
+        ctx:Set('event', event)
+        cb(ctx, ...)
+      end, geterrorhandler())
     end
     self._bucketTimers[event] = nil
     self._bucketCallbacks[event] = {}

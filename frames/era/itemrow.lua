@@ -30,7 +30,7 @@ local item = addon:GetModule('ItemRowFrame')
 ---@param static? boolean
 function item.itemRowProto:SetItemFromData(ctx, data, static)
   self.slotkey = data.slotkey
-  self.button:SetSize(20, 20)
+  self.button:SetSize(ctx, 20, 20)
   if static then
     self.button:SetStaticItemFromData(ctx, data)
   else

@@ -93,10 +93,11 @@ local children = {
   "HighlightTexture"
 }
 
+---@param ctx Context
 ---@param found? boolean
-function itemFrame.itemProto:UpdateSearch(found)
+function itemFrame.itemProto:UpdateSearch(ctx, found)
   if self.slotkey == nil then return end
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   decoration:SetMatchesSearch(found and true or false)
 end
 
@@ -119,21 +120,24 @@ function itemFrame.itemProto:OnLeave()
   itemFrame.emptyItemTooltip:Hide()
 end
 
-function itemFrame.itemProto:UpdateCooldown()
+---@param ctx Context
+function itemFrame.itemProto:UpdateCooldown(ctx)
   if self.slotkey == nil then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if not data or data.isItemEmpty then return end
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   decoration:UpdateCooldown(data.itemInfo.itemIcon)
 end
 
-function itemFrame.itemProto:Lock()
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+function itemFrame.itemProto:Lock(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
   SetItemButtonDesaturated(decoration, true)
 end
 
-function itemFrame.itemProto:Unlock()
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+function itemFrame.itemProto:Unlock(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
   SetItemButtonDesaturated(decoration, false)
 end
 
@@ -183,19 +187,21 @@ function itemFrame.itemProto:DrawItemLevel()
   self:ShowItemLevel()
 end
 
-function itemFrame.itemProto:UpdateCount()
+---@param ctx Context
+function itemFrame.itemProto:UpdateCount(ctx)
   if not self.slotkey then return end
   if not self.kind then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if not data or data.isItemEmpty then return end
   local count = data.stackedCount or data.itemInfo.currentItemCount
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   SetItemButtonCount(decoration, count)
 end
 
-function itemFrame.itemProto:UpdateUpgrade()
+---@param ctx Context
+function itemFrame.itemProto:UpdateUpgrade(ctx)
   local data = self:GetItemData()
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   if not data or not data.inventorySlots then return end
   if self.staticData then return end
 
@@ -262,7 +268,7 @@ end
 function itemFrame.itemProto:SetItemFromData(ctx, data)
   assert(data, 'data must be provided')
   self.slotkey = data.slotkey
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   local tooltipOwner = GameTooltip:GetOwner()
   local bagid, slotid = data.bagid, data.slotid
   if bagid and slotid then
@@ -312,12 +318,12 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
     decoration.IconBorder:SetBlendMode("BLEND")
     decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
   end
-  self:UpdateCount()
+  self:UpdateCount(ctx)
   --self:SetLock(data.itemInfo.isLocked)
   decoration:UpdateExtended()
   decoration:UpdateQuestItem(isQuestItem, questID, isActive)
   if not self.staticData then
-    self:UpdateNewItem(data.itemInfo.itemQuality)
+    self:UpdateNewItem(ctx, data.itemInfo.itemQuality)
   end
   decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue)
   decoration:UpdateItemContextMatching()
@@ -325,7 +331,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   decoration:SetReadable(readable)
   decoration:CheckUpdateTooltip(tooltipOwner)
   decoration:SetMatchesSearch(not isFiltered)
-  self:Unlock()
+  self:Unlock(ctx)
 
   self.freeSlotName = ""
   self.freeSlotCount = 0
@@ -335,13 +341,14 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
     events:SendMessage('item/Updated', ctx, self, decoration)
   end
   decoration:SetFrameLevel(self.button:GetFrameLevel() - 1)
-  self:UpdateUpgrade()
+  self:UpdateUpgrade(ctx)
   self.frame:Show()
   self.button:Show()
 end
 
-function itemFrame.itemProto:FlashItem()
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+function itemFrame.itemProto:FlashItem(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
   decoration.NewItemTexture:SetAtlas("bags-glow-white")
   decoration.NewItemTexture:Show()
   if (not decoration.flashAnim:IsPlaying() and not decoration.newitemglowAnim:IsPlaying()) then
@@ -350,8 +357,9 @@ function itemFrame.itemProto:FlashItem()
   end
 end
 
-function itemFrame.itemProto:ClearFlashItem()
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+function itemFrame.itemProto:ClearFlashItem(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
   decoration.BattlepayItemTexture:Hide()
   decoration.NewItemTexture:Hide()
   if (decoration.flashAnim:IsPlaying() or decoration.newitemglowAnim:IsPlaying()) then
@@ -360,8 +368,10 @@ function itemFrame.itemProto:ClearFlashItem()
   end
 end
 
-function itemFrame.itemProto:UpdateNewItem(quality)
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+---@param quality Enum.ItemQuality
+function itemFrame.itemProto:UpdateNewItem(ctx, quality)
+  local decoration = themes:GetItemButton(ctx, self)
 	if(not decoration.BattlepayItemTexture and not self.NewItemTexture) then
 		return
 	end
@@ -393,14 +403,18 @@ function itemFrame.itemProto:UpdateNewItem(quality)
 	end
 end
 
-function itemFrame.itemProto:ResetSize()
-  local decoration = themes:GetItemButton(self)
-  self:SetSize(37, 37)
+---@param ctx Context
+function itemFrame.itemProto:ResetSize(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
+  self:SetSize(ctx, 37, 37)
   decoration.NormalTexture:SetSize(64, 64)
 end
 
-function itemFrame.itemProto:SetSize(width, height)
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+---@param width number
+---@param height number
+function itemFrame.itemProto:SetSize(ctx, width, height)
+  local decoration = themes:GetItemButton(ctx, self)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
   decoration:SetSize(width, height)
@@ -449,7 +463,7 @@ end
 ---@param count number
 ---@param nocount? boolean
 function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
@@ -504,9 +518,10 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
   self.button:Show()
 end
 
+---@param ctx Context
 ---@return boolean
-function itemFrame.itemProto:IsNewItem()
-  local decoration = themes:GetItemButton(self)
+function itemFrame.itemProto:IsNewItem(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if decoration.NewItemTexture:IsShown() then
     return true
@@ -545,7 +560,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:ClearItem(ctx)
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   events:SendMessage('item/Clearing', ctx, self, decoration)
   self.kind = nil
   self.frame:ClearAllPoints()
@@ -572,7 +587,7 @@ function itemFrame.itemProto:ClearItem(ctx)
   self.button:Enable()
   self.ilvlText:SetText("")
   self.ilvlText:Hide()
-  self:ResetSize()
+  self:ResetSize(ctx)
   self.slotkey = ""
   self.stacks = {}
   self.stackCount = 1
@@ -641,18 +656,21 @@ function itemFrame:_DoCreate()
   -- Install special handlers for themed interaction textures.
   button.PushedTexture:SetTexture("")
   button.NormalTexture:SetTexture("")
-  button:HookScript("OnMouseDown", function()
-    themes:GetItemButton(i):GetPushedTexture():Show()
+  addon.HookScript(button, "OnMouseDown", function(ctx)
+    themes:GetItemButton(ctx, i):GetPushedTexture():Show()
   end)
-  button:HookScript("OnMouseUp", function()
-    themes:GetItemButton(i):GetPushedTexture():Hide()
+
+  addon.HookScript(button, "OnMouseUp", function(ctx)
+    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
   end)
-  button:HookScript("OnLeave", function()
-    themes:GetItemButton(i):GetHighlightTexture():Hide()
-    themes:GetItemButton(i):GetPushedTexture():Hide()
+
+  addon.HookScript(button, "OnLeave", function(ctx)
+    themes:GetItemButton(ctx, i):GetHighlightTexture():Hide()
+    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
   end)
-  button:HookScript("OnEnter", function()
-    themes:GetItemButton(i):GetHighlightTexture():Show()
+
+  addon.HookScript(button, "OnEnter", function(ctx)
+    themes:GetItemButton(ctx, i):GetHighlightTexture():Show()
   end)
 
   -- Hide all the default textures on the clickable button.

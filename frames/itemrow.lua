@@ -69,7 +69,7 @@ end
 ---@param static? boolean
 function item.itemRowProto:SetItemFromData(ctx, data, static)
   self.slotkey = data.slotkey
-  self.button:SetSize(20, 20)
+  self.button:SetSize(ctx, 20, 20)
   if static then
     self.button:SetStaticItemFromData(ctx, data)
   else
@@ -151,9 +151,10 @@ function item.itemRowProto:GetCategory()
   return self.button:GetItemData().itemInfo.category
 end
 
+---@param ctx Context
 ---@return boolean
-function item.itemRowProto:IsNewItem()
-  return self.button:IsNewItem()
+function item.itemRowProto:IsNewItem(ctx)
+  return self.button:IsNewItem(ctx)
 end
 
 ---@return string
@@ -171,8 +172,9 @@ function item.itemRowProto:UpdateSearch(text)
   self.button:UpdateSearch(text)
 end
 
-function item.itemRowProto:UpdateCooldown()
-  self.button:UpdateCooldown()
+---@param ctx Context
+function item.itemRowProto:UpdateCooldown(ctx)
+  self.button:UpdateCooldown(ctx)
 end
 
 local buttonCount = 0

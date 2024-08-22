@@ -273,18 +273,20 @@ function bagFrame.bagProto:Refresh(ctx)
   end
 end
 
+---@param ctx Context
 ---@param results table<string, boolean>
-function bagFrame.bagProto:Search(results)
+function bagFrame.bagProto:Search(ctx, results)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateSearch(results[item.slotkey])
+    item:UpdateSearch(ctx, results[item.slotkey])
   end
 end
 
-function bagFrame.bagProto:ResetSearch()
+---@param ctx Context
+function bagFrame.bagProto:ResetSearch(ctx)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateSearch(true)
+    item:UpdateSearch(ctx, true)
   end
 end
 
@@ -313,7 +315,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
     local text = searchBox:GetText()
     if text ~= "" and text ~= nil then
-      self:Search(search:Search(text))
+      self:Search(ctx, search:Search(text))
     end
     self:OnResize()
     if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
@@ -428,30 +430,37 @@ function bagFrame.bagProto:SwitchToBankAndWipe()
   self:Wipe()
 end
 
-function bagFrame.bagProto:OnCooldown()
+---@param ctx Context
+function bagFrame.bagProto:OnCooldown(ctx)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateCooldown()
+    item:UpdateCooldown(ctx)
   end
 end
 
-function bagFrame.bagProto:OnLock(bagid, slotid)
+---@param ctx Context
+---@param bagid number
+---@param slotid number
+function bagFrame.bagProto:OnLock(ctx, bagid, slotid)
   if not self.currentView then return end
   if slotid == nil then return end
   local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   local button = self.currentView.itemsByBagAndSlot[slotkey]
   if button then
-    button:Lock()
+    button:Lock(ctx)
   end
 end
 
-function bagFrame.bagProto:OnUnlock(bagid, slotid)
+---@param ctx Context
+---@param bagid number
+---@param slotid number
+function bagFrame.bagProto:OnUnlock(ctx, bagid, slotid)
   if not self.currentView then return end
   if slotid == nil then return end
   local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   local button = self.currentView.itemsByBagAndSlot[slotkey]
   if button then
-    button:Unlock()
+    button:Unlock(ctx)
   end
 end
 
@@ -676,17 +685,17 @@ function bagFrame:Create(ctx, kind)
   b:KeepBagInBounds()
 
   if b.kind == const.BAG_KIND.BACKPACK then
-    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
+    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(ectx) b:OnCooldown(ectx) end)
   end
 
-  events:RegisterMessage('search/SetInFrame', function (_, shown)
-    themes:SetSearchState(b.frame, shown)
+  events:RegisterMessage('search/SetInFrame', function (ectx, _, shown)
+    themes:SetSearchState(ectx, b.frame, shown)
   end)
 
-  events:RegisterMessage('bag/RedrawIcons', function()
+  events:RegisterMessage('bag/RedrawIcons', function(ectx)
     if not b.currentView then return end
     for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
-      item:UpdateUpgrade()
+      item:UpdateUpgrade(ectx)
     end
   end)
   return b

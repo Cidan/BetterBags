@@ -319,25 +319,25 @@ function bagFrame:Create(ctx, kind)
   b:KeepBagInBounds()
 
   if b.kind == const.BAG_KIND.BACKPACK then
-    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
+    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(ectx) b:OnCooldown(ectx) end)
   end
 
-  events:RegisterEvent('ITEM_LOCKED', function(_, bagid, slotid)
-    b:OnLock(bagid, slotid)
+  events:RegisterEvent('ITEM_LOCKED', function(ectx, _, bagid, slotid)
+    b:OnLock(ectx, bagid, slotid)
   end)
 
-  events:RegisterEvent('ITEM_UNLOCKED', function(_, bagid, slotid)
-    b:OnUnlock(bagid, slotid)
+  events:RegisterEvent('ITEM_UNLOCKED', function(ectx, _, bagid, slotid)
+    b:OnUnlock(ectx, bagid, slotid)
   end)
 
-  events:RegisterMessage('search/SetInFrame', function (_, shown)
-    themes:SetSearchState(b.frame, shown)
+  events:RegisterMessage('search/SetInFrame', function (ectx, _, shown)
+    themes:SetSearchState(ectx, b.frame, shown)
   end)
 
-  events:RegisterMessage('bag/RedrawIcons', function()
+  events:RegisterMessage('bag/RedrawIcons', function(ectx)
     if not b.currentView then return end
     for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
-      item:UpdateUpgrade()
+      item:UpdateUpgrade(ectx)
     end
   end)
 
