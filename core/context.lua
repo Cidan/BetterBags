@@ -26,6 +26,9 @@ function context:Set(key, value)
   if self.done then
     error("context has been cancelled")
   end
+  if self.keys['event'] ~= nil and key == 'event' then
+    error("the event key for a context can not be overridden")
+  end
   self.keys[key] = value
 end
 
@@ -37,6 +40,12 @@ function context:Get(key)
     error("context has been cancelled")
   end
   return self.keys[key]
+end
+
+-- Event gets the event from the context.
+---@return string
+function context:Event()
+  return self.keys['event']
 end
 
 -- Check checks if a key exists in the context.

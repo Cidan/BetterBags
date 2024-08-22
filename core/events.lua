@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@alias eventData any[][]
 
 ---@class Callback
@@ -37,44 +40,54 @@ function events:OnInitialize()
 end
 
 ---@param event string
----@param callback fun(...)
----@param arg? any
-function events:RegisterMessage(event, callback, arg)
+---@param callback fun(ctx: Context, ...)
+function events:RegisterMessage(event, callback)
   if self._messageMap[event] == nil then
     self._messageMap[event] = {
       fn = function(...)
         for _, cb in pairs(self._messageMap[event].cbs) do
-          if cb.a ~= nil then
-            cb.cb(cb.a, ...)
-          else
-            cb.cb(...)
-          end
+          cb.cb(select(2, ...))
         end
       end,
       cbs = {},
     }
     self._eventHandler:RegisterMessage(event, self._messageMap[event].fn)
   end
-  table.insert(self._messageMap[event].cbs, {cb = callback, a = arg})
+  table.insert(self._messageMap[event].cbs, {cb = callback})
 end
 
-function events:RegisterEvent(event, callback, arg)
+---@param event string
+---@param callback fun(ctx: Context, ...)
+function events:RegisterEvent(event, callback)
   if self._eventMap[event] == nil then
     self._eventMap[event] = {
       fn = function(...)
         for _, cb in pairs(self._eventMap[event].cbs) do
-          if cb.a ~= nil then
-            cb.cb(cb.a, ...)
-          else
-            cb.cb(...)
-          end
+          local ctx = context:New()
+          ctx:Set('event', event)
+          cb.cb(ctx, ...)
         end
       end,
       cbs = {},
     }
     self._eventHandler:RegisterEvent(event, self._eventMap[event].fn)
   end
-  table.insert(self._eventMap[event].cbs, {cb = callback, a = arg})
+  table.insert(self._eventMap[event].cbs, {cb = callback})
+end
+
+---@param evts? table<string, fun()>
+---@param messages? table<string, fun()>
+function events:RegisterMap(evts, messages)
+  if evts then
+    for event, callback in pairs(evts) do
+      self:RegisterEvent(event, callback)
+    end
+  end
+  if messages then
+    for message, callback in pairs(messages) do
+      self:RegisterMessage(message, callback)
+    end
+  end
 end
 
 -- CatchUntil will group all events that fire as caughtEvent,
@@ -172,21 +185,22 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   table.insert(self._bucketCallbacks[joinedEvents], callback)
 end
 
-function events:SendMessage(event, ...)
-  self._eventHandler:SendMessage(event, ...)
+---@param event string
+---@param ctx Context
+---@param ... any
+function events:SendMessage(event, ctx, ...)
+  local args = {...}
+  table.insert(args, 1, ctx)
+  self._eventHandler:SendMessage(event, unpack(args))
 end
 
 ---@param event string
----@param callback? function
+---@param ctx Context
 ---@param ... any
-function events:SendMessageLater(event, callback, ...)
-  ---@type any[]
-  local vararg = {...}
+function events:SendMessageLater(event, ctx, ...)
+  local args = {...}
   C_Timer.After(0, function()
-    self._eventHandler:SendMessage(event, vararg)
-    if callback then
-      callback()
-    end
+    self:SendMessage(event, ctx, unpack(args))
   end)
 end
 

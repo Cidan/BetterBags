@@ -137,6 +137,7 @@ function items:OnEnable()
   end)
 end
 
+
 ---@param kind BagKind
 function items:WipeSlotInfo(kind)
   self.slotInfo = self.slotInfo or {}
@@ -549,7 +550,7 @@ function items:ProcessContainer(ctx, kind, container)
     self:LoadItems(ctx, kind, container:GetDataCache(), const.BAG_KIND.BACKPACK and container:GetEquipmentDataCache() or nil, function()
       local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-      events:SendMessageLater(ev, nil, ctx, self.slotInfo[kind])
+      events:SendMessageLater(ev, ctx, self.slotInfo[kind])
       if kind == const.BAG_KIND.BACKPACK then
         debug:EndProfile('Backpack Data Pipeline')
       end
