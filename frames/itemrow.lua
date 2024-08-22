@@ -28,6 +28,9 @@ local items = addon:GetModule('Items')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Pool: AceModule
+local pool = addon:GetModule('Pool')
+
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')
 
@@ -38,7 +41,6 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field rowButton ItemButton|Button
 ---@field text FontString
 ---@field slotkey string
----@field package __releaseContext Context
 item.itemRowProto = {}
 
 function item.itemRowProto:Unlock()
@@ -164,8 +166,7 @@ end
 
 ---@param ctx Context
 function item.itemRowProto:Release(ctx)
-  self.__releaseContext = ctx
-  item._pool:Release(self)
+  item._pool:Release(ctx, self)
 end
 
 function item.itemRowProto:UpdateSearch(text)
@@ -180,20 +181,18 @@ end
 local buttonCount = 0
 
 function item:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-  if self._pool.SetResetDisallowedIfNew then
-    self._pool:SetResetDisallowedIfNew()
-  end
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
 end
 
+---@param ctx Context
 ---@param i ItemRow
-function item:_DoReset(i)
-  i:ClearItem(i.__releaseContext)
-  i.__releaseContext = nil
+function item._DoReset(ctx, i)
+  i:ClearItem(ctx)
 end
 
+---@param ctx Context
 ---@return ItemRow
-function item:_DoCreate()
+function item:_DoCreate(ctx)
   local i = setmetatable({}, { __index = item.itemRowProto })
 
   -- Backwards compatibility for item data.
@@ -220,7 +219,7 @@ function item:_DoCreate()
 
   -- Button properties are set when setting the item,
   -- and setting them here will have no effect.
-  local button = itemFrame:Create()
+  local button = itemFrame:Create(ctx)
   i.button = button
 
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -274,7 +273,8 @@ function item:_DoCreate()
   return i
 end
 
+---@param ctx Context
 ---@return ItemRow
-function item:Create()
-  return self._pool:Acquire()
+function item:Create(ctx)
+  return self._pool:Acquire(ctx)
 end

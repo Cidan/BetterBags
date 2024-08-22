@@ -251,9 +251,10 @@ function bagFrame.bagProto:Sort(ctx)
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
-function bagFrame.bagProto:Wipe()
+---@param ctx Context
+function bagFrame.bagProto:Wipe(ctx)
   if self.currentView then
-    self.currentView:Wipe()
+    self.currentView:Wipe(ctx)
   end
 end
 
@@ -303,7 +304,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
   end
 
   if self.currentView and self.currentView:GetBagView() ~=  view:GetBagView() then
-    self.currentView:Wipe()
+    self.currentView:Wipe(ctx)
     self.currentView:GetContent():Hide()
   end
 
@@ -364,21 +365,22 @@ function bagFrame.bagProto:SetTitle(text)
   themes:SetTitle(self.frame, text)
 end
 
-function bagFrame.bagProto:SwitchToBank()
-  local ctx = context:New()
+---@param ctx Context
+function bagFrame.bagProto:SwitchToBank(ctx)
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
   AccountBankPanel.selectedTabID = nil
-  self:Wipe()
+  self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
 end
 
-function bagFrame.bagProto:SwitchToReagentBank()
-  local ctx = context:New()
+---@param ctx Context
+---@return boolean
+function bagFrame.bagProto:SwitchToReagentBank(ctx)
   if not IsReagentBankUnlocked() then
     StaticPopup_Show("CONFIRM_BUY_REAGENTBANK_TAB")
     return false
@@ -389,16 +391,16 @@ function bagFrame.bagProto:SwitchToReagentBank()
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
   AccountBankPanel.selectedTabID = nil
-  self:Wipe()
+  self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
   return true
 end
 
+---@param ctx Context
 ---@param tabIndex number
 ---@return boolean
-function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
-  local ctx = context:New()
+function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   self.bankTab = tabIndex
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 3
@@ -411,15 +413,15 @@ function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
   end
   self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
   self.currentItemCount = -1
-  self:Wipe()
+  self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
   return true
 end
 
-function bagFrame.bagProto:SwitchToBankAndWipe()
+---@param ctx Context
+function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
-  local ctx = context:New()
   ctx:Set('wipe', true)
   self.tabs:SetTabByIndex(1)
   self.bankTab = const.BANK_TAB.BANK
@@ -427,7 +429,7 @@ function bagFrame.bagProto:SwitchToBankAndWipe()
   BankFrame.activeTabIndex = 1
   self:SetTitle(L:G("Bank"))
   items:ClearBankCache(ctx)
-  self:Wipe()
+  self:Wipe(ctx)
 end
 
 ---@param ctx Context
@@ -622,20 +624,20 @@ function bagFrame:Create(ctx, kind)
 
     b.tabs:SetTabByIndex(1)
 
-    b.tabs:SetClickHandler(function(tabIndex, button)
+    b.tabs:SetClickHandler(function(ectx, tabIndex, button)
       if tabIndex == 1 then
         AccountBankPanel.TabSettingsMenu:Hide()
-        b:SwitchToBank()
+        b:SwitchToBank(ectx)
       elseif tabIndex == 2 then
         AccountBankPanel.TabSettingsMenu:Hide()
-        return b:SwitchToReagentBank()
+        return b:SwitchToReagentBank(ectx)
       else
         if button == "RightButton" or AccountBankPanel.TabSettingsMenu:IsShown() then
           AccountBankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
           AccountBankPanel.TabSettingsMenu:Show()
           AccountBankPanel.TabSettingsMenu:Update()
         end
-        b:SwitchToAccountBank(tabIndex)
+        b:SwitchToAccountBank(ectx, tabIndex)
       end
       return true
     end)

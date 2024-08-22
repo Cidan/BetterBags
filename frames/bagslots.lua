@@ -121,7 +121,7 @@ function BagSlots:CreatePanel(ctx, kind)
 
   local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS_LIST or const.BANK_ONLY_BAGS_LIST
   for i, bag in pairs(bags) do
-    local iframe = bagButton:Create()
+    local iframe = bagButton:Create(ctx)
     iframe:SetBag(ctx, bag)
     b.content:AddCell(tostring(i), iframe)
   end

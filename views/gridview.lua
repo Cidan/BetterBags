@@ -38,21 +38,22 @@ local async = addon:GetModule('Async')
 local debug = addon:GetModule('Debug')
 
 ---@param view View
-local function Wipe(view)
+---@param ctx Context
+local function Wipe(view, ctx)
   debug:Log("Wipe", "Grid View Wipe")
   view.content:Wipe()
   if view.freeSlot ~= nil then
-    view.freeSlot:Release()
+    view.freeSlot:Release(ctx)
     view.freeSlot = nil
   end
   if view.freeReagentSlot ~= nil then
-    view.freeReagentSlot:Release()
+    view.freeReagentSlot:Release(ctx)
     view.freeReagentSlot = nil
   end
   view.itemCount = 0
   for _, section in pairs(view.sections) do
-    section:ReleaseAllCells()
-    section:Release()
+    section:ReleaseAllCells(ctx)
+    section:Release(ctx)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
@@ -60,13 +61,14 @@ end
 
 -- ClearButton clears a button and makes it empty while preserving the slot,
 -- but does not release it, while also adding it to the deferred items list.
+---@param ctx Context
 ---@param view View
 ---@param item ItemData
-local function ClearButton(view, item)
+local function ClearButton(ctx, view, item)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   if cell then
-    cell:SetFreeSlots(bagid, slotid, -1)
+    cell:SetFreeSlots(ctx, bagid, slotid, -1)
   end
   view:AddDeferredItem(item.slotkey)
   local section = view:GetSlotSection(item.slotkey)
@@ -78,18 +80,19 @@ local function ClearButton(view, item)
 end
 
 -- CreateButton creates a button for an item and adds it to the view.
+---@param ctx Context
 ---@param view View
 ---@param item ItemData
-local function CreateButton(view, item)
+local function CreateButton(ctx, view, item)
   debug:Log("CreateButton", "Creating button for item", item.slotkey)
   view:RemoveDeferredItem(item.slotkey)
   local oldSection = view:GetSlotSection(item.slotkey)
   if oldSection then
     oldSection:RemoveCell(item.slotkey)
   end
-  local itemButton = view:GetOrCreateItemButton(item.slotkey)
-  itemButton:SetItem(item.slotkey)
-  local section = view:GetOrCreateSection(item.itemInfo.category)
+  local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+  itemButton:SetItem(ctx, item.slotkey)
+  local section = view:GetOrCreateSection(ctx, item.itemInfo.category)
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
   view:AddDirtySection(item.itemInfo.category)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
@@ -101,10 +104,10 @@ end
 local function UpdateButton(ctx, view, slotkey)
   debug:Log("UpdateButton", "Updating button for item", slotkey)
   view:RemoveDeferredItem(slotkey)
-  local itemButton = view:GetOrCreateItemButton(slotkey)
-  itemButton:SetItem(slotkey)
+  local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+  itemButton:SetItem(ctx, slotkey)
   if ctx:GetBool('wipe') == false and database:GetShowNewItemFlash(view.kind) then
-    view:FlashStack(slotkey)
+    view:FlashStack(ctx, slotkey)
   end
   local data = itemButton:GetItemData()
   view:AddDirtySection(data.itemInfo.category)
@@ -124,7 +127,7 @@ local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
     return
   end
   oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
-  oldSlotCell:SetItem(newSlotKey)
+  oldSlotCell:SetItem(ctx, newSlotKey)
   view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
   view.itemsByBagAndSlot[oldSlotKey] = nil
   view:SetSlotSection(newSlotKey, oldSlotSection)
@@ -151,7 +154,7 @@ end
 ---@param callback fun()
 local function GridView(view, ctx, bag, slotInfo, callback)
   if ctx:GetBool('wipe') then
-    view:Wipe()
+    view:Wipe(ctx)
   end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
@@ -166,7 +169,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
         -- place due to the deleted being the head of a stack.
         if not newSlotKey then
-          ClearButton(view, item)
+          ClearButton(ctx, view, item)
         else
           UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
         end
@@ -188,7 +191,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         function(item, _)
           local updateKey = view:AddButton(item)
           if not updateKey then
-            CreateButton(view, item)
+            CreateButton(ctx, view, item)
           else
             UpdateButton(ctx, view, updateKey)
           end
@@ -204,7 +207,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
           UpdateButton(ctx, view, item.slotkey)
         end
         if removeKey then
-          ClearButton(view, items:GetItemDataFromSlotKey(removeKey))
+          ClearButton(ctx, view, items:GetItemDataFromSlotKey(removeKey))
         end
       end
     end,
@@ -213,7 +216,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         for slotkey, _ in pairs(view:GetDeferredItems()) do
           local section = view:GetSlotSection(slotkey)
           section:RemoveCell(slotkey)
-          view.itemsByBagAndSlot[slotkey]:Wipe()
+          view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
           view:RemoveSlotSection(slotkey)
         end
         view:ClearDeferredItems()
@@ -235,8 +238,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
             if section:GetCellCount() == 0 then
               debug:Log("Section", "Removing section", sectionName)
               view:RemoveSection(sectionName)
-              section:ReleaseAllCells()
-              section:Release()
+              section:ReleaseAllCells(ctx)
+              section:Release(ctx)
             else
               debug:Log("Section", "Drawing section", sectionName)
               if sectionName == L:G("Recent Items") then
@@ -259,15 +262,15 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end,
     function()
       -- Get the free slots section and add the free slots to it.
-      local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
+      local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
       if database:GetShowAllFreeSpace(bag.kind) then
         freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
         freeSlotsSection:WipeOnlyContents()
         for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
           for slotid, item in pairs(data) do
             if not view:GetDeferredItems()[item.slotkey] then
-              local itemButton = view:GetOrCreateItemButton(item.slotkey)
-              itemButton:SetFreeSlots(bagid, slotid, 1, true)
+              local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+              itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
               freeSlotsSection:AddCell(item.slotkey, itemButton)
             end
           end
@@ -277,13 +280,13 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
         for name, freeSlotCount in pairs(slotInfo.emptySlots) do
           if slotInfo.freeSlotKeys[name] ~= nil then
-            local itemButton = view:GetOrCreateItemButton(name)
+            local itemButton = view:GetOrCreateItemButton(ctx, name)
             local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-            itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount)
+            itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
             freeSlotsSection:AddCell(name, itemButton)
           else
-            local itemButton = view:GetOrCreateItemButton(name)
-            itemButton:SetFreeSlots(1, 1, freeSlotCount)
+            local itemButton = view:GetOrCreateItemButton(ctx, name)
+            itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
             freeSlotsSection:AddCell(name, itemButton)
           end
         end

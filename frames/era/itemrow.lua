@@ -75,8 +75,9 @@ end
 
 local buttonCount = 0
 
+---@param ctx Context
 ---@return ItemRow
-function item:_DoCreate()
+function item:_DoCreate(ctx)
   local i = setmetatable({}, { __index = item.itemRowProto })
 
   -- Backwards compatibility for item data.
@@ -104,7 +105,7 @@ function item:_DoCreate()
 
   -- Button properties are set when setting the item,
   -- and setting them here will have no effect.
-  local button = itemFrame:Create()
+  local button = itemFrame:Create(ctx)
   i.button = button
   --i.button.NormalTexture:Hide()
   --i.button.NormalTexture:SetTexture(nil)

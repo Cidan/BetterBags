@@ -119,7 +119,7 @@ end
 function sectionItemListFrame:initSectionItem(frame, elementData)
   local ctx = context:New("SectionItemList_Init")
   if frame.item == nil then
-    frame.item = itemRowFrame:Create()
+    frame.item = itemRowFrame:Create(ctx)
     frame.item.frame:SetParent(frame)
     frame.item.frame:SetPoint("LEFT", frame, "LEFT", 4, 0)
     frame.item.frame:SetPoint("RIGHT", frame, "RIGHT", -9, 0)
@@ -140,9 +140,10 @@ function sectionItemListFrame:initSectionItem(frame, elementData)
     self:OnItemClick(ectx, b, elementData)
   end)
 
-  items:GetItemData({elementData.id}, function(itemData)
-    frame.item:SetStaticItemFromData(itemData[1])
+  items:GetItemData(ctx, {elementData.id}, function(ectx, itemData)
+    frame.item:SetStaticItemFromData(ectx, itemData[1])
   end)
+
   frame.item:SetStaticItemFromData(ctx, elementData.data)
 end
 
@@ -150,8 +151,9 @@ end
 ---@param elementData table
 function sectionItemListFrame:resetSectionItem(frame, elementData)
   _ = elementData
+  local ctx = context:New("SectionItemList_Reset")
   if frame.item then
-    frame.item:ClearItem()
+    frame.item:ClearItem(ctx)
     frame.item.rowButton:SetScript("OnMouseDown", nil)
   end
 end
@@ -210,11 +212,12 @@ function sectionItemList:Create(parent)
   sc.frame:SetPoint('TOPRIGHT', parent, 'TOPLEFT', -10, 0)
   sc.frame:SetWidth(300)
   sc.frame:EnableMouse(true)
-  sc.frame:SetScript("OnReceiveDrag", function()
-    sc:OnReceiveDrag()
+
+  addon.SetScript(sc.frame, "OnReceiveDrag", function(ctx)
+    sc:OnReceiveDrag(ctx)
   end)
-  sc.frame:SetScript("OnMouseDown", function()
-    sc:OnReceiveDrag()
+  addon.SetScript(sc.frame, "OnMouseDown", function(ctx)
+    sc:OnReceiveDrag(ctx)
   end)
 
   themes:RegisterSimpleWindow(sc.frame, L:G("Items"))

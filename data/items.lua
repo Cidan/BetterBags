@@ -566,9 +566,10 @@ function items:StageBagForUpdate(bagid, container)
   end
 end
 
+---@param ctx Context
 ---@param itemList number[]
----@param callback function<ItemData[]>
-function items:GetItemData(itemList, callback)
+---@param callback fun(ctx: Context, items: ItemData[])
+function items:GetItemData(ctx, itemList, callback)
   local container = ContinuableContainer:Create()
   for _, itemID in pairs(itemList) do
     local itemMixin = Item:CreateFromItemID(itemID)
@@ -582,7 +583,7 @@ function items:GetItemData(itemList, callback)
       self:AttachBasicItemInfo(itemID, data)
       table.insert(dataList, data)
     end
-    callback(dataList)
+    callback(ctx, dataList)
   end)
 end
 

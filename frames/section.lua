@@ -40,6 +40,9 @@ local items = addon:GetModule('Items')
 ---@class MovementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')
 
+---@class Pool: AceModule
+local pool = addon:GetModule('Pool')
+
 -------
 --- Section Prototype
 -------
@@ -114,9 +117,10 @@ function sectionProto:GetContent()
   return self.content
 end
 
-function sectionProto:ReleaseAllCells()
+---@param ctx Context
+function sectionProto:ReleaseAllCells(ctx)
   for _, cell in pairs(self.content.cells) do
-    cell:Release()
+    cell:Release(ctx)
   end
 end
 
@@ -176,8 +180,9 @@ function sectionProto:GetRawCells()
   return self.content.cells
 end
 
-function sectionProto:Release()
-  sectionFrame._pool:Release(self)
+---@param ctx Context
+function sectionProto:Release(ctx)
+  sectionFrame._pool:Release(ctx, self)
 end
 
 -- Grid will render the section as a grid of icons.
@@ -219,7 +224,7 @@ end
 -------
 
 function sectionFrame:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
   events:RegisterEvent('MODIFIER_STATE_CHANGED', function()
     if self.currentTooltip then
       self.currentTooltip:onTitleMouseEnter()
@@ -227,8 +232,10 @@ function sectionFrame:OnInitialize()
   end)
 end
 
+---@param ctx Context
 ---@param f Section
-function sectionFrame:_DoReset(f)
+function sectionFrame._DoReset(ctx, f)
+  _ = ctx
   f:EnableHeader()
   f:GetContent():SortHorizontal()
   f:Wipe()
@@ -379,8 +386,9 @@ function sectionFrame:_DoCreate()
 end
 
 -- Create will create a new section view.
+---@param ctx Context
 ---@return Section
-function sectionFrame:Create()
+function sectionFrame:Create(ctx)
   ---@return Section
-  return self._pool:Acquire()
+  return self._pool:Acquire(ctx)
 end

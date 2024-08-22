@@ -13,6 +13,9 @@ local events = addon:GetModule('Events')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Pool: AceModule
+local pool = addon:GetModule('Pool')
+
 ---@class BagButtonFrame: AceModule
 local BagButtonFrame = addon:NewModule('BagButton')
 
@@ -25,7 +28,6 @@ local buttonCount = 0
 ---@field empty boolean
 ---@field kind BagKind
 ---@field canBuy boolean
----@field package __releaseContext Context
 BagButtonFrame.bagButtonProto = {}
 
 ---@param ctx Context
@@ -36,8 +38,7 @@ end
 
 ---@param ctx Context
 function BagButtonFrame.bagButtonProto:Release(ctx)
-  self.__releaseContext = ctx
-  BagButtonFrame._pool:Release(self)
+  BagButtonFrame._pool:Release(ctx, self)
 end
 
 function BagButtonFrame.bagButtonProto:CheckForPurchase()
@@ -105,7 +106,6 @@ function BagButtonFrame.bagButtonProto:ClearBag(ctx)
   self.frame.ItemSlotBackground:SetVertexColor(1.0,1.0,1.0)
   SetItemButtonTexture(self.frame, nil)
   SetItemButtonQuality(self.frame, nil)
-  self.__releaseContext = nil
 end
 
 function BagButtonFrame.bagButtonProto:OnEnter()
@@ -168,17 +168,19 @@ function BagButtonFrame.bagButtonProto:OnReceiveDrag()
 end
 
 function BagButtonFrame:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
 end
 
+---@param ctx Context
 ---@return BagButton
-function BagButtonFrame:Create()
-  return self._pool:Acquire()
+function BagButtonFrame:Create(ctx)
+  return self._pool:Acquire(ctx)
 end
 
+---@param ctx Context
 ---@param b BagButton
-function BagButtonFrame:_DoReset(b)
-  b:ClearBag(b.__releaseContext)
+function BagButtonFrame._DoReset(ctx, b)
+  b:ClearBag(ctx)
 end
 
 ---@return BagButton

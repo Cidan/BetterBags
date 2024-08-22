@@ -31,12 +31,13 @@ local sort = addon:GetModule('Sort')
 local L = addon:GetModule('Localization')
 
 ---@param view View
-local function Wipe(view)
+---@param ctx Context
+local function Wipe(view, ctx)
   view.content:Wipe()
   view.itemCount = 0
   for _, section in pairs(view.sections) do
-    section:ReleaseAllCells()
-    section:Release()
+    section:ReleaseAllCells(ctx)
+    section:Release(ctx)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
@@ -65,26 +66,28 @@ end
 
 -- ClearButton clears a button and makes it empty while preserving the slot,
 -- but does not release it, while also adding it to the deferred items list.
+---@param ctx Context
 ---@param view View
 ---@param item ItemData
-local function ClearButton(view, item)
+local function ClearButton(ctx, view, item)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
-  cell:SetFreeSlots(bagid, slotid, -1)
+  cell:SetFreeSlots(ctx, bagid, slotid, -1)
   view:AddDeferredItem(item.slotkey)
   addon:GetBagFromBagID(bagid).drawOnClose = true
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
 -- button position and section to prevent a sort from happening.
+---@param ctx Context
 ---@param view View
 ---@param oldSlotKey string
 ---@param newSlotKey string
-local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
+local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
   local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
   local oldSlotSection = view:GetSlotSection(oldSlotKey)
   oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
-  oldSlotCell:SetItem(newSlotKey)
+  oldSlotCell:SetItem(ctx, newSlotKey)
   view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
   view.itemsByBagAndSlot[oldSlotKey] = nil
   view:SetSlotSection(newSlotKey, oldSlotSection)
@@ -92,39 +95,41 @@ local function UpdateDeletedSlot(view, oldSlotKey, newSlotKey)
 end
 
 -- CreateButton creates a button for an item and adds it to the view.
+---@param ctx Context
 ---@param view View
 ---@param item ItemData
-local function CreateButton(view, item)
+local function CreateButton(ctx, view, item)
   debug:Log("CreateButton", "Creating button for item", item.slotkey)
   view:RemoveDeferredItem(item.slotkey)
   local oldSection = view:GetSlotSection(item.slotkey)
   if oldSection then
     oldSection:RemoveCell(item.slotkey)
   end
-  local itemButton = view:GetOrCreateItemButton(item.slotkey)
-  itemButton:SetItem(item.slotkey)
-  local section = view:GetOrCreateSection(GetBagName(item.bagid))
+  local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+  itemButton:SetItem(ctx, item.slotkey)
+  local section = view:GetOrCreateSection(ctx, GetBagName(item.bagid))
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
 end
 
+---@param ctx Context
 ---@param view View
 ---@param slotkey string
-local function UpdateButton(view, slotkey)
+local function UpdateButton(ctx, view, slotkey)
   view:RemoveDeferredItem(slotkey)
-  local itemButton = view:GetOrCreateItemButton(slotkey)
-  itemButton:SetItem(slotkey)
+  local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+  itemButton:SetItem(ctx, slotkey)
 end
 
-
+---@param ctx Context
 ---@param view View
 ---@param newSlotKey string
-local function AddSlot(view, newSlotKey)
-  local itemButton = view:GetOrCreateItemButton(newSlotKey)
+local function AddSlot(ctx, view, newSlotKey)
+  local itemButton = view:GetOrCreateItemButton(ctx, newSlotKey)
   local newBagid = view:ParseSlotKey(newSlotKey)
-  local newSection = view:GetOrCreateSection(GetBagName(newBagid))
+  local newSection = view:GetOrCreateSection(ctx, GetBagName(newBagid))
   newSection:AddCell(newSlotKey, itemButton)
-  itemButton:SetItem(newSlotKey)
+  itemButton:SetItem(ctx, newSlotKey)
 end
 
 ---@param view View
@@ -144,7 +149,7 @@ end
 ---@param callback fun()
 local function BagView(view, ctx, bag, slotInfo, callback)
   if ctx:GetBool('wipe') then
-    view:Wipe()
+    view:Wipe(ctx)
   end
   -- Use the section grid sizing for this view type.
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_GRID)
@@ -154,9 +159,9 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   for _, item in pairs(removed) do
     local newSlotKey = view:RemoveButton(item)
     if not newSlotKey then
-      ClearButton(view, item)
+      ClearButton(ctx, view, item)
     else
-      UpdateDeletedSlot(view, item.slotkey, newSlotKey)
+      UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
     end
   end
 
@@ -164,14 +169,14 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   for _, item in pairs(added) do
     local updateKey = view:AddButton(item)
     if not updateKey then
-      CreateButton(view, item)
+      CreateButton(ctx, view, item)
     else
-      UpdateButton(view, updateKey)
+      UpdateButton(ctx, view, updateKey)
     end
   end
 
   for _, item in pairs(changed) do
-    UpdateButton(view, view:ChangeButton(item))
+    UpdateButton(ctx, view, view:ChangeButton(item))
   end
 
   for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
@@ -180,26 +185,26 @@ local function BagView(view, ctx, bag, slotInfo, callback)
       if C_Container.GetBagName(bagid) ~= nil then
         local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
         if itemButton == nil then
-          itemButton = itemFrame:Create()
+          itemButton = itemFrame:Create(ctx)
           view.itemsByBagAndSlot[slotkey] = itemButton
         end
-        itemButton:SetFreeSlots(bagid, slotid, -1)
-        local section = view:GetOrCreateSection(GetBagName(bagid))
+        itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
+        local section = view:GetOrCreateSection(ctx, GetBagName(bagid))
         section:AddCell(slotkey, itemButton)
       end
     end
   end
 
   for _, item in pairs(view.itemsByBagAndSlot) do
-    item:UpdateCount()
+    item:UpdateCount(ctx)
   end
 
   for sectionName, section in pairs(view:GetAllSections()) do
     if section:GetCellCount() == 0 then
       debug:Log("RemoveSection", "Removed because empty", sectionName)
       view:RemoveSection(sectionName)
-      section:ReleaseAllCells()
-      section:Release()
+      section:ReleaseAllCells(ctx)
+      section:Release(ctx)
     else
       debug:Log("KeepSection", "Section kept because not empty", sectionName)
       section:SetMaxCellWidth(12)

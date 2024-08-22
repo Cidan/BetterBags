@@ -76,10 +76,10 @@ local simpleDark = {
       close:SetHighlightTexture("Interface\\AddOns\\BetterBags\\textures\\close.png")
       close:SetSize(12, 12)
       close:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -8, -8)
-      close:SetScript("OnClick", function()
+      addon.SetScript(close, "OnClick", function(ctx)
         -- frame.Owner is the bag construct itself in 'frames\bag.lua'. You can use this
         -- to access the bag construct's methods and properties if needed.
-        frame.Owner:Hide()
+        frame.Owner:Hide(ctx)
       end)
       close:SetFrameLevel(1001)
 

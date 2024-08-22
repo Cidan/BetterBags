@@ -41,6 +41,9 @@ local search = addon:GetModule('Search')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Pool: AceModule
+local pool = addon:GetModule('Pool')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -74,7 +77,6 @@ local debug = addon:GetModule('Debug')
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
----@field package __releaseContext Context
 itemFrame.itemProto = {}
 
 local buttonCount = 0
@@ -536,8 +538,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:Release(ctx)
-  self.__releaseContext = ctx
-  itemFrame._pool:Release(self)
+  itemFrame._pool:Release(ctx, self)
 end
 
 ---@param ctx Context
@@ -600,10 +601,8 @@ function itemFrame.itemProto:ClearItem(ctx)
 end
 
 function itemFrame:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-  if self._pool.SetResetDisallowedIfNew then
-    self._pool:SetResetDisallowedIfNew()
-  end
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
+  --self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
 end
 
 function itemFrame:OnEnable()
@@ -618,7 +617,7 @@ function itemFrame:OnEnable()
   ---@type Item[]
   local frames = {}
   for i = 1, 700 do
-    frames[i] = self:Create()
+    frames[i] = self:Create(ctx)
   end
   for _, frame in pairs(frames) do
     frame:Release(ctx)
@@ -626,13 +625,14 @@ function itemFrame:OnEnable()
 
 end
 
+---@param ctx Context
 ---@param i Item
-function itemFrame:_DoReset(i)
-  i:ClearItem(i.__releaseContext)
-  i.__releaseContext = nil
+function itemFrame._DoReset(ctx, i)
+  i:ClearItem(ctx)
 end
 
-function itemFrame:_DoCreate()
+---@return Item
+function itemFrame:_DoCreate(_)
   local i = setmetatable({}, { __index = itemFrame.itemProto })
 
   -- Backwards compatibility for item data.
@@ -656,21 +656,21 @@ function itemFrame:_DoCreate()
   -- Install special handlers for themed interaction textures.
   button.PushedTexture:SetTexture("")
   button.NormalTexture:SetTexture("")
-  addon.HookScript(button, "OnMouseDown", function(ctx)
-    themes:GetItemButton(ctx, i):GetPushedTexture():Show()
+  addon.HookScript(button, "OnMouseDown", function(ectx)
+    themes:GetItemButton(ectx, i):GetPushedTexture():Show()
   end)
 
-  addon.HookScript(button, "OnMouseUp", function(ctx)
-    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
+  addon.HookScript(button, "OnMouseUp", function(ectx)
+    themes:GetItemButton(ectx, i):GetPushedTexture():Hide()
   end)
 
-  addon.HookScript(button, "OnLeave", function(ctx)
-    themes:GetItemButton(ctx, i):GetHighlightTexture():Hide()
-    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
+  addon.HookScript(button, "OnLeave", function(ectx)
+    themes:GetItemButton(ectx, i):GetHighlightTexture():Hide()
+    themes:GetItemButton(ectx, i):GetPushedTexture():Hide()
   end)
 
-  addon.HookScript(button, "OnEnter", function(ctx)
-    themes:GetItemButton(ctx, i):GetHighlightTexture():Show()
+  addon.HookScript(button, "OnEnter", function(ectx)
+    themes:GetItemButton(ectx, i):GetHighlightTexture():Show()
   end)
 
   -- Hide all the default textures on the clickable button.
@@ -710,8 +710,9 @@ function itemFrame:_DoCreate()
   return i
 end
 
+---@param ctx Context
 ---@return Item
-function itemFrame:Create()
+function itemFrame:Create(ctx)
   ---@return Item
-  return self._pool:Acquire()
+  return self._pool:Acquire(ctx)
 end

@@ -37,7 +37,7 @@ local debug = addon:GetModule('Debug')
 ---@field tabIndex TabButton[]
 ---@field buttonToName table<TabButton, string>
 ---@field selectedTab number
----@field clickHandler fun(name: number, button: string): boolean?
+---@field clickHandler fun(ctx: Context, name: number, button: string): boolean?
 ---@field width number
 local tabFrame = {}
 
@@ -178,13 +178,13 @@ function tabFrame:ResizeTabByIndex(index)
 
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
   if not tab.sabtClick then
-    decoration:SetScript("OnClick", function(_, button)
+    addon.SetScript(decoration, "OnClick", function(ctx, _, button)
       if tab.onClick then
         tab.onClick()
         return
       end
       if self.clickHandler and (self.selectedTab ~= index or button == "RightButton") then
-        if self.clickHandler(tab.id or tab.index, button) then
+        if self.clickHandler(ctx, tab.id or tab.index, button) then
           self:SetTabByIndex(index)
         end
       end
@@ -284,7 +284,7 @@ function tabFrame:SelectTab(index)
 	end
 end
 
----@param fn fun(name: number, button: string): boolean?
+---@param fn fun(ctx: Context, name: number, button: string): boolean?
 function tabFrame:SetClickHandler(fn)
   self.clickHandler = fn
 end

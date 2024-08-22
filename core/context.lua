@@ -131,7 +131,7 @@ function addon.HookScript(obj, script, func)
   obj:HookScript(script, function(...)
     local ctx = context:New()
     ctx:Set('event', script)
-    func(ctx, unpack(...))
+    func(ctx, unpack({...}))
   end)
 end
 
@@ -142,6 +142,6 @@ function addon.SetScript(obj, script, func)
   obj:SetScript(script, function(...)
     local ctx = context:New()
     ctx:Set('event', script)
-    func(ctx, unpack(...))
+    func(ctx, unpack({...}))
   end)
 end

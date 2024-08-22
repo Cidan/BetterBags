@@ -340,8 +340,9 @@ function itemFrame:_DoCreate()
   return i
 end
 
+---@param ctx Context
 ---@return Item
-function itemFrame:Create()
+function itemFrame:Create(ctx)
   ---@return Item
-  return self._pool:Acquire()
+  return self._pool:Acquire(ctx)
 end

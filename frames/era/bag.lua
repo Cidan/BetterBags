@@ -76,15 +76,15 @@ local context = addon:GetModule('Context')
 ---@class Anchor: AceModule
 local anchor = addon:GetModule('Anchor')
 
-function bagFrame.bagProto:SwitchToBankAndWipe()
+---@param ctx Context
+function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
-  local ctx = context:New()
   ctx:Set("wipe", true)
   --self.frame:SetTitle(L:G("Bank"))
   items:ClearBankCache(ctx)
-  self:Wipe()
+  self:Wipe(ctx)
 end
 
 ---@param ctx Context

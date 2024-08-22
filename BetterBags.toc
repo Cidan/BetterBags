@@ -35,6 +35,7 @@ core\boot.lua
 animations\fade.lua
 
 core\context.lua
+core\pool.lua
 
 debug\debug.lua
 debug\frames.lua

@@ -13,6 +13,9 @@ local debug = addon:GetModule('Debug')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
@@ -95,6 +98,7 @@ end
 ---@param interactingFrame? Frame
 function addon:ToggleAllBags(ctx, interactingFrame)
   if interactingFrame ~= nil then return end
+  ctx = ctx or context:New('ToggleAllBags')
   debug:Log('Hooks', 'ToggleAllBags')
   if addon.Bags.Backpack:IsShown() then
     addon.backpackShouldClose = true
@@ -104,11 +108,11 @@ function addon:ToggleAllBags(ctx, interactingFrame)
   events:SendMessage('bags/OpenClose', ctx)
 end
 
----@param ctx Context
 ---@param interactingFrame Frame
-function addon:CloseSpecialWindows(ctx, interactingFrame)
+function addon:CloseSpecialWindows(interactingFrame)
   if interactingFrame ~= nil then return end
 
+  local ctx = context:New('CloseSpecialWindows')
   ---@class Async: AceModule
   local async = addon:GetModule('Async')
 
@@ -116,7 +120,7 @@ function addon:CloseSpecialWindows(ctx, interactingFrame)
   addon.backpackShouldClose = true
   async:AfterCombat(function()
     addon.Bags.Bank:Hide(ctx)
-    addon.Bags.Bank:SwitchToBankAndWipe()
+    addon.Bags.Bank:SwitchToBankAndWipe(ctx)
   end)
   events:SendMessage('addon/CloseSpecialWindows', ctx)
   if C_Bank then
@@ -143,6 +147,6 @@ function addon:CloseBank(ctx, interactingFrame)
   debug:Log('Hooks', 'CloseBank')
   if interactingFrame ~= nil then return end
   addon.Bags.Bank:Hide(ctx)
-  addon.Bags.Bank:SwitchToBankAndWipe()
+  addon.Bags.Bank:SwitchToBankAndWipe(ctx)
   events:SendMessage('bags/BankClosed', ctx)
 end

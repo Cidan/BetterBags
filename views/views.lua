@@ -50,7 +50,7 @@ local stackProto = {}
 ---@field deferredItems table<string, boolean>
 ---@field dirtySections table<string, boolean>
 ---@field private stacks table<string, Stack>
----@field WipeHandler fun(view: View)
+---@field WipeHandler fun(view: View, ctx: Context)
 views.viewProto = {}
 
 function views:OnEnable()
@@ -82,9 +82,10 @@ function views.viewProto:AddSlot(newSlotKey)
   error('AddSlot method not implemented')
 end
 
-function views.viewProto:Wipe()
+---@param ctx Context
+function views.viewProto:Wipe(ctx)
   assert(self.WipeHandler, 'WipeHandler not set')
-  self.WipeHandler(self)
+  self.WipeHandler(self, ctx)
   self:ClearDeferredItems()
   self:ClearDirtySections()
   wipe(self.stacks)
@@ -107,13 +108,14 @@ end
 
 -- GetOrCreateItemButton will get an existing item button by slotkey,
 -- creating it if it doesn't exist.
+---@param ctx Context
 ---@param slotkey string
 ---@param createFunc? fun(): Item|ItemRow
 ---@return Item
-function views.viewProto:GetOrCreateItemButton(slotkey, createFunc)
+function views.viewProto:GetOrCreateItemButton(ctx, slotkey, createFunc)
   local item = self.itemsByBagAndSlot[slotkey]
   if item == nil then
-    item = self:GetItemFrame(createFunc)
+    item = self:GetItemFrame(ctx, createFunc)
     self.itemsByBagAndSlot[slotkey] = item
   end
   return item
@@ -121,13 +123,14 @@ end
 
 -- GetOrCreateSection will get an existing section by category,
 -- creating it if it doesn't exist.
+---@param ctx Context
 ---@param category string
 ---@param onlyCreate? boolean If true, only create the section, but don't add it to the view.
 ---@return Section
-function views.viewProto:GetOrCreateSection(category, onlyCreate)
+function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
   local section = self.sections[category]
   if section == nil then
-    section = sectionFrame:Create()
+    section = sectionFrame:Create(ctx)
     section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
     if not onlyCreate then
@@ -135,7 +138,7 @@ function views.viewProto:GetOrCreateSection(category, onlyCreate)
     end
     self.sections[category] = section
     if self.bagview == const.BAG_VIEW.SECTION_GRID then
-      categories:CreateCategory({
+      categories:CreateCategory(ctx, {
         name = category,
         itemList = {},
         dynamic = true,
@@ -192,18 +195,20 @@ function views.viewProto:ParseSlotKey(slotkey)
   return tonumber(bagid) --[[@as number]], tonumber(slotid) --[[@as number]]
 end
 
+---@param ctx Context
 ---@param createFunc? fun(): Item
 ---@return Item
-function views.viewProto:GetItemFrame(createFunc)
+function views.viewProto:GetItemFrame(ctx, createFunc)
   self.itemFrames = self.itemFrames or {}
-  local i = createFunc and createFunc() or itemFrame:Create()
+  local i = createFunc and createFunc() or itemFrame:Create(ctx)
   tinsert(self.itemFrames, i)
   return i
 end
 
-function views.viewProto:ReleaseItemFrames()
+---@param ctx Context
+function views.viewProto:ReleaseItemFrames(ctx)
   for _, item in pairs(self.itemFrames) do
-    item:Release()
+    item:Release(ctx)
   end
   wipe(self.itemFrames)
 end
@@ -270,8 +275,9 @@ function views.viewProto:UpdateListSize(bag)
   _ = bag
 end
 
+---@param ctx Context
 ---@param slotkey string
-function views.viewProto:FlashStack(slotkey)
+function views.viewProto:FlashStack(ctx, slotkey)
   -- HACKFIX: Disable this for non retail clients due to
   -- a lack of stable sort API.
   if not addon.isRetail then return end
@@ -279,16 +285,16 @@ function views.viewProto:FlashStack(slotkey)
   local item = items:GetItemDataFromSlotKey(slotkey)
   local stack = self.stacks[item.itemHash]
   if not stack then return end
-  items:ClearNewItem(slotkey)
-  items:ClearNewItem(stack.item)
+  items:ClearNewItem(ctx, slotkey)
+  items:ClearNewItem(ctx, stack.item)
   for subItemSlotKey in pairs(stack.subItems) do
-    items:ClearNewItem(subItemSlotKey)
+    items:ClearNewItem(ctx, subItemSlotKey)
     if self.itemsByBagAndSlot[subItemSlotKey] then
-      self.itemsByBagAndSlot[subItemSlotKey]:ClearFlashItem()
+      self.itemsByBagAndSlot[subItemSlotKey]:ClearFlashItem(ctx)
     end
   end
-  local itemButton = self:GetOrCreateItemButton(slotkey)
-  itemButton:FlashItem()
+  local itemButton = self:GetOrCreateItemButton(ctx, slotkey)
+  itemButton:FlashItem(ctx)
 end
 
 -- RemoveButton removes an item from a stack if it's in a stack,

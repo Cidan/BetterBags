@@ -31,7 +31,7 @@ local decoratorFrames = {}
 ---@param panel GuildWarsDecoration
 ---@param texture string
 ---@param tooltip string
----@param onClick fun()
+---@param onClick fun(ctx: Context)
 ---@return Button
 local function newPanelButton(panel, texture, tooltip, onClick)
   local button = CreateFrame("Button", nil, panel)
@@ -40,9 +40,9 @@ local function newPanelButton(panel, texture, tooltip, onClick)
   button:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
   button:SetHighlightTexture(texture)
   button:GetHighlightTexture():SetTexCoord(0, 1, 0, 1)
-  button:SetScript("OnClick", onClick)
-  button:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+  addon.SetScript(button, "OnClick", onClick)
+  addon.SetScript(button, "OnEnter", function(_)
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
     GameTooltip:SetText(tooltip)
     GameTooltip:Show()
   end)
@@ -97,8 +97,8 @@ local gw2Theme = {
 
       local close = CreateFrame("Button", nil, decoration.gwHeader, "UIPanelCloseButtonNoScripts")
       close:SetPoint("TOPRIGHT", decoration.gwHeader, "TOPRIGHT", -5, -25)
-      close:SetScript("OnClick", function()
-        frame.Owner:Hide()
+      addon.SetScript(close, "OnClick", function(ctx)
+        frame.Owner:Hide(ctx)
       end)
       close:GwSkinButton(true)
 
@@ -123,8 +123,8 @@ local gw2Theme = {
         end
       end)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/CollectionsMicroButton-Up", "Sort Bags", function()
-        frame.Owner:Sort()
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/CollectionsMicroButton-Up", "Sort Bags", function(ctx)
+        frame.Owner:Sort(ctx)
       end)
 
       if frame.Owner.kind == const.BAG_KIND.BACKPACK then
@@ -155,8 +155,8 @@ local gw2Theme = {
         end)
       end
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/MainMenuMicroButton-Up", "Open Settings", function()
-        contextMenu:Show(frame.Owner.menuList)
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/MainMenuMicroButton-Up", "Open Settings", function(ctx)
+        contextMenu:Show(ctx, frame.Owner.menuList)
       end)
 
     else
@@ -185,8 +185,8 @@ local gw2Theme = {
 
       local close = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonNoScripts")
       close:SetPoint("TOPRIGHT", decoration.gwHeader, "TOPRIGHT", -5, -25)
-      close:SetScript("OnClick", function()
-        frame.Owner:Hide()
+      addon.SetScript(close, "OnClick", function(ctx)
+        frame.Owner:Hide(ctx)
       end)
       close:GwSkinButton(true)
     else

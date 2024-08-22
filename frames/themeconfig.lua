@@ -39,8 +39,8 @@ function themeConfigFrame:initThemeItem(f, data)
   f:SetHeight(30)
   f:SetNormalFontObject(fonts.UnitFrame12White)
   f:SetText(data.theme.Name)
-  f:SetScript("OnClick", function()
-    themes:ApplyTheme(data.theme.key)
+  addon.SetScript(f, "OnClick", function(ctx)
+    themes:ApplyTheme(ctx, data.theme.key)
   end)
 end
 
