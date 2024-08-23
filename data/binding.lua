@@ -54,7 +54,7 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = const.BINDING_SCOPE.ACCOUNT
     end
 
-    if C_Container.GetContainerItemPurchaseInfo(bagID, slotID or equipSlotIndex, isEquipped) then
+    if C_Container.GetContainerItemPurchaseInfo(bagID or 0, slotID or equipSlotIndex, isEquipped) then
       bindinginfo.binding = const.BINDING_SCOPE.REFUNDABLE
     end
 
