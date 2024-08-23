@@ -18,6 +18,8 @@ local binding = addon:NewModule('Binding')
 ---@return BindingInfo
 function binding.GetItemBinding(itemLocation, bindType)
   local bagID, slotID = itemLocation:GetBagAndSlot()
+  local equipSlotIndex = itemLocation:GetEquipmentSlot()
+  local isEquipped = itemLocation:IsEquipmentSlot() or false
   ---@type BindingInfo
   local bindinginfo = {
     binding = const.BINDING_SCOPE.UNKNOWN,
@@ -52,7 +54,7 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = const.BINDING_SCOPE.ACCOUNT
     end
 
-    if C_Container.GetContainerItemPurchaseInfo(bagID, slotID, false) then
+    if C_Container.GetContainerItemPurchaseInfo(bagID, slotID or equipSlotIndex, isEquipped) then
       bindinginfo.binding = const.BINDING_SCOPE.REFUNDABLE
     end
 
