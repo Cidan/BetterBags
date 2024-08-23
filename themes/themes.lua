@@ -143,7 +143,7 @@ function themes:ApplyTheme(ctx, key)
     frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", offset, 0)
     frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", offset, 0)
     if frame.Owner.tabs then
-      frame.Owner.tabs:Reload()
+      frame.Owner.tabs:Reload(ctx)
     end
   end
 
@@ -295,9 +295,10 @@ function themes:GetItemButton(ctx, item)
   return button
 end
 
+---@param ctx Context
 ---@param tab TabButton
 ---@return PanelTabButtonTemplate
-function themes:GetTabButton(tab)
+function themes:GetTabButton(ctx, tab)
   local theme = self:GetCurrentTheme()
   if theme.Tab then
     return theme.Tab(tab)
@@ -305,7 +306,7 @@ function themes:GetTabButton(tab)
   local tabIndex = tab.index
   local decoration = self.tabs[tabIndex]
   if decoration then
-    async:AfterCombat(function()
+    async:AfterCombat(ctx, function(_)
       decoration:Show()
     end)
     return decoration

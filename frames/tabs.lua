@@ -41,11 +41,12 @@ local debug = addon:GetModule('Debug')
 ---@field width number
 local tabFrame = {}
 
+---@param ctx Context
 ---@param name string
 ---@param id? number
 ---@param onClick? fun()
 ---@param sabtClick? Button
-function tabFrame:AddTab(name, id, onClick, sabtClick)
+function tabFrame:AddTab(ctx, name, id, onClick, sabtClick)
   ---@type TabButton
   local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame) --[[@as TabButton]]
   tab.sabtClick = sabtClick
@@ -63,8 +64,8 @@ function tabFrame:AddTab(name, id, onClick, sabtClick)
   table.insert(self.tabIndex, tab)
   tab.index = #self.tabIndex
   self.buttonToName[tab] = name
-  self:DeselectTab(tab.index)
-  self:ResizeTabByIndex(tab.index)
+  self:DeselectTab(ctx, tab.index)
+  self:ResizeTabByIndex(ctx, tab.index)
   self:ReanchorTabs()
 end
 
@@ -85,11 +86,12 @@ function tabFrame:TabExists(name)
   return self:GetTabByName(name) ~= nil
 end
 
-function tabFrame:Reload()
+---@param ctx Context
+function tabFrame:Reload(ctx)
   for index in pairs(self.tabIndex) do
-    self:ResizeTabByIndex(index)
+    self:ResizeTabByIndex(ctx, index)
   end
-  self:SetTabByIndex(self.selectedTab)
+  self:SetTabByIndex(ctx, self.selectedTab)
 end
 
 function tabFrame:ReanchorTabs()
@@ -153,23 +155,25 @@ function tabFrame:TabExistsByID(id)
   return false
 end
 
+---@param ctx Context
 ---@param id number
 ---@param name string
-function tabFrame:RenameTabByID(id, name)
+function tabFrame:RenameTabByID(ctx, id, name)
   for index, tab in pairs(self.tabIndex) do
     if tab.id == id then
       tab.name = name
       self.buttonToName[tab] = name
-      self:ResizeTabByIndex(index)
+      self:ResizeTabByIndex(ctx, index)
       return
     end
   end
 end
 
+---@param ctx Context
 ---@param index number
-function tabFrame:ResizeTabByIndex(index)
+function tabFrame:ResizeTabByIndex(ctx, index)
   local tab = self.tabIndex[index]
-  local decoration = themes:GetTabButton(tab)
+  local decoration = themes:GetTabButton(ctx, tab)
   decoration.Text:SetText(tab.name)
 
   PanelTemplates_TabResize(decoration)
@@ -178,37 +182,39 @@ function tabFrame:ResizeTabByIndex(index)
 
   decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
   if not tab.sabtClick then
-    addon.SetScript(decoration, "OnClick", function(ctx, _, button)
+    addon.SetScript(decoration, "OnClick", function(ectx, _, button)
       if tab.onClick then
         tab.onClick()
         return
       end
       if self.clickHandler and (self.selectedTab ~= index or button == "RightButton") then
-        if self.clickHandler(ctx, tab.id or tab.index, button) then
-          self:SetTabByIndex(index)
+        if self.clickHandler(ectx, tab.id or tab.index, button) then
+          self:SetTabByIndex(ectx, index)
         end
       end
     end)
   end
 end
 
+---@param ctx Context
 ---@param id number
-function tabFrame:SetTabByID(id)
+function tabFrame:SetTabByID(ctx, id)
   for index, tab in pairs(self.tabIndex) do
     if tab.id == id then
-      self:SetTabByIndex(index)
+      self:SetTabByIndex(ctx, index)
       return
     end
   end
 end
 
+---@param ctx Context
 ---@param index number
-function tabFrame:SetTabByIndex(index)
+function tabFrame:SetTabByIndex(ctx, index)
   for i in pairs(self.tabIndex) do
     if i == index then
-      self:SelectTab(i)
+      self:SelectTab(ctx, i)
     else
-      self:DeselectTab(i)
+      self:DeselectTab(ctx, i)
     end
   end
   self.selectedTab = index
@@ -241,10 +247,11 @@ function tabFrame:HideTabByName(name)
 end
 
 ---@private
+---@param ctx Context
 ---@param index number
-function tabFrame:DeselectTab(index)
+function tabFrame:DeselectTab(ctx, index)
   local tab = self.tabIndex[index]
-  local decoration = themes:GetTabButton(tab)
+  local decoration = themes:GetTabButton(ctx, tab)
 	decoration.Left:Show()
 	decoration.Middle:Show()
 	decoration.Right:Show()
@@ -260,10 +267,11 @@ function tabFrame:DeselectTab(index)
 end
 
 ---@private
+---@param ctx Context
 ---@param index number
-function tabFrame:SelectTab(index)
+function tabFrame:SelectTab(ctx, index)
   local tab = self.tabIndex[index]
-  local decoration = themes:GetTabButton(tab)
+  local decoration = themes:GetTabButton(ctx, tab)
 	decoration.Left:Hide()
 	decoration.Middle:Hide()
 	decoration.Right:Hide()

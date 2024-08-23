@@ -53,7 +53,7 @@ function addon.OnUpdate(ctx)
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldOpen = false
     addon.backpackShouldClose = false
-    addon.Bags.Backpack:Show()
+    addon.Bags.Backpack:Show(ctx)
     addon:UpdateButtonHighlight()
     if addon.atInteracting then
       events:SendMessage('bags/FullRefreshAll', ctx)
@@ -118,9 +118,9 @@ function addon:CloseSpecialWindows(interactingFrame)
 
   debug:Log('Hooks', 'CloseSpecialWindows')
   addon.backpackShouldClose = true
-  async:AfterCombat(function()
-    addon.Bags.Bank:Hide(ctx)
-    addon.Bags.Bank:SwitchToBankAndWipe(ctx)
+  async:AfterCombat(ctx, function(ectx)
+    addon.Bags.Bank:Hide(ectx)
+    addon.Bags.Bank:SwitchToBankAndWipe(ectx)
   end)
   events:SendMessage('addon/CloseSpecialWindows', ctx)
   if C_Bank then

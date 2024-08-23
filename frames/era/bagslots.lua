@@ -88,7 +88,7 @@ function BagSlots:CreatePanel(ctx, kind)
     database:SetBagView(kind, database:GetPreviousView(kind))
     events:SendMessage('bags/FullRefreshAll', ectx)
   end)
-  events:RegisterEvent("BAG_CONTAINER_UPDATE", function() b:Draw() end)
+  events:RegisterEvent("BAG_CONTAINER_UPDATE", function(ectx) b:Draw(ectx) end)
   b.kind = kind
   b:Hide()
   return b

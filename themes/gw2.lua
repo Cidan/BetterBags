@@ -114,11 +114,11 @@ local gw2Theme = {
       leftSide:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 25)
       leftSide:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 25)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/BagMicroButton-Up", "Show Bags", function()
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/BagMicroButton-Up", "Show Bags", function(ctx)
         if frame.Owner.slots:IsShown() then
           frame.Owner.slots:Hide()
         else
-          frame.Owner.slots:Draw()
+          frame.Owner.slots:Draw(ctx)
           frame.Owner.slots:Show()
         end
       end)

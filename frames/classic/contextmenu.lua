@@ -215,10 +215,11 @@ function contextMenu:CreateContextMenu(bag)
     tooltipTitle = L:G("Show Bags"),
     tooltipText = L:G("Click to toggle the display of the bag slots."),
     func = function()
+      local ctx = context:New('ToggleBagSlots')
       if bag.slots:IsShown() then
         bag.slots:Hide()
       else
-        bag.slots:Draw()
+        bag.slots:Draw(ctx)
         bag.slots:Show()
       end
     end

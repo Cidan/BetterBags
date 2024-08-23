@@ -283,7 +283,7 @@ function addon:OnEnable()
     debug:Log("init/OnInitialize/items", "Drawing bank")
      -- Show the bank frame if it's not already shown.
     if not addon.Bags.Bank:IsShown() and addon.atBank then
-      addon.Bags.Bank:Show()
+      addon.Bags.Bank:Show(ctx)
     end
     addon.Bags.Bank:Draw(ctx, slotInfo, function()
       events:SendMessage('bags/Draw/Bank/Done', ctx)

@@ -127,18 +127,19 @@ local tabs = addon:GetModule('Tabs')
 ---@field bankTab BankTab
 bagFrame.bagProto = {}
 
-function bagFrame.bagProto:GenerateWarbankTabs()
+---@param ctx Context
+function bagFrame.bagProto:GenerateWarbankTabs(ctx)
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if self.tabs:TabExistsByID(data.ID) and self.tabs:GetTabNameByID(data.ID) ~= data.name then
-      self.tabs:RenameTabByID(data.ID, data.name)
+      self.tabs:RenameTabByID(ctx, data.ID, data.name)
     elseif not self.tabs:TabExistsByID(data.ID) then
-      self.tabs:AddTab(data.name, data.ID)
+      self.tabs:AddTab(ctx, data.name, data.ID)
     end
   end
 
   if not self.tabs:TabExists("Purchase Warbank Tab") then
-    self.tabs:AddTab("Purchase Warbank Tab", nil, nil, AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
+    self.tabs:AddTab(ctx, "Purchase Warbank Tab", nil, nil, AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
   end
 
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
@@ -177,7 +178,8 @@ function bagFrame.bagProto:ShowBankAndReagentTabs()
   self.tabs:ShowTabByIndex(2)
 end
 
-function bagFrame.bagProto:Show()
+---@param ctx Context
+function bagFrame.bagProto:Show(ctx)
   if self.frame:IsShown() then
     return
   end
@@ -185,10 +187,10 @@ function bagFrame.bagProto:Show()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
 
   if self.kind == const.BAG_KIND.BANK and addon.isRetail then
-    self:GenerateWarbankTabs()
+    self:GenerateWarbankTabs(ctx)
     if addon.atWarbank then
       self:HideBankAndReagentTabs()
-      self.tabs:SetTabByID(13)
+      self.tabs:SetTabByID(ctx, 13)
     else
       self:ShowBankAndReagentTabs()
     end
@@ -227,7 +229,7 @@ function bagFrame.bagProto:Toggle(ctx)
   if self.frame:IsShown() then
     self:Hide(ctx)
   else
-    self:Show()
+    self:Show(ctx)
   end
 end
 
@@ -320,7 +322,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     end
     self:OnResize()
     if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
-      self.slots:Draw()
+      self.slots:Draw(ctx)
       self.slots:Show()
     end
     events:SendMessage('bag/RedrawIcons', ctx, self)
@@ -423,7 +425,7 @@ end
 function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
   ctx:Set('wipe', true)
-  self.tabs:SetTabByIndex(1)
+  self.tabs:SetTabByIndex(ctx, 1)
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
@@ -583,7 +585,7 @@ function bagFrame:Create(ctx, kind)
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    b.searchFrame = searchBox:Create(b.frame)
+    b.searchFrame = searchBox:Create(ctx, b.frame)
   end
 
   if kind == const.BAG_KIND.BACKPACK then
@@ -619,10 +621,10 @@ function bagFrame:Create(ctx, kind)
     end
 
     b.tabs = tabs:Create(b.frame)
-    b.tabs:AddTab("Bank")
-    b.tabs:AddTab("Reagent Bank")
+    b.tabs:AddTab(ctx, "Bank")
+    b.tabs:AddTab(ctx, "Reagent Bank")
 
-    b.tabs:SetTabByIndex(1)
+    b.tabs:SetTabByIndex(ctx, 1)
 
     b.tabs:SetClickHandler(function(ectx, tabIndex, button)
       if tabIndex == 1 then
@@ -643,11 +645,11 @@ function bagFrame:Create(ctx, kind)
     end)
     -- BANK_TAB_SETTINGS_UPDATED
     -- BANK_TABS_CHANGED
-    events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function()
-      b:GenerateWarbankTabs()
+    events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function(ectx)
+      b:GenerateWarbankTabs(ectx)
     end)
-    events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function()
-      b:GenerateWarbankTabs()
+    events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function(ectx)
+      b:GenerateWarbankTabs(ectx)
     end)
   end
 

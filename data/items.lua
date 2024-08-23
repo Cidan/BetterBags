@@ -384,7 +384,7 @@ end
 ---@param kind BagKind
 ---@param dataCache table<string, ItemData>
 ---@param equipmentCache? table<number, ItemData>
----@param callback fun()
+---@param callback fun(ctx: Context)
 function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
   -- Wipe the data if needed before loading the new data.
   if ctx:GetBool('wipe') then
@@ -408,7 +408,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     table.insert(list, item)
   end
 
-  async:Batch(10, list, function (currentItem, _)
+  async:Batch(ctx, 10, list, function (ectx, currentItem, _)
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
     local name = ""
@@ -428,8 +428,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
       slotInfo.addedItems[currentItem.slotkey] = currentItem
-      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
-        self:MarkItemAsNew(ctx, currentItem)
+      if not ectx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
+        self:MarkItemAsNew(ectx, currentItem)
       end
       search:Add(currentItem)
     elseif items:ItemRemoved(currentItem, previousItem) then
@@ -466,13 +466,13 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       slotInfo.totalItems = slotInfo.totalItems + 1
     end
     local oldCategory = currentItem.itemInfo.category
-    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
+    currentItem.itemInfo.category = self:GetCategory(ectx, currentItem)
     search:UpdateCategoryIndex(currentItem, oldCategory)
-  end, function()
+  end, function(ectx)
     for _, addedItem in pairs(slotInfo.addedItems) do
       for _, removedItem in pairs(slotInfo.removedItems) do
         if addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
-          self:ClearNewItem(ctx, addedItem.slotkey)
+          self:ClearNewItem(ectx, addedItem.slotkey)
         end
       end
     end
@@ -496,7 +496,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
         end
       end
     end
-    callback()
+    callback(ectx)
   end)
 end
 
@@ -535,16 +535,16 @@ end
 ---@param kind BagKind
 ---@param container ItemLoader
 function items:ProcessContainer(ctx, kind, container)
-  container:Load(function()
+  container:Load(ctx, function(ectx)
     if self._firstLoad[kind] == true then
       self._firstLoad[kind] = false
-      ctx:Set('wipe', true)
+      ectx:Set('wipe', true)
     end
 
-    self:LoadItems(ctx, kind, container:GetDataCache(), const.BAG_KIND.BACKPACK and container:GetEquipmentDataCache() or nil, function()
+    self:LoadItems(ectx, kind, container:GetDataCache(), const.BAG_KIND.BACKPACK and container:GetEquipmentDataCache() or nil, function(ictx)
       local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-      events:SendMessageLater(ev, ctx, self.slotInfo[kind])
+      events:SendMessageLater(ev, ictx, self.slotInfo[kind])
       if kind == const.BAG_KIND.BACKPACK then
         debug:EndProfile('Backpack Data Pipeline')
       end

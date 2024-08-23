@@ -151,7 +151,6 @@ function refresh:OnEnable()
   -- Register when the bag slots change for any reason.
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ctx)
     ctx:Set("wipe", true)
-    print("this bag update?")
     table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
   end)
 

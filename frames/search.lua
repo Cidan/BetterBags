@@ -12,6 +12,9 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
@@ -39,17 +42,19 @@ searchBox.searchProto = {}
 -- BetterBags_ToggleSearch toggles the search view. This function is used in the
 -- search key bind.
 function BetterBags_ToggleSearch()
-  searchBox.searchFrame:Toggle()
+  local ctx = context:New('BetterBags_ToggleSearch')
+  searchBox.searchFrame:Toggle(ctx)
 end
 
-function searchBox.searchProto:Toggle()
+---@param ctx Context
+function searchBox.searchProto:Toggle(ctx)
   if self.frame:IsShown() then
     self.textBox:SetText("")
     self.textBox:ClearFocus()
     self.fadeOutGroup:Play()
   else
     self.textBox:ClearFocus()
-    addon.Bags.Backpack:Show()
+    addon.Bags.Backpack:Show(ctx)
     self.fadeInGroup:Play()
   end
 end
@@ -148,9 +153,10 @@ function searchBox:GetText()
   return self.searchFrame.textBox:GetText()
 end
 
+---@param ctx Context
 ---@param parent Frame
 ---@return SearchFrame
-function searchBox:Create(parent)
+function searchBox:Create(ctx, parent)
   local sf = setmetatable({}, {__index = searchBox.searchProto})
   local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "BetterBagsSearchPanelTemplate") --[[@as Frame]]
   f:SetSize(400, 75)
@@ -181,11 +187,11 @@ function searchBox:Create(parent)
   textBox:SetScript("OnEscapePressed", function(me)
     ---@cast me +EditBox
     me:ClearFocus()
-    sf:Toggle()
+    sf:Toggle(ctx)
   end)
 
-  addon.SetScript(textBox, "OnTextChanged", function(ctx)
-    sf:UpdateSearch(ctx)
+  addon.SetScript(textBox, "OnTextChanged", function(ectx)
+    sf:UpdateSearch(ectx)
   end)
 
   textBox:SetScript("OnEnterPressed", function()

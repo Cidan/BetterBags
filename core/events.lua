@@ -204,6 +204,15 @@ function events:SendMessage(event, ctx, ...)
   self._eventHandler:SendMessage(event, unpack(args))
 end
 
+---@param event? string
+---@param ctx Context
+---@param ... any
+function events:SendMessageIf(event, ctx, ...)
+  if event then
+    self:SendMessage(event, ctx, ...)
+  end
+end
+
 ---@param event string
 ---@param ctx Context
 ---@param ... any

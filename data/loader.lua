@@ -105,11 +105,13 @@ function ItemLoader:ProcessMixin(itemMixin)
   end)
 end
 
-function ItemLoader:Load(callback)
-  async:Batch(10, self.mixins, function(itemMixin, _)
+---@param ctx Context
+---@param callback fun(ctx: Context)
+function ItemLoader:Load(ctx, callback)
+  async:Batch(ctx, 10, self.mixins, function(_, itemMixin, _)
     self:ProcessMixin(itemMixin)
-  end, function()
-    async:Until(function()
+  end, function(ectx)
+    async:Until(ectx, function(_)
       for itemGUID, location in pairs(self.locations) do
         local l = location:GetItemLocation()
         if l == nil or (l.IsValid and not l:IsValid()) then
@@ -124,8 +126,8 @@ function ItemLoader:Load(callback)
         return true
       end
       return false
-    end, function()
-      callback()
+    end, function(ictx)
+      callback(ictx)
     end)
   end)
 end

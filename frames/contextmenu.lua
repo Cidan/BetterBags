@@ -242,10 +242,11 @@ function contextMenu:CreateContextMenu(bag)
         print("BetterBags: "..L:G("Cannot toggle bag slots in combat."))
         return
       end
+      local ctx = context:New('ToggleBagSlots')
       if bag.slots:IsShown() then
         bag.slots:Hide()
       else
-        bag.slots:Draw()
+        bag.slots:Draw(ctx)
         bag.slots:Show()
       end
     end

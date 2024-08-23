@@ -49,10 +49,12 @@ local context = addon:GetModule('Context')
 ---@field fadeOutGroup AnimationGroup
 BagSlots.bagSlotProto = {}
 
-function BagSlots.bagSlotProto:Draw()
+---@param ctx Context
+function BagSlots.bagSlotProto:Draw(ctx)
   debug:Log('BagSlots', "Bag Slots Draw called")
   for _, cell in ipairs(self.content.cells) do
-    cell:Draw(const.BAG_KIND.UNDEFINED, const.BAG_VIEW.UNDEFINED, false)
+    ---@cast cell +BagButton
+    cell:Draw(ctx)
   end
   local w, h = self.content:Draw({
     cells = self.content.cells,
@@ -142,8 +144,8 @@ function BagSlots:CreatePanel(ctx, kind)
     events:SendMessage('bags/FullRefreshAll', ectx)
   end)
 
-  events:RegisterEvent('BAG_CONTAINER_UPDATE', function() b:Draw() end)
-  events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function() b:Draw() end)
+  events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ectx) b:Draw(ectx) end)
+  events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function(ectx) b:Draw(ectx) end)
   b.kind = kind
   b.frame:Hide()
   return b

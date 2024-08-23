@@ -163,19 +163,21 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   local hiddenCells = {}
 
   async:Chain(
-    function()
+    ctx,
+    nil,
+    function(ectx)
       for _, item in pairs(removed) do
         local newSlotKey = view:RemoveButton(item)
         -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
         -- place due to the deleted being the head of a stack.
         if not newSlotKey then
-          ClearButton(ctx, view, item)
+          ClearButton(ectx, view, item)
         else
-          UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
+          UpdateDeletedSlot(ectx, view, item.slotkey, newSlotKey)
         end
       end
     end,
-    function()
+    function(ectx)
       -- TODO(lobato): Abstract this code into a function. 
       debug:StartProfile('Create Button Stage %d', bag.kind)
       ---@type ItemData[]
@@ -186,9 +188,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       local count = 10
       debug:Log("Item Add Batch", "Batching", count, "items")
       async:RawBatch(
+        ectx,
         count,
         list,
-        function(item, _)
+        function(_, item, _)
           local updateKey = view:AddButton(item)
           if not updateKey then
             CreateButton(ctx, view, item)
