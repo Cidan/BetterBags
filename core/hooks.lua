@@ -68,7 +68,7 @@ end
 
 ---@param ctx Context
 ---@param interactionType Enum.PlayerInteractionType
-function addon:OpenInteractionWindow(ctx, interactionType)
+function addon.OpenInteractionWindow(ctx, _, interactionType)
   if interactionEvents[interactionType] == nil then return end
   if GameMenuFrame:IsShown() then
     return
@@ -84,7 +84,7 @@ end
 
 ---@param ctx Context
 ---@param interactionType Enum.PlayerInteractionType
-function addon:CloseInteractionWindow(ctx, interactionType)
+function addon.CloseInteractionWindow(ctx, _, interactionType)
   if interactionEvents[interactionType] == nil then return end
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
