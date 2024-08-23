@@ -609,8 +609,7 @@ function itemFrame:OnEnable()
   self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
   self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
 
-  local ctx = context:New()
-  ctx:Set('event', 'on_enable')
+  local ctx = context:New('itemFrame_OnEnable')
   -- Pre-populate the pool with 600 items. This is done
   -- so that items acquired during combat do not taint
   -- the bag frame.

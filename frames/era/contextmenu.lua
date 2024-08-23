@@ -133,8 +133,7 @@ function contextMenu:CreateContextMenu(bag)
         notCheckable = false,
         checked = function() return bag.anchor:IsActive() end,
         func = function()
-          local ctx = context:New()
-          ctx:Set('event', 'BagAnchorToggle')
+          local ctx = context:New('BagAnchorToggle')
           bag.anchor:ToggleActive()
           contextMenu:Hide(ctx)
         end
@@ -144,8 +143,7 @@ function contextMenu:CreateContextMenu(bag)
         notCheckable = false,
         checked = function() return bag.anchor.frame:IsShown() end,
         func = function()
-          local ctx = context:New()
-          ctx:Set('event', 'BagAnchorShow')
+          local ctx = context:New('BagAnchorShow')
           bag.anchor:ToggleShown()
           contextMenu:Hide(ctx)
         end
@@ -160,8 +158,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPLEFT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'BagAnchorSetStaticAnchorPoint')
+              local ctx = context:New('BagAnchorSetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('TOPLEFT')
               contextMenu:Hide(ctx)
             end
@@ -171,8 +168,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPRIGHT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'BagAnchorSetStaticAnchorPoint')
+              local ctx = context:New('BagAnchorSetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('TOPRIGHT')
               contextMenu:Hide(ctx)
             end
@@ -182,8 +178,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMLEFT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'BagAnchorSetStaticAnchorPoint')
+              local ctx = context:New('BagAnchorSetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('BOTTOMLEFT')
               contextMenu:Hide(ctx)
             end
@@ -193,8 +188,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMRIGHT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'BagAnchorSetStaticAnchorPoint')
+              local ctx = context:New('BagAnchorSetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('BOTTOMRIGHT')
               contextMenu:Hide(ctx)
             end
@@ -204,8 +198,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == nil end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'BagAnchorSetStaticAnchorPoint')
+              local ctx = context:New('BagAnchorSetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint(nil)
               contextMenu:Hide(ctx)
             end
@@ -261,8 +254,7 @@ function contextMenu:CreateContextMenu(bag)
     tooltipTitle = L:G("Open Options Screen"),
     tooltipText = L:G("Click to open the options screen."),
     func = function()
-      local ctx = context:New()
-      ctx:Set('event', 'OpenOptionsScreen')
+      local ctx = context:New('OpenOptionsScreen')
       contextMenu:Hide(ctx)
       events:SendMessage('config/Open', ctx)
     end
@@ -272,8 +264,7 @@ function contextMenu:CreateContextMenu(bag)
     text = L:G("Close Menu"),
     notCheckable = true,
     func = function()
-      local ctx = context:New()
-      ctx:Set('event', 'CloseContextMenu')
+      local ctx = context:New('CloseContextMenu')
       contextMenu:Hide(ctx)
     end
   })

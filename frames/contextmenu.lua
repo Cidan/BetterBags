@@ -133,8 +133,7 @@ function contextMenu:CreateContextMenu(bag)
         notCheckable = false,
         checked = function() return bag.anchor:IsActive() end,
         func = function()
-          local ctx = context:New()
-          ctx:Set('event', 'ToggleAnchor')
+          local ctx = context:New('ToggleAnchor')
           bag.anchor:ToggleActive()
           contextMenu:Hide(ctx)
         end
@@ -144,8 +143,7 @@ function contextMenu:CreateContextMenu(bag)
         notCheckable = false,
         checked = function() return bag.anchor.frame:IsShown() end,
         func = function()
-          local ctx = context:New()
-          ctx:Set('event', 'ToggleAnchor')
+          local ctx = context:New('ToggleAnchor')
           bag.anchor:ToggleShown()
           contextMenu:Hide(ctx)
         end
@@ -160,8 +158,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPLEFT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'SetStaticAnchorPoint')
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('TOPLEFT')
               contextMenu:Hide(ctx)
             end
@@ -171,8 +168,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPRIGHT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'SetStaticAnchorPoint')
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('TOPRIGHT')
               contextMenu:Hide(ctx)
             end
@@ -182,8 +178,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMLEFT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'SetStaticAnchorPoint')
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('BOTTOMLEFT')
               contextMenu:Hide(ctx)
             end
@@ -193,8 +188,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMRIGHT' end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'SetStaticAnchorPoint')
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('BOTTOMRIGHT')
               contextMenu:Hide(ctx)
             end
@@ -204,8 +198,7 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == nil end,
             func = function()
-              local ctx = context:New()
-              ctx:Set('event', 'SetStaticAnchorPoint')
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint(nil)
               contextMenu:Hide(ctx)
             end
@@ -334,8 +327,7 @@ function contextMenu:CreateContextMenu(bag)
     tooltipTitle = L:G("Open Options Screen"),
     tooltipText = L:G("Click to open the options screen."),
     func = function()
-      local ctx = context:New()
-      ctx:Set('event', 'OpenOptions')
+      local ctx = context:New('OpenOptions')
       contextMenu:Hide(ctx)
       events:SendMessage('config/Open', ctx)
     end
@@ -345,8 +337,7 @@ function contextMenu:CreateContextMenu(bag)
     text = L:G("Close Menu"),
     notCheckable = true,
     func = function()
-      local ctx = context:New()
-      ctx:Set('event', 'CloseMenu')
+      local ctx = context:New('CloseMenu')
       contextMenu:Hide(ctx)
     end
   })

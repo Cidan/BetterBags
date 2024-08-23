@@ -72,7 +72,7 @@ function themes:OnInitialize()
 end
 
 function themes:OnEnable()
-  local ctx = context:New()
+  local ctx = context:New('Themes_OnEnable')
   local theme = db:GetTheme()
   if self.themes[theme] and self.themes[theme].Available then
     self:ApplyTheme(ctx, theme)

@@ -75,8 +75,7 @@ function BagSlots:CreatePanel(ctx, kind)
 
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
-    local ectx = context:New()
-    ectx:Set('event', 'bag_slots_fade_in_finished')
+    local ectx = context:New('bag_slots_fade_in_finished')
     if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
       return
     end
@@ -85,8 +84,7 @@ function BagSlots:CreatePanel(ctx, kind)
     events:SendMessage('bags/FullRefreshAll', ectx)
   end)
   b.fadeOutGroup:HookScript("OnFinished", function()
-    local ectx = context:New()
-    ectx:Set('event', 'bag_slots_fade_out_finished')
+    local ectx = context:New('bag_slots_fade_out_finished')
     database:SetBagView(kind, database:GetPreviousView(kind))
     events:SendMessage('bags/FullRefreshAll', ectx)
   end)

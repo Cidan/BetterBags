@@ -11,15 +11,14 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local context = addon:NewModule('Context')
 
 -- New creates a new context object.
----@param event? string
+---@param event string
 ---@return Context
 function context:New(event)
   local obj = setmetatable({}, {__index = self})
   obj.keys = {}
   obj.done = false
-  if event ~= nil then
-    obj:Set('event', event)
-  end
+  obj:Set('event', event)
+  obj:Set('events', {})
   return obj
 end
 
@@ -50,6 +49,13 @@ end
 ---@return string
 function context:Event()
   return self.keys['event']
+end
+
+-- AppendEvent appends an event to the context.
+---@param event string
+function context:AppendEvent(event)
+  self.keys['events'] = self.keys['events'] or {}
+  table.insert(self.keys['events'], event)
 end
 
 -- Check checks if a key exists in the context.
@@ -117,9 +123,11 @@ function context:Copy()
   if self.done then
     error("context has been cancelled")
   end
-  local newContext = context:New()
+  local newContext = context:New(self.keys['event'])
   for key, value in pairs(self.keys) do
-    newContext:Set(key, value)
+    if key ~= 'event' then
+      newContext:Set(key, value)
+    end
   end
   return newContext
 end
@@ -129,8 +137,7 @@ end
 ---@param func fun(ctx: Context, ...)
 function addon.HookScript(obj, script, func)
   obj:HookScript(script, function(...)
-    local ctx = context:New()
-    ctx:Set('event', script)
+    local ctx = context:New(script)
     func(ctx, unpack({...}))
   end)
 end
@@ -140,8 +147,7 @@ end
 ---@param func fun(ctx: Context, ...)
 function addon.SetScript(obj, script, func)
   obj:SetScript(script, function(...)
-    local ctx = context:New()
-    ctx:Set('event', script)
+    local ctx = context:New(script)
     func(ctx, unpack({...}))
   end)
 end

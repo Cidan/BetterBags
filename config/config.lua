@@ -125,8 +125,7 @@ function config:GetGeneralOptions()
         end,
         set = function(_, value)
           DB:SetUpgradeIconProvider(value)
-          local ctx = context:New()
-          ctx:Set('event', 'on_click')
+          local ctx = context:New('on_click')
           events:SendMessage('bag/RedrawIcons', ctx)
         end,
       },
@@ -212,8 +211,7 @@ end
 
 function config:Open()
   LibStub("AceConfigDialog-3.0"):Open(addonName)
-  local ctx = context:New()
-  ctx:Set('event', 'on_click')
+  local ctx = context:New('on_click')
   events:SendMessage('config/Opened', ctx)
 end
 
@@ -244,8 +242,7 @@ function config:OnEnable()
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()
     DB:SetDebugMode(not DB:GetDebugMode())
-    local ctx = context:New()
-    ctx:Set('event', 'on_click')
+    local ctx = context:New('on_click')
     events:SendMessage('config/DebugMode', ctx, DB:GetDebugMode())
   end)
 end

@@ -43,8 +43,7 @@ function config:CreateCustomCategoryConfig(category)
         confirmText = L:G("Are you sure you want to delete this category?"),
         order = 2,
         func = function()
-          local ctx = context:New()
-          ctx:Set('event', 'DeleteCategory_Menu')
+          local ctx = context:New('DeleteCategory_Menu')
           categories:DeleteCategory(ctx, category)
         end,
       }
@@ -85,8 +84,7 @@ function config:GetCustomCategoryConfig()
             end,
             set = function(_, value)
               if value == "" then return end
-              local ctx = context:New()
-              ctx:Set('event', 'CreateCategory_Menu')
+              local ctx = context:New('CreateCategory_Menu')
               categories:CreateCategory(ctx, {
                 name = value,
                 save = true,

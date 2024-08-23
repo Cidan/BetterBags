@@ -56,8 +56,7 @@ function debugWindow:Create(ctx)
   self.frame.ClosePanelButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 
   self.frame.ClosePanelButton:SetScript("OnClick", function(_, e)
-    local ectx = context:New()
-    ectx:Set('event', 'DebugFrameCloseClick')
+    local ectx = context:New('DebugFrameCloseClick')
     if e == "LeftButton" then
       database:SetDebugMode(false)
       events:SendMessage('config/DebugMode', ectx, false)

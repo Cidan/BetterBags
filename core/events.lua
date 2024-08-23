@@ -63,8 +63,7 @@ function events:RegisterEvent(event, callback)
     self._eventMap[event] = {
       fn = function(...)
         for _, cb in pairs(self._eventMap[event].cbs) do
-          local ctx = context:New()
-          ctx:Set('event', event)
+          local ctx = context:New(event)
           cb.cb(ctx, ...)
         end
       end,
@@ -98,20 +97,20 @@ end
 -- finalEvent arguments.
 ---@param caughtEvent string
 ---@param finalEvent string
----@param callback fun(caughtEvents: EventArg[], finalArgs: EventArg)
+---@param callback fun(ctx: Context, caughtEvents: EventArg[], finalArgs: EventArg)
 function events:CatchUntil(caughtEvent, finalEvent, callback)
   local caughtEvents = {}
   local finalArgs = nil
-  local caughtFunction = function(eventName, ...)
+  local caughtFunction = function(ctx, eventName, ...)
     table.insert(caughtEvents, {
-      eventName = eventName, args = {...}
+      eventName = eventName, args = {...}, ctx = ctx
     })
   end
-  local finalFunction = function(eventName, ...)
+  local finalFunction = function(ctx, eventName, ...)
     finalArgs = {
-      eventName = eventName, args = {...}
+      eventName = eventName, args = {...}, ctx = ctx
     }
-    callback(CopyTable(caughtEvents), CopyTable(finalArgs))
+    callback(ctx, CopyTable(caughtEvents), CopyTable(finalArgs))
     caughtEvents = {}
     finalArgs = nil
   end
@@ -126,8 +125,7 @@ function events:BucketEvent(event, callback)
   local bucketFunction = function()
     for _, cb in pairs(self._bucketCallbacks[event]) do
       xpcall(function(...)
-        local ctx = context:New()
-        ctx:Set('event', event)
+        local ctx = context:New(event)
         cb(ctx, ...)
       end, geterrorhandler())
     end
@@ -201,6 +199,7 @@ function events:SendMessage(event, ctx, ...)
   if ctx:IsCancelled() then
     error('ctx has been cancelled: ' .. event)
   end
+  ctx:AppendEvent(event)
   local args = {...}
   table.insert(args, 1, ctx)
   self._eventHandler:SendMessage(event, unpack(args))

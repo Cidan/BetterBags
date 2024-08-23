@@ -33,11 +33,10 @@ local L = addon:GetModule('Localization')
 local context = addon:GetModule('Context')
 
 -- Create a new context.
-local ctx = context:New()
 -- Set the event for the context. This is used for tracking the state of the addon
 -- and can be any string you want. It tells the addon where this call originated from
 -- even across frames.
-ctx:Set('event', 'MyAddon_Event')
+local ctx = context:New('MyAddon_Event')
 
 -- Use this API for creating a custom category based on the item's ID. These categories are
 -- not persistant, such that if a user disables your addon, the categories will disappear.

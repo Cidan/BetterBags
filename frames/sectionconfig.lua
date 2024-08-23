@@ -238,8 +238,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         return not categories:IsCategoryShown(elementData.title)
       end,
       func = function()
-        local ectx = context:New()
-        ectx:Set('event', 'SectionConfigFrame_HideCategory')
+        local ectx = context:New('SectionConfigFrame_HideCategory')
         categories:ToggleCategoryShown(ectx, elementData.title)
         if categories:IsCategoryShown(elementData.title) then
           local filter = categories:GetCategoryByName(elementData.title)
@@ -265,13 +264,11 @@ function sectionConfigFrame:initSectionItem(button, elementData)
             self:UpdatePinnedItems()
             if self.itemList:IsShown() and self.itemList:IsCategory(elementData.title) then
               self.itemList:Hide(function()
-                local ectx = context:New()
-                ectx:Set('event', 'SectionConfigFrame_DeleteCategory')
+                local ectx = context:New('SectionConfigFrame_DeleteCategory')
                 categories:DeleteCategory(ectx, elementData.title)
               end)
             else
-              local ectx = context:New()
-              ectx:Set('event', 'SectionConfigFrame_DeleteCategory')
+              local ectx = context:New('SectionConfigFrame_DeleteCategory')
               categories:DeleteCategory(ectx, elementData.title)
             end
           end, function()
@@ -452,8 +449,7 @@ function sectionConfig:Create(kind, parent)
     end)
 
     sc.content.dragBehavior:SetFinalizeDrop(function(_)
-      local ctx = context:New()
-      ctx:Set('event', 'SectionConfigFrame_FinalizeDrop')
+      local ctx = context:New('SectionConfigFrame_FinalizeDrop')
       sc:UpdatePinnedItems()
       events:SendMessage('bags/FullRefreshAll', ctx)
     end)
@@ -462,8 +458,7 @@ function sectionConfig:Create(kind, parent)
   else
     -- Setup the callback for when an item is moved.
     sc.content:SetCanReorder(true, function(_, elementData, currentIndex, newIndex)
-      local ctx = context:New()
-      ctx:Set('event', 'SectionConfigFrame_Reorder')
+      local ctx = context:New('SectionConfigFrame_Reorder')
       -- Headers can never be moved.
       if elementData.header then
         -- Use the manual remove/insert to avoid an infinite loop.

@@ -94,8 +94,7 @@ addon.atWarbank = false
 
 -- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
 function BetterBags_ToggleBags()
-  local ctx = context:New()
-  ctx:Set('event', 'BetterBags_ToggleBags')
+  local ctx = context:New('BetterBags_ToggleBags')
   addon:ToggleAllBags(ctx)
 end
 
@@ -186,8 +185,7 @@ function addon:HideBlizzardBags()
   end
 
   MainMenuBarBackpackButton:SetScript("OnClick", function()
-    local ctx = context:New()
-    ctx:Set('event', 'MainMenuBarBackpackButton_OnClick')
+    local ctx = context:New('MainMenuBarBackpackButton_OnClick')
     self:ToggleAllBags(ctx)
   end)
 
@@ -248,8 +246,7 @@ function addon:OnEnable()
   async:Enable()
 
   self:HideBlizzardBags()
-  local rootctx = context:New()
-  rootctx:Set('event', 'addon_enable')
+  local rootctx = context:New('addon_enable')
   addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
   addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
 
@@ -273,30 +270,28 @@ function addon:OnEnable()
   events:RegisterMessage('items/RefreshBackpack/Done', function(ctx, slotInfo)
     ---@cast slotInfo +SlotInfo
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    print("In init")
-    print(ctx:Event())
-    --addon.Bags.Backpack:Draw(args[1], args[2], function()
-    --  events:SendMessage('bags/Draw/Backpack/Done', args[1])
-    --  if not addon.Bags.Backpack.loaded then
-    --    addon.Bags.Backpack.loaded = true
-    --    events:SendMessage('bags/Draw/Backpack/Loaded')
-    --  end
-    --end)
+    addon.Bags.Backpack:Draw(ctx, slotInfo, function()
+      events:SendMessage('bags/Draw/Backpack/Done', ctx)
+      if not addon.Bags.Backpack.loaded then
+        addon.Bags.Backpack.loaded = true
+        events:SendMessage('bags/Draw/Backpack/Loaded', ctx)
+      end
+    end)
    end)
 
-  events:RegisterMessage('items/RefreshBank/Done', function(_, args)
+  events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
     debug:Log("init/OnInitialize/items", "Drawing bank")
      -- Show the bank frame if it's not already shown.
     if not addon.Bags.Bank:IsShown() and addon.atBank then
       addon.Bags.Bank:Show()
     end
-    --addon.Bags.Bank:Draw(args[1], args[2], function()
-    --  events:SendMessage('bags/Draw/Bank/Done')
-    --  if not addon.Bags.Bank.loaded then
-    --    addon.Bags.Bank.loaded = true
-    --    events:SendMessage('bags/Draw/Bank/Loaded')
-    --  end
-    --end)
+    addon.Bags.Bank:Draw(ctx, slotInfo, function()
+      events:SendMessage('bags/Draw/Bank/Done', ctx)
+      if not addon.Bags.Bank.loaded then
+        addon.Bags.Bank.loaded = true
+        events:SendMessage('bags/Draw/Bank/Loaded', ctx)
+      end
+    end)
   end)
 
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)

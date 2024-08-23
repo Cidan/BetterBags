@@ -22,8 +22,7 @@ end
 function debug:OnEnable()
   ---@class DebugWindow: AceModule
   self.window = addon:GetModule('DebugWindow')
-  local ctx = context:New()
-  ctx:Set('event', 'DebugWindowEnable')
+  local ctx = context:New('DebugWindowEnable')
   self.window:Create(ctx)
 
   ---@class Events: AceModule
@@ -121,9 +120,22 @@ end
 
 function debug:Log(category, ...)
   if not self.enabled then return end
-  local ctx = context:New()
-  ctx:Set('event', 'DebugLog')
+  local ctx = context:New('DebugLog')
   self.window:AddLogLine(ctx, category, debug:Format(...))
+end
+
+---@param category string
+---@param ctx Context
+function debug:LogContext(category, ctx)
+  if not self.enabled then return end
+  if ctx == nil then
+    error("context is nil")
+  end
+  self:Log(category, ctx:Get('event'))
+  local eventList = ctx:Get('events') --[[@as table<number, string>]]
+  for k, v in ipairs(eventList) do
+    self:Log(category, k, v)
+  end
 end
 
 ---@param tag string
