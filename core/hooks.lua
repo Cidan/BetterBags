@@ -131,19 +131,9 @@ function addon:CloseSpecialWindows(interactingFrame)
   events:SendMessageLater('bags/OpenClose', ctx)
 end
 
-function addon:OpenBank(interactingFrame)
-  if interactingFrame ~= nil then return end
-  if GameMenuFrame:IsShown() then
-    return
-  end
-  debug:Log('Hooks', 'OpenBank')
-  addon.Bags.Bank:Show()
-  addon.Bags.Backpack:Show()
-end
-
 ---@param ctx Context
 ---@param interactingFrame Frame
-function addon:CloseBank(ctx, interactingFrame)
+function addon.CloseBank(ctx, _, interactingFrame)
   debug:Log('Hooks', 'CloseBank')
   if interactingFrame ~= nil then return end
   addon.Bags.Bank:Hide(ctx)
