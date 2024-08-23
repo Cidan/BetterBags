@@ -15,6 +15,9 @@ local debug = addon:GetModule('Debug')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class SearchCategory
 ---@field query string The search query for the category.
 
@@ -113,6 +116,13 @@ end
 ---@param id number The ItemID of the item to add to the category.
 ---@param category string The name of the custom category to add the item to.
 function categories:AddPermanentItemToCategory(ctx, id, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "number" then
+    category = id --[[@as string]]
+    id = ctx
+    ctx = context:New('AddPermanentItemToCategory')
+  end
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
@@ -139,6 +149,13 @@ end
 ---@param id number The ItemID of the item to add to the category.
 ---@param category string The name of the custom category to add the item to.
 function categories:AddItemToCategory(ctx, id, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "number" then
+    category = id --[[@as string]]
+    id = ctx
+    ctx = context:New('AddItemToCategory')
+  end
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
@@ -171,6 +188,12 @@ end
 ---@param ctx Context
 ---@param category string The name of the custom category to wipe.
 function categories:WipeCategory(ctx, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "string" then
+    category = ctx
+    ctx = context:New('WipeCategory')
+  end
   database:WipeItemCategory(category)
   if self.ephemeralCategories[category] then
     for id, _ in pairs(self.ephemeralCategories[category].itemList) do
@@ -269,6 +292,12 @@ end
 ---@param ctx Context
 ---@param category CustomCategoryFilter
 function categories:CreateCategory(ctx, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "table" and not ctx.Event then
+    category = ctx --[[@as CustomCategoryFilter]]
+    ctx = context:New('CreateCategory')
+  end
   category.enabled = category.enabled or {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
@@ -333,6 +362,13 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:DeleteCategory(ctx, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "string" then
+    category = ctx
+    ctx = context:New('DeleteCategory')
+  end
+
   if self.ephemeralCategories[category] then
     for id, _ in pairs(self.ephemeralCategories[category].itemList) do
       self.ephemeralCategoryByItemID[id] = nil
@@ -348,6 +384,12 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:HideCategory(ctx, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "string" then
+    category = ctx
+    ctx = context:New('HideCategory')
+  end
   database:GetCategoryOptions(category).shown = false
   events:SendMessage('bags/FullRefreshAll', ctx)
 end
@@ -355,6 +397,12 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:ShowCategory(ctx, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "string" then
+    category = ctx
+    ctx = context:New('ShowCategory')
+  end
   database:GetCategoryOptions(category).shown = true
   events:SendMessage('bags/FullRefreshAll', ctx)
 end
@@ -374,6 +422,12 @@ end
 ---@param ctx Context
 ---@param category string
 function categories:ToggleCategoryShown(ctx, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "string" then
+    category = ctx
+    ctx = context:New('ToggleCategoryShown')
+  end
   local options = database:GetCategoryOptions(category)
   options.shown = not options.shown
   events:SendMessage('bags/FullRefreshAll', ctx)
@@ -387,6 +441,13 @@ end
 ---@param data ItemData The item data to get the custom category for.
 ---@return string|nil
 function categories:GetCustomCategory(ctx, kind, data)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "number" then
+    data = kind --[[@as ItemData]]
+    kind = ctx
+    ctx = context:New('GetCustomCategory')
+  end
   local itemID = data.itemInfo.itemID
   if not itemID then return nil end
   local filter = database:GetItemCategoryByItemID(itemID)
