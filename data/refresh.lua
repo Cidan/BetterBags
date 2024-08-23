@@ -190,8 +190,7 @@ function refresh:OnEnable()
   end)
 
   -- Register when everything should be refreshed, manually.
-  events:RegisterMessage('bags/RefreshAll', function(ctx, _, shouldWipe)
-    ctx:Set("wipe", shouldWipe)
+  events:RegisterMessage('bags/RefreshAll', function(ctx)
     table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
     self:StartUpdate(ctx)
   end)

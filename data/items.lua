@@ -188,7 +188,7 @@ function items:WipeAndRefreshAll(ctx)
   debug:Log('WipeAndRefreshAll', "Wipe And Refresh All triggered")
   --self:ClearItemCache()
   ctx:Set('wipe', true)
-  events:SendMessage('bags/RefreshAll', ctx)
+  self:RefreshAll(ctx)
 end
 
 ---@private
