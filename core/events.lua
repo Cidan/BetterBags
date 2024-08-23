@@ -101,21 +101,20 @@ end
 function events:CatchUntil(caughtEvent, finalEvent, callback)
   local caughtEvents = {}
   local finalArgs = nil
-  local caughtFunction = function(ctx, eventName, ...)
+  self:RegisterEvent(caughtEvent, function(ctx, eventName, ...)
     table.insert(caughtEvents, {
-      eventName = eventName, args = {...}, ctx = ctx
+      eventName = eventName, args = CopyTable({...}), ctx = ctx
     })
-  end
-  local finalFunction = function(ctx, eventName, ...)
+  end)
+
+  self:RegisterEvent(finalEvent, function(ctx, eventName, ...)
     finalArgs = {
-      eventName = eventName, args = {...}, ctx = ctx
+      eventName = eventName, args = CopyTable({...}), ctx = ctx
     }
-    callback(ctx, CopyTable(caughtEvents), CopyTable(finalArgs))
+    callback(ctx, caughtEvents, finalArgs)
     caughtEvents = {}
     finalArgs = nil
-  end
-  self:RegisterEvent(caughtEvent, caughtFunction)
-  self:RegisterEvent(finalEvent, finalFunction)
+  end)
 end
 
 ---@param event string

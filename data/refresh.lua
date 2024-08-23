@@ -46,6 +46,7 @@ function refresh:StartUpdate(ctx)
   local sortBackpack = false
   local sortBackpackClassic = false
   for _, event in pairs(self.UpdateQueue) do
+    debug:Inspect("brokenctx", event.ctx)
     if event.ctx:GetBool("wipe") then
       -- Prevent full wipes from happening in combat.
       -- This function will be called again when combat ends automatically.
@@ -150,6 +151,7 @@ function refresh:OnEnable()
   -- Register when the bag slots change for any reason.
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ctx)
     ctx:Set("wipe", true)
+    print("this bag update?")
     table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE', args = {}, ctx = ctx})
   end)
 
