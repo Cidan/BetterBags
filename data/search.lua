@@ -203,7 +203,7 @@ function search:Add(item)
     search:addStringToIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  if const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
+  if item.bindingInfo.binding ~= nil and const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
     search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
   end
 
@@ -253,7 +253,7 @@ function search:Remove(item)
     search:removeStringFromIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
   end
 
-  if const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
+  if item.bindingInfo.binding ~= nil and const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
     search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
   end
 
