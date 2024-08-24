@@ -408,7 +408,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     table.insert(list, item)
   end
 
-  async:Batch(ctx, 10, list, function (ectx, currentItem, _)
+  async:Batch(ctx, 999, list, function (ectx, currentItem, _)
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
     local name = ""
