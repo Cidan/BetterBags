@@ -408,7 +408,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     table.insert(list, item)
   end
 
-  async:Batch(ctx, 999, list, function (ectx, currentItem, _)
+  --async:Batch(ctx, 999, list, function (ectx, currentItem, _)
+  for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
     local name = ""
@@ -428,8 +429,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
       slotInfo.addedItems[currentItem.slotkey] = currentItem
-      if not ectx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
-        self:MarkItemAsNew(ectx, currentItem)
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
+        self:MarkItemAsNew(ctx, currentItem)
       end
       search:Add(currentItem)
     elseif items:ItemRemoved(currentItem, previousItem) then
@@ -466,13 +467,14 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       slotInfo.totalItems = slotInfo.totalItems + 1
     end
     local oldCategory = currentItem.itemInfo.category
-    currentItem.itemInfo.category = self:GetCategory(ectx, currentItem)
+    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
     search:UpdateCategoryIndex(currentItem, oldCategory)
-  end, function(ectx)
+  end
+  --end, function(ectx)
     for _, addedItem in pairs(slotInfo.addedItems) do
       for _, removedItem in pairs(slotInfo.removedItems) do
         if addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
-          self:ClearNewItem(ectx, addedItem.slotkey)
+          self:ClearNewItem(ctx, addedItem.slotkey)
         end
       end
     end
@@ -496,8 +498,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
         end
       end
     end
-    callback(ectx)
-  end)
+    callback(ctx)
+  --end)
 end
 
 ---@param kind BagKind
