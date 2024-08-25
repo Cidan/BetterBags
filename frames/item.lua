@@ -195,7 +195,27 @@ function itemFrame.itemProto:UpdateCount(ctx)
   if not self.kind then return end
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   if not data or data.isItemEmpty then return end
-  local count = data.stackedCount or data.itemInfo.currentItemCount
+  ---@type number
+  local count = 0
+  local opts = database:GetStackingOptions(self.kind)
+  if (not opts.mergeStacks) or
+  (opts.unmergeAtShop and addon.atInteracting) or
+  (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount) or
+  (not opts.mergeUnstackable and data.itemInfo.itemStackCount == 1) then
+    count = data.itemInfo.currentItemCount
+  else
+    local stack = items:GetStackData(data)
+    if stack then
+      count = items:GetItemDataFromSlotKey(stack.rootItem).itemInfo.currentItemCount
+      if stack.count > 1 then
+        for slotKey in pairs(stack.slotkeys) do
+          local itemData = items:GetItemDataFromSlotKey(slotKey)
+          count = count + itemData.itemInfo.currentItemCount
+        end
+      end
+    end
+  end
+
   local decoration = themes:GetItemButton(ctx, self)
   SetItemButtonCount(decoration, count)
 end

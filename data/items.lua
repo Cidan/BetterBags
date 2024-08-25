@@ -1070,6 +1070,12 @@ function items:GetItemDataFromInventorySlot(slot)
   return self.equipmentCache[slot]
 end
 
+---@param item ItemData
+---@return StackInfo?
+function items:GetStackData(item)
+  return self.slotInfo[item.kind].stacks:GetStackInfo(item.itemHash)
+end
+
 ---@param cb function
 function items:PreLoadAllEquipmentSlots(cb)
   local continuableContainer = ContinuableContainer:Create()
