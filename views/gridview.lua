@@ -221,13 +221,17 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     else
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       if stackInfo and stackInfo.count > 0 then
-        -- If there are other items in the stack, update the existing slot
-        local existingSlotKey = next(stackInfo.slotkeys)
-        if existingSlotKey then
-          UpdateButton(ctx, view, existingSlotKey)
-          if existingSlotKey ~= item.slotkey then
-            -- Clear the old button if it's different from the existing stack
-            ClearButton(ctx, view, item)
+        if stackInfo.rootItem == item.slotkey then
+          UpdateButton(ctx, view, item.slotkey)
+        else
+          -- If there are other items in the stack, update the existing slot
+          local existingSlotKey = next(stackInfo.slotkeys)
+          if existingSlotKey then
+            UpdateButton(ctx, view, existingSlotKey)
+            if existingSlotKey ~= item.slotkey then
+              -- Clear the old button if it's different from the existing stack
+              ClearButton(ctx, view, item)
+            end
           end
         end
       else
