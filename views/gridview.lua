@@ -167,10 +167,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   for _, item in pairs(removed) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
     if stackInfo and stackInfo.count > 0 then
-      -- If there are other items in the stack, update the slot
-      local newSlotKey = next(stackInfo.slotkeys)
-      if newSlotKey then
-        UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
+      if stackInfo.rootItem ~= nil then
+        UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
       else
         ClearButton(ctx, view, item)
       end
