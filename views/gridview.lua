@@ -163,55 +163,78 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   local hiddenCells = {}
 
   for _, item in pairs(removed) do
-    local newSlotKey = view:RemoveButton(item)
-    -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
-    -- place due to the deleted being the head of a stack.
-    if not newSlotKey then
-      ClearButton(ctx, view, item)
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    if stackInfo and stackInfo.count > 0 then
+      -- If there are other items in the stack, update the slot
+      local newSlotKey = next(stackInfo.slotkeys)
+      if newSlotKey then
+        UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
+      else
+        ClearButton(ctx, view, item)
+      end
     else
-      UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
+      -- If the stack is empty or doesn't exist, clear the button
+      ClearButton(ctx, view, item)
     end
   end
+
   debug:StartProfile('Create Button Stage %d', bag.kind)
+
   for _, item in pairs(added) do
-    local updateKey = view:AddButton(item)
-    if not updateKey then
+    local opts = database:GetStackingOptions(bag.kind)
+    -- Check stacking options
+    if (not opts.mergeStacks) or
+    (opts.unmergeAtShop and addon.atInteracting) or
+    (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+      -- If stacking is not allowed, create a new button
       CreateButton(ctx, view, item)
     else
-      UpdateButton(ctx, view, updateKey)
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      if stackInfo and stackInfo.count > 0 then
+        -- If there are other items in the stack, check if this is the root item
+        if item.slotkey == stackInfo.rootItem then
+          CreateButton(ctx, view, item)
+        else
+          -- If not the root item, update the existing slot
+          UpdateButton(ctx, view, stackInfo.rootItem)
+        end
+      else
+        -- If the stack is empty or doesn't exist, create a new button
+        CreateButton(ctx, view, item)
+      end
     end
   end
-  --@type ItemData[]
-  --local list = {}
-  --for _, item in pairs(added) do
-  --  table.insert(list, item)
-  --end
-  --local count = 10
-  --debug:Log("Item Add Batch", "Batching", count, "items")
-  --async:RawBatch(
-  --  ctx,
-  --  count,
-  --  list,
-  --  function(_, item, _)
-  --    local updateKey = view:AddButton(item)
-  --    if not updateKey then
-  --      CreateButton(ctx, view, item)
-  --    else
-  --      UpdateButton(ctx, view, updateKey)
-  --    end
-  --  end
-  --)
+
   debug:EndProfile('Create Button Stage %d', bag.kind)
+
   for _, item in pairs(changed) do
-    local updateKey, removeKey = view:ChangeButton(item)
-    UpdateButton(ctx, view, updateKey)
-    if updateKey ~= item.slotkey then
+    local opts = database:GetStackingOptions(bag.kind)
+    if (not opts.mergeStacks) or
+    (opts.unmergeAtShop and addon.atInteracting) or
+    (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+      -- If stacking is not allowed, just update the existing button
       UpdateButton(ctx, view, item.slotkey)
-    end
-    if removeKey then
-      ClearButton(ctx, view, items:GetItemDataFromSlotKey(removeKey))
+    else
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      if stackInfo and stackInfo.count > 0 then
+        -- If there are other items in the stack, update the existing slot
+        local existingSlotKey = next(stackInfo.slotkeys)
+        if existingSlotKey then
+          UpdateButton(ctx, view, existingSlotKey)
+          if existingSlotKey ~= item.slotkey then
+            -- Clear the old button if it's different from the existing stack
+            ClearButton(ctx, view, item)
+          end
+        end
+      else
+        -- If the stack is empty or doesn't exist, update the current button
+        UpdateButton(ctx, view, item.slotkey)
+      end
     end
   end
+
   if not slotInfo.deferDelete then
     for slotkey, _ in pairs(view:GetDeferredItems()) do
       local section = view:GetSlotSection(slotkey)

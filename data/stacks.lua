@@ -8,6 +8,7 @@ local stacks = addon:NewModule('Stacks')
 
 ---@class StackInfo
 ---@field count number
+---@field rootItem string
 ---@field slotkeys table<string, boolean>
 
 ---@class Stack
@@ -29,7 +30,8 @@ function stack:AddToStack(item)
     local slotkey = item.slotkey
 
     if not self.stacksByItemHash[itemHash] then
-        self.stacksByItemHash[itemHash] = {count = 0, slotkeys = {}}
+        self.stacksByItemHash[itemHash] = {count = 1, rootItem = slotkey, slotkeys = {}}
+        return
     end
 
     local stackinfo = self.stacksByItemHash[itemHash]
@@ -46,13 +48,19 @@ function stack:RemoveFromStack(item)
     local itemHash = item.itemHash
     local slotkey = item.slotkey
     local stackinfo = self.stacksByItemHash[itemHash]
-    if stackinfo and stackinfo.slotkeys[slotkey] then
-        stackinfo.slotkeys[slotkey] = nil
-        stackinfo.count = stackinfo.count - 1
+    if not stackinfo then return end
 
-        if next(stackinfo.slotkeys) == nil then
+    if stackinfo.rootItem == slotkey then
+        if next(stackinfo.slotkeys) then
+            stackinfo.rootItem = next(stackinfo.slotkeys)
+            stackinfo.slotkeys[stackinfo.rootItem] = nil
+            stackinfo.count = stackinfo.count - 1
+        else
             self.stacksByItemHash[itemHash] = nil
         end
+    elseif stackinfo.slotkeys[slotkey] then
+        stackinfo.slotkeys[slotkey] = nil
+        stackinfo.count = stackinfo.count - 1
     end
 end
 
@@ -64,12 +72,11 @@ function stack:GetTotalCount(itemHash)
     return stackinfo and stackinfo.count or 0
 end
 
---- Gets all slotkeys for an item
+--- Gets stack information for an item
 ---@param itemHash string
----@return table<string, boolean>
-function stack:GetSlotKeys(itemHash)
-    local stackinfo = self.stacksByItemHash[itemHash]
-    return stackinfo and stackinfo.slotkeys or {}
+---@return StackInfo?
+function stack:GetStackInfo(itemHash)
+    return self.stacksByItemHash[itemHash]
 end
 
 --- Clears all stack information

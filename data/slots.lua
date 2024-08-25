@@ -148,4 +148,5 @@ function SlotInfo:Wipe()
   self.removedItems = {}
   self.updatedItems = {}
   self.deferDelete = false
+  self.stacks:Clear()
 end
