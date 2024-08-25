@@ -428,39 +428,35 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     -- Process item changes.
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
-      slotInfo.addedItems[currentItem.slotkey] = currentItem
+      slotInfo:AddToAddedItems(currentItem)
       if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
         self:MarkItemAsNew(ctx, currentItem)
       end
       search:Add(currentItem)
     elseif items:ItemRemoved(currentItem, previousItem) then
       debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
-      slotInfo.removedItems[previousItem.slotkey] = previousItem
+      slotInfo:AddToRemovedItems(previousItem)
       search:Remove(previousItem)
     elseif items:ItemHashChanged(currentItem, previousItem) then
       debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
-      slotInfo.removedItems[previousItem.slotkey] = previousItem
-      slotInfo.addedItems[currentItem.slotkey] = currentItem
+      slotInfo:AddToRemovedItems(previousItem)
+      slotInfo:AddToAddedItems(currentItem)
       search:Remove(previousItem)
       search:Add(currentItem)
     elseif items:ItemGUIDChanged(currentItem, previousItem) then
       debug:Log("ItemGUIDChanged", currentItem.itemInfo.itemLink)
-      slotInfo.removedItems[previousItem.slotkey] = previousItem
-      slotInfo.addedItems[currentItem.slotkey] = currentItem
+      slotInfo:AddToRemovedItems(previousItem)
+      slotInfo:AddToAddedItems(currentItem)
       search:Remove(previousItem)
       search:Add(currentItem)
     elseif items:ItemChanged(currentItem, previousItem) then
       debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
-      slotInfo.updatedItems[currentItem.slotkey] = currentItem
+      slotInfo:AddToUpdatedItems(previousItem, currentItem)
       search:Remove(currentItem)
       search:Add(currentItem)
     end
-    -- Store empty slot data
-    if currentItem.isItemEmpty then
-      slotInfo.freeSlotKeys[name] = bagid .. '_' .. slotid
-      slotInfo.emptySlotByBagAndSlot[bagid] = slotInfo.emptySlotByBagAndSlot[bagid] or {}
-      slotInfo.emptySlotByBagAndSlot[bagid][slotid] = currentItem
-    end
+
+    slotInfo:StoreIfEmptySlot(name, currentItem)
 
     -- Increment the total items count.
     if not currentItem.isItemEmpty then

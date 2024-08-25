@@ -9,6 +9,9 @@ local debug = addon:GetModule('Debug')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Stacks: AceModule
+local stacks = addon:GetModule('Stacks')
+
 ---@class (exact) SwapSet
 ---@field a string
 ---@field b? string
@@ -27,6 +30,7 @@ local items = addon:GetModule('Items')
 ---@field addedItems table<string, ItemData> A list of items that were added since the last refresh.
 ---@field removedItems table<string, ItemData> A list of items that were removed since the last refresh.
 ---@field updatedItems table<string, ItemData> A list of items that were updated since the last refresh.
+---@field stacks Stack A stack object to manage item stacks.
 local SlotInfo = {}
 
 function items:NewSlotInfo()
@@ -41,7 +45,8 @@ function items:NewSlotInfo()
       addedItems = {},
       removedItems = {},
       updatedItems = {},
-      deferDelete = false
+      deferDelete = false,
+      stacks = stacks:Create()
     }, {__index = SlotInfo})
 end
 
@@ -50,6 +55,42 @@ end
 ---@return ItemData
 function SlotInfo:GetCurrentItemByBagAndSlot(bagid, slotid)
   return self.itemsBySlotKey[items:GetSlotKeyFromBagAndSlot(bagid, slotid)]
+end
+
+---@param item ItemData
+function SlotInfo:AddToRemovedItems(item)
+  if item and item.slotkey then
+    self.removedItems[item.slotkey] = item
+    self.stacks:RemoveFromStack(item)
+  end
+end
+
+---@param item ItemData
+function SlotInfo:AddToAddedItems(item)
+  if item and item.slotkey then
+    self.addedItems[item.slotkey] = item
+    self.stacks:AddToStack(item)
+  end
+end
+
+---@param oldItem ItemData
+---@param newItem ItemData
+function SlotInfo:AddToUpdatedItems(oldItem, newItem)
+	if newItem and newItem.slotkey then
+		self.updatedItems[newItem.slotkey] = newItem
+		self.stacks:RemoveFromStack(oldItem)
+		self.stacks:AddToStack(newItem)
+	end
+end
+
+---@param name string
+---@param item ItemData
+function SlotInfo:StoreIfEmptySlot(name, item)
+  if item.isItemEmpty then
+    self.emptySlotByBagAndSlot[item.bagid] = self.emptySlotByBagAndSlot[item.bagid] or {}
+    self.emptySlotByBagAndSlot[item.bagid][item.slotid] = item
+    self.freeSlotKeys[name] = item.slotkey
+  end
 end
 
 ---@param bagid number

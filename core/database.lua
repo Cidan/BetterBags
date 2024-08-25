@@ -500,11 +500,11 @@ function DB:Migrate()
     Do not remove before Q1'25.
   ]]--
   if DB:GetBagView(const.BAG_KIND.BACKPACK) ~= const.BAG_VIEW.SECTION_GRID and DB:GetBagView(const.BAG_KIND.BACKPACK) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
-    DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.GRID)
+    DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
   end
 
   if DB:GetBagView(const.BAG_KIND.BANK) ~= const.BAG_VIEW.SECTION_GRID and DB:GetBagView(const.BAG_KIND.BANK) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
-    DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.GRID)
+    DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
   end
 
   --[[
