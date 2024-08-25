@@ -35,7 +35,9 @@ function refresh:StartUpdate(ctx)
     -- This is a safety check to ensure that the update process is
     -- never missed in the event of the update queue being interrupted.
     C_Timer.After(0, function()
-      self:StartUpdate(ctx)
+      if next(self.UpdateQueue) ~= nil then
+        self:StartUpdate(ctx)
+      end
     end)
     return
   end
@@ -46,7 +48,6 @@ function refresh:StartUpdate(ctx)
   local sortBackpack = false
   local sortBackpackClassic = false
   for _, event in pairs(self.UpdateQueue) do
-    debug:Inspect("brokenctx", event.ctx)
     if event.ctx:GetBool("wipe") then
       -- Prevent full wipes from happening in combat.
       -- This function will be called again when combat ends automatically.
@@ -107,12 +108,14 @@ function refresh:StartUpdate(ctx)
   end
 
   if updateBackpack then
+    if not ctx:HasTimeout() then
     -- This timer runs during loading screens, which can cause the context
     -- to be cancelled before the draw even happens.
-    ctx:Timeout(60, function()
-      self.isUpdateRunning = false
-      items._preSort = false
-    end)
+      ctx:Timeout(60, function()
+        self.isUpdateRunning = false
+        items._preSort = false
+      end)
+    end
     items:RefreshBackpack(ctx)
   else
     self.isUpdateRunning = false
@@ -214,15 +217,13 @@ function refresh:OnEnable()
 
   -- Register for when bags are done drawing.
   events:RegisterMessage('bags/Draw/Backpack/Done', function(ctx)
-    -- Cancel the context as the bag has been drawn.
-    -----@cast ctx Context
-    --ctx:Cancel()
-
     -- If there are more updates in the queue, start the next one with a new context.
     self.isUpdateRunning = false
     items._preSort = false
     if next(self.UpdateQueue) ~= nil then
       self:StartUpdate(ctx)
+    else
+      ctx:Cancel()
     end
   end)
 

@@ -8,6 +8,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class (exact) Context: AceModule
 ---@field private keys table<string, any>
 ---@field private done boolean
+---@field private timeout FunctionContainer
 local context = addon:NewModule('Context')
 
 -- New creates a new context object.
@@ -98,6 +99,10 @@ function context:Cancel()
     error("context has been cancelled")
   end
   self.done = true
+  if self.timeout then
+    self.timeout:Cancel()
+    self.timeout = nil
+  end
 end
 
 -- Timeout will cancel the context after a certain number of seconds.
@@ -107,13 +112,21 @@ function context:Timeout(seconds, callback)
   if self.done then
     error("context has been cancelled")
   end
-  C_Timer.After(seconds, function()
+  if self.timeout then
+    error("context already has a timeout")
+  end
+  self.timeout = C_Timer.NewTimer(seconds, function()
     if self.done then
       return
     end
     self.done = true
+    self.timeout = nil
     callback()
   end)
+end
+
+function context:HasTimeout()
+  return self.timeout ~= nil
 end
 
 -- Copy creates a copy of the context and returns it.
