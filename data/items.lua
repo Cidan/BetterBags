@@ -276,8 +276,8 @@ end
 ---@param oldData ItemData
 ---@return boolean
 function items:ItemRemoved(newData, oldData)
+  if newData.isItemEmpty and (oldData and not oldData.isItemEmpty) then return true end
   if not oldData or (oldData and oldData.isItemEmpty) then return false end
-  if newData.isItemEmpty then return true end
   return false
 end
 
