@@ -90,11 +90,12 @@ local function CreateButton(ctx, view, item)
   if oldSection then
     oldSection:RemoveCell(item.slotkey)
   end
+  local category = categories:GetCustomCategory(ctx, view.kind, item) or item.itemInfo.category
   local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
   itemButton:SetItem(ctx, item.slotkey)
-  local section = view:GetOrCreateSection(ctx, item.itemInfo.category)
+  local section = view:GetOrCreateSection(ctx, category)
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
-  view:AddDirtySection(item.itemInfo.category)
+  view:AddDirtySection(category)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
 end
 
@@ -110,7 +111,8 @@ local function UpdateButton(ctx, view, slotkey)
     view:FlashStack(ctx, slotkey)
   end
   local data = itemButton:GetItemData()
-  view:AddDirtySection(data.itemInfo.category)
+  local category = categories:GetCustomCategory(ctx, view.kind, data) or data.itemInfo.category
+  view:AddDirtySection(category)
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
