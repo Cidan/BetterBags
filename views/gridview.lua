@@ -92,7 +92,11 @@ local function CreateButton(ctx, view, item)
   end
   local category = items:GetCategory(ctx, item)
   local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-  itemButton:SetItem(ctx, item.slotkey)
+  if item.isItemEmpty then
+    itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, -1)
+  else
+    itemButton:SetItem(ctx, item.slotkey)
+  end
   local section = view:GetOrCreateSection(ctx, category)
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
   view:AddDirtySection(category)
@@ -246,16 +250,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   if database:GetShowAllBags() then
     for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
-        local slotkey = view:GetSlotKey(data)
-        if C_Container.GetBagName(bagid) ~= nil then
-          local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-          if itemButton == nil then
-            itemButton = itemFrame:Create(ctx)
-            view.itemsByBagAndSlot[slotkey] = itemButton
-          end
-          itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
-          local section = view:GetOrCreateSection(ctx, items:GetBagCategoryName(bagid))
-          section:AddCell(slotkey, itemButton)
+        if view.itemsByBagAndSlot[data.slotkey] == nil then
+          CreateButton(ctx, view, data)
         end
       end
     end
