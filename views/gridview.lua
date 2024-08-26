@@ -251,13 +251,14 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
         if view.itemsByBagAndSlot[data.slotkey] == nil then
+          print("Creating button for empty slot", data.slotkey)
           CreateButton(ctx, view, data)
         end
       end
     end
   end
 
-  if not slotInfo.deferDelete then
+  if not slotInfo.deferDelete and not database:GetShowAllBags() then
     for slotkey, _ in pairs(view:GetDeferredItems()) do
       local section = view:GetSlotSection(slotkey)
       section:RemoveCell(slotkey)
@@ -267,34 +268,49 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     view:ClearDeferredItems()
   end
   debug:StartProfile('Section Draw Stage %d', bag.kind)
-  if not slotInfo.deferDelete then
-    local dirtySections = view:GetDirtySections()
-    for sectionName in pairs(dirtySections) do
-      local section = view:GetSection(sectionName)
-      -- We need to check for the section here, as a section
-      -- may have been added to dirty items when it doesn't
-      -- exist yet. This happens when a new item's "new item"
-      -- status expires, it's category is no longer a new item
-      -- but the actual category hasn't been drawn yet.
-      if section ~= nil then
-        -- Remove the section if it's empty, otherwise draw it.
-        if section:GetCellCount() == 0 then
-          debug:Log("Section", "Removing section", sectionName)
-          view:RemoveSection(sectionName)
-          section:ReleaseAllCells(ctx)
-          section:Release(ctx)
-        else
-          debug:Log("Section", "Drawing section", sectionName)
-          if sectionName == L:G("Recent Items") then
-            section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+  if not database:GetShowAllBags() then
+    if not slotInfo.deferDelete then
+      local dirtySections = view:GetDirtySections()
+      for sectionName in pairs(dirtySections) do
+        local section = view:GetSection(sectionName)
+        -- We need to check for the section here, as a section
+        -- may have been added to dirty items when it doesn't
+        -- exist yet. This happens when a new item's "new item"
+        -- status expires, it's category is no longer a new item
+        -- but the actual category hasn't been drawn yet.
+        if section ~= nil then
+          -- Remove the section if it's empty, otherwise draw it.
+          if section:GetCellCount() == 0 then
+            debug:Log("Section", "Removing section", sectionName)
+            view:RemoveSection(sectionName)
+            section:ReleaseAllCells(ctx)
+            section:Release(ctx)
           else
-            section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+            debug:Log("Section", "Drawing section", sectionName)
+            if sectionName == L:G("Recent Items") then
+              section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+            else
+              section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+            end
+            section:Draw(bag.kind, database:GetBagView(bag.kind), false)
           end
-          section:Draw(bag.kind, database:GetBagView(bag.kind), false)
         end
       end
+      view:ClearDirtySections()
     end
-    view:ClearDirtySections()
+  else
+    for sectionName, section in pairs(view:GetAllSections()) do
+      if section:GetCellCount() == 0 then
+        debug:Log("RemoveSection", "Removed because empty", sectionName)
+        view:RemoveSection(sectionName)
+        section:ReleaseAllCells(ctx)
+        section:Release(ctx)
+      else
+        debug:Log("KeepSection", "Section kept because not empty", sectionName)
+        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+        section:Draw(bag.kind, database:GetBagView(bag.kind), true)
+      end
+    end
   end
   for sectionName, section in pairs(view:GetAllSections()) do
     if categories:IsCategoryShown(sectionName) == false then
