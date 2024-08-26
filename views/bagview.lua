@@ -157,23 +157,22 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   local added, removed, changed = slotInfo:GetChangeset()
 
   for _, item in pairs(removed) do
-    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    if stackInfo and stackInfo.count > 0 then
-      if stackInfo.rootItem ~= nil then
-        UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
-      else
-        ClearButton(ctx, view, item)
-      end
-    else
-      -- If the stack is empty or doesn't exist, clear the button
+    local newSlotKey = view:RemoveButton(item)
+    if not newSlotKey then
       ClearButton(ctx, view, item)
+    else
+      UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
     end
   end
 
   for _, item in pairs(added) do
     --local updateKey = view:AddButton(item)
     --if not updateKey then
+    if not view.itemsByBagAndSlot[item.slotkey] then
       CreateButton(ctx, view, item)
+    else
+      UpdateButton(ctx, view, item.slotkey)
+    end
     --else
     --  UpdateButton(ctx, view, updateKey)
     --end
