@@ -100,7 +100,6 @@ frames\debug.lua
 
 views\views.lua
 views\gridview.lua
-views\bagview.lua
 
 frames\bag.lua
 

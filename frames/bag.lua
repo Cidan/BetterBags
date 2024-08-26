@@ -546,7 +546,6 @@ function bagFrame:Create(ctx, kind)
 
   b.views = {
     [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
-    [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
   }
 
   -- Register the bag frame so that window positions are saved.

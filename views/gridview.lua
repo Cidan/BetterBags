@@ -186,7 +186,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if (not opts.mergeStacks) or
     (opts.unmergeAtShop and addon.atInteracting) or
     (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
+    database:GetShowAllBags() then
       -- If stacking is not allowed, create a new button
       CreateButton(ctx, view, item)
     else
@@ -213,7 +214,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if (not opts.mergeStacks) or
     (opts.unmergeAtShop and addon.atInteracting) or
     (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
+    database:GetShowAllBags() then
       -- If stacking is not allowed, just update the existing button
       UpdateButton(ctx, view, item.slotkey)
     else
