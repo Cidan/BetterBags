@@ -90,13 +90,9 @@ local function CreateButton(ctx, view, item)
   if oldSection then
     oldSection:RemoveCell(item.slotkey)
   end
-  local category = items:GetCategory(ctx, item)
+  local category = categories:GetCustomCategory(ctx, view.kind, item) or item.itemInfo.category
   local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-  if item.isItemEmpty then
-    itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, -1)
-  else
-    itemButton:SetItem(ctx, item.slotkey)
-  end
+  itemButton:SetItem(ctx, item.slotkey)
   local section = view:GetOrCreateSection(ctx, category)
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
   view:AddDirtySection(category)
@@ -115,7 +111,7 @@ local function UpdateButton(ctx, view, slotkey)
     view:FlashStack(ctx, slotkey)
   end
   local data = itemButton:GetItemData()
-  local category = items:GetCategory(ctx, data)
+  local category = categories:GetCustomCategory(ctx, view.kind, data) or data.itemInfo.category
   view:AddDirtySection(category)
 end
 
@@ -190,8 +186,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if (not opts.mergeStacks) or
     (opts.unmergeAtShop and addon.atInteracting) or
     (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
-    database:GetShowAllBags() then
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
       -- If stacking is not allowed, create a new button
       CreateButton(ctx, view, item)
     else
@@ -218,8 +213,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if (not opts.mergeStacks) or
     (opts.unmergeAtShop and addon.atInteracting) or
     (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
-    database:GetShowAllBags() then
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
       -- If stacking is not allowed, just update the existing button
       UpdateButton(ctx, view, item.slotkey)
     else
@@ -247,18 +241,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end
   end
 
-  if database:GetShowAllBags() then
-    for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, data in pairs(emptyBagData) do
-        if view.itemsByBagAndSlot[data.slotkey] == nil then
-          print("Creating button for empty slot", data.slotkey)
-          CreateButton(ctx, view, data)
-        end
-      end
-    end
-  end
-
-  if not slotInfo.deferDelete and not database:GetShowAllBags() then
+  if not slotInfo.deferDelete then
     for slotkey, _ in pairs(view:GetDeferredItems()) do
       local section = view:GetSlotSection(slotkey)
       section:RemoveCell(slotkey)
@@ -268,49 +251,34 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     view:ClearDeferredItems()
   end
   debug:StartProfile('Section Draw Stage %d', bag.kind)
-  if not database:GetShowAllBags() then
-    if not slotInfo.deferDelete then
-      local dirtySections = view:GetDirtySections()
-      for sectionName in pairs(dirtySections) do
-        local section = view:GetSection(sectionName)
-        -- We need to check for the section here, as a section
-        -- may have been added to dirty items when it doesn't
-        -- exist yet. This happens when a new item's "new item"
-        -- status expires, it's category is no longer a new item
-        -- but the actual category hasn't been drawn yet.
-        if section ~= nil then
-          -- Remove the section if it's empty, otherwise draw it.
-          if section:GetCellCount() == 0 then
-            debug:Log("Section", "Removing section", sectionName)
-            view:RemoveSection(sectionName)
-            section:ReleaseAllCells(ctx)
-            section:Release(ctx)
+  if not slotInfo.deferDelete then
+    local dirtySections = view:GetDirtySections()
+    for sectionName in pairs(dirtySections) do
+      local section = view:GetSection(sectionName)
+      -- We need to check for the section here, as a section
+      -- may have been added to dirty items when it doesn't
+      -- exist yet. This happens when a new item's "new item"
+      -- status expires, it's category is no longer a new item
+      -- but the actual category hasn't been drawn yet.
+      if section ~= nil then
+        -- Remove the section if it's empty, otherwise draw it.
+        if section:GetCellCount() == 0 then
+          debug:Log("Section", "Removing section", sectionName)
+          view:RemoveSection(sectionName)
+          section:ReleaseAllCells(ctx)
+          section:Release(ctx)
+        else
+          debug:Log("Section", "Drawing section", sectionName)
+          if sectionName == L:G("Recent Items") then
+            section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
           else
-            debug:Log("Section", "Drawing section", sectionName)
-            if sectionName == L:G("Recent Items") then
-              section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-            else
-              section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-            end
-            section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+            section:SetMaxCellWidth(sizeInfo.itemsPerRow)
           end
+          section:Draw(bag.kind, database:GetBagView(bag.kind), false)
         end
       end
-      view:ClearDirtySections()
     end
-  else
-    for sectionName, section in pairs(view:GetAllSections()) do
-      if section:GetCellCount() == 0 then
-        debug:Log("RemoveSection", "Removed because empty", sectionName)
-        view:RemoveSection(sectionName)
-        section:ReleaseAllCells(ctx)
-        section:Release(ctx)
-      else
-        debug:Log("KeepSection", "Section kept because not empty", sectionName)
-        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-        section:Draw(bag.kind, database:GetBagView(bag.kind), true)
-      end
-    end
+    view:ClearDirtySections()
   end
   for sectionName, section in pairs(view:GetAllSections()) do
     if categories:IsCategoryShown(sectionName) == false then
@@ -318,43 +286,37 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end
   end
   debug:EndProfile('Section Draw Stage %d', bag.kind)
-
-  if database:GetShowAllBags() then
-    -- No action needed for show all bags
-  else
-    -- Get the free slots section and add the free slots to it.
-    local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
-    if database:GetShowAllFreeSpace(bag.kind) then
-      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-      freeSlotsSection:WipeOnlyContents()
-      for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
-        for slotid, item in pairs(data) do
-          if not view:GetDeferredItems()[item.slotkey] then
-            local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-            itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
-            freeSlotsSection:AddCell(item.slotkey, itemButton)
-          end
+  -- Get the free slots section and add the free slots to it.
+  local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
+  if database:GetShowAllFreeSpace(bag.kind) then
+    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+    freeSlotsSection:WipeOnlyContents()
+    for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
+      for slotid, item in pairs(data) do
+        if not view:GetDeferredItems()[item.slotkey] then
+          local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+          itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
+          freeSlotsSection:AddCell(item.slotkey, itemButton)
         end
       end
-      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
-    else
-      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
-      for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-        if slotInfo.freeSlotKeys[name] ~= nil then
-          local itemButton = view:GetOrCreateItemButton(ctx, name)
-          local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-          itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
-          freeSlotsSection:AddCell(name, itemButton)
-        else
-          local itemButton = view:GetOrCreateItemButton(ctx, name)
-          itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
-          freeSlotsSection:AddCell(name, itemButton)
-        end
-      end
-      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
     end
+    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
+  else
+    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
+    for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+      if slotInfo.freeSlotKeys[name] ~= nil then
+        local itemButton = view:GetOrCreateItemButton(ctx, name)
+        local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+        itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
+        freeSlotsSection:AddCell(name, itemButton)
+      else
+        local itemButton = view:GetOrCreateItemButton(ctx, name)
+        itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
+        freeSlotsSection:AddCell(name, itemButton)
+      end
+    end
+    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
   end
-
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))

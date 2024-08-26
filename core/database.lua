@@ -341,16 +341,6 @@ function DB:GetCategoryOptions(category)
   return options
 end
 
----@return boolean
-function DB:GetShowAllBags()
-  return DB.data.profile.showAllBags
-end
-
----@param value boolean
-function DB:SetShowAllBags(value)
-  DB.data.profile.showAllBags = value
-end
-
 ---@param kind BagKind
 function DB:ClearCustomSectionSort(kind)
   DB.data.profile.customSectionSort[kind] = {}
@@ -500,17 +490,22 @@ end
 function DB:Migrate()
 
   --[[
-    Migration away from multi-view bags and bank to a single view.
-    Do not remove before Q2'25.
-  ]]--
-  DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
-  DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
-
-  --[[
     Deletion of the old lockedItems table.
     Do not remove before Q1'25.
   ]]--
   DB.data.profile.lockedItems = {}
+
+  --[[
+    Migration away from multi-view bags and bank to a single view.
+    Do not remove before Q1'25.
+  ]]--
+  if DB:GetBagView(const.BAG_KIND.BACKPACK) ~= const.BAG_VIEW.SECTION_GRID and DB:GetBagView(const.BAG_KIND.BACKPACK) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+    DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+  end
+
+  if DB:GetBagView(const.BAG_KIND.BANK) ~= const.BAG_VIEW.SECTION_GRID and DB:GetBagView(const.BAG_KIND.BANK) ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+    DB:SetBagView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
+  end
 
   --[[
     Migration of the custom category filters from single filter to per-bag filter.

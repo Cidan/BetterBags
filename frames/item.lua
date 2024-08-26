@@ -201,8 +201,7 @@ function itemFrame.itemProto:UpdateCount(ctx)
   if (not opts.mergeStacks) or
   (opts.unmergeAtShop and addon.atInteracting) or
   (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount) or
-  (not opts.mergeUnstackable and data.itemInfo.itemStackCount == 1) or
-  database:GetShowAllBags() then
+  (not opts.mergeUnstackable and data.itemInfo.itemStackCount == 1) then
     count = data.itemInfo.currentItemCount
   else
     local stack = items:GetStackData(data)

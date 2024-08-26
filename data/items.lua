@@ -741,34 +741,10 @@ function items:GenerateItemHash(data)
   return hash
 end
 
----@param bagid number
----@return string
-function items:GetBagCategoryName(bagid)
-  local isBackpack = const.BACKPACK_BAGS[bagid] ~= nil
-  if isBackpack then
-    local bagname = bagid == Enum.BagIndex.Keyring and L:G('Keyring') or C_Container.GetBagName(bagid)
-    local displayid = bagid == Enum.BagIndex.Keyring and 6 or bagid+1
-    return format("#%d: %s", displayid, bagname or "Unknown")
-  end
-
-    local id = bagid
-    if id == -1 then
-      return format("#%d: %s", 1, L:G('Bank'))
-    elseif id == -3 then
-      return format("#%d: %s", 1, L:G('Reagent Bank'))
-    else
-      return format("#%d: %s", id - 4, C_Container.GetBagName(id))
-    end
-end
-
 ---@param ctx Context
 ---@param data ItemData
 ---@return string
 function items:GetCategory(ctx, data)
-  if database:GetShowAllBags() then
-    return self:GetBagCategoryName(data.bagid)
-  end
-
   if not data or data.isItemEmpty then return L:G('Empty Slot') end
 
   if database:GetCategoryFilter(data.kind, "RecentItems") then
