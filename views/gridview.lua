@@ -243,6 +243,24 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end
   end
 
+  if database:GetShowAllBags() then
+    for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
+      for slotid, data in pairs(emptyBagData) do
+        local slotkey = view:GetSlotKey(data)
+        if C_Container.GetBagName(bagid) ~= nil then
+          local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+          if itemButton == nil then
+            itemButton = itemFrame:Create(ctx)
+            view.itemsByBagAndSlot[slotkey] = itemButton
+          end
+          itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
+          local section = view:GetOrCreateSection(ctx, items:GetBagCategoryName(bagid))
+          section:AddCell(slotkey, itemButton)
+        end
+      end
+    end
+  end
+
   if not slotInfo.deferDelete then
     for slotkey, _ in pairs(view:GetDeferredItems()) do
       local section = view:GetSlotSection(slotkey)
@@ -288,37 +306,43 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end
   end
   debug:EndProfile('Section Draw Stage %d', bag.kind)
-  -- Get the free slots section and add the free slots to it.
-  local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
-  if database:GetShowAllFreeSpace(bag.kind) then
-    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-    freeSlotsSection:WipeOnlyContents()
-    for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, item in pairs(data) do
-        if not view:GetDeferredItems()[item.slotkey] then
-          local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-          itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
-          freeSlotsSection:AddCell(item.slotkey, itemButton)
+
+  if database:GetShowAllBags() then
+    -- No action needed for show all bags
+  else
+    -- Get the free slots section and add the free slots to it.
+    local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
+    if database:GetShowAllFreeSpace(bag.kind) then
+      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+      freeSlotsSection:WipeOnlyContents()
+      for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
+        for slotid, item in pairs(data) do
+          if not view:GetDeferredItems()[item.slotkey] then
+            local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+            itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
+            freeSlotsSection:AddCell(item.slotkey, itemButton)
+          end
         end
       end
-    end
-    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
-  else
-    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
-    for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-      if slotInfo.freeSlotKeys[name] ~= nil then
-        local itemButton = view:GetOrCreateItemButton(ctx, name)
-        local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-        itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
-        freeSlotsSection:AddCell(name, itemButton)
-      else
-        local itemButton = view:GetOrCreateItemButton(ctx, name)
-        itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
-        freeSlotsSection:AddCell(name, itemButton)
+      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
+    else
+      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
+      for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+        if slotInfo.freeSlotKeys[name] ~= nil then
+          local itemButton = view:GetOrCreateItemButton(ctx, name)
+          local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+          itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
+          freeSlotsSection:AddCell(name, itemButton)
+        else
+          local itemButton = view:GetOrCreateItemButton(ctx, name)
+          itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
+          freeSlotsSection:AddCell(name, itemButton)
+        end
       end
+      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
     end
-    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
   end
+
   view.content.maxCellWidth = sizeInfo.columnCount
   -- Sort the sections.
   view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
