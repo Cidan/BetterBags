@@ -152,31 +152,35 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     view:Wipe(ctx)
   end
   -- Use the section grid sizing for this view type.
-  local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_GRID)
+  local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
   for _, item in pairs(removed) do
-    local newSlotKey = view:RemoveButton(item)
-    if not newSlotKey then
-      ClearButton(ctx, view, item)
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    if stackInfo and stackInfo.count > 0 then
+      if stackInfo.rootItem ~= nil then
+        UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
+      else
+        ClearButton(ctx, view, item)
+      end
     else
-      UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
+      -- If the stack is empty or doesn't exist, clear the button
+      ClearButton(ctx, view, item)
     end
   end
 
-
   for _, item in pairs(added) do
-    local updateKey = view:AddButton(item)
-    if not updateKey then
+    --local updateKey = view:AddButton(item)
+    --if not updateKey then
       CreateButton(ctx, view, item)
-    else
-      UpdateButton(ctx, view, updateKey)
-    end
+    --else
+    --  UpdateButton(ctx, view, updateKey)
+    --end
   end
 
   for _, item in pairs(changed) do
-    UpdateButton(ctx, view, view:ChangeButton(item))
+    UpdateButton(ctx, view, item.slotkey)
   end
 
   for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
@@ -207,7 +211,7 @@ local function BagView(view, ctx, bag, slotInfo, callback)
       section:Release(ctx)
     else
       debug:Log("KeepSection", "Section kept because not empty", sectionName)
-      section:SetMaxCellWidth(12)
+      section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       section:Draw(bag.kind, database:GetBagView(bag.kind), true)
     end
   end
@@ -219,8 +223,8 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   debug:StartProfile('Content Draw Stage')
   local w, h = view.content:Draw({
     cells = view.content.cells,
-    maxWidthPerRow = ((37 + 4) * 1) + 16,
-    columns = 2,
+    maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+    columns = sizeInfo.columnCount,
   })
   debug:EndProfile('Content Draw Stage')
   -- Reposition the content frame if the recent items section is empty.
