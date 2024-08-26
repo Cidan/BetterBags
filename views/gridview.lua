@@ -90,7 +90,7 @@ local function CreateButton(ctx, view, item)
   if oldSection then
     oldSection:RemoveCell(item.slotkey)
   end
-  local category = categories:GetCustomCategory(ctx, view.kind, item) or item.itemInfo.category
+  local category = items:GetCategory(ctx, item)
   local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
   itemButton:SetItem(ctx, item.slotkey)
   local section = view:GetOrCreateSection(ctx, category)
@@ -111,7 +111,7 @@ local function UpdateButton(ctx, view, slotkey)
     view:FlashStack(ctx, slotkey)
   end
   local data = itemButton:GetItemData()
-  local category = categories:GetCustomCategory(ctx, view.kind, data) or data.itemInfo.category
+  local category = items:GetCategory(ctx, data)
   view:AddDirtySection(category)
 end
 

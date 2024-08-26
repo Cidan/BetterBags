@@ -341,6 +341,16 @@ function DB:GetCategoryOptions(category)
   return options
 end
 
+---@return boolean
+function DB:GetShowAllBags()
+  return DB.data.profile.showAllBags
+end
+
+---@param value boolean
+function DB:SetShowAllBags(value)
+  DB.data.profile.showAllBags = value
+end
+
 ---@param kind BagKind
 function DB:ClearCustomSectionSort(kind)
   DB.data.profile.customSectionSort[kind] = {}

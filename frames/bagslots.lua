@@ -131,16 +131,18 @@ function BagSlots:CreatePanel(ctx, kind)
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
 
   addon.HookScript(b.fadeInGroup, "OnFinished", function(ectx)
-    if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-      return
-    end
-    database:SetPreviousView(kind, database:GetBagView(kind))
-    database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
+    database:SetShowAllBags(true)
+--    if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+--      return
+--    end
+--    database:SetPreviousView(kind, database:GetBagView(kind))
+--    database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
     events:SendMessage('bags/FullRefreshAll', ectx)
   end)
 
   addon.HookScript(b.fadeOutGroup, "OnFinished", function(ectx)
-    database:SetBagView(kind, database:GetPreviousView(kind))
+    database:SetShowAllBags(false)
+    --database:SetBagView(kind, database:GetPreviousView(kind))
     events:SendMessage('bags/FullRefreshAll', ectx)
   end)
 
