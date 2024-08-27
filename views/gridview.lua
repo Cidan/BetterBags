@@ -166,13 +166,21 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   for _, item in pairs(removed) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    if not stackInfo or not slotInfo.stacks:HasItem(item.itemHash, item.slotkey) then
-      print("remove: clearing", item.slotkey)
-      ClearButton(ctx, view, item)
-    else
-      print("remove: updating", item.slotkey, "->", stackInfo.rootItem)
+    if stackInfo and stackInfo.count > 1 then
       UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
+    else
+      ClearButton(ctx, view, item)
     end
+    --if not stackInfo or (not slotInfo.stacks:HasItem(item.itemHash, item.slotkey) and stackInfo.count == 1) then
+    --  print("remove: clearing", item.slotkey, item.itemInfo.itemLink)
+    --  print("remove: clearing because has item is: ", slotInfo.stacks:HasItem(item.itemHash, item.slotkey))
+    --  print("remove: but also stack count is: ", stackInfo.count)
+    --  ClearButton(ctx, view, item)
+    --else
+    --  local root = items:GetItemDataFromSlotKey(stackInfo.rootItem)
+    --  print("remove: updating", item.slotkey, "->", stackInfo.rootItem, root.itemInfo.itemLink)
+    --  UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
+    --end
   end
 
   debug:StartProfile('Create Button Stage %d', bag.kind)
