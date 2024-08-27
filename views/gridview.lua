@@ -167,8 +167,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   for _, item in pairs(removed) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
     if not stackInfo or not slotInfo.stacks:HasItem(item.itemHash, item.slotkey) then
+      print("remove: clearing", item.slotkey)
       ClearButton(ctx, view, item)
     else
+      print("remove: updating", item.slotkey, "->", stackInfo.rootItem)
       UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
     end
   end
@@ -187,8 +189,11 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     else
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       if stackInfo and slotInfo.stacks:IsRootItem(item.itemHash, item.slotkey) then
+        print("add: creating new button", item.slotkey, item.itemInfo.itemLink)
         CreateButton(ctx, view, item)
       elseif stackInfo then
+        local root = items:GetItemDataFromSlotKey(stackInfo.rootItem)
+        print("add: updating existing button", stackInfo.rootItem, root.itemInfo.itemLink)
         UpdateButton(ctx, view, stackInfo.rootItem)
       end
     end
