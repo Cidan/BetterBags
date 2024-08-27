@@ -167,8 +167,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   for _, item in pairs(removed) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
     if stackInfo and stackInfo.count > 1 then
+      print("remove: updating deleted slot", item.slotkey, stackInfo.rootItem, stackInfo.count)
       UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
     else
+      print("remove: clearing", item.slotkey, item.itemInfo.itemLink)
       ClearButton(ctx, view, item)
     end
     --if not stackInfo or (not slotInfo.stacks:HasItem(item.itemHash, item.slotkey) and stackInfo.count == 1) then
