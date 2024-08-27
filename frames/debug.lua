@@ -18,11 +18,14 @@ local tabs = addon:GetModule('Tabs')
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
+---@class ItemBrowser: AceModule
+local itemBrowser = addon:GetModule('ItemBrowser')
+
 ---@class DebugWindow: AceModule
 ---@field frame Frame
 ---@field rows number
 ---@field tabFrame Tab
----@field contentFrames ListFrame[]
+---@field contentFrames any[]
 local debugWindow = addon:NewModule('DebugWindow')
 
 
@@ -61,13 +64,15 @@ function debugWindow:Create(ctx)
     return false
   end)
 
-  -- Add default "Debug Log" tab
+  -- Add default "Debug Log" tab and new "Items" tab
   self.tabFrame:AddTab(ctx, "Debug Log")
+  self.tabFrame:AddTab(ctx, "Items")
   self.tabFrame:SetTabByIndex(ctx, 1)
 
   -- Create content frames for each tab
   self.contentFrames = {}
   self.contentFrames[1] = self:CreateDebugLogFrame()
+  self.contentFrames[2] = self:CreateItemsFrame()
 
   local closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButtonDefaultAnchors")
   closeButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
@@ -98,7 +103,6 @@ function debugWindow:Create(ctx)
 
   events:RegisterMessage('debug/ClearLog', function()
     self.contentFrames[1]:Wipe()
-    --self.provider:Flush()
     self.cells = {}
     self.rows = 0
   end)
@@ -134,6 +138,16 @@ function debugWindow:CreateDebugLogFrame()
   frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
   frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
   frame:SetupDataSource("BetterBagsDebugListButton", initDebugListItem, function()end)
+  return frame
+end
+
+---CreateItemsFrame creates the frame for the Items tab.
+---@return ItemBrowserFrame
+function debugWindow:CreateItemsFrame()
+  local frame = itemBrowser:Create(self.frame)
+  frame:GetFrame():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
+  frame:GetFrame():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
+  frame:Hide() -- Hide by default as Debug Log is the initial tab
   return frame
 end
 
