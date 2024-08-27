@@ -165,7 +165,6 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   local hiddenCells = {}
 
   for _, item in pairs(removed) do
-    print("removed", item.slotkey)
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
     if not stackInfo or not slotInfo.stacks:HasItem(item.itemHash, item.slotkey) then
       ClearButton(ctx, view, item)
