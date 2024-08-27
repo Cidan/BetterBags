@@ -3,7 +3,7 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class ListFrame: AceModule
+---@class ListFrame
 ---@field frame Frame
 ---@field ScrollBox WowScrollBox
 ---@field ScrollBar MinimalScrollBar
@@ -56,6 +56,11 @@ end
 ---@param index number
 function listFrame:RemoveAtIndex(index)
   self.provider:RemoveIndex(index)
+end
+
+---@param data table
+function listFrame:InsertTable(data)
+  self.provider:InsertTable(data)
 end
 
 ---@param data table

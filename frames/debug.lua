@@ -15,6 +15,9 @@ local context = addon:GetModule('Context')
 ---@class Tabs: AceModule
 local tabs = addon:GetModule('Tabs')
 
+---@class List: AceModule
+local list = addon:GetModule('List')
+
 ---@class DebugWindow: AceModule
 ---@field frame ScrollingFlatPanelTemplate
 ---@field rows number
@@ -78,9 +81,10 @@ function debugWindow:Create(ctx)
   end)
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
-    self.provider:InsertTable(self.cells)
+    self.contentFrames[1]:InsertTable(self.cells)
+    --self.provider:InsertTable(self.cells)
     wipe(self.cells)
-    self.frame.ScrollBox:ScrollToEnd()
+    --self.frame.ScrollBox:ScrollToEnd()
   end)
 
   events:RegisterMessage('config/DebugMode', function(_, enabled)
@@ -92,7 +96,8 @@ function debugWindow:Create(ctx)
   end)
 
   events:RegisterMessage('debug/ClearLog', function()
-    self.provider:Flush()
+    self.contentFrames[1]:Wipe()
+    --self.provider:Flush()
     self.cells = {}
     self.rows = 0
   end)
@@ -122,24 +127,28 @@ function debugWindow:AddLogLine(ctx, title, message)
 end
 
 ---CreateDebugLogFrame creates the frame for the debug log tab.
----@return Frame
+---@return ListFrame
 function debugWindow:CreateDebugLogFrame()
-  local frame = CreateFrame("Frame", nil, self.frame)
-  frame:SetAllPoints(self.frame)
-
-  frame.ScrollBox = self.frame.ScrollBox
-  frame.ScrollBar = self.frame.ScrollBar
-
-  frame.ScrollBox:SetInterpolateScroll(true)
-  frame.ScrollBar:SetInterpolateScroll(true)
-  local view = CreateScrollBoxListLinearView()
-  view:SetElementInitializer("BetterBagsDebugListButton", initDebugListItem)
-  view:SetPadding(4,4,8,4,0)
-  view:SetExtent(20)
-  ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
-  frame.ScrollBox:GetUpperShadowTexture():ClearAllPoints()
-  frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
-  frame.ScrollBox:SetDataProvider(self.provider)
+  local frame = list:Create(self.frame)
+  frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 10, -10)
+  frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -10, 10)
+  frame:SetupDataSource("BetterBagsDebugListButton", initDebugListItem, function()end)
+  --local frame = CreateFrame("Frame", nil, self.frame)
+  --frame:SetAllPoints(self.frame)
+--
+  --frame.ScrollBox = self.frame.ScrollBox
+  --frame.ScrollBar = self.frame.ScrollBar
+--
+  --frame.ScrollBox:SetInterpolateScroll(true)
+  --frame.ScrollBar:SetInterpolateScroll(true)
+  --local view = CreateScrollBoxListLinearView()
+  --view:SetElementInitializer("BetterBagsDebugListButton", initDebugListItem)
+  --view:SetPadding(4,4,8,4,0)
+  --view:SetExtent(20)
+  --ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
+  --frame.ScrollBox:GetUpperShadowTexture():ClearAllPoints()
+  --frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
+  --frame.ScrollBox:SetDataProvider(self.provider)
 
   return frame
 end
