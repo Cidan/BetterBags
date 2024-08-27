@@ -53,7 +53,7 @@ local context = addon:GetModule('Context')
 ---@field sectionFonts table<string, FontString>
 ---@field titles table<string, string>
 ---@field itemButtons table<string, ItemButton>
----@field tabs table<number, PanelTabButtonTemplate>
+---@field tabs table<string, PanelTabButtonTemplate>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -115,9 +115,9 @@ function themes:ApplyTheme(ctx, key)
   db:SetTheme(key)
 
   -- Hide all tab decorations.
-  for _, tab in pairs(self.tabs) do
-    tab:Hide()
-  end
+  --for _, tab in pairs(self.tabs) do
+  --  --tab:Hide()
+  --end
 
   -- Apply all portrait themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
@@ -303,7 +303,7 @@ function themes:GetTabButton(ctx, tab)
   if theme.Tab then
     return theme.Tab(tab)
   end
-  local tabIndex = tab.index
+  local tabIndex = tab:GetName()
   local decoration = self.tabs[tabIndex]
   if decoration then
     async:AfterCombat(ctx, function(_)
@@ -313,6 +313,9 @@ function themes:GetTabButton(ctx, tab)
   end
   decoration = themes.CreateDefaultTabDecoration(tab)
   self.tabs[tabIndex] = decoration
+  async:AfterCombat(ctx, function(_)
+    decoration:Show()
+  end)
   return decoration
 end
 

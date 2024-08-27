@@ -10,6 +10,6 @@
     </Size>
   </Button>
 
-  <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="PanelTabButtonTemplate,SecureActionButtonTemplate">
+  <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="PanelTabButtonTemplate,InsecureActionButtonTemplate">
   </Button>
 </Ui>

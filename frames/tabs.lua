@@ -39,6 +39,7 @@ local debug = addon:GetModule('Debug')
 ---@field selectedTab number
 ---@field clickHandler fun(ctx: Context, name: number, button: string): boolean?
 ---@field width number
+---@field tabCount number
 local tabFrame = {}
 
 ---@param ctx Context
@@ -48,12 +49,13 @@ local tabFrame = {}
 ---@param sabtClick? Button
 function tabFrame:AddTab(ctx, name, id, onClick, sabtClick)
   ---@type TabButton
-  local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), #self.tabIndex), self.frame) --[[@as TabButton]]
+  local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), self.tabCount), self.frame) --[[@as TabButton]]
   tab.sabtClick = sabtClick
   tab.onClick = onClick
   tab.name = name
   tab.id = id
   tab:SetNormalFontObject(GameFontNormalSmall)
+  self.tabCount = self.tabCount + 1
   local anchorFrame = self.frame
   local anchorPoint = "TOPLEFT"
   if self.tabIndex[#self.tabIndex] then
@@ -272,6 +274,7 @@ end
 function tabFrame:SelectTab(ctx, index)
   local tab = self.tabIndex[index]
   local decoration = themes:GetTabButton(ctx, tab)
+  decoration:Show()
 	decoration.Left:Hide()
 	decoration.Middle:Hide()
 	decoration.Right:Hide()
@@ -310,5 +313,6 @@ function tabs:Create(parent)
   container.tabs = {}
   container.tabIndex = {}
   container.buttonToName = {}
+  container.tabCount = 0
   return container
 end

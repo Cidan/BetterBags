@@ -12,9 +12,13 @@ local database = addon:GetModule('Database')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Tabs: AceModule
+local tabs = addon:GetModule('Tabs')
+
 ---@class DebugWindow: AceModule
 ---@field frame ScrollingFlatPanelTemplate
 ---@field rows number
+---@field tabFrame Tab
 local debugWindow = addon:NewModule('DebugWindow')
 
 
@@ -42,16 +46,24 @@ function debugWindow:Create(ctx)
   self.frame:SetScript("OnDragStart", self.frame.StartMoving)
   self.frame:SetScript("OnDragStop", self.frame.StopMovingOrSizing)
   self.frame:SetTitle("BetterBags Debug Window")
-  self.frame.ScrollBox:SetInterpolateScroll(true)
-  self.frame.ScrollBar:SetInterpolateScroll(true)
-  local view = CreateScrollBoxListLinearView()
-  view:SetElementInitializer("BetterBagsDebugListButton", initDebugListItem)
-  view:SetPadding(4,4,8,4,0)
-  view:SetExtent(20)
-  ScrollUtil.InitScrollBoxListWithScrollBar(self.frame.ScrollBox, self.frame.ScrollBar, view)
-  self.frame.ScrollBox:GetUpperShadowTexture():ClearAllPoints()
-  self.frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
-  self.frame.ScrollBox:SetDataProvider(self.provider)
+
+  -- Create tab frame
+  self.tabFrame = tabs:Create(self.frame)
+  self.tabFrame:SetClickHandler(function(_, id, button)
+    if button == "LeftButton" then
+      self:SwitchTab(id)
+      return true
+    end
+    return false
+  end)
+
+  -- Add default "Debug Log" tab
+  self.tabFrame:AddTab(ctx, "Debug Log")
+  self.tabFrame:SetTabByIndex(ctx, 1)
+
+  -- Create content frames for each tab
+  self.contentFrames = {}
+  self.contentFrames[1] = self:CreateDebugLogFrame()
 
   self.frame.ClosePanelButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 
@@ -107,4 +119,39 @@ function debugWindow:AddLogLine(ctx, title, message)
   })
   self.rows = self.rows + 1
   events:SendMessage('debug/LogAdded', ctx)
+end
+
+---CreateDebugLogFrame creates the frame for the debug log tab.
+---@return Frame
+function debugWindow:CreateDebugLogFrame()
+  local frame = CreateFrame("Frame", nil, self.frame)
+  frame:SetAllPoints(self.frame)
+
+  frame.ScrollBox = self.frame.ScrollBox
+  frame.ScrollBar = self.frame.ScrollBar
+
+  frame.ScrollBox:SetInterpolateScroll(true)
+  frame.ScrollBar:SetInterpolateScroll(true)
+  local view = CreateScrollBoxListLinearView()
+  view:SetElementInitializer("BetterBagsDebugListButton", initDebugListItem)
+  view:SetPadding(4,4,8,4,0)
+  view:SetExtent(20)
+  ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
+  frame.ScrollBox:GetUpperShadowTexture():ClearAllPoints()
+  frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
+  frame.ScrollBox:SetDataProvider(self.provider)
+
+  return frame
+end
+
+---SwitchTab switches to the specified tab.
+---@param tabId number
+function debugWindow:SwitchTab(tabId)
+  for id, frame in pairs(self.contentFrames) do
+    if id == tabId then
+      frame:Show()
+    else
+      frame:Hide()
+    end
+  end
 end
