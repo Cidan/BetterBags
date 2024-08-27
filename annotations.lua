@@ -16,6 +16,7 @@
 ---@field flashAnim AnimationGroup
 ---@field newitemglowAnim AnimationGroup
 ---@field IconOverlay Texture
+---@field GetItemContextMatchResult function
 ---@field ItemContextOverlay Texture
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
@@ -478,6 +479,15 @@ CharacterReagentBag0Slot = {}
 
 ---@class MainMenuBagButton: Button
 ---@field SlotHighlightTexture Texture
+
+ItemButtonUtil = {}
+
+---@enum ItemContextMatchResult
+ItemButtonUtil.ItemContextMatchResult = {
+	Match = 1,
+	Mismatch = 2,
+	DoesNotApply = 3,
+}
 
 ----
 -- ConsolePort annotations

@@ -198,6 +198,7 @@ function bagFrame.bagProto:Show(ctx)
   end
 
   self.frame:Show()
+  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
 end
 
 ---@param ctx Context
@@ -222,6 +223,7 @@ function bagFrame.bagProto:Hide(ctx)
     self.drawOnClose = false
     self:Refresh(ctx)
   end
+  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
 end
 
 ---@param ctx Context
@@ -378,6 +380,7 @@ function bagFrame.bagProto:SwitchToBank(ctx)
   self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
+  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
 end
 
 ---@param ctx Context
@@ -396,6 +399,7 @@ function bagFrame.bagProto:SwitchToReagentBank(ctx)
   self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
+  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
   return true
 end
 
@@ -418,6 +422,7 @@ function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
+  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
   return true
 end
 
