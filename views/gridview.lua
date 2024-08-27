@@ -186,17 +186,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       CreateButton(ctx, view, item)
     else
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-      if stackInfo and stackInfo.count > 0 then
-        -- If there are other items in the stack, check if this is the root item
-        if item.slotkey == stackInfo.rootItem then
-          CreateButton(ctx, view, item)
-        else
-          -- If not the root item, update the existing slot
-          UpdateButton(ctx, view, stackInfo.rootItem)
-        end
-      else
-        -- If the stack is empty or doesn't exist, create a new button
+      if stackInfo and slotInfo.stacks:IsRootItem(item.itemHash, item.slotkey) then
         CreateButton(ctx, view, item)
+      elseif stackInfo then
+        UpdateButton(ctx, view, stackInfo.rootItem)
       end
     end
   end

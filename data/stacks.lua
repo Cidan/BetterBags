@@ -94,6 +94,16 @@ function stack:HasItem(itemHash, slotkey)
   return stackinfo.slotkeys[slotkey]
 end
 
+--- Checks if a slotkey is the root item of a stack
+---@param itemHash string
+---@param slotkey string
+---@return boolean
+function stack:IsRootItem(itemHash, slotkey)
+  local stackinfo = self.stacksByItemHash[itemHash]
+  if not stackinfo then return false end
+  return stackinfo.rootItem == slotkey
+end
+
 --- Clears all stack information
 function stack:Clear()
   wipe(self.stacksByItemHash)
