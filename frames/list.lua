@@ -33,6 +33,10 @@ function listFrame:SetupDataSource(itemTemplate, elementFactory, elementResetter
   self.ScrollBox:SetDataProvider(self.provider)
 end
 
+function listFrame:ScrollToEnd()
+  self.ScrollBox:ScrollToEnd()
+end
+
 -- AddToEnd will add an item to the end of the list.
 ---@param data table
 function listFrame:AddToEnd(data)
@@ -105,6 +109,14 @@ function listFrame:SetCanReorder(canReorder, cb)
   if cb then
     self.provider:RegisterCallback(DataProviderMixin.Event.OnMove, cb)
   end
+end
+
+function listFrame:Show()
+  self.frame:Show()
+end
+
+function listFrame:Hide()
+  self.frame:Hide()
 end
 
 ---@class List: AceModule

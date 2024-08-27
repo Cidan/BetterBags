@@ -19,9 +19,10 @@ local tabs = addon:GetModule('Tabs')
 local list = addon:GetModule('List')
 
 ---@class DebugWindow: AceModule
----@field frame ScrollingFlatPanelTemplate
+---@field frame Frame
 ---@field rows number
 ---@field tabFrame Tab
+---@field contentFrames ListFrame[]
 local debugWindow = addon:NewModule('DebugWindow')
 
 
@@ -40,7 +41,7 @@ function debugWindow:Create(ctx)
   self.cells = {}
   self.rows = 0
   self.provider = CreateDataProvider()
-  self.frame = CreateFrame("Frame", "BetterBagsDebugWindow", UIParent, "ScrollingFlatPanelTemplate") --[[@as ScrollingFlatPanelTemplate]]
+  self.frame = CreateFrame("Frame", "BetterBagsDebugWindow", UIParent, "DefaultPanelFlatTemplate") --[[@as Frame]]
   self.frame:SetPoint("CENTER")
   self.frame:SetSize(800, 600)
   self.frame:SetMovable(true)
@@ -68,9 +69,10 @@ function debugWindow:Create(ctx)
   self.contentFrames = {}
   self.contentFrames[1] = self:CreateDebugLogFrame()
 
-  self.frame.ClosePanelButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
+  local closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButtonDefaultAnchors")
+  closeButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 
-  self.frame.ClosePanelButton:SetScript("OnClick", function(_, e)
+  closeButton:SetScript("OnClick", function(_, e)
     local ectx = context:New('DebugFrameCloseClick')
     if e == "LeftButton" then
       database:SetDebugMode(false)
@@ -82,9 +84,8 @@ function debugWindow:Create(ctx)
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
     self.contentFrames[1]:InsertTable(self.cells)
-    --self.provider:InsertTable(self.cells)
+    self.contentFrames[1]:ScrollToEnd()
     wipe(self.cells)
-    --self.frame.ScrollBox:ScrollToEnd()
   end)
 
   events:RegisterMessage('config/DebugMode', function(_, enabled)
@@ -130,26 +131,9 @@ end
 ---@return ListFrame
 function debugWindow:CreateDebugLogFrame()
   local frame = list:Create(self.frame)
-  frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 10, -10)
-  frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -10, 10)
+  frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
+  frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
   frame:SetupDataSource("BetterBagsDebugListButton", initDebugListItem, function()end)
-  --local frame = CreateFrame("Frame", nil, self.frame)
-  --frame:SetAllPoints(self.frame)
---
-  --frame.ScrollBox = self.frame.ScrollBox
-  --frame.ScrollBar = self.frame.ScrollBar
---
-  --frame.ScrollBox:SetInterpolateScroll(true)
-  --frame.ScrollBar:SetInterpolateScroll(true)
-  --local view = CreateScrollBoxListLinearView()
-  --view:SetElementInitializer("BetterBagsDebugListButton", initDebugListItem)
-  --view:SetPadding(4,4,8,4,0)
-  --view:SetExtent(20)
-  --ScrollUtil.InitScrollBoxListWithScrollBar(frame.ScrollBox, frame.ScrollBar, view)
-  --frame.ScrollBox:GetUpperShadowTexture():ClearAllPoints()
-  --frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
-  --frame.ScrollBox:SetDataProvider(self.provider)
-
   return frame
 end
 
