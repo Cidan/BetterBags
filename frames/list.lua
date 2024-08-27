@@ -80,6 +80,10 @@ function listFrame:HasItem(data)
   end)
 end
 
+function listFrame:GetIndexFromItem(item)
+  return self.provider:FindIndex(item)
+end
+
 ---@return table[]
 function listFrame:GetAllItems()
   return self.provider:GetCollection()

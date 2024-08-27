@@ -30,4 +30,22 @@
       </Layer>
     </Layers>
   </Button>
+  <Button name="BetterBagsItemBrowserButton" virtual="true"> 
+    <Size>
+      <AbsDimension y="20"/>
+    </Size>
+    <Layers>
+      <Layer level="OVERLAY">
+        <FontString name="$parentTitle" inherits="GameFontHighlightLarge" parentKey="Title">
+          <Color r="1" g="1" b="1" />
+          <Anchors>
+            <Anchor point="LEFT"/>
+          </Anchors>
+          <Size>
+            <AbsDimension x="200" y="20"/>
+          </Size>
+        </FontString>
+      </Layer>
+    </Layers>
+  </Button>
 </Ui>

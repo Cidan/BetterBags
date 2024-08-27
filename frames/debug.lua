@@ -157,6 +157,9 @@ function debugWindow:SwitchTab(tabId)
   for id, frame in pairs(self.contentFrames) do
     if id == tabId then
       frame:Show()
+      if id == 2 then
+        frame:Update()
+      end
     else
       frame:Hide()
     end

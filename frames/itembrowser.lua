@@ -24,9 +24,16 @@ local context = addon:GetModule('Context')
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
+---@class Node
+---@field nodeType string
+---@field kind BagKind
+---@field slotInfo? SlotInfo
+---@field itemData? ItemData
+---@field key any
+---@field data any
+
 ---@class ItemBrowserFrame
 ---@field list ListFrame
----@field content ListFrame
 local itemBrowserFrame = {}
 
 function itemBrowserFrame:Show()
@@ -42,19 +49,15 @@ function itemBrowserFrame:GetFrame()
 end
 
 function itemBrowserFrame:Update()
-    -- Stub: Implement update logic
-end
-
-function itemBrowserFrame.initItem()
+  self.list:Wipe()
 end
 
 ---@param parent Frame
 ---@return ItemBrowserFrame
 function itemBrowser:Create(parent)
-    -- Stub: Implement creation logic
-    local ib = setmetatable({}, {__index = itemBrowserFrame})
-    ib.list = list:Create(parent)
-    ib.list:SetupDataSource("BetterBagsItemBrowserButton", itemBrowserFrame.initItem, function()end)
-    -- Create frame and setup basic structure
-    return ib
+  -- Stub: Implement creation logic
+  local ib = setmetatable({}, {__index = itemBrowserFrame})
+  ib.list = list:Create(parent)
+  -- Create frame and setup basic structure
+  return ib
 end
