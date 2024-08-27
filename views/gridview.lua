@@ -165,16 +165,12 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   local hiddenCells = {}
 
   for _, item in pairs(removed) do
+    print("removed", item.slotkey)
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    if stackInfo and stackInfo.count > 0 then
-      if stackInfo.rootItem ~= nil then
-        UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
-      else
-        ClearButton(ctx, view, item)
-      end
-    else
-      -- If the stack is empty or doesn't exist, clear the button
+    if not stackInfo or not slotInfo.stacks:HasItem(item.itemHash, item.slotkey) then
       ClearButton(ctx, view, item)
+    else
+      UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
     end
   end
 

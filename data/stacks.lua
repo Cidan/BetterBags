@@ -82,6 +82,18 @@ function stack:GetStackInfo(itemHash)
   return self.stacksByItemHash[itemHash]
 end
 
+---@param itemHash string
+---@param slotkey string
+---@return boolean
+function stack:HasItem(itemHash, slotkey)
+  local stackinfo = self.stacksByItemHash[itemHash]
+  if not stackinfo then return false end
+  if stackinfo.rootItem == slotkey then
+    return true
+  end
+  return stackinfo.slotkeys[slotkey]
+end
+
 --- Clears all stack information
 function stack:Clear()
   wipe(self.stacksByItemHash)
