@@ -290,6 +290,7 @@ end
 ---@return integer
 function itemFrame.GetItemContextMatchResult(item)
   local itemLocation = ItemLocation:CreateFromBagAndSlot(item.bagID, item:GetID())
+  if not itemLocation then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
   if not itemLocation:IsValid() then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
   local result = ItemButtonUtil.GetItemContextMatchResultForItem( itemLocation ) --[[@as integer]]
   if not const.BACKPACK_BAGS[item.bagID] then return ItemButtonUtil.ItemContextMatchResult.Match end
@@ -331,9 +332,6 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
     return
   end
 
-  --override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
-  decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
-
   local questInfo = data.questInfo
   local info = data.containerInfo
   local readable = info and info.isReadable;
@@ -352,6 +350,9 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   ClearItemButtonOverlay(decoration)
   decoration:SetHasItem(data.itemInfo.itemIcon)
   self.button:SetHasItem(data.itemInfo.itemIcon)
+
+  --override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
+  decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
   decoration:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
   if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > Enum.ItemQuality.Common then
@@ -535,6 +536,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
   if not nocount then
     SetItemButtonCount(decoration, count)
   end
+  decoration.GetItemContextMatchResult = nil
   decoration:SetItemButtonTexture(0)
   decoration:UpdateQuestItem(false, nil, nil)
   decoration:UpdateNewItem(false)
@@ -613,6 +615,7 @@ function itemFrame.itemProto:ClearItem(ctx)
   self.frame:Hide()
   decoration:SetHasItem(false)
   self.button:SetHasItem(false)
+  decoration.GetItemContextMatchResult = nil
   decoration:SetItemButtonTexture(0)
   decoration:UpdateQuestItem(false, nil, nil)
   decoration:UpdateNewItem(false)
