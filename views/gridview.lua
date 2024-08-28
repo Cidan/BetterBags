@@ -90,7 +90,7 @@ local function CreateButton(ctx, view, item)
   if oldSection then
     oldSection:RemoveCell(item.slotkey)
   end
-  local category = categories:GetCustomCategory(ctx, view.kind, item) or item.itemInfo.category
+  local category = item.itemInfo.category
   local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
   itemButton:SetItem(ctx, item.slotkey)
   local section = view:GetOrCreateSection(ctx, category)
@@ -111,7 +111,7 @@ local function UpdateButton(ctx, view, slotkey)
     view:FlashStack(ctx, slotkey)
   end
   local data = itemButton:GetItemData()
-  local category = categories:GetCustomCategory(ctx, view.kind, data) or data.itemInfo.category
+  local category = data.itemInfo.category
   view:AddDirtySection(category)
 end
 
@@ -166,7 +166,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   for _, item in pairs(removed) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    if stackInfo and stackInfo.count > 1 then
+    if stackInfo and items:GetItemDataFromSlotKey(item.slotkey).isItemEmpty then
       UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
     else
       ClearButton(ctx, view, item)
@@ -189,7 +189,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       if stackInfo and slotInfo.stacks:IsRootItem(item.itemHash, item.slotkey) then
         CreateButton(ctx, view, item)
       elseif stackInfo then
-        UpdateButton(ctx, view, stackInfo.rootItem)
+        CreateButton(ctx, view, items:GetItemDataFromSlotKey(stackInfo.rootItem))
       end
     end
   end
