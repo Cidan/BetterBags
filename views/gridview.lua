@@ -190,8 +190,12 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       if stackInfo and slotInfo.stacks:IsRootItem(item.itemHash, item.slotkey) then
         CreateButton(ctx, view, item)
-      elseif stackInfo then
-        CreateButton(ctx, view, items:GetItemDataFromSlotKey(stackInfo.rootItem))
+      elseif stackInfo and not slotInfo.stacks:IsRootItem(item.itemHash, item.slotkey) then
+        if not view.sections[stackInfo.rootItem] or view.deferredItems[stackInfo.rootItem] then
+          CreateButton(ctx, view, items:GetItemDataFromSlotKey(stackInfo.rootItem))
+        else
+          UpdateButton(ctx, view, stackInfo.rootItem)
+        end
       end
     end
   end
@@ -237,8 +241,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       if section then
         section:RemoveCell(slotkey)
       end
-      view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
+      if view.itemsByBagAndSlot[slotkey] then
+        view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
       view:RemoveSlotSection(slotkey)
+    end
     end
     view:ClearDeferredItems()
   end
