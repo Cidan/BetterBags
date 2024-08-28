@@ -243,8 +243,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       end
       if view.itemsByBagAndSlot[slotkey] then
         view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
-      view:RemoveSlotSection(slotkey)
-    end
+        view:RemoveSlotSection(slotkey)
+      end
     end
     view:ClearDeferredItems()
   end
