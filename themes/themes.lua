@@ -21,6 +21,9 @@ local async = addon:GetModule('Async')
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class BagButton: Button
 ---@field portrait Texture
 ---@field highlightTex Texture
@@ -50,7 +53,7 @@ local db = addon:GetModule('Database')
 ---@field sectionFonts table<string, FontString>
 ---@field titles table<string, string>
 ---@field itemButtons table<string, ItemButton>
----@field tabs table<number, PanelTabButtonTemplate>
+---@field tabs table<string, PanelTabButtonTemplate>
 local themes = addon:NewModule('Themes')
 
 -- Initialize this bare as we will be adding themes from bare files.
@@ -69,12 +72,13 @@ function themes:OnInitialize()
 end
 
 function themes:OnEnable()
+  local ctx = context:New('Themes_OnEnable')
   local theme = db:GetTheme()
   if self.themes[theme] and self.themes[theme].Available then
-    self:ApplyTheme(theme)
+    self:ApplyTheme(ctx, theme)
   else
     db:SetTheme('Default')
-    self:ApplyTheme('Default')
+    self:ApplyTheme(ctx, 'Default')
   end
 end
 
@@ -96,8 +100,9 @@ function themes:RegisterTheme(key, themeTemplate)
 end
 
 -- ApplyTheme is used to apply a theme to every window registered with RegisterWindow.
+---@param ctx Context
 ---@param key string
-function themes:ApplyTheme(key)
+function themes:ApplyTheme(ctx, key)
   assert(self.themes[key], 'Theme does not exist.')
 
   -- Reset the old theme.
@@ -110,9 +115,9 @@ function themes:ApplyTheme(key)
   db:SetTheme(key)
 
   -- Hide all tab decorations.
-  for _, tab in pairs(self.tabs) do
-    tab:Hide()
-  end
+  --for _, tab in pairs(self.tabs) do
+  --  --tab:Hide()
+  --end
 
   -- Apply all portrait themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
@@ -138,7 +143,7 @@ function themes:ApplyTheme(key)
     frame.Owner.sideAnchor:SetPoint("TOPRIGHT", frame, "TOPLEFT", offset, 0)
     frame.Owner.sideAnchor:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", offset, 0)
     if frame.Owner.tabs then
-      frame.Owner.tabs:Reload()
+      frame.Owner.tabs:Reload(ctx)
     end
   end
 
@@ -166,16 +171,17 @@ function themes:ApplyTheme(key)
 
 
   --TODO(lobato): Create a new message just for redrawing items.
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
 -- SetSearchState will show or hide the search bar for the given frame.
+---@param ctx Context
 ---@param frame Frame
 ---@param shown boolean
-function themes:SetSearchState(frame, shown)
+function themes:SetSearchState(ctx, frame, shown)
   local theme = self.themes[db:GetTheme()]
   theme.ToggleSearch(frame, shown)
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.
@@ -268,9 +274,10 @@ function themes:SetTitle(frame, title)
   self.titles[frame:GetName()] = title
 end
 
+---@param ctx Context
 ---@param item Item
 ---@return ItemButton
-function themes:GetItemButton(item)
+function themes:GetItemButton(ctx, item)
   local theme = self:GetCurrentTheme()
   if theme.ItemButton then
     return theme.ItemButton(item)
@@ -279,32 +286,36 @@ function themes:GetItemButton(item)
   local button = self.itemButtons[buttonName]
   if button then
     button:Show()
-    events:SendMessage('item/NewButton', item, button)
+    events:SendMessage('item/NewButton', ctx, item, button)
     return button
   end
   button = themes.CreateBlankItemButtonDecoration(item.frame, "default", buttonName)
-  events:SendMessage('item/NewButton', item, button)
+  events:SendMessage('item/NewButton', ctx, item, button)
   self.itemButtons[buttonName] = button
   return button
 end
 
+---@param ctx Context
 ---@param tab TabButton
 ---@return PanelTabButtonTemplate
-function themes:GetTabButton(tab)
+function themes:GetTabButton(ctx, tab)
   local theme = self:GetCurrentTheme()
   if theme.Tab then
     return theme.Tab(tab)
   end
-  local tabIndex = tab.index
+  local tabIndex = tab:GetName()
   local decoration = self.tabs[tabIndex]
   if decoration then
-    async:AfterCombat(function()
+    async:AfterCombat(ctx, function(_)
       decoration:Show()
     end)
     return decoration
   end
   decoration = themes.CreateDefaultTabDecoration(tab)
   self.tabs[tabIndex] = decoration
+  async:AfterCombat(ctx, function(_)
+    decoration:Show()
+  end)
   return decoration
 end
 
@@ -444,7 +455,7 @@ function themes.SetupBagButton(bag, decoration)
   end)
   bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   bagButton:SetScript("OnReceiveDrag", bag.CreateCategoryForItemInCursor)
-  bagButton:SetScript("OnClick", function(_, e)
+  addon.SetScript(bagButton, "OnClick", function(ctx, _, e)
     if e == "LeftButton" then
       if db:GetFirstTimeMenu() then
         db:SetFirstTimeMenu(false)
@@ -455,9 +466,9 @@ function themes.SetupBagButton(bag, decoration)
       if IsShiftKeyDown() then
         BetterBags_ToggleSearch()
       elseif CursorHasItem() and GetCursorInfo() == "item" then
-        bag:CreateCategoryForItemInCursor()
+        bag:CreateCategoryForItemInCursor(ctx)
       else
-        contextMenu:Show(bag.menuList)
+        contextMenu:Show(ctx, bag.menuList)
       end
     elseif e == "RightButton" then
       if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
@@ -467,7 +478,7 @@ function themes.SetupBagButton(bag, decoration)
           C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
         end
       else
-        bag:Sort()
+        bag:Sort(ctx)
       end
     end
   end)

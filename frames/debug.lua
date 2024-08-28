@@ -9,9 +9,23 @@ local events = addon:GetModule('Events')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+---@class Tabs: AceModule
+local tabs = addon:GetModule('Tabs')
+
+---@class List: AceModule
+local list = addon:GetModule('List')
+
+---@class ItemBrowser: AceModule
+local itemBrowser = addon:GetModule('ItemBrowser')
+
 ---@class DebugWindow: AceModule
----@field frame ScrollingFlatPanelTemplate
+---@field frame Frame
 ---@field rows number
+---@field tabFrame Tab
+---@field contentFrames any[]
 local debugWindow = addon:NewModule('DebugWindow')
 
 
@@ -25,11 +39,12 @@ local function initDebugListItem(button, elementData)
   button.Message:SetPoint("LEFT", button.Category, "RIGHT", 10, 0)
 end
 
-function debugWindow:Create()
+---@param ctx Context
+function debugWindow:Create(ctx)
   self.cells = {}
   self.rows = 0
   self.provider = CreateDataProvider()
-  self.frame = CreateFrame("Frame", "BetterBagsDebugWindow", UIParent, "ScrollingFlatPanelTemplate") --[[@as ScrollingFlatPanelTemplate]]
+  self.frame = CreateFrame("Frame", "BetterBagsDebugWindow", UIParent, "DefaultPanelFlatTemplate") --[[@as Frame]]
   self.frame:SetPoint("CENTER")
   self.frame:SetSize(800, 600)
   self.frame:SetMovable(true)
@@ -38,32 +53,44 @@ function debugWindow:Create()
   self.frame:SetScript("OnDragStart", self.frame.StartMoving)
   self.frame:SetScript("OnDragStop", self.frame.StopMovingOrSizing)
   self.frame:SetTitle("BetterBags Debug Window")
-  self.frame.ScrollBox:SetInterpolateScroll(true)
-  self.frame.ScrollBar:SetInterpolateScroll(true)
-  local view = CreateScrollBoxListLinearView()
-  view:SetElementInitializer("BetterBagsDebugListButton", initDebugListItem)
-  view:SetPadding(4,4,8,4,0)
-  view:SetExtent(20)
-  ScrollUtil.InitScrollBoxListWithScrollBar(self.frame.ScrollBox, self.frame.ScrollBar, view)
-  self.frame.ScrollBox:GetUpperShadowTexture():ClearAllPoints()
-  self.frame.ScrollBox:GetLowerShadowTexture():ClearAllPoints()
-  self.frame.ScrollBox:SetDataProvider(self.provider)
 
-  self.frame.ClosePanelButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
+  -- Create tab frame
+  self.tabFrame = tabs:Create(self.frame)
+  self.tabFrame:SetClickHandler(function(_, id, button)
+    if button == "LeftButton" then
+      self:SwitchTab(id)
+      return true
+    end
+    return false
+  end)
 
-  self.frame.ClosePanelButton:SetScript("OnClick", function(_, e)
+  -- Add default "Debug Log" tab and new "Items" tab
+  self.tabFrame:AddTab(ctx, "Debug Log")
+  self.tabFrame:AddTab(ctx, "Items")
+  self.tabFrame:SetTabByIndex(ctx, 1)
+
+  -- Create content frames for each tab
+  self.contentFrames = {}
+  self.contentFrames[1] = self:CreateDebugLogFrame()
+  self.contentFrames[2] = self:CreateItemsFrame()
+
+  local closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButtonDefaultAnchors")
+  closeButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
+
+  closeButton:SetScript("OnClick", function(_, e)
+    local ectx = context:New('DebugFrameCloseClick')
     if e == "LeftButton" then
       database:SetDebugMode(false)
-      events:SendMessage('config/DebugMode', false)
+      events:SendMessage('config/DebugMode', ectx, false)
     elseif e == "RightButton" then
-      events:SendMessage('debug/ClearLog')
+      events:SendMessage('debug/ClearLog', ectx)
     end
   end)
 
   events:GroupBucketEvent({}, {'debug/LogAdded'}, function()
-    self.provider:InsertTable(self.cells)
+    self.contentFrames[1]:InsertTable(self.cells)
+    self.contentFrames[1]:ScrollToEnd()
     wipe(self.cells)
-    self.frame.ScrollBox:ScrollToEnd()
   end)
 
   events:RegisterMessage('config/DebugMode', function(_, enabled)
@@ -75,7 +102,7 @@ function debugWindow:Create()
   end)
 
   events:RegisterMessage('debug/ClearLog', function()
-    self.provider:Flush()
+    self.contentFrames[1]:Wipe()
     self.cells = {}
     self.rows = 0
   end)
@@ -85,10 +112,13 @@ function debugWindow:Create()
   else
     self.frame:Hide()
   end
-  self:AddLogLine("Debug", "debug window created")
+  self:AddLogLine(ctx, "Debug", "debug window created")
 end
 
-function debugWindow:AddLogLine(title, message)
+---@param ctx Context
+---@param title string
+---@param message? string
+function debugWindow:AddLogLine(ctx, title, message)
   if not self.frame:IsVisible() then
     return
   end
@@ -98,5 +128,40 @@ function debugWindow:AddLogLine(title, message)
     message=message
   })
   self.rows = self.rows + 1
-  events:SendMessage('debug/LogAdded')
+  events:SendMessage('debug/LogAdded', ctx)
+end
+
+---CreateDebugLogFrame creates the frame for the debug log tab.
+---@return ListFrame
+function debugWindow:CreateDebugLogFrame()
+  local frame = list:Create(self.frame)
+  frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
+  frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
+  frame:SetupDataSource("BetterBagsDebugListButton", initDebugListItem, function()end)
+  return frame
+end
+
+---CreateItemsFrame creates the frame for the Items tab.
+---@return ItemBrowserFrame
+function debugWindow:CreateItemsFrame()
+  local frame = itemBrowser:Create(self.frame)
+  frame:GetFrame():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
+  frame:GetFrame():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
+  frame:Hide() -- Hide by default as Debug Log is the initial tab
+  return frame
+end
+
+---SwitchTab switches to the specified tab.
+---@param tabId number
+function debugWindow:SwitchTab(tabId)
+  for id, frame in pairs(self.contentFrames) do
+    if id == tabId then
+      frame:Show()
+      if id == 2 then
+        frame:Update()
+      end
+    else
+      frame:Hide()
+    end
+  end
 end

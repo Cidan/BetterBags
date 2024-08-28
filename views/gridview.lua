@@ -38,21 +38,22 @@ local async = addon:GetModule('Async')
 local debug = addon:GetModule('Debug')
 
 ---@param view View
-local function Wipe(view)
+---@param ctx Context
+local function Wipe(view, ctx)
   debug:Log("Wipe", "Grid View Wipe")
   view.content:Wipe()
   if view.freeSlot ~= nil then
-    view.freeSlot:Release()
+    view.freeSlot:Release(ctx)
     view.freeSlot = nil
   end
   if view.freeReagentSlot ~= nil then
-    view.freeReagentSlot:Release()
+    view.freeReagentSlot:Release(ctx)
     view.freeReagentSlot = nil
   end
   view.itemCount = 0
   for _, section in pairs(view.sections) do
-    section:ReleaseAllCells()
-    section:Release()
+    section:ReleaseAllCells(ctx)
+    section:Release(ctx)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
@@ -60,13 +61,15 @@ end
 
 -- ClearButton clears a button and makes it empty while preserving the slot,
 -- but does not release it, while also adding it to the deferred items list.
+---@param ctx Context
 ---@param view View
 ---@param item ItemData
-local function ClearButton(view, item)
+local function ClearButton(ctx, view, item)
+  debug:Log("ClearButton", "Clearing button for item", item.slotkey)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   if cell then
-    cell:SetFreeSlots(bagid, slotid, -1)
+    cell:SetFreeSlots(ctx, bagid, slotid, -1)
   end
   view:AddDeferredItem(item.slotkey)
   local section = view:GetSlotSection(item.slotkey)
@@ -78,20 +81,22 @@ local function ClearButton(view, item)
 end
 
 -- CreateButton creates a button for an item and adds it to the view.
+---@param ctx Context
 ---@param view View
 ---@param item ItemData
-local function CreateButton(view, item)
+local function CreateButton(ctx, view, item)
   debug:Log("CreateButton", "Creating button for item", item.slotkey)
   view:RemoveDeferredItem(item.slotkey)
   local oldSection = view:GetSlotSection(item.slotkey)
   if oldSection then
     oldSection:RemoveCell(item.slotkey)
   end
-  local itemButton = view:GetOrCreateItemButton(item.slotkey)
-  itemButton:SetItem(item.slotkey)
-  local section = view:GetOrCreateSection(item.itemInfo.category)
+  local category = item.itemInfo.category
+  local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+  itemButton:SetItem(ctx, item.slotkey)
+  local section = view:GetOrCreateSection(ctx, category)
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
-  view:AddDirtySection(item.itemInfo.category)
+  view:AddDirtySection(category)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
 end
 
@@ -101,13 +106,14 @@ end
 local function UpdateButton(ctx, view, slotkey)
   debug:Log("UpdateButton", "Updating button for item", slotkey)
   view:RemoveDeferredItem(slotkey)
-  local itemButton = view:GetOrCreateItemButton(slotkey)
-  itemButton:SetItem(slotkey)
+  local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+  itemButton:SetItem(ctx, slotkey)
   if ctx:GetBool('wipe') == false and database:GetShowNewItemFlash(view.kind) then
-    view:FlashStack(slotkey)
+    view:FlashStack(ctx, slotkey)
   end
   local data = itemButton:GetItemData()
-  view:AddDirtySection(data.itemInfo.category)
+  local category = data.itemInfo.category
+  view:AddDirtySection(category)
 end
 
 -- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
@@ -117,6 +123,7 @@ end
 ---@param oldSlotKey string
 ---@param newSlotKey string
 local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
+  debug:Log("UpdateDeletedSlot", "Updating button for item", oldSlotKey, newSlotKey)
   local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
   local oldSlotSection = view:GetSlotSection(oldSlotKey)
   if not oldSlotSection then
@@ -124,7 +131,7 @@ local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
     return
   end
   oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
-  oldSlotCell:SetItem(newSlotKey)
+  oldSlotCell:SetItem(ctx, newSlotKey)
   view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
   view.itemsByBagAndSlot[oldSlotKey] = nil
   view:SetSlotSection(newSlotKey, oldSlotSection)
@@ -151,7 +158,7 @@ end
 ---@param callback fun()
 local function GridView(view, ctx, bag, slotInfo, callback)
   if ctx:GetBool('wipe') then
-    view:Wipe()
+    view:Wipe(ctx)
   end
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
@@ -159,194 +166,197 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   ---@type Cell[]
   local hiddenCells = {}
 
-  async:Chain(
-    function()
-      for _, item in pairs(removed) do
-        local newSlotKey = view:RemoveButton(item)
-        -- Clear if the item is empty, otherwise reindex it as a new item has taken it's
-        -- place due to the deleted being the head of a stack.
-        if not newSlotKey then
-          ClearButton(view, item)
+  for _, item in pairs(removed) do
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    if stackInfo and items:GetItemDataFromSlotKey(item.slotkey).isItemEmpty then
+      UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
+    else
+      ClearButton(ctx, view, item)
+    end
+  end
+
+  debug:StartProfile('Create Button Stage %d', bag.kind)
+
+  for _, item in pairs(added) do
+    local opts = database:GetStackingOptions(bag.kind)
+    -- Check stacking options
+    if (not opts.mergeStacks) or
+    (opts.unmergeAtShop and addon.atInteracting) or
+    (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+      -- If stacking is not allowed, create a new button
+      CreateButton(ctx, view, item)
+    else
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      if stackInfo and slotInfo.stacks:IsRootItem(item.itemHash, item.slotkey) then
+        CreateButton(ctx, view, item)
+      elseif stackInfo and not slotInfo.stacks:IsRootItem(item.itemHash, item.slotkey) then
+        if not view.sections[stackInfo.rootItem] or view.deferredItems[stackInfo.rootItem] then
+          CreateButton(ctx, view, items:GetItemDataFromSlotKey(stackInfo.rootItem))
         else
-          UpdateDeletedSlot(ctx, view, item.slotkey, newSlotKey)
+          UpdateButton(ctx, view, stackInfo.rootItem)
         end
       end
-    end,
-    function()
-      -- This works, but breaks because the context is cancelled by the scheduler.
+    end
+  end
 
-      debug:StartProfile('Create Button Stage %d', bag.kind)
-      ---@type ItemData[]
-      local list = {}
-      for _, item in pairs(added) do
-        table.insert(list, item)
-      end
-      local count = 10
-      debug:Log("Item Add Batch", "Batching", count, "items")
-      for i = 1, #list, count do
-        for j = i, math.min(i + count - 1, #list) do
-          local item = list[j]
-          local updateKey = view:AddButton(item)
-          if not updateKey then
-            CreateButton(view, item)
-          else
-            UpdateButton(ctx, view, updateKey)
-          end
-        end
-        async:Yield()
-      end
-      debug:EndProfile('Create Button Stage %d', bag.kind)
+  debug:EndProfile('Create Button Stage %d', bag.kind)
 
-      --for _, item in pairs(added) do
-      --  local updateKey = view:AddButton(item)
-      --  if not updateKey then
-      --    debug:StartProfile('Create Button Stage')
-      --    CreateButton(view, item)
-      --    debug:EndProfile('Create Button Stage')
-      --  else
-      --    UpdateButton(ctx, view, updateKey)
-      --  end
-      --end
-    end,
-    function()
-      for _, item in pairs(changed) do
-        local updateKey, removeKey = view:ChangeButton(item)
-        UpdateButton(ctx, view, updateKey)
-        if updateKey ~= item.slotkey then
+  for _, item in pairs(changed) do
+    local opts = database:GetStackingOptions(bag.kind)
+    if (not opts.mergeStacks) or
+    (opts.unmergeAtShop and addon.atInteracting) or
+    (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+      -- If stacking is not allowed, just update the existing button
+      UpdateButton(ctx, view, item.slotkey)
+    else
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      if stackInfo and stackInfo.count > 0 then
+        if stackInfo.rootItem == item.slotkey then
           UpdateButton(ctx, view, item.slotkey)
-        end
-        if removeKey then
-          ClearButton(view, items:GetItemDataFromSlotKey(removeKey))
-        end
-      end
-    end,
-    function()
-      if not slotInfo.deferDelete then
-        for slotkey, _ in pairs(view:GetDeferredItems()) do
-          local section = view:GetSlotSection(slotkey)
-          section:RemoveCell(slotkey)
-          view.itemsByBagAndSlot[slotkey]:Wipe()
-          view:RemoveSlotSection(slotkey)
-        end
-        view:ClearDeferredItems()
-      end
-    end,
-    function()
-      debug:StartProfile('Section Draw Stage %d', bag.kind)
-      if not slotInfo.deferDelete then
-        local dirtySections = view:GetDirtySections()
-        for sectionName in pairs(dirtySections) do
-          local section = view:GetSection(sectionName)
-          -- We need to check for the section here, as a section
-          -- may have been added to dirty items when it doesn't
-          -- exist yet. This happens when a new item's "new item"
-          -- status expires, it's category is no longer a new item
-          -- but the actual category hasn't been drawn yet.
-          if section ~= nil then
-            -- Remove the section if it's empty, otherwise draw it.
-            if section:GetCellCount() == 0 then
-              debug:Log("Section", "Removing section", sectionName)
-              view:RemoveSection(sectionName)
-              section:ReleaseAllCells()
-              section:Release()
-            else
-              debug:Log("Section", "Drawing section", sectionName)
-              if sectionName == L:G("Recent Items") then
-                section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-              else
-                section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-              end
-              section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+        elseif stackInfo.rootItem ~= nil then
+          UpdateButton(ctx, view, stackInfo.rootItem)
+        else
+          -- If there are other items in the stack, update the existing slot
+          local existingSlotKey = next(stackInfo.slotkeys)
+          if existingSlotKey then
+            UpdateButton(ctx, view, existingSlotKey)
+            if existingSlotKey ~= item.slotkey then
+              -- Clear the old button if it's different from the existing stack
+              ClearButton(ctx, view, item)
             end
           end
         end
-        view:ClearDirtySections()
-      end
-      for sectionName, section in pairs(view:GetAllSections()) do
-        if categories:IsCategoryShown(sectionName) == false then
-          table.insert(hiddenCells, section)
-        end
-      end
-      debug:EndProfile('Section Draw Stage %d', bag.kind)
-    end,
-    function()
-      -- Get the free slots section and add the free slots to it.
-      local freeSlotsSection = view:GetOrCreateSection(L:G("Free Space"))
-      if database:GetShowAllFreeSpace(bag.kind) then
-        freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-        freeSlotsSection:WipeOnlyContents()
-        for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
-          for slotid, item in pairs(data) do
-            if not view:GetDeferredItems()[item.slotkey] then
-              local itemButton = view:GetOrCreateItemButton(item.slotkey)
-              itemButton:SetFreeSlots(bagid, slotid, 1, true)
-              freeSlotsSection:AddCell(item.slotkey, itemButton)
-            end
-          end
-        end
-        freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
       else
-        freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
-        for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-          if slotInfo.freeSlotKeys[name] ~= nil then
-            local itemButton = view:GetOrCreateItemButton(name)
-            local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-            itemButton:SetFreeSlots(freeSlotBag, freeSlotID, freeSlotCount)
-            freeSlotsSection:AddCell(name, itemButton)
+        -- If the stack is empty or doesn't exist, update the current button
+        UpdateButton(ctx, view, item.slotkey)
+      end
+    end
+  end
+
+  if not slotInfo.deferDelete then
+    for slotkey, _ in pairs(view:GetDeferredItems()) do
+      local section = view:GetSlotSection(slotkey)
+      if section then
+        section:RemoveCell(slotkey)
+      end
+      if view.itemsByBagAndSlot[slotkey] then
+        view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
+        view:RemoveSlotSection(slotkey)
+      end
+    end
+    view:ClearDeferredItems()
+  end
+  debug:StartProfile('Section Draw Stage %d', bag.kind)
+  if not slotInfo.deferDelete then
+    local dirtySections = view:GetDirtySections()
+    for sectionName in pairs(dirtySections) do
+      local section = view:GetSection(sectionName)
+      -- We need to check for the section here, as a section
+      -- may have been added to dirty items when it doesn't
+      -- exist yet. This happens when a new item's "new item"
+      -- status expires, it's category is no longer a new item
+      -- but the actual category hasn't been drawn yet.
+      if section ~= nil then
+        -- Remove the section if it's empty, otherwise draw it.
+        if section:GetCellCount() == 0 then
+          debug:Log("Section", "Removing section", sectionName)
+          view:RemoveSection(sectionName)
+          section:ReleaseAllCells(ctx)
+          section:Release(ctx)
+        else
+          debug:Log("Section", "Drawing section", sectionName)
+          if sectionName == L:G("Recent Items") then
+            section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
           else
-            local itemButton = view:GetOrCreateItemButton(name)
-            itemButton:SetFreeSlots(1, 1, freeSlotCount)
-            freeSlotsSection:AddCell(name, itemButton)
+            section:SetMaxCellWidth(sizeInfo.itemsPerRow)
           end
+          section:Draw(bag.kind, database:GetBagView(bag.kind), false)
         end
-        freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
       end
-    end,
-    function()
-      view.content.maxCellWidth = sizeInfo.columnCount
-      -- Sort the sections.
-      view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
-      if not slotInfo.deferDelete then
-        debug:StartProfile('Content Draw Stage %d', bag.kind)
-        local w, h = view.content:Draw({
-          cells = view.content.cells,
-          maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
-          columns = sizeInfo.columnCount,
-          header = view:RemoveSectionFromGrid(L:G("Recent Items")),
-          footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
-          mask = hiddenCells,
-        })
-        for _, section in pairs(view.sections) do
-          debug:WalkAndFixAnchorGraph(section.frame)
+    end
+    view:ClearDirtySections()
+  end
+  for sectionName, section in pairs(view:GetAllSections()) do
+    if categories:IsCategoryShown(sectionName) == false then
+      table.insert(hiddenCells, section)
+    end
+  end
+  debug:EndProfile('Section Draw Stage %d', bag.kind)
+  -- Get the free slots section and add the free slots to it.
+  local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
+  if database:GetShowAllFreeSpace(bag.kind) then
+    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+    freeSlotsSection:WipeOnlyContents()
+    for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
+      for slotid, item in pairs(data) do
+        if not view:GetDeferredItems()[item.slotkey] then
+          local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+          itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
+          freeSlotsSection:AddCell(item.slotkey, itemButton)
         end
-        debug:EndProfile('Content Draw Stage %d', bag.kind)
-        -- Reposition the content frame if the recent items section is empty.
-        if w < 160 then
-          w = 220
-        end
-        if bag.tabs and w < bag.tabs.width then
-          w = bag.tabs.width
-        end
-        if h == 0 then
-          h = 40
-        end
-        if database:GetInBagSearch() then
-          h = h + 20
-        end
-        view.content:HideScrollBar()
-        --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-        -- than the screen space.
-        bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
-        local bagHeight = h +
-        const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-        const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-        bag.frame:SetHeight(bagHeight)
-        UpdateViewSize(view)
       end
-      view.itemCount = slotInfo.totalItems
-    end,
-    callback
-  )
+    end
+    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
+  else
+    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
+    for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+      if slotInfo.freeSlotKeys[name] ~= nil then
+        local itemButton = view:GetOrCreateItemButton(ctx, name)
+        local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+        itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
+        freeSlotsSection:AddCell(name, itemButton)
+      else
+        local itemButton = view:GetOrCreateItemButton(ctx, name)
+        itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
+        freeSlotsSection:AddCell(name, itemButton)
+      end
+    end
+    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
+  end
+  view.content.maxCellWidth = sizeInfo.columnCount
+  -- Sort the sections.
+  view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
+  if not slotInfo.deferDelete then
+    debug:StartProfile('Content Draw Stage %d', bag.kind)
+    local w, h = view.content:Draw({
+      cells = view.content.cells,
+      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+      columns = sizeInfo.columnCount,
+      header = view:RemoveSectionFromGrid(L:G("Recent Items")),
+      footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
+      mask = hiddenCells,
+    })
+    for _, section in pairs(view.sections) do
+      debug:WalkAndFixAnchorGraph(section.frame)
+    end
+    debug:EndProfile('Content Draw Stage %d', bag.kind)
+    -- Reposition the content frame if the recent items section is empty.
+    if w < 160 then
+      w = 220
+    end
+    if bag.tabs and w < bag.tabs.width then
+      w = bag.tabs.width
+    end
+    if h == 0 then
+      h = 40
+    end
+    if database:GetInBagSearch() then
+      h = h + 20
+    end
+    view.content:HideScrollBar()
+    --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
+    -- than the screen space.
+    bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+    local bagHeight = h +
+    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+    bag.frame:SetHeight(bagHeight)
+    UpdateViewSize(view)
+  end
+  view.itemCount = slotInfo.totalItems
+  callback()
 end
 
 ---@param parent Frame

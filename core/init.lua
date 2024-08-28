@@ -78,6 +78,9 @@ local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -91,7 +94,8 @@ addon.atWarbank = false
 
 -- BetterBags_ToggleBags is a wrapper function for the ToggleAllBags function.
 function BetterBags_ToggleBags()
-  addon:ToggleAllBags()
+  local ctx = context:New('BetterBags_ToggleBags')
+  addon:ToggleAllBags(ctx)
 end
 
 local function CheckKeyBindings()
@@ -147,9 +151,9 @@ function addon:OnInitialize()
   end
 
   for _, button in pairs(addon._buttons) do
-    button:HookScript("OnClick",
-    function()
-      addon:ToggleAllBags()
+    addon.HookScript(button, "OnClick",
+    function(ctx)
+      addon:ToggleAllBags(ctx)
     end)
   end
 end
@@ -181,7 +185,8 @@ function addon:HideBlizzardBags()
   end
 
   MainMenuBarBackpackButton:SetScript("OnClick", function()
-    self:ToggleAllBags()
+    local ctx = context:New('MainMenuBarBackpackButton_OnClick')
+    self:ToggleAllBags(ctx)
   end)
 
   BagBarExpandToggle:SetParent(sneakyFrame)
@@ -241,8 +246,9 @@ function addon:OnEnable()
   async:Enable()
 
   self:HideBlizzardBags()
-  addon.Bags.Backpack = BagFrame:Create(const.BAG_KIND.BACKPACK)
-  addon.Bags.Bank = BagFrame:Create(const.BAG_KIND.BANK)
+  local rootctx = context:New('addon_enable')
+  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+  addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
 
   -- Apply themes globally -- do not instantiate new windows after this call.
   themes:Enable()
@@ -261,28 +267,29 @@ function addon:OnEnable()
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_SHOW', self.OpenInteractionWindow)
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_HIDE', self.CloseInteractionWindow)
 
-  events:RegisterMessage('items/RefreshBackpack/Done', function(_, args)
+  events:RegisterMessage('items/RefreshBackpack/Done', function(ctx, slotInfo)
+    ---@cast slotInfo +SlotInfo
     debug:Log("init/OnInitialize/items", "Drawing bag")
-    addon.Bags.Backpack:Draw(args[1], args[2], function()
-      events:SendMessage('bags/Draw/Backpack/Done', args[1])
+    addon.Bags.Backpack:Draw(ctx, slotInfo, function()
+      events:SendMessage('bags/Draw/Backpack/Done', ctx)
       if not addon.Bags.Backpack.loaded then
         addon.Bags.Backpack.loaded = true
-        events:SendMessage('bags/Draw/Backpack/Loaded')
+        events:SendMessage('bags/Draw/Backpack/Loaded', ctx)
       end
     end)
    end)
 
-  events:RegisterMessage('items/RefreshBank/Done', function(_, args)
+  events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
     debug:Log("init/OnInitialize/items", "Drawing bank")
      -- Show the bank frame if it's not already shown.
     if not addon.Bags.Bank:IsShown() and addon.atBank then
-      addon.Bags.Bank:Show()
+      addon.Bags.Bank:Show(ctx)
     end
-    addon.Bags.Bank:Draw(args[1], args[2], function()
-      events:SendMessage('bags/Draw/Bank/Done')
+    addon.Bags.Bank:Draw(ctx, slotInfo, function()
+      events:SendMessage('bags/Draw/Bank/Done', ctx)
       if not addon.Bags.Bank.loaded then
         addon.Bags.Bank.loaded = true
-        events:SendMessage('bags/Draw/Bank/Loaded')
+        events:SendMessage('bags/Draw/Bank/Loaded', ctx)
       end
     end)
   end)

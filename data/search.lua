@@ -180,6 +180,7 @@ end
 
 ---@param item ItemData
 function search:Add(item)
+  if item.isItemEmpty then return end
   search:addStringToIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:addStringToIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
@@ -230,6 +231,7 @@ end
 
 ---@param item ItemData
 function search:Remove(item)
+  if item.isItemEmpty then return end
   search:removeStringFromIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)

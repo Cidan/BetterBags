@@ -26,19 +26,31 @@ local config = addon:GetModule('Config')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+-- This is the context module, which is required for most API calls.
+-- The context module is used to track the state of the addon and it's
+-- calls, including a call stack across events, across frames.
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+-- Create a new context.
+-- Set the event for the context. This is used for tracking the state of the addon
+-- and can be any string you want. It tells the addon where this call originated from
+-- even across frames.
+local ctx = context:New('MyAddon_Event')
+
 -- Use this API for creating a custom category based on the item's ID. These categories are
 -- not persistant, such that if a user disables your addon, the categories will disappear.
-categories:AddItemToCategory(12345, L:G("My Category"))
+categories:AddItemToCategory(ctx, 12345, L:G("My Category"))
 
 -- Use this API to delete all the items in a category. This will not delete the category itself,
 -- but will empty it's item list from the persistant store. This is useful if you want to
 -- make sure the user's categories are in a known state, i.e. on every load of your plugin,
 -- you wipe and then add all the items to the category.
-categories:WipeCategory(L:G("My Category"))
+categories:WipeCategory(ctx, L:G("My Category"))
 
 -- This this API to explicitly create a category with the defined parameters. This option
 -- replaces the old Create* functions, and is the preferred way to create categories.
-categories:CreateCategory({
+categories:CreateCategory(ctx, {
   name = L:G("My Category"), -- The name of the category
   itemList = {[12345] = true}, -- A list of item IDs that should be in this category
   save = true, -- If set, this category will persist between sessions. Optional, default is false.

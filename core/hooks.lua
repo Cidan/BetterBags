@@ -13,6 +13,9 @@ local debug = addon:GetModule('Debug')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
@@ -44,26 +47,28 @@ function addon.ForceShowBlizzardBags()
   end
 end
 
-function addon.OnUpdate()
+---@param ctx Context
+function addon.OnUpdate(ctx)
   if addon.backpackShouldOpen then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldOpen = false
     addon.backpackShouldClose = false
-    addon.Bags.Backpack:Show()
+    addon.Bags.Backpack:Show(ctx)
     addon:UpdateButtonHighlight()
     if addon.atInteracting then
-      events:SendMessage('bags/FullRefreshAll')
+      events:SendMessage('bags/FullRefreshAll', ctx)
     end
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldClose = false
-    addon.Bags.Backpack:Hide()
+    addon.Bags.Backpack:Hide(ctx)
     addon:UpdateButtonHighlight()
   end
 end
 
+---@param ctx Context
 ---@param interactionType Enum.PlayerInteractionType
-function addon:OpenInteractionWindow(interactionType)
+function addon.OpenInteractionWindow(ctx, _, interactionType)
   if interactionEvents[interactionType] == nil then return end
   if GameMenuFrame:IsShown() then
     return
@@ -74,67 +79,64 @@ function addon:OpenInteractionWindow(interactionType)
   end
   addon.atInteracting = true
   addon.backpackShouldOpen = true
-  events:SendMessageLater('bags/OpenClose')
+  events:SendMessageLater('bags/OpenClose', ctx)
 end
 
+---@param ctx Context
 ---@param interactionType Enum.PlayerInteractionType
-function addon:CloseInteractionWindow(interactionType)
+function addon.CloseInteractionWindow(ctx, _, interactionType)
   if interactionEvents[interactionType] == nil then return end
   debug:Log("Interaction", "CloseInteractionWindow", interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
   addon.backpackShouldClose = true
-  events:SendMessage('bags/FullRefreshAll')
-  events:SendMessageLater('bags/OpenClose')
+  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessageLater('bags/OpenClose', ctx)
 end
 
-function addon:ToggleAllBags(interactingFrame)
+---@param ctx Context
+---@param interactingFrame? Frame
+function addon:ToggleAllBags(ctx, interactingFrame)
   if interactingFrame ~= nil then return end
+  ctx = ctx or context:New('ToggleAllBags')
   debug:Log('Hooks', 'ToggleAllBags')
   if addon.Bags.Backpack:IsShown() then
     addon.backpackShouldClose = true
   else
     addon.backpackShouldOpen = true
   end
-  events:SendMessage('bags/OpenClose')
+  events:SendMessage('bags/OpenClose', ctx)
 end
 
+---@param interactingFrame Frame
 function addon:CloseSpecialWindows(interactingFrame)
   if interactingFrame ~= nil then return end
 
+  local ctx = context:New('CloseSpecialWindows')
   ---@class Async: AceModule
   local async = addon:GetModule('Async')
 
   debug:Log('Hooks', 'CloseSpecialWindows')
   addon.backpackShouldClose = true
-  async:AfterCombat(function()
-    addon.Bags.Bank:Hide()
-    addon.Bags.Bank:SwitchToBankAndWipe()
+  async:AfterCombat(ctx, function(ectx)
+    addon.Bags.Bank:Hide(ectx)
+    addon.Bags.Bank:SwitchToBankAndWipe(ectx)
   end)
-  events:SendMessage('addon/CloseSpecialWindows')
+  events:SendMessage('addon/CloseSpecialWindows', ctx)
   if C_Bank then
     C_Bank.CloseBankFrame()
   else
     CloseBankFrame()
   end
-  events:SendMessageLater('bags/OpenClose')
+  events:SendMessageLater('bags/OpenClose', ctx)
 end
 
-function addon:OpenBank(interactingFrame)
-  if interactingFrame ~= nil then return end
-  if GameMenuFrame:IsShown() then
-    return
-  end
-  debug:Log('Hooks', 'OpenBank')
-  addon.Bags.Bank:Show()
-  addon.Bags.Backpack:Show()
-end
-
+---@param ctx Context
 ---@param interactingFrame Frame
-function addon:CloseBank(interactingFrame)
+function addon.CloseBank(ctx, _, interactingFrame)
   debug:Log('Hooks', 'CloseBank')
   if interactingFrame ~= nil then return end
-  addon.Bags.Bank:Hide()
-  addon.Bags.Bank:SwitchToBankAndWipe()
-  events:SendMessage('bags/BankClosed')
+  addon.Bags.Bank:Hide(ctx)
+  addon.Bags.Bank:SwitchToBankAndWipe(ctx)
+  events:SendMessage('bags/BankClosed', ctx)
 end

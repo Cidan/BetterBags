@@ -50,8 +50,8 @@ local theme = {
       decoration:SetAllPoints()
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration.CloseButton = CreateFrame("Button", frame:GetName().."CloseButton", decoration) --[[@as Button]]
-      decoration.CloseButton:SetScript("OnClick", function()
-        frame.Owner:Hide()
+      addon.SetScript(decoration.CloseButton, "OnClick", function(ctx)
+        frame.Owner:Hide(ctx)
       end)
       decoration.CloseButton:SetPoint("TOPRIGHT", decoration, "TOPRIGHT", -4, -4)
       decoration.CloseButton:SetSize(24,24)

@@ -3,7 +3,7 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class ListFrame: AceModule
+---@class ListFrame
 ---@field frame Frame
 ---@field ScrollBox WowScrollBox
 ---@field ScrollBar MinimalScrollBar
@@ -33,6 +33,10 @@ function listFrame:SetupDataSource(itemTemplate, elementFactory, elementResetter
   self.ScrollBox:SetDataProvider(self.provider)
 end
 
+function listFrame:ScrollToEnd()
+  self.ScrollBox:ScrollToEnd()
+end
+
 -- AddToEnd will add an item to the end of the list.
 ---@param data table
 function listFrame:AddToEnd(data)
@@ -59,6 +63,11 @@ function listFrame:RemoveAtIndex(index)
 end
 
 ---@param data table
+function listFrame:InsertTable(data)
+  self.provider:InsertTable(data)
+end
+
+---@param data table
 ---@return boolean
 function listFrame:HasItem(data)
   return self.provider:ContainsByPredicate(function(elementData)
@@ -69,6 +78,10 @@ function listFrame:HasItem(data)
     end
     return true
   end)
+end
+
+function listFrame:GetIndexFromItem(item)
+  return self.provider:FindIndex(item)
 end
 
 ---@return table[]
@@ -100,6 +113,14 @@ function listFrame:SetCanReorder(canReorder, cb)
   if cb then
     self.provider:RegisterCallback(DataProviderMixin.Event.OnMove, cb)
   end
+end
+
+function listFrame:Show()
+  self.frame:Show()
+end
+
+function listFrame:Hide()
+  self.frame:Hide()
 end
 
 ---@class List: AceModule

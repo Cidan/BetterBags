@@ -29,6 +29,9 @@ local items = addon:GetModule('Items')
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 
 ---@class (exact) MenuList
@@ -58,15 +61,17 @@ function contextMenu:OnEnable()
   self.frame = frame
 end
 
+---@param ctx Context
 ---@param menuList MenuList[]
-function contextMenu:Show(menuList)
+function contextMenu:Show(ctx, menuList)
   LibDD:EasyMenu(menuList, self.frame, 'cursor', 0, 0, 'MENU')
-  events:SendMessage('context/show')
+  events:SendMessage('context/show', ctx)
 end
 
-function contextMenu:Hide()
+---@param ctx Context
+function contextMenu:Hide(ctx)
   LibDD:HideDropDownMenu(1)
-  events:SendMessage('context/hide')
+  events:SendMessage('context/hide', ctx)
 end
 
 function contextMenu:AddDivider(menuList)
@@ -128,8 +133,9 @@ function contextMenu:CreateContextMenu(bag)
         notCheckable = false,
         checked = function() return bag.anchor:IsActive() end,
         func = function()
+          local ctx = context:New('ToggleAnchor')
           bag.anchor:ToggleActive()
-          contextMenu:Hide()
+          contextMenu:Hide(ctx)
         end
       },
       {
@@ -137,8 +143,9 @@ function contextMenu:CreateContextMenu(bag)
         notCheckable = false,
         checked = function() return bag.anchor.frame:IsShown() end,
         func = function()
+          local ctx = context:New('ToggleAnchor')
           bag.anchor:ToggleShown()
-          contextMenu:Hide()
+          contextMenu:Hide(ctx)
         end
       },
       {
@@ -151,8 +158,9 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPLEFT' end,
             func = function()
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('TOPLEFT')
-              contextMenu:Hide()
+              contextMenu:Hide(ctx)
             end
           },
           {
@@ -160,8 +168,9 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'TOPRIGHT' end,
             func = function()
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('TOPRIGHT')
-              contextMenu:Hide()
+              contextMenu:Hide(ctx)
             end
           },
           {
@@ -169,8 +178,9 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMLEFT' end,
             func = function()
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('BOTTOMLEFT')
-              contextMenu:Hide()
+              contextMenu:Hide(ctx)
             end
           },
           {
@@ -178,8 +188,9 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == 'BOTTOMRIGHT' end,
             func = function()
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint('BOTTOMRIGHT')
-              contextMenu:Hide()
+              contextMenu:Hide(ctx)
             end
           },
           {
@@ -187,8 +198,9 @@ function contextMenu:CreateContextMenu(bag)
             notCheckable = false,
             checked = function() return database:GetAnchorState(bag.kind).staticPoint == nil end,
             func = function()
+              local ctx = context:New('SetStaticAnchorPoint')
               bag.anchor:SetStaticAnchorPoint(nil)
-              contextMenu:Hide()
+              contextMenu:Hide(ctx)
             end
           }
         }
@@ -230,10 +242,11 @@ function contextMenu:CreateContextMenu(bag)
         print("BetterBags: "..L:G("Cannot toggle bag slots in combat."))
         return
       end
+      local ctx = context:New('ToggleBagSlots')
       if bag.slots:IsShown() then
         bag.slots:Hide()
       else
-        bag.slots:Draw()
+        bag.slots:Draw(ctx)
         bag.slots:Show()
       end
     end
@@ -315,8 +328,9 @@ function contextMenu:CreateContextMenu(bag)
     tooltipTitle = L:G("Open Options Screen"),
     tooltipText = L:G("Click to open the options screen."),
     func = function()
-      contextMenu:Hide()
-      events:SendMessage('config/Open')
+      local ctx = context:New('OpenOptions')
+      contextMenu:Hide(ctx)
+      events:SendMessage('config/Open', ctx)
     end
   })
 
@@ -324,7 +338,8 @@ function contextMenu:CreateContextMenu(bag)
     text = L:G("Close Menu"),
     notCheckable = true,
     func = function()
-      contextMenu:Hide()
+      local ctx = context:New('CloseMenu')
+      contextMenu:Hide(ctx)
     end
   })
   enableTooltips(menuList)

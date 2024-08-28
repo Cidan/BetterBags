@@ -39,8 +39,8 @@ local defaultTheme = {
       decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
       decoration.TitleContainer.TitleText:SetFontObject(fonts.UnitFrame12Yellow)
       decoration.CloseButton = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonDefaultAnchors") --[[@as Button]]
-      decoration.CloseButton:SetScript("OnClick", function()
-        frame.Owner:Hide()
+      addon.SetScript(decoration.CloseButton, "OnClick", function(ctx)
+        frame.Owner:Hide(ctx)
       end)
 
       local box = searchBox:CreateBox(frame.Owner.kind, decoration --[[@as Frame]])

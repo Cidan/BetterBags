@@ -127,18 +127,19 @@ local tabs = addon:GetModule('Tabs')
 ---@field bankTab BankTab
 bagFrame.bagProto = {}
 
-function bagFrame.bagProto:GenerateWarbankTabs()
+---@param ctx Context
+function bagFrame.bagProto:GenerateWarbankTabs(ctx)
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if self.tabs:TabExistsByID(data.ID) and self.tabs:GetTabNameByID(data.ID) ~= data.name then
-      self.tabs:RenameTabByID(data.ID, data.name)
+      self.tabs:RenameTabByID(ctx, data.ID, data.name)
     elseif not self.tabs:TabExistsByID(data.ID) then
-      self.tabs:AddTab(data.name, data.ID)
+      self.tabs:AddTab(ctx, data.name, data.ID)
     end
   end
 
   if not self.tabs:TabExists("Purchase Warbank Tab") then
-    self.tabs:AddTab("Purchase Warbank Tab", nil, nil, AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
+    self.tabs:AddTab(ctx, "Purchase Warbank Tab", nil, nil, AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
   end
 
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
@@ -177,7 +178,8 @@ function bagFrame.bagProto:ShowBankAndReagentTabs()
   self.tabs:ShowTabByIndex(2)
 end
 
-function bagFrame.bagProto:Show()
+---@param ctx Context
+function bagFrame.bagProto:Show(ctx)
   if self.frame:IsShown() then
     return
   end
@@ -185,10 +187,10 @@ function bagFrame.bagProto:Show()
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
 
   if self.kind == const.BAG_KIND.BANK and addon.isRetail then
-    self:GenerateWarbankTabs()
+    self:GenerateWarbankTabs(ctx)
     if addon.atWarbank then
       self:HideBankAndReagentTabs()
-      self.tabs:SetTabByID(13)
+      self.tabs:SetTabByID(ctx, 13)
     else
       self:ShowBankAndReagentTabs()
     end
@@ -198,7 +200,8 @@ function bagFrame.bagProto:Show()
   self.frame:Show()
 end
 
-function bagFrame.bagProto:Hide()
+---@param ctx Context
+function bagFrame.bagProto:Hide(ctx)
   if not self.frame:IsShown() then
     return
   end
@@ -217,15 +220,16 @@ function bagFrame.bagProto:Hide()
   if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
     debug:Log("draw", "Drawing bag on close")
     self.drawOnClose = false
-    self:Refresh()
+    self:Refresh(ctx)
   end
 end
 
-function bagFrame.bagProto:Toggle()
+---@param ctx Context
+function bagFrame.bagProto:Toggle(ctx)
   if self.frame:IsShown() then
-    self:Hide()
+    self:Hide(ctx)
   else
-    self:Show()
+    self:Show(ctx)
   end
 end
 
@@ -241,16 +245,18 @@ function bagFrame.bagProto:GetPosition()
   return x * scale, y * scale
 end
 
-function bagFrame.bagProto:Sort()
+---@param ctx Context
+function bagFrame.bagProto:Sort(ctx)
   if self.kind ~= const.BAG_KIND.BACKPACK then return end
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-  events:SendMessage('bags/SortBackpack')
+  events:SendMessage('bags/SortBackpack', ctx)
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
-function bagFrame.bagProto:Wipe()
+---@param ctx Context
+function bagFrame.bagProto:Wipe(ctx)
   if self.currentView then
-    self.currentView:Wipe()
+    self.currentView:Wipe(ctx)
   end
 end
 
@@ -261,26 +267,29 @@ end
 
 -- Refresh will refresh this bag's item database, and then redraw the bag.
 -- This is what would be considered a "full refresh".
-function bagFrame.bagProto:Refresh()
+---@param ctx Context
+function bagFrame.bagProto:Refresh(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then
-    events:SendMessage('bags/RefreshBackpack')
+    events:SendMessage('bags/RefreshBackpack', ctx)
   else
-    events:SendMessage('bags/RefreshBank')
+    events:SendMessage('bags/RefreshBank', ctx)
   end
 end
 
+---@param ctx Context
 ---@param results table<string, boolean>
-function bagFrame.bagProto:Search(results)
+function bagFrame.bagProto:Search(ctx, results)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateSearch(results[item.slotkey])
+    item:UpdateSearch(ctx, results[item.slotkey])
   end
 end
 
-function bagFrame.bagProto:ResetSearch()
+---@param ctx Context
+function bagFrame.bagProto:ResetSearch(ctx)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateSearch(true)
+    item:UpdateSearch(ctx, true)
   end
 end
 
@@ -297,7 +306,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
   end
 
   if self.currentView and self.currentView:GetBagView() ~=  view:GetBagView() then
-    self.currentView:Wipe()
+    self.currentView:Wipe(ctx)
     self.currentView:GetContent():Hide()
   end
 
@@ -309,15 +318,15 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
     local text = searchBox:GetText()
     if text ~= "" and text ~= nil then
-      self:Search(search:Search(text))
+      self:Search(ctx, search:Search(text))
     end
     self:OnResize()
     if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
-      self.slots:Draw()
+      self.slots:Draw(ctx)
       self.slots:Show()
     end
-    events:SendMessage('bag/RedrawIcons', self)
-    events:SendMessage('bag/Rendered', self, slotInfo)
+    events:SendMessage('bag/RedrawIcons', ctx, self)
+    events:SendMessage('bag/Rendered', ctx, self, slotInfo)
     callback()
   end)
 end
@@ -358,21 +367,22 @@ function bagFrame.bagProto:SetTitle(text)
   themes:SetTitle(self.frame, text)
 end
 
-function bagFrame.bagProto:SwitchToBank()
-  local ctx = context:New()
+---@param ctx Context
+function bagFrame.bagProto:SwitchToBank(ctx)
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
   AccountBankPanel.selectedTabID = nil
-  self:Wipe()
+  self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
 end
 
-function bagFrame.bagProto:SwitchToReagentBank()
-  local ctx = context:New()
+---@param ctx Context
+---@return boolean
+function bagFrame.bagProto:SwitchToReagentBank(ctx)
   if not IsReagentBankUnlocked() then
     StaticPopup_Show("CONFIRM_BUY_REAGENTBANK_TAB")
     return false
@@ -383,16 +393,16 @@ function bagFrame.bagProto:SwitchToReagentBank()
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
   AccountBankPanel.selectedTabID = nil
-  self:Wipe()
+  self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
   return true
 end
 
+---@param ctx Context
 ---@param tabIndex number
 ---@return boolean
-function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
-  local ctx = context:New()
+function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   self.bankTab = tabIndex
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 3
@@ -405,49 +415,56 @@ function bagFrame.bagProto:SwitchToAccountBank(tabIndex)
   end
   self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
   self.currentItemCount = -1
-  self:Wipe()
+  self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
   return true
 end
 
-function bagFrame.bagProto:SwitchToBankAndWipe()
+---@param ctx Context
+function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
-  local ctx = context:New()
   ctx:Set('wipe', true)
-  self.tabs:SetTabByIndex(1)
+  self.tabs:SetTabByIndex(ctx, 1)
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
   self:SetTitle(L:G("Bank"))
   items:ClearBankCache(ctx)
-  self:Wipe()
+  self:Wipe(ctx)
 end
 
-function bagFrame.bagProto:OnCooldown()
+---@param ctx Context
+function bagFrame.bagProto:OnCooldown(ctx)
   if not self.currentView then return end
   for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-    item:UpdateCooldown()
+    item:UpdateCooldown(ctx)
   end
 end
 
-function bagFrame.bagProto:OnLock(bagid, slotid)
+---@param ctx Context
+---@param bagid number
+---@param slotid number
+function bagFrame.bagProto:OnLock(ctx, bagid, slotid)
   if not self.currentView then return end
   if slotid == nil then return end
   local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   local button = self.currentView.itemsByBagAndSlot[slotkey]
   if button then
-    button:Lock()
+    button:Lock(ctx)
   end
 end
 
-function bagFrame.bagProto:OnUnlock(bagid, slotid)
+---@param ctx Context
+---@param bagid number
+---@param slotid number
+function bagFrame.bagProto:OnUnlock(ctx, bagid, slotid)
   if not self.currentView then return end
   if slotid == nil then return end
   local slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   local button = self.currentView.itemsByBagAndSlot[slotkey]
   if button then
-    button:Unlock()
+    button:Unlock(ctx)
   end
 end
 
@@ -455,19 +472,20 @@ function bagFrame.bagProto:UpdateContextMenu()
   self.menuList = contextMenu:CreateContextMenu(self)
 end
 
-function bagFrame.bagProto:CreateCategoryForItemInCursor()
+---@param ctx Context
+function bagFrame.bagProto:CreateCategoryForItemInCursor(ctx)
   local _, itemID, itemLink = GetCursorInfo()
   ---@cast itemID number
   question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
   function(input)
     if input == nil then return end
     if input == "" then return end
-    categories:CreateCategory({
+    categories:CreateCategory(ctx, {
       name = input,
       itemList = {[itemID] = true},
       save = true,
     })
-    events:SendMessage('bags/FullRefreshAll')
+    events:SendMessage('bags/FullRefreshAll', ctx)
   end)
   GameTooltip:Hide()
   ClearCursor()
@@ -478,9 +496,10 @@ end
 -------
 
 --- Create creates a new bag view.
+---@param ctx Context
 ---@param kind BagKind
 ---@return Bag
-function bagFrame:Create(kind)
+function bagFrame:Create(ctx, kind)
   ---@class Bag
   local b = {}
   setmetatable(b, { __index = bagFrame.bagProto })
@@ -559,14 +578,14 @@ function bagFrame:Create(kind)
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 
-  local slots = bagSlots:CreatePanel(kind)
+  local slots = bagSlots:CreatePanel(ctx, kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
   slots.frame:SetParent(b.frame)
   slots.frame:Hide()
   b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
-    b.searchFrame = searchBox:Create(b.frame)
+    b.searchFrame = searchBox:Create(ctx, b.frame)
   end
 
   if kind == const.BAG_KIND.BACKPACK then
@@ -602,35 +621,35 @@ function bagFrame:Create(kind)
     end
 
     b.tabs = tabs:Create(b.frame)
-    b.tabs:AddTab("Bank")
-    b.tabs:AddTab("Reagent Bank")
+    b.tabs:AddTab(ctx, "Bank")
+    b.tabs:AddTab(ctx, "Reagent Bank")
 
-    b.tabs:SetTabByIndex(1)
+    b.tabs:SetTabByIndex(ctx, 1)
 
-    b.tabs:SetClickHandler(function(tabIndex, button)
+    b.tabs:SetClickHandler(function(ectx, tabIndex, button)
       if tabIndex == 1 then
         AccountBankPanel.TabSettingsMenu:Hide()
-        b:SwitchToBank()
+        b:SwitchToBank(ectx)
       elseif tabIndex == 2 then
         AccountBankPanel.TabSettingsMenu:Hide()
-        return b:SwitchToReagentBank()
+        return b:SwitchToReagentBank(ectx)
       else
         if button == "RightButton" or AccountBankPanel.TabSettingsMenu:IsShown() then
           AccountBankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
           AccountBankPanel.TabSettingsMenu:Show()
           AccountBankPanel.TabSettingsMenu:Update()
         end
-        b:SwitchToAccountBank(tabIndex)
+        b:SwitchToAccountBank(ectx, tabIndex)
       end
       return true
     end)
     -- BANK_TAB_SETTINGS_UPDATED
     -- BANK_TABS_CHANGED
-    events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function()
-      b:GenerateWarbankTabs()
+    events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function(ectx)
+      b:GenerateWarbankTabs(ectx)
     end)
-    events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function()
-      b:GenerateWarbankTabs()
+    events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function(ectx)
+      b:GenerateWarbankTabs(ectx)
     end)
   end
 
@@ -670,25 +689,17 @@ function bagFrame:Create(kind)
   b:KeepBagInBounds()
 
   if b.kind == const.BAG_KIND.BACKPACK then
-    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(_) b:OnCooldown() end)
+    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(ectx) b:OnCooldown(ectx) end)
   end
 
-  events:RegisterEvent('ITEM_LOCKED', function(_, bagid, slotid)
-    b:OnLock(bagid, slotid)
+  events:RegisterMessage('search/SetInFrame', function (ectx, _, shown)
+    themes:SetSearchState(ectx, b.frame, shown)
   end)
 
-  events:RegisterEvent('ITEM_UNLOCKED', function(_, bagid, slotid)
-    b:OnUnlock(bagid, slotid)
-  end)
-
-  events:RegisterMessage('search/SetInFrame', function (_, shown)
-    themes:SetSearchState(b.frame, shown)
-  end)
-
-  events:RegisterMessage('bag/RedrawIcons', function()
+  events:RegisterMessage('bag/RedrawIcons', function(ectx)
     if not b.currentView then return end
     for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
-      item:UpdateUpgrade()
+      item:UpdateUpgrade(ectx)
     end
   end)
   return b

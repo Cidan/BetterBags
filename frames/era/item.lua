@@ -53,17 +53,22 @@ local children = {
   "HighlightTexture"
 }
 
-function itemFrame.itemProto:UpdateCooldown()
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+function itemFrame.itemProto:UpdateCooldown(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
   ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
 
-function itemFrame.itemProto:ResetSize()
-  self:SetSize(37, 37)
+---@param ctx Context
+function itemFrame.itemProto:ResetSize(ctx)
+  self:SetSize(ctx, 37, 37)
 end
 
-function itemFrame.itemProto:SetSize(width, height)
-  local decoration = themes:GetItemButton(self)
+---@param ctx Context
+---@param width number
+---@param height number
+function itemFrame.itemProto:SetSize(ctx, width, height)
+  local decoration = themes:GetItemButton(ctx, self)
   self.frame:SetSize(width, height)
   self.button:SetSize(width, height)
   decoration.IconBorder:SetSize(width, height)
@@ -71,11 +76,12 @@ function itemFrame.itemProto:SetSize(width, height)
   decoration.IconTexture:SetSize(width, height)
 end
 
+---@param ctx Context
 ---@param data ItemData
-function itemFrame.itemProto:SetItemFromData(data)
+function itemFrame.itemProto:SetItemFromData(ctx, data)
   assert(data, 'data must be provided')
   self.slotkey = data.slotkey
-  local decoration = themes:GetItemButton(self)
+  local decoration = themes:GetItemButton(ctx, self)
   local bagid, slotid = data.bagid, data.slotid
   if bagid ~= nil and slotid ~= nil then
     self.button:SetID(slotid)
@@ -126,7 +132,7 @@ function itemFrame.itemProto:SetItemFromData(data)
   end
   decoration.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
   decoration.IconBorder:Show()
-  self:UpdateCount()
+  self:UpdateCount(ctx)
   SetItemButtonDesaturated(decoration, data.itemInfo.isLocked)
   decoration.IconQuestTexture:Hide()
   --self:SetLock(data.itemInfo.isLocked)
@@ -161,19 +167,20 @@ function itemFrame.itemProto:SetItemFromData(data)
   self.isFreeSlot = nil
   self:SetAlpha(1)
   if self.slotkey ~= nil then
-    events:SendMessage('item/Updated', self, decoration)
+    events:SendMessage('item/Updated', ctx, self, decoration)
   end
-  self:UpdateUpgrade()
+  self:UpdateUpgrade(ctx)
   self.frame:Show()
   self.button:Show()
 end
 
 -- SetFreeSlots will set the item button to a free slot.
+---@param ctx Context
 ---@param bagid number
 ---@param slotid number
 ---@param count number
-function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count)
-  local decoration = themes:GetItemButton(self)
+function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count)
+  local decoration = themes:GetItemButton(ctx, self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
@@ -197,7 +204,7 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count)
   SetItemButtonQuality(decoration, false)
   SetItemButtonDesaturated(decoration, false)
   SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]])
-  self:UpdateCooldown()
+  self:UpdateCooldown(ctx)
   decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   decoration.IconBorder:SetBlendMode("BLEND")
   decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
@@ -211,19 +218,19 @@ function itemFrame.itemProto:SetFreeSlots(bagid, slotid, count)
 
   self.freeSlotName = self:GetBagType(bagid)
   --SetItemButtonQuality(decoration, 4, nil, false, false)
-  self:Unlock()
+  self:Unlock(ctx)
 
   decoration.IconBorder:SetBlendMode("BLEND")
   self.frame:SetAlpha(1)
-  events:SendMessage('item/Updated', self, decoration)
+  events:SendMessage('item/Updated', ctx, self, decoration)
   self.frame:Show()
   self.button:Show()
 end
 
-
-function itemFrame.itemProto:ClearItem()
-  local decoration = themes:GetItemButton(self)
-  events:SendMessage('item/Clearing', self, decoration)
+---@param ctx Context
+function itemFrame.itemProto:ClearItem(ctx)
+  local decoration = themes:GetItemButton(ctx, self)
+  events:SendMessage('item/Clearing', ctx, self, decoration)
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
@@ -241,14 +248,14 @@ function itemFrame.itemProto:ClearItem()
   decoration.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
-  self:SetSize(37, 37)
+  self:SetSize(ctx, 37, 37)
   decoration.UpgradeIcon:SetShown(false)
   self.freeSlotName = ""
   self.freeSlotCount = 0
   self.isFreeSlot = nil
   self.slotkey = ""
   self.staticData = nil
-  self:UpdateCooldown()
+  self:UpdateCooldown(ctx)
 end
 
 function itemFrame.itemProto:UpdateTooltip()
@@ -284,18 +291,21 @@ function itemFrame:_DoCreate()
   button:GetPushedTexture():SetTexture("")
   button:GetNormalTexture():SetTexture("")
 
-  button:HookScript("OnMouseDown", function()
-    themes:GetItemButton(i):GetPushedTexture():Show()
+  addon.HookScript(button, "OnMouseDown", function(ctx)
+    themes:GetItemButton(ctx, i):GetPushedTexture():Show()
   end)
-  button:HookScript("OnMouseUp", function()
-    themes:GetItemButton(i):GetPushedTexture():Hide()
+
+  addon.HookScript(button, "OnMouseUp", function(ctx)
+    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
   end)
-  button:HookScript("OnLeave", function()
-    themes:GetItemButton(i):GetHighlightTexture():Hide()
-    themes:GetItemButton(i):GetPushedTexture():Hide()
+
+  addon.HookScript(button, "OnLeave", function(ctx)
+    themes:GetItemButton(ctx, i):GetHighlightTexture():Hide()
+    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
   end)
-  button:HookScript("OnEnter", function()
-    themes:GetItemButton(i):GetHighlightTexture():Show()
+
+  addon.HookScript(button, "OnEnter", function(ctx)
+    themes:GetItemButton(ctx, i):GetHighlightTexture():Show()
   end)
 
   -- Assign the global item button textures to the item button.
@@ -330,8 +340,9 @@ function itemFrame:_DoCreate()
   return i
 end
 
+---@param ctx Context
 ---@return Item
-function itemFrame:Create()
+function itemFrame:Create(ctx)
   ---@return Item
-  return self._pool:Acquire()
+  return self._pool:Acquire(ctx)
 end

@@ -18,6 +18,9 @@ local config = addon:GetModule('Config')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@param category string
 ---@return AceConfig.OptionsTable
 function config:CreateCustomCategoryConfig(category)
@@ -40,7 +43,8 @@ function config:CreateCustomCategoryConfig(category)
         confirmText = L:G("Are you sure you want to delete this category?"),
         order = 2,
         func = function()
-          categories:DeleteCategory(category)
+          local ctx = context:New('DeleteCategory_Menu')
+          categories:DeleteCategory(ctx, category)
         end,
       }
     },
@@ -80,7 +84,8 @@ function config:GetCustomCategoryConfig()
             end,
             set = function(_, value)
               if value == "" then return end
-              categories:CreateCategory({
+              local ctx = context:New('CreateCategory_Menu')
+              categories:CreateCategory(ctx, {
                 name = value,
                 save = true,
                 enabled = {

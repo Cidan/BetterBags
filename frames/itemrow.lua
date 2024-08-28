@@ -28,6 +28,9 @@ local items = addon:GetModule('Items')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Pool: AceModule
+local pool = addon:GetModule('Pool')
+
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')
 
@@ -50,26 +53,29 @@ function item.itemRowProto:GetItemData()
   return self.button:GetItemData()
 end
 
+---@param ctx Context
 ---@param data ItemData
-function item.itemRowProto:SetStaticItemFromData(data)
-  self:SetItemFromData(data, true)
+function item.itemRowProto:SetStaticItemFromData(ctx, data)
+  self:SetItemFromData(ctx, data, true)
 end
 
+---@param ctx Context
 ---@param slotkey string
-function item.itemRowProto:SetItem(slotkey)
+function item.itemRowProto:SetItem(ctx, slotkey)
   local data = items:GetItemDataFromSlotKey(slotkey)
-  self:SetItemFromData(data)
+  self:SetItemFromData(ctx, data)
 end
 
+---@param ctx Context
 ---@param data ItemData
 ---@param static? boolean
-function item.itemRowProto:SetItemFromData(data, static)
+function item.itemRowProto:SetItemFromData(ctx, data, static)
   self.slotkey = data.slotkey
-  self.button:SetSize(20, 20)
+  self.button:SetSize(ctx, 20, 20)
   if static then
-    self.button:SetStaticItemFromData(data)
+    self.button:SetStaticItemFromData(ctx, data)
   else
-    self.button:SetItemFromData(data)
+    self.button:SetItemFromData(ctx, data)
   end
   self.button.frame:SetParent(self.frame)
   self.button.frame:SetPoint("LEFT", self.frame, "LEFT", 4, 0)
@@ -113,7 +119,7 @@ function item.itemRowProto:SetItemFromData(data, static)
   end)
 
   if self.slotkey ~= nil then
-    events:SendMessage('item/UpdatedRow', self)
+    events:SendMessage('item/UpdatedRow', ctx, self)
   end
   self.frame:Show()
   self.rowButton:Show()
@@ -125,9 +131,10 @@ function item.itemRowProto:Wipe()
   self.frame:ClearAllPoints()
 end
 
-function item.itemRowProto:ClearItem()
-  events:SendMessage('item/ClearingRow', self)
-  self.button:ClearItem()
+---@param ctx Context
+function item.itemRowProto:ClearItem(ctx)
+  events:SendMessage('item/ClearingRow', ctx, self)
+  self.button:ClearItem(ctx)
 
   self.rowButton:SetID(0)
   self.frame:SetID(0)
@@ -146,9 +153,10 @@ function item.itemRowProto:GetCategory()
   return self.button:GetItemData().itemInfo.category
 end
 
+---@param ctx Context
 ---@return boolean
-function item.itemRowProto:IsNewItem()
-  return self.button:IsNewItem()
+function item.itemRowProto:IsNewItem(ctx)
+  return self.button:IsNewItem(ctx)
 end
 
 ---@return string
@@ -156,34 +164,35 @@ function item.itemRowProto:GetGUID()
   return self.button:GetItemData().itemInfo.itemGUID
 end
 
-function item.itemRowProto:Release()
-  item._pool:Release(self)
+---@param ctx Context
+function item.itemRowProto:Release(ctx)
+  item._pool:Release(ctx, self)
 end
 
 function item.itemRowProto:UpdateSearch(text)
   self.button:UpdateSearch(text)
 end
 
-function item.itemRowProto:UpdateCooldown()
-  self.button:UpdateCooldown()
+---@param ctx Context
+function item.itemRowProto:UpdateCooldown(ctx)
+  self.button:UpdateCooldown(ctx)
 end
 
 local buttonCount = 0
 
 function item:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
-  if self._pool.SetResetDisallowedIfNew then
-    self._pool:SetResetDisallowedIfNew()
-  end
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
 end
 
+---@param ctx Context
 ---@param i ItemRow
-function item:_DoReset(i)
-  i:ClearItem()
+function item._DoReset(ctx, i)
+  i:ClearItem(ctx)
 end
 
+---@param ctx Context
 ---@return ItemRow
-function item:_DoCreate()
+function item:_DoCreate(ctx)
   local i = setmetatable({}, { __index = item.itemRowProto })
 
   -- Backwards compatibility for item data.
@@ -210,7 +219,7 @@ function item:_DoCreate()
 
   -- Button properties are set when setting the item,
   -- and setting them here will have no effect.
-  local button = itemFrame:Create()
+  local button = itemFrame:Create(ctx)
   i.button = button
 
   local text = i.frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -264,7 +273,8 @@ function item:_DoCreate()
   return i
 end
 
+---@param ctx Context
 ---@return ItemRow
-function item:Create()
-  return self._pool:Acquire()
+function item:Create(ctx)
+  return self._pool:Acquire(ctx)
 end

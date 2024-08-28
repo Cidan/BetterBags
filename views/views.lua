@@ -50,7 +50,7 @@ local stackProto = {}
 ---@field deferredItems table<string, boolean>
 ---@field dirtySections table<string, boolean>
 ---@field private stacks table<string, Stack>
----@field WipeHandler fun(view: View)
+---@field WipeHandler fun(view: View, ctx: Context)
 views.viewProto = {}
 
 function views:OnEnable()
@@ -82,9 +82,10 @@ function views.viewProto:AddSlot(newSlotKey)
   error('AddSlot method not implemented')
 end
 
-function views.viewProto:Wipe()
+---@param ctx Context
+function views.viewProto:Wipe(ctx)
   assert(self.WipeHandler, 'WipeHandler not set')
-  self.WipeHandler(self)
+  self.WipeHandler(self, ctx)
   self:ClearDeferredItems()
   self:ClearDirtySections()
   wipe(self.stacks)
@@ -107,13 +108,14 @@ end
 
 -- GetOrCreateItemButton will get an existing item button by slotkey,
 -- creating it if it doesn't exist.
+---@param ctx Context
 ---@param slotkey string
 ---@param createFunc? fun(): Item|ItemRow
 ---@return Item
-function views.viewProto:GetOrCreateItemButton(slotkey, createFunc)
+function views.viewProto:GetOrCreateItemButton(ctx, slotkey, createFunc)
   local item = self.itemsByBagAndSlot[slotkey]
   if item == nil then
-    item = self:GetItemFrame(createFunc)
+    item = self:GetItemFrame(ctx, createFunc)
     self.itemsByBagAndSlot[slotkey] = item
   end
   return item
@@ -121,13 +123,14 @@ end
 
 -- GetOrCreateSection will get an existing section by category,
 -- creating it if it doesn't exist.
+---@param ctx Context
 ---@param category string
 ---@param onlyCreate? boolean If true, only create the section, but don't add it to the view.
 ---@return Section
-function views.viewProto:GetOrCreateSection(category, onlyCreate)
+function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
   local section = self.sections[category]
   if section == nil then
-    section = sectionFrame:Create()
+    section = sectionFrame:Create(ctx)
     section.frame:SetParent(self.content:GetScrollView())
     section:SetTitle(category)
     if not onlyCreate then
@@ -135,7 +138,7 @@ function views.viewProto:GetOrCreateSection(category, onlyCreate)
     end
     self.sections[category] = section
     if self.bagview == const.BAG_VIEW.SECTION_GRID then
-      categories:CreateCategory({
+      categories:CreateCategory(ctx, {
         name = category,
         itemList = {},
         dynamic = true,
@@ -192,18 +195,20 @@ function views.viewProto:ParseSlotKey(slotkey)
   return tonumber(bagid) --[[@as number]], tonumber(slotid) --[[@as number]]
 end
 
+---@param ctx Context
 ---@param createFunc? fun(): Item
 ---@return Item
-function views.viewProto:GetItemFrame(createFunc)
+function views.viewProto:GetItemFrame(ctx, createFunc)
   self.itemFrames = self.itemFrames or {}
-  local i = createFunc and createFunc() or itemFrame:Create()
+  local i = createFunc and createFunc() or itemFrame:Create(ctx)
   tinsert(self.itemFrames, i)
   return i
 end
 
-function views.viewProto:ReleaseItemFrames()
+---@param ctx Context
+function views.viewProto:ReleaseItemFrames(ctx)
   for _, item in pairs(self.itemFrames) do
-    item:Release()
+    item:Release(ctx)
   end
   wipe(self.itemFrames)
 end
@@ -270,8 +275,9 @@ function views.viewProto:UpdateListSize(bag)
   _ = bag
 end
 
+---@param ctx Context
 ---@param slotkey string
-function views.viewProto:FlashStack(slotkey)
+function views.viewProto:FlashStack(ctx, slotkey)
   -- HACKFIX: Disable this for non retail clients due to
   -- a lack of stable sort API.
   if not addon.isRetail then return end
@@ -279,104 +285,18 @@ function views.viewProto:FlashStack(slotkey)
   local item = items:GetItemDataFromSlotKey(slotkey)
   local stack = self.stacks[item.itemHash]
   if not stack then return end
-  items:ClearNewItem(slotkey)
-  items:ClearNewItem(stack.item)
+  items:ClearNewItem(ctx, slotkey)
+  items:ClearNewItem(ctx, stack.item)
   for subItemSlotKey in pairs(stack.subItems) do
-    items:ClearNewItem(subItemSlotKey)
+    items:ClearNewItem(ctx, subItemSlotKey)
     if self.itemsByBagAndSlot[subItemSlotKey] then
-      self.itemsByBagAndSlot[subItemSlotKey]:ClearFlashItem()
+      self.itemsByBagAndSlot[subItemSlotKey]:ClearFlashItem(ctx)
     end
   end
-  local itemButton = self:GetOrCreateItemButton(slotkey)
-  itemButton:FlashItem()
+  local itemButton = self:GetOrCreateItemButton(ctx, slotkey)
+  itemButton:FlashItem(ctx)
 end
 
--- RemoveButton removes an item from a stack if it's in a stack,
--- promoting the first sub item to the main item if the item was the main item.
--- If the stack is empty after removal, the stack is removed.
--- Returns the slotkey of the main stack view item if the item was removed from a stack, or nil if
--- the item was not in a stack.
----@param item ItemData
----@return string?
-function views.viewProto:RemoveButton(item)
-  local stack = self.stacks[item.itemHash]
-  if not stack or not stack:IsInStack(item.slotkey) then
-    return nil
-  end
-  local updateKey = stack:RemoveItem(item.slotkey)
-  if stack:IsStackEmpty() then
-    self.stacks[item.itemHash] = nil
-  end
-  return updateKey
-end
-
--- AddButton adds an item to a stack if stacking options are enabled for this item.
--- Returns the slotkey of the item base item if the item was added to a stack, or nil if it was
--- added as a new item or stack.
----@param item ItemData
----@return string?
-function views.viewProto:AddButton(item)
-  local opts = database:GetStackingOptions(self.kind)
-  -- If we're not merging stacks, return nil.
-  if (not opts.mergeStacks) or
-  (opts.unmergeAtShop and addon.atInteracting) or
-  (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-  (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
-  self.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-    return nil
-  end
-
-  local stack = self.stacks[item.itemHash]
-
-  -- If a stack was found, update it and return the stack button.
-  if stack then
-    local added = stack:AddItem(item.slotkey)
-    stack:UpdateCount()
-    if added then
-      return nil
-    else
-      return stack.item
-    end
-  end
-
-  -- No stack was found, create a new stack.
-  self.stacks[item.itemHash] = views:NewStack(item.slotkey)
-  return nil
-end
-
--- ChangeButton updates the item in the stack if it exists.
--- Returns the slotkey of the item base item if the item was updated in a stack, or the slotkey
--- of the item if it was not in a stack.
--- The second return is the slotkey of the item that should be removed from the view,
--- if the item was merged into a stack.
--- The third return is the slotkey of the item that should be added to the view.
----@param item ItemData
----@return string, string?, string?
-function views.viewProto:ChangeButton(item)
-  local stack = self.stacks[item.itemHash]
-  local opts = database:GetStackingOptions(self.kind)
-  -- If we're not merging stacks, return nil.
-  if (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) then
-    return item.slotkey
-  end
-
-  if stack then
-    if not stack:IsInStack(item.slotkey) then
-      stack:AddItem(item.slotkey)
-      stack:UpdateCount()
-      return stack.item, item.slotkey
-    end
-    stack:UpdateCount()
-    return stack.item
-  end
-  return item.slotkey
-end
-
----@param itemHash string
----@return Stack
-function views.viewProto:GetStack(itemHash)
-  return self.stacks[itemHash]
-end
 
 ---@return View
 function views:NewBlankView()

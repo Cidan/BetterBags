@@ -48,6 +48,9 @@ local fonts = addon:GetModule('Fonts')
 ---@class SearchCategoryConfig: AceModule
 local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
 
@@ -77,16 +80,17 @@ local sectionConfigItem = {}
 ---@field package itemList SectionItemListFrame
 local sectionConfigFrame = {}
 
+---@param ctx Context
 ---@param category string
 ---@return boolean
-function sectionConfigFrame:OnReceiveDrag(category)
+function sectionConfigFrame:OnReceiveDrag(ctx, category)
   if categories:IsDynamicCategory(category) then return false end
   local kind, id = GetCursorInfo()
   if kind ~= "item" or not tonumber(id) then return false end
   ClearCursor()
   local itemid = tonumber(id) --[[@as number]]
-  categories:AddPermanentItemToCategory(itemid, category)
-  events:SendMessage('bags/FullRefreshAll')
+  categories:AddPermanentItemToCategory(ctx, itemid, category)
+  events:SendMessage('bags/FullRefreshAll', ctx)
   return true
 end
 
@@ -218,7 +222,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   -- Set the text and icon for the button.
   button.Category:SetText(elementData.title)
 
-  button:SetScript("OnMouseDown", function(_, b)
+  addon.SetScript(button, "OnMouseDown", function(ctx, _, b)
     if b ~= "RightButton" or IsShiftKeyDown() then
       return
     end
@@ -234,7 +238,8 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         return not categories:IsCategoryShown(elementData.title)
       end,
       func = function()
-        categories:ToggleCategoryShown(elementData.title)
+        local ectx = context:New('SectionConfigFrame_HideCategory')
+        categories:ToggleCategoryShown(ectx, elementData.title)
         if categories:IsCategoryShown(elementData.title) then
           local filter = categories:GetCategoryByName(elementData.title)
           if filter and filter.searchCategory then
@@ -259,29 +264,32 @@ function sectionConfigFrame:initSectionItem(button, elementData)
             self:UpdatePinnedItems()
             if self.itemList:IsShown() and self.itemList:IsCategory(elementData.title) then
               self.itemList:Hide(function()
-                categories:DeleteCategory(elementData.title)
+                local ectx = context:New('SectionConfigFrame_DeleteCategory')
+                categories:DeleteCategory(ectx, elementData.title)
               end)
             else
-              categories:DeleteCategory(elementData.title)
+              local ectx = context:New('SectionConfigFrame_DeleteCategory')
+              categories:DeleteCategory(ectx, elementData.title)
             end
           end, function()
           end)
         end
       })
     end
-    contextMenu:Show(menuOptions)
+    contextMenu:Show(ctx, menuOptions)
   end)
 
   if categories:DoesCategoryExist(elementData.title) and not categories:IsDynamicCategory(elementData.title) then
     -- Script handler for dropping items into a category.
-    button:SetScript("OnReceiveDrag", function()
+    addon.SetScript(button, "OnReceiveDrag", function(ctx)
       if elementData.header then
         return
       end
-      self:OnReceiveDrag(elementData.title)
+      self:OnReceiveDrag(ctx, elementData.title)
     end)
   end
-  button:SetScript("OnMouseUp", function(_, key)
+
+  addon.SetScript(button, "OnMouseUp", function(ctx, _, key)
     -- Headers can't be clicked.
     if elementData.header then
       return
@@ -289,7 +297,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
 
     -- Toggle the category from containing items.
     if key == "LeftButton" then
-      if self:OnReceiveDrag(elementData.title) then
+      if self:OnReceiveDrag(ctx, elementData.title) then
         return
       end
       if IsShiftKeyDown() then
@@ -304,7 +312,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
           button:SetBackdropColor(1, 1, 0, .2)
         end
       end
-      events:SendMessage('bags/FullRefreshAll')
+      events:SendMessage('bags/FullRefreshAll', ctx)
     end
   end)
 end
@@ -441,14 +449,16 @@ function sectionConfig:Create(kind, parent)
     end)
 
     sc.content.dragBehavior:SetFinalizeDrop(function(_)
+      local ctx = context:New('SectionConfigFrame_FinalizeDrop')
       sc:UpdatePinnedItems()
-      events:SendMessage('bags/FullRefreshAll')
+      events:SendMessage('bags/FullRefreshAll', ctx)
     end)
 
     sc.content:SetCanReorder(true)
   else
     -- Setup the callback for when an item is moved.
     sc.content:SetCanReorder(true, function(_, elementData, currentIndex, newIndex)
+      local ctx = context:New('SectionConfigFrame_Reorder')
       -- Headers can never be moved.
       if elementData.header then
         -- Use the manual remove/insert to avoid an infinite loop.
@@ -463,7 +473,7 @@ function sectionConfig:Create(kind, parent)
       end
 
       sc:UpdatePinnedItems()
-      events:SendMessage('bags/FullRefreshAll')
+      events:SendMessage('bags/FullRefreshAll', ctx)
     end)
   end
   sc.content:AddToStart({ title = "Pinned", header = true })

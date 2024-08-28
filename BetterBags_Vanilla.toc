@@ -35,13 +35,15 @@ core\boot.lua
 
 animations\fade.lua
 
+core\context.lua
+core\pool.lua
+
 debug\debug.lua
 debug\frames.lua
 debug\profile.lua
 debug\items.lua
 debug\analytics.lua
 
-core\context.lua
 core\events.lua
 core\localization.lua
 core\translations.lua
@@ -66,6 +68,7 @@ data\equipmentsets.lua
 data\categories.lua
 data\items.lua
 data\loader.lua
+data\stacks.lua
 data\slots.lua
 data\refresh.lua
 
@@ -100,6 +103,7 @@ frames\sectionconfig.lua
 frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
+frames\itembrowser.lua
 frames\debug.lua
 
 views\views.lua
@@ -118,7 +122,6 @@ config\config.lua
 config\era\config.lua
 config\help.lua
 config\era\bags.lua
-config\itemlist.lua
 config\customcat.lua
 
 integrations\consoleport.lua

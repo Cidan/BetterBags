@@ -40,6 +40,9 @@ local items = addon:GetModule('Items')
 ---@class MovementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')
 
+---@class Pool: AceModule
+local pool = addon:GetModule('Pool')
+
 -------
 --- Section Prototype
 -------
@@ -114,9 +117,10 @@ function sectionProto:GetContent()
   return self.content
 end
 
-function sectionProto:ReleaseAllCells()
+---@param ctx Context
+function sectionProto:ReleaseAllCells(ctx)
   for _, cell in pairs(self.content.cells) do
-    cell:Release()
+    cell:Release(ctx)
   end
 end
 
@@ -176,8 +180,9 @@ function sectionProto:GetRawCells()
   return self.content.cells
 end
 
-function sectionProto:Release()
-  sectionFrame._pool:Release(self)
+---@param ctx Context
+function sectionProto:Release(ctx)
+  sectionFrame._pool:Release(ctx, self)
 end
 
 -- Grid will render the section as a grid of icons.
@@ -219,7 +224,7 @@ end
 -------
 
 function sectionFrame:OnInitialize()
-  self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
   events:RegisterEvent('MODIFIER_STATE_CHANGED', function()
     if self.currentTooltip then
       self.currentTooltip:onTitleMouseEnter()
@@ -227,15 +232,18 @@ function sectionFrame:OnInitialize()
   end)
 end
 
+---@param ctx Context
 ---@param f Section
-function sectionFrame:_DoReset(f)
+function sectionFrame._DoReset(ctx, f)
+  _ = ctx
   f:EnableHeader()
   f:GetContent():SortHorizontal()
   f:Wipe()
 end
 
+---@param ctx Context
 ---@param section Section
-function sectionFrame:OnTitleClickOrDrop(section)
+function sectionFrame:OnTitleClickOrDrop(ctx, section)
   if not CursorHasItem() then return end
   if not IsShiftKeyDown() then return end
   local cursorType, itemID = GetCursorInfo()
@@ -243,9 +251,9 @@ function sectionFrame:OnTitleClickOrDrop(section)
   ---@cast itemID number
   if cursorType ~= "item" then return end
   local category = section.title:GetText()
-  categories:AddPermanentItemToCategory(itemID, category)
+  categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
-  events:SendMessage('bags/FullRefreshAll')
+  events:SendMessage('bags/FullRefreshAll', ctx)
 end
 
 ---@param section Section
@@ -264,9 +272,9 @@ function sectionFrame:OnTitleRightClick(section)
       table.insert(list, data)
 
       -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
-      local stack = addon:GetBagFromBagID(data.bagid).currentView:GetStack(data.itemHash)
+      local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
       if stack ~= nil then
-        for subSlotKey in pairs(stack.subItems) do
+        for subSlotKey in pairs(stack.slotkeys) do
           local subData = items:GetItemDataFromSlotKey(subSlotKey)
           table.insert(list, subData)
         end
@@ -351,18 +359,18 @@ function sectionFrame:_DoCreate()
 
   title:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-  title:SetScript("OnClick", function(_, e)
+  addon.SetScript(title, "OnClick", function(ctx, _, e)
     if s.headerDisabled then return end
     if e == "RightButton" then
       sectionFrame:OnTitleRightClick(s)
     elseif e == "LeftButton" then
-      sectionFrame:OnTitleClickOrDrop(s)
+      sectionFrame:OnTitleClickOrDrop(ctx, s)
     end
   end)
 
-  title:SetScript("OnReceiveDrag", function()
+  addon.SetScript(title, "OnReceiveDrag", function(ctx)
     if s.headerDisabled then return end
-    sectionFrame:OnTitleClickOrDrop(s)
+    sectionFrame:OnTitleClickOrDrop(ctx, s)
   end)
 
   s.title = title
@@ -378,8 +386,9 @@ function sectionFrame:_DoCreate()
 end
 
 -- Create will create a new section view.
+---@param ctx Context
 ---@return Section
-function sectionFrame:Create()
+function sectionFrame:Create(ctx)
   ---@return Section
-  return self._pool:Acquire()
+  return self._pool:Acquire(ctx)
 end
