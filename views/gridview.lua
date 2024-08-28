@@ -65,6 +65,7 @@ end
 ---@param view View
 ---@param item ItemData
 local function ClearButton(ctx, view, item)
+  debug:Log("ClearButton", "Clearing button for item", item.slotkey)
   local cell = view.itemsByBagAndSlot[item.slotkey]
   local bagid, slotid = view:ParseSlotKey(item.slotkey)
   if cell then
@@ -122,6 +123,7 @@ end
 ---@param oldSlotKey string
 ---@param newSlotKey string
 local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
+  debug:Log("UpdateDeletedSlot", "Updating button for item", oldSlotKey, newSlotKey)
   local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
   local oldSlotSection = view:GetSlotSection(oldSlotKey)
   if not oldSlotSection then
@@ -232,7 +234,9 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   if not slotInfo.deferDelete then
     for slotkey, _ in pairs(view:GetDeferredItems()) do
       local section = view:GetSlotSection(slotkey)
-      section:RemoveCell(slotkey)
+      if section then
+        section:RemoveCell(slotkey)
+      end
       view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
       view:RemoveSlotSection(slotkey)
     end
