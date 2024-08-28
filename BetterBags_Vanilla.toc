@@ -103,6 +103,7 @@ frames\sectionconfig.lua
 frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
+frames\itembrowser.lua
 frames\debug.lua
 
 views\views.lua
