@@ -189,6 +189,10 @@ function sectionProto:DislocateCell(slotkey)
   self.content:DislocateCell(slotkey)
 end
 
+function sectionProto:DislocateAllCellsWithID(slotkey)
+  self.content:DislocateAllCellsWithID(slotkey)
+end
+
 -- Grid will render the section as a grid of icons.
 ---@param kind BagKind
 ---@param view BagView

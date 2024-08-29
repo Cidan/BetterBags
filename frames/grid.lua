@@ -164,10 +164,11 @@ end
 -- to the cell's frame, and instead is setpoint relative to the cell to the left
 -- of it, leaving a gap where the cell once was. If the cell is the first cell in
 -- the grid, the right cell will be setpoint relative to the inner frame of the grid.
+-- If the cell is the first cell in a row and the row is not the first row, the right cell
+-- will be setpoint relative to the bottomright of the cell above this cell.
 function gridProto:DislocateCell(id)
   local cell = self.idToCell[id]
   if not cell then return end
-
   -- First, loop all the cells and figure out what cell is to the left, and to the right
   -- of this cell.
   ---@type Cell?
@@ -207,6 +208,29 @@ function gridProto:DislocateCell(id)
   end
   cell.frame:Hide()
   cell.frame:ClearAllPoints()
+end
+
+-- DislocateAllCellsWithID will dislocate all in the grid, hiding the cell
+-- with the given id.
+function gridProto:DislocateAllCellsWithID(id)
+  local targetCell = self.idToCell[id]
+  if not targetCell then return end
+  local parentTop, parentLeft = self.inner:GetTop(), self.inner:GetLeft()
+  ---@type {x: number, y: number, cell: Cell}[]
+  local positions = {}
+  for _, cell in pairs(self.cells) do
+    if cell.frame:IsShown() then
+      -- Get the top left point of the cell.
+      local x, y = cell.frame:GetLeft(), cell.frame:GetTop()
+      table.insert(positions, {x = parentLeft - x, y = parentTop - y, cell = cell})
+    end
+  end
+  for _, position in ipairs(positions) do
+    position.cell.frame:ClearAllPoints()
+    position.cell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", -position.x, -position.y)
+  end
+  targetCell.frame:Hide()
+  targetCell.frame:ClearAllPoints()
 end
 
 -- Sort will sort the cells in this grid using the given function.
