@@ -185,6 +185,10 @@ function sectionProto:Release(ctx)
   sectionFrame._pool:Release(ctx, self)
 end
 
+function sectionProto:DislocateCell(slotkey)
+  self.content:DislocateCell(slotkey)
+end
+
 -- Grid will render the section as a grid of icons.
 ---@param kind BagKind
 ---@param view BagView

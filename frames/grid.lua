@@ -159,6 +159,56 @@ function gridProto:ShowScrollBar()
   self.bar:SetAlpha(1)
 end
 
+-- DislocateCell will dislocate a cell from this grid, making it so
+-- anything to the right of this cell is no longer setpoint relative
+-- to the cell's frame, and instead is setpoint relative to the cell to the left
+-- of it, leaving a gap where the cell once was. If the cell is the first cell in
+-- the grid, the right cell will be setpoint relative to the inner frame of the grid.
+function gridProto:DislocateCell(id)
+  local cell = self.idToCell[id]
+  if not cell then return end
+
+  -- First, loop all the cells and figure out what cell is to the left, and to the right
+  -- of this cell.
+  ---@type Cell?
+  local leftCell = nil
+  ---@type Cell?
+  local rightCell = nil
+  for i, c in ipairs(self.cells) do
+    if c == cell then
+      if i > 1 then
+        leftCell = self.cells[i - 1]
+      end
+      if i < #self.cells then
+        rightCell = self.cells[i + 1]
+      end
+      break
+    end
+  end
+
+  ---@type string, ScriptRegion, string, number, number
+  local point, relativeTo, relativePoint, offsetX, offsetY = cell.frame:GetPoint(1)
+  ---@type string, ScriptRegion, string, number, number
+  local _, _, rightRelativePoint, _, _
+  if rightCell then
+    _, _, rightRelativePoint, _, _ = rightCell.frame:GetPoint(1)
+  end
+  -- If there is a right cell and left cell, set it to be setpoint relative to the left cell, leaving a gap for the cell that was removed.
+  if rightCell and leftCell then
+    -- This cell is the first cell in a new row, offset the height of the right cell using the height offset of the current cell.
+    if relativePoint == "BOTTOMLEFT" then
+      rightCell.frame:SetPoint("TOPLEFT", relativeTo, "BOTTOMRIGHT", (self.spacing), offsetY)
+    elseif rightRelativePoint ~= "BOTTOMLEFT" then
+      rightCell.frame:SetPoint("TOPLEFT", leftCell.frame, "TOPRIGHT", (self.spacing * 2) + cell.frame:GetWidth(), 0)
+    end
+  elseif not leftCell and rightCell then
+    -- This is the first cell in the grid.
+    rightCell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", (self.spacing * 2) + cell.frame:GetWidth(), 0)
+  end
+  cell.frame:Hide()
+  cell.frame:ClearAllPoints()
+end
+
 -- Sort will sort the cells in this grid using the given function.
 ---@param fn fun(a: `T`, b: `T`):boolean
 function gridProto:Sort(fn)
