@@ -167,12 +167,12 @@ local function AltGridView(view, ctx, bag, slotInfo, callback)
   local opts = database:GetStackingOptions(bag.kind)
 
   for _, item in pairs(removed) do
---    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
---    if stackInfo and stackInfo.rootItem ~= item.slotkey then
-      --UpdateButton(ctx, view, stackInfo.rootItem)
---    else
+    --local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    --if stackInfo and stackInfo.rootItem ~= item.slotkey then
+    --  UpdateButton(ctx, view, stackInfo.rootItem)
+    --else
       ClearButton(ctx, view, item.slotkey)
---    end
+    --end
   end
 
   -- Let's just add items for now.
@@ -221,6 +221,14 @@ local function AltGridView(view, ctx, bag, slotInfo, callback)
     -- status expires, it's category is no longer a new item
     -- but the actual category hasn't been drawn yet.
     if section ~= nil then
+      -- If a cell is hidden, remove it as it was dislocated and hidden.
+      for slotkey, cell in pairs(section:GetAllCells()) do
+        if not cell.frame:IsShown() then
+          section:RemoveCell(slotkey)
+          cell:Wipe(ctx)
+          view:RemoveSlotSection(slotkey)
+        end
+      end
       -- Remove the section if it's empty, otherwise draw it.
       if section:GetCellCount() == 0 then
         debug:Log("Section", "Removing section", sectionName)
