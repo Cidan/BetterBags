@@ -72,6 +72,10 @@ local function ClearButton(ctx, view, slotkey)
     local section = view:GetSlotSection(slotkey)
     section:DislocateAllCellsWithID(slotkey)
     view:AddDeferredItem(slotkey)
+    section:RemoveCell(slotkey)
+    view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
+    view.itemsByBagAndSlot[slotkey] = nil
+    view:RemoveSlotSection(slotkey)
   end
   addon:GetBagFromBagID(item.bagid).drawOnClose = true
 end
@@ -167,49 +171,45 @@ local function AltGridView(view, ctx, bag, slotInfo, callback)
   local opts = database:GetStackingOptions(bag.kind)
 
   for _, item in pairs(removed) do
-    --local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    --if stackInfo and stackInfo.rootItem ~= item.slotkey then
-    --  UpdateButton(ctx, view, stackInfo.rootItem)
-    --else
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    if not stackInfo then
       ClearButton(ctx, view, item.slotkey)
-    --end
+    elseif view.itemsByBagAndSlot[item.slotkey] then
+      ClearButton(ctx, view, item.slotkey)
+    elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
+      UpdateButton(ctx, view, stackInfo.rootItem)
+    end
   end
 
   -- Let's just add items for now.
   for _, item in pairs(added) do
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
     ---- Check stacking options
-    --if (not opts.mergeStacks) or
-    --(opts.unmergeAtShop and addon.atInteracting) or
-    --(opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-    --(not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
-    --  -- If stacking is not allowed, create a new button
-    --  CreateButton(ctx, view, item.slotkey)
-    --else
-    --  local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    --  if not stackInfo then
-    --    CreateButton(ctx, view, item.slotkey)
-    --  elseif stackInfo.rootItem ~= item.slotkey then
-    --    UpdateButton(ctx, view, stackInfo.rootItem)
-    --  else
-    --    CreateButton(ctx, view, item.slotkey)
-    --    print("this case needs to be handled")
-    --  end
-    --end
-    CreateButton(ctx, view, item.slotkey)
+    if (not opts.mergeStacks) or
+    (opts.unmergeAtShop and addon.atInteracting) or
+    (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
+    not stackInfo then
+      -- If stacking is not allowed, create a new button
+      CreateButton(ctx, view, item.slotkey)
+    elseif stackInfo.rootItem ~= item.slotkey and view.itemsByBagAndSlot[stackInfo.rootItem] ~= nil then
+      UpdateButton(ctx, view, stackInfo.rootItem)
+    elseif stackInfo.rootItem ~= item.slotkey and view.itemsByBagAndSlot[stackInfo.rootItem] == nil then
+      CreateButton(ctx, view, stackInfo.rootItem)
+    else
+      CreateButton(ctx, view, item.slotkey)
+    end
   end
 
   for _, item in pairs(changed) do
-    ---- Check stacking options
-    --if (not opts.mergeStacks) or
-    --   (opts.unmergeAtShop and addon.atInteracting) or
-    --   (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
-    --   (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
-    --  -- If stacking is not allowed, create a new button
-    --  UpdateButton(ctx, view, item.slotkey)
-    --else
-    --  -- Handle stacking case if needed
-    --end
-    UpdateButton(ctx, view, item.slotkey)
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    if not stackInfo then
+      UpdateButton(ctx, view, item.slotkey)
+    elseif view.itemsByBagAndSlot[item.slotkey] then
+      UpdateButton(ctx, view, item.slotkey)
+    elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
+      UpdateButton(ctx, view, stackInfo.rootItem)
+    end
   end
 
   -- Special handling for Recent Items -- add it to the dirty sections if
