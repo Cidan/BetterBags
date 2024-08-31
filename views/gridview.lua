@@ -159,6 +159,11 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
+  if ctx:GetBool('redraw') then
+    view:Wipe(ctx)
+    added = slotInfo:GetCurrentItems()
+  end
+
   local opts = database:GetStackingOptions(bag.kind)
 
   for _, item in pairs(removed) do
