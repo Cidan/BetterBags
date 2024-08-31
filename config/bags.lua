@@ -157,6 +157,7 @@ function config:GetBagOptions(kind)
         values = {
           [const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY] = L:G("Quality, then Alphabetically"),
           [const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY] = L:G("Alphabetically, then Quality"),
+          [const.ITEM_SORT_TYPE.ITEM_LEVEL] = L:G("Item Level"),
         }
       },
       newItems = {

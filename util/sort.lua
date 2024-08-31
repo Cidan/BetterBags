@@ -67,6 +67,8 @@ function sort:GetItemSortFunction(kind, view)
     return self.SortItemsByAlphaThenQuality
   elseif sortType == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY then
     return self.SortItemsByQualityThenAlpha
+  elseif sortType == const.ITEM_SORT_TYPE.ITEM_LEVEL then
+    return self.SortItemsByItemLevel
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end
@@ -188,6 +190,23 @@ function sort.SortItemsByAlphaThenQuality(a, b)
   return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByItemLevel(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
+    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
 ---@param a Item
 ---@param b Item
 ---@return boolean
