@@ -286,6 +286,25 @@ function itemFrame.itemProto:SetItem(ctx, slotkey)
   self:SetItemFromData(ctx, data)
 end
 
+---@param item ItemButton
+---@return integer
+function itemFrame.GetItemContextMatchResult(item)
+  local itemLocation = ItemLocation:CreateFromBagAndSlot(item.bagID, item:GetID())
+  if not itemLocation then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
+  if not itemLocation:IsValid() then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
+  local result = ItemButtonUtil.GetItemContextMatchResultForItem( itemLocation ) --[[@as integer]]
+  if not const.BACKPACK_BAGS[item.bagID] then return ItemButtonUtil.ItemContextMatchResult.Match end
+  if result == ItemButtonUtil.ItemContextMatchResult.Match then return ItemButtonUtil.ItemContextMatchResult.Match end
+  if addon.atBank and addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+    if not C_Bank.IsItemAllowedInBankType( Enum.BankType.Account, itemLocation ) then
+      return ItemButtonUtil.ItemContextMatchResult.Mismatch
+    else
+      return ItemButtonUtil.ItemContextMatchResult.Match
+    end
+  end
+  return result or ItemButtonUtil.ItemContextMatchResult.Match
+end
+
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:SetItemFromData(ctx, data)
@@ -297,6 +316,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   if bagid and slotid then
     self.button:SetID(slotid)
     decoration:SetID(slotid)
+    decoration.bagID = bagid
     self.frame:SetID(bagid)
     if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
       self.kind = const.BAG_KIND.BANK
@@ -330,6 +350,9 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   ClearItemButtonOverlay(decoration)
   decoration:SetHasItem(data.itemInfo.itemIcon)
   self.button:SetHasItem(data.itemInfo.itemIcon)
+
+  --override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
+  decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
   decoration:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
   if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > Enum.ItemQuality.Common then
@@ -513,6 +536,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
   if not nocount then
     SetItemButtonCount(decoration, count)
   end
+  decoration.GetItemContextMatchResult = nil
   decoration:SetItemButtonTexture(0)
   decoration:UpdateQuestItem(false, nil, nil)
   decoration:UpdateNewItem(false)
@@ -591,6 +615,7 @@ function itemFrame.itemProto:ClearItem(ctx)
   self.frame:Hide()
   decoration:SetHasItem(false)
   self.button:SetHasItem(false)
+  decoration.GetItemContextMatchResult = nil
   decoration:SetItemButtonTexture(0)
   decoration:UpdateQuestItem(false, nil, nil)
   decoration:UpdateNewItem(false)
