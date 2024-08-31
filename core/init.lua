@@ -189,15 +189,16 @@ function addon:HideBlizzardBags()
     self:ToggleAllBags(ctx)
   end)
 
-  BagBarExpandToggle:SetParent(sneakyFrame)
-  for i = 0, 3 do
-    local bagButton = _G["CharacterBag"..i.."Slot"] --[[@as Button]]
-    bagButton:SetParent(sneakyFrame)
-  end
-  for i = 0, 0 do
-    local bagButton = _G["CharacterReagentBag"..i.."Slot"] --[[@as Button]]
-    bagButton:SetParent(sneakyFrame)
-  end
+  -- Disable for now because bartender has issues with this.
+  --BagBarExpandToggle:SetParent(sneakyFrame)
+  --for i = 0, 3 do
+  --  local bagButton = _G["CharacterBag"..i.."Slot"] --[[@as Button]]
+  --  bagButton:SetParent(sneakyFrame)
+  --end
+  --for i = 0, 0 do
+  --  local bagButton = _G["CharacterReagentBag"..i.."Slot"] --[[@as Button]]
+  --  bagButton:SetParent(sneakyFrame)
+  --end
 
   if not database:GetShowBagButton() then
     BagsBar:SetParent(sneakyFrame)
