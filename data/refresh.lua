@@ -18,11 +18,11 @@ local context = addon:GetModule('Context')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Refresh: AceModule
+---@class (exact) Refresh: AceModule
 ---@field UpdateQueue table<number, EventArg>
 ---@field private isUpdateRunning boolean
 ---@field private backpackRedrawPending boolean
----@field private backpackSortPending boolean
+---@field private backpackSortStage number
 ---@field private itemLockCount number
 local refresh = addon:NewModule('Refresh')
 
@@ -30,7 +30,7 @@ function refresh:OnInitialize()
   self.UpdateQueue = {}
   self.isUpdateRunning = false
   self.backpackRedrawPending = false
-  self.backpackSortPending = false
+  self.backpackSortStage = 0
   self.itemLockCount = 0
 end
 
@@ -101,12 +101,9 @@ function refresh:StartUpdate(ctx)
   wipe(self.UpdateQueue)
 
   if sortBackpack then
-    debug:Log('SortBackpack', 'Sorting backpack')
-    if self.backpackSortPending then
-      return
-    end
-    self.backpackSortPending = true
     self.isUpdateRunning = false
+    items:RemoveNewItemFromAllItems()
+    self.backpackSortStage = 1
     C_Container.SortBags()
     return
   end
@@ -241,8 +238,8 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/Draw/Backpack/Done', function(ctx)
     -- If there are more updates in the queue, start the next one with a new context.
     self.isUpdateRunning = false
-    items._preSort = false
     self.backpackRedrawPending = false
+    self.backpackSortStage = 0
     if next(self.UpdateQueue) ~= nil then
       self:StartUpdate(ctx)
     else
@@ -251,17 +248,23 @@ function refresh:OnEnable()
   end)
 
   events:RegisterEvent('ITEM_LOCKED', function(ctx)
-    if self.backpackSortPending then
+    if self.backpackSortStage == 1 then
       self.itemLockCount = self.itemLockCount + 1
     end
   end)
   events:RegisterEvent('ITEM_UNLOCKED', function(ctx)
-    if self.backpackSortPending then
+    if self.backpackSortStage == 1 then
       self.itemLockCount = self.itemLockCount - 1
       if self.itemLockCount == 0 then
-        self.backpackSortPending = false
-        self.isUpdateRunning = false
-        events:SendMessage('bags/FullRefreshAll', ctx)
+       self.backpackSortStage = 0
+        C_Timer.After(0.5, function()
+          events:SendMessage('bags/FullRefreshAll', ctx)
+        end)
+    --    self.backpackSortStage = 2
+    --    self.isUpdateRunning = false
+    --    ctx:Set('redraw', true)
+    --    ctx:Set('wipe', true)
+    --    print("about to redraw because bag sort done")
       end
     end
   end)
