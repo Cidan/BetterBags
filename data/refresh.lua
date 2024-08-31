@@ -260,11 +260,6 @@ function refresh:OnEnable()
         C_Timer.After(0.5, function()
           events:SendMessage('bags/FullRefreshAll', ctx)
         end)
-    --    self.backpackSortStage = 2
-    --    self.isUpdateRunning = false
-    --    ctx:Set('redraw', true)
-    --    ctx:Set('wipe', true)
-    --    print("about to redraw because bag sort done")
       end
     end
   end)

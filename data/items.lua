@@ -208,7 +208,10 @@ function items:RefreshAccountBank(ctx, kind)
   local container = self:NewLoader(kind)
 
   self:StageBagForUpdate(kind, container)
-
+  for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+    local itemMixin = Item:CreateFromEquipmentSlot(i)
+    container:AddInventorySlot(itemMixin)
+  end
   --- Process the item container.
   self:ProcessContainer(ctx, kind, container)
 end
@@ -237,7 +240,10 @@ function items:RefreshBank(ctx)
       self:StageBagForUpdate(i, container)
     end
   end
-
+  for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+    local itemMixin = Item:CreateFromEquipmentSlot(i)
+    container:AddInventorySlot(itemMixin)
+  end
   --- Process the item container.
   self:ProcessContainer(ctx, const.BAG_KIND.BANK, container)
 end
@@ -539,7 +545,7 @@ function items:ProcessContainer(ctx, kind, container)
       ectx:Set('wipe', true)
     end
 
-    self:LoadItems(ectx, kind, container:GetDataCache(), const.BAG_KIND.BACKPACK and container:GetEquipmentDataCache() or nil, function(ictx)
+    self:LoadItems(ectx, kind, container:GetDataCache(), container:GetEquipmentDataCache(), function(ictx)
       local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
       events:SendMessageLater(ev, ictx, self.slotInfo[kind])
