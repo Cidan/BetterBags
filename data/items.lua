@@ -927,6 +927,7 @@ function items:AttachItemInfo(data, kind)
   data.slotkey = slotkey
   if itemID == nil then
     data.isItemEmpty = true
+    data.bindingInfo = {} --[[@as table]]
     data.itemInfo = {} --[[@as table]]
     return data
   end
