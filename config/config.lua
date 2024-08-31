@@ -199,7 +199,6 @@ function config:GetOptions()
     name = L:G("BetterBags"),
     args = {
       general = self:GetGeneralOptions(),
-      customCategories = self:GetCustomCategoryConfig(),
       backpack = self:GetBagOptions(const.BAG_KIND.BACKPACK),
       bank = self:GetBagOptions(const.BAG_KIND.BANK),
       help = self:GenerateHelp(),

@@ -37,45 +37,19 @@ local context = addon:GetModule('Context')
 ---@param kind BagKind
 ---@return AceConfig.OptionsTable
 function config:GetCustomCategoryOptions(kind)
-  if categories:GetCategoryCount() == 0 then
-    return {
-      type = "group",
-      name = L:G("Custom Categories"),
-      order = -1,
-      inline = true,
-      args = {
-        noCategories = {
-          type = "description",
-          name = L:G("No custom categories have been created yet."),
-          order = 1,
-        }
+  return {
+    type = "group",
+    name = L:G("Custom Categories"),
+    order = -1,
+    inline = true,
+    args = {
+      noCategories = {
+        type = "description",
+        name = L:G("Configure custom categories in the Configure Categories window from the bag menu."),
+        order = 1,
       }
     }
-  end
-  ---@type AceConfig.OptionsTable
-  local options = {
-    type = "multiselect",
-    name = L:G("Custom Categories"),
-    desc = L:G("Select which custom categories to show in this bag. If an option is checked, items that belong to the checked category will be put into a section for that category."),
-    order = -1,
-    get = function(_, value)
-      return categories:IsCategoryEnabled(kind, value)
-    end,
-    set = function(_, value)
-      categories:SetCategoryState(kind, value, not categories:IsCategoryEnabled(kind, value))
-      local ctx = context:New('on_click')
-      events:SendMessage('bags/FullRefreshAll', ctx)
-    end,
-    values = {}
   }
-  for category, _ in pairs(categories:GetAllCategories()) do
-    if type(category) == "string" then
-      options.values[category] = category
-    else
-      DB:DeleteItemCategory(category)
-    end
-  end
-  return options
 end
 
 ---@param kind BagKind

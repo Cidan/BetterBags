@@ -90,7 +90,7 @@ local function CreateButton(ctx, view, slotkey)
   if oldSection then
     oldSection:RemoveCell(slotkey)
   end
-  local category = item.itemInfo.category
+  local category = items:GetCategory(ctx, item)
   local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
   itemButton:SetItem(ctx, slotkey)
   local section = view:GetOrCreateSection(ctx, category)
@@ -149,15 +149,26 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 local function GridView(view, ctx, bag, slotInfo, callback)
-  if ctx:GetBool('wipe') then
-    view:Wipe(ctx)
-  end
   ---@type Cell[]
   local hiddenCells = {}
 
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
   local added, removed, changed = slotInfo:GetChangeset()
+
+  if ctx:GetBool('redraw') then
+    view:Wipe(ctx)
+    ---@type ItemData[]
+    local currentItems = {}
+    for _, item in pairs(slotInfo:GetCurrentItems()) do
+      if not item.isItemEmpty then
+        table.insert(currentItems, item)
+      end
+    end
+    added = currentItems
+  elseif ctx:GetBool('wipe') then
+    view:Wipe(ctx)
+  end
 
   local opts = database:GetStackingOptions(bag.kind)
 
