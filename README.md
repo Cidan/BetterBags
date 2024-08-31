@@ -1,10 +1,11 @@
 <div align="center" style="text-align:center">
 
 # BetterBags
+[![Discord BetterBags](https://discordapp.com/api/guilds/1063213796845428876/widget.png?style=banner2)](https://discord.gg/a6DQuK8hV7)
+
 [![CurseForge BetterBags](https://img.shields.io/badge/CurseForge-BetterBags-F16436.svg?style=flat)](https://www.curseforge.com/wow/addons/better-bags)
-[![Discord BetterBags](https://img.shields.io/badge/Discord-BetterBags-5865F2.svg?style=flat)](https://discord.gg/a6DQuK8hV7)
-[![Package and release](https://github.com/Cidan/BetterBags/actions/workflows/release.yml/badge.svg)](https://github.com/Cidan/BetterBags/actions/workflows/release.yml)
 [![Wago BetterBags](https://img.shields.io/badge/Wago-BetterBags-C1272D.svg?style=flat)](https://addons.wago.io/addons/betterbags/versions?stability=stable)
+[![Package and release](https://github.com/Cidan/BetterBags/actions/workflows/release.yml/badge.svg)](https://github.com/Cidan/BetterBags/actions/workflows/release.yml)
 
 
 <img src="https://i.imgur.com/AyITAAV.png" alt="BetterBags Logo">
@@ -147,6 +148,39 @@ If you would rather see all of the spaces with their own icon, there is a settin
 		</td>
 	</tr>
 </table>
+
+### Extra Glowy Item Buttons
+If you would like more glow on the action buttons (more like what AdiBags had), there is a setting to turn on Extra Glowy Action Buttons in the options screen.
+
+<div align="center" style="text-align:center">
+	<table>
+		<tr>
+			<td align="middle">
+				<a href="https://i.imgur.com/JaWJ90x.png" target="_blank"><img src="https://i.imgur.com/JaWJ90x.png" alt="Normal Icons in Retail."></a></td>
+			</td>
+			<td align="middle">
+				<a href="https://i.imgur.com/abtd1fn.pngg" target="_blank"><img src="https://i.imgur.com/abtd1fn.png" alt="Extra Glowy Icons in Retail."></a></td>
+			</td>
+		</tr>
+		<tr>
+			<td align="middle">
+				Normal Icons in Retail.
+			</td>
+			<td align="middle">
+				Extra Glowy Icons in Retail.
+			</td>
+		</tr>
+	</table>
+</div>
+
+### Item Level Upgrade Arrow
+Equipment in your bags that is an item level upgrade compared to the gear you are currently wearing will have a green upgrade arrow in the top corner of the item in your bags. This lets you easily see which pieces of gear in your bags might be an upgrade, such as when you're leveling and your item level is rapidly increasing.
+
+<div align="center" style="text-align:center">
+<img src="https://i.imgur.com/QGjlIYX.png" alt="Item Level Upgrade in Retail.">  
+
+*Item Level Upgrade in Retail.*
+</div>
 
 ### Show Currencies
 Currencies can be tracked at the bottom of the bag window. Up to 7 currencies can be shown at a time and tracking them is as simple as clicking on the currencies in the `Show Currencies` side window. Any currency that is highlighted is currently tracked. If you attempt to track more than 7 currencies, only the first 7 in the list will be shown at the bottom of the bag.
@@ -299,7 +333,7 @@ Search allows you to find items by the following indices (based on the item belo
 
 ### Numbers
 - `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.
-- `rarity` (rarity = epic or rarity = 4) The rarity of the item. Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5.
+- `rarity` (rarity = epic or rarity = 4) The rarity of the item. Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Artifact = 6, Heirloom = 7.
 - `id` (id = 212685) The internal itemID of the item. A number uniquely identifying the base item. Specific ItemIDs can be found in the url on the item's WoWHead page.
 - `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. **NOTE:** Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
 - `class` (class = 4) The numeric representation of itemType.
@@ -322,6 +356,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `(` and `)` To group search terms.
 - `=` (type = Armor, ilvl = 506) Items with a value equal to the text or number on the right side. This will find any items starting with the value.
 - `%=` (slot %= Hand \[This will match any gear pieces that are slotted into any slot with `Hand` in the name. eg. Hands, Main Hand, Offhand\]) Items with the value in the full text of the field(s).
+- `!=` (expansion != DF) Items with a value not equal to the text or number on the right side. This will find any items NOT starting with the value.
 - `"` or `'` (slot = "Main Hand") To search for a multi-word string.
 
 ### Comparison Operators
@@ -445,12 +480,12 @@ BetterBags is constantly getting new features and updates.
 Github hosts both our [Progress Board](https://github.com/users/Cidan/projects/2) and means to [report bugs and request new features](https://github.com/Cidan/BetterBags/issues/new/choose).
 
 The following features are under active development:
-- Dynamic number of columns.
+- A new config system using a forms style like the search-based category window.
 
 These features are planned for the long term:
 - User customizable themes.
 - Character specific profiles.
-- A new config system using a forms style like the search-based category window.
+- Dynamic number of columns.
 - Reagent bag markers for items in the reagent bag.
 - Faster/smoother item updates.
 - And much more!

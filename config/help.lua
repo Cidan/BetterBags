@@ -148,6 +148,7 @@ Logical Operators:
     - `(` and `)` To group search terms.
     - `=` (type = Armor, ilvl = 506) Items with a value equal to the right side.
     - `%=` (slot %= Hand) Items with the value in the full text of the field(s).
+    - `!=` (expansion != DF) Items with a value not equal to the right side.
     - `"` or `'` (slot = "Main Hand") To search for a multi-word string.
 
 Comparison Operators:
