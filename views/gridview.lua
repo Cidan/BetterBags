@@ -71,7 +71,6 @@ local function ClearButton(ctx, view, slotkey)
   if cell then
     local section = view:GetSlotSection(slotkey)
     section:DislocateAllCellsWithID(slotkey)
-    view:AddDeferredItem(slotkey)
     section:RemoveCell(slotkey)
     view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
     view.itemsByBagAndSlot[slotkey] = nil
@@ -87,7 +86,6 @@ end
 local function CreateButton(ctx, view, slotkey)
   local item = items:GetItemDataFromSlotKey(slotkey)
   debug:Log("CreateButton", "Creating button for item", slotkey)
-  view:RemoveDeferredItem(slotkey)
   local oldSection = view:GetSlotSection(slotkey)
   if oldSection then
     oldSection:RemoveCell(slotkey)
@@ -106,15 +104,33 @@ end
 ---@param slotkey string
 local function UpdateButton(ctx, view, slotkey)
   debug:Log("UpdateButton", "Updating button for item", slotkey)
-  view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
   itemButton:SetItem(ctx, slotkey)
   if ctx:GetBool('wipe') == false and database:GetShowNewItemFlash(view.kind) then
     view:FlashStack(ctx, slotkey)
   end
-  --local data = itemButton:GetItemData()
-  --local category = data.itemInfo.category
-  --view:AddDirtySection(category)
+end
+
+-- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
+-- button position and section to prevent a sort from happening.
+---@param ctx Context
+---@param view View
+---@param oldSlotKey string
+---@param newSlotKey string
+local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
+  debug:Log("UpdateDeletedSlot", "Updating button for item", oldSlotKey, newSlotKey)
+  local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
+  local oldSlotSection = view:GetSlotSection(oldSlotKey)
+  if not oldSlotSection then
+    UpdateButton(ctx, view, newSlotKey)
+    return
+  end
+  oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
+  oldSlotCell:SetItem(ctx, newSlotKey)
+  view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
+  view.itemsByBagAndSlot[oldSlotKey] = nil
+  view:SetSlotSection(newSlotKey, oldSlotSection)
+  view:RemoveSlotSection(oldSlotKey)
 end
 
 ---@param view View
@@ -150,7 +166,11 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if not stackInfo then
       ClearButton(ctx, view, item.slotkey)
     elseif view.itemsByBagAndSlot[item.slotkey] then
-      ClearButton(ctx, view, item.slotkey)
+      if stackInfo.rootItem ~= nil and view.itemsByBagAndSlot[stackInfo.rootItem] == nil then
+        UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
+      else
+        ClearButton(ctx, view, item.slotkey)
+      end
     elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
       UpdateButton(ctx, view, stackInfo.rootItem)
     end
@@ -258,11 +278,9 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     freeSlotsSection:WipeOnlyContents()
     for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
       for slotid, item in pairs(data) do
-        if not view:GetDeferredItems()[item.slotkey] then
-          local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-          itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
-          freeSlotsSection:AddCell(item.slotkey, itemButton)
-        end
+        local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+        itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
+        freeSlotsSection:AddCell(item.slotkey, itemButton)
       end
     end
     freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)

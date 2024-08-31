@@ -216,6 +216,7 @@ function gridProto:DislocateAllCellsWithID(id)
   local targetCell = self.idToCell[id]
   if not targetCell then return end
   local parentTop, parentLeft = self.inner:GetTop(), self.inner:GetLeft()
+  if parentTop == nil or parentLeft == nil then return end
   ---@type {x: number, y: number, cell: Cell}[]
   local positions = {}
   for _, cell in pairs(self.cells) do
