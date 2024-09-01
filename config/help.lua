@@ -133,6 +133,8 @@ Numbers:
     - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it.
     - `bindtype` (bindtype = 1) The binding type returned by GetItemInfo().
           1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE.
+    - `bonusID` (bonusid = 9639) BonusIDs can adjust many different things about items,
+          including the item level, stats, drop location, and much more.
 
 Booleans:
     - `reagent` (reagent = false) Is the item classified as a reagent?

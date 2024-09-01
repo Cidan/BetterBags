@@ -282,7 +282,8 @@ To deposit or withdraw gold from the Warbank, hover over the gold amount at the 
 
 ## Recent Items
 BetterBags places items that have been flagged as new by the WoW client in a special category at the top of your bag so that you can quickly find these looted items.  
-**Note: To clear recent items manually, right-click the bag icon. On Cataclysm and Classic, you must install the [SortBags Addon](https://www.curseforge.com/wow/addons/sortbags) to manually clear recent items.**
+**Note: To clear recent items manually, right-click the bag icon. As of version v0.2.3, BetterBags includes its own sorting method on all versions.  
+If you are on an older version of BetterBags and playing on Cataclysm or Classic, you must install the [SortBags Addon](https://www.curseforge.com/wow/addons/sortbags) to manually clear recent items.**
 
 These can be further fine-tuned by:
 - Setting a custom duration before they are sorted into their categories.
@@ -341,6 +342,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 6-12 for bank bags, -3 for the reagent bank, -2 for the keyring (Classic only), and 13-17 for warbank tabs.
 - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
 - `bindtype` (bindtype = 1) The binding type of the item returned by GetItemInfo(). 1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Enum.ItemBind) for specifics.
+- `bonusID` (bonusid = 9639 \[This item additionally has bonusIDs of: 6652, 9144, 10338, 3207, and 8767.\]) BonusIDs can adjust many different things about items, including the item level, stats, drop location, and much more. See the [Raidbots json dumps](https://www.raidbots.com/developers), specifically `bonuses.json` for information about specific bonusIDs.
 
 ### Booleans
 - `reagent` (reagent = false) Is the item classified as a reagent?
