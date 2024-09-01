@@ -208,69 +208,105 @@ function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
   local possibleTargets = {}
 
   local rootItem = self:GetItemDataFromSlotKey(stackInfo.rootItem)
-  if rootItem ~= item then
-    table.insert(possibleTargets,{
-      item = rootItem,
-      newNumber = rootItem.itemInfo.currentItemCount,
-      maxNumber = rootItem.itemInfo.itemStackCount,
-    })
-  end
+
+  -- The root item should always be a target for other items to stack on,
+  -- so we return here.
+  if item.slotkey == rootItem.slotkey then return end
+
+  local rootItemTarget = targets[rootItem.slotkey] or {
+    item = rootItem,
+    newNumber = rootItem.itemInfo.currentItemCount,
+    maxNumber = rootItem.itemInfo.itemStackCount,
+  }
+  table.insert(possibleTargets, rootItemTarget)
+  targets[rootItem.slotkey] = rootItemTarget
+
   for childSlotKey in pairs(stackInfo.slotkeys) do
     local childItem = self:GetItemDataFromSlotKey(childSlotKey)
-    if childItem ~= item then
-      table.insert(possibleTargets, {
+    if childItem.slotkey ~= item.slotkey then
+      local childItemTarget = targets[childItem.slotkey] or {
         item = childItem,
         newNumber = childItem.itemInfo.currentItemCount,
         maxNumber = childItem.itemInfo.itemStackCount,
-      })
+      }
+      table.insert(possibleTargets, childItemTarget)
+      targets[childItem.slotkey] = childItemTarget
     end
   end
 
+  -- Sort the possible targets by itemStackCount in descending order.
+  table.sort(possibleTargets, function(a, b)
+    return a.item.itemInfo.itemStackCount > b.item.itemInfo.itemStackCount
+  end)
   -- Possible targets now contain all the possible targets for this item.
 
-  local target = targets[stackInfo.rootItem] or {newNumber = rootItem.itemInfo.currentItemCount, maxNumber = rootItem.itemInfo.itemStackCount}
-  if target.newNumber + item.itemInfo.currentItemCount <= target.maxNumber and item.slotkey ~= stackInfo.rootItem then
-    target.newNumber = target.newNumber + item.itemInfo.currentItemCount
-    table.insert(movePairs, {
-      fromBag = item.bagid,
-      fromSlot = item.slotid,
-      toBag = rootItem.bagid,
-      toSlot = rootItem.slotid,
-    })
-  elseif target.newNumber ~= target.maxNumber and item.slotkey ~= stackInfo.rootItem then
-    -- Partially merge the item.
-    local split = target.maxNumber - target.newNumber
-    target.newNumber = target.maxNumber
-    table.insert(movePairs, {
-      fromBag = item.bagid,
-      fromSlot = item.slotid,
-      toBag = rootItem.bagid,
-      toSlot = rootItem.slotid,
-      partial = split,
-    })
-    local remainder = item.itemInfo.currentItemCount - split
-    -- TODO(lobato): Recurse this.
-    ---@type number
-    local highestChildCount = remainder
-    local highestChildItem = item
-    -- Loop the child stack items until we have the highest itemStackCount number.
-    for childSlotKey in pairs(stackInfo.slotkeys) do
-      local childItem = self:GetItemDataFromSlotKey(childSlotKey)
-      if childItem.itemInfo.itemStackCount > highestChildCount then
-        highestChildCount = childItem.itemInfo.itemStackCount
-        highestChildItem = childItem
-      end
-    end
-    if highestChildItem ~= item then
-      -- Move the remainder to the highest child stack.
+  local remainder = item.itemInfo.currentItemCount
+  for _, target in ipairs(possibleTargets) do
+    if remainder <= 0 then break end
+    if target.newNumber + remainder <= target.maxNumber then
+      target.newNumber = target.newNumber + remainder
+      remainder = 0
       table.insert(movePairs, {
         fromBag = item.bagid,
         fromSlot = item.slotid,
-        toBag = highestChildItem.bagid,
-        toSlot = highestChildItem.slotid,
+        toBag = target.item.bagid,
+        toSlot = target.item.slotid,
+      })
+    elseif target.newNumber < target.maxNumber then
+      remainder = remainder - (target.maxNumber - target.newNumber)
+      target.newNumber = target.maxNumber
+      table.insert(movePairs, {
+        fromBag = item.bagid,
+        fromSlot = item.slotid,
+        toBag = target.item.bagid,
+        toSlot = target.item.slotid,
+        partial = target.maxNumber - target.newNumber,
       })
     end
   end
+  --local target = targets[stackInfo.rootItem] or {newNumber = rootItem.itemInfo.currentItemCount, maxNumber = rootItem.itemInfo.itemStackCount}
+  --if target.newNumber + item.itemInfo.currentItemCount <= target.maxNumber and item.slotkey ~= stackInfo.rootItem then
+  --  target.newNumber = target.newNumber + item.itemInfo.currentItemCount
+  --  table.insert(movePairs, {
+  --    fromBag = item.bagid,
+  --    fromSlot = item.slotid,
+  --    toBag = rootItem.bagid,
+  --    toSlot = rootItem.slotid,
+  --  })
+  --elseif target.newNumber ~= target.maxNumber and item.slotkey ~= stackInfo.rootItem then
+  --  -- Partially merge the item.
+  --  local split = target.maxNumber - target.newNumber
+  --  target.newNumber = target.maxNumber
+  --  table.insert(movePairs, {
+  --    fromBag = item.bagid,
+  --    fromSlot = item.slotid,
+  --    toBag = rootItem.bagid,
+  --    toSlot = rootItem.slotid,
+  --    partial = split,
+  --  })
+  --  local remainder = item.itemInfo.currentItemCount - split
+  --  -- TODO(lobato): Recurse this.
+  --  ---@type number
+  --  local highestChildCount = remainder
+  --  local highestChildItem = item
+  --  -- Loop the child stack items until we have the highest itemStackCount number.
+  --  for childSlotKey in pairs(stackInfo.slotkeys) do
+  --    local childItem = self:GetItemDataFromSlotKey(childSlotKey)
+  --    if childItem.itemInfo.itemStackCount > highestChildCount then
+  --      highestChildCount = childItem.itemInfo.itemStackCount
+  --      highestChildItem = childItem
+  --    end
+  --  end
+  --  if highestChildItem ~= item then
+  --    -- Move the remainder to the highest child stack.
+  --    table.insert(movePairs, {
+  --      fromBag = item.bagid,
+  --      fromSlot = item.slotid,
+  --      toBag = highestChildItem.bagid,
+  --      toSlot = highestChildItem.slotid,
+  --    })
+  --  end
+  --end
 end
 
 --TODO(lobato): for stacking, need to:
@@ -289,15 +325,15 @@ function items:Restack(ctx, kind)
 
   for _, item in pairs(slotInfo:GetCurrentItems()) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    if not item.isItemEmpty and stackInfo then
+    if not item.isItemEmpty and item.itemInfo.itemStackCount > 1 and stackInfo then
       self:findBestFit(ctx, item, stackInfo, targets, movePairs)
     end
   end
-
+  debug:Inspect("all move", movePairs)
   async:Until(ctx, function(ectx)
     for _, movePair in ipairs(movePairs) do
       if not movePair.done then
-        if movePair.partial and movePair.partial ~= 1 then
+        if movePair.partial and movePair.partial > 0 then
           C_Container.SplitContainerItem(movePair.fromBag, movePair.fromSlot, movePair.partial)
           C_Container.PickupContainerItem(movePair.toBag, movePair.toSlot)
         else
