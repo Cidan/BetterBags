@@ -45,11 +45,18 @@ function refresh:AfterSort(ctx)
   self.isSorting = false
   -- TODO(lobato): Detect if only new items were moved,
   -- and only refresh the backpack if that's the case.
-  if ctx:GetBool('moved') then
+  -- After moving an item, the client state does not update right
+  -- away, and there is a delay. This delay will prevent issues
+  -- with drawing.
+  C_Timer.After(0.2, function()
     events:SendMessage(ctx, 'bags/FullRefreshAll')
-  else
-    events:SendMessage(ctx, 'bags/FullRefreshAll')
-  end
+  end)
+
+  --if ctx:GetBool('moved') then
+  --  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  --else
+  --  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  --end
 end
 
 -- StartUpdate will start the bag update process if it's not already running.
