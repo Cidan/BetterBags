@@ -94,10 +94,6 @@ function refresh:StartUpdate(ctx)
       if not InCombatLockdown() then
         sortBackpack = true
       end
-    elseif event.eventName == 'BAG_SORT_CLASSIC' then
-      if not InCombatLockdown() then
-        sortBackpackClassic = true
-      end
     elseif event.eventName == 'BAG_UPDATE_BANK' then
       updateBank = true
     elseif const.BANK_BAGS[event.args[1]] then
@@ -227,12 +223,6 @@ function refresh:OnEnable()
   -- Register when then backpack should be sorted.
   events:RegisterMessage('bags/SortBackpack', function(ctx)
     table.insert(refresh.UpdateQueue, {eventName = 'BAG_SORT', args = {const.BAG_KIND.BACKPACK}, ctx = ctx})
-    self:StartUpdate(ctx)
-  end)
-
-  -- Register when the classic backpack should be sorted.
-  events:RegisterMessage('bags/SortBackpackClassic', function(ctx)
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_SORT_CLASSIC', args = {const.BAG_KIND.BACKPACK}, ctx = ctx})
     self:StartUpdate(ctx)
   end)
 
