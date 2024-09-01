@@ -188,10 +188,10 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   table.insert(self._bucketCallbacks[joinedEvents], callback)
 end
 
----@param event string
 ---@param ctx Context
+---@param event string
 ---@param ... any
-function events:SendMessage(event, ctx, ...)
+function events:SendMessage(ctx, event, ...)
   if type(ctx) ~= 'table' or not ctx.Event then
     error('ctx must be passed into SendMessage and must be a Context object: ' .. event)
   end
@@ -209,17 +209,17 @@ end
 ---@param ... any
 function events:SendMessageIf(event, ctx, ...)
   if event then
-    self:SendMessage(event, ctx, ...)
+    self:SendMessage(ctx, event, ...)
   end
 end
 
 ---@param event string
 ---@param ctx Context
 ---@param ... any
-function events:SendMessageLater(event, ctx, ...)
+function events:SendMessageLater(ctx, event, ...)
   local args = {...}
   C_Timer.After(0, function()
-    self:SendMessage(event, ctx, unpack(args))
+    self:SendMessage(ctx, event, unpack(args))
   end)
 end
 

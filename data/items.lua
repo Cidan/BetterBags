@@ -240,6 +240,7 @@ end
 ---@param targets table<string, MoveTargetData>
 ---@param movePairs table<string, MoveTargetData>
 function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
+  _ = ctx
   -- Collect all the possible targets for this item.
   ---@type MoveTargetData[]
   local possibleTargets = {}
@@ -329,6 +330,10 @@ end
 ---@param movePairs table<string, MoveTargetData>
 ---@param takenEmptySlots table<string, boolean>
 function items:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
+  _ = ctx
+  _ = targets
+  _ = movePairs
+  _ = takenEmptySlots
 end
 
 ---@private
@@ -956,7 +961,7 @@ end
 ---@return string
 function items:GenerateItemHash(data)
   local stackOpts = database:GetStackingOptions(data.kind)
-  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d%d",
+  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%d%d%d",
     data.itemLinkInfo.itemID,
     data.itemLinkInfo.enchantID,
     data.itemLinkInfo.gemID1,
@@ -964,7 +969,7 @@ function items:GenerateItemHash(data)
     data.itemLinkInfo.gemID3,
     data.itemLinkInfo.suffixID,
     table.concat(data.itemLinkInfo.bonusIDs, ","),
-    table.concat(data.itemLinkInfo.modifierIDs, ","),
+    --table.concat(data.itemLinkInfo.modifierIDs, ","),
     table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
     table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
     table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
@@ -1292,7 +1297,7 @@ function items:GetBagKindFromSlotKey(slotkey)
   return self:GetBagKindFromBagID(bagid)
 end
 
----@param bagid number
+---@param bagid number|string
 ---@return BagKind
 function items:GetBagKindFromBagID(bagid)
   if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
