@@ -195,10 +195,14 @@ end
 ---@field newNumber number
 ---@field maxNumber number
 
+--TODO(lobato): for stacking, need to:
+-- * If the root item can't hold the whole stack, we need to split the stack and fit what can be fit.
+-- * If there is a remainder after the split, we need to move the remainder to the next biggest stack with room.
+-- * If the item is itself the next biggest stack, do nothing.
 ---@param ctx Context
 ---@param kind BagKind
 function items:Restack(ctx, kind)
-  ---@type {fromBag: number, fromSlot: number, toBag: number, toSlot: number, done: boolean}[]
+  ---@type {fromBag: number, fromSlot: number, toBag: number, toSlot: number, partial: number, done: boolean}[]
   local movePairs = {}
 
   ---@type table<string, MoveTargetData>
@@ -218,8 +222,39 @@ function items:Restack(ctx, kind)
           toBag = rootItem.bagid,
           toSlot = rootItem.slotid,
         })
-      else -- Check if we can partially merge the item.
+      elseif target.newNumber ~= target.maxNumber and item.slotkey ~= stackInfo.rootItem then
+        -- Partially merge the item.
+        local split = target.maxNumber - target.newNumber
+        target.newNumber = target.maxNumber
+        table.insert(movePairs, {
+          fromBag = item.bagid,
+          fromSlot = item.slotid,
+          toBag = rootItem.bagid,
+          toSlot = rootItem.slotid,
+          partial = split,
+        })
+        local remainder = item.itemInfo.currentItemCount - split
+        -- TODO(lobato): Recurse this.
+        ---@type number
+        local highestChildCount = remainder
+        local highestChildItem = item
         -- Loop the child stack items until we have the highest itemStackCount number.
+        for childSlotKey in pairs(stackInfo.slotkeys) do
+          local childItem = self:GetItemDataFromSlotKey(childSlotKey)
+          if childItem.itemInfo.itemStackCount > highestChildCount then
+            highestChildCount = childItem.itemInfo.itemStackCount
+            highestChildItem = childItem
+          end
+        end
+        if highestChildItem ~= item then
+          -- Move the remainder to the highest child stack.
+          table.insert(movePairs, {
+            fromBag = item.bagid,
+            fromSlot = item.slotid,
+            toBag = highestChildItem.bagid,
+            toSlot = highestChildItem.slotid,
+          })
+        end
       end
     end
   end
