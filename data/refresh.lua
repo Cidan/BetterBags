@@ -37,7 +37,7 @@ function refresh:RedrawBackpack(ctx)
   debug:Log('RedrawBackpack', 'Redrawing backpack')
   ctx:Set('redraw', true)
   addon.Bags.Backpack:Draw(ctx, items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK], function()
-    events:SendMessage('bags/Draw/Backpack/Done', ctx)
+    events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
   end)
 end
 
@@ -46,9 +46,9 @@ function refresh:AfterSort(ctx)
   -- TODO(lobato): Detect if only new items were moved,
   -- and only refresh the backpack if that's the case.
   if ctx:GetBool('moved') then
-    events:SendMessage('bags/FullRefreshAll', ctx)
+    events:SendMessage(ctx, 'bags/FullRefreshAll')
   else
-    events:SendMessage('bags/FullRefreshAll', ctx)
+    events:SendMessage(ctx, 'bags/FullRefreshAll')
   end
 end
 

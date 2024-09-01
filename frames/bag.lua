@@ -251,7 +251,7 @@ end
 function bagFrame.bagProto:Sort(ctx)
   if self.kind ~= const.BAG_KIND.BACKPACK then return end
   PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-  events:SendMessage('bags/SortBackpack', ctx)
+  events:SendMessage(ctx, 'bags/SortBackpack')
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.
@@ -272,9 +272,9 @@ end
 ---@param ctx Context
 function bagFrame.bagProto:Refresh(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then
-    events:SendMessage('bags/RefreshBackpack', ctx)
+    events:SendMessage(ctx, 'bags/RefreshBackpack')
   else
-    events:SendMessage('bags/RefreshBank', ctx)
+    events:SendMessage(ctx, 'bags/RefreshBank')
   end
 end
 
@@ -327,8 +327,8 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
       self.slots:Draw(ctx)
       self.slots:Show()
     end
-    events:SendMessage('bag/RedrawIcons', ctx, self)
-    events:SendMessage('bag/Rendered', ctx, self, slotInfo)
+    events:SendMessage(ctx, 'bag/RedrawIcons', self)
+    events:SendMessage(ctx, 'bag/Rendered', self, slotInfo)
     callback()
   end)
 end
@@ -490,7 +490,7 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor(ctx)
       itemList = {[itemID] = true},
       save = true,
     })
-    events:SendMessage('bags/FullRefreshAll', ctx)
+    events:SendMessage(ctx, 'bags/FullRefreshAll')
   end)
   GameTooltip:Hide()
   ClearCursor()
@@ -697,7 +697,7 @@ function bagFrame:Create(ctx, kind)
     events:BucketEvent('BAG_UPDATE_COOLDOWN',function(ectx) b:OnCooldown(ectx) end)
   end
 
-  events:RegisterMessage('search/SetInFrame', function (ectx, _, shown)
+  events:RegisterMessage('search/SetInFrame', function (ectx, shown)
     themes:SetSearchState(ectx, b.frame, shown)
   end)
 

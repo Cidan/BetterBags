@@ -204,17 +204,17 @@ function events:SendMessage(ctx, event, ...)
   self._eventHandler:SendMessage(event, unpack(args))
 end
 
----@param event? string
 ---@param ctx Context
+---@param event? string
 ---@param ... any
-function events:SendMessageIf(event, ctx, ...)
+function events:SendMessageIf(ctx, event,...)
   if event then
     self:SendMessage(ctx, event, ...)
   end
 end
 
----@param event string
 ---@param ctx Context
+---@param event string
 ---@param ... any
 function events:SendMessageLater(ctx, event, ...)
   local args = {...}

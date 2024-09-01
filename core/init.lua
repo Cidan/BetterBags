@@ -272,10 +272,10 @@ function addon:OnEnable()
     ---@cast slotInfo +SlotInfo
     debug:Log("init/OnInitialize/items", "Drawing bag")
     addon.Bags.Backpack:Draw(ctx, slotInfo, function()
-      events:SendMessage('bags/Draw/Backpack/Done', ctx)
+      events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
       if not addon.Bags.Backpack.loaded then
         addon.Bags.Backpack.loaded = true
-        events:SendMessage('bags/Draw/Backpack/Loaded', ctx)
+        events:SendMessage(ctx, 'bags/Draw/Backpack/Loaded')
       end
     end)
    end)
@@ -287,10 +287,10 @@ function addon:OnEnable()
       addon.Bags.Bank:Show(ctx)
     end
     addon.Bags.Bank:Draw(ctx, slotInfo, function()
-      events:SendMessage('bags/Draw/Bank/Done', ctx)
+      events:SendMessage(ctx, 'bags/Draw/Bank/Done')
       if not addon.Bags.Bank.loaded then
         addon.Bags.Bank.loaded = true
-        events:SendMessage('bags/Draw/Bank/Loaded', ctx)
+        events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
       end
     end)
   end)

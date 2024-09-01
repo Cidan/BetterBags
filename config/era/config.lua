@@ -19,6 +19,9 @@ local config = addon:GetModule('Config')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@return AceConfig.OptionsTable
 function config:GetGeneralOptions()
   ---@type AceConfig.OptionsTable
@@ -38,7 +41,7 @@ function config:GetGeneralOptions()
         end,
         set = function(_, value)
           DB:SetInBagSearch(value)
-          events:SendMessage('search/SetInFrame', value)
+          events:SendMessage(context:New('OnClick_InBagSearch'), 'search/SetInFrame', value)
         end,
       },
       categorySell = {

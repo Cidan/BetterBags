@@ -56,7 +56,7 @@ function addon.OnUpdate(ctx)
     addon.Bags.Backpack:Show(ctx)
     addon:UpdateButtonHighlight()
     if addon.atInteracting then
-      events:SendMessage('bags/FullRefreshAll', ctx)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
@@ -79,7 +79,7 @@ function addon.OpenInteractionWindow(ctx, _, interactionType)
   end
   addon.atInteracting = true
   addon.backpackShouldOpen = true
-  events:SendMessageLater('bags/OpenClose', ctx)
+  events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 
 ---@param ctx Context
@@ -90,8 +90,8 @@ function addon.CloseInteractionWindow(ctx, _, interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
   addon.backpackShouldClose = true
-  events:SendMessage('bags/FullRefreshAll', ctx)
-  events:SendMessageLater('bags/OpenClose', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 
 ---@param ctx Context
@@ -105,7 +105,7 @@ function addon:ToggleAllBags(ctx, interactingFrame)
   else
     addon.backpackShouldOpen = true
   end
-  events:SendMessage('bags/OpenClose', ctx)
+  events:SendMessage(ctx, 'bags/OpenClose')
 end
 
 ---@param interactingFrame Frame
@@ -122,13 +122,13 @@ function addon:CloseSpecialWindows(interactingFrame)
     addon.Bags.Bank:Hide(ectx)
     addon.Bags.Bank:SwitchToBankAndWipe(ectx)
   end)
-  events:SendMessage('addon/CloseSpecialWindows', ctx)
+  events:SendMessage(ctx, 'addon/CloseSpecialWindows')
   if C_Bank then
     C_Bank.CloseBankFrame()
   else
     CloseBankFrame()
   end
-  events:SendMessageLater('bags/OpenClose', ctx)
+  events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 
 ---@param ctx Context
@@ -138,5 +138,5 @@ function addon.CloseBank(ctx, _, interactingFrame)
   if interactingFrame ~= nil then return end
   addon.Bags.Bank:Hide(ctx)
   addon.Bags.Bank:SwitchToBankAndWipe(ctx)
-  events:SendMessage('bags/BankClosed', ctx)
+  events:SendMessage(ctx, 'bags/BankClosed')
 end

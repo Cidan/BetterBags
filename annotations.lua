@@ -432,7 +432,10 @@ AccountBankPanel = {}
 AccountBankPanel.PurchasePrompt = {}
 AccountBankPanel.PurchasePrompt.TabCostFrame = {}
 ---@type Button
-AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton = {}
+AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton = {
+  BattlepayItemTexture = {},
+  isSkinned = true,
+}
 
 ACCOUNT_BANK_PANEL_TITLE = ""
 
@@ -469,13 +472,18 @@ function AceItemList:SetList(values) end
 function ContainerFrame_UpdateCooldown(id, button) end
 
 ---@type Frame
-GameMenuFrame = {}
+GameMenuFrame = {
+  scrollable = true,
+}
 
 ---@type CheckButton
 KeyRingButton = {}
 
 ---@type Button
-CharacterReagentBag0Slot = {}
+CharacterReagentBag0Slot = {
+  BattlepayItemTexture = {},
+  isSkinned = true,
+}
 
 ---@class MainMenuBagButton: Button
 ---@field SlotHighlightTexture Texture

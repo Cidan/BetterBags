@@ -171,7 +171,7 @@ function themes:ApplyTheme(ctx, key)
 
 
   --TODO(lobato): Create a new message just for redrawing items.
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 -- SetSearchState will show or hide the search bar for the given frame.
@@ -181,7 +181,7 @@ end
 function themes:SetSearchState(ctx, frame, shown)
   local theme = self.themes[db:GetTheme()]
   theme.ToggleSearch(frame, shown)
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.
@@ -286,11 +286,11 @@ function themes:GetItemButton(ctx, item)
   local button = self.itemButtons[buttonName]
   if button then
     button:Show()
-    events:SendMessage('item/NewButton', ctx, item, button)
+    events:SendMessage(ctx, 'item/NewButton', item, button)
     return button
   end
   button = themes.CreateBlankItemButtonDecoration(item.frame, "default", buttonName)
-  events:SendMessage('item/NewButton', ctx, item, button)
+  events:SendMessage(ctx, 'item/NewButton', item, button)
   self.itemButtons[buttonName] = button
   return button
 end

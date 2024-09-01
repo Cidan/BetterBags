@@ -201,7 +201,7 @@ function categories:WipeCategory(ctx, category)
     end
     wipe(self.ephemeralCategories[category].itemList)
   end
-  events:SendMessage('categories/Changed', ctx)
+  events:SendMessage(ctx, 'categories/Changed')
 end
 
 -- IsCategoryEnabled returns whether or not a custom category is enabled.
@@ -317,7 +317,7 @@ function categories:CreateCategory(ctx, category)
     end
     database:CreateOrUpdateCategory(category)
   end
-  events:SendMessage('categories/Changed', ctx)
+  events:SendMessage(ctx, 'categories/Changed')
 end
 
 ---@param name string
@@ -377,8 +377,8 @@ function categories:DeleteCategory(ctx, category)
   end
 
   database:DeleteItemCategory(category)
-  events:SendMessage('categories/Changed', ctx)
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'categories/Changed')
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 ---@param ctx Context
@@ -391,7 +391,7 @@ function categories:HideCategory(ctx, category)
     ctx = context:New('HideCategory')
   end
   database:GetCategoryOptions(category).shown = false
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 ---@param ctx Context
@@ -404,7 +404,7 @@ function categories:ShowCategory(ctx, category)
     ctx = context:New('ShowCategory')
   end
   database:GetCategoryOptions(category).shown = true
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 ---@param category string
@@ -430,7 +430,7 @@ function categories:ToggleCategoryShown(ctx, category)
   end
   local options = database:GetCategoryOptions(category)
   options.shown = not options.shown
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
@@ -474,7 +474,7 @@ function categories:GetCustomCategory(ctx, kind, data)
       self:AddItemToCategory(ctx, itemID, category)
       if not found then
         self.categoryCount = self.categoryCount + 1
-        events:SendMessage('categories/Changed', ctx)
+        events:SendMessage(ctx, 'categories/Changed')
       end
       if self:IsCategoryEnabled(kind, category) then
         return category
@@ -515,5 +515,5 @@ end
 ---@param ctx Context
 function categories:ReprocessAllItems(ctx)
   wipe(self.itemsWithNoCategory)
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end

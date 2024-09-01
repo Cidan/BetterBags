@@ -90,12 +90,12 @@ function BagButtonFrame.bagButtonProto:SetBag(ctx, bag)
   SetItemButtonTexture(self.frame, icon)
   SetItemButtonQuality(self.frame, GetInventoryItemQuality("player", self.invID))
   SetItemButtonCount(self.frame, 1)
-  events:SendMessage('bagbutton/Updated', ctx, self)
+  events:SendMessage(ctx, 'bagbutton/Updated', self)
 end
 
 ---@param ctx Context
 function BagButtonFrame.bagButtonProto:ClearBag(ctx)
-  events:SendMessage('bagbutton/Clearing', ctx, self)
+  events:SendMessage(ctx, 'bagbutton/Clearing', self)
   self.masqueGroup = nil
   self.invID = nil
   self.bag = nil

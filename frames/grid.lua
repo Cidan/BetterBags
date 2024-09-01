@@ -188,7 +188,7 @@ function gridProto:DislocateCell(id)
   end
 
   ---@type string, ScriptRegion, string, number, number
-  local point, relativeTo, relativePoint, offsetX, offsetY = cell.frame:GetPoint(1)
+  local _, relativeTo, relativePoint, _, offsetY = cell.frame:GetPoint(1)
   ---@type string, ScriptRegion, string, number, number
   local _, _, rightRelativePoint, _, _
   if rightCell then

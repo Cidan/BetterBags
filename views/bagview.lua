@@ -77,23 +77,6 @@ local function ClearButton(ctx, view, item)
   addon:GetBagFromBagID(bagid).drawOnClose = true
 end
 
--- UpdateDeletedSlot updates the slot key of a deleted slot, while maintaining the
--- button position and section to prevent a sort from happening.
----@param ctx Context
----@param view View
----@param oldSlotKey string
----@param newSlotKey string
-local function UpdateDeletedSlot(ctx, view, oldSlotKey, newSlotKey)
-  local oldSlotCell = view.itemsByBagAndSlot[oldSlotKey]
-  local oldSlotSection = view:GetSlotSection(oldSlotKey)
-  oldSlotSection:RekeyCell(oldSlotKey, newSlotKey)
-  oldSlotCell:SetItem(ctx, newSlotKey)
-  view.itemsByBagAndSlot[newSlotKey] = oldSlotCell
-  view.itemsByBagAndSlot[oldSlotKey] = nil
-  view:SetSlotSection(newSlotKey, oldSlotSection)
-  view:RemoveSlotSection(oldSlotKey)
-end
-
 -- CreateButton creates a button for an item and adds it to the view.
 ---@param ctx Context
 ---@param view View

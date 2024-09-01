@@ -161,7 +161,7 @@ end
 
 ---@param ctx Context
 function items:RefreshAll(ctx)
-  events:SendMessage('bags/RefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/RefreshAll')
 end
 
 ---@private
@@ -334,6 +334,7 @@ function items:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
   _ = targets
   _ = movePairs
   _ = takenEmptySlots
+  _ = item
 end
 
 ---@private
@@ -401,6 +402,7 @@ function items:Restack(ctx, kind, callback)
     ctx:Set('moved', true)
   end
   async:Until(ctx, function(ectx)
+    _ = ectx
     for _, movePair in ipairs(movePairs) do
       if not movePair.done then
         if movePair.partial and movePair.partial > 0 then
@@ -783,7 +785,7 @@ function items:ProcessContainer(ctx, kind, container)
     self:LoadItems(ectx, kind, container:GetDataCache(), container:GetEquipmentDataCache(), function(ictx)
       local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-      events:SendMessageLater(ev, ictx, self.slotInfo[kind])
+      events:SendMessageLater(ictx, ev, self.slotInfo[kind])
       if kind == const.BAG_KIND.BACKPACK then
         debug:EndProfile('Backpack Data Pipeline')
       end
