@@ -229,23 +229,31 @@ function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
         newNumber = childItem.itemInfo.currentItemCount,
         maxNumber = childItem.itemInfo.itemStackCount,
       }
-      table.insert(possibleTargets, childItemTarget)
-      targets[childItem.slotkey] = childItemTarget
+      if childItemTarget.newNumber > 0 then
+        table.insert(possibleTargets, childItemTarget)
+        targets[childItem.slotkey] = childItemTarget
+      end
     end
   end
 
+  local myTarget = targets[item.slotkey] or {
+    item = item,
+    newNumber = item.itemInfo.currentItemCount,
+    maxNumber = item.itemInfo.itemStackCount,
+  }
+  if myTarget.newNumber <= 0 then return end
   -- Sort the possible targets by itemStackCount in descending order.
   table.sort(possibleTargets, function(a, b)
     return a.item.itemInfo.itemStackCount > b.item.itemInfo.itemStackCount
   end)
   -- Possible targets now contain all the possible targets for this item.
 
-  local remainder = item.itemInfo.currentItemCount
   for _, target in ipairs(possibleTargets) do
-    if remainder <= 0 then break end
-    if target.newNumber + remainder <= target.maxNumber then
-      target.newNumber = target.newNumber + remainder
-      remainder = 0
+    if myTarget.newNumber <= 0 then break end
+    if target.newNumber + myTarget.newNumber <= target.maxNumber then
+      print(format("moving from %d:%d to %d:%d, because i have %d/%d, and target has %d/%d", item.bagid, item.slotid, target.item.bagid, target.item.slotid, myTarget.newNumber, myTarget.maxNumber, target.newNumber, target.maxNumber))
+      target.newNumber = target.newNumber + myTarget.newNumber
+      myTarget.newNumber = 0
       table.insert(movePairs, {
         fromBag = item.bagid,
         fromSlot = item.slotid,
@@ -253,8 +261,9 @@ function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
         toSlot = target.item.slotid,
       })
     elseif target.newNumber < target.maxNumber then
-      remainder = remainder - (target.maxNumber - target.newNumber)
-      target.newNumber = target.maxNumber
+      print(format("moving from %d:%d to %d:%d, because i have %d/%d, and target has %d/%d, partial of %d", item.bagid, item.slotid, target.item.bagid, target.item.slotid, myTarget.newNumber, myTarget.maxNumber, target.newNumber, target.maxNumber, target.maxNumber - target.newNumber))
+      myTarget.newNumber = myTarget.newNumber - (target.maxNumber - target.newNumber)
+      print(format("myTarget.newNumber is now %d", myTarget.newNumber))
       table.insert(movePairs, {
         fromBag = item.bagid,
         fromSlot = item.slotid,
@@ -262,6 +271,7 @@ function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
         toSlot = target.item.slotid,
         partial = target.maxNumber - target.newNumber,
       })
+      target.newNumber = target.maxNumber
     end
   end
   --local target = targets[stackInfo.rootItem] or {newNumber = rootItem.itemInfo.currentItemCount, maxNumber = rootItem.itemInfo.itemStackCount}
