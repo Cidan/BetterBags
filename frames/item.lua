@@ -200,7 +200,7 @@ function itemFrame.itemProto:UpdateCount(ctx)
   local opts = database:GetStackingOptions(self.kind)
   if (not opts.mergeStacks) or
   (opts.unmergeAtShop and addon.atInteracting) or
-  (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount) or
+  (opts.dontMergePartial and data.itemInfo.currentItemCount <= data.itemInfo.itemStackCount) or
   (not opts.mergeUnstackable and data.itemInfo.itemStackCount == 1) or
   database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     count = data.itemInfo.currentItemCount
