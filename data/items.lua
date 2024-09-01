@@ -191,6 +191,147 @@ function items:WipeAndRefreshAll(ctx)
   self:RefreshAll(ctx)
 end
 
+---@class MoveTargetData
+---@field newNumber number
+---@field maxNumber number
+---@field item ItemData
+
+---@private
+---@param ctx Context
+---@param item ItemData
+---@param stackInfo StackInfo
+---@param targets table<string, MoveTargetData>
+---@param movePairs table<string, MoveTargetData>
+function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
+  -- Collect all the possible targets for this item.
+  ---@type MoveTargetData[]
+  local possibleTargets = {}
+
+  local rootItem = self:GetItemDataFromSlotKey(stackInfo.rootItem)
+
+  -- The root item should always be a target for other items to stack on,
+  -- so we return here.
+  if item.slotkey == rootItem.slotkey then return end
+
+  local myTarget = targets[item.slotkey] or {
+    item = item,
+    newNumber = item.itemInfo.currentItemCount,
+    maxNumber = item.itemInfo.itemStackCount,
+  }
+  if not targets[item.slotkey] then
+    targets[item.slotkey] = myTarget
+  end
+
+  local rootItemTarget = targets[rootItem.slotkey] or {
+    item = rootItem,
+    newNumber = rootItem.itemInfo.currentItemCount,
+    maxNumber = rootItem.itemInfo.itemStackCount,
+  }
+  if rootItemTarget.newNumber > 0 then
+    table.insert(possibleTargets, rootItemTarget)
+    targets[rootItem.slotkey] = rootItemTarget
+  end
+
+  for childSlotKey in pairs(stackInfo.slotkeys) do
+    local childItem = self:GetItemDataFromSlotKey(childSlotKey)
+    if childItem.slotkey ~= item.slotkey then
+      local childItemTarget = targets[childItem.slotkey] or {
+        item = childItem,
+        newNumber = childItem.itemInfo.currentItemCount,
+        maxNumber = childItem.itemInfo.itemStackCount,
+      }
+      if childItemTarget.newNumber > 0 then
+        table.insert(possibleTargets, childItemTarget)
+      end
+      if not targets[childItem.slotkey] then
+        targets[childItem.slotkey] = childItemTarget
+      end
+    end
+  end
+
+  if myTarget.newNumber <= 0 then return end
+  -- Sort the possible targets by itemStackCount in descending order.
+  table.sort(possibleTargets, function(a, b)
+    return a.item.itemInfo.itemStackCount > b.item.itemInfo.itemStackCount
+  end)
+  -- Possible targets now contain all the possible targets for this item.
+
+  --print("possibleTargets", #possibleTargets)
+  for _, target in ipairs(possibleTargets) do
+    if myTarget.newNumber <= 0 then break end
+    if target.newNumber + myTarget.newNumber <= target.maxNumber and target.newNumber ~= 0 then
+      --print(format("moving from %d:%d to %d:%d, because i have %d/%d, and target has %d/%d", item.bagid, item.slotid, target.item.bagid, target.item.slotid, myTarget.newNumber, myTarget.maxNumber, target.newNumber, target.maxNumber))
+      target.newNumber = target.newNumber + myTarget.newNumber
+      myTarget.newNumber = 0
+      table.insert(movePairs, {
+        fromBag = item.bagid,
+        fromSlot = item.slotid,
+        toBag = target.item.bagid,
+        toSlot = target.item.slotid,
+      })
+    elseif target.newNumber < target.maxNumber then
+      --print(format("moving from %d:%d to %d:%d, because i have %d/%d, and target has %d/%d, partial of %d", item.bagid, item.slotid, target.item.bagid, target.item.slotid, myTarget.newNumber, myTarget.maxNumber, target.newNumber, target.maxNumber, target.maxNumber - target.newNumber))
+      myTarget.newNumber = myTarget.newNumber - (target.maxNumber - target.newNumber)
+      --print(format("myTarget.newNumber is now %d", myTarget.newNumber))
+      table.insert(movePairs, {
+        fromBag = item.bagid,
+        fromSlot = item.slotid,
+        toBag = target.item.bagid,
+        toSlot = target.item.slotid,
+        partial = target.maxNumber - target.newNumber,
+      })
+      target.newNumber = target.maxNumber
+    end
+  end
+end
+
+--TODO(lobato): for stacking, need to:
+-- * If the root item can't hold the whole stack, we need to split the stack and fit what can be fit.
+-- * If there is a remainder after the split, we need to move the remainder to the next biggest stack with room.
+-- * If the item is itself the next biggest stack, do nothing.
+---@param ctx Context
+---@param kind BagKind
+function items:Restack(ctx, kind)
+  ---@type {fromBag: number, fromSlot: number, toBag: number, toSlot: number, partial: number, done: boolean}[]
+  local movePairs = {}
+
+  ---@type table<string, MoveTargetData>
+  local targets = {}
+  local slotInfo = self.slotInfo[kind]
+
+  for _, item in pairs(slotInfo:GetCurrentItems()) do
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    if not item.isItemEmpty and item.itemInfo.itemStackCount > 1 and stackInfo then
+      self:findBestFit(ctx, item, stackInfo, targets, movePairs)
+    end
+  end
+  debug:Inspect("all move", movePairs)
+  async:Until(ctx, function(ectx)
+    for _, movePair in ipairs(movePairs) do
+      if not movePair.done then
+        if movePair.partial and movePair.partial > 0 then
+          C_Container.SplitContainerItem(movePair.fromBag, movePair.fromSlot, movePair.partial)
+          C_Container.PickupContainerItem(movePair.toBag, movePair.toSlot)
+        else
+          C_Container.PickupContainerItem(movePair.fromBag, movePair.fromSlot)
+          C_Container.PickupContainerItem(movePair.toBag, movePair.toSlot)
+        end
+        local cursorInfo = GetCursorInfo()
+        if cursorInfo ~= 'item' then
+          movePair.done = true
+        else
+          ClearCursor()
+          movePair.done = false
+          return false
+        end
+      end
+    end
+    return true
+  end,
+  function() end)
+
+end
+
 ---@private
 ---@param ctx Context
 function items:DoRefreshAll(ctx)
