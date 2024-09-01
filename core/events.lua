@@ -193,7 +193,9 @@ end
 ---@param ... any
 function events:SendMessage(ctx, event, ...)
   if type(ctx) ~= 'table' or not ctx.Event then
-    error('ctx must be passed into SendMessage and must be a Context object: ' .. event)
+    event = ctx --[[@as string]]
+    ctx = context:New("SendMessage" .. event)
+    --error('ctx must be passed into SendMessage and must be a Context object: ' .. event)
   end
   if ctx:IsCancelled() then
     error('ctx has been cancelled: ' .. event)
