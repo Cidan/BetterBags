@@ -261,7 +261,7 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   local category = section.title:GetText()
   categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 ---@param section Section

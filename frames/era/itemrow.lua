@@ -67,7 +67,7 @@ function item.itemRowProto:SetItemFromData(ctx, data, static)
   end)
 
   if self.slotkey ~= nil then
-    events:SendMessage('item/UpdatedRow', ctx, self)
+    events:SendMessage(ctx, 'item/UpdatedRow', self)
   end
   self.frame:Show()
   self.rowButton:Show()

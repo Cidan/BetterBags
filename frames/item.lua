@@ -383,7 +383,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   self.isFreeSlot = nil
   self:SetAlpha(1)
   if self.slotkey ~= nil then
-    events:SendMessage('item/Updated', ctx, self, decoration)
+    events:SendMessage(ctx, 'item/Updated', self, decoration)
   end
   decoration:SetFrameLevel(self.button:GetFrameLevel() - 1)
   self:UpdateUpgrade(ctx)
@@ -559,7 +559,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
   self.isFreeSlot = true
   decoration.ItemSlotBackground:Show()
   self.frame:SetAlpha(1)
-  events:SendMessage('item/Updated', ctx, self, decoration)
+  events:SendMessage(ctx, 'item/Updated', self, decoration)
   self.frame:Show()
   self.button:Show()
 end
@@ -606,7 +606,7 @@ end
 ---@param ctx Context
 function itemFrame.itemProto:ClearItem(ctx)
   local decoration = themes:GetItemButton(ctx, self)
-  events:SendMessage('item/Clearing', ctx, self, decoration)
+  events:SendMessage(ctx, 'item/Clearing', self, decoration)
   self.kind = nil
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)

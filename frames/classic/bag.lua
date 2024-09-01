@@ -228,7 +228,7 @@ function bagFrame:Create(ctx, kind)
     b:OnUnlock(ectx, bagid, slotid)
   end)
 
-  events:RegisterMessage('search/SetInFrame', function (ectx, _, shown)
+  events:RegisterMessage('search/SetInFrame', function (ectx, shown)
     themes:SetSearchState(ectx, b.frame, shown)
   end)
 

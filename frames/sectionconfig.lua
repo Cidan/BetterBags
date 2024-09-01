@@ -90,7 +90,7 @@ function sectionConfigFrame:OnReceiveDrag(ctx, category)
   ClearCursor()
   local itemid = tonumber(id) --[[@as number]]
   categories:AddPermanentItemToCategory(ctx, itemid, category)
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
   return true
 end
 
@@ -312,7 +312,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
           button:SetBackdropColor(1, 1, 0, .2)
         end
       end
-      events:SendMessage('bags/FullRefreshAll', ctx)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end
   end)
 end
@@ -451,7 +451,7 @@ function sectionConfig:Create(kind, parent)
     sc.content.dragBehavior:SetFinalizeDrop(function(_)
       local ctx = context:New('SectionConfigFrame_FinalizeDrop')
       sc:UpdatePinnedItems()
-      events:SendMessage('bags/FullRefreshAll', ctx)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end)
 
     sc.content:SetCanReorder(true)
@@ -473,7 +473,7 @@ function sectionConfig:Create(kind, parent)
       end
 
       sc:UpdatePinnedItems()
-      events:SendMessage('bags/FullRefreshAll', ctx)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end)
   end
   sc.content:AddToStart({ title = "Pinned", header = true })

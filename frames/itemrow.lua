@@ -119,7 +119,7 @@ function item.itemRowProto:SetItemFromData(ctx, data, static)
   end)
 
   if self.slotkey ~= nil then
-    events:SendMessage('item/UpdatedRow', ctx, self)
+    events:SendMessage(ctx, 'item/UpdatedRow', self)
   end
   self.frame:Show()
   self.rowButton:Show()
@@ -133,7 +133,7 @@ end
 
 ---@param ctx Context
 function item.itemRowProto:ClearItem(ctx)
-  events:SendMessage('item/ClearingRow', ctx, self)
+  events:SendMessage(ctx, 'item/ClearingRow', self)
   self.button:ClearItem(ctx)
 
   self.rowButton:SetID(0)

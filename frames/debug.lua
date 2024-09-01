@@ -81,9 +81,9 @@ function debugWindow:Create(ctx)
     local ectx = context:New('DebugFrameCloseClick')
     if e == "LeftButton" then
       database:SetDebugMode(false)
-      events:SendMessage('config/DebugMode', ectx, false)
+      events:SendMessage(ectx, 'config/DebugMode', false)
     elseif e == "RightButton" then
-      events:SendMessage('debug/ClearLog', ectx)
+      events:SendMessage(ectx, 'debug/ClearLog')
     end
   end)
 
@@ -128,7 +128,7 @@ function debugWindow:AddLogLine(ctx, title, message)
     message=message
   })
   self.rows = self.rows + 1
-  events:SendMessage('debug/LogAdded', ctx)
+  events:SendMessage(ctx, 'debug/LogAdded')
 end
 
 ---CreateDebugLogFrame creates the frame for the debug log tab.

@@ -136,12 +136,12 @@ function BagSlots:CreatePanel(ctx, kind)
     end
     database:SetPreviousView(kind, database:GetBagView(kind))
     database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
-    events:SendMessage('bags/FullRefreshAll', ectx)
+    events:SendMessage(ectx, 'bags/FullRefreshAll')
   end)
 
   addon.HookScript(b.fadeOutGroup, "OnFinished", function(ectx)
     database:SetBagView(kind, database:GetPreviousView(kind))
-    events:SendMessage('bags/FullRefreshAll', ectx)
+    events:SendMessage(ectx, 'bags/FullRefreshAll')
   end)
 
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ectx) b:Draw(ectx) end)

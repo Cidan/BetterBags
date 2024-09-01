@@ -91,7 +91,7 @@ function sectionItemListFrame:OnReceiveDrag(ctx)
   ClearCursor()
   local itemid = tonumber(id) --[[@as number]]
   categories:AddPermanentItemToCategory(ctx, itemid, self.currentCategory)
-  events:SendMessage('bags/FullRefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 ---@param ctx Context
@@ -109,7 +109,7 @@ function sectionItemListFrame:OnItemClick(ctx, b, elementData)
     hasArrow = false,
     func = function()
       database:DeleteItemFromCategory(elementData.data.itemInfo.itemID, elementData.category)
-      events:SendMessage('bags/FullRefreshAll', ctx)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end
   }})
 end

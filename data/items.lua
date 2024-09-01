@@ -161,7 +161,7 @@ end
 
 ---@param ctx Context
 function items:RefreshAll(ctx)
-  events:SendMessage('bags/RefreshAll', ctx)
+  events:SendMessage(ctx, 'bags/RefreshAll')
 end
 
 ---@private
@@ -240,6 +240,7 @@ end
 ---@param targets table<string, MoveTargetData>
 ---@param movePairs table<string, MoveTargetData>
 function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
+  _ = ctx
   -- Collect all the possible targets for this item.
   ---@type MoveTargetData[]
   local possibleTargets = {}
@@ -329,6 +330,11 @@ end
 ---@param movePairs table<string, MoveTargetData>
 ---@param takenEmptySlots table<string, boolean>
 function items:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
+  _ = ctx
+  _ = targets
+  _ = movePairs
+  _ = takenEmptySlots
+  _ = item
 end
 
 ---@private
@@ -396,6 +402,7 @@ function items:Restack(ctx, kind, callback)
     ctx:Set('moved', true)
   end
   async:Until(ctx, function(ectx)
+    _ = ectx
     for _, movePair in ipairs(movePairs) do
       if not movePair.done then
         if movePair.partial and movePair.partial > 0 then
@@ -778,7 +785,7 @@ function items:ProcessContainer(ctx, kind, container)
     self:LoadItems(ectx, kind, container:GetDataCache(), container:GetEquipmentDataCache(), function(ictx)
       local ev = kind == const.BAG_KIND.BANK and 'items/RefreshBank/Done' or 'items/RefreshBackpack/Done'
 
-      events:SendMessageLater(ev, ictx, self.slotInfo[kind])
+      events:SendMessageLater(ictx, ev, self.slotInfo[kind])
       if kind == const.BAG_KIND.BACKPACK then
         debug:EndProfile('Backpack Data Pipeline')
       end
@@ -956,7 +963,7 @@ end
 ---@return string
 function items:GenerateItemHash(data)
   local stackOpts = database:GetStackingOptions(data.kind)
-  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%s%d%d%d",
+  local hash = format("%d%s%s%s%s%s%s%s%s%s%s%s%d%d%d",
     data.itemLinkInfo.itemID,
     data.itemLinkInfo.enchantID,
     data.itemLinkInfo.gemID1,
@@ -964,7 +971,7 @@ function items:GenerateItemHash(data)
     data.itemLinkInfo.gemID3,
     data.itemLinkInfo.suffixID,
     table.concat(data.itemLinkInfo.bonusIDs, ","),
-    table.concat(data.itemLinkInfo.modifierIDs, ","),
+    --table.concat(data.itemLinkInfo.modifierIDs, ","),
     table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
     table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
     table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
@@ -1292,7 +1299,7 @@ function items:GetBagKindFromSlotKey(slotkey)
   return self:GetBagKindFromBagID(bagid)
 end
 
----@param bagid number
+---@param bagid number|string
 ---@return BagKind
 function items:GetBagKindFromBagID(bagid)
   if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then

@@ -65,13 +65,13 @@ end
 ---@param menuList MenuList[]
 function contextMenu:Show(ctx, menuList)
   LibDD:EasyMenu(menuList, self.frame, 'cursor', 0, 0, 'MENU')
-  events:SendMessage('context/show', ctx)
+  events:SendMessage(ctx, 'context/show')
 end
 
 ---@param ctx Context
 function contextMenu:Hide(ctx)
   LibDD:HideDropDownMenu(1)
-  events:SendMessage('context/hide', ctx)
+  events:SendMessage(ctx, 'context/hide')
 end
 
 function contextMenu:AddDivider(menuList)
@@ -257,7 +257,7 @@ function contextMenu:CreateContextMenu(bag)
     func = function()
       local ctx = context:New('OpenOptionsScreen')
       contextMenu:Hide(ctx)
-      events:SendMessage('config/Open', ctx)
+      events:SendMessage(ctx, 'config/Open')
     end
   })
 

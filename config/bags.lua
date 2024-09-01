@@ -37,6 +37,7 @@ local context = addon:GetModule('Context')
 ---@param kind BagKind
 ---@return AceConfig.OptionsTable
 function config:GetCustomCategoryOptions(kind)
+  _ = kind
   return {
     type = "group",
     name = L:G("Custom Categories"),
@@ -77,7 +78,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetCategoryFilter(kind, value, not DB:GetCategoryFilter(kind, value))
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
             values = {
               ["RecentItems"] = L:G("Recent Items"),
@@ -105,7 +106,7 @@ function config:GetBagOptions(kind)
         set = function(_, value)
           DB:SetSectionSortType(kind, DB:GetBagView(kind), value)
           local ctx = context:New('on_click')
-          events:SendMessage('bags/FullRefreshAll', ctx)
+          events:SendMessage(ctx, 'bags/FullRefreshAll')
         end,
         values = {
           [const.SECTION_SORT_TYPE.ALPHABETICALLY] = L:G("Alphabetically"),
@@ -126,7 +127,7 @@ function config:GetBagOptions(kind)
         set = function(_, value)
           DB:SetItemSortType(kind, DB:GetBagView(kind), value)
           local ctx = context:New('on_click')
-          events:SendMessage('bags/FullRefreshAll', ctx)
+          events:SendMessage(ctx, 'bags/FullRefreshAll')
         end,
         values = {
           [const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY] = L:G("Quality, then Alphabetically"),
@@ -183,7 +184,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetMergeItems(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           mergeUnstackable = {
@@ -197,7 +198,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetMergeUnstackable(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           unmergeAtShop = {
@@ -211,7 +212,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetUnmergeAtShop(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           dontMergePartial = {
@@ -225,7 +226,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetDontMergePartial(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           dontMergeTransmog = {
@@ -239,7 +240,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetDontMergeTransmog(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
         }
@@ -261,7 +262,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetItemLevelEnabled(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           color = {
@@ -275,7 +276,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetItemLevelColorEnabled(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
         }
@@ -298,7 +299,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetShowFullSectionNames(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           showAllFreeSpace = {
@@ -313,7 +314,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetShowAllFreeSpace(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           showExtraGlowyButtons = {
@@ -328,7 +329,7 @@ function config:GetBagOptions(kind)
             set = function(_, value)
               DB:SetExtraGlowyButtons(kind, value)
               local ctx = context:New('on_click')
-              events:SendMessage('bags/FullRefreshAll', ctx)
+              events:SendMessage(ctx, 'bags/FullRefreshAll')
             end,
           },
           itemsPerRow = {
@@ -346,7 +347,7 @@ function config:GetBagOptions(kind)
               DB:SetBagViewSizeItems(kind, DB:GetBagView(kind), value)
               bucket:Later("setItemsPerRow", 0.2, function()
                 local ctx = context:New('on_click')
-                events:SendMessage('bags/FullRefreshAll', ctx)
+                events:SendMessage(ctx, 'bags/FullRefreshAll')
               end)
             end,
           },
@@ -381,7 +382,7 @@ function config:GetBagOptions(kind)
               DB:SetBagViewSizeColumn(kind, DB:GetBagView(kind), value)
               bucket:Later("setSectionsPerRow", 0.2, function()
                 local ctx = context:New('on_click')
-                events:SendMessage('bags/FullRefreshAll', ctx)
+                events:SendMessage(ctx, 'bags/FullRefreshAll')
               end)
             end,
           },

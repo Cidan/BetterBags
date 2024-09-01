@@ -54,7 +54,7 @@ function async:DoWithDelay(ctx, delay, fn, event)
         if type(task.event) == 'function' then
           task.event(task.ctx)
         elseif type(task.event) == 'string' then
-          events:SendMessage(task.event --[[@as string]], task.ctx)
+          events:SendMessage(task.ctx, task.event --[[@as string]])
         end
       end
       return
@@ -180,7 +180,7 @@ function async:Chain(ctx, event, ...)
         end
       )
     elseif event ~= nil then
-      events:SendMessage(event, ctx)
+      events:SendMessage(ctx, event)
     end
   end
   executeNext()

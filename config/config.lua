@@ -77,7 +77,7 @@ function config:GetGeneralOptions()
         end,
         set = function(_, value)
           DB:SetInBagSearch(value)
-          events:SendMessage('search/SetInFrame', value)
+          events:SendMessage(context:New('OnClick_InBagSearch'), 'search/SetInFrame', value)
         end,
       },
       enableEnterToMakeCategory = {
@@ -139,7 +139,7 @@ function config:GetGeneralOptions()
         set = function(_, value)
           DB:SetUpgradeIconProvider(value)
           local ctx = context:New('on_click')
-          events:SendMessage('bag/RedrawIcons', ctx)
+          events:SendMessage(ctx, 'bag/RedrawIcons')
         end,
       },
       newItemTime = {
@@ -224,7 +224,7 @@ end
 function config:Open()
   LibStub("AceConfigDialog-3.0"):Open(addonName)
   local ctx = context:New('on_click')
-  events:SendMessage('config/Opened', ctx)
+  events:SendMessage(ctx, 'config/Opened')
 end
 
 function config:OnEnable()
@@ -255,7 +255,7 @@ function config:OnEnable()
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()
     DB:SetDebugMode(not DB:GetDebugMode())
     local ctx = context:New('on_click')
-    events:SendMessage('config/DebugMode', ctx, DB:GetDebugMode())
+    events:SendMessage(ctx, 'config/DebugMode', DB:GetDebugMode())
   end)
 end
 

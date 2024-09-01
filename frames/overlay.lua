@@ -26,7 +26,7 @@ function overlayFrame:Show(ctx, event)
     self.frame:Show()
     self.frame:SetAlpha(1)
     if event then
-      events:SendMessage(event, ctx)
+      events:SendMessage(ctx, event)
     end
   end
   self.fadeIn:Play()
@@ -38,7 +38,7 @@ function overlayFrame:Hide(ctx, event)
   self.fadeOut.callback = function()
     self.fadeOut.callback = nil
     if event then
-      events:SendMessage(event, ctx)
+      events:SendMessage(ctx, event)
     end
   end
   self.fadeOut:Play()

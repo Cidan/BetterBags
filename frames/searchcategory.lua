@@ -139,7 +139,7 @@ function searchCategoryConfig:OnEnable()
       categories:DeleteCategory(ctx, self.openedName)
     end
     self.openedName = nil
-    events:SendMessage('bags/FullRefreshAll', ctx)
+    events:SendMessage(ctx, 'bags/FullRefreshAll')
     self.fadeOutGroup:Play()
   end)
 
