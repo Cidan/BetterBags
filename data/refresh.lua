@@ -103,8 +103,7 @@ function refresh:StartUpdate(ctx)
   if sortBackpack then
     self.isUpdateRunning = false
     items:RemoveNewItemFromAllItems()
-    self.backpackSortStage = 1
-    C_Container.SortBags()
+    items:Restack(ctx, const.BAG_KIND.BACKPACK)
     return
   end
 

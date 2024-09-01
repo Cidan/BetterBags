@@ -191,6 +191,60 @@ function items:WipeAndRefreshAll(ctx)
   self:RefreshAll(ctx)
 end
 
+---@class MoveTargetData
+---@field newNumber number
+---@field maxNumber number
+
+---@param ctx Context
+---@param kind BagKind
+function items:Restack(ctx, kind)
+  ---@type {fromBag: number, fromSlot: number, toBag: number, toSlot: number, done: boolean}[]
+  local movePairs = {}
+
+  ---@type table<string, MoveTargetData>
+  local targets = {}
+  local slotInfo = self.slotInfo[kind]
+
+  for _, item in pairs(slotInfo:GetCurrentItems()) do
+    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+    if not item.isItemEmpty and stackInfo then
+      local rootItem = self:GetItemDataFromSlotKey(stackInfo.rootItem)
+      local target = targets[stackInfo.rootItem] or {newNumber = rootItem.itemInfo.currentItemCount, maxNumber = rootItem.itemInfo.itemStackCount}
+      if target.newNumber + item.itemInfo.currentItemCount <= target.maxNumber and item.slotkey ~= stackInfo.rootItem then
+        target.newNumber = target.newNumber + item.itemInfo.currentItemCount
+        table.insert(movePairs, {
+          fromBag = item.bagid,
+          fromSlot = item.slotid,
+          toBag = rootItem.bagid,
+          toSlot = rootItem.slotid,
+        })
+      else -- Check if we can partially merge the item.
+        -- Loop the child stack items until we have the highest itemStackCount number.
+      end
+    end
+  end
+
+  async:Until(ctx, function(ectx)
+    for _, movePair in ipairs(movePairs) do
+      if not movePair.done then
+        C_Container.PickupContainerItem(movePair.fromBag, movePair.fromSlot)
+        C_Container.PickupContainerItem(movePair.toBag, movePair.toSlot)
+        local cursorInfo = GetCursorInfo()
+        if cursorInfo ~= 'item' then
+          movePair.done = true
+        else
+          ClearCursor()
+          movePair.done = false
+          return false
+        end
+      end
+    end
+    return true
+  end,
+  function() end)
+
+end
+
 ---@private
 ---@param ctx Context
 function items:DoRefreshAll(ctx)
