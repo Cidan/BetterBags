@@ -341,6 +341,16 @@ function DB:GetCategoryOptions(category)
   return options
 end
 
+---@return boolean
+function DB:GetEnterToMakeCategory()
+  return DB.data.profile.enterToMakeCategory
+end
+
+---@param value boolean
+function DB:SetEnterToMakeCategory(value)
+  DB.data.profile.enterToMakeCategory = value
+end
+
 ---@param kind BagKind
 function DB:ClearCustomSectionSort(kind)
   DB.data.profile.customSectionSort[kind] = {}

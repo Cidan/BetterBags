@@ -22,16 +22,14 @@ local debug = addon:GetModule('Debug')
 ---@field UpdateQueue table<number, EventArg>
 ---@field private isUpdateRunning boolean
 ---@field private backpackRedrawPending boolean
----@field private backpackSortStage number
----@field private itemLockCount number
+---@field private isSorting boolean
 local refresh = addon:NewModule('Refresh')
 
 function refresh:OnInitialize()
   self.UpdateQueue = {}
   self.isUpdateRunning = false
   self.backpackRedrawPending = false
-  self.backpackSortStage = 0
-  self.itemLockCount = 0
+  self.isSorting = false
 end
 
 ---@param ctx Context
@@ -43,9 +41,24 @@ function refresh:RedrawBackpack(ctx)
   end)
 end
 
+function refresh:AfterSort(ctx)
+  self.isSorting = false
+  -- TODO(lobato): Detect if only new items were moved,
+  -- and only refresh the backpack if that's the case.
+  if ctx:GetBool('moved') then
+    events:SendMessage('bags/FullRefreshAll', ctx)
+  else
+    events:SendMessage('bags/FullRefreshAll', ctx)
+  end
+end
+
 -- StartUpdate will start the bag update process if it's not already running.
 ---@param ctx Context
 function refresh:StartUpdate(ctx)
+  if self.isSorting then
+    wipe(self.UpdateQueue)
+    return
+  end
   if self.isUpdateRunning then
     -- This is a safety check to ensure that the update process is
     -- never missed in the event of the update queue being interrupted.
@@ -61,7 +74,6 @@ function refresh:StartUpdate(ctx)
   local updateBackpack = false
   local updateBank = false
   local sortBackpack = false
-  local sortBackpackClassic = false
   for _, event in pairs(self.UpdateQueue) do
     if event.ctx:GetBool("wipe") then
       -- Prevent full wipes from happening in combat.
@@ -82,10 +94,6 @@ function refresh:StartUpdate(ctx)
       if not InCombatLockdown() then
         sortBackpack = true
       end
-    elseif event.eventName == 'BAG_SORT_CLASSIC' then
-      if not InCombatLockdown() then
-        sortBackpackClassic = true
-      end
     elseif event.eventName == 'BAG_UPDATE_BANK' then
       updateBank = true
     elseif const.BANK_BAGS[event.args[1]] then
@@ -102,15 +110,11 @@ function refresh:StartUpdate(ctx)
 
   if sortBackpack then
     self.isUpdateRunning = false
+    self.isSorting = true
     items:RemoveNewItemFromAllItems()
-    items:Restack(ctx, const.BAG_KIND.BACKPACK)
-    return
-  end
-
-  if sortBackpackClassic then
-    self.isUpdateRunning = false
-    items:RemoveNewItemFromAllItems()
-    _G.SortBags()
+    items:Restack(ctx, const.BAG_KIND.BACKPACK, function()
+      self:AfterSort(ctx)
+    end)
     return
   end
 
@@ -222,12 +226,6 @@ function refresh:OnEnable()
     self:StartUpdate(ctx)
   end)
 
-  -- Register when the classic backpack should be sorted.
-  events:RegisterMessage('bags/SortBackpackClassic', function(ctx)
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_SORT_CLASSIC', args = {const.BAG_KIND.BACKPACK}, ctx = ctx})
-    self:StartUpdate(ctx)
-  end)
-
   -- Register when all bags should be wiped and reloaded.
   events:RegisterMessage('bags/FullRefreshAll', function(ctx)
     items:WipeAndRefreshAll(ctx)
@@ -238,28 +236,10 @@ function refresh:OnEnable()
     -- If there are more updates in the queue, start the next one with a new context.
     self.isUpdateRunning = false
     self.backpackRedrawPending = false
-    self.backpackSortStage = 0
     if next(self.UpdateQueue) ~= nil then
       self:StartUpdate(ctx)
     else
       ctx:Cancel()
-    end
-  end)
-
-  events:RegisterEvent('ITEM_LOCKED', function(ctx)
-    if self.backpackSortStage == 1 then
-      self.itemLockCount = self.itemLockCount + 1
-    end
-  end)
-  events:RegisterEvent('ITEM_UNLOCKED', function(ctx)
-    if self.backpackSortStage == 1 then
-      self.itemLockCount = self.itemLockCount - 1
-      if self.itemLockCount == 0 then
-       self.backpackSortStage = 0
-        C_Timer.After(0.5, function()
-          events:SendMessage('bags/FullRefreshAll', ctx)
-        end)
-      end
     end
   end)
 

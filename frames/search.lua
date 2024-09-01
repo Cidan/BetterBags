@@ -21,6 +21,10 @@ local search = addon:GetModule('Search')
 ---@class SearchCategoryConfig: AceModule
 local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+
 ---@class SearchBox: AceModule
 ---@field searchFrame SearchFrame
 local searchBox = addon:NewModule('SearchBox')
@@ -195,14 +199,16 @@ function searchBox:Create(ctx, parent)
   end)
 
   textBox:SetScript("OnEnterPressed", function()
-    searchCategoryConfig:Open({
-      name = "",
-      itemList = {},
-      priority = 10,
-      searchCategory = {
-        query = searchBox:GetText(),
-      }
-    })
+    if database:GetEnterToMakeCategory() then
+      searchCategoryConfig:Open({
+        name = "",
+        itemList = {},
+        priority = 10,
+        searchCategory = {
+          query = searchBox:GetText(),
+        }
+      })
+    end
   end)
 
   local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK", "GameFontDisableLarge")
@@ -253,14 +259,16 @@ function searchBox:CreateBox(kind, parent)
   end)
 
   textBox:SetScript("OnEnterPressed", function()
-    searchCategoryConfig:Open({
-      name = "",
-      itemList = {},
-      priority = 10,
-      searchCategory = {
-        query = textBox:GetText(),
-      }
-    })
+    if database:GetEnterToMakeCategory() then
+      searchCategoryConfig:Open({
+        name = "",
+        itemList = {},
+        priority = 10,
+        searchCategory = {
+          query = textBox:GetText(),
+        }
+      })
+    end
   end)
 
   textBox:SetAllPoints()
