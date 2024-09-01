@@ -291,7 +291,8 @@ end
 -- * If the item is itself the next biggest stack, do nothing.
 ---@param ctx Context
 ---@param kind BagKind
-function items:Restack(ctx, kind)
+---@param callback fun(ctx: Context)|string
+function items:Restack(ctx, kind, callback)
   ---@type {fromBag: number, fromSlot: number, toBag: number, toSlot: number, partial: number, done: boolean}[]
   local movePairs = {}
 
@@ -305,7 +306,9 @@ function items:Restack(ctx, kind)
       self:findBestFit(ctx, item, stackInfo, targets, movePairs)
     end
   end
-  debug:Inspect("all move", movePairs)
+  if #movePairs > 0 then
+    ctx:Set('moved', true)
+  end
   async:Until(ctx, function(ectx)
     for _, movePair in ipairs(movePairs) do
       if not movePair.done then
@@ -328,7 +331,7 @@ function items:Restack(ctx, kind)
     end
     return true
   end,
-  function() end)
+  callback)
 
 end
 

@@ -87,14 +87,6 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   self:Wipe(ctx)
 end
 
----@param ctx Context
-function bagFrame.bagProto:Sort(ctx)
-  PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-  if _G.SortBags ~= nil then
-    events:SendMessage('bags/SortBackpackClassic', ctx)
-  end
-end
-
 -------
 --- Bag Frame
 -------
