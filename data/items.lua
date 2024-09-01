@@ -194,6 +194,7 @@ end
 ---@class MoveTargetData
 ---@field newNumber number
 ---@field maxNumber number
+---@field item ItemData
 
 ---@private
 ---@param ctx Context
@@ -202,7 +203,31 @@ end
 ---@param targets table<string, MoveTargetData>
 ---@param movePairs table<string, MoveTargetData>
 function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
+  -- Collect all the possible targets for this item.
+  ---@type MoveTargetData[]
+  local possibleTargets = {}
+
   local rootItem = self:GetItemDataFromSlotKey(stackInfo.rootItem)
+  if rootItem ~= item then
+    table.insert(possibleTargets,{
+      item = rootItem,
+      newNumber = rootItem.itemInfo.currentItemCount,
+      maxNumber = rootItem.itemInfo.itemStackCount,
+    })
+  end
+  for childSlotKey in pairs(stackInfo.slotkeys) do
+    local childItem = self:GetItemDataFromSlotKey(childSlotKey)
+    if childItem ~= item then
+      table.insert(possibleTargets, {
+        item = childItem,
+        newNumber = childItem.itemInfo.currentItemCount,
+        maxNumber = childItem.itemInfo.itemStackCount,
+      })
+    end
+  end
+
+  -- Possible targets now contain all the possible targets for this item.
+
   local target = targets[stackInfo.rootItem] or {newNumber = rootItem.itemInfo.currentItemCount, maxNumber = rootItem.itemInfo.itemStackCount}
   if target.newNumber + item.itemInfo.currentItemCount <= target.maxNumber and item.slotkey ~= stackInfo.rootItem then
     target.newNumber = target.newNumber + item.itemInfo.currentItemCount
