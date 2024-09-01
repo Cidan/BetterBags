@@ -250,7 +250,7 @@ function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
 
   for _, target in ipairs(possibleTargets) do
     if myTarget.newNumber <= 0 then break end
-    if target.newNumber + myTarget.newNumber <= target.maxNumber then
+    if target.newNumber + myTarget.newNumber <= target.maxNumber and target.newNumber ~= 0 then
       print(format("moving from %d:%d to %d:%d, because i have %d/%d, and target has %d/%d", item.bagid, item.slotid, target.item.bagid, target.item.slotid, myTarget.newNumber, myTarget.maxNumber, target.newNumber, target.maxNumber))
       target.newNumber = target.newNumber + myTarget.newNumber
       myTarget.newNumber = 0
