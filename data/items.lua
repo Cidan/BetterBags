@@ -191,6 +191,43 @@ function items:WipeAndRefreshAll(ctx)
   self:RefreshAll(ctx)
 end
 
+---@param bagid number
+---@return number, number
+function items:GetBagTypeFromBagID(bagid)
+  local invid = C_Container.ContainerIDToInventoryID(bagid)
+  local baglink = GetInventoryItemLink("player", invid)
+  if baglink ~= nil and invid ~= nil then
+    local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+    return class, subclass
+  else
+    return Enum.ItemClass.Container, 0
+  end
+end
+
+-- HasReagentBag returns true if the player has a reagent bag slotted in their inventory.
+---@return boolean
+function items:HasReagentBag()
+  local invid = C_Container.ContainerIDToInventoryID(Enum.BagIndex.ReagentBag)
+  local baglink = GetInventoryItemLink("player", invid)
+  if not baglink then return false end
+  return true
+end
+
+---@param bagid number
+---@param ignore? table<string, boolean>
+---@return ItemData?
+function items:GetFreeSlot(bagid, ignore)
+  local kind = self:GetBagKindFromBagID(bagid)
+  local freeSlots = self:GetAllSlotInfo()[kind].emptySlotByBagAndSlot[bagid]
+  if not freeSlots then return nil end
+  for _, free in pairs(freeSlots) do
+    if (ignore and not ignore[free.slotkey]) or not ignore then
+      return free
+    end
+  end
+  return nil
+end
+
 ---@class MoveTargetData
 ---@field newNumber number
 ---@field maxNumber number
@@ -285,10 +322,48 @@ function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
   end
 end
 
---TODO(lobato): for stacking, need to:
--- * If the root item can't hold the whole stack, we need to split the stack and fit what can be fit.
--- * If there is a remainder after the split, we need to move the remainder to the next biggest stack with room.
--- * If the item is itself the next biggest stack, do nothing.
+---@private
+---@param ctx Context
+---@param item ItemData
+---@param targets table<string, MoveTargetData>
+---@param movePairs table<string, MoveTargetData>
+---@param takenEmptySlots table<string, boolean>
+function items:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
+end
+
+---@private
+---@param ctx Context
+---@param item ItemData
+---@param targets table<string, MoveTargetData>
+---@param movePairs table<string, MoveTargetData>
+---@param takenEmptySlots table<string, boolean>
+function items:fitForMove(ctx, item, targets, movePairs, takenEmptySlots)
+  if not addon.isRetail then
+    self:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
+    return
+  end
+
+  local class, subclass = self:GetBagTypeFromBagID(item.bagid)
+  if item.itemInfo.isCraftingReagent then
+    if class == Enum.ItemClass.Container and subclass ~= 11 and self:HasReagentBag() then
+      local freeSlot = self:GetFreeSlot(Enum.BagIndex.ReagentBag, takenEmptySlots)
+      if freeSlot then
+        table.insert(movePairs, {
+          fromBag = item.bagid,
+          fromSlot = item.slotid,
+          toBag = freeSlot.bagid,
+          toSlot = freeSlot.slotid,
+        })
+        takenEmptySlots[freeSlot.slotkey] = true
+      end
+    end
+  end
+end
+
+-- Restack is BetterBag's internal sort function for re-stacking items
+-- and moving them to the correct slots and bags. It is more performant
+-- than the standard Blizzard sort function, and does not lock the player's
+-- rendering while sorting.
 ---@param ctx Context
 ---@param kind BagKind
 ---@param callback fun(ctx: Context)|string
@@ -300,12 +375,23 @@ function items:Restack(ctx, kind, callback)
   local targets = {}
   local slotInfo = self.slotInfo[kind]
 
+  -- Pass 1: Find all items that need to be stacked, and stack them.
   for _, item in pairs(slotInfo:GetCurrentItems()) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
     if not item.isItemEmpty and item.itemInfo.itemStackCount > 1 and stackInfo then
       self:findBestFit(ctx, item, stackInfo, targets, movePairs)
     end
   end
+
+  ---@type table<string, boolean>
+  local takenEmptySlots = {}
+  -- Pass 2: Move items to the right slot for their type.
+  for _, item in pairs(slotInfo:GetCurrentItems()) do
+    if not item.isItemEmpty and ((targets[item.slotkey] and targets[item.slotkey].newNumber > 0) or (not targets[item.slotkey])) then
+      self:fitForMove(ctx, item, targets, movePairs, takenEmptySlots)
+    end
+  end
+
   if #movePairs > 0 then
     ctx:Set('moved', true)
   end
@@ -1203,6 +1289,12 @@ end
 ---@return BagKind
 function items:GetBagKindFromSlotKey(slotkey)
   local bagid = string.split('_', slotkey) --[[@as string]]
+  return self:GetBagKindFromBagID(bagid)
+end
+
+---@param bagid number
+---@return BagKind
+function items:GetBagKindFromBagID(bagid)
   if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
     return const.BAG_KIND.BANK
   end

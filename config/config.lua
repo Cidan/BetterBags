@@ -80,10 +80,23 @@ function config:GetGeneralOptions()
           events:SendMessage('search/SetInFrame', value)
         end,
       },
-      categorySell = {
+      enableEnterToMakeCategory = {
         type = "toggle",
         width = "full",
         order = 1,
+        name = L:G("Enable Enter to Make Category"),
+        desc = L:G("If enabled, pressing Enter with a search query will open the make category menu."),
+        get = function()
+          return DB:GetEnterToMakeCategory()
+        end,
+        set = function(_, value)
+          DB:SetEnterToMakeCategory(value)
+        end,
+      },
+      categorySell = {
+        type = "toggle",
+        width = "full",
+        order = 2,
         name = L:G("Enable Category Sell"),
         desc = L:G("If enabled, right-clicking a category header at a NPC shop will sell all its contents (limited to 10 stacks to allow buy-backs)."),
         get = function()
@@ -96,7 +109,7 @@ function config:GetGeneralOptions()
       showBagButton = {
         type = "toggle",
         width = "full",
-        order = 2,
+        order = 3,
         name = L:G("Show Blizzard Bag Button"),
         desc = L:G("Show or hide the default Blizzard bag button."),
         get = DB.GetShowBagButton,
@@ -113,7 +126,7 @@ function config:GetGeneralOptions()
       upgradeIconProvider = {
         type = "select",
         width = "double",
-        order = 3,
+        order = 4,
         name = L:G("Upgrade Icon Provider"),
         desc = L:G("Select the provider for the upgrade icon."),
         values = {
@@ -131,7 +144,7 @@ function config:GetGeneralOptions()
       },
       newItemTime = {
         type = "range",
-        order = 4,
+        order = 5,
         name = L:G("New Item Duration"),
         desc = L:G("The time, in minutes, to consider an item a new item."),
         min = 0,
