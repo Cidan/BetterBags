@@ -45,7 +45,8 @@ function stack:AddToStack(item)
   local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
 
   -- Always ensure the lead item in the stack is the one with the most count.
-  if item.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount then
+  if item.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount or
+  (item.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and item.slotkey > stackinfo.rootItem) then
     stackinfo.slotkeys[stackinfo.rootItem] = true
     stackinfo.slotkeys[item.slotkey] = nil
     stackinfo.rootItem = item.slotkey

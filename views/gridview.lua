@@ -84,6 +84,9 @@ end
 ---@param view View
 ---@param slotkey string
 local function CreateButton(ctx, view, slotkey)
+  if view.itemsByBagAndSlot[slotkey] then
+    return
+  end
   local item = items:GetItemDataFromSlotKey(slotkey)
   debug:Log("CreateButton", "Creating button for item", slotkey)
   local oldSection = view:GetSlotSection(slotkey)

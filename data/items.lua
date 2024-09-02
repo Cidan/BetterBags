@@ -241,6 +241,10 @@ end
 ---@param movePairs table<string, MoveTargetData>
 function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
   _ = ctx
+
+  -- Don't move items that are already full.
+  if item.itemInfo.currentItemCount == item.itemInfo.itemStackCount then return end
+
   -- Collect all the possible targets for this item.
   ---@type MoveTargetData[]
   local possibleTargets = {}
@@ -400,6 +404,7 @@ function items:Restack(ctx, kind, callback)
 
   if #movePairs > 0 then
     ctx:Set('moved', true)
+    debug:Inspect("MovePairs", movePairs)
   end
   async:Until(ctx, function(ectx)
     _ = ectx
