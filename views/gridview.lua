@@ -198,11 +198,18 @@ local function ReconcileStack(ctx, view, stackInfo)
     return
    end
 
-   -- The root item is always drawn, so first, let's draw it.
-   if not CreateButton(ctx, view, stackInfo.rootItem) then
-    -- And update it just in case it aleady exists.
-    UpdateButton(ctx, view, stackInfo.rootItem)
-   end
+  -- If any child item has a button, clear it, as it's no longer the root item.
+  for childKey in pairs(stackInfo.slotkeys) do
+    if view.itemsByBagAndSlot[childKey] then
+      ClearButton(ctx, view, childKey)
+    end
+  end
+
+  -- The root item is always drawn, so first, let's draw it.
+  if not CreateButton(ctx, view, stackInfo.rootItem) then
+   -- And update it just in case it aleady exists.
+   UpdateButton(ctx, view, stackInfo.rootItem)
+  end
 end
 
 ---@param view View
