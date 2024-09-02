@@ -57,6 +57,25 @@ function config:GetGeneralOptions()
           DB:SetCategorySell(value)
         end,
       },
+      upgradeIconProvider = {
+        type = "select",
+        width = "double",
+        order = 4,
+        name = L:G("Upgrade Icon Provider"),
+        desc = L:G("Select the provider for the upgrade icon."),
+        values = {
+          ["None"] = L:G("None"),
+          ["BetterBags"] = L:G("BetterBags"),
+        },
+        get = function()
+          return DB:GetUpgradeIconProvider()
+        end,
+        set = function(_, value)
+          DB:SetUpgradeIconProvider(value)
+          local ctx = context:New('on_click')
+          events:SendMessage(ctx, 'bag/RedrawIcons')
+        end,
+      },
       newItemTime = {
         type = "range",
         order = 2,
