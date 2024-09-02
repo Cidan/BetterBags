@@ -65,6 +65,9 @@ end
 ---@param view View
 ---@param slotkey string
 local function ClearButton(ctx, view, slotkey)
+  if not view.itemsByBagAndSlot[slotkey] then
+    return
+  end
   local item = items:GetItemDataFromSlotKey(slotkey)
   debug:Log("ClearButton", "Clearing button for item", slotkey)
   local cell = view.itemsByBagAndSlot[slotkey]
@@ -80,10 +83,15 @@ local function ClearButton(ctx, view, slotkey)
 end
 
 -- CreateButton creates a button for an item and adds it to the view.
+-- Returns true if the button was created, false if it already existed.
 ---@param ctx Context
 ---@param view View
 ---@param slotkey string
+---@return boolean
 local function CreateButton(ctx, view, slotkey)
+  if view.itemsByBagAndSlot[slotkey] then
+    return false
+  end
   local item = items:GetItemDataFromSlotKey(slotkey)
   debug:Log("CreateButton", "Creating button for item", slotkey)
   local oldSection = view:GetSlotSection(slotkey)
@@ -97,6 +105,7 @@ local function CreateButton(ctx, view, slotkey)
   section:AddCell(itemButton:GetItemData().slotkey, itemButton)
   view:AddDirtySection(category)
   view:SetSlotSection(itemButton:GetItemData().slotkey, section)
+  return true
 end
 
 ---@param ctx Context
@@ -140,6 +149,66 @@ local function UpdateViewSize(view)
     view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET - 20)
   else
     view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  end
+end
+
+---@param ctx Context
+---@param view View
+---@param stackInfo StackInfo
+local function ReconcileWithPartial(ctx, view, stackInfo)
+  local opts = database:GetStackingOptions(view.kind)
+  if not opts.dontMergePartial then return end
+  local rootItem = items:GetItemDataFromSlotKey(stackInfo.rootItem)
+
+  -- If the root item is not full, all items in the stack will be partial,
+  -- so let's make sure they all are drawn.
+  if rootItem.itemInfo.currentItemCount ~= rootItem.itemInfo.itemStackCount then
+    CreateButton(ctx, view, rootItem.slotkey)
+    for slotkey in pairs(stackInfo.slotkeys) do
+      CreateButton(ctx, view, slotkey)
+    end
+    return
+  end
+
+  -- The root item is full, so first, let's draw it.
+  if not CreateButton(ctx, view, stackInfo.rootItem) then
+    -- And update it just in case
+    UpdateButton(ctx, view, stackInfo.rootItem)
+  end
+
+  -- Now we need to check each item in the stack to see if it's partial. If it is, draw it
+  -- if it's not, clear it.
+  for slotkey in pairs(stackInfo.slotkeys) do
+    local childData = items:GetItemDataFromSlotKey(slotkey)
+    if childData.itemInfo.currentItemCount ~= childData.itemInfo.itemStackCount then
+      CreateButton(ctx, view, slotkey)
+    else
+      ClearButton(ctx, view, slotkey)
+    end
+  end
+end
+
+---@param ctx Context
+---@param view View
+---@param stackInfo StackInfo
+local function ReconcileStack(ctx, view, stackInfo)
+  local opts = database:GetStackingOptions(view.kind)
+  if opts.dontMergePartial then
+    ReconcileWithPartial(ctx, view, stackInfo)
+    return
+   end
+
+  -- If any child item has a button, clear it, as it's no longer the root item.
+  for childKey in pairs(stackInfo.slotkeys) do
+    if view.itemsByBagAndSlot[childKey] then
+      ClearButton(ctx, view, childKey)
+    end
+  end
+
+  -- The root item is always drawn, so first, let's draw it.
+  if not CreateButton(ctx, view, stackInfo.rootItem) then
+   -- And update it just in case it aleady exists.
+   UpdateButton(ctx, view, stackInfo.rootItem)
   end
 end
 
@@ -198,12 +267,9 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     not stackInfo then
       -- If stacking is not allowed, create a new button
       CreateButton(ctx, view, item.slotkey)
-    elseif stackInfo.rootItem ~= item.slotkey and view.itemsByBagAndSlot[stackInfo.rootItem] ~= nil then
-      UpdateButton(ctx, view, stackInfo.rootItem)
-    elseif stackInfo.rootItem ~= item.slotkey and view.itemsByBagAndSlot[stackInfo.rootItem] == nil then
-      CreateButton(ctx, view, stackInfo.rootItem)
     else
-      CreateButton(ctx, view, item.slotkey)
+      -- If the item is part of a stack, reconcile the stack
+      ReconcileStack(ctx, view, stackInfo)
     end
   end
 
@@ -213,8 +279,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       UpdateButton(ctx, view, item.slotkey)
     elseif view.itemsByBagAndSlot[item.slotkey] then
       UpdateButton(ctx, view, item.slotkey)
+      ReconcileStack(ctx, view, stackInfo)
     elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
       UpdateButton(ctx, view, stackInfo.rootItem)
+      ReconcileStack(ctx, view, stackInfo)
     end
   end
 
