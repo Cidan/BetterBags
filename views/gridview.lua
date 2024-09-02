@@ -193,7 +193,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     ---- Check stacking options
     if (not opts.mergeStacks) or
     (opts.unmergeAtShop and addon.atInteracting) or
-    (opts.dontMergePartial and item.itemInfo.currentItemCount < item.itemInfo.itemStackCount) or
+    (opts.dontMergePartial and item.itemInfo.itemStackCount ~= item.itemInfo.currentItemCount) or
     (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
     not stackInfo then
       -- If stacking is not allowed, create a new button

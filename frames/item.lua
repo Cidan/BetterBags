@@ -201,10 +201,18 @@ function itemFrame.itemProto:UpdateCount(ctx)
   local stack = items:GetStackData(data)
   if (not opts.mergeStacks) or
   (opts.unmergeAtShop and addon.atInteracting) or
-  (opts.dontMergePartial and data.itemInfo.currentItemCount <= data.itemInfo.itemStackCount and data.itemInfo.itemStackCount ~= 1) or
+  (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount and data.itemInfo.itemStackCount ~= 1) or
   (not opts.mergeUnstackable and data.itemInfo.itemStackCount == 1) or
   database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     count = data.itemInfo.currentItemCount
+  elseif opts.dontMergePartial and data.itemInfo.currentItemCount == data.itemInfo.itemStackCount and stack then
+    count = data.itemInfo.currentItemCount
+    for slotKey in pairs(stack.slotkeys) do
+      local childData = items:GetItemDataFromSlotKey(slotKey)
+      if childData.itemInfo.currentItemCount == childData.itemInfo.itemStackCount then
+        count = count + childData.itemInfo.currentItemCount
+      end
+    end
   else
     if stack then
       count = items:GetItemDataFromSlotKey(stack.rootItem).itemInfo.currentItemCount

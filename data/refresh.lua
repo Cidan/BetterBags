@@ -42,13 +42,13 @@ function refresh:RedrawBackpack(ctx)
 end
 
 function refresh:AfterSort(ctx)
-  self.isSorting = false
   -- TODO(lobato): Detect if only new items were moved,
   -- and only refresh the backpack if that's the case.
   -- After moving an item, the client state does not update right
   -- away, and there is a delay. This delay will prevent issues
   -- with drawing.
-  C_Timer.After(0.2, function()
+  C_Timer.After(0.5, function()
+    self.isSorting = false
     events:SendMessage(ctx, 'bags/FullRefreshAll')
   end)
 

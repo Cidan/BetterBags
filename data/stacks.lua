@@ -26,14 +26,12 @@ end
 --- Initializes or updates stack information for an item
 ---@param item ItemData
 function stack:AddToStack(item)
-  local itemHash = item.itemHash
-  local slotkey = item.slotkey
   if item.isItemEmpty then
     return
   end
 
-  if not self.stacksByItemHash[itemHash] then
-    self.stacksByItemHash[itemHash] = {count = 1, rootItem = slotkey, slotkeys = {}}
+  if not self.stacksByItemHash[item.itemHash] then
+    self.stacksByItemHash[item.itemHash] = {count = 1, rootItem = item.slotkey, slotkeys = {}}
     return
   end
 
@@ -42,18 +40,18 @@ function stack:AddToStack(item)
   ---@class Items: AceModule
   local items = addon:GetModule('Items')
 
-  local stackinfo = self.stacksByItemHash[itemHash]
+  local stackinfo = self.stacksByItemHash[item.itemHash]
 
   local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
 
   -- Always ensure the lead item in the stack is the one with the most count.
   if item.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount then
     stackinfo.slotkeys[stackinfo.rootItem] = true
-    stackinfo.slotkeys[slotkey] = nil
-    stackinfo.rootItem = slotkey
+    stackinfo.slotkeys[item.slotkey] = nil
+    stackinfo.rootItem = item.slotkey
     stackinfo.count = stackinfo.count + 1
-  elseif not stackinfo.slotkeys[slotkey] then
-    stackinfo.slotkeys[slotkey] = true
+  elseif not stackinfo.slotkeys[item.slotkey] then
+    stackinfo.slotkeys[item.slotkey] = true
     stackinfo.count = stackinfo.count + 1
   end
 end
