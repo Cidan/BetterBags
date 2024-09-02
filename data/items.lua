@@ -186,7 +186,7 @@ end
 ---@param ctx Context
 function items:WipeAndRefreshAll(ctx)
   debug:Log('WipeAndRefreshAll', "Wipe And Refresh All triggered")
-  --self:ClearItemCache()
+  self:ClearItemCache(ctx)
   ctx:Set('wipe', true)
   self:RefreshAll(ctx)
 end
