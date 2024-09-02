@@ -223,7 +223,9 @@ function gridProto:DislocateAllCellsWithID(id)
     if cell.frame:IsShown() then
       -- Get the top left point of the cell.
       local x, y = cell.frame:GetLeft(), cell.frame:GetTop()
-      table.insert(positions, {x = parentLeft - x, y = parentTop - y, cell = cell})
+      if x and y then
+        table.insert(positions, {x = parentLeft - x, y = parentTop - y, cell = cell})
+      end
     end
   end
   for _, position in ipairs(positions) do
