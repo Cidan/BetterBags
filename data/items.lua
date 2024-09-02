@@ -170,6 +170,10 @@ function items:ClearItemCache(ctx)
   self.previousItemGUID = {}
   self:ResetSlotInfo()
   search:Wipe()
+  self._firstLoad = {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true,
+  }
   ctx:Set('wipe', true)
   debug:Log("Items", "Item Cache Cleared")
 end
