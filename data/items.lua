@@ -691,6 +691,9 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       slotInfo:AddToAddedItems(currentItem)
       search:Remove(previousItem)
       search:Add(currentItem)
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and currentItem.itemInfo.itemID ~= previousItem.itemInfo.itemID then
+        self:MarkItemAsNew(ctx, currentItem)
+      end
     elseif items:ItemGUIDChanged(currentItem, previousItem) then
       debug:Log("ItemGUIDChanged", currentItem.itemInfo.itemLink)
       slotInfo:AddToRemovedItems(previousItem)

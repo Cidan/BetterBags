@@ -528,11 +528,11 @@ const.DATABASE_DEFAULTS = {
     },
     newItems = {
       [const.BAG_KIND.BACKPACK] = {
-        markRecentItems = false,
+        markRecentItems = true,
         showNewItemFlash = false,
       },
       [const.BAG_KIND.BANK] = {
-        markRecentItems = false,
+        markRecentItems = true,
         showNewItemFlash = false,
       },
     },
