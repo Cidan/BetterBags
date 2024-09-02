@@ -65,6 +65,9 @@ end
 ---@param view View
 ---@param slotkey string
 local function ClearButton(ctx, view, slotkey)
+  if not view.itemsByBagAndSlot[slotkey] then
+    return
+  end
   local item = items:GetItemDataFromSlotKey(slotkey)
   debug:Log("ClearButton", "Clearing button for item", slotkey)
   local cell = view.itemsByBagAndSlot[slotkey]
@@ -146,6 +149,41 @@ local function UpdateViewSize(view)
   end
 end
 
+---@param ctx Context
+---@param view View
+---@param stackInfo StackInfo
+local function ReconcileStack(ctx, view, stackInfo)
+  local opts = database:GetStackingOptions(view.kind)
+  if not opts.dontMergePartial then return end
+  local rootItem = items:GetItemDataFromSlotKey(stackInfo.rootItem)
+
+  -- If the root item is not full, all items in the stack will be partial,
+  -- so let's make sure they all are drawn.
+  if rootItem.itemInfo.currentItemCount ~= rootItem.itemInfo.itemStackCount then
+    CreateButton(ctx, view, rootItem.slotkey)
+    for slotkey in pairs(stackInfo.slotkeys) do
+      CreateButton(ctx, view, slotkey)
+    end
+    return
+  end
+
+  -- The root item is full, so first, let's draw it.
+  CreateButton(ctx, view, stackInfo.rootItem)
+  -- And update it just in case
+  UpdateButton(ctx, view, stackInfo.rootItem)
+
+  -- Now we need to check each item in the stack to see if it's partial. If it is, draw it
+  -- if it's not, clear it.
+  for slotkey in pairs(stackInfo.slotkeys) do
+    local childData = items:GetItemDataFromSlotKey(slotkey)
+    if childData.itemInfo.currentItemCount ~= childData.itemInfo.itemStackCount then
+      CreateButton(ctx, view, slotkey)
+    else
+      ClearButton(ctx, view, slotkey)
+    end
+  end
+end
+
 ---@param view View
 ---@param ctx Context
 ---@param bag Bag
@@ -216,8 +254,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       UpdateButton(ctx, view, item.slotkey)
     elseif view.itemsByBagAndSlot[item.slotkey] then
       UpdateButton(ctx, view, item.slotkey)
+      ReconcileStack(ctx, view, stackInfo)
     elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
       UpdateButton(ctx, view, stackInfo.rootItem)
+      ReconcileStack(ctx, view, stackInfo)
     end
   end
 

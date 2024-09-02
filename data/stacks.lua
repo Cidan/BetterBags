@@ -44,38 +44,52 @@ function stack:AddToStack(item)
 
   local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
 
+  stackinfo.slotkeys[item.slotkey] = true
+  stackinfo.count = stackinfo.count + 1
+
   -- Always ensure the lead item in the stack is the one with the most count.
-  if item.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount or
-  (item.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and item.slotkey > stackinfo.rootItem) then
-    stackinfo.slotkeys[stackinfo.rootItem] = true
-    stackinfo.slotkeys[item.slotkey] = nil
-    stackinfo.rootItem = item.slotkey
-    stackinfo.count = stackinfo.count + 1
-  elseif not stackinfo.slotkeys[item.slotkey] then
-    stackinfo.slotkeys[item.slotkey] = true
-    stackinfo.count = stackinfo.count + 1
+  for slotkey in pairs(stackinfo.slotkeys) do
+    local childData = items:GetItemDataFromSlotKey(slotkey)
+    if childData.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount or
+    (childData.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and childData.slotkey > stackinfo.rootItem) then
+      stackinfo.slotkeys[stackinfo.rootItem] = true
+      stackinfo.slotkeys[slotkey] = nil
+      stackinfo.rootItem = slotkey
+    end
   end
 end
 
 --- Removes an item from a stack
 ---@param item ItemData
 function stack:RemoveFromStack(item)
-  local itemHash = item.itemHash
-  local slotkey = item.slotkey
-  local stackinfo = self.stacksByItemHash[itemHash]
+  ---@class Items: AceModule
+  local items = addon:GetModule('Items')
+
+  local stackinfo = self.stacksByItemHash[item.itemHash]
   if not stackinfo then return end
 
-  if stackinfo.rootItem == slotkey then
+  if stackinfo.rootItem == item.slotkey then
     if next(stackinfo.slotkeys) then
       stackinfo.rootItem = next(stackinfo.slotkeys)
       stackinfo.slotkeys[stackinfo.rootItem] = nil
       stackinfo.count = stackinfo.count - 1
     else
-      self.stacksByItemHash[itemHash] = nil
+      self.stacksByItemHash[item.itemHash] = nil
     end
-  elseif stackinfo.slotkeys[slotkey] then
-    stackinfo.slotkeys[slotkey] = nil
+  elseif stackinfo.slotkeys[item.slotkey] then
+    stackinfo.slotkeys[item.slotkey] = nil
     stackinfo.count = stackinfo.count - 1
+  end
+  local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
+  -- Always ensure the lead item in the stack is the one with the most count.
+  for slotkey in pairs(stackinfo.slotkeys) do
+    local childData = items:GetItemDataFromSlotKey(slotkey)
+    if childData.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount or
+    (childData.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and childData.slotkey > stackinfo.rootItem) then
+      stackinfo.slotkeys[stackinfo.rootItem] = true
+      stackinfo.slotkeys[slotkey] = nil
+      stackinfo.rootItem = slotkey
+    end
   end
 end
 
