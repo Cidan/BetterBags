@@ -198,12 +198,31 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     not stackInfo then
       -- If stacking is not allowed, create a new button
       CreateButton(ctx, view, item.slotkey)
-    elseif stackInfo.rootItem ~= item.slotkey and view.itemsByBagAndSlot[stackInfo.rootItem] ~= nil then
-      UpdateButton(ctx, view, stackInfo.rootItem)
-    elseif stackInfo.rootItem ~= item.slotkey and view.itemsByBagAndSlot[stackInfo.rootItem] == nil then
-      CreateButton(ctx, view, stackInfo.rootItem)
     else
-      CreateButton(ctx, view, item.slotkey)
+      -- Handle if this is the only item in the stack. 
+      if next(stackInfo.slotkeys) == nil then
+        if view.itemsByBagAndSlot[stackInfo.rootItem] then
+          UpdateButton(ctx, view, stackInfo.rootItem)
+        else
+          CreateButton(ctx, view, stackInfo.rootItem)
+        end
+      else
+        local found = false
+        for slotkey in pairs(stackInfo.slotkeys) do
+          if view.itemsByBagAndSlot[slotkey] then
+            UpdateButton(ctx, view, slotkey)
+            found = true
+            break
+          end
+        end
+        if not found then
+          if view.itemsByBagAndSlot[stackInfo.rootItem] then
+            UpdateButton(ctx, view, stackInfo.rootItem)
+          else
+            CreateButton(ctx, view, stackInfo.rootItem)
+          end
+        end
+      end
     end
   end
 
