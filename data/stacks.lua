@@ -37,9 +37,22 @@ function stack:AddToStack(item)
     return
   end
 
+  -- JIT load here due to import loop.
+
+  ---@class Items: AceModule
+  local items = addon:GetModule('Items')
+
   local stackinfo = self.stacksByItemHash[itemHash]
 
-  if not stackinfo.slotkeys[slotkey] then
+  local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
+
+  -- Always ensure the lead item in the stack is the one with the most count.
+  if item.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount then
+    stackinfo.slotkeys[stackinfo.rootItem] = true
+    stackinfo.slotkeys[slotkey] = nil
+    stackinfo.rootItem = slotkey
+    stackinfo.count = stackinfo.count + 1
+  elseif not stackinfo.slotkeys[slotkey] then
     stackinfo.slotkeys[slotkey] = true
     stackinfo.count = stackinfo.count + 1
   end
