@@ -85,8 +85,9 @@ function stack:RemoveFromStack(item)
   -- Always ensure the lead item in the stack is the one with the most count.
   for slotkey in pairs(stackinfo.slotkeys) do
     local childData = items:GetItemDataFromSlotKey(slotkey)
-    if childData.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount or
-    (childData.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and childData.slotkey > stackinfo.rootItem) then
+    if rootItemData.isItemEmpty or
+    (not childData.isItemEmpty and ((childData.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount) or
+    (childData.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and childData.slotkey > stackinfo.rootItem))) then
       stackinfo.slotkeys[stackinfo.rootItem] = true
       stackinfo.slotkeys[slotkey] = nil
       stackinfo.rootItem = slotkey
