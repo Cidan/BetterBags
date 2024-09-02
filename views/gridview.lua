@@ -347,8 +347,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   end
 
   -- Sort the sections.
-  view.content.maxCellWidth = sizeInfo.columnCount
-  view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
+  if ctx:GetBool('wipe') then
+    view.content.maxCellWidth = sizeInfo.columnCount
+    view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
+  end
 
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
