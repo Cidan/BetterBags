@@ -73,8 +73,10 @@ local function ClearButton(ctx, view, slotkey)
   local cell = view.itemsByBagAndSlot[slotkey]
   if cell then
     local section = view:GetSlotSection(slotkey)
-    section:DislocateAllCellsWithID(slotkey)
-    section:RemoveCell(slotkey)
+    if section then
+      section:DislocateAllCellsWithID(slotkey)
+      section:RemoveCell(slotkey)
+    end
     view.itemsByBagAndSlot[slotkey]:Wipe(ctx)
     view.itemsByBagAndSlot[slotkey] = nil
     view:RemoveSlotSection(slotkey)
