@@ -39,6 +39,9 @@ local themes = addon:GetModule('Themes')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:NewModule('SectionItemList')
 
@@ -108,7 +111,7 @@ function sectionItemListFrame:OnItemClick(ctx, b, elementData)
     notCheckable = true,
     hasArrow = false,
     func = function()
-      database:DeleteItemFromCategory(elementData.data.itemInfo.itemID, elementData.category)
+      database:DeleteItemFromCategory(elementData.id, elementData.category)
       events:SendMessage(ctx, 'bags/FullRefreshAll')
     end
   }})
