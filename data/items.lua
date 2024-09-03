@@ -706,9 +706,17 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       search:Add(currentItem)
     elseif items:ItemChanged(currentItem, previousItem) then
       debug:Log("ItemChanged", currentItem.itemInfo.itemLink)
-      slotInfo:AddToUpdatedItems(previousItem, currentItem)
-      search:Remove(currentItem)
-      search:Add(currentItem)
+      --- HACKFIX: If the item is empty and the previous item is empty, then the item is bugged
+      --- This happens due to a race condition in Blizzard's server side code
+      --- where BAG_UPDATE and BAG_UPDATE_DELAYED events are fired prematurely.
+      --- See: https://github.com/Stanzilla/WoWUIBugs/issues/650
+      if currentItem.isItemEmpty and previousItem and previousItem.isItemEmpty then
+        debug:Log("ItemChanged", "Bugged item detected during loading, skipping.")
+      else
+        slotInfo:AddToUpdatedItems(previousItem, currentItem)
+        search:Remove(currentItem)
+        search:Add(currentItem)
+      end
     end
 
     slotInfo:StoreIfEmptySlot(name, currentItem)

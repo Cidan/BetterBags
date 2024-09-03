@@ -80,7 +80,7 @@ function ItemLoader:ProcessMixin(itemMixin)
   local itemLocation = itemMixin:GetItemLocation()
   if itemLocation == nil then return end
 
-  if itemMixin:IsItemEmpty() then
+  if not itemMixin:GetItemLocation():IsValid() then
     local data = {}
     ---@cast data +ItemData
     data.bagid, data.slotid = itemMixin:GetItemLocation():GetBagAndSlot()
