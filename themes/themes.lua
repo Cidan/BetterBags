@@ -454,7 +454,9 @@ function themes.SetupBagButton(bag, decoration)
     end
   end)
   bagButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  bagButton:SetScript("OnReceiveDrag", bag.CreateCategoryForItemInCursor)
+  addon.SetScript(bagButton, "OnReceiveDrag", function(ctx)
+    bag:CreateCategoryForItemInCursor(ctx)
+  end)
   addon.SetScript(bagButton, "OnClick", function(ctx, _, e)
     if e == "LeftButton" then
       if db:GetFirstTimeMenu() then
