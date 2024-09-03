@@ -9,9 +9,9 @@ local color = addon:NewModule('Color')
 ---@type table<number, table<number, number, number>>
 local colorTable = {
   [1] = {0.62, 0.62, 0.62},
-  [300] = {0, 0.55, 0.87},
-  [420] = {1, 1, 1},
-  [489] = {1, 0.5, 0}
+  [551] = {0, 0.55, 0.87},
+  [590] = {1, 1, 1},
+  [639] = {1, 0.5, 0}
 }
 
 ---@param colors table<number, table<number, number, number>>
