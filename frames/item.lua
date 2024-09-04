@@ -297,20 +297,20 @@ end
 ---@return integer
 function itemFrame.GetItemContextMatchResult(item)
   local itemLocation = ItemLocation:CreateFromBagAndSlot(item.bagID, item:GetID())
-  if not itemLocation then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
-  if not C_Item.DoesItemExist(itemLocation) then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
-  if not itemLocation:IsBagAndSlot() then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
-  local result = ItemButtonUtil.GetItemContextMatchResultForItem( itemLocation ) --[[@as integer]]
-  if not const.BACKPACK_BAGS[item.bagID] then return ItemButtonUtil.ItemContextMatchResult.Match end
-  if result == ItemButtonUtil.ItemContextMatchResult.Match then return ItemButtonUtil.ItemContextMatchResult.Match end
-  if addon.atBank and addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
-    if not C_Bank.IsItemAllowedInBankType( Enum.BankType.Account, itemLocation ) then
-      return ItemButtonUtil.ItemContextMatchResult.Mismatch
-    else
-      return ItemButtonUtil.ItemContextMatchResult.Match
+  if itemLocation and itemLocation:HasAnyLocation() and itemLocation:IsBagAndSlot() and itemLocation:IsValid() then
+    local result = ItemButtonUtil.GetItemContextMatchResultForItem( itemLocation ) --[[@as integer]]
+    if not const.BACKPACK_BAGS[item.bagID] then return ItemButtonUtil.ItemContextMatchResult.Match end
+    if result == ItemButtonUtil.ItemContextMatchResult.Match then return ItemButtonUtil.ItemContextMatchResult.Match end
+    if addon.atBank and addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+      if not C_Bank.IsItemAllowedInBankType( Enum.BankType.Account, itemLocation ) then
+        return ItemButtonUtil.ItemContextMatchResult.Mismatch
+      else
+        return ItemButtonUtil.ItemContextMatchResult.Match
+      end
     end
+    return result or ItemButtonUtil.ItemContextMatchResult.Match
   end
-  return result or ItemButtonUtil.ItemContextMatchResult.Match
+  return ItemButtonUtil.ItemContextMatchResult.DoesNotApply
 end
 
 ---@param ctx Context
