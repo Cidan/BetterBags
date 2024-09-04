@@ -376,12 +376,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   if database:GetShowAllFreeSpace(bag.kind) then
     freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
     freeSlotsSection:WipeOnlyContents()
-    for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, item in pairs(data) do
-        local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-        itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
-        freeSlotsSection:AddCell(item.slotkey, itemButton)
-      end
+    for _, item in ipairs(slotInfo.emptySlotsSorted) do
+      local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+      itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
+      freeSlotsSection:AddCell(item.slotkey, itemButton)
     end
     freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
   else
