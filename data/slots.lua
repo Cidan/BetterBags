@@ -30,6 +30,7 @@ local stacks = addon:GetModule('Stacks')
 ---@field addedItems table<string, ItemData> A list of items that were added since the last refresh.
 ---@field removedItems table<string, ItemData> A list of items that were removed since the last refresh.
 ---@field updatedItems table<string, ItemData> A list of items that were updated since the last refresh.
+---@field emptySlotsSorted ItemData[] A sorted list of empty slots by bag and then slot.
 ---@field stacks Stack A stack object to manage item stacks.
 local SlotInfo = {}
 
@@ -45,6 +46,7 @@ function items:NewSlotInfo()
       addedItems = {},
       removedItems = {},
       updatedItems = {},
+      emptySlotsSorted = {},
       deferDelete = false,
       stacks = stacks:Create()
     }, {__index = SlotInfo})
@@ -90,7 +92,17 @@ function SlotInfo:StoreIfEmptySlot(name, item)
     self.emptySlotByBagAndSlot[item.bagid] = self.emptySlotByBagAndSlot[item.bagid] or {}
     self.emptySlotByBagAndSlot[item.bagid][item.slotid] = item
     self.freeSlotKeys[name] = item.slotkey
+    table.insert(self.emptySlotsSorted, item)
   end
+end
+
+function SlotInfo:SortEmptySlots()
+  table.sort(self.emptySlotsSorted, function(a, b)
+    if a.bagid == b.bagid then
+      return a.slotid < b.slotid
+    end
+    return a.bagid < b.bagid
+  end)
 end
 
 ---@param bagid number
@@ -132,6 +144,7 @@ function SlotInfo:Update(ctx, newItems)
   self.updatedItems = {}
   self.emptySlotByBagAndSlot = {}
   self.dirtyItems = {}
+  self.emptySlotsSorted = {}
   self.deferDelete = false
 end
 
@@ -147,6 +160,7 @@ function SlotInfo:Wipe()
   self.addedItems = {}
   self.removedItems = {}
   self.updatedItems = {}
+  self.emptySlotsSorted = {}
   self.deferDelete = false
   self.stacks:Clear()
 end

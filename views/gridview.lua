@@ -285,11 +285,23 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if not stackInfo then
       UpdateButton(ctx, view, item.slotkey)
     elseif view.itemsByBagAndSlot[item.slotkey] then
-      UpdateButton(ctx, view, item.slotkey)
-      ReconcileStack(ctx, view, stackInfo)
+      if (not opts.mergeStacks) or
+      (opts.unmergeAtShop and addon.atInteracting) or
+      (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+        UpdateButton(ctx, view, item.slotkey)
+      else
+        UpdateButton(ctx, view, item.slotkey)
+        ReconcileStack(ctx, view, stackInfo)
+      end
     elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
-      UpdateButton(ctx, view, stackInfo.rootItem)
-      ReconcileStack(ctx, view, stackInfo)
+      if (not opts.mergeStacks) or
+      (opts.unmergeAtShop and addon.atInteracting) or
+      (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+        UpdateButton(ctx, view, stackInfo.rootItem)
+      else
+        UpdateButton(ctx, view, stackInfo.rootItem)
+        ReconcileStack(ctx, view, stackInfo)
+      end
     end
   end
 
@@ -364,12 +376,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   if database:GetShowAllFreeSpace(bag.kind) then
     freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
     freeSlotsSection:WipeOnlyContents()
-    for bagid, data in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, item in pairs(data) do
-        local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-        itemButton:SetFreeSlots(ctx, bagid, slotid, 1, true)
-        freeSlotsSection:AddCell(item.slotkey, itemButton)
-      end
+    for _, item in ipairs(slotInfo.emptySlotsSorted) do
+      local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+      itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
+      freeSlotsSection:AddCell(item.slotkey, itemButton)
     end
     freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
   else

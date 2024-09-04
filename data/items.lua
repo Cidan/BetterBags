@@ -729,6 +729,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
     search:UpdateCategoryIndex(currentItem, oldCategory)
   end
+
+  slotInfo:SortEmptySlots()
   --end, function(ectx)
     for _, addedItem in pairs(slotInfo.addedItems) do
       for _, removedItem in pairs(slotInfo.removedItems) do
