@@ -18,9 +18,8 @@ One of the last major features currently missing is user selectable themes.
 If you have any feedback, please let us know in the [Discord](https://discord.gg/a6DQuK8hV7).
 
 BetterBags currently supports the following versions of World of Warcraft:  
-Retail (including WoW: Remix and The War Within Pre-Patch)  
+Retail (The War Within)  
 Classic (Era, Cataclysm Classic, SoD, etc.)  
-The War Within Beta
 </div>
 
 # Screenshots
@@ -282,7 +281,7 @@ To deposit or withdraw gold from the Warbank, hover over the gold amount at the 
 
 ## Recent Items
 BetterBags places items that have been flagged as new by the WoW client in a special category at the top of your bag so that you can quickly find these looted items.  
-**Note: To clear recent items manually, right-click the bag icon. As of version v0.2.3, BetterBags includes its own sorting method on all versions.  
+**Note: To clear recent items manually, right-click the bag icon. As of version v0.3.0, BetterBags includes its own sorting method on all versions.  
 If you are on an older version of BetterBags and playing on Cataclysm or Classic, you must install the [SortBags Addon](https://www.curseforge.com/wow/addons/sortbags) to manually clear recent items.**
 
 These can be further fine-tuned by:
