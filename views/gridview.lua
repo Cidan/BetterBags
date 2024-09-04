@@ -92,7 +92,12 @@ end
 ---@return boolean
 local function CreateButton(ctx, view, slotkey)
   if view.itemsByBagAndSlot[slotkey] then
-    return false
+    if not view.itemsByBagAndSlot[slotkey].isFreeSlot then
+      debug:Log("CreateButton", "Button already exists for slotkey", slotkey)
+      return false
+    else
+      ClearButton(ctx, view, slotkey)
+    end
   end
   local item = items:GetItemDataFromSlotKey(slotkey)
   debug:Log("CreateButton", "Creating button for item", slotkey)
