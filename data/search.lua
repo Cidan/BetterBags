@@ -563,7 +563,7 @@ function search:EvaluateAST(node)
       elseif operator == "<" then
         return self:isLess(field, value)
       else
-        error("Unknown operator: " .. operator)
+        return {}
       end
   end
 
