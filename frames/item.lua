@@ -298,6 +298,7 @@ end
 function itemFrame.GetItemContextMatchResult(item)
   local itemLocation = ItemLocation:CreateFromBagAndSlot(item.bagID, item:GetID())
   if not itemLocation then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
+  if not itemLocation:IsValid() then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
   if not itemLocation:IsBagAndSlot() then return ItemButtonUtil.ItemContextMatchResult.DoesNotApply end
   local result = ItemButtonUtil.GetItemContextMatchResultForItem( itemLocation ) --[[@as integer]]
   if not const.BACKPACK_BAGS[item.bagID] then return ItemButtonUtil.ItemContextMatchResult.Match end
