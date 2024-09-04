@@ -285,11 +285,23 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if not stackInfo then
       UpdateButton(ctx, view, item.slotkey)
     elseif view.itemsByBagAndSlot[item.slotkey] then
-      UpdateButton(ctx, view, item.slotkey)
-      ReconcileStack(ctx, view, stackInfo)
+      if (not opts.mergeStacks) or
+      (opts.unmergeAtShop and addon.atInteracting) or
+      (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+        UpdateButton(ctx, view, item.slotkey)
+      else
+        UpdateButton(ctx, view, item.slotkey)
+        ReconcileStack(ctx, view, stackInfo)
+      end
     elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
-      UpdateButton(ctx, view, stackInfo.rootItem)
-      ReconcileStack(ctx, view, stackInfo)
+      if (not opts.mergeStacks) or
+      (opts.unmergeAtShop and addon.atInteracting) or
+      (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+        UpdateButton(ctx, view, stackInfo.rootItem)
+      else
+        UpdateButton(ctx, view, stackInfo.rootItem)
+        ReconcileStack(ctx, view, stackInfo)
+      end
     end
   end
 
