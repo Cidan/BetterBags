@@ -31,6 +31,10 @@ local formFrame = {}
 ---@field title string
 ---@field description string
 
+---@class FormCheckboxOptions
+---@field title string
+---@field description string
+
 local formCounter = 0
 -- Create will create a new form with the given layout.
 ---@param opts FormCreateOptions
@@ -42,7 +46,7 @@ function form:Create(opts)
 
   l.ScrollBox = CreateFrame("Frame", nil, l.frame, "WowScrollBox") --[[@as WowScrollBox]]
   l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -22)
-  l.ScrollBox:SetPoint("BOTTOM", 0, 4)
+  l.ScrollBox:SetPoint("BOTTOMRIGHT", l.frame, "BOTTOMRIGHT", 0, 4)
 
   l.ScrollBar = CreateFrame("EventFrame", nil, l.ScrollBox, "MinimalScrollBar") --[[@as MinimalScrollBar]]
   l.ScrollBar:SetPoint("TOPLEFT", l.frame, "TOPRIGHT", -16, -28)
@@ -58,7 +62,7 @@ function form:Create(opts)
   l.inner = CreateFrame('Frame', nil, l.ScrollBox)
   l.inner.scrollable = true
   l.inner:SetPoint("TOPLEFT", l.ScrollBox, "TOPLEFT")
-  l.inner:SetPoint("TOPRIGHT", l.ScrollBox, "TOPRIGHT")
+  l.inner:SetPoint("TOPRIGHT", l.ScrollBox, "TOPRIGHT", -18, 0)
 
   l.frame:EnableMouse(true)
   l.frame:SetMovable(true)
@@ -74,9 +78,14 @@ function form:Create(opts)
   return l
 end
 
+function formFrame:Refresh()
+  self.inner:SetHeight(self.layout.height)
+end
+
 ---@param opts FormSectionOptions
 function formFrame:AddSection(opts)
   self.layout:AddSection(opts)
+  self:Refresh()
 end
 
 function formFrame:AddInputBoxGroup(opts)
@@ -88,7 +97,10 @@ end
 function formFrame:AddTextArea(opts)
 end
 
-function formFrame:AddCheckboxGroup(opts)
+---@param opts FormCheckboxOptions
+function formFrame:AddCheckbox(opts)
+  self.layout:AddCheckbox(opts)
+  self:Refresh()
 end
 
 function formFrame:AddButtonGroup(opts)
@@ -96,18 +108,34 @@ end
 
 function formFrame:Show()
   self.frame:Show()
-  self.frame:SetSize(400, 400)
+  self.frame:SetSize(600, 400)
   self.frame:SetPoint("CENTER")
 end
 
 function form:OnEnable()
   local f = form:Create({
-    title = 'Test Form',
+    title = 'BetterBags Settings',
     layout = const.FORM_LAYOUT.STACKED
   })
  f:AddSection({
-   title = 'Section 1',
-   description = 'This is a description of the section.',
+   title = 'General',
+   description = 'General settings for BetterBags.',
  })
+  f:AddCheckbox({
+   title = 'Enable In-Bag Search',
+   description = 'If enabled, a search bar will appear at the top of your bags.',
+  })
+  f:AddCheckbox({
+    title = 'Enable Enter to Make Category',
+    description = 'If enabled, pressing Enter with a search query will open the make category menu.',
+  })
+  f:AddCheckbox({
+    title = 'Enable Category Sell and Deposit',
+    description = 'If enabled, right-clicking a category header at an NPC shop will sell all its contents, or deposit to bank.',
+  })
+  f:AddCheckbox({
+    title = 'Show Blizzard Bag Button',
+    description = 'Show or hide the default Blizzard bag button.',
+  })
   f:Show()
 end
