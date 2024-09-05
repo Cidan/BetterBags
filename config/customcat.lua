@@ -74,6 +74,11 @@ function config:GetCustomCategoryConfig()
             name = L:G("Categories you create can be enabled and disabled just like the default categories in the configuration menu option for the bag (Backpack or Bank) on the left. Once you have created a category, you can configure it by selecting it on the menu on the left."),
             order = 1,
           },
+          afterHelp = {
+            type = "description",
+            name = L:G("After creating a category, you can use the side menu via the bag menu, Configure Categories, to add or remove items"),
+            order = 2,
+          },
           name = {
             name = L:G("New Category Name"),
             type = "input",
@@ -101,9 +106,5 @@ function config:GetCustomCategoryConfig()
       }
     },
   }
-
-  for category, _ in pairs(categories:GetAllCategories()) do
-    options.args[category] = config:CreateCustomCategoryConfig(category)
-  end
   return options
 end
