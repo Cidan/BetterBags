@@ -43,6 +43,8 @@ function form:Create(opts)
   local l = setmetatable({}, {__index = formFrame}) --[[@as FormFrame]]
   l.frame = CreateFrame('Frame', format("BetterBagsForm%d%s", formCounter, opts.title), UIParent)
   formCounter = formCounter + 1
+  l.frame:SetFrameStrata("DIALOG")
+  l.frame:SetFrameLevel(9999)
 
   l.ScrollBox = CreateFrame("Frame", nil, l.frame, "WowScrollBox") --[[@as WowScrollBox]]
   l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -22)
@@ -136,6 +138,14 @@ function form:OnEnable()
   f:AddCheckbox({
     title = 'Show Blizzard Bag Button',
     description = 'Show or hide the default Blizzard bag button.',
+  })
+  f:AddSection({
+    title = 'Backpack',
+    description = 'Settings for the player backpack bag.',
+  })
+  f:AddCheckbox({
+    title = 'All Items Recent',
+    description = 'All new items you loot, pickup, or move into the bag will be marked as recent.',
   })
   f:Show()
 end
