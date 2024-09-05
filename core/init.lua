@@ -84,6 +84,9 @@ local context = addon:GetModule('Context')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Form: AceModule
+local form = addon:GetModule('Form')
+
 ---@class BagFrames
 ---@field Backpack Bag
 ---@field Bank Bag
@@ -245,6 +248,7 @@ function addon:OnEnable()
   views:Enable()
   searchCategoryConfig:Enable()
   async:Enable()
+  form:Enable()
 
   self:HideBlizzardBags()
   local rootctx = context:New('addon_enable')
