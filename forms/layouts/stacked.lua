@@ -185,21 +185,52 @@ function stackedLayout:AddSlider(opts)
   container.slider:SetMinMaxValues(opts.min, opts.max)
   container.slider:SetValueStep(opts.step)
   container.slider:SetObeyStepOnDrag(true)
+  addon.SetScript(container.slider, "OnValueChanged", function(ctx, _, value, user)
+    opts.setValue(ctx, value)
+    if user then
+      container.input:SetText(tostring(value))
+    end
+  end)
 
   container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
   container.input:SetSize(50, 20)
   container.input:SetPoint("TOP", container.slider, "BOTTOM", 0, -5)
   container.input:SetNumeric(true)
   container.input:SetAutoFocus(false)
-  addon.SetScript(container.input, "OnTextChanged", function(ctx, _, value)
-    print(value)
-    container.slider:SetValue(value)
-    --opts.setValue(ctx, value)
+  addon.SetScript(container.input, "OnEditFocusLost", function(ctx)
+    local value = tonumber(container.input:GetText())
+    if value then
+      if value < opts.min then
+        value = opts.min
+      elseif value > opts.max then
+        value = opts.max
+      end
+      container.slider:SetValue(value)
+      container.input:SetText(tostring(value))
+    else
+      value = opts.min
+    end
+    container.input:SetText(tostring(container.slider:GetValue()))
+  end)
+  addon.SetScript(container.input, "OnTextChanged", function(ctx, _, user)
+    if user then
+      local value = tonumber(container.input:GetText())
+      if value then
+        if value < opts.min then
+          value = opts.min
+        elseif value > opts.max then
+          value = opts.max
+        end
+        container.slider:SetValue(value)
+        container.input:SetText(tostring(value))
+      else
+        value = opts.min
+      end
+    else
+      container.input:SetText(tostring(container.slider:GetValue()))
+    end
   end)
 
-  addon.SetScript(container.slider, "OnValueChanged", function(ctx, _, value)
-    opts.setValue(ctx, value)
-  end)
   container.slider:SetValue(opts.getValue(context:New('Slider_Load')))
 
   container:SetHeight(
