@@ -9,6 +9,9 @@ local const = addon:GetModule('Constants')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
 
@@ -44,7 +47,6 @@ function form:Create(opts)
   l.frame = CreateFrame('Frame', format("BetterBagsForm%d%s", formCounter, opts.title), UIParent)
   formCounter = formCounter + 1
   l.frame:SetFrameStrata("DIALOG")
-  l.frame:SetFrameLevel(9999)
 
   l.ScrollBox = CreateFrame("Frame", nil, l.frame, "WowScrollBox") --[[@as WowScrollBox]]
   l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -22)
@@ -58,19 +60,17 @@ function form:Create(opts)
   l.ScrollBar:SetInterpolateScroll(true)
 
   local view = CreateScrollBoxLinearView()
-  view:SetPanExtent(100)
-  ScrollUtil.InitScrollBoxWithScrollBar(l.ScrollBox, l.ScrollBar, view)
+  view:SetPanExtent(40)
 
   l.inner = CreateFrame('Frame', nil, l.ScrollBox)
   l.inner.scrollable = true
-  l.inner:SetPoint("TOPLEFT", l.ScrollBox, "TOPLEFT")
-  l.inner:SetPoint("TOPRIGHT", l.ScrollBox, "TOPRIGHT", -18, 0)
 
   l.frame:EnableMouse(true)
   l.frame:SetMovable(true)
   l.frame:SetScript("OnMouseDown", l.frame.StartMoving)
   l.frame:SetScript("OnMouseUp", l.frame.StopMovingOrSizing)
 
+  ScrollUtil.InitScrollBoxWithScrollBar(l.ScrollBox, l.ScrollBar, view)
   themes:RegisterFlatWindow(l.frame, opts.title)
 
   if opts.layout == const.FORM_LAYOUT.STACKED then
@@ -81,7 +81,8 @@ function form:Create(opts)
 end
 
 function formFrame:Refresh()
-  self.inner:SetHeight(self.layout.height)
+  self.inner:SetHeight(self.layout.height + 50)
+  self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
 end
 
 ---@param opts FormSectionOptions
@@ -110,7 +111,7 @@ end
 
 function formFrame:Show()
   self.frame:Show()
-  self.frame:SetSize(600, 400)
+  self.frame:SetSize(600, 800)
   self.frame:SetPoint("CENTER")
 end
 

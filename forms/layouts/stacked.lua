@@ -31,10 +31,12 @@ function stackedLayout:AddSection(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormSection]]
   if t == self.targetFrame then
     container:SetPoint("TOPLEFT", t, "TOPLEFT", 10, -10)
-    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -10, -10)
+    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
+    self.height = self.height + 10
   else
     container:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -20)
-    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -10)
+    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
+    self.height = self.height + 20
   end
 
   container.title = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
@@ -48,7 +50,6 @@ function stackedLayout:AddSection(opts)
   container.description:SetJustifyH("LEFT")
   container.description:SetText(opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
-
   container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 10)
   self.sections[opts.title] = container
 
@@ -61,10 +62,12 @@ function stackedLayout:AddCheckbox(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormCheckbox]]
   if t == self.targetFrame then
     container:SetPoint("TOPLEFT", t, "TOPLEFT", 10, -10)
-    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -10, -10)
+    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
+    self.height = self.height + 10
   else
     container:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -20)
-    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -40)
+    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
+    self.height = self.height + 20
   end
 
   container.checkbox = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate") --[[@as CheckButton]]
@@ -85,10 +88,9 @@ function stackedLayout:AddCheckbox(opts)
   container.description:SetText(opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
   container.description:SetPoint("RIGHT", container, "RIGHT", 0, 0)
-
   container.description:GetLineHeight()
   container.description:GetStringHeight()
-  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 10)
+  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end
