@@ -12,6 +12,12 @@ local themes = addon:GetModule('Themes')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Database: AceModule
+local db = addon:GetModule('Database')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
 
@@ -73,7 +79,7 @@ function form:Create(opts)
 end
 
 function formFrame:Refresh()
-  self.inner:SetHeight(self.layout.height + 50)
+  self.inner:SetHeight(self.layout.height + 20)
   self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
 end
 
@@ -91,6 +97,7 @@ end
 ---@param opts FormSliderOptions
 function formFrame:AddSlider(opts)
   self.layout:AddSlider(opts)
+  self:Refresh()
 end
 
 function formFrame:AddInputBoxGroup(opts)
@@ -132,18 +139,43 @@ function form:OnEnable()
   f:AddCheckbox({
    title = 'Enable In-Bag Search',
    description = 'If enabled, a search bar will appear at the top of your bags.',
+   getValue = function(ctx)
+    return db:GetInBagSearch()
+   end,
+    setValue = function(ctx, value)
+      db:SetInBagSearch(value)
+      events:SendMessage(ctx, 'search/SetInFrame', value)
+    end
   })
   f:AddCheckbox({
     title = 'Enable Enter to Make Category',
     description = 'If enabled, pressing Enter with a search query will open the make category menu.',
+    getValue = function(ctx)
+      return db:GetEnterToMakeCategory()
+    end,
+    setValue = function(ctx, value)
+      db:SetEnterToMakeCategory(value)
+    end
   })
   f:AddCheckbox({
     title = 'Enable Category Sell and Deposit',
     description = 'If enabled, right-clicking a category header at an NPC shop will sell all its contents, or deposit to bank.',
+    getValue = function(ctx)
+      return db:GetCategorySell()
+    end,
+    setValue = function(ctx, value)
+      db:SetCategorySell(value)
+    end
   })
   f:AddCheckbox({
     title = 'Show Blizzard Bag Button',
     description = 'Show or hide the default Blizzard bag button.',
+    getValue = function(ctx)
+      return db:GetShowBagButton()
+    end,
+    setValue = function(ctx, value)
+      db:SetShowBagButton(value)
+    end
   })
 
   local fakedb = {
@@ -151,6 +183,10 @@ function form:OnEnable()
     ['backpackSectionOrder'] = 'Alphabetically',
     ['backpackItemOrder'] = 'Alphabetically',
     ['newItemsDuration'] = 30,
+    ['itemsPerRow'] = 5,
+    ['columns'] = 2,
+    ['opacity'] = 92,
+    ['scale'] = 100
   }
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
@@ -214,36 +250,83 @@ function form:OnEnable()
   f:AddCheckbox({
     title = 'All Items Recent',
     description = 'All new items you loot, pickup, or move into the bag will be marked as recent.',
+    getValue = function(ctx)
+      return db:GetMarkRecentItems(const.BAG_KIND.BACKPACK)
+    end,
+    setValue = function(ctx, value)
+      db:SetMarkRecentItems(const.BAG_KIND.BACKPACK, value)
+    end
   })
 
   f:AddCheckbox({
     title = 'Flash Stacks',
     description = 'When a stack of items gets a new item, the stack will flash.',
+    getValue = function(ctx)
+      return db:GetShowNewItemFlash(const.BAG_KIND.BACKPACK)
+    end,
+    setValue = function(ctx, value)
+      db:SetShowNewItemFlash(const.BAG_KIND.BACKPACK, value)
+    end
   })
 
   f:AddCheckbox({
     title = 'Merge Stacks',
     description = 'Stackable items will merge into a single item button in your backpack.',
+    getValue = function(ctx)
+      return db:GetStackingOptions(const.BAG_KIND.BACKPACK).mergeStacks
+    end,
+    setValue = function(ctx, value)
+      db:GetStackingOptions(const.BAG_KIND.BACKPACK).mergeStacks = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
   f:AddCheckbox({
     title = 'Merge Unstackable',
     description = 'Unstackable items, such as armor and weapons, will merge into a single item button in your backpack.',
+    getValue = function(ctx)
+      return db:GetStackingOptions(const.BAG_KIND.BACKPACK).mergeUnstackable
+    end,
+    setValue = function(ctx, value)
+      db:GetStackingOptions(const.BAG_KIND.BACKPACK).mergeUnstackable = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
   f:AddCheckbox({
     title = "Don't Merge Partial Stacks",
     description = 'Partial stacks of items will not merge with other partial or full stacks.',
+    getValue = function(ctx)
+      return db:GetStackingOptions(const.BAG_KIND.BACKPACK).dontMergePartial
+    end,
+    setValue = function(ctx, value)
+      db:GetStackingOptions(const.BAG_KIND.BACKPACK).dontMergePartial = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
   f:AddCheckbox({
     title = "Split Transmogged Items",
     description = 'Transmogged items will be split into a separate, stackable button in your backpack.',
+    getValue = function(ctx)
+      return db:GetStackingOptions(const.BAG_KIND.BACKPACK).dontMergeTransmog
+    end,
+    setValue = function(ctx, value)
+      db:GetStackingOptions(const.BAG_KIND.BACKPACK).dontMergeTransmog = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
   f:AddCheckbox({
     title = 'Unmerge on Interactions',
     description = 'When you interact a vendor, mailbox, auction house, etc, all merged items will unmerge.',
+    getValue = function(ctx)
+      return db:GetStackingOptions(const.BAG_KIND.BACKPACK).unmergeAtShop
+    end,
+    setValue = function(ctx, value)
+      db:GetStackingOptions(const.BAG_KIND.BACKPACK).unmergeAtShop = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
 
@@ -255,11 +338,25 @@ function form:OnEnable()
   f:AddCheckbox({
     title = 'Show Item Level',
     description = 'Show the item level on item buttons in the backpack.',
+    getValue = function(ctx)
+      return db:GetItemLevelOptions(const.BAG_KIND.BACKPACK).enabled
+    end,
+    setValue = function(ctx, value)
+      db:GetItemLevelOptions(const.BAG_KIND.BACKPACK).enabled = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
   f:AddCheckbox({
     title = 'Show Item Level Color',
     description = 'Show the item level in color on item buttons in the backpack.',
+    getValue = function(ctx)
+      return db:GetItemLevelOptions(const.BAG_KIND.BACKPACK).color
+    end,
+    setValue = function(ctx, value)
+      db:GetItemLevelOptions(const.BAG_KIND.BACKPACK).color = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
 
@@ -271,17 +368,93 @@ function form:OnEnable()
   f:AddCheckbox({
     title = 'Show Full Section Names',
     description = 'Show the full section names for each section and do not cut them off.',
+    getValue = function(ctx)
+      return db:GetShowFullSectionNames(const.BAG_KIND.BACKPACK)
+    end,
+    setValue = function(ctx, value)
+      db:SetShowFullSectionNames(const.BAG_KIND.BACKPACK, value)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
   f:AddCheckbox({
     title = 'Show All Free Space Slots',
     description = 'Show all free space slots, individually, at the bottom of the backpack.',
+    getValue = function(ctx)
+      return db:GetShowAllFreeSpace(const.BAG_KIND.BACKPACK)
+    end,
+    setValue = function(ctx, value)
+      db:SetShowAllFreeSpace(const.BAG_KIND.BACKPACK, value)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
   f:AddCheckbox({
     title = 'Extra Glowy Item Buttons',
     description = 'Item buttons will have an enhanced glow effect using the item quality color.',
+    getValue = function(ctx)
+      return db:GetExtraGlowyButtons(const.BAG_KIND.BACKPACK)
+    end,
+    setValue = function(ctx, value)
+      db:SetExtraGlowyButtons(const.BAG_KIND.BACKPACK, value)
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
   })
 
+  f:AddSlider({
+    title = 'Items Per Row',
+    description = 'The number of items per row in each section.',
+    min = 3,
+    max = 20,
+    step = 1,
+    getValue = function(ctx)
+      return fakedb['itemsPerRow']
+    end,
+    setValue = function(ctx, value)
+      fakedb['itemsPerRow'] = value
+    end,
+  })
+
+  f:AddSlider({
+    title = 'Columns',
+    description = 'The number of columns in the backpack.',
+    min = 1,
+    max = 20,
+    step = 1,
+    getValue = function(ctx)
+      return fakedb['columns']
+    end,
+    setValue = function(ctx, value)
+      fakedb['columns'] = value
+    end,
+  })
+
+  f:AddSlider({
+    title = 'Opacity',
+    description = 'The opacity of the background of the backpack.',
+    min = 0,
+    max = 100,
+    step = 1,
+    getValue = function(ctx)
+      return fakedb['opacity']
+    end,
+    setValue = function(ctx, value)
+      fakedb['opacity'] = value
+    end,
+  })
+
+  f:AddSlider({
+    title = 'Scale',
+    description = 'The scale of the backpack.',
+    min = 50,
+    max = 200,
+    step = 1,
+    getValue = function(ctx)
+      return fakedb['scale']
+    end,
+    setValue = function(ctx, value)
+      fakedb['scale'] = value
+    end,
+  })
   f:Show()
 end

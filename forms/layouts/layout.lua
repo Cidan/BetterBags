@@ -49,6 +49,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormCheckboxOptions
 ---@field title string
 ---@field description string
+---@field getValue fun(ctx: Context): boolean
+---@field setValue fun(ctx: Context, value: boolean)
 
 ---@class (exact) FormDropdownOptions
 ---@field title string

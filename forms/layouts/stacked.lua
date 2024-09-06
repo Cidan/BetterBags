@@ -117,6 +117,10 @@ function stackedLayout:AddCheckbox(opts)
 
   container.checkbox = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate") --[[@as CheckButton]]
   container.checkbox:SetPoint("TOPLEFT", container, "TOPLEFT")
+  addon.SetScript(container.checkbox, "OnClick", function(ctx)
+    opts.setValue(ctx, container.checkbox:GetChecked())
+  end)
+  container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Load')))
 
   container.title = self:createTitle(container, opts.title)
   container.title:SetPoint("LEFT", container.checkbox, "RIGHT", 5, 0)
