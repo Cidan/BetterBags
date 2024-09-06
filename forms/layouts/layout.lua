@@ -22,7 +22,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormDropdown: Frame
 ---@field title FontString
 ---@field description FontString
----@field dropdown Button
+---@field dropdown DropdownButton
 
 --[[
 -- Widget Options
@@ -36,10 +36,12 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field title string
 ---@field description string
 
----@class FormDropdownOptions
+---@class (exact) FormDropdownOptions
 ---@field title string
 ---@field description string
 ---@field items string[]
+---@field getValue fun(string): boolean
+---@field setValue fun(string)
 
 ---@class (exact) FormLayout
 ---@field targetFrame Frame

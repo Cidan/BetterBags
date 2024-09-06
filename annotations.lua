@@ -113,6 +113,14 @@ MainMenuBarBackpackButton = {}
 ---@class BagBarExpandToggle: Button
 BagBarExpandToggle = {}
 
+---@class DropdownButton: Button
+local dropdownButton = {}
+
+---@param setupFunction fun(dropdown: DropdownButton, root: table)
+function dropdownButton:SetupMenu(setupFunction) end
+
+function dropdownButton:GenerateMenu() end
+
 ---@class BetterBagsDebugListButton: Button
 ---@field RowNumber FontString
 ---@field Category FontString

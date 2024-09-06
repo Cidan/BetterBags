@@ -122,18 +122,13 @@ function stackedLayout:AddDropdown(opts)
   container.description:SetText(opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
-  container.dropdown = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate") --[[@as Button]]
+  container.dropdown = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
   container.dropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  local getValue = function(value)
-    return value == "None"
-  end
-  local setValue = function(value)
-  end
-  container.dropdown:SetupMenu(function(dropdown, rootDescription)
+  container.dropdown:SetupMenu(function(_, root)
     for _, item in ipairs(opts.items) do
-      rootDescription:CreateCheckbox(item, getValue, setValue, item)
+      root:CreateCheckbox(item, opts.getValue, opts.setValue, item)
     end
   end)
 

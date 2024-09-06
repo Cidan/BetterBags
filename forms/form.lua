@@ -86,6 +86,7 @@ end
 function formFrame:AddInputBoxGroup(opts)
 end
 
+---@param opts FormDropdownOptions
 function formFrame:AddDropdown(opts)
   self.layout:AddDropdown(opts)
   self:Refresh()
@@ -134,11 +135,20 @@ function form:OnEnable()
     title = 'Show Blizzard Bag Button',
     description = 'Show or hide the default Blizzard bag button.',
   })
+
+  local holder = "None"
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
     items = {'None', 'BetterBags'},
+    getValue = function(value)
+      return value == holder
+    end,
+    setValue = function(value)
+      holder = value
+    end,
   })
+
   f:AddSection({
     title = 'Backpack',
     description = 'Settings for the player backpack bag.',
