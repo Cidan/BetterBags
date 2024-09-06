@@ -225,5 +225,42 @@ function form:OnEnable()
     description = 'When you interact a vendor, mailbox, auction house, etc, all merged items will unmerge.',
   })
 
+
+  f:AddSubSection({
+    title = 'Item Level',
+    description = 'Settings for item level in the backpack.',
+  })
+
+  f:AddCheckbox({
+    title = 'Show Item Level',
+    description = 'Show the item level on item buttons in the backpack.',
+  })
+
+  f:AddCheckbox({
+    title = 'Show Item Level Color',
+    description = 'Show the item level in color on item buttons in the backpack.',
+  })
+
+
+  f:AddSubSection({
+    title = 'Display',
+    description = 'Settings that adjust layout and visual aspects of the backpack.',
+  })
+
+  f:AddCheckbox({
+    title = 'Show Full Section Names',
+    description = 'Show the full section names for each section and do not cut them off.',
+  })
+
+  f:AddCheckbox({
+    title = 'Show All Free Space Slots',
+    description = 'Show all free space slots, individually, at the bottom of the backpack.',
+  })
+
+  f:AddCheckbox({
+    title = 'Extra Glowy Item Buttons',
+    description = 'Item buttons will have an enhanced glow effect using the item quality color.',
+  })
+
   f:Show()
 end
