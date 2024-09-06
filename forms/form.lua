@@ -52,7 +52,7 @@ function form:Create(opts)
   l.ScrollBar:SetInterpolateScroll(true)
 
   local view = CreateScrollBoxLinearView()
-  view:SetPanExtent(40)
+  view:SetPanExtent(60)
 
   l.inner = CreateFrame('Frame', nil, l.ScrollBox)
   l.inner.scrollable = true
@@ -83,8 +83,14 @@ function formFrame:AddSection(opts)
   self:Refresh()
 end
 
+---@param opts FormSubSectionOptions
 function formFrame:AddSubSection(opts)
   self.layout:AddSubSection(opts)
+end
+
+---@param opts FormSliderOptions
+function formFrame:AddSlider(opts)
+  self.layout:AddSlider(opts)
 end
 
 function formFrame:AddInputBoxGroup(opts)
@@ -144,6 +150,7 @@ function form:OnEnable()
     ['upgradeIconProvider'] = 'BetterBags',
     ['backpackSectionOrder'] = 'Alphabetically',
     ['backpackItemOrder'] = 'Alphabetically',
+    ['newItemsDuration'] = 30,
   }
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
@@ -154,6 +161,20 @@ function form:OnEnable()
     end,
     setValue = function(value)
       fakedb['upgradeIconProvider'] = value
+    end,
+  })
+
+  f:AddSlider({
+    title = 'New Item Duration',
+    description = 'The duration in minutes that an item is considered new.',
+    min = 1,
+    max = 120,
+    step = 1,
+    getValue = function(ctx)
+      return fakedb['newItemsDuration']
+    end,
+    setValue = function(ctx, value)
+      fakedb['newItemsDuration'] = value
     end,
   })
 

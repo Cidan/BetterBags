@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class (exact) FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
 
@@ -157,6 +160,54 @@ function stackedLayout:AddDropdown(opts)
     container.description:GetLineHeight() +
     container.dropdown:GetHeight() +
     25
+  )
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+end
+
+---@param opts FormSliderOptions
+function stackedLayout:AddSlider(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormSlider]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title)
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  container.slider = CreateFrame("Slider", nil, container, "UISliderTemplate") --[[@as Slider]]
+  container.slider:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  container.slider:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+  container.slider:SetOrientation("HORIZONTAL")
+  container.slider:SetHeight(20)
+  container.slider:SetMinMaxValues(opts.min, opts.max)
+  container.slider:SetValueStep(opts.step)
+  container.slider:SetObeyStepOnDrag(true)
+
+  container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
+  container.input:SetSize(50, 20)
+  container.input:SetPoint("TOP", container.slider, "BOTTOM", 0, -5)
+  container.input:SetNumeric(true)
+  container.input:SetAutoFocus(false)
+  addon.SetScript(container.input, "OnTextChanged", function(ctx, _, value)
+    print(value)
+    container.slider:SetValue(value)
+    --opts.setValue(ctx, value)
+  end)
+
+  addon.SetScript(container.slider, "OnValueChanged", function(ctx, _, value)
+    opts.setValue(ctx, value)
+  end)
+  container.slider:SetValue(opts.getValue(context:New('Slider_Load')))
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.slider:GetHeight() +
+    container.input:GetHeight() +
+    30
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()

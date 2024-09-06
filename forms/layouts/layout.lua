@@ -28,19 +28,25 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field description FontString
 ---@field dropdown DropdownButton
 
+---@class (exact) FormSlider: Frame
+---@field title FontString
+---@field description FontString
+---@field slider Slider
+---@field input EditBox
+
 --[[
 -- Widget Options
 ]]--
 
----@class FormSectionOptions
+---@class (exact) FormSectionOptions
 ---@field title string
 ---@field description string
 
----@class FormSubSectionOptions
+---@class (exact) FormSubSectionOptions
 ---@field title string
 ---@field description string
 
----@class FormCheckboxOptions
+---@class (exact) FormCheckboxOptions
 ---@field title string
 ---@field description string
 
@@ -51,6 +57,15 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field getValue fun(string): boolean
 ---@field setValue fun(string)
 
+---@class (exact) FormSliderOptions
+---@field title string
+---@field description string
+---@field min number
+---@field max number
+---@field step number
+---@field getValue fun(ctx: Context): number
+---@field setValue fun(ctx: Context, value: number)
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -59,3 +74,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddCheckbox fun(self: FormLayout, opts: FormCheckboxOptions)
 ---@field AddDropdown fun(self: FormLayout, opts: FormDropdownOptions)
 ---@field AddSubSection fun(self: FormLayout, opts: FormSubSectionOptions)
+---@field AddSlider fun(self: FormLayout, opts: FormSliderOptions)
