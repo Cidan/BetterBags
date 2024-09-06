@@ -30,14 +30,6 @@ local formFrame = {}
 ---@field title string
 ---@field layout FormLayoutType
 
----@class FormSectionOptions
----@field title string
----@field description string
-
----@class FormCheckboxOptions
----@field title string
----@field description string
-
 local formCounter = 0
 -- Create will create a new form with the given layout.
 ---@param opts FormCreateOptions
@@ -94,7 +86,9 @@ end
 function formFrame:AddInputBoxGroup(opts)
 end
 
-function formFrame:AddDropdownGroup(opts)
+function formFrame:AddDropdown(opts)
+  self.layout:AddDropdown(opts)
+  self:Refresh()
 end
 
 function formFrame:AddTextArea(opts)
@@ -139,6 +133,11 @@ function form:OnEnable()
   f:AddCheckbox({
     title = 'Show Blizzard Bag Button',
     description = 'Show or hide the default Blizzard bag button.',
+  })
+  f:AddDropdown({
+    title = 'Upgrade Icon Provider',
+    description = 'Select the icon provider for item upgrades.',
+    items = {'None', 'BetterBags'},
   })
   f:AddSection({
     title = 'Backpack',
