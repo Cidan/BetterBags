@@ -136,16 +136,20 @@ function form:OnEnable()
     description = 'Show or hide the default Blizzard bag button.',
   })
 
-  local holder = "None"
+  local fakedb = {
+    ['upgradeIconProvider'] = 'BetterBags',
+    ['backpackSectionOrder'] = 'Alphabetically',
+    ['backpackItemOrder'] = 'Alphabetically',
+  }
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
     items = {'None', 'BetterBags'},
     getValue = function(value)
-      return value == holder
+      return value == fakedb['upgradeIconProvider']
     end,
     setValue = function(value)
-      holder = value
+      fakedb['upgradeIconProvider'] = value
     end,
   })
 
@@ -153,9 +157,64 @@ function form:OnEnable()
     title = 'Backpack',
     description = 'Settings for the player backpack bag.',
   })
+
+  f:AddDropdown({
+    title = 'Section Order',
+    description = 'The order of sections in the backpack when not pinned.',
+    items = {'Alphabetically', 'Size Descending', 'Size Ascending'},
+    getValue = function(value)
+      return value == fakedb['backpackSectionOrder']
+    end,
+    setValue = function(value)
+      fakedb['backpackSectionOrder'] = value
+    end,
+  })
+
+  f:AddDropdown({
+    title = 'Item Order',
+    description = 'The default order of items within each section.',
+    items = {'Alphabetically', 'Quality', 'Item Level'},
+    getValue = function(value)
+      return value == fakedb['backpackItemOrder']
+    end,
+    setValue = function(value)
+      fakedb['backpackItemOrder'] = value
+    end,
+  })
   f:AddCheckbox({
     title = 'All Items Recent',
     description = 'All new items you loot, pickup, or move into the bag will be marked as recent.',
   })
+
+  f:AddCheckbox({
+    title = 'Flash Stacks',
+    description = 'When a stack of items gets a new item, the stack will flash.',
+  })
+
+  f:AddCheckbox({
+    title = 'Merge Stacks',
+    description = 'Stackable items will merge into a single item button in your backpack.',
+  })
+
+  f:AddCheckbox({
+    title = 'Merge Unstackable',
+    description = 'Unstackable items, such as armor and weapons, will merge into a single item button in your backpack.',
+  })
+
+  f:AddCheckbox({
+    title = "Don't Merge Partial Stacks",
+    description = 'Partial stacks of items will not merge with other partial or full stacks.',
+  })
+
+  f:AddCheckbox({
+    title = "Split Transmogged Items",
+    description = 'Transmogged items will be split into a separate, stackable button in your backpack.',
+  })
+
+  f:AddCheckbox({
+    title = 'Unmerge on Interactions',
+    description = 'When you interact a vendor, mailbox, auction house, etc, all merged items will unmerge.',
+  })
+
   f:Show()
 end
