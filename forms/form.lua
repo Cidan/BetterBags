@@ -83,6 +83,10 @@ function formFrame:AddSection(opts)
   self:Refresh()
 end
 
+function formFrame:AddSubSection(opts)
+  self.layout:AddSubSection(opts)
+end
+
 function formFrame:AddInputBoxGroup(opts)
 end
 
@@ -180,6 +184,11 @@ function form:OnEnable()
     setValue = function(value)
       fakedb['backpackItemOrder'] = value
     end,
+  })
+
+  f:AddSubSection({
+    title = 'Item Stacking',
+    description = 'Settings for item stacking in the backpack.',
   })
   f:AddCheckbox({
     title = 'All Items Recent',

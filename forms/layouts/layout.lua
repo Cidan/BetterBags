@@ -14,6 +14,10 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field title FontString
 ---@field description FontString
 
+---@class (exact) FormSubSection: Frame
+---@field title FontString
+---@field description FontString
+
 ---@class (exact) FormCheckbox: Frame
 ---@field title FontString
 ---@field description FontString
@@ -29,6 +33,10 @@ local layouts = addon:NewModule('FormLayouts')
 ]]--
 
 ---@class FormSectionOptions
+---@field title string
+---@field description string
+
+---@class FormSubSectionOptions
 ---@field title string
 ---@field description string
 
@@ -50,3 +58,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddSection fun(self: FormLayout, opts: FormSectionOptions)
 ---@field AddCheckbox fun(self: FormLayout, opts: FormCheckboxOptions)
 ---@field AddDropdown fun(self: FormLayout, opts: FormDropdownOptions)
+---@field AddSubSection fun(self: FormLayout, opts: FormSubSectionOptions)

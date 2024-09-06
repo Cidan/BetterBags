@@ -25,31 +25,61 @@ function layouts:NewStackedLayout(targetFrame)
   return l
 end
 
+---@private
+---@param t Frame
+---@param container Frame
+---@param indent? number
+function stackedLayout:alignFrame(t, container, indent)
+  indent = indent or 0
+  if t == self.targetFrame then
+    container:SetPoint("TOPLEFT", t, "TOPLEFT", 10 + indent, -10)
+    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
+    self.height = self.height + 10
+  else
+    container:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0 + indent, -20)
+    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
+    self.height = self.height + 20
+  end
+end
+
+---@private
+---@param container Frame
+---@param title string
+---@return FontString
+function stackedLayout:createTitle(container, title)
+  local titleFont = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  titleFont:SetTextColor(1, 1, 1)
+  titleFont:SetJustifyH("LEFT")
+  titleFont:SetText(title)
+  return titleFont
+end
+
+---@private
+---@param container Frame
+---@param description string
+---@return FontString
+function stackedLayout:createDescription(container, description)
+  local descriptionFont = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  descriptionFont:SetTextColor(1, 1, 1)
+  descriptionFont:SetJustifyH("LEFT")
+  descriptionFont:SetText(description)
+  descriptionFont:SetWordWrap(true)
+  descriptionFont:SetNonSpaceWrap(true)
+  return descriptionFont
+end
+
 ---@param opts FormSectionOptions
 function stackedLayout:AddSection(opts)
   local t = self.nextFrame
   local container = CreateFrame("Frame", nil, t) --[[@as FormSection]]
-  if t == self.targetFrame then
-    container:SetPoint("TOPLEFT", t, "TOPLEFT", 10, -10)
-    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
-    self.height = self.height + 10
-  else
-    container:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -20)
-    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
-    self.height = self.height + 20
-  end
+  self:alignFrame(t, container)
 
-  container.title = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  container.title:SetTextColor(1, 1, 1)
-  container.title:SetJustifyH("LEFT")
-  container.title:SetText(opts.title)
+  container.title = self:createTitle(container, opts.title)
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT")
 
-  container.description = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  container.description:SetTextColor(1, 1, 1)
-  container.description:SetJustifyH("LEFT")
-  container.description:SetText(opts.description)
+  container.description = self:createDescription(container, opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
   container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 10)
   self.sections[opts.title] = container
 
@@ -57,39 +87,41 @@ function stackedLayout:AddSection(opts)
   self.height = self.height + container:GetHeight()
 end
 
+---@param opts FormSubSectionOptions
+function stackedLayout:AddSubSection(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormSubSection]]
+  self:alignFrame(t, container)
+
+  local titleContainer = CreateFrame("Frame", nil, container)
+  titleContainer:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  titleContainer:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+  container.title = self:createTitle(titleContainer, opts.title)
+  container.title:SetPoint("TOPLEFT", titleContainer, "TOPLEFT")
+  container.description = self:createDescription(container, opts.description)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+end
+
+---@param opts FormCheckboxOptions
 function stackedLayout:AddCheckbox(opts)
   local t = self.nextFrame
   local container = CreateFrame("Frame", nil, t) --[[@as FormCheckbox]]
-  if t == self.targetFrame then
-    container:SetPoint("TOPLEFT", t, "TOPLEFT", 10, -10)
-    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
-    self.height = self.height + 10
-  else
-    container:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -20)
-    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
-    self.height = self.height + 20
-  end
+  self:alignFrame(t, container)
 
   container.checkbox = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate") --[[@as CheckButton]]
   container.checkbox:SetPoint("TOPLEFT", container, "TOPLEFT")
 
-  container.title = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  container.title:SetTextColor(1, 1, 1)
-  container.title:SetJustifyH("LEFT")
-  container.title:SetText(opts.title)
+  container.title = self:createTitle(container, opts.title)
   container.title:SetPoint("LEFT", container.checkbox, "RIGHT", 5, 0)
   container.title:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  container.description = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  container.description:SetTextColor(1, 1, 1)
-  container.description:SetJustifyH("LEFT")
-  container.description:SetWordWrap(true)
-  container.description:SetNonSpaceWrap(true)
-  container.description:SetText(opts.description)
+  container.description = self:createDescription(container, opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
   container.description:SetPoint("RIGHT", container, "RIGHT", 0, 0)
-  container.description:GetLineHeight()
-  container.description:GetStringHeight()
 
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
   self.nextFrame = container
@@ -100,26 +132,12 @@ end
 function stackedLayout:AddDropdown(opts)
   local t = self.nextFrame
   local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
-  if t == self.targetFrame then
-    container:SetPoint("TOPLEFT", t, "TOPLEFT", 10, -10)
-    container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
-    self.height = self.height + 10
-  else
-    container:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -20)
-    container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
-    self.height = self.height + 20
-  end
+  self:alignFrame(t, container)
 
-  container.title = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  container.title:SetTextColor(1, 1, 1)
-  container.title:SetJustifyH("LEFT")
-  container.title:SetText(opts.title)
+  container.title = self:createTitle(container, opts.title)
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  container.description:SetTextColor(1, 1, 1)
-  container.description:SetJustifyH("LEFT")
-  container.description:SetText(opts.description)
+  container.description = self:createDescription(container, opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
   container.dropdown = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
