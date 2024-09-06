@@ -71,6 +71,61 @@ function stackedLayout:createDescription(container, description)
   return descriptionFont
 end
 
+---@private
+---@param parent Frame
+---@return Frame
+function stackedLayout:createDividerLineMiddle(parent)
+  local container = CreateFrame("Frame", nil, parent)
+  local white = CreateColor(1, 1, 1, 1)
+  local faded = CreateColor(1, 1, 1, 0.2)
+  local left = container:CreateTexture(nil, "ARTWORK")
+
+  left:SetGradient("HORIZONTAL", faded, white)
+  left:SetColorTexture(1, 1, 1, 1)
+  left:SetHeight(1)
+  left:SetWidth(100)
+
+  local middle = container:CreateTexture(nil, "ARTWORK")
+  middle:SetColorTexture(1, 1, 1, 1)
+  middle:SetHeight(1)
+
+  local right = container:CreateTexture(nil, "ARTWORK")
+  right:SetGradient("HORIZONTAL", white, faded)
+  right:SetColorTexture(1, 1, 1, 1)
+  right:SetHeight(1)
+  right:SetWidth(100)
+
+  left:SetPoint("LEFT", container, "LEFT")
+  middle:SetPoint("LEFT", left, "RIGHT")
+  middle:SetPoint("RIGHT", right, "LEFT")
+  right:SetPoint("RIGHT", container, "RIGHT")
+  container:SetHeight(3)
+  return container
+end
+
+function stackedLayout:createDividerLineLeft(parent)
+  local container = CreateFrame("Frame", nil, parent)
+  local white = CreateColor(1, 1, 1, 1)
+  local faded = CreateColor(1, 1, 1, 0.2)
+
+  local left = container:CreateTexture(nil, "ARTWORK")
+  left:SetColorTexture(1, 1, 1, 1)
+  left:SetHeight(1)
+
+  local right = container:CreateTexture(nil, "ARTWORK")
+  right:SetGradient("HORIZONTAL", white, faded)
+  right:SetColorTexture(1, 1, 1, 1)
+  right:SetHeight(1)
+  right:SetWidth(100)
+
+  left:SetPoint("LEFT", container, "LEFT")
+  right:SetPoint("LEFT", left, "RIGHT")
+  right:SetPoint("RIGHT", container, "RIGHT")
+
+  container:SetHeight(3)
+  return container
+end
+
 ---@param opts FormSectionOptions
 function stackedLayout:AddSection(opts)
   local t = self.nextFrame
@@ -83,7 +138,11 @@ function stackedLayout:AddSection(opts)
   container.description = self:createDescription(container, opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
-  container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 10)
+  local div = self:createDividerLineLeft(container)
+  div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+
+  container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 18)
   self.sections[opts.title] = container
 
   self.nextFrame = container
@@ -103,8 +162,10 @@ function stackedLayout:AddSubSection(opts)
   container.title:SetPoint("TOPLEFT", titleContainer, "TOPLEFT")
   container.description = self:createDescription(container, opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
-
-  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
+  local div = self:createDividerLineMiddle(container)
+  div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 33)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end

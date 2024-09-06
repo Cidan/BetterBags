@@ -174,6 +174,7 @@ local gw2Theme = {
 
       decoration:SetAllPoints()
       decoration:SetFrameStrata("BACKGROUND")
+      decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
 
       decoration:SetBackdrop(gw.BackdropTemplates.Default)
       decoration.title:ClearAllPoints()
@@ -201,7 +202,8 @@ local gw2Theme = {
       decoration.title = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
 
       decoration:SetAllPoints()
-      decoration:SetFrameStrata("BACKGROUND")
+      decoration:SetFrameStrata(frame:GetFrameStrata())
+      decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
 
       decoration:SetBackdrop(gw.BackdropTemplates.Default)
       decoration.title:ClearAllPoints()

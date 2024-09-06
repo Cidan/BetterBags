@@ -44,7 +44,9 @@ function form:Create(opts)
   local l = setmetatable({}, {__index = formFrame}) --[[@as FormFrame]]
   l.frame = CreateFrame('Frame', format("BetterBagsForm%d%s", formCounter, opts.title), UIParent)
   formCounter = formCounter + 1
+
   l.frame:SetFrameStrata("DIALOG")
+  l.frame:SetFrameLevel(800)
 
   l.ScrollBox = CreateFrame("Frame", nil, l.frame, "WowScrollBox") --[[@as WowScrollBox]]
   l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -22)
