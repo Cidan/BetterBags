@@ -17,6 +17,7 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field nextIndex Frame
 ---@field baseFrame Frame
 ---@field indexFrame Frame
+---@field sections {point: Frame, button: Button}[]
 ---@field scrollBox WowScrollBox
 ---@field height number
 ---@field index boolean
@@ -48,6 +49,21 @@ function stackedLayout:setupIndex()
   self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -20)
   self.indexFrame:SetPoint("BOTTOM", self.baseFrame, "BOTTOM", 0, 0)
   self.indexFrame:SetWidth(120)
+
+  local underline = self:createDividerLineLeft(self.indexFrame)
+  self.scrollBox:RegisterCallback(BaseScrollBoxEvents.OnScroll, function()
+    for i, section in ipairs(self.sections) do
+      local targetTop = section.point:GetTop()
+      local parentTop = self.targetFrame:GetTop()
+      if parentTop == nil then break end
+      if self.scrollBox:GetDerivedScrollOffset() < parentTop - targetTop then
+        local uSection = i == 1 and section or self.sections[i - 1]
+        underline:SetPoint("TOPLEFT", uSection.button, "BOTTOMLEFT", 0, 0)
+        underline:SetPoint("TOPRIGHT", uSection.button, "BOTTOMRIGHT", 0, 0)
+        break
+      end
+    end
+  end)
   self.nextIndex = self.indexFrame
 end
 
@@ -72,7 +88,7 @@ function stackedLayout:addIndex(title, point, sub)
   indexButton:SetScript("OnClick", function()
     local targetTop = point:GetTop()
     local parentTop = self.targetFrame:GetTop()
-    self.scrollBox:ScrollToOffset(parentTop - targetTop)
+    self.scrollBox:ScrollToOffset((parentTop - targetTop) + 1)
   end)
 
   if self.nextIndex == self.indexFrame then
@@ -80,6 +96,7 @@ function stackedLayout:addIndex(title, point, sub)
   else
     indexButton:SetPoint("TOPLEFT", self.nextIndex, "BOTTOMLEFT", 0, -5)
   end
+  table.insert(self.sections, {point = point, button = indexButton})
   self.nextIndex = indexButton
 end
 
@@ -202,7 +219,6 @@ function stackedLayout:AddSection(opts)
   div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
 
   container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 18)
-  self.sections[opts.title] = container
 
   self:addIndex(opts.title, container)
   self.nextFrame = container
