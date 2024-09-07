@@ -49,7 +49,7 @@ function config:CreateConfig()
   f:AddCheckbox({
    title = 'Enable In-Bag Search',
    description = 'If enabled, a search bar will appear at the top of your bags.',
-   getValue = function(ctx)
+   getValue = function(_)
     return db:GetInBagSearch()
    end,
     setValue = function(ctx, value)
@@ -60,30 +60,30 @@ function config:CreateConfig()
   f:AddCheckbox({
     title = 'Enable Enter to Make Category',
     description = 'If enabled, pressing Enter with a search query will open the make category menu.',
-    getValue = function(ctx)
+    getValue = function(_)
       return db:GetEnterToMakeCategory()
     end,
-    setValue = function(ctx, value)
+    setValue = function(_, value)
       db:SetEnterToMakeCategory(value)
     end
   })
   f:AddCheckbox({
     title = 'Enable Category Sell and Deposit',
     description = 'If enabled, right-clicking a category header at an NPC shop will sell all its contents, or deposit to bank.',
-    getValue = function(ctx)
+    getValue = function(_)
       return db:GetCategorySell()
     end,
-    setValue = function(ctx, value)
+    setValue = function(_, value)
       db:SetCategorySell(value)
     end
   })
   f:AddCheckbox({
     title = 'Show Blizzard Bag Button',
     description = 'Show or hide the default Blizzard bag button.',
-    getValue = function(ctx)
+    getValue = function(_)
       return db:GetShowBagButton()
     end,
-    setValue = function(ctx, value)
+    setValue = function(_, value)
       db:SetShowBagButton(value)
     end
   })
@@ -92,7 +92,7 @@ function config:CreateConfig()
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
     items = {'None', 'BetterBags'},
-    getValue = function(ctx, value)
+    getValue = function(_, value)
       return value == db:GetUpgradeIconProvider()
     end,
     setValue = function(ctx, value)
@@ -107,10 +107,10 @@ function config:CreateConfig()
     min = 1,
     max = 120,
     step = 1,
-    getValue = function(ctx)
+    getValue = function(_)
       return db:GetData().profile.newItemTime / 60
     end,
-    setValue = function(ctx, value)
+    setValue = function(_, value)
       db:GetData().profile.newItemTime = value * 60
     end,
   })
@@ -134,7 +134,7 @@ function config:CreateConfig()
       title = 'Section Order',
       description = 'The order of sections in the backpack when not pinned.',
       items = {'Alphabetically', 'Size Descending', 'Size Ascending'},
-      getValue = function(ctx, value)
+      getValue = function(_, value)
         return sectionOrders[value] == db:GetSectionSortType(bagType.kind, db:GetBagView(bagType.kind))
       end,
       setValue = function(ctx, value)
@@ -152,7 +152,7 @@ function config:CreateConfig()
       title = 'Item Order',
       description = 'The default order of items within each section.',
       items = {'Alphabetically', 'Quality', 'Item Level'},
-      getValue = function(ctx, value)
+      getValue = function(_, value)
         return itemOrders[value] == db:GetItemSortType(bagType.kind, db:GetBagView(bagType.kind))
       end,
       setValue = function(ctx, value)
@@ -169,7 +169,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Equipment Location',
       description = 'Sort items into categories based on equipment location (Main Hand, Head, etc).',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetCategoryFilters(bagType.kind).EquipmentLocation
       end,
       setValue = function(ctx, value)
@@ -181,7 +181,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Expansion',
       description = 'Sort items into categories based on their expansion.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetCategoryFilters(bagType.kind).Expansion
       end,
       setValue = function(ctx, value)
@@ -193,7 +193,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Equipment Set',
       description = 'Sort items into categories based on equipment sets.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetCategoryFilters(bagType.kind).GearSet
       end,
       setValue = function(ctx, value)
@@ -205,7 +205,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Recent Items',
       description = 'Enable the Recent Items category for new items.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetCategoryFilters(bagType.kind).RecentItems
       end,
       setValue = function(ctx, value)
@@ -217,7 +217,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Trade Skill',
       description = 'Sort items into categories based on their trade skill usage.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetCategoryFilters(bagType.kind).TradeSkill
       end,
       setValue = function(ctx, value)
@@ -229,7 +229,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Type',
       description = 'Sort items into categories based on their equipment type (Consumable, Quest, etc).',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetCategoryFilters(bagType.kind).Type
       end,
       setValue = function(ctx, value)
@@ -241,7 +241,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Sub Type',
       description = 'Sort items into categories based on sub type (Potions, Bandages, etc).',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetCategoryFilters(bagType.kind).Subtype
       end,
       setValue = function(ctx, value)
@@ -258,10 +258,10 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'All Items Recent',
       description = 'All new items you loot, pickup, or move into the bag will be marked as recent.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetMarkRecentItems(bagType.kind)
       end,
-      setValue = function(ctx, value)
+      setValue = function(_, value)
         db:SetMarkRecentItems(bagType.kind, value)
       end
     })
@@ -269,10 +269,10 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Flash Stacks',
       description = 'When a stack of items gets a new item, the stack will flash.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetShowNewItemFlash(bagType.kind)
       end,
-      setValue = function(ctx, value)
+      setValue = function(_, value)
         db:SetShowNewItemFlash(bagType.kind, value)
       end
     })
@@ -280,7 +280,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Merge Stacks',
       description = 'Stackable items will merge into a single item button in your backpack.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetStackingOptions(bagType.kind).mergeStacks
       end,
       setValue = function(ctx, value)
@@ -292,7 +292,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Merge Unstackable',
       description = 'Unstackable items, such as armor and weapons, will merge into a single item button in your backpack.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetStackingOptions(bagType.kind).mergeUnstackable
       end,
       setValue = function(ctx, value)
@@ -304,7 +304,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = "Don't Merge Partial Stacks",
       description = 'Partial stacks of items will not merge with other partial or full stacks.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetStackingOptions(bagType.kind).dontMergePartial
       end,
       setValue = function(ctx, value)
@@ -316,7 +316,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = "Split Transmogged Items",
       description = 'Transmogged items will be split into a separate, stackable button in your backpack.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetStackingOptions(bagType.kind).dontMergeTransmog
       end,
       setValue = function(ctx, value)
@@ -328,7 +328,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Unmerge on Interactions',
       description = 'When you interact a vendor, mailbox, auction house, etc, all merged items will unmerge.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetStackingOptions(bagType.kind).unmergeAtShop
       end,
       setValue = function(ctx, value)
@@ -346,7 +346,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Show Item Level',
       description = 'Show the item level on item buttons in the backpack.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetItemLevelOptions(bagType.kind).enabled
       end,
       setValue = function(ctx, value)
@@ -358,7 +358,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Show Item Level Color',
       description = 'Show the item level in color on item buttons in the backpack.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetItemLevelOptions(bagType.kind).color
       end,
       setValue = function(ctx, value)
@@ -376,7 +376,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Show Full Section Names',
       description = 'Show the full section names for each section and do not cut them off.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetShowFullSectionNames(bagType.kind)
       end,
       setValue = function(ctx, value)
@@ -388,7 +388,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Show All Free Space Slots',
       description = 'Show all free space slots, individually, at the bottom of the backpack.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetShowAllFreeSpace(bagType.kind)
       end,
       setValue = function(ctx, value)
@@ -400,7 +400,7 @@ function config:CreateConfig()
     f:AddCheckbox({
       title = 'Extra Glowy Item Buttons',
       description = 'Item buttons will have an enhanced glow effect using the item quality color.',
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetExtraGlowyButtons(bagType.kind)
       end,
       setValue = function(ctx, value)
@@ -415,7 +415,7 @@ function config:CreateConfig()
       min = 3,
       max = 20,
       step = 1,
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).itemsPerRow > 20 and 20 or db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).itemsPerRow
       end,
       setValue = function(ctx, value)
@@ -432,7 +432,7 @@ function config:CreateConfig()
       min = 1,
       max = 20,
       step = 1,
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).columnCount > 20 and 20 or db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).columnCount
       end,
       setValue = function(ctx, value)
@@ -449,10 +449,10 @@ function config:CreateConfig()
       min = 0,
       max = 100,
       step = 1,
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).opacity
       end,
-      setValue = function(ctx, value)
+      setValue = function(_, value)
         db:SetBagViewSizeOpacity(bagType.kind, db:GetBagView(bagType.kind), value)
         themes:UpdateOpacity()
       end,
@@ -464,10 +464,10 @@ function config:CreateConfig()
       min = 50,
       max = 200,
       step = 1,
-      getValue = function(ctx)
+      getValue = function(_)
         return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).scale
       end,
-      setValue = function(ctx, value)
+      setValue = function(_, value)
         -- TODO(lobato): This should be an event.
         local bag = addon:GetBagFromKind(bagType.kind)
         if not bag then return end
@@ -482,12 +482,12 @@ function config:CreateConfig()
   self.configFrame = f
 end
 
+---@diagnostic disable-next-line: duplicate-set-field
 function config:Open()
   self.configFrame:Show()
 end
 
 function config:RegisterSettings()
-  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
   LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
     self:Open()
   end)

@@ -115,6 +115,7 @@ function formFrame:AddSlider(opts)
 end
 
 function formFrame:AddInputBoxGroup(opts)
+  _ = opts
 end
 
 ---@param opts FormDropdownOptions
@@ -124,6 +125,7 @@ function formFrame:AddDropdown(opts)
 end
 
 function formFrame:AddTextArea(opts)
+  _ = opts
 end
 
 ---@param opts FormCheckboxOptions
@@ -133,6 +135,7 @@ function formFrame:AddCheckbox(opts)
 end
 
 function formFrame:AddButtonGroup(opts)
+  _ = opts
 end
 
 ---@return Frame

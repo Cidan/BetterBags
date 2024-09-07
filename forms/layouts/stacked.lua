@@ -456,7 +456,7 @@ function stackedLayout:AddSlider(opts)
   container.input:SetPoint("TOP", container.slider, "BOTTOM", 0, -5)
   container.input:SetNumeric(true)
   container.input:SetAutoFocus(false)
-  addon.SetScript(container.input, "OnEditFocusLost", function(ctx)
+  addon.SetScript(container.input, "OnEditFocusLost", function(_)
     local value = tonumber(container.input:GetText())
     if value then
       if value < opts.min then
@@ -471,7 +471,7 @@ function stackedLayout:AddSlider(opts)
     end
     container.input:SetText(tostring(container.slider:GetValue()))
   end)
-  addon.SetScript(container.input, "OnTextChanged", function(ctx, _, user)
+  addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
     if user then
       local value = tonumber(container.input:GetText())
       if value then
