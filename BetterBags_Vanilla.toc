@@ -124,7 +124,7 @@ themes\simpledark.lua
 themes\gw2.lua
 themes\elvui.lua
 
-config\newconfig.lua
+config\config.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua
