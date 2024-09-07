@@ -517,4 +517,5 @@ end
 function config:OnEnable()
   self:CreateConfig()
   self:RegisterSettings()
+  table.insert(UISpecialFrames, self.configFrame.frame:GetName())
 end
