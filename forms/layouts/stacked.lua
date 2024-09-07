@@ -113,6 +113,12 @@ function stackedLayout:UpdateUnderline()
     local targetTop = section.point:GetTop()
     local parentTop = self.targetFrame:GetTop()
     if parentTop == nil then break end
+    if i == #self.sections and self.scrollBox:GetDerivedScrollOffset() > parentTop - targetTop then
+      local uSection = self.sections[i]
+      self.underline:SetPoint("TOPLEFT", uSection.button, "BOTTOMLEFT", 0, 0)
+      self.underline:SetPoint("TOPRIGHT", uSection.button, "BOTTOMRIGHT", 0, 0)
+      break
+    end
     if self.scrollBox:GetDerivedScrollOffset() <= parentTop - targetTop then
       local uSection = i == 1 and section or self.sections[i - 1]
       self.underline:SetPoint("TOPLEFT", uSection.button, "BOTTOMLEFT", 0, 0)

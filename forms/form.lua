@@ -87,7 +87,7 @@ function form:Create(opts)
 end
 
 function formFrame:Refresh()
-  self.inner:SetHeight(self.layout.height + 20)
+  self.inner:SetHeight(self.layout.height + 25)
   self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
 end
 
