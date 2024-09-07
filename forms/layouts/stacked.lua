@@ -72,11 +72,9 @@ function stackedLayout:addIndex(title, point, sub)
   indexButton:SetScript("OnClick", function()
     local targetTop = point:GetTop()
     local parentTop = self.targetFrame:GetTop()
-    local scrollHeight = self.targetFrame:GetHeight()
-    local percent = (parentTop - targetTop) / scrollHeight
-    self.scrollBox:SetScrollPercentage(percent)
-    print("scroll to", percent, parentTop, targetTop)
+    self.scrollBox:ScrollToOffset(parentTop - targetTop)
   end)
+
   if self.nextIndex == self.indexFrame then
     indexButton:SetPoint("TOPLEFT", self.indexFrame, "TOPLEFT", 5, -10)
   else

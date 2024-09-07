@@ -236,6 +236,7 @@ function WowScrollBox:GetUpperShadowTexture() end
 ---@return Texture
 function WowScrollBox:GetLowerShadowTexture() end
 function WowScrollBox:SetDataProvider(provider) end
+function WowScrollBox:ScrollToOffset(offset) end
 
 ---@class InputScrollFrameTemplate: Frame
 ---@field EditBox EditBox

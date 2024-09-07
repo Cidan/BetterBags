@@ -59,6 +59,7 @@ function form:Create(opts)
 
   l.ScrollBox:SetInterpolateScroll(true)
   l.ScrollBar:SetInterpolateScroll(true)
+  l.ScrollBar:SetHideIfUnscrollable(true)
 
   local view = CreateScrollBoxLinearView()
   view:SetPanExtent(60)
