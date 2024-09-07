@@ -78,14 +78,18 @@ function stackedLayout:addIndex(title, point, sub)
   local indexButton = CreateFrame("Button", nil, self.indexFrame) --[[@as Button]]
   indexButton:SetSize(100, 24)
   if sub then
-    indexButton:SetNormalFontObject("GameFontNormal")
+    local font = indexButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    indexButton:SetFontString(font)
   else
-    indexButton:SetNormalFontObject("GameFontNormalLarge")
+    local font = indexButton:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    indexButton:SetFontString(font)
   end
-  local fs = indexButton:GetNormalFontObject()
-  fs:SetTextColor(1, 1, 1)
-  fs:SetJustifyH("LEFT")
   indexButton:SetText(sub and "  " .. title or title)
+  local fs = indexButton:GetFontString()
+  fs:SetTextColor(1, 1, 1)
+  fs:ClearAllPoints()
+  fs:SetPoint("LEFT", indexButton, "LEFT", 5, 0)
+  fs:SetJustifyH("LEFT")
 
   indexButton:SetScript("OnClick", function()
     local targetTop = point:GetTop()
