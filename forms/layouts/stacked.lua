@@ -14,18 +14,75 @@ local layouts = addon:GetModule('FormLayouts')
 
 ---@class (exact) StackedLayout: FormLayout
 ---@field nextFrame Frame
+---@field nextIndex Frame
+---@field baseFrame Frame
+---@field indexFrame Frame
+---@field scrollBox WowScrollBox
 ---@field height number
+---@field index boolean
 local stackedLayout = {}
 
 ---@param targetFrame Frame
+---@param baseFrame Frame
+---@param scrollBox WowScrollBox
+---@param index boolean
 ---@return FormLayout
-function layouts:NewStackedLayout(targetFrame)
+function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   local l = setmetatable({}, {__index = stackedLayout}) --[[@as StackedLayout]]
   l.targetFrame = targetFrame
   l.nextFrame = targetFrame
   l.height = 0
+  l.index = index
+  l.baseFrame = baseFrame
+  l.scrollBox = scrollBox
   l.sections = {}
+  if index then
+    l:setupIndex()
+  end
   return l
+end
+
+---@package
+function stackedLayout:setupIndex()
+  self.indexFrame = CreateFrame("Frame", nil, self.baseFrame) --[[@as Frame]]
+  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -20)
+  self.indexFrame:SetPoint("BOTTOM", self.baseFrame, "BOTTOM", 0, 0)
+  self.indexFrame:SetWidth(120)
+  self.nextIndex = self.indexFrame
+end
+
+---@package
+---@param title string
+---@param point Frame
+---@param sub? boolean
+function stackedLayout:addIndex(title, point, sub)
+  if not self.index then return end
+  local indexButton = CreateFrame("Button", nil, self.indexFrame) --[[@as Button]]
+  indexButton:SetSize(100, 24)
+  if sub then
+    indexButton:SetNormalFontObject("GameFontNormal")
+  else
+    indexButton:SetNormalFontObject("GameFontNormalLarge")
+  end
+  local fs = indexButton:GetNormalFontObject()
+  fs:SetTextColor(1, 1, 1)
+  fs:SetJustifyH("LEFT")
+  indexButton:SetText(sub and "  " .. title or title)
+
+  indexButton:SetScript("OnClick", function()
+    local targetTop = point:GetTop()
+    local parentTop = self.targetFrame:GetTop()
+    local scrollHeight = self.targetFrame:GetHeight()
+    local percent = (parentTop - targetTop) / scrollHeight
+    self.scrollBox:SetScrollPercentage(percent)
+    print("scroll to", percent, parentTop, targetTop)
+  end)
+  if self.nextIndex == self.indexFrame then
+    indexButton:SetPoint("TOPLEFT", self.indexFrame, "TOPLEFT", 5, -10)
+  else
+    indexButton:SetPoint("TOPLEFT", self.nextIndex, "BOTTOMLEFT", 0, -5)
+  end
+  self.nextIndex = indexButton
 end
 
 ---@private
@@ -35,7 +92,11 @@ end
 function stackedLayout:alignFrame(t, container, indent)
   indent = indent or 0
   if t == self.targetFrame then
-    container:SetPoint("TOPLEFT", t, "TOPLEFT", 10 + indent, -10)
+    if self.index then
+      container:SetPoint("TOPLEFT", t, "TOPLEFT", self.indexFrame:GetWidth() + 10 + indent, -10)
+    else
+      container:SetPoint("TOPLEFT", t, "TOPLEFT", 10 + indent, -10)
+    end
     container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
     self.height = self.height + 10
   else
@@ -145,6 +206,7 @@ function stackedLayout:AddSection(opts)
   container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 18)
   self.sections[opts.title] = container
 
+  self:addIndex(opts.title, container)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end
@@ -166,6 +228,7 @@ function stackedLayout:AddSubSection(opts)
   div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 33)
+  self:addIndex(opts.title, container, true)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end

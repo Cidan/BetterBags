@@ -35,6 +35,7 @@ local formFrame = {}
 ---@class FormCreateOptions
 ---@field title string
 ---@field layout FormLayoutType
+---@field index boolean
 
 local formCounter = 0
 -- Create will create a new form with the given layout.
@@ -74,7 +75,7 @@ function form:Create(opts)
   themes:RegisterFlatWindow(l.frame, opts.title)
 
   if opts.layout == const.FORM_LAYOUT.STACKED then
-    l.layout = layouts:NewStackedLayout(l.inner)
+    l.layout = layouts:NewStackedLayout(l.inner, l.frame, l.ScrollBox, opts.index)
   end
 
   return l
@@ -132,7 +133,8 @@ end
 function form:OnEnable()
   local f = form:Create({
     title = 'BetterBags Settings',
-    layout = const.FORM_LAYOUT.STACKED
+    layout = const.FORM_LAYOUT.STACKED,
+    index = true
   })
  f:AddSection({
    title = 'General',
@@ -243,6 +245,11 @@ function form:OnEnable()
     setValue = function(value)
       fakedb['backpackItemOrder'] = value
     end,
+  })
+
+  f:AddSubSection({
+    title = 'Categories',
+    description = 'Settings for Blizzard item categories in the backpack.',
   })
 
   f:AddSubSection({
