@@ -222,44 +222,44 @@ function config:GetOptions()
   return options
 end
 
-function config:Open()
-  LibStub("AceConfigDialog-3.0"):Open(addonName)
-  local ctx = context:New('on_click')
-  events:SendMessage(ctx, 'config/Opened')
-end
+--function config:Open()
+  --LibStub("AceConfigDialog-3.0"):Open(addonName)
+  --local ctx = context:New('on_click')
+  --events:SendMessage(ctx, 'config/Opened')
+--end
 
-function config:OnEnable()
-  self.helpText = {}
-  self:CreateAllHelp()
-  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
-  self.frame, self.category = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
-  LibStub("AceConfigDialog-3.0"):SetDefaultSize(addonName, 700, 800)
-  LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
-    self:Open()
-  end)
-
-  LibStub('AceConsole-3.0'):RegisterChatCommand("bbanchor", function()
-    addon.Bags.Backpack.anchor:Activate()
-    addon.Bags.Backpack.anchor:Show()
-    addon.Bags.Bank.anchor:Activate()
-    addon.Bags.Bank.anchor:Show()
-  end)
-
-  events:RegisterMessage('categories/Changed', function()
-    LibStub('AceConfigRegistry-3.0'):NotifyChange(addonName)
-  end)
-
-  events:RegisterMessage('config/Open', function()
-    self:Open()
-  end)
-
-  LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()
-    DB:SetDebugMode(not DB:GetDebugMode())
-    local ctx = context:New('on_click')
-    events:SendMessage(ctx, 'config/DebugMode', DB:GetDebugMode())
-  end)
-end
-
-function config:OnInitialize()
-  self.pluginOptions = {}
-end
+--function config:OnEnable()
+--  self.helpText = {}
+--  self:CreateAllHelp()
+--  LibStub('AceConfig-3.0'):RegisterOptionsTable(addonName, function() return self:GetOptions() end)
+--  self.frame, self.category = LibStub("AceConfigDialog-3.0"):AddToBlizOptions(addonName, "BetterBags")
+--  LibStub("AceConfigDialog-3.0"):SetDefaultSize(addonName, 700, 800)
+--  LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
+--    self:Open()
+--  end)
+--
+--  LibStub('AceConsole-3.0'):RegisterChatCommand("bbanchor", function()
+--    addon.Bags.Backpack.anchor:Activate()
+--    addon.Bags.Backpack.anchor:Show()
+--    addon.Bags.Bank.anchor:Activate()
+--    addon.Bags.Bank.anchor:Show()
+--  end)
+--
+--  events:RegisterMessage('categories/Changed', function()
+--    LibStub('AceConfigRegistry-3.0'):NotifyChange(addonName)
+--  end)
+--
+--  events:RegisterMessage('config/Open', function()
+--    self:Open()
+--  end)
+--
+--  LibStub('AceConsole-3.0'):RegisterChatCommand("bbdb", function()
+--    DB:SetDebugMode(not DB:GetDebugMode())
+--    local ctx = context:New('on_click')
+--    events:SendMessage(ctx, 'config/DebugMode', DB:GetDebugMode())
+--  end)
+--end
+--
+--function config:OnInitialize()
+--  self.pluginOptions = {}
+--end

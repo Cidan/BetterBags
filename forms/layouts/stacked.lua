@@ -17,6 +17,7 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field nextIndex Frame
 ---@field baseFrame Frame
 ---@field indexFrame Frame
+---@field underline Frame
 ---@field sections {point: Frame, button: Button}[]
 ---@field scrollBox WowScrollBox
 ---@field height number
@@ -51,18 +52,9 @@ function stackedLayout:setupIndex()
   self.indexFrame:SetWidth(120)
 
   local underline = self:createDividerLineLeft(self.indexFrame)
+  self.underline = underline
   self.scrollBox:RegisterCallback(BaseScrollBoxEvents.OnScroll, function()
-    for i, section in ipairs(self.sections) do
-      local targetTop = section.point:GetTop()
-      local parentTop = self.targetFrame:GetTop()
-      if parentTop == nil then break end
-      if self.scrollBox:GetDerivedScrollOffset() < parentTop - targetTop then
-        local uSection = i == 1 and section or self.sections[i - 1]
-        underline:SetPoint("TOPLEFT", uSection.button, "BOTTOMLEFT", 0, 0)
-        underline:SetPoint("TOPRIGHT", uSection.button, "BOTTOMRIGHT", 0, 0)
-        break
-      end
-    end
+    self:updateUnderline()
   end)
   self.nextIndex = self.indexFrame
 end
@@ -97,7 +89,24 @@ function stackedLayout:addIndex(title, point, sub)
     indexButton:SetPoint("TOPLEFT", self.nextIndex, "BOTTOMLEFT", 0, -5)
   end
   table.insert(self.sections, {point = point, button = indexButton})
+  self:updateUnderline()
   self.nextIndex = indexButton
+end
+
+function stackedLayout:updateUnderline()
+  for i, section in ipairs(self.sections) do
+    local targetTop = section.point:GetTop()
+    local parentTop = self.targetFrame:GetTop()
+    if parentTop == nil then break end
+    if self.scrollBox:GetDerivedScrollOffset() <= parentTop - targetTop then
+      local uSection = i == 1 and section or self.sections[i - 1]
+      self.underline:SetPoint("TOPLEFT", uSection.button, "BOTTOMLEFT", 0, 0)
+      self.underline:SetPoint("TOPRIGHT", uSection.button, "BOTTOMRIGHT", 0, 0)
+      break
+    end
+  end
+  self.underline:Show()
+  self.underline:GetTop()
 end
 
 ---@private
@@ -189,6 +198,9 @@ function stackedLayout:createDividerLineMiddle(parent)
   return container
 end
 
+---@private
+---@param parent Frame
+---@return Frame
 function stackedLayout:createDividerLineLeft(parent)
   local container = CreateFrame("Frame", nil, parent)
   local white = CreateColor(1, 1, 1, 1)
@@ -283,8 +295,9 @@ function stackedLayout:AddCheckbox(opts)
   self.height = self.height + container:GetHeight()
 end
 
+---@private
 ---@param opts FormDropdownOptions
-function stackedLayout:AddDropdown(opts)
+function stackedLayout:addDropdownRetail(opts)
   local t = self.nextFrame
   local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
   self:alignFrame(t, container)
@@ -322,6 +335,26 @@ function stackedLayout:AddDropdown(opts)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+end
+
+function stackedLayout:AddDropdownClassic(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+end
+
+---@param opts FormDropdownOptions
+function stackedLayout:AddDropdown(opts)
+  if addon.isRetail then
+    self:addDropdownRetail(opts)
+    return
+  end
 end
 
 ---@param opts FormSliderOptions
