@@ -337,7 +337,9 @@ function stackedLayout:addDropdownRetail(opts)
   self.height = self.height + container:GetHeight()
 end
 
-function stackedLayout:AddDropdownClassic(opts)
+---@private
+---@param opts FormDropdownOptions
+function stackedLayout:addDropdownClassic(opts)
   local t = self.nextFrame
   local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
   self:alignFrame(t, container)
@@ -347,6 +349,19 @@ function stackedLayout:AddDropdownClassic(opts)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  container.classicDropdown = CreateFrame("Frame", nil, container, "UIDropDownMenuTemplate")
+  container.classicDropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  container.classicDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.classicDropdown:GetHeight() +
+    25
+  )
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
 end
 
 ---@param opts FormDropdownOptions
@@ -355,6 +370,7 @@ function stackedLayout:AddDropdown(opts)
     self:addDropdownRetail(opts)
     return
   end
+  self:addDropdownClassic(opts)
 end
 
 ---@param opts FormSliderOptions
