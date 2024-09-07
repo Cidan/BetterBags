@@ -21,6 +21,9 @@ local events = addon:GetModule('Events')
 ---@class Bucket: AceModule
 local bucket = addon:GetModule('Bucket')
 
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
 ---@class FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
 
@@ -30,6 +33,8 @@ local form = addon:NewModule('Form')
 ---@class (exact) FormFrame: AceModule
 ---@field layout FormLayout
 ---@field frame Frame This is the container frame for the form window.
+---@field fadeIn AnimationGroup
+---@field fadeOut AnimationGroup
 ---@field ScrollBox WowScrollBox This is the scroll box that contains the inner frame.
 ---@field ScrollBar MinimalScrollBar This is the scrollbar that controls the scroll box.
 ---@field inner Frame This is the inner frame that contains the form elements.
@@ -82,6 +87,7 @@ function form:Create(opts)
     l.layout = layouts:NewStackedLayout(l.inner, l.frame, l.ScrollBox, opts.index)
   end
 
+  l.fadeIn, l.fadeOut = animations:AttachFadeGroup(l.frame)
   l.frame:Hide()
   return l
 end
@@ -135,10 +141,10 @@ function formFrame:GetFrame()
 end
 
 function formFrame:Show()
-  self.frame:Show()
+  self.fadeIn:Play()
   self.layout:UpdateUnderline()
 end
 
 function formFrame:Hide()
-  self.frame:Hide()
+  self.fadeOut:Play()
 end
