@@ -72,6 +72,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
+---@field UpdateUnderline fun(self: FormLayout)
 ---@field AddSection fun(self: FormLayout, opts: FormSectionOptions)
 ---@field AddCheckbox fun(self: FormLayout, opts: FormCheckboxOptions)
 ---@field AddDropdown fun(self: FormLayout, opts: FormDropdownOptions)

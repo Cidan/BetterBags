@@ -136,6 +136,7 @@ end
 
 function formFrame:Show()
   self.frame:Show()
+  self.layout:UpdateUnderline()
 end
 
 function formFrame:Hide()

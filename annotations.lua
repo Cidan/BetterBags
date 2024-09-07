@@ -240,6 +240,10 @@ function WowScrollBox:ScrollToOffset(offset) end
 function WowScrollBox:RegisterCallback(event, callback) end
 ---@return number
 function WowScrollBox:GetDerivedScrollOffset() end
+---@return number
+function WowScrollBox:GetDerivedScrollRange() end
+---@param percent number
+function WowScrollBox:SetScrollPercentage(percent) end
 
 ---@class InputScrollFrameTemplate: Frame
 ---@field EditBox EditBox

@@ -54,9 +54,19 @@ function stackedLayout:setupIndex()
   local underline = self:createDividerLineLeft(self.indexFrame)
   self.underline = underline
   self.scrollBox:RegisterCallback(BaseScrollBoxEvents.OnScroll, function()
-    self:updateUnderline()
+    self:UpdateUnderline()
   end)
   self.nextIndex = self.indexFrame
+end
+
+---@private
+---@param offset number
+function stackedLayout:scrollToOffset(offset)
+  local scrollRange = self.scrollBox:GetDerivedScrollRange()
+  if scrollRange > 0 then
+    local scrollPercentage = offset / scrollRange
+    self.scrollBox:SetScrollPercentage(scrollPercentage)
+  end
 end
 
 ---@package
@@ -80,7 +90,11 @@ function stackedLayout:addIndex(title, point, sub)
   indexButton:SetScript("OnClick", function()
     local targetTop = point:GetTop()
     local parentTop = self.targetFrame:GetTop()
-    self.scrollBox:ScrollToOffset((parentTop - targetTop) + 1)
+    if addon.isRetail then
+      self.scrollBox:ScrollToOffset((parentTop - targetTop) + 1)
+    else
+      self:scrollToOffset((parentTop - targetTop) + 1)
+    end
   end)
 
   if self.nextIndex == self.indexFrame then
@@ -89,11 +103,12 @@ function stackedLayout:addIndex(title, point, sub)
     indexButton:SetPoint("TOPLEFT", self.nextIndex, "BOTTOMLEFT", 0, -5)
   end
   table.insert(self.sections, {point = point, button = indexButton})
-  self:updateUnderline()
+  self:UpdateUnderline()
   self.nextIndex = indexButton
 end
 
-function stackedLayout:updateUnderline()
+function stackedLayout:UpdateUnderline()
+  if not self.index then return end
   for i, section in ipairs(self.sections) do
     local targetTop = section.point:GetTop()
     local parentTop = self.targetFrame:GetTop()
@@ -411,7 +426,11 @@ function stackedLayout:AddSlider(opts)
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
-  container.slider = CreateFrame("Slider", nil, container, "UISliderTemplate") --[[@as Slider]]
+  if addon.isRetail then
+    container.slider = CreateFrame("Slider", nil, container, "UISliderTemplate") --[[@as Slider]]
+  else
+    container.slider = CreateFrame("Slider", nil, container, "HorizontalSliderTemplate") --[[@as Slider]]
+  end
   container.slider:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.slider:SetPoint("RIGHT", container, "RIGHT", 0, 0)
   container.slider:SetOrientation("HORIZONTAL")
