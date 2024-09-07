@@ -723,6 +723,7 @@ const.DATABASE_DEFAULTS = {
     categoryFilters = {
       [const.BAG_KIND.BACKPACK] = {
         Type = true,
+        Subtype = false,
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,
@@ -731,6 +732,7 @@ const.DATABASE_DEFAULTS = {
       },
       [const.BAG_KIND.BANK] = {
         Type = true,
+        Subtype = false,
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,

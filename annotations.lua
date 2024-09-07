@@ -315,6 +315,7 @@ local frameProto = {}
 ---@class MinimalScrollBar: Frame
 local MinimalScrollBar = {}
 function MinimalScrollBar:SetInterpolateScroll(interpolate) end
+function MinimalScrollBar:SetHideIfUnscrollable(hide) end
 
 ---@class EventFrame
 local EventFrame = {}

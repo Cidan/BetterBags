@@ -56,8 +56,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field title string
 ---@field description string
 ---@field items string[]
----@field getValue fun(string): boolean
----@field setValue fun(string)
+---@field getValue fun(ctx: Context, value: string): boolean
+---@field setValue fun(ctx: Context, value: string)
 
 ---@class (exact) FormSliderOptions
 ---@field title string

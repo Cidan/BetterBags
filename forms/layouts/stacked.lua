@@ -291,7 +291,14 @@ function stackedLayout:AddDropdown(opts)
 
   container.dropdown:SetupMenu(function(_, root)
     for _, item in ipairs(opts.items) do
-      root:CreateCheckbox(item, opts.getValue, opts.setValue, item)
+      root:CreateCheckbox(item, function(value)
+        local ctx = context:New('Dropdown_Get')
+        return opts.getValue(ctx, value)
+      end,
+      function(value)
+        local ctx = context:New('Dropdown_Set')
+        opts.setValue(ctx, value)
+      end, item)
     end
   end)
 

@@ -95,6 +95,10 @@ function DB:SetCategoryFilter(kind, filter, value)
   DB.data.profile.categoryFilters[kind][filter] = value
 end
 
+function DB:GetCategoryFilters(kind)
+  return DB.data.profile.categoryFilters[kind]
+end
+
 ---@param show boolean
 function DB:SetShowBagButton(show)
   DB.data.profile.showBagButton = show

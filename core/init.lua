@@ -178,6 +178,18 @@ function addon:GetBagFromBagID(bagid)
   end
 end
 
+---@param kind BagKind
+---@return Bag
+function addon:GetBagFromKind(kind)
+  if kind == const.BAG_KIND.BACKPACK then
+    return addon.Bags.Backpack
+  elseif kind == const.BAG_KIND.BANK then
+    return addon.Bags.Bank
+  else
+    error("invalid kind")
+  end
+end
+
 -- HideBlizzardBags will hide the default Blizzard bag frames.
 function addon:HideBlizzardBags()
   local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")

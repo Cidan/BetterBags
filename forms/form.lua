@@ -18,6 +18,9 @@ local db = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Bucket: AceModule
+local bucket = addon:GetModule('Bucket')
+
 ---@class FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
 
@@ -73,7 +76,7 @@ function form:Create(opts)
   l.frame:SetScript("OnMouseUp", l.frame.StopMovingOrSizing)
 
   ScrollUtil.InitScrollBoxWithScrollBar(l.ScrollBox, l.ScrollBar, view)
-  themes:RegisterFlatWindow(l.frame, opts.title)
+  themes:RegisterSimpleWindow(l.frame, opts.title)
 
   if opts.layout == const.FORM_LAYOUT.STACKED then
     l.layout = layouts:NewStackedLayout(l.inner, l.frame, l.ScrollBox, opts.index)
@@ -197,11 +200,12 @@ function form:OnEnable()
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
     items = {'None', 'BetterBags'},
-    getValue = function(value)
-      return value == fakedb['upgradeIconProvider']
+    getValue = function(ctx, value)
+      return value == db:GetUpgradeIconProvider()
     end,
-    setValue = function(value)
-      fakedb['upgradeIconProvider'] = value
+    setValue = function(ctx, value)
+      db:SetUpgradeIconProvider(value)
+      events:SendMessage(ctx, 'bag/RedrawIcons')
     end,
   })
 
@@ -212,10 +216,10 @@ function form:OnEnable()
     max = 120,
     step = 1,
     getValue = function(ctx)
-      return fakedb['newItemsDuration']
+      return db:GetData().profile.newItemTime / 60
     end,
     setValue = function(ctx, value)
-      fakedb['newItemsDuration'] = value
+      db:GetData().profile.newItemTime = value * 60
     end,
   })
 
@@ -223,28 +227,39 @@ function form:OnEnable()
     title = 'Backpack',
     description = 'Settings for the player backpack bag.',
   })
-
+  local sectionOrders = {
+    ["Alphabetically"] = const.SECTION_SORT_TYPE.ALPHABETICALLY,
+    ["Size Descending"] = const.SECTION_SORT_TYPE.SIZE_DESCENDING,
+    ["Size Ascending"] = const.SECTION_SORT_TYPE.SIZE_ASCENDING,
+  }
   f:AddDropdown({
     title = 'Section Order',
     description = 'The order of sections in the backpack when not pinned.',
     items = {'Alphabetically', 'Size Descending', 'Size Ascending'},
-    getValue = function(value)
-      return value == fakedb['backpackSectionOrder']
+    getValue = function(ctx, value)
+      return sectionOrders[value] == db:GetSectionSortType(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     end,
-    setValue = function(value)
-      fakedb['backpackSectionOrder'] = value
+    setValue = function(ctx, value)
+      db:SetSectionSortType(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK), sectionOrders[value])
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end,
   })
 
+  local itemOrders = {
+    ["Alphabetically"] = const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY,
+    ["Quality"] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
+    ["Item Level"] = const.ITEM_SORT_TYPE.ITEM_LEVEL,
+  }
   f:AddDropdown({
     title = 'Item Order',
     description = 'The default order of items within each section.',
     items = {'Alphabetically', 'Quality', 'Item Level'},
-    getValue = function(value)
-      return value == fakedb['backpackItemOrder']
+    getValue = function(ctx, value)
+      return itemOrders[value] == db:GetItemSortType(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     end,
-    setValue = function(value)
-      fakedb['backpackItemOrder'] = value
+    setValue = function(ctx, value)
+      db:SetItemSortType(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK), itemOrders[value])
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end,
   })
 
@@ -253,10 +268,95 @@ function form:OnEnable()
     description = 'Settings for Blizzard item categories in the backpack.',
   })
 
+  f:AddCheckbox({
+    title = 'Equipment Location',
+    description = 'Sort items into categories based on equipment location (Main Hand, Head, etc).',
+    getValue = function(ctx)
+      return db:GetCategoryFilters(const.BAG_KIND.BACKPACK).EquipmentLocation
+    end,
+    setValue = function(ctx, value)
+      db:GetCategoryFilters(const.BAG_KIND.BACKPACK).EquipmentLocation = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'Expansion',
+    description = 'Sort items into categories based on their expansion.',
+    getValue = function(ctx)
+      return db:GetCategoryFilters(const.BAG_KIND.BACKPACK).Expansion
+    end,
+    setValue = function(ctx, value)
+      db:GetCategoryFilters(const.BAG_KIND.BACKPACK).Expansion = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'Equipment Set',
+    description = 'Sort items into categories based on equipment sets.',
+    getValue = function(ctx)
+      return db:GetCategoryFilters(const.BAG_KIND.BACKPACK).GearSet
+    end,
+    setValue = function(ctx, value)
+      db:GetCategoryFilters(const.BAG_KIND.BACKPACK).GearSet = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'Recent Items',
+    description = 'Enable the Recent Items category for new items.',
+    getValue = function(ctx)
+      return db:GetCategoryFilters(const.BAG_KIND.BACKPACK).RecentItems
+    end,
+    setValue = function(ctx, value)
+      db:GetCategoryFilters(const.BAG_KIND.BACKPACK).RecentItems = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'Trade Skill',
+    description = 'Sort items into categories based on their trade skill usage.',
+    getValue = function(ctx)
+      return db:GetCategoryFilters(const.BAG_KIND.BACKPACK).TradeSkill
+    end,
+    setValue = function(ctx, value)
+      db:GetCategoryFilters(const.BAG_KIND.BACKPACK).TradeSkill = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'Type',
+    description = 'Sort items into categories based on their equipment type (Consumable, Quest, etc).',
+    getValue = function(ctx)
+      return db:GetCategoryFilters(const.BAG_KIND.BACKPACK).Type
+    end,
+    setValue = function(ctx, value)
+      db:GetCategoryFilters(const.BAG_KIND.BACKPACK).Type = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'Sub Type',
+    description = 'Sort items into categories based on sub type (Potions, Bandages, etc).',
+    getValue = function(ctx)
+      return db:GetCategoryFilters(const.BAG_KIND.BACKPACK).Subtype
+    end,
+    setValue = function(ctx, value)
+      db:GetCategoryFilters(const.BAG_KIND.BACKPACK).Subtype = value
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
+    end
+  })
+
   f:AddSubSection({
     title = 'Item Stacking',
     description = 'Settings for item stacking in the backpack.',
   })
+
   f:AddCheckbox({
     title = 'All Items Recent',
     description = 'All new items you loot, pickup, or move into the bag will be marked as recent.',
@@ -418,10 +518,13 @@ function form:OnEnable()
     max = 20,
     step = 1,
     getValue = function(ctx)
-      return fakedb['itemsPerRow']
+      return db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK)).itemsPerRow > 20 and 20 or db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK)).itemsPerRow
     end,
     setValue = function(ctx, value)
-      fakedb['itemsPerRow'] = value
+      db:SetBagViewSizeItems(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK), value)
+      bucket:Later("setItemsPerRow", 0.2, function()
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
+      end)
     end,
   })
 
@@ -432,10 +535,13 @@ function form:OnEnable()
     max = 20,
     step = 1,
     getValue = function(ctx)
-      return fakedb['columns']
+      return db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK)).columnCount > 20 and 20 or db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK)).columnCount
     end,
     setValue = function(ctx, value)
-      fakedb['columns'] = value
+      db:SetBagViewSizeColumn(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK), value)
+      bucket:Later("setSectionsPerRow", 0.2, function()
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
+      end)
     end,
   })
 
@@ -446,10 +552,11 @@ function form:OnEnable()
     max = 100,
     step = 1,
     getValue = function(ctx)
-      return fakedb['opacity']
+      return db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK)).opacity
     end,
     setValue = function(ctx, value)
-      fakedb['opacity'] = value
+      db:SetBagViewSizeOpacity(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK), value)
+      themes:UpdateOpacity()
     end,
   })
 
@@ -460,10 +567,14 @@ function form:OnEnable()
     max = 200,
     step = 1,
     getValue = function(ctx)
-      return fakedb['scale']
+      return db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK)).scale
     end,
     setValue = function(ctx, value)
-      fakedb['scale'] = value
+      -- TODO(lobato): This should be an event.
+      local bag = addon:GetBagFromKind(const.BAG_KIND.BACKPACK)
+      if not bag then return end
+      bag.frame:SetScale(value / 100)
+      db:SetBagViewSizeScale(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK), value)
     end,
   })
   f:Show()
