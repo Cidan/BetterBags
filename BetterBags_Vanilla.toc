@@ -79,6 +79,12 @@ util\bucket.lua
 util\windowgroup.lua
 util\movementflow.lua
 
+forms\layouts\layout.lua
+forms\layouts\stacked.lua
+forms\layouts\twocolumn.lua
+
+forms\form.lua
+
 frames\searchcategory.lua
 frames\question.lua
 frames\search.lua
@@ -119,10 +125,6 @@ themes\gw2.lua
 themes\elvui.lua
 
 config\config.lua
-config\era\config.lua
-config\help.lua
-config\era\bags.lua
-config\customcat.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua

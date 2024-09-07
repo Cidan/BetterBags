@@ -81,6 +81,7 @@ function refresh:StartUpdate(ctx)
   local updateBackpack = false
   local updateBank = false
   local sortBackpack = false
+  local wipeAndRefreshAll = false
   for _, event in pairs(self.UpdateQueue) do
     if event.ctx:GetBool("wipe") then
       -- Prevent full wipes from happening in combat.
@@ -103,6 +104,8 @@ function refresh:StartUpdate(ctx)
       end
     elseif event.eventName == 'BAG_UPDATE_BANK' then
       updateBank = true
+    elseif event.eventName == 'WIPE_AND_REFRESH_ALL' then
+      wipeAndRefreshAll = true
     elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
     elseif const.REAGENTBANK_BAGS[event.args[1]] then
@@ -114,6 +117,13 @@ function refresh:StartUpdate(ctx)
     end
   end
   wipe(self.UpdateQueue)
+
+  if wipeAndRefreshAll then
+    items:ClearItemCache(ctx)
+    ctx:Set('wipe', true)
+    updateBackpack = true
+    updateBank = true
+  end
 
   if sortBackpack then
     self.isUpdateRunning = false
@@ -235,7 +245,8 @@ function refresh:OnEnable()
 
   -- Register when all bags should be wiped and reloaded.
   events:RegisterMessage('bags/FullRefreshAll', function(ctx)
-    items:WipeAndRefreshAll(ctx)
+    table.insert(refresh.UpdateQueue, {eventName = 'WIPE_AND_REFRESH_ALL', args = {}, ctx = ctx})
+    self:StartUpdate(ctx)
   end)
 
   -- Register for when bags are done drawing.

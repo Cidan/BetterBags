@@ -490,6 +490,19 @@ const.INVENTORY_TYPE_TO_INVENTORY_SLOTS = {
   [Enum.InventoryType.IndexRangedrightType] = {INVSLOT_MAINHAND},
 }
 
+-- FormLayout defines the layout type for a form.
+---@enum FormLayoutType
+const.FORM_LAYOUT = {
+  -- TwoColumn is a form layout that has the section titles
+  -- on the left and form elements on the right. The section
+  -- title is pinned to the top as you scroll.
+  TWO_COLUMN = 1,
+  -- A stacked form is a simple form layout with all form
+  -- elements stacked on top of each other. Section titles
+  -- pin to the top as you scroll.
+  STACKED = 2,
+}
+
 ---@class SizeInfo
 ---@field columnCount number
 ---@field itemsPerRow number
@@ -710,6 +723,7 @@ const.DATABASE_DEFAULTS = {
     categoryFilters = {
       [const.BAG_KIND.BACKPACK] = {
         Type = true,
+        Subtype = false,
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,
@@ -718,6 +732,7 @@ const.DATABASE_DEFAULTS = {
       },
       [const.BAG_KIND.BANK] = {
         Type = true,
+        Subtype = false,
         Expansion = false,
         TradeSkill = false,
         RecentItems = true,

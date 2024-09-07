@@ -173,7 +173,8 @@ local gw2Theme = {
       decoration.title = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
 
       decoration:SetAllPoints()
-      decoration:SetFrameStrata("BACKGROUND")
+      decoration:SetFrameStrata(frame:GetFrameStrata())
+      decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
 
       decoration:SetBackdrop(gw.BackdropTemplates.Default)
       decoration.title:ClearAllPoints()
@@ -184,9 +185,9 @@ local gw2Theme = {
       decoration.title:SetText(themes.titles[frame:GetName()])
 
       local close = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonNoScripts")
-      close:SetPoint("TOPRIGHT", decoration.gwHeader, "TOPRIGHT", -5, -25)
-      addon.SetScript(close, "OnClick", function(ctx)
-        frame.Owner:Hide(ctx)
+      close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
+      addon.SetScript(close, "OnClick", function()
+        frame:Hide()
       end)
       close:GwSkinButton(true)
     else
@@ -201,7 +202,8 @@ local gw2Theme = {
       decoration.title = decoration:CreateFontString(frame:GetName().."GW2_title", "OVERLAY", "GameFontNormal")
 
       decoration:SetAllPoints()
-      decoration:SetFrameStrata("BACKGROUND")
+      decoration:SetFrameStrata(frame:GetFrameStrata())
+      decoration:SetFrameLevel(frame:GetFrameLevel() - 1)
 
       decoration:SetBackdrop(gw.BackdropTemplates.Default)
       decoration.title:ClearAllPoints()

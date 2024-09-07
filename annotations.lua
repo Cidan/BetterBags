@@ -113,6 +113,14 @@ MainMenuBarBackpackButton = {}
 ---@class BagBarExpandToggle: Button
 BagBarExpandToggle = {}
 
+---@class DropdownButton: Button
+local dropdownButton = {}
+
+---@param setupFunction fun(dropdown: DropdownButton, root: table)
+function dropdownButton:SetupMenu(setupFunction) end
+
+function dropdownButton:GenerateMenu() end
+
 ---@class BetterBagsDebugListButton: Button
 ---@field RowNumber FontString
 ---@field Category FontString
@@ -228,6 +236,14 @@ function WowScrollBox:GetUpperShadowTexture() end
 ---@return Texture
 function WowScrollBox:GetLowerShadowTexture() end
 function WowScrollBox:SetDataProvider(provider) end
+function WowScrollBox:ScrollToOffset(offset) end
+function WowScrollBox:RegisterCallback(event, callback) end
+---@return number
+function WowScrollBox:GetDerivedScrollOffset() end
+---@return number
+function WowScrollBox:GetDerivedScrollRange() end
+---@param percent number
+function WowScrollBox:SetScrollPercentage(percent) end
 
 ---@class InputScrollFrameTemplate: Frame
 ---@field EditBox EditBox
@@ -303,6 +319,7 @@ local frameProto = {}
 ---@class MinimalScrollBar: Frame
 local MinimalScrollBar = {}
 function MinimalScrollBar:SetInterpolateScroll(interpolate) end
+function MinimalScrollBar:SetHideIfUnscrollable(hide) end
 
 ---@class EventFrame
 local EventFrame = {}
