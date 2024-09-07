@@ -350,9 +350,35 @@ function stackedLayout:addDropdownClassic(opts)
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
-  container.classicDropdown = CreateFrame("Frame", nil, container, "UIDropDownMenuTemplate")
+  container.classicDropdown = CreateFrame("Frame", nil, container, "UIDropDownMenuTemplate") --[[@as Frame]]
   container.classicDropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.classicDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+
+   -- Create and bind the initialization function to the dropdown menu
+  UIDropDownMenu_Initialize(container.classicDropdown, function(_, level, _)
+   for _, item in ipairs(opts.items) do
+    local info = UIDropDownMenu_CreateInfo()
+    info.text = item
+    info.checked = function()
+      local ctx = context:New('Dropdown_Get')
+      return opts.getValue(ctx, item)
+    end
+    info.func = function()
+      UIDropDownMenu_SetText(container.classicDropdown, item)
+      local ctx = context:New('Dropdown_Set')
+      opts.setValue(ctx, item)
+    end
+    UIDropDownMenu_AddButton(info, level)
+   end
+  end)
+
+  for _, item in ipairs(opts.items) do
+    local ctx = context:New('Dropdown_Load')
+    if opts.getValue(ctx, item) then
+      UIDropDownMenu_SetText(container.classicDropdown, item)
+      break
+    end
+  end
 
   container:SetHeight(
     container.title:GetLineHeight() +

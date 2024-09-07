@@ -27,7 +27,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field title FontString
 ---@field description FontString
 ---@field dropdown DropdownButton
----@field classicDropdown Button
+---@field classicDropdown Frame
 
 ---@class (exact) FormSlider: Frame
 ---@field title FontString
