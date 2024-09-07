@@ -124,10 +124,15 @@ end
 ---@private
 ---@param container Frame
 ---@param title string
+---@param color? table
 ---@return FontString
-function stackedLayout:createTitle(container, title)
+function stackedLayout:createTitle(container, title, color)
   local titleFont = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  titleFont:SetTextColor(1, 1, 1)
+  if color then
+    titleFont:SetTextColor(unpack(color))
+  else
+    titleFont:SetTextColor(1, 1, 1)
+  end
   titleFont:SetJustifyH("LEFT")
   titleFont:SetText(title)
   return titleFont
@@ -136,10 +141,15 @@ end
 ---@private
 ---@param container Frame
 ---@param description string
+---@param color? table
 ---@return FontString
-function stackedLayout:createDescription(container, description)
+function stackedLayout:createDescription(container, description, color)
   local descriptionFont = container:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  descriptionFont:SetTextColor(1, 1, 1)
+  if color then
+    descriptionFont:SetTextColor(unpack(color))
+  else
+    descriptionFont:SetTextColor(1, 1, 1)
+  end
   descriptionFont:SetJustifyH("LEFT")
   descriptionFont:SetText(description)
   descriptionFont:SetWordWrap(true)
@@ -260,11 +270,11 @@ function stackedLayout:AddCheckbox(opts)
   end)
   container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Load')))
 
-  container.title = self:createTitle(container, opts.title)
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
   container.title:SetPoint("LEFT", container.checkbox, "RIGHT", 5, 0)
   container.title:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  container.description = self:createDescription(container, opts.description)
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
   container.description:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
@@ -279,10 +289,10 @@ function stackedLayout:AddDropdown(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
   self:alignFrame(t, container)
 
-  container.title = self:createTitle(container, opts.title)
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = self:createDescription(container, opts.description)
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
   container.dropdown = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
@@ -320,10 +330,10 @@ function stackedLayout:AddSlider(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormSlider]]
   self:alignFrame(t, container)
 
-  container.title = self:createTitle(container, opts.title)
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
   container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
 
-  container.description = self:createDescription(container, opts.description)
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
   container.slider = CreateFrame("Slider", nil, container, "UISliderTemplate") --[[@as Slider]]
