@@ -91,9 +91,9 @@ function stackedLayout:addIndex(title, point, sub)
     local targetTop = point:GetTop()
     local parentTop = self.targetFrame:GetTop()
     if addon.isRetail then
-      self.scrollBox:ScrollToOffset((parentTop - targetTop) + 1)
+      self.scrollBox:ScrollToOffset((parentTop - targetTop) - 10)
     else
-      self:scrollToOffset((parentTop - targetTop) + 1)
+      self:scrollToOffset((parentTop - targetTop) - 10)
     end
   end)
 
