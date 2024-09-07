@@ -185,7 +185,7 @@ local gw2Theme = {
       decoration.title:SetText(themes.titles[frame:GetName()])
 
       local close = CreateFrame("Button", nil, decoration, "UIPanelCloseButtonNoScripts")
-      close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -5, -5)
+      close:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -1, -1)
       addon.SetScript(close, "OnClick", function()
         frame:Hide()
       end)
