@@ -124,8 +124,10 @@ function formFrame:AddDropdown(opts)
   self:Refresh()
 end
 
+---@param opts FormTextAreaOptions
 function formFrame:AddTextArea(opts)
-  _ = opts
+  self.layout:AddTextArea(opts)
+  self:Refresh()
 end
 
 ---@param opts FormCheckboxOptions

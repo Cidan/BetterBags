@@ -343,7 +343,6 @@ function stackedLayout:addDropdownRetail(opts)
   if opts.items then
     itemList = opts.items --[=[@as string[]]=]
   elseif opts.itemsFunction then
-    print("setting item list to fun")
     local ctx = context:New('Dropdown_Items')
     itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
   end
@@ -552,6 +551,38 @@ function stackedLayout:AddButtonGroup(opts)
   end
 
   container:SetHeight(container.buttons[1]:GetHeight() + 30)
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+end
+
+---@param opts FormTextAreaOptions
+function stackedLayout:AddTextArea(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormTextArea]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  container.input = CreateFrame("ScrollFrame", nil, container, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
+  container.input:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 5, -5)
+  container.input:SetPoint("RIGHT", container, "RIGHT", -5, 0)
+  container.input:SetHeight(100)
+  container.input.EditBox:SetAllPoints()
+  container.input.EditBox:SetFontObject("GameFontHighlight")
+  container.input.EditBox:SetMaxLetters(99999)
+  container.input.EditBox:SetText(opts.getValue(context:New('TextArea_Load')))
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.input:GetHeight() +
+    30
+  )
+
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end

@@ -77,11 +77,10 @@ function config:AddPluginConfig(title, c)
       local valueList, valueFunc
 
       if type(o.values) == 'function' then
-        valueFunc = function(ctx)
+        valueFunc = function(_)
           local iv = o.values() --[[@as table<any, string>]]
           local result = {}
           for _, v in pairs(iv) do
-            print(v)
             table.insert(result, v) --[[@as string]]
           end
           return result
@@ -97,6 +96,17 @@ function config:AddPluginConfig(title, c)
         itemsFunction = valueFunc,
         getValue = function(_, value)
           return value == o.get()
+        end,
+        setValue = function(_, value)
+          o.set(_, value)
+        end
+      })
+    elseif o.type == 'input' and o.multiline then
+      f:AddTextArea({
+        title = subTitle,
+        description = subDesc,
+        getValue = function(_)
+          return o.get()
         end,
         setValue = function(_, value)
           o.set(_, value)

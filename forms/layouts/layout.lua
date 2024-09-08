@@ -38,6 +38,11 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormButtons: Frame
 ---@field buttons Button[]
 
+---@class (exact) FormTextArea: Frame
+---@field title FontString
+---@field description FontString
+---@field input InputScrollFrameTemplate
+
 --[[
 -- Widget Options
 ]]--
@@ -80,6 +85,12 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormButtonGroupOptions
 ---@field ButtonOptions FormButtonOption[]
 
+---@class (exact) FormTextAreaOptions
+---@field title string
+---@field description string
+---@field getValue fun(ctx: Context): string
+---@field setValue fun(ctx: Context, value: string)
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -90,3 +101,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddSubSection fun(self: FormLayout, opts: FormSubSectionOptions)
 ---@field AddSlider fun(self: FormLayout, opts: FormSliderOptions)
 ---@field AddButtonGroup fun(self: FormLayout, opts: FormButtonGroupOptions)
+---@field AddTextArea fun(self: FormLayout, opts: FormTextAreaOptions)
