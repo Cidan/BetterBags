@@ -83,6 +83,12 @@ function config:CreateConfig()
     end,
     setValue = function(_, value)
       db:SetShowBagButton(value)
+      local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame	
+      if value then
+        BagsBar:SetParent(UIParent)
+      else
+        BagsBar:SetParent(sneakyFrame)
+      end
     end
   })
 
