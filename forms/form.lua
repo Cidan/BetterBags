@@ -134,8 +134,10 @@ function formFrame:AddCheckbox(opts)
   self:Refresh()
 end
 
+---@param opts FormButtonGroupOptions
 function formFrame:AddButtonGroup(opts)
-  _ = opts
+  self.layout:AddButtonGroup(opts)
+  self:Refresh()
 end
 
 ---@return Frame

@@ -35,6 +35,9 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field slider Slider
 ---@field input EditBox
 
+---@class (exact) FormButtons: Frame
+---@field buttons Button[]
+
 --[[
 -- Widget Options
 ]]--
@@ -69,6 +72,13 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field getValue fun(ctx: Context): number
 ---@field setValue fun(ctx: Context, value: number)
 
+---@class (exact) FormButtonOption
+---@field title string
+---@field onClick fun(ctx: Context)
+
+---@class (exact) FormButtonGroupOptions
+---@field ButtonOptions FormButtonOption[]
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -78,3 +88,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddDropdown fun(self: FormLayout, opts: FormDropdownOptions)
 ---@field AddSubSection fun(self: FormLayout, opts: FormSubSectionOptions)
 ---@field AddSlider fun(self: FormLayout, opts: FormSliderOptions)
+---@field AddButtonGroup fun(self: FormLayout, opts: FormButtonGroupOptions)

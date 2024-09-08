@@ -506,3 +506,30 @@ function stackedLayout:AddSlider(opts)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end
+
+---@param opts FormButtonGroupOptions
+function stackedLayout:AddButtonGroup(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormButtons]]
+  self:alignFrame(t, container)
+  container.buttons = {}
+  local buttonHeight = 0
+  for _, buttonData in ipairs(opts.ButtonOptions) do
+    local button = CreateFrame("Button", nil, container, "UIPanelButtonTemplate") --[[@as Button]]
+    button:SetSize(100, 24)
+    button:SetText(buttonData.title)
+    addon.SetScript(button, "OnClick", function(ctx)
+      buttonData.onClick(ctx)
+    end)
+    if #container.buttons == 0 then
+      button:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+    else
+      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", -10, 0)
+    end
+    table.insert(container.buttons, button)
+  end
+  container:SetHeight(container.buttons[1]:GetHeight() + 30)
+  --container:SetHeight(container:GetHeight() + 30)
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+end

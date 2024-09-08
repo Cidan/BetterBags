@@ -34,8 +34,6 @@ local form = addon:GetModule('Form')
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
 
-
-
 function config:CreateConfig()
   local f = form:Create({
     title = 'BetterBags Settings',
@@ -515,6 +513,7 @@ function config:RegisterSettings()
 end
 
 function config:OnEnable()
+  if self.configFrame then return end
   self:CreateConfig()
   self:RegisterSettings()
   table.insert(UISpecialFrames, self.configFrame.frame:GetName())
