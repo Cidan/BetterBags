@@ -60,6 +60,12 @@ function stackedLayout:ReloadAllFormElements()
   for container, opts in pairs(self.checkboxes) do
     container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Reload')))
   end
+
+  if addon.isRetail then
+    for container in pairs(self.dropdowns) do
+      container.dropdown:GenerateMenu()
+    end
+  end
 end
 
 ---@package
@@ -376,6 +382,7 @@ function stackedLayout:addDropdownRetail(opts)
       function(value)
         local ctx = context:New('Dropdown_Set')
         opts.setValue(ctx, value)
+        self:ReloadAllFormElements()
       end, item)
     end
   end)
