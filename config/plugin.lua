@@ -73,7 +73,7 @@ function config:AddPluginConfig(title, c)
         }}
       })
     else
-      error("Unsupported option type for plugin config: " .. o.type)
+      print("Unsupported option type for plugin config: " .. o.type)
     end
   end
 end

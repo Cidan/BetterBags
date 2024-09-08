@@ -513,7 +513,7 @@ function stackedLayout:AddButtonGroup(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormButtons]]
   self:alignFrame(t, container)
   container.buttons = {}
-  local buttonHeight = 0
+
   for _, buttonData in ipairs(opts.ButtonOptions) do
     local button = CreateFrame("Button", nil, container, "UIPanelButtonTemplate") --[[@as Button]]
     button:SetSize(100, 24)
@@ -528,8 +528,8 @@ function stackedLayout:AddButtonGroup(opts)
     end
     table.insert(container.buttons, button)
   end
+
   container:SetHeight(container.buttons[1]:GetHeight() + 30)
-  --container:SetHeight(container:GetHeight() + 30)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end
