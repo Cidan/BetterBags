@@ -337,8 +337,19 @@ function stackedLayout:addDropdownRetail(opts)
   container.dropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
+  ---@type string[]
+  local itemList = {}
+
+  if opts.items then
+    itemList = opts.items --[=[@as string[]]=]
+  elseif opts.itemsFunction then
+    print("setting item list to fun")
+    local ctx = context:New('Dropdown_Items')
+    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
+  end
+
   container.dropdown:SetupMenu(function(_, root)
-    for _, item in ipairs(opts.items) do
+    for _, item in ipairs(itemList) do
       root:CreateCheckbox(item, function(value)
         local ctx = context:New('Dropdown_Get')
         return opts.getValue(ctx, value)
@@ -379,9 +390,19 @@ function stackedLayout:addDropdownClassic(opts)
   container.classicDropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.classicDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
+  ---@type string[]
+  local itemList = {}
+
+  if opts.items then
+    itemList = opts.items --[=[@as string[]]=]
+  elseif opts.itemsFunction then
+    local ctx = context:New('Dropdown_Items')
+    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
+  end
+
    -- Create and bind the initialization function to the dropdown menu
   UIDropDownMenu_Initialize(container.classicDropdown, function(_, level, _)
-   for _, item in ipairs(opts.items) do
+   for _, item in ipairs(itemList) do
     local info = UIDropDownMenu_CreateInfo()
     info.text = item
     info.checked = function()
@@ -516,8 +537,9 @@ function stackedLayout:AddButtonGroup(opts)
 
   for _, buttonData in ipairs(opts.ButtonOptions) do
     local button = CreateFrame("Button", nil, container, "UIPanelButtonTemplate") --[[@as Button]]
-    button:SetSize(100, 24)
     button:SetText(buttonData.title)
+    local w = button:GetFontString():GetStringWidth()
+    button:SetSize(w + 6, 24)
     addon.SetScript(button, "OnClick", function(ctx)
       buttonData.onClick(ctx)
     end)

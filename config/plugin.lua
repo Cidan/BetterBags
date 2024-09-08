@@ -60,7 +60,7 @@ function config:AddPluginConfig(title, c)
           return o.get()
         end,
         setValue = function(_, value)
-          o.set(value)
+          o.set(_, value)
         end
       })
     elseif o.type =='execute' then
@@ -71,6 +71,36 @@ function config:AddPluginConfig(title, c)
             o.func()
           end
         }}
+      })
+    elseif o.type == 'select' then
+      ---@type string[], function
+      local valueList, valueFunc
+
+      if type(o.values) == 'function' then
+        valueFunc = function(ctx)
+          local iv = o.values() --[[@as table<any, string>]]
+          local result = {}
+          for _, v in pairs(iv) do
+            print(v)
+            table.insert(result, v) --[[@as string]]
+          end
+          return result
+        end
+      else
+        valueList = o.values --[=[@as string[]]=]
+      end
+
+      f:AddDropdown({
+        title = subTitle,
+        description = subDesc,
+        items = valueList,
+        itemsFunction = valueFunc,
+        getValue = function(_, value)
+          return value == o.get()
+        end,
+        setValue = function(_, value)
+          o.set(_, value)
+        end
       })
     else
       print("Unsupported option type for plugin config: " .. o.type)

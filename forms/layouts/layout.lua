@@ -59,7 +59,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormDropdownOptions
 ---@field title string
 ---@field description string
----@field items string[]
+---@field items? string[]
+---@field itemsFunction? fun(ctx: Context): string[]
 ---@field getValue fun(ctx: Context, value: string): boolean
 ---@field setValue fun(ctx: Context, value: string)
 
