@@ -109,7 +109,9 @@ function config:AddPluginConfig(title, c)
           return o.get()
         end,
         setValue = function(_, value)
-          o.set(_, value)
+          if o.set then
+            o.set(_, value)
+          end
         end
       })
     elseif o.type == 'input' then
@@ -120,7 +122,9 @@ function config:AddPluginConfig(title, c)
           return o.get()
         end,
         setValue = function(_, value)
-          o.set(_, value)
+          if o.set then
+            o.set(_, value)
+          end
         end
       })
     else

@@ -66,6 +66,19 @@ function stackedLayout:ReloadAllFormElements()
       container.dropdown:GenerateMenu()
     end
   end
+
+  for container, opts in pairs(self.sliders) do
+    container.slider:SetValue(opts.getValue(context:New('Slider_Reload')))
+    container.input:SetText(tostring(container.slider:GetValue()))
+  end
+
+  for container, opts in pairs(self.textAreas) do
+    container.input.EditBox:SetText(opts.getValue(context:New('TextArea_Reload')))
+  end
+
+  for container, opts in pairs(self.inputBoxes) do
+    container.input:SetText(opts.getValue(context:New('InputBox_Reload')))
+  end
 end
 
 ---@package
@@ -440,6 +453,7 @@ function stackedLayout:addDropdownClassic(opts)
       UIDropDownMenu_SetText(container.classicDropdown, item)
       local ctx = context:New('Dropdown_Set')
       opts.setValue(ctx, item)
+      self:ReloadAllFormElements()
     end
     UIDropDownMenu_AddButton(info, level)
    end
@@ -501,6 +515,7 @@ function stackedLayout:AddSlider(opts)
     opts.setValue(ctx, value)
     if user then
       container.input:SetText(tostring(value))
+      self:ReloadAllFormElements()
     end
   end)
 
@@ -523,6 +538,7 @@ function stackedLayout:AddSlider(opts)
       value = opts.min
     end
     container.input:SetText(tostring(container.slider:GetValue()))
+    self:ReloadAllFormElements()
   end)
   addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
     if user then
@@ -606,7 +622,18 @@ function stackedLayout:AddTextArea(opts)
   container.input.EditBox:SetFontObject("GameFontHighlight")
   container.input.EditBox:SetMaxLetters(99999)
   container.input.EditBox:SetText(opts.getValue(context:New('TextArea_Load')))
+  addon.SetScript(container.input.EditBox, "OnEditFocusLost", function()
+    local value = container.input.EditBox:GetText()
+    opts.setValue(context:New('InputBox_Set'), value)
+    self:ReloadAllFormElements()
+  end)
 
+  addon.SetScript(container.input.EditBox, "OnTextChanged", function(_, _, user)
+    if user then
+      local value = container.input.EditBox:GetText()
+      opts.setValue(context:New('InputBox_Set'), value)
+    end
+  end)
   container:SetHeight(
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
@@ -641,6 +668,7 @@ function stackedLayout:AddInputBox(opts)
   addon.SetScript(container.input, "OnEditFocusLost", function(_)
     local value = container.input:GetText()
     opts.setValue(context:New('InputBox_Set'), value)
+    self:ReloadAllFormElements()
   end)
 
   addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
