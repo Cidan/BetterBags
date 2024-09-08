@@ -112,6 +112,17 @@ function config:AddPluginConfig(title, c)
           o.set(_, value)
         end
       })
+    elseif o.type == 'input' then
+      f:AddInputBox({
+        title = subTitle,
+        description = subDesc,
+        getValue = function(_)
+          return o.get()
+        end,
+        setValue = function(_, value)
+          o.set(_, value)
+        end
+      })
     else
       print("Unsupported option type for plugin config: " .. o.type)
     end

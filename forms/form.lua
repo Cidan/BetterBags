@@ -114,8 +114,10 @@ function formFrame:AddSlider(opts)
   self:Refresh()
 end
 
-function formFrame:AddInputBoxGroup(opts)
-  _ = opts
+---@param opts FormInputBoxOptions
+function formFrame:AddInputBox(opts)
+  self.layout:AddInputBox(opts)
+  self:Refresh()
 end
 
 ---@param opts FormDropdownOptions

@@ -586,3 +586,45 @@ function stackedLayout:AddTextArea(opts)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end
+
+---@param opts FormInputBoxOptions
+function stackedLayout:AddInputBox(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormInputBox]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
+  container.input:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 5, -5)
+  container.input:SetPoint("RIGHT", container, "RIGHT", -5, 0)
+  container.input:SetHeight(20)
+  container.input:SetAutoFocus(false)
+  container.input:SetFontObject("GameFontHighlight")
+  container.input:SetText(opts.getValue(context:New('InputBox_Load')))
+  addon.SetScript(container.input, "OnEditFocusLost", function(_)
+    local value = container.input:GetText()
+    opts.setValue(context:New('InputBox_Set'), value)
+  end)
+
+  addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
+    if user then
+      local value = container.input:GetText()
+      opts.setValue(context:New('InputBox_Set'), value)
+    end
+  end)
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.input:GetHeight() +
+    30
+  )
+
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+end
