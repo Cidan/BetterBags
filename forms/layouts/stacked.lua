@@ -19,6 +19,12 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field indexFrame Frame
 ---@field underline Frame
 ---@field sections {point: Frame, button: Button}[]
+---@field checkboxes table<FormCheckbox, FormCheckboxOptions>
+---@field dropdowns table<FormDropdown, FormDropdownOptions>
+---@field sliders table<FormSlider, FormSliderOptions>
+---@field buttonGroups table<FormButtons, FormButtonGroupOptions>
+---@field textAreas table<FormTextArea, FormTextAreaOptions>
+---@field inputBoxes table<FormInputBox, FormInputBoxOptions>
 ---@field scrollBox WowScrollBox
 ---@field height number
 ---@field index boolean
@@ -37,11 +43,23 @@ function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   l.index = index
   l.baseFrame = baseFrame
   l.scrollBox = scrollBox
+  l.checkboxes = {}
+  l.dropdowns = {}
+  l.sliders = {}
+  l.buttonGroups = {}
+  l.textAreas = {}
+  l.inputBoxes = {}
   l.sections = {}
   if index then
     l:setupIndex()
   end
   return l
+end
+
+function stackedLayout:ReloadAllFormElements()
+  for container, opts in pairs(self.checkboxes) do
+    container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Reload')))
+  end
 end
 
 ---@package
@@ -304,6 +322,7 @@ function stackedLayout:AddCheckbox(opts)
   container.checkbox:SetPoint("TOPLEFT", container, "TOPLEFT")
   addon.SetScript(container.checkbox, "OnClick", function(ctx)
     opts.setValue(ctx, container.checkbox:GetChecked())
+    self:ReloadAllFormElements()
   end)
   container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Load')))
 
@@ -318,6 +337,7 @@ function stackedLayout:AddCheckbox(opts)
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.checkboxes[container] = opts
 end
 
 ---@private
@@ -370,6 +390,7 @@ function stackedLayout:addDropdownRetail(opts)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.dropdowns[container] = opts
 end
 
 ---@private
@@ -433,6 +454,7 @@ function stackedLayout:addDropdownClassic(opts)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.dropdowns[container] = opts
 end
 
 ---@param opts FormDropdownOptions
@@ -525,6 +547,7 @@ function stackedLayout:AddSlider(opts)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.sliders[container] = opts
 end
 
 ---@param opts FormButtonGroupOptions
@@ -553,6 +576,7 @@ function stackedLayout:AddButtonGroup(opts)
   container:SetHeight(container.buttons[1]:GetHeight() + 30)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.buttonGroups[container] = opts
 end
 
 ---@param opts FormTextAreaOptions
@@ -585,6 +609,7 @@ function stackedLayout:AddTextArea(opts)
 
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.textAreas[container] = opts
 end
 
 ---@param opts FormInputBoxOptions
@@ -627,4 +652,5 @@ function stackedLayout:AddInputBox(opts)
 
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.inputBoxes[container] = opts
 end
