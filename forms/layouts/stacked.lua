@@ -387,6 +387,7 @@ function stackedLayout:addDropdownRetail(opts)
   end
 
   container.dropdown:SetupMenu(function(_, root)
+    root:SetScrollMode(20 * 20)
     for _, item in ipairs(itemList) do
       root:CreateCheckbox(item, function(value)
         local ctx = context:New('Dropdown_Get')
