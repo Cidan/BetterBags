@@ -63,7 +63,7 @@ function stackedLayout:ReloadAllFormElements()
 
   if addon.isRetail then
     for container in pairs(self.dropdowns) do
-      container.dropdown:GenerateMenu()
+      container.dropdown:Update()
     end
   end
 
