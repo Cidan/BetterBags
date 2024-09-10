@@ -25,6 +25,7 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field buttonGroups table<FormButtons, FormButtonGroupOptions>
 ---@field textAreas table<FormTextArea, FormTextAreaOptions>
 ---@field inputBoxes table<FormInputBox, FormInputBoxOptions>
+---@field colorPickers table<FormColor, FormColorOptions>
 ---@field scrollBox WowScrollBox
 ---@field height number
 ---@field index boolean
@@ -49,6 +50,7 @@ function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   l.buttonGroups = {}
   l.textAreas = {}
   l.inputBoxes = {}
+  l.colorPickers = {}
   l.sections = {}
   if index then
     l:setupIndex()
@@ -742,4 +744,38 @@ function stackedLayout:AddInputBox(opts)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
   self.inputBoxes[container] = opts
+end
+
+---@param opts FormColorOptions
+function stackedLayout:AddColor(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormColor]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  container.colorPicker = CreateFrame("Frame", nil, container) --[[@as Frame]]
+  container.colorPicker:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  container.colorPicker:SetSize(64, 64)
+  local tex = container.colorPicker:CreateTexture(nil, "ARTWORK")
+  tex:SetAllPoints()
+  tex:SetTexture([[world\\expansion09\\doodads\\tuskarr\\8fx_explosionsmoke_a]])
+  --tex:SetVertexColor(unpack(opts.getValue(context:New('Color_Load'))))
+  tex:SetVertexColor(1, 0, 0, 1)
+  --tex:SetColorTexture(1, 0, 0, 1)
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.colorPicker:GetHeight() +
+    30
+  )
+
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+  self.colorPickers[container] = opts
 end

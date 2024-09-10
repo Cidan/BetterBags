@@ -127,6 +127,17 @@ function config:AddPluginConfig(title, c)
           end
         end
       })
+    elseif o.type == 'color' then
+      f:AddColor({
+        title = subTitle,
+        description = subDesc,
+        getValue = function(_)
+          return o.get()
+        end,
+        setValue = function(_, value)
+          o.set(_, value)
+        end
+      })
     else
       print("Unsupported option type for plugin config: " .. o.type)
     end

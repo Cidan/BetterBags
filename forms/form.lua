@@ -148,6 +148,12 @@ function formFrame:AddButtonGroup(opts)
   self:Resize()
 end
 
+---@param opts FormColorOptions
+function formFrame:AddColor(opts)
+  self.layout:AddColor(opts)
+  self:Resize()
+end
+
 ---@return Frame
 function formFrame:GetFrame()
   return self.frame

@@ -48,6 +48,11 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field description FontString
 ---@field input EditBox
 
+---@class (exact) FormColor: Frame
+---@field title FontString
+---@field description FontString
+---@field colorPicker Frame
+
 --[[
 -- Widget Options
 ]]--
@@ -102,6 +107,12 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field getValue fun(ctx: Context): string
 ---@field setValue fun(ctx: Context, value: string)
 
+---@class (exact) FormColorOptions
+---@field title string
+---@field description string
+---@field getValue fun(ctx: Context): Color
+---@field setValue fun(ctx: Context, value: Color)
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -115,3 +126,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddButtonGroup fun(self: FormLayout, opts: FormButtonGroupOptions)
 ---@field AddTextArea fun(self: FormLayout, opts: FormTextAreaOptions)
 ---@field AddInputBox fun(self: FormLayout, opts: FormInputBoxOptions)
+---@field AddColor fun(self: FormLayout, opts: FormColorOptions)
