@@ -634,6 +634,7 @@ function stackedLayout:AddTextArea(opts)
   ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   ScrollBox:SetHeight(100)
   ScrollBox:SetWidth(container:GetWidth() - 50)
+  ScrollBox:EnableMouseWheel(false)
 
   local ScrollBar = CreateFrame("EventFrame", nil, container, "MinimalScrollBar") --[[@as MinimalScrollBar]]
   ScrollBar:SetPoint("TOPLEFT", ScrollBox, "TOPRIGHT", 4, -2)
@@ -662,9 +663,14 @@ function stackedLayout:AddTextArea(opts)
     ScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
   end)
 
+  addon.SetScript(editBox, "OnEditFocusGained", function()
+    ScrollBox:EnableMouseWheel(true)
+  end)
+
   addon.SetScript(editBox, "OnEditFocusLost", function()
     opts.setValue(context:New('InputBox_Set'), editBox:GetText())
     self:ReloadAllFormElements()
+    ScrollBox:EnableMouseWheel(false)
   end)
 
   addon.SetScript(editBox, "OnTextChanged", function(_, _, user)
