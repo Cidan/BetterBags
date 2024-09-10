@@ -228,7 +228,7 @@ function FontString:SetScript(event, func) end
 local WowScrollBox = {}
 function WowScrollBox:SetInterpolateScroll(interpolate) end
 function WowScrollBox:ScrollInDirection(percent, direction) end
-function WowScrollBox:FullUpdate() end
+function WowScrollBox:FullUpdate(const) end
 function WowScrollBox:OnMouseWheel(delta) end
 function WowScrollBox:ScrollToEnd() end
 ---@return Texture

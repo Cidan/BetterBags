@@ -72,9 +72,9 @@ function stackedLayout:ReloadAllFormElements()
     container.input:SetText(tostring(container.slider:GetValue()))
   end
 
-  --for container, opts in pairs(self.textAreas) do
-  --  container.input.EditBox:SetText(opts.getValue(context:New('TextArea_Reload')))
-  --end
+  for container, opts in pairs(self.textAreas) do
+    container.input:SetText(opts.getValue(context:New('TextArea_Reload')))
+  end
 
   for container, opts in pairs(self.inputBoxes) do
     container.input:SetText(opts.getValue(context:New('InputBox_Reload')))
@@ -104,6 +104,21 @@ function stackedLayout:scrollToOffset(offset)
     local scrollPercentage = offset / scrollRange
     self.scrollBox:SetScrollPercentage(scrollPercentage)
   end
+end
+
+---@private
+---@param parent Frame
+---@return Frame
+function stackedLayout:createTextAreaBackground(parent)
+  local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate") --[[@as Frame]]
+  frame:SetBackdrop({
+    bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+    edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 4,
+    insets = { left = 0, right = 0, top = 0, bottom = 0 }
+  })
+  frame:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+  frame:SetBackdropBorderColor(0.4, 0.4, 0.4)
+  return frame
 end
 
 ---@package
@@ -617,80 +632,63 @@ function stackedLayout:AddTextArea(opts)
 
   local ScrollBox = CreateFrame("Frame", nil, container, "WowScrollBox") --[[@as WowScrollBox]]
   ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
-  ScrollBox:SetPoint("RIGHT", container, "RIGHT", -25, 0)
   ScrollBox:SetHeight(100)
+  ScrollBox:SetWidth(container:GetWidth() - 50)
 
   local ScrollBar = CreateFrame("EventFrame", nil, container, "MinimalScrollBar") --[[@as MinimalScrollBar]]
   ScrollBar:SetPoint("TOPLEFT", ScrollBox, "TOPRIGHT", 4, -2)
   ScrollBar:SetPoint("BOTTOMLEFT", ScrollBox, "BOTTOMRIGHT", 2, 0)
 
-  --local scrollBackground = CreateFrame("Frame", nil, container) --[[@as Frame]]
-  --scrollBackground:SetPoint("TOPLEFT", ScrollBox, "TOPLEFT", -2, 2)
-  --scrollBackground:SetPoint("BOTTOMRIGHT", ScrollBox, "BOTTOMRIGHT", 2, -2)
+  ScrollBar:SetHideIfUnscrollable(true)
+  ScrollBox:SetInterpolateScroll(true)
+  ScrollBar:SetInterpolateScroll(true)
 
-  --local bgleft = scrollBackground:CreateTexture(nil, "BACKGROUND")
-  --bgleft:SetAtlas("common-search-border-left", false)
-  ----bgleft:SetSize(8, 20)
-  --bgleft:SetPoint("TOPLEFT", -5, 0)
-  --bgleft:SetPoint("BOTTOMLEFT", -5, 0)
---
-  --local bgright = scrollBackground:CreateTexture(nil, "BACKGROUND")
-  --bgright:SetAtlas("common-search-border-right")
-  --bgright:SetPoint("TOPRIGHT", 0, 0)
-  --bgright:SetPoint("BOTTOMRIGHT", 0, 0)
---
-  --local bgmid = scrollBackground:CreateTexture(nil, "BACKGROUND")
-  --bgmid:SetAtlas("common-search-border-middle")
-  --bgmid:SetSize(10, 20)
-  --bgmid:SetPoint("LEFT", bgleft, "RIGHT")
-  --bgmid:SetPoint("RIGHT", bgright, "LEFT")
-
+  local scrollBackground = self:createTextAreaBackground(ScrollBox)
+  scrollBackground:SetPoint("TOPLEFT", ScrollBox, "TOPLEFT", 0, 0)
+  scrollBackground:SetPoint("BOTTOMRIGHT", ScrollBox, "BOTTOMRIGHT", 0, 0)
   local view = CreateScrollBoxLinearView()
-  view:SetPanExtent(60)
+  view:SetPanExtent(10)
 
   local editBox = CreateFrame("EditBox", nil, ScrollBox) --[[@as EditBox]]
-  --editBox:SetAllPoints()
   editBox:SetFontObject("ChatFontNormal")
   editBox:SetMultiLine(true)
   editBox:EnableMouse(true)
   editBox:SetCountInvisibleLetters(false)
   editBox:SetAutoFocus(false)
   editBox.scrollable = true
-  --editBox:SetHeight(90)
 
-  ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, view)
-  --scrollFrame:SetScrollChild(editBox)
-  container.input = ScrollBox
-  debug:DrawBorder(container, 1, 0, 0, false)
-  debug:DrawBorder(ScrollBox, 0, 1, 0, false)
-  debug:DrawBorder(editBox, 0, 0, 1, false)
-  --container.input = CreateFrame("ScrollFrame", nil, container, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
-  --container.input:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 5, -5)
-  --container.input:SetPoint("RIGHT", container, "RIGHT", -5, 0)
-  --container.input:SetHeight(100)
-  --container.input.EditBox:SetAllPoints()
-  --container.input.EditBox:SetFontObject("GameFontHighlight")
-  --container.input.EditBox:SetMaxLetters(99999)
-  --container.input.EditBox:SetText(opts.getValue(context:New('TextArea_Load')))
-  --addon.SetScript(container.input.EditBox, "OnEditFocusLost", function()
-  --  local value = container.input.EditBox:GetText()
-  --  opts.setValue(context:New('InputBox_Set'), value)
-  --  self:ReloadAllFormElements()
-  --end)
---
-  --addon.SetScript(container.input.EditBox, "OnTextChanged", function(_, _, user)
-  --  if user then
-  --    local value = container.input.EditBox:GetText()
-  --    opts.setValue(context:New('InputBox_Set'), value)
-  --  end
-  --end)
+  addon.SetScript(editBox, "OnEscapePressed", function()
+    editBox:ClearFocus()
+    ScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+  end)
+
+  addon.SetScript(editBox, "OnEditFocusLost", function()
+    opts.setValue(context:New('InputBox_Set'), editBox:GetText())
+    self:ReloadAllFormElements()
+  end)
+
+  addon.SetScript(editBox, "OnTextChanged", function(_, _, user)
+    ScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+    ScrollBox:ScrollToEnd()
+    if opts.setValue and user then
+      opts.setValue(context:New('TextArea_Set'), editBox:GetText())
+    end
+  end)
+
+  addon.SetScript(ScrollBox, "OnMouseDown", function()
+    editBox:SetFocus()
+  end)
+
+  container.input = editBox
+
   container:SetHeight(
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
-    container.input:GetHeight() +
+    ScrollBox:GetHeight() +
     30
   )
 
+  ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, view)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
   self.textAreas[container] = opts

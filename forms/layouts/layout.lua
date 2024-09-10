@@ -41,7 +41,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormTextArea: Frame
 ---@field title FontString
 ---@field description FontString
----@field input InputScrollFrameTemplate
+---@field input EditBox
 
 ---@class (exact) FormInputBox: Frame
 ---@field title FontString
