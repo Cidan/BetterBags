@@ -479,7 +479,8 @@ end
 
 ---@param ctx Context
 function bagFrame.bagProto:CreateCategoryForItemInCursor(ctx)
-  local _, itemID, itemLink = GetCursorInfo()
+  local kind, itemID, itemLink = GetCursorInfo()
+  if not itemLink or kind ~= "item" then return end
   ---@cast itemID number
   question:AskForInput("Create Category", format(L:G("What would you like to name the new category for %s?"), itemLink),
   function(input)

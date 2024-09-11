@@ -34,8 +34,6 @@ local form = addon:GetModule('Form')
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
 
-
-
 function config:CreateConfig()
   local f = form:Create({
     title = 'BetterBags Settings',
@@ -85,6 +83,12 @@ function config:CreateConfig()
     end,
     setValue = function(_, value)
       db:SetShowBagButton(value)
+      local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame	
+      if value then
+        BagsBar:SetParent(UIParent)
+      else
+        BagsBar:SetParent(sneakyFrame)
+      end
     end
   })
 
@@ -515,6 +519,7 @@ function config:RegisterSettings()
 end
 
 function config:OnEnable()
+  if self.configFrame then return end
   self:CreateConfig()
   self:RegisterSettings()
   table.insert(UISpecialFrames, self.configFrame.frame:GetName())

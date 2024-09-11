@@ -92,15 +92,19 @@ function form:Create(opts)
   return l
 end
 
-function formFrame:Refresh()
+function formFrame:Resize()
   self.inner:SetHeight(self.layout.height + 25)
   self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
+end
+
+function formFrame:ReloadAllFormElements()
+  self.layout:ReloadAllFormElements()
 end
 
 ---@param opts FormSectionOptions
 function formFrame:AddSection(opts)
   self.layout:AddSection(opts)
-  self:Refresh()
+  self:Resize()
 end
 
 ---@param opts FormSubSectionOptions
@@ -111,31 +115,43 @@ end
 ---@param opts FormSliderOptions
 function formFrame:AddSlider(opts)
   self.layout:AddSlider(opts)
-  self:Refresh()
+  self:Resize()
 end
 
-function formFrame:AddInputBoxGroup(opts)
-  _ = opts
+---@param opts FormInputBoxOptions
+function formFrame:AddInputBox(opts)
+  self.layout:AddInputBox(opts)
+  self:Resize()
 end
 
 ---@param opts FormDropdownOptions
 function formFrame:AddDropdown(opts)
   self.layout:AddDropdown(opts)
-  self:Refresh()
+  self:Resize()
 end
 
+---@param opts FormTextAreaOptions
 function formFrame:AddTextArea(opts)
-  _ = opts
+  self.layout:AddTextArea(opts)
+  self:Resize()
 end
 
 ---@param opts FormCheckboxOptions
 function formFrame:AddCheckbox(opts)
   self.layout:AddCheckbox(opts)
-  self:Refresh()
+  self:Resize()
 end
 
+---@param opts FormButtonGroupOptions
 function formFrame:AddButtonGroup(opts)
-  _ = opts
+  self.layout:AddButtonGroup(opts)
+  self:Resize()
+end
+
+---@param opts FormColorOptions
+function formFrame:AddColor(opts)
+  self.layout:AddColor(opts)
+  self:Resize()
 end
 
 ---@return Frame

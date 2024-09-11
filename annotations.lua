@@ -113,6 +113,19 @@ MainMenuBarBackpackButton = {}
 ---@class BagBarExpandToggle: Button
 BagBarExpandToggle = {}
 
+
+---@class ColorPickerFrame: Frame
+ColorPickerFrame = {}
+
+function ColorPickerFrame:SetupColorPickerAndShow(opts) end
+
+---@return number, number, number
+function ColorPickerFrame:GetColorRGB() end
+
+---@return number
+function ColorPickerFrame:GetColorAlpha() end
+
+
 ---@class DropdownButton: Button
 local dropdownButton = {}
 
@@ -120,6 +133,8 @@ local dropdownButton = {}
 function dropdownButton:SetupMenu(setupFunction) end
 
 function dropdownButton:GenerateMenu() end
+
+function dropdownButton:Update() end
 
 ---@class BetterBagsDebugListButton: Button
 ---@field RowNumber FontString
@@ -228,7 +243,7 @@ function FontString:SetScript(event, func) end
 local WowScrollBox = {}
 function WowScrollBox:SetInterpolateScroll(interpolate) end
 function WowScrollBox:ScrollInDirection(percent, direction) end
-function WowScrollBox:FullUpdate() end
+function WowScrollBox:FullUpdate(const) end
 function WowScrollBox:OnMouseWheel(delta) end
 function WowScrollBox:ScrollToEnd() end
 ---@return Texture

@@ -19,6 +19,13 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field indexFrame Frame
 ---@field underline Frame
 ---@field sections {point: Frame, button: Button}[]
+---@field checkboxes table<FormCheckbox, FormCheckboxOptions>
+---@field dropdowns table<FormDropdown, FormDropdownOptions>
+---@field sliders table<FormSlider, FormSliderOptions>
+---@field buttonGroups table<FormButtons, FormButtonGroupOptions>
+---@field textAreas table<FormTextArea, FormTextAreaOptions>
+---@field inputBoxes table<FormInputBox, FormInputBoxOptions>
+---@field colorPickers table<FormColor, FormColorOptions>
 ---@field scrollBox WowScrollBox
 ---@field height number
 ---@field index boolean
@@ -37,11 +44,48 @@ function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   l.index = index
   l.baseFrame = baseFrame
   l.scrollBox = scrollBox
+  l.checkboxes = {}
+  l.dropdowns = {}
+  l.sliders = {}
+  l.buttonGroups = {}
+  l.textAreas = {}
+  l.inputBoxes = {}
+  l.colorPickers = {}
   l.sections = {}
   if index then
     l:setupIndex()
   end
   return l
+end
+
+function stackedLayout:ReloadAllFormElements()
+  for container, opts in pairs(self.checkboxes) do
+    container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Reload')))
+  end
+
+  if addon.isRetail then
+    for container in pairs(self.dropdowns) do
+      container.dropdown:Update()
+    end
+  end
+
+  for container, opts in pairs(self.sliders) do
+    container.slider:SetValue(opts.getValue(context:New('Slider_Reload')))
+    container.input:SetText(tostring(container.slider:GetValue()))
+  end
+
+  for container, opts in pairs(self.textAreas) do
+    container.input:SetText(opts.getValue(context:New('TextArea_Reload')))
+  end
+
+  for container, opts in pairs(self.inputBoxes) do
+    container.input:SetText(opts.getValue(context:New('InputBox_Reload')))
+  end
+
+  for container, opts in pairs(self.colorPickers) do
+    local color = opts.getValue(context:New('Color_Reload'))
+    container.colorTexture:SetVertexColor(color.red, color.green, color.blue, color.alpha)
+  end
 end
 
 ---@package
@@ -67,6 +111,21 @@ function stackedLayout:scrollToOffset(offset)
     local scrollPercentage = offset / scrollRange
     self.scrollBox:SetScrollPercentage(scrollPercentage)
   end
+end
+
+---@private
+---@param parent Frame
+---@return Frame
+function stackedLayout:createTextAreaBackground(parent)
+  local frame = CreateFrame("Frame", nil, parent, "BackdropTemplate") --[[@as Frame]]
+  frame:SetBackdrop({
+    bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+    edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 4,
+    insets = { left = 0, right = 0, top = 0, bottom = 0 }
+  })
+  frame:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+  frame:SetBackdropBorderColor(0.4, 0.4, 0.4)
+  return frame
 end
 
 ---@package
@@ -304,6 +363,7 @@ function stackedLayout:AddCheckbox(opts)
   container.checkbox:SetPoint("TOPLEFT", container, "TOPLEFT")
   addon.SetScript(container.checkbox, "OnClick", function(ctx)
     opts.setValue(ctx, container.checkbox:GetChecked())
+    self:ReloadAllFormElements()
   end)
   container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Load')))
 
@@ -318,6 +378,7 @@ function stackedLayout:AddCheckbox(opts)
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.checkboxes[container] = opts
 end
 
 ---@private
@@ -337,8 +398,19 @@ function stackedLayout:addDropdownRetail(opts)
   container.dropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
+  ---@type string[]
+  local itemList = {}
+
+  if opts.items then
+    itemList = opts.items --[=[@as string[]]=]
+  elseif opts.itemsFunction then
+    local ctx = context:New('Dropdown_Items')
+    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
+  end
+
   container.dropdown:SetupMenu(function(_, root)
-    for _, item in ipairs(opts.items) do
+    root:SetScrollMode(20 * 20)
+    for _, item in ipairs(itemList) do
       root:CreateCheckbox(item, function(value)
         local ctx = context:New('Dropdown_Get')
         return opts.getValue(ctx, value)
@@ -346,6 +418,7 @@ function stackedLayout:addDropdownRetail(opts)
       function(value)
         local ctx = context:New('Dropdown_Set')
         opts.setValue(ctx, value)
+        self:ReloadAllFormElements()
       end, item)
     end
   end)
@@ -360,6 +433,7 @@ function stackedLayout:addDropdownRetail(opts)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.dropdowns[container] = opts
 end
 
 ---@private
@@ -379,9 +453,19 @@ function stackedLayout:addDropdownClassic(opts)
   container.classicDropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   container.classicDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
+  ---@type string[]
+  local itemList = {}
+
+  if opts.items then
+    itemList = opts.items --[=[@as string[]]=]
+  elseif opts.itemsFunction then
+    local ctx = context:New('Dropdown_Items')
+    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
+  end
+
    -- Create and bind the initialization function to the dropdown menu
   UIDropDownMenu_Initialize(container.classicDropdown, function(_, level, _)
-   for _, item in ipairs(opts.items) do
+   for _, item in ipairs(itemList) do
     local info = UIDropDownMenu_CreateInfo()
     info.text = item
     info.checked = function()
@@ -392,6 +476,7 @@ function stackedLayout:addDropdownClassic(opts)
       UIDropDownMenu_SetText(container.classicDropdown, item)
       local ctx = context:New('Dropdown_Set')
       opts.setValue(ctx, item)
+      self:ReloadAllFormElements()
     end
     UIDropDownMenu_AddButton(info, level)
    end
@@ -413,6 +498,7 @@ function stackedLayout:addDropdownClassic(opts)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.dropdowns[container] = opts
 end
 
 ---@param opts FormDropdownOptions
@@ -452,6 +538,7 @@ function stackedLayout:AddSlider(opts)
     opts.setValue(ctx, value)
     if user then
       container.input:SetText(tostring(value))
+      self:ReloadAllFormElements()
     end
   end)
 
@@ -474,6 +561,7 @@ function stackedLayout:AddSlider(opts)
       value = opts.min
     end
     container.input:SetText(tostring(container.slider:GetValue()))
+    self:ReloadAllFormElements()
   end)
   addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
     if user then
@@ -505,4 +593,227 @@ function stackedLayout:AddSlider(opts)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+  self.sliders[container] = opts
+end
+
+---@param opts FormButtonGroupOptions
+function stackedLayout:AddButtonGroup(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormButtons]]
+  self:alignFrame(t, container)
+  container.buttons = {}
+
+  for _, buttonData in ipairs(opts.ButtonOptions) do
+    local button = CreateFrame("Button", nil, container, "UIPanelButtonTemplate") --[[@as Button]]
+    button:SetText(buttonData.title)
+    local w = button:GetFontString():GetStringWidth()
+    button:SetSize(w + 6, 24)
+    addon.SetScript(button, "OnClick", function(ctx)
+      buttonData.onClick(ctx)
+    end)
+    if #container.buttons == 0 then
+      button:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+    else
+      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", -10, 0)
+    end
+    table.insert(container.buttons, button)
+  end
+
+  container:SetHeight(container.buttons[1]:GetHeight() + 30)
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+  self.buttonGroups[container] = opts
+end
+
+---@param opts FormTextAreaOptions
+function stackedLayout:AddTextArea(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormTextArea]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  local ScrollBox = CreateFrame("Frame", nil, container, "WowScrollBox") --[[@as WowScrollBox]]
+  ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  ScrollBox:SetHeight(100)
+  ScrollBox:SetWidth(container:GetWidth() - 50)
+  ScrollBox:EnableMouseWheel(false)
+
+  local ScrollBar = CreateFrame("EventFrame", nil, container, "MinimalScrollBar") --[[@as MinimalScrollBar]]
+  ScrollBar:SetPoint("TOPLEFT", ScrollBox, "TOPRIGHT", 4, -2)
+  ScrollBar:SetPoint("BOTTOMLEFT", ScrollBox, "BOTTOMRIGHT", 2, 0)
+
+  ScrollBar:SetHideIfUnscrollable(true)
+  ScrollBox:SetInterpolateScroll(true)
+  ScrollBar:SetInterpolateScroll(true)
+
+  local scrollBackground = self:createTextAreaBackground(ScrollBox)
+  scrollBackground:SetPoint("TOPLEFT", ScrollBox, "TOPLEFT", 0, 0)
+  scrollBackground:SetPoint("BOTTOMRIGHT", ScrollBox, "BOTTOMRIGHT", 0, 0)
+  local view = CreateScrollBoxLinearView()
+  view:SetPanExtent(10)
+
+  local editBox = CreateFrame("EditBox", nil, ScrollBox) --[[@as EditBox]]
+  editBox:SetFontObject("ChatFontNormal")
+  editBox:SetMultiLine(true)
+  editBox:EnableMouse(true)
+  editBox:SetCountInvisibleLetters(false)
+  editBox:SetAutoFocus(false)
+  editBox.scrollable = true
+
+  addon.SetScript(editBox, "OnEscapePressed", function()
+    editBox:ClearFocus()
+    ScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+  end)
+
+  addon.SetScript(editBox, "OnEditFocusGained", function()
+    ScrollBox:EnableMouseWheel(true)
+  end)
+
+  addon.SetScript(editBox, "OnEditFocusLost", function()
+    opts.setValue(context:New('InputBox_Set'), editBox:GetText())
+    self:ReloadAllFormElements()
+    ScrollBox:EnableMouseWheel(false)
+  end)
+
+  addon.SetScript(editBox, "OnTextChanged", function(_, _, user)
+    ScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+    ScrollBox:ScrollToEnd()
+    if opts.setValue and user then
+      opts.setValue(context:New('TextArea_Set'), editBox:GetText())
+    end
+  end)
+
+  addon.SetScript(ScrollBox, "OnMouseDown", function()
+    editBox:SetFocus()
+  end)
+
+  container.input = editBox
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    ScrollBox:GetHeight() +
+    30
+  )
+
+  ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, view)
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+  self.textAreas[container] = opts
+end
+
+---@param opts FormInputBoxOptions
+function stackedLayout:AddInputBox(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormInputBox]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+  container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
+  container.input:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 5, -5)
+  container.input:SetPoint("RIGHT", container, "RIGHT", -5, 0)
+  container.input:SetHeight(20)
+  container.input:SetAutoFocus(false)
+  container.input:SetFontObject("GameFontHighlight")
+  container.input:SetText(opts.getValue(context:New('InputBox_Load')))
+  addon.SetScript(container.input, "OnEditFocusLost", function(_)
+    local value = container.input:GetText()
+    opts.setValue(context:New('InputBox_Set'), value)
+    self:ReloadAllFormElements()
+  end)
+
+  addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
+    if user then
+      local value = container.input:GetText()
+      opts.setValue(context:New('InputBox_Set'), value)
+    end
+  end)
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.input:GetHeight() +
+    30
+  )
+
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+  self.inputBoxes[container] = opts
+end
+
+---@param opts FormColorOptions
+function stackedLayout:AddColor(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormColor]]
+  self:alignFrame(t, container)
+
+  container.colorPicker = CreateFrame("Frame", nil, container) --[[@as Frame]]
+  container.colorPicker:SetPoint("TOPLEFT", container, "TOPLEFT")
+  container.colorPicker:SetSize(28, 28)
+
+  local tex = container.colorPicker:CreateTexture(nil, "ARTWORK")
+  tex:SetAllPoints()
+  tex:SetTexture(5014189)
+  local mask = container:CreateMaskTexture()
+  mask:SetAllPoints(tex)
+  mask:SetTexture("Interface/CHARACTERFRAME/TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+  tex:AddMaskTexture(mask)
+  local defaultColor = opts.getValue(context:New('Color_Load'))
+  tex:SetVertexColor(defaultColor.red, defaultColor.green, defaultColor.blue, defaultColor.alpha)
+  container.colorTexture = tex
+
+  local function OnColorChanged()
+    local r, g, b = ColorPickerFrame:GetColorRGB()
+    local a = ColorPickerFrame:GetColorAlpha()
+    opts.setValue(context:New('Color_Set'), {
+      red = r,
+      green = g,
+      blue = b,
+      alpha = a
+    })
+    tex:SetVertexColor(r, g, b, a)
+    self:ReloadAllFormElements()
+  end
+
+  container.colorPicker:SetScript("OnMouseDown", function()
+    local color = opts.getValue(context:New('Color_Load'))
+    local options = {
+      swatchFunc = OnColorChanged,
+      opacityFunc = OnColorChanged,
+      cancelFunc = function() end,
+      hasOpacity = true,
+      opacity = color.alpha,
+      r = color.red,
+      g = color.green,
+      b = color.blue,
+    }
+    ColorPickerFrame:SetupColorPickerAndShow(options)
+  end)
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("LEFT", container.colorPicker, "RIGHT", 5, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.colorPicker:GetHeight() +
+    30
+  )
+
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+  self.colorPickers[container] = opts
 end

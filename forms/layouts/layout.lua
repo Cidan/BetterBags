@@ -35,9 +35,34 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field slider Slider
 ---@field input EditBox
 
+---@class (exact) FormButtons: Frame
+---@field buttons Button[]
+
+---@class (exact) FormTextArea: Frame
+---@field title FontString
+---@field description FontString
+---@field input EditBox
+
+---@class (exact) FormInputBox: Frame
+---@field title FontString
+---@field description FontString
+---@field input EditBox
+
+---@class (exact) FormColor: Frame
+---@field title FontString
+---@field description FontString
+---@field colorPicker Frame
+---@field colorTexture Texture
+
 --[[
 -- Widget Options
 ]]--
+
+---@class Colors
+---@field red number
+---@field green number
+---@field blue number
+---@field alpha number
 
 ---@class (exact) FormSectionOptions
 ---@field title string
@@ -56,7 +81,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormDropdownOptions
 ---@field title string
 ---@field description string
----@field items string[]
+---@field items? string[]
+---@field itemsFunction? fun(ctx: Context): string[]
 ---@field getValue fun(ctx: Context, value: string): boolean
 ---@field setValue fun(ctx: Context, value: string)
 
@@ -69,12 +95,42 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field getValue fun(ctx: Context): number
 ---@field setValue fun(ctx: Context, value: number)
 
+---@class (exact) FormButtonOption
+---@field title string
+---@field onClick fun(ctx: Context)
+
+---@class (exact) FormButtonGroupOptions
+---@field ButtonOptions FormButtonOption[]
+
+---@class (exact) FormTextAreaOptions
+---@field title string
+---@field description string
+---@field getValue fun(ctx: Context): string
+---@field setValue fun(ctx: Context, value: string)
+
+---@class (exact) FormInputBoxOptions
+---@field title string
+---@field description string
+---@field getValue fun(ctx: Context): string
+---@field setValue fun(ctx: Context, value: string)
+
+---@class (exact) FormColorOptions
+---@field title string
+---@field description string
+---@field getValue fun(ctx: Context): Colors
+---@field setValue fun(ctx: Context, value: Colors)
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
+---@field ReloadAllFormElements fun(self: FormLayout)
 ---@field UpdateUnderline fun(self: FormLayout)
 ---@field AddSection fun(self: FormLayout, opts: FormSectionOptions)
 ---@field AddCheckbox fun(self: FormLayout, opts: FormCheckboxOptions)
 ---@field AddDropdown fun(self: FormLayout, opts: FormDropdownOptions)
 ---@field AddSubSection fun(self: FormLayout, opts: FormSubSectionOptions)
 ---@field AddSlider fun(self: FormLayout, opts: FormSliderOptions)
+---@field AddButtonGroup fun(self: FormLayout, opts: FormButtonGroupOptions)
+---@field AddTextArea fun(self: FormLayout, opts: FormTextAreaOptions)
+---@field AddInputBox fun(self: FormLayout, opts: FormInputBoxOptions)
+---@field AddColor fun(self: FormLayout, opts: FormColorOptions)
