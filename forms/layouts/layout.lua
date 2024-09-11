@@ -52,10 +52,17 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field title FontString
 ---@field description FontString
 ---@field colorPicker Frame
+---@field colorTexture Texture
 
 --[[
 -- Widget Options
 ]]--
+
+---@class Colors
+---@field red number
+---@field green number
+---@field blue number
+---@field alpha number
 
 ---@class (exact) FormSectionOptions
 ---@field title string
@@ -110,8 +117,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormColorOptions
 ---@field title string
 ---@field description string
----@field getValue fun(ctx: Context): Color
----@field setValue fun(ctx: Context, value: Color)
+---@field getValue fun(ctx: Context): Colors
+---@field setValue fun(ctx: Context, value: Colors)
 
 ---@class (exact) FormLayout
 ---@field targetFrame Frame

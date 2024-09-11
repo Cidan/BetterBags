@@ -81,6 +81,11 @@ function stackedLayout:ReloadAllFormElements()
   for container, opts in pairs(self.inputBoxes) do
     container.input:SetText(opts.getValue(context:New('InputBox_Reload')))
   end
+
+  for container, opts in pairs(self.colorPickers) do
+    local color = opts.getValue(context:New('Color_Reload'))
+    container.colorTexture:SetVertexColor(color.red, color.green, color.blue, color.alpha)
+  end
 end
 
 ---@package
@@ -752,21 +757,54 @@ function stackedLayout:AddColor(opts)
   local container = CreateFrame("Frame", nil, t) --[[@as FormColor]]
   self:alignFrame(t, container)
 
+  container.colorPicker = CreateFrame("Frame", nil, container) --[[@as Frame]]
+  container.colorPicker:SetPoint("TOPLEFT", container, "TOPLEFT")
+  container.colorPicker:SetSize(28, 28)
+
+  local tex = container.colorPicker:CreateTexture(nil, "ARTWORK")
+  tex:SetAllPoints()
+  tex:SetTexture(5014189)
+  local mask = container:CreateMaskTexture()
+  mask:SetAllPoints(tex)
+  mask:SetTexture("Interface/CHARACTERFRAME/TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+  tex:AddMaskTexture(mask)
+  local defaultColor = opts.getValue(context:New('Color_Load'))
+  tex:SetVertexColor(defaultColor.red, defaultColor.green, defaultColor.blue, defaultColor.alpha)
+  container.colorTexture = tex
+
+  local function OnColorChanged()
+    local r, g, b = ColorPickerFrame:GetColorRGB()
+    local a = ColorPickerFrame:GetColorAlpha()
+    opts.setValue(context:New('Color_Set'), {
+      red = r,
+      green = g,
+      blue = b,
+      alpha = a
+    })
+    tex:SetVertexColor(r, g, b, a)
+    self:ReloadAllFormElements()
+  end
+
+  container.colorPicker:SetScript("OnMouseDown", function()
+    local color = opts.getValue(context:New('Color_Load'))
+    local options = {
+      swatchFunc = OnColorChanged,
+      opacityFunc = OnColorChanged,
+      cancelFunc = function() end,
+      hasOpacity = true,
+      opacity = color.alpha,
+      r = color.red,
+      g = color.green,
+      b = color.blue,
+    }
+    ColorPickerFrame:SetupColorPickerAndShow(options)
+  end)
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.title:SetPoint("LEFT", container.colorPicker, "RIGHT", 5, 0)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
 
-  container.colorPicker = CreateFrame("Frame", nil, container) --[[@as Frame]]
-  container.colorPicker:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
-  container.colorPicker:SetSize(64, 64)
-  local tex = container.colorPicker:CreateTexture(nil, "ARTWORK")
-  tex:SetAllPoints()
-  tex:SetTexture([[world\\expansion09\\doodads\\tuskarr\\8fx_explosionsmoke_a]])
-  --tex:SetVertexColor(unpack(opts.getValue(context:New('Color_Load'))))
-  tex:SetVertexColor(1, 0, 0, 1)
-  --tex:SetColorTexture(1, 0, 0, 1)
 
   container:SetHeight(
     container.title:GetLineHeight() +

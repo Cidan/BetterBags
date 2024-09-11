@@ -132,10 +132,13 @@ function config:AddPluginConfig(title, c)
         title = subTitle,
         description = subDesc,
         getValue = function(_)
-          return o.get()
+          ---@type number, number, number, number|nil
+          local r, g, b, a = o.get()
+          if a == nil then a = 1 end
+          return {red = r, green = g, blue = b, alpha = a}
         end,
         setValue = function(_, value)
-          o.set(_, value)
+          o.set(_, value.red, value.green, value.blue, value.alpha)
         end
       })
     else
