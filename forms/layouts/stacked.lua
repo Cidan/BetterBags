@@ -817,3 +817,18 @@ function stackedLayout:AddColor(opts)
   self.height = self.height + container:GetHeight()
   self.colorPickers[container] = opts
 end
+
+---@param opts FormLabelOptions
+function stackedLayout:AddLabel(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormLabel]]
+  self:alignFrame(t, container)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.description:SetPoint("RIGHT", container, "RIGHT", -5, 0)
+
+  container:SetHeight(container.description:GetLineHeight() + 10)
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+end

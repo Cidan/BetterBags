@@ -154,6 +154,12 @@ function formFrame:AddColor(opts)
   self:Resize()
 end
 
+---@param opts FormLabelOptions
+function formFrame:AddLabel(opts)
+  self.layout:AddLabel(opts)
+  self:Resize()
+end
+
 ---@return Frame
 function formFrame:GetFrame()
   return self.frame

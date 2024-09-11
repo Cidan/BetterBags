@@ -54,6 +54,9 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field colorPicker Frame
 ---@field colorTexture Texture
 
+---@class (exact) FormLabel: Frame
+---@field description FontString
+
 --[[
 -- Widget Options
 ]]--
@@ -120,6 +123,9 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field getValue fun(ctx: Context): Colors
 ---@field setValue fun(ctx: Context, value: Colors)
 
+---@class (exact) FormLabelOptions
+---@field description string
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -134,3 +140,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddTextArea fun(self: FormLayout, opts: FormTextAreaOptions)
 ---@field AddInputBox fun(self: FormLayout, opts: FormInputBoxOptions)
 ---@field AddColor fun(self: FormLayout, opts: FormColorOptions)
+---@field AddLabel fun(self: FormLayout, opts: FormLabelOptions)

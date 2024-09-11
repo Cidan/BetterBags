@@ -136,7 +136,7 @@ function config:CreateConfig()
     }
     f:AddDropdown({
       title = 'Section Order',
-      description = 'The order of sections in the backpack when not pinned.',
+      description = 'The order of sections in the ' .. string.lower(bagType.name) .. ' when not pinned.',
       items = {'Alphabetically', 'Size Descending', 'Size Ascending'},
       getValue = function(_, value)
         return sectionOrders[value] == db:GetSectionSortType(bagType.kind, db:GetBagView(bagType.kind))
@@ -167,7 +167,11 @@ function config:CreateConfig()
 
     f:AddSubSection({
       title = 'Categories',
-      description = 'Settings for Blizzard item categories in the backpack.',
+      description = 'Settings for Blizzard item categories in the ' .. string.lower(bagType.name) .. '.',
+    })
+
+    f:AddLabel({
+      description = 'To create a custom category, drag an item into the bag button on the top of your bag and let go.',
     })
 
     f:AddCheckbox({
@@ -256,7 +260,7 @@ function config:CreateConfig()
 
     f:AddSubSection({
       title = 'Item Stacking',
-      description = 'Settings for item stacking in the backpack.',
+      description = 'Settings for item stacking in the ' .. string.lower(bagType.name) .. '.',
     })
 
     f:AddCheckbox({
@@ -283,7 +287,7 @@ function config:CreateConfig()
 
     f:AddCheckbox({
       title = 'Merge Stacks',
-      description = 'Stackable items will merge into a single item button in your backpack.',
+      description = 'Stackable items will merge into a single item button in your ' .. string.lower(bagType.name) .. '.',
       getValue = function(_)
         return db:GetStackingOptions(bagType.kind).mergeStacks
       end,
@@ -295,7 +299,7 @@ function config:CreateConfig()
 
     f:AddCheckbox({
       title = 'Merge Unstackable',
-      description = 'Unstackable items, such as armor and weapons, will merge into a single item button in your backpack.',
+      description = 'Unstackable items, such as armor and weapons, will merge into a single item button in your ' .. string.lower(bagType.name) .. '.',
       getValue = function(_)
         return db:GetStackingOptions(bagType.kind).mergeUnstackable
       end,
@@ -319,7 +323,7 @@ function config:CreateConfig()
 
     f:AddCheckbox({
       title = "Split Transmogged Items",
-      description = 'Transmogged items will be split into a separate, stackable button in your backpack.',
+      description = 'Transmogged items will be split into a separate, stackable button in your ' .. string.lower(bagType.name) .. '.',
       getValue = function(_)
         return db:GetStackingOptions(bagType.kind).dontMergeTransmog
       end,
@@ -344,12 +348,12 @@ function config:CreateConfig()
 
     f:AddSubSection({
       title = 'Item Level',
-      description = 'Settings for item level in the backpack.',
+      description = 'Settings for item level in the ' .. string.lower(bagType.name) .. '.',
     })
 
     f:AddCheckbox({
       title = 'Show Item Level',
-      description = 'Show the item level on item buttons in the backpack.',
+      description = 'Show the item level on item buttons in the ' .. string.lower(bagType.name) .. '.',
       getValue = function(_)
         return db:GetItemLevelOptions(bagType.kind).enabled
       end,
@@ -361,7 +365,7 @@ function config:CreateConfig()
 
     f:AddCheckbox({
       title = 'Show Item Level Color',
-      description = 'Show the item level in color on item buttons in the backpack.',
+      description = 'Show the item level in color on item buttons in the ' .. string.lower(bagType.name) .. '.',
       getValue = function(_)
         return db:GetItemLevelOptions(bagType.kind).color
       end,
@@ -374,7 +378,7 @@ function config:CreateConfig()
 
     f:AddSubSection({
       title = 'Display',
-      description = 'Settings that adjust layout and visual aspects of the backpack.',
+      description = 'Settings that adjust layout and visual aspects of the ' .. string.lower(bagType.name) .. '.',
     })
 
     f:AddCheckbox({
@@ -391,7 +395,7 @@ function config:CreateConfig()
 
     f:AddCheckbox({
       title = 'Show All Free Space Slots',
-      description = 'Show all free space slots, individually, at the bottom of the backpack.',
+      description = 'Show all free space slots, individually, at the bottom of the ' .. string.lower(bagType.name) .. '.',
       getValue = function(_)
         return db:GetShowAllFreeSpace(bagType.kind)
       end,
@@ -432,7 +436,7 @@ function config:CreateConfig()
 
     f:AddSlider({
       title = 'Columns',
-      description = 'The number of columns in the backpack.',
+      description = 'The number of columns in the ' .. string.lower(bagType.name) .. '.',
       min = 1,
       max = 20,
       step = 1,
@@ -449,7 +453,7 @@ function config:CreateConfig()
 
     f:AddSlider({
       title = 'Opacity',
-      description = 'The opacity of the background of the backpack.',
+      description = 'The opacity of the background of the ' .. string.lower(bagType.name) .. '.',
       min = 0,
       max = 100,
       step = 1,
@@ -464,7 +468,7 @@ function config:CreateConfig()
 
     f:AddSlider({
       title = 'Scale',
-      description = 'The scale of the backpack.',
+      description = 'The scale of the ' .. string.lower(bagType.name) .. '.',
       min = 50,
       max = 200,
       step = 1,
