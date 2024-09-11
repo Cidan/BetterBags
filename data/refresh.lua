@@ -71,7 +71,7 @@ function refresh:StartUpdate(ctx)
     -- never missed in the event of the update queue being interrupted.
     C_Timer.After(0, function()
       if next(self.UpdateQueue) ~= nil then
-        self:StartUpdate(ctx)
+        self:StartUpdate(context:New('MissedEvent'))
       end
     end)
     return
