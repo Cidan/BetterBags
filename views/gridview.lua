@@ -41,7 +41,9 @@ local debug = addon:GetModule('Debug')
 ---@param ctx Context
 local function Wipe(view, ctx)
   debug:Log("Wipe", "Grid View Wipe")
+  debug:StartProfile('Grid View Content Wipe')
   view.content:Wipe()
+  debug:EndProfile('Grid View Content Wipe')
   if view.freeSlot ~= nil then
     view.freeSlot:Release(ctx)
     view.freeSlot = nil
@@ -51,12 +53,21 @@ local function Wipe(view, ctx)
     view.freeReagentSlot = nil
   end
   view.itemCount = 0
+end
+
+---@param ctx Context
+---@param view View
+local function WipeSections(ctx, view)
+  debug:StartProfile('Grid View Sections Wipe')
   for _, section in pairs(view.sections) do
-    section:ReleaseAllCells(ctx)
+    async:RawBatch(ctx, 10, section:GetCellList(), function(bctx, cell)
+      cell:Release(bctx)
+    end)
     section:Release(ctx)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
+  debug:EndProfile('Grid View Sections Wipe')
 end
 
 -- ClearButton clears a button and makes it empty while preserving the slot,
@@ -246,10 +257,14 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   async:Chain(ctx, nil,
   function(ectx)
     if ectx:GetBool('wipe') then
+      debug:StartProfile('Wipe Loop')
       view:Wipe(ectx)
+      WipeSections(ectx, view)
+      debug:EndProfile('Wipe Loop')
     end
   end,
   function(ectx)
+    debug:StartProfile('Removed Loop')
     async:RawBatch(ectx, 15, removed, function(bctx, item)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       if not stackInfo then
@@ -264,8 +279,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         UpdateButton(bctx, view, stackInfo.rootItem)
       end
     end)
+    debug:EndProfile('Removed Loop')
   end,
   function(ectx)
+    debug:StartProfile('Added Loop')
     async:RawBatch(ectx, 15, added, function(bctx, item)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       ---- Check stacking options
@@ -281,8 +298,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         ReconcileStack(bctx, view, stackInfo)
       end
     end)
+    debug:EndProfile('Added Loop')
   end,
   function(ectx)
+    debug:StartProfile('Changed Loop')
     async:RawBatch(ectx, 15, changed, function(bctx, item)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       if not stackInfo then
@@ -307,6 +326,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         end
       end
     end)
+    debug:EndProfile('Changed Loop')
   end,
   function(ectx)
     debug:StartProfile('Everything Else')
@@ -442,49 +462,6 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     view.itemCount = slotInfo.totalItems
     debug:EndProfile('Everything Else')
   end, callback)
-
-  --debug:StartProfile('Added Loop')
-  --for _, item in pairs(added) do
-  --  local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-  --  ---- Check stacking options
-  --  if (not opts.mergeStacks) or
-  --  (opts.unmergeAtShop and addon.atInteracting) or
-  --  (opts.dontMergePartial and item.itemInfo.itemStackCount ~= item.itemInfo.currentItemCount) or
-  --  (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) or
-  --  not stackInfo then
-  --    -- If stacking is not allowed, create a new button
-  --    CreateButton(ctx, view, item.slotkey)
-  --  else
-  --    -- If the item is part of a stack, reconcile the stack
-  --    ReconcileStack(ctx, view, stackInfo)
-  --  end
-  --end
-  --debug:EndProfile('Added Loop')
-  --for _, item in pairs(changed) do
-  --  local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-  --  if not stackInfo then
-  --    UpdateButton(ctx, view, item.slotkey)
-  --  elseif view.itemsByBagAndSlot[item.slotkey] then
-  --    if (not opts.mergeStacks) or
-  --    (opts.unmergeAtShop and addon.atInteracting) or
-  --    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
-  --      UpdateButton(ctx, view, item.slotkey)
-  --    else
-  --      UpdateButton(ctx, view, item.slotkey)
-  --      ReconcileStack(ctx, view, stackInfo)
-  --    end
-  --  elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
-  --    if (not opts.mergeStacks) or
-  --    (opts.unmergeAtShop and addon.atInteracting) or
-  --    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
-  --      UpdateButton(ctx, view, stackInfo.rootItem)
-  --    else
-  --      UpdateButton(ctx, view, stackInfo.rootItem)
-  --      ReconcileStack(ctx, view, stackInfo)
-  --    end
-  --  end
-  --end
-
 
 end
 
