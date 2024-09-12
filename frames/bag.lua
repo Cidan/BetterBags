@@ -310,7 +310,6 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
   --end
 
   debug:StartProfile('Bag Render %d', self.kind)
-  updateView:Wipe(ctx)
   updateView:Render(ctx, self, slotInfo, function()
     debug:EndProfile('Bag Render %d', self.kind)
     updateView:GetContent():Show()
@@ -329,8 +328,10 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     events:SendMessage(ctx, 'bag/Rendered', self, slotInfo)
     if previousView then
       previousView:GetContent():Hide()
+      previousView:Render(ctx, self, slotInfo, callback)
+    else
+      callback()
     end
-    callback()
   end)
 end
 

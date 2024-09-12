@@ -232,19 +232,38 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
-  ---@type ItemData[]
-  local currentItems = {}
-  for _, item in pairs(slotInfo:GetCurrentItems()) do
-    if not item.isItemEmpty then
-      table.insert(currentItems, item)
-    end
-  end
-  added = currentItems
+  -----@type ItemData[]
+  --local currentItems = {}
+  --for _, item in pairs(slotInfo:GetCurrentItems()) do
+  --  if not item.isItemEmpty then
+  --    table.insert(currentItems, item)
+  --  end
+  --end
+  --added = currentItems
   local opts = database:GetStackingOptions(bag.kind)
 
   -- Let's just add items for now.
-  async:Chain(ctx, nil, function(ectx)
-   view:Wipe(ectx)
+  async:Chain(ctx, nil,
+  function(ectx)
+    if ectx:GetBool('wipe') then
+      view:Wipe(ectx)
+    end
+  end,
+  function(ectx)
+    async:RawBatch(ectx, 15, removed, function(bctx, item)
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      if not stackInfo then
+        ClearButton(bctx, view, item.slotkey)
+      elseif view.itemsByBagAndSlot[item.slotkey] then
+        if stackInfo.rootItem ~= nil and view.itemsByBagAndSlot[stackInfo.rootItem] == nil then
+          UpdateDeletedSlot(bctx, view, item.slotkey, stackInfo.rootItem)
+        else
+          ClearButton(bctx, view, item.slotkey)
+        end
+      elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
+        UpdateButton(bctx, view, stackInfo.rootItem)
+      end
+    end)
   end,
   function(ectx)
     async:RawBatch(ectx, 15, added, function(bctx, item)
@@ -262,7 +281,34 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         ReconcileStack(bctx, view, stackInfo)
       end
     end)
-  end, function(ectx)
+  end,
+  function(ectx)
+    async:RawBatch(ectx, 15, changed, function(bctx, item)
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      if not stackInfo then
+        UpdateButton(bctx, view, item.slotkey)
+      elseif view.itemsByBagAndSlot[item.slotkey] then
+        if (not opts.mergeStacks) or
+        (opts.unmergeAtShop and addon.atInteracting) or
+        (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+          UpdateButton(bctx, view, item.slotkey)
+        else
+          UpdateButton(bctx, view, item.slotkey)
+          ReconcileStack(bctx, view, stackInfo)
+        end
+      elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
+        if (not opts.mergeStacks) or
+        (opts.unmergeAtShop and addon.atInteracting) or
+        (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+          UpdateButton(bctx, view, stackInfo.rootItem)
+        else
+          UpdateButton(bctx, view, stackInfo.rootItem)
+          ReconcileStack(bctx, view, stackInfo)
+        end
+      end
+    end)
+  end,
+  function(ectx)
     debug:StartProfile('Everything Else')
   -- Special handling for Recent Items -- add it to the dirty sections if
   -- it has no items visible.
