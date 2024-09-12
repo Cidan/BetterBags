@@ -304,7 +304,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
   local updateView = viewList[1] == self.currentView and viewList[2] or viewList[1]
   local previousView = self.currentView
 
-  --if self.currentView and self.currentView:GetBagView() ~=  view:GetBagView() then
+  --if self.currentView and self.currentView:GetBagView() ~=  updateView:GetBagView() then
   --  self.currentView:Wipe(ctx)
   --  self.currentView:GetContent():Hide()
   --end
@@ -328,7 +328,11 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     events:SendMessage(ctx, 'bag/Rendered', self, slotInfo)
     if previousView then
       previousView:GetContent():Hide()
-      previousView:Render(ctx, self, slotInfo, callback)
+      if previousView:GetBagView() == updateView:GetBagView() then
+        previousView:Render(ctx, self, slotInfo, callback)
+      else
+        callback()
+      end
     else
       callback()
     end
