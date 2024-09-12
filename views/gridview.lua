@@ -247,7 +247,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
    view:Wipe(ectx)
   end,
   function(ectx)
-    async:RawBatch(ectx, 5, added, function(bctx, item)
+    async:RawBatch(ectx, 15, added, function(bctx, item)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       ---- Check stacking options
       if (not opts.mergeStacks) or
