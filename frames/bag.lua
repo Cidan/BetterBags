@@ -328,7 +328,6 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     events:SendMessage(ctx, 'bag/RedrawIcons', self)
     events:SendMessage(ctx, 'bag/Rendered', self, slotInfo)
     if previousView then
-      previousView:Wipe(ctx)
       previousView:GetContent():Hide()
     end
     callback()
