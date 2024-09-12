@@ -232,36 +232,33 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
-  if ctx:GetBool('redraw') then
-    view:Wipe(ctx)
-    ---@type ItemData[]
-    local currentItems = {}
-    for _, item in pairs(slotInfo:GetCurrentItems()) do
-      if not item.isItemEmpty then
-        table.insert(currentItems, item)
-      end
-    end
-    added = currentItems
-  elseif ctx:GetBool('wipe') then
+  if ctx:GetBool('wipe') then
     view:Wipe(ctx)
   end
-
+  ---@type ItemData[]
+  local currentItems = {}
+  for _, item in pairs(slotInfo:GetCurrentItems()) do
+    if not item.isItemEmpty then
+      table.insert(currentItems, item)
+    end
+  end
+  added = currentItems
   local opts = database:GetStackingOptions(bag.kind)
 
-  for _, item in pairs(removed) do
-    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    if not stackInfo then
-      ClearButton(ctx, view, item.slotkey)
-    elseif view.itemsByBagAndSlot[item.slotkey] then
-      if stackInfo.rootItem ~= nil and view.itemsByBagAndSlot[stackInfo.rootItem] == nil then
-        UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
-      else
-        ClearButton(ctx, view, item.slotkey)
-      end
-    elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
-      UpdateButton(ctx, view, stackInfo.rootItem)
-    end
-  end
+  --for _, item in pairs(removed) do
+  --  local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+  --  if not stackInfo then
+  --    ClearButton(ctx, view, item.slotkey)
+  --  elseif view.itemsByBagAndSlot[item.slotkey] then
+  --    if stackInfo.rootItem ~= nil and view.itemsByBagAndSlot[stackInfo.rootItem] == nil then
+  --      UpdateDeletedSlot(ctx, view, item.slotkey, stackInfo.rootItem)
+  --    else
+  --      ClearButton(ctx, view, item.slotkey)
+  --    end
+  --  elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
+  --    UpdateButton(ctx, view, stackInfo.rootItem)
+  --  end
+  --end
 
   -- Let's just add items for now.
   for _, item in pairs(added) do
@@ -280,30 +277,30 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end
   end
 
-  for _, item in pairs(changed) do
-    local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-    if not stackInfo then
-      UpdateButton(ctx, view, item.slotkey)
-    elseif view.itemsByBagAndSlot[item.slotkey] then
-      if (not opts.mergeStacks) or
-      (opts.unmergeAtShop and addon.atInteracting) or
-      (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
-        UpdateButton(ctx, view, item.slotkey)
-      else
-        UpdateButton(ctx, view, item.slotkey)
-        ReconcileStack(ctx, view, stackInfo)
-      end
-    elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
-      if (not opts.mergeStacks) or
-      (opts.unmergeAtShop and addon.atInteracting) or
-      (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
-        UpdateButton(ctx, view, stackInfo.rootItem)
-      else
-        UpdateButton(ctx, view, stackInfo.rootItem)
-        ReconcileStack(ctx, view, stackInfo)
-      end
-    end
-  end
+  --for _, item in pairs(changed) do
+  --  local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+  --  if not stackInfo then
+  --    UpdateButton(ctx, view, item.slotkey)
+  --  elseif view.itemsByBagAndSlot[item.slotkey] then
+  --    if (not opts.mergeStacks) or
+  --    (opts.unmergeAtShop and addon.atInteracting) or
+  --    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+  --      UpdateButton(ctx, view, item.slotkey)
+  --    else
+  --      UpdateButton(ctx, view, item.slotkey)
+  --      ReconcileStack(ctx, view, stackInfo)
+  --    end
+  --  elseif view.itemsByBagAndSlot[stackInfo.rootItem] then
+  --    if (not opts.mergeStacks) or
+  --    (opts.unmergeAtShop and addon.atInteracting) or
+  --    (not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1) then
+  --      UpdateButton(ctx, view, stackInfo.rootItem)
+  --    else
+  --      UpdateButton(ctx, view, stackInfo.rootItem)
+  --      ReconcileStack(ctx, view, stackInfo)
+  --    end
+  --  end
+  --end
 
   -- Special handling for Recent Items -- add it to the dirty sections if
   -- it has no items visible.

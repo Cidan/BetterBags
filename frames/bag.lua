@@ -117,7 +117,7 @@ local tabs = addon:GetModule('Tabs')
 ---@field menuList MenuList[]
 ---@field toRelease Item[]
 ---@field toReleaseSections Section[]
----@field views table<BagView, View>
+---@field views table<BagView, View[]>
 ---@field loaded boolean
 ---@field windowGrouping WindowGrouping
 ---@field sideAnchor Frame
@@ -300,23 +300,21 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
-  local view = self.views[database:GetBagView(self.kind)]
+  local viewList = self.views[database:GetBagView(self.kind)]
+  local updateView = viewList[1] == self.currentView and viewList[2] or viewList[1]
+  local previousView = self.currentView
 
-  if view == nil then
-    assert(view, "No view found for bag view: "..database:GetBagView(self.kind))
-    return
-  end
-
-  if self.currentView and self.currentView:GetBagView() ~=  view:GetBagView() then
-    self.currentView:Wipe(ctx)
-    self.currentView:GetContent():Hide()
-  end
+  --if self.currentView and self.currentView:GetBagView() ~=  view:GetBagView() then
+  --  self.currentView:Wipe(ctx)
+  --  self.currentView:GetContent():Hide()
+  --end
 
   debug:StartProfile('Bag Render %d', self.kind)
-  view:Render(ctx, self, slotInfo, function()
+  updateView:Wipe(ctx)
+  updateView:Render(ctx, self, slotInfo, function()
     debug:EndProfile('Bag Render %d', self.kind)
-    view:GetContent():Show()
-    self.currentView = view
+    updateView:GetContent():Show()
+    self.currentView = updateView
     self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
     local text = searchBox:GetText()
     if text ~= "" and text ~= nil then
@@ -329,6 +327,10 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
     end
     events:SendMessage(ctx, 'bag/RedrawIcons', self)
     events:SendMessage(ctx, 'bag/Rendered', self, slotInfo)
+    if previousView then
+      previousView:Wipe(ctx)
+      previousView:GetContent():Hide()
+    end
     callback()
   end)
 end
@@ -551,8 +553,8 @@ function bagFrame:Create(ctx, kind)
   --end)
 
   b.views = {
-    [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
-    [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
+    [const.BAG_VIEW.SECTION_GRID] = {views:NewGrid(f, b.kind), views:NewGrid(f, b.kind)},
+    [const.BAG_VIEW.SECTION_ALL_BAGS] = {views:NewBagView(f, b.kind), views:NewBagView(f, b.kind)},
   }
 
   -- Register the bag frame so that window positions are saved.
