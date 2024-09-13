@@ -48,7 +48,7 @@ end
 ---@param ctx Context
 ---@param view View
 local function WipeSections(ctx, view)
-  debug:StartProfile('Bag View Sections Wipe %d', view.kind)
+  debug:StartProfile('Bag View Sections Wipe')
   for _, section in pairs(view.sections) do
     async:RawBatch(ctx, 10, section:GetCellList(), function(bctx, cell)
       cell:Release(bctx)
@@ -57,7 +57,7 @@ local function WipeSections(ctx, view)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
-  debug:EndProfile('Bag View Sections Wipe %d', view.kind)
+  debug:EndProfile('Bag View Sections Wipe')
 end
 
 ---@param bagid number
@@ -159,10 +159,10 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   async:Chain(ctx, nil,
   function(ectx)
     if ectx:GetBool('wipe') then
-      debug:StartProfile('Wipe Loop %d', bag.kind)
+      debug:StartProfile('Wipe Loop')
       view:Wipe(ectx)
       WipeSections(ectx, view)
-      debug:EndProfile('Wipe Loop %d', bag.kind)
+      debug:EndProfile('Wipe Loop')
     end
   end,
   function(ectx)
@@ -218,13 +218,13 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     view.content:Sort(function(a, b)
       return sort.SortSectionsAlphabetically(view.kind, a, b)
     end)
-    debug:StartProfile('Content Draw Stage %d', bag.kind)
+    debug:StartProfile('Content Draw Stage')
     local w, h = view.content:Draw({
       cells = view.content.cells,
       maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
       columns = sizeInfo.columnCount,
     })
-    debug:EndProfile('Content Draw Stage %d', bag.kind)
+    debug:EndProfile('Content Draw Stage')
     -- Reposition the content frame if the recent items section is empty.
     if w < 160 then
       w = 160

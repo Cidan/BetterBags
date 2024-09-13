@@ -82,7 +82,6 @@ function refresh:StartUpdate(ctx)
   local updateBank = false
   local sortBackpack = false
   local wipeAndRefreshAll = false
-  ctx:Set('wipe', false)
   for _, event in pairs(self.UpdateQueue) do
     if event.ctx:GetBool("wipe") then
       -- Prevent full wipes from happening in combat.
@@ -107,8 +106,6 @@ function refresh:StartUpdate(ctx)
       updateBank = true
     elseif event.eventName == 'WIPE_AND_REFRESH_ALL' then
       wipeAndRefreshAll = true
-    elseif event.eventName == 'BAG_UPDATE_ONLY' then
-      updateBackpack = true
     elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
     elseif const.REAGENTBANK_BAGS[event.args[1]] then
@@ -142,11 +139,7 @@ function refresh:StartUpdate(ctx)
     if addon.atWarbank and addon.Bags.Bank.bankTab < const.BANK_TAB.ACCOUNT_BANK_1 then
       addon.Bags.Bank.bankTab = const.BANK_TAB.ACCOUNT_BANK_1
     end
-    if updateBackpack then
-      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_ONLY', args = {const.BAG_KIND.BACKPACK}, ctx = ctx:Copy()})
-    end
     items:RefreshBank(ctx:Copy())
-    return
   end
 
   if updateBackpack then
@@ -256,13 +249,6 @@ function refresh:OnEnable()
     self:StartUpdate(ctx)
   end)
 
-  events:RegisterMessage('bags/Draw/Bank/Done', function(ctx)
-    self.isUpdateRunning = false
-    if next(self.UpdateQueue) ~= nil then
-      self:StartUpdate(ctx)
-    end
-  end)
-
   -- Register for when bags are done drawing.
   events:RegisterMessage('bags/Draw/Backpack/Done', function(ctx)
     -- If there are more updates in the queue, start the next one with a new context.
@@ -270,6 +256,8 @@ function refresh:OnEnable()
     self.backpackRedrawPending = false
     if next(self.UpdateQueue) ~= nil then
       self:StartUpdate(ctx)
+    else
+      ctx:Cancel()
     end
   end)
 
