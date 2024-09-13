@@ -302,7 +302,7 @@ end
 function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
   local viewList = self.views[database:GetBagView(self.kind)]
   local updateView = viewList[1] == self.currentView and viewList[2] or viewList[1]
-  local previousView = self.currentView
+  local previousView = updateView == viewList[1] and viewList[2] or viewList[1]
 
   --if self.currentView and self.currentView:GetBagView() ~=  updateView:GetBagView() then
   --  self.currentView:Wipe(ctx)
