@@ -41,9 +41,9 @@ local debug = addon:GetModule('Debug')
 ---@param ctx Context
 local function Wipe(view, ctx)
   debug:Log("Wipe", "Grid View Wipe")
-  debug:StartProfile('Grid View Content Wipe')
+  debug:StartProfile('Grid View Content Wipe %d', view.kind)
   view.content:Wipe()
-  debug:EndProfile('Grid View Content Wipe')
+  debug:EndProfile('Grid View Content Wipe %d', view.kind)
   if view.freeSlot ~= nil then
     view.freeSlot:Release(ctx)
     view.freeSlot = nil
@@ -58,7 +58,7 @@ end
 ---@param ctx Context
 ---@param view View
 local function WipeSections(ctx, view)
-  debug:StartProfile('Grid View Sections Wipe')
+  debug:StartProfile('Grid View Sections Wipe %d', view.kind)
   for _, section in pairs(view.sections) do
     async:RawBatch(ctx, 10, section:GetCellList(), function(bctx, cell)
       cell:Release(bctx)
@@ -67,7 +67,7 @@ local function WipeSections(ctx, view)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
-  debug:EndProfile('Grid View Sections Wipe')
+  debug:EndProfile('Grid View Sections Wipe %d', view.kind)
 end
 
 -- ClearButton clears a button and makes it empty while preserving the slot,
@@ -257,14 +257,14 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   async:Chain(ctx, nil,
   function(ectx)
     if ectx:GetBool('wipe') then
-      debug:StartProfile('Wipe Loop')
+      debug:StartProfile('Wipe Loop %d', bag.kind)
       view:Wipe(ectx)
       WipeSections(ectx, view)
-      debug:EndProfile('Wipe Loop')
+      debug:EndProfile('Wipe Loop %d', bag.kind)
     end
   end,
   function(ectx)
-    debug:StartProfile('Removed Loop')
+    debug:StartProfile('Removed Loop %d', bag.kind)
     async:RawBatch(ectx, 15, removed, function(bctx, item)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       if not stackInfo then
@@ -279,10 +279,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         UpdateButton(bctx, view, stackInfo.rootItem)
       end
     end)
-    debug:EndProfile('Removed Loop')
+    debug:EndProfile('Removed Loop %d', bag.kind)
   end,
   function(ectx)
-    debug:StartProfile('Added Loop')
+    debug:StartProfile('Added Loop %d', bag.kind)
     async:RawBatch(ectx, 15, added, function(bctx, item)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       ---- Check stacking options
@@ -298,10 +298,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         ReconcileStack(bctx, view, stackInfo)
       end
     end)
-    debug:EndProfile('Added Loop')
+    debug:EndProfile('Added Loop %d', bag.kind)
   end,
   function(ectx)
-    debug:StartProfile('Changed Loop')
+    debug:StartProfile('Changed Loop %d', bag.kind)
     async:RawBatch(ectx, 15, changed, function(bctx, item)
       local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
       if not stackInfo then
@@ -326,10 +326,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         end
       end
     end)
-    debug:EndProfile('Changed Loop')
+    debug:EndProfile('Changed Loop %d', bag.kind)
   end,
   function(ectx)
-    debug:StartProfile('Everything Else')
+    debug:StartProfile('Everything Else %d', bag.kind)
   -- Special handling for Recent Items -- add it to the dirty sections if
   -- it has no items visible.
     local recentItemsSection = view:GetSection(L:G("Recent Items"))
@@ -460,7 +460,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     bag.frame:SetHeight(bagHeight)
     UpdateViewSize(view)
     view.itemCount = slotInfo.totalItems
-    debug:EndProfile('Everything Else')
+    debug:EndProfile('Everything Else %d', bag.kind)
   end, callback)
 
 end
