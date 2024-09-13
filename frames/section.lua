@@ -124,11 +124,6 @@ function sectionProto:ReleaseAllCells(ctx)
   end
 end
 
----@return Cell[]|Item[]|Section[]|any[]
-function sectionProto:GetCellList()
-  return self.content.cells
-end
-
 function sectionProto:Wipe()
   self.content:Wipe()
   self.frame:Hide()

@@ -124,19 +124,7 @@ end
 
 ---@return ItemData[], ItemData[], ItemData[]
 function SlotInfo:GetChangeset()
-  local added = {}
-  local removed = {}
-  local updated = {}
-  for _, item in pairs(self.addedItems) do
-    table.insert(added, item)
-  end
-  for _, item in pairs(self.removedItems) do
-    table.insert(removed, item)
-  end
-  for _, item in pairs(self.updatedItems) do
-    table.insert(updated, item)
-  end
-  return added, removed, updated
+  return self.addedItems, self.removedItems, self.updatedItems
 end
 
 ---@param ctx Context

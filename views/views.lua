@@ -85,15 +85,11 @@ end
 ---@param ctx Context
 function views.viewProto:Wipe(ctx)
   assert(self.WipeHandler, 'WipeHandler not set')
-  debug:StartProfile('WipeHandler')
   self.WipeHandler(self, ctx)
-  debug:EndProfile('WipeHandler')
-  debug:StartProfile('Rest of Wipe')
   self:ClearDeferredItems()
   self:ClearDirtySections()
   wipe(self.stacks)
   wipe(self.slotToSection)
-  debug:EndProfile('Rest of Wipe')
 end
 
 function views.viewProto:WipeStacks()

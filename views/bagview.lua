@@ -27,37 +27,20 @@ local database = addon:GetModule('Database')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
-
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
 ---@param view View
-local function Wipe(view, _)
+---@param ctx Context
+local function Wipe(view, ctx)
   view.content:Wipe()
   view.itemCount = 0
-  --for _, section in pairs(view.sections) do
-  --  section:ReleaseAllCells(ctx)
-  --  section:Release(ctx)
-  --end
-  --wipe(view.sections)
-  --wipe(view.itemsByBagAndSlot)
-end
-
----@param ctx Context
----@param view View
-local function WipeSections(ctx, view)
-  debug:StartProfile('Bag View Sections Wipe')
   for _, section in pairs(view.sections) do
-    async:RawBatch(ctx, 10, section:GetCellList(), function(bctx, cell)
-      cell:Release(bctx)
-    end)
+    section:ReleaseAllCells(ctx)
     section:Release(ctx)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
-  debug:EndProfile('Bag View Sections Wipe')
 end
 
 ---@param bagid number
@@ -156,99 +139,85 @@ local function BagView(view, ctx, bag, slotInfo, callback)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
-  async:Chain(ctx, nil,
-  function(ectx)
-    if ectx:GetBool('wipe') then
-      debug:StartProfile('Wipe Loop')
-      view:Wipe(ectx)
-      WipeSections(ectx, view)
-      debug:EndProfile('Wipe Loop')
-    end
-  end,
-  function(ectx)
-    async:RawBatch(ectx, 15, removed, function(bctx, item)
-      ClearButton(bctx, view, item)
-    end)
-  end,
-  function(ectx)
-    async:RawBatch(ectx, 15, added, function(bctx, item)
-      CreateButton(bctx, view, item)
-    end)
-  end,
-  function(ectx)
-    async:RawBatch(ectx, 15, changed, function(bctx, item)
-      UpdateButton(bctx, view, item.slotkey)
-    end)
-  end,
-  function(ectx)
-    for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, data in pairs(emptyBagData) do
-        local slotkey = view:GetSlotKey(data)
-        if C_Container.GetBagName(bagid) ~= nil then
-          local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-          if itemButton == nil then
-            itemButton = itemFrame:Create(ectx)
-            view.itemsByBagAndSlot[slotkey] = itemButton
-          end
-          itemButton:SetFreeSlots(ectx, bagid, slotid, -1)
-          local section = view:GetOrCreateSection(ectx, GetBagName(bagid))
-          section:AddCell(slotkey, itemButton)
+  for _, item in pairs(removed) do
+    ClearButton(ctx, view, item)
+  end
+
+  for _, item in pairs(added) do
+    CreateButton(ctx, view, item)
+  end
+
+  for _, item in pairs(changed) do
+    UpdateButton(ctx, view, item.slotkey)
+  end
+
+  for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
+    for slotid, data in pairs(emptyBagData) do
+      local slotkey = view:GetSlotKey(data)
+      if C_Container.GetBagName(bagid) ~= nil then
+        local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
+        if itemButton == nil then
+          itemButton = itemFrame:Create(ctx)
+          view.itemsByBagAndSlot[slotkey] = itemButton
         end
+        itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
+        local section = view:GetOrCreateSection(ctx, GetBagName(bagid))
+        section:AddCell(slotkey, itemButton)
       end
     end
+  end
 
-    for _, item in pairs(view.itemsByBagAndSlot) do
-      item:UpdateCount(ectx)
-    end
+  for _, item in pairs(view.itemsByBagAndSlot) do
+    item:UpdateCount(ctx)
+  end
 
-    for sectionName, section in pairs(view:GetAllSections()) do
-      if section:GetCellCount() == 0 then
-        debug:Log("RemoveSection", "Removed because empty", sectionName)
-        view:RemoveSection(sectionName)
-        section:ReleaseAllCells(ectx)
-        section:Release(ectx)
-      else
-        debug:Log("KeepSection", "Section kept because not empty", sectionName)
-        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-        section:Draw(bag.kind, database:GetBagView(bag.kind), true)
-      end
+  for sectionName, section in pairs(view:GetAllSections()) do
+    if section:GetCellCount() == 0 then
+      debug:Log("RemoveSection", "Removed because empty", sectionName)
+      view:RemoveSection(sectionName)
+      section:ReleaseAllCells(ctx)
+      section:Release(ctx)
+    else
+      debug:Log("KeepSection", "Section kept because not empty", sectionName)
+      section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+      section:Draw(bag.kind, database:GetBagView(bag.kind), true)
     end
-    view.content.maxCellWidth = sizeInfo.columnCount
-    -- Sort the sections.
-    view.content:Sort(function(a, b)
-      return sort.SortSectionsAlphabetically(view.kind, a, b)
-    end)
-    debug:StartProfile('Content Draw Stage')
-    local w, h = view.content:Draw({
-      cells = view.content.cells,
-      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
-      columns = sizeInfo.columnCount,
-    })
-    debug:EndProfile('Content Draw Stage')
-    -- Reposition the content frame if the recent items section is empty.
-    if w < 160 then
-      w = 160
-    end
-    if bag.tabs and w < bag.tabs.width then
-      w = bag.tabs.width
-    end
-    if h == 0 then
-      h = 40
-    end
-    if database:GetInBagSearch() then
-      h = h + 20
-    end
-    view.content:HideScrollBar()
-    --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-    -- than the screen space.
-    bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
-    local bagHeight = h +
-    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-    bag.frame:SetHeight(bagHeight)
-    UpdateViewSize(view)
-  end, callback)
-
+  end
+  view.content.maxCellWidth = sizeInfo.columnCount
+  -- Sort the sections.
+  view.content:Sort(function(a, b)
+    return sort.SortSectionsAlphabetically(view.kind, a, b)
+  end)
+  debug:StartProfile('Content Draw Stage')
+  local w, h = view.content:Draw({
+    cells = view.content.cells,
+    maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+    columns = sizeInfo.columnCount,
+  })
+  debug:EndProfile('Content Draw Stage')
+  -- Reposition the content frame if the recent items section is empty.
+  if w < 160 then
+    w = 160
+  end
+  if bag.tabs and w < bag.tabs.width then
+    w = bag.tabs.width
+  end
+  if h == 0 then
+    h = 40
+  end
+  if database:GetInBagSearch() then
+    h = h + 20
+  end
+  view.content:HideScrollBar()
+  --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
+  -- than the screen space.
+  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+  local bagHeight = h +
+  const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+  const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+  bag.frame:SetHeight(bagHeight)
+  UpdateViewSize(view)
+  callback()
 end
 
 ---@param parent Frame
