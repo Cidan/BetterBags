@@ -54,11 +54,14 @@ end
 
 function categories:OnEnable()
   for name, filter in pairs(database:GetAllItemCategories()) do
-    if filter.save then
-      self.categoryCount = self.categoryCount + 1
-      self.categories[name] = CopyTable(filter, false)
-      -- Delete the temporary item list.
-      self.categories[name].itemList = {}
+    self.categoryCount = self.categoryCount + 1
+    self.categories[name] = CopyTable(filter, false)
+    -- Delete the temporary item list.
+    self.categories[name].itemList = {}
+    -- In-line migration for allowBlizzardItems.
+    if self.categories[name].allowBlizzardItems == nil then
+      self.categories[name].allowBlizzardItems = true
+      self:SaveCategoryToDisk(context:New('OnEnable'), name)
     end
   end
 end
