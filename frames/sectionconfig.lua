@@ -171,7 +171,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
   end
 
   -- Set the backdrop initial state.
-  if not elementData.header and (categories:IsCategoryEnabled(self.kind, elementData.title) or not categories:DoesCategoryExist(elementData.title)) then
+  if not elementData.header and (categories:IsCategoryEnabled(self.kind, elementData.title)) then
     button:SetBackdropColor(1, 1, 0, .2)
   elseif elementData.header then
     button:SetBackdropColor(0, 0, 0, .3)

@@ -53,10 +53,14 @@ end
 
 function categories:OnEnable()
   for name, filter in pairs(database:GetAllItemCategories()) do
-    self.categoryCount = self.categoryCount + 1
-    self.categories[name] = CopyTable(filter, false)
-    -- Delete the temporary item list.
-    self.categories[name].itemList = {}
+    if filter.save then
+      self.categoryCount = self.categoryCount + 1
+      self.categories[name] = CopyTable(filter, false)
+      -- Delete the temporary item list.
+      self.categories[name].itemList = {}
+    else
+      database:DeleteItemCategory(name)
+    end
   end
 end
 
@@ -112,7 +116,7 @@ end
 function categories:SaveCategoryToDisk(ctx, name)
   _ = ctx
   local category = self.categories[name]
-  if category and category.save then
+  if category then
     database:CreateOrUpdateCategory(category)
   end
 end
