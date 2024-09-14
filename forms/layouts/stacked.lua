@@ -368,14 +368,14 @@ function stackedLayout:AddCheckbox(opts)
   container.checkbox:SetChecked(opts.getValue(context:New('Checkbox_Load')))
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("LEFT", container.checkbox, "RIGHT", 5, 0)
+  container.title:SetPoint("LEFT", container.checkbox, "RIGHT", (opts.left or 0) + 5, (opts.top or 0))
   container.title:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
   container.description:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
+  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + (opts.bottom or 25))
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
   self.checkboxes[container] = opts
@@ -389,13 +389,13 @@ function stackedLayout:addDropdownRetail(opts)
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", (opts.left or 0) + 37, (opts.top or 0))
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
 
   container.dropdown = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
-  container.dropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  container.dropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
   container.dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
   ---@type string[]
@@ -429,7 +429,7 @@ function stackedLayout:addDropdownRetail(opts)
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
     container.dropdown:GetHeight() +
-    25
+    (opts.bottom or 25)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
@@ -444,13 +444,13 @@ function stackedLayout:addDropdownClassic(opts)
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", (opts.left or 0) + 37, (opts.top or 0))
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
 
   container.classicDropdown = CreateFrame("Frame", nil, container, "UIDropDownMenuTemplate") --[[@as Frame]]
-  container.classicDropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  container.classicDropdown:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
   container.classicDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
   ---@type string[]
@@ -494,7 +494,7 @@ function stackedLayout:addDropdownClassic(opts)
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
     container.classicDropdown:GetHeight() +
-    25
+    (opts.bottom or 25)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
@@ -517,17 +517,17 @@ function stackedLayout:AddSlider(opts)
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", (opts.left or 0) + 37, (opts.top or 0))
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
 
   if addon.isRetail then
     container.slider = CreateFrame("Slider", nil, container, "UISliderTemplate") --[[@as Slider]]
   else
     container.slider = CreateFrame("Slider", nil, container, "HorizontalSliderTemplate") --[[@as Slider]]
   end
-  container.slider:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  container.slider:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
   container.slider:SetPoint("RIGHT", container, "RIGHT", 0, 0)
   container.slider:SetOrientation("HORIZONTAL")
   container.slider:SetHeight(20)
@@ -544,7 +544,7 @@ function stackedLayout:AddSlider(opts)
 
   container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
   container.input:SetSize(50, 20)
-  container.input:SetPoint("TOP", container.slider, "BOTTOM", 0, -5)
+  container.input:SetPoint("TOP", container.slider, "BOTTOM", (opts.left or 0), (opts.top or -5))
   container.input:SetNumeric(true)
   container.input:SetAutoFocus(false)
   addon.SetScript(container.input, "OnEditFocusLost", function(_)
@@ -567,9 +567,9 @@ function stackedLayout:AddSlider(opts)
     if user then
       local value = tonumber(container.input:GetText())
       if value then
-        if value < opts.min then
+        if tonumber(value) < tonumber(opts.min) then
           value = opts.min
-        elseif value > opts.max then
+        elseif tonumber(value) > tonumber(opts.max) then
           value = opts.max
         end
         container.slider:SetValue(value)
@@ -589,7 +589,7 @@ function stackedLayout:AddSlider(opts)
     container.description:GetLineHeight() +
     container.slider:GetHeight() +
     container.input:GetHeight() +
-    30
+    (opts.bottom or 30)
   )
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
@@ -606,20 +606,29 @@ function stackedLayout:AddButtonGroup(opts)
   for _, buttonData in ipairs(opts.ButtonOptions) do
     local button = CreateFrame("Button", nil, container, "UIPanelButtonTemplate") --[[@as Button]]
     button:SetText(buttonData.title)
-    local w = button:GetFontString():GetStringWidth()
-    button:SetSize(w + 6, 24)
+    button:SetSize(buttonData.width or button:GetFontString():GetStringWidth() + 6, buttonData.height or 24)
     addon.SetScript(button, "OnClick", function(ctx)
       buttonData.onClick(ctx)
     end)
-    if #container.buttons == 0 then
-      button:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+    if buttonData.align ~= nil and buttonData.align == "RIGHT" then
+      if #container.buttons == 0 then
+        button:SetPoint("TOPRIGHT", container, "TOPRIGHT", (buttonData.right or 0), (buttonData.top or 0))
+      elseif container.buttons[#container.buttons].align ~= nil and container.buttons[#container.buttons].align == "RIGHT" then
+        button:SetPoint("TOPRIGHT", container.buttons[#container.buttons], "TOPLEFT", (buttonData.right or 0), (buttonData.top or 0))
+      else
+        button:SetPoint("TOPRIGHT", container, "TOPRIGHT", (buttonData.right or 0), (buttonData.top or 0))
+      end
     else
-      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", -10, 0)
+      if #container.buttons == 0 then
+        button:SetPoint("TOPLEFT", container, "TOPLEFT", (buttonData.left or 0) + 37, (buttonData.top or 0))
+      else
+        button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", (buttonData.left or 0), (buttonData.top or 0))
+      end
     end
     table.insert(container.buttons, button)
   end
 
-  container:SetHeight(container.buttons[1]:GetHeight() + 30)
+  container:SetHeight(container.buttons[1]:GetHeight() + (opts.bottom or 30))
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
   self.buttonGroups[container] = opts
@@ -632,10 +641,10 @@ function stackedLayout:AddTextArea(opts)
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", (opts.left or 0) + 37, (opts.top or 0))
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
 
   local ScrollBox = CreateFrame("Frame", nil, container, "WowScrollBox") --[[@as WowScrollBox]]
   ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
@@ -698,7 +707,7 @@ function stackedLayout:AddTextArea(opts)
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
     ScrollBox:GetHeight() +
-    30
+    (opts.bottom or 30)
   )
 
   ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, view)
@@ -714,13 +723,13 @@ function stackedLayout:AddInputBox(opts)
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", (opts.left or 0) + 37, (opts.top or 0))
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
 
   container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
-  container.input:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 5, -5)
+  container.input:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", (opts.left or 0) + 5, (opts.top or -5))
   container.input:SetPoint("RIGHT", container, "RIGHT", -5, 0)
   container.input:SetHeight(20)
   container.input:SetAutoFocus(false)
@@ -743,7 +752,7 @@ function stackedLayout:AddInputBox(opts)
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
     container.input:GetHeight() +
-    30
+    (opts.bottom or 30)
   )
 
   self.nextFrame = container
@@ -800,17 +809,16 @@ function stackedLayout:AddColor(opts)
     ColorPickerFrame:SetupColorPickerAndShow(options)
   end)
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("LEFT", container.colorPicker, "RIGHT", 5, 0)
+  container.title:SetPoint("LEFT", container.colorPicker, "RIGHT", (opts.left or 0) + 5, 0)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
-
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", (opts.left or 0), (opts.top or -5))
 
   container:SetHeight(
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
     container.colorPicker:GetHeight() +
-    30
+    (opts.bottom or 30)
   )
 
   self.nextFrame = container
@@ -825,10 +833,10 @@ function stackedLayout:AddLabel(opts)
   self:alignFrame(t, container)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+  container.description:SetPoint("TOPLEFT", container, "TOPLEFT", (opts.left or 0) + 37, (opts.top or 0))
   container.description:SetPoint("RIGHT", container, "RIGHT", -5, 0)
 
-  container:SetHeight(container.description:GetLineHeight() + 10)
+  container:SetHeight(container.description:GetLineHeight() + (opts.bottom or 10))
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end
