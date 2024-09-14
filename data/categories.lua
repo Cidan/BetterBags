@@ -55,6 +55,8 @@ function categories:OnEnable()
   for name, filter in pairs(database:GetAllItemCategories()) do
     self.categoryCount = self.categoryCount + 1
     self.categories[name] = CopyTable(filter, false)
+    -- Delete the temporary item list.
+    self.categories[name].itemList = {}
   end
 end
 

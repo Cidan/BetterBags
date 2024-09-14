@@ -271,26 +271,8 @@ end
 
 ---@param category CustomCategoryFilter
 function DB:CreateOrUpdateCategory(category)
-  DB.data.profile.customCategoryFilters[category.name] = category
-end
-
----@param category string
----@return boolean
-function DB:IsSearchCategory(category)
-  return DB.data.profile.searchCategories[category] ~= nil
-end
-
----@param category string
----@return CategoryOptions
-function DB:GetCategoryOptions(category)
-  local options = DB.data.profile.categoryOptions[category]
-  if not options then
-    options = {
-      shown = true,
-    }
-    DB.data.profile.categoryOptions[category] = options
-  end
-  return options
+  DB.data.profile.customCategoryFilters[category.name] = CopyTable(category, false)
+  DB.data.profile.customCategoryFilters[category.name].itemList = {}
 end
 
 ---@return boolean
@@ -450,6 +432,26 @@ function DB:SetShowAllFreeSpace(kind, value)
 end
 
 function DB:Migrate()
+
+  --[[
+    Migration of itemList items to permanentItemList, and removal of old category options.
+
+    Do not remove before Q2'25.
+  ]]--
+
+  for _, category in pairs(DB.data.profile.customCategoryFilters) do
+    if category.permanentItemList == nil then
+      if category.itemList then
+        category.permanentItemList = category.itemList
+        category.itemList = {}
+      end
+    end
+  end
+
+---@diagnostic disable-next-line: no-unknown
+  DB.data.profile.ephemeralCategoryFilters = nil
+---@diagnostic disable-next-line: no-unknown
+  DB.data.profile.categoryOptions = nil
 
   --[[
     Deletion of the old lockedItems table.
