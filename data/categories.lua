@@ -24,7 +24,7 @@ local context = addon:GetModule('Context')
 ---@class (exact) CustomCategoryFilter
 ---@field name string The name of this category as it appears for the user.
 ---@field itemList? table<number, boolean> The list of item IDs in this category.
----@field temporaryItemList? table<number, boolean> The list of item IDs in this category.
+---@field permanentItemList? table<number, boolean> The list of item IDs in this category.
 ---@field enabled? table<BagKind, boolean> The enabled state of the category for each bag.
 ---@field readOnly? boolean Currently unused.
 ---@field save? boolean If true, this category is saved to disk.
@@ -65,7 +65,7 @@ function categories:NewBlankCategory(name)
   local category = {
     name = name,
     itemList = {},
-    temporaryItemList = {},
+    permanentItemList = {},
     enabled = {
       [const.BAG_KIND.BACKPACK] = true,
       [const.BAG_KIND.BANK] = true,
@@ -129,7 +129,7 @@ function categories:AddPermanentItemToCategory(ctx, id, name)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", name))
   assert(name ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, name))
-  self.categories[name].itemList[id] = true
+  self.categories[name].permanentItemList[id] = true
   self.categories[name].save = true
   self:SaveCategoryToDisk(ctx, name)
 end
@@ -149,7 +149,7 @@ function categories:AddItemToCategory(ctx, id, name)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", name))
   assert(name ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, name))
-  self.categories[name].temporaryItemList[id] = true
+  self.categories[name].itemList[id] = true
   self:SaveCategoryToDisk(ctx, name)
 end
 
@@ -408,7 +408,7 @@ function categories:RemoveItemFromCategory(ctx, id)
   local category = self.itemIDToCategory[id]
   if not category then return end
   category.itemList[id] = nil
-  category.temporaryItemList[id] = nil
+  category.permanentItemList[id] = nil
   self:SaveCategoryToDisk(ctx, category.name)
 end
 
