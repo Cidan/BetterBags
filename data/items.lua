@@ -1045,7 +1045,13 @@ function items:GetCategory(ctx, data)
   data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
   _G[data.itemInfo.itemEquipLoc] ~= nil and
   _G[data.itemInfo.itemEquipLoc] ~= "" then
-    return _G[data.itemInfo.itemEquipLoc]
+    categories:CreateCategory(ctx, {
+      name = _G[data.itemInfo.itemEquipLoc],
+    })
+    local filter = categories:GetCategoryByName(_G[data.itemInfo.itemEquipLoc])
+    if filter.allowBlizzardItems then
+      return filter.name
+    end
   end
 
   local category = ""
@@ -1092,7 +1098,15 @@ function items:GetCategory(ctx, data)
     category = L:G('Everything')
   end
 
-  return category
+  categories:CreateCategory(ctx, {
+    name = category,
+  })
+  local filter = categories:GetCategoryByName(category)
+  if filter.allowBlizzardItems then
+    return filter.name
+  end
+
+  return L:G('Everything')
 end
 
 ---@param itemLink string

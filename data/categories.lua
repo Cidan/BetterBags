@@ -34,6 +34,7 @@ local context = addon:GetModule('Context')
 ---@field priority? number The priority of the category. A higher number has a higher priority.
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 ---@field shown? boolean If true, this category is shown in the UI.
+---@field allowBlizzardItems? boolean If true, this category will allow Blizzard items to be added to it.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -82,6 +83,7 @@ function categories:NewBlankCategory(name)
     priority = 0,
     dynamic = false,
     shown = true,
+    allowBlizzardItems = true,
   }
   return category
 end
