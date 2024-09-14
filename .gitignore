@@ -1,3 +1,4 @@
+/.idea/*
 /libs/**
 /includes/**
 # Bugfix for Cursor editor.
