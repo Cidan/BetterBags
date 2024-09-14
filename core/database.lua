@@ -222,55 +222,15 @@ end
 
 ---@param itemID number
 ---@param category string
-function DB:SaveItemToCategory(itemID, category)
-  assert(DB.data.profile.customCategoryFilters[category] ~= nil, "Category does not exist: " .. category)
-  DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
-  local previousCategory = DB.data.profile.customCategoryIndex[itemID]
-  if previousCategory and previousCategory ~= category then
-    DB.data.profile.customCategoryFilters[previousCategory].itemList[itemID] = nil
-  end
-  DB.data.profile.customCategoryIndex[itemID] = category
-end
-
----@param itemID number
----@param category string
 function DB:DeleteItemFromCategory(itemID, category)
   if DB.data.profile.customCategoryFilters[category] then
     DB.data.profile.customCategoryFilters[category].itemList[itemID] = nil
-    DB.data.profile.customCategoryIndex[itemID] = nil
   end
-end
-
----@param kind BagKind
----@param category string
----@param enabled boolean
-function DB:SetItemCategoryEnabled(kind, category, enabled)
-  assert(DB.data.profile.customCategoryFilters[category] ~= nil, "Category does not exist: " .. category)
-  DB.data.profile.customCategoryFilters[category].enabled[kind] = enabled
-end
-
-function DB:SetEphemeralItemCategoryEnabled(kind, category, enabled)
-  DB.data.profile.ephemeralCategoryFilters[category].enabled[kind] = enabled
 end
 
 ---@param category string
 function DB:DeleteItemCategory(category)
-  if DB.data.profile.customCategoryFilters[category] ~= nil then
-    for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
-      DB:DeleteItemFromCategory(itemID, category)
-    end
-  end
   DB.data.profile.customCategoryFilters[category] = nil
-  DB.data.profile.ephemeralCategoryFilters[category] = nil
-end
-
----@param category string
-function DB:WipeItemCategory(category)
-  if DB.data.profile.customCategoryFilters[category] then
-    for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
-      DB:DeleteItemFromCategory(itemID, category)
-    end
-  end
 end
 
 ---@return table<string, CustomCategoryFilter>
@@ -311,19 +271,7 @@ end
 
 ---@param category CustomCategoryFilter
 function DB:CreateOrUpdateCategory(category)
-  if category.save then
-    DB.data.profile.customCategoryFilters[category.name] = category
-    for itemID, _ in pairs(category.itemList) do
-      DB.data.profile.customCategoryIndex[itemID] = category.name
-    end
-  else
-    DB.data.profile.ephemeralCategoryFilters[category.name] = {
-      name = category.name,
-      enabled = category.enabled,
-      dynamic = category.dynamic,
-      itemList = {},
-    }
-  end
+  DB.data.profile.customCategoryFilters[category.name] = category
 end
 
 ---@param category string

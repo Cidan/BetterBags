@@ -716,10 +716,6 @@ const.DATABASE_DEFAULTS = {
     categoryOptions = {},
     ---@type table<string, CustomCategoryFilter>
     customCategoryFilters = {},
-    ---@type table<string, CustomCategoryFilter>
-    ephemeralCategoryFilters = {},
-    ---@type table<number, string>
-    customCategoryIndex = {},
     categoryFilters = {
       [const.BAG_KIND.BACKPACK] = {
         Type = true,
