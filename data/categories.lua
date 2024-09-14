@@ -58,8 +58,6 @@ function categories:OnEnable()
       self.categories[name] = CopyTable(filter, false)
       -- Delete the temporary item list.
       self.categories[name].itemList = {}
-    else
-      database:DeleteItemCategory(name)
     end
   end
 end
