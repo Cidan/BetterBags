@@ -61,7 +61,8 @@ end
 ---@param name string
 ---@return CustomCategoryFilter
 function categories:NewBlankCategory(name)
-  return {
+  ---@type CustomCategoryFilter
+  local category = {
     name = name,
     itemList = {},
     temporaryItemList = {},
@@ -76,7 +77,9 @@ function categories:NewBlankCategory(name)
     color = nil,
     priority = 0,
     dynamic = false,
+    shown = true,
   }
+  return category
 end
 
 ---@return number
@@ -127,6 +130,7 @@ function categories:AddPermanentItemToCategory(ctx, id, name)
   assert(name ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, name))
   self.categories[name].itemList[id] = true
+  self.categories[name].save = true
   self:SaveCategoryToDisk(ctx, name)
 end
 

@@ -84,7 +84,6 @@ local sectionConfigFrame = {}
 ---@param category string
 ---@return boolean
 function sectionConfigFrame:OnReceiveDrag(ctx, category)
-  if categories:IsDynamicCategory(category) then return false end
   local kind, id = GetCursorInfo()
   if kind ~= "item" or not tonumber(id) then return false end
   ClearCursor()
@@ -194,7 +193,6 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     button:SetScript("OnEnter", function()
       GameTooltip:SetOwner(button, "ANCHOR_LEFT")
       GameTooltip:AddLine(elementData.title, 1, .81960791349411, 0, true)
-      if categories:DoesCategoryExist(elementData.title) and not categories:IsDynamicCategory(elementData.title) then
         GameTooltip:AddLine([[
         Left click to enable or disable items from being added to this category.
         Drag this category to Pinned to keep it at the top of your bags, or to Automatically Sorted to have it sorted with the rest of your items.]], 1, 1, 1, true)
@@ -202,14 +200,6 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         GameTooltip:AddDoubleLine("Left Click", "Enable or Disable Category")
         GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
         GameTooltip:AddDoubleLine("Right Click", "Open Menu")
-      else
-        GameTooltip:AddLine([[
-          Dynamic categories can't be enabled or disabled (yet).
-          Drag this category to Pinned to keep it at the top of your bags, or to Automatically Sorted to have it sorted with the rest of your items.]], 1, 1, 1, true)
-          GameTooltip:AddLine("\n", 1, 1, 1, true)
-          GameTooltip:AddDoubleLine("Shift Left Click", format("Move %s to the top of your bags", elementData.title))
-          GameTooltip:AddDoubleLine("Right Click", "Open Menu")
-      end
       GameTooltip:Show()
     end)
 
@@ -279,15 +269,13 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     contextMenu:Show(ctx, menuOptions)
   end)
 
-  if categories:DoesCategoryExist(elementData.title) and not categories:IsDynamicCategory(elementData.title) then
-    -- Script handler for dropping items into a category.
-    addon.SetScript(button, "OnReceiveDrag", function(ctx)
-      if elementData.header then
-        return
-      end
-      self:OnReceiveDrag(ctx, elementData.title)
-    end)
-  end
+  -- Script handler for dropping items into a category.
+  addon.SetScript(button, "OnReceiveDrag", function(ctx)
+    if elementData.header then
+      return
+    end
+    self:OnReceiveDrag(ctx, elementData.title)
+  end)
 
   addon.SetScript(button, "OnMouseUp", function(ctx, _, key)
     -- Headers can't be clicked.
@@ -303,12 +291,12 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       if IsShiftKeyDown() then
         self.content.provider:MoveElementDataToIndex(elementData, 2)
         self:UpdatePinnedItems()
-      elseif categories:DoesCategoryExist(elementData.title) and not categories:IsDynamicCategory(elementData.title) then
+      else
         if categories:IsCategoryEnabled(self.kind, elementData.title) then
-          categories:DisableCategory(self.kind, elementData.title)
+          categories:DisableCategory(ctx, self.kind, elementData.title)
           button:SetBackdropColor(0, 0, 0, 0)
         else
-          categories:EnableCategory(self.kind, elementData.title)
+          categories:EnableCategory(ctx, self.kind, elementData.title)
           button:SetBackdropColor(1, 1, 0, .2)
         end
       end
