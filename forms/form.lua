@@ -113,50 +113,50 @@ function formFrame:AddSubSection(opts)
 end
 
 ---@param opts FormSliderOptions
-function formFrame:AddSlider(opts)
-  self.layout:AddSlider(opts)
+function formFrame:AddSlider(opts, frameName)
+  self.layout:AddSlider(opts, frameName)
   self:Resize()
 end
 
 ---@param opts FormInputBoxOptions
-function formFrame:AddInputBox(opts)
-  self.layout:AddInputBox(opts)
+function formFrame:AddInputBox(opts, frameName)
+  self.layout:AddInputBox(opts, frameName)
   self:Resize()
 end
 
 ---@param opts FormDropdownOptions
-function formFrame:AddDropdown(opts)
-  self.layout:AddDropdown(opts)
+function formFrame:AddDropdown(opts, frameName)
+  self.layout:AddDropdown(opts, frameName)
   self:Resize()
 end
 
 ---@param opts FormTextAreaOptions
-function formFrame:AddTextArea(opts)
-  self.layout:AddTextArea(opts)
+function formFrame:AddTextArea(opts, frameName)
+  self.layout:AddTextArea(opts, frameName)
   self:Resize()
 end
 
 ---@param opts FormCheckboxOptions
-function formFrame:AddCheckbox(opts)
-  self.layout:AddCheckbox(opts)
+function formFrame:AddCheckbox(opts, frameName)
+  self.layout:AddCheckbox(opts, frameName)
   self:Resize()
 end
 
 ---@param opts FormButtonGroupOptions
-function formFrame:AddButtonGroup(opts)
-  self.layout:AddButtonGroup(opts)
+function formFrame:AddButtonGroup(opts, frameName)
+  self.layout:AddButtonGroup(opts, frameName)
   self:Resize()
 end
 
 ---@param opts FormColorOptions
-function formFrame:AddColor(opts)
-  self.layout:AddColor(opts)
+function formFrame:AddColor(opts, frameName)
+  self.layout:AddColor(opts, frameName)
   self:Resize()
 end
 
 ---@param opts FormLabelOptions
-function formFrame:AddLabel(opts)
-  self.layout:AddLabel(opts)
+function formFrame:AddLabel(opts, frameName)
+  self.layout:AddLabel(opts, frameName)
   self:Resize()
 end
 

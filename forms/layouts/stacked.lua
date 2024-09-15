@@ -354,9 +354,9 @@ function stackedLayout:AddSubSection(opts)
 end
 
 ---@param opts FormCheckboxOptions
-function stackedLayout:AddCheckbox(opts)
+function stackedLayout:AddCheckbox(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormCheckbox]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormCheckbox]]
   self:alignFrame(t, container)
 
   container.checkbox = CreateFrame("CheckButton", nil, container, "UICheckButtonTemplate") --[[@as CheckButton]]
@@ -383,9 +383,9 @@ end
 
 ---@private
 ---@param opts FormDropdownOptions
-function stackedLayout:addDropdownRetail(opts)
+function stackedLayout:addDropdownRetail(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormDropdown]]
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
@@ -438,9 +438,9 @@ end
 
 ---@private
 ---@param opts FormDropdownOptions
-function stackedLayout:addDropdownClassic(opts)
+function stackedLayout:addDropdownClassic(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormDropdown]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormDropdown]]
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
@@ -502,18 +502,18 @@ function stackedLayout:addDropdownClassic(opts)
 end
 
 ---@param opts FormDropdownOptions
-function stackedLayout:AddDropdown(opts)
+function stackedLayout:AddDropdown(opts, frameName)
   if addon.isRetail then
-    self:addDropdownRetail(opts)
+    self:addDropdownRetail(opts, frameName)
     return
   end
-  self:addDropdownClassic(opts)
+  self:addDropdownClassic(opts, frameName)
 end
 
 ---@param opts FormSliderOptions
-function stackedLayout:AddSlider(opts)
+function stackedLayout:AddSlider(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormSlider]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormSlider]]
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
@@ -597,9 +597,9 @@ function stackedLayout:AddSlider(opts)
 end
 
 ---@param opts FormButtonGroupOptions
-function stackedLayout:AddButtonGroup(opts)
+function stackedLayout:AddButtonGroup(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormButtons]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormButtons]]
   self:alignFrame(t, container)
   container.buttons = {}
 
@@ -635,9 +635,9 @@ function stackedLayout:AddButtonGroup(opts)
 end
 
 ---@param opts FormTextAreaOptions
-function stackedLayout:AddTextArea(opts)
+function stackedLayout:AddTextArea(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormTextArea]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormTextArea]]
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
@@ -717,9 +717,9 @@ function stackedLayout:AddTextArea(opts)
 end
 
 ---@param opts FormInputBoxOptions
-function stackedLayout:AddInputBox(opts)
+function stackedLayout:AddInputBox(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormInputBox]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormInputBox]]
   self:alignFrame(t, container)
 
   container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
@@ -761,9 +761,9 @@ function stackedLayout:AddInputBox(opts)
 end
 
 ---@param opts FormColorOptions
-function stackedLayout:AddColor(opts)
+function stackedLayout:AddColor(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormColor]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormColor]]
   self:alignFrame(t, container)
 
   container.colorPicker = CreateFrame("Frame", nil, container) --[[@as Frame]]
@@ -827,9 +827,9 @@ function stackedLayout:AddColor(opts)
 end
 
 ---@param opts FormLabelOptions
-function stackedLayout:AddLabel(opts)
+function stackedLayout:AddLabel(opts, frameName)
   local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormLabel]]
+  local container = CreateFrame("Frame", frameName or nil, t) --[[@as FormLabel]]
   self:alignFrame(t, container)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
