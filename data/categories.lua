@@ -42,12 +42,12 @@ local context = addon:GetModule('Context')
 ---@field private categoryFunctions table<string, fun(data: ItemData): string>
 ---@field private categoryCount number
 ---@field private categories table<string, CustomCategoryFilter>
----@field private itemIDToCategory table<number, CustomCategoryFilter>
+---@field private itemIDToCategories table<number, string[]>
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
   self.categories = {}
-  self.itemIDToCategory = {}
+  self.itemIDToCategories = {}
   self.categoryFunctions = {}
   self.itemsWithNoCategory = {}
   self.categoryCount = 0
@@ -68,6 +68,14 @@ function categories:OnEnable()
     end
     if self.categories[name].shown == nil then
       self.categories[name].shown = true
+    end
+    if filter.permanentItemList then
+      for id in pairs(filter.permanentItemList) do
+        if not self.itemIDToCategories[id] then
+          self.itemIDToCategories[id] = {}
+        end
+        table.insert(self.itemIDToCategories[id], name)
+      end
     end
     self:SaveCategoryToDisk(context:New('OnEnable'), name)
   end
@@ -113,13 +121,29 @@ function categories:CreateCategory(ctx, category)
     return
   end
 
-  assert(not category.sortOrder, "sortOrder is not allowed when creating a category, as it is an internal field.")
-
   category.enabled = category.enabled or {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
   }
 
+  if category.permanentItemList then
+    for id in pairs(category.permanentItemList) do
+      if not self.itemIDToCategories[id] then
+        self.itemIDToCategories[id] = {}
+      end
+      table.insert(self.itemIDToCategories[id], category.name)
+    end
+  end
+  if category.itemList then
+    for id in pairs(category.itemList) do
+      if not self.itemIDToCategories[id] then
+        self.itemIDToCategories[id] = {}
+      end
+      table.insert(self.itemIDToCategories[id], category.name)
+    end
+  end
+  category.sortOrder = -1
+  category.shown = category.shown or true
   self.categories[category.name] = category
   self:SaveCategoryToDisk(ctx, category.name)
   events:SendMessage(ctx, 'categories/Changed')
@@ -156,7 +180,7 @@ function categories:GetCategoryBySortThenAlphaOrder()
   end
   table.sort(list, function(a, b)
     if a.sortOrder == b.sortOrder then
-      return a.name < b.name
+      return string.lower(a.name) < string.lower(b.name)
     end
     if a.sortOrder > 0 and b.sortOrder > 0 then
       return a.sortOrder < b.sortOrder
@@ -410,11 +434,15 @@ function categories:GetCustomCategory(ctx, kind, data)
   end
   local itemID = data.itemInfo.itemID
   if not itemID then return nil end
-  local filter = self.itemIDToCategory[itemID]
-  if filter and filter.enabled[kind] then
-    return filter.name
+  local filterNames = self.itemIDToCategories[itemID]
+  if filterNames then
+    for _, name in ipairs(filterNames) do
+      local filter = self.categories[name]
+      if filter.enabled[kind] then
+        return filter.name
+      end
+    end
   end
-
   -- Check for items that had no category previously. This
   -- is a performance optimization to avoid calling all
   -- registered functions for every item.
@@ -441,12 +469,12 @@ end
 
 ---@param ctx Context
 ---@param id number The ItemID of the item to remove from a custom category.
-function categories:RemoveItemFromCategory(ctx, id)
-  local category = self.itemIDToCategory[id]
-  if not category then return end
-  category.itemList[id] = nil
-  category.permanentItemList[id] = nil
-  self:SaveCategoryToDisk(ctx, category.name)
+function categories:RemoveItemFromAllCategories(ctx, id)
+  for _, filterName in ipairs(self.itemIDToCategories[id]) do
+    self.categories[filterName].itemList[id] = nil
+    self.categories[filterName].permanentItemList[id] = nil
+    self:SaveCategoryToDisk(ctx, filterName)
+  end
 end
 
 -- RegisterCategoryFunction registers a function that will be called to get the category name for all items.

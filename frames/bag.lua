@@ -488,7 +488,7 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor(ctx)
     if input == "" then return end
     categories:CreateCategory(ctx, {
       name = input,
-      itemList = {[itemID] = true},
+      permanentItemList = {[itemID] = true},
       save = true,
     })
     events:SendMessage(ctx, 'bags/FullRefreshAll')
