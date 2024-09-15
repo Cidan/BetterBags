@@ -67,6 +67,11 @@ local debug = addon:GetModule('Debug')
 ---@field itemModifiedAppearanceID number
 ---@field hasTransmog boolean
 
+---@class (exact) CategoryInfo
+---@field blizzard? {name: string, priority: number}
+---@field manual? {name: string, priority: number}
+---@field search? {name: string, priority: number}
+
 -- ItemData contains all the information about an item in a bag or bank.
 ---@class (exact) ItemData
 ---@field basic boolean
@@ -91,6 +96,8 @@ local debug = addon:GetModule('Debug')
 ---@field bagName string
 ---@field forceClear boolean
 ---@field nextStack string
+---@field categories CategoryInfo
+---@field internalNewItem boolean
 local itemDataProto = {}
 
 ---@class (exact) Items: AceModule
@@ -745,19 +752,22 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       slotInfo.deferDelete = true
     end
 
+    categories:UpdateSearchCache(ctx)
+
     -- Refresh the search cache.
     self:RefreshSearchCache(kind)
 
     -- Get the categories for each item.
     for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
-      local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
-      if newCategory then
-        local oldCategory = currentItem.itemInfo.category
-        if oldCategory ~= L:G("Recent Items") then
-          currentItem.itemInfo.category = newCategory
-          search:UpdateCategoryIndex(currentItem, oldCategory)
-        end
-      end
+      categories:CalculateAndUpdateCategoriesForItem(ctx, currentItem)
+      --local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
+      --if newCategory then
+      --  local oldCategory = currentItem.itemInfo.category
+      --  if oldCategory ~= L:G("Recent Items") then
+      --    currentItem.itemInfo.category = newCategory
+      --    search:UpdateCategoryIndex(currentItem, oldCategory)
+      --  end
+      --end
     end
     callback(ctx)
   --end)
@@ -1276,6 +1286,7 @@ function items:AttachItemInfo(data, kind)
   data.forceClear = false
   data.stacks = 0
   data.stackedCount = data.itemInfo.currentItemCount
+  data.internalNewItem = self:IsNewItem(data)
   return data
 end
 

@@ -21,6 +21,9 @@ local search = addon:GetModule('Search')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Localization: AceModule
+local L =  addon:GetModule('Localization')
+
 ---@class SearchCategory
 ---@field query string The search query for the category.
 
@@ -81,6 +84,9 @@ function categories:OnEnable()
         end
         table.insert(self.itemIDToCategories[id], name)
       end
+    end
+    if self.categories[name].priority == nil then
+      self.categories[name].priority = 10
     end
     self:SaveCategoryToDisk(context:New('OnEnable'), name)
   end
@@ -148,6 +154,7 @@ function categories:CreateCategory(ctx, category)
     end
   end
   category.sortOrder = -1
+  category.priority = category.priority or 10
   category.shown = category.shown or true
   self.categories[category.name] = category
   self:SaveCategoryToDisk(ctx, category.name)
@@ -244,10 +251,21 @@ function categories:UpdateSearchCache(ctx)
     local results = search:Search(filter.searchCategory.query)
     for slotkey, match in pairs(results) do
       if match then
+        self.slotsToCategories[slotkey] = self.slotsToCategories[slotkey] or {}
         table.insert(self.slotsToCategories[slotkey], filter.name)
       end
     end
   end
+  for slotkey, _ in pairs(self.slotsToCategories) do
+    table.sort(self.slotsToCategories[slotkey], function(a, b)
+      return self.categories[a].priority < self.categories[b].priority
+    end)
+  end
+end
+
+---@return table<string, string[]>
+function categories:GetSearchCache()
+  return self.slotsToCategories
 end
 
 ---@param ctx Context
@@ -265,6 +283,8 @@ function categories:AddPermanentItemToCategory(ctx, id, name)
   assert(name ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, name))
   self.categories[name].permanentItemList[id] = true
+  self.itemIDToCategories[id] = self.itemIDToCategories[id] or {}
+  table.insert(self.itemIDToCategories[id], name)
   self.categories[name].save = true
   self:SaveCategoryToDisk(ctx, name)
 end
@@ -285,6 +305,8 @@ function categories:AddItemToCategory(ctx, id, name)
   assert(name ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, name))
   self.categories[name].itemList[id] = true
+  self.itemIDToCategories[id] = self.itemIDToCategories[id] or {}
+  table.insert(self.itemIDToCategories[id], name)
   self:SaveCategoryToDisk(ctx, name)
 end
 
@@ -434,6 +456,151 @@ function categories:ToggleCategoryShown(ctx, name)
   events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
+---@param ctx Context
+---@param data ItemData
+function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
+  if database:GetCategoryFilter(data.kind, "RecentItems") then
+    if data.internalNewItem then
+      data.categories.blizzard = {name = L:G('Recent Items'), priority = 1}
+      return
+    end
+  end
+
+  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
+  if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
+    data.categories.blizzard = {name = "Gear: " .. data.itemInfo.equipmentSets[1], priority = 1}
+    return
+  end
+
+  if data.containerInfo.quality == Enum.ItemQuality.Poor then
+    data.categories.blizzard = {name = L:G('Junk'), priority = 1}
+  end
+
+  local category = ""
+
+  if database:GetCategoryFilter(data.kind, "EquipmentLocation") and
+  data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
+  _G[data.itemInfo.itemEquipLoc] ~= nil and
+  _G[data.itemInfo.itemEquipLoc] ~= "" then
+    categories:CreateCategory(ctx, {
+      name = _G[data.itemInfo.itemEquipLoc],
+    })
+    local filter = categories:GetCategoryByName(_G[data.itemInfo.itemEquipLoc])
+    if filter.allowBlizzardItems and filter.enabled[data.kind] then
+      data.categories.blizzard = {name = filter.name, priority = filter.priority}
+    end
+  end
+  -- Add the type filter to the category if enabled, but not to trade goods
+  -- when the tradeskill filter is enabled. This makes it so trade goods are
+  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
+  if database:GetCategoryFilter(data.kind, "Type") and not
+  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
+  data.itemInfo.itemType then
+    category = category .. data.itemInfo.itemType --[[@as string]]
+  end
+
+  -- Add the subtype filter to the category if enabled, but same as with
+  -- the type filter we don't add it to trade goods when the tradeskill
+  -- filter is enabled.
+  if database:GetCategoryFilter(data.kind, "Subtype") and not
+  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
+  data.itemInfo.itemSubType then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. data.itemInfo.itemSubType
+  end
+
+  -- Add the tradeskill filter to the category if enabled.
+  if data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill") then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.TRADESKILL_MAP[data.itemInfo.subclassID]
+  end
+
+  -- Add the expansion filter to the category if enabled.
+  if database:GetCategoryFilter(data.kind, "Expansion") and data.itemInfo.expacID ~= nil then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.EXPANSION_MAP[data.itemInfo.expacID] --[[@as string]]
+  end
+
+  if category == "" then
+    category = L:G('Everything')
+  end
+
+  categories:CreateCategory(ctx, {
+    name = category,
+  })
+
+  local filter = categories:GetCategoryByName(category)
+  if filter.allowBlizzardItems and filter.enabled[data.kind] then
+    data.categories.blizzard = {name = filter.name, priority = filter.priority}
+    return
+  end
+
+  filter = categories:GetCategoryByName(L:G('Everything'))
+  data.categories.blizzard = {name = filter.name, priority = filter.priority}
+end
+
+---@param ctx Context
+---@param data ItemData
+function categories:CalculateAndUpdateManualCategory(ctx, data)
+  local category = self:GetCustomCategory(ctx, data.kind, data)
+  if category then
+    local filter = self.categories[category]
+    if category then
+      data.categories.manual = {name = category, priority = filter.priority}
+    end
+  end
+end
+
+---@param ctx Context
+---@param data ItemData
+function categories:CalculateAndUpdateSearchCategory(ctx, data)
+  local slotkey = data.slotkey
+  if self.slotsToCategories[slotkey] and #self.slotsToCategories[slotkey] > 0 then
+    local filter = self.categories[self.slotsToCategories[slotkey][1]]
+    data.categories.search = {name = filter.name, priority = filter.priority}
+  end
+end
+
+---@param ctx Context
+---@param data ItemData
+function categories:CalculateAndUpdateCategoriesForItem(ctx, data)
+  data.categories = {}
+  if data.isItemEmpty then
+    data.categories.blizzard = {name = L:G('Empty Slot'), priority = 1}
+    return
+  end
+  self:CalculateAndUpdateBlizzardCategory(ctx, data)
+  self:CalculateAndUpdateManualCategory(ctx, data)
+  self:CalculateAndUpdateSearchCategory(ctx, data)
+end
+
+---@param ctx Context
+---@param data ItemData
+---@return string
+function categories:GetBestCategoryForItem(ctx, data)
+  ---@type {name: string, priority: number}[]
+  local allCategories = {}
+  if data.categories.blizzard then
+    table.insert(allCategories, data.categories.blizzard)
+  end
+  if data.categories.manual then
+    table.insert(allCategories, data.categories.manual)
+  end
+  if data.categories.search then
+    table.insert(allCategories, data.categories.search)
+  end
+  table.sort(allCategories, function(a, b)
+    return a.priority < b.priority
+  end)
+  return allCategories[1].name
+end
+
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
 -- This will JIT call all registered functions the first time an item is seen, returning
 -- the custom category if one is found. If no custom category is found, nil is returned.
@@ -453,6 +620,9 @@ function categories:GetCustomCategory(ctx, kind, data)
   if not itemID then return nil end
   local filterNames = self.itemIDToCategories[itemID]
   if filterNames then
+    table.sort(filterNames, function(a, b)
+      return self.categories[a].priority < self.categories[b].priority
+    end)
     for _, name in ipairs(filterNames) do
       local filter = self.categories[name]
       if filter.enabled[kind] then
