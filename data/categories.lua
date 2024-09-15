@@ -15,6 +15,9 @@ local debug = addon:GetModule('Debug')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Search: AceModule
+local search = addon:GetModule('Search')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -43,11 +46,13 @@ local context = addon:GetModule('Context')
 ---@field private categoryCount number
 ---@field private categories table<string, CustomCategoryFilter>
 ---@field private itemIDToCategories table<number, string[]>
+---@field private slotsToCategories table<string, string[]>
 local categories = addon:NewModule('Categories')
 
 function categories:OnInitialize()
   self.categories = {}
   self.itemIDToCategories = {}
+  self.slotsToCategories = {}
   self.categoryFunctions = {}
   self.itemsWithNoCategory = {}
   self.categoryCount = 0
@@ -190,6 +195,38 @@ function categories:GetCategoryBySortThenAlphaOrder()
   return list
 end
 
+---@param name string
+---@return CustomCategoryFilter
+function categories:GetCategoryByName(name)
+  return self.categories[name]
+end
+
+---@return table<string, CustomCategoryFilter>
+function categories:GetAllCategoriesWithSearch()
+  ---@type table<string, CustomCategoryFilter>
+  local results = {}
+  for name, category in pairs(self.categories) do
+    if category.searchCategory then
+      results[name] = category
+    end
+  end
+  return results
+end
+
+-- Returns a reverse sorted list of search categories, by priority.
+---@return CustomCategoryFilter[]
+function categories:GetSortedSearchCategories()
+  ---@type CustomCategoryFilter[]
+  local results = {}
+  for _, searchCategory in pairs(self:GetAllCategoriesWithSearch()) do
+    table.insert(results, searchCategory)
+  end
+  table.sort(results, function(a, b)
+    return a.priority > b.priority
+  end)
+  return results
+end
+
 -- SaveCategoryToDisk saves a custom category to disk.
 ---@param ctx Context
 ---@param name string
@@ -198,6 +235,18 @@ function categories:SaveCategoryToDisk(ctx, name)
   local category = self.categories[name]
   if category then
     database:CreateOrUpdateCategory(category)
+  end
+end
+
+function categories:UpdateSearchCache(ctx)
+  wipe(self.slotsToCategories)
+  for _, filter in pairs(self:GetAllCategoriesWithSearch()) do
+    local results = search:Search(filter.searchCategory.query)
+    for slotkey, match in pairs(results) do
+      if match then
+        table.insert(self.slotsToCategories[slotkey], filter.name)
+      end
+    end
   end
 end
 
@@ -314,38 +363,6 @@ end
 ---@return boolean
 function categories:DoesCategoryExist(name)
   return self.categories[name] ~= nil
-end
-
----@param name string
----@return CustomCategoryFilter
-function categories:GetCategoryByName(name)
-  return self.categories[name]
-end
-
----@return table<string, CustomCategoryFilter>
-function categories:GetAllCategoriesWithSearch()
-  ---@type table<string, CustomCategoryFilter>
-  local results = {}
-  for name, category in pairs(self.categories) do
-    if category.searchCategory then
-      results[name] = category
-    end
-  end
-  return results
-end
-
--- Returns a reverse sorted list of search categories, by priority.
----@return CustomCategoryFilter[]
-function categories:GetSortedSearchCategories()
-  ---@type CustomCategoryFilter[]
-  local results = {}
-  for _, searchCategory in pairs(self:GetAllCategoriesWithSearch()) do
-    table.insert(results, searchCategory)
-  end
-  table.sort(results, function(a, b)
-    return a.priority > b.priority
-  end)
-  return results
 end
 
 ---@param ctx Context
