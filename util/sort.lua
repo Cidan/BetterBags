@@ -12,6 +12,9 @@ local const = addon:GetModule('Constants')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class Sort: AceModule
 local sort = addon:NewModule('Sort')
 
@@ -81,12 +84,15 @@ end
 function sort.SortSectionsByPriority(kind, a, b)
   if not a or not b then return false, false end
   local aTitle, bTitle = a.title:GetText(), b.title:GetText()
-  local pinnedItems = database:GetCustomSectionSort(kind)
-  if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end
-  if pinnedItems[aTitle] and not pinnedItems[bTitle] then return true, true end
-  if not pinnedItems[aTitle] and pinnedItems[bTitle] then return true, false end
+  local aCategory, bCategory = categories:GetCategoryByName(aTitle), categories:GetCategoryByName(bTitle)
+  if not aCategory and not bCategory then return false, false end
+  if aCategory and not bCategory then return true, true end
+  if not aCategory and bCategory then return true, false end
+  if aCategory.sortOrder == -1 and bCategory.sortOrder == -1 then return false, false end
+  if aCategory.sortOrder == -1 and bCategory.sortOrder ~= -1 then return true, false end
+  if aCategory.sortOrder ~= -1 and bCategory.sortOrder == -1 then return true, true end
 
-  return true, pinnedItems[aTitle] < pinnedItems[bTitle]
+  return true, aCategory.sortOrder < bCategory.sortOrder
 end
 
 ---@param kind BagKind
