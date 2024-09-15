@@ -479,26 +479,6 @@ function sectionConfig:Create(kind, parent)
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()
     sc:LoadAllItems()
-    -----@type string[]
-    --local names = {}
-    --local bag = kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank
-    --for sName in pairs(categories:GetAllCategories()) do
-    --  table.insert(names, sName)
-    --end
-    --table.sort(names)
-    --for _, sName in ipairs(names) do
-    --  sc:AddSection(sName)
-    --end
-    --for index, elementData in sc.content.provider:EnumerateEntireRange() do
-    --  if not elementData.header and not bag.currentView.sections[elementData.title] then
-    --    sc.content:RemoveAtIndex(index)
-    --  end
-    --  local filter = categories:GetCategoryByName(elementData.title)
-    --  if filter and filter.searchCategory then
-    --    sc.content:RemoveAtIndex(index)
-    --    sc.content:AddAtIndex(elementData, index)
-    --  end
-    --end
     if sc.itemList:IsShown() then
       sc.itemList:Redraw()
     end
