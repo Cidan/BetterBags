@@ -66,6 +66,9 @@ function categories:OnEnable()
     if self.categories[name].sortOrder == nil then
       self.categories[name].sortOrder = -1
     end
+    if self.categories[name].shown == nil then
+      self.categories[name].shown = true
+    end
     self:SaveCategoryToDisk(context:New('OnEnable'), name)
   end
 end
