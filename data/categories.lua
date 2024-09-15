@@ -113,6 +113,8 @@ function categories:CreateCategory(ctx, category)
     return
   end
 
+  assert(not category.sortOrder, "sortOrder is not allowed when creating a category, as it is an internal field.")
+
   category.enabled = category.enabled or {
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
