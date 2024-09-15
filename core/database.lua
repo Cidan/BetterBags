@@ -235,9 +235,6 @@ end
 
 ---@return table<string, CustomCategoryFilter>
 function DB:GetAllItemCategories()
-  for category, _ in pairs(DB.data.profile.customCategoryFilters) do
-    DB.data.profile.customCategoryFilters[category].name = category
-  end
   return DB.data.profile.customCategoryFilters
 end
 

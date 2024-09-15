@@ -251,7 +251,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         func = function()
           question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", elementData.title), function()
             self.content.provider:Remove(elementData)
-            self:UpdatePinnedItems()
+            self:UpdatePinnedItems(ctx)
             if self.itemList:IsShown() and self.itemList:IsCategory(elementData.title) then
               self.itemList:Hide(function()
                 local ectx = context:New('SectionConfigFrame_DeleteCategory')
@@ -290,7 +290,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       end
       if IsShiftKeyDown() then
         self.content.provider:MoveElementDataToIndex(elementData, 2)
-        self:UpdatePinnedItems()
+        self:UpdatePinnedItems(ctx)
       else
         if categories:IsCategoryEnabled(self.kind, elementData.title) then
           categories:DisableCategory(ctx, self.kind, elementData.title)
@@ -357,30 +357,40 @@ function sectionConfigFrame:IsShown()
   return self.frame:IsShown()
 end
 
-function sectionConfigFrame:UpdatePinnedItems()
+---@param ctx Context
+function sectionConfigFrame:UpdatePinnedItems(ctx)
   local itemList = self.content:GetAllItems()
-  database:ClearCustomSectionSort(self.kind)
-  local index, elementData = next(itemList)
-  repeat
-    if elementData.title ~= "Pinned" and not elementData.header then
-      database:SetCustomSectionSort(self.kind, elementData.title, index - 1)
+  local passedPinned = false
+  local passedAutomaticallySorted = false
+  for i, elementData in ipairs(itemList) do
+    if elementData.title == "Pinned" and elementData.header == true then
+      passedPinned = true
     end
-    index, elementData = next(itemList, index)
-  until elementData.title == "Automatically Sorted" and elementData.header
+    if elementData.title == "Automatically Sorted" and elementData.header == true then
+      passedAutomaticallySorted = true
+    end
+
+    if not elementData.header then
+      local category = categories:GetCategoryByName(elementData.title)
+      local position = -1
+      if passedPinned and not passedAutomaticallySorted then
+        position = i - 1
+      end
+      category.sortOrder = position
+      categories:SaveCategoryToDisk(ctx, category.name)
+    end
+  end
 end
 
-function sectionConfigFrame:LoadPinnedItems()
-  local pinnedList = database:GetCustomSectionSort(self.kind)
-  ---@type SectionConfigElement[]
-  local sortedList = {}
-  for title, index in pairs(pinnedList) do
-    table.insert(sortedList, { title = title, index = index })
-  end
-  table.sort(sortedList, function(a, b)
-    return a.index < b.index
-  end)
-  for _, element in ipairs(sortedList) do
-    self.content.provider:Insert({title = element.title})
+function sectionConfigFrame:LoadAllItems()
+  self:Wipe()
+  local sortedList = categories:GetCategoryBySortThenAlphaOrder()
+  self.content:AddToStart({ title = "Pinned", header = true })
+  for _, v in ipairs(sortedList) do
+    if v.sortOrder == -1 and not self.content:HasItem({ title = "Automatically Sorted", header = true }) then
+      self.content:AddToStart({ title = "Automatically Sorted", header = true })
+    end
+    self.content:AddToStart({ title = v.name })
   end
 end
 
@@ -438,7 +448,7 @@ function sectionConfig:Create(kind, parent)
 
     sc.content.dragBehavior:SetFinalizeDrop(function(_)
       local ctx = context:New('SectionConfigFrame_FinalizeDrop')
-      sc:UpdatePinnedItems()
+      sc:UpdatePinnedItems(ctx)
       events:SendMessage(ctx, 'bags/FullRefreshAll')
     end)
 
@@ -460,19 +470,20 @@ function sectionConfig:Create(kind, parent)
         sc.content.provider:InsertAtIndex(elementData, 2)
       end
 
-      sc:UpdatePinnedItems()
+      sc:UpdatePinnedItems(ctx)
       events:SendMessage(ctx, 'bags/FullRefreshAll')
     end)
   end
-  sc.content:AddToStart({ title = "Pinned", header = true })
-  sc:LoadPinnedItems()
-  sc.content:AddToStart({ title = "Automatically Sorted", header = true })
+  --sc.content:AddToStart({ title = "Pinned", header = true })
+  --sc:LoadPinnedItems()
+  --sc.content:AddToStart({ title = "Automatically Sorted", header = true })
 
   -- Create the pop out item list.
   sc.itemList = sectionItemList:Create(sc.frame)
 
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()
+    sc:LoadAllItems()
     -----@type string[]
     --local names = {}
     --local bag = kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank
@@ -493,9 +504,9 @@ function sectionConfig:Create(kind, parent)
     --    sc.content:AddAtIndex(elementData, index)
     --  end
     --end
-    --if sc.itemList:IsShown() then
-    --  sc.itemList:Redraw()
-    --end
+    if sc.itemList:IsShown() then
+      sc.itemList:Redraw()
+    end
   end)
 
   return sc

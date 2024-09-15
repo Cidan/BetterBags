@@ -35,6 +35,7 @@ local context = addon:GetModule('Context')
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 ---@field shown? boolean If true, this category is shown in the UI.
 ---@field allowBlizzardItems? boolean If true, this category will allow Blizzard items to be added to it.
+---@field sortOrder? number The sort order of the category. No value means it will be sorted via the section sort option.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -61,8 +62,11 @@ function categories:OnEnable()
     -- In-line migration for allowBlizzardItems.
     if self.categories[name].allowBlizzardItems == nil then
       self.categories[name].allowBlizzardItems = true
-      self:SaveCategoryToDisk(context:New('OnEnable'), name)
     end
+    if self.categories[name].sortOrder == nil then
+      self.categories[name].sortOrder = -1
+    end
+    self:SaveCategoryToDisk(context:New('OnEnable'), name)
   end
 end
 
@@ -87,8 +91,33 @@ function categories:NewBlankCategory(name)
     dynamic = false,
     shown = true,
     allowBlizzardItems = true,
+    sortOrder = -1,
   }
   return category
+end
+
+---@param ctx Context
+---@param category CustomCategoryFilter
+function categories:CreateCategory(ctx, category)
+  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
+  -- To be removed eventually.
+  if type(ctx) == "table" and not ctx.Event then
+    category = ctx --[[@as CustomCategoryFilter]]
+    ctx = context:New('CreateCategory')
+  end
+
+  if self.categories[category.name] then
+    return
+  end
+
+  category.enabled = category.enabled or {
+    [const.BAG_KIND.BACKPACK] = true,
+    [const.BAG_KIND.BANK] = true,
+  }
+
+  self.categories[category.name] = category
+  self:SaveCategoryToDisk(ctx, category.name)
+  events:SendMessage(ctx, 'categories/Changed')
 end
 
 ---@return number
@@ -111,6 +140,25 @@ end
 ---@return CustomCategoryFilter?
 function categories:GetMergedCategory(name)
   return self.categories[name]
+end
+
+---@return CustomCategoryFilter[]
+function categories:GetCategoryBySortThenAlphaOrder()
+  ---@type CustomCategoryFilter[]
+  local list = {}
+  for _, category in pairs(self.categories) do
+    table.insert(list, category)
+  end
+  table.sort(list, function(a, b)
+    if a.sortOrder == b.sortOrder then
+      return a.name < b.name
+    end
+    if a.sortOrder > 0 and b.sortOrder > 0 then
+      return a.sortOrder < b.sortOrder
+    end
+    return a.sortOrder > b.sortOrder
+  end)
+  return list
 end
 
 -- SaveCategoryToDisk saves a custom category to disk.
@@ -237,31 +285,6 @@ end
 ---@return boolean
 function categories:DoesCategoryExist(name)
   return self.categories[name] ~= nil
-end
-
-
----@param ctx Context
----@param category CustomCategoryFilter
-function categories:CreateCategory(ctx, category)
-  -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
-  -- To be removed eventually.
-  if type(ctx) == "table" and not ctx.Event then
-    category = ctx --[[@as CustomCategoryFilter]]
-    ctx = context:New('CreateCategory')
-  end
-
-  if self.categories[category.name] then
-    return
-  end
-
-  category.enabled = category.enabled or {
-    [const.BAG_KIND.BACKPACK] = true,
-    [const.BAG_KIND.BANK] = true,
-  }
-
-  self.categories[category.name] = category
-  self:SaveCategoryToDisk(ctx, category.name)
-  events:SendMessage(ctx, 'categories/Changed')
 end
 
 ---@param name string
