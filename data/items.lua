@@ -1049,7 +1049,7 @@ function items:GetCategory(ctx, data)
       name = _G[data.itemInfo.itemEquipLoc],
     })
     local filter = categories:GetCategoryByName(_G[data.itemInfo.itemEquipLoc])
-    if filter.allowBlizzardItems then
+    if filter.allowBlizzardItems and filter.enabled[data.kind] then
       return filter.name
     end
   end
@@ -1102,7 +1102,7 @@ function items:GetCategory(ctx, data)
     name = category,
   })
   local filter = categories:GetCategoryByName(category)
-  if filter.allowBlizzardItems then
+  if filter.allowBlizzardItems and filter.enabled[data.kind] then
     return filter.name
   end
 

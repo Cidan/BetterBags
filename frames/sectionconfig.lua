@@ -150,13 +150,8 @@ function sectionConfigFrame:initSectionItem(button, elementData)
       end
     end)
     button.Expand:Show()
-    if not categories:DoesCategoryExist(elementData.title) then
-      button.Expand:Disable()
-      button.Expand:GetNormalTexture():SetDesaturated(true)
-    else
-      button.Expand:Enable()
-      button.Expand:GetNormalTexture():SetDesaturated(false)
-    end
+    button.Expand:Enable()
+    button.Expand:GetNormalTexture():SetDesaturated(false)
 
     if categories:IsCategoryShown(elementData.title) then
       local filter = categories:GetCategoryByName(elementData.title)
