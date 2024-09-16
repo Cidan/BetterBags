@@ -67,10 +67,14 @@ local debug = addon:GetModule('Debug')
 ---@field itemModifiedAppearanceID number
 ---@field hasTransmog boolean
 
+---@class (exact) CategoryInfoData
+---@field name string
+---@field priority number
+
 ---@class (exact) CategoryInfo
----@field blizzard? {name: string, priority: number}
----@field manual? {name: string, priority: number}
----@field search? {name: string, priority: number}
+---@field blizzard? CategoryInfoData
+---@field manual? CategoryInfoData
+---@field search? CategoryInfoData
 
 -- ExpandedItemInfo is the information about an item that is returned by GetItemInfo.
 ---@class (exact) ExpandedItemInfo
@@ -101,7 +105,6 @@ local debug = addon:GetModule('Debug')
 ---@field isLocked boolean
 ---@field isNewItem boolean
 ---@field currentItemCount number
----@field category string
 ---@field currentItemLevel number
 ---@field equipmentSets string[]|nil
 
@@ -588,7 +591,7 @@ function items:ItemChanged(newData, oldData)
   end
 
   -- Item is no longer in the recent items category.
-  if oldData and oldData.itemInfo and oldData.itemInfo.category == L:G("Recent Items") and not self:IsNewItem(oldData) then
+  if oldData and oldData.categories and oldData.categories.blizzard and oldData.categories.blizzard.name == L:G("Recent Items") and not self:IsNewItem(oldData) then
     return true
   end
 
@@ -724,6 +727,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
         self:MarkItemAsNew(ctx, currentItem)
       end
+      categories:CalculateAndUpdateBlizzardCategory(ctx, currentItem)
+      categories:CalculateAndUpdateManualCategory(ctx, currentItem)
       search:Add(currentItem)
     elseif items:ItemRemoved(currentItem, previousItem) then
       debug:Log("ItemRemoved", previousItem.itemInfo.itemLink)
@@ -733,6 +738,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       debug:Log("ItemHashChanged", currentItem.itemInfo.itemLink)
       slotInfo:AddToRemovedItems(previousItem)
       slotInfo:AddToAddedItems(currentItem)
+      categories:CalculateAndUpdateBlizzardCategory(ctx, currentItem)
+      categories:CalculateAndUpdateManualCategory(ctx, currentItem)
       search:Remove(previousItem)
       search:Add(currentItem)
       if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and currentItem.itemInfo.itemID ~= previousItem.itemInfo.itemID then
@@ -742,6 +749,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       debug:Log("ItemGUIDChanged", currentItem.itemInfo.itemLink)
       slotInfo:AddToRemovedItems(previousItem)
       slotInfo:AddToAddedItems(currentItem)
+      categories:CalculateAndUpdateBlizzardCategory(ctx, currentItem)
+      categories:CalculateAndUpdateManualCategory(ctx, currentItem)
       search:Remove(previousItem)
       search:Add(currentItem)
     elseif items:ItemChanged(currentItem, previousItem) then
@@ -754,6 +763,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
         debug:Log("ItemChanged", "Bugged item detected during loading, skipping.")
       else
         slotInfo:AddToUpdatedItems(previousItem, currentItem)
+        categories:CalculateAndUpdateBlizzardCategory(ctx, currentItem)
+        categories:CalculateAndUpdateManualCategory(ctx, currentItem)
         search:Remove(currentItem)
         search:Add(currentItem)
       end
@@ -765,9 +776,9 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     if not currentItem.isItemEmpty then
       slotInfo.totalItems = slotInfo.totalItems + 1
     end
-    local oldCategory = currentItem.itemInfo.category
-    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
-    search:UpdateCategoryIndex(currentItem, oldCategory)
+    --local oldCategory = currentItem.itemInfo.category
+    --currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
+    --search:UpdateCategoryIndex(currentItem, oldCategory)
   end
 
   slotInfo:SortEmptySlots()
@@ -788,11 +799,12 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     categories:UpdateSearchCache(ctx)
 
     -- Refresh the search cache.
-    self:RefreshSearchCache(kind)
+    --self:RefreshSearchCache(kind)
 
     -- Get the categories for each item.
     for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
-      categories:CalculateAndUpdateCategoriesForItem(ctx, currentItem)
+      categories:CalculateAndUpdateSearchCategory(ctx, currentItem)
+      search:UpdateSearchCategory(ctx, currentItem)
       --local newCategory = self:GetSearchCategory(kind, currentItem.slotkey)
       --if newCategory then
       --  local oldCategory = currentItem.itemInfo.category
@@ -914,7 +926,7 @@ function items:ClearNewItem(ctx, slotkey)
   C_NewItems.RemoveNewItem(data.bagid, data.slotid)
   data.itemInfo.isNewItem = false
   self._newItemTimers[data.itemInfo.itemGUID] = nil
-  data.itemInfo.category = self:GetCategory(ctx, data)
+  --data.itemInfo.category = self:GetCategory(ctx, data)
 end
 
 function items:ClearNewItems()
@@ -928,7 +940,7 @@ function items:MarkItemAsNew(ctx, data)
   if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()
     data.itemInfo.isNewItem = true
-    data.itemInfo.category = self:GetCategory(ctx, data)
+    --data.itemInfo.category = self:GetCategory(ctx, data)
   end
 end
 
@@ -1047,109 +1059,6 @@ function items:GenerateItemHash(data)
     stackOpts.dontMergeTransmog and data.transmogInfo.transmogInfoMixin and data.transmogInfo.transmogInfoMixin.appearanceID or 0
   )
   return hash
-end
-
----@param ctx Context
----@param data ItemData
----@return string
-function items:GetCategory(ctx, data)
-  if not data or data.isItemEmpty then return L:G('Empty Slot') end
-
-  if database:GetCategoryFilter(data.kind, "RecentItems") then
-    if items:IsNewItem(data) then
-      return L:G("Recent Items")
-    end
-  end
-
-  -- Search categories come before all.
-  if self.searchCache[data.kind][data.slotkey] ~= nil then
-    return self.searchCache[data.kind][data.slotkey]
-  end
-
-  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
-  if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
-    return "Gear: " .. data.itemInfo.equipmentSets[1] -- Always use the first set, for now.
-  end
-
-  -- Return the custom category if it exists next.
-  local customCategory = categories:GetCustomCategory(ctx, data.kind, data)
-  if customCategory then
-    return customCategory
-  end
-
-  if not data.kind then return L:G('Everything') end
-
-  if data.containerInfo.quality == Enum.ItemQuality.Poor then
-    return L:G('Junk')
-  end
-
-  -- Item Equipment location takes precedence filters below and does not bisect.
-  if database:GetCategoryFilter(data.kind, "EquipmentLocation") and
-  data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
-  _G[data.itemInfo.itemEquipLoc] ~= nil and
-  _G[data.itemInfo.itemEquipLoc] ~= "" then
-    categories:CreateCategory(ctx, {
-      name = _G[data.itemInfo.itemEquipLoc],
-    })
-    local filter = categories:GetCategoryByName(_G[data.itemInfo.itemEquipLoc])
-    if filter.allowBlizzardItems and filter.enabled[data.kind] then
-      return filter.name
-    end
-  end
-
-  local category = ""
-
-  -- Add the type filter to the category if enabled, but not to trade goods
-  -- when the tradeskill filter is enabled. This makes it so trade goods are
-  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
-  if database:GetCategoryFilter(data.kind, "Type") and not
-  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
-  data.itemInfo.itemType then
-    category = category .. data.itemInfo.itemType --[[@as string]]
-  end
-
-  -- Add the subtype filter to the category if enabled, but same as with
-  -- the type filter we don't add it to trade goods when the tradeskill
-  -- filter is enabled.
-  if database:GetCategoryFilter(data.kind, "Subtype") and not
-  (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill")) and
-  data.itemInfo.itemSubType then
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. data.itemInfo.itemSubType
-  end
-
-  -- Add the tradeskill filter to the category if enabled.
-  if data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill") then
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. const.TRADESKILL_MAP[data.itemInfo.subclassID]
-  end
-
-  -- Add the expansion filter to the category if enabled.
-  if database:GetCategoryFilter(data.kind, "Expansion") then
-    if not data.itemInfo.expacID then return L:G('Unknown') end
-    if category ~= "" then
-      category = category .. " - "
-    end
-    category = category .. const.EXPANSION_MAP[data.itemInfo.expacID] --[[@as string]]
-  end
-
-  if category == "" then
-    category = L:G('Everything')
-  end
-
-  categories:CreateCategory(ctx, {
-    name = category,
-  })
-  local filter = categories:GetCategoryByName(category)
-  if filter.allowBlizzardItems and filter.enabled[data.kind] then
-    return filter.name
-  end
-
-  return L:G('Everything')
 end
 
 ---@param itemLink string
@@ -1319,6 +1228,7 @@ function items:AttachItemInfo(data, kind)
   data.forceClear = false
   data.stacks = 0
   data.stackedCount = data.itemInfo.currentItemCount
+  data.categories = {}
   data.internalNewItem = self:IsNewItem(data)
   return data
 end

@@ -171,11 +171,27 @@ function search:removeStringFromIndex(index, value, slotkey)
 end
 
 ---@param item ItemData
----@param oldCategory string
-function search:UpdateCategoryIndex(item, oldCategory)
-  if item == nil or item.isItemEmpty or item.itemInfo.category == nil then return end
-  search:removeStringFromIndex(self.indicies.category, oldCategory, item.slotkey)
-  search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+---@param oldCategories string[]
+function search:UpdateCategoryIndex(item, oldCategories)
+  if item == nil or item.isItemEmpty then return end
+  for _, oldCategory in ipairs(oldCategories) do
+    search:removeStringFromIndex(self.indicies.category, oldCategory, item.slotkey)
+  end
+  if item.categories.blizzard then
+    search:addStringToIndex(self.indicies.category, item.categories.blizzard.name, item.slotkey)
+  end
+  if item.categories.manual then
+    search:addStringToIndex(self.indicies.category, item.categories.manual.name, item.slotkey)
+  end
+end
+
+---@param ctx Context
+---@param item ItemData
+function search:UpdateSearchCategory(ctx, item)
+  if item == nil or item.isItemEmpty then return end
+  if item.categories.search then
+    search:addStringToIndex(self.indicies.category, item.categories.search.name, item.slotkey)
+  end
 end
 
 ---@param item ItemData
@@ -184,7 +200,14 @@ function search:Add(item)
   search:addStringToIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:addStringToIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
-  search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+
+  if item.categories.blizzard then
+    search:addStringToIndex(self.indicies.category, item.categories.blizzard.name, item.slotkey)
+  end
+  if item.categories.manual then
+    search:addStringToIndex(self.indicies.category, item.categories.manual.name, item.slotkey)
+  end
+
   search:addStringToIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
   --search:addStringToIndex(self.indicies.bagName, item.bagName, item.slotkey)
 
@@ -235,7 +258,12 @@ function search:Remove(item)
   search:removeStringFromIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
-  search:removeStringFromIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
+  if item.categories.blizzard then
+    search:removeStringFromIndex(self.indicies.category, item.categories.blizzard.name, item.slotkey)
+  end
+  if item.categories.manual then
+    search:removeStringFromIndex(self.indicies.category, item.categories.manual.name, item.slotkey)
+  end
   search:removeStringFromIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
   --search:removeStringFromIndex(self.indicies.bagName, item.bagName, item.slotkey)
 

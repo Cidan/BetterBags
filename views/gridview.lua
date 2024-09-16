@@ -105,7 +105,7 @@ local function CreateButton(ctx, view, slotkey)
   if oldSection then
     oldSection:RemoveCell(slotkey)
   end
-  local category = items:GetCategory(ctx, item)
+  local category = categories:GetBestCategoryForItem(ctx, item)
   local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
   itemButton:SetItem(ctx, slotkey)
   local section = view:GetOrCreateSection(ctx, category)
