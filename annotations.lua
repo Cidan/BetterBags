@@ -343,39 +343,6 @@ local EventFrame = {}
 ---@return boolean, boolean, boolean, boolean, number, number
 function EquipmentManager_UnpackLocation(location) end
 
--- ItemInfo is the information about an item that is returned by GetItemInfo.
----@class (exact) ExpandedItemInfo
----@field itemID number
----@field itemGUID string
----@field itemName string
----@field itemLink string
----@field itemQuality Enum.ItemQuality
----@field itemLevel number
----@field itemMinLevel number
----@field itemType string
----@field itemSubType string
----@field itemStackCount number
----@field itemEquipLoc string
----@field itemTexture number
----@field sellPrice number
----@field classID Enum.ItemClass
----@field subclassID number
----@field bindType Enum.ItemBind
----@field expacID ExpansionType
----@field setID number
----@field isCraftingReagent boolean
----@field effectiveIlvl number
----@field isPreview boolean
----@field baseIlvl number
----@field itemIcon? number
----@field isBound boolean
----@field isLocked boolean
----@field isNewItem boolean
----@field currentItemCount number
----@field category string
----@field currentItemLevel number
----@field equipmentSets string[]|nil
-
 ---@return Frame
 function CreateScrollBoxLinearView() end
 
