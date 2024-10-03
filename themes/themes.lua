@@ -244,6 +244,7 @@ end
 
 function themes:UpdateOpacity()
   local theme = self.themes[db:GetTheme()]
+  if not theme then return end
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
     local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
     theme.Opacity(frame, sizeInfo.opacity)
