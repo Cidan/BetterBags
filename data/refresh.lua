@@ -154,7 +154,7 @@ function refresh:StartUpdate(ctx)
     items:RefreshBackpack(ctx)
   else
     self.isUpdateRunning = false
-    ctx:Cancel()
+    -- ctx:Cancel()
   end
 
 end
@@ -257,7 +257,7 @@ function refresh:OnEnable()
     if next(self.UpdateQueue) ~= nil then
       self:StartUpdate(ctx)
     else
-      ctx:Cancel()
+      -- ctx:Cancel()
     end
   end)
 

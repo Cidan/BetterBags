@@ -482,11 +482,13 @@ function stackedLayout:addDropdownClassic(opts)
    end
   end)
 
-  for _, item in ipairs(opts.items) do
-    local ctx = context:New('Dropdown_Load')
-    if opts.getValue(ctx, item) then
-      UIDropDownMenu_SetText(container.classicDropdown, item)
-      break
+  if opts.items ~= nil then
+    for _, item in ipairs(opts.items) do
+      local ctx = context:New('Dropdown_Load')
+      if opts.getValue(ctx, item) then
+        UIDropDownMenu_SetText(container.classicDropdown, item)
+        break
+      end
     end
   end
 
