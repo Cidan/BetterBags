@@ -371,11 +371,23 @@ function stackedLayout:AddCheckbox(opts)
   container.title:SetPoint("LEFT", container.checkbox, "RIGHT", 5, 0)
   container.title:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
-  container.description:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+  if opts.tooltipDescription then
+    container:SetScript("OnEnter", function()
+      GameTooltip:SetOwner(container, "ANCHOR_TOPLEFT")
+      GameTooltip:SetText(opts.description)
+      GameTooltip:Show()
+    end)
+    container:SetScript("OnLeave", function()
+      GameTooltip:Hide()
+    end)
+    container:SetHeight(container.title:GetLineHeight() + 20)
+  else
+    container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+    container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+    container.description:SetPoint("RIGHT", container, "RIGHT", 0, 0)
+    container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
+  end
 
-  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
   self.checkboxes[container] = opts

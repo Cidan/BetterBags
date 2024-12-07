@@ -70,20 +70,24 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormSectionOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 
 ---@class (exact) FormSubSectionOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 
 ---@class (exact) FormCheckboxOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 ---@field getValue fun(ctx: Context): boolean
 ---@field setValue fun(ctx: Context, value: boolean)
 
 ---@class (exact) FormDropdownOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 ---@field items? string[]
 ---@field itemsFunction? fun(ctx: Context): string[]
 ---@field getValue fun(ctx: Context, value: string): boolean
@@ -92,6 +96,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormSliderOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 ---@field min number
 ---@field max number
 ---@field step number
@@ -104,27 +109,32 @@ local layouts = addon:NewModule('FormLayouts')
 
 ---@class (exact) FormButtonGroupOptions
 ---@field ButtonOptions FormButtonOption[]
+---@field tooltipDescription? boolean
 
 ---@class (exact) FormTextAreaOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 ---@field getValue fun(ctx: Context): string
 ---@field setValue fun(ctx: Context, value: string)
 
 ---@class (exact) FormInputBoxOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 ---@field getValue fun(ctx: Context): string
 ---@field setValue fun(ctx: Context, value: string)
 
 ---@class (exact) FormColorOptions
 ---@field title string
 ---@field description string
+---@field tooltipDescription? boolean
 ---@field getValue fun(ctx: Context): Colors
 ---@field setValue fun(ctx: Context, value: Colors)
 
 ---@class (exact) FormLabelOptions
 ---@field description string
+---@field tooltipDescription? boolean
 
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
