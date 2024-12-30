@@ -832,8 +832,7 @@ function stackedLayout:AddColor(opts)
   container:SetHeight(
     container.title:GetLineHeight() +
     container.description:GetLineHeight() +
-    container.colorPicker:GetHeight() +
-    30
+    container.colorPicker:GetHeight()
   )
 
   self.nextFrame = container

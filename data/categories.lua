@@ -120,7 +120,8 @@ end
 
 ---@param ctx Context
 ---@param category CustomCategoryFilter
-function categories:CreateCategory(ctx, category)
+---@param update? boolean If true, update the existing category.
+function categories:CreateCategory(ctx, category, update)
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
   if type(ctx) == "table" and not ctx.Event then
@@ -129,7 +130,11 @@ function categories:CreateCategory(ctx, category)
   end
 
   if self.categories[category.name] then
-    return
+    if update then
+      category.sortOrder = self.categories[category.name].sortOrder
+    else
+      return
+    end
   end
 
   category.enabled = category.enabled or {
@@ -153,7 +158,7 @@ function categories:CreateCategory(ctx, category)
       table.insert(self.itemIDToCategories[id], category.name)
     end
   end
-  category.sortOrder = -1
+  category.sortOrder = category.sortOrder or -1
   category.priority = category.priority or 10
   category.shown = category.shown or true
   self.categories[category.name] = category

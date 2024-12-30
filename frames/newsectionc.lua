@@ -18,9 +18,16 @@ local const = addon:GetModule('Constants')
 ---@class Form: AceModule
 local form = addon:GetModule('Form')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
 ---@class NewSectionC: AceModule
 ---@field form FormFrame
 ---@field currentFilter CustomCategoryFilter
+---@field openedName string
 local newSectionC = addon:NewModule('NewSectionC')
 
 function newSectionC:OnEnable()
@@ -58,7 +65,7 @@ function newSectionC:OnEnable()
 
   self.form:AddColor({
     title = 'Color',
-    description = 'The color of the section.',
+    description = 'The color of the section title as it appears in your inventory.',
     getValue = function()
       return {
         red = self.currentFilter.color[1],
@@ -104,8 +111,26 @@ function newSectionC:OnEnable()
 
   self.form:AddButtonGroup({
     ButtonOptions = {
-      { title = 'Cancel', onClick = function() end },
-      { title = 'Save', onClick = function() end },
+      { title = 'Cancel', onClick = function()
+        self.currentFilter = nil
+        self.openedName = nil
+        self.form:Hide()
+      end },
+      { title = 'Save', onClick = function(ctx)
+        categories:CreateCategory(ctx, {
+          name = self.currentFilter.name,
+          priority = self.currentFilter.priority,
+          color = self.currentFilter.color,
+          searchCategory = self.currentFilter.searchCategory,
+        }, true)
+        if self.openedName ~= self.currentFilter.name and self.openedName ~= nil and self.openedName ~= "" then
+          categories:DeleteCategory(ctx, self.openedName)
+        end
+        self.openedName = nil
+        self.currentFilter = nil
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        self.form:Hide()
+      end },
     },
     rightAlign = true
   })
@@ -120,6 +145,7 @@ function newSectionC:Open(filter, parent)
     return
   end
   self.currentFilter = CopyTable(filter)
+  self.openedName = filter.name
   self.currentFilter.color = self.currentFilter.color or {
     [1] = 1,
     [2] = 1,
