@@ -83,6 +83,7 @@ forms\layouts\twocolumn.lua
 
 forms\form.lua
 
+frames\newsectionc.lua
 frames\searchcategory.lua
 frames\question.lua
 frames\search.lua

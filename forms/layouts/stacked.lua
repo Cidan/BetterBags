@@ -244,7 +244,7 @@ function stackedLayout:createDescription(container, description, color)
     descriptionFont:SetTextColor(1, 1, 1)
   end
   descriptionFont:SetJustifyH("LEFT")
-  descriptionFont:SetText(description)
+  descriptionFont:SetText(description or '')
   descriptionFont:SetWordWrap(true)
   descriptionFont:SetNonSpaceWrap(true)
   return descriptionFont
@@ -621,14 +621,22 @@ function stackedLayout:AddButtonGroup(opts)
     local button = CreateFrame("Button", nil, container, "UIPanelButtonTemplate") --[[@as Button]]
     button:SetText(buttonData.title)
     local w = button:GetFontString():GetStringWidth()
-    button:SetSize(w + 6, 24)
+    button:SetSize(w + 32, 34)
     addon.SetScript(button, "OnClick", function(ctx)
       buttonData.onClick(ctx)
     end)
     if #container.buttons == 0 then
-      button:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+      if opts.rightAlign then
+        button:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
+      else
+        button:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+      end
     else
-      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", -10, 0)
+      if opts.rightAlign then
+        button:SetPoint("TOPRIGHT", container.buttons[#container.buttons], "TOPLEFT", -10, 0)
+      else
+        button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", 10, 0)
+      end
     end
     table.insert(container.buttons, button)
   end
@@ -653,8 +661,9 @@ function stackedLayout:AddTextArea(opts)
 
   local ScrollBox = CreateFrame("Frame", nil, container, "WowScrollBox") --[[@as WowScrollBox]]
   ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  ScrollBox:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -5, 5)
+  --ScrollBox:SetWidth(container:GetWidth() - 50)
   ScrollBox:SetHeight(100)
-  ScrollBox:SetWidth(container:GetWidth() - 50)
   ScrollBox:EnableMouseWheel(false)
 
   local ScrollBar = CreateFrame("EventFrame", nil, container, "MinimalScrollBar") --[[@as MinimalScrollBar]]

@@ -75,6 +75,9 @@ local views = addon:GetModule('Views')
 ---@class SearchCategoryConfig: AceModule
 local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 
+---@class NewSectionC: AceModule
+local newSectionC = addon:GetModule('NewSectionC')
+
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
@@ -261,6 +264,7 @@ function addon:OnEnable()
   searchCategoryConfig:Enable()
   async:Enable()
   form:Enable()
+  newSectionC:Enable()
 
   self:HideBlizzardBags()
   local rootctx = context:New('addon_enable')

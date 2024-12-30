@@ -110,6 +110,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormButtonGroupOptions
 ---@field ButtonOptions FormButtonOption[]
 ---@field tooltipDescription? boolean
+---@field rightAlign? boolean
 
 ---@class (exact) FormTextAreaOptions
 ---@field title string

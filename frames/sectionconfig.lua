@@ -48,6 +48,9 @@ local fonts = addon:GetModule('Fonts')
 ---@class SearchCategoryConfig: AceModule
 local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 
+---@class NewSectionC: AceModule
+local newSectionC = addon:GetModule('NewSectionC')
+
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -131,23 +134,24 @@ function sectionConfigFrame:initSectionItem(button, elementData)
     button.Category:SetFontObject(fonts.UnitFrame12White)
     button.Expand:SetScript("OnClick", function()
       local filter = categories:GetCategoryByName(elementData.title)
-      if filter.searchCategory then
-        if self.itemList:IsShown() then
-          self.itemList:Hide(function()
-            searchCategoryConfig:Open(filter, self.frame)
-          end)
-        else
-          searchCategoryConfig:Open(filter, self.frame)
-        end
-      else
-        if searchCategoryConfig:IsShown() then
-          searchCategoryConfig:Close(function()
-            self.itemList:ShowCategory(elementData.title)
-          end)
-        else
-          self.itemList:ShowCategory(elementData.title)
-        end
-      end
+      newSectionC:Open(filter, self.frame)
+      --if filter.searchCategory then
+      --  if self.itemList:IsShown() then
+      --    self.itemList:Hide(function()
+      --      searchCategoryConfig:Open(filter, self.frame)
+      --    end)
+      --  else
+      --    searchCategoryConfig:Open(filter, self.frame)
+      --  end
+      --else
+      --  if searchCategoryConfig:IsShown() then
+      --    searchCategoryConfig:Close(function()
+      --      self.itemList:ShowCategory(elementData.title)
+      --    end)
+      --  else
+      --    self.itemList:ShowCategory(elementData.title)
+      --  end
+      --end
     end)
     button.Expand:Show()
     button.Expand:Enable()

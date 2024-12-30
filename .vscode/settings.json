@@ -181,5 +181,6 @@
     "codestyle": "Information"
   },
   "Lua.runtime.version": "Lua 5.1",
-  "stylua.targetReleaseVersion": "latest"
+  "stylua.targetReleaseVersion": "latest",
+  "Lua.diagnostics.workspaceDelay": -1
 }
