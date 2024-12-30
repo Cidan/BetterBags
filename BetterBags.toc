@@ -77,6 +77,7 @@ util\bucket.lua
 util\windowgroup.lua
 util\movementflow.lua
 
+forms\widgets\itemlist.lua
 forms\layouts\layout.lua
 forms\layouts\stacked.lua
 forms\layouts\twocolumn.lua

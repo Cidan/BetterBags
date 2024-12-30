@@ -60,7 +60,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormItemList: Frame
 ---@field title FontString
 ---@field description FontString
----@field list Frame
+---@field list ItemListFrame
 
 --[[
 -- Widget Options

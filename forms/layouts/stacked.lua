@@ -9,6 +9,9 @@ local debug = addon:GetModule('Debug')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class (exact) ItemList: AceModule
+local itemList = addon:GetModule('ItemList')
+
 ---@class (exact) FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
 
@@ -417,18 +420,18 @@ function stackedLayout:addDropdownRetail(opts)
   container.dropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
   ---@type string[]
-  local itemList = {}
+  local ilist = {}
 
   if opts.items then
-    itemList = opts.items --[=[@as string[]]=]
+    ilist = opts.items --[=[@as string[]]=]
   elseif opts.itemsFunction then
     local ctx = context:New('Dropdown_Items')
-    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
+    ilist = opts.itemsFunction(ctx) --[=[@as string[]]=]
   end
 
   container.dropdown:SetupMenu(function(_, root)
     root:SetScrollMode(20 * 20)
-    for _, item in ipairs(itemList) do
+    for _, item in ipairs(ilist) do
       root:CreateCheckbox(item, function(value)
         local ctx = context:New('Dropdown_Get')
         return opts.getValue(ctx, value)
@@ -472,18 +475,18 @@ function stackedLayout:addDropdownClassic(opts)
   container.classicDropdown:SetPoint("RIGHT", container, "RIGHT", 0, 0)
 
   ---@type string[]
-  local itemList = {}
+  local ilist = {}
 
   if opts.items then
-    itemList = opts.items --[=[@as string[]]=]
+    ilist = opts.items --[=[@as string[]]=]
   elseif opts.itemsFunction then
     local ctx = context:New('Dropdown_Items')
-    itemList = opts.itemsFunction(ctx) --[=[@as string[]]=]
+    ilist = opts.itemsFunction(ctx) --[=[@as string[]]=]
   end
 
    -- Create and bind the initialization function to the dropdown menu
   UIDropDownMenu_Initialize(container.classicDropdown, function(_, level, _)
-   for _, item in ipairs(itemList) do
+   for _, item in ipairs(ilist) do
     local info = UIDropDownMenu_CreateInfo()
     info.text = item
     info.checked = function()
@@ -873,6 +876,20 @@ function stackedLayout:AddItemList(opts)
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
   container:SetHeight(container.description:GetLineHeight() + 10)
+
+  container.list = itemList:Create(container)
+  container.list.frame:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  container.list.frame:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -5, 5)
+  container.list.frame:SetHeight(100)
+  container.list.frame:SetWidth(container:GetWidth() - 50)
+
+  container:SetHeight(
+    container.title:GetLineHeight() +
+    container.description:GetLineHeight() +
+    container.list.frame:GetHeight() +
+    30
+  )
+
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
   self.itemLists[container] = opts

@@ -124,7 +124,7 @@ function newSectionC:OnEnable()
 
   self.form:AddItemList({
     title = 'Items',
-    description = 'The items that will be added to this section.',
+    description = 'Drag items from the inventory to this list to add them to this section.',
     getValue = function()
       ---@type FormItemListItem[]
       local items = {}
