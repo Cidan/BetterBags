@@ -26,6 +26,7 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field textAreas table<FormTextArea, FormTextAreaOptions>
 ---@field inputBoxes table<FormInputBox, FormInputBoxOptions>
 ---@field colorPickers table<FormColor, FormColorOptions>
+---@field itemLists table<FormItemList, FormItemListOptions>
 ---@field scrollBox WowScrollBox
 ---@field height number
 ---@field index boolean
@@ -52,6 +53,7 @@ function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   l.inputBoxes = {}
   l.colorPickers = {}
   l.sections = {}
+  l.itemLists = {}
   if index then
     l:setupIndex()
   end
@@ -85,6 +87,10 @@ function stackedLayout:ReloadAllFormElements()
   for container, opts in pairs(self.colorPickers) do
     local color = opts.getValue(context:New('Color_Reload'))
     container.colorTexture:SetVertexColor(color.red, color.green, color.blue, color.alpha)
+  end
+
+  for container, opts in pairs(self.itemLists) do
+    --container.list:Refresh()
   end
 end
 
@@ -853,4 +859,21 @@ function stackedLayout:AddLabel(opts)
   container:SetHeight(container.description:GetLineHeight() + 10)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
+end
+
+---@param opts FormItemListOptions
+function stackedLayout:AddItemList(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormItemList]]
+  self:alignFrame(t, container)
+
+  container.title = self:createTitle(container, opts.title, {0.75, 0.75, 0.75})
+  container.title:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
+
+  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
+  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container:SetHeight(container.description:GetLineHeight() + 10)
+  self.nextFrame = container
+  self.height = self.height + container:GetHeight()
+  self.itemLists[container] = opts
 end

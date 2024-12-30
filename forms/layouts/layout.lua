@@ -57,6 +57,11 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormLabel: Frame
 ---@field description FontString
 
+---@class (exact) FormItemList: Frame
+---@field title FontString
+---@field description FontString
+---@field list Frame
+
 --[[
 -- Widget Options
 ]]--
@@ -137,6 +142,18 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field description string
 ---@field tooltipDescription? boolean
 
+---@class (exact) FormItemListItem
+---@field id number
+---@field category string
+
+---@class (exact) FormItemListOptions
+---@field title string
+---@field description string
+---@field tooltipDescription? boolean
+---@field items? FormItemListItem[]
+---@field getValue fun(ctx: Context): FormItemListItem[]
+---@field setValue fun(ctx: Context, value: FormItemListItem[])
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -152,3 +169,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddInputBox fun(self: FormLayout, opts: FormInputBoxOptions)
 ---@field AddColor fun(self: FormLayout, opts: FormColorOptions)
 ---@field AddLabel fun(self: FormLayout, opts: FormLabelOptions)
+---@field AddItemList fun(self: FormLayout, opts: FormItemListOptions)

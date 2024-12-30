@@ -160,6 +160,12 @@ function formFrame:AddLabel(opts)
   self:Resize()
 end
 
+---@param opts FormItemListOptions
+function formFrame:AddItemList(opts)
+  self.layout:AddItemList(opts)
+  self:Resize()
+end
+
 ---@return Frame
 function formFrame:GetFrame()
   return self.frame

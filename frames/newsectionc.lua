@@ -42,7 +42,9 @@ function newSectionC:OnEnable()
       [2] = 1,
       [3] = 1,
       [4] = 1,
-    }
+    },
+    allowBlizzardItems = false,
+    itemList = {},
   }
   self.form = form:Create({
     title = 'Section Editor',
@@ -120,6 +122,28 @@ function newSectionC:OnEnable()
     end,
   })
 
+  self.form:AddItemList({
+    title = 'Items',
+    description = 'The items that will be added to this section.',
+    getValue = function()
+      ---@type FormItemListItem[]
+      local items = {}
+      for id in pairs(self.currentFilter.itemList) do
+        table.insert(items, {
+          id = id,
+          category = self.currentFilter.name,
+        })
+      end
+      return items
+    end,
+    setValue = function(_, value)
+      self.currentFilter.itemList = {}
+      for _, item in pairs(value) do
+        self.currentFilter.itemList[item.id] = true
+      end
+    end,
+  })
+
   self.form:AddButtonGroup({
     ButtonOptions = {
       { title = 'Cancel', onClick = function()
@@ -159,6 +183,7 @@ function newSectionC:Open(filter, parent)
     [4] = 1,
   }
   self.currentFilter.searchCategory = self.currentFilter.searchCategory or {query = ''}
+  self.currentFilter.itemList = self.currentFilter.itemList or {}
   self.form:GetFrame():ClearAllPoints()
   self.form:GetFrame():SetPoint("TOPRIGHT", parent, "TOPLEFT", -10, 0)
   self.form:ReloadAllFormElements()
