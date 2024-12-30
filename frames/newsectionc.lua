@@ -45,7 +45,7 @@ function newSectionC:OnEnable()
     }
   }
   self.form = form:Create({
-    title = 'New Section',
+    title = 'Section Editor',
     layout = const.FORM_LAYOUT.STACKED,
     index = false
   })
@@ -109,6 +109,17 @@ function newSectionC:OnEnable()
     step = 1,
   })
 
+  self.form:AddCheckbox({
+    title = 'Allow Blizzard Items',
+    description = 'If this is a "built in" section, allow items from Blizzard to be added to this section.',
+    getValue = function()
+      return self.currentFilter.allowBlizzardItems
+    end,
+    setValue = function(_, value)
+      self.currentFilter.allowBlizzardItems = value
+    end,
+  })
+
   self.form:AddButtonGroup({
     ButtonOptions = {
       { title = 'Cancel', onClick = function()
@@ -117,12 +128,7 @@ function newSectionC:OnEnable()
         self.form:Hide()
       end },
       { title = 'Save', onClick = function(ctx)
-        categories:CreateCategory(ctx, {
-          name = self.currentFilter.name,
-          priority = self.currentFilter.priority,
-          color = self.currentFilter.color,
-          searchCategory = self.currentFilter.searchCategory,
-        }, true)
+        self:Save(ctx)
         if self.openedName ~= self.currentFilter.name and self.openedName ~= nil and self.openedName ~= "" then
           categories:DeleteCategory(ctx, self.openedName)
         end
@@ -157,4 +163,15 @@ function newSectionC:Open(filter, parent)
   self.form:GetFrame():SetPoint("TOPRIGHT", parent, "TOPLEFT", -10, 0)
   self.form:ReloadAllFormElements()
   self.form:Show()
+end
+
+---@param ctx Context
+function newSectionC:Save(ctx)
+  categories:CreateCategory(ctx, {
+    name = self.currentFilter.name,
+    priority = self.currentFilter.priority,
+    color = self.currentFilter.color,
+    searchCategory = self.currentFilter.searchCategory,
+    allowBlizzardItems = self.currentFilter.allowBlizzardItems,
+  }, true)
 end
