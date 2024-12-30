@@ -9,6 +9,9 @@ local context = addon:GetModule('Context')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Categories: AceModule
+local categories = addon:GetModule('Categories')
+
 ---@class ItemList: AceModule
 local itemList = addon:NewModule('ItemList')
 
@@ -74,6 +77,15 @@ function itemListFrame:resetSectionItem(frame, elementData)
   if frame.item then
     frame.item:ClearItem(ctx)
     frame.item.rowButton:SetScript("OnMouseDown", nil)
+  end
+end
+
+---@param itemDataList FormItemListItem[]
+function itemListFrame:AddItems(itemDataList)
+  self.content:Wipe()
+
+  for _, idata in pairs(itemDataList) do
+    self.content:AddToStart(idata)
   end
 end
 

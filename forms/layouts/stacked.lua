@@ -93,7 +93,8 @@ function stackedLayout:ReloadAllFormElements()
   end
 
   for container, opts in pairs(self.itemLists) do
-    --container.list:Refresh()
+    container.list:AddItems(opts.getValue(context:New('ItemList_Reload')))
+    container.list.frame:SetWidth(container:GetWidth() - 50)
   end
 end
 
@@ -879,8 +880,8 @@ function stackedLayout:AddItemList(opts)
 
   container.list = itemList:Create(container)
   container.list.frame:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
-  container.list.frame:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -5, 5)
-  container.list.frame:SetHeight(100)
+  --container.list.frame:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -5, 5)
+  container.list.frame:SetHeight(300)
   container.list.frame:SetWidth(container:GetWidth() - 50)
 
   container:SetHeight(

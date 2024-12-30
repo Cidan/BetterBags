@@ -128,7 +128,7 @@ function newSectionC:OnEnable()
     getValue = function()
       ---@type FormItemListItem[]
       local items = {}
-      for id in pairs(self.currentFilter.itemList) do
+      for id in pairs(self.currentFilter.permanentItemList) do
         table.insert(items, {
           id = id,
           category = self.currentFilter.name,
@@ -137,9 +137,9 @@ function newSectionC:OnEnable()
       return items
     end,
     setValue = function(_, value)
-      self.currentFilter.itemList = {}
+      self.currentFilter.permanentItemList = {}
       for _, item in pairs(value) do
-        self.currentFilter.itemList[item.id] = true
+        self.currentFilter.permanentItemList[item.id] = true
       end
     end,
   })
@@ -184,6 +184,7 @@ function newSectionC:Open(filter, parent)
   }
   self.currentFilter.searchCategory = self.currentFilter.searchCategory or {query = ''}
   self.currentFilter.itemList = self.currentFilter.itemList or {}
+  self.currentFilter.permanentItemList = self.currentFilter.permanentItemList or {}
   self.form:GetFrame():ClearAllPoints()
   self.form:GetFrame():SetPoint("TOPRIGHT", parent, "TOPLEFT", -10, 0)
   self.form:ReloadAllFormElements()
@@ -198,5 +199,6 @@ function newSectionC:Save(ctx)
     color = self.currentFilter.color,
     searchCategory = self.currentFilter.searchCategory,
     allowBlizzardItems = self.currentFilter.allowBlizzardItems,
+    permanentItemList = self.currentFilter.permanentItemList
   }, true)
 end
