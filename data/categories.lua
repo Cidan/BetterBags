@@ -143,11 +143,16 @@ function categories:CreateCategory(ctx, category, update)
   }
 
   if category.permanentItemList then
-    for id in pairs(category.permanentItemList) do
+    for id, add in pairs(category.permanentItemList) do
       if not self.itemIDToCategories[id] then
         self.itemIDToCategories[id] = {}
       end
-      table.insert(self.itemIDToCategories[id], category.name)
+      if add then
+        table.insert(self.itemIDToCategories[id], category.name)
+      else
+        self.itemIDToCategories[id] = nil
+        category.permanentItemList[id] = nil
+      end
     end
   end
   if category.itemList then

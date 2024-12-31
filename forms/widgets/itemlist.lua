@@ -15,22 +15,39 @@ local categories = addon:GetModule('Categories')
 ---@class ItemList: AceModule
 local itemList = addon:NewModule('ItemList')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
 
 ---@class ItemListFrame: Frame
 ---@field frame Frame
 ---@field content ListFrame
+---@field onDragFunction fun(ctx: Context, self: ItemListFrame)
+---@field onItemClickFunction fun(ctx: Context, b: string, elementData: FormItemListItem, self: ItemListFrame)
 local itemListFrame = {}
 
 function itemListFrame:OnReceiveDrag(ctx)
-  print("OnReceiveDrag", ctx)
+  if self.onDragFunction then
+    self.onDragFunction(ctx, self)
+  end
 end
 
 function itemListFrame:OnMouseDown(ctx)
-  print("OnMouseDown", ctx)
 end
 
 function itemListFrame:OnItemClick(ctx, b, elementData)
-  print("OnItemClick", ctx, b, elementData)
+  if b == "LeftButton" then
+    self:OnReceiveDrag(ctx)
+    return
+  end
+  if self.onItemClickFunction then
+    self.onItemClickFunction(ctx, b, elementData, self)
+  end
 end
 
 ---@param frame BetterBagsSectionConfigItemFrame
@@ -87,6 +104,21 @@ function itemListFrame:AddItems(itemDataList)
   for _, idata in pairs(itemDataList) do
     self.content:AddToStart(idata)
   end
+end
+
+---@param itemDataList FormItemListItem[]
+function itemListFrame:UpdateItems(itemDataList)
+  for _, idata in pairs(itemDataList) do
+    self.content:AddToStart(idata)
+  end
+end
+
+function itemListFrame:SetOnDragFunction(func)
+  self.onDragFunction = func
+end
+
+function itemListFrame:SetOnItemClickFunction(func)
+  self.onItemClickFunction = func
 end
 
 ---@param parent Frame

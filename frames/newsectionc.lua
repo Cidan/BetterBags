@@ -31,6 +31,9 @@ local events = addon:GetModule('Events')
 local newSectionC = addon:NewModule('NewSectionC')
 
 function newSectionC:OnEnable()
+  ---@class ContextMenu: AceModule
+  local contextMenu = addon:GetModule('ContextMenu')
+
   self.currentFilter = {
     name = '',
     searchCategory = {
@@ -125,6 +128,29 @@ function newSectionC:OnEnable()
   self.form:AddItemList({
     title = 'Items',
     description = 'Drag items from the inventory to this list to add them to this section.',
+    onDragFunction = function(ctx, list)
+      local kind, id = GetCursorInfo()
+      if kind ~= "item" or not tonumber(id) then return end
+      ClearCursor()
+      local itemid = tonumber(id) --[[@as number]]
+      self.currentFilter.permanentItemList[itemid] = true
+      list:UpdateItems({{
+        id = itemid,
+        category = self.currentFilter.name,
+      }})
+    end,
+    onItemClickFunction = function(ctx, b, elementData, list)
+      ClearCursor()
+      contextMenu:Show(ctx, {{
+        text = L:G("Remove"),
+        notCheckable = true,
+        hasArrow = false,
+        func = function()
+          self.currentFilter.permanentItemList[elementData.id] = false
+          list.content:RemoveAtIndex(list.content:GetIndexFromItem(elementData))
+        end
+      }})
+    end,
     getValue = function()
       ---@type FormItemListItem[]
       local items = {}

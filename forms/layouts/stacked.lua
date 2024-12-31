@@ -883,6 +883,8 @@ function stackedLayout:AddItemList(opts)
   --container.list.frame:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", -5, 5)
   container.list.frame:SetHeight(300)
   container.list.frame:SetWidth(container:GetWidth() - 50)
+  container.list:SetOnDragFunction(opts.onDragFunction)
+  container.list:SetOnItemClickFunction(opts.onItemClickFunction)
 
   container:SetHeight(
     container.title:GetLineHeight() +

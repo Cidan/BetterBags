@@ -151,6 +151,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field description string
 ---@field tooltipDescription? boolean
 ---@field items? FormItemListItem[]
+---@field onDragFunction? fun(ctx: Context, list: ItemListFrame)
+---@field onItemClickFunction? fun(ctx: Context, b: string, elementData: FormItemListItem, list: ItemListFrame)
 ---@field getValue fun(ctx: Context): FormItemListItem[]
 ---@field setValue fun(ctx: Context, value: FormItemListItem[])
 
