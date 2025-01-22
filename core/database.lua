@@ -230,7 +230,6 @@ function DB:SaveItemToCategory(itemID, category)
   if previousCategory and previousCategoryFilter and previousCategory ~= category then
     DB.data.profile.customCategoryFilters[previousCategory].itemList[itemID] = nil
   end
-  DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
   DB.data.profile.customCategoryIndex[itemID] = category
 end
 
