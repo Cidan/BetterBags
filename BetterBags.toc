@@ -1,4 +1,4 @@
-## Interface: 110002
+## Interface: 110100
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -10,6 +10,18 @@
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
 ## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, WagoAnalytics, GW2_UI, ElvUI, DevTool
+
+## Category-enUS: Inventory
+## Category-deDE: Inventar
+## Category-esES: Inventario
+## Category-esMX: Inventario
+## Category-frFR: Inventaire
+## Category-itIT: Inventario
+## Category-koKR: 소지품
+## Category-ptBR: Inventário
+## Category-ruRU: Предметы
+## Category-zhCN: 物品栏
+## Category-zhTW: 物品欄
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
