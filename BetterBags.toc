@@ -1,6 +1,7 @@
-## Interface: 110002
+## Interface: 110105
 
 ## Title: BetterBags
+## Category: Inventory
 ## Notes: Better Bags for everyone!
 ## Author: Cidan
 ## Version: @project-version@
