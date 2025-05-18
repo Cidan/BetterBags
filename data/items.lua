@@ -955,9 +955,15 @@ end
 ---@return ItemLinkInfo
 function items:ParseItemLink(link)
 	-- Parse the first elements that have no variable length
-	local _, itemID, enchantID, gemID1, gemID2, gemID3, gemID4,
+	local _, _, itemID, enchantID, gemID1, gemID2, gemID3, gemID4,
 	suffixID, uniqueID, linkLevel, specializationID, modifiersMask,
-	itemContext, rest = strsplit(":", link, 14) --[[@as string]]
+	itemContext, rest = strsplit(":", link, 15) --[[@as string]]
+
+  if not addon.isRetail then
+	  _, itemID, enchantID, gemID1, gemID2, gemID3, gemID4,
+	  suffixID, uniqueID, linkLevel, specializationID, modifiersMask,
+	  itemContext, rest = strsplit(":", link, 14) --[[@as string]]
+  end
 
   ---@type string, string
 	local crafterGUID, extraEnchantID
