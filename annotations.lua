@@ -480,7 +480,9 @@ AccountBankPanel = {}
 AccountBankPanel.PurchasePrompt = {}
 AccountBankPanel.PurchasePrompt.TabCostFrame = {}
 ---@type Button
+---@diagnostic disable-next-line: missing-fields
 AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton = {
+---@diagnostic disable-next-line: missing-fields
     BattlepayItemTexture = {},
     isSkinned = true,
 }
@@ -520,15 +522,19 @@ function AceItemList:SetList(values) end
 function ContainerFrame_UpdateCooldown(id, button) end
 
 ---@type Frame
+---@diagnostic disable-next-line: missing-fields
 GameMenuFrame = {
     scrollable = true,
 }
 
 ---@type CheckButton
+---@diagnostic disable-next-line: missing-fields
 KeyRingButton = {}
 
 ---@type Button
+---@diagnostic disable-next-line: missing-fields
 CharacterReagentBag0Slot = {
+---@diagnostic disable-next-line: missing-fields
     BattlepayItemTexture = {},
     isSkinned = true,
 }
