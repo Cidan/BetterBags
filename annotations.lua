@@ -72,7 +72,7 @@ function Button:RegisterForClicks(...) end
 ---@return Texture
 function itemButton:GetHighlightTexture() end
 
----@class ContinuableContainer 
+---@class ContinuableContainer
 ContinuableContainer = {}
 
 ---@class MasqueGroup
@@ -80,9 +80,13 @@ ContinuableContainer = {}
 MasqueGroup = {}
 
 function MasqueGroup:AddButton(group, button) end
+
 function MasqueGroup:RemoveButton(group, button) end
+
 function MasqueGroup:ReSkin(boolean) end
+
 function MasqueGroup:RegisterCallback(func, obj) end
+
 ---@class Masque
 Masque = {}
 
@@ -95,7 +99,9 @@ function Masque:Group(name, group) end
 Window = {}
 
 function Window.RegisterConfig(frame, config) end
+
 function Window.SavePosition(frame) end
+
 function Window.RestorePosition(frame) end
 
 ---@class ContainerFrameCombinedBags: Frame
@@ -125,7 +131,6 @@ function ColorPickerFrame:GetColorRGB() end
 ---@return number
 function ColorPickerFrame:GetColorAlpha() end
 
-
 ---@class DropdownButton: Button
 local dropdownButton = {}
 
@@ -150,7 +155,9 @@ function dropdownButton:Update() end
 DLAPI = {}
 
 function DLAPI.RegisterFormat(name, format) end
+
 function DLAPI.SetFormat(name, format) end
+
 function DLAPI.DebugLog(category, message) end
 
 ---@param createFunc fun(): any
@@ -162,7 +169,9 @@ function CreateObjectPool(createFunc, resetFunc) end
 local ObjectPool = {}
 ---@return any
 function ObjectPool:Acquire() end
+
 function ObjectPool:Release(o) end
+
 function ObjectPool:SetResetDisallowedIfNew(disallow) end
 
 ---@class LibUIDropDownMenu-4.0
@@ -172,8 +181,11 @@ local LibUIDropDownMenu = {}
 ---@param parent Frame
 ---@return frame
 function LibUIDropDownMenu:Create_UIDropDownMenu(name, parent) end
+
 function LibUIDropDownMenu:EasyMenu_Initialize(frame, level, menuList, anchor, x, y, displayMode, autoHideDelay) end
+
 function LibUIDropDownMenu:EasyMenu(menuList, frame, anchor, x, y, displayMode, autoHideDelay) end
+
 function LibUIDropDownMenu:HideDropDownMenu(level) end
 
 ---@class SearchBox: EditBox
@@ -222,10 +234,13 @@ function NineSlicePanelMixin:GetFrameLayoutTextureKit() end
 ---@class BackdropTemplate
 local BackdropTemplate = {}
 function BackdropTemplate:Show() end
+
 function BackdropTemplate:Hide() end
 
 function BetterBagsBagPortraitTemplate:SetPortraitToAsset(texture) end
+
 function BetterBagsBagPortraitTemplate:SetPortraitTextureSizeAndOffset(size, offsetX, offsetY) end
+
 function BetterBagsBagPortraitTemplate:SetTitle(title) end
 
 ---@class BetterBagsClassicBagPortrait
@@ -242,21 +257,33 @@ function FontString:SetScript(event, func) end
 ---@class WowScrollBox: Frame
 local WowScrollBox = {}
 function WowScrollBox:SetInterpolateScroll(interpolate) end
+
 function WowScrollBox:ScrollInDirection(percent, direction) end
+
 function WowScrollBox:FullUpdate(const) end
+
 function WowScrollBox:OnMouseWheel(delta) end
+
 function WowScrollBox:ScrollToEnd() end
+
 ---@return Texture
 function WowScrollBox:GetUpperShadowTexture() end
+
 ---@return Texture
 function WowScrollBox:GetLowerShadowTexture() end
+
 function WowScrollBox:SetDataProvider(provider) end
+
 function WowScrollBox:ScrollToOffset(offset) end
+
 function WowScrollBox:RegisterCallback(event, callback) end
+
 ---@return number
 function WowScrollBox:GetDerivedScrollOffset() end
+
 ---@return number
 function WowScrollBox:GetDerivedScrollRange() end
+
 ---@param percent number
 function WowScrollBox:SetScrollPercentage(percent) end
 
@@ -266,39 +293,56 @@ function WowScrollBox:SetScrollPercentage(percent) end
 ---@class DataProviderMixin: CallbackRegistryMixin
 local DataProviderMixin = {}
 function DataProviderMixin:Enumerate(indexBegin, indexEnd) end
+
 function DataProviderMixin:Insert(...) end
+
 function DataProviderMixin:InsertTable(tbl) end
+
 function DataProviderMixin:InsertAtIndex(elementData, insertIndex) end
+
 ---@return number
 function DataProviderMixin:GetSize() end
+
 ---@param elementData table
 ---@return number
 function DataProviderMixin:FindIndex(elementData) end
+
 function DataProviderMixin:RemoveIndex(index) end
+
 function DataProviderMixin:Flush() end
+
 ---@param predicate fun(elementData: table<any, any>): boolean
 ---@return boolean
 function DataProviderMixin:ContainsByPredicate(predicate) end
+
 ---@return fun(): number, table
 function DataProviderMixin:EnumerateEntireRange() end
+
 ---@return table[]
 function DataProviderMixin:GetCollection() end
+
 ---@param index number
 ---@return table
 function DataProviderMixin:Find(index) end
+
 ---@param elementData table
 ---@param newIndex number
 function DataProviderMixin:MoveElementDataToIndex(elementData, newIndex) end
+
 ---@return number
 function DataProviderMixin:GetSize() end
+
 function DataProviderMixin:Remove(...) end
 
 ---@class ScrollBoxDragBehavior
 local ScrollBoxDragBehavior = {}
 ---@param reorderable boolean
 function ScrollBoxDragBehavior:SetReorderable(reorderable) end
+
 function ScrollBoxDragBehavior:SetDropPredicate(fn) end
+
 function ScrollBoxDragBehavior:SetDragPredicate(fn) end
+
 function ScrollBoxDragBehavior:SetFinalizeDrop(fn) end
 
 ---@class C_Bank
@@ -315,16 +359,16 @@ function CloseBankFrame() end
 
 ---@enum BagSlotFlags
 BagSlotFlags = {
-  DisableAutoSort = 1,
-  ClassEquipment = 2,
-  ClassConsumables = 4,
-  ClassProfessionGoods = 8,
-  ClassJunk = 16,
-  ClassQuestItems = 32,
-  ExcludeJunkSell = 64,
-  ClassReagents = 128,
-  ExpansionCurrent = 256,
-  ExpansionLegacy = 512,
+    DisableAutoSort = 1,
+    ClassEquipment = 2,
+    ClassConsumables = 4,
+    ClassProfessionGoods = 8,
+    ClassJunk = 16,
+    ClassQuestItems = 32,
+    ExcludeJunkSell = 64,
+    ClassReagents = 128,
+    ExpansionCurrent = 256,
+    ExpansionLegacy = 512,
 }
 
 ---@class Frame
@@ -334,6 +378,7 @@ local frameProto = {}
 ---@class MinimalScrollBar: Frame
 local MinimalScrollBar = {}
 function MinimalScrollBar:SetInterpolateScroll(interpolate) end
+
 function MinimalScrollBar:SetHideIfUnscrollable(hide) end
 
 ---@class EventFrame
@@ -411,17 +456,21 @@ Enum.PlayerInteractionType.AccountBanker = 68
 
 ---@enum BankType
 Enum.BankType = {
-  Character = 0,
-  Guild = 1,
-  Account = 2,
+    Character = 0,
+    Guild = 1,
+    Account = 2,
 }
 
 ---@class TabSettingsMenu: Frame
 TabSettingsMenu = {}
 function TabSettingsMenu:Show() end
+
 function TabSettingsMenu:Hide() end
+
 function TabSettingsMenu:SetSelectedTab(index) end
+
 function TabSettingsMenu:Update() end
+
 function TabSettingsMenu:GetBankFrame() end
 
 ---@class AccountBankPanel: Frame
@@ -432,8 +481,8 @@ AccountBankPanel.PurchasePrompt = {}
 AccountBankPanel.PurchasePrompt.TabCostFrame = {}
 ---@type Button
 AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton = {
-  BattlepayItemTexture = {},
-  isSkinned = true,
+    BattlepayItemTexture = {},
+    isSkinned = true,
 }
 
 ACCOUNT_BANK_PANEL_TITLE = ""
@@ -472,7 +521,7 @@ function ContainerFrame_UpdateCooldown(id, button) end
 
 ---@type Frame
 GameMenuFrame = {
-  scrollable = true,
+    scrollable = true,
 }
 
 ---@type CheckButton
@@ -480,8 +529,8 @@ KeyRingButton = {}
 
 ---@type Button
 CharacterReagentBag0Slot = {
-  BattlepayItemTexture = {},
-  isSkinned = true,
+    BattlepayItemTexture = {},
+    isSkinned = true,
 }
 
 ---@class MainMenuBagButton: Button
@@ -491,9 +540,9 @@ ItemButtonUtil = {}
 
 ---@enum ItemContextMatchResult
 ItemButtonUtil.ItemContextMatchResult = {
-	Match = 1,
-	Mismatch = 2,
-	DoesNotApply = 3,
+    Match = 1,
+    Mismatch = 2,
+    DoesNotApply = 3,
 }
 
 ----
@@ -504,7 +553,6 @@ ConsolePort = {}
 
 ---@param frame Frame
 function ConsolePort:AddInterfaceCursorFrame(frame) end
-
 
 --- Pawn Globals
 
@@ -517,7 +565,8 @@ PawnVersion = _G['PawnVersion'] --[[@as number]]
 PawnGetItemData = _G['PawnGetItemData'] --[[@as fun(itemLink: string): table]]
 PawnIsItemAnUpgrade = _G['PawnIsItemAnUpgrade'] --[[@as fun(itemData: table): boolean]]
 PawnShouldItemLinkHaveUpgradeArrow = _G['PawnShouldItemLinkHaveUpgradeArrow'] --[[@as fun(itemLink: string): boolean]]
-PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string, level?: boolean): boolean]]
+PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = _G
+['PawnShouldItemLinkHaveUpgradeArrowUnbudgeted'] --[[@as fun(itemLink: string, level?: boolean): boolean]]
 
 --- SimpleItemLevel API Globals
 ---@class SimpleItemLevel
@@ -552,7 +601,6 @@ function GetCurrencyListInfo(index) end
 ---@return number
 function GetCurrencyListSize() end
 
-
 --- WagoAnalytics
 ---@class WagoAnalytics
 local WagoAnalytics = {}
@@ -576,7 +624,6 @@ function WagoAnalytics:DecrementCounter(counter, amount) end
 ---@param amount number
 function WagoAnalytics:SetCounter(counter, amount) end
 
-
 ---@class DecorationFrame: Frame
 
 --- GuildWars2 API
@@ -585,9 +632,11 @@ GW2_ADDON = {}
 
 GW2_ADDON.BackdropTemplates = {}
 function GW2_ADDON.CreateFrameHeaderWithBody(frame, titletext, icon, details) end
+
 function GW2_ADDON.SkinBagSearchBox(searchBox) end
 
 function Button:GwSkinButton(x) end
+
 function Button:GwStripTextures() end
 
 ---@class GuildWarsHeader: Frame
@@ -596,13 +645,13 @@ function Button:GwStripTextures() end
 ---@class ElvUI
 ---@field RegisterCooldown fun(self: ElvUI, tex: Cooldown, b: string)
 ElvUI = {
-  media = {
-    bordercolor = {}
-  },
-  Media = {
-    Textures = {},
-    bordercolor = {}
-  }
+    media = {
+        bordercolor = {}
+    },
+    Media = {
+        Textures = {},
+        bordercolor = {}
+    }
 }
 
 ---@class ElvUISkin

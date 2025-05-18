@@ -17,5 +17,5 @@ svn checkout https://repos.wowace.com/wow/ace-gui-3-0-shared-media-widgets/trunk
 svn checkout https://repos.curseforge.com/wow/libwindow-1-1/trunk/LibWindow-1.1 ./libs/LibWindow-1.1
 svn checkout https://repos.wowace.com/wow/libuidropdownmenu/trunk/LibUIDropDownMenu ./libs/LibUIDropDownMenu
 mkdir -p ./.libraries
-git clone https://github.com/Ketho/vscode-wow-api ./.libraries/
-git clone https://github.com/Gethe/wow-ui-source ./.libraries/
+git clone https://github.com/Ketho/vscode-wow-api ./.libraries/vscode-wow-api
+git clone https://github.com/Gethe/wow-ui-source ./.libraries/wow-ui-source
