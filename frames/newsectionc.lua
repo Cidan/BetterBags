@@ -116,7 +116,7 @@ function newSectionC:OnEnable()
 
   self.form:AddCheckbox({
     title = 'Allow Blizzard Items',
-    description = 'If this is a "built in" section, allow items from Blizzard to be added to this section.',
+    description = 'If this is a "built in" category as it appears in the auction house, such as Gem, Consumable, etc, allow those items to be added to this category along side your custom item list/search items.',
     getValue = function()
       return self.currentFilter.allowBlizzardItems
     end,
