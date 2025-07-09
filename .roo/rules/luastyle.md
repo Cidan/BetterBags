@@ -11,3 +11,5 @@ The following guidelines apply to all lua files in this codebase.
 * Never ignore linting errors or warnings. Always keep the codebase clean, and always properly annotate all fields.
 
 * Never access inner fields on properties and assume all fields are private. Always use a typed getter and setter when accessing a field from outside of the class, i.e. treat all fields as protected where possible.
+
+* Annotations may sometimes be in annotations.lua, but they may also sometimes be in the location where the class is used. Make sure to fully understand where class annotations are before you start adding annotations to classes. If you can't find the annotation for a class, use codebase indexing to try to find it. Only if you are sure the annotation does not exist elsewhere (this is extremely unlikely, except if you're making a brand new class), may you add it to annotations.lua. Even then, try to keep the class annotations within the files where the class is actually created. 
