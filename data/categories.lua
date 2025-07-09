@@ -166,6 +166,12 @@ function categories:CreateCategory(ctx, category, update)
   category.sortOrder = category.sortOrder or -1
   category.priority = category.priority or 10
   category.shown = category.shown or true
+  -- On a fresh install, categories are created on the fly. Without this,
+  -- `allowBlizzardItems` is nil, and items are not assigned to their correct
+  -- categories.
+  if category.allowBlizzardItems == nil then
+    category.allowBlizzardItems = true
+  end
   self.categories[category.name] = category
   self:SaveCategoryToDisk(ctx, category.name)
   events:SendMessage(ctx, 'categories/Changed')
