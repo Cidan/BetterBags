@@ -10,4 +10,4 @@ The following guidelines apply to all lua files in this codebase.
 
 * Never ignore linting errors or warnings. Always keep the codebase clean, and always properly annotate all fields.
 
-* Never access inner fields on properties and assume all fields are private. Always use a typed getter and setter when writing new code for all fields.
+* Never access inner fields on properties and assume all fields are private. Always use a typed getter and setter when accessing a field from outside of the class, i.e. treat all fields as protected where possible.
