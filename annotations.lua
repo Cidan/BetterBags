@@ -682,3 +682,4 @@ function ElvUISkin:HandleTab(tab) end
 ---@param name string
 ---@return ElvUISkin
 function ElvUI:GetModule(name) end
+

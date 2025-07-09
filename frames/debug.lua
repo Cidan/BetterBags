@@ -67,12 +67,14 @@ function debugWindow:Create(ctx)
   -- Add default "Debug Log" tab and new "Items" tab
   self.tabFrame:AddTab(ctx, "Debug Log")
   self.tabFrame:AddTab(ctx, "Items")
+  self.tabFrame:AddTab(ctx, "Config")
   self.tabFrame:SetTabByIndex(ctx, 1)
 
   -- Create content frames for each tab
   self.contentFrames = {}
   self.contentFrames[1] = self:CreateDebugLogFrame()
   self.contentFrames[2] = self:CreateItemsFrame()
+  self.contentFrames[3] = self:CreateConfigFrame()
 
   local closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButtonDefaultAnchors")
   closeButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
@@ -149,6 +151,32 @@ function debugWindow:CreateItemsFrame()
   frame:GetFrame():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
   frame:Hide() -- Hide by default as Debug Log is the initial tab
   return frame
+end
+
+---CreateConfigFrame creates the frame for the Config tab.
+---@return Frame
+function debugWindow:CreateConfigFrame()
+  local frame = CreateFrame("Frame", nil, self.frame)
+  frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
+  frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
+
+  local deleteButton = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
+  deleteButton:SetText("Delete Configuration")
+  deleteButton:SetPoint("TOPLEFT", 10, -20)
+  deleteButton:SetSize(160, 25)
+  deleteButton:SetScript("OnClick", function()
+    self:DeleteConfig()
+  end)
+
+  frame:Hide()
+  return frame
+end
+
+---DeleteConfig deletes the current configuration and reloads the UI.
+function debugWindow:DeleteConfig()
+  local db = database:GetData()
+  db:ResetDB()
+  ReloadUI()
 end
 
 ---SwitchTab switches to the specified tab.

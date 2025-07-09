@@ -551,8 +551,15 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
     return
   end
 
-  filter = categories:GetCategoryByName(L:G('Everything'))
-  data.categories.blizzard = {name = filter.name, priority = filter.priority}
+  local everythingCategoryName = L:G('Everything')
+  local everythingFilter = categories:GetCategoryByName(everythingCategoryName)
+  if not everythingFilter then
+    categories:CreateCategory(ctx, {
+      name = everythingCategoryName,
+    })
+    everythingFilter = categories:GetCategoryByName(everythingCategoryName)
+  end
+  data.categories.blizzard = {name = everythingFilter.name, priority = everythingFilter.priority}
 end
 
 ---@param ctx Context

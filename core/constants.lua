@@ -514,7 +514,7 @@ const.FORM_LAYOUT = {
 ---@class (exact) CategoryOptions
 ---@field shown boolean
 
----@class databaseOptions
+---@class databaseOptions: AceDBObject-3.0
 const.DATABASE_DEFAULTS = {
   profile = {
     firstTimeMenu = true,
