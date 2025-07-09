@@ -29,3 +29,4 @@ ignore:
   - cache 
   - .libraries
   - .roo
+  - .roomodes
