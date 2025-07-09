@@ -109,7 +109,7 @@ function categories:NewBlankCategory(name)
     searchCategory = nil,
     note = nil,
     color = nil,
-    priority = 0,
+    priority = 10,
     dynamic = false,
     shown = true,
     allowBlizzardItems = true,
@@ -477,19 +477,19 @@ end
 function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
   if database:GetCategoryFilter(data.kind, "RecentItems") then
     if data.internalNewItem then
-      data.categories.blizzard = {name = L:G('Recent Items'), priority = 1}
+      data.categories.blizzard = {name = L:G('Recent Items'), priority = 10}
       return
     end
   end
 
   -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
   if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
-    data.categories.blizzard = {name = "Gear: " .. data.itemInfo.equipmentSets[1], priority = 1}
+    data.categories.blizzard = {name = "Gear: " .. data.itemInfo.equipmentSets[1], priority = 10}
     return
   end
 
   if data.containerInfo.quality == Enum.ItemQuality.Poor then
-    data.categories.blizzard = {name = L:G('Junk'), priority = 1}
+    data.categories.blizzard = {name = L:G('Junk'), priority = 10}
   end
 
   local category = ""
@@ -595,7 +595,7 @@ end
 function categories:CalculateAndUpdateCategoriesForItem(ctx, data)
   data.categories = {}
   if data.isItemEmpty then
-    data.categories.blizzard = {name = L:G('Empty Slot'), priority = 1}
+    data.categories.blizzard = {name = L:G('Empty Slot'), priority = 10}
     return
   end
   self:CalculateAndUpdateBlizzardCategory(ctx, data)

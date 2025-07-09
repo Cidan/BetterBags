@@ -159,7 +159,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
 
     if categories:IsCategoryShown(elementData.title) then
       local filter = categories:GetCategoryByName(elementData.title)
-      if filter and filter.searchCategory then
+      if filter then
         button.Note:SetText(format("Priority: %d", filter.priority))
       else
         button.Note:SetText("")
@@ -231,7 +231,7 @@ function sectionConfigFrame:initSectionItem(button, elementData)
         categories:ToggleCategoryShown(ectx, elementData.title)
         if categories:IsCategoryShown(elementData.title) then
           local filter = categories:GetCategoryByName(elementData.title)
-          if filter and filter.searchCategory then
+          if filter then
             button.Note:SetText(format("Priority: %d", elementData.priority or filter.priority))
           else
             button.Note:SetText("")
