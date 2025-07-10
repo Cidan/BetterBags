@@ -182,5 +182,26 @@
   },
   "Lua.runtime.version": "Lua 5.1",
   "stylua.targetReleaseVersion": "latest",
-  "Lua.diagnostics.workspaceDelay": -1
+  "Lua.diagnostics.workspaceDelay": -1,
+  "luahelper.base.ignoreFileOrDirError": [
+    ".vscode/",
+    "one11.lua",
+    ".libraries",
+    "libs"
+  ],
+  "luahelper.format.align_args": true,
+  "luahelper.format.align_parameter": true,
+  "luahelper.format.continuation_indent_width": 2,
+  "luahelper.format.indent_width": 2,
+  "luahelper.format.tab_width": 2,
+  "luahelper.Warn.CheckFuncParam": false,
+  "luahelper.Warn.CheckLocalNoUse": true,
+  "luahelper.Warn.CheckNoDefine": true,
+  "luahelper.Warn.CheckNoUseAssign": true,
+  "luahelper.Warn.CheckSelfAssign": true,
+  "Lua.type.checkTableShape": false,
+  "Lua.workspace.library": [
+    ".libraries\\vscode-wow-api\\Annotations",
+    ".libraries\\wow-ui-source\\Interface\\AddOns"
+  ]
 }
