@@ -1,6 +1,3 @@
-
-
-
 local addon = GetBetterBags()
 
 local events = addon:GetEvents()

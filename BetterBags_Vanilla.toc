@@ -124,7 +124,7 @@ themes\gw2.lua
 themes\elvui.lua
 
 config\config.lua
-config\plugin.lua
+config\
 
 integrations\consoleport.lua
 integrations\pawn.lua
