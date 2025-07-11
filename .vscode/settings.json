@@ -204,4 +204,5 @@
     ".libraries\\vscode-wow-api\\Annotations",
     ".libraries\\wow-ui-source\\Interface\\AddOns"
   ],
+  "Lua.format.enable": true
 }

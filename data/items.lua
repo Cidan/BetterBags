@@ -129,6 +129,7 @@ local itemDataProto = {}
 ---@field _preSort boolean
 ---@field _refreshQueueEvent EventArg[]
 ---@field _firstLoad table<BagKind, boolean>
+---@field NewSlotInfo fun(self: Items): SlotInfo
 local items = addon:NewModule('Items')
 
 function items:OnInitialize()
@@ -190,7 +191,6 @@ function items:RefreshAll(ctx)
   events:SendMessage(ctx, 'bags/RefreshAll')
 end
 
----@private
 ---@param ctx Context
 function items:ClearItemCache(ctx)
   self.previousItemGUID = {}

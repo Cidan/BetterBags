@@ -10,6 +10,12 @@ local context = addon:GetContext()
 ---@field enabled boolean
 ---@field profiles table<string, number>
 ---@field tooltip GameTooltip
+---@field StartProfile fun(self: Debug, name: string, ...)
+---@field EndProfile fun(self: Debug, name: string, ...)
+---@field Switch fun(self: Debug, label: string, enabled: boolean)
+---@field IncrementCounter fun(self: Debug, counter: string, amount: number)
+---@field DecrementCounter fun(self: Debug, counter: string, amount: number)
+---@field SetCounter fun(self: Debug, counter: string, amount: number)
 local debug = addon:NewModule('Debug')
 
 function debug:OnInitialize()
