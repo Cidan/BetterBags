@@ -71,7 +71,7 @@ function stack:RemoveFromStack(item)
 
   if stackinfo.rootItem == item.slotkey then
     if next(stackinfo.slotkeys) then
-      stackinfo.rootItem = next(stackinfo.slotkeys)
+      stackinfo.rootItem = next(stackinfo.slotkeys) --[[@as string]]
       stackinfo.slotkeys[stackinfo.rootItem] = nil
       stackinfo.count = stackinfo.count - 1
     else

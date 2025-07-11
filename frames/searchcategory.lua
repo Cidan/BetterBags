@@ -33,7 +33,7 @@ function searchCategoryConfig:CheckNameboxText()
 end
 
 function searchCategoryConfig:OnEnable()
-  self.frame = CreateFrame("Frame", addonName .. "SearchCategoryConfig", UIParent)
+  self.frame = CreateFrame("Frame", addon:GetName() .. "SearchCategoryConfig", UIParent)
   themes:RegisterFlatWindow(self.frame, "Configure Search Category")
 
   self.frame:SetSize(430, 380)
@@ -52,7 +52,7 @@ function searchCategoryConfig:OnEnable()
   self.nameBoxLabel:SetPoint("TOPLEFT", 20, -40)
   self.nameBoxLabel:SetText("Category Name")
 
-  self.nameBox = CreateFrame("EditBox", addonName .. "SearchCategoryConfigNameBox", self.frame, "InputBoxTemplate")
+  self.nameBox = CreateFrame("EditBox", addon:GetName() .. "SearchCategoryConfigNameBox", self.frame, "InputBoxTemplate")
   self.nameBox:SetSize(200, 20)
   self.nameBox:SetPoint("TOPLEFT", self.nameBoxLabel, "BOTTOMLEFT", 2, -7)
   self.nameBox:SetAutoFocus(false)
@@ -66,7 +66,7 @@ function searchCategoryConfig:OnEnable()
   self.queryBoxLabel:SetPoint("TOPLEFT", self.nameBox, "BOTTOMLEFT", -2, -20)
   self.queryBoxLabel:SetText("Search Query")
 
-  self.queryBox = CreateFrame("ScrollFrame", addonName .. "SearchCategoryConfigQueryBox", self.frame, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
+  self.queryBox = CreateFrame("ScrollFrame", addon:GetName() .. "SearchCategoryConfigQueryBox", self.frame, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
   self.queryBox:SetSize(400, 100)
   self.queryBox.EditBox:SetSize(390, 100)
   self.queryBox:SetPoint("TOPLEFT", self.queryBoxLabel, "BOTTOMLEFT", 2, -7)
@@ -87,7 +87,7 @@ function searchCategoryConfig:OnEnable()
   self.priorityBoxLabel:SetPoint("TOPLEFT", self.queryBox, "BOTTOMLEFT", -2, -20)
   self.priorityBoxLabel:SetText("Priority")
 
-  self.priorityBox = CreateFrame("EditBox", addonName .. "SearchCategoryConfigPriorityBox", self.frame, "InputBoxTemplate")
+  self.priorityBox = CreateFrame("EditBox", addon:GetName() .. "SearchCategoryConfigPriorityBox", self.frame, "InputBoxTemplate")
   self.priorityBox:SetSize(200, 20)
   self.priorityBox:SetPoint("TOPLEFT", self.priorityBoxLabel, "BOTTOMLEFT", 2, -7)
   self.priorityBox:SetAutoFocus(false)
@@ -110,12 +110,12 @@ function searchCategoryConfig:OnEnable()
   self.errorText:SetText("")
   self.errorText:SetTextColor(1, 0, 0)
 
-  self.saveButton = CreateFrame("Button", addonName .. "SearchCategoryConfigSaveButton", self.frame, "UIPanelButtonTemplate")
+  self.saveButton = CreateFrame("Button", addon:GetName() .. "SearchCategoryConfigSaveButton", self.frame, "UIPanelButtonTemplate")
   self.saveButton:SetSize(100, 30)
   self.saveButton:SetPoint("BOTTOMRIGHT", -20, 20)
   self.saveButton:SetText("Save")
 
-  self.cancelButton = CreateFrame("Button", addonName .. "SearchCategoryConfigCancelButton", self.frame, "UIPanelButtonTemplate")
+  self.cancelButton = CreateFrame("Button", addon:GetName() .. "SearchCategoryConfigCancelButton", self.frame, "UIPanelButtonTemplate")
   self.cancelButton:SetSize(100, 30)
   self.cancelButton:SetPoint("RIGHT", self.saveButton, "LEFT", -10, 0)
   self.cancelButton:SetText("Cancel")

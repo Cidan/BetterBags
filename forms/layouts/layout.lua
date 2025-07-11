@@ -145,6 +145,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormItemListItem
 ---@field id number
 ---@field category string
+---@field data any
 
 ---@class (exact) FormItemListOptions
 ---@field title string

@@ -1,5 +1,9 @@
 ---@meta
 
+---@class ItemLocationMixin
+---@field GetBagAndSlot fun(): number, number
+---@field GetEquipmentSlot fun(): number
+
 ---@class AnimationGroup
 ---@field callback fun()
 

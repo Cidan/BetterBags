@@ -114,7 +114,7 @@ function contextMenu:CreateContextMenu(bag)
   -- Context Menu title.
   table.insert(menuList, {
     --@debug@
-		text = addonName..' Dev Mode',
+		text = addon:GetName()..' Dev Mode',
 		--@end-debug@
 		--[===[@non-debug@
 		text = addonName..' @project-version@',

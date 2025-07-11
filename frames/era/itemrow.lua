@@ -118,7 +118,7 @@ function item:_DoCreate(ctx)
   text:SetTextHeight(28)
   text:SetWordWrap(true)
   text:SetJustifyH("LEFT")
-  text:SetFont("Fonts\\FRIZQT__.TTF", 14, "THICK")
+  text:SetFont("Fonts\\FRIZQT__.TTF", 14, "THICKOUTLINE")
   text:SetShadowColor(0, 0, 0, 1)
   i.text = text
 

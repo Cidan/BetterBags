@@ -45,7 +45,7 @@ function money:Create(warbank)
   ---@type Money
   local m = setmetatable({}, { __index = money.moneyProto })
   m.warbank = warbank
-  local name = addonName .. "MoneyFrame" .. (warbank and "Warbank" or "")
+  local name = addon:GetName() .. "MoneyFrame" .. (warbank and "Warbank" or "")
   local f = CreateFrame("Frame", name, UIParent)
   local overlay = CreateFrame("Frame", name.."overlay", f)
   m.frame = f
