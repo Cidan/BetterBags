@@ -3,14 +3,12 @@
 
 local addon = GetBetterBags()
 
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
+local grid = addon:GetGrid()
 
 local views = addon:GetViews()
 
 local const = addon:GetConstants()
----@class Debug : AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 local items = addon:GetItems()
 
@@ -18,8 +16,7 @@ local itemFrame = addon:GetItemFrame()
 
 local database = addon:GetDatabase()
 
----@class Sort: AceModule
-local sort = addon:GetModule('Sort')
+local sort = addon:GetSort()
 
 local L = addon:GetLocalization()
 

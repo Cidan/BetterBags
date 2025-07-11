@@ -11,11 +11,9 @@ local BagSlots = addon:NewModule('BagSlots')
 local const = addon:GetConstants()
 local L = addon:GetLocalization()
 
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
+local grid = addon:GetGrid()
 
----@class BagButtonFrame: AceModule
-local bagButton = addon:GetModule('BagButton')
+local bagButton = addon:GetBagButton()
 
 local events = addon:GetEvents()
 

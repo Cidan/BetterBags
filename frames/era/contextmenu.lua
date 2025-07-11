@@ -11,8 +11,7 @@ local contextMenu = addon:NewModule('ContextMenu')
 local const = addon:GetConstants()
 local database = addon:GetDatabase()
 
----@class SliderFrame: AceModule
-local slider = addon:GetModule('Slider')
+local slider = addon:GetSlider()
 
 local categories = addon:GetCategories()
 

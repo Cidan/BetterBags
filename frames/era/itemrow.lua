@@ -15,8 +15,7 @@ local debug = addon:GetDebug()
 
 local itemFrame = addon:GetItemFrame()
 
----@class ItemRowFrame: AceModule
-local item = addon:GetModule('ItemRowFrame')
+local item = addon:GetItemRowFrame()
 
 ---@param ctx Context
 ---@param data ItemData

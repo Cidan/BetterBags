@@ -10,8 +10,7 @@ local items = addon:GetItems()
 local const = addon:GetConstants()
 local debug = addon:GetDebug()
 
----@class List: AceModule
-local list = addon:GetModule('List')
+local list = addon:GetList()
 
 local categories = addon:GetCategories()
 
@@ -28,11 +27,9 @@ local question = addon:GetQuestion()
 
 local themes = addon:GetThemes()
 
----@class SectionItemList: AceModule
-local sectionItemList = addon:GetModule('SectionItemList')
+local sectionItemList = addon:GetSectionItemList()
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
+local fonts = addon:GetFonts()
 
 local searchCategoryConfig = addon:GetSearchCategoryConfig()
 

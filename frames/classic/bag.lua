@@ -1,66 +1,44 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
-
-
-
 local addon = GetBetterBags()
 
----@class BagFrame: AceModule
-local bagFrame = addon:GetModule('BagFrame')
-
-local L = addon:GetLocalization()
+local bagFrame = addon:GetBagFrame()
 
 local const = addon:GetConstants()
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
 
 local items = addon:GetItems()
 
-local itemFrame = addon:GetItemFrame()
-
----@class BagSlots: AceModule
-local bagSlots = addon:GetModule('BagSlots')
-
-local sectionFrame = addon:GetSectionFrame()
+local bagSlots = addon:GetBagSlots()
 
 local database = addon:GetDatabase()
 
 local contextMenu = addon:GetContextMenu()
 
----@class MoneyFrame: AceModule
-local money = addon:GetModule('MoneyFrame')
+local money = addon:GetMoneyFrame()
 
 local views = addon:GetViews()
 
----@class Resize: AceModule
-local resize = addon:GetModule('Resize')
+local resize = addon:GetResize()
 
 local events = addon:GetEvents()
-
-local debug = addon:GetDebug()
 
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
 
----@class Currency: AceModule
-local currency = addon:GetModule('Currency')
+local currency = addon:GetCurrency()
 
----@class SearchBox: AceModule
-local searchBox = addon:GetModule('SearchBox')
+local searchBox = addon:GetSearchBox()
 
 local themes = addon:GetThemes()
 
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule('ThemeConfig')
+local themeConfig = addon:GetThemeConfig()
 
----@class WindowGroup: AceModule
-local windowGroup = addon:GetModule('WindowGroup')
+local windowGroup = addon:GetWindowGroup()
 
 local sectionConfig = addon:GetSectionConfig()
 
 local context = addon:GetContext()
 
----@class Anchor: AceModule
-local anchor = addon:GetModule('Anchor')
+local anchor = addon:GetAnchor()
 
 ---@param ctx Context
 function bagFrame.bagProto:SwitchToBankAndWipe(ctx)

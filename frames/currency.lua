@@ -7,8 +7,7 @@ local addon = GetBetterBags()
 ---@class Currency: AceModule
 local currency = addon:NewModule('Currency')
 
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
+local grid = addon:GetGrid()
 
 local const = addon:GetConstants()
 local events = addon:GetEvents()
@@ -19,8 +18,7 @@ local themes = addon:GetThemes()
 
 local L = addon:GetLocalization()
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
+local fonts = addon:GetFonts()
 
 local animations = addon:GetAnimations()
 

@@ -10,15 +10,13 @@ local bagFrame = addon:NewModule('BagFrame')
 local L = addon:GetLocalization()
 
 local const = addon:GetConstants()
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
+local grid = addon:GetGrid()
 
 local items = addon:GetItems()
 
 local itemFrame = addon:GetItemFrame()
 
----@class BagSlots: AceModule
-local bagSlots = addon:GetModule('BagSlots')
+local bagSlots = addon:GetBagSlots()
 
 local sectionFrame = addon:GetSectionFrame()
 
@@ -26,13 +24,11 @@ local database = addon:GetDatabase()
 
 local contextMenu = addon:GetContextMenu()
 
----@class MoneyFrame: AceModule
-local money = addon:GetModule('MoneyFrame')
+local money = addon:GetMoneyFrame()
 
 local views = addon:GetViews()
 
----@class Resize: AceModule
-local resize = addon:GetModule('Resize')
+local resize = addon:GetResize()
 
 local events = addon:GetEvents()
 
@@ -45,31 +41,25 @@ local categories = addon:GetCategories()
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
 
----@class Currency: AceModule
-local currency = addon:GetModule('Currency')
+local currency = addon:GetCurrency()
 
 local context = addon:GetContext()
 
----@class SearchBox: AceModule
-local searchBox = addon:GetModule('SearchBox')
+local searchBox = addon:GetSearchBox()
 
 local search = addon:GetSearch()
 
 local sectionConfig = addon:GetSectionConfig()
 
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule('ThemeConfig')
+local themeConfig = addon:GetThemeConfig()
 
 local themes = addon:GetThemes()
 
----@class WindowGroup: AceModule
-local windowGroup = addon:GetModule('WindowGroup')
+local windowGroup = addon:GetWindowGroup()
 
----@class Anchor: AceModule
-local anchor = addon:GetModule('Anchor')
+local anchor = addon:GetAnchor()
 
----@class Tabs: AceModule
-local tabs = addon:GetModule('Tabs')
+local tabs = addon:GetTabs()
 
 -------
 --- Bag Prototype

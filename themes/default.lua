@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class SearchBox: AceModule
-local searchBox = addon:GetModule('SearchBox')
+local searchBox = addon:GetSearchBox()
 
 ---@class DefaultThemeTemplate: Frame
 ---@field Bg Texture
@@ -22,8 +21,7 @@ local decoratorFrames = {}
 
 local themes = addon:GetThemes()
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
+local fonts = addon:GetFonts()
 
 ---@type Theme
 local defaultTheme = {

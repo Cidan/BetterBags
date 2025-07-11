@@ -9,8 +9,7 @@ local events = addon:GetEvents()
 
 local L = addon:GetLocalization()
 
----@class BagButtonFrame: AceModule
-local BagButtonFrame = addon:GetModule('BagButton')
+local BagButtonFrame = addon:GetBagButton()
 
 local buttonCount = 0
 

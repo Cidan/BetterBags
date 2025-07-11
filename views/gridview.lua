@@ -11,13 +11,11 @@ local itemFrame = addon:GetItemFrame()
 
 local items = addon:GetItems()
 
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
+local grid = addon:GetGrid()
 
 local views = addon:GetViews()
 
----@class Sort: AceModule
-local sort = addon:GetModule('Sort')
+local sort = addon:GetSort()
 
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
@@ -26,8 +24,7 @@ local categories = addon:GetCategories()
 
 local async = addon:GetAsync()
 
----@class Debug : AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@param view View
 ---@param ctx Context

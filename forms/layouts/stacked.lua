@@ -1,17 +1,10 @@
-
-
-
 local addon = GetBetterBags()
-
-local debug = addon:GetDebug()
 
 local context = addon:GetContext()
 
----@class (exact) ItemList: AceModule
-local itemList = addon:GetModule('ItemList')
+local itemList = addon:GetItemList()
 
----@class (exact) FormLayouts: AceModule
-local layouts = addon:GetModule('FormLayouts')
+local layouts = addon:GetFormLayouts()
 
 ---@class (exact) StackedLayout: FormLayout
 ---@field nextFrame Frame

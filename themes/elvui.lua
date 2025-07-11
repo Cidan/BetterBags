@@ -19,8 +19,7 @@ if ElvUI then
   S = E:GetModule('Skins')
 end
 
----@class SearchBox: AceModule
-local searchBox = addon:GetModule('SearchBox')
+local searchBox = addon:GetSearchBox()
 
 ---@class ElvUIDecoration: Frame
 ---@field title FontString

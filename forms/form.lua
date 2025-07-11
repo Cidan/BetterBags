@@ -16,8 +16,7 @@ local bucket = addon:GetBucket()
 
 local animations = addon:GetAnimations()
 
----@class FormLayouts: AceModule
-local layouts = addon:GetModule('FormLayouts')
+local layouts = addon:GetFormLayouts()
 
 ---@class (exact) Form: AceModule
 local form = addon:NewModule('Form')

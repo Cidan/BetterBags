@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Trees: AceModule
-local trees = addon:GetModule('Trees')
+local trees = addon:GetTrees()
 
 ---@class (exact) IntervalTreeNode
 ---@field value number

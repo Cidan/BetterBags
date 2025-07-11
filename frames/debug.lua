@@ -9,14 +9,11 @@ local database = addon:GetDatabase()
 
 local context = addon:GetContext()
 
----@class Tabs: AceModule
-local tabs = addon:GetModule('Tabs')
+local tabs = addon:GetTabs()
 
----@class List: AceModule
-local list = addon:GetModule('List')
+local list = addon:GetList()
 
----@class ItemBrowser: AceModule
-local itemBrowser = addon:GetModule('ItemBrowser')
+local itemBrowser = addon:GetItemBrowser()
 
 ---@class DebugWindow: AceModule
 ---@field frame Frame

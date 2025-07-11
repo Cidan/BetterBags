@@ -4,8 +4,7 @@
 
 local addon = GetBetterBags()
 
----@class MoneyFrame: AceModule
-local money = addon:GetModule('MoneyFrame')
+local money = addon:GetMoneyFrame()
 
 local debug = addon:GetDebug()
 

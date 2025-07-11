@@ -6,8 +6,7 @@ local addon = GetBetterBags()
 local events = addon:GetEvents()
 
 local const = addon:GetConstants()
----@class EquipmentSets: AceModule
-local equipmentSets = addon:GetModule('EquipmentSets')
+local equipmentSets = addon:GetEquipmentSets()
 
 local categories = addon:GetCategories()
 
@@ -19,8 +18,7 @@ local search = addon:GetSearch()
 
 local L = addon:GetLocalization()
 
----@class Binding: AceModule
-local binding = addon:GetModule("Binding")
+local binding = addon:GetBinding()
 
 local async = addon:GetAsync()
 

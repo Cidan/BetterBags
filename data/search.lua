@@ -4,16 +4,13 @@
 local addon = GetBetterBags()
 
 local const = addon:GetConstants()
----@class QueryParser: AceModule
-local QueryParser = addon:GetModule('QueryParser')
+local QueryParser = addon:GetQueryParser()
 
 local debug = addon:GetDebug()
 
----@class Binding: AceModule
-local binding = addon:GetModule('Binding')
+local binding = addon:GetBinding()
 
----@class Trees: AceModule
-local trees = addon:GetModule('Trees')
+local trees = addon:GetTrees()
 
 ---@class SearchIndex
 ---@field property string

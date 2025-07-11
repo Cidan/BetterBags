@@ -5,8 +5,7 @@ local addon = GetBetterBags()
 
 local animations = addon:GetAnimations()
 
----@class List: AceModule
-local list = addon:GetModule('List')
+local list = addon:GetList()
 
 local themes = addon:GetThemes()
 
@@ -14,8 +13,7 @@ local const = addon:GetConstants()
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
+local fonts = addon:GetFonts()
 
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:NewModule('ThemeConfig')

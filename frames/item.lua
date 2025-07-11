@@ -13,13 +13,11 @@ local events = addon:GetEvents()
 
 local database = addon:GetDatabase()
 
----@class Color: AceModule
-local color = addon:GetModule('Color')
+local color = addon:GetColor()
 
 local categories = addon:GetCategories()
 
----@class EquipmentSets: AceModule
-local equipmentSets = addon:GetModule('EquipmentSets')
+local equipmentSets = addon:GetEquipmentSets()
 
 local L = addon:GetLocalization()
 
@@ -31,8 +29,7 @@ local search = addon:GetSearch()
 
 local context = addon:GetContext()
 
----@class Pool: AceModule
-local pool = addon:GetModule('Pool')
+local pool = addon:GetPool()
 
 local debug = addon:GetDebug()
 

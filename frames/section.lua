@@ -12,8 +12,7 @@ local categories = addon:GetCategories()
 local events = addon:GetEvents()
 
 local const = addon:GetConstants()
----@class Sort: AceModule
-local sort = addon:GetModule('Sort')
+local sort = addon:GetSort()
 
 local debug = addon:GetDebug()
 
@@ -21,18 +20,15 @@ local database = addon:GetDatabase()
 
 local themes = addon:GetThemes()
 
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
+local grid = addon:GetGrid()
 
 local db = addon:GetDatabase()
 
 local items = addon:GetItems()
 
----@class MovementFlow: AceModule
-local movementFlow = addon:GetModule('MovementFlow')
+local movementFlow = addon:GetMovementFlow()
 
----@class Pool: AceModule
-local pool = addon:GetModule('Pool')
+local pool = addon:GetPool()
 
 -------
 --- Section Prototype

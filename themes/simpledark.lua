@@ -3,13 +3,11 @@
 
 local addon = GetBetterBags()
 
----@class SearchBox: AceModule
-local searchBox = addon:GetModule('SearchBox')
+local searchBox = addon:GetSearchBox()
 
 local themes = addon:GetThemes()
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
+local fonts = addon:GetFonts()
 
 ---@class SimpleDarkDecoration: Frame
 ---@field title FontString

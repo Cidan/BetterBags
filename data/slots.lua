@@ -7,8 +7,7 @@ local debug = addon:GetDebug()
 
 local items = addon:GetItems()
 
----@class Stacks: AceModule
-local stacks = addon:GetModule('Stacks')
+local stacks = addon:GetStacks()
 
 ---@class (exact) SwapSet
 ---@field a string

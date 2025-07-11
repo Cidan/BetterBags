@@ -16,8 +16,7 @@ local items = addon:GetItems()
 
 local themes = addon:GetThemes()
 
----@class Pool: AceModule
-local pool = addon:GetModule('Pool')
+local pool = addon:GetPool()
 
 ---@class ItemRowFrame: AceModule
 local item = addon:NewModule('ItemRowFrame')

@@ -9,8 +9,7 @@ local events = addon:GetEvents()
 
 local L = addon:GetLocalization()
 
----@class Pool: AceModule
-local pool = addon:GetModule('Pool')
+local pool = addon:GetPool()
 
 ---@class BagButtonFrame: AceModule
 local BagButtonFrame = addon:NewModule('BagButton')

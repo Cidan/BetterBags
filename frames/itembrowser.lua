@@ -15,8 +15,7 @@ local items = addon:GetItems()
 
 local context = addon:GetContext()
 
----@class List: AceModule
-local list = addon:GetModule('List')
+local list = addon:GetList()
 
 ---@class Node
 ---@field nodeType string

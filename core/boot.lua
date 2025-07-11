@@ -328,3 +328,8 @@ end
 function addon:GetForm()
   return self:GetModule('Form') --[[@as Form]]
 end
+
+---@return ItemList
+function addon:GetItemList()
+  return addon:GetModule('ItemList') --[[@as ItemList]]
+end

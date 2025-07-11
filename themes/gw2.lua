@@ -7,13 +7,11 @@ local addon = GetBetterBags()
 local contextMenu = addon:GetContextMenu()
 
 local const = addon:GetConstants()
----@class SearchBox: AceModule
-local searchBox = addon:GetModule('SearchBox')
+local searchBox = addon:GetSearchBox()
 
 local themes = addon:GetThemes()
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
+local fonts = addon:GetFonts()
 
 ---@class GuildWarsDecoration: Frame
 ---@field panelButtons Button[]
