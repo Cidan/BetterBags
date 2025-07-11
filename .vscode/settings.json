@@ -180,5 +180,11 @@
     "luadoc": "Warning",
     "codestyle": "Information"
   },
-  "Lua.runtime.version": "Lua 5.1"
+  "Lua.runtime.version": "Lua 5.1",
+  "Lua.workspace.library": [
+    ".libraries"
+  ],
+  "search.exclude": {
+    "**/.libraries": true,
+  }
 }

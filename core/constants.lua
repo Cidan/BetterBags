@@ -264,16 +264,25 @@ const.OFFSETS = {
   BOTTOM_BAR_RIGHT_INSET = -6,
 }
 
-if not addon.isRetail then
-  Enum.ItemQuality.Poor = 0
-  Enum.ItemQuality.Common = 1
-  Enum.ItemQuality.Uncommon = 2
-  Enum.ItemQuality.Rare = 3
-  Enum.ItemQuality.Epic = 4
-  Enum.ItemQuality.Legendary = 5
-  Enum.ItemQuality.Artifact = 6
-  Enum.ItemQuality.Heirloom = 7
-  Enum.ItemQuality.WoWToken = 8
+---@enum ItemQuality
+const.ITEM_QUALITY = {
+  Poor = Enum.ItemQuality.Poor,
+  Common = Enum.ItemQuality.Common,
+  Uncommon = Enum.ItemQuality.Uncommon,
+  Rare = Enum.ItemQuality.Rare,
+  Epic = Enum.ItemQuality.Epic,
+  Legendary = Enum.ItemQuality.Legendary,
+  Artifact = Enum.ItemQuality.Artifact,
+  Heirloom = Enum.ItemQuality.Heirloom,
+  WoWToken = Enum.ItemQuality.WoWToken,
+}
+
+if addon.isMists then
+  const.ITEM_QUALITY.Good = Enum.ItemQuality.Good
+  const.ITEM_QUALITY.Uncommon = Enum.ItemQuality.Good
+
+  const.ITEM_QUALITY.Standard = Enum.ItemQuality.Standard
+  const.ITEM_QUALITY.Common = Enum.ItemQuality.Standard
 end
 
 const.BAG_SUBTYPES = {
@@ -290,90 +299,90 @@ const.BAG_SUBTYPES = {
   ["Cooking Bag"] = 10,
 }
 
----@type table<number, Enum.ItemQuality>
+---@type table<number, ItemQuality>
 const.BAG_SUBTYPE_TO_QUALITY = {
-  [0] = Enum.ItemQuality.Poor,
-  [1] = Enum.ItemQuality.Epic,
-  [2] = Enum.ItemQuality.Uncommon,
-  [3] = Enum.ItemQuality.Rare,
-  [4] = Enum.ItemQuality.Artifact,
-  [5] = Enum.ItemQuality.Heirloom,
-  [6] = Enum.ItemQuality.Common,
-  [7] = Enum.ItemQuality.Common,
-  [8] = Enum.ItemQuality.Common,
-  [9] = Enum.ItemQuality.Common,
-  [10] = Enum.ItemQuality.Common,
-  [99] = Enum.ItemQuality.Common
+  [0] = const.ITEM_QUALITY.Poor,
+  [1] = const.ITEM_QUALITY.Epic,
+  [2] = const.ITEM_QUALITY.Uncommon,
+  [3] = const.ITEM_QUALITY.Rare,
+  [4] = const.ITEM_QUALITY.Artifact,
+  [5] = const.ITEM_QUALITY.Heirloom,
+  [6] = const.ITEM_QUALITY.Common,
+  [7] = const.ITEM_QUALITY.Common,
+  [8] = const.ITEM_QUALITY.Common,
+  [9] = const.ITEM_QUALITY.Common,
+  [10] = const.ITEM_QUALITY.Common,
+  [99] = const.ITEM_QUALITY.Common
 }
 
----@type table<string, Enum.ItemQuality>
+---@type table<string, ItemQuality>
 const.ITEM_QUALITY_TO_ENUM = {
-  ITEM_QUALITY0_DESC = Enum.ItemQuality.Poor,
-  ITEM_QUALITY1_DESC = Enum.ItemQuality.Common,
-  ITEM_QUALITY2_DESC = Enum.ItemQuality.Uncommon,
-  ITEM_QUALITY3_DESC = Enum.ItemQuality.Rare,
-  ITEM_QUALITY4_DESC = Enum.ItemQuality.Epic,
-  ITEM_QUALITY5_DESC = Enum.ItemQuality.Legendary,
-  ITEM_QUALITY6_DESC = Enum.ItemQuality.Artifact,
-  ITEM_QUALITY7_DESC = Enum.ItemQuality.Heirloom,
-  ITEM_QUALITY8_DESC = Enum.ItemQuality.WoWToken,
+  ITEM_QUALITY0_DESC = const.ITEM_QUALITY.Poor,
+  ITEM_QUALITY1_DESC = const.ITEM_QUALITY.Common,
+  ITEM_QUALITY2_DESC = const.ITEM_QUALITY.Uncommon,
+  ITEM_QUALITY3_DESC = const.ITEM_QUALITY.Rare,
+  ITEM_QUALITY4_DESC = const.ITEM_QUALITY.Epic,
+  ITEM_QUALITY5_DESC = const.ITEM_QUALITY.Legendary,
+  ITEM_QUALITY6_DESC = const.ITEM_QUALITY.Artifact,
+  ITEM_QUALITY7_DESC = const.ITEM_QUALITY.Heirloom,
+  ITEM_QUALITY8_DESC = const.ITEM_QUALITY.WoWToken,
 }
 
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY0_DESC)] = Enum.ItemQuality.Poor
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY1_DESC)] = Enum.ItemQuality.Common
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY2_DESC)] = Enum.ItemQuality.Uncommon
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY3_DESC)] = Enum.ItemQuality.Rare
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY4_DESC)] = Enum.ItemQuality.Epic
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY5_DESC)] = Enum.ItemQuality.Legendary
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY6_DESC)] = Enum.ItemQuality.Artifact
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY7_DESC)] = Enum.ItemQuality.Heirloom
-const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY8_DESC)] = Enum.ItemQuality.WoWToken
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY0_DESC)] = const.ITEM_QUALITY.Poor
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY1_DESC)] = const.ITEM_QUALITY.Common
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY2_DESC)] = const.ITEM_QUALITY.Uncommon
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY3_DESC)] = const.ITEM_QUALITY.Rare
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY4_DESC)] = const.ITEM_QUALITY.Epic
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY5_DESC)] = const.ITEM_QUALITY.Legendary
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY6_DESC)] = const.ITEM_QUALITY.Artifact
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY7_DESC)] = const.ITEM_QUALITY.Heirloom
+const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY8_DESC)] = const.ITEM_QUALITY.WoWToken
 
 const.ITEM_QUALITY_COLOR = {
-  [Enum.ItemQuality.Poor] = {0.62, 0.62, 0.62, 1},
-  [Enum.ItemQuality.Common] = {1, 1, 1, 1},
-  [Enum.ItemQuality.Uncommon] = {0.12, 1, 0, 1},
-  [Enum.ItemQuality.Rare] = {0.00, 0.44, 0.87, 1},
-  [Enum.ItemQuality.Epic] = {0.64, 0.21, 0.93, 1},
-  [Enum.ItemQuality.Legendary] = {1, 0.50, 0, 1},
-  [Enum.ItemQuality.Artifact] = {0.90, 0.80, 0.50, 1},
-  [Enum.ItemQuality.Heirloom] = {0, 0.8, 1, 1},
-  [Enum.ItemQuality.WoWToken] = {0, 0.8, 1, 1},
+  [const.ITEM_QUALITY.Poor] = {0.62, 0.62, 0.62, 1},
+  [const.ITEM_QUALITY.Common] = {1, 1, 1, 1},
+  [const.ITEM_QUALITY.Uncommon] = {0.12, 1, 0, 1},
+  [const.ITEM_QUALITY.Rare] = {0.00, 0.44, 0.87, 1},
+  [const.ITEM_QUALITY.Epic] = {0.64, 0.21, 0.93, 1},
+  [const.ITEM_QUALITY.Legendary] = {1, 0.50, 0, 1},
+  [const.ITEM_QUALITY.Artifact] = {0.90, 0.80, 0.50, 1},
+  [const.ITEM_QUALITY.Heirloom] = {0, 0.8, 1, 1},
+  [const.ITEM_QUALITY.WoWToken] = {0, 0.8, 1, 1},
 }
 
 const.ITEM_QUALITY_HIGHLIGHT = {
-  [Enum.ItemQuality.Poor] = {0.682, 0.682, 0.682, 1},
-  [Enum.ItemQuality.Common] = {1, 1, 1, 1},
-  [Enum.ItemQuality.Uncommon] = {0.132, 1, 0, 1},
-  [Enum.ItemQuality.Rare] = {0, 0.484, 0.957, 1},
-  [Enum.ItemQuality.Epic] = {0.704, 0.231, 1, 1},
-  [Enum.ItemQuality.Legendary] = {1, 0.55, 0, 1},
-  [Enum.ItemQuality.Artifact] = {0.99, 0.88, 0.55, 1},
-  [Enum.ItemQuality.Heirloom] = {0, 0.88, 1, 1},
-  [Enum.ItemQuality.WoWToken] = {0, 0.88, 1, 1},
+  [const.ITEM_QUALITY.Poor] = {0.682, 0.682, 0.682, 1},
+  [const.ITEM_QUALITY.Common] = {1, 1, 1, 1},
+  [const.ITEM_QUALITY.Uncommon] = {0.132, 1, 0, 1},
+  [const.ITEM_QUALITY.Rare] = {0, 0.484, 0.957, 1},
+  [const.ITEM_QUALITY.Epic] = {0.704, 0.231, 1, 1},
+  [const.ITEM_QUALITY.Legendary] = {1, 0.55, 0, 1},
+  [const.ITEM_QUALITY.Artifact] = {0.99, 0.88, 0.55, 1},
+  [const.ITEM_QUALITY.Heirloom] = {0, 0.88, 1, 1},
+  [const.ITEM_QUALITY.WoWToken] = {0, 0.88, 1, 1},
 }
 const.ITEM_QUALITY_COLOR_HIGH = {
-  [Enum.ItemQuality.Poor] = {0.558, 0.558, 0.558, 0.3},
-  [Enum.ItemQuality.Common] = {0.9, 0.9, 0.9, 0.3},
-  [Enum.ItemQuality.Uncommon] = {0.108, 0.9, 0, 0.3},
-  [Enum.ItemQuality.Rare] = {0, 0.396, 0.783, 0.3},
-  [Enum.ItemQuality.Epic] = {0.576, 0.189, 0.837, 0.3},
-  [Enum.ItemQuality.Legendary] = {0.9, 0.45, 0, 0.3},
-  [Enum.ItemQuality.Artifact] = {0.81, 0.72, 0.45, 0.3},
-  [Enum.ItemQuality.Heirloom] = {0, 0.72, 0.9, 0.3},
-  [Enum.ItemQuality.WoWToken] = {0, 0.72, 0.9, 0.3},
+  [const.ITEM_QUALITY.Poor] = {0.558, 0.558, 0.558, 0.3},
+  [const.ITEM_QUALITY.Common] = {0.9, 0.9, 0.9, 0.3},
+  [const.ITEM_QUALITY.Uncommon] = {0.108, 0.9, 0, 0.3},
+  [const.ITEM_QUALITY.Rare] = {0, 0.396, 0.783, 0.3},
+  [const.ITEM_QUALITY.Epic] = {0.576, 0.189, 0.837, 0.3},
+  [const.ITEM_QUALITY.Legendary] = {0.9, 0.45, 0, 0.3},
+  [const.ITEM_QUALITY.Artifact] = {0.81, 0.72, 0.45, 0.3},
+  [const.ITEM_QUALITY.Heirloom] = {0, 0.72, 0.9, 0.3},
+  [const.ITEM_QUALITY.WoWToken] = {0, 0.72, 0.9, 0.3},
 }
 
 const.ITEM_QUALITY_COLOR_LOW = {
-  [Enum.ItemQuality.Poor] = {0.558, 0.558, 0.558, 0.1},
-  [Enum.ItemQuality.Common] = {0.9, 0.9, 0.9, 0.1},
-  [Enum.ItemQuality.Uncommon] = {0.108, 0.9, 0, 0.1},
-  [Enum.ItemQuality.Rare] = {0, 0.396, 0.783, 0.1},
-  [Enum.ItemQuality.Epic] = {0.576, 0.189, 0.837, 0.1},
-  [Enum.ItemQuality.Legendary] = {0.9, 0.45, 0, 0.1},
-  [Enum.ItemQuality.Artifact] = {0.81, 0.72, 0.45, 0.1},
-  [Enum.ItemQuality.Heirloom] = {0, 0.72, 0.9, 0.1},
-  [Enum.ItemQuality.WoWToken] = {0, 0.72, 0.9, 0.1},
+  [const.ITEM_QUALITY.Poor] = {0.558, 0.558, 0.558, 0.1},
+  [const.ITEM_QUALITY.Common] = {0.9, 0.9, 0.9, 0.1},
+  [const.ITEM_QUALITY.Uncommon] = {0.108, 0.9, 0, 0.1},
+  [const.ITEM_QUALITY.Rare] = {0, 0.396, 0.783, 0.1},
+  [const.ITEM_QUALITY.Epic] = {0.576, 0.189, 0.837, 0.1},
+  [const.ITEM_QUALITY.Legendary] = {0.9, 0.45, 0, 0.1},
+  [const.ITEM_QUALITY.Artifact] = {0.81, 0.72, 0.45, 0.1},
+  [const.ITEM_QUALITY.Heirloom] = {0, 0.72, 0.9, 0.1},
+  [const.ITEM_QUALITY.WoWToken] = {0, 0.72, 0.9, 0.1},
 }
 ---@class ExpansionMap
 ---@type table<number, string>

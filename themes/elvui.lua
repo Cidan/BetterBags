@@ -181,7 +181,7 @@ local theme = {
     if button.SetItemButtonQuality then
       hooksecurefunc(button, 'SetItemButtonQuality', function(_, quality)
         -- ElvUI Icon Borders are super edgy.
-        if quality == Enum.ItemQuality.Common then
+        if quality == const.ITEM_QUALITY.Common then
           button.IconBorder:SetVertexColor(0, 0, 0, 1)
         end
       end)

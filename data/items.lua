@@ -1042,7 +1042,7 @@ function items:GetCategory(ctx, data)
 
   if not data.kind then return L:G('Everything') end
 
-  if data.containerInfo.quality == Enum.ItemQuality.Poor then
+  if data.containerInfo.quality == const.ITEM_QUALITY.Poor then
     return L:G('Junk')
   end
 
@@ -1140,7 +1140,7 @@ function items:GetEquipmentInfo(itemMixin)
   }
   data.inventoryType = invType --[[@as number]]
   data.inventorySlots = {itemMixin:GetItemLocation():GetEquipmentSlot()}
-  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
+  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
   data.itemInfo = {
     itemID = itemID,
@@ -1203,7 +1203,7 @@ function items:AttachItemInfo(data, kind)
   sellPrice, classID, subclassID, bindType, expacID,
   setID, isCraftingReagent = C_Item.GetItemInfo(itemID)
   bindType = self:GetBindTypeFromLink(itemLink) or bindType  --link overrides itemID if set
-  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
+  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   local invType = itemMixin:GetInventoryType()
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)

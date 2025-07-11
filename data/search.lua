@@ -511,7 +511,7 @@ function search:isRarity(operator, value)
       error("Unknown operator: " .. operator)
     end
   end
-  local rarity = const.ITEM_QUALITY_TO_ENUM[value] --[[@as Enum.ItemQuality]]
+  local rarity = const.ITEM_QUALITY_TO_ENUM[value] --[[@as ItemQuality]]
   if not rarity then return {} end
   if operator == "=" then
     return self:isInIndex('rarity', rarity)

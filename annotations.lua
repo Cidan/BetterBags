@@ -349,7 +349,7 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field itemGUID string
 ---@field itemName string
 ---@field itemLink string
----@field itemQuality Enum.ItemQuality
+---@field itemQuality ItemQuality
 ---@field itemLevel number
 ---@field itemMinLevel number
 ---@field itemType string

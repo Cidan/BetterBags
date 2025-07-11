@@ -363,7 +363,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
   decoration:SetItemButtonTexture(data.itemInfo.itemIcon)
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
-  if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > Enum.ItemQuality.Common then
+  if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > const.ITEM_QUALITY.Common then
     decoration.IconBorder:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
     decoration.IconBorder:SetBlendMode("ADD")
     decoration.IconBorder:SetTexCoord(14/64, 49/64, 15/64, 50/64)
@@ -423,7 +423,7 @@ function itemFrame.itemProto:ClearFlashItem(ctx)
 end
 
 ---@param ctx Context
----@param quality Enum.ItemQuality
+---@param quality ItemQuality
 function itemFrame.itemProto:UpdateNewItem(ctx, quality)
   local decoration = themes:GetItemButton(ctx, self)
 	if(not decoration.BattlepayItemTexture and not self.NewItemTexture) then
@@ -495,7 +495,7 @@ function itemFrame.itemProto:GetBagType(bagid)
 end
 
 ---@param bagid number
----@return Enum.ItemQuality
+---@return ItemQuality
 function itemFrame.itemProto:GetBagTypeQuality(bagid)
   local invid = C_Container.ContainerIDToInventoryID(bagid)
   local baglink = GetInventoryItemLink("player", invid)
@@ -558,9 +558,9 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
 
   self.freeSlotName = self:GetBagType(bagid)
   if database:GetShowAllFreeSpace(self.kind) and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-    SetItemButtonQuality(decoration, Enum.ItemQuality.Uncommon, nil, false, false)
+    SetItemButtonQuality(decoration, const.ITEM_QUALITY.Uncommon, nil, false, false)
   else
-    SetItemButtonQuality(decoration, Enum.ItemQuality.Common, nil, false, false)
+    SetItemButtonQuality(decoration, const.ITEM_QUALITY.Common, nil, false, false)
   end
   decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   decoration.IconBorder:SetBlendMode("BLEND")

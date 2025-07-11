@@ -121,7 +121,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality)
   decoration.minDisplayCount = 1
   SetItemButtonTexture(decoration, data.itemInfo.itemIcon)
-  if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > Enum.ItemQuality.Common then
+  if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > const.ITEM_QUALITY.Common then
     decoration.IconBorder:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
     decoration.IconBorder:SetBlendMode("ADD")
     decoration.IconBorder:SetTexCoord(14/64, 49/64, 15/64, 50/64)
