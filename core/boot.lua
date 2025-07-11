@@ -184,9 +184,9 @@ function addon:GetBagSlots()
   return self:GetModule('BagSlots') --[[@as BagSlots]]
 end
 
----@return BagButton
+---@return BagButtonFrame
 function addon:GetBagButton()
-  return self:GetModule('BagButton') --[[@as BagButton]]
+  return self:GetModule('BagButton') --[[@as BagButtonFrame]]
 end
 
 ---@return BagFrame

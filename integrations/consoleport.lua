@@ -41,8 +41,10 @@ function consoleport:OnEnable()
   config.Open = function(me)
     ---@cast me +Config
     if addon.isClassic then
+---@diagnostic disable-next-line: undefined-field
       Settings.OpenToCategory(me.frame)
     else
+---@diagnostic disable-next-line: undefined-field
       Settings.OpenToCategory(me.category)
     end
   end
