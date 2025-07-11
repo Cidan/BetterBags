@@ -1,10 +1,5 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field,deprecated
-local addonName = ... ---@type string
-
----@class BetterBags: AceAddon
----@field _buttons CheckButton[]|MainMenuBagButton[]
-local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
----@cast addon +AceHook-3.0
+local addon = GetBetterBags()
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
@@ -90,11 +85,7 @@ local debug = addon:GetModule('Debug')
 ---@class Form: AceModule
 local form = addon:GetModule('Form')
 
----@class BagFrames
----@field Backpack Bag
----@field Bank Bag
 addon.Bags = {}
-
 addon.atBank = false
 addon.atWarbank = false
 

@@ -1,11 +1,4 @@
-local addonName = ... ---@type string
-
----@class BetterBags: AceAddon
----@field backpackShouldOpen boolean
----@field backpackShouldClose boolean
----@field atInteracting boolean
-local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
----@cast addon +AceHook-3.0
+local addon = GetBetterBags()
 
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')

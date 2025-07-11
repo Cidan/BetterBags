@@ -168,10 +168,10 @@ func main() {
 		outputs = append(outputs, resp.Choices[0].Message.Content)
 		fmt.Printf("Processed chunk %d (%d/%d)\n", i, i+1, len(inputs))
 	}
-	var luaOutput = `local addonName = ... ---@type string
+	var luaOutput = `
 
----@class BetterBags: AceAddon
-local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+---@type BetterBags
+local addon = GetBetterBags()
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')

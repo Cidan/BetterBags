@@ -1,7 +1,5 @@
-local addonName = ... ---@type string
-
----@class BetterBags: AceAddon
-local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+---@type BetterBags
+local addon = GetBetterBags()
 
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
@@ -12,7 +10,7 @@ local DB = addon:NewModule('Database')
 
 function DB:OnInitialize()
   -- Create the settings database.
-  DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
+  DB.data = LibStub('AceDB-3.0'):New(addon:GetName() .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
   DB:Migrate()
 end
 

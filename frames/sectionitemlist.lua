@@ -1,7 +1,7 @@
-local addonName = ... ---@type string
 
----@class BetterBags: AceAddon
-local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+
+---@type BetterBags
+local addon = GetBetterBags()
 
 ---@class List: AceModule
 local list = addon:GetModule('List')

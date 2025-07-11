@@ -1,8 +1,8 @@
-local addonName = ... ---@type string
+
 local gw = GW2_ADDON
 
----@class BetterBags: AceAddon
-local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
+---@type BetterBags
+local addon = GetBetterBags()
 
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')

@@ -28,6 +28,10 @@
 ---@field searchOverlay Texture
 local itemButton = {}
 
+---@class BagFrames
+---@field Backpack? Bag
+---@field Bank? Bag
+
 ---@param bagid number
 function itemButton:SetBagID(bagid) end
 
