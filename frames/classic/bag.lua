@@ -7,8 +7,7 @@ local addon = GetBetterBags()
 ---@class BagFrame: AceModule
 local bagFrame = addon:GetModule('BagFrame')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')

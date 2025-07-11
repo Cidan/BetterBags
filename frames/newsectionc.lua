@@ -1,7 +1,6 @@
 local addon = GetBetterBags()
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')

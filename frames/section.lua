@@ -31,8 +31,7 @@ local themes = addon:GetModule('Themes')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
----@class Database: AceModule
-local db = addon:GetModule('Database')
+local db = addon:GetDatabase()
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')

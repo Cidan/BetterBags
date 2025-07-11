@@ -1,8 +1,7 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field,deprecated
 local addon = GetBetterBags()
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')

@@ -21,8 +21,7 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@class ItemListFrame: Frame
 ---@field frame Frame

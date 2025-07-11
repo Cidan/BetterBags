@@ -12,8 +12,7 @@ local themes = addon:GetModule('Themes')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Database: AceModule
-local db = addon:GetModule('Database')
+local db = addon:GetDatabase()
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')

@@ -22,8 +22,7 @@ local debug = addon:GetModule('Debug')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 local animations = addon:GetAnimations()
 

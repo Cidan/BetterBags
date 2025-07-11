@@ -27,8 +27,7 @@ local database = addon:GetModule('Database')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@param view View
 ---@param ctx Context

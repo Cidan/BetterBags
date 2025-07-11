@@ -23,8 +23,7 @@ local config = addon:GetModule('Config')
 -- This will get a handle to the localization module, which should be
 -- used for all text your users will see. For all category names,
 -- you should use the L:G() function to get the localized string.
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 -- This is the context module, which is required for most API calls.
 -- The context module is used to track the state of the addon and it's

@@ -26,8 +26,7 @@ local categories = addon:GetModule('Categories')
 ---@class EquipmentSets: AceModule
 local equipmentSets = addon:GetModule('EquipmentSets')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')

@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 --[[
   This file is safe to edit manually for translations. Do not overwrite an entire translation table

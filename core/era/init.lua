@@ -5,8 +5,7 @@
 local addon = GetBetterBags()
 ---@cast addon +AceHook-3.0
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')

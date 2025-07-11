@@ -24,8 +24,7 @@ local context = addon:GetModule('Context')
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
+local L = addon:GetLocalization()
 
 ---@class Binding: AceModule
 local binding = addon:GetModule("Binding")
