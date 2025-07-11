@@ -6,7 +6,6 @@ local addon = GetBetterBags()
 local database = addon:GetDatabase()
 
 local const = addon:GetConstants()
-local debug = addon:GetDebug()
 
 local categories = addon:GetCategories()
 

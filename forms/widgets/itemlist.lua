@@ -1,22 +1,11 @@
-
-
-
 local addon = GetBetterBags()
-
-local context = addon:GetContext()
-
-local items = addon:GetItems()
-
-local categories = addon:GetCategories()
 
 ---@class ItemList: AceModule
 local itemList = addon:NewModule('ItemList')
 
-local database = addon:GetDatabase()
+local context = addon:GetContext()
 
-local events = addon:GetEvents()
-
-local L = addon:GetLocalization()
+local items = addon:GetItems()
 
 ---@class ItemListFrame: Frame
 ---@field frame Frame

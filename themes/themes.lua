@@ -6,8 +6,6 @@ local addon = GetBetterBags()
 local const = addon:GetConstants()
 local L = addon:GetLocalization()
 
-local debug = addon:GetDebug()
-
 local events = addon:GetEvents()
 
 local async = addon:GetAsync()

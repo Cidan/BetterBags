@@ -1,15 +1,7 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
-
-
-
 local addon = GetBetterBags()
 
 local money = addon:GetMoneyFrame()
-
-local debug = addon:GetDebug()
-
-local events = addon:GetEvents()
-
 
 function money:CreateButton(kind, parent)
   local b = CreateFrame("Button", nil, parent)

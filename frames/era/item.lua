@@ -1,10 +1,8 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
-
-
-
 local addon = GetBetterBags()
 
 local const = addon:GetConstants()
+
 local itemFrame = addon:GetItemFrame()
 
 local events = addon:GetEvents()
@@ -13,17 +11,10 @@ local database = addon:GetDatabase()
 
 local color = addon:GetColor()
 
-local categories = addon:GetCategories()
-
-local equipmentSets = addon:GetEquipmentSets()
-
-local L = addon:GetLocalization()
-
 local items = addon:GetItems()
 
 local themes = addon:GetThemes()
 
-local debug = addon:GetDebug()
 
 local buttonCount = 0
 local children = {

@@ -1,7 +1,4 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
-
-
-
 local addon = GetBetterBags()
 
 ---@class ContextMenu: AceModule
@@ -9,15 +6,10 @@ local addon = GetBetterBags()
 local contextMenu = addon:NewModule('ContextMenu')
 
 local const = addon:GetConstants()
+
 local database = addon:GetDatabase()
 
-local slider = addon:GetSlider()
-
-local categories = addon:GetCategories()
-
 local events = addon:GetEvents()
-
-local items = addon:GetItems()
 
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')

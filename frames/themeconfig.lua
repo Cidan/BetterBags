@@ -9,7 +9,6 @@ local list = addon:GetList()
 
 local themes = addon:GetThemes()
 
-local const = addon:GetConstants()
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 

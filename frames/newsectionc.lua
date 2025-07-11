@@ -2,9 +2,8 @@ local addon = GetBetterBags()
 
 local L = addon:GetLocalization()
 
-local themes = addon:GetThemes()
-
 local const = addon:GetConstants()
+
 local form = addon:GetForm()
 
 local categories = addon:GetCategories()

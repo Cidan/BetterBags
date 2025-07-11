@@ -1,19 +1,7 @@
-
-
-
 local addon = GetBetterBags()
 
 ---@class ItemBrowser: AceModule
 local itemBrowser = addon:NewModule('ItemBrowser')
-
-local const = addon:GetConstants()
-local events = addon:GetEvents()
-
-local database = addon:GetDatabase()
-
-local items = addon:GetItems()
-
-local context = addon:GetContext()
 
 local list = addon:GetList()
 

@@ -6,7 +6,6 @@ local addon = GetBetterBags()
 local sectionFrame = addon:GetSectionFrame()
 
 local const = addon:GetConstants()
-local database = addon:GetDatabase()
 
 local itemFrame = addon:GetItemFrame()
 
@@ -14,7 +13,6 @@ local items = addon:GetItems()
 
 local categories = addon:GetCategories()
 
-local debug = addon:GetDebug()
 
 ---@class Views: AceModule
 local views = addon:NewModule('Views')

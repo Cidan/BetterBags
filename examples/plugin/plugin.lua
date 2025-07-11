@@ -1,3 +1,4 @@
+---@diagnostic disable: unused-local
 --[[
   This is an example of how to create a category plugin for BetterBags.
   Your addon must be a loadable addon, and it must have a .toc file,

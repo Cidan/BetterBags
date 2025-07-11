@@ -1,6 +1,3 @@
-
-
-
 local addon = GetBetterBags()
 
 local list = addon:GetList()
@@ -17,17 +14,13 @@ local contextMenu = addon:GetContextMenu()
 
 local database = addon:GetDatabase()
 
----@class Localization: AceModule
-local L =  addon:GetModule('Localization')
+local L =  addon:GetLocalization()
 
 local events = addon:GetEvents()
 
-local const = addon:GetConstants()
 local themes = addon:GetThemes()
 
 local context = addon:GetContext()
-
-local debug = addon:GetDebug()
 
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:NewModule('SectionItemList')

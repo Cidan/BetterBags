@@ -8,7 +8,6 @@ local tabs = addon:NewModule('Tabs')
 
 local themes = addon:GetThemes()
 
-local debug = addon:GetDebug()
 
 ---@class PanelTabButtonTemplate: Button
 ---@field Text FontString

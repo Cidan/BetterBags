@@ -1,7 +1,4 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
-
-
-
 local addon = GetBetterBags()
 
 local const = addon:GetConstants()
@@ -15,17 +12,11 @@ local database = addon:GetDatabase()
 
 local color = addon:GetColor()
 
-local categories = addon:GetCategories()
-
-local equipmentSets = addon:GetEquipmentSets()
-
 local L = addon:GetLocalization()
 
 local items = addon:GetItems()
 
 local themes = addon:GetThemes()
-
-local search = addon:GetSearch()
 
 local context = addon:GetContext()
 

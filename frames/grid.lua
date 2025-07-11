@@ -1,9 +1,4 @@
-
-
-
 local addon = GetBetterBags()
-
-local debug = addon:GetDebug()
 
 local const = addon:GetConstants()
 ---@class GridFrame: AceModule

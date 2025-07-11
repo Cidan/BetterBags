@@ -1,13 +1,8 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
-
-
-
 local addon = GetBetterBags()
 
 ---@class MoneyFrame: AceModule
 local money = addon:NewModule('MoneyFrame')
-
-local debug = addon:GetDebug()
 
 local events = addon:GetEvents()
 

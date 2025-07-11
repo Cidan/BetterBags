@@ -1,17 +1,9 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
-
-
-
 local addon = GetBetterBags()
 
 local const = addon:GetConstants()
+
 local events = addon:GetEvents()
-
-local database = addon:GetDatabase()
-
-local L = addon:GetLocalization()
-
-local debug = addon:GetDebug()
 
 local itemFrame = addon:GetItemFrame()
 
