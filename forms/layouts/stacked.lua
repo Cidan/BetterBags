@@ -26,11 +26,6 @@ local layouts = addon:GetFormLayouts()
 ---@field index boolean
 local stackedLayout = {}
 
----@param targetFrame Frame
----@param baseFrame Frame
----@param scrollBox WowScrollBox
----@param index boolean
----@return FormLayout
 function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   local l = setmetatable({}, {__index = stackedLayout}) --[[@as StackedLayout]]
   l.targetFrame = targetFrame

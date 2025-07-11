@@ -1,9 +1,7 @@
-
-
-
 local addon = GetBetterBags()
 
 ---@class FormLayouts: AceModule
+---@field NewStackedLayout fun(self: FormLayouts, targetFrame: Frame, baseFrame: Frame, scrollBox: WowScrollBox, index: boolean): FormLayout
 local layouts = addon:NewModule('FormLayouts')
 
 --[[
