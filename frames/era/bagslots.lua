@@ -8,9 +8,7 @@ local addon = GetBetterBags()
 ---@class BagSlots: AceModule
 local BagSlots = addon:GetModule('BagSlots')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 local L = addon:GetLocalization()
 
 ---@class GridFrame: AceModule
@@ -19,25 +17,21 @@ local grid = addon:GetModule('Grid')
 ---@class BagButtonFrame: AceModule
 local bagButton = addon:GetModule('BagButton')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 local animations = addon:GetAnimations()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 ---@param ctx Context
 ---@param kind BagKind

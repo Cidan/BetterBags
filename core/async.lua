@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Task
 ---@field fn fun()

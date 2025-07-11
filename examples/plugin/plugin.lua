@@ -28,8 +28,7 @@ local L = addon:GetLocalization()
 -- This is the context module, which is required for most API calls.
 -- The context module is used to track the state of the addon and it's
 -- calls, including a call stack across events, across frames.
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 -- Create a new context.
 -- Set the event for the context. This is used for tracking the state of the addon

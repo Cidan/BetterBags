@@ -6,11 +6,9 @@ local addon = GetBetterBags()
 ---@class Tabs: AceModule
 local tabs = addon:NewModule('Tabs')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class PanelTabButtonTemplate: Button
 ---@field Text FontString

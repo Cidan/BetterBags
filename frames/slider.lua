@@ -6,9 +6,7 @@ local addon = GetBetterBags()
 ---@class SliderFrame: AceModule
 local slider = addon:NewModule('Slider')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class BetterSlider
 ---@field private frame Frame
 ---@field private slider Slider

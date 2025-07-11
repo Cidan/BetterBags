@@ -7,14 +7,11 @@ local addon = GetBetterBags()
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')

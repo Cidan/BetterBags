@@ -3,14 +3,11 @@
 
 local addon = GetBetterBags()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class QueryParser: AceModule
 local QueryParser = addon:GetModule('QueryParser')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class Binding: AceModule
 local binding = addon:GetModule('Binding')

@@ -1,9 +1,7 @@
 
 local addon = GetBetterBags()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Binding: AceModule
 local binding = addon:NewModule('Binding')
 

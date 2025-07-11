@@ -4,11 +4,8 @@
 
 local addon = GetBetterBags()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local const = addon:GetConstants()
+local events = addon:GetEvents()
 
 local L = addon:GetLocalization()
 

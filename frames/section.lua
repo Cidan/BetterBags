@@ -10,23 +10,18 @@ local sectionFrame = addon:NewModule('SectionFrame')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')

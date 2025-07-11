@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')

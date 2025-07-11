@@ -4,9 +4,7 @@
 
 local addon = GetBetterBags()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 

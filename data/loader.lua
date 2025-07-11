@@ -3,17 +3,13 @@
 
 local addon = GetBetterBags()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local const = addon:GetConstants()
+local debug = addon:GetDebug()
 
 ---@class Items: AceModule
 ---@field private loaders ItemLoader[]

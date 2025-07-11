@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 function debug:StartProfile(name, ...)
   if not self.enabled then return end

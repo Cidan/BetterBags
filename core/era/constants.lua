@@ -5,9 +5,7 @@ local addon = GetBetterBags()
 
 local L = addon:GetLocalization()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 _G.NUM_TOTAL_BAG_FRAMES = 5
 
 -- BankTab is an enum for the different bank tabs.

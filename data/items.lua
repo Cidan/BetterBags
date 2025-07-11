@@ -3,12 +3,9 @@
 
 local addon = GetBetterBags()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class EquipmentSets: AceModule
 local equipmentSets = addon:GetModule('EquipmentSets')
 
@@ -18,8 +15,7 @@ local categories = addon:GetModule('Categories')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 ---@class Search: AceModule
 local search = addon:GetModule('Search')
@@ -32,8 +28,7 @@ local binding = addon:GetModule("Binding")
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 -- A slot key is a string that represents a bag and slot id.
 ---@alias SlotKey string

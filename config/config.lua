@@ -4,26 +4,18 @@ local L = addon:GetLocalization()
 
 local db = addon:GetDatabase()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
+local const = addon:GetConstants()
+local context = addon:GetContext()
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local events = addon:GetEvents()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local themes = addon:GetThemes()
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local debug = addon:GetDebug()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local bucket = addon:GetBucket()
 
----@class Bucket: AceModule
-local bucket = addon:GetModule('Bucket')
-
----@class Form: AceModule
-local form = addon:GetModule('Form')
+local form = addon:GetForm()
 
 ---@class Config: AceModule
 ---@field configFrame FormFrame

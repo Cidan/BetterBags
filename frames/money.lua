@@ -7,11 +7,9 @@ local addon = GetBetterBags()
 ---@class MoneyFrame: AceModule
 local money = addon:NewModule('MoneyFrame')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Money
 ---@field frame Frame

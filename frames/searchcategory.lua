@@ -3,16 +3,14 @@
 
 local addon = GetBetterBags()
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
 local animations = addon:GetAnimations()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class SearchCategoryConfig: AceModule
 ---@field frame Frame

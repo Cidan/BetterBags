@@ -4,14 +4,11 @@
 
 local addon = GetBetterBags()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
@@ -30,11 +27,9 @@ local L = addon:GetLocalization()
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 local buttonCount = 0
 local children = {

@@ -3,9 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class MovementFlow: AceModule
 local movementFlow = addon:NewModule('MovementFlow')
 

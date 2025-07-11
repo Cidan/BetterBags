@@ -9,17 +9,14 @@ local database = addon:GetModule('Database')
 ---@class BagFrame: AceModule
 local BagFrame = addon:GetModule('BagFrame')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class MasqueTheme: AceModule
 local masque = addon:GetModule('Masque')
@@ -60,8 +57,7 @@ local refresh = addon:GetModule('Refresh')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
@@ -75,14 +71,11 @@ local newSectionC = addon:GetModule('NewSectionC')
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
----@class Form: AceModule
-local form = addon:GetModule('Form')
+local form = addon:GetForm()
 
 addon.Bags = {}
 addon.atBank = false

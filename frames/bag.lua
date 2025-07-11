@@ -9,9 +9,7 @@ local bagFrame = addon:NewModule('BagFrame')
 
 local L = addon:GetLocalization()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -42,11 +40,9 @@ local views = addon:GetModule('Views')
 ---@class Resize: AceModule
 local resize = addon:GetModule('Resize')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
@@ -60,8 +56,7 @@ local Window = LibStub('LibWindow-1.1')
 ---@class Currency: AceModule
 local currency = addon:GetModule('Currency')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
@@ -75,8 +70,7 @@ local sectionConfig = addon:GetModule('SectionConfig')
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:GetModule('ThemeConfig')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class WindowGroup: AceModule
 local windowGroup = addon:GetModule('WindowGroup')

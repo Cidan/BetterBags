@@ -8,9 +8,7 @@ local addon = GetBetterBags()
 ---@field frame Frame
 local contextMenu = addon:NewModule('ContextMenu')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -20,8 +18,7 @@ local slider = addon:GetModule('Slider')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
@@ -29,8 +26,7 @@ local items = addon:GetModule('Items')
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 

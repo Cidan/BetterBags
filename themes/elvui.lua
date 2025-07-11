@@ -4,8 +4,7 @@
 
 local addon = GetBetterBags()
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class ElvItemButton: ItemButton
 ---@field SetTemplate fun(self:ElvItemButton|ItemButton, template?: string, texture: boolean)

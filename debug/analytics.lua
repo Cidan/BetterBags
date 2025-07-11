@@ -6,8 +6,7 @@ local addon = GetBetterBags()
 ---@class WagoAnalytics
 local WagoAnalytics = LibStub("WagoAnalytics"):Register("aNDmy96o")
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@param label string
 ---@param enabled boolean

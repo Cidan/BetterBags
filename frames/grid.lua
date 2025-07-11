@@ -3,12 +3,9 @@
 
 local addon = GetBetterBags()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class GridFrame: AceModule
 local grid = addon:NewModule('Grid')
 

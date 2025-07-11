@@ -1,13 +1,10 @@
 local addon = GetBetterBags()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false

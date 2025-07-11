@@ -8,12 +8,9 @@ local animations = addon:GetAnimations()
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 

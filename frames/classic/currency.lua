@@ -10,17 +10,12 @@ local currency = addon:NewModule('Currency')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
+local const = addon:GetConstants()
+local events = addon:GetEvents()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local debug = addon:GetDebug()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 local L = addon:GetLocalization()
 

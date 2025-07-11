@@ -3,11 +3,9 @@
 
 local addon = GetBetterBags()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 ---@class (exact) ItemList: AceModule
 local itemList = addon:GetModule('ItemList')

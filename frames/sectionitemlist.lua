@@ -26,20 +26,14 @@ local database = addon:GetModule('Database')
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
+local const = addon:GetConstants()
+local themes = addon:GetThemes()
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local context = addon:GetContext()
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class SectionItemList: AceModule
 local sectionItemList = addon:NewModule('SectionItemList')

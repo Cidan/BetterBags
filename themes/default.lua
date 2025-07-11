@@ -20,8 +20,7 @@ local searchBox = addon:GetModule('SearchBox')
 ---@type table<string, DefaultThemeTemplate>
 local decoratorFrames = {}
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')

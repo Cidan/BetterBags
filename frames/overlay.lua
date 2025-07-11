@@ -5,8 +5,7 @@ local addon = GetBetterBags()
 
 local animations = addon:GetAnimations()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Overlay: AceModule
 local overlay = addon:NewModule('Overlay')

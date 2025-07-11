@@ -9,9 +9,7 @@ local grid = addon:GetModule('Grid')
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 

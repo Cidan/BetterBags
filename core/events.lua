@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
+local context = addon:GetContext()
 
 ---@alias eventData any[][]
 

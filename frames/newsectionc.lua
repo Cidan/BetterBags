@@ -2,20 +2,15 @@ local addon = GetBetterBags()
 
 local L = addon:GetLocalization()
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
----@class Form: AceModule
-local form = addon:GetModule('Form')
+local const = addon:GetConstants()
+local form = addon:GetForm()
 
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class NewSectionC: AceModule
 ---@field form FormFrame

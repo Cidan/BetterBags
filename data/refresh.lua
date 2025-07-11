@@ -3,20 +3,15 @@
 
 local addon = GetBetterBags()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
+local const = addon:GetConstants()
+local context = addon:GetContext()
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class (exact) Refresh: AceModule
 ---@field UpdateQueue table<number, EventArg>

@@ -3,17 +3,12 @@
 
 local addon = GetBetterBags()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local const = addon:GetConstants()
+local themes = addon:GetThemes()
 
 ---@class MasqueTheme: AceModule
 ---@field groups table<string, MasqueGroup>

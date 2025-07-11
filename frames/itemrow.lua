@@ -1,19 +1,15 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
 local addon = GetBetterBags()
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local const = addon:GetConstants()
+local events = addon:GetEvents()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
 local L = addon:GetLocalization()
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
@@ -21,8 +17,7 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+local themes = addon:GetThemes()
 
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')

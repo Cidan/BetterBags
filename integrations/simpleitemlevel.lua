@@ -3,15 +3,12 @@
 
 local addon = GetBetterBags()
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class SimpleItemLevel: AceModule
 local simpleItemLevel = addon:NewModule('SimpleItemLevel')
 

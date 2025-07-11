@@ -13,17 +13,14 @@ local database = addon:GetModule('Database')
 ---@class BagFrame: AceModule
 local BagFrame = addon:GetModule('BagFrame')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
+local const = addon:GetConstants()
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+local events = addon:GetEvents()
 
 ---@class MasqueTheme: AceModule
 local masque = addon:GetModule('Masque')
@@ -43,8 +40,7 @@ local config = addon:GetModule('Config')
 ---@class Config: AceModule
 local currency = addon:GetModule('Currency')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
+local debug = addon:GetDebug()
 
 function addon:HideBlizzardBags()
   local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
