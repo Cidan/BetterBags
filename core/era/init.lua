@@ -1,7 +1,7 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field
 
 
----@type BetterBags
+
 local addon = GetBetterBags()
 ---@cast addon +AceHook-3.0
 

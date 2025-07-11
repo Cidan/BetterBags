@@ -1,6 +1,3 @@
-
-
----@type BetterBags
 local addon = GetBetterBags()
 
 ---@class Debug: AceModule

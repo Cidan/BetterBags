@@ -170,7 +170,7 @@ func main() {
 	}
 	var luaOutput = `
 
----@type BetterBags
+
 local addon = GetBetterBags()
 
 ---@class Localization: AceModule

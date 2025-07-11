@@ -1,7 +1,7 @@
 
 local gw = GW2_ADDON
 
----@type BetterBags
+
 local addon = GetBetterBags()
 
 ---@class ContextMenu: AceModule

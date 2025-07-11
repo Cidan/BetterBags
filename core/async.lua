@@ -1,6 +1,6 @@
 
 
----@type BetterBags
+
 local addon = GetBetterBags()
 
 ---@class Events: AceModule

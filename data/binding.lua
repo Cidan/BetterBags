@@ -1,4 +1,4 @@
----@type BetterBags
+
 local addon = GetBetterBags()
 
 ---@class Constants: AceModule

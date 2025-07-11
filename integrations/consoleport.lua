@@ -1,7 +1,7 @@
 ---@diagnostic disable: duplicate-set-field,duplicate-doc-field,duplicate-doc-alias
 
 
----@type BetterBags
+
 local addon = GetBetterBags()
 
 ---@class Events: AceModule

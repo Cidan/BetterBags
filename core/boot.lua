@@ -43,3 +43,8 @@ BINDING_NAME_BETTERBAGS_TOGGLEBAGS = "Toggle Bags"
 function GetBetterBags()
   return LibStub('AceAddon-3.0'):GetAddon(addonName) --[[@as BetterBags]]
 end
+
+---@return Animations
+function addon:GetAnimations()
+  return self:GetModule('Animations') --[[@as Animations]]
+end

@@ -1,6 +1,6 @@
 
 
----@type BetterBags
+
 local addon = GetBetterBags()
 
 ---@class LibWindow-1.1: AceAddon

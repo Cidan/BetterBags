@@ -1,7 +1,7 @@
 ---@diagnostic disable: duplicate-set-field
 
 
----@type BetterBags
+
 local addon = GetBetterBags()
 
 ---@class Themes: AceModule

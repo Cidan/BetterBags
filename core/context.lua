@@ -1,4 +1,4 @@
----@type BetterBags
+
 local addon = GetBetterBags()
 
 -- Context is a simple container for passing context between function
