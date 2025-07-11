@@ -6,8 +6,7 @@ local addon = GetBetterBags()
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 ---@class Anchor: AceModule
 local anchor = addon:NewModule('Anchor')

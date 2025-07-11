@@ -16,8 +16,7 @@ local search = addon:GetModule('Search')
 ---@class SearchCategoryConfig: AceModule
 local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 
 ---@class SearchBox: AceModule

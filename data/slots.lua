@@ -5,8 +5,7 @@ local addon = GetBetterBags()
 
 local debug = addon:GetDebug()
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
 ---@class Stacks: AceModule
 local stacks = addon:GetModule('Stacks')

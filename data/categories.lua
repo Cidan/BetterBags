@@ -1,7 +1,6 @@
 local addon = GetBetterBags()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 local events = addon:GetEvents()
 

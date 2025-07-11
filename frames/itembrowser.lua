@@ -9,11 +9,9 @@ local itemBrowser = addon:NewModule('ItemBrowser')
 local const = addon:GetConstants()
 local events = addon:GetEvents()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
 local context = addon:GetContext()
 

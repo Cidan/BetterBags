@@ -12,13 +12,11 @@ local addon = LibStub('AceAddon-3.0'):GetAddon("BetterBags")
 
 -- This will get a handle to the Categories module, which exposes
 -- the API for creating categories.
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
 -- This will get a handle to the Config module, which exposes
 -- the API for creating a configuration entry in the BetterBags config panel.
----@class Config: AceModule
-local config = addon:GetModule('Config')
+local config = addon:GetConfig()
 
 -- This will get a handle to the localization module, which should be
 -- used for all text your users will see. For all category names,

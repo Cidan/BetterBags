@@ -2,8 +2,7 @@ local addon = GetBetterBags()
 
 local debug = addon:GetDebug()
 
----@class Config: AceModule
-local config = addon:GetModule('Config')
+local config = addon:GetConfig()
 
 ---@param c table<string, AceConfig.OptionsTable>
 ---@param result AceConfig.OptionsTable[]

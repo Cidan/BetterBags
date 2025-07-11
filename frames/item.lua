@@ -11,22 +11,19 @@ local itemFrame = addon:NewModule('ItemFrame')
 
 local events = addon:GetEvents()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 ---@class Color: AceModule
 local color = addon:GetModule('Color')
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
 ---@class EquipmentSets: AceModule
 local equipmentSets = addon:GetModule('EquipmentSets')
 
 local L = addon:GetLocalization()
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
 local themes = addon:GetThemes()
 

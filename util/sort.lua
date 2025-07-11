@@ -3,14 +3,12 @@
 
 local addon = GetBetterBags()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 local const = addon:GetConstants()
 local debug = addon:GetDebug()
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
 ---@class Sort: AceModule
 local sort = addon:NewModule('Sort')

@@ -13,23 +13,18 @@ local const = addon:GetConstants()
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
+local itemFrame = addon:GetItemFrame()
 
 ---@class BagSlots: AceModule
 local bagSlots = addon:GetModule('BagSlots')
 
----@class SectionFrame: AceModule
-local sectionFrame = addon:GetModule('SectionFrame')
+local sectionFrame = addon:GetSectionFrame()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
----@class ContextMenu: AceModule
-local contextMenu = addon:GetModule('ContextMenu')
+local contextMenu = addon:GetContextMenu()
 
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
@@ -47,8 +42,7 @@ local debug = addon:GetDebug()
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')

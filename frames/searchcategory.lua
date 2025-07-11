@@ -5,8 +5,7 @@ local addon = GetBetterBags()
 
 local themes = addon:GetThemes()
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
 local animations = addon:GetAnimations()
 

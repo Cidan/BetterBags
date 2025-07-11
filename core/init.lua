@@ -3,38 +3,29 @@ local addon = GetBetterBags()
 
 local L = addon:GetLocalization()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 ---@class BagFrame: AceModule
 local BagFrame = addon:GetModule('BagFrame')
 
 local const = addon:GetConstants()
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
+local itemFrame = addon:GetItemFrame()
 
 local events = addon:GetEvents()
 
----@class MasqueTheme: AceModule
-local masque = addon:GetModule('Masque')
+local masque = addon:GetMasque()
 
----@class SectionFrame: AceModule
-local sectionFrame = addon:GetModule('SectionFrame')
+local sectionFrame = addon:GetSectionFrame()
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
----@class ContextMenu: AceModule
-local contextMenu = addon:GetModule('ContextMenu')
+local contextMenu = addon:GetContextMenu()
 
----@class Config: AceModule
-local config = addon:GetModule('Config')
+local config = addon:GetConfig()
 
----@class Config: AceModule
-local currency = addon:GetModule('Currency')
+local currency = addon:GetCurrency()
 
 ---@class Search: AceModule
 local search = addon:GetModule('Search')

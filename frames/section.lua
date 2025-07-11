@@ -7,8 +7,7 @@ local addon = GetBetterBags()
 ---@field currentTooltip Section
 local sectionFrame = addon:NewModule('SectionFrame')
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
 local events = addon:GetEvents()
 
@@ -18,8 +17,7 @@ local sort = addon:GetModule('Sort')
 
 local debug = addon:GetDebug()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 local themes = addon:GetThemes()
 
@@ -28,8 +26,7 @@ local grid = addon:GetModule('Grid')
 
 local db = addon:GetDatabase()
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
 ---@class MovementFlow: AceModule
 local movementFlow = addon:GetModule('MovementFlow')

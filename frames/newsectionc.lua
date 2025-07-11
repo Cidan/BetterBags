@@ -7,8 +7,7 @@ local themes = addon:GetThemes()
 local const = addon:GetConstants()
 local form = addon:GetForm()
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
 local events = addon:GetEvents()
 

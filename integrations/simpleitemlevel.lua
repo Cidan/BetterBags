@@ -5,8 +5,7 @@ local addon = GetBetterBags()
 
 local events = addon:GetEvents()
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
 local const = addon:GetConstants()
 ---@class SimpleItemLevel: AceModule

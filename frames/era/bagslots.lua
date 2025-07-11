@@ -19,15 +19,13 @@ local bagButton = addon:GetModule('BagButton')
 
 local events = addon:GetEvents()
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
 local debug = addon:GetDebug()
 
 local animations = addon:GetAnimations()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 local themes = addon:GetThemes()
 

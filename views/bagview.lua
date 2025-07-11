@@ -13,14 +13,11 @@ local const = addon:GetConstants()
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
+local itemFrame = addon:GetItemFrame()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')

@@ -4,8 +4,7 @@ local gw = GW2_ADDON
 
 local addon = GetBetterBags()
 
----@class ContextMenu: AceModule
-local contextMenu = addon:GetModule('ContextMenu')
+local contextMenu = addon:GetContextMenu()
 
 local const = addon:GetConstants()
 ---@class SearchBox: AceModule

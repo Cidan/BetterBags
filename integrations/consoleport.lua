@@ -6,11 +6,9 @@ local addon = GetBetterBags()
 
 local events = addon:GetEvents()
 
----@class ContextMenu: AceModule
-local contextMenu = addon:GetModule('ContextMenu')
+local contextMenu = addon:GetContextMenu()
 
----@class Config: AceModule
-local config = addon:GetModule('Config')
+local config = addon:GetConfig()
 
 ---@class ConsolePort: AceModule
 ---@field private enabled boolean

@@ -11,17 +11,13 @@ local animations = addon:GetAnimations()
 ---@class ItemRowFrame: AceModule
 local itemRowFrame = addon:GetModule('ItemRowFrame')
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
+local categories = addon:GetCategories()
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
+local items = addon:GetItems()
 
----@class ContextMenu: AceModule
-local contextMenu = addon:GetModule('ContextMenu')
+local contextMenu = addon:GetContextMenu()
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
+local database = addon:GetDatabase()
 
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
