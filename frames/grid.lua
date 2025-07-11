@@ -1,7 +1,9 @@
 local addon = GetBetterBags()
 
 local const = addon:GetConstants()
+
 ---@class GridFrame: AceModule
+---@field Create fun(self: GridFrame, parent: Frame): Grid
 local grid = addon:NewModule('Grid')
 
 ---@class Cell

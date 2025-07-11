@@ -84,9 +84,9 @@ function addon:GetDebug()
   return self:GetModule('Debug') --[[@as Debug]]
 end
 
----@return Grid
+---@return GridFrame
 function addon:GetGrid()
-  return self:GetModule('Grid') --[[@as Grid]]
+  return self:GetModule('Grid') --[[@as GridFrame]]
 end
 
 ---@return Views

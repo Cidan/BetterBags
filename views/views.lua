@@ -15,6 +15,8 @@ local categories = addon:GetCategories()
 
 
 ---@class Views: AceModule
+---@field NewGrid fun(self: Views, parent: Frame, kind: BagKind): View
+---@field NewBagView fun(self: Views, parent: Frame, kind: BagKind): View
 local views = addon:NewModule('Views')
 
 ---@class (exact) Stack
