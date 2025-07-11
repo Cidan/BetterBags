@@ -1,6 +1,3 @@
-
-
-
 local addon = GetBetterBags()
 
 local context = addon:GetContext()

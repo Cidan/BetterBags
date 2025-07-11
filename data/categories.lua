@@ -7,8 +7,7 @@ local events = addon:GetEvents()
 local debug = addon:GetDebug()
 
 local const = addon:GetConstants()
----@class Search: AceModule
-local search = addon:GetModule('Search')
+local search = addon:GetSearch()
 
 local context = addon:GetContext()
 

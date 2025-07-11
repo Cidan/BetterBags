@@ -10,11 +10,9 @@ local events = addon:GetEvents()
 local const = addon:GetConstants()
 local context = addon:GetContext()
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+local search = addon:GetSearch()
 
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+local searchCategoryConfig = addon:GetSearchCategoryConfig()
 
 local database = addon:GetDatabase()
 

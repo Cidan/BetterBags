@@ -5,8 +5,7 @@ local L = addon:GetLocalization()
 
 local database = addon:GetDatabase()
 
----@class BagFrame: AceModule
-local BagFrame = addon:GetModule('BagFrame')
+local BagFrame = addon:GetBagFrame()
 
 local const = addon:GetConstants()
 local items = addon:GetItems()
@@ -27,40 +26,29 @@ local config = addon:GetConfig()
 
 local currency = addon:GetCurrency()
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+local search = addon:GetSearch()
 
----@class ConsolePort: AceModule
-local consoleport = addon:GetModule('ConsolePort')
+local consoleport = addon:GetConsolePort()
 
----@class Pawn: AceModule
-local pawn = addon:GetModule('Pawn')
+local pawn = addon:GetPawn()
 
----@class Question: AceModule
-local question = addon:GetModule('Question')
+local question = addon:GetQuestion()
 
----@class SimpleItemLevel: AceModule
-local simpleItemLevel = addon:GetModule('SimpleItemLevel')
+local simpleItemLevel = addon:GetSimpleItemLevel()
 
----@class Refresh: AceModule
-local refresh = addon:GetModule('Refresh')
+local refresh = addon:GetRefresh()
 
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
+local sectionConfig = addon:GetSectionConfig()
 
 local themes = addon:GetThemes()
 
----@class Views: AceModule
-local views = addon:GetModule('Views')
+local views = addon:GetViews()
 
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+local searchCategoryConfig = addon:GetSearchCategoryConfig()
 
----@class NewSectionC: AceModule
-local newSectionC = addon:GetModule('NewSectionC')
+local newSectionC = addon:GetNewSectionC()
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
+local async = addon:GetAsync()
 
 local context = addon:GetContext()
 

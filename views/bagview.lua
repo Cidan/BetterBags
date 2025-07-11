@@ -6,8 +6,7 @@ local addon = GetBetterBags()
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
----@class Views: AceModule
-local views = addon:GetModule('Views')
+local views = addon:GetViews()
 
 local const = addon:GetConstants()
 ---@class Debug : AceModule

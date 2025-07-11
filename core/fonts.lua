@@ -1,6 +1,3 @@
-
-
-
 local addon = GetBetterBags()
 
 ---@class Fonts: AceModule

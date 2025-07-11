@@ -9,8 +9,7 @@ local L = addon:GetLocalization()
 
 local database = addon:GetDatabase()
 
----@class BagFrame: AceModule
-local BagFrame = addon:GetModule('BagFrame')
+local BagFrame = addon:GetBagFrame()
 
 local const = addon:GetConstants()
 local items = addon:GetItems()

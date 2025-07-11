@@ -14,8 +14,7 @@ local items = addon:GetItems()
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
----@class Views: AceModule
-local views = addon:GetModule('Views')
+local views = addon:GetViews()
 
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
@@ -25,8 +24,7 @@ local L =  addon:GetModule('Localization')
 
 local categories = addon:GetCategories()
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
+local async = addon:GetAsync()
 
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')

@@ -29,8 +29,7 @@ local contextMenu = addon:GetContextMenu()
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
 
----@class Views: AceModule
-local views = addon:GetModule('Views')
+local views = addon:GetViews()
 
 ---@class Resize: AceModule
 local resize = addon:GetModule('Resize')
@@ -39,8 +38,7 @@ local events = addon:GetEvents()
 
 local debug = addon:GetDebug()
 
----@class Question: AceModule
-local question = addon:GetModule('Question')
+local question = addon:GetQuestion()
 
 local categories = addon:GetCategories()
 
@@ -55,11 +53,9 @@ local context = addon:GetContext()
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+local search = addon:GetSearch()
 
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
+local sectionConfig = addon:GetSectionConfig()
 
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:GetModule('ThemeConfig')

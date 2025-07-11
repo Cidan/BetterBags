@@ -27,8 +27,7 @@ local items = addon:GetItems()
 
 local themes = addon:GetThemes()
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+local search = addon:GetSearch()
 
 local context = addon:GetContext()
 

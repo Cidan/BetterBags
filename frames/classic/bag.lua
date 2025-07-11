@@ -29,8 +29,7 @@ local contextMenu = addon:GetContextMenu()
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
 
----@class Views: AceModule
-local views = addon:GetModule('Views')
+local views = addon:GetViews()
 
 ---@class Resize: AceModule
 local resize = addon:GetModule('Resize')
@@ -56,8 +55,7 @@ local themeConfig = addon:GetModule('ThemeConfig')
 ---@class WindowGroup: AceModule
 local windowGroup = addon:GetModule('WindowGroup')
 
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
+local sectionConfig = addon:GetSectionConfig()
 
 local context = addon:GetContext()
 

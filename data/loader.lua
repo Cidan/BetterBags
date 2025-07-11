@@ -5,8 +5,7 @@ local addon = GetBetterBags()
 
 local events = addon:GetEvents()
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
+local async = addon:GetAsync()
 
 local const = addon:GetConstants()
 local debug = addon:GetDebug()

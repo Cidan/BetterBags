@@ -10,8 +10,7 @@ local debug = addon:GetDebug()
 
 local events = addon:GetEvents()
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
+local async = addon:GetAsync()
 
 local db = addon:GetDatabase()
 

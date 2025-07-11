@@ -15,16 +15,14 @@ local database = addon:GetDatabase()
 
 local context = addon:GetContext()
 
----@class Search: AceModule
-local search = addon:GetModule('Search')
+local search = addon:GetSearch()
 
 local L = addon:GetLocalization()
 
 ---@class Binding: AceModule
 local binding = addon:GetModule("Binding")
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
+local async = addon:GetAsync()
 
 local debug = addon:GetDebug()
 

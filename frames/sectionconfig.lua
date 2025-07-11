@@ -24,8 +24,7 @@ local contextMenu = addon:GetContextMenu()
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
----@class Question: AceModule
-local question = addon:GetModule('Question')
+local question = addon:GetQuestion()
 
 local themes = addon:GetThemes()
 
@@ -35,11 +34,9 @@ local sectionItemList = addon:GetModule('SectionItemList')
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
 
----@class SearchCategoryConfig: AceModule
-local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
+local searchCategoryConfig = addon:GetSearchCategoryConfig()
 
----@class NewSectionC: AceModule
-local newSectionC = addon:GetModule('NewSectionC')
+local newSectionC = addon:GetNewSectionC()
 
 local context = addon:GetContext()
 
