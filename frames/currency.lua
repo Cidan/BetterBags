@@ -12,8 +12,6 @@ local grid = addon:GetGrid()
 local const = addon:GetConstants()
 local events = addon:GetEvents()
 
-local debug = addon:GetDebug()
-
 local themes = addon:GetThemes()
 
 local L = addon:GetLocalization()

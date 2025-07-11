@@ -7,10 +7,6 @@ local addon = GetBetterBags()
 ---@field bagAndSlotToSet table<number, table<number, string[]>>
 local equipmentSets = addon:NewModule('EquipmentSets')
 
-local events = addon:GetEvents()
-
-local debug = addon:GetDebug()
-
 function equipmentSets:OnInitialize()
   self.bagAndSlotToSet = {}
 end

@@ -17,8 +17,6 @@ local bagButton = addon:GetBagButton()
 
 local events = addon:GetEvents()
 
-local items = addon:GetItems()
-
 local debug = addon:GetDebug()
 
 local animations = addon:GetAnimations()
@@ -26,8 +24,6 @@ local animations = addon:GetAnimations()
 local themes = addon:GetThemes()
 
 local database = addon:GetDatabase()
-
-local context = addon:GetContext()
 
 ---@class bagSlots
 ---@field frame Frame

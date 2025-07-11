@@ -8,8 +8,6 @@ local QueryParser = addon:GetQueryParser()
 
 local debug = addon:GetDebug()
 
-local binding = addon:GetBinding()
-
 local trees = addon:GetTrees()
 
 ---@class SearchIndex

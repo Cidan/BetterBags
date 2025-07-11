@@ -6,18 +6,11 @@ local addon = GetBetterBags()
 
 local bagFrame = addon:GetBagFrame()
 
-local L = addon:GetLocalization()
-
 local const = addon:GetConstants()
-local grid = addon:GetGrid()
 
 local items = addon:GetItems()
 
-local itemFrame = addon:GetItemFrame()
-
 local bagSlots = addon:GetBagSlots()
-
-local sectionFrame = addon:GetSectionFrame()
 
 local database = addon:GetDatabase()
 
@@ -31,12 +24,8 @@ local resize = addon:GetResize()
 
 local events = addon:GetEvents()
 
-local debug = addon:GetDebug()
-
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
-
-local currency = addon:GetCurrency()
 
 local searchBox = addon:GetSearchBox()
 
@@ -47,8 +36,6 @@ local themeConfig = addon:GetThemeConfig()
 local themes = addon:GetThemes()
 
 local windowGroup = addon:GetWindowGroup()
-
-local context = addon:GetContext()
 
 local anchor = addon:GetAnchor()
 

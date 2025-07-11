@@ -4,8 +4,6 @@ local database = addon:GetDatabase()
 
 local events = addon:GetEvents()
 
-local debug = addon:GetDebug()
-
 local const = addon:GetConstants()
 local search = addon:GetSearch()
 

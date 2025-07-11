@@ -12,8 +12,6 @@ local categories = addon:GetCategories()
 
 local database = addon:GetDatabase()
 
-local context = addon:GetContext()
-
 local search = addon:GetSearch()
 
 local L = addon:GetLocalization()

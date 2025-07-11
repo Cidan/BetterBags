@@ -7,8 +7,6 @@ local addon = GetBetterBags()
 local const = addon:GetConstants()
 local events = addon:GetEvents()
 
-local L = addon:GetLocalization()
-
 local BagButtonFrame = addon:GetBagButton()
 
 local buttonCount = 0

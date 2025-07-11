@@ -3,8 +3,6 @@
 
 local addon = GetBetterBags()
 
-local debug = addon:GetDebug()
-
 local items = addon:GetItems()
 
 local stacks = addon:GetStacks()

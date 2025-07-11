@@ -6,8 +6,6 @@ local addon = GetBetterBags()
 
 local events = addon:GetEvents()
 
-local contextMenu = addon:GetContextMenu()
-
 local config = addon:GetConfig()
 
 ---@class ConsolePort: AceModule

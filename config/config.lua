@@ -1,7 +1,5 @@
 local addon = GetBetterBags()
 
-local L = addon:GetLocalization()
-
 local db = addon:GetDatabase()
 
 local const = addon:GetConstants()
@@ -10,8 +8,6 @@ local context = addon:GetContext()
 local events = addon:GetEvents()
 
 local themes = addon:GetThemes()
-
-local debug = addon:GetDebug()
 
 local bucket = addon:GetBucket()
 

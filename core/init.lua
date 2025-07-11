@@ -38,8 +38,6 @@ local simpleItemLevel = addon:GetSimpleItemLevel()
 
 local refresh = addon:GetRefresh()
 
-local sectionConfig = addon:GetSectionConfig()
-
 local themes = addon:GetThemes()
 
 local views = addon:GetViews()

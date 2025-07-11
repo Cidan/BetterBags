@@ -7,8 +7,6 @@ local addon = GetBetterBags()
 local const = addon:GetConstants()
 local database = addon:GetDatabase()
 
-local itemFrame = addon:GetItemFrame()
-
 local items = addon:GetItems()
 
 local grid = addon:GetGrid()
@@ -21,8 +19,6 @@ local sort = addon:GetSort()
 local L =  addon:GetModule('Localization')
 
 local categories = addon:GetCategories()
-
-local async = addon:GetAsync()
 
 local debug = addon:GetDebug()
 

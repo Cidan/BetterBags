@@ -36,8 +36,6 @@ local windowGroup = addon:GetWindowGroup()
 
 local sectionConfig = addon:GetSectionConfig()
 
-local context = addon:GetContext()
-
 local anchor = addon:GetAnchor()
 
 ---@param ctx Context

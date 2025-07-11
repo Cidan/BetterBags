@@ -3,8 +3,6 @@
 
 local addon = GetBetterBags()
 
-local L = addon:GetLocalization()
-
 local const = addon:GetConstants()
 _G.NUM_TOTAL_BAG_FRAMES = 5
 

@@ -10,8 +10,6 @@ local views = addon:GetViews()
 local const = addon:GetConstants()
 local debug = addon:GetDebug()
 
-local items = addon:GetItems()
-
 local itemFrame = addon:GetItemFrame()
 
 local database = addon:GetDatabase()

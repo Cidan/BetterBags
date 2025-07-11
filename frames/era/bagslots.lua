@@ -8,6 +8,7 @@ local addon = GetBetterBags()
 local BagSlots = addon:GetBagSlots()
 
 local const = addon:GetConstants()
+
 local L = addon:GetLocalization()
 
 local grid = addon:GetGrid()
@@ -15,10 +16,6 @@ local grid = addon:GetGrid()
 local bagButton = addon:GetBagButton()
 
 local events = addon:GetEvents()
-
-local items = addon:GetItems()
-
-local debug = addon:GetDebug()
 
 local animations = addon:GetAnimations()
 

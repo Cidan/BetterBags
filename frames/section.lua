@@ -14,8 +14,6 @@ local events = addon:GetEvents()
 local const = addon:GetConstants()
 local sort = addon:GetSort()
 
-local debug = addon:GetDebug()
-
 local database = addon:GetDatabase()
 
 local themes = addon:GetThemes()
