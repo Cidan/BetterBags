@@ -7,6 +7,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
+---@class Constants
+local const = addon:GetModule('Constants')
+
 ---@class ElvItemButton: ItemButton
 ---@field SetTemplate fun(self:ElvItemButton|ItemButton, template?: string, texture: boolean)
 
