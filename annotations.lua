@@ -499,6 +499,7 @@ ACCOUNT_BANK_PANEL_TITLE = ""
 
 ---@class AceConfig.OptionsTable
 ---@field values? table<any, any>
+---@field multiline boolean
 ---[Documentation](http://www.wowace.com/addons/ace3/pages/ace-config-3-0-options-tables/)
 local OptionsTable = {}
 

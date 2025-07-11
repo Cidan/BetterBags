@@ -38,6 +38,7 @@ function itemListFrame:OnReceiveDrag(ctx)
 end
 
 function itemListFrame:OnMouseDown(ctx)
+  _ = ctx
 end
 
 function itemListFrame:OnItemClick(ctx, b, elementData)

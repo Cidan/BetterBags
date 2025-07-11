@@ -920,6 +920,7 @@ end
 ---@param ctx Context
 ---@param slotkey string
 function items:ClearNewItem(ctx, slotkey)
+  _ = ctx
   if not slotkey then return end
   local data = self:GetItemDataFromSlotKey(slotkey)
   if data.isItemEmpty then return end
@@ -937,6 +938,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function items:MarkItemAsNew(ctx, data)
+  _ = ctx
   if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()
     data.itemInfo.isNewItem = true

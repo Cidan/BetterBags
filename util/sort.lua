@@ -82,6 +82,7 @@ end
 ---@param b Section
 ---@return boolean, boolean
 function sort.SortSectionsByPriority(kind, a, b)
+  _ = kind
   if not a or not b then return false, false end
   local aTitle, bTitle = a.title:GetText(), b.title:GetText()
   local aCategory, bCategory = categories:GetCategoryByName(aTitle), categories:GetCategoryByName(bTitle)

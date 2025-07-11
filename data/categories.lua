@@ -261,7 +261,9 @@ function categories:SaveCategoryToDisk(ctx, name)
   end
 end
 
+---@param ctx Context
 function categories:UpdateSearchCache(ctx)
+  _ = ctx
   wipe(self.slotsToCategories)
   for _, filter in pairs(self:GetAllCategoriesWithSearch()) do
     local results = search:Search(filter.searchCategory.query)
@@ -583,6 +585,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function categories:CalculateAndUpdateSearchCategory(ctx, data)
+  _ = ctx
   local slotkey = data.slotkey
   if self.slotsToCategories[slotkey] and #self.slotsToCategories[slotkey] > 0 then
     local filter = self.categories[self.slotsToCategories[slotkey][1]]
@@ -607,6 +610,7 @@ end
 ---@param data ItemData
 ---@return string
 function categories:GetBestCategoryForItem(ctx, data)
+  _ = ctx
   ---@type {name: string, priority: number}[]
   local allCategories = {}
   if data.categories.blizzard then

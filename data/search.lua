@@ -188,6 +188,7 @@ end
 ---@param ctx Context
 ---@param item ItemData
 function search:UpdateSearchCategory(ctx, item)
+  _ = ctx
   if item == nil or item.isItemEmpty then return end
   if item.categories.search then
     search:addStringToIndex(self.indicies.category, item.categories.search.name, item.slotkey)

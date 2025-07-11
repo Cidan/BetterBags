@@ -129,6 +129,7 @@ function newSectionC:OnEnable()
     title = 'Items',
     description = 'Drag items from the inventory to this list to add them to this section.',
     onDragFunction = function(ctx, list)
+      _ = ctx
       local kind, id = GetCursorInfo()
       if kind ~= "item" or not tonumber(id) then return end
       ClearCursor()
@@ -140,6 +141,7 @@ function newSectionC:OnEnable()
       }})
     end,
     onItemClickFunction = function(ctx, b, elementData, list)
+      _ = b
       ClearCursor()
       contextMenu:Show(ctx, {{
         text = L:G("Remove"),
