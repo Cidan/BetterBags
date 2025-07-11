@@ -182,7 +182,7 @@
   },
   "Lua.runtime.version": "Lua 5.1",
   "stylua.targetReleaseVersion": "latest",
-  "Lua.diagnostics.workspaceDelay": -1,
+  "Lua.diagnostics.workspaceDelay": 3000,
   "luahelper.base.ignoreFileOrDirError": [
     ".vscode/",
     "one11.lua",
@@ -203,5 +203,5 @@
   "Lua.workspace.library": [
     ".libraries\\vscode-wow-api\\Annotations",
     ".libraries\\wow-ui-source\\Interface\\AddOns"
-  ]
+  ],
 }

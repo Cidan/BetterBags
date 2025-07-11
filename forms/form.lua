@@ -21,8 +21,7 @@ local events = addon:GetModule('Events')
 ---@class Bucket: AceModule
 local bucket = addon:GetModule('Bucket')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
+local animations = addon:GetAnimations()
 
 ---@class FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')

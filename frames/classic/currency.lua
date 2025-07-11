@@ -25,8 +25,7 @@ local themes = addon:GetModule('Themes')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
+local animations = addon:GetAnimations()
 
 ---@class CurrencyGrid
 ---@field frame Frame

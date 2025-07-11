@@ -29,8 +29,7 @@ local items = addon:GetModule('Items')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
+local animations = addon:GetAnimations()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')

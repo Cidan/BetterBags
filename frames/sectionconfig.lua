@@ -21,8 +21,7 @@ local list = addon:GetModule('List')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
+local animations = addon:GetAnimations()
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')

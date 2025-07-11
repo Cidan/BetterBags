@@ -3,8 +3,7 @@
 
 local addon = GetBetterBags()
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
+local animations = addon:GetAnimations()
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')

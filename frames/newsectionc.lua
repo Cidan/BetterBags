@@ -1,10 +1,4 @@
-
-
-
 local addon = GetBetterBags()
-
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')

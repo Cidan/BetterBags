@@ -6,8 +6,7 @@ local addon = GetBetterBags()
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
+local animations = addon:GetAnimations()
 
 ---@class ItemRowFrame: AceModule
 local itemRowFrame = addon:GetModule('ItemRowFrame')
