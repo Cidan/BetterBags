@@ -109,6 +109,7 @@ end
 ---@param view BagView
 ---@return SizeInfo
 function DB:GetBagSizeInfo(kind, view)
+  ---@diagnostic disable-next-line: return-type-mismatch
   return DB.data.profile.size[view][kind]
 end
 
@@ -116,6 +117,7 @@ end
 ---@param view BagView
 ---@param count number
 function DB:SetBagViewSizeColumn(kind, view, count)
+  ---@diagnostic disable-next-line: inject-field
   DB.data.profile.size[view][kind].columnCount = count
 end
 
@@ -123,12 +125,14 @@ end
 ---@param view BagView
 ---@param count number
 function DB:SetBagViewSizeItems(kind, view, count)
+  ---@diagnostic disable-next-line: inject-field
   DB.data.profile.size[view][kind].itemsPerRow = count
 end
 ---@param kind BagKind
 ---@param view BagView
 ---@param scale number
 function DB:SetBagViewSizeScale(kind, view, scale)
+  ---@diagnostic disable-next-line: inject-field
   DB.data.profile.size[view][kind].scale = scale
 end
 
@@ -137,6 +141,7 @@ end
 ---@return number, number
 function DB:GetBagViewFrameSize(kind, view)
   local s = DB.data.profile.size[view][kind]
+  ---@diagnostic disable-next-line: undefined-field
   return s.width, s.height
 end
 
@@ -145,7 +150,9 @@ end
 ---@param width number
 ---@param height number
 function DB:SetBagViewFrameSize(kind, view, width, height)
+  ---@diagnostic disable-next-line: inject-field
   DB.data.profile.size[view][kind].width = width
+  ---@diagnostic disable-next-line: inject-field
   DB.data.profile.size[view][kind].height = height
 end
 
@@ -173,6 +180,7 @@ end
 ---@param view BagView
 ---@param opacity number
 function DB:SetBagViewSizeOpacity(kind, view, opacity)
+  ---@diagnostic disable-next-line: inject-field
   DB.data.profile.size[view][kind].opacity = opacity
 end
 
@@ -180,6 +188,7 @@ end
 ---@param view BagView
 ---@return SectionSortType
 function DB:GetSectionSortType(kind, view)
+  ---@diagnostic disable-next-line: return-type-mismatch
   return DB.data.profile.sectionSort[kind][view]
 end
 
@@ -206,6 +215,7 @@ end
 ---@param view BagView
 ---@return ItemSortType
 function DB:GetItemSortType(kind, view)
+  ---@diagnostic disable-next-line: return-type-mismatch
   return DB.data.profile.itemSort[kind][view]
 end
 
@@ -219,6 +229,7 @@ end
 ---@param itemID number
 ---@param category string
 function DB:DeleteItemFromCategory(itemID, category)
+  ---@diagnostic disable-next-line: unnecessary-if
   if DB.data.profile.customCategoryFilters[category] then
     DB.data.profile.customCategoryFilters[category].itemList[itemID] = nil
   end
@@ -243,6 +254,7 @@ end
 ---@param category string
 ---@return CustomCategoryFilter?
 function DB:GetEphemeralItemCategory(category)
+  ---@diagnostic disable-next-line: undefined-field
   return DB.data.profile.ephemeralCategoryFilters[category]
 end
 
@@ -259,6 +271,7 @@ end
 ---@param itemID number
 ---@return CustomCategoryFilter
 function DB:GetItemCategoryByItemID(itemID)
+  ---@diagnostic disable-next-line: undefined-field
   return DB.data.profile.customCategoryFilters[DB.data.profile.customCategoryIndex[itemID]] or {}
 end
 
@@ -482,8 +495,10 @@ function DB:Migrate()
   -- Do not remove before Q1'25.
   for _, bagView in pairs(const.BAG_VIEW) do
     for _, bagKind in pairs(const.BAG_KIND) do
+      ---@diagnostic disable-next-line: unnecessary-if
       if DB.data.profile.size[bagView] then
         local t = DB.data.profile.size[bagView][bagKind]
+        ---@diagnostic disable-next-line: unnecessary-if
         if t then
           if t.itemsPerRow ~= nil and t.itemsPerRow > 30 or t.itemsPerRow < 1 then
             t.itemsPerRow = 7

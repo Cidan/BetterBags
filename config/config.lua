@@ -522,6 +522,7 @@ end
 function config:flattenPluginConfig(c, result)
   for _, t in pairs(c) do
     if t.type == 'group' then
+      ---@diagnostic disable-next-line: param-type-not-match
       self:flattenPluginConfig(t.args, result)
     else
       table.insert(result, t)

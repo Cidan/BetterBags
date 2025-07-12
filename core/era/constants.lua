@@ -42,6 +42,7 @@ const.BANK_ONLY_BAGS = {
   [Enum.BagIndex.BankBag_6 - 1] = Enum.BagIndex.BankBag_6 - 1,
 }
 
+---@diagnostic disable-next-line: assign-type-mismatch
 const.BANK_ONLY_BAGS_LIST = {
   Enum.BagIndex.BankBag_1 - 1,
   Enum.BagIndex.BankBag_2 - 1,
