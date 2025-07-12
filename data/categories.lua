@@ -30,6 +30,7 @@ local L =  addon:GetModule('Localization')
 ---@field shown? boolean If true, this category is shown in the UI.
 ---@field allowBlizzardItems? boolean If true, this category will allow Blizzard items to be added to it.
 ---@field sortOrder? number The sort order of the category. No value means it will be sorted via the section sort option.
+---@field blizzard? boolean If true, this category is a Blizzard category.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -64,6 +65,9 @@ function categories:OnEnable()
     end
     if self.categories[name].shown == nil then
       self.categories[name].shown = true
+    end
+    if self.categories[name].blizzard == nil then
+      self.categories[name].blizzard = false
     end
     if filter.permanentItemList then
       for id in pairs(filter.permanentItemList) do
@@ -102,6 +106,7 @@ function categories:NewBlankCategory(name)
     shown = true,
     allowBlizzardItems = true,
     sortOrder = -1,
+    blizzard = false,
   }
   return category
 end
@@ -160,6 +165,7 @@ function categories:CreateCategory(ctx, category, update)
   if category.allowBlizzardItems == nil then
     category.allowBlizzardItems = true
   end
+  category.blizzard = category.blizzard or false
   self.categories[category.name] = category
   self:SaveCategoryToDisk(ctx, category.name)
   events:SendMessage(ctx, 'categories/Changed')
@@ -490,6 +496,7 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
   _G[data.itemInfo.itemEquipLoc] ~= "" then
     categories:CreateCategory(ctx, {
       name = _G[data.itemInfo.itemEquipLoc],
+      blizzard = true,
     })
     local filter = categories:GetCategoryByName(_G[data.itemInfo.itemEquipLoc])
     if filter.allowBlizzardItems and filter.enabled[data.kind] then
@@ -539,6 +546,7 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
 
   categories:CreateCategory(ctx, {
     name = category,
+    blizzard = true,
   })
 
   local filter = categories:GetCategoryByName(category)
@@ -552,6 +560,7 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
   if not everythingFilter then
     categories:CreateCategory(ctx, {
       name = everythingCategoryName,
+      blizzard = true,
     })
     everythingFilter = categories:GetCategoryByName(everythingCategoryName)
   end
