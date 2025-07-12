@@ -3,8 +3,8 @@
 
 local addon = GetBetterBags()
 
----@class Debug
-local debug = addon:GetModule('Debug')
+---@class (partial) Debug
+local debug = addon:GetDebug()
 
 ---@param data ItemData
 ---@param id number

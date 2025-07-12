@@ -1,9 +1,6 @@
-
-
-
 local addon = GetBetterBags()
 
----@class Debug
+---@class (partial) Debug
 local debug = addon:GetModule('Debug')
 
 ---@param frame Frame The frame to draw the debug border around.

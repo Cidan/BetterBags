@@ -5,7 +5,7 @@ local addon = GetBetterBags()
 
 local context = addon:GetContext()
 
----@class Debug: AceModule
+---@class (partial) Debug: AceModule
 ---@field window DebugWindow
 ---@field enabled boolean
 ---@field profiles table<string, number>
