@@ -211,6 +211,7 @@ function search:Add(item)
   end
 
   if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
+    ---@diagnostic disable-next-line: undefined-field
     search:addStringToIndex(self.indicies.expansion, const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID], item.slotkey)
   end
 
@@ -221,17 +222,21 @@ function search:Add(item)
   end
 
   if item.bindingInfo and item.bindingInfo.binding ~= nil and const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
+    ---@diagnostic disable-next-line: undefined-field
     search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
   end
 
   search:addNumberToIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
+  ---@diagnostic disable-next-line: param-type-not-match
   search:addNumberToIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
   search:addNumberToIndex(self.indicies.id, item.itemInfo.itemID, item.slotkey)
   search:addNumberToIndex(self.indicies.stackcount, item.itemInfo.currentItemCount, item.slotkey)
+  ---@diagnostic disable-next-line: param-type-not-match
   search:addNumberToIndex(self.indicies.class, item.itemInfo.classID, item.slotkey)
   search:addNumberToIndex(self.indicies.subclass, item.itemInfo.subclassID, item.slotkey)
   search:addNumberToIndex(self.indicies.bagid, item.bagid, item.slotkey)
   search:addNumberToIndex(self.indicies.slotid, item.slotid, item.slotkey)
+  ---@diagnostic disable-next-line: param-type-not-match
   search:addNumberToIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
   for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
     local bonusNum = tonumber(bonusID)
@@ -267,6 +272,7 @@ function search:Remove(item)
   end
 
   if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
+    ---@diagnostic disable-next-line: undefined-field
     search:removeStringFromIndex(self.indicies.expansion, const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID], item.slotkey)
   end
 
@@ -277,17 +283,21 @@ function search:Remove(item)
   end
 
   if item.bindingInfo and item.bindingInfo.binding ~= nil and const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
+    ---@diagnostic disable-next-line: undefined-field
     search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
   end
 
   search:removeNumberFromIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
+  ---@diagnostic disable-next-line: param-type-not-match
   search:removeNumberFromIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
   search:removeNumberFromIndex(self.indicies.id, item.itemInfo.itemID, item.slotkey)
   search:removeNumberFromIndex(self.indicies.stackcount, item.itemInfo.currentItemCount, item.slotkey)
+  ---@diagnostic disable-next-line: param-type-not-match
   search:removeNumberFromIndex(self.indicies.class, item.itemInfo.classID, item.slotkey)
   search:removeNumberFromIndex(self.indicies.subclass, item.itemInfo.subclassID, item.slotkey)
   search:removeNumberFromIndex(self.indicies.bagid, item.bagid, item.slotkey)
   search:removeNumberFromIndex(self.indicies.slotid, item.slotid, item.slotkey)
+  ---@diagnostic disable-next-line: param-type-not-match
   search:removeNumberFromIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
   for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
     local bonusNum = tonumber(bonusID)
@@ -348,6 +358,7 @@ function search:isNotInIndex(name, value)
   if type(tonumber(value)) == 'number' then
     local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
     if node then
+      ---@diagnostic disable-next-line: param-type-not-match
       for k in pairs(node.data) do
         results[k] = false
       end
@@ -391,6 +402,7 @@ end
 ---@return boolean
 function search:Find(query, item)
   local ast = QueryParser:Query(query)
+  ---@diagnostic disable-next-line: param-type-not-match
   local p, n = self:EvaluateQuery(ast)
   return p[item.slotkey] and not n[item.slotkey]
 end
@@ -401,6 +413,7 @@ function search:Search(query)
   ---@type table<string, boolean>
   local results = {}
   local ast = QueryParser:Query(query)
+  ---@diagnostic disable-next-line: param-type-not-match
   local p, n = self:EvaluateQuery(ast)
   for k, v in pairs(p) do
     if v and not n[k] then
@@ -422,6 +435,7 @@ function search:isLess(name, value)
     local results = {}
     local nodes = index.numbers:LessThan(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
+      ---@diagnostic disable-next-line: param-type-not-match
       for k, v in pairs(node.data) do
         results[k] = v
       end
@@ -442,6 +456,7 @@ function search:isLessOrEqual(name, value)
     local results = {}
     local nodes = index.numbers:LessThanEqual(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
+      ---@diagnostic disable-next-line: param-type-not-match
       for k, v in pairs(node.data) do
         results[k] = v
       end
@@ -462,6 +477,7 @@ function search:isGreater(name, value)
     local results = {}
     local nodes = index.numbers:GreaterThan(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
+      ---@diagnostic disable-next-line: param-type-not-match
       for k, v in pairs(node.data) do
         results[k] = v
       end
@@ -482,6 +498,7 @@ function search:isGreaterOrEqual(name, value)
     local results = {}
     local nodes = index.numbers:GreaterThanEqual(tonumber(value)--[[@as number]])
     for _, node in pairs(nodes) do
+      ---@diagnostic disable-next-line: param-type-not-match
       for k, v in pairs(node.data) do
         results[k] = v
       end
@@ -645,7 +662,9 @@ function search:EvaluateAST(node)
 
   if node.type == "logical" then
       if node.operator == "AND" or node.operator == "OR" then
+          ---@diagnostic disable-next-line: param-type-not-match
           local left = self:EvaluateAST(node.left)
+          ---@diagnostic disable-next-line: param-type-not-match
           local right = self:EvaluateAST(node.right)
           return combine_results(node.operator, left, right)
       elseif node.operator == "NOT" then
@@ -664,6 +683,7 @@ function search:EvaluateAST(node)
           error("Unknown logical operator: " .. node.operator)
       end
   elseif node.type == "comparison" then
+      ---@diagnostic disable-next-line: param-type-not-match
       return evaluate_condition(node.field, node.operator, node.value)
   elseif node.type == "term" then
       return self:DefaultSearch(node.value)
@@ -694,8 +714,7 @@ function search:EvaluateQuery(ast)
   -- in the result set, as this is a negation of the entire index.
   if not ast.left and not ast.right and ast.operator == "!=" then
     -- JIT load this module, as there is a circular dependency.
-    ---@class Items: AceModule
-    local items = addon:GetModule('Items')
+    local items = addon:GetItems()
 
     for _, slotInfo in pairs(items:GetAllSlotInfo()) do
       for k in pairs(slotInfo.itemsBySlotKey) do

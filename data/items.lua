@@ -230,7 +230,7 @@ function items:GetBagTypeFromBagID(bagid)
   local invid = C_Container.ContainerIDToInventoryID(bagid)
   local baglink = GetInventoryItemLink("player", invid)
   if baglink ~= nil and invid ~= nil then
-    local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+    local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]] ---@diagnostic disable-line: cast-type-mismatch
     return class, subclass
   else
     return Enum.ItemClass.Container, 0
@@ -651,7 +651,7 @@ function items:UpdateFreeSlots(ctx, kind)
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
     if baglink ~= nil and invid ~= nil then
-      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]] ---@diagnostic disable-line: cast-type-mismatch
       name = C_Item.GetItemSubClassInfo(class, subclass)
     else
       name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
@@ -715,7 +715,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     if bagid == Enum.BagIndex.Keyring then
       name = L:G("Keyring")
     elseif baglink ~= nil and invid ~= nil then
-      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]] ---@diagnostic disable-line: cast-type-mismatch
       name = C_Item.GetItemSubClassInfo(class, subclass)
     else
       name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
@@ -899,7 +899,7 @@ function items:GetItemData(ctx, itemList, callback)
     ---@type ItemData[]
     local dataList = {}
     for _, itemID in pairs(itemList) do
-      local data = setmetatable({}, {__index = itemDataProto}) ---@type ItemData
+      local data = setmetatable({}, {__index = itemDataProto}) ---@type ItemData ---@diagnostic disable-line: assign-type-mismatch
       self:AttachBasicItemInfo(itemID, data)
       table.insert(dataList, data)
     end
@@ -962,12 +962,12 @@ function items:ParseItemLink(link)
 	-- Parse the first elements that have no variable length
 	local _, _, itemID, enchantID, gemID1, gemID2, gemID3, gemID4,
 	suffixID, uniqueID, linkLevel, specializationID, modifiersMask,
-	itemContext, rest = strsplit(":", link, 15) --[[@as string]]
+	itemContext, rest = strsplit(":", link, 15) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
 
   if not addon.isRetail then
 	  _, itemID, enchantID, gemID1, gemID2, gemID3, gemID4,
 	  suffixID, uniqueID, linkLevel, specializationID, modifiersMask,
-	  itemContext, rest = strsplit(":", link, 14) --[[@as string]]
+	  itemContext, rest = strsplit(":", link, 14) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
   end
 
   ---@type string, string
@@ -984,7 +984,7 @@ function items:ParseItemLink(link)
 	local relic3NumBonusIDs, relic3BonusIDs
 
   if rest ~= nil then
-	  numBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+	  numBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
 
 	  if numBonusIDs ~= "" then
 	  	local splits = (tonumber(numBonusIDs))+1
@@ -993,7 +993,7 @@ function items:ParseItemLink(link)
 	  	rest = table.remove(bonusIDs, splits)
 	  end
 
-	  numModifiers, rest = strsplit(":", rest, 2) --[[@as string]]
+	  numModifiers, rest = strsplit(":", rest, 2) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
 	  if numModifiers ~= "" then
 	  	local splits = (tonumber(numModifiers)*2)+1
 	  	modifierIDs = strsplittable(":", rest, splits)
@@ -1001,7 +1001,7 @@ function items:ParseItemLink(link)
 	  	rest = table.remove(modifierIDs, splits)
 	  end
 
-	  relic1NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+	  relic1NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
 	  if relic1NumBonusIDs ~= "" then
 	  	local splits = (tonumber(relic1NumBonusIDs))+1
 	  	relic1BonusIDs = strsplittable(":", rest, splits)
@@ -1009,7 +1009,7 @@ function items:ParseItemLink(link)
 	  	rest = table.remove(relic1BonusIDs, splits)
 	  end
 
-	  relic2NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+	  relic2NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
 	  if relic2NumBonusIDs ~= "" then
 	  	local splits = (tonumber(relic2NumBonusIDs))+1
 	  	relic2BonusIDs = strsplittable(":", rest, (tonumber(relic2NumBonusIDs))+1)
@@ -1017,7 +1017,7 @@ function items:ParseItemLink(link)
 	  	rest = table.remove(relic2BonusIDs, splits)
 	  end
 
-	  relic3NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]]
+	  relic3NumBonusIDs, rest = strsplit(":", rest, 2) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
 	  if relic3NumBonusIDs ~= "" then
 	  	local splits = (tonumber(relic3NumBonusIDs))+1
 	  	relic3BonusIDs = strsplittable(":", rest, (tonumber(relic3NumBonusIDs))+1)
@@ -1026,7 +1026,7 @@ function items:ParseItemLink(link)
 	  end
 
     ---@type string, string
-	  crafterGUID, extraEnchantID = strsplit(":", rest, 3)
+	  crafterGUID, extraEnchantID = strsplit(":", rest, 3) ---@diagnostic disable-line: cast-type-mismatch
   end
 
 	return {
@@ -1155,7 +1155,7 @@ function items:GetEquipmentInfo(itemMixin)
     currentItemCount = C_Item.GetStackCount(itemLocation),
     category = "",
 ---@diagnostic disable-next-line: param-type-not-match
-    currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
+    currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]], ---@diagnostic disable-line: cast-type-mismatch
     equipmentSets = nil,
   }
   ---@diagnostic disable-next-line: return-type-mismatch
@@ -1233,10 +1233,10 @@ function items:AttachItemInfo(data, kind)
     itemEquipLoc = itemEquipLoc,
     itemTexture = itemTexture,
     sellPrice = sellPrice,
-    classID = classID,
+    classID = classID, ---@diagnostic disable-line: assign-type-mismatch
     subclassID = subclassID,
-    bindType = bindType,
-    expacID = expacID,
+    bindType = bindType, ---@diagnostic disable-line: assign-type-mismatch
+    expacID = expacID, ---@diagnostic disable-line: assign-type-mismatch
     setID = setID or 0,
     isCraftingReagent = isCraftingReagent,
     effectiveIlvl = effectiveIlvl --[[@as number]],
@@ -1248,7 +1248,7 @@ function items:AttachItemInfo(data, kind)
     isNewItem = C_NewItems.IsNewItem(bagid, slotid),
     currentItemCount = C_Item.GetStackCount(itemLocation),
     category = "",
-    currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
+    currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]], ---@diagnostic disable-line: cast-type-mismatch
     equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
   }
 
@@ -1294,10 +1294,10 @@ function items:AttachBasicItemInfo(itemID, data)
     itemEquipLoc = itemEquipLoc,
     itemTexture = itemTexture,
     sellPrice = sellPrice,
-    classID = classID,
+    classID = classID, ---@diagnostic disable-line: assign-type-mismatch
     subclassID = subclassID,
-    bindType = bindType,
-    expacID = expacID,
+    bindType = bindType, ---@diagnostic disable-line: assign-type-mismatch
+    expacID = expacID, ---@diagnostic disable-line: assign-type-mismatch
     setID = setID or 0,
     isCraftingReagent = isCraftingReagent,
     effectiveIlvl = effectiveIlvl --[[@as number]],
@@ -1309,8 +1309,8 @@ function items:AttachBasicItemInfo(itemID, data)
     isNewItem = false,
     currentItemCount = 1,
     category = "",
-    currentItemLevel = 0 --[[@as number]],
-    equipmentSet = nil,
+    currentItemLevel = 0 --[[@as number]], ---@diagnostic disable-line: cast-type-mismatch
+    equipmentSet = nil, ---@diagnostic disable-line: undefined-field
   }
   data.forceClear = false
 end
@@ -1318,7 +1318,7 @@ end
 ---@param slotkey string
 ---@return BagKind
 function items:GetBagKindFromSlotKey(slotkey)
-  local bagid = string.split('_', slotkey) --[[@as string]]
+  local bagid = string.split('_', slotkey) --[[@as string]] ---@diagnostic disable-line: cast-type-mismatch
   return self:GetBagKindFromBagID(bagid)
 end
 
