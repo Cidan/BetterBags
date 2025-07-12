@@ -25,19 +25,16 @@ function debug:OnInitialize()
 end
 
 function debug:OnEnable()
-  ---@class DebugWindow: AceModule
-  self.window = addon:GetModule('DebugWindow')
+  self.window = addon:GetDebugWindow()
   local ctx = context:New('DebugWindowEnable')
   self.window:Create(ctx)
 
-  ---@class Events: AceModule
-  local events = addon:GetModule('Events')
+  local events = addon:GetEvents()
   events:RegisterMessage('config/DebugMode', function(_, enabled)
     self.enabled = enabled
   end)
 
-  ---@class Database: AceModule
-  local database = addon:GetModule('Database')
+  local database = addon:GetDatabase()
   self.enabled = database:GetDebugMode()
   if self.enabled then
     print("BetterBags: debug mode enabled")

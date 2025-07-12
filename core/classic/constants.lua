@@ -1,4 +1,4 @@
----@diagnostic disable: duplicate-set-field,duplicate-doc-field,duplicate-doc-alias
+---@diagnostic disable: duplicate-set-field,duplicate-doc-field,duplicate-doc-alias, assign-type-mismatch
 
 
 local addon = GetBetterBags()
@@ -75,6 +75,7 @@ const.BACKPACK_ONLY_BAGS = {
 
 const.ACCOUNT_BANK_BAGS = {}
 
+---@diagnostic disable-next-line: assign-type-mismatch
 const.BACKPACK_ONLY_BAGS_LIST = {
   Enum.BagIndex.Bag_1,
   Enum.BagIndex.Bag_2,
@@ -82,6 +83,7 @@ const.BACKPACK_ONLY_BAGS_LIST = {
   Enum.BagIndex.Bag_4,
 }
 
+---@diagnostic disable-next-line: assign-type-mismatch
 const.BACKPACK_ONLY_REAGENT_BAGS = {
   [Enum.BagIndex.ReagentBag] = nil,
 }

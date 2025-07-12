@@ -97,7 +97,7 @@ function context:Cancel()
     error("context has been cancelled")
   end
   self.done = true
-  if self.timeout then
+  if self.timeout ~= nil then
     self.timeout:Cancel()
     self.timeout = nil
   end
@@ -110,11 +110,12 @@ function context:Timeout(seconds, callback)
   if self.done then
     error("context has been cancelled")
   end
-  if self.timeout then
+  if self.timeout ~= nil then
     error("context already has a timeout")
   end
   self.timeout = C_Timer.NewTimer(seconds, function()
-    if self.done then
+    ---@diagnostic disable-next-line: unnecessary-if
+    if self.done == true then
       return
     end
     self.done = true
