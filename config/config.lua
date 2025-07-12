@@ -19,6 +19,7 @@ local debug = addon:GetDebug()
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
 
+---@return FormFrame
 function config:CreateConfig()
   local f = form:Create({
     title = 'BetterBags Settings',
@@ -127,7 +128,7 @@ function config:CreateConfig()
         return sectionOrders[value] == db:GetSectionSortType(bagType.kind, db:GetBagView(bagType.kind))
       end,
       setValue = function(ctx, value)
-        db:SetSectionSortType(bagType.kind, db:GetBagView(bagType.kind), sectionOrders[value])
+        db:SetSectionSortType(bagType.kind, db:GetBagView(bagType.kind), sectionOrders[value] --[[@as SectionSortType]])
         events:SendMessage(ctx, 'bags/FullRefreshAll')
       end,
     })
@@ -145,7 +146,7 @@ function config:CreateConfig()
         return itemOrders[value] == db:GetItemSortType(bagType.kind, db:GetBagView(bagType.kind))
       end,
       setValue = function(ctx, value)
-        db:SetItemSortType(bagType.kind, db:GetBagView(bagType.kind), itemOrders[value])
+        db:SetItemSortType(bagType.kind, db:GetBagView(bagType.kind), itemOrders[value] --[[@as ItemSortType]])
         events:SendMessage(ctx, 'bags/FullRefreshAll')
       end,
     })
@@ -472,7 +473,7 @@ function config:CreateConfig()
 
   f:GetFrame():SetSize(600, 800)
   f:GetFrame():SetPoint("CENTER")
-  self.configFrame = f
+  return f
 end
 
 ---@diagnostic disable-next-line: duplicate-set-field
@@ -486,10 +487,12 @@ function config:RegisterSettings()
   end)
 
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbanchor", function()
-    addon.Bags.Backpack.anchor:Activate()
-    addon.Bags.Backpack.anchor:Show()
-    addon.Bags.Bank.anchor:Activate()
-    addon.Bags.Bank.anchor:Show()
+    if addon.Bags.Backpack ~= nil and addon.Bags.Bank ~= nil then
+      addon.Bags.Backpack.anchor:Activate()
+      addon.Bags.Backpack.anchor:Show()
+      addon.Bags.Bank.anchor:Activate()
+      addon.Bags.Bank.anchor:Show()
+    end
   end)
 
   events:RegisterMessage('categories/Changed', function()
@@ -508,8 +511,8 @@ function config:RegisterSettings()
 end
 
 function config:OnEnable()
-  if self.configFrame then return end
-  self:CreateConfig()
+  if self.configFrame ~= nil then return end
+  self.configFrame = self:CreateConfig()
   self:RegisterSettings()
   table.insert(UISpecialFrames, self.configFrame.frame:GetName())
 end
@@ -606,7 +609,7 @@ function config:AddPluginConfig(title, c)
           o.set(_, value)
         end
       })
-    elseif o.type == 'input' and o.multiline then
+    elseif o.type == 'input' and o.multiline --[[@as boolean]] then
       f:AddTextArea({
         title = subTitle,
         description = subDesc,

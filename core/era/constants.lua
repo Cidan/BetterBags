@@ -7,7 +7,7 @@ local const = addon:GetConstants()
 _G.NUM_TOTAL_BAG_FRAMES = 5
 
 -- BankTab is an enum for the different bank tabs.
----@enum BankTab
+---@enum (partial) BankTab
 const.BANK_TAB = {
   BANK = Enum.BagIndex.Bank,
   REAGENT = Enum.BagIndex.Reagentbank,

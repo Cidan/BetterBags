@@ -8,8 +8,7 @@
 ]]--
 
 -- This will get a handle to the BetterBags addon.
----@class BetterBags: AceAddon
-local addon = LibStub('AceAddon-3.0'):GetAddon("BetterBags")
+local addon = GetBetterBags()
 
 -- This will get a handle to the Categories module, which exposes
 -- the API for creating categories.

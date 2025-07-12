@@ -1,6 +1,7 @@
--- boot.lua handles the initialisation of the addon and the creation of the root module.
-
-local addonName, root = ... --[[@type string, table]]
+-- boot.lua handles the initialipation of the addon and the creation of the root module.
+---@diagnostic disable-next-line: unbalanced-assignments
+---@type string, table
+local addonName, root = ...
 
 -- BetterBags is the root module of the addon.
 ---@class BetterBags: AceModule, AceHook-3.0, AceEvent-3.0

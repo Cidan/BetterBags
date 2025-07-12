@@ -27,7 +27,7 @@ const.BAG_KIND = {
 }
 
 -- BankTab is an enum for the different bank tabs.
----@enum BankTab
+---@enum (partial) BankTab
 const.BANK_TAB = {
   BANK = Enum.BagIndex.Bank,
   REAGENT = Enum.BagIndex.Reagentbank,

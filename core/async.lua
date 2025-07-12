@@ -49,7 +49,7 @@ function async:DoWithDelay(ctx, delay, fn, event)
     end
 
     if coroutine.status(task.thread) == 'dead' then
-      if task.event then
+      if task.event ~= nil then
         if type(task.event) == 'function' then
           task.event(task.ctx)
         elseif type(task.event) == 'string' then

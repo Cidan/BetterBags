@@ -103,8 +103,7 @@ function addon:CloseSpecialWindows(interactingFrame)
   if interactingFrame ~= nil then return end
 
   local ctx = context:New('CloseSpecialWindows')
-  ---@class Async: AceModule
-  local async = addon:GetModule('Async')
+  local async = addon:GetAsync()
 
   debug:Log('Hooks', 'CloseSpecialWindows')
   addon.backpackShouldClose = true
