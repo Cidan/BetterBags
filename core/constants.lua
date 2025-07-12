@@ -277,7 +277,7 @@ const.ITEM_QUALITY = {
   WoWToken = Enum.ItemQuality.WoWToken,
 }
 
-if addon.isMists then
+if addon.isMists or addon.isClassic then
   const.ITEM_QUALITY.Good = Enum.ItemQuality.Good
   const.ITEM_QUALITY.Uncommon = Enum.ItemQuality.Good
 
