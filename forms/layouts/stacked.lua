@@ -410,10 +410,10 @@ function stackedLayout:addDropdownRetail(opts)
   local ilist = {}
 
   if opts.items then
-    ilist = opts.items --[=[@as string[]]=]
+    ilist = opts.items --[=[@as string[] ]=]
   elseif opts.itemsFunction then
     local ctx = context:New('Dropdown_Items')
-    ilist = opts.itemsFunction(ctx) --[=[@as string[]]=]
+    ilist = opts.itemsFunction(ctx) --[=[@as string[] ]=]
   end
 
   container.dropdown:SetupMenu(function(_, root)
@@ -465,10 +465,10 @@ function stackedLayout:addDropdownClassic(opts)
   local ilist = {}
 
   if opts.items then
-    ilist = opts.items --[=[@as string[]]=]
+    ilist = opts.items --[=[@as string[] ]=]
   elseif opts.itemsFunction then
     local ctx = context:New('Dropdown_Items')
-    ilist = opts.itemsFunction(ctx) --[=[@as string[]]=]
+    ilist = opts.itemsFunction(ctx) --[=[@as string[] ]=]
   end
 
    -- Create and bind the initialization function to the dropdown menu

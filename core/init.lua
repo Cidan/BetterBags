@@ -105,14 +105,14 @@ function addon:OnInitialize()
   addon._bindingFrame:SetScript("OnEvent", CheckKeyBindings)
   addon._buttons = {
     MainMenuBarBackpackButton --[[@as MainMenuBagButton]],
-    _G["CharacterBag0Slot"],
-    _G["CharacterBag1Slot"],
-    _G["CharacterBag2Slot"],
-    _G["CharacterBag3Slot"],
-    KeyRingButton,
+    _G["CharacterBag0Slot"] --[[@as MainMenuBagButton]],
+    _G["CharacterBag1Slot"] --[[@as MainMenuBagButton]],
+    _G["CharacterBag2Slot"] --[[@as MainMenuBagButton]],
+    _G["CharacterBag3Slot"] --[[@as MainMenuBagButton]],
+    KeyRingButton --[[@as MainMenuBagButton]],
   }
 
-  if CharacterReagentBag0Slot then
+  if CharacterReagentBag0Slot ~= nil then
     table.insert(addon._buttons, CharacterReagentBag0Slot)
   end
 
@@ -263,7 +263,7 @@ function addon:OnEnable()
   events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
     debug:Log("init/OnInitialize/items", "Drawing bank")
      -- Show the bank frame if it's not already shown.
-    if not addon.Bags.Bank:IsShown() and addon.atBank then
+    if not addon.Bags.Bank:IsShown() and addon.atBank ~= nil then
       addon.Bags.Bank:Show(ctx)
     end
     addon.Bags.Bank:Draw(ctx, slotInfo, function()

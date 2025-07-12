@@ -591,7 +591,7 @@ function config:AddPluginConfig(title, c)
           return result
         end
       else
-        valueList = o.values --[=[@as string[]]=]
+        valueList = o.values --[=[@as string[] ]=]
       end
 
       f:AddDropdown({
