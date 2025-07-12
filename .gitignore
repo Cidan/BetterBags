@@ -3,4 +3,4 @@
 # Bugfix for Cursor editor.
 cpp-ghost-text-preview-widget-anysphere://*
 cpp-ghost-text-preview-widget-anysphere://**
-./libraries/**
+/annotations/**
