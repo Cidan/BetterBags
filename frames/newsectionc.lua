@@ -36,7 +36,7 @@ function newSectionC:OnEnable()
     itemList = {},
   }
   self.form = form:Create({
-    title = 'Section Editor',
+    title = 'Edit Category',
     layout = const.FORM_LAYOUT.STACKED,
     index = false
   })
