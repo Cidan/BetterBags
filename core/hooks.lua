@@ -39,6 +39,7 @@ end
 
 ---@param ctx Context
 function addon.OnUpdate(ctx)
+  ---@diagnostic disable-next-line: unnecessary-if
   if addon.backpackShouldOpen then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldOpen = false
@@ -48,6 +49,7 @@ function addon.OnUpdate(ctx)
     if addon.atInteracting then
       events:SendMessage(ctx, 'bags/FullRefreshAll')
     end
+---@diagnostic disable-next-line: unnecessary-if
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
     addon.backpackShouldClose = false
@@ -112,6 +114,7 @@ function addon:CloseSpecialWindows(interactingFrame)
     addon.Bags.Bank:SwitchToBankAndWipe(ectx)
   end)
   events:SendMessage(ctx, 'addon/CloseSpecialWindows')
+  ---@diagnostic disable-next-line: unnecessary-if
   if C_Bank then
     C_Bank.CloseBankFrame()
   else

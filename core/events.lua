@@ -25,6 +25,7 @@ local callbackProto = {}
 local events = addon:NewModule('Events')
 
 function events:OnInitialize()
+  ---@diagnostic disable-next-line: missing-fields
   self._eventHandler = {}
   self._messageMap = {}
   self._eventMap = {}
@@ -41,6 +42,7 @@ function events:RegisterMessage(event, callback)
   if self._messageMap[event] == nil then
     self._messageMap[event] = {
       fn = function(...)
+        ---@diagnostic disable-next-line: undefined-field
         for _, cb in pairs(self._messageMap[event].cbs) do
           cb.cb(select(2, ...))
         end
@@ -58,6 +60,7 @@ function events:RegisterEvent(event, callback)
   if self._eventMap[event] == nil then
     self._eventMap[event] = {
       fn = function(...)
+        ---@diagnostic disable-next-line: undefined-field
         for _, cb in pairs(self._eventMap[event].cbs) do
           local ctx = context:New(event)
           cb.cb(ctx, ...)
@@ -130,6 +133,7 @@ function events:BucketEvent(event, callback)
 
   self._bucketCallbacks[event] = {}
   self:RegisterEvent(event, function()
+    ---@diagnostic disable-next-line: unnecessary-if
     if self._bucketTimers[event] then
       self._bucketTimers[event]:Cancel()
     end
@@ -160,6 +164,7 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   self._eventArguments[joinedEvents] = {}
   for _, event in pairs(groupEvents) do
     self:RegisterEvent(event, function(eventName, ...)
+      ---@diagnostic disable-next-line: unnecessary-if
       if self._bucketTimers[joinedEvents] then
         self._bucketTimers[joinedEvents]:Cancel()
       end
@@ -172,6 +177,7 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
 
   for _, event in pairs(groupMessages) do
     self:RegisterMessage(event, function(eventName, ...)
+      ---@diagnostic disable-next-line: unnecessary-if
       if self._bucketTimers[joinedEvents] then
         self._bucketTimers[joinedEvents]:Cancel()
       end

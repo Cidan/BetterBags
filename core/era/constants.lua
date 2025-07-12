@@ -75,6 +75,7 @@ const.BACKPACK_ONLY_BAGS = {
   [Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring,
 }
 
+---@diagnostic disable-next-line: assign-type-mismatch
 const.BACKPACK_ONLY_BAGS_LIST = {
   Enum.BagIndex.Bag_1,
   Enum.BagIndex.Bag_2,
@@ -83,7 +84,7 @@ const.BACKPACK_ONLY_BAGS_LIST = {
 }
 
 const.BACKPACK_ONLY_REAGENT_BAGS = {
-  [Enum.BagIndex.ReagentBag] = nil,
+  [Enum.BagIndex.ReagentBag] = nil, ---@diagnostic disable-line: assign-type-mismatch
 }
 
 const.OFFSETS = {

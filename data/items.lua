@@ -119,7 +119,7 @@ local debug = addon:GetDebug()
 ---@field internalNewItem boolean
 local itemDataProto = {}
 
----@class (exact) Items: AceModule
+---@class (partial) Items: AceModule
 ---@field private slotInfo table<BagKind, SlotInfo>
 ---@field private searchCache table<BagKind, table<string, string>> A table of slotid's to categories.
 ---@field private equipmentCache table<number, ItemData>
@@ -178,7 +178,9 @@ end
 
 function items:RemoveNewItemFromAllItems()
   for _, item in pairs(self.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+    ---@diagnostic disable-next-line: param-type-not-match
     if C_NewItems.IsNewItem(item.bagid, item.slotid) then
+      ---@diagnostic disable-next-line: param-type-not-match
       C_NewItems.RemoveNewItem(item.bagid, item.slotid)
     end
     item.itemInfo.isNewItem = false
@@ -224,6 +226,7 @@ end
 ---@param bagid number
 ---@return number, number
 function items:GetBagTypeFromBagID(bagid)
+  ---@diagnostic disable-next-line: param-type-not-match
   local invid = C_Container.ContainerIDToInventoryID(bagid)
   local baglink = GetInventoryItemLink("player", invid)
   if baglink ~= nil and invid ~= nil then
@@ -365,9 +368,13 @@ end
 ---@param takenEmptySlots table<string, boolean>
 function items:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
   _ = ctx
+  ---@diagnostic disable-next-line: assign-type-mismatch
   _ = targets
+  ---@diagnostic disable-next-line: assign-type-mismatch
   _ = movePairs
+  ---@diagnostic disable-next-line: assign-type-mismatch
   _ = takenEmptySlots
+  ---@diagnostic disable-next-line: assign-type-mismatch
   _ = item
 end
 
@@ -419,6 +426,7 @@ function items:Restack(ctx, kind, callback)
   for _, item in pairs(slotInfo:GetCurrentItems()) do
     local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
     if not item.isItemEmpty and item.itemInfo.itemStackCount > 1 and stackInfo then
+      ---@diagnostic disable-next-line: param-type-not-match
       self:findBestFit(ctx, item, stackInfo, targets, movePairs)
     end
   end
@@ -428,6 +436,7 @@ function items:Restack(ctx, kind, callback)
   -- Pass 2: Move items to the right slot for their type.
   for _, item in pairs(slotInfo:GetCurrentItems()) do
     if not item.isItemEmpty and ((targets[item.slotkey] and targets[item.slotkey].newNumber > 0) or (not targets[item.slotkey])) then
+      ---@diagnostic disable-next-line: param-type-not-match
       self:fitForMove(ctx, item, targets, movePairs, takenEmptySlots)
     end
   end
@@ -441,10 +450,14 @@ function items:Restack(ctx, kind, callback)
     for _, movePair in ipairs(movePairs) do
       if not movePair.done then
         if movePair.partial and movePair.partial > 0 then
+          ---@diagnostic disable-next-line: param-type-not-match
           C_Container.SplitContainerItem(movePair.fromBag, movePair.fromSlot, movePair.partial)
+          ---@diagnostic disable-next-line: param-type-not-match
           C_Container.PickupContainerItem(movePair.toBag, movePair.toSlot)
         else
+          ---@diagnostic disable-next-line: param-type-not-match
           C_Container.PickupContainerItem(movePair.fromBag, movePair.fromSlot)
+          ---@diagnostic disable-next-line: param-type-not-match
           C_Container.PickupContainerItem(movePair.toBag, movePair.toSlot)
         end
         local cursorInfo = GetCursorInfo()
@@ -479,6 +492,7 @@ end
 function items:RefreshAccountBank(ctx, kind)
   local container = self:NewLoader(kind)
 
+  ---@diagnostic disable-next-line: param-type-not-match
   self:StageBagForUpdate(kind, container)
   for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
     local itemMixin = Item:CreateFromEquipmentSlot(i)
@@ -504,6 +518,7 @@ function items:RefreshBank(ctx)
     self:StageBagForUpdate(const.BANK_TAB.REAGENT, container)
   elseif addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
     ctx:Set('bagid', addon.Bags.Bank.bankTab)
+    ---@diagnostic disable-next-line: param-type-not-match
     self:StageBagForUpdate(addon.Bags.Bank.bankTab, container)
   else
     ctx:Set('bagid', const.BANK_TAB.BANK)
@@ -563,6 +578,7 @@ end
 ---@param oldData ItemData
 ---@return boolean
 function items:ItemChanged(newData, oldData)
+  ---@diagnostic disable-next-line: param-type-not-match
   -- Item was marked as new when it wasn't before.
   if C_NewItems.IsNewItem(newData.bagid, newData.slotid) and oldData and oldData.itemInfo and not oldData.itemInfo.isNewItem then
     return true
@@ -692,6 +708,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     local slotid = currentItem.slotid
     local name = ""
     local previousItem = slotInfo:GetPreviousItemByBagAndSlot(bagid, slotid)
+    ---@diagnostic disable-next-line: param-type-not-match
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
 
@@ -818,6 +835,7 @@ function items:RefreshSearchCache(kind)
   self:WipeSearchCache(kind)
   local categoryTable = categories:GetSortedSearchCategories()
   for _, categoryFilter in ipairs(categoryTable) do
+    ---@diagnostic disable-next-line: unnecessary-if
     if categoryFilter.enabled[kind] then
       local results = search:Search(categoryFilter.searchCategory.query)
       for slotkey, match in pairs(results) do
@@ -859,6 +877,7 @@ end
 ---@param bagid number
 ---@param container ItemLoader
 function items:StageBagForUpdate(bagid, container)
+  ---@diagnostic disable-next-line: param-type-not-match
   local size = C_Container.GetContainerNumSlots(bagid)
   -- Loop through every container slot and create an item for it.
   for slotid = 1, size do
@@ -893,6 +912,7 @@ end
 function items:IsNewItem(data)
   if not data or data.isItemEmpty then return false end
   if (self._newItemTimers[data.itemInfo.itemGUID] ~= nil and time() - self._newItemTimers[data.itemInfo.itemGUID] < database:GetNewItemTime()) or
+---@diagnostic disable-next-line: param-type-not-match
     C_NewItems.IsNewItem(data.bagid, data.slotid) then
     return true
   end
@@ -969,6 +989,7 @@ function items:ParseItemLink(link)
 	  if numBonusIDs ~= "" then
 	  	local splits = (tonumber(numBonusIDs))+1
 	  	bonusIDs = strsplittable(":", rest, splits)
+	  	---@diagnostic disable-next-line: param-type-not-match
 	  	rest = table.remove(bonusIDs, splits)
 	  end
 
@@ -976,6 +997,7 @@ function items:ParseItemLink(link)
 	  if numModifiers ~= "" then
 	  	local splits = (tonumber(numModifiers)*2)+1
 	  	modifierIDs = strsplittable(":", rest, splits)
+	  	---@diagnostic disable-next-line: param-type-not-match
 	  	rest = table.remove(modifierIDs, splits)
 	  end
 
@@ -983,6 +1005,7 @@ function items:ParseItemLink(link)
 	  if relic1NumBonusIDs ~= "" then
 	  	local splits = (tonumber(relic1NumBonusIDs))+1
 	  	relic1BonusIDs = strsplittable(":", rest, splits)
+	  	---@diagnostic disable-next-line: param-type-not-match
 	  	rest = table.remove(relic1BonusIDs, splits)
 	  end
 
@@ -990,6 +1013,7 @@ function items:ParseItemLink(link)
 	  if relic2NumBonusIDs ~= "" then
 	  	local splits = (tonumber(relic2NumBonusIDs))+1
 	  	relic2BonusIDs = strsplittable(":", rest, (tonumber(relic2NumBonusIDs))+1)
+	  	---@diagnostic disable-next-line: param-type-not-match
 	  	rest = table.remove(relic2BonusIDs, splits)
 	  end
 
@@ -997,6 +1021,7 @@ function items:ParseItemLink(link)
 	  if relic3NumBonusIDs ~= "" then
 	  	local splits = (tonumber(relic3NumBonusIDs))+1
 	  	relic3BonusIDs = strsplittable(":", rest, (tonumber(relic3NumBonusIDs))+1)
+	  	---@diagnostic disable-next-line: param-type-not-match
 	  	rest = table.remove(relic3BonusIDs, splits)
 	  end
 
@@ -1005,7 +1030,7 @@ function items:ParseItemLink(link)
   end
 
 	return {
-		itemID = tonumber(itemID),
+		itemID = tonumber(itemID), ---@diagnostic disable-line: assign-type-mismatch
 		enchantID = enchantID,
 		gemID1 = gemID1,
 		gemID2 = gemID2,
@@ -1060,6 +1085,7 @@ function items:GetBindTypeFromLink(itemLink)
   if (strfind(itemLink, "item:")) then
     bindType, _, _, _ = select(14, C_Item.GetItemInfo(itemLink))
   end
+  ---@diagnostic disable-next-line: return-type-mismatch
   return bindType
 end
 
@@ -1079,6 +1105,8 @@ function items:GetEquipmentInfo(itemMixin)
   setID = C_Item.GetItemInfo(itemLink)
   local itemAppearanceID, itemModifiedAppearanceID = C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
   data.transmogInfo = {
+---@diagnostic disable-next-line: param-type-not-match
+---@diagnostic disable-next-line: assign-type-mismatch
     transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
       appearanceID = 0,
       secondaryAppearanceID = 0,
@@ -1091,10 +1119,12 @@ function items:GetEquipmentInfo(itemMixin)
   }
   data.inventoryType = invType --[[@as number]]
   data.inventorySlots = {itemMixin:GetItemLocation():GetEquipmentSlot()}
+  ---@diagnostic disable-next-line: param-type-not-match
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
   data.itemInfo = {
     itemID = itemID,
+---@diagnostic disable-next-line: param-type-not-match
     itemGUID = C_Item.GetItemGUID(itemLocation),
     itemName = itemName,
     itemLink = itemLink,
@@ -1107,24 +1137,28 @@ function items:GetEquipmentInfo(itemMixin)
     itemEquipLoc = itemEquipLoc,
     itemTexture = itemTexture,
     sellPrice = sellPrice,
-    classID = classID,
+    classID = classID, ---@diagnostic disable-line: assign-type-mismatch
     subclassID = subclassID,
-    bindType = bindType,
-    expacID = expacID,
+    bindType = bindType, ---@diagnostic disable-line: assign-type-mismatch
+    expacID = expacID, ---@diagnostic disable-line: assign-type-mismatch
     setID = setID or 0,
     isCraftingReagent = false,
     effectiveIlvl = effectiveIlvl --[[@as number]],
     isPreview = isPreview --[[@as boolean]],
     baseIlvl = baseIlvl --[[@as number]],
     itemIcon = 0,
+---@diagnostic disable-next-line: param-type-not-match
     isBound = C_Item.IsBound(itemLocation),
     isLocked = false,
     isNewItem = false,
+---@diagnostic disable-next-line: param-type-not-match
     currentItemCount = C_Item.GetStackCount(itemLocation),
     category = "",
+---@diagnostic disable-next-line: param-type-not-match
     currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
     equipmentSets = nil,
   }
+  ---@diagnostic disable-next-line: return-type-mismatch
   return data
 end
 
@@ -1136,15 +1170,17 @@ function items:AttachItemInfo(data, kind)
   local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
   local bagid, slotid = data.bagid, data.slotid
   local slotkey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  ---@diagnostic disable-next-line: param-type-not-match
   local itemID = C_Container.GetContainerItemID(bagid, slotid)
+  ---@diagnostic disable-next-line: param-type-not-match
   local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
   data.kind = kind
   data.basic = false
   data.slotkey = slotkey
   if itemID == nil then
     data.isItemEmpty = true
-    data.bindingInfo = {} --[[@as table]]
-    data.itemInfo = {} --[[@as table]]
+    data.bindingInfo = {} --[[@as table]] ---@diagnostic disable-line: missing-fields
+    data.itemInfo = {} --[[@as table]]  ---@diagnostic disable-line: missing-fields
     return data
   end
   data.isItemEmpty = false
@@ -1153,30 +1189,36 @@ function items:AttachItemInfo(data, kind)
   itemStackCount, itemEquipLoc, itemTexture,
   sellPrice, classID, subclassID, bindType, expacID,
   setID, isCraftingReagent = C_Item.GetItemInfo(itemID)
+  
+  ---@diagnostic disable-next-line: assign-type-mismatch
   bindType = self:GetBindTypeFromLink(itemLink) or bindType  --link overrides itemID if set
-  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]]
+  local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as Enum.ItemQuality]] ---@diagnostic disable-line: param-type-not-match
   local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
   local invType = itemMixin:GetInventoryType()
+  ---@diagnostic disable-next-line: param-type-not-match
   data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
+  ---@diagnostic disable-next-line: param-type-not-match
   data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
 
   local itemAppearanceID, itemModifiedAppearanceID = C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
   data.transmogInfo = {
+---@diagnostic disable-next-line: param-type-not-match
     transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
       appearanceID = 0,
       secondaryAppearanceID = 0,
       appliedAppearanceID = 0,
       appliedSecondaryAppearanceID = 0,
-    },
+    }, ---@diagnostic disable-line: assign-type-mismatch
     itemAppearanceID = itemAppearanceID,
     itemModifiedAppearanceID = itemModifiedAppearanceID,
     hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID)
   }
 
+  ---@diagnostic disable-next-line: param-type-not-match
   data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)
 
   data.inventoryType = invType --[[@as number]]
-  data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] and const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] or {0}
+  data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] and const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType] or {0} ---@diagnostic disable-line: undefined-field
   data.itemInfo = {
     itemID = itemID,
     itemGUID = C_Item.GetItemGUID(itemLocation),

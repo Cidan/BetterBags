@@ -9,7 +9,7 @@ local search = addon:GetSearch()
 
 local context = addon:GetContext()
 
----@class Localization: AceModule
+---@class (partial) Localization: AceModule
 local L =  addon:GetModule('Localization')
 
 ---@class SearchCategory
@@ -122,6 +122,7 @@ function categories:CreateCategory(ctx, category, update)
     ctx = context:New('CreateCategory')
   end
 
+  ---@diagnostic disable-next-line: unnecessary-if
   if self.categories[category.name] then
     if update then
       category.sortOrder = self.categories[category.name].sortOrder
@@ -250,6 +251,7 @@ end
 function categories:SaveCategoryToDisk(ctx, name)
   _ = ctx
   local category = self.categories[name]
+  ---@diagnostic disable-next-line: unnecessary-if
   if category then
     database:CreateOrUpdateCategory(category)
   end
@@ -291,8 +293,10 @@ function categories:AddPermanentItemToCategory(ctx, id, name)
     id = ctx
     ctx = context:New('AddPermanentItemToCategory')
   end
+  ---@diagnostic disable-next-line: unnecessary-assert
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", name))
   assert(name ~= nil, format("Attempted to add item %d to a nil category.", id))
+  ---@diagnostic disable-next-line: unnecessary-assert
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, name))
   self.categories[name].permanentItemList[id] = true
   self.itemIDToCategories[id] = self.itemIDToCategories[id] or {}
@@ -313,8 +317,10 @@ function categories:AddItemToCategory(ctx, id, name)
     id = ctx
     ctx = context:New('AddItemToCategory')
   end
+  ---@diagnostic disable-next-line: unnecessary-assert
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", name))
   assert(name ~= nil, format("Attempted to add item %d to a nil category.", id))
+  ---@diagnostic disable-next-line: unnecessary-assert
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, name))
   self.categories[name].itemList[id] = true
   self.itemIDToCategories[id] = self.itemIDToCategories[id] or {}
@@ -342,7 +348,9 @@ end
 ---@param name string The name of the custom category to check.
 ---@return boolean
 function categories:IsCategoryEnabled(kind, name)
+  ---@diagnostic disable-next-line: unnecessary-if
   if self.categories[name] then
+    ---@diagnostic disable-next-line: return-type-mismatch
     return self.categories[name].enabled[kind]
   end
   return false
@@ -353,6 +361,7 @@ end
 ---@param kind BagKind
 ---@param name string The name of the custom category to toggle.
 function categories:ToggleCategory(ctx, kind, name)
+  ---@diagnostic disable-next-line: unnecessary-if
   if self.categories[name] then
     self.categories[name].enabled[kind] = not self.categories[name].enabled[kind]
     self:SaveCategoryToDisk(ctx, name)
@@ -364,6 +373,7 @@ end
 ---@param kind BagKind
 ---@param name string The name of the custom category to toggle.
 function categories:EnableCategory(ctx, kind, name)
+  ---@diagnostic disable-next-line: unnecessary-if
   if self.categories[name] then
     self.categories[name].enabled[kind] = true
     self:SaveCategoryToDisk(ctx, name)
@@ -374,6 +384,7 @@ end
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:DisableCategory(ctx, kind, category)
+  ---@diagnostic disable-next-line: unnecessary-if
   if self.categories[category] then
     self.categories[category].enabled[kind] = false
     self:SaveCategoryToDisk(ctx, category)
@@ -386,6 +397,7 @@ end
 ---@param name string The name of the custom category to toggle.
 ---@param enabled boolean
 function categories:SetCategoryState(ctx, kind, name, enabled)
+  ---@diagnostic disable-next-line: unnecessary-if
   if self.categories[name] then
     self.categories[name].enabled[kind] = enabled
     self:SaveCategoryToDisk(ctx, name)
@@ -448,7 +460,9 @@ end
 ---@param category string
 ---@return boolean
 function categories:IsCategoryShown(category)
+  ---@diagnostic disable-next-line: unnecessary-if
   if self.categories[category] then
+    ---@diagnostic disable-next-line: return-type-mismatch
     return self.categories[category].shown
   end
   return false
@@ -499,7 +513,9 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
       blizzard = true,
     })
     local filter = categories:GetCategoryByName(_G[data.itemInfo.itemEquipLoc])
+    ---@diagnostic disable-next-line: unnecessary-if
     if filter.allowBlizzardItems and filter.enabled[data.kind] then
+      ---@diagnostic disable-next-line: assign-type-mismatch
       data.categories.blizzard = {name = filter.name, priority = filter.priority}
     end
   end
@@ -529,6 +545,7 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
     if category ~= "" then
       category = category .. " - "
     end
+    ---@diagnostic disable-next-line: undefined-field
     category = category .. const.TRADESKILL_MAP[data.itemInfo.subclassID]
   end
 
@@ -550,7 +567,9 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
   })
 
   local filter = categories:GetCategoryByName(category)
+  ---@diagnostic disable-next-line: unnecessary-if
   if filter.allowBlizzardItems and filter.enabled[data.kind] then
+    ---@diagnostic disable-next-line: assign-type-mismatch
     data.categories.blizzard = {name = filter.name, priority = filter.priority}
     return
   end
@@ -564,6 +583,7 @@ function categories:CalculateAndUpdateBlizzardCategory(ctx, data)
     })
     everythingFilter = categories:GetCategoryByName(everythingCategoryName)
   end
+  ---@diagnostic disable-next-line: assign-type-mismatch
   data.categories.blizzard = {name = everythingFilter.name, priority = everythingFilter.priority}
 end
 
@@ -573,6 +593,7 @@ function categories:CalculateAndUpdateManualCategory(ctx, data)
   local category = self:GetCustomCategory(ctx, data.kind, data)
   if category then
     local filter = self.categories[category]
+    ---@diagnostic disable-next-line: unnecessary-if
     if category then
       data.categories.manual = {name = category, priority = filter.priority}
     end
@@ -586,6 +607,7 @@ function categories:CalculateAndUpdateSearchCategory(ctx, data)
   local slotkey = data.slotkey
   if self.slotsToCategories[slotkey] and #self.slotsToCategories[slotkey] > 0 then
     local filter = self.categories[self.slotsToCategories[slotkey][1]]
+    ---@diagnostic disable-next-line: assign-type-mismatch
     data.categories.search = {name = filter.name, priority = filter.priority}
   end
 end
@@ -637,18 +659,21 @@ function categories:GetCustomCategory(ctx, kind, data)
   -- To be removed eventually.
   if type(ctx) == "number" then
     data = kind --[[@as ItemData]]
+ ---@diagnostic disable-next-line: assign-type-mismatch
     kind = ctx
     ctx = context:New('GetCustomCategory')
   end
   local itemID = data.itemInfo.itemID
   if not itemID then return nil end
   local filterNames = self.itemIDToCategories[itemID]
+  ---@diagnostic disable-next-line: unnecessary-if
   if filterNames then
     table.sort(filterNames, function(a, b)
       return self.categories[a].priority < self.categories[b].priority
     end)
     for _, name in ipairs(filterNames) do
       local filter = self.categories[name]
+      ---@diagnostic disable-next-line: unnecessary-if
       if filter.enabled[kind] then
         return filter.name
       end
@@ -665,10 +690,12 @@ function categories:GetCustomCategory(ctx, kind, data)
       local name = select(1, args) --[[@as string]]
       local found = self.categories[name] and true or false
       self:AddItemToCategory(ctx, itemID, name)
+      ---@diagnostic disable-next-line: unnecessary-if
       if not found then
         self.categoryCount = self.categoryCount + 1
         events:SendMessage(ctx, 'categories/Changed')
       end
+      ---@diagnostic disable-next-line: param-type-not-match
       if self:IsCategoryEnabled(kind, name) then
         return name
       end

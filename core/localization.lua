@@ -1,9 +1,7 @@
-
-
-
 local addon = GetBetterBags()
 
----@class Localization: AceModule
+
+---@class (partial) Localization: AceModule
 ---@field data table<string, table<string, string>>
 local L = addon:NewModule('Localization')
 
