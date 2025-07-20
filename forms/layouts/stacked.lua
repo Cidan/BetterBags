@@ -565,20 +565,26 @@ function stackedLayout:AddSlider(opts)
     container.input:SetText(tostring(container.slider:GetValue()))
     self:ReloadAllFormElements()
   end)
+  -- Wait for the user to submit the value directly before validating
+  addon.SetScript(container.input, "OnEnterPressed", function(_)
+    local value = tonumber(container.input:GetText())
+    if value then
+      if value < opts.min then
+        value = opts.min
+      elseif value > opts.max then
+        value = opts.max
+      end
+      container.slider:SetValue(value)
+      container.input:SetText(tostring(value))
+    else
+      value = opts.min
+    end
+  end)
   addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
     if user then
-      local value = tonumber(container.input:GetText())
-      if value then
-        if value < opts.min then
-          value = opts.min
-        elseif value > opts.max then
-          value = opts.max
-        end
-        container.slider:SetValue(value)
-        container.input:SetText(tostring(value))
-      else
-        value = opts.min
-      end
+      -- Don't set the value immediately, it makes it impossible to enter in a specific
+      -- value because a temporary value will be outside the min and max most likely
+      return
     else
       container.input:SetText(tostring(container.slider:GetValue()))
     end
