@@ -224,10 +224,12 @@ function addon:HideBlizzardBags()
     BagsBar:SetParent(sneakyFrame)
   end
 
-  BankFrame:SetParent(sneakyFrame)
-  BankFrame:SetScript("OnHide", nil)
-  BankFrame:SetScript("OnShow", nil)
-  BankFrame:SetScript("OnEvent", nil)
+  if not addon.isRetail then
+    BankFrame:SetParent(sneakyFrame)
+    BankFrame:SetScript("OnHide", nil)
+    BankFrame:SetScript("OnShow", nil)
+    BankFrame:SetScript("OnEvent", nil)
+  end
 end
 
 function addon:UpdateButtonHighlight()

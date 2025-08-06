@@ -301,7 +301,7 @@ function itemFrame.GetItemContextMatchResult(item)
     local result = ItemButtonUtil.GetItemContextMatchResultForItem( itemLocation ) --[[@as integer]]
     if not const.BACKPACK_BAGS[item.bagID] then return ItemButtonUtil.ItemContextMatchResult.Match end
     if result == ItemButtonUtil.ItemContextMatchResult.Match then return ItemButtonUtil.ItemContextMatchResult.Match end
-    if addon.atBank and addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+    if not addon.isRetail and addon.atBank and addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
       if not C_Bank.IsItemAllowedInBankType( Enum.BankType.Account, itemLocation ) then
         return ItemButtonUtil.ItemContextMatchResult.Mismatch
       else

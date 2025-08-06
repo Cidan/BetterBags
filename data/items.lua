@@ -440,10 +440,15 @@ end
 ---@private
 ---@param ctx Context
 function items:DoRefreshAll(ctx)
-  if not addon.Bags.Bank or not addon.Bags.Backpack then return end
-  if addon.Bags.Bank.frame:IsShown() or addon.atBank then
-    local bankContext = ctx:Copy()
-    self:RefreshBank(bankContext)
+  if not addon.isRetail then
+    if not addon.Bags.Bank or not addon.Bags.Backpack then return end
+  end
+  if not addon.Bags.Backpack then return end
+  if not addon.isRetail then
+    if addon.Bags.Bank.frame:IsShown() or addon.atBank then
+      local bankContext = ctx:Copy()
+      self:RefreshBank(bankContext)
+    end
   end
   self:RefreshBackpack(ctx)
 end
