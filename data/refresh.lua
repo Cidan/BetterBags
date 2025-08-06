@@ -177,15 +177,16 @@ function refresh:OnEnable()
   end)
 
   -- Register when bank slots change for any reason.
-  events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(ctx, _, slot)
-    if slot > NUM_BANKGENERIC_SLOTS then
-      ctx:Set("wipe", true)
-    else
-      ctx:Set("wipe", false)
-    end
-    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_BANK', args = {}, ctx = ctx})
-  end)
-
+  if not addon.isRetail then
+    events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(ctx, _, slot)
+      if slot > NUM_BANKGENERIC_SLOTS then
+        ctx:Set("wipe", true)
+      else
+        ctx:Set("wipe", false)
+      end
+      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_BANK', args = {}, ctx = ctx})
+    end)
+  end
   -- Register when the bag slots change for any reason.
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ctx)
     ctx:Set("wipe", true)
@@ -198,14 +199,6 @@ function refresh:OnEnable()
     table.insert(refresh.UpdateQueue, {eventName = 'EQUIPMENT_SETS_CHANGED', args = {}, ctx = ctx})
     self:StartUpdate(ctx)
   end)
-
-  -- Register when reagent bank slots change, only in retail.
-  if addon.isRetail then
-    events:RegisterEvent('PLAYERREAGENTBANKSLOTS_CHANGED', function(ctx)
-      ctx:Set("wipe", false)
-      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_BANK', args = {}, ctx = ctx})
-    end)
-  end
 
   -- Register when combat ends and start updates to catch any
   -- required updates.

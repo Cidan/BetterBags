@@ -141,7 +141,9 @@ function searchBox.searchProto:UpdateSearch(ctx)
     if text == "" then
       self.enterLabelFadeOut:Play()
       addon.Bags.Backpack:ResetSearch(ctx)
-      addon.Bags.Bank:ResetSearch(ctx)
+      if not addon.isRetail then
+        addon.Bags.Bank:ResetSearch(ctx)
+      end
     else
       if not self.enterLabel:IsShown() then
         self.enterLabelFadeIn:Play()

@@ -84,43 +84,44 @@ const.BINDING_MAP = {
 
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
-const.BANK_BAGS = {
-  [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
-}
+if addon.isRetail then
+else
+  const.BANK_BAGS = {
+    [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
+    [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
+    [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
+    [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
+    [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
+    [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
+    [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
+    [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  }
+  -- BANK_ONLY_BAGS contains all the bags that are part of the bank, excluding
+  -- the main bank view.
+  const.BANK_ONLY_BAGS = {
+    [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
+    [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
+    [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
+    [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
+    [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
+    [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
+    [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  }
+  const.BANK_ONLY_BAGS_LIST = {
+    Enum.BagIndex.BankBag_1,
+    Enum.BagIndex.BankBag_2,
+    Enum.BagIndex.BankBag_3,
+    Enum.BagIndex.BankBag_4,
+    Enum.BagIndex.BankBag_5,
+    Enum.BagIndex.BankBag_6,
+    Enum.BagIndex.BankBag_7,
+  }
 
--- BANK_ONLY_BAGS contains all the bags that are part of the bank, excluding
--- the main bank view.
-const.BANK_ONLY_BAGS = {
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
-}
-const.BANK_ONLY_BAGS_LIST = {
-  Enum.BagIndex.BankBag_1,
-  Enum.BagIndex.BankBag_2,
-  Enum.BagIndex.BankBag_3,
-  Enum.BagIndex.BankBag_4,
-  Enum.BagIndex.BankBag_5,
-  Enum.BagIndex.BankBag_6,
-  Enum.BagIndex.BankBag_7,
-}
-
--- REAGENTBANK_BAGS contains the reagent bank bag.
-const.REAGENTBANK_BAGS = {
-  [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
-}
-
+  -- REAGENTBANK_BAGS contains the reagent bank bag.
+  const.REAGENTBANK_BAGS = {
+    [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
+  }
+end
 
 if addon.isRetail then
   const.ACCOUNT_BANK_BAGS = {

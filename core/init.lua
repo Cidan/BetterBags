@@ -195,10 +195,15 @@ function addon:HideBlizzardBags()
   local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
   sneakyFrame:Hide()
   ContainerFrameCombinedBags:SetParent(sneakyFrame)
-  for i = 1, 13 do
-    _G["ContainerFrame"..i]:SetParent(sneakyFrame)
+  if addon.isRetail then
+    for i = 1, 6 do
+      _G["ContainerFrame"..i]:SetParent(sneakyFrame)
+    end
+  else
+    for i = 1, 13 do
+      _G["ContainerFrame"..i]:SetParent(sneakyFrame)
+    end
   end
-
   MainMenuBarBackpackButton:SetScript("OnClick", function()
     local ctx = context:New('MainMenuBarBackpackButton_OnClick')
     self:ToggleAllBags(ctx)
@@ -265,7 +270,9 @@ function addon:OnEnable()
   self:HideBlizzardBags()
   local rootctx = context:New('addon_enable')
   addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-  addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+  if not addon.isRetail then
+    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+  end
 
   -- Apply themes globally -- do not instantiate new windows after this call.
   themes:Enable()
@@ -273,14 +280,17 @@ function addon:OnEnable()
   addon.Bags.Backpack:SetTitle(L:G("Backpack"))
 
   table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-  table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-
+  if not addon.isRetail then
+    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+  end
   consoleport:Enable()
 
   self:SecureHook('ToggleAllBags')
   self:SecureHook('CloseSpecialWindows')
 
-  events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
+  if not addon.isRetail then
+    events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
+  end
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_SHOW', self.OpenInteractionWindow)
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_HIDE', self.CloseInteractionWindow)
 
@@ -296,21 +306,22 @@ function addon:OnEnable()
     end)
    end)
 
-  events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
-    debug:Log("init/OnInitialize/items", "Drawing bank")
-     -- Show the bank frame if it's not already shown.
-    if not addon.Bags.Bank:IsShown() and addon.atBank then
-      addon.Bags.Bank:Show(ctx)
-    end
-    addon.Bags.Bank:Draw(ctx, slotInfo, function()
-      events:SendMessage(ctx, 'bags/Draw/Bank/Done')
-      if not addon.Bags.Bank.loaded then
-        addon.Bags.Bank.loaded = true
-        events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
+  if not addon.isRetail then
+    events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
+      debug:Log("init/OnInitialize/items", "Drawing bank")
+       -- Show the bank frame if it's not already shown.
+      if not addon.Bags.Bank:IsShown() and addon.atBank then
+        addon.Bags.Bank:Show(ctx)
       end
+      addon.Bags.Bank:Draw(ctx, slotInfo, function()
+        events:SendMessage(ctx, 'bags/Draw/Bank/Done')
+        if not addon.Bags.Bank.loaded then
+          addon.Bags.Bank.loaded = true
+          events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
+        end
+      end)
     end)
-  end)
-
+  end
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 
   --This tutorial bitfield change does not persist when set in OnInitialize()
