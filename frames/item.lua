@@ -148,7 +148,7 @@ function itemFrame.itemProto:ShowItemLevel()
   local data = items:GetItemDataFromSlotKey(self.slotkey)
   local ilvl = data.itemInfo.currentItemLevel
   self.ilvlText:SetText(tostring(ilvl))
-  if ilvlOpts.color then
+  if ilvlOpts.color and data.itemInfo.classID ~= Enum.ItemClass.Profession then
     local r, g, b = color:GetItemLevelColor(ilvl)
     self.ilvlText:SetTextColor(r, g, b, 1)
   else
@@ -170,8 +170,11 @@ function itemFrame.itemProto:DrawItemLevel()
     return
   end
 
-  if (data.itemInfo.classID ~= Enum.ItemClass.Armor and
-  data.itemInfo.classID ~= Enum.ItemClass.Weapon) then
+  if (
+    data.itemInfo.classID ~= Enum.ItemClass.Armor and
+    data.itemInfo.classID ~= Enum.ItemClass.Weapon and
+    data.itemInfo.classID ~= Enum.ItemClass.Profession
+  ) then
     self.ilvlText:Hide()
     return
   end
