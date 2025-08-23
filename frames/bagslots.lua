@@ -145,7 +145,9 @@ function BagSlots:CreatePanel(ctx, kind)
   end)
 
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ectx) b:Draw(ectx) end)
-  events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function(ectx) b:Draw(ectx) end)
+  if not addon.isRetail then
+    events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function(ectx) b:Draw(ectx) end)
+  end
   b.kind = kind
   b.frame:Hide()
   return b

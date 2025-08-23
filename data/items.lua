@@ -1330,7 +1330,7 @@ end
 ---@param bagid number|string
 ---@return BagKind
 function items:GetBagKindFromBagID(bagid)
-  if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
+  if const.BANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
     return const.BAG_KIND.BANK
   end
   return const.BAG_KIND.BACKPACK

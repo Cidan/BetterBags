@@ -195,7 +195,8 @@ function addon:HideBlizzardBags()
   local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
   sneakyFrame:Hide()
   ContainerFrameCombinedBags:SetParent(sneakyFrame)
-  for i = 1, 13 do
+  local maxBags = addon.isRetail and 6 or 13
+  for i = 1, maxBags do
     _G["ContainerFrame"..i]:SetParent(sneakyFrame)
   end
 

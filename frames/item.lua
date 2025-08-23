@@ -326,7 +326,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
     decoration:SetID(slotid)
     decoration.bagID = bagid
     self.frame:SetID(bagid)
-    if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
+    if const.BANK_BAGS[bagid] then
       self.kind = const.BAG_KIND.BANK
     else
       self.kind = const.BAG_KIND.BACKPACK
@@ -519,7 +519,7 @@ end
 function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
   local decoration = themes:GetItemButton(ctx, self)
   self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
-  if const.BANK_BAGS[bagid] or const.REAGENTBANK_BAGS[bagid] then
+  if const.BANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
     self.kind = const.BAG_KIND.BACKPACK

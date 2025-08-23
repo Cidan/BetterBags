@@ -584,11 +584,11 @@ function bagFrame:Create(ctx, kind)
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 
-  local slots = bagSlots:CreatePanel(ctx, kind)
-  slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
-  slots.frame:SetParent(b.frame)
-  slots.frame:Hide()
-  b.slots = slots
+  --local slots = bagSlots:CreatePanel(ctx, kind)
+  --slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
+  --slots.frame:SetParent(b.frame)
+  --slots.frame:Hide()
+  --b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
     b.searchFrame = searchBox:Create(ctx, b.frame)
@@ -606,12 +606,12 @@ function bagFrame:Create(ctx, kind)
 
   if kind == const.BAG_KIND.BANK then
     -- Move the settings menu to the bag frame.
-    AccountBankPanel.TabSettingsMenu:SetParent(b.frame)
-    AccountBankPanel.TabSettingsMenu:ClearAllPoints()
-    AccountBankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMRIGHT", 10, 0)
+    BankPanel.TabSettingsMenu:SetParent(b.frame)
+    BankPanel.TabSettingsMenu:ClearAllPoints()
+    BankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMRIGHT", 10, 0)
 
     -- Adjust the settings function so the tab settings menu is populated correctly.
-    AccountBankPanel.TabSettingsMenu.GetBankFrame = function()
+    BankPanel.TabSettingsMenu.GetBankFrame = function()
       return {
         GetTabData = function(_, id)
           local bankTabData = b:GetWarbankTabDataByID(id)
@@ -634,16 +634,16 @@ function bagFrame:Create(ctx, kind)
 
     b.tabs:SetClickHandler(function(ectx, tabIndex, button)
       if tabIndex == 1 then
-        AccountBankPanel.TabSettingsMenu:Hide()
+        BankPanel.TabSettingsMenu:Hide()
         b:SwitchToBank(ectx)
       elseif tabIndex == 2 then
-        AccountBankPanel.TabSettingsMenu:Hide()
+        BankPanel.TabSettingsMenu:Hide()
         return b:SwitchToReagentBank(ectx)
       else
-        if button == "RightButton" or AccountBankPanel.TabSettingsMenu:IsShown() then
-          AccountBankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
-          AccountBankPanel.TabSettingsMenu:Show()
-          AccountBankPanel.TabSettingsMenu:Update()
+        if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
+          BankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
+          BankPanel.TabSettingsMenu:Show()
+          BankPanel.TabSettingsMenu:Update()
         end
         b:SwitchToAccountBank(ectx, tabIndex)
       end

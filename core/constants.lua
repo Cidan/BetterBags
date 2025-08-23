@@ -31,13 +31,18 @@ const.BAG_KIND = {
 -- BankTab is an enum for the different bank tabs.
 ---@enum BankTab
 const.BANK_TAB = {
-  BANK = Enum.BagIndex.Bank,
-  REAGENT = Enum.BagIndex.Reagentbank,
-  ACCOUNT_BANK_1 = Enum.BagIndex.AccountBankTab_1,
-  ACCOUNT_BANK_2 = Enum.BagIndex.AccountBankTab_2,
-  ACCOUNT_BANK_3 = Enum.BagIndex.AccountBankTab_3,
-  ACCOUNT_BANK_4 = Enum.BagIndex.AccountBankTab_4,
-  ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
+  [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
+  [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
+  [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
+  [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
+  [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
+  [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
+  [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
+  [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
+  [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
+  [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
+  [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
+  [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
 }
 
 ---@enum MovementFlowType
@@ -82,45 +87,64 @@ const.BINDING_MAP = {
   [const.BINDING_SCOPE.WUE] = "wue",
 }
 
+if addon.isRetail then
+  const.BANK_BAGS = {
+    [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
+    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
+    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
+    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
+    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
+    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
+    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
+  }
+  const.BANK_ONLY_BAGS = {
+    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
+    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
+    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
+    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
+    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
+    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
+  }
+  const.BANK_ONLY_BAGS_LIST = {
+    Enum.BagIndex.CharacterBankTab_1,
+    Enum.BagIndex.CharacterBankTab_2,
+    Enum.BagIndex.CharacterBankTab_3,
+    Enum.BagIndex.CharacterBankTab_4,
+    Enum.BagIndex.CharacterBankTab_5,
+    Enum.BagIndex.CharacterBankTab_6,
+  }
+else
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
-const.BANK_BAGS = {
-  [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
-}
-
--- BANK_ONLY_BAGS contains all the bags that are part of the bank, excluding
--- the main bank view.
-const.BANK_ONLY_BAGS = {
-  [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
-  [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
-  [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
-  [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
-  [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
-  [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
-  [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
-}
-const.BANK_ONLY_BAGS_LIST = {
-  Enum.BagIndex.BankBag_1,
-  Enum.BagIndex.BankBag_2,
-  Enum.BagIndex.BankBag_3,
-  Enum.BagIndex.BankBag_4,
-  Enum.BagIndex.BankBag_5,
-  Enum.BagIndex.BankBag_6,
-  Enum.BagIndex.BankBag_7,
-}
-
--- REAGENTBANK_BAGS contains the reagent bank bag.
-const.REAGENTBANK_BAGS = {
-  [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
-}
-
+  const.BANK_BAGS = {
+    [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
+    [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
+    [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
+    [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
+    [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
+    [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
+    [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
+    [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  }
+  const.BANK_ONLY_BAGS = {
+    [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
+    [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
+    [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
+    [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
+    [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
+    [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
+    [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+  }
+  const.BANK_ONLY_BAGS_LIST = {
+    Enum.BagIndex.BankBag_1,
+    Enum.BagIndex.BankBag_2,
+    Enum.BagIndex.BankBag_3,
+    Enum.BagIndex.BankBag_4,
+    Enum.BagIndex.BankBag_5,
+    Enum.BagIndex.BankBag_6,
+    Enum.BagIndex.BankBag_7,
+  }
+end
 
 if addon.isRetail then
   const.ACCOUNT_BANK_BAGS = {
