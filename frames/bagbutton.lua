@@ -55,7 +55,7 @@ end
 ---@param bag Enum.BagIndex
 function BagButtonFrame.bagButtonProto:SetBag(ctx, bag)
   self.bag = bag
-  if const.BANK_ONLY_BAGS[bag] then
+  if not addon.isRetail and const.BANK_ONLY_BAGS[bag] then
     self.kind = const.BAG_KIND.BANK
   else
     self.kind = const.BAG_KIND.BACKPACK

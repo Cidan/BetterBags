@@ -275,7 +275,7 @@ end
 function bagFrame.bagProto:Refresh(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then
     events:SendMessage(ctx, 'bags/RefreshBackpack')
-  else
+  elseif not addon.isRetail then
     events:SendMessage(ctx, 'bags/RefreshBank')
   end
 end
