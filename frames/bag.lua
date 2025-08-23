@@ -138,8 +138,9 @@ function bagFrame.bagProto:GenerateWarbankTabs(ctx)
     end
   end
 
+  --[[
   if not self.tabs:TabExists("Purchase Warbank Tab") then
-    self.tabs:AddTab(ctx, "Purchase Warbank Tab", nil, nil, AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
+    self.tabs:AddTab(ctx, "Purchase Warbank Tab", nil, nil, BankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
   end
 
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
@@ -148,6 +149,7 @@ function bagFrame.bagProto:GenerateWarbankTabs(ctx)
     self.tabs:MoveToEnd("Purchase Warbank Tab")
     self.tabs:ShowTabByName("Purchase Warbank Tab")
   end
+  ]]--
   -- TODO(lobato): this
   --self.currentView:UpdateWidth()
   local w = self.tabs.width
@@ -323,7 +325,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
       self:Search(ctx, search:Search(text))
     end
     self:OnResize()
-    if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
+    if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and self.slots and not self.slots:IsShown() then
       self.slots:Draw(ctx)
       self.slots:Show()
     end
@@ -371,36 +373,16 @@ end
 
 ---@param ctx Context
 function bagFrame.bagProto:SwitchToBank(ctx)
-  self.bankTab = const.BANK_TAB.BANK
+  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
-  AccountBankPanel.selectedTabID = nil
+  BankPanel.selectedTabID = nil
   self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
   ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
-end
-
----@param ctx Context
----@return boolean
-function bagFrame.bagProto:SwitchToReagentBank(ctx)
-  if not IsReagentBankUnlocked() then
-    StaticPopup_Show("CONFIRM_BUY_REAGENTBANK_TAB")
-    return false
-  end
-  self.bankTab = const.BANK_TAB.REAGENT
-  BankFrame.selectedTab = 2
-  self:SetTitle(L:G("Reagent Bank"))
-  self.currentItemCount = -1
-  BankFrame.activeTabIndex = 1
-  AccountBankPanel.selectedTabID = nil
-  self:Wipe(ctx)
-  ctx:Set('wipe', true)
-  items:RefreshBank(ctx)
-  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
-  return true
 end
 
 ---@param ctx Context
@@ -413,7 +395,7 @@ function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if data.ID == tabIndex then
-      AccountBankPanel.selectedTabID = data.ID
+      BankPanel.selectedTabID = data.ID
       break
     end
   end
@@ -431,7 +413,7 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
   ctx:Set('wipe', true)
   self.tabs:SetTabByIndex(ctx, 1)
-  self.bankTab = const.BANK_TAB.BANK
+  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
   self:SetTitle(L:G("Bank"))
@@ -512,7 +494,7 @@ function bagFrame:Create(ctx, kind)
   b.currentItemCount = 0
   b.drawOnClose = false
   b.drawAfterCombat = false
-  b.bankTab = const.BANK_TAB.BANK
+  b.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   b.sections = {}
   b.toRelease = {}
   b.toReleaseSections = {}
@@ -584,11 +566,11 @@ function bagFrame:Create(ctx, kind)
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 
-  local slots = bagSlots:CreatePanel(ctx, kind)
-  slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
-  slots.frame:SetParent(b.frame)
-  slots.frame:Hide()
-  b.slots = slots
+  --local slots = bagSlots:CreatePanel(ctx, kind)
+  --slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
+  --slots.frame:SetParent(b.frame)
+  --slots.frame:Hide()
+  --b.slots = slots
 
   if kind == const.BAG_KIND.BACKPACK then
     b.searchFrame = searchBox:Create(ctx, b.frame)
@@ -606,12 +588,12 @@ function bagFrame:Create(ctx, kind)
 
   if kind == const.BAG_KIND.BANK then
     -- Move the settings menu to the bag frame.
-    AccountBankPanel.TabSettingsMenu:SetParent(b.frame)
-    AccountBankPanel.TabSettingsMenu:ClearAllPoints()
-    AccountBankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMRIGHT", 10, 0)
+    BankPanel.TabSettingsMenu:SetParent(b.frame)
+    BankPanel.TabSettingsMenu:ClearAllPoints()
+    BankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMRIGHT", 10, 0)
 
     -- Adjust the settings function so the tab settings menu is populated correctly.
-    AccountBankPanel.TabSettingsMenu.GetBankFrame = function()
+    BankPanel.TabSettingsMenu.GetBankFrame = function()
       return {
         GetTabData = function(_, id)
           local bankTabData = b:GetWarbankTabDataByID(id)
@@ -628,22 +610,18 @@ function bagFrame:Create(ctx, kind)
 
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab(ctx, "Bank")
-    b.tabs:AddTab(ctx, "Reagent Bank")
 
     b.tabs:SetTabByIndex(ctx, 1)
 
     b.tabs:SetClickHandler(function(ectx, tabIndex, button)
       if tabIndex == 1 then
-        AccountBankPanel.TabSettingsMenu:Hide()
+        BankPanel.TabSettingsMenu:Hide()
         b:SwitchToBank(ectx)
-      elseif tabIndex == 2 then
-        AccountBankPanel.TabSettingsMenu:Hide()
-        return b:SwitchToReagentBank(ectx)
       else
-        if button == "RightButton" or AccountBankPanel.TabSettingsMenu:IsShown() then
-          AccountBankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
-          AccountBankPanel.TabSettingsMenu:Show()
-          AccountBankPanel.TabSettingsMenu:Update()
+        if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
+          BankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
+          BankPanel.TabSettingsMenu:Show()
+          BankPanel.TabSettingsMenu:Update()
         end
         b:SwitchToAccountBank(ectx, tabIndex)
       end

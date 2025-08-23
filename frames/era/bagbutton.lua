@@ -19,6 +19,16 @@ local BagButtonFrame = addon:GetModule('BagButton')
 local buttonCount = 0
 
 
+function BagButtonFrame.bagButtonProto:CheckForPurchase()
+  local _, full = GetNumBankSlots()
+  if full then return end
+  if not self.canBuy then return end
+  local cost = GetBankSlotCost(self.bag)
+  BankFrame.nextSlotCost = cost
+  PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+  StaticPopup_Show("CONFIRM_BUY_BANK_SLOT")
+end
+
 ---@param ctx Context
 ---@param bag Enum.BagIndex
 function BagButtonFrame.bagButtonProto:SetBag(ctx, bag)

@@ -106,11 +106,9 @@ function refresh:StartUpdate(ctx)
       updateBank = true
     elseif event.eventName == 'WIPE_AND_REFRESH_ALL' then
       wipeAndRefreshAll = true
-    elseif not addon.isRetail and const.BANK_BAGS[event.args[1]] then
+    elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
-    elseif not addon.isRetail and const.REAGENTBANK_BAGS[event.args[1]] then
-      updateBank = true
-    elseif not addon.isRetail and const.ACCOUNT_BANK_BAGS[event.args[1]] then
+    elseif const.ACCOUNT_BANK_BAGS[event.args[1]] then
       updateBank = true
     elseif const.BACKPACK_BAGS[event.args[1]] then
       updateBackpack = true
@@ -135,9 +133,10 @@ function refresh:StartUpdate(ctx)
     return
   end
 
-  if not addon.isRetail and updateBank and addon.atBank then
-    if addon.atWarbank and addon.Bags.Bank.bankTab < const.BANK_TAB.ACCOUNT_BANK_1 then
-      addon.Bags.Bank.bankTab = const.BANK_TAB.ACCOUNT_BANK_1
+  if updateBank and addon.atBank and addon.Bags.Bank then
+    local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
+    if addon.atWarbank and addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab < accountBankStart then
+      addon.Bags.Bank.bankTab = accountBankStart
     end
     items:RefreshBank(ctx:Copy())
   end
@@ -176,8 +175,8 @@ function refresh:OnEnable()
     self:StartUpdate(ctx)
   end)
 
-  -- Register when bank slots change for any reason.
   if not addon.isRetail then
+    -- Register when bank slots change for any reason.
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(ctx, _, slot)
       if slot > NUM_BANKGENERIC_SLOTS then
         ctx:Set("wipe", true)
@@ -218,13 +217,12 @@ function refresh:OnEnable()
   end)
 
   -- Register when the bank is manually refreshed.
-  if not addon.isRetail then
-    events:RegisterMessage('bags/RefreshBank', function (ctx, _, shouldWipe)
-      ctx:Set("wipe", shouldWipe)
-      table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
-      self:StartUpdate(ctx)
-    end)
-  end
+  events:RegisterMessage('bags/RefreshBank', function (ctx, _, shouldWipe)
+    ctx:Set("wipe", shouldWipe)
+    table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})
+    self:StartUpdate(ctx)
+  end)
+
   -- Register when everything should be refreshed, manually.
   events:RegisterMessage('bags/RefreshAll', function(ctx)
     table.insert(refresh.UpdateQueue, {eventName = 'BAG_UPDATE_DELAYED', args = {}, ctx = ctx})

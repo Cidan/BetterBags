@@ -169,8 +169,6 @@ function addon:GetBagFromBagID(bagid)
     return addon.Bags.Backpack
   elseif const.BANK_BAGS[bagid] then
     return addon.Bags.Bank
-  elseif const.REAGENTBANK_BAGS[bagid] then
-    return addon.Bags.Bank
   elseif const.ACCOUNT_BANK_BAGS[bagid] then
     return addon.Bags.Bank
   else
@@ -195,15 +193,11 @@ function addon:HideBlizzardBags()
   local sneakyFrame = CreateFrame("Frame", "BetterBagsSneakyFrame")
   sneakyFrame:Hide()
   ContainerFrameCombinedBags:SetParent(sneakyFrame)
-  if addon.isRetail then
-    for i = 1, 6 do
-      _G["ContainerFrame"..i]:SetParent(sneakyFrame)
-    end
-  else
-    for i = 1, 13 do
-      _G["ContainerFrame"..i]:SetParent(sneakyFrame)
-    end
+  local maxBags = addon.isRetail and 6 or 13
+  for i = 1, maxBags do
+    _G["ContainerFrame"..i]:SetParent(sneakyFrame)
   end
+
   MainMenuBarBackpackButton:SetScript("OnClick", function()
     local ctx = context:New('MainMenuBarBackpackButton_OnClick')
     self:ToggleAllBags(ctx)
@@ -224,12 +218,10 @@ function addon:HideBlizzardBags()
     BagsBar:SetParent(sneakyFrame)
   end
 
-  if not addon.isRetail then
-    BankFrame:SetParent(sneakyFrame)
-    BankFrame:SetScript("OnHide", nil)
-    BankFrame:SetScript("OnShow", nil)
-    BankFrame:SetScript("OnEvent", nil)
-  end
+  BankFrame:SetParent(sneakyFrame)
+  BankFrame:SetScript("OnHide", nil)
+  BankFrame:SetScript("OnShow", nil)
+  BankFrame:SetScript("OnEvent", nil)
 end
 
 function addon:UpdateButtonHighlight()
@@ -272,9 +264,7 @@ function addon:OnEnable()
   self:HideBlizzardBags()
   local rootctx = context:New('addon_enable')
   addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-  if not addon.isRetail then
-    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-  end
+  addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
 
   -- Apply themes globally -- do not instantiate new windows after this call.
   themes:Enable()
@@ -282,17 +272,14 @@ function addon:OnEnable()
   addon.Bags.Backpack:SetTitle(L:G("Backpack"))
 
   table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-  if not addon.isRetail then
-    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-  end
+  table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+
   consoleport:Enable()
 
   self:SecureHook('ToggleAllBags')
   self:SecureHook('CloseSpecialWindows')
 
-  if not addon.isRetail then
-    events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
-  end
+  events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_SHOW', self.OpenInteractionWindow)
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_HIDE', self.CloseInteractionWindow)
 
@@ -308,22 +295,21 @@ function addon:OnEnable()
     end)
    end)
 
-  if not addon.isRetail then
-    events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
-      debug:Log("init/OnInitialize/items", "Drawing bank")
-       -- Show the bank frame if it's not already shown.
-      if not addon.Bags.Bank:IsShown() and addon.atBank then
-        addon.Bags.Bank:Show(ctx)
+  events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
+    debug:Log("init/OnInitialize/items", "Drawing bank")
+     -- Show the bank frame if it's not already shown.
+    if not addon.Bags.Bank:IsShown() and addon.atBank then
+      addon.Bags.Bank:Show(ctx)
+    end
+    addon.Bags.Bank:Draw(ctx, slotInfo, function()
+      events:SendMessage(ctx, 'bags/Draw/Bank/Done')
+      if not addon.Bags.Bank.loaded then
+        addon.Bags.Bank.loaded = true
+        events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
       end
-      addon.Bags.Bank:Draw(ctx, slotInfo, function()
-        events:SendMessage(ctx, 'bags/Draw/Bank/Done')
-        if not addon.Bags.Bank.loaded then
-          addon.Bags.Bank.loaded = true
-          events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
-        end
-      end)
     end)
-  end
+  end)
+
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 
   --This tutorial bitfield change does not persist when set in OnInitialize()

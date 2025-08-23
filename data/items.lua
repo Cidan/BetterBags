@@ -440,15 +440,10 @@ end
 ---@private
 ---@param ctx Context
 function items:DoRefreshAll(ctx)
-  if not addon.isRetail then
-    if not addon.Bags.Bank or not addon.Bags.Backpack then return end
-  end
-  if not addon.Bags.Backpack then return end
-  if not addon.isRetail then
-    if addon.Bags.Bank.frame:IsShown() or addon.atBank then
-      local bankContext = ctx:Copy()
-      self:RefreshBank(bankContext)
-    end
+  if not addon.Bags.Bank or not addon.Bags.Backpack then return end
+  if addon.Bags.Bank.frame:IsShown() or addon.atBank then
+    local bankContext = ctx:Copy()
+    self:RefreshBank(bankContext)
   end
   self:RefreshBackpack(ctx)
 end
@@ -478,10 +473,13 @@ function items:RefreshBank(ctx)
     GetInventoryItemQuality("player", id)
   end
 
-  if addon.Bags.Bank.bankTab == const.BANK_TAB.REAGENT then
-    ctx:Set('bagid', const.BANK_TAB.REAGENT)
-    self:StageBagForUpdate(const.BANK_TAB.REAGENT, container)
-  elseif addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+  local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
+  local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
+  
+  if addon.Bags.Bank.bankTab and reagentBank and addon.Bags.Bank.bankTab == reagentBank then
+    ctx:Set('bagid', reagentBank)
+    self:StageBagForUpdate(reagentBank, container)
+  elseif addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
     ctx:Set('bagid', addon.Bags.Bank.bankTab)
     self:StageBagForUpdate(addon.Bags.Bank.bankTab, container)
   else
@@ -598,9 +596,7 @@ function items:UpdateFreeSlots(ctx, kind)
   local baglist
   local tab = ctx:Get('bagid')
   if kind == const.BAG_KIND.BANK then
-    if tab == const.BANK_TAB.REAGENT then
-      baglist = const.REAGENTBANK_BAGS
-    elseif tab == const.BANK_TAB.BANK then
+    if tab == const.BANK_TAB.BANK then
       baglist = const.BANK_BAGS
     else
       baglist = {[tab] = tab}
@@ -1335,10 +1331,8 @@ end
 ---@param bagid number|string
 ---@return BagKind
 function items:GetBagKindFromBagID(bagid)
-  if not addon.isRetail then
-    if const.BANK_BAGS[tonumber(bagid)] or const.REAGENTBANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
-      return const.BAG_KIND.BANK
-    end
+  if const.BANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
+    return const.BAG_KIND.BANK
   end
   return const.BAG_KIND.BACKPACK
 end

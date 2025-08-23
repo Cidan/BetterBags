@@ -29,8 +29,18 @@ end
 
 ---@return MovementFlowType
 function movementFlow:GetMovementFlow()
-  if addon.atBank and addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then return const.MOVEMENT_FLOW.WARBANK end
-  if addon.atBank and addon.Bags.Bank.bankTab == const.BANK_TAB.REAGENT then return const.MOVEMENT_FLOW.REAGENT end
+  -- Fix for retail WoW: use Enum.BagIndex values directly
+  local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
+  local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
+  
+  if addon.atBank and addon.Bags.Bank and addon.Bags.Bank.bankTab then
+    if accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
+      return const.MOVEMENT_FLOW.WARBANK
+    end
+    if reagentBank and addon.Bags.Bank.bankTab == reagentBank then
+      return const.MOVEMENT_FLOW.REAGENT
+    end
+  end
   if addon.atBank then return const.MOVEMENT_FLOW.BANK end
   if movementFlow:AtSendMail() then return const.MOVEMENT_FLOW.SENDMAIL end
   if movementFlow:AtTradeWindow() then return const.MOVEMENT_FLOW.TRADE end
