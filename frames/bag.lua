@@ -139,7 +139,7 @@ function bagFrame.bagProto:GenerateWarbankTabs(ctx)
   end
 
   if not self.tabs:TabExists("Purchase Warbank Tab") then
-    self.tabs:AddTab(ctx, "Purchase Warbank Tab", nil, nil, AccountBankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
+    self.tabs:AddTab(ctx, "Purchase Warbank Tab", nil, nil, BankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
   end
 
   if C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
@@ -371,12 +371,12 @@ end
 
 ---@param ctx Context
 function bagFrame.bagProto:SwitchToBank(ctx)
-  self.bankTab = const.BANK_TAB.BANK
+  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
-  AccountBankPanel.selectedTabID = nil
+  BankPanel.selectedTabID = nil
   self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
@@ -390,12 +390,12 @@ function bagFrame.bagProto:SwitchToReagentBank(ctx)
     StaticPopup_Show("CONFIRM_BUY_REAGENTBANK_TAB")
     return false
   end
-  self.bankTab = const.BANK_TAB.REAGENT
+  self.bankTab = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
   BankFrame.selectedTab = 2
   self:SetTitle(L:G("Reagent Bank"))
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
-  AccountBankPanel.selectedTabID = nil
+  BankPanel.selectedTabID = nil
   self:Wipe(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
@@ -413,7 +413,7 @@ function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if data.ID == tabIndex then
-      AccountBankPanel.selectedTabID = data.ID
+      BankPanel.selectedTabID = data.ID
       break
     end
   end
@@ -431,7 +431,7 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
   ctx:Set('wipe', true)
   self.tabs:SetTabByIndex(ctx, 1)
-  self.bankTab = const.BANK_TAB.BANK
+  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
   self:SetTitle(L:G("Bank"))
@@ -512,7 +512,7 @@ function bagFrame:Create(ctx, kind)
   b.currentItemCount = 0
   b.drawOnClose = false
   b.drawAfterCombat = false
-  b.bankTab = const.BANK_TAB.BANK
+  b.bankTab = addon.isRetail and Enum.BagIndex.Bank or const.BANK_TAB.BANK
   b.sections = {}
   b.toRelease = {}
   b.toReleaseSections = {}

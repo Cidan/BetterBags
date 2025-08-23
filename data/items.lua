@@ -473,10 +473,13 @@ function items:RefreshBank(ctx)
     GetInventoryItemQuality("player", id)
   end
 
-  if addon.Bags.Bank.bankTab == const.BANK_TAB.REAGENT then
-    ctx:Set('bagid', const.BANK_TAB.REAGENT)
-    self:StageBagForUpdate(const.BANK_TAB.REAGENT, container)
-  elseif addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+  local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
+  local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
+  
+  if addon.Bags.Bank.bankTab and reagentBank and addon.Bags.Bank.bankTab == reagentBank then
+    ctx:Set('bagid', reagentBank)
+    self:StageBagForUpdate(reagentBank, container)
+  elseif addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
     ctx:Set('bagid', addon.Bags.Bank.bankTab)
     self:StageBagForUpdate(addon.Bags.Bank.bankTab, container)
   else

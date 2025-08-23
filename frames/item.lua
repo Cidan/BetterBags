@@ -301,7 +301,19 @@ function itemFrame.GetItemContextMatchResult(item)
     local result = ItemButtonUtil.GetItemContextMatchResultForItem( itemLocation ) --[[@as integer]]
     if not const.BACKPACK_BAGS[item.bagID] then return ItemButtonUtil.ItemContextMatchResult.Match end
     if result == ItemButtonUtil.ItemContextMatchResult.Match then return ItemButtonUtil.ItemContextMatchResult.Match end
-    if addon.atBank and addon.Bags.Bank.bankTab >= const.BANK_TAB.ACCOUNT_BANK_1 then
+    
+    -- Debug logging to identify nil values
+    if addon.isRetail and addon.atBank then
+      debug:Log("ItemContext", "Bank.bankTab: %s, ACCOUNT_BANK_1 value: %s",
+        tostring(addon.Bags.Bank and addon.Bags.Bank.bankTab),
+        tostring(const.BANK_TAB.ACCOUNT_BANK_1))
+      debug:Log("ItemContext", "AccountBankTab_1 enum value: %s",
+        tostring(Enum.BagIndex.AccountBankTab_1))
+    end
+    
+    -- Fix for retail WoW: use Enum.BagIndex.AccountBankTab_1 directly
+    local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
+    if addon.atBank and addon.Bags.Bank and addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
       if not C_Bank.IsItemAllowedInBankType( Enum.BankType.Account, itemLocation ) then
         return ItemButtonUtil.ItemContextMatchResult.Mismatch
       else
