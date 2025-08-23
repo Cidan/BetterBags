@@ -327,6 +327,7 @@ function themes.CreateDefaultTabDecoration(tab)
   if tab.sabtClick then
     decoration:SetAttribute("type", "click")
     decoration:SetAttribute("clickbutton", tab.sabtClick)
+    decoration:SetAttribute("overrideBankType", Enum.BankType.Account)
   end
   decoration:SetPoint("TOPLEFT", tab, "TOPLEFT", 0, 0)
   decoration:RegisterForClicks("LeftButtonDown", "RightButtonDown")
@@ -477,8 +478,10 @@ function themes.SetupBagButton(bag, decoration)
       if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
         if bag.bankTab <= Enum.BagIndex.CharacterBankTab_6 then
           C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
+          C_Container.SortBankBags()
         else
           C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
+          C_Container.SortAccountBankBags()
         end
       else
         bag:Sort(ctx)

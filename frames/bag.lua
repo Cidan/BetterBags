@@ -138,6 +138,7 @@ function bagFrame.bagProto:GenerateWarbankTabs(ctx)
     end
   end
 
+  --[[
   if not self.tabs:TabExists("Purchase Warbank Tab") then
     self.tabs:AddTab(ctx, "Purchase Warbank Tab", nil, nil, BankPanel.PurchasePrompt.TabCostFrame.PurchaseButton)
   end
@@ -148,6 +149,7 @@ function bagFrame.bagProto:GenerateWarbankTabs(ctx)
     self.tabs:MoveToEnd("Purchase Warbank Tab")
     self.tabs:ShowTabByName("Purchase Warbank Tab")
   end
+  ]]--
   -- TODO(lobato): this
   --self.currentView:UpdateWidth()
   local w = self.tabs.width
