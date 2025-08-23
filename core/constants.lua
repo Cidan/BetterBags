@@ -28,23 +28,36 @@ const.BAG_KIND = {
   BANK = 1,
 }
 
--- BankTab is an enum for the different bank tabs.
----@enum BankTab
-const.BANK_TAB = {
-  [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
-  [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
-  [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
-  [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
-  [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
-  [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
-  [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
-  [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
-  [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
-  [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
-  [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
-  [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
-}
-
+if addon.isRetail then
+  -- BankTab is an enum for the different bank tabs.
+  ---@enum BankTab
+  const.BANK_TAB = {
+    [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
+    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
+    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
+    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
+    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
+    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
+    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
+    [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
+    [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
+    [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
+    [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
+    [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
+  }
+else
+  -- BankTab is an enum for the different bank tabs.
+  ---@enum BankTab
+  const.BANK_TAB = {
+    BANK = Enum.BagIndex.Bank,
+    REAGENT = Enum.BagIndex.Reagentbank,
+    ACCOUNT_BANK_1 = Enum.BagIndex.AccountBankTab_1,
+    ACCOUNT_BANK_2 = Enum.BagIndex.AccountBankTab_2,
+    ACCOUNT_BANK_3 = Enum.BagIndex.AccountBankTab_3,
+    ACCOUNT_BANK_4 = Enum.BagIndex.AccountBankTab_4,
+    ACCOUNT_BANK_5 = Enum.BagIndex.AccountBankTab_5,
+  }
+end
 ---@enum MovementFlowType
 const.MOVEMENT_FLOW = {
   UNDEFINED = -1,

@@ -593,9 +593,7 @@ function items:UpdateFreeSlots(ctx, kind)
   local baglist
   local tab = ctx:Get('bagid')
   if kind == const.BAG_KIND.BANK then
-    if tab == const.BANK_TAB.REAGENT then
-      baglist = const.REAGENTBANK_BAGS
-    elseif tab == const.BANK_TAB.BANK then
+    if tab == const.BANK_TAB.BANK then
       baglist = const.BANK_BAGS
     else
       baglist = {[tab] = tab}

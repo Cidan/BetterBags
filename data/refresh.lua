@@ -108,8 +108,6 @@ function refresh:StartUpdate(ctx)
       wipeAndRefreshAll = true
     elseif const.BANK_BAGS[event.args[1]] then
       updateBank = true
-    elseif const.REAGENTBANK_BAGS[event.args[1]] then
-      updateBank = true
     elseif const.ACCOUNT_BANK_BAGS[event.args[1]] then
       updateBank = true
     elseif const.BACKPACK_BAGS[event.args[1]] then
