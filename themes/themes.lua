@@ -475,8 +475,8 @@ function themes.SetupBagButton(bag, decoration)
       end
     elseif e == "RightButton" then
       if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
-        if bag.bankTab == const.BANK_TAB.REAGENT then
-          DepositReagentBank()
+        if bag.bankTab <= Enum.BagIndex.CharacterBankTab_6 then
+          C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
         else
           C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
         end

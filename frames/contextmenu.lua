@@ -210,13 +210,14 @@ function contextMenu:CreateContextMenu(bag)
 
   if bag.kind == const.BAG_KIND.BANK then
     table.insert(menuList, {
-      text = L:G("Deposit All Reagents"),
+      text = L:G("Sort Bank"),
       notCheckable = true,
-      tooltipTitle = L:G("Deposit All Reagents"),
-      tooltipText = L:G("Click to deposit all reagents into your reagent bank."),
+      tooltipTitle = L:G("Sort Bank"),
+      tooltipText = L:G("Click to sort the bank."),
       func = function()
         PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-        DepositReagentBank()
+        C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
+        C_Container.SortBankBags()
       end
     })
     table.insert(menuList, {
@@ -231,26 +232,31 @@ function contextMenu:CreateContextMenu(bag)
     })
   end
 
-  -- Show bag slot toggle.
-  table.insert(menuList, {
-    text = L:G("Show Bags"),
-    checked = function() return bag.slots:IsShown() end,
-    tooltipTitle = L:G("Show Bags"),
-    tooltipText = L:G("Click to toggle the display of the bag slots."),
-    func = function()
-      if InCombatLockdown() then
-        print("BetterBags: "..L:G("Cannot toggle bag slots in combat."))
-        return
+  -- Show bag slot toggle (only if slots are available).
+  if bag.slots then
+    table.insert(menuList, {
+      text = L:G("Show Bags"),
+      checked = function() return bag.slots and bag.slots:IsShown() end,
+      tooltipTitle = L:G("Show Bags"),
+      tooltipText = L:G("Click to toggle the display of the bag slots."),
+      func = function()
+        if InCombatLockdown() then
+          print("BetterBags: "..L:G("Cannot toggle bag slots in combat."))
+          return
+        end
+        if not bag.slots then
+          return
+        end
+        local ctx = context:New('ToggleBagSlots')
+        if bag.slots and bag.slots:IsShown() then
+          bag.slots:Hide()
+        elseif bag.slots then
+          bag.slots:Draw(ctx)
+          bag.slots:Show()
+        end
       end
-      local ctx = context:New('ToggleBagSlots')
-      if bag.slots:IsShown() then
-        bag.slots:Hide()
-      else
-        bag.slots:Draw(ctx)
-        bag.slots:Show()
-      end
-    end
-  })
+    })
+  end
 
   if bag.kind == const.BAG_KIND.BACKPACK then
     -- Show bag slot toggle.

@@ -323,7 +323,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
       self:Search(ctx, search:Search(text))
     end
     self:OnResize()
-    if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and not self.slots:IsShown() then
+    if database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and self.slots and not self.slots:IsShown() then
       self.slots:Draw(ctx)
       self.slots:Show()
     end
@@ -371,7 +371,7 @@ end
 
 ---@param ctx Context
 function bagFrame.bagProto:SwitchToBank(ctx)
-  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or const.BANK_TAB.BANK
+  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   BankFrame.selectedTab = 1
   self:SetTitle(L:G("Bank"))
   self.currentItemCount = -1
@@ -381,26 +381,6 @@ function bagFrame.bagProto:SwitchToBank(ctx)
   ctx:Set('wipe', true)
   items:RefreshBank(ctx)
   ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
-end
-
----@param ctx Context
----@return boolean
-function bagFrame.bagProto:SwitchToReagentBank(ctx)
-  if not IsReagentBankUnlocked() then
-    StaticPopup_Show("CONFIRM_BUY_REAGENTBANK_TAB")
-    return false
-  end
-  self.bankTab = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
-  BankFrame.selectedTab = 2
-  self:SetTitle(L:G("Reagent Bank"))
-  self.currentItemCount = -1
-  BankFrame.activeTabIndex = 1
-  BankPanel.selectedTabID = nil
-  self:Wipe(ctx)
-  ctx:Set('wipe', true)
-  items:RefreshBank(ctx)
-  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
-  return true
 end
 
 ---@param ctx Context
@@ -431,7 +411,7 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
   ctx:Set('wipe', true)
   self.tabs:SetTabByIndex(ctx, 1)
-  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or const.BANK_TAB.BANK
+  self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
   self:SetTitle(L:G("Bank"))
@@ -512,7 +492,7 @@ function bagFrame:Create(ctx, kind)
   b.currentItemCount = 0
   b.drawOnClose = false
   b.drawAfterCombat = false
-  b.bankTab = addon.isRetail and Enum.BagIndex.Bank or const.BANK_TAB.BANK
+  b.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   b.sections = {}
   b.toRelease = {}
   b.toReleaseSections = {}
@@ -628,7 +608,6 @@ function bagFrame:Create(ctx, kind)
 
     b.tabs = tabs:Create(b.frame)
     b.tabs:AddTab(ctx, "Bank")
-    b.tabs:AddTab(ctx, "Reagent Bank")
 
     b.tabs:SetTabByIndex(ctx, 1)
 
@@ -636,9 +615,6 @@ function bagFrame:Create(ctx, kind)
       if tabIndex == 1 then
         BankPanel.TabSettingsMenu:Hide()
         b:SwitchToBank(ectx)
-      elseif tabIndex == 2 then
-        BankPanel.TabSettingsMenu:Hide()
-        return b:SwitchToReagentBank(ectx)
       else
         if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
           BankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
