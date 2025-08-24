@@ -434,11 +434,11 @@ _G.ITEM_QUALITY7_DESC = _G.ITEM_QUALITY7_DESC
 ---@type string
 _G.ITEM_QUALITY8_DESC = _G.ITEM_QUALITY8_DESC
 
-Enum.BagIndex.AccountBankTab_1 = 13
-Enum.BagIndex.AccountBankTab_2 = 14
-Enum.BagIndex.AccountBankTab_3 = 15
-Enum.BagIndex.AccountBankTab_4 = 16
-Enum.BagIndex.AccountBankTab_5 = 17
+--Enum.BagIndex.AccountBankTab_1 = 13
+--Enum.BagIndex.AccountBankTab_2 = 14
+--Enum.BagIndex.AccountBankTab_3 = 15
+--Enum.BagIndex.AccountBankTab_4 = 16
+--Enum.BagIndex.AccountBankTab_5 = 17
 
 Enum.PlayerInteractionType.AccountBanker = 68
 

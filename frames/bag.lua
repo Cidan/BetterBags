@@ -399,6 +399,7 @@ function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
       break
     end
   end
+  BankPanel:TriggerEvent(BankPanelMixin.Event.BankTabClicked, tabIndex)
   self:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
   self.currentItemCount = -1
   self:Wipe(ctx)
@@ -616,11 +617,14 @@ function bagFrame:Create(ctx, kind)
     b.tabs:SetClickHandler(function(ectx, tabIndex, button)
       if tabIndex == 1 then
         BankPanel.TabSettingsMenu:Hide()
+        BankPanel.bankType = Enum.BankType.Character
         b:SwitchToBank(ectx)
       else
         if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
-          BankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
+          BankPanel.bankType = Enum.BankType.Account
+          BankPanel:FetchPurchasedBankTabData()
           BankPanel.TabSettingsMenu:Show()
+          BankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
           BankPanel.TabSettingsMenu:Update()
         end
         b:SwitchToAccountBank(ectx, tabIndex)
