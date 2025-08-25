@@ -549,6 +549,12 @@ function DB:Migrate()
       end
     end
   end
+
+  -- Removal of bags for bank in retail, do not remove before Q3 '26
+
+  if addon.isRetail then
+    DB.data.profile.views[const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID
+  end
 end
 
 DB:Enable()
