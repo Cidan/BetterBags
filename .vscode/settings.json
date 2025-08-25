@@ -179,7 +179,7 @@
   "Lua.runtime.version": "Lua 5.1",
   "Lua.workspace.library": [
     ".libraries",
-    "~\\.vscode\\extensions\\ketho.wow-api-0.21.0\\Annotations\\Core"
+    "~/.vscode/extensions/ketho.wow-api-0.21.0/Annotations/Core"
   ],
   "search.exclude": {
     "**/.libraries": true,

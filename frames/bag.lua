@@ -567,11 +567,13 @@ function bagFrame:Create(ctx, kind)
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 
-  --local slots = bagSlots:CreatePanel(ctx, kind)
-  --slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
-  --slots.frame:SetParent(b.frame)
-  --slots.frame:Hide()
-  --b.slots = slots
+  if kind == const.BAG_KIND.BACKPACK then
+    local slots = bagSlots:CreatePanel(ctx, kind)
+    slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
+    slots.frame:SetParent(b.frame)
+    slots.frame:Hide()
+    b.slots = slots
+  end
 
   if kind == const.BAG_KIND.BACKPACK then
     b.searchFrame = searchBox:Create(ctx, b.frame)
