@@ -564,8 +564,6 @@ function bagFrame:Create(ctx, kind)
     moneyFrame.frame:SetParent(b.frame)
     b.moneyFrame = moneyFrame
   end
-  -- Setup the context menu.
-  b.menuList = contextMenu:CreateContextMenu(b)
 
   if kind == const.BAG_KIND.BACKPACK then
     local slots = bagSlots:CreatePanel(ctx, kind)
@@ -692,5 +690,7 @@ function bagFrame:Create(ctx, kind)
       item:UpdateUpgrade(ectx)
     end
   end)
+  -- Setup the context menu.
+  b.menuList = contextMenu:CreateContextMenu(b)
   return b
 end
