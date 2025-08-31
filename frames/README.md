@@ -53,6 +53,7 @@ The main container frame for displaying bags (backpack or bank).
 ---@field sections table<string, Section>
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
+---@field bankTab BankTab
 ```
 
 **Key Methods:**
@@ -199,6 +200,7 @@ Right-click context menu system.
 - Bag configuration options
 - View mode switching
 - Anchor controls
+- Character bank tabs toggle (retail)
 - Bank tab purchases
 - Sort operations
 
@@ -207,10 +209,14 @@ Right-click context menu system.
 Tab management for bank views.
 
 **Features:**
-- Bank/Reagent/Warbank tabs
+- Bank/Warbank tabs
+- Character bank tabs (individual tabs for each bank slot)
 - Dynamic tab creation
 - Tab renaming
 - Click handlers
+- Toggle between single bank tab and multiple character bank tabs (retail only)
+- Tab visibility management (ShowTabByID/HideTabByID)
+- Automatic tab sorting by ID for consistent display order
 
 ### Bag Slots (`bagslots.lua`)
 
@@ -273,6 +279,59 @@ Individual bag slot buttons.
 - `item.lua` - Classic item display
 - `itemrow.lua` - Classic item rows
 - `money.lua` - Classic money frame
+
+## Character Bank Tabs Feature (Retail Only)
+
+### Overview
+The character bank tabs feature allows players to switch between two display modes for their character bank:
+1. **Single Tab Mode** (default): All character bank bags shown in one tab labeled "Bank"
+2. **Multiple Tabs Mode**: Individual tabs for each character bank bag slot (Tab 1, Tab 2, etc.)
+
+### Configuration
+Players can toggle between modes using the context menu option "Show Character Bank Tabs" when right-clicking on the bank frame.
+
+### Implementation Details
+
+#### Database Setting
+- `characterBankTabsEnabled`: Boolean setting stored in the database
+- `GetCharacterBankTabsEnabled()` / `SetCharacterBankTabsEnabled()`: Accessor methods
+
+#### Tab Generation
+When multiple tabs mode is enabled:
+- Each bank bag gets its own tab with names retrieved from the WoW API
+- Tab names are fetched using `C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)`
+- If API data is unavailable, falls back to bag item names or generic "Bank Tab X" labels
+- Tabs use the actual bag IDs (Enum.BagIndex.CharacterBankTab_1 through CharacterBankTab_6)
+- The single "Bank" tab is hidden when multiple tabs are enabled
+- Tabs are automatically sorted by ID to ensure consistent display order
+
+#### Tab Management
+- `ShowTabByID(tabID)`: Shows a specific tab by its ID
+- `HideTabByID(tabID)`: Hides a specific tab by its ID
+- `SortTabsByID()`: Sorts all tabs by their ID values for consistent ordering
+- Tab visibility is properly managed when toggling between single/multiple tab modes
+
+#### Content Filtering
+When a specific character bank tab is selected:
+- Only items from that specific bank bag are displayed
+- The `filterBagID` context variable is used to filter items during refresh
+- The items module handles the actual filtering in `RefreshBank()`
+
+#### Tab Switching
+- `SwitchToCharacterBankTab(ctx, tabID)`: Switches to a specific character bank tab
+- Sets the appropriate filter and refreshes the bank display
+- Updates the title to show which tab is active
+- Right-clicking on a character bank tab opens the settings menu for that specific tab
+
+### Interaction with Warbank
+- Character bank tabs and warbank tabs can coexist
+- When at the warbank, character bank tabs are hidden
+- When at the character bank, warbank tabs remain visible for easy switching
+- Both warbank and character bank tabs are sorted by ID for consistent ordering
+- The single "Bank" tab always appears first when visible
+
+### Note on Reagent Bank
+As of the latest patch, the Reagent Bank has been removed from World of Warcraft. This feature and related tabs are no longer included in BetterBags.
 
 ### Classic (`classic/`)
 - `bag.lua` - TBC/Wrath bag handling
@@ -424,11 +483,11 @@ local query = searchBox:GetText()
 
 ## Integration with Other Modules
 
-- **Items Module**: Provides item data for display
+- **Items Module**: Provides item data for display, handles filtering for character bank tabs
 - **Categories Module**: Determines section grouping
 - **Themes Module**: Handles visual styling
 - **Events Module**: Coordinates frame updates
-- **Database Module**: Stores frame positions and settings
+- **Database Module**: Stores frame positions, settings, and character bank tabs preference
 - **Search Module**: Provides search functionality
 - **Views Module**: Implements different view modes
 

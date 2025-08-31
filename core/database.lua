@@ -109,6 +109,16 @@ function DB:GetShowBagButton()
   return DB.data.profile.showBagButton
 end
 
+---@param enabled boolean
+function DB:SetCharacterBankTabsEnabled(enabled)
+  DB.data.profile.characterBankTabsEnabled = enabled
+end
+
+---@return boolean
+function DB:GetCharacterBankTabsEnabled()
+  return DB.data.profile.characterBankTabsEnabled
+end
+
 ---@param kind BagKind
 ---@param view BagView
 ---@return SizeInfo

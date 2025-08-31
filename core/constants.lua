@@ -567,6 +567,7 @@ const.DATABASE_DEFAULTS = {
     firstTimeMenu = true,
     enabled = true,
     showBagButton = true,
+    characterBankTabsEnabled = false,
     debug = false,
     inBagSearch = true,
     categorySell = false,

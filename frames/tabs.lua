@@ -98,20 +98,26 @@ end
 
 function tabFrame:ReanchorTabs()
   self.width = 0
-  local tabCount = 1
+  local visibleTabs = {}
+  
+  -- Collect visible tabs
   for i, tab in ipairs(self.tabIndex) do
-    tab:ClearAllPoints()
     if tab:IsShown() then
-      local anchorFrame = self.frame
-      local anchorPoint = "TOPLEFT"
-      if tabCount > 1 then
-        anchorFrame = self.tabIndex[i - 1]
-        anchorPoint = "TOPRIGHT"
-      end
-      tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
-      self.width = self.width + tab:GetWidth() + 5
-      tabCount = tabCount + 1
+      table.insert(visibleTabs, tab)
     end
+  end
+  
+  -- Reanchor visible tabs
+  for i, tab in ipairs(visibleTabs) do
+    tab:ClearAllPoints()
+    local anchorFrame = self.frame
+    local anchorPoint = "TOPLEFT"
+    if i > 1 then
+      anchorFrame = visibleTabs[i - 1]
+      anchorPoint = "TOPRIGHT"
+    end
+    tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
+    self.width = self.width + tab:GetWidth() + 5
   end
 end
 
@@ -126,6 +132,36 @@ function tabFrame:MoveToEnd(name)
   for i, tab in ipairs(self.tabIndex) do
     tab.index = i
   end
+  self:ReanchorTabs()
+end
+
+-- Sort tabs by their ID
+function tabFrame:SortTabsByID()
+  table.sort(self.tabIndex, function(a, b)
+    -- Special case: Bank tab (ID 1) should always be first
+    if a.id == 1 then return true end
+    if b.id == 1 then return false end
+    
+    -- If both have IDs, sort by ID
+    if a.id and b.id then
+      return a.id < b.id
+    end
+    -- If only one has an ID, put the one with ID first
+    if a.id and not b.id then
+      return true
+    end
+    if not a.id and b.id then
+      return false
+    end
+    -- If neither has an ID, maintain current order (by index)
+    return a.index < b.index
+  end)
+  
+  -- Update the index values after sorting
+  for i, tab in ipairs(self.tabIndex) do
+    tab.index = i
+  end
+  
   self:ReanchorTabs()
 end
 
@@ -190,8 +226,13 @@ function tabFrame:ResizeTabByIndex(ctx, index)
         return
       end
       if self.clickHandler and (self.selectedTab ~= index or button == "RightButton") then
-        if self.clickHandler(ectx, tab.id or tab.index, button) then
-          self:SetTabByIndex(ectx, index)
+        local shouldSelect = self.clickHandler(ectx, tab.id or tab.index, button)
+        if shouldSelect ~= false then
+          if tab.id then
+            self:SetTabByID(ectx, tab.id)
+          else
+            self:SetTabByIndex(ectx, index)
+          end
         end
       end
     end)
@@ -202,7 +243,7 @@ end
 ---@param id number
 function tabFrame:SetTabByID(ctx, id)
   for index, tab in pairs(self.tabIndex) do
-    if tab.id == id then
+    if tab.id == id and tab:IsShown() then
       self:SetTabByIndex(ctx, index)
       return
     end
@@ -212,14 +253,16 @@ end
 ---@param ctx Context
 ---@param index number
 function tabFrame:SetTabByIndex(ctx, index)
-  for i in pairs(self.tabIndex) do
-    if i == index then
-      self:SelectTab(ctx, i)
-    else
-      self:DeselectTab(ctx, i)
+  for i, tab in pairs(self.tabIndex) do
+    if tab:IsShown() then
+      if i == index then
+        self:SelectTab(ctx, i)
+        self.selectedTab = index
+      else
+        self:DeselectTab(ctx, i)
+      end
     end
   end
-  self.selectedTab = index
 end
 
 ---@param index number
@@ -235,6 +278,17 @@ function tabFrame:ShowTabByName(name)
   self:ReanchorTabs()
 end
 
+---@param id number
+function tabFrame:ShowTabByID(id)
+  for _, tab in pairs(self.tabIndex) do
+    if tab.id == id then
+      tab:Show()
+      self:ReanchorTabs()
+      return
+    end
+  end
+end
+
 ---@param index number
 function tabFrame:HideTabByIndex(index)
   self.tabIndex[index]:Hide()
@@ -246,6 +300,17 @@ function tabFrame:HideTabByName(name)
   local tab = self:GetTabByName(name)
   if tab then tab:Hide() end
   self:ReanchorTabs()
+end
+
+---@param id number
+function tabFrame:HideTabByID(id)
+  for _, tab in pairs(self.tabIndex) do
+    if tab.id == id then
+      tab:Hide()
+      self:ReanchorTabs()
+      return
+    end
+  end
 end
 
 ---@private

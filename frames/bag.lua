@@ -128,6 +128,63 @@ local tabs = addon:GetModule('Tabs')
 bagFrame.bagProto = {}
 
 ---@param ctx Context
+function bagFrame.bagProto:GenerateCharacterBankTabs(ctx)
+  if not addon.isRetail then return end
+
+  -- Only generate individual tabs if enabled
+  if not database:GetCharacterBankTabsEnabled() then
+    -- Hide all character bank tabs
+    local bankBags = const.BANK_ONLY_BAGS_LIST
+    for _, bagID in ipairs(bankBags) do
+      if self.tabs:TabExistsByID(bagID) then
+        self.tabs:HideTabByID(bagID)
+      end
+    end
+
+    -- Show single bank tab
+    if not self.tabs:TabExistsByID(1) then
+      self.tabs:AddTab(ctx, "Bank", 1)
+    else
+      self.tabs:ShowTabByID(1)
+    end
+    
+    -- Sort tabs to ensure Bank tab is first
+    self.tabs:SortTabsByID()
+    return
+  end
+
+  -- Hide the single bank tab when multiple tabs are enabled
+  if self.tabs:TabExistsByID(1) then
+    self.tabs:HideTabByID(1)
+  end
+
+  -- Try to get character bank tab data from the API
+  local characterTabData = C_Bank and C_Bank.FetchPurchasedBankTabData and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
+
+
+  for _, data in pairs(characterTabData) do
+    if not self.tabs:TabExistsByID(data.ID) then
+      self.tabs:AddTab(ctx, data.name, data.ID)
+    else
+      -- Update the name if it changed
+      if self.tabs:GetTabNameByID(data.ID) ~= data.name then
+        self.tabs:RenameTabByID(ctx, data.ID, data.name)
+      end
+      self.tabs:ShowTabByID(data.ID)
+    end
+  end
+  
+  -- Sort tabs by ID to ensure proper order
+  self.tabs:SortTabsByID()
+  
+  -- Adjust frame width if needed
+  local w = self.tabs.width
+  if self.frame:GetWidth() + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET < w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET then
+    self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+  end
+end
+
+---@param ctx Context
 function bagFrame.bagProto:GenerateWarbankTabs(ctx)
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
@@ -171,13 +228,33 @@ function bagFrame.bagProto:GetWarbankTabDataByID(id)
 end
 
 function bagFrame.bagProto:HideBankAndReagentTabs()
-  self.tabs:HideTabByIndex(1)
-  self.tabs:HideTabByIndex(2)
+  if database:GetCharacterBankTabsEnabled() then
+    -- Hide all character bank tabs
+    local bankBags = const.BANK_ONLY_BAGS_LIST
+    for _, bagID in ipairs(bankBags) do
+      local tabID = bagID
+      if self.tabs:TabExistsByID(tabID) then
+        self.tabs:HideTabByID(tabID)
+      end
+    end
+  else
+    self.tabs:HideTabByID(1) -- Hide Bank tab
+  end
 end
 
 function bagFrame.bagProto:ShowBankAndReagentTabs()
-  self.tabs:ShowTabByIndex(1)
-  self.tabs:ShowTabByIndex(2)
+  if database:GetCharacterBankTabsEnabled() then
+    -- Show all character bank tabs
+    local bankBags = const.BANK_ONLY_BAGS_LIST
+    for _, bagID in ipairs(bankBags) do
+      local tabID = bagID
+      if self.tabs:TabExistsByID(tabID) then
+        self.tabs:ShowTabByID(tabID)
+      end
+    end
+  else
+    self.tabs:ShowTabByID(1)
+  end
 end
 
 ---@param ctx Context
@@ -189,12 +266,23 @@ function bagFrame.bagProto:Show(ctx)
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
 
   if self.kind == const.BAG_KIND.BANK and addon.isRetail then
+    self:GenerateCharacterBankTabs(ctx)
     self:GenerateWarbankTabs(ctx)
     if addon.atWarbank then
       self:HideBankAndReagentTabs()
       self.tabs:SetTabByID(ctx, 13)
     else
       self:ShowBankAndReagentTabs()
+      -- Set first tab when using multiple character bank tabs
+      if database:GetCharacterBankTabsEnabled() then
+        local firstTabID = const.BANK_ONLY_BAGS_LIST[1]
+        self.bankTab = firstTabID  -- Important: set bankTab before SetTabByID
+        self.tabs:SetTabByID(ctx, firstTabID)
+        ctx:Set('filterBagID', firstTabID)  -- Set the filter for the initial tab
+      else
+        self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
+        self.tabs:SetTabByID(ctx, 1)
+      end
     end
    self.moneyFrame:Update()
   end
@@ -379,9 +467,36 @@ function bagFrame.bagProto:SwitchToBank(ctx)
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
   BankPanel.selectedTabID = nil
+  -- Clear bank cache to ensure clean state
+  items:ClearBankCache(ctx)
   self:Wipe(ctx)
   ctx:Set('wipe', true)
-  items:RefreshBank(ctx)
+  ctx:Set('filterBagID', nil) -- Clear filter for single bank tab
+  -- Update visual tab selection
+  self.tabs:SetTabByID(ctx, 1)
+  -- Trigger a full refresh and redraw
+  events:SendMessage(ctx, 'bags/RefreshBank')
+  ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
+end
+
+---@param ctx Context
+---@param tabID number
+function bagFrame.bagProto:SwitchToCharacterBankTab(ctx, tabID)
+  self.bankTab = tabID
+  BankFrame.selectedTab = 1
+  BankFrame.activeTabIndex = 1
+  BankPanel.selectedTabID = nil
+  self:SetTitle(format(L:G("Bank Tab %d"), tabID - const.BANK_ONLY_BAGS_LIST[1] + 1))
+  self.currentItemCount = -1
+  -- Clear bank cache to ensure no items from other tabs remain
+  items:ClearBankCache(ctx)
+  self:Wipe(ctx)
+  ctx:Set('wipe', true)
+  ctx:Set('filterBagID', tabID)
+  -- Update visual tab selection
+  self.tabs:SetTabByID(ctx, tabID)
+  -- Trigger a full refresh and redraw
+  events:SendMessage(ctx, 'bags/RefreshBank')
   ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
 end
 
@@ -404,6 +519,9 @@ function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   self.currentItemCount = -1
   self:Wipe(ctx)
   ctx:Set('wipe', true)
+  ctx:Set('filterBagID', nil) -- Clear filter for account bank
+  -- Update visual tab selection
+  self.tabs:SetTabByID(ctx, tabIndex)
   items:RefreshBank(ctx)
   ItemButtonUtil.TriggerEvent( ItemButtonUtil.Event.ItemContextChanged )
   return true
@@ -413,7 +531,7 @@ end
 function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
   ctx:Set('wipe', true)
-  self.tabs:SetTabByIndex(ctx, 1)
+  self.tabs:SetTabByID(ctx, 1)
   self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
@@ -597,39 +715,113 @@ function bagFrame:Create(ctx, kind)
     BankPanel.TabSettingsMenu.GetBankFrame = function()
       return {
         GetTabData = function(_, id)
-          local bankTabData = b:GetWarbankTabDataByID(id)
-          return {
-            ID = id,
-            icon = bankTabData.icon,
-            name = b.tabs:GetTabNameByID(id),
-            depositFlags = bankTabData.depositFlags,
-            bankType = Enum.BankType.Account,
-          }
+          -- Check if this is a character bank tab request
+          if BankPanel.bankType == Enum.BankType.Character then
+            -- For character bank tabs, we need to get the bag information
+            local bagID = const.BANK_ONLY_BAGS_LIST[id]
+            if bagID then
+              local invid = C_Container.ContainerIDToInventoryID(bagID)
+              local baglink = GetInventoryItemLink("player", invid)
+              local icon = nil
+              local tabName = format("Bank Tab %d", id)
+
+              if baglink then
+                icon = C_Item.GetItemIconByID(baglink)
+                local itemName = C_Item.GetItemNameByID(baglink)
+                if itemName and itemName ~= "" then
+                  tabName = itemName
+                end
+              end
+
+              -- Try to get character bank tab data from API if available
+              local characterTabData = C_Bank and C_Bank.FetchPurchasedBankTabData and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
+              local depositFlags = nil
+
+              if characterTabData then
+                for _, data in pairs(characterTabData) do
+                  if data.ID == id then
+                    tabName = data.name or tabName
+                    icon = data.icon or icon
+                    depositFlags = data.depositFlags
+                    break
+                  end
+                end
+              end
+              
+              return {
+                ID = id,
+                icon = icon or 133633, -- Default bag icon
+                name = tabName,
+                depositFlags = depositFlags,
+                bankType = Enum.BankType.Character,
+              }
+            end
+          else
+            -- Original warbank tab data handling
+            local bankTabData = b:GetWarbankTabDataByID(id)
+            return {
+              ID = id,
+              icon = bankTabData.icon,
+              name = b.tabs:GetTabNameByID(id),
+              depositFlags = bankTabData.depositFlags,
+              bankType = Enum.BankType.Account,
+            }
+          end
         end
       }
     end
 
     b.tabs = tabs:Create(b.frame)
-    b.tabs:AddTab(ctx, "Bank")
+    
+    -- Always create Bank tab
+    if not b.tabs:TabExistsByID(1) then
+      b.tabs:AddTab(ctx, "Bank", 1)
+    end
+    
+    -- Set initial tab if not using character bank tabs
+    if not database:GetCharacterBankTabsEnabled() then
+      b.tabs:SetTabByID(ctx, 1)
+    end
 
-    b.tabs:SetTabByIndex(ctx, 1)
-
-    b.tabs:SetClickHandler(function(ectx, tabIndex, button)
-      if tabIndex == 1 then
+    b.tabs:SetClickHandler(function(ectx, tabID, button)
+      -- Check if this is a character bank tab
+      if tabID and tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
+        if button == "RightButton" then
+          -- Show settings menu for character bank tabs
+          BankPanel.bankType = Enum.BankType.Character
+          local bagIndex = tabID
+          -- Try to get character bank tab data if available
+          local characterTabData = C_Bank and C_Bank.FetchPurchasedBankTabData and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
+          if characterTabData then
+            BankPanel:FetchPurchasedBankTabData()
+          end
+          BankPanel.TabSettingsMenu:Show()
+          BankPanel.TabSettingsMenu:SetSelectedTab(bagIndex)
+          BankPanel.TabSettingsMenu:Update()
+        else
+          BankPanel.TabSettingsMenu:Hide()
+          BankPanel.bankType = Enum.BankType.Character
+        end
+        b:SwitchToCharacterBankTab(ectx, tabID)
+        return true -- Tab switch handled, allow selection
+      elseif tabID == 1 then
+        -- Bank tab
         BankPanel.TabSettingsMenu:Hide()
         BankPanel.bankType = Enum.BankType.Character
         b:SwitchToBank(ectx)
+        return true -- Tab switch handled, allow selection
       else
+        -- Warbank tabs
         if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
           BankPanel.bankType = Enum.BankType.Account
           BankPanel:FetchPurchasedBankTabData()
           BankPanel.TabSettingsMenu:Show()
-          BankPanel.TabSettingsMenu:SetSelectedTab(tabIndex)
+          BankPanel.TabSettingsMenu:SetSelectedTab(tabID)
           BankPanel.TabSettingsMenu:Update()
         end
-        b:SwitchToAccountBank(ectx, tabIndex)
+        b:SwitchToAccountBank(ectx, tabID)
+        return true -- Tab switch handled, allow selection
       end
-      return true
     end)
     -- BANK_TAB_SETTINGS_UPDATED
     -- BANK_TABS_CHANGED
@@ -637,7 +829,11 @@ function bagFrame:Create(ctx, kind)
       b:GenerateWarbankTabs(ectx)
     end)
     events:RegisterEvent('BANK_TAB_SETTINGS_UPDATED', function(ectx)
+      -- Update both warbank and character bank tabs when settings change
       b:GenerateWarbankTabs(ectx)
+      if database:GetCharacterBankTabsEnabled() then
+        b:GenerateCharacterBankTabs(ectx)
+      end
     end)
   end
 

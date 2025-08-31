@@ -476,7 +476,19 @@ function items:RefreshBank(ctx)
   local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
   local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
   
-  if addon.Bags.Bank.bankTab and reagentBank and addon.Bags.Bank.bankTab == reagentBank then
+  -- Check if we're filtering for a specific character bank tab
+  local filterBagID = ctx:Get('filterBagID')
+  if filterBagID ~= nil and const.BANK_BAGS[filterBagID] then
+    -- We're showing a specific character bank tab
+    ctx:Set('bagid', filterBagID)
+    -- Only stage the specific bag for update when filtering
+    -- Character bank tabs use the bag IDs directly
+    self:StageBagForUpdate(filterBagID, container)
+    -- Also include the main bank bag for the first character bank tab
+    if filterBagID == const.BANK_ONLY_BAGS_LIST[1] then
+      self:StageBagForUpdate(addon.isRetail and Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank, container)
+    end
+  elseif addon.Bags.Bank.bankTab and reagentBank and addon.Bags.Bank.bankTab == reagentBank then
     ctx:Set('bagid', reagentBank)
     self:StageBagForUpdate(reagentBank, container)
   elseif addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
@@ -682,7 +694,10 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
       slotInfo:AddToAddedItems(currentItem)
-      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) then
+      -- Only mark as new if this is not a filtered view (character bank tabs)
+      -- and the item is actually new (not just appearing due to tab switch)
+      local filterBagID = ctx:Get('filterBagID')
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and not filterBagID then
         self:MarkItemAsNew(ctx, currentItem)
       end
       search:Add(currentItem)
@@ -696,7 +711,11 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       slotInfo:AddToAddedItems(currentItem)
       search:Remove(previousItem)
       search:Add(currentItem)
-      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and currentItem.itemInfo.itemID ~= previousItem.itemInfo.itemID then
+      -- Only mark as new if this is not a filtered view (character bank tabs)
+      -- and the item ID actually changed
+      local filterBagID = ctx:Get('filterBagID')
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and
+         currentItem.itemInfo.itemID ~= previousItem.itemInfo.itemID and not filterBagID then
         self:MarkItemAsNew(ctx, currentItem)
       end
     elseif items:ItemGUIDChanged(currentItem, previousItem) then
@@ -822,7 +841,12 @@ end
 ---@param bagid number
 ---@param container ItemLoader
 function items:StageBagForUpdate(bagid, container)
+  -- Check if this is a valid container before trying to get its slots
+  -- This handles cases where bank tabs haven't been purchased yet
   local size = C_Container.GetContainerNumSlots(bagid)
+  if not size or size <= 0 then
+    return
+  end
   -- Loop through every container slot and create an item for it.
   for slotid = 1, size do
     local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)

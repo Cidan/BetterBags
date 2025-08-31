@@ -138,7 +138,34 @@ function refresh:StartUpdate(ctx)
     if addon.atWarbank and addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab < accountBankStart then
       addon.Bags.Bank.bankTab = accountBankStart
     end
-    items:RefreshBank(ctx:Copy())
+
+    -- Set the filterBagID based on the current bank state and tab settings
+    local database = addon:GetModule('Database')
+    local refreshCtx = ctx:Copy()
+    
+    -- Check if the context already has a filterBagID set (from tab switching)
+    local existingFilter = ctx:Get('filterBagID')
+    if existingFilter ~= nil then
+      -- Preserve the existing filter from tab switching
+      refreshCtx:Set('filterBagID', existingFilter)
+    elseif addon.atWarbank then
+      -- If at warbank, use the current warbank tab
+      refreshCtx:Set('filterBagID', addon.Bags.Bank.bankTab)
+    elseif database:GetCharacterBankTabsEnabled() then
+      -- If character bank tabs are enabled, use the current bank tab if it's a character bank tab
+      local currentTab = addon.Bags.Bank.bankTab
+      if currentTab >= Enum.BagIndex.CharacterBankTab_1 and currentTab <= Enum.BagIndex.CharacterBankTab_6 then
+        refreshCtx:Set('filterBagID', currentTab)
+      else
+        -- Default to first character bank tab if current tab is not a character bank tab
+        refreshCtx:Set('filterBagID', Enum.BagIndex.CharacterBankTab_1)
+      end
+    else
+      -- If character bank tabs are disabled, clear the filter for single bank tab mode
+      refreshCtx:Set('filterBagID', nil)
+    end
+
+    items:RefreshBank(refreshCtx)
   end
 
   if updateBackpack then
