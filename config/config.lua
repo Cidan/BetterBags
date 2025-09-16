@@ -92,6 +92,21 @@ function config:CreateConfig()
     end
   })
 
+  f:AddCheckbox({
+    title = 'Use Blizzard Bank UI',
+    description = 'If enabled, BetterBags will leave the Blizzard Bank/Warbank frames intact and not replace them. Requires UI reload.',
+    getValue = function(_)
+      return db:GetUseBlizzardBank()
+    end,
+    setValue = function(ctx, value)
+      db:SetUseBlizzardBank(value)
+      -- Changing whether we replace the Blizzard bank requires a UI reload to apply cleanly.
+      question:YesNo('Reload UI', 'Changing the bank UI backend requires reloading the UI. Reload now?', function()
+        ReloadUI()
+      end, function() end)
+    end
+  })
+
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',

@@ -567,6 +567,7 @@ const.DATABASE_DEFAULTS = {
     firstTimeMenu = true,
     enabled = true,
     showBagButton = true,
+    useBlizzardBank = false,
     characterBankTabsEnabled = false,
     debug = false,
     inBagSearch = true,

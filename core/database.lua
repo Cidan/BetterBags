@@ -110,6 +110,16 @@ function DB:GetShowBagButton()
 end
 
 ---@param enabled boolean
+function DB:SetUseBlizzardBank(enabled)
+  DB.data.profile.useBlizzardBank = enabled
+end
+
+---@return boolean
+function DB:GetUseBlizzardBank()
+  return DB.data.profile.useBlizzardBank
+end
+
+---@param enabled boolean
 function DB:SetCharacterBankTabsEnabled(enabled)
   DB.data.profile.characterBankTabsEnabled = enabled
 end
