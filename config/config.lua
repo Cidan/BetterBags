@@ -83,12 +83,37 @@ function config:CreateConfig()
     end,
     setValue = function(_, value)
       db:SetShowBagButton(value)
-      local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame	
+      local sneakyFrame = _G["BetterBagsSneakyFrame"] ---@type Frame
       if value then
         BagsBar:SetParent(UIParent)
       else
         BagsBar:SetParent(sneakyFrame)
       end
+    end
+  })
+
+  f:AddCheckbox({
+    title = 'Enable Bank Bags',
+    description = 'Enable BetterBags for bank. If disabled, the default Blizzard bank UI will be used. Requires a UI reload to take effect.',
+    getValue = function(_)
+      return db:GetEnableBankBag()
+    end,
+    setValue = function(_, value)
+      db:SetEnableBankBag(value)
+      -- Prompt user to reload UI
+      StaticPopupDialogs["BETTERBAGS_RELOAD_UI"] = {
+        text = "BetterBags needs to reload the UI for this change to take effect. Reload now?",
+        button1 = "Yes",
+        button2 = "No",
+        OnAccept = function()
+          ReloadUI()
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+      }
+      StaticPopup_Show("BETTERBAGS_RELOAD_UI")
     end
   })
 
@@ -503,8 +528,10 @@ function config:RegisterSettings()
   LibStub('AceConsole-3.0'):RegisterChatCommand("bbanchor", function()
     addon.Bags.Backpack.anchor:Activate()
     addon.Bags.Backpack.anchor:Show()
-    addon.Bags.Bank.anchor:Activate()
-    addon.Bags.Bank.anchor:Show()
+    if addon.Bags.Bank then
+      addon.Bags.Bank.anchor:Activate()
+      addon.Bags.Bank.anchor:Show()
+    end
   end)
 
   events:RegisterMessage('categories/Changed', function()

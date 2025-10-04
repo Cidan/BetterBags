@@ -124,17 +124,22 @@ function items:OnInitialize()
 end
 
 function items:OnEnable()
-  events:RegisterEvent('BANKFRAME_OPENED', function()
-    if GameMenuFrame:IsShown() then
-      return
-    end
-    addon.atBank = true
-  end)
+  -- Only register bank events if bank bags are enabled
+  -- Note: We check the database setting here because addon.Bags.Bank
+  -- hasn't been created yet at the time this OnEnable is called
+  if database:GetEnableBankBag() then
+    events:RegisterEvent('BANKFRAME_OPENED', function()
+      if GameMenuFrame:IsShown() then
+        return
+      end
+      addon.atBank = true
+    end)
 
-  events:RegisterEvent('BANKFRAME_CLOSED', function()
-    addon.atBank = false
-    --items:ClearBankCache()
-  end)
+    events:RegisterEvent('BANKFRAME_CLOSED', function()
+      addon.atBank = false
+      --items:ClearBankCache()
+    end)
+  end
 end
 
 

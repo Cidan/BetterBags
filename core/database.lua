@@ -119,6 +119,16 @@ function DB:GetCharacterBankTabsEnabled()
   return DB.data.profile.characterBankTabsEnabled
 end
 
+---@param enabled boolean
+function DB:SetEnableBankBag(enabled)
+  DB.data.profile.enableBankBag = enabled
+end
+
+---@return boolean
+function DB:GetEnableBankBag()
+  return DB.data.profile.enableBankBag
+end
+
 ---@param kind BagKind
 ---@param view BagView
 ---@return SizeInfo

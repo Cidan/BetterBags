@@ -568,6 +568,7 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     showBagButton = true,
     characterBankTabsEnabled = false,
+    enableBankBag = true,
     debug = false,
     inBagSearch = true,
     categorySell = false,
