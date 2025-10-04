@@ -271,6 +271,10 @@ function bagFrame.bagProto:Show(ctx)
     if addon.atWarbank then
       self:HideBankAndReagentTabs()
       self.tabs:SetTabByID(ctx, 13)
+      -- Set the active bank type for warbank
+      if BankPanel then
+        BankPanel.bankType = Enum.BankType.Account
+      end
     else
       self:ShowBankAndReagentTabs()
       -- Set first tab when using multiple character bank tabs
@@ -282,6 +286,10 @@ function bagFrame.bagProto:Show(ctx)
       else
         self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
         self.tabs:SetTabByID(ctx, 1)
+      end
+      -- Set the active bank type for character bank
+      if BankPanel then
+        BankPanel.bankType = Enum.BankType.Character
       end
     end
    self.moneyFrame:Update()
@@ -467,6 +475,10 @@ function bagFrame.bagProto:SwitchToBank(ctx)
   self.currentItemCount = -1
   BankFrame.activeTabIndex = 1
   BankPanel.selectedTabID = nil
+  -- Set the active bank type so right-click item movement works correctly
+  if addon.isRetail and BankPanel then
+    BankPanel.bankType = Enum.BankType.Character
+  end
   -- Clear bank cache to ensure clean state
   items:ClearBankCache(ctx)
   self:Wipe(ctx)
@@ -486,6 +498,10 @@ function bagFrame.bagProto:SwitchToCharacterBankTab(ctx, tabID)
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
   BankPanel.selectedTabID = nil
+  -- Set the active bank type so right-click item movement works correctly
+  if addon.isRetail and BankPanel then
+    BankPanel.bankType = Enum.BankType.Character
+  end
   self:SetTitle(format(L:G("Bank Tab %d"), tabID - const.BANK_ONLY_BAGS_LIST[1] + 1))
   self.currentItemCount = -1
   -- Clear bank cache to ensure no items from other tabs remain
@@ -507,6 +523,10 @@ function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   self.bankTab = tabIndex
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 3
+  -- Set the active bank type so right-click item movement works correctly
+  if addon.isRetail and BankPanel then
+    BankPanel.bankType = Enum.BankType.Account
+  end
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if data.ID == tabIndex then
@@ -535,6 +555,10 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
+  -- Set the active bank type so right-click item movement works correctly
+  if addon.isRetail and BankPanel then
+    BankPanel.bankType = Enum.BankType.Character
+  end
   self:SetTitle(L:G("Bank"))
   items:ClearBankCache(ctx)
   self:Wipe(ctx)

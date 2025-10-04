@@ -222,6 +222,31 @@ function addon:HideBlizzardBags()
   BankFrame:SetScript("OnHide", nil)
   BankFrame:SetScript("OnShow", nil)
   BankFrame:SetScript("OnEvent", nil)
+
+  -- Override BankFrame:GetActiveBankType() to return the correct bank type
+  -- based on BetterBags' current tab selection. This is necessary because
+  -- BetterBags hides the Blizzard BankPanel, causing the original function
+  -- to return nil.
+  if addon.isRetail and BankFrame.GetActiveBankType then
+    BankFrame.GetActiveBankType = function(self)
+      -- If BetterBags bank is not open, return nil
+      if not addon.Bags or not addon.Bags.Bank or not addon.Bags.Bank:IsShown() then
+        return nil
+      end
+
+      -- Return the bank type based on BetterBags' current bank tab
+      if addon.Bags.Bank.bankTab then
+        -- Account bank tabs are >= 13 (Enum.BagIndex.AccountBankTab_1)
+        if addon.Bags.Bank.bankTab >= (Enum.BagIndex.AccountBankTab_1 or 13) then
+          return Enum.BankType.Account
+        else
+          return Enum.BankType.Character
+        end
+      end
+
+      return Enum.BankType.Character
+    end
+  end
 end
 
 function addon:UpdateButtonHighlight()
