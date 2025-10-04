@@ -142,7 +142,7 @@ function refresh:StartUpdate(ctx)
     -- Set the filterBagID based on the current bank state and tab settings
     local database = addon:GetModule('Database')
     local refreshCtx = ctx:Copy()
-    
+
     -- Check if the context already has a filterBagID set (from tab switching)
     local existingFilter = ctx:Get('filterBagID')
     if existingFilter ~= nil then
@@ -151,18 +151,27 @@ function refresh:StartUpdate(ctx)
     elseif addon.atWarbank then
       -- If at warbank, use the current warbank tab
       refreshCtx:Set('filterBagID', addon.Bags.Bank.bankTab)
-    elseif database:GetCharacterBankTabsEnabled() then
-      -- If character bank tabs are enabled, use the current bank tab if it's a character bank tab
-      local currentTab = addon.Bags.Bank.bankTab
-      if currentTab >= Enum.BagIndex.CharacterBankTab_1 and currentTab <= Enum.BagIndex.CharacterBankTab_6 then
-        refreshCtx:Set('filterBagID', currentTab)
-      else
-        -- Default to first character bank tab if current tab is not a character bank tab
-        refreshCtx:Set('filterBagID', Enum.BagIndex.CharacterBankTab_1)
-      end
     else
-      -- If character bank tabs are disabled, clear the filter for single bank tab mode
-      refreshCtx:Set('filterBagID', nil)
+      -- Determine what to filter based on current tab
+      local currentTab = addon.Bags.Bank.bankTab
+      local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or 13
+
+      if currentTab >= accountBankStart then
+        -- Current tab is an account bank tab - don't filter, show all account bank items
+        refreshCtx:Set('filterBagID', nil)
+      elseif database:GetCharacterBankTabsEnabled() then
+        -- Character bank tabs are enabled
+        if currentTab >= Enum.BagIndex.CharacterBankTab_1 and currentTab <= Enum.BagIndex.CharacterBankTab_6 then
+          -- Current tab is a character bank tab - filter to just this tab
+          refreshCtx:Set('filterBagID', currentTab)
+        else
+          -- Default to first character bank tab if current tab is not a character bank tab
+          refreshCtx:Set('filterBagID', Enum.BagIndex.CharacterBankTab_1)
+        end
+      else
+        -- Character bank tabs are disabled, clear the filter for single bank tab mode
+        refreshCtx:Set('filterBagID', nil)
+      end
     end
 
     items:RefreshBank(refreshCtx)
