@@ -163,7 +163,7 @@ end
 
 
 ---@param bagid number
----@return Bag
+---@return Bag|nil
 function addon:GetBagFromBagID(bagid)
   if const.BACKPACK_BAGS[bagid] then
     return addon.Bags.Backpack
@@ -172,19 +172,19 @@ function addon:GetBagFromBagID(bagid)
   elseif const.ACCOUNT_BANK_BAGS[bagid] then
     return addon.Bags.Bank
   else
-    error("invalid bagid")
+    return nil
   end
 end
 
 ---@param kind BagKind
----@return Bag
+---@return Bag|nil
 function addon:GetBagFromKind(kind)
   if kind == const.BAG_KIND.BACKPACK then
     return addon.Bags.Backpack
   elseif kind == const.BAG_KIND.BANK then
     return addon.Bags.Bank
   else
-    error("invalid kind")
+    return nil
   end
 end
 
@@ -218,27 +218,30 @@ function addon:HideBlizzardBags()
     BagsBar:SetParent(sneakyFrame)
   end
 
-  BankFrame:SetParent(sneakyFrame)
-  BankFrame:SetScript("OnHide", nil)
-  BankFrame:SetScript("OnShow", nil)
-  BankFrame:SetScript("OnEvent", nil)
+  -- Only hide the bank frame if bank bags are enabled
+  if database:GetEnableBankBag() then
+    BankFrame:SetParent(sneakyFrame)
+    BankFrame:SetScript("OnHide", nil)
+    BankFrame:SetScript("OnShow", nil)
+    BankFrame:SetScript("OnEvent", nil)
 
-  -- Instead of overriding GetActiveBankType (which causes taint), we keep
-  -- BankPanel visible but hide all its visual elements. This allows the
-  -- original GetActiveBankType() to work correctly while keeping the UI hidden.
-  if addon.isRetail and BankPanel then
-    -- Hide all visual elements of BankPanel
-    BankPanel:SetAlpha(0)
-    BankPanel:EnableMouse(false)
-    BankPanel:EnableKeyboard(false)
+    -- Instead of overriding GetActiveBankType (which causes taint), we keep
+    -- BankPanel visible but hide all its visual elements. This allows the
+    -- original GetActiveBankType() to work correctly while keeping the UI hidden.
+    if addon.isRetail and BankPanel then
+      -- Hide all visual elements of BankPanel
+      BankPanel:SetAlpha(0)
+      BankPanel:EnableMouse(false)
+      BankPanel:EnableKeyboard(false)
 
-    -- Hide the money frame and other UI elements
-    if BankPanel.MoneyFrame then BankPanel.MoneyFrame:Hide() end
-    if BankPanel.AutoDepositFrame then BankPanel.AutoDepositFrame:Hide() end
-    if BankPanel.Header then BankPanel.Header:Hide() end
+      -- Hide the money frame and other UI elements
+      if BankPanel.MoneyFrame then BankPanel.MoneyFrame:Hide() end
+      if BankPanel.AutoDepositFrame then BankPanel.AutoDepositFrame:Hide() end
+      if BankPanel.Header then BankPanel.Header:Hide() end
 
-    -- Keep BankPanel shown but invisible so GetActiveBankType works
-    BankPanel:Show()
+      -- Keep BankPanel shown but invisible so GetActiveBankType works
+      BankPanel:Show()
+    end
   end
 end
 
@@ -282,7 +285,11 @@ function addon:OnEnable()
   self:HideBlizzardBags()
   local rootctx = context:New('addon_enable')
   addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-  addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+
+  -- Only create the bank bag if the setting is enabled
+  if database:GetEnableBankBag() then
+    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+  end
 
   -- Apply themes globally -- do not instantiate new windows after this call.
   themes:Enable()
@@ -290,14 +297,22 @@ function addon:OnEnable()
   addon.Bags.Backpack:SetTitle(L:G("Backpack"))
 
   table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-  table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+
+  -- Only add bank to UISpecialFrames if it was created
+  if addon.Bags.Bank then
+    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+  end
 
   consoleport:Enable()
 
   self:SecureHook('ToggleAllBags')
   self:SecureHook('CloseSpecialWindows')
 
-  events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
+  -- Only register bank events if the bank bag is enabled
+  if addon.Bags.Bank then
+    events:RegisterEvent('BANKFRAME_CLOSED', self.CloseBank)
+  end
+
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_SHOW', self.OpenInteractionWindow)
   events:RegisterEvent('PLAYER_INTERACTION_MANAGER_FRAME_HIDE', self.CloseInteractionWindow)
 
@@ -313,20 +328,23 @@ function addon:OnEnable()
     end)
    end)
 
-  events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
-    debug:Log("init/OnInitialize/items", "Drawing bank")
-     -- Show the bank frame if it's not already shown.
-    if not addon.Bags.Bank:IsShown() and addon.atBank then
-      addon.Bags.Bank:Show(ctx)
-    end
-    addon.Bags.Bank:Draw(ctx, slotInfo, function()
-      events:SendMessage(ctx, 'bags/Draw/Bank/Done')
-      if not addon.Bags.Bank.loaded then
-        addon.Bags.Bank.loaded = true
-        events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
+  -- Only register bank refresh handler if the bank bag is enabled
+  if addon.Bags.Bank then
+    events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
+      debug:Log("init/OnInitialize/items", "Drawing bank")
+       -- Show the bank frame if it's not already shown.
+      if not addon.Bags.Bank:IsShown() and addon.atBank then
+        addon.Bags.Bank:Show(ctx)
       end
+      addon.Bags.Bank:Draw(ctx, slotInfo, function()
+        events:SendMessage(ctx, 'bags/Draw/Bank/Done')
+        if not addon.Bags.Bank.loaded then
+          addon.Bags.Bank.loaded = true
+          events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
+        end
+      end)
     end)
-  end)
+  end
 
   events:RegisterMessage('bags/OpenClose', addon.OnUpdate)
 

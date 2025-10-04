@@ -32,8 +32,9 @@ function movementFlow:GetMovementFlow()
   -- Fix for retail WoW: use Enum.BagIndex values directly
   local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
   local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
-  
-  if addon.atBank and addon.Bags.Bank and addon.Bags.Bank.bankTab then
+
+  -- Only check bank-specific flows if Bank bag is enabled
+  if addon.Bags.Bank and addon.atBank and addon.Bags.Bank.bankTab then
     if accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
       return const.MOVEMENT_FLOW.WARBANK
     end

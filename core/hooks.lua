@@ -118,7 +118,7 @@ function addon:CloseSpecialWindows(interactingFrame)
 
   debug:Log('Hooks', 'CloseSpecialWindows')
   addon.backpackShouldClose = true
-  if not addon.isRetail then
+  if not addon.isRetail and addon.Bags.Bank then
     async:AfterCombat(ctx, function(ectx)
       addon.Bags.Bank:Hide(ectx)
       addon.Bags.Bank:SwitchToBankAndWipe(ectx)
@@ -138,7 +138,9 @@ end
 function addon.CloseBank(ctx, _, interactingFrame)
   debug:Log('Hooks', 'CloseBank')
   if interactingFrame ~= nil then return end
-  addon.Bags.Bank:Hide(ctx)
-  addon.Bags.Bank:SwitchToBankAndWipe(ctx)
+  if addon.Bags.Bank then
+    addon.Bags.Bank:Hide(ctx)
+    addon.Bags.Bank:SwitchToBankAndWipe(ctx)
+  end
   events:SendMessage(ctx, 'bags/BankClosed')
 end

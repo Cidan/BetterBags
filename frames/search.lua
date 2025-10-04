@@ -130,18 +130,20 @@ function searchBox.searchProto:UpdateSearch(ctx)
         addon.Bags.Backpack:Search(ctx, results)
       end
     else
-      if text == "" then
-        addon.Bags.Bank:ResetSearch(ctx)
-      else
-        local results = search:Search(text)
-        addon.Bags.Bank:Search(ctx, results)
+      if addon.Bags.Bank then
+        if text == "" then
+          addon.Bags.Bank:ResetSearch(ctx)
+        else
+          local results = search:Search(text)
+          addon.Bags.Bank:Search(ctx, results)
+        end
       end
     end
   else
     if text == "" then
       self.enterLabelFadeOut:Play()
       addon.Bags.Backpack:ResetSearch(ctx)
-      if not addon.isRetail then
+      if not addon.isRetail and addon.Bags.Bank then
         addon.Bags.Bank:ResetSearch(ctx)
       end
     else
@@ -150,7 +152,9 @@ function searchBox.searchProto:UpdateSearch(ctx)
       end
       local results = search:Search(text)
       addon.Bags.Backpack:Search(ctx, results)
-      addon.Bags.Bank:Search(ctx, results)
+      if addon.Bags.Bank then
+        addon.Bags.Bank:Search(ctx, results)
+      end
     end
   end
 end

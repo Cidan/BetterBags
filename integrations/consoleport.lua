@@ -24,7 +24,9 @@ end
 function consoleport:OnEnable()
   if not self.enabled then return end
   self:Add(addon.Bags.Backpack.frame)
-  self:Add(addon.Bags.Bank.frame)
+  if addon.Bags.Bank then
+    self:Add(addon.Bags.Bank.frame)
+  end
 
   -- Context menus are created on demand, so we need to listen for the context/show event to add them.
   events:RegisterMessage('context/show', function()

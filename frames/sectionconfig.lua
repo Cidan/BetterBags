@@ -488,6 +488,7 @@ function sectionConfig:Create(kind, parent)
     ---@type string[]
     local names = {}
     local bag = kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank
+    if not bag then return end
     if bag.currentView.bagview == const.BAG_VIEW.SECTION_GRID or bag.currentView.bagview == const.BAG_VIEW.LIST then
       for sName in pairs(bag.currentView.sections) do
         table.insert(names, sName)
