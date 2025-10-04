@@ -146,8 +146,6 @@ function sectionItemListFrame:initSectionItem(frame, elementData)
   items:GetItemData(ctx, {elementData.id}, function(ectx, itemData)
     frame.item:SetStaticItemFromData(ectx, itemData[1])
   end)
-
-  frame.item:SetStaticItemFromData(ctx, elementData.data)
 end
 
 ---@param frame BetterBagsSectionConfigItemFrame
