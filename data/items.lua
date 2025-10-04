@@ -694,10 +694,9 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
     if items:ItemAdded(currentItem, previousItem) then
       debug:Log("ItemAdded", currentItem.itemInfo.itemLink)
       slotInfo:AddToAddedItems(currentItem)
-      -- Only mark as new if this is not a filtered view (character bank tabs)
-      -- and the item is actually new (not just appearing due to tab switch)
-      local filterBagID = ctx:Get('filterBagID')
-      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and not filterBagID then
+      -- Only mark items as new in the backpack, not in the bank
+      -- Bank items are just being viewed, not actively acquired
+      if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and kind == const.BAG_KIND.BACKPACK then
         self:MarkItemAsNew(ctx, currentItem)
       end
       search:Add(currentItem)
@@ -711,11 +710,10 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
       slotInfo:AddToAddedItems(currentItem)
       search:Remove(previousItem)
       search:Add(currentItem)
-      -- Only mark as new if this is not a filtered view (character bank tabs)
-      -- and the item ID actually changed
-      local filterBagID = ctx:Get('filterBagID')
+      -- Only mark items as new in the backpack, not in the bank
+      -- Bank items are just being viewed, not actively acquired
       if not ctx:GetBool('wipe') and addon.isRetail and database:GetMarkRecentItems(kind) and
-         currentItem.itemInfo.itemID ~= previousItem.itemInfo.itemID and not filterBagID then
+         currentItem.itemInfo.itemID ~= previousItem.itemInfo.itemID and kind == const.BAG_KIND.BACKPACK then
         self:MarkItemAsNew(ctx, currentItem)
       end
     elseif items:ItemGUIDChanged(currentItem, previousItem) then

@@ -27,3 +27,6 @@ ignore:
   - go.mod
   - go.sum
   - cache 
+  - .claude
+  - .roo
+  - .libraries
