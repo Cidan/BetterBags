@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "mcp__github__search_issues",
+      "mcp__github__update_issue",
+      "mcp__github__add_issue_comment"
     ],
     "deny": [],
     "ask": []
