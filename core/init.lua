@@ -223,29 +223,22 @@ function addon:HideBlizzardBags()
   BankFrame:SetScript("OnShow", nil)
   BankFrame:SetScript("OnEvent", nil)
 
-  -- Override BankFrame:GetActiveBankType() to return the correct bank type
-  -- based on BetterBags' current tab selection. This is necessary because
-  -- BetterBags hides the Blizzard BankPanel, causing the original function
-  -- to return nil.
-  if addon.isRetail and BankFrame.GetActiveBankType then
-    BankFrame.GetActiveBankType = function(self)
-      -- If BetterBags bank is not open, return nil
-      if not addon.Bags or not addon.Bags.Bank or not addon.Bags.Bank:IsShown() then
-        return nil
-      end
+  -- Instead of overriding GetActiveBankType (which causes taint), we keep
+  -- BankPanel visible but hide all its visual elements. This allows the
+  -- original GetActiveBankType() to work correctly while keeping the UI hidden.
+  if addon.isRetail and BankPanel then
+    -- Hide all visual elements of BankPanel
+    BankPanel:SetAlpha(0)
+    BankPanel:EnableMouse(false)
+    BankPanel:EnableKeyboard(false)
 
-      -- Return the bank type based on BetterBags' current bank tab
-      if addon.Bags.Bank.bankTab then
-        -- Account bank tabs are >= 13 (Enum.BagIndex.AccountBankTab_1)
-        if addon.Bags.Bank.bankTab >= (Enum.BagIndex.AccountBankTab_1 or 13) then
-          return Enum.BankType.Account
-        else
-          return Enum.BankType.Character
-        end
-      end
+    -- Hide the money frame and other UI elements
+    if BankPanel.MoneyFrame then BankPanel.MoneyFrame:Hide() end
+    if BankPanel.AutoDepositFrame then BankPanel.AutoDepositFrame:Hide() end
+    if BankPanel.Header then BankPanel.Header:Hide() end
 
-      return Enum.BankType.Character
-    end
+    -- Keep BankPanel shown but invisible so GetActiveBankType works
+    BankPanel:Show()
   end
 end
 
