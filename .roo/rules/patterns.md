@@ -316,3 +316,59 @@ end
 ```
 
 **When to Apply**: When you need to programmatically manipulate form elements after creation. Use delayed lookup for accessing the actual input controls within form containers.
+
+## Object Pooling Patterns
+
+### Pattern: Always Reset ALL Properties When Releasing Pooled Objects
+**Problem**: Pooled objects (like Section frames) retain state from previous use, causing visual glitches or unexpected behavior when reused. For example, a section that was collapsed and dimmed may retain the dimmed color when reused for a different category.
+
+**Why**: Object pools reuse frames/objects for performance. When an object is returned to the pool and later retrieved for a new purpose, any properties not explicitly reset will carry over from the previous usage. This includes:
+- Visual properties (colors, alpha, sizes)
+- State flags (collapsed, enabled, visible)
+- Cached data (item counts, titles, references)
+- Custom properties added for features (like `originalTextColor` for collapse dimming)
+
+**Solution Pattern**: In the pool's reset function (typically `_DoReset` or `Wipe`), explicitly reset ALL properties to their default state:
+
+```lua
+function sectionProto:Wipe()
+  self.content:Wipe()
+  self.frame:Hide()
+  self.view = const.BAG_VIEW.SECTION_GRID
+  self.frame:ClearAllPoints()
+  self.frame:SetParent(nil)
+  self.fillWidth = false
+  self.frame:SetAlpha(1)
+
+  -- Reset state flags
+  self.collapsed = false
+  self.shouldShrinkWhenCollapsed = true
+
+  -- Restore visual properties before clearing cached values
+  if self.originalTextColor then
+    self.title:GetFontString():SetTextColor(
+      self.originalTextColor.r,
+      self.originalTextColor.g,
+      self.originalTextColor.b,
+      self.originalTextColor.a
+    )
+  end
+
+  -- Clear cached properties
+  self.originalTextColor = nil
+  self.kind = nil
+  -- ... reset any other custom properties
+end
+```
+
+**Critical Guidelines**:
+1. **Document new properties**: When adding new fields to pooled objects, add a comment to the reset function reminding future developers to reset them
+2. **Visual properties first**: Restore visual state (colors, sizes) BEFORE clearing the cached data needed to restore them
+3. **Test with reuse**: After implementing pooling features, verify the object works correctly when released and reused multiple times
+4. **Audit existing resets**: When tracking down "random" visual bugs, check if a pooled object's reset function is incomplete
+
+**When to Apply**:
+- Any time you add a new property to a pooled object (Section, ItemButton, Grid, etc.)
+- When debugging issues where state "randomly" appears or disappears
+- During code review of features that modify pooled object properties
+- When implementing new visual indicators or state tracking on existing pooled types

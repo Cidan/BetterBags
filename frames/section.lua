@@ -63,6 +63,7 @@ local pool = addon:GetModule('Pool')
 ---@field private collapsed boolean
 ---@field private kind BagKind
 ---@field shouldShrinkWhenCollapsed boolean Whether to actually shrink the frame when collapsed
+---@field private originalTextColor? table The original RGBA color of the section title text
 local sectionProto = {}
 
 ---@param kind BagKind
@@ -80,6 +81,11 @@ end
 function sectionProto:SetTitle(text)
   self.title:SetText(text)
   themes:UpdateSectionFont(self.title:GetFontString())
+  -- Store the original text color after the theme has been applied
+  if not self.originalTextColor then
+    local r, g, b, a = self.title:GetFontString():GetTextColor()
+    self.originalTextColor = {r = r, g = g, b = b, a = a}
+  end
 end
 
 -- GetTitleWithoutIndicator returns the title text without the collapse indicator.
@@ -155,6 +161,16 @@ function sectionProto:Wipe()
   self.frame:SetAlpha(1)
   self.collapsed = false
   self.shouldShrinkWhenCollapsed = true
+  -- Restore original text color before clearing it
+  if self.originalTextColor then
+    self.title:GetFontString():SetTextColor(
+      self.originalTextColor.r,
+      self.originalTextColor.g,
+      self.originalTextColor.b,
+      self.originalTextColor.a
+    )
+  end
+  self.originalTextColor = nil
 end
 
 function sectionProto:WipeOnlyContents()
@@ -257,6 +273,16 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
   -- If collapsed, hide content and optionally shrink frame
   if self.collapsed then
     self.content:Hide()
+    -- Apply dimmed color to indicate collapsed state
+    if self.originalTextColor then
+      local dimFactor = 0.6
+      self.title:GetFontString():SetTextColor(
+        self.originalTextColor.r * dimFactor,
+        self.originalTextColor.g * dimFactor,
+        self.originalTextColor.b * dimFactor,
+        self.originalTextColor.a
+      )
+    end
     -- Only shrink if we're allowed to (no other expanded sections in our row)
     if self.shouldShrinkWhenCollapsed then
       local collapsedHeight = self.title:GetHeight() + 6
@@ -267,6 +293,15 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
     end
   else
     self.content:Show()
+    -- Restore original color when expanded
+    if self.originalTextColor then
+      self.title:GetFontString():SetTextColor(
+        self.originalTextColor.r,
+        self.originalTextColor.g,
+        self.originalTextColor.b,
+        self.originalTextColor.a
+      )
+    end
     self.frame:SetSize(fullWidth, fullHeight)
   end
 
@@ -397,6 +432,14 @@ function sectionProto:onTitleMouseEnter()
   elseif CursorHasItem() and cursorType == "item" then
     GameTooltip:AddLine(" ", 1, 1, 1)
     GameTooltip:AddLine("Hold shift to add "..itemLink.." to "..self.title:GetText()..".", 1, 1, 1)
+  else
+    -- Add collapse/expand hint when not holding an item
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    if self.collapsed then
+      GameTooltip:AddLine("Left click to expand this section.", 1, 1, 1)
+    else
+      GameTooltip:AddLine("Left click to collapse this section.", 1, 1, 1)
+    end
   end
   GameTooltip:Show()
 end
