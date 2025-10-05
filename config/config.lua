@@ -512,11 +512,11 @@ function config:CreateConfig()
 
   f:AddSection({
     title = 'Import/Export',
-    description = 'Export your settings to share with others or import settings from another user.',
+    description = 'Export your category configuration to share with others or import category configurations from another user.',
   })
 
   f:AddLabel({
-    description = 'Export your current settings to a string that can be copied and shared. Import a settings string to apply another user\'s configuration.',
+    description = 'Export your current category configuration to a string that can be copied and shared. Import a category configuration string to apply another user\'s bag organization. Note: Only category settings are included - general settings like themes, sizes, and display options are not affected.',
   })
 
   -- Store reference to text area input fields
@@ -526,7 +526,7 @@ function config:CreateConfig()
   f:AddButtonGroup({
     ButtonOptions = {
       {
-        title = 'Export Settings',
+        title = 'Export Category Configuration',
         onClick = function(_)
           local exportString = db:ExportSettings()
           if config.exportTextBox then
@@ -540,8 +540,8 @@ function config:CreateConfig()
   })
 
   f:AddTextArea({
-    title = 'Exported Settings',
-    description = 'Copy this text to share your settings. Click in the box and press Ctrl+A to select all, then Ctrl+C to copy.',
+    title = 'Exported Category Configuration',
+    description = 'Copy this text to share your category configuration. Click in the box and press Ctrl+A to select all, then Ctrl+C to copy.',
     getValue = function(_)
       return ""
     end,
@@ -553,7 +553,7 @@ function config:CreateConfig()
   -- Initialize the exportTextBox reference
   bucket:Later("getExportTextBox", 0.1, function()
     for container, _ in pairs(f.layout.textAreas) do
-      if container.title:GetText() == 'Exported Settings' then
+      if container.title:GetText() == 'Exported Category Configuration' then
         config.exportTextBox = container.input
         break
       end
@@ -561,8 +561,8 @@ function config:CreateConfig()
   end)
 
   f:AddTextArea({
-    title = 'Import Settings',
-    description = 'Paste settings string here and click Import to apply.',
+    title = 'Import Category Configuration',
+    description = 'Paste category configuration string here and click Import to apply.',
     getValue = function(_)
       return ""
     end,
@@ -574,7 +574,7 @@ function config:CreateConfig()
   -- Initialize the importTextBox reference
   bucket:Later("getImportTextBox", 0.1, function()
     for container, _ in pairs(f.layout.textAreas) do
-      if container.title:GetText() == 'Import Settings' then
+      if container.title:GetText() == 'Import Category Configuration' then
         config.importTextBox = container.input
         break
       end
@@ -584,14 +584,14 @@ function config:CreateConfig()
   f:AddButtonGroup({
     ButtonOptions = {
       {
-        title = 'Import Settings',
+        title = 'Import Category Configuration',
         onClick = function(_)
           if not config.importTextBox then return end
 
           local importString = config.importTextBox:GetText()
           if not importString or importString == "" then
             StaticPopupDialogs["BETTERBAGS_IMPORT_ERROR"] = {
-              text = "Please paste a settings string in the Import Settings field.",
+              text = "Please paste a category configuration string in the Import Category Configuration field.",
               button1 = "OK",
               timeout = 0,
               whileDead = true,
@@ -604,14 +604,14 @@ function config:CreateConfig()
 
           -- Confirmation dialog
           StaticPopupDialogs["BETTERBAGS_IMPORT_CONFIRM"] = {
-            text = "This will overwrite your current settings. Continue?",
+            text = "This will overwrite your current category configuration. Continue?",
             button1 = "Yes",
             button2 = "No",
             OnAccept = function()
               local success, message = db:ImportSettings(importString)
               if success then
                 StaticPopupDialogs["BETTERBAGS_IMPORT_SUCCESS"] = {
-                  text = "Settings imported successfully! Reload UI to apply changes?",
+                  text = "Category configuration imported successfully! Reload UI to apply changes?",
                   button1 = "Reload",
                   button2 = "Later",
                   OnAccept = function()
@@ -629,7 +629,7 @@ function config:CreateConfig()
                 end
               else
                 StaticPopupDialogs["BETTERBAGS_IMPORT_ERROR"] = {
-                  text = "Failed to import settings: " .. message,
+                  text = "Failed to import category configuration: " .. message,
                   button1 = "OK",
                   timeout = 0,
                   whileDead = true,
