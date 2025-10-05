@@ -565,7 +565,8 @@ function DB:ExportSettings()
   -- Encode to base64
   local encoded = serialization:EncodeBase64(serialized)
 
-  return encoded
+  -- Add BetterBags prefix for identification
+  return "!BB" .. encoded
 end
 
 -- Import category configuration from a base64-encoded string
@@ -581,6 +582,12 @@ function DB:ImportSettings(dataString)
 
   -- Remove whitespace
   dataString = dataString:gsub("%s+", "")
+
+  -- Validate and strip BetterBags prefix
+  if not dataString:match("^!BB") then
+    return false, "Invalid import string: Missing !BB prefix. Please make sure you copied the full export string."
+  end
+  dataString = dataString:sub(4) -- Remove "!BB" prefix
 
   -- Decode from base64
   local decoded = serialization:DecodeBase64(dataString)
