@@ -510,6 +510,148 @@ function config:CreateConfig()
     })
   end
 
+  f:AddSection({
+    title = 'Import/Export',
+    description = 'Export your settings to share with others or import settings from another user.',
+  })
+
+  f:AddLabel({
+    description = 'Export your current settings to a string that can be copied and shared. Import a settings string to apply another user\'s configuration.',
+  })
+
+  -- Store reference to text area input fields
+  config.exportTextBox = nil
+  config.importTextBox = nil
+
+  f:AddButtonGroup({
+    ButtonOptions = {
+      {
+        title = 'Export Settings',
+        onClick = function(_)
+          local exportString = db:ExportSettings()
+          if config.exportTextBox then
+            config.exportTextBox:SetText(exportString)
+            config.exportTextBox:HighlightText()
+            config.exportTextBox:SetFocus()
+          end
+        end
+      }
+    }
+  })
+
+  f:AddTextArea({
+    title = 'Exported Settings',
+    description = 'Copy this text to share your settings. Click in the box and press Ctrl+A to select all, then Ctrl+C to copy.',
+    getValue = function(_)
+      return ""
+    end,
+    setValue = function(_, value)
+      -- Store reference to the text box on first load
+      if not config.exportTextBox then
+        -- The text box will be accessible through the form layout
+        bucket:Later("getExportTextBox", 0.1, function()
+          -- Find the text area input
+          for container, _ in pairs(f.layout.textAreas) do
+            if container.title:GetText() == 'Exported Settings' then
+              config.exportTextBox = container.input
+              break
+            end
+          end
+        end)
+      end
+    end
+  })
+
+  f:AddTextArea({
+    title = 'Import Settings',
+    description = 'Paste settings string here and click Import to apply.',
+    getValue = function(_)
+      return ""
+    end,
+    setValue = function(_, value)
+      -- Store reference to the text box on first load
+      if not config.importTextBox then
+        bucket:Later("getImportTextBox", 0.1, function()
+          for container, _ in pairs(f.layout.textAreas) do
+            if container.title:GetText() == 'Import Settings' then
+              config.importTextBox = container.input
+              break
+            end
+          end
+        end)
+      end
+    end
+  })
+
+  f:AddButtonGroup({
+    ButtonOptions = {
+      {
+        title = 'Import Settings',
+        onClick = function(_)
+          if not config.importTextBox then return end
+
+          local importString = config.importTextBox:GetText()
+          if not importString or importString == "" then
+            StaticPopupDialogs["BETTERBAGS_IMPORT_ERROR"] = {
+              text = "Please paste a settings string in the Import Settings field.",
+              button1 = "OK",
+              timeout = 0,
+              whileDead = true,
+              hideOnEscape = true,
+              preferredIndex = 3,
+            }
+            StaticPopup_Show("BETTERBAGS_IMPORT_ERROR")
+            return
+          end
+
+          -- Confirmation dialog
+          StaticPopupDialogs["BETTERBAGS_IMPORT_CONFIRM"] = {
+            text = "This will overwrite your current settings. Continue?",
+            button1 = "Yes",
+            button2 = "No",
+            OnAccept = function()
+              local success, message = db:ImportSettings(importString)
+              if success then
+                StaticPopupDialogs["BETTERBAGS_IMPORT_SUCCESS"] = {
+                  text = "Settings imported successfully! Reload UI to apply changes?",
+                  button1 = "Reload",
+                  button2 = "Later",
+                  OnAccept = function()
+                    ReloadUI()
+                  end,
+                  timeout = 0,
+                  whileDead = true,
+                  hideOnEscape = true,
+                  preferredIndex = 3,
+                }
+                StaticPopup_Show("BETTERBAGS_IMPORT_SUCCESS")
+                -- Clear the import text box
+                if config.importTextBox then
+                  config.importTextBox:SetText("")
+                end
+              else
+                StaticPopupDialogs["BETTERBAGS_IMPORT_ERROR"] = {
+                  text = "Failed to import settings: " .. message,
+                  button1 = "OK",
+                  timeout = 0,
+                  whileDead = true,
+                  hideOnEscape = true,
+                  preferredIndex = 3,
+                }
+                StaticPopup_Show("BETTERBAGS_IMPORT_ERROR")
+              end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_IMPORT_CONFIRM")
+        end
+      }
+    }
+  })
+
   f:GetFrame():SetSize(600, 800)
   f:GetFrame():SetPoint("CENTER")
   self.configFrame = f

@@ -521,6 +521,176 @@ function DB:SetShowAllFreeSpace(kind, value)
   DB.data.profile.showAllFreeSpace[kind] = value
 end
 
+-- Export settings to a base64-encoded string
+---@return string
+function DB:ExportSettings()
+  ---@class Serialization: AceModule
+  local serialization = addon:GetModule('Serialization')
+
+  -- Create a table with all exportable settings
+  local exportData = {
+    version = 1, -- Version number for future compatibility
+    customCategoryFilters = serialization:DeepCopy(DB.data.profile.customCategoryFilters),
+    customCategoryIndex = serialization:DeepCopy(DB.data.profile.customCategoryIndex),
+    ephemeralCategoryFilters = serialization:DeepCopy(DB.data.profile.ephemeralCategoryFilters),
+    categoryOptions = serialization:DeepCopy(DB.data.profile.categoryOptions),
+    categoryFilters = serialization:DeepCopy(DB.data.profile.categoryFilters),
+    customSectionSort = serialization:DeepCopy(DB.data.profile.customSectionSort),
+    size = serialization:DeepCopy(DB.data.profile.size),
+    itemSort = serialization:DeepCopy(DB.data.profile.sectionSort),
+    sectionSort = serialization:DeepCopy(DB.data.profile.itemSort),
+    stacking = serialization:DeepCopy(DB.data.profile.stacking),
+    itemLevel = serialization:DeepCopy(DB.data.profile.itemLevel),
+    theme = DB.data.profile.theme,
+    upgradeIconProvider = DB.data.profile.upgradeIconProvider,
+    inBagSearch = DB.data.profile.inBagSearch,
+    categorySell = DB.data.profile.categorySell,
+    enterToMakeCategory = DB.data.profile.enterToMakeCategory,
+    showBagButton = DB.data.profile.showBagButton,
+    enableBankBag = DB.data.profile.enableBankBag,
+    showFullSectionNames = serialization:DeepCopy(DB.data.profile.showFullSectionNames),
+    showAllFreeSpace = serialization:DeepCopy(DB.data.profile.showAllFreeSpace),
+    extraGlowyButtons = serialization:DeepCopy(DB.data.profile.extraGlowyButtons),
+    newItems = serialization:DeepCopy(DB.data.profile.newItems),
+    newItemTime = DB.data.profile.newItemTime,
+  }
+
+  -- Serialize the table
+  local serialized = serialization:Serialize(exportData)
+
+  -- Encode to base64
+  local encoded = serialization:EncodeBase64(serialized)
+
+  return encoded
+end
+
+-- Import settings from a base64-encoded string
+---@param dataString string
+---@return boolean, string
+function DB:ImportSettings(dataString)
+  ---@class Serialization: AceModule
+  local serialization = addon:GetModule('Serialization')
+
+  if not dataString or dataString == "" then
+    return false, "Import data is empty"
+  end
+
+  -- Remove whitespace
+  dataString = dataString:gsub("%s+", "")
+
+  -- Decode from base64
+  local decoded = serialization:DecodeBase64(dataString)
+  if not decoded then
+    return false, "Failed to decode import data"
+  end
+
+  -- Deserialize the table
+  local importData, err = serialization:Deserialize(decoded)
+  if not importData then
+    return false, "Failed to parse import data: " .. (err or "unknown error")
+  end
+
+  -- Validate version
+  if not importData.version or type(importData.version) ~= "number" then
+    return false, "Invalid import data format"
+  end
+
+  -- Apply the imported settings
+  if importData.customCategoryFilters then
+    DB.data.profile.customCategoryFilters = serialization:DeepCopy(importData.customCategoryFilters)
+  end
+
+  if importData.customCategoryIndex then
+    DB.data.profile.customCategoryIndex = serialization:DeepCopy(importData.customCategoryIndex)
+  end
+
+  if importData.ephemeralCategoryFilters then
+    DB.data.profile.ephemeralCategoryFilters = serialization:DeepCopy(importData.ephemeralCategoryFilters)
+  end
+
+  if importData.categoryOptions then
+    DB.data.profile.categoryOptions = serialization:DeepCopy(importData.categoryOptions)
+  end
+
+  if importData.categoryFilters then
+    DB.data.profile.categoryFilters = serialization:DeepCopy(importData.categoryFilters)
+  end
+
+  if importData.customSectionSort then
+    DB.data.profile.customSectionSort = serialization:DeepCopy(importData.customSectionSort)
+  end
+
+  if importData.size then
+    DB.data.profile.size = serialization:DeepCopy(importData.size)
+  end
+
+  if importData.itemSort then
+    DB.data.profile.sectionSort = serialization:DeepCopy(importData.itemSort)
+  end
+
+  if importData.sectionSort then
+    DB.data.profile.itemSort = serialization:DeepCopy(importData.sectionSort)
+  end
+
+  if importData.stacking then
+    DB.data.profile.stacking = serialization:DeepCopy(importData.stacking)
+  end
+
+  if importData.itemLevel then
+    DB.data.profile.itemLevel = serialization:DeepCopy(importData.itemLevel)
+  end
+
+  if importData.theme then
+    DB.data.profile.theme = importData.theme
+  end
+
+  if importData.upgradeIconProvider then
+    DB.data.profile.upgradeIconProvider = importData.upgradeIconProvider
+  end
+
+  if importData.inBagSearch ~= nil then
+    DB.data.profile.inBagSearch = importData.inBagSearch
+  end
+
+  if importData.categorySell ~= nil then
+    DB.data.profile.categorySell = importData.categorySell
+  end
+
+  if importData.enterToMakeCategory ~= nil then
+    DB.data.profile.enterToMakeCategory = importData.enterToMakeCategory
+  end
+
+  if importData.showBagButton ~= nil then
+    DB.data.profile.showBagButton = importData.showBagButton
+  end
+
+  if importData.enableBankBag ~= nil then
+    DB.data.profile.enableBankBag = importData.enableBankBag
+  end
+
+  if importData.showFullSectionNames then
+    DB.data.profile.showFullSectionNames = serialization:DeepCopy(importData.showFullSectionNames)
+  end
+
+  if importData.showAllFreeSpace then
+    DB.data.profile.showAllFreeSpace = serialization:DeepCopy(importData.showAllFreeSpace)
+  end
+
+  if importData.extraGlowyButtons then
+    DB.data.profile.extraGlowyButtons = serialization:DeepCopy(importData.extraGlowyButtons)
+  end
+
+  if importData.newItems then
+    DB.data.profile.newItems = serialization:DeepCopy(importData.newItems)
+  end
+
+  if importData.newItemTime then
+    DB.data.profile.newItemTime = importData.newItemTime
+  end
+
+  return true, "Settings imported successfully"
+end
+
 function DB:Migrate()
 
   --[[

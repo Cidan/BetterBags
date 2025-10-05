@@ -212,3 +212,107 @@ Before implementing hooks or workarounds:
 - **data/refresh.lua**: Event handling and context management
 
 Keep these boundaries clear to avoid circular dependencies and taint propagation.
+
+## Form/Settings UI Patterns
+
+### Pattern: Use Anchor Points Instead of Fixed Widths for UI Elements
+**Problem**: When creating form elements like text areas or scroll boxes, using `SetWidth(container:GetWidth() - offset)` results in very small or zero-width elements that don't expand properly.
+
+**Why**: When `GetWidth()` is called immediately after creating a frame, the layout engine hasn't calculated the frame's actual width yet. The container's width is determined by anchor points (SetPoint), not by an explicit SetWidth call, so GetWidth() returns 0 or a minimal value at creation time.
+
+**Solution Pattern**: Use anchor points to automatically expand elements with their parent container:
+```lua
+-- BAD: Fixed width evaluates to 0 or small value immediately
+local ScrollBox = CreateFrame("Frame", nil, container, "WowScrollBox")
+ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+ScrollBox:SetWidth(container:GetWidth() - 50)  -- container width is 0!
+
+-- GOOD: Anchor to both left and right edges
+local ScrollBox = CreateFrame("Frame", nil, container, "WowScrollBox")
+ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+ScrollBox:SetPoint("RIGHT", container, "RIGHT", -20, 0)  -- Expands automatically
+```
+
+**When to Apply**: Any time creating UI elements that should fill available width. Use anchor points for dynamic sizing, not GetWidth() at creation time.
+
+### Pattern: Constrain FontString Width with RIGHT Anchor for Word Wrapping
+**Problem**: FontStrings with word wrapping enabled overflow the frame boundaries when description text is long.
+
+**Why**: FontStrings need both word wrap enabled AND width constraints. Even with `SetWordWrap(true)` and `SetNonSpaceWrap(true)`, if the FontString isn't constrained horizontally, it will expand infinitely to fit the text on one line.
+
+**Solution Pattern**: Anchor both left and right sides of the FontString:
+```lua
+-- BAD: Text overflows frame, no width constraint
+container.description = self:createDescription(container, opts.description)
+container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+-- Word wrap is enabled in createDescription, but text still overflows!
+
+-- GOOD: Constrain width with RIGHT anchor
+container.description = self:createDescription(container, opts.description)
+container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+container.description:SetPoint("RIGHT", container, "RIGHT", -20, 0)
+```
+
+**When to Apply**: Any multi-line text that should wrap within frame boundaries. Always pair SetWordWrap with width constraints via anchor points.
+
+### Pattern: Module Loading Order for GetModule Calls
+**Problem**: Calling `addon:GetModule('ModuleName')` at file scope (outside functions) fails with "Cannot find module" error.
+
+**Why**: Modules are registered during the addon loading process. When a file executes at load time, other module files may not have been loaded and registered yet. The module system only guarantees modules are available after all files are loaded.
+
+**Solution Pattern**: Move GetModule calls inside functions that execute after initialization:
+```lua
+-- BAD: Called at file load time, module may not exist yet
+local serialization = addon:GetModule('Serialization')
+
+function DB:ExportSettings()
+  local data = serialization:Serialize(...)  -- May fail
+end
+
+-- GOOD: Called when function executes, after all modules loaded
+function DB:ExportSettings()
+  local serialization = addon:GetModule('Serialization')
+  local data = serialization:Serialize(...)  -- Works correctly
+end
+```
+
+**When to Apply**: Any cross-module dependencies. Always call GetModule inside functions, not at file scope, unless you're certain the module loads earlier in the TOC file.
+
+### Pattern: Accessing Form Element References After Layout
+**Problem**: Need to programmatically set text in form TextArea elements, but form:AddTextArea() doesn't return a direct reference to the EditBox.
+
+**Why**: The form API returns container frames, not the actual input elements. The EditBox is stored as `container.input` and isn't available until after the layout is fully created.
+
+**Solution Pattern**: Use delayed lookup via bucket:Later to find the element after layout completes:
+```lua
+-- Store reference at module level
+config.exportTextBox = nil
+
+-- In form creation
+f:AddTextArea({
+  title = 'Exported Settings',
+  getValue = function(_) return "" end,
+  setValue = function(_, value)
+    if not config.exportTextBox then
+      bucket:Later("getExportTextBox", 0.1, function()
+        for container, _ in pairs(f.layout.textAreas) do
+          if container.title:GetText() == 'Exported Settings' then
+            config.exportTextBox = container.input
+            break
+          end
+        end
+      end)
+    end
+  end
+})
+
+-- Later, when button is clicked
+function onExportClick()
+  if config.exportTextBox then
+    config.exportTextBox:SetText(exportedData)
+    config.exportTextBox:HighlightText()
+  end
+end
+```
+
+**When to Apply**: When you need to programmatically manipulate form elements after creation. Use delayed lookup for accessing the actual input controls within form containers.

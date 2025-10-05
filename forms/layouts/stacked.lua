@@ -638,11 +638,12 @@ function stackedLayout:AddTextArea(opts)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("RIGHT", container, "RIGHT", -20, 0)
 
   local ScrollBox = CreateFrame("Frame", nil, container, "WowScrollBox") --[[@as WowScrollBox]]
   ScrollBox:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+  ScrollBox:SetPoint("RIGHT", container, "RIGHT", -20, 0)
   ScrollBox:SetHeight(100)
-  ScrollBox:SetWidth(container:GetWidth() - 50)
   ScrollBox:EnableMouseWheel(false)
 
   local ScrollBar = CreateFrame("EventFrame", nil, container, "MinimalScrollBar") --[[@as MinimalScrollBar]]
