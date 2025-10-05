@@ -62,29 +62,32 @@ function refresh:AfterSort(ctx)
 end
 
 -- RequestUpdate queues an update and debounces it
----@param wipe? boolean
----@param updateBackpack? boolean
----@param updateBank? boolean
----@param sort? boolean
-function refresh:RequestUpdate(wipe, updateBackpack, updateBank, sort)
+---@class RefreshRequest
+---@field wipe? boolean Clear cache before refresh
+---@field backpack? boolean Update backpack items
+---@field bank? boolean Update bank items
+---@field sort? boolean Sort backpack items
+
+---@param request RefreshRequest
+function refresh:RequestUpdate(request)
   -- Don't queue updates during sorting
   if self.isSorting then
     return
   end
 
   -- Set pending flags
-  if wipe then
+  if request.wipe then
     self.pendingWipe = true
   end
-  if updateBackpack then
+  if request.backpack then
     self.pendingBackpack = true
   end
-  if updateBank then
+  if request.bank then
     self.pendingBank = true
   end
 
   -- Handle sorting immediately
-  if sort and not InCombatLockdown() then
+  if request.sort and not InCombatLockdown() then
     self.isSorting = true
     items:RemoveNewItemFromAllItems()
     local ctx = context:New('BagSort')
@@ -194,25 +197,27 @@ function refresh:OnEnable()
       updateBank = true
     end
 
-    self:RequestUpdate(false, updateBackpack, updateBank, false)
+    self:RequestUpdate({ backpack = updateBackpack, bank = updateBank })
   end)
 
   if not addon.isRetail then
     -- Register when bank slots change for any reason.
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(_, _, slot)
-      local wipe = slot > NUM_BANKGENERIC_SLOTS
-      self:RequestUpdate(wipe, false, true, false)
+      self:RequestUpdate({
+        wipe = slot > NUM_BANKGENERIC_SLOTS,
+        bank = true
+      })
     end)
   end
 
   -- Register when the bag slots change for any reason.
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function()
-    self:RequestUpdate(true, true, false, false)
+    self:RequestUpdate({ wipe = true, backpack = true })
   end)
 
   -- Register when equipment sets change.
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:RequestUpdate(true, true, true, false)
+    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
 
   -- Register when combat ends and execute any pending updates
@@ -228,27 +233,27 @@ function refresh:OnEnable()
 
   -- Register when the backpack is manually refreshed.
   events:RegisterMessage('bags/RefreshBackpack', function(_, _, shouldWipe)
-    self:RequestUpdate(shouldWipe, true, false, false)
+    self:RequestUpdate({ wipe = shouldWipe, backpack = true })
   end)
 
   -- Register when the bank is manually refreshed.
   events:RegisterMessage('bags/RefreshBank', function (_, _, shouldWipe)
-    self:RequestUpdate(shouldWipe, false, true, false)
+    self:RequestUpdate({ wipe = shouldWipe, bank = true })
   end)
 
   -- Register when everything should be refreshed, manually.
   events:RegisterMessage('bags/RefreshAll', function()
-    self:RequestUpdate(false, true, true, false)
+    self:RequestUpdate({ backpack = true, bank = true })
   end)
 
   -- Register when then backpack should be sorted.
   events:RegisterMessage('bags/SortBackpack', function()
-    self:RequestUpdate(false, false, false, true)
+    self:RequestUpdate({ sort = true })
   end)
 
   -- Register when all bags should be wiped and reloaded.
   events:RegisterMessage('bags/FullRefreshAll', function()
-    self:RequestUpdate(true, true, true, false)
+    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
 
 end
