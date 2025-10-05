@@ -246,7 +246,8 @@ function DB:SaveItemToCategory(itemID, category)
   assert(DB.data.profile.customCategoryFilters[category] ~= nil, "Category does not exist: " .. category)
   DB.data.profile.customCategoryFilters[category].itemList[itemID] = true
   local previousCategory = DB.data.profile.customCategoryIndex[itemID]
-  if previousCategory and previousCategory ~= category then
+  local previousCategoryFilter = DB.data.profile.customCategoryFilters[category]
+  if previousCategory and previousCategoryFilter and previousCategory ~= category then
     DB.data.profile.customCategoryFilters[previousCategory].itemList[itemID] = nil
   end
   DB.data.profile.customCategoryIndex[itemID] = category
