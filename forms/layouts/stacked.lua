@@ -319,6 +319,7 @@ function stackedLayout:AddSection(opts)
 
   container.description = self:createDescription(container, opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
 
   local div = self:createDividerLineLeft(container)
   div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
@@ -344,6 +345,7 @@ function stackedLayout:AddSubSection(opts)
   container.title:SetPoint("TOPLEFT", titleContainer, "TOPLEFT")
   container.description = self:createDescription(container, opts.description)
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
   local div = self:createDividerLineMiddle(container)
   div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
@@ -832,7 +834,7 @@ function stackedLayout:AddLabel(opts)
   container.description:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
   container.description:SetPoint("RIGHT", container, "RIGHT", -5, 0)
 
-  container:SetHeight(container.description:GetLineHeight() + 10)
+  container:SetHeight(container.description:GetStringHeight() + 10)
   self.nextFrame = container
   self.height = self.height + container:GetHeight()
 end
