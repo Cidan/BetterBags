@@ -11,7 +11,9 @@
       "mcp__github__get_me",
       "Bash(git show:*)",
       "mcp__clipboard__read_clipboard",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(git remote get-url:*)",
+      "mcp__github__list_issues"
     ],
     "deny": [],
     "ask": []
