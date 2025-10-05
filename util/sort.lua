@@ -51,8 +51,11 @@ function sort:GetSectionSortFunction(kind, view)
       return self.SortSectionsBySizeDescending(kind, a, b)
     end
   end
-  -- Return the default sort in case of an unknown sort type.
-  return self:GetSectionSortFunction(kind, const.SECTION_SORT_TYPE.ALPHABETICALLY)
+  -- Return the default alphabetical sort in case of an unknown sort type.
+  -- This can happen if external addons modify the saved variables.
+  return function(a, b)
+    return self.SortSectionsAlphabetically(kind, a, b)
+  end
 end
 
 ---@param kind BagKind

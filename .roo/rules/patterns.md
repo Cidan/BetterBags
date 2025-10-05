@@ -355,6 +355,54 @@ end
 
 **When to Apply**: When you need to programmatically manipulate form elements after creation. Use delayed lookup for accessing the actual input controls within form containers.
 
+## Defensive Programming Against External Addon Interference
+
+### Pattern: Validate Function Parameters from Saved Variables
+**Problem**: External addons may modify your saved variables, causing functions expecting valid comparison functions to receive nil or invalid values, resulting in "invalid order function for sorting" errors.
+
+**Why**: WoW addons share the same Lua environment and can access each other's saved variables. Malicious or buggy addons can corrupt your data structures. When you retrieve sort type preferences from saved variables and use them to select comparison functions, an invalid value can result in nil or non-function values being passed to `table.sort()`, causing Lua errors.
+
+**Solution Pattern**: Guard against invalid function parameters at the point of use:
+```lua
+-- BAD: Assumes fn is always a valid function
+function gridProto:Sort(fn)
+  table.sort(self.cells, fn)  -- Crashes if fn is nil or not a function
+end
+
+-- GOOD: Validate function parameter with safe default
+function gridProto:Sort(fn)
+  -- Guard against invalid sort functions from external addons modifying saved variables.
+  -- Use a no-op comparison function as a safe default to prevent crashes.
+  if type(fn) ~= "function" then
+    fn = function() return false end
+  end
+  table.sort(self.cells, fn)
+end
+
+-- ALSO GOOD: Provide default at source with defensive fallback
+function sort:GetSectionSortFunction(kind, view)
+  local sortType = database:GetSectionSortType(kind, view)
+  if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
+    return function(a, b) return self.SortSectionsAlphabetically(kind, a, b) end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
+    return function(a, b) return self.SortSectionsBySizeAscending(kind, a, b) end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
+    return function(a, b) return self.SortSectionsBySizeDescending(kind, a, b) end
+  end
+  -- Return the default alphabetical sort in case of an unknown sort type.
+  -- This can happen if external addons modify the saved variables.
+  return function(a, b)
+    return self.SortSectionsAlphabetically(kind, a, b)
+  end
+end
+```
+
+**When to Apply**:
+- Any function that receives callbacks or functions derived from saved variables
+- Functions passed to Lua standard library functions that require valid function types (table.sort, pcall, etc.)
+- When implementing user-configurable sorting, filtering, or transformation functions
+- At module boundaries where external code provides function parameters
+
 ## Object Pooling Patterns
 
 ### Pattern: Always Reset ALL Properties When Releasing Pooled Objects
