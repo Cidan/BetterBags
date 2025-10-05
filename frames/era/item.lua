@@ -291,21 +291,34 @@ function itemFrame:_DoCreate()
   button:GetPushedTexture():SetTexture("")
   button:GetNormalTexture():SetTexture("")
 
-  addon.HookScript(button, "OnMouseDown", function(ctx)
-    themes:GetItemButton(ctx, i):GetPushedTexture():Show()
+  -- Use plain HookScript (not addon.HookScript) to avoid creating contexts during
+  -- mouse events, which can cause taint when followed by protected clicks (e.g. UseContainerItem).
+  -- Cache a lazy reference to get the decoration button.
+  local decoration
+  local getDecoration = function()
+    if not decoration then
+      local ctx = context:New('itemButton_init')
+      decoration = themes:GetItemButton(ctx, i)
+    end
+    return decoration
+  end
+
+  button:HookScript("OnMouseDown", function()
+    getDecoration():GetPushedTexture():Show()
   end)
 
-  addon.HookScript(button, "OnMouseUp", function(ctx)
-    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
+  button:HookScript("OnMouseUp", function()
+    getDecoration():GetPushedTexture():Hide()
   end)
 
-  addon.HookScript(button, "OnLeave", function(ctx)
-    themes:GetItemButton(ctx, i):GetHighlightTexture():Hide()
-    themes:GetItemButton(ctx, i):GetPushedTexture():Hide()
+  button:HookScript("OnLeave", function()
+    local dec = getDecoration()
+    dec:GetHighlightTexture():Hide()
+    dec:GetPushedTexture():Hide()
   end)
 
-  addon.HookScript(button, "OnEnter", function(ctx)
-    themes:GetItemButton(ctx, i):GetHighlightTexture():Show()
+  button:HookScript("OnEnter", function()
+    getDecoration():GetHighlightTexture():Show()
   end)
 
   -- Assign the global item button textures to the item button.

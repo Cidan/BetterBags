@@ -34,6 +34,44 @@ BankPanel:Show()
 BankPanel.bankType = Enum.BankType.Account
 ```
 
+### Pattern: Avoid Context Creation in Mouse Event Hooks on Item Buttons
+**Problem**: Using `addon.HookScript()` for mouse events (OnMouseDown, OnMouseUp, OnEnter, OnLeave) on item buttons causes `ADDON_ACTION_FORBIDDEN` errors when users right-click consumable items.
+
+**Why**:
+- `addon.HookScript()` creates a new context object for every event
+- Mouse events fire immediately before protected clicks (e.g., UseContainerItem for consumables)
+- Creating contexts and touching addon tables during these events taints the execution path
+- When the subsequent protected function tries to execute, WoW blocks it due to the taint
+
+**Solution Pattern**:
+1. Use plain `button:HookScript()` instead of `addon.HookScript()` for mouse events
+2. Implement lazy caching to fetch decoration buttons once and reuse them
+3. Avoid calling into addon modules (like themes) during the actual mouse events
+
+**Example**:
+```lua
+-- BAD: Creates context on every mouse event, causes taint
+addon.HookScript(button, "OnMouseDown", function(ectx)
+  themes:GetItemButton(ectx, i):GetPushedTexture():Show()
+end)
+
+-- GOOD: Plain HookScript with lazy cached decoration reference
+local decoration
+local getDecoration = function()
+  if not decoration then
+    local ctx = context:New('itemButton_init')
+    decoration = themes:GetItemButton(ctx, i)
+  end
+  return decoration
+end
+
+button:HookScript("OnMouseDown", function()
+  getDecoration():GetPushedTexture():Show()
+end)
+```
+
+**When to Apply**: Any time you need to hook mouse events on buttons that use `ContainerFrameItemButtonTemplate` or any button where clicks can trigger protected functions.
+
 ## State Management Across Events
 
 ### Pattern: Context Filter Propagation

@@ -7,7 +7,9 @@
       "mcp__github__add_issue_comment",
       "mcp__github__get_issue",
       "Bash(git log:*)",
-      "mcp__github__get_issue_comments"
+      "mcp__github__get_issue_comments",
+      "mcp__github__get_me",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": []
