@@ -37,6 +37,9 @@ local themes = addon:GetModule('Themes')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 local buttonCount = 0
 local children = {
   "IconQuestTexture",
