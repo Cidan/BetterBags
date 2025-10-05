@@ -62,7 +62,7 @@ local pool = addon:GetModule('Pool')
 ---@field private maxItemsPerRow number
 ---@field private collapsed boolean
 ---@field private kind BagKind
----@field collapsedHeightSaved number How much height is saved when collapsed (for bag sizing)
+---@field shouldShrinkWhenCollapsed boolean Whether to actually shrink the frame when collapsed
 local sectionProto = {}
 
 ---@param kind BagKind
@@ -154,7 +154,7 @@ function sectionProto:Wipe()
   self.fillWidth = false
   self.frame:SetAlpha(1)
   self.collapsed = false
-  self.collapsedHeightSaved = 0
+  self.shouldShrinkWhenCollapsed = true
 end
 
 function sectionProto:WipeOnlyContents()
@@ -254,20 +254,24 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
   self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
 
-  -- If collapsed, hide content and shrink frame
+  -- If collapsed, hide content and optionally shrink frame
   if self.collapsed then
     self.content:Hide()
-    local collapsedHeight = self.title:GetHeight() + 6
-    self.frame:SetSize(fullWidth, collapsedHeight)
-    self.collapsedHeightSaved = fullHeight - collapsedHeight
+    -- Only shrink if we're allowed to (no other expanded sections in our row)
+    if self.shouldShrinkWhenCollapsed then
+      local collapsedHeight = self.title:GetHeight() + 6
+      self.frame:SetSize(fullWidth, collapsedHeight)
+    else
+      -- Keep full height but hide content
+      self.frame:SetSize(fullWidth, fullHeight)
+    end
   else
     self.content:Show()
     self.frame:SetSize(fullWidth, fullHeight)
-    self.collapsedHeightSaved = 0
   end
 
   self.frame:Show()
-  return fullWidth, self.collapsed and (self.title:GetHeight() + 6) or fullHeight
+  return fullWidth, (self.collapsed and self.shouldShrinkWhenCollapsed) and (self.title:GetHeight() + 6) or fullHeight
 end
 
 -------
@@ -409,6 +413,7 @@ function sectionFrame:_DoCreate()
 
   s.maxItemsPerRow = 5
   s.collapsed = false
+  s.shouldShrinkWhenCollapsed = true
   -- Create the section title.
   local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")

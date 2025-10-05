@@ -374,6 +374,12 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
   end
 
+  -- First pass: Set all sections to not shrink when collapsed so they draw at full expanded width
+  -- This allows us to determine the actual row layout
+  for _, section in ipairs(view.content.cells) do
+    section.shouldShrinkWhenCollapsed = false
+  end
+
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
   local freeSpaceCollapsed = database:GetSectionCollapsed(bag.kind, L:G("Free Space"))
@@ -413,6 +419,74 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
     mask = hiddenCells,
   })
+
+  -- Second pass: Now that sections are drawn, analyze which sections are in the same row
+  -- Only shrink collapsed sections if ALL sections in their row are collapsed
+  local maxRowWidth = ((37 + 4) * sizeInfo.itemsPerRow) + 16
+  local spacing = 4
+  local rowSections = {}
+  local currentRowWidth = 0
+  local currentRow = 1
+  local needsRedraw = false
+
+  for _, section in ipairs(view.content.cells) do
+    if section.frame and section.frame:IsShown() then
+      local sectionWidth = section.frame:GetWidth()
+
+      -- Check if this section fits in the current row (matching grid.lua logic)
+      if currentRowWidth > 0 and currentRowWidth + sectionWidth > maxRowWidth then
+        -- Start a new row
+        currentRow = currentRow + 1
+        currentRowWidth = sectionWidth
+      else
+        -- Add to current row
+        if currentRowWidth > 0 then
+          currentRowWidth = currentRowWidth + sectionWidth + spacing
+        else
+          currentRowWidth = sectionWidth
+        end
+      end
+
+      if not rowSections[currentRow] then
+        rowSections[currentRow] = {}
+      end
+      table.insert(rowSections[currentRow], section)
+    end
+  end
+
+  -- For each row, check if all sections are collapsed
+  for _, sectionsInRow in pairs(rowSections) do
+    local allCollapsed = true
+    for _, section in ipairs(sectionsInRow) do
+      if not section:IsCollapsed() then
+        allCollapsed = false
+        break
+      end
+    end
+
+    -- Update shouldShrinkWhenCollapsed and check if we need to redraw
+    for _, section in ipairs(sectionsInRow) do
+      if section.shouldShrinkWhenCollapsed ~= allCollapsed then
+        section.shouldShrinkWhenCollapsed = allCollapsed
+        needsRedraw = true
+      end
+    end
+  end
+
+  -- If we changed any shouldShrinkWhenCollapsed flags, redraw the sections and grid
+  if needsRedraw then
+    for _, section in ipairs(view.content.cells) do
+      section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+    end
+    w, h = view.content:Draw({
+      cells = view.content.cells,
+      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
+      columns = sizeInfo.columnCount,
+      header = view:RemoveSectionFromGrid(L:G("Recent Items")),
+      footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
+      mask = hiddenCells,
+    })
+  end
 
   for _, section in pairs(view.sections) do
     debug:WalkAndFixAnchorGraph(section.frame)
