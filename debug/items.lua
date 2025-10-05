@@ -79,7 +79,8 @@ end
 
 ---@param item Item
 function debug:HideItemTooltip(item)
-  _ = item
+  ---@diagnostic disable-next-line: unused-local
+  local _ = item
   tooltipLines = 0
   self.tooltip:Hide()
 end

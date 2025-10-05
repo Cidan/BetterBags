@@ -933,6 +933,7 @@ function items:ParseItemLink(link)
 	itemContext, rest = strsplit(":", link, 15) --[[@as string]]
 
   if not addon.isRetail then
+	  local _
 	  _, itemID, enchantID, gemID1, gemID2, gemID3, gemID4,
 	  suffixID, uniqueID, linkLevel, specializationID, modifiersMask,
 	  itemContext, rest = strsplit(":", link, 14) --[[@as string]]
@@ -1135,7 +1136,7 @@ function items:GetBindTypeFromLink(itemLink)
   -- itemLink has better information for items, but no information for pet or keystone links
   local bindType = nil
   if (strfind(itemLink, "item:")) then
-    bindType, _, _, _ = select(14, C_Item.GetItemInfo(itemLink))
+    bindType = select(14, C_Item.GetItemInfo(itemLink))
   end
   return bindType
 end

@@ -266,14 +266,25 @@ function bagFrame.bagProto:Show(ctx)
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
 
   if self.kind == const.BAG_KIND.BANK and addon.isRetail then
+    -- Configure and show BankPanel so GetActiveBankType works
+    if BankPanel then
+      -- Make BankPanel invisible but functional
+      BankPanel:SetAlpha(0)
+      BankPanel:EnableMouse(false)
+      BankPanel:EnableKeyboard(false)
+      if BankPanel.MoneyFrame then BankPanel.MoneyFrame:Hide() end
+      if BankPanel.AutoDepositFrame then BankPanel.AutoDepositFrame:Hide() end
+      if BankPanel.Header then BankPanel.Header:Hide() end
+      BankPanel:Show()
+    end
     self:GenerateCharacterBankTabs(ctx)
     self:GenerateWarbankTabs(ctx)
     if addon.atWarbank then
       self:HideBankAndReagentTabs()
       self.tabs:SetTabByID(ctx, 13)
       -- Set the active bank type for warbank
-      if BankPanel then
-        BankPanel.bankType = Enum.BankType.Account
+      if BankPanel and BankPanel.SetBankType then
+        BankPanel:SetBankType(Enum.BankType.Account)
       end
     else
       self:ShowBankAndReagentTabs()
@@ -288,8 +299,8 @@ function bagFrame.bagProto:Show(ctx)
         self.tabs:SetTabByID(ctx, 1)
       end
       -- Set the active bank type for character bank
-      if BankPanel then
-        BankPanel.bankType = Enum.BankType.Character
+      if BankPanel and BankPanel.SetBankType then
+        BankPanel:SetBankType(Enum.BankType.Character)
       end
     end
    self.moneyFrame:Update()
@@ -308,6 +319,10 @@ function bagFrame.bagProto:Hide(ctx)
   PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
   self.frame:Hide()
   if self.kind == const.BAG_KIND.BANK then
+    -- Hide BankPanel to prevent taint from affecting other container operations
+    if addon.isRetail and BankPanel then
+      BankPanel:Hide()
+    end
     if C_Bank then
       C_Bank.CloseBankFrame()
     else
@@ -476,8 +491,8 @@ function bagFrame.bagProto:SwitchToBank(ctx)
   BankFrame.activeTabIndex = 1
   BankPanel.selectedTabID = nil
   -- Set the active bank type so right-click item movement works correctly
-  if addon.isRetail and BankPanel then
-    BankPanel.bankType = Enum.BankType.Character
+  if addon.isRetail and BankPanel and BankPanel.SetBankType then
+    BankPanel:SetBankType(Enum.BankType.Character)
   end
   -- Clear bank cache to ensure clean state
   items:ClearBankCache(ctx)
@@ -499,8 +514,8 @@ function bagFrame.bagProto:SwitchToCharacterBankTab(ctx, tabID)
   BankFrame.activeTabIndex = 1
   BankPanel.selectedTabID = nil
   -- Set the active bank type so right-click item movement works correctly
-  if addon.isRetail and BankPanel then
-    BankPanel.bankType = Enum.BankType.Character
+  if addon.isRetail and BankPanel and BankPanel.SetBankType then
+    BankPanel:SetBankType(Enum.BankType.Character)
   end
   self:SetTitle(format(L:G("Bank Tab %d"), tabID - const.BANK_ONLY_BAGS_LIST[1] + 1))
   self.currentItemCount = -1
@@ -524,13 +539,17 @@ function bagFrame.bagProto:SwitchToAccountBank(ctx, tabIndex)
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 3
   -- Set the active bank type so right-click item movement works correctly
-  if addon.isRetail and BankPanel then
-    BankPanel.bankType = Enum.BankType.Account
+  if addon.isRetail and BankPanel and BankPanel.SetBankType then
+    BankPanel:SetBankType(Enum.BankType.Account)
   end
   local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
   for _, data in pairs(tabData) do
     if data.ID == tabIndex then
-      BankPanel.selectedTabID = data.ID
+      if BankPanel.SelectTab then
+        BankPanel:SelectTab(data.ID)
+      else
+        BankPanel.selectedTabID = data.ID
+      end
       break
     end
   end
@@ -556,8 +575,8 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   BankFrame.selectedTab = 1
   BankFrame.activeTabIndex = 1
   -- Set the active bank type so right-click item movement works correctly
-  if addon.isRetail and BankPanel then
-    BankPanel.bankType = Enum.BankType.Character
+  if addon.isRetail and BankPanel and BankPanel.SetBankType then
+    BankPanel:SetBankType(Enum.BankType.Character)
   end
   self:SetTitle(L:G("Bank"))
   items:ClearBankCache(ctx)
@@ -812,7 +831,9 @@ function bagFrame:Create(ctx, kind)
       if tabID and tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
         if button == "RightButton" then
           -- Show settings menu for character bank tabs
-          BankPanel.bankType = Enum.BankType.Character
+          if BankPanel.SetBankType then
+            BankPanel:SetBankType(Enum.BankType.Character)
+          end
           local bagIndex = tabID
           -- Try to get character bank tab data if available
           local characterTabData = C_Bank and C_Bank.FetchPurchasedBankTabData and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
@@ -824,20 +845,26 @@ function bagFrame:Create(ctx, kind)
           BankPanel.TabSettingsMenu:Update()
         else
           BankPanel.TabSettingsMenu:Hide()
-          BankPanel.bankType = Enum.BankType.Character
+          if BankPanel.SetBankType then
+            BankPanel:SetBankType(Enum.BankType.Character)
+          end
         end
         b:SwitchToCharacterBankTab(ectx, tabID)
         return true -- Tab switch handled, allow selection
       elseif tabID == 1 then
         -- Bank tab
         BankPanel.TabSettingsMenu:Hide()
-        BankPanel.bankType = Enum.BankType.Character
+        if BankPanel.SetBankType then
+          BankPanel:SetBankType(Enum.BankType.Character)
+        end
         b:SwitchToBank(ectx)
         return true -- Tab switch handled, allow selection
       else
         -- Warbank tabs
         if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
-          BankPanel.bankType = Enum.BankType.Account
+          if BankPanel.SetBankType then
+            BankPanel:SetBankType(Enum.BankType.Account)
+          end
           BankPanel:FetchPurchasedBankTabData()
           BankPanel.TabSettingsMenu:Show()
           BankPanel.TabSettingsMenu:SetSelectedTab(tabID)

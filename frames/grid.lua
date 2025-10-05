@@ -190,9 +190,10 @@ function gridProto:DislocateCell(id)
   ---@type string, ScriptRegion, string, number, number
   local _, relativeTo, relativePoint, _, offsetY = cell.frame:GetPoint(1)
   ---@type string, ScriptRegion, string, number, number
-  local _, _, rightRelativePoint, _, _
+  local rightRelativePoint
   if rightCell then
-    _, _, rightRelativePoint, _, _ = rightCell.frame:GetPoint(1)
+    local _, _, rp = rightCell.frame:GetPoint(1)
+    rightRelativePoint = rp
   end
   -- If there is a right cell and left cell, set it to be setpoint relative to the left cell, leaving a gap for the cell that was removed.
   if rightCell and leftCell then

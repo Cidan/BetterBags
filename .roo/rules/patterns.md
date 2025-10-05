@@ -9,30 +9,80 @@
 
 ## Protected Code and Taint
 
+### Pattern: Never Assign to Global `_` Variable
+**Problem**: Assigning to the global `_` variable (throwaway variable) without declaring it as local causes taint that prevents protected actions like using items.
+
+**Why**: In WoW's Lua environment, `_` is a global variable. When addon code assigns to it (e.g., `bindType, _, _, _ = select(...)`), it taints the global environment. This taint propagates and blocks protected functions like `UseContainerItem`. Even if you declare `local _, _, x, _, _`, only the LAST `_` becomes accessible as local - subsequent assignments without `local` will taint the global.
+
+**Solution Pattern**: Always use `local _` in the same statement as the assignment, or only capture what you need:
+```lua
+-- BAD: Taints global _ variable
+bindType, _, _, _ = select(14, C_Item.GetItemInfo(itemLink))
+
+-- BAD: Reusing local _ in multi-value assignment
+local _, _, x, _, _
+_, _, x, _, _ = foo()  -- Only last _ is local, others are global!
+
+-- GOOD: Declare local in same statement
+local bindType, _, _, _ = select(14, C_Item.GetItemInfo(itemLink))
+
+-- BETTER: Only capture what you need
+local bindType = select(14, C_Item.GetItemInfo(itemLink))
+
+-- GOOD: Separate assignment with new local
+local x
+if condition then
+  local _, _, val = foo()
+  x = val
+end
+```
+
+**When to Apply**: Any time you use `_` as a throwaway variable. Always verify assignments have `local` in the SAME statement.
+
 ### Pattern: Cannot Override Functions Called in Protected Contexts
 **Problem**: Overriding Blizzard functions that are called during protected actions (combat, secure actions like UseContainerItem) causes `ADDON_ACTION_FORBIDDEN` errors.
 
-**Why**: WoW's taint system prevents addons from influencing protected actions. Even reading addon tables during protected calls can cause taint.
+**Why**: WoW's taint system prevents addons from influencing protected actions. Even reading addon tables during protected calls can cause taint. Additionally, **touching Blizzard frames at initialization taints them permanently**, blocking all future protected operations.
 
-**Solution Pattern**: Instead of overriding functions:
-1. Keep Blizzard frames/panels visible but invisible (alpha=0, disable mouse/keyboard)
-2. Set the state variables that Blizzard code reads (e.g., `BankPanel.bankType`)
-3. Let Blizzard's original functions work naturally by ensuring their preconditions are met
+**Critical Discovery**: Blizzard's `UseContainerItem()` (called for ALL containers including backpack) calls `BankFrame:GetActiveBankType()`. If BankPanel has been touched by addon code at ANY point, this call fails with taint errors - even for backpack items!
+
+**Solution Pattern**:
+1. **Never show or interact with BankPanel during initialization** - this taints it permanently
+2. Only show BankPanel when bank is actually open, hide it when closed
+3. Make BankPanel invisible (alpha=0, disable mouse/keyboard) but only when shown
+4. Use Blizzard's methods (e.g., `BankPanel:SetBankType()`) instead of direct field assignment
 
 **Example**:
 ```lua
--- BAD: Overriding causes taint
-BankFrame.GetActiveBankType = function()
-  return addon.Bags.Bank.bankTab >= 13 and Account or Character
+-- BAD: Showing at initialization taints permanently
+-- This will cause ALL UseContainerItem calls to fail!
+if BankPanel then
+  BankPanel:SetAlpha(0)
+  BankPanel:Show()  -- NEVER DO THIS AT INIT
 end
 
--- GOOD: Keep BankPanel shown but invisible
-BankPanel:SetAlpha(0)
-BankPanel:EnableMouse(false)
-BankPanel:Show()
--- Then set what Blizzard reads:
-BankPanel.bankType = Enum.BankType.Account
+-- GOOD: Configure invisibility but don't show
+if BankPanel then
+  BankPanel:SetAlpha(0)
+  BankPanel:EnableMouse(false)
+  BankPanel:Hide()  -- Keep hidden initially
+end
+
+-- Then when bank opens:
+if BankPanel then
+  BankPanel:Show()  -- Now show it
+  if BankPanel.SetBankType then
+    BankPanel:SetBankType(Enum.BankType.Character)
+  end
+end
+
+-- When bank closes:
+if BankPanel then
+  BankPanel:Hide()  -- Hide to prevent taint affecting other operations
+end
 ```
+
+**When to Apply**: Any time working with Blizzard frames that are checked by protected code (BankPanel, BankFrame, etc.)
 
 ### Pattern: Avoid Context Creation in Mouse Event Hooks on Item Buttons
 **Problem**: Using `addon.HookScript()` for mouse events (OnMouseDown, OnMouseUp, OnEnter, OnLeave) on item buttons causes `ADDON_ACTION_FORBIDDEN` errors when users right-click consumable items.
@@ -107,13 +157,15 @@ end
 ### Pattern: Bank Type Determines Item Destination
 **Problem**: Right-click item movement needs to know if it should go to character or account bank.
 
-**Why**: `C_Container.UseContainerItem()` accepts an optional `bankType` parameter that Blizzard code determines via `BankFrame:GetActiveBankType()`.
+**Why**: `C_Container.UseContainerItem()` accepts an optional `bankType` parameter that Blizzard code determines via `BankPanel:GetActiveBankType()`.
 
 **Solution Pattern**:
-1. Maintain `BankPanel.bankType` as source of truth
-2. Set it whenever switching tabs: `Enum.BankType.Character` or `Enum.BankType.Account`
+1. Use `BankPanel:SetBankType()` method instead of direct field assignment to avoid taint
+2. Call it whenever switching tabs: `BankPanel:SetBankType(Enum.BankType.Character)` or `BankPanel:SetBankType(Enum.BankType.Account)`
 3. Ensure `BankPanel:IsShown()` returns true for the lookup to work
-4. Clear/reset when closing bank to avoid stale state
+4. Always check method exists: `if BankPanel and BankPanel.SetBankType then`
+
+**Critical**: Never directly assign to `BankPanel.bankType` - this taints the BankPanel object and causes `ADDON_ACTION_FORBIDDEN` errors when Blizzard's protected code calls `GetActiveBankType()`.
 
 ## Item Filtering and Display
 

@@ -225,23 +225,13 @@ function addon:HideBlizzardBags()
     BankFrame:SetScript("OnShow", nil)
     BankFrame:SetScript("OnEvent", nil)
 
-    -- Instead of overriding GetActiveBankType (which causes taint), we keep
-    -- BankPanel visible but hide all its visual elements. This allows the
-    -- original GetActiveBankType() to work correctly while keeping the UI hidden.
-    if addon.isRetail and BankPanel then
-      -- Hide all visual elements of BankPanel
-      BankPanel:SetAlpha(0)
-      BankPanel:EnableMouse(false)
-      BankPanel:EnableKeyboard(false)
-
-      -- Hide the money frame and other UI elements
-      if BankPanel.MoneyFrame then BankPanel.MoneyFrame:Hide() end
-      if BankPanel.AutoDepositFrame then BankPanel.AutoDepositFrame:Hide() end
-      if BankPanel.Header then BankPanel.Header:Hide() end
-
-      -- Keep BankPanel shown but invisible so GetActiveBankType works
-      BankPanel:Show()
-    end
+    -- CRITICAL: Do NOT touch BankPanel during initialization!
+    -- Any interaction with BankPanel (SetAlpha, Show, Hide, etc.) taints it permanently.
+    -- Once tainted, all UseContainerItem() calls (including backpack) will fail because
+    -- Blizzard's protected code calls BankFrame:GetActiveBankType() which reads from
+    -- the tainted BankPanel.
+    --
+    -- BankPanel will be configured and shown only when the bank is actually opened.
   end
 end
 
