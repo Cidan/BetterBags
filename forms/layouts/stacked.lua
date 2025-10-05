@@ -611,7 +611,7 @@ function stackedLayout:AddButtonGroup(opts)
     local button = CreateFrame("Button", nil, container, "UIPanelButtonTemplate") --[[@as Button]]
     button:SetText(buttonData.title)
     local w = button:GetFontString():GetStringWidth()
-    button:SetSize(w + 6, 24)
+    button:SetSize(w + 20, 24)
     addon.SetScript(button, "OnClick", function(ctx)
       buttonData.onClick(ctx)
     end)
