@@ -519,6 +519,11 @@ function config:CreateConfig()
     description = 'Export your current category configuration to a string that can be copied and shared. Import a category configuration string to apply another user\'s bag organization. Note: Only category settings are included - general settings like themes, sizes, and display options are not affected.',
   })
 
+  -- Spacer for button positioning
+  f:AddLabel({
+    description = ' ',
+  })
+
   -- Store reference to text area input fields
   config.exportTextBox = nil
   config.importTextBox = nil
