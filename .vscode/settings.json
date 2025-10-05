@@ -214,5 +214,9 @@
     "undefined-global",
     "no-unknown"
   ],
-  "wowAPI.luals.frameXML": false
+  "wowAPI.luals.frameXML": false,
+  "[lua]": {
+    "editor.defaultFormatter": "JohnnyMorganz.stylua"
+  },
+  "editor.formatOnSave": true
 }

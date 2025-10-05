@@ -154,7 +154,7 @@ function refresh:StartUpdate(ctx)
     else
       -- Determine what to filter based on current tab
       local currentTab = addon.Bags.Bank.bankTab
-      local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or 13
+      accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or 13
 
       if currentTab >= accountBankStart then
         -- Current tab is an account bank tab - don't filter, show all account bank items
