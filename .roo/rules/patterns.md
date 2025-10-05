@@ -213,6 +213,44 @@ Before implementing hooks or workarounds:
 
 Keep these boundaries clear to avoid circular dependencies and taint propagation.
 
+### Pattern: Maintain Feature Parity Across Game Versions
+**Problem**: Changes to retail code (frames/\*.lua) that aren't mirrored in Classic Era (frames/era/\*.lua) or Classic (frames/classic/\*.lua) can cause errors or missing features in those versions.
+
+**Why**: BetterBags supports three different WoW clients with separate codebases:
+- **Mainline/Retail**: frames/\*.lua
+- **Classic Era**: frames/era/\*.lua
+- **Classic**: frames/classic/\*.lua
+
+Each version has its own quirks and API differences, but core functionality should work consistently across all versions. When fixing bugs or adding features, it's easy to only update one version and forget the others.
+
+**Solution Pattern**:
+1. When making changes to frames/item.lua, check if frames/era/item.lua and frames/classic/item.lua need similar updates
+2. When adding new module imports or dependencies, verify all versions have them
+3. When fixing bugs, search for similar patterns in other version folders
+4. Test changes across all supported game versions when possible
+5. In commit messages, note which versions were updated
+
+**Example**:
+```lua
+// frames/item.lua (retail)
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+// frames/era/item.lua (classic era) - MUST ALSO HAVE THIS
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+// frames/classic/item.lua (classic) - AND THIS TOO
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+```
+
+**When to Apply**:
+- After any bug fix that touches version-specific code
+- When adding new features that should work across all versions
+- When refactoring shared functionality
+- During code review - verify all versions are updated consistently
+
 ## Form/Settings UI Patterns
 
 ### Pattern: Use Anchor Points Instead of Fixed Widths for UI Elements
