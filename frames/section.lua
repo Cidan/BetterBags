@@ -60,6 +60,9 @@ local pool = addon:GetModule('Pool')
 ---@field private fillWidth boolean
 ---@field private headerDisabled boolean
 ---@field private maxItemsPerRow number
+---@field private collapsed boolean
+---@field private kind BagKind
+---@field private expandedHeight number The height when expanded, used for layout calculations
 local sectionProto = {}
 
 ---@param kind BagKind
@@ -77,6 +80,24 @@ end
 function sectionProto:SetTitle(text)
   self.title:SetText(text)
   themes:UpdateSectionFont(self.title:GetFontString())
+end
+
+-- GetTitleWithoutIndicator returns the title text without the collapse indicator.
+---@return string
+function sectionProto:GetTitleWithoutIndicator()
+  return self.title:GetText()
+end
+
+-- SetCollapsed sets the collapsed state of the section.
+---@param collapsed boolean
+function sectionProto:SetCollapsed(collapsed)
+  self.collapsed = collapsed
+end
+
+-- IsCollapsed returns whether the section is collapsed.
+---@return boolean
+function sectionProto:IsCollapsed()
+  return self.collapsed or false
 end
 
 function sectionProto:AddCell(id, cell)
@@ -132,6 +153,8 @@ function sectionProto:Wipe()
   self.frame:SetParent(nil)
   self.fillWidth = false
   self.frame:SetAlpha(1)
+  self.collapsed = false
+  self.expandedHeight = nil
 end
 
 function sectionProto:WipeOnlyContents()
@@ -201,6 +224,8 @@ end
 ---@return number width
 ---@return number height
 function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
+  self.kind = kind
+
   if not nosort then
     if freeSpaceShown then
       self.content:Sort(sort.GetItemSortBySlot)
@@ -208,23 +233,45 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
       self.content:Sort(sort:GetItemSortFunction(kind, view))
     end
   end
+
   local w, h = self.content:Draw({
     cells = self.content.cells,
     maxWidthPerRow = ((37 + 4) * self.maxItemsPerRow) + 16,
   })
-  self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
-  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
-  self.content:Show()
+
   if w == 0 then
     self.frame:Hide()
     return 0, 0
   end
+
   if self.fillWidth or database:GetShowFullSectionNames(kind) then
     w = math.max(w, self.title:GetTextWidth())
   end
-  self.frame:SetSize(w + 12, h + self.title:GetHeight() + 6)
+
+  local fullWidth = w + 12
+  local fullHeight = h + self.title:GetHeight() + 6
+
+  -- Store the expanded height for layout calculations
+  self.expandedHeight = fullHeight
+
+  -- If collapsed, hide content and shrink frame
+  if self.collapsed then
+    self.content:Hide()
+    local collapsedWidth = self.title:GetTextWidth() + 12
+    if self.fillWidth or database:GetShowFullSectionNames(kind) then
+      collapsedWidth = math.max(collapsedWidth, self.title:GetTextWidth() + 12)
+    end
+    self.frame:SetSize(collapsedWidth, self.title:GetHeight() + 6)
+    self.frame:Show()
+    return collapsedWidth, self.title:GetHeight() + 6
+  end
+
+  self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
+  self.content:Show()
+  self.frame:SetSize(fullWidth, fullHeight)
   self.frame:Show()
-  return w + 12, h + self.title:GetHeight() + 6
+  return fullWidth, fullHeight
 end
 
 -------
@@ -251,6 +298,26 @@ end
 
 ---@param ctx Context
 ---@param section Section
+function sectionFrame:OnTitleCollapseToggle(ctx, section)
+  local category = section:GetTitleWithoutIndicator()
+  -- Try to find which bag this section belongs to by checking both
+  local kind = section.kind
+  if not kind then
+    -- If kind not set, try both bags
+    if addon.Bags.Backpack and addon.Bags.Backpack:IsShown() then
+      kind = const.BAG_KIND.BACKPACK
+    elseif addon.Bags.Bank and addon.Bags.Bank:IsShown() then
+      kind = const.BAG_KIND.BANK
+    end
+  end
+  if kind then
+    database:ToggleSectionCollapsed(kind, category)
+    events:SendMessage(ctx, 'bags/FullRefreshAll')
+  end
+end
+
+---@param ctx Context
+---@param section Section
 function sectionFrame:OnTitleClickOrDrop(ctx, section)
   if not CursorHasItem() then return end
   if not IsShiftKeyDown() then return end
@@ -258,7 +325,7 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   ---@cast cursorType string
   ---@cast itemID number
   if cursorType ~= "item" then return end
-  local category = section.title:GetText()
+  local category = section:GetTitleWithoutIndicator()
   categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
   events:SendMessage(ctx, 'bags/FullRefreshAll')
@@ -345,6 +412,7 @@ function sectionFrame:_DoCreate()
   s.frame = f
 
   s.maxItemsPerRow = 5
+  s.collapsed = false
   -- Create the section title.
   local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")
@@ -372,7 +440,12 @@ function sectionFrame:_DoCreate()
     if e == "RightButton" then
       sectionFrame:OnTitleRightClick(s)
     elseif e == "LeftButton" then
-      sectionFrame:OnTitleClickOrDrop(ctx, s)
+      -- Check if we should toggle collapse instead of drop
+      if not CursorHasItem() then
+        sectionFrame:OnTitleCollapseToggle(ctx, s)
+      else
+        sectionFrame:OnTitleClickOrDrop(ctx, s)
+      end
     end
   end)
 

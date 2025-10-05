@@ -393,6 +393,27 @@ function DB:GetCustomSectionSort(kind)
   return DB.data.profile.customSectionSort[kind]
 end
 
+---@param kind BagKind
+---@param category string
+---@return boolean
+function DB:GetSectionCollapsed(kind, category)
+  return DB.data.profile.collapsedSections[kind][category] or false
+end
+
+---@param kind BagKind
+---@param category string
+---@param collapsed boolean
+function DB:SetSectionCollapsed(kind, category, collapsed)
+  DB.data.profile.collapsedSections[kind][category] = collapsed
+end
+
+---@param kind BagKind
+---@param category string
+function DB:ToggleSectionCollapsed(kind, category)
+  local current = DB:GetSectionCollapsed(kind, category)
+  DB:SetSectionCollapsed(kind, category, not current)
+end
+
 ---@param guid string
 ---@param locked boolean
 function DB:SetItemLock(guid, locked)

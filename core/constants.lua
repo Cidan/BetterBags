@@ -678,6 +678,12 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BANK] = {},
       ---@type table<string, number>
     },
+    collapsedSections = {
+      ---@type table<string, boolean>
+      [const.BAG_KIND.BACKPACK] = {},
+      ---@type table<string, boolean>
+      [const.BAG_KIND.BANK] = {},
+    },
     size = {
       ---@type SizeInfo[]
       [const.BAG_VIEW.ONE_BAG] = {

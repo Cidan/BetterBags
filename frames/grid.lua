@@ -285,16 +285,23 @@ function gridProto:calculateColumns(options)
   local totalHeight = 0
   ---@type Cell[][]
   local columns = {}
+
+  -- Helper function to get the height to use for layout calculations
+  local function getLayoutHeight(cell)
+    -- Use expandedHeight if available (for collapsed sections), otherwise use actual height
+    return cell.expandedHeight or cell.frame:GetHeight()
+  end
+
   for i, cell in ipairs(maskedCells) do
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-        totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
+        totalHeight = totalHeight + getLayoutHeight(cell) + self.spacing
         rowWidth = cell.frame:GetWidth()
       else
         rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
       end
     else
-      totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
+      totalHeight = totalHeight + getLayoutHeight(cell) + self.spacing
     end
   end
 
@@ -305,18 +312,18 @@ function gridProto:calculateColumns(options)
   for i, cell in ipairs(maskedCells) do
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-        if currentHeight + cell.frame:GetHeight() > splitAt then
+        if currentHeight + getLayoutHeight(cell) > splitAt then
           currentColumn = currentColumn + 1
           currentHeight = 0
         else
-          currentHeight = currentHeight + cell.frame:GetHeight()
+          currentHeight = currentHeight + getLayoutHeight(cell)
         end
         rowWidth = cell.frame:GetWidth()
       else
         rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
       end
     else
-      currentHeight = currentHeight + cell.frame:GetHeight()
+      currentHeight = currentHeight + getLayoutHeight(cell)
     end
     if not columns[currentColumn] then
       columns[currentColumn] = {}
