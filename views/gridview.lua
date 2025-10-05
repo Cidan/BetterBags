@@ -413,9 +413,16 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
     mask = hiddenCells,
   })
+
+  -- Calculate total height saved from collapsed sections
+  local totalCollapsedSaved = 0
   for _, section in pairs(view.sections) do
     debug:WalkAndFixAnchorGraph(section.frame)
+    if section.collapsedHeightSaved then
+      totalCollapsedSaved = totalCollapsedSaved + section.collapsedHeightSaved
+    end
   end
+
   debug:EndProfile('Content Draw Stage %d', bag.kind)
   -- Reposition the content frame if the recent items section is empty.
   if w < 160 then
@@ -427,6 +434,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   if h == 0 then
     h = 40
   end
+
+  -- Subtract the saved height from collapsed sections
+  h = h - totalCollapsedSaved
+
   if database:GetInBagSearch() then
     h = h + 20
   end

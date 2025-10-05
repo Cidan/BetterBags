@@ -62,7 +62,7 @@ local pool = addon:GetModule('Pool')
 ---@field private maxItemsPerRow number
 ---@field private collapsed boolean
 ---@field private kind BagKind
----@field private expandedHeight number The height when expanded, used for layout calculations
+---@field collapsedHeightSaved number How much height is saved when collapsed (for bag sizing)
 local sectionProto = {}
 
 ---@param kind BagKind
@@ -154,7 +154,7 @@ function sectionProto:Wipe()
   self.fillWidth = false
   self.frame:SetAlpha(1)
   self.collapsed = false
-  self.expandedHeight = nil
+  self.collapsedHeightSaved = 0
 end
 
 function sectionProto:WipeOnlyContents()
@@ -251,27 +251,23 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
   local fullWidth = w + 12
   local fullHeight = h + self.title:GetHeight() + 6
 
-  -- Store the expanded height for layout calculations
-  self.expandedHeight = fullHeight
+  self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
 
   -- If collapsed, hide content and shrink frame
   if self.collapsed then
     self.content:Hide()
-    local collapsedWidth = self.title:GetTextWidth() + 12
-    if self.fillWidth or database:GetShowFullSectionNames(kind) then
-      collapsedWidth = math.max(collapsedWidth, self.title:GetTextWidth() + 12)
-    end
-    self.frame:SetSize(collapsedWidth, self.title:GetHeight() + 6)
-    self.frame:Show()
-    return collapsedWidth, self.title:GetHeight() + 6
+    local collapsedHeight = self.title:GetHeight() + 6
+    self.frame:SetSize(fullWidth, collapsedHeight)
+    self.collapsedHeightSaved = fullHeight - collapsedHeight
+  else
+    self.content:Show()
+    self.frame:SetSize(fullWidth, fullHeight)
+    self.collapsedHeightSaved = 0
   end
 
-  self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
-  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
-  self.content:Show()
-  self.frame:SetSize(fullWidth, fullHeight)
   self.frame:Show()
-  return fullWidth, fullHeight
+  return fullWidth, self.collapsed and (self.title:GetHeight() + 6) or fullHeight
 end
 
 -------
