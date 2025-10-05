@@ -43,16 +43,6 @@ function consoleport:OnEnable()
     end
     self:Select(_G['L_DropDownList1Button2'])
   end)
-
-  -- Overwrite the config open function so that it opens to Blizzard config when using ConsolePort
-  config.Open = function(me)
-    ---@cast me +Config
-    if addon.isClassic then
-      Settings.OpenToCategory(me.frame)
-    else
-      Settings.OpenToCategory(me.category)
-    end
-  end
 end
 
 ---@param frame Frame
