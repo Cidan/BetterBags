@@ -470,86 +470,155 @@ function items:DoRefreshAll(ctx)
 	self:RefreshBackpack(ctx)
 end
 
+--- LoadBagItems loads items from specified bags and equipment slots using ContinuableContainer.
+--- This is the new unified item loading function that replaces the old ItemLoader approach.
+---@private
 ---@param ctx Context
 ---@param kind BagKind
-function items:RefreshAccountBank(ctx, kind)
-	local container = self:NewLoader(kind)
+---@param bagList table<number, number> Bags to load (e.g., const.BACKPACK_BAGS)
+---@param includeEquipment boolean Whether to include equipped items
+---@param callback fun(ctx: Context, itemData: table<string, ItemData>, equipmentData: table<number, ItemData>)
+function items:LoadBagItems(ctx, kind, bagList, includeEquipment, callback)
+	local container = ContinuableContainer:Create()
+	local itemData = {}
+	local equipmentData = {}
 
-	self:StageBagForUpdate(kind, container)
-	for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
-		local itemMixin = Item:CreateFromEquipmentSlot(i)
-		container:AddInventorySlot(itemMixin)
+	-- Stage all bag items for loading (only non-empty items can be added to ContinuableContainer)
+	for bagid in pairs(bagList) do
+		local size = C_Container.GetContainerNumSlots(bagid)
+		if size and size > 0 then
+			for slotid = 1, size do
+				local itemID = C_Container.GetContainerItemID(bagid, slotid)
+				if itemID then
+					local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+					container:AddContinuable(itemMixin)
+				end
+			end
+		end
 	end
-	--- Process the item container.
-	self:ProcessContainer(ctx, kind, container)
+
+	-- Stage equipment items if requested
+	if includeEquipment then
+		for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+			local itemMixin = Item:CreateFromEquipmentSlot(i)
+			if not itemMixin:IsItemEmpty() then
+				container:AddContinuable(itemMixin)
+			end
+		end
+	end
+
+	-- Wait for all items to load, then process them (including empty slots)
+	container:ContinueOnLoad(function()
+		-- Process all bag slots (including empty ones)
+		for bagid in pairs(bagList) do
+			local size = C_Container.GetContainerNumSlots(bagid)
+			if size and size > 0 then
+				for slotid = 1, size do
+					local data = {}
+					---@cast data +ItemData
+					data.bagid, data.slotid = bagid, slotid
+					self:AttachItemInfo(data, kind)
+					itemData[self:GetSlotKey(data)] = data
+				end
+			end
+		end
+
+		-- Process equipment items
+		if includeEquipment then
+			for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+				local itemMixin = Item:CreateFromEquipmentSlot(i)
+				if not itemMixin:IsItemEmpty() then
+					local data = self:GetEquipmentInfo(itemMixin)
+					equipmentData[data.inventorySlots[1]] = data
+				end
+			end
+		end
+
+		callback(ctx, itemData, equipmentData)
+	end)
+end
+
+--- RefreshBags is the unified function for refreshing any bag type.
+--- This replaces RefreshBackpack, RefreshBank, and RefreshAccountBank.
+---@param ctx Context
+---@param kind BagKind
+function items:RefreshBags(ctx, kind)
+	if kind == const.BAG_KIND.BACKPACK then
+		debug:StartProfile("Backpack Data Pipeline")
+	end
+
+	equipmentSets:Update()
+
+	-- Determine which bags to load based on kind and context
+	local bagList = {}
+	if kind == const.BAG_KIND.BACKPACK then
+		bagList = const.BACKPACK_BAGS
+	elseif kind == const.BAG_KIND.BANK then
+		-- Pre-cache bank bag quality data
+		for _, bag in pairs(const.BANK_ONLY_BAGS) do
+			local id = C_Container.ContainerIDToInventoryID(bag)
+			GetInventoryItemQuality("player", id)
+		end
+
+		local filterBagID = ctx:Get("filterBagID")
+		local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
+		local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
+
+		-- Determine which bank bags to show
+		if filterBagID ~= nil and const.BANK_BAGS[filterBagID] then
+			-- Specific character bank tab
+			ctx:Set("bagid", filterBagID)
+			bagList[filterBagID] = filterBagID
+			-- Include main bank bag for first character bank tab
+			if filterBagID == const.BANK_ONLY_BAGS_LIST[1] then
+				local mainBank = addon.isRetail and Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank
+				bagList[mainBank] = mainBank
+			end
+		elseif addon.Bags.Bank.bankTab and reagentBank and addon.Bags.Bank.bankTab == reagentBank then
+			-- Reagent bank
+			ctx:Set("bagid", reagentBank)
+			bagList[reagentBank] = reagentBank
+		elseif addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
+			-- Account bank tab
+			ctx:Set("bagid", addon.Bags.Bank.bankTab)
+			bagList[addon.Bags.Bank.bankTab] = addon.Bags.Bank.bankTab
+		else
+			-- All bank bags
+			ctx:Set("bagid", const.BANK_TAB.BANK)
+			bagList = const.BANK_BAGS
+		end
+	end
+
+	-- Load items and process them
+	self:LoadBagItems(ctx, kind, bagList, true, function(ectx, itemData, equipmentData)
+		-- Handle first load
+		if self._firstLoad[kind] == true then
+			self._firstLoad[kind] = false
+			ectx:Set("wipe", true)
+		end
+
+		-- Load and process items
+		self:LoadItems(ectx, kind, itemData, equipmentData, function(ictx)
+			local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
+			events:SendMessageLater(ictx, ev, self.slotInfo[kind])
+
+			if kind == const.BAG_KIND.BACKPACK then
+				debug:EndProfile("Backpack Data Pipeline")
+			end
+		end)
+	end)
 end
 
 ---@param ctx Context
 function items:RefreshBank(ctx)
-	equipmentSets:Update()
-	local container = self:NewLoader(const.BAG_KIND.BANK)
-	-- This is a small hack to force the bank bag quality data to be cached
-	-- before the bank bag frame is drawn.
-	for _, bag in pairs(const.BANK_ONLY_BAGS) do
-		local id = C_Container.ContainerIDToInventoryID(bag)
-		GetInventoryItemQuality("player", id)
-	end
-
-	local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
-	local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
-
-	-- Check if we're filtering for a specific character bank tab
-	local filterBagID = ctx:Get("filterBagID")
-	if filterBagID ~= nil and const.BANK_BAGS[filterBagID] then
-		-- We're showing a specific character bank tab
-		ctx:Set("bagid", filterBagID)
-		-- Only stage the specific bag for update when filtering
-		-- Character bank tabs use the bag IDs directly
-		self:StageBagForUpdate(filterBagID, container)
-		-- Also include the main bank bag for the first character bank tab
-		if filterBagID == const.BANK_ONLY_BAGS_LIST[1] then
-			self:StageBagForUpdate(addon.isRetail and Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank, container)
-		end
-	elseif addon.Bags.Bank.bankTab and reagentBank and addon.Bags.Bank.bankTab == reagentBank then
-		ctx:Set("bagid", reagentBank)
-		self:StageBagForUpdate(reagentBank, container)
-	elseif addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
-		ctx:Set("bagid", addon.Bags.Bank.bankTab)
-		self:StageBagForUpdate(addon.Bags.Bank.bankTab, container)
-	else
-		ctx:Set("bagid", const.BANK_TAB.BANK)
-		-- Loop through all the bags and schedule each item for a refresh.
-		for i in pairs(const.BANK_BAGS) do
-			self:StageBagForUpdate(i, container)
-		end
-	end
-	for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
-		local itemMixin = Item:CreateFromEquipmentSlot(i)
-		container:AddInventorySlot(itemMixin)
-	end
-	--- Process the item container.
-	self:ProcessContainer(ctx, const.BAG_KIND.BANK, container)
+	self:RefreshBags(ctx, const.BAG_KIND.BANK)
 end
 
 -- RefreshBackback will refresh all bags' contents entirely and update
 -- the item database.
 ---@param ctx Context
 function items:RefreshBackpack(ctx)
-	debug:StartProfile("Backpack Data Pipeline")
-
-	equipmentSets:Update()
-	local container = self:NewLoader(const.BAG_KIND.BACKPACK)
-
-	-- Loop through all the bags and schedule each item for a refresh.
-	for i in pairs(const.BACKPACK_BAGS) do
-		self:StageBagForUpdate(i, container)
-	end
-	for i = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
-		local itemMixin = Item:CreateFromEquipmentSlot(i)
-		container:AddInventorySlot(itemMixin)
-	end
-	--- Process the item container.
-	self:ProcessContainer(ctx, const.BAG_KIND.BACKPACK, container)
+	self:RefreshBags(ctx, const.BAG_KIND.BACKPACK)
 end
 
 ---@param newData ItemData
@@ -862,49 +931,6 @@ function items:RefreshSearchCache(kind)
 				end
 			end
 		end
-	end
-end
-
--- ProcessContainer will load all items in the container and fire
--- a message when all items are done loading.
----@private
----@param ctx Context
----@param kind BagKind
----@param container ItemLoader
-function items:ProcessContainer(ctx, kind, container)
-	container:Load(ctx, function(ectx)
-		if self._firstLoad[kind] == true then
-			self._firstLoad[kind] = false
-			ectx:Set("wipe", true)
-		end
-
-		self:LoadItems(ectx, kind, container:GetDataCache(), container:GetEquipmentDataCache(), function(ictx)
-			local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
-
-			events:SendMessageLater(ictx, ev, self.slotInfo[kind])
-			if kind == const.BAG_KIND.BACKPACK then
-				debug:EndProfile("Backpack Data Pipeline")
-			end
-		end)
-	end)
-end
-
--- StageBagForUpdate will scan a bag for items and add them
--- to the provided container for data fetching.
----@private
----@param bagid number
----@param container ItemLoader
-function items:StageBagForUpdate(bagid, container)
-	-- Check if this is a valid container before trying to get its slots
-	-- This handles cases where bank tabs haven't been purchased yet
-	local size = C_Container.GetContainerNumSlots(bagid)
-	if not size or size <= 0 then
-		return
-	end
-	-- Loop through every container slot and create an item for it.
-	for slotid = 1, size do
-		local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
-		container:Add(itemMixin)
 	end
 end
 

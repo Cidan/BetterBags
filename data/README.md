@@ -18,9 +18,10 @@ The Data module handles:
 
 ### Items (`items.lua`)
 
-The main item management module that handles all item data operations.
+The main item management module that handles all item data operations including async loading with ContinuableContainer.
 
 #### Key Features
+- **Unified Item Loading**: Uses ContinuableContainer for efficient async item data loading
 - **Item Data Management**: Stores and manages all item information including stats, quality, binding status, etc.
 - **Bag Type Detection**: Identifies different bag types (normal, profession, reagent)
 - **Item Hashing**: Generates unique hashes for item stacking
