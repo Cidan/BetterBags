@@ -678,8 +678,9 @@ function stackedLayout:AddTextArea(opts)
   end)
 
   addon.SetScript(editBox, "OnEditFocusLost", function()
-    opts.setValue(context:New('InputBox_Set'), editBox:GetText())
-    self:ReloadAllFormElements()
+    if opts.setValue then
+      opts.setValue(context:New('InputBox_Set'), editBox:GetText())
+    end
     ScrollBox:EnableMouseWheel(false)
   end)
 

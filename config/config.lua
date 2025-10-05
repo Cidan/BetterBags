@@ -546,21 +546,19 @@ function config:CreateConfig()
       return ""
     end,
     setValue = function(_, value)
-      -- Store reference to the text box on first load
-      if not config.exportTextBox then
-        -- The text box will be accessible through the form layout
-        bucket:Later("getExportTextBox", 0.1, function()
-          -- Find the text area input
-          for container, _ in pairs(f.layout.textAreas) do
-            if container.title:GetText() == 'Exported Settings' then
-              config.exportTextBox = container.input
-              break
-            end
-          end
-        end)
-      end
+      -- Store reference will be set after form creation
     end
   })
+
+  -- Initialize the exportTextBox reference
+  bucket:Later("getExportTextBox", 0.1, function()
+    for container, _ in pairs(f.layout.textAreas) do
+      if container.title:GetText() == 'Exported Settings' then
+        config.exportTextBox = container.input
+        break
+      end
+    end
+  end)
 
   f:AddTextArea({
     title = 'Import Settings',
@@ -569,19 +567,19 @@ function config:CreateConfig()
       return ""
     end,
     setValue = function(_, value)
-      -- Store reference to the text box on first load
-      if not config.importTextBox then
-        bucket:Later("getImportTextBox", 0.1, function()
-          for container, _ in pairs(f.layout.textAreas) do
-            if container.title:GetText() == 'Import Settings' then
-              config.importTextBox = container.input
-              break
-            end
-          end
-        end)
-      end
+      -- Store reference will be set after form creation
     end
   })
+
+  -- Initialize the importTextBox reference
+  bucket:Later("getImportTextBox", 0.1, function()
+    for container, _ in pairs(f.layout.textAreas) do
+      if container.title:GetText() == 'Import Settings' then
+        config.importTextBox = container.input
+        break
+      end
+    end
+  end)
 
   f:AddButtonGroup({
     ButtonOptions = {
