@@ -181,10 +181,12 @@ local theme = {
     button:GetHighlightTexture():SetVertexColor(1, 1, 1, 0.3)
     button:SetPushedTexture(E.Media.Textures.White8x8)
     button:GetPushedTexture():SetVertexColor(1, 1, 1, 0.3)
-    if button.SetItemButtonQuality then
+    -- Cache the common quality value with defensive nil checking
+    local commonQuality = const and const.ITEM_QUALITY and const.ITEM_QUALITY.Common
+    if button.SetItemButtonQuality and commonQuality then
       hooksecurefunc(button, 'SetItemButtonQuality', function(_, quality)
         -- ElvUI Icon Borders are super edgy.
-        if quality == const.ITEM_QUALITY.Common then
+        if quality == commonQuality then
           button.IconBorder:SetVertexColor(0, 0, 0, 1)
         end
       end)

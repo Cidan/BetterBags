@@ -13,7 +13,8 @@
       "mcp__clipboard__read_clipboard",
       "Read(//tmp/**)",
       "Bash(git remote get-url:*)",
-      "mcp__github__list_issues"
+      "mcp__github__list_issues",
+      "WebFetch(domain:warcraft.wiki.gg)"
     ],
     "deny": [],
     "ask": []
