@@ -14,7 +14,17 @@
       "Read(//tmp/**)",
       "Bash(git remote get-url:*)",
       "mcp__github__list_issues",
-      "WebFetch(domain:warcraft.wiki.gg)"
+      "WebFetch(domain:warcraft.wiki.gg)",
+      "mcp__wow-api__search_wow_global_api_names",
+      "mcp__wow-api__get_warcraft_wiki_page_data",
+      "mcp__ide__getDiagnostics",
+      "Read(//c/Users/Antonio/git/Moonlight/.roo/rules/**)",
+      "Read(//c/Users/Antonio/git/Moonlight/container/**)",
+      "Read(//c/Users/Antonio/git/Moonlight/button/**)",
+      "Read(//c/Users/Antonio/git/Moonlight/**)",
+      "Bash(test:*)",
+      "mcp__wow-api__search_wow_global_strings",
+      "mcp__wow-api__get_warcraft_wiki_global_api_info"
     ],
     "deny": [],
     "ask": []

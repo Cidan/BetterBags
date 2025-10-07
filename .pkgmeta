@@ -19,6 +19,9 @@ externals:
   libs/WagoAnalytics:
     url: https://github.com/wagoio/WagoAnalyticsShim.git
     branch: main
+  libs/Moonlight:
+    url: https://github.com/Cidan/Moonlight.git
+    branch: main
 ignore:
   - install-deps.sh
   - annotations.lua
@@ -26,7 +29,7 @@ ignore:
   - tools
   - go.mod
   - go.sum
-  - cache 
+  - cache
   - .claude
   - .roo
   - .libraries

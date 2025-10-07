@@ -9,128 +9,144 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, ElvUI
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, SortBags, WagoAnalytics, ElvUI, Moonlight
 
-libs\LibStub\LibStub.lua
-libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
-libs\AceAddon-3.0\AceAddon-3.0.xml
-libs\AceDB-3.0\AceDB-3.0.xml
-libs\AceHook-3.0\AceHook-3.0.xml
-libs\AceConsole-3.0\AceConsole-3.0.xml
-libs\AceEvent-3.0\AceEvent-3.0.xml
-libs\AceGUI-3.0\AceGUI-3.0.xml
-libs\AceConfig-3.0\AceConfig-3.0.xml
-libs\LibSharedMedia-3.0\lib.xml
-libs\LibWindow-1.1\LibWindow-1.1.lua
-libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
-libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
-libs/WagoAnalytics/Shim.lua
+# BetterBags Boot System
+boot\boot.lua
 
-templates\era\container.xml
-templates\era\debug.xml
-templates\debug.xml
-templates\sectionconfig.xml
+# BetterBags Bag Module
+bag\constants.lua
+bag\stack.lua
+bag\bagdata.lua
+bag\backpack.lua
+bag\bank.lua
 
-core\boot.lua
+# BetterBags Binds Module
+binds\binds.lua
 
-animations\fade.lua
+#libs\LibStub\LibStub.lua
+#libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
+#libs\AceAddon-3.0\AceAddon-3.0.xml
+#libs\AceDB-3.0\AceDB-3.0.xml
+#libs\AceHook-3.0\AceHook-3.0.xml
+#libs\AceConsole-3.0\AceConsole-3.0.xml
+#libs\AceEvent-3.0\AceEvent-3.0.xml
+#libs\AceGUI-3.0\AceGUI-3.0.xml
+#libs\AceConfig-3.0\AceConfig-3.0.xml
+#libs\LibSharedMedia-3.0\lib.xml
+#libs\LibWindow-1.1\LibWindow-1.1.lua
+#libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+#libs\LibUIDropDownMenu\LibUIDropDownMenu.xml
+#libs/WagoAnalytics/Shim.lua
 
-core\context.lua
-core\pool.lua
+#templates\era\container.xml
+#templates\era\debug.xml
+#templates\debug.xml
+#templates\sectionconfig.xml
 
-debug\debug.lua
-debug\frames.lua
-debug\profile.lua
-debug\items.lua
-debug\analytics.lua
+#core\boot.lua
 
-core\events.lua
-core\localization.lua
-core\translations.lua
-core\overrides.lua
-core\constants.lua
-core\classic\constants.lua
-core\database.lua
-core\hooks.lua
-core\async.lua
-core\fonts.lua
+#animations\fade.lua
+
+#core\context.lua
+#core\pool.lua
+
+#debug\debug.lua
+#debug\frames.lua
+#debug\profile.lua
+#debug\items.lua
+#debug\analytics.lua
+
+#core\events.lua
+#core\localization.lua
+#core\translations.lua
+#core\overrides.lua
+#core\constants.lua
+#core\classic\constants.lua
+#core\database.lua
+#core\hooks.lua
+#core\async.lua
+#core\fonts.lua
 
 # The Theme API loads earlier than actual themes.
-themes\themes.lua
+#themes\themes.lua
 
-util\trees\trees.lua
-util\trees\intervaltree.lua
-util\query.lua
+#util\trees\trees.lua
+#util\trees\intervaltree.lua
+#util\query.lua
 
-data\binding.lua
-data\search.lua
-data\equipmentsets.lua
-data\categories.lua
-data\items.lua
-data\stacks.lua
-data\slots.lua
-data\refresh.lua
+#data\binding.lua
+#data\search.lua
+#data\equipmentsets.lua
+#data\categories.lua
+#data\items.lua
+#data\stacks.lua
+#data\slots.lua
+#data\refresh.lua
 
-util\color.lua
-util\resize.lua
-util\sort.lua
-util\bucket.lua
-util\windowgroup.lua
-util\movementflow.lua
-util\serialization.lua
+#util\color.lua
+#util\resize.lua
+#util\sort.lua
+#util\bucket.lua
+#util\windowgroup.lua
+#util\movementflow.lua
+#util\serialization.lua
 
-forms\layouts\layout.lua
-forms\layouts\stacked.lua
-forms\layouts\twocolumn.lua
+#forms\layouts\layout.lua
+#forms\layouts\stacked.lua
+#forms\layouts\twocolumn.lua
 
-forms\form.lua
+#forms\form.lua
 
-frames\searchcategory.lua
-frames\question.lua
-frames\search.lua
-frames\slider.lua
-frames\money.lua
-frames\era\money.lua
-frames\classic\contextmenu.lua
-frames\grid.lua
-frames\item.lua
-frames\era\item.lua
-frames\itemrow.lua
-frames\era\itemrow.lua
-frames\section.lua
-frames\bagbutton.lua
-frames\era\bagbutton.lua
-frames\bagslots.lua
-frames\era\bagslots.lua
-frames\classic\currency.lua
-frames\list.lua
-frames\sectionitemlist.lua
-frames\sectionconfig.lua
-frames\themeconfig.lua
-frames\tabs.lua
-frames\anchor.lua
-frames\itembrowser.lua
-frames\debug.lua
+#frames\searchcategory.lua
+#frames\question.lua
+#frames\search.lua
+#frames\slider.lua
+#frames\money.lua
+#frames\era\money.lua
+#frames\classic\contextmenu.lua
+#frames\grid.lua
+#frames\item.lua
+#frames\era\item.lua
+#frames\itemrow.lua
+#frames\era\itemrow.lua
+#frames\section.lua
+#frames\bagbutton.lua
+#frames\era\bagbutton.lua
+#frames\bagslots.lua
+#frames\era\bagslots.lua
+#frames\classic\currency.lua
+#frames\list.lua
+#frames\sectionitemlist.lua
+#frames\sectionconfig.lua
+#frames\themeconfig.lua
+#frames\tabs.lua
+#frames\anchor.lua
+#frames\itembrowser.lua
+#frames\debug.lua
 
-views\views.lua
-views\gridview.lua
-views\bagview.lua
+#views\views.lua
+#views\gridview.lua
+#views\bagview.lua
 
-frames\bag.lua
-frames\classic\bag.lua
+#frames\bag.lua
+#frames\classic\bag.lua
 
-themes\default.lua
-themes\simpledark.lua
-themes\gw2.lua
-themes\elvui.lua
+#themes\default.lua
+#themes\simpledark.lua
+#themes\gw2.lua
+#themes\elvui.lua
 
-config\config.lua
-config\plugin.lua
+#config\config.lua
+#config\plugin.lua
 
-integrations\consoleport.lua
-integrations\pawn.lua
-integrations\masque.lua
-integrations\simpleitemlevel.lua
+#integrations\consoleport.lua
+#integrations\pawn.lua
+#integrations\masque.lua
+#integrations\simpleitemlevel.lua
 
-core\init.lua
-core\era\init.lua
+#core\init.lua
+#core\era\init.lua
+
+# BetterBags Initialization - must go last
+boot\init.lua
