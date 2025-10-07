@@ -7,6 +7,104 @@
 - Solution pattern
 - When to apply it
 
+## General Lua Patterns
+
+### Pattern: Always Use Explicit Comparisons in Conditional Statements
+**Problem**: Using implicit truthiness checks (like `if someVar then`) can cause IDE type checking issues and makes code less explicit about intent.
+
+**Why**: Lua treats nil and false as falsy, and everything else as truthy. While `if someVar then` works at runtime, it's ambiguous whether you're checking for nil, false, or both. Explicit comparisons make your intent clear and help type checkers understand your code better.
+
+**Solution Pattern**: Always use explicit comparisons with a specific value:
+```lua
+-- BAD: Implicit truthiness check
+if BankPanel then
+  BankPanel:Show()
+end
+
+if someTable.field then
+  DoSomething(someTable.field)
+end
+
+-- GOOD: Explicit nil check
+if BankPanel ~= nil then
+  BankPanel:Show()
+end
+
+if someTable.field ~= nil then
+  DoSomething(someTable.field)
+end
+
+-- GOOD: Explicit boolean check when dealing with actual booleans
+if isEnabled == true then
+  EnableFeature()
+end
+
+if shouldSkip == false then
+  ProcessItem()
+end
+
+-- GOOD: Explicit empty string/table checks when appropriate
+if name ~= "" then
+  SetName(name)
+end
+
+if #items > 0 then
+  ProcessItems(items)
+end
+```
+
+**When to Apply**:
+- All conditional statements (`if`, `elseif`, ternary operators)
+- When checking optional function parameters or table fields
+- When checking global variables that may or may not exist
+- When working with API results that can return nil
+
+## TOC File and Module Loading
+
+### Pattern: Never Load @meta Annotation Files in TOC
+**Problem**: Loading Lua files that contain `---@meta` at the top causes runtime errors and unexpected behavior.
+
+**Why**: Files marked with `---@meta` are EmmyLua annotation files meant only for type checking and IDE support. They are NOT executable code and should never be loaded by WoW. Loading them can cause:
+- Duplicate definitions
+- Runtime errors
+- Unexpected nil values
+- Blizzard UI errors (like "attempt to call method 'IsShown' (a nil value)")
+
+**Solution Pattern**: Exclude all files with `---@meta` from TOC files:
+
+```lua
+-- Check file contents - if it starts with ---@meta, do NOT add to TOC
+---@meta
+
+---@class (exact) Bag
+---@field window Window
+-- This file should NOT be in the TOC!
+
+-- Only load actual implementation files:
+# BetterBags Bag Module
+bag\stack.lua       -- ✓ Load this (implementation)
+bag\bagdata.lua     -- ✓ Load this (implementation)
+bag\backpack.lua    -- ✓ Load this (implementation)
+bag\bank.lua        -- ✓ Load this (implementation)
+# bag\types.lua     -- ✗ DO NOT load (has ---@meta)
+
+# BetterBags Binds Module
+binds\binds.lua     -- ✓ Load this (implementation)
+# binds\types.lua   -- ✗ DO NOT load (has ---@meta)
+```
+
+**Critical Guidelines**:
+1. **Check file top before adding to TOC** - Look for `---@meta` marker
+2. **Annotation files are for IDE only** - They provide type information, not runtime code
+3. **Common naming**: Files named `types.lua`, `annotations.lua`, or containing `@meta` are annotation files
+4. **Consistency across TOCs** - All TOC files (mainline, Mists, Vanilla) should exclude the same annotation files
+
+**When to Apply**:
+- Every time you add a new Lua file to TOC files
+- When reviewing TOC files for consistency
+- When debugging unexpected runtime errors related to types or definitions
+- When creating new modules with separate type definition files
+
 ## Protected Code and Taint
 
 ### Pattern: Never Assign to Global `_` Variable
@@ -38,6 +136,235 @@ end
 ```
 
 **When to Apply**: Any time you use `_` as a throwaway variable. Always verify assignments have `local` in the SAME statement.
+
+## BetterBags and Moonlight Architecture
+
+### Overview: Framework vs Application Pattern
+**Architecture**: BetterBags uses Moonlight as a UI framework library while maintaining its own business logic modules. This creates a clean separation between framework concerns (UI, rendering, data structures) and application concerns (bags, binds, keybindings).
+
+**Key Principles**:
+- **Moonlight**: Standalone addon providing framework services (Window, Pool, Section, Render, etc.)
+- **BetterBags**: Application that owns bag-specific business logic and uses Moonlight framework
+- **Dual Namespace**: Two independent module registration systems that work together
+- **Load Order**: Moonlight loads first as OptionalDep, then BetterBags initializes
+
+### Pattern: Dual Namespace System
+**Problem**: Need to separate application modules from framework modules while allowing seamless integration.
+
+**Why**: Keeping bag business logic in BetterBags while leveraging Moonlight's framework prevents tight coupling and allows both to evolve independently. BetterBags modules need to access both BetterBags-specific functionality and Moonlight framework components.
+
+**Solution Pattern**: Use two separate accessor functions with clear boundaries:
+
+```lua
+-- In BetterBags modules
+local bb = GetBetterBags()        -- Access BetterBags application modules
+local moonlight = GetMoonlight()  -- Access Moonlight framework modules
+
+-- Register with BetterBags
+local myModule = bb:NewClass("myModule")
+
+-- Access BetterBags modules
+local backpack = bb:GetBackpack()
+local binds = bb:GetBinds()
+local bagdata = bb:GetBagdata()
+local stack = bb:GetStack()
+
+-- Access Moonlight framework modules
+local window = moonlight:GetWindow()
+local pool = moonlight:GetPool()
+local section = moonlight:GetSection()
+local render = moonlight:GetRender()
+local event = moonlight:GetEvent()
+```
+
+**BetterBags Modules** (registered via `GetBetterBags():NewClass()`):
+- `backpack` - Backpack bag implementation with views
+- `bank` - Bank bag implementation
+- `bagdata` - Bag data management and item organization
+- `stack` - Item stack tracking and management
+- `binds` - Keybindings and Blizzard bag hiding
+
+**Moonlight Framework Modules** (registered via `GetMoonlight():NewClass()`):
+- **UI Components**: Window, Container, Tab, Scrollbox, Grid, Section, Sectionset, Drawable
+- **Data Management**: Item, Loader, Pool
+- **Rendering**: Render, Animation
+- **Theming**: SonataEngine, various theme modules
+- **Infrastructure**: Event, Save, Const, Util
+
+**When to Apply**:
+- Use `bb:NewClass()` for BetterBags-specific business logic (bags, binds)
+- Use `moonlight:GetX()` for framework services (UI, rendering, data structures)
+- Always include both namespaces at the top of BetterBags module files
+
+### Pattern: Creating New BetterBags Modules
+**Problem**: Need consistent pattern for adding new modules to BetterBags that integrate with Moonlight framework.
+
+**Solution Pattern**: Follow the Moonlight module creation conventions:
+
+```lua
+-- 1. Get both namespaces at file top
+local bb = GetBetterBags()
+local moonlight = GetMoonlight()
+
+-- 2. Register module with BetterBags (lowercase = package accessor)
+---@class mymodule
+---@field pool Pool
+local mymodule = bb:NewClass("mymodule")
+
+-- 3. Define instance class (uppercase = instance)
+---@class MyModule
+---@field someProperty string
+local MyModule = {}
+
+-- 4. Create constructor
+---@return MyModule
+local mymoduleConstructor = function()
+  local instance = {
+    someProperty = "default"
+  }
+  return setmetatable(instance, {
+    __index = MyModule
+  })
+end
+
+-- 5. Create deconstructor
+---@param m MyModule
+local mymoduleDeconstructor = function(m)
+  m.someProperty = nil
+end
+
+-- 6. Implement New() method with pooling
+---@return MyModule
+function mymodule:New()
+  if self.pool == nil then
+    self.pool = moonlight:GetPool():New(mymoduleConstructor, mymoduleDeconstructor)
+  end
+  return self.pool:TakeOne("MyModule")
+end
+
+-- 7. Implement instance methods
+function MyModule:DoSomething()
+  -- Access BetterBags modules
+  local backpack = bb:GetBackpack()
+
+  -- Access Moonlight framework
+  local window = moonlight:GetWindow()
+end
+
+-- 8. Implement Boot() if needed for initialization
+function mymodule:Boot()
+  -- Initialize module after all dependencies loaded
+end
+```
+
+**Steps to Add Module to BetterBags**:
+1. Create module file in appropriate directory (e.g., `mymodule/mymodule.lua`)
+2. Add module to TOC files (BetterBags.toc, BetterBags_Mists.toc, BetterBags_Vanilla.toc)
+3. Add accessor in `boot/boot.lua`:
+```lua
+---@return mymodule
+function BetterBags:GetMymodule()
+  return self.classes.mymodule
+end
+```
+4. Initialize in `boot/boot.lua` Start() if needed:
+```lua
+local mymod = self:GetMymodule()
+mymod:Boot()
+```
+5. Create README.md in module directory documenting functionality
+
+**When to Apply**: Any time creating new bag-specific functionality in BetterBags.
+
+### Pattern: Load Order and Initialization
+**Problem**: BetterBags depends on Moonlight being fully initialized before it can use framework services.
+
+**Why**: Moonlight provides the foundational framework (windows, pooling, events) that BetterBags modules need. If BetterBags tries to access Moonlight before it's initialized, methods and classes won't be available.
+
+**Solution Pattern**: Leverage WoW's addon dependency system:
+
+```lua
+-- In BetterBags TOC files
+## OptionalDeps: ..., Moonlight
+
+-- Load order guaranteed by WoW:
+-- 1. Moonlight loads as standalone addon
+-- 2. Moonlight:Load() -> ADDON_LOADED -> Moonlight:Start()
+-- 3. BetterBags loads (Moonlight already initialized)
+-- 4. BetterBags:Load() -> ADDON_LOADED -> BetterBags:Start()
+-- 5. BetterBags boots its modules (can safely use Moonlight)
+
+function BetterBags:Start()
+  -- Moonlight is already initialized, just use it
+  local backpack = self:GetBackpack()
+  local bank = self:GetBank()
+  local binds = self:GetBinds()
+
+  backpack:Boot()
+  bank:Boot()
+  binds:Boot()
+
+  -- Trigger bag data refresh
+  local moonlight = GetMoonlight()
+  C_Timer.After(1, function()
+    moonlight:GetLoader():FullRefreshAllBagData()
+  end)
+end
+```
+
+**Critical Guidelines**:
+1. **Never call `moonlight:Load()`** - Moonlight loads itself as standalone addon
+2. **OptionalDeps declares dependency** - WoW ensures load order
+3. **Start() can immediately use Moonlight** - No need to wait or check
+4. **Both call FullRefreshAllBagData()** - Moonlight calls it for standalone use, BetterBags calls it after bag initialization
+
+**When to Apply**: All BetterBags initialization code. Never try to initialize or load Moonlight from BetterBags.
+
+### Pattern: Module Dependencies and Cross-References
+**Problem**: BetterBags modules need to reference each other and Moonlight modules without creating circular dependencies.
+
+**Why**: Modules load in TOC order, but instance creation happens at runtime. If you call GetModule at file scope, the target module may not be registered yet.
+
+**Solution Pattern**: Always get module references inside functions, not at file scope:
+
+```lua
+-- BAD: Module may not be registered yet at file scope
+local bb = GetBetterBags()
+local backpack = bb:GetBackpack()  -- May be nil!
+
+function binds:DoSomething()
+  backpack:Show()  -- Will fail
+end
+
+-- GOOD: Get module reference when function executes
+local bb = GetBetterBags()
+
+function binds:DoSomething()
+  local backpack = bb:GetBackpack()  -- Now it's registered
+  backpack:Show()  -- Works correctly
+end
+
+-- ALSO GOOD: Cache in Boot() for repeated use
+local bb = GetBetterBags()
+local binds = bb:NewClass("binds")
+
+local cachedBackpack  -- Declare at module scope
+
+function binds:Boot()
+  -- Cache references after all modules loaded
+  cachedBackpack = bb:GetBackpack():GetBackpack()
+end
+
+function binds:DoSomething()
+  cachedBackpack:Show()  -- Use cached reference
+end
+```
+
+**When to Apply**:
+- Any cross-module references in BetterBags
+- References to Moonlight framework modules
+- Inside Boot() methods for modules that need initialization
+- Inside instance methods that run after Boot() phase
 
 ### Pattern: Cannot Override Functions Called in Protected Contexts
 **Problem**: Overriding Blizzard functions that are called during protected actions (combat, secure actions like UseContainerItem) causes `ADDON_ACTION_FORBIDDEN` errors.
@@ -122,134 +449,12 @@ end)
 
 **When to Apply**: Any time you need to hook mouse events on buttons that use `ContainerFrameItemButtonTemplate` or any button where clicks can trigger protected functions.
 
-## State Management Across Events
-
-### Pattern: Context Filter Propagation
-**Problem**: When BAG_UPDATE events fire, the refresh logic may not know which specific bag/tab is currently active, causing items from wrong tabs to display.
-
-**Why**: Events are asynchronous and don't carry context about the current UI state.
-
-**Solution Pattern**:
-1. Store filter state in context objects that propagate through event chains
-2. At event entry points, determine the correct filter based on current state
-3. Check for existing filters in context before defaulting
-4. Handle special cases (account bank vs character bank) with explicit checks
-
-**Example**:
-```lua
-local existingFilter = ctx:Get('filterBagID')
-if existingFilter ~= nil then
-  refreshCtx:Set('filterBagID', existingFilter)
-elseif currentTab >= accountBankStart then
-  refreshCtx:Set('filterBagID', nil) -- Account bank shows all
-else
-  refreshCtx:Set('filterBagID', currentTab) -- Character bank filters to tab
-end
-```
-
 ## WoW Bank System Architecture
 
 ### Bank Type Hierarchy
 - **Character Bank**: Bags 6-11 (Enum.BagIndex.CharacterBankTab_1 through CharacterBankTab_6)
 - **Account Bank**: Bags 13-17 (Enum.BagIndex.AccountBankTab_1 through AccountBankTab_5)
 - **Reagent Bank**: Special bag (Enum.BagIndex.Reagentbank)
-
-### Pattern: Bank Type Determines Item Destination
-**Problem**: Right-click item movement needs to know if it should go to character or account bank.
-
-**Why**: `C_Container.UseContainerItem()` accepts an optional `bankType` parameter that Blizzard code determines via `BankPanel:GetActiveBankType()`.
-
-**Solution Pattern**:
-1. Use `BankPanel:SetBankType()` method instead of direct field assignment to avoid taint
-2. Call it whenever switching tabs: `BankPanel:SetBankType(Enum.BankType.Character)` or `BankPanel:SetBankType(Enum.BankType.Account)`
-3. Ensure `BankPanel:IsShown()` returns true for the lookup to work
-4. Always check method exists: `if BankPanel and BankPanel.SetBankType then`
-
-**Critical**: Never directly assign to `BankPanel.bankType` - this taints the BankPanel object and causes `ADDON_ACTION_FORBIDDEN` errors when Blizzard's protected code calls `GetActiveBankType()`.
-
-## Item Filtering and Display
-
-### Pattern: Conditional Filtering by Bank Type
-**Problem**: Different bank types need different filtering strategies (account shows all items in that tab, character shows only specific bag).
-
-**Why**: Account bank tabs are shared and show aggregate items; character bank tabs are individual bags.
-
-**Solution Pattern**:
-```lua
-if currentTab >= accountBankStart then
-  -- Account bank: don't filter, let items module use bankTab directly
-  filterBagID = nil
-else
-  -- Character bank: filter to specific bag
-  filterBagID = currentTab
-end
-```
-
-## Debugging Strategies
-
-### Pattern: Trace State Through Call Chain
-When debugging complex state issues:
-1. Identify the end symptom (wrong items displayed)
-2. Find the function that queries items (items module)
-3. Trace backwards: What determines the query? (filterBagID)
-4. Find where filter is set (refresh logic)
-5. Find where events trigger refresh (event handlers)
-6. Verify state at each switch point (tab switching)
-
-### Pattern: Check Blizzard Source for API Understanding
-Before implementing hooks or workarounds:
-1. Check `.libraries/wow-ui-source/` for actual Blizzard implementation
-2. Understand what Blizzard code expects (preconditions, state variables)
-3. Use MCP WoW API tools for documentation
-4. Test against real game behavior, not assumptions
-
-## Code Organization
-
-### Pattern: Separation of Concerns for Bank Logic
-- **core/init.lua**: One-time setup, frame hiding/showing, Blizzard integration
-- **frames/bag.lua**: UI state management, tab switching, visual updates
-- **data/items.lua**: Item queries and filtering based on state
-- **data/refresh.lua**: Event handling and context management
-
-Keep these boundaries clear to avoid circular dependencies and taint propagation.
-
-### Pattern: Maintain Feature Parity Across Game Versions
-**Problem**: Changes to retail code (frames/\*.lua) that aren't mirrored in Classic Era (frames/era/\*.lua) or Classic (frames/classic/\*.lua) can cause errors or missing features in those versions.
-
-**Why**: BetterBags supports three different WoW clients with separate codebases:
-- **Mainline/Retail**: frames/\*.lua
-- **Classic Era**: frames/era/\*.lua
-- **Classic**: frames/classic/\*.lua
-
-Each version has its own quirks and API differences, but core functionality should work consistently across all versions. When fixing bugs or adding features, it's easy to only update one version and forget the others.
-
-**Solution Pattern**:
-1. When making changes to frames/item.lua, check if frames/era/item.lua and frames/classic/item.lua need similar updates
-2. When adding new module imports or dependencies, verify all versions have them
-3. When fixing bugs, search for similar patterns in other version folders
-4. Test changes across all supported game versions when possible
-5. In commit messages, note which versions were updated
-
-**Example**:
-```lua
-// frames/item.lua (retail)
----@class Context: AceModule
-local context = addon:GetModule('Context')
-
-// frames/era/item.lua (classic era) - MUST ALSO HAVE THIS
----@class Context: AceModule
-local context = addon:GetModule('Context')
-
-// frames/classic/item.lua (classic) - AND THIS TOO
----@class Context: AceModule
-local context = addon:GetModule('Context')
-```
-
-**When to Apply**:
-- After any bug fix that touches version-specific code
-- When adding new features that should work across all versions
-- When refactoring shared functionality
-- During code review - verify all versions are updated consistently
 
 ## Form/Settings UI Patterns
 
@@ -316,45 +521,6 @@ end
 
 **When to Apply**: Any cross-module dependencies. Always call GetModule inside functions, not at file scope, unless you're certain the module loads earlier in the TOC file.
 
-### Pattern: Accessing Form Element References After Layout
-**Problem**: Need to programmatically set text in form TextArea elements, but form:AddTextArea() doesn't return a direct reference to the EditBox.
-
-**Why**: The form API returns container frames, not the actual input elements. The EditBox is stored as `container.input` and isn't available until after the layout is fully created.
-
-**Solution Pattern**: Use delayed lookup via bucket:Later to find the element after layout completes:
-```lua
--- Store reference at module level
-config.exportTextBox = nil
-
--- In form creation
-f:AddTextArea({
-  title = 'Exported Settings',
-  getValue = function(_) return "" end,
-  setValue = function(_, value)
-    if not config.exportTextBox then
-      bucket:Later("getExportTextBox", 0.1, function()
-        for container, _ in pairs(f.layout.textAreas) do
-          if container.title:GetText() == 'Exported Settings' then
-            config.exportTextBox = container.input
-            break
-          end
-        end
-      end)
-    end
-  end
-})
-
--- Later, when button is clicked
-function onExportClick()
-  if config.exportTextBox then
-    config.exportTextBox:SetText(exportedData)
-    config.exportTextBox:HighlightText()
-  end
-end
-```
-
-**When to Apply**: When you need to programmatically manipulate form elements after creation. Use delayed lookup for accessing the actual input controls within form containers.
-
 ## Defensive Programming Against External Addon Interference
 
 ### Pattern: Validate Function Parameters from Saved Variables
@@ -365,35 +531,32 @@ end
 **Solution Pattern**: Guard against invalid function parameters at the point of use:
 ```lua
 -- BAD: Assumes fn is always a valid function
-function gridProto:Sort(fn)
-  table.sort(self.cells, fn)  -- Crashes if fn is nil or not a function
+function MyObject:Sort(fn)
+  table.sort(self.items, fn)  -- Crashes if fn is nil or not a function
 end
 
 -- GOOD: Validate function parameter with safe default
-function gridProto:Sort(fn)
+function MyObject:Sort(fn)
   -- Guard against invalid sort functions from external addons modifying saved variables.
   -- Use a no-op comparison function as a safe default to prevent crashes.
   if type(fn) ~= "function" then
     fn = function() return false end
   end
-  table.sort(self.cells, fn)
+  table.sort(self.items, fn)
 end
 
 -- ALSO GOOD: Provide default at source with defensive fallback
-function sort:GetSectionSortFunction(kind, view)
-  local sortType = database:GetSectionSortType(kind, view)
-  if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
-    return function(a, b) return self.SortSectionsAlphabetically(kind, a, b) end
-  elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
-    return function(a, b) return self.SortSectionsBySizeAscending(kind, a, b) end
-  elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
-    return function(a, b) return self.SortSectionsBySizeDescending(kind, a, b) end
+function GetSortFunction(sortType)
+  if sortType == "alphabetical" then
+    return function(a, b) return a.name < b.name end
+  elseif sortType == "ascending" then
+    return function(a, b) return a.value < b.value end
+  elseif sortType == "descending" then
+    return function(a, b) return a.value > b.value end
   end
-  -- Return the default alphabetical sort in case of an unknown sort type.
+  -- Return a default sort in case of an unknown sort type.
   -- This can happen if external addons modify the saved variables.
-  return function(a, b)
-    return self.SortSectionsAlphabetically(kind, a, b)
-  end
+  return function(a, b) return a.name < b.name end
 end
 ```
 
@@ -406,43 +569,46 @@ end
 ## Object Pooling Patterns
 
 ### Pattern: Always Reset ALL Properties When Releasing Pooled Objects
-**Problem**: Pooled objects (like Section frames) retain state from previous use, causing visual glitches or unexpected behavior when reused. For example, a section that was collapsed and dimmed may retain the dimmed color when reused for a different category.
+**Problem**: Pooled objects retain state from previous use, causing visual glitches or unexpected behavior when reused. For example, a frame that was colored red may retain that color when reused for a different purpose.
 
 **Why**: Object pools reuse frames/objects for performance. When an object is returned to the pool and later retrieved for a new purpose, any properties not explicitly reset will carry over from the previous usage. This includes:
 - Visual properties (colors, alpha, sizes)
 - State flags (collapsed, enabled, visible)
 - Cached data (item counts, titles, references)
-- Custom properties added for features (like `originalTextColor` for collapse dimming)
+- Custom properties added for features
 
 **Solution Pattern**: In the pool's reset function (typically `_DoReset` or `Wipe`), explicitly reset ALL properties to their default state:
 
 ```lua
-function sectionProto:Wipe()
-  self.content:Wipe()
+function pooledObject:Reset()
+  -- Hide and clear frame properties
   self.frame:Hide()
-  self.view = const.BAG_VIEW.SECTION_GRID
   self.frame:ClearAllPoints()
   self.frame:SetParent(nil)
-  self.fillWidth = false
   self.frame:SetAlpha(1)
 
-  -- Reset state flags
-  self.collapsed = false
-  self.shouldShrinkWhenCollapsed = true
+  -- Reset visual properties
+  if self.frame.texture then
+    self.frame.texture:SetColorTexture(1, 1, 1, 1)
+  end
 
-  -- Restore visual properties before clearing cached values
-  if self.originalTextColor then
-    self.title:GetFontString():SetTextColor(
-      self.originalTextColor.r,
-      self.originalTextColor.g,
-      self.originalTextColor.b,
-      self.originalTextColor.a
+  -- Reset state flags
+  self.isActive = false
+  self.isExpanded = false
+
+  -- Restore cached visual properties before clearing them
+  if self.originalColor then
+    self.frame:SetBackdropColor(
+      self.originalColor.r,
+      self.originalColor.g,
+      self.originalColor.b,
+      self.originalColor.a
     )
   end
 
   -- Clear cached properties
-  self.originalTextColor = nil
-  self.kind = nil
+  self.originalColor = nil
+  self.data = nil
   -- ... reset any other custom properties
 end
 ```
@@ -454,7 +620,35 @@ end
 4. **Audit existing resets**: When tracking down "random" visual bugs, check if a pooled object's reset function is incomplete
 
 **When to Apply**:
-- Any time you add a new property to a pooled object (Section, ItemButton, Grid, etc.)
+- Any time you add a new property to a pooled object
 - When debugging issues where state "randomly" appears or disappears
 - During code review of features that modify pooled object properties
 - When implementing new visual indicators or state tracking on existing pooled types
+
+## SlotKey Parsing
+
+### Pattern: Use util:GetBagAndSlotFromSlotkey() Instead of Custom Regex
+**Problem**: Need to extract bagID and slotID from SlotKey strings (format "bagID_slotID").
+
+**Why**: Custom regex parsing with `string.match` and `tonumber` is error-prone and requires manual nil guards. Moonlight provides a typed utility function that handles parsing correctly.
+
+**Solution Pattern**: Always use the Moonlight util module's parsing function:
+
+```lua
+-- BAD: Custom regex parsing without nil guards
+local bagID = tonumber(string.match(slotKey, "^(%d+)_"))
+if isBankBag(bagID) then  -- bagID could be nil!
+  -- ...
+end
+
+-- ALSO BAD: Custom parsing even with correct API
+local bagid, slotid = strsplit('_', slotKey)
+local bagNum = tonumber(bagid)  -- Duplicating logic that exists in framework
+
+-- GOOD: Use framework utility with strong typing
+local util = moonlight:GetUtil()
+local bagID, slotID = util:GetBagAndSlotFromSlotkey(slotKey)
+-- Type checker ensures proper nil handling via return type annotations
+```
+
+**When to Apply**: Any time you need to parse a SlotKey string into its component bag and slot IDs. The framework's strong typing ensures the editor will warn about potential nil values.

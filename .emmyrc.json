@@ -1,0 +1,132 @@
+{
+  "workspace": {
+    "enableReindex": true,
+    "encoding": "utf-8",
+    "ignoreDir": [
+      "annotations\\bb"
+    ],
+    "ignoreGlobs": [],
+    "library": [],
+    "moduleMap": [],
+    "preloadFileSize": 0,
+    "reindexDuration": 1000,
+    "workspaceRoots": []
+  },
+  "diagnostics": {
+    "diagnosticInterval": 500,
+    "disable": [],
+    "enable": true,
+    "enables": [],
+    "globals": [],
+    "globalsRegex": [],
+    "severity": {
+      "access-invisible": "error",
+      "annotation-usage-error": "error",
+      "assign-type-mismatch": "error",
+      "await-in-sync": "error",
+      "circle-doc-class": "error",
+      "code-style-check": "error",
+      "deprecated": "error",
+      "discard-returns": "error",
+      "doc-syntax-error": "error",
+      "duplicate-doc-field": "error",
+      "duplicate-index": "error",
+      "duplicate-require": "error",
+      "duplicate-set-field": "error",
+      "duplicate-type": "error",
+      "generic-constraint-mismatch": "error",
+      "incomplete-signature-doc": "error",
+      "inject-field": "error",
+      "iter-variable-reassign": "error",
+      "local-const-reassign": "error",
+      "missing-fields": "error",
+      "missing-global-doc": "error",
+      "missing-parameter": "error",
+      "missing-return": "error",
+      "missing-return-value": "error",
+      "need-check-nil": "error",
+      "non-literal-expressions-in-assert": "error",
+      "param-type-not-match": "error",
+      "redundant-parameter": "error",
+      "redundant-return-value": "error",
+      "redefined-label": "error",
+      "redefined-local": "error",
+      "return-type-mismatch": "error",
+      "syntax-error": "error",
+      "type-not-found": "error",
+      "unbalanced-assignments": "error",
+      "undefined-doc-param": "error",
+      "undefined-field": "error",
+      "undefined-global": "error",
+      "unnecessary-assert": "error",
+      "unnecessary-if": "error",
+      "unreachable-code": "error"
+    }
+  },
+  "references": {
+    "enable": true,
+    "fuzzySearch": true,
+    "shortStringSearch": false
+  },
+  "strict": {
+    "arrayIndex": true,
+    "docBaseConstMatchBaseType": true,
+    "metaOverrideFileDefine": true,
+    "requirePath": false,
+    "typeCall": false
+  },
+  "resource": {
+    "paths": []
+  },
+  "completion": {
+    "autoRequire": true,
+    "autoRequireFunction": "require",
+    "autoRequireNamingConvention": "keep",
+    "autoRequireSeparator": ".",
+    "baseFunctionIncludesName": true,
+    "callSnippet": false,
+    "enable": true,
+    "postfix": "@"
+  },
+  "hint": {
+    "enable": true,
+    "indexHint": true,
+    "localHint": true,
+    "metaCallHint": true,
+    "overrideHint": true,
+    "paramHint": true
+  },
+  "documentColor": {
+    "enable": true
+  },
+  "hover": {
+    "enable": true
+  },
+  "inlineValues": {
+    "enable": true
+  },
+  "semanticTokens": {
+    "enable": true
+  },
+  "signature": {
+    "detailSignatureHelper": true
+  },
+  "codeAction": {
+    "insertSpace": false
+  },
+  "codeLens": {
+    "enable": true
+  },
+  "runtime": {
+    "classDefaultCall": {
+      "forceNonColon": false,
+      "forceReturnSelf": false,
+      "functionName": ""
+    },
+    "extensions": [],
+    "frameworkVersions": [],
+    "requireLikeFunction": [],
+    "requirePattern": [],
+    "version": "Lua5.1"
+  }
+}
