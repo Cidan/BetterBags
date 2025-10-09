@@ -61,6 +61,11 @@ function backpack:Boot()
 		BagFilter = {
 			[0] = true, [1] = true, [2] = true, [3] = true, [4] = true, [5] = true -- Backpack bags only
 		},
+		SectionSetConfig = {
+			SectionOffset = 4,
+			Columns = 2,
+			HeaderSections = {"New Items"}
+		},
 		ItemSortFunction = function(a, b)
 			local adata = a:GetItemData()
 			local bdata = b:GetItemData()

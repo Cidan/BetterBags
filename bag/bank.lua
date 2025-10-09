@@ -83,6 +83,11 @@ function Bank:RefreshTabs()
 					BagFilter = {
 						[tabData.ID] = true -- Only this specific bank tab
 					},
+					SectionSetConfig = {
+						SectionOffset = 4,
+						Columns = 2,
+						HeaderSections = {"New Items"}
+					},
 					ItemSortFunction = function(a, b)
 						local adata = a:GetItemData()
 						local bdata = b:GetItemData()
@@ -137,6 +142,11 @@ function Bank:RefreshTabs()
 					CombineAllItems = false,
 					BagFilter = {
 						[tabData.ID] = true -- Only this specific warband tab
+					},
+					SectionSetConfig = {
+						SectionOffset = 4,
+						Columns = 2,
+						HeaderSections = {"New Items"}
 					},
 					ItemSortFunction = function(a, b)
 						local adata = a:GetItemData()

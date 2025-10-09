@@ -19,7 +19,9 @@
       "mcp__wow-api__get_warcraft_wiki_page_data",
       "mcp__ide__getDiagnostics",
       "Read(//c/Users/Antonio/git/Moonlight/.roo/rules/**)",
-      "Read(//c/Users/Antonio/git/Moonlight/container/**)"
+      "Read(//c/Users/Antonio/git/Moonlight/container/**)",
+      "Read(//c/Users/Antonio/git/Moonlight/button/**)",
+      "Read(//c/Users/Antonio/git/Moonlight/**)"
     ],
     "deny": [],
     "ask": []
