@@ -294,6 +294,11 @@ function Bank:Hide(doNotAnimate)
 	-- TODO(lobato): Add callback support to Drawable Hide and Show
 	C_Timer.After(1, function()
 		for _, view in pairs(self.views) do
+			-- Clear all placeholders from sections when bag closes
+			local sectionSet = view:GetMySectionSet()
+			for _, section in ipairs(sectionSet:GetAllSections()) do
+				section:ForceFullRedraw()
+			end
 			view:RemoveUnusedSections()
 		end
 		self:Redraw()

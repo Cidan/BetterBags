@@ -43,12 +43,20 @@ Core bag data management that organizes items into sections and manages their di
 - Implements three view modes: by category, by bag name, and combined view
 - Handles item categorization and section assignment
 - Manages item button creation and updates
+- Integrates placeholder system to preserve empty item slots during gameplay
 
 **Key Functions:**
 - `Bagdata:SetConfig(config)`: Configure view mode and sorting behavior
 - `Bagdata:RegisterCallbackWhenItemsChange(callback)`: Set redraw callback
 - `Bagdata:theseBagsHaveBeenUpdated(bags)`: Process bag updates and trigger redraws
 - `Bagdata:figureOutWhereAnItemGoes(item)`: Categorize and place items in sections
+
+**Placeholder Integration:**
+
+When items are removed during redraw cycles, bagdata uses `Section:RemoveItemButKeepSpace()` instead of `Section:RemoveItem()` to preserve grid layout. When adding items, it first calls `Section:TryReplacePlaceholder()` to fill empty spaces before expanding the grid. This creates a smooth experience where:
+- Empty slots remain visible during gameplay
+- New items fill existing empty spaces first
+- Grid size stays consistent across multiple redraws
 
 ### `backpack.lua`
 Backpack bag implementation with multiple view modes:
@@ -61,6 +69,10 @@ Backpack bag implementation with multiple view modes:
 - `backpack:Boot()`: Initialize backpack with views and UI
 - `Backpack:Show/Hide(doNotAnimate)`: Control visibility with optional animations
 - `Backpack:BindBagShowAndHideEvents()`: Wire up bag toggle keybinds
+
+**Placeholder Cleanup:**
+
+When the backpack is hidden, `Hide()` calls `Section:ForceFullRedraw()` on all sections in all views to remove placeholders before the bag reopens. This ensures each bag session starts with a clean layout without leftover empty spaces from previous sessions.
 
 ### `bank.lua`
 Bank bag implementation with character and account-wide warband bank support:
@@ -81,6 +93,10 @@ Bank bag implementation with character and account-wide warband bank support:
 - `Bank:RefreshTabs()`: Fetches purchased tabs from C_Bank API and creates views dynamically (called on BANKFRAME_OPENED)
 - `Bank:BindBankShowAndHideEvents()`: Wire up bank open/close event handlers
 - `Bank:Show/Hide(doNotAnimate)`: Control visibility with optional animations
+
+**Placeholder Cleanup:**
+
+When the bank is hidden, `Hide()` calls `Section:ForceFullRedraw()` on all sections in all views to remove placeholders before the bank reopens. This ensures each bank session starts with a clean layout without leftover empty spaces from previous sessions.
 
 **Architecture:**
 - Uses `C_Bank` API to get real tab names/icons instead of hardcoded values

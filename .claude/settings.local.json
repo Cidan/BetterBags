@@ -21,7 +21,8 @@
       "Read(//c/Users/Antonio/git/Moonlight/.roo/rules/**)",
       "Read(//c/Users/Antonio/git/Moonlight/container/**)",
       "Read(//c/Users/Antonio/git/Moonlight/button/**)",
-      "Read(//c/Users/Antonio/git/Moonlight/**)"
+      "Read(//c/Users/Antonio/git/Moonlight/**)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []

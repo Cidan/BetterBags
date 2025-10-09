@@ -119,10 +119,10 @@ function Bagdata:figureOutWhereAnItemGoes(i)
 			return "NO_OP"
 		end
 
-		-- Item is now empty, so remove it.
+		-- Item is now empty, so remove it but keep the space with a placeholder.
 		local frame = self.allItemButtonsByItem[i]
 		if frame ~= nil then
-			oldSection:RemoveItem(frame)
+			oldSection:RemoveItemButKeepSpace(frame)
 			self.allItemButtonsByItem[i] = nil
 		end
 		self.allSectionsByItem[i] = nil
@@ -169,7 +169,7 @@ function Bagdata:figureOutWhereAnItemGoes(i)
 		if frame ~= nil then
 			-- Don't remove items in New Items while the window is visible.
 			if oldSection:GetTitle() == "New Items" and oldSection:IsVisible() == false then
-				oldSection:RemoveItem(frame)
+				oldSection:RemoveItemButKeepSpace(frame)
 			else
 				frame:Update()
 				return "REMOVED"
@@ -189,7 +189,12 @@ function Bagdata:figureOutWhereAnItemGoes(i)
 		frame:SetItem(i)
 		self.allItemButtonsByItem[i] = frame
 	end
-	newSection:AddItem(frame)
+
+	-- Try to replace a placeholder first, otherwise add normally
+	if newSection:TryReplacePlaceholder(frame) == false then
+		newSection:AddItem(frame)
+	end
+
 	frame:Update()
 	self.allSectionsByItem[i] = newSection
 
@@ -224,7 +229,11 @@ function Bagdata:figureOutWhereAnItemGoesWithBagsShown(i)
 		frame = itemButton:New()
 		frame:SetItem(i)
 		self.allItemButtonsByItem[i] = frame
-		currentSection:AddItem(frame)
+
+		-- Try to replace a placeholder first, otherwise add normally
+		if currentSection:TryReplacePlaceholder(frame) == false then
+			currentSection:AddItem(frame)
+		end
 	end
 
 	---@param item MoonlightItem
@@ -252,9 +261,9 @@ function Bagdata:figureOutWhereAnItemGoesWithBagsShown(i)
 				return "NO_OP" -- Already gone.
 			end
 
-			-- It exists, so remove it.
+			-- It exists, so remove it but keep the space with a placeholder.
 			if itemButtonFrame ~= nil then
-				oldCategorySection:RemoveItem(itemButtonFrame)
+				oldCategorySection:RemoveItemButKeepSpace(itemButtonFrame)
 				self.allItemButtonsByItem[item] = nil
 			end
 			self.allSectionsByItem[item] = nil
@@ -271,9 +280,14 @@ function Bagdata:figureOutWhereAnItemGoesWithBagsShown(i)
 
 		if oldCategorySection ~= categorySection then
 			if oldCategorySection ~= nil then
-				oldCategorySection:RemoveItem(itemButtonFrame)
+				oldCategorySection:RemoveItemButKeepSpace(itemButtonFrame)
 			end
-			categorySection:AddItem(itemButtonFrame)
+
+			-- Try to replace a placeholder first, otherwise add normally
+			if categorySection:TryReplacePlaceholder(itemButtonFrame) == false then
+				categorySection:AddItem(itemButtonFrame)
+			end
+
 			self.allSectionsByItem[item] = categorySection
 		end
 
@@ -352,8 +366,34 @@ function Bagdata:theseBagsHaveBeenUpdated(bagToMixins)
 		---@type MoonlightItemButton[]
 		local children = section:GetChildren()
 		table.sort(children, itemSortFunction)
-		for i, button in ipairs(children) do
-			button:SetSortKey(i)
+
+		-- Build set of sort keys already occupied by placeholders
+		local grid = section.grid
+		local allGridChildren = grid:GetChildren()
+		local occupiedSortKeys = {}
+		for _, child in ipairs(allGridChildren) do
+			-- Check if this child is a placeholder by seeing if it's NOT in children array
+			local isPlaceholder = true
+			for _, itemButton in ipairs(children) do
+				if child == itemButton then
+					isPlaceholder = false
+					break
+				end
+			end
+			if isPlaceholder then
+				occupiedSortKeys[child:GetSortKey()] = true
+			end
+		end
+
+		-- Assign sort keys to items, skipping positions occupied by placeholders
+		local nextSortKey = 1
+		for _, button in ipairs(children) do
+			-- Skip sort keys occupied by placeholders
+			while occupiedSortKeys[nextSortKey] ~= nil do
+				nextSortKey = nextSortKey + 1
+			end
+			button:SetSortKey(nextSortKey)
+			nextSortKey = nextSortKey + 1
 		end
 	end
 
