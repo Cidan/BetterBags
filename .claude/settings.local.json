@@ -22,7 +22,8 @@
       "Read(//c/Users/Antonio/git/Moonlight/container/**)",
       "Read(//c/Users/Antonio/git/Moonlight/button/**)",
       "Read(//c/Users/Antonio/git/Moonlight/**)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "mcp__wow-api__search_wow_global_strings"
     ],
     "deny": [],
     "ask": []

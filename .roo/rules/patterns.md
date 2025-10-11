@@ -652,3 +652,86 @@ local bagID, slotID = util:GetBagAndSlotFromSlotkey(slotKey)
 ```
 
 **When to Apply**: Any time you need to parse a SlotKey string into its component bag and slot IDs. The framework's strong typing ensures the editor will warn about potential nil values.
+
+## WoW Asynchronous Item Loading
+
+### Pattern: Bag Items Must Be Loaded Before Querying Bag Properties
+**Problem**: `C_Container.GetBagName()` returns `nil` even for valid equipped bags, causing crashes when trying to format strings with bag names.
+
+**Why**: Bags themselves are items that need asynchronous loading through WoW's item data system. Just like items in bags need `ContinueOnItemLoad()`, the bag items themselves (equipped in bag slots) also need to be loaded before their properties (name, icon, etc.) become available.
+
+**Critical Understanding**:
+- A bag is an item equipped in a container slot
+- `C_Container.GetBagName()` queries the bag item's cached name property
+- This property is `nil` until the bag item goes through `ContinuableContainer:ContinueOnItemLoad()`
+- You cannot synchronously query bag properties at addon load time or immediately after bag updates
+- This is NOT a case for defensive nil guards - it's an API contract violation if bag names are nil when item data is being read
+
+**Solution Pattern**: Two-phase loading in the data loader (implemented in Moonlight's loader):
+
+```lua
+-- Phase 1: Load bag items themselves
+function loader:LoadBagItems(bagSet, callback)
+  local bagMixins = {}
+  for bagID in pairs(bagSet) do
+    -- Don't create mixins for special bags that don't have item representations
+    if bagID ~= Enum.BagIndex.Backpack and bagID ~= Enum.BagIndex.Reagentbank then
+      -- Use C_Container.ContainerIDToInventoryID to convert bagID to inventory slot
+      local bagSlotIndex = C_Container.ContainerIDToInventoryID(bagID)
+      if bagSlotIndex ~= nil then
+        local itemLocation = ItemLocation:CreateFromEquipmentSlot(bagSlotIndex)
+        if C_Item.DoesItemExist(itemLocation) then
+          local mixin = Item:CreateFromItemLocation(itemLocation)
+          table.insert(bagMixins, mixin)
+        end
+      end
+    end
+  end
+
+  local continue = ContinuableContainer:Create()
+  for _, mixin in pairs(bagMixins) do
+    continue:AddContinuable(mixin)
+  end
+  continue:ContinueOnLoad(callback)
+end
+
+-- Phase 2: After bags loaded, cache their names and then load contents
+loader:LoadBagItems(bags, function()
+  -- NOW C_Container.GetBagName() will return valid data
+  for bagID in pairs(bags) do
+    local bagName = C_Container.GetBagName(bagID)
+    cacheTable[bagID] = bagName or GetFallbackName(bagID)
+  end
+  -- Continue loading bag contents...
+end)
+```
+
+**Application Code Pattern**: Use cached bag names from the loader:
+```lua
+-- BAD: Directly querying C_Container.GetBagName during item read
+function MoonlightItem:ReadItemData()
+  self.itemData.BagName = C_Container.GetBagName(self.itemData.BagID)
+  -- This will be nil if bag item hasn't loaded yet!
+end
+
+-- GOOD: Use loader's cached bag name (loaded during Phase 1)
+function MoonlightItem:ReadItemData()
+  local loader = moonlight:GetLoader()
+  self.itemData.BagName = loader:GetBagName(self.itemData.BagID)
+  -- Loader guarantees this is always a string
+end
+```
+
+**When to Apply**:
+- Any time querying container/bag properties (name, icon, type)
+- Loading bag contents - always load bags first
+- Initialization code that displays bag information
+- Any API starting with `C_Container.GetBag*()` - the bag must be loaded first
+
+**Related APIs That Require Loaded Bags**:
+- `C_Container.GetBagName(bagID)` - requires bag item loaded via ContinuableContainer
+- `C_Container.GetBagSlotFlag(bagID)` - requires bag item loaded
+- `C_Container.ContainerIDToInventoryID(bagID)` - converts container ID to inventory slot ID (for creating ItemLocation)
+- Any property of the bag item itself needs async loading through the item system
+
+**Why Not Nil Guards**: This pattern is about API correctness. The framework (Moonlight) guarantees that `ItemData.BagName` is always a string. Adding nil guards in application code (BetterBags) would mask the real issue - that bags weren't loaded properly. The fix belongs in the framework's loading sequence, not in defensive programming at usage sites.
