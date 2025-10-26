@@ -16,3 +16,21 @@ svn checkout https://repos.wowace.com/wow/libsharedmedia-3-0/trunk/LibSharedMedi
 svn checkout https://repos.wowace.com/wow/ace-gui-3-0-shared-media-widgets/trunk/AceGUI-3.0-SharedMediaWidgets ./libs/AceGUI-3.0-SharedMediaWidgets
 svn checkout https://repos.curseforge.com/wow/libwindow-1-1/trunk/LibWindow-1.1 ./libs/LibWindow-1.1
 svn checkout https://repos.wowace.com/wow/libuidropdownmenu/trunk/LibUIDropDownMenu ./libs/LibUIDropDownMenu
+
+# Clone vscode-wow-api for WoW API annotations
+git clone https://github.com/Ketho/vscode-wow-api .libraries/vscode-wow-api
+cd .libraries/vscode-wow-api
+# Remove .git directory
+rm -rf .git
+# Keep only the Annotations folder, delete everything else
+find . -mindepth 1 -maxdepth 1 ! -name 'Annotations' -exec rm -rf {} +
+cd ../..
+
+# Clone wow-ui-source for Blizzard UI source code
+git clone https://github.com/Gethe/wow-ui-source .libraries/wow-ui-source
+cd .libraries/wow-ui-source
+# Remove .git directory
+rm -rf .git
+# Keep only the Interface folder, delete everything else
+find . -mindepth 1 -maxdepth 1 ! -name 'Interface' -exec rm -rf {} +
+cd ../..
