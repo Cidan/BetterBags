@@ -178,26 +178,10 @@ end
 function refresh:OnEnable()
 
   -- Register for main bag update events from the WoW client.
-  events:CatchUntil('BAG_UPDATE', 'BAG_UPDATE_DELAYED', function(_, eventList)
-    local updateBackpack = false
-    local updateBank = false
-
-    -- Process all bag update events
-    for _, event in pairs(eventList) do
-      if const.BANK_BAGS[event.args[1]] or const.ACCOUNT_BANK_BAGS[event.args[1]] then
-        updateBank = true
-      elseif const.BACKPACK_BAGS[event.args[1]] then
-        updateBackpack = true
-      end
-    end
-
-    -- If no specific bags, update both
-    if #eventList == 0 or (not updateBackpack and not updateBank) then
-      updateBackpack = true
-      updateBank = true
-    end
-
-    self:RequestUpdate({ backpack = updateBackpack, bank = updateBank })
+  -- BAG_UPDATE_DELAYED signals that all bag updates are complete and data is available.
+  -- Always refresh all bags when this fires - bank will only actually update if addon.atBank is true.
+  events:RegisterEvent('BAG_UPDATE_DELAYED', function()
+    self:RequestUpdate({ backpack = true, bank = true })
   end)
 
   if not addon.isRetail then
