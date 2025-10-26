@@ -437,14 +437,6 @@ function sectionProto:onTitleMouseEnter()
   elseif CursorHasItem() and cursorType == "item" then
     GameTooltip:AddLine(" ", 1, 1, 1)
     GameTooltip:AddLine("Hold shift to add "..itemLink.." to "..self.title:GetText()..".", 1, 1, 1)
-  else
-    -- Add collapse/expand hint when not holding an item
-    GameTooltip:AddLine(" ", 1, 1, 1)
-    if self.collapsed then
-      GameTooltip:AddLine("Left click to expand this section.", 1, 1, 1)
-    else
-      GameTooltip:AddLine("Left click to collapse this section.", 1, 1, 1)
-    end
   end
   GameTooltip:Show()
 end
@@ -489,10 +481,8 @@ function sectionFrame:_DoCreate()
     if e == "RightButton" then
       sectionFrame:OnTitleRightClick(s)
     elseif e == "LeftButton" then
-      -- Check if we should toggle collapse instead of drop
-      if not CursorHasItem() then
-        sectionFrame:OnTitleCollapseToggle(ctx, s)
-      else
+      -- Only handle left-click when cursor has an item for category assignment
+      if CursorHasItem() then
         sectionFrame:OnTitleClickOrDrop(ctx, s)
       end
     end

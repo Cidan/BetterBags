@@ -688,6 +688,15 @@ function DB:Migrate()
   if addon.isRetail then
     DB.data.profile.views[const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_GRID
   end
+
+  --[[
+    Clear all collapsed section states since the collapse feature has been disabled.
+    Do not remove before Q1'27.
+  ]]--
+  DB.data.profile.collapsedSections = {
+    [const.BAG_KIND.BACKPACK] = {},
+    [const.BAG_KIND.BANK] = {},
+  }
 end
 
 DB:Enable()

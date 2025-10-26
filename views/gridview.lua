@@ -347,9 +347,6 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         section:Release(ctx)
       else
         debug:Log("Section", "Drawing section", sectionName)
-        -- Set collapsed state from database
-        local isCollapsed = database:GetSectionCollapsed(bag.kind, sectionName)
-        section:SetCollapsed(isCollapsed)
         if sectionName == L:G("Recent Items") then
           section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
         else
@@ -382,8 +379,6 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   -- Get the free slots section and add the free slots to it.
   local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
-  local freeSpaceCollapsed = database:GetSectionCollapsed(bag.kind, L:G("Free Space"))
-  freeSlotsSection:SetCollapsed(freeSpaceCollapsed)
   if database:GetShowAllFreeSpace(bag.kind) then
     freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
     freeSlotsSection:WipeOnlyContents()
