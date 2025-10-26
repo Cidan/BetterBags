@@ -144,6 +144,11 @@ function sectionProto:GetContent()
   return self.content
 end
 
+---@return BagKind
+function sectionProto:GetKind()
+  return self.kind
+end
+
 ---@param ctx Context
 function sectionProto:ReleaseAllCells(ctx)
   for _, cell in pairs(self.content.cells) do
@@ -336,7 +341,7 @@ end
 function sectionFrame:OnTitleCollapseToggle(ctx, section)
   local category = section:GetTitleWithoutIndicator()
   -- Try to find which bag this section belongs to by checking both
-  local kind = section.kind
+  local kind = section:GetKind()
   if not kind then
     -- If kind not set, try both bags
     if addon.Bags.Backpack and addon.Bags.Backpack:IsShown() then
