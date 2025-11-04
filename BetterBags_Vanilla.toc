@@ -64,6 +64,7 @@ util\query.lua
 
 data\binding.lua
 data\search.lua
+data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua
 data\items.lua

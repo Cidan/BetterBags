@@ -8,6 +8,7 @@ The Data module handles:
 - Item data loading and caching
 - Category management (both custom and search-based)
 - Full-text search with query parsing
+- Tooltip text extraction and indexing
 - Equipment set tracking
 - Item binding information
 - Refresh and update coordination
@@ -144,6 +145,59 @@ search:Remove(itemData)
 
 -- Check if item matches query
 search:Find(query, item)
+```
+
+### Tooltip Scanner (`tooltip.lua`)
+
+Extracts and caches tooltip text from items for search indexing, enabling users to search for items by text that appears in their tooltips.
+
+#### Features
+- **Dual API Support**:
+  - Retail: Uses modern `C_TooltipInfo.GetBagItem()` API
+  - Classic/Era: Uses GameTooltip scanning with FontString iteration
+- **GUID-Based Caching**: Prevents repeated expensive tooltip extractions
+- **Automatic Integration**: Tooltip text automatically indexed during item loading
+- **Memory Efficient**: ~150KB cache for 500 items
+
+#### Use Cases
+Users can search for:
+- Profession skill items by searching "Study"
+- Equipment by slot type: "Hand", "Waist", "Weapon"
+- Crafting reagents by profession name
+- Any text that appears in item tooltips
+
+#### Key Functions
+```lua
+-- Extract tooltip text for an item (with caching)
+tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
+
+-- Clear entire cache (called on item cache wipe)
+tooltipScanner:ClearCache()
+
+-- Remove specific item from cache
+tooltipScanner:RemoveFromCache(itemGUID)
+
+-- Get cache size for monitoring
+tooltipScanner:GetCacheSize()
+```
+
+#### Implementation Details
+- **Retail Extraction**: Uses `C_TooltipInfo.GetBagItem()` to get structured TooltipData with lines array
+- **Classic Extraction**: Creates hidden GameTooltip, populates with `SetBagItem()`, reads FontStrings
+- **Text Concatenation**: All tooltip lines (left and right text) joined with spaces
+- **Classic Line Limit**: Capped at 30 lines to avoid WoW's 9+ line FontString naming bug
+- **Search Integration**: Tooltip text added to search index as "tooltip" field, included in default search
+
+#### Example Usage
+```lua
+-- Automatically happens during item loading:
+local tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
+-- Result: "Item Name\nBinds when picked up\n+15 Agility\n..."
+
+-- Users can then search:
+-- "study" - finds profession skill items
+-- "tooltip%=equip" - finds items with "equip" in tooltip
+-- "name:sword AND NOT tooltip:bind" - swords that don't bind
 ```
 
 ### Refresh (`refresh.lua`)

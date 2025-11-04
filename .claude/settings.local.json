@@ -14,7 +14,9 @@
       "Read(//tmp/**)",
       "Bash(git remote get-url:*)",
       "mcp__github__list_issues",
-      "WebFetch(domain:warcraft.wiki.gg)"
+      "WebFetch(domain:warcraft.wiki.gg)",
+      "mcp__github__issue_read",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
