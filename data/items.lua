@@ -174,6 +174,12 @@ function items:ClearItemCache(ctx)
 	self.previousItemGUID = {}
 	self:ResetSlotInfo()
 	search:Wipe()
+
+	-- Clear tooltip cache
+	---@class TooltipScanner: AceModule
+	local tooltipScanner = addon:GetModule('TooltipScanner')
+	tooltipScanner:ClearCache()
+
 	self._firstLoad = {
 		[const.BAG_KIND.BACKPACK] = true,
 		[const.BAG_KIND.BANK] = true,
@@ -1356,6 +1362,11 @@ function items:AttachItemInfo(data, kind)
 
 	data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)
 
+	-- Extract tooltip text for search indexing
+	---@class TooltipScanner: AceModule
+	local tooltipScanner = addon:GetModule('TooltipScanner')
+	local tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, C_Item.GetItemGUID(itemLocation))
+
 	data.inventoryType = invType --[[@as number]]
 	data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType]
 			and const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType]
@@ -1391,6 +1402,7 @@ function items:AttachItemInfo(data, kind)
 		category = "",
 		currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
 		equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
+		tooltipText = tooltipText or "",
 	}
 
 	if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then

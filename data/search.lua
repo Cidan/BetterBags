@@ -54,6 +54,7 @@ function search:OnInitialize()
   self:CreateIndex('bagName')
   self:CreateIndex('guid')
   self:CreateIndex('binding')
+  self:CreateIndex('tooltip')
 
   -- Number indexes
   self:CreateIndex('level')
@@ -82,6 +83,7 @@ function search:OnInitialize()
     'subtype',
     'equipmentlocation',
     'binding',
+    'tooltip',
   }
 
   self.indexLookup = {
@@ -208,6 +210,10 @@ function search:Add(item)
     search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
   end
 
+  if item.itemInfo.tooltipText and item.itemInfo.tooltipText ~= "" then
+    search:addStringToIndex(self.indicies.tooltip, item.itemInfo.tooltipText, item.slotkey)
+  end
+
   search:addNumberToIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
   search:addNumberToIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
   search:addNumberToIndex(self.indicies.id, item.itemInfo.itemID, item.slotkey)
@@ -257,6 +263,10 @@ function search:Remove(item)
 
   if item.bindingInfo and item.bindingInfo.binding ~= nil and const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
     search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
+  end
+
+  if item.itemInfo.tooltipText and item.itemInfo.tooltipText ~= "" then
+    search:removeStringFromIndex(self.indicies.tooltip, item.itemInfo.tooltipText, item.slotkey)
   end
 
   search:removeNumberFromIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)

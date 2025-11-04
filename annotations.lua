@@ -375,6 +375,7 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field category string
 ---@field currentItemLevel number
 ---@field equipmentSets string[]|nil
+---@field tooltipText string
 
 ---@return Frame
 function CreateScrollBoxLinearView() end
