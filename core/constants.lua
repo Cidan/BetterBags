@@ -20,6 +20,7 @@ addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 addon.isBCC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addon.isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 addon.isMists = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
+addon.isMidnight = GetBuildInfo and select(4, GetBuildInfo()) >= 120000
 
 ---@enum BagKind
 const.BAG_KIND = {
@@ -440,6 +441,10 @@ if addon.isRetail then
   const.EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = _G.EXPANSION_NAME10
 end
 
+if addon.isMidnight then
+  const.EXPANSION_MAP[_G.LE_EXPANSION_MIDNIGHT] = _G.EXPANSION_NAME11
+end
+
 ---@class BriefExpansionMap
 ---@type table<number, string>
 const.BRIEF_EXPANSION_MAP = {
@@ -457,6 +462,10 @@ const.BRIEF_EXPANSION_MAP = {
 
 if addon.isRetail then
   const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = "tww"
+end
+
+if addon.isMidnight then
+  const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_MIDNIGHT] = "mid"
 end
 
 ---@class TradeSkillMap
