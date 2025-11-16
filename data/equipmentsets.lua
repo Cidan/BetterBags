@@ -13,6 +13,14 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
+
+
+local EquipmentManager_UnpackLocation = EquipmentManager_UnpackLocation or function(packedLocation)
+	local locationData = EquipmentManager_GetLocationData(packedLocation);
+	-- Void Storage was removed from Retail in 11.2.0
+	local voidStorage, tab, voidSlot = false, nil, nil;
+	return locationData.isPlayer or false, locationData.isBank or false, locationData.isBags or false, voidStorage, locationData.slot, locationData.bag, tab, voidSlot;
+end
 function equipmentSets:OnInitialize()
   self.bagAndSlotToSet = {}
 end
