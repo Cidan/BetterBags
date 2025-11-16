@@ -13,8 +13,6 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
-
-
 local EquipmentManager_UnpackLocation = EquipmentManager_UnpackLocation or function(packedLocation)
 	local locationData = EquipmentManager_GetLocationData(packedLocation);
 	-- Void Storage was removed from Retail in 11.2.0
