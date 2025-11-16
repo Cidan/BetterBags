@@ -62,3 +62,4 @@ function equipmentSets:GetItemSets(bagid, slotid)
 end
 
 equipmentSets:Enable()
+
