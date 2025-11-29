@@ -17,7 +17,7 @@ BagFrame (shared core in frames/bag.lua)
 
 ## Behavior Interface
 
-Each behavior module implements the following interface:
+Each behavior module implements the following core interface:
 
 ```lua
 ---@class BagBehavior
@@ -30,6 +30,25 @@ Each behavior module implements the following interface:
 ---@field SetupMoneyFrame fun(bag: Bag, bottomBar: Frame): Money|nil  -- Creates money frame
 ---@field RegisterEvents fun(bag: Bag): void             -- Registers behavior-specific events
 ---@field ShouldHandleSort fun(): boolean                -- Whether sorting is enabled
+---@field SwitchToBankAndWipe fun(ctx: Context, bag: Bag): void  -- Reset bank to default state
+```
+
+### Bank-Specific Methods
+
+The BankBehavior also implements these bank-specific methods (not part of BackpackBehavior):
+
+```lua
+-- Tab management
+---@field GenerateCharacterBankTabs fun(ctx: Context, bag: Bag): void
+---@field GenerateWarbankTabs fun(ctx: Context, bag: Bag): void
+---@field GetWarbankTabDataByID fun(id: number): BankTabData
+---@field HideBankAndReagentTabs fun(bag: Bag): void
+---@field ShowBankAndReagentTabs fun(bag: Bag): void
+
+-- Tab switching
+---@field SwitchToBank fun(ctx: Context, bag: Bag): void
+---@field SwitchToCharacterBankTab fun(ctx: Context, tabID: number, bag: Bag): void
+---@field SwitchToAccountBank fun(ctx: Context, tabIndex: number, bag: Bag): boolean
 ```
 
 ## Files

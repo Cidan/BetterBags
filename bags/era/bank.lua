@@ -16,6 +16,9 @@ local items = addon:GetModule("Items")
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
 
+---@class Localization: AceModule
+local L = addon:GetModule("Localization")
+
 -------
 --- Era Bank Behavior Overrides
 --- Classic Era doesn't have BankPanel, tabs, or warbank.
@@ -63,4 +66,15 @@ end
 ---@param bag Bag
 function bank.proto:RegisterEvents(bag)
 	-- No bank-specific events in Era
+end
+
+---@param ctx Context
+---@param bag Bag
+function bank.proto:SwitchToBankAndWipe(ctx, bag)
+	ctx:Set("wipe", true)
+	bag.bankTab = const.BANK_TAB.BANK
+	BankFrame.selectedTab = 1
+	bag:SetTitle(L:G("Bank"))
+	items:ClearBankCache(ctx)
+	bag:Wipe(ctx)
 end

@@ -67,14 +67,12 @@ local backpackBehavior = addon:GetModule('BackpackBehavior')
 ---@class BankBehavior: AceModule
 local bankBehavior = addon:GetModule('BankBehavior')
 
+--- SwitchToBankAndWipe delegates to behavior for bank-specific implementation.
+--- This proxy method exists because external code (hooks.lua) calls bag:SwitchToBankAndWipe().
 ---@param ctx Context
 function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
-  self.bankTab = const.BANK_TAB.BANK
-  BankFrame.selectedTab = 1
-  ctx:Set('wipe', true)
-  items:ClearBankCache(ctx)
-  self:Wipe(ctx)
+  self.behavior:SwitchToBankAndWipe(ctx, self)
 end
 
 -------
