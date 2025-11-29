@@ -117,6 +117,10 @@ views\views.lua
 views\gridview.lua
 views\bagview.lua
 
+bags\backpack.lua
+bags\bank.lua
+bags\era\bank.lua
+
 frames\bag.lua
 frames\era\bag.lua
 

@@ -111,6 +111,9 @@ views\views.lua
 views\gridview.lua
 views\bagview.lua
 
+bags\backpack.lua
+bags\bank.lua
+
 frames\bag.lua
 
 themes\default.lua

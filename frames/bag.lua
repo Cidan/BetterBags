@@ -88,6 +88,12 @@ local anchor = addon:GetModule("Anchor")
 ---@class Tabs: AceModule
 local tabs = addon:GetModule("Tabs")
 
+---@class BackpackBehavior: AceModule
+local backpackBehavior = addon:GetModule("BackpackBehavior")
+
+---@class BankBehavior: AceModule
+local bankBehavior = addon:GetModule("BankBehavior")
+
 -------
 --- Bag Prototype
 -------
@@ -125,6 +131,7 @@ local tabs = addon:GetModule("Tabs")
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
 ---@field bankTab BankTab
+---@field behavior BackpackBehaviorProto|BankBehaviorProto The bag-type-specific behavior
 bagFrame.bagProto = {}
 
 ---@param ctx Context
@@ -272,58 +279,7 @@ function bagFrame.bagProto:Show(ctx)
 	if self.frame:IsShown() then
 		return
 	end
-	--addon.ForceShowBlizzardBags()
-	PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_OPEN or SOUNDKIT.IG_BACKPACK_OPEN)
-
-	if self.kind == const.BAG_KIND.BANK and addon.isRetail then
-		-- Configure and show BankPanel so GetActiveBankType works
-		if BankPanel then
-			-- Make BankPanel invisible but functional
-			BankPanel:SetAlpha(0)
-			BankPanel:EnableMouse(false)
-			BankPanel:EnableKeyboard(false)
-			if BankPanel.MoneyFrame then
-				BankPanel.MoneyFrame:Hide()
-			end
-			if BankPanel.AutoDepositFrame then
-				BankPanel.AutoDepositFrame:Hide()
-			end
-			if BankPanel.Header then
-				BankPanel.Header:Hide()
-			end
-			BankPanel:Show()
-		end
-		self:GenerateCharacterBankTabs(ctx)
-		self:GenerateWarbankTabs(ctx)
-		if addon.atWarbank then
-			self:HideBankAndReagentTabs()
-			self.tabs:SetTabByID(ctx, 13)
-			-- Set the active bank type for warbank
-			if BankPanel and BankPanel.SetBankType then
-				BankPanel:SetBankType(Enum.BankType.Account)
-			end
-		else
-			self:ShowBankAndReagentTabs()
-			-- Set first tab when using multiple character bank tabs
-			if database:GetCharacterBankTabsEnabled() then
-				local firstTabID = const.BANK_ONLY_BAGS_LIST[1]
-				self.bankTab = firstTabID -- Important: set bankTab before SetTabByID
-				self.tabs:SetTabByID(ctx, firstTabID)
-				ctx:Set("filterBagID", firstTabID) -- Set the filter for the initial tab
-			else
-				self.bankTab = addon.isRetail and Enum.BagIndex.Bank or Enum.BagIndex.Characterbanktab
-				self.tabs:SetTabByID(ctx, 1)
-			end
-			-- Set the active bank type for character bank
-			if BankPanel and BankPanel.SetBankType then
-				BankPanel:SetBankType(Enum.BankType.Character)
-			end
-		end
-		self.moneyFrame:Update()
-	end
-
-	self.frame:Show()
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	self.behavior:OnShow(ctx, self)
 end
 
 ---@param ctx Context
@@ -331,28 +287,7 @@ function bagFrame.bagProto:Hide(ctx)
 	if not self.frame:IsShown() then
 		return
 	end
-	addon.ForceHideBlizzardBags()
-	PlaySound(self.kind == const.BAG_KIND.BANK and SOUNDKIT.IG_MAINMENU_CLOSE or SOUNDKIT.IG_BACKPACK_CLOSE)
-	self.frame:Hide()
-	if self.kind == const.BAG_KIND.BANK then
-		-- Hide BankPanel to prevent taint from affecting other container operations
-		if addon.isRetail and BankPanel then
-			BankPanel:Hide()
-		end
-		if C_Bank then
-			C_Bank.CloseBankFrame()
-		else
-			CloseBankFrame()
-		end
-	elseif self.kind == const.BAG_KIND.BACKPACK then
-		self.searchFrame:Hide()
-	end
-	if self.drawOnClose and self.kind == const.BAG_KIND.BACKPACK then
-		debug:Log("draw", "Drawing bag on close")
-		self.drawOnClose = false
-		self:Refresh(ctx)
-	end
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	self.behavior:OnHide(ctx, self)
 end
 
 ---@param ctx Context
@@ -378,7 +313,7 @@ end
 
 ---@param ctx Context
 function bagFrame.bagProto:Sort(ctx)
-	if self.kind ~= const.BAG_KIND.BACKPACK then
+	if not self.behavior:ShouldHandleSort() then
 		return
 	end
 	PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
@@ -402,11 +337,7 @@ end
 -- This is what would be considered a "full refresh".
 ---@param ctx Context
 function bagFrame.bagProto:Refresh(ctx)
-	if self.kind == const.BAG_KIND.BACKPACK then
-		events:SendMessage(ctx, "bags/RefreshBackpack")
-	elseif not addon.isRetail then
-		events:SendMessage(ctx, "bags/RefreshBank")
-	end
+	self.behavior:OnRefresh(ctx, self)
 end
 
 ---@param ctx Context
@@ -709,6 +640,14 @@ function bagFrame:Create(ctx, kind)
 	b.toReleaseSections = {}
 	b.kind = kind
 	b.windowGrouping = windowGroup:Create()
+
+	-- Instantiate the appropriate behavior based on bag kind
+	if kind == const.BAG_KIND.BACKPACK then
+		b.behavior = backpackBehavior:Create()
+	else
+		b.behavior = bankBehavior:Create()
+	end
+
 	local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
 	-- The main display frame for the bag.
 	---@class Frame: BetterBagsBagPortraitTemplate
@@ -726,11 +665,10 @@ function bagFrame:Create(ctx, kind)
 	f.Owner = b
 	b.frame:SetParent(UIParent)
 	b.frame:SetToplevel(true)
-	if b.kind == const.BAG_KIND.BACKPACK then
-		b.frame:SetFrameStrata("MEDIUM")
-		b.frame:SetFrameLevel(500)
-	else
-		b.frame:SetFrameStrata("HIGH")
+	b.frame:SetFrameStrata(b.behavior:GetFrameStrata())
+	local frameLevel = b.behavior:GetFrameLevel()
+	if frameLevel then
+		b.frame:SetFrameLevel(frameLevel)
 	end
 	b.frame:Hide()
 	b.frame:SetSize(200, 200)
@@ -769,187 +707,11 @@ function bagFrame:Create(ctx, kind)
 	bottomBar:Show()
 	b.bottomBar = bottomBar
 
-	-- Create the money frame only in the player backpack bag.
-	if kind == const.BAG_KIND.BACKPACK then
-		local moneyFrame = money:Create()
-		moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", -4, 0)
-		moneyFrame.frame:SetParent(b.frame)
-		b.moneyFrame = moneyFrame
-	end
+	-- Setup money frame via behavior
+	b.moneyFrame = b.behavior:SetupMoneyFrame(b, bottomBar)
 
-	-- ...except for warbank!
-	if kind == const.BAG_KIND.BANK then
-		local moneyFrame = money:Create(true)
-		moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", -4, 0)
-		moneyFrame.frame:SetParent(b.frame)
-		b.moneyFrame = moneyFrame
-	end
-
-	if kind == const.BAG_KIND.BACKPACK then
-		local slots = bagSlots:CreatePanel(ctx, kind)
-		slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
-		slots.frame:SetParent(b.frame)
-		slots.frame:Hide()
-		b.slots = slots
-	end
-
-	if kind == const.BAG_KIND.BACKPACK then
-		b.searchFrame = searchBox:Create(ctx, b.frame)
-	end
-
-	if kind == const.BAG_KIND.BACKPACK then
-		local currencyFrame = currency:Create(b.sideAnchor, b.frame)
-		currencyFrame:Hide()
-		b.currencyFrame = currencyFrame
-
-		b.themeConfigFrame = themeConfig:Create(b.sideAnchor)
-		b.windowGrouping:AddWindow("themeConfig", b.themeConfigFrame)
-		b.windowGrouping:AddWindow("currencyConfig", b.currencyFrame)
-	end
-
-	if kind == const.BAG_KIND.BANK then
-		-- Move the settings menu to the bag frame.
-		BankPanel.TabSettingsMenu:SetParent(b.frame)
-		BankPanel.TabSettingsMenu:ClearAllPoints()
-		BankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", b.frame, "BOTTOMRIGHT", 10, 0)
-
-		-- Adjust the settings function so the tab settings menu is populated correctly.
-		BankPanel.TabSettingsMenu.GetBankFrame = function()
-			return {
-				GetTabData = function(_, id)
-					-- Check if this is a character bank tab request
-					if BankPanel.bankType == Enum.BankType.Character then
-						-- For character bank tabs, we need to get the bag information
-						local bagID = const.BANK_ONLY_BAGS_LIST[id]
-						if bagID then
-							local invid = C_Container.ContainerIDToInventoryID(bagID)
-							local baglink = GetInventoryItemLink("player", invid)
-							local icon = nil
-							local tabName = format("Bank Tab %d", id)
-
-							if baglink then
-								icon = C_Item.GetItemIconByID(baglink)
-								local itemName = C_Item.GetItemNameByID(baglink)
-								if itemName and itemName ~= "" then
-									tabName = itemName
-								end
-							end
-
-							-- Try to get character bank tab data from API if available
-							local characterTabData = C_Bank
-								and C_Bank.FetchPurchasedBankTabData
-								and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
-							local depositFlags = nil
-
-							if characterTabData then
-								for _, data in pairs(characterTabData) do
-									if data.ID == id then
-										tabName = data.name or tabName
-										icon = data.icon or icon
-										depositFlags = data.depositFlags
-										break
-									end
-								end
-							end
-
-							return {
-								ID = id,
-								icon = icon or 133633, -- Default bag icon
-								name = tabName,
-								depositFlags = depositFlags,
-								bankType = Enum.BankType.Character,
-							}
-						end
-					else
-						-- Original warbank tab data handling
-						local bankTabData = b:GetWarbankTabDataByID(id)
-						return {
-							ID = id,
-							icon = bankTabData.icon,
-							name = b.tabs:GetTabNameByID(id),
-							depositFlags = bankTabData.depositFlags,
-							bankType = Enum.BankType.Account,
-						}
-					end
-				end,
-			}
-		end
-
-		b.tabs = tabs:Create(b.frame)
-
-		-- Always create Bank tab
-		if not b.tabs:TabExistsByID(1) then
-			b.tabs:AddTab(ctx, "Bank", 1)
-		end
-
-		-- Set initial tab if not using character bank tabs
-		if not database:GetCharacterBankTabsEnabled() then
-			b.tabs:SetTabByID(ctx, 1)
-		end
-
-		b.tabs:SetClickHandler(function(ectx, tabID, button)
-			-- Check if this is a character bank tab
-			if tabID and tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
-				if button == "RightButton" then
-					-- Show settings menu for character bank tabs
-					if BankPanel.SetBankType then
-						BankPanel:SetBankType(Enum.BankType.Character)
-					end
-					local bagIndex = tabID
-					-- Try to get character bank tab data if available
-					local characterTabData = C_Bank
-						and C_Bank.FetchPurchasedBankTabData
-						and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
-					if characterTabData then
-						BankPanel:FetchPurchasedBankTabData()
-					end
-					BankPanel.TabSettingsMenu:Show()
-					BankPanel.TabSettingsMenu:SetSelectedTab(bagIndex)
-					BankPanel.TabSettingsMenu:Update()
-				else
-					BankPanel.TabSettingsMenu:Hide()
-					if BankPanel.SetBankType then
-						BankPanel:SetBankType(Enum.BankType.Character)
-					end
-				end
-				b:SwitchToCharacterBankTab(ectx, tabID)
-				return true -- Tab switch handled, allow selection
-			elseif tabID == 1 then
-				-- Bank tab
-				BankPanel.TabSettingsMenu:Hide()
-				if BankPanel.SetBankType then
-					BankPanel:SetBankType(Enum.BankType.Character)
-				end
-				b:SwitchToBank(ectx)
-				return true -- Tab switch handled, allow selection
-			else
-				-- Warbank tabs
-				if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
-					if BankPanel.SetBankType then
-						BankPanel:SetBankType(Enum.BankType.Account)
-					end
-					BankPanel:FetchPurchasedBankTabData()
-					BankPanel.TabSettingsMenu:Show()
-					BankPanel.TabSettingsMenu:SetSelectedTab(tabID)
-					BankPanel.TabSettingsMenu:Update()
-				end
-				b:SwitchToAccountBank(ectx, tabID)
-				return true -- Tab switch handled, allow selection
-			end
-		end)
-		-- BANK_TAB_SETTINGS_UPDATED
-		-- BANK_TABS_CHANGED
-		events:RegisterEvent("PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", function(ectx)
-			b:GenerateWarbankTabs(ectx)
-		end)
-		events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ectx)
-			-- Update both warbank and character bank tabs when settings change
-			b:GenerateWarbankTabs(ectx)
-			if database:GetCharacterBankTabsEnabled() then
-				b:GenerateCharacterBankTabs(ectx)
-			end
-		end)
-	end
+	-- Call behavior-specific creation (search, slots, currency, tabs, etc.)
+	b.behavior:OnCreate(ctx, b)
 
 	b.sectionConfigFrame = sectionConfig:Create(kind, b.sideAnchor)
 	b.windowGrouping:AddWindow("sectionConfig", b.sectionConfigFrame)
@@ -986,11 +748,8 @@ function bagFrame:Create(ctx, kind)
 	b.resizeHandle:Hide()
 	b:KeepBagInBounds()
 
-	if b.kind == const.BAG_KIND.BACKPACK then
-		events:BucketEvent("BAG_UPDATE_COOLDOWN", function(ectx)
-			b:OnCooldown(ectx)
-		end)
-	end
+	-- Register behavior-specific events
+	b.behavior:RegisterEvents(b)
 
 	events:RegisterMessage("search/SetInFrame", function(ectx, shown)
 		themes:SetSearchState(ectx, b.frame, shown)

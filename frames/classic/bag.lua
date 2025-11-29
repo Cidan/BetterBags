@@ -13,20 +13,11 @@ local L = addon:GetModule('Localization')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class GridFrame: AceModule
-local grid = addon:GetModule('Grid')
-
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
-
 ---@class BagSlots: AceModule
 local bagSlots = addon:GetModule('BagSlots')
-
----@class SectionFrame: AceModule
-local sectionFrame = addon:GetModule('SectionFrame')
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
@@ -45,9 +36,6 @@ local resize = addon:GetModule('Resize')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
 
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub('LibWindow-1.1')
@@ -70,11 +58,14 @@ local windowGroup = addon:GetModule('WindowGroup')
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:GetModule('SectionConfig')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
-
 ---@class Anchor: AceModule
 local anchor = addon:GetModule('Anchor')
+
+---@class BackpackBehavior: AceModule
+local backpackBehavior = addon:GetModule('BackpackBehavior')
+
+---@class BankBehavior: AceModule
+local bankBehavior = addon:GetModule('BankBehavior')
 
 ---@param ctx Context
 function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
@@ -82,7 +73,6 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   self.bankTab = const.BANK_TAB.BANK
   BankFrame.selectedTab = 1
   ctx:Set('wipe', true)
-  --self.frame:SetTitle(L:G("Bank"))
   items:ClearBankCache(ctx)
   self:Wipe(ctx)
 end
@@ -107,6 +97,14 @@ function bagFrame:Create(ctx, kind)
   b.toReleaseSections = {}
   b.kind = kind
   b.windowGrouping = windowGroup:Create()
+
+  -- Instantiate the appropriate behavior based on bag kind
+  if kind == const.BAG_KIND.BACKPACK then
+    b.behavior = backpackBehavior:Create()
+  else
+    b.behavior = bankBehavior:Create()
+  end
+
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   -- The main display frame for the bag.
   ---@class Frame: BetterBagsClassicBagPortrait
@@ -122,11 +120,10 @@ function bagFrame:Create(ctx, kind)
 
   b.frame:SetParent(UIParent)
   b.frame:SetToplevel(true)
-  if b.kind == const.BAG_KIND.BACKPACK then
-    b.frame:SetFrameStrata("MEDIUM")
-    b.frame:SetFrameLevel(500)
-  else
-    b.frame:SetFrameStrata("HIGH")
+  b.frame:SetFrameStrata(b.behavior:GetFrameStrata())
+  local frameLevel = b.behavior:GetFrameLevel()
+  if frameLevel then
+    b.frame:SetFrameLevel(frameLevel)
   end
 
   b.frame:Hide()
@@ -148,28 +145,23 @@ function bagFrame:Create(ctx, kind)
   bottomBar:Show()
   b.bottomBar = bottomBar
 
-  -- Create the money frame only in the player backpack bag.
-  if kind == const.BAG_KIND.BACKPACK then
-    local moneyFrame = money:Create()
-    moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", -4, 0)
-    moneyFrame.frame:SetParent(b.frame)
-    b.moneyFrame = moneyFrame
-  end
+  -- Setup money frame via behavior
+  b.moneyFrame = b.behavior:SetupMoneyFrame(b, bottomBar)
 
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
 
+  -- Classic creates bag slots for both backpack and bank
   local slots = bagSlots:CreatePanel(ctx, kind)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
   slots.frame:SetParent(b.frame)
   slots.frame:Hide()
   b.slots = slots
 
+  -- Backpack-specific: search, currency, and theme config
   if kind == const.BAG_KIND.BACKPACK then
     b.searchFrame = searchBox:Create(ctx, b.frame)
-  end
 
-  if kind == const.BAG_KIND.BACKPACK then
     local currencyFrame = currency:Create(b.frame)
     currencyFrame:Hide()
     b.currencyFrame = currencyFrame
@@ -179,9 +171,11 @@ function bagFrame:Create(ctx, kind)
     b.windowGrouping:AddWindow('currencyConfig', b.currencyFrame)
   end
 
+  -- Bank-specific initialization via behavior
   if kind == const.BAG_KIND.BANK then
-    b.bankTab = const.BANK_TAB.BANK
+    b.behavior:OnCreate(ctx, b)
   end
+
   b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
   b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)
 
@@ -216,9 +210,8 @@ function bagFrame:Create(ctx, kind)
   b.resizeHandle:Hide()
   b:KeepBagInBounds()
 
-  if b.kind == const.BAG_KIND.BACKPACK then
-    events:BucketEvent('BAG_UPDATE_COOLDOWN',function(ectx) b:OnCooldown(ectx) end)
-  end
+  -- Register behavior-specific events
+  b.behavior:RegisterEvents(b)
 
   events:RegisterEvent('ITEM_LOCKED', function(ectx, _, bagid, slotid)
     b:OnLock(ectx, bagid, slotid)
