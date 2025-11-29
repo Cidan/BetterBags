@@ -17,7 +17,8 @@
       "WebFetch(domain:warcraft.wiki.gg)",
       "mcp__github__issue_read",
       "WebSearch",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

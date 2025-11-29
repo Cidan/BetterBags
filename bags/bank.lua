@@ -249,12 +249,8 @@ function bank.proto:OnCreate(ctx)
 	end)
 end
 
----@param ctx Context
-function bank.proto:OnRefresh(ctx)
-	-- Retail bank is event-driven, non-retail sends refresh message
-	if not addon.isRetail then
-		events:SendMessage(ctx, "bags/RefreshBank")
-	end
+function bank.proto:OnRefresh()
+	-- Retail bank is event-driven, refresh handled via BANKFRAME events
 end
 
 ---@return FrameStrata

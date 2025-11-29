@@ -120,8 +120,7 @@ function backpack.proto:ShouldHandleSort()
 	return true
 end
 
----@param ctx Context
-function backpack.proto:SwitchToBankAndWipe(ctx)
+function backpack.proto:SwitchToBankAndWipe()
 	-- No-op for backpack - this method only applies to bank
 end
 

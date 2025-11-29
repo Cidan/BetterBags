@@ -550,7 +550,7 @@ function config:CreateConfig()
     getValue = function(_)
       return ""
     end,
-    setValue = function(_, value)
+    setValue = function()
       -- Store reference will be set after form creation
     end
   })
@@ -571,7 +571,7 @@ function config:CreateConfig()
     getValue = function(_)
       return ""
     end,
-    setValue = function(_, value)
+    setValue = function()
       -- Store reference will be set after form creation
     end
   })
