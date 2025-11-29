@@ -567,7 +567,8 @@ function items:RefreshBags(ctx, kind)
 		end
 
 		local filterBagID = ctx:Get("filterBagID")
-		local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
+		-- Reagent bank was removed in TWW 11.2 for retail, only exists in classic/era
+		local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
 		local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
 
 		-- Determine which bank bags to show
@@ -748,13 +749,12 @@ function items:UpdateFreeSlots(ctx, kind)
 		else
 			name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
 		end
-		if bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank then
-			-- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
-			-- There are 4 extra slots in the bank bag in Classic that should not
-			-- exist. This is a Blizzard bug.
-			if addon.isClassic then
-				freeSlots = freeSlots - 4
-			end
+		-- BugFix(https://github.com/Stanzilla/WoWUIBugs/issues/538):
+		-- There are 4 extra slots in the bank bag in Classic that should not
+		-- exist. This is a Blizzard bug.
+		-- Note: Enum.BagIndex.Bank and Reagentbank were removed in TWW 11.2
+		if addon.isClassic and (bagid == Enum.BagIndex.Bank or bagid == Enum.BagIndex.Reagentbank) then
+			freeSlots = freeSlots - 4
 		end
 
 		if bagid ~= Enum.BagIndex.Keyring then

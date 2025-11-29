@@ -80,7 +80,7 @@ function bank.proto:OnShow(ctx)
 			self.bag.tabs:SetTabByID(ctx, firstTabID)
 			ctx:Set("filterBagID", firstTabID) -- Set the filter for the initial tab
 		else
-			self.bag.bankTab = Enum.BagIndex.Bank
+			self.bag.bankTab = Enum.BagIndex.Characterbanktab
 			self.bag.tabs:SetTabByID(ctx, 1)
 		end
 		-- Set the active bank type for character bank
@@ -420,7 +420,7 @@ end
 
 ---@param ctx Context
 function bank.proto:SwitchToBank(ctx)
-	self.bag.bankTab = Enum.BagIndex.Bank
+	self.bag.bankTab = Enum.BagIndex.Characterbanktab
 	BankFrame.selectedTab = 1
 	self.bag:SetTitle(L:G("Bank"))
 	self.bag.currentItemCount = -1
@@ -505,13 +505,17 @@ end
 ---@param ctx Context
 function bank.proto:SwitchToBankAndWipe(ctx)
 	ctx:Set("wipe", true)
-	self.bag.tabs:SetTabByID(ctx, 1)
-	self.bag.bankTab = Enum.BagIndex.Bank
+	-- Set bankTab first to ensure it's always valid for refresh operations
+	-- Use Characterbanktab as Bank was removed in TWW 11.2
+	self.bag.bankTab = Enum.BagIndex.Characterbanktab
 	BankFrame.selectedTab = 1
 	BankFrame.activeTabIndex = 1
 	-- Set the active bank type so right-click item movement works correctly
 	if BankPanel and BankPanel.SetBankType then
 		BankPanel:SetBankType(Enum.BankType.Character)
+	end
+	if self.bag.tabs then
+		self.bag.tabs:SetTabByID(ctx, 1)
 	end
 	self.bag:SetTitle(L:G("Bank"))
 	items:ClearBankCache(ctx)

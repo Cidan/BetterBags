@@ -31,7 +31,8 @@ end
 function movementFlow:GetMovementFlow()
   -- Fix for retail WoW: use Enum.BagIndex values directly
   local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
-  local reagentBank = addon.isRetail and Enum.BagIndex.Reagentbank or const.BANK_TAB.REAGENT
+  -- Reagent bank was removed in TWW 11.2 for retail, only exists in classic/era
+  local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
 
   -- Only check bank-specific flows if Bank bag is enabled
   if addon.Bags.Bank and addon.atBank and addon.Bags.Bank.bankTab then
