@@ -24,57 +24,46 @@ local L = addon:GetModule("Localization")
 --- Classic (MoP Remix, Cata) doesn't have BankPanel, tabs, or warbank.
 -------
 
----@param ctx Context
----@param bag Bag
-function bank.proto:OnShow(ctx, bag)
+function bank.proto:OnShow()
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-	bag.frame:Show()
+	self.bag.frame:Show()
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
----@param ctx Context
----@param bag Bag
-function bank.proto:OnHide(ctx, bag)
+function bank.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
-	bag.frame:Hide()
+	self.bag.frame:Hide()
 	CloseBankFrame()
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
----@param ctx Context
----@param bag Bag
-function bank.proto:OnCreate(ctx, bag)
+function bank.proto:OnCreate()
 	-- Classic bank doesn't have tabs or BankPanel settings
-	bag.bankTab = const.BANK_TAB.BANK
+	self.bag.bankTab = const.BANK_TAB.BANK
 end
 
 ---@param ctx Context
----@param bag Bag
-function bank.proto:OnRefresh(ctx, bag)
+function bank.proto:OnRefresh(ctx)
 	events:SendMessage(ctx, "bags/RefreshBank")
 end
 
----@param bag Bag
----@param bottomBar Frame
 ---@return Money|nil
-function bank.proto:SetupMoneyFrame(bag, bottomBar)
+function bank.proto:SetupMoneyFrame()
 	-- Classic bank doesn't have a money frame
 	return nil
 end
 
----@param bag Bag
-function bank.proto:RegisterEvents(bag)
+function bank.proto:RegisterEvents()
 	-- No bank-specific events in Classic
 end
 
 ---@param ctx Context
----@param bag Bag
-function bank.proto:SwitchToBankAndWipe(ctx, bag)
+function bank.proto:SwitchToBankAndWipe(ctx)
 	ctx:Set("wipe", true)
-	bag.bankTab = const.BANK_TAB.BANK
+	self.bag.bankTab = const.BANK_TAB.BANK
 	BankFrame.selectedTab = 1
-	bag:SetTitle(L:G("Bank"))
+	self.bag:SetTitle(L:G("Bank"))
 	items:ClearBankCache(ctx)
-	bag:Wipe(ctx)
+	self.bag:Wipe(ctx)
 end

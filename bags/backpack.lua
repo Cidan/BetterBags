@@ -41,56 +41,51 @@ local money = addon:GetModule("MoneyFrame")
 ---@field bag Bag Reference to the parent bag
 backpack.proto = {}
 
----@param ctx Context
----@param bag Bag
-function backpack.proto:OnShow(ctx, bag)
+function backpack.proto:OnShow()
 	PlaySound(SOUNDKIT.IG_BACKPACK_OPEN)
-	bag.frame:Show()
+	self.bag.frame:Show()
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
 ---@param ctx Context
----@param bag Bag
-function backpack.proto:OnHide(ctx, bag)
+function backpack.proto:OnHide(ctx)
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-	bag.frame:Hide()
-	bag.searchFrame:Hide()
-	if bag.drawOnClose then
+	self.bag.frame:Hide()
+	self.bag.searchFrame:Hide()
+	if self.bag.drawOnClose then
 		debug:Log("draw", "Drawing bag on close")
-		bag.drawOnClose = false
-		bag:Refresh(ctx)
+		self.bag.drawOnClose = false
+		self.bag:Refresh(ctx)
 	end
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
 ---@param ctx Context
----@param bag Bag
-function backpack.proto:OnCreate(ctx, bag)
+function backpack.proto:OnCreate(ctx)
 	-- Search frame
-	bag.searchFrame = searchBox:Create(ctx, bag.frame)
+	self.bag.searchFrame = searchBox:Create(ctx, self.bag.frame)
 
 	-- Bag slots panel
 	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BACKPACK)
-	slots.frame:SetPoint("BOTTOMLEFT", bag.frame, "TOPLEFT", 0, 8)
-	slots.frame:SetParent(bag.frame)
+	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
+	slots.frame:SetParent(self.bag.frame)
 	slots.frame:Hide()
-	bag.slots = slots
+	self.bag.slots = slots
 
 	-- Currency frame
-	local currencyFrame = currency:Create(bag.sideAnchor, bag.frame)
+	local currencyFrame = currency:Create(self.bag.sideAnchor, self.bag.frame)
 	currencyFrame:Hide()
-	bag.currencyFrame = currencyFrame
+	self.bag.currencyFrame = currencyFrame
 
 	-- Theme config
-	bag.themeConfigFrame = themeConfig:Create(bag.sideAnchor)
-	bag.windowGrouping:AddWindow("themeConfig", bag.themeConfigFrame)
-	bag.windowGrouping:AddWindow("currencyConfig", bag.currencyFrame)
+	self.bag.themeConfigFrame = themeConfig:Create(self.bag.sideAnchor)
+	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
+	self.bag.windowGrouping:AddWindow("currencyConfig", self.bag.currencyFrame)
 end
 
 ---@param ctx Context
----@param bag Bag
-function backpack.proto:OnRefresh(ctx, bag)
+function backpack.proto:OnRefresh(ctx)
 	events:SendMessage(ctx, "bags/RefreshBackpack")
 end
 
@@ -104,18 +99,17 @@ function backpack.proto:GetFrameLevel()
 	return 500
 end
 
----@param bag Bag
 ---@param bottomBar Frame
 ---@return Money
-function backpack.proto:SetupMoneyFrame(bag, bottomBar)
+function backpack.proto:SetupMoneyFrame(bottomBar)
 	local moneyFrame = money:Create()
 	moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", -4, 0)
-	moneyFrame.frame:SetParent(bag.frame)
+	moneyFrame.frame:SetParent(self.bag.frame)
 	return moneyFrame
 end
 
----@param bag Bag
-function backpack.proto:RegisterEvents(bag)
+function backpack.proto:RegisterEvents()
+	local bag = self.bag
 	events:BucketEvent("BAG_UPDATE_COOLDOWN", function(ectx)
 		bag:OnCooldown(ectx)
 	end)
@@ -126,13 +120,20 @@ function backpack.proto:ShouldHandleSort()
 	return true
 end
 
+---@param ctx Context
+function backpack.proto:SwitchToBankAndWipe(ctx)
+	-- No-op for backpack - this method only applies to bank
+end
+
 -------
 --- BackpackBehavior Module Functions
 -------
 
+---@param bag Bag
 ---@return BackpackBehaviorProto
-function backpack:Create()
+function backpack:Create(bag)
 	local b = {}
 	setmetatable(b, { __index = backpack.proto })
+	b.bag = bag
 	return b
 end

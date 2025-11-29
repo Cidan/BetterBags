@@ -69,7 +69,7 @@ local bankBehavior = addon:GetModule('BankBehavior')
 ---@param ctx Context
 function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
   if self.kind == const.BAG_KIND.BACKPACK then return end
-  self.behavior:SwitchToBankAndWipe(ctx, self)
+  self.behavior:SwitchToBankAndWipe(ctx)
 end
 
 -------
@@ -95,9 +95,9 @@ function bagFrame:Create(ctx, kind)
 
   -- Instantiate the appropriate behavior based on bag kind
   if kind == const.BAG_KIND.BACKPACK then
-    b.behavior = backpackBehavior:Create()
+    b.behavior = backpackBehavior:Create(b)
   else
-    b.behavior = bankBehavior:Create()
+    b.behavior = bankBehavior:Create(b)
   end
 
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
@@ -143,7 +143,7 @@ function bagFrame:Create(ctx, kind)
   b.bottomBar = bottomBar
 
   -- Setup money frame via behavior
-  b.moneyFrame = b.behavior:SetupMoneyFrame(b, bottomBar)
+  b.moneyFrame = b.behavior:SetupMoneyFrame(bottomBar)
 
   -- Setup the context menu.
   b.menuList = contextMenu:CreateContextMenu(b)
@@ -164,7 +164,7 @@ function bagFrame:Create(ctx, kind)
 
   -- Bank-specific initialization via behavior
   if kind == const.BAG_KIND.BANK then
-    b.behavior:OnCreate(ctx, b)
+    b.behavior:OnCreate(ctx)
   end
 
   b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
@@ -202,7 +202,7 @@ function bagFrame:Create(ctx, kind)
   b:KeepBagInBounds()
 
   -- Register behavior-specific events
-  b.behavior:RegisterEvents(b)
+  b.behavior:RegisterEvents()
 
   events:RegisterEvent('ITEM_LOCKED', function(ectx, _, bagid, slotid)
     b:OnLock(ectx, bagid, slotid)

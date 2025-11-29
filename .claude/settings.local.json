@@ -16,7 +16,8 @@
       "mcp__github__list_issues",
       "WebFetch(domain:warcraft.wiki.gg)",
       "mcp__github__issue_read",
-      "WebSearch"
+      "WebSearch",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []

@@ -139,7 +139,7 @@ function bagFrame.bagProto:Show(ctx)
 	if self.frame:IsShown() then
 		return
 	end
-	self.behavior:OnShow(ctx, self)
+	self.behavior:OnShow(ctx)
 end
 
 ---@param ctx Context
@@ -147,7 +147,7 @@ function bagFrame.bagProto:Hide(ctx)
 	if not self.frame:IsShown() then
 		return
 	end
-	self.behavior:OnHide(ctx, self)
+	self.behavior:OnHide(ctx)
 end
 
 ---@param ctx Context
@@ -197,7 +197,7 @@ end
 -- This is what would be considered a "full refresh".
 ---@param ctx Context
 function bagFrame.bagProto:Refresh(ctx)
-	self.behavior:OnRefresh(ctx, self)
+	self.behavior:OnRefresh(ctx)
 end
 
 ---@param ctx Context
@@ -306,7 +306,7 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
 	if self.kind == const.BAG_KIND.BACKPACK then
 		return
 	end
-	self.behavior:SwitchToBankAndWipe(ctx, self)
+	self.behavior:SwitchToBankAndWipe(ctx)
 end
 
 ---@param ctx Context
@@ -410,9 +410,9 @@ function bagFrame:Create(ctx, kind)
 
 	-- Instantiate the appropriate behavior based on bag kind
 	if kind == const.BAG_KIND.BACKPACK then
-		b.behavior = backpackBehavior:Create()
+		b.behavior = backpackBehavior:Create(b)
 	else
-		b.behavior = bankBehavior:Create()
+		b.behavior = bankBehavior:Create(b)
 	end
 
 	local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
@@ -475,10 +475,10 @@ function bagFrame:Create(ctx, kind)
 	b.bottomBar = bottomBar
 
 	-- Setup money frame via behavior
-	b.moneyFrame = b.behavior:SetupMoneyFrame(b, bottomBar)
+	b.moneyFrame = b.behavior:SetupMoneyFrame(bottomBar)
 
 	-- Call behavior-specific creation (search, slots, currency, tabs, etc.)
-	b.behavior:OnCreate(ctx, b)
+	b.behavior:OnCreate(ctx)
 
 	b.sectionConfigFrame = sectionConfig:Create(kind, b.sideAnchor)
 	b.windowGrouping:AddWindow("sectionConfig", b.sectionConfigFrame)
@@ -516,7 +516,7 @@ function bagFrame:Create(ctx, kind)
 	b:KeepBagInBounds()
 
 	-- Register behavior-specific events
-	b.behavior:RegisterEvents(b)
+	b.behavior:RegisterEvents()
 
 	events:RegisterMessage("search/SetInFrame", function(ectx, shown)
 		themes:SetSearchState(ectx, b.frame, shown)
