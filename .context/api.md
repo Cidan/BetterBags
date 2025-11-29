@@ -4,6 +4,6 @@
 
 * Whenever you are working with a widget API, such as frame:GetName() or similar, look up the details of that API here, and do not guess where API's may be: https://warcraft.wiki.gg/wiki/Widget_API
 
-* Annotations for the Blizzard default frames are in the Moonlight directory under annotations/wow-ui-source -- use this directory when you need information on Blizzard's default frames.
+* Annotations for the Blizzard default frames are in the .libraries/wow-ui-source/AddOns.
 
 * Preload the above two URL's into your context right now.
