@@ -7,3 +7,5 @@
 * Annotations for the Blizzard default frames are in the .libraries/wow-ui-source/AddOns.
 
 * Preload the above two URL's into your context right now.
+
+* Use the lua reference manual, https://www.lua.org/manual/5.1/ -- World of Warcraft uses lua 5.1
