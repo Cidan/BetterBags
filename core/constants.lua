@@ -20,6 +20,7 @@ addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 addon.isBCC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addon.isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 addon.isMists = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
+addon.isAnniversary = WOW_PROJECT_ID == 5
 
 ---@enum BagKind
 const.BAG_KIND = {
@@ -314,7 +315,7 @@ const.ITEM_QUALITY = {
   WoWToken = Enum.ItemQuality.WoWToken,
 }
 
-if addon.isMists or addon.isClassic then
+if addon.isMists or addon.isClassic or addon.isAnniversary then
   const.ITEM_QUALITY.Good = Enum.ItemQuality.Good
   const.ITEM_QUALITY.Uncommon = Enum.ItemQuality.Good
 
