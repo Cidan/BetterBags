@@ -23,6 +23,7 @@ end
 
 function equipmentSets:Update()
   if addon.isClassic then return end
+  if addon.isAnniversary then return end
 
   wipe(self.bagAndSlotToSet)
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
