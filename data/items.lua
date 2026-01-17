@@ -1230,6 +1230,12 @@ function items:GetCategory(ctx, data)
 		if not data.itemInfo.expacID then
 			return L:G("Unknown")
 		end
+		-- Guard against unmapped expansion IDs (e.g., future Anniversary editions).
+		-- This defensive check prevents nil concatenation crashes when Blizzard introduces
+		-- new expansion IDs that aren't yet in EXPANSION_MAP.
+		if not const.EXPANSION_MAP[data.itemInfo.expacID] then
+			return L:G("Unknown")
+		end
 		if category ~= "" then
 			category = category .. " - "
 		end

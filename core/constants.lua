@@ -441,6 +441,11 @@ if addon.isRetail then
   const.EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = _G.EXPANSION_NAME10
 end
 
+-- TBC Anniversary uses special expansion ID 254 for TBC items
+if addon.isAnniversary then
+  const.EXPANSION_MAP[254] = "The Burning Crusade"
+end
+
 ---@class BriefExpansionMap
 ---@type table<number, string>
 const.BRIEF_EXPANSION_MAP = {
@@ -458,6 +463,11 @@ const.BRIEF_EXPANSION_MAP = {
 
 if addon.isRetail then
   const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = "tww"
+end
+
+-- TBC Anniversary uses special expansion ID 254 for TBC items
+if addon.isAnniversary then
+  const.BRIEF_EXPANSION_MAP[254] = "bc"
 end
 
 ---@class TradeSkillMap
