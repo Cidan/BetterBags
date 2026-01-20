@@ -59,30 +59,20 @@ function equipmentSets:UpdatePreMidnight()
 end
 
 -- Midnight implementation (12.0.0+)
--- NOTE: This function will need to be implemented based on the actual API changes in Midnight
+-- Uses the new EquipmentManager_GetLocationData() function instead of UnpackLocation
 function equipmentSets:UpdateMidnight()
   wipe(self.bagAndSlotToSet)
-  -- TODO: Implement Midnight-specific equipment set API logic
-  -- The API signature or behavior may have changed in 12.0.0
-  -- Common changes could include:
-  --   - Different return values from C_EquipmentSet functions
-  --   - New location format requiring different unpacking
-  --   - Additional fields or data structures
-  --   - Deprecated functions replaced with new ones
-
-  -- Placeholder implementation (copy of pre-Midnight for now):
-  -- Note: Midnight only runs on retail, so no need to handle void bank shifting
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do
     local setName = C_EquipmentSet.GetEquipmentSetInfo(setID)
     local setLocations = C_EquipmentSet.GetItemLocations(setID)
     if setLocations ~= nil then
       for _, location in pairs(setLocations) do
-        local _, bank, bags, _, slot, bag = EquipmentManager_UnpackLocation(location)
-        if (bank or bags) and slot ~= nil and bag ~= nil then
-          self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
-          self.bagAndSlotToSet[bag][slot] = self.bagAndSlotToSet[bag][slot] or {}
-          table.insert(self.bagAndSlotToSet[bag][slot], setName)
+        local locationData = EquipmentManager_GetLocationData(location)
+        if (locationData.isBank or locationData.isBags) and locationData.slot ~= nil and locationData.bag ~= nil then
+          self.bagAndSlotToSet[locationData.bag] = self.bagAndSlotToSet[locationData.bag] or {}
+          self.bagAndSlotToSet[locationData.bag][locationData.slot] = self.bagAndSlotToSet[locationData.bag][locationData.slot] or {}
+          table.insert(self.bagAndSlotToSet[locationData.bag][locationData.slot], setName)
         end
       end
     end
