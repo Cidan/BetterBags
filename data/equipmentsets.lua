@@ -25,6 +25,16 @@ function equipmentSets:Update()
   if addon.isClassic then return end
   if addon.isAnniversary then return end
 
+  -- Use different implementation for Midnight vs War Within
+  if addon.isMidnight then
+    return self:UpdateMidnight()
+  else
+    return self:UpdatePreMidnight()
+  end
+end
+
+-- Pre-Midnight implementation (War Within and earlier)
+function equipmentSets:UpdatePreMidnight()
   wipe(self.bagAndSlotToSet)
   local sets = C_EquipmentSet.GetEquipmentSetIDs()
   for _, setID in ipairs(sets) do
@@ -38,6 +48,37 @@ function equipmentSets:Update()
           bag = slot
           slot = void --[[@as number]]
         end
+        if (bank or bags) and slot ~= nil and bag ~= nil then
+          self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
+          self.bagAndSlotToSet[bag][slot] = self.bagAndSlotToSet[bag][slot] or {}
+          table.insert(self.bagAndSlotToSet[bag][slot], setName)
+        end
+      end
+    end
+  end
+end
+
+-- Midnight implementation (12.0.0+)
+-- NOTE: This function will need to be implemented based on the actual API changes in Midnight
+function equipmentSets:UpdateMidnight()
+  wipe(self.bagAndSlotToSet)
+  -- TODO: Implement Midnight-specific equipment set API logic
+  -- The API signature or behavior may have changed in 12.0.0
+  -- Common changes could include:
+  --   - Different return values from C_EquipmentSet functions
+  --   - New location format requiring different unpacking
+  --   - Additional fields or data structures
+  --   - Deprecated functions replaced with new ones
+
+  -- Placeholder implementation (copy of pre-Midnight for now):
+  -- Note: Midnight only runs on retail, so no need to handle void bank shifting
+  local sets = C_EquipmentSet.GetEquipmentSetIDs()
+  for _, setID in ipairs(sets) do
+    local setName = C_EquipmentSet.GetEquipmentSetInfo(setID)
+    local setLocations = C_EquipmentSet.GetItemLocations(setID)
+    if setLocations ~= nil then
+      for _, location in pairs(setLocations) do
+        local _, bank, bags, _, slot, bag = EquipmentManager_UnpackLocation(location)
         if (bank or bags) and slot ~= nil and bag ~= nil then
           self.bagAndSlotToSet[bag] = self.bagAndSlotToSet[bag] or {}
           self.bagAndSlotToSet[bag][slot] = self.bagAndSlotToSet[bag][slot] or {}

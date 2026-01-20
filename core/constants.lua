@@ -22,6 +22,14 @@ addon.isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 addon.isMists = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
 addon.isAnniversary = WOW_PROJECT_ID == 5
 
+-- Get the interface/TOC version for patch-specific feature gating
+-- Format: 110207 for patch 11.0.207, 120000 for 12.0.0 (Midnight), etc.
+local _, _, _, tocVersion = GetBuildInfo()
+addon.tocVersion = tocVersion
+
+-- Helper to check if we're running Midnight (12.x) or later
+addon.isMidnight = addon.isRetail and tocVersion >= 120000
+
 ---@enum BagKind
 const.BAG_KIND = {
   UNDEFINED = -1,
