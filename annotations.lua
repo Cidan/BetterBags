@@ -395,6 +395,7 @@ _G.LE_EXPANSION_BATTLE_FOR_AZEROTH = 7
 _G.LE_EXPANSION_SHADOWLANDS = 8
 _G.LE_EXPANSION_DRAGONFLIGHT = 9
 _G.LE_EXPANSION_WAR_WITHIN = 10
+_G.LE_EXPANSION_MIDNIGHT = 11
 
 -- Write out all the expansion names.
 _G.EXPANSION_NAME0 = "Classic"
@@ -408,6 +409,7 @@ _G.EXPANSION_NAME7 = "Battle for Azeroth"
 _G.EXPANSION_NAME8 = "Shadowlands"
 _G.EXPANSION_NAME9 = "Dragonflight"
 _G.EXPANSION_NAME10 = "The War Within"
+_G.EXPANSION_NAME11 = "Midnight"
 
 _G.BANK_BAG_PURCHASE = "Purchasable Bag Slot"
 _G.COSTS_LABEL = "Cost:"

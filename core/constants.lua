@@ -467,6 +467,7 @@ const.BRIEF_EXPANSION_MAP = {
   [_G.LE_EXPANSION_BATTLE_FOR_AZEROTH] = "bfa",
   [_G.LE_EXPANSION_SHADOWLANDS] = "sl",
   [_G.LE_EXPANSION_DRAGONFLIGHT] = "df",
+  [_G.LE_EXPANSION_MIDNIGHT] = "midnight",
 }
 
 if addon.isRetail then
