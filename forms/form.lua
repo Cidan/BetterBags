@@ -44,6 +44,7 @@ local formFrame = {}
 ---@field title string
 ---@field layout FormLayoutType
 ---@field index boolean
+---@field tabbed boolean
 
 local formCounter = 0
 -- Create will create a new form with the given layout.
@@ -84,7 +85,7 @@ function form:Create(opts)
   themes:RegisterSimpleWindow(l.frame, opts.title)
 
   if opts.layout == const.FORM_LAYOUT.STACKED then
-    l.layout = layouts:NewStackedLayout(l.inner, l.frame, l.ScrollBox, opts.index)
+    l.layout = layouts:NewStackedLayout(l.inner, l.frame, l.ScrollBox, opts.index, opts.tabbed)
   end
 
   l.fadeIn, l.fadeOut = animations:AttachFadeGroup(l.frame)
@@ -93,7 +94,16 @@ function form:Create(opts)
 end
 
 function formFrame:Resize()
-  self.inner:SetHeight(self.layout.height + 25)
+  if self.layout.tabbed then
+    -- In tabbed mode, update the active tab's height
+    local activeTabHeight = self.layout.tabHeights[self.layout.activeTab] + 25
+    if self.layout.tabContainers[self.layout.activeTab] then
+      self.layout.tabContainers[self.layout.activeTab]:SetHeight(activeTabHeight)
+      self.inner:SetHeight(activeTabHeight)
+    end
+  else
+    self.inner:SetHeight(self.layout.height + 25)
+  end
   self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
 end
 

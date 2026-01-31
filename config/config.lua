@@ -38,7 +38,8 @@ function config:CreateConfig()
   local f = form:Create({
     title = 'BetterBags Settings',
     layout = const.FORM_LAYOUT.STACKED,
-    index = true
+    index = true,
+    tabbed = true
   })
  f:AddSection({
    title = 'General',
@@ -655,7 +656,7 @@ function config:CreateConfig()
     }
   })
 
-  f:GetFrame():SetSize(600, 800)
+  f:GetFrame():SetSize(850, 800)
   f:GetFrame():SetPoint("CENTER")
   self.configFrame = f
 end
