@@ -42,77 +42,148 @@ bank.proto = {}
 function bank.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 
-	-- CRITICAL: BankPanel taint handling (see patterns.md)
-	-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
-	-- This allows Blizzard to know which bank (character/account) to use for item deposits.
-	-- The taint was caused by field assignments and dropdown menu issues, not by showing BankPanel.
-	if BankPanel then
-		-- Make BankPanel invisible but functional
-		BankPanel:SetAlpha(0)
-		BankPanel:EnableMouse(false)
-		BankPanel:EnableKeyboard(false)
-		if BankPanel.MoneyFrame then
-			BankPanel.MoneyFrame:Hide()
-		end
-		if BankPanel.AutoDepositFrame then
-			BankPanel.AutoDepositFrame:Hide()
-		end
-		if BankPanel.Header then
-			BankPanel.Header:Hide()
-		end
-		BankPanel:Show()
-	end
-
+	-- Generate tabs before showing frame
 	self:GenerateCharacterBankTabs(ctx)
 	self:GenerateWarbankTabs(ctx)
 
-	if addon.atWarbank then
-		self:HideBankAndReagentTabs()
-		self.bag.tabs:SetTabByID(ctx, 13)
-		-- Set the active bank type for warbank
-		if BankPanel and BankPanel.SetBankType then
-			BankPanel:SetBankType(Enum.BankType.Account)
-		end
-	else
-		self:ShowBankAndReagentTabs()
-		-- Set first tab when using multiple character bank tabs
-		if database:GetCharacterBankTabsEnabled() then
-			local firstTabID = const.BANK_ONLY_BAGS_LIST[1]
-			self.bag.bankTab = firstTabID -- Important: set bankTab before SetTabByID
-			self.bag.tabs:SetTabByID(ctx, firstTabID)
-			ctx:Set("filterBagID", firstTabID) -- Set the filter for the initial tab
-		else
-			self.bag.bankTab = Enum.BagIndex.Characterbanktab
-			self.bag.tabs:SetTabByID(ctx, 1)
-		end
-		-- Set the active bank type for character bank
-		if BankPanel and BankPanel.SetBankType then
-			BankPanel:SetBankType(Enum.BankType.Character)
-		end
-	end
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		-- Set up callback to handle BankPanel and tab initialization
+		self.bag.fadeInGroup.callback = function()
+			self.bag.fadeInGroup.callback = nil  -- Clean up callback
 
-	self.bag.moneyFrame:Update()
-	self.bag.frame:Show()
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+			-- CRITICAL: BankPanel taint handling (see patterns.md)
+			-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
+			if BankPanel then
+				BankPanel:SetAlpha(0)
+				BankPanel:EnableMouse(false)
+				BankPanel:EnableKeyboard(false)
+				if BankPanel.MoneyFrame then
+					BankPanel.MoneyFrame:Hide()
+				end
+				if BankPanel.AutoDepositFrame then
+					BankPanel.AutoDepositFrame:Hide()
+				end
+				if BankPanel.Header then
+					BankPanel.Header:Hide()
+				end
+				BankPanel:Show()
+			end
+
+			-- Set initial tab after frame is shown
+			if addon.atWarbank then
+				self:HideBankAndReagentTabs()
+				self.bag.tabs:SetTabByID(ctx, 13)
+				if BankPanel and BankPanel.SetBankType then
+					BankPanel:SetBankType(Enum.BankType.Account)
+				end
+			else
+				self:ShowBankAndReagentTabs()
+				if database:GetCharacterBankTabsEnabled() then
+					local firstTabID = const.BANK_ONLY_BAGS_LIST[1]
+					self.bag.bankTab = firstTabID
+					self.bag.tabs:SetTabByID(ctx, firstTabID)
+					ctx:Set("filterBagID", firstTabID)
+				else
+					self.bag.bankTab = Enum.BagIndex.Characterbanktab
+					self.bag.tabs:SetTabByID(ctx, 1)
+				end
+				if BankPanel and BankPanel.SetBankType then
+					BankPanel:SetBankType(Enum.BankType.Character)
+				end
+			end
+
+			self.bag.moneyFrame:Update()
+			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		end
+		self.bag.fadeInGroup:Play()
+	else
+		-- Direct show path (existing logic)
+		-- CRITICAL: BankPanel taint handling (see patterns.md)
+		-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
+		if BankPanel then
+			BankPanel:SetAlpha(0)
+			BankPanel:EnableMouse(false)
+			BankPanel:EnableKeyboard(false)
+			if BankPanel.MoneyFrame then
+				BankPanel.MoneyFrame:Hide()
+			end
+			if BankPanel.AutoDepositFrame then
+				BankPanel.AutoDepositFrame:Hide()
+			end
+			if BankPanel.Header then
+				BankPanel.Header:Hide()
+			end
+			BankPanel:Show()
+		end
+
+		if addon.atWarbank then
+			self:HideBankAndReagentTabs()
+			self.bag.tabs:SetTabByID(ctx, 13)
+			if BankPanel and BankPanel.SetBankType then
+				BankPanel:SetBankType(Enum.BankType.Account)
+			end
+		else
+			self:ShowBankAndReagentTabs()
+			if database:GetCharacterBankTabsEnabled() then
+				local firstTabID = const.BANK_ONLY_BAGS_LIST[1]
+				self.bag.bankTab = firstTabID
+				self.bag.tabs:SetTabByID(ctx, firstTabID)
+				ctx:Set("filterBagID", firstTabID)
+			else
+				self.bag.bankTab = Enum.BagIndex.Characterbanktab
+				self.bag.tabs:SetTabByID(ctx, 1)
+			end
+			if BankPanel and BankPanel.SetBankType then
+				BankPanel:SetBankType(Enum.BankType.Character)
+			end
+		end
+
+		self.bag.moneyFrame:Update()
+		self.bag.frame:Show()
+		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	end
 end
 
 function bank.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
-	self.bag.frame:Hide()
 
-	-- Hide BankPanel to prevent taint from affecting other container operations
-	if BankPanel then
-		BankPanel:Hide()
-	end
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		self.bag.fadeOutGroup.callback = function()
+			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
 
-	if C_Bank then
-		C_Bank.CloseBankFrame()
+			-- Hide BankPanel after fade completes to prevent taint
+			if BankPanel then
+				BankPanel:Hide()
+			end
+
+			if C_Bank then
+				C_Bank.CloseBankFrame()
+			else
+				CloseBankFrame()
+			end
+
+			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		end
+		self.bag.fadeOutGroup:Play()
 	else
-		CloseBankFrame()
-	end
+		self.bag.frame:Hide()
 
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		-- Hide BankPanel to prevent taint from affecting other container operations
+		if BankPanel then
+			BankPanel:Hide()
+		end
+
+		if C_Bank then
+			C_Bank.CloseBankFrame()
+		else
+			CloseBankFrame()
+		end
+
+		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	end
 end
 
 ---@param ctx Context

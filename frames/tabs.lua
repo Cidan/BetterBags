@@ -50,7 +50,7 @@ local tabFrame = {}
 ---@param customParent? Frame
 ---@param template? string
 function tabFrame:AddTab(ctx, name, id, onClick, sabtClick, customParent, template)
-	---@type TabButton
+	---@type TabButton | Frame
 	local parent = customParent or self.frame
 	local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), self.tabCount), parent, template) --[[@as TabButton]]
 	tab.sabtClick = sabtClick

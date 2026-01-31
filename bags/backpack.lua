@@ -17,6 +17,9 @@ local events = addon:GetModule("Events")
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class BagSlots: AceModule
 local bagSlots = addon:GetModule("BagSlots")
 
@@ -43,7 +46,14 @@ backpack.proto = {}
 
 function backpack.proto:OnShow()
 	PlaySound(SOUNDKIT.IG_BACKPACK_OPEN)
-	self.bag.frame:Show()
+
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		self.bag.fadeInGroup:Play()
+	else
+		self.bag.frame:Show()
+	end
+
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
@@ -51,14 +61,31 @@ end
 function backpack.proto:OnHide(ctx)
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-	self.bag.frame:Hide()
-	self.bag.searchFrame:Hide()
-	if self.bag.drawOnClose then
-		debug:Log("draw", "Drawing bag on close")
-		self.bag.drawOnClose = false
-		self.bag:Refresh(ctx)
+
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		-- Set up callback to handle post-hide logic
+		self.bag.fadeOutGroup.callback = function()
+			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
+			self.bag.searchFrame:Hide()
+			if self.bag.drawOnClose then
+				debug:Log("draw", "Drawing bag on close")
+				self.bag.drawOnClose = false
+				self.bag:Refresh(ctx)
+			end
+			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		end
+		self.bag.fadeOutGroup:Play()
+	else
+		self.bag.frame:Hide()
+		self.bag.searchFrame:Hide()
+		if self.bag.drawOnClose then
+			debug:Log("draw", "Drawing bag on close")
+			self.bag.drawOnClose = false
+			self.bag:Refresh(ctx)
+		end
+		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 	end
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
 ---@param ctx Context

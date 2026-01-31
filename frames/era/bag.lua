@@ -126,6 +126,10 @@ function bagFrame:Create(ctx, kind)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
 
+  -- Attach fade animations (created once, used conditionally based on settings)
+  local animations = addon:GetModule('Animations')
+  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
+
   b.views = {
     [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
     [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),

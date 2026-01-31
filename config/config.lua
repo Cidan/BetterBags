@@ -118,6 +118,17 @@ function config:CreateConfig()
     end
   })
 
+  f:AddCheckbox({
+    title = 'Enable Bag Fading',
+    description = 'If enabled, bags will smoothly fade in and out when opening/closing.',
+    getValue = function(_)
+      return db:GetEnableBagFading()
+    end,
+    setValue = function(_, value)
+      db:SetEnableBagFading(value)
+    end
+  })
+
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',

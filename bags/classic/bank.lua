@@ -19,6 +19,9 @@ local events = addon:GetModule("Events")
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 -------
 --- Classic Bank Behavior Overrides
 --- Classic (MoP Remix, Cata) doesn't have BankPanel, tabs, or warbank.
@@ -26,16 +29,34 @@ local L = addon:GetModule("Localization")
 
 function bank.proto:OnShow()
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-	self.bag.frame:Show()
+
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		self.bag.fadeInGroup:Play()
+	else
+		self.bag.frame:Show()
+	end
+
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
 function bank.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
-	self.bag.frame:Hide()
-	CloseBankFrame()
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		self.bag.fadeOutGroup.callback = function()
+			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
+			CloseBankFrame()
+			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		end
+		self.bag.fadeOutGroup:Play()
+	else
+		self.bag.frame:Hide()
+		CloseBankFrame()
+		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	end
 end
 
 function bank.proto:OnCreate()

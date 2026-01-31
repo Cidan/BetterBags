@@ -440,6 +440,10 @@ function bagFrame:Create(ctx, kind)
 	b.frame:Hide()
 	b.frame:SetSize(200, 200)
 
+	-- Attach fade animations (created once, used conditionally based on settings)
+	local animations = addon:GetModule('Animations')
+	b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
+
 	--b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
 	--b.frame.CloseButton:SetScript("OnClick", function()
 	--  b:Hide()

@@ -588,6 +588,7 @@ const.DATABASE_DEFAULTS = {
   profile = {
     firstTimeMenu = true,
     enabled = true,
+    enableBagFading = false,
     showBagButton = true,
     characterBankTabsEnabled = false,
     enableBankBag = true,

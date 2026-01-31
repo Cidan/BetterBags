@@ -129,6 +129,16 @@ function DB:GetEnableBankBag()
   return DB.data.profile.enableBankBag
 end
 
+---@param enabled boolean
+function DB:SetEnableBagFading(enabled)
+  DB.data.profile.enableBagFading = enabled
+end
+
+---@return boolean
+function DB:GetEnableBagFading()
+  return DB.data.profile.enableBagFading
+end
+
 ---@param kind BagKind
 ---@param view BagView
 ---@return SizeInfo
