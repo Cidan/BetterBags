@@ -417,13 +417,14 @@ end
 ---@param opts FormSectionOptions
 function stackedLayout:AddSection(opts)
   if self.tabbed then
-    -- Create a new container frame for this tab
+    -- Create a new container frame for this tab as a direct child of targetFrame
+    -- This ensures proper scrolling behavior
     local tabContainer = CreateFrame("Frame", nil, self.targetFrame)
     -- Position tab container to the right of the index frame
     local leftOffset = (self.indexFrame and self.indexFrame:GetWidth() or 0) + 10
     tabContainer:SetPoint("TOPLEFT", self.targetFrame, "TOPLEFT", leftOffset, 0)
-    tabContainer:SetPoint("TOPRIGHT", self.targetFrame, "TOPRIGHT", 0, 0)
-    tabContainer:SetHeight(1)  -- Start with minimal height, will grow as widgets are added
+    tabContainer:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
+    tabContainer:SetHeight(2000)  -- Start with large height, will be updated by Resize()
     tabContainer:Hide()  -- Start hidden
 
     -- Create fade animations for this tab
@@ -462,11 +463,8 @@ function stackedLayout:AddSection(opts)
     self.nextFrame = container
     self:addHeight(container:GetHeight())
 
-    -- Show first tab by default
+    -- Show first tab by default (height will be set by Resize() as widgets are added)
     if #self.tabContainers == 1 then
-      local firstTabHeight = self.tabHeights[1] + 25
-      tabContainer:SetHeight(firstTabHeight)
-      self.targetFrame:SetHeight(firstTabHeight)
       tabContainer:Show()
       tabContainer:SetAlpha(1)
       self:UpdateTabHighlighting(1)

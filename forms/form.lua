@@ -70,11 +70,11 @@ function form:Create(opts)
   l.ScrollBar:SetInterpolateScroll(true)
   l.ScrollBar:SetHideIfUnscrollable(true)
 
-  local view = CreateScrollBoxLinearView()
-  view:SetPanExtent(60)
-
   l.inner = CreateFrame('Frame', nil, l.ScrollBox)
   l.inner.scrollable = true
+
+  local view = CreateScrollBoxLinearView()
+  view:SetPanExtent(60)
 
   l.frame:EnableMouse(true)
   l.frame:SetMovable(true)
@@ -82,6 +82,9 @@ function form:Create(opts)
   l.frame:SetScript("OnMouseUp", l.frame.StopMovingOrSizing)
 
   ScrollUtil.InitScrollBoxWithScrollBar(l.ScrollBox, l.ScrollBar, view)
+
+  -- For tabbed mode, we need to ensure scrolling works properly
+  l.view = view
   themes:RegisterSimpleWindow(l.frame, opts.title)
 
   if opts.layout == const.FORM_LAYOUT.STACKED then
@@ -95,16 +98,29 @@ end
 
 function formFrame:Resize()
   if self.layout.tabbed then
-    -- In tabbed mode, update the active tab's height
-    local activeTabHeight = self.layout.tabHeights[self.layout.activeTab] + 25
-    if self.layout.tabContainers[self.layout.activeTab] then
-      self.layout.tabContainers[self.layout.activeTab]:SetHeight(activeTabHeight)
-      self.inner:SetHeight(activeTabHeight)
+    -- In tabbed mode, find the tallest tab and set inner frame to that height
+    -- This ensures scrolling works consistently regardless of which tab is active
+    local maxHeight = 0
+    for _, height in ipairs(self.layout.tabHeights) do
+      if height > maxHeight then
+        maxHeight = height
+      end
     end
+    maxHeight = maxHeight + 25
+
+    -- Update all tab container heights to their calculated values
+    for i, container in ipairs(self.layout.tabContainers) do
+      local tabHeight = (self.layout.tabHeights[i] or 0) + 25
+      container:SetHeight(tabHeight)
+    end
+
+    -- Set inner frame to the tallest tab's height
+    self.inner:SetHeight(maxHeight)
+    self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
   else
     self.inner:SetHeight(self.layout.height + 25)
+    self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
   end
-  self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
 end
 
 function formFrame:ReloadAllFormElements()
