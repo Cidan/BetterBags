@@ -43,8 +43,9 @@ function bank.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 
 	-- CRITICAL: BankPanel taint handling (see patterns.md)
-	-- Make BankPanel invisible but let Blizzard show it naturally via events.
-	-- Do NOT manually call BankPanel:Show() as that creates taint.
+	-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
+	-- This allows Blizzard to know which bank (character/account) to use for item deposits.
+	-- The taint was caused by field assignments and dropdown menu issues, not by showing BankPanel.
 	if BankPanel then
 		-- Make BankPanel invisible but functional
 		BankPanel:SetAlpha(0)
@@ -59,6 +60,7 @@ function bank.proto:OnShow(ctx)
 		if BankPanel.Header then
 			BankPanel.Header:Hide()
 		end
+		BankPanel:Show()
 	end
 
 	self:GenerateCharacterBankTabs(ctx)
