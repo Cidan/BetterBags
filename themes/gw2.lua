@@ -114,7 +114,7 @@ local gw2Theme = {
       leftSide:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 25)
       leftSide:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 25)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/BagMicroButton-Up", "Show Bags", function(ctx)
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/bagmicrobutton-up", "Show Bags", function(ctx)
         if frame.Owner.slots:IsShown() then
           frame.Owner.slots:Hide()
         else
@@ -123,12 +123,12 @@ local gw2Theme = {
         end
       end)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/CollectionsMicroButton-Up", "Sort Bags", function(ctx)
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/collectionsmicrobutton-up", "Sort Bags", function(ctx)
         frame.Owner:Sort(ctx)
       end)
 
       if frame.Owner.kind == const.BAG_KIND.BACKPACK then
-        newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/StoreMicroButton-Up", "Show Currency", function()
+        newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/storemicrobutton-up.png", "Show Currency", function()
           if frame.Owner.currencyFrame:IsShown() then
             frame.Owner.currencyFrame:Hide()
           else
@@ -137,7 +137,7 @@ local gw2Theme = {
         end)
       end
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/QuestLogMicroButton-Up", "Show Categories", function()
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/questlogmicrobutton-up.png", "Show Categories", function()
         if frame.Owner.sectionConfigFrame:IsShown() then
           frame.Owner.sectionConfigFrame:Hide()
         else
@@ -146,7 +146,7 @@ local gw2Theme = {
       end)
 
       if frame.Owner.kind == const.BAG_KIND.BACKPACK then
-        newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/EJMicroButton-Up", "Show Themes", function()
+        newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/ejmicrobutton-up.png", "Show Themes", function()
           if frame.Owner.themeConfigFrame:IsShown() then
             frame.Owner.themeConfigFrame:Hide()
           else
@@ -155,7 +155,7 @@ local gw2Theme = {
         end)
       end
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/MainMenuMicroButton-Up", "Open Settings", function(ctx)
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/mainmenumicrobutton-up", "Open Settings", function(ctx)
         contextMenu:Show(ctx, frame.Owner.menuList)
       end)
 
