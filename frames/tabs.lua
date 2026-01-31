@@ -137,6 +137,13 @@ end
 
 -- Sort tabs by their ID
 function tabFrame:SortTabsByID()
+	-- Remember which tab was selected (by tab ID, not index) before sorting
+	-- This prevents tab selection bugs when tabs are re-indexed
+	local selectedTabID = nil
+	if self.selectedTab and self.tabIndex[self.selectedTab] then
+		selectedTabID = self.tabIndex[self.selectedTab].id
+	end
+
 	table.sort(self.tabIndex, function(a, b)
 		-- Special case: Bank tab (ID 1) should always be first
 		if a.id == 1 then
@@ -144,6 +151,14 @@ function tabFrame:SortTabsByID()
 		end
 		if b.id == 1 then
 			return false
+		end
+
+		-- Special case: Purchase tabs (negative IDs) should always be last
+		if a.id and a.id < 0 and b.id and b.id > 0 then
+			return false
+		end
+		if b.id and b.id < 0 and a.id and a.id > 0 then
+			return true
 		end
 
 		-- If both have IDs, sort by ID
@@ -164,6 +179,17 @@ function tabFrame:SortTabsByID()
 	-- Update the index values after sorting
 	for i, tab in ipairs(self.tabIndex) do
 		tab.index = i
+	end
+
+	-- Restore selection by finding the tab with the remembered ID
+	-- This fixes the bug where tabs become unselectable after sorting
+	if selectedTabID then
+		for i, tab in ipairs(self.tabIndex) do
+			if tab.id == selectedTabID then
+				self.selectedTab = i  -- Update to new index position
+				break
+			end
+		end
 	end
 
 	self:ReanchorTabs()
@@ -387,5 +413,6 @@ function tabs:Create(parent)
 	container.tabIndex = {}
 	container.buttonToName = {}
 	container.tabCount = 0
+	container.selectedTab = nil  -- Initialize to nil to avoid undefined state
 	return container
 end

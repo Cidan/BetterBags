@@ -266,65 +266,6 @@ function bank.proto:OnCreate(ctx)
 			return true -- Tab switch handled, allow selection
 		end
 	end)
-
-	-- Create character bank purchase button (like Baganator pattern)
-	-- Button is parented to bank frame (secure context) to avoid taint
-	self.characterPurchaseButton = CreateFrame("Button", nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
-	self.characterPurchaseButton:SetAttribute("overrideBankType", Enum.BankType.Character)
-	self.characterPurchaseButton:SetSize(32, 32)
-	self.characterPurchaseButton:HookScript("OnClick", function()
-		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
-	end)
-	self.characterPurchaseButton:SetScript("OnEnter", function(btn)
-		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L:G("Purchase Character Bank Tab"))
-		if C_Bank and C_Bank.FetchNextPurchasableBankTabData then
-			local tabData = C_Bank.FetchNextPurchasableBankTabData(Enum.BankType.Character)
-			if tabData and tabData.tabCost then
-				local cost = tabData.tabCost
-				if cost > GetMoney() then
-					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 0, 0)
-				else
-					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 1, 1)
-				end
-			end
-		end
-		GameTooltip:Show()
-	end)
-	self.characterPurchaseButton:SetScript("OnLeave", function()
-		GameTooltip:Hide()
-	end)
-	self.characterPurchaseButton:SetNormalTexture("Interface\\GuildBankFrame\\UI-GuildBankFrame-NewTab")
-	self.characterPurchaseButton:Hide() -- Hidden by default, shown in GenerateCharacterBankTabs
-
-	-- Create account bank purchase button
-	self.accountPurchaseButton = CreateFrame("Button", nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
-	self.accountPurchaseButton:SetAttribute("overrideBankType", Enum.BankType.Account)
-	self.accountPurchaseButton:SetSize(32, 32)
-	self.accountPurchaseButton:HookScript("OnClick", function()
-		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
-	end)
-	self.accountPurchaseButton:SetScript("OnEnter", function(btn)
-		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
-		GameTooltip:SetText(L:G("Purchase Warbank Tab"))
-		if C_Bank and C_Bank.FetchNextPurchasableBankTabData then
-			local tabData = C_Bank.FetchNextPurchasableBankTabData(Enum.BankType.Account)
-			if tabData and tabData.tabCost then
-				local cost = tabData.tabCost
-				if cost > GetMoney() then
-					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 0, 0)
-				else
-					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 1, 1)
-				end
-			end
-		end
-		GameTooltip:Show()
-	end)
-	self.accountPurchaseButton:SetScript("OnLeave", function()
-		GameTooltip:Hide()
-	end)
-	self.accountPurchaseButton:SetNormalTexture("Interface\\GuildBankFrame\\UI-GuildBankFrame-NewTab")
-	self.accountPurchaseButton:Hide() -- Hidden by default, shown in GenerateWarbankTabs
 end
 
 function bank.proto:OnRefresh()
@@ -355,13 +296,50 @@ function bank.proto:RegisterEvents()
 	local behavior = self
 
 	events:RegisterEvent("PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", function(ectx)
+		-- Track tab count before regeneration to detect new purchases
+		local oldTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
+		local oldCount = #oldTabData
+
 		behavior:GenerateWarbankTabs(ectx)
+
+		-- If new tab was added, auto-select it
+		local newTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
+		if #newTabData > oldCount and #newTabData > 0 then
+			local newestTab = newTabData[#newTabData]
+			behavior:SwitchToAccountBank(ectx, newestTab.ID)
+		end
 	end)
-	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ectx)
-		-- Update both warbank and character bank tabs when settings change
-		behavior:GenerateWarbankTabs(ectx)
-		if database:GetCharacterBankTabsEnabled() then
+
+	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ectx, bankType)
+		-- Update tabs based on which bank type changed
+		if bankType == Enum.BankType.Account then
+			local oldTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
+			local oldCount = #oldTabData
+
+			behavior:GenerateWarbankTabs(ectx)
+
+			local newTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
+			if #newTabData > oldCount and #newTabData > 0 then
+				local newestTab = newTabData[#newTabData]
+				behavior:SwitchToAccountBank(ectx, newestTab.ID)
+			end
+		elseif bankType == Enum.BankType.Character and database:GetCharacterBankTabsEnabled() then
+			local oldTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character) or {}
+			local oldCount = #oldTabData
+
 			behavior:GenerateCharacterBankTabs(ectx)
+
+			local newTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character) or {}
+			if #newTabData > oldCount and #newTabData > 0 then
+				local newestTab = newTabData[#newTabData]
+				behavior:SwitchToCharacterBankTab(ectx, newestTab.ID)
+			end
+		else
+			-- Fallback for other bank types or when character tabs are disabled
+			behavior:GenerateWarbankTabs(ectx)
+			if database:GetCharacterBankTabsEnabled() then
+				behavior:GenerateCharacterBankTabs(ectx)
+			end
 		end
 	end)
 end
@@ -424,16 +402,25 @@ function bank.proto:GenerateCharacterBankTabs(ctx)
 	-- Sort tabs by ID to ensure proper order
 	self.bag.tabs:SortTabsByID()
 
-	-- Show character bank purchase button if available
+	-- Add character bank purchase tab (special ID: -1) if available
 	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
 		and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
 		and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
-		self.characterPurchaseButton:ClearAllPoints()
-		-- Position below the tabs container
-		self.characterPurchaseButton:SetPoint("TOPLEFT", self.bag.tabs.frame, "BOTTOMLEFT", 0, -5)
-		self.characterPurchaseButton:Show()
+		-- Add purchase tab if it doesn't exist
+		if not self.bag.tabs:TabExistsByID(-1) then
+			local behavior = self
+			self.bag.tabs:AddTab(ctx, L:G("Purchase Bank Tab"), -1, function(tabCtx)
+				-- Custom click handler: trigger purchase dialog instead of switching views
+				behavior:TriggerPurchaseDialog(Enum.BankType.Character)
+			end)
+		else
+			self.bag.tabs:ShowTabByID(-1)
+		end
 	else
-		self.characterPurchaseButton:Hide()
+		-- Hide purchase tab if max tabs reached
+		if self.bag.tabs:TabExistsByID(-1) then
+			self.bag.tabs:HideTabByID(-1)
+		end
 	end
 
 	-- Adjust frame width if needed
@@ -457,16 +444,28 @@ function bank.proto:GenerateWarbankTabs(ctx)
 		end
 	end
 
-	-- Show account bank purchase button if available
+	-- Sort tabs by ID to ensure proper order (was missing - caused tab selection bugs)
+	self.bag.tabs:SortTabsByID()
+
+	-- Add account bank purchase tab (special ID: -2) if available
 	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
 		and C_Bank.CanPurchaseBankTab(Enum.BankType.Account)
 		and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
-		self.accountPurchaseButton:ClearAllPoints()
-		-- Position below the tabs container
-		self.accountPurchaseButton:SetPoint("TOPLEFT", self.bag.tabs.frame, "BOTTOMLEFT", 0, -5)
-		self.accountPurchaseButton:Show()
+		-- Add purchase tab if it doesn't exist
+		if not self.bag.tabs:TabExistsByID(-2) then
+			local behavior = self
+			self.bag.tabs:AddTab(ctx, L:G("Purchase Warbank Tab"), -2, function(tabCtx)
+				-- Custom click handler: trigger purchase dialog instead of switching views
+				behavior:TriggerPurchaseDialog(Enum.BankType.Account)
+			end)
+		else
+			self.bag.tabs:ShowTabByID(-2)
+		end
 	else
-		self.accountPurchaseButton:Hide()
+		-- Hide purchase tab if max tabs reached
+		if self.bag.tabs:TabExistsByID(-2) then
+			self.bag.tabs:HideTabByID(-2)
+		end
 	end
 
 	local w = self.bag.tabs.width
@@ -617,6 +616,24 @@ function bank.proto:SwitchToBankAndWipe(ctx)
 	self.bag:SetTitle(L:G("Bank"))
 	items:ClearBankCache(ctx)
 	self.bag:Wipe(ctx)
+end
+
+---@param bankType number
+function bank.proto:TriggerPurchaseDialog(bankType)
+	-- Use Blizzard's native purchase confirmation dialog
+	if not C_Bank or not C_Bank.FetchNextPurchasableBankTabData then
+		return
+	end
+
+	local tabData = C_Bank.FetchNextPurchasableBankTabData(bankType)
+	if not tabData or not tabData.tabCost then
+		return
+	end
+
+	-- Blizzard's CONFIRM_BUY_BANK_TAB dialog expects bankType in data parameter
+	StaticPopup_Show("CONFIRM_BUY_BANK_TAB", tabData.tabCost, nil, {
+		bankType = bankType
+	})
 end
 
 -------
