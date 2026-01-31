@@ -129,9 +129,10 @@ end)
 
 **Solution Pattern**:
 1. **Never touch BankPanel in OnHide/OnShow scripts** - move all BankPanel manipulation to event handlers
-2. **Never call CloseBankFrame() in OnHide** - let Blizzard's CloseSpecialWindows handle it, or call it from event handlers
-3. **Use BANKFRAME_OPENED/CLOSED event handlers** for safe BankPanel manipulation (these run in addon context, not protected context)
-4. **Keep OnHide/OnShow scripts minimal** - only handle your own addon's UI cleanup (sounds, animations, frame hiding)
+2. **Never call CloseBankFrame() in OnHide** - it runs in protected context and causes taint
+3. **DO call CloseBankFrame() in CloseSpecialWindows SecureHook** - this is safe and necessary to exit banking mode
+4. **Use BANKFRAME_OPENED/CLOSED event handlers** for safe BankPanel manipulation (these run in addon context, not protected context)
+5. **Keep OnHide/OnShow scripts minimal** - only handle your own addon's UI cleanup (sounds, animations, frame hiding)
 
 **Example**:
 ```lua
@@ -170,6 +171,27 @@ function bank.proto:OnHide()
   end
 end
 
+-- GOOD: Call CloseBankFrame() in CloseSpecialWindows hook (safe context)
+function addon:CloseSpecialWindows(interactingFrame)
+  if interactingFrame ~= nil then return end
+
+  local ctx = context:New('CloseSpecialWindows')
+  addon.backpackShouldClose = true
+
+  -- ... other cleanup ...
+
+  -- Call CloseBankFrame() to exit banking mode and trigger BANKFRAME_CLOSED event.
+  -- This is safe here (SecureHook runs after Blizzard's function completes).
+  -- CRITICAL: Do NOT call this from OnHide - that runs in protected context!
+  if C_Bank then
+    C_Bank.CloseBankFrame()
+  else
+    CloseBankFrame()
+  end
+
+  events:SendMessageLater(ctx, 'bags/OpenClose')
+end
+
 -- GOOD: BankPanel manipulation in event handler (safe context)
 function addon.CloseBank(ctx, _, interactingFrame)
   if interactingFrame ~= nil then return end
@@ -186,6 +208,11 @@ function addon.CloseBank(ctx, _, interactingFrame)
   events:SendMessage(ctx, 'bags/BankClosed')
 end
 ```
+
+**Key Distinction**:
+- ❌ **OnHide script**: Runs in protected context (from UISpecialFrames) - touching BankPanel or calling CloseBankFrame() here CAUSES TAINT
+- ✅ **CloseSpecialWindows SecureHook**: Runs after Blizzard's function completes, in addon context - safe to call CloseBankFrame()
+- ✅ **BANKFRAME_CLOSED event handler**: Runs in addon context - safe to hide BankPanel
 
 **When to Apply**:
 - Any time implementing custom bank frame behavior with UISpecialFrames registration

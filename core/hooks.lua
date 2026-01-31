@@ -126,9 +126,14 @@ function addon:CloseSpecialWindows(interactingFrame)
   end
   events:SendMessage(ctx, 'addon/CloseSpecialWindows')
 
-  -- Don't call CloseBankFrame() here - Blizzard's CloseSpecialWindows() already
-  -- handles closing the bank if it's open. Our BANKFRAME_CLOSED handler will
-  -- clean up BankPanel safely.
+  -- Call CloseBankFrame() to exit banking mode and trigger BANKFRAME_CLOSED event.
+  -- This is safe here (SecureHook runs after Blizzard's function completes).
+  -- CRITICAL: Do NOT call this from OnHide - that runs in protected context and causes taint.
+  if C_Bank then
+    C_Bank.CloseBankFrame()
+  else
+    CloseBankFrame()
+  end
 
   events:SendMessageLater(ctx, 'bags/OpenClose')
 end
