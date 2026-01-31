@@ -56,42 +56,6 @@ function contextMenu:OnInitialize()
 	--self:CreateContext()
 end
 
-function contextMenu:GetPurchaseSabt(title, bankType)
-	if self.sabt[title] ~= nil then
-		return self.sabt[title]
-	end
-	local clickFrame = CreateFrame("Frame", nil, nil, "UIDropDownCustomMenuEntryTemplate")
-	clickFrame:SetWidth(120)
-	clickFrame:SetHeight(16)
-
-	local p = CreateFrame("Button", nil, clickFrame, "BankPanelPurchaseButtonScriptTemplate")
-	p:SetAttribute("overrideBankType", bankType)
-	p:SetAllPoints()
-
-	local text1 = p:CreateFontString(name and (name .. "NormalText") or nil)
-	p:SetFontString(text1)
-	text1:SetPoint("LEFT", p, 0, 0)
-	p:SetNormalFontObject("GameFontHighlightSmallLeft")
-	p:SetHighlightFontObject("GameFontHighlightSmallLeft")
-	p:SetDisabledFontObject("GameFontDisableSmallLeft")
-
-	p.Highlight = p:CreateTexture(name and (name .. "Highlight") or nil, "BACKGROUND")
-	p.Highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-	p.Highlight:SetBlendMode("ADD")
-	p.Highlight:SetAllPoints()
-	p.Highlight:Hide()
-
-	p:SetScript("OnEnter", function()
-		p.Highlight:Show()
-	end)
-	p:SetScript("OnLeave", function()
-		p.Highlight:Hide()
-	end)
-	p:SetText(title)
-	self.sabt[title] = clickFrame
-	return clickFrame
-end
-
 function contextMenu:OnEnable()
 	local frame = LibDD:Create_UIDropDownMenu("BetterBagsContextMenu", UIParent)
 	LibDD:EasyMenu_Initialize(frame, 4, {})
@@ -279,24 +243,9 @@ function contextMenu:CreateContextMenu(bag)
 			})
 		end
 
-		if C_Bank.HasMaxBankTabs(Enum.BankType.Account) == false then
-			table.insert(menuList, {
-				text = L:G("Purchase Warbank Tab"),
-				notCheckable = true,
-				tooltipTitle = L:G("Purchase Warbank Tab"),
-				tooltipText = L:G("Purchase a new Warbank tab"),
-				customFrame = self:GetPurchaseSabt("Purchase Warbank Tab", Enum.BankType.Account),
-			})
-		end
-		if C_Bank.HasMaxBankTabs(Enum.BankType.Character) == false then
-			table.insert(menuList, {
-				text = L:G("Purchase Character Tab"),
-				notCheckable = true,
-				tooltipTitle = L:G("Purchase Character Tab"),
-				tooltipText = L:G("Purchase a new Character tab"),
-				customFrame = self:GetPurchaseSabt("Purchase Bank Tab", Enum.BankType.Bank),
-			})
-		end
+		-- Purchase bank tab buttons removed from context menu.
+		-- They are now implemented as persistent tab buttons on the bank frame
+		-- to avoid taint issues (see bags/bank.lua OnCreate).
 		table.insert(menuList, {
 			text = L:G("Sort Bank"),
 			notCheckable = true,

@@ -43,7 +43,8 @@ function bank.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 
 	-- CRITICAL: BankPanel taint handling (see patterns.md)
-	-- Configure and show BankPanel so GetActiveBankType works
+	-- Make BankPanel invisible but let Blizzard show it naturally via events.
+	-- Do NOT manually call BankPanel:Show() as that creates taint.
 	if BankPanel then
 		-- Make BankPanel invisible but functional
 		BankPanel:SetAlpha(0)
@@ -58,7 +59,6 @@ function bank.proto:OnShow(ctx)
 		if BankPanel.Header then
 			BankPanel.Header:Hide()
 		end
-		BankPanel:Show()
 	end
 
 	self:GenerateCharacterBankTabs(ctx)
@@ -118,17 +118,19 @@ function bank.proto:OnCreate(ctx)
 	-- Capture behavior reference for closures
 	local behavior = self
 
-	-- Move the settings menu to the bag frame.
-	BankPanel.TabSettingsMenu:SetParent(self.bag.frame)
-	BankPanel.TabSettingsMenu:ClearAllPoints()
-	BankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", self.bag.frame, "BOTTOMRIGHT", 10, 0)
+	-- Move the settings menu to the bag frame (with validation)
+	if BankPanel and BankPanel.TabSettingsMenu then
+		BankPanel.TabSettingsMenu:SetParent(self.bag.frame)
+		BankPanel.TabSettingsMenu:ClearAllPoints()
+		BankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", self.bag.frame, "BOTTOMRIGHT", 10, 0)
 
-	-- Adjust the settings function so the tab settings menu is populated correctly.
-	BankPanel.TabSettingsMenu.GetBankFrame = function()
+		-- Adjust the settings function so the tab settings menu is populated correctly.
+		BankPanel.TabSettingsMenu.GetBankFrame = function()
 		return {
 			GetTabData = function(_, id)
-				-- Check if this is a character bank tab request
-				if BankPanel.bankType == Enum.BankType.Character then
+				-- Check if this is a character bank tab request using addon state
+				-- instead of reading BankPanel.bankType field (avoids taint)
+				if not addon.atWarbank then
 					-- For character bank tabs, we need to get the bag information
 					local bagID = const.BANK_ONLY_BAGS_LIST[id]
 					if bagID then
@@ -184,6 +186,7 @@ function bank.proto:OnCreate(ctx)
 			end,
 		}
 	end
+	end -- Close BankPanel validation check
 
 	self.bag.tabs = tabs:Create(self.bag.frame)
 
@@ -202,7 +205,7 @@ function bank.proto:OnCreate(ctx)
 		if tabID and tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
 			if button == "RightButton" then
 				-- Show settings menu for character bank tabs
-				if BankPanel.SetBankType then
+				if BankPanel and BankPanel.SetBankType then
 					BankPanel:SetBankType(Enum.BankType.Character)
 				end
 				local bagIndex = tabID
@@ -210,15 +213,19 @@ function bank.proto:OnCreate(ctx)
 				local characterTabData = C_Bank
 					and C_Bank.FetchPurchasedBankTabData
 					and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
-				if characterTabData then
+				if characterTabData and BankPanel and BankPanel.FetchPurchasedBankTabData then
 					BankPanel:FetchPurchasedBankTabData()
 				end
-				BankPanel.TabSettingsMenu:Show()
-				BankPanel.TabSettingsMenu:SetSelectedTab(bagIndex)
-				BankPanel.TabSettingsMenu:Update()
+				if BankPanel and BankPanel.TabSettingsMenu then
+					BankPanel.TabSettingsMenu:Show()
+					BankPanel.TabSettingsMenu:SetSelectedTab(bagIndex)
+					BankPanel.TabSettingsMenu:Update()
+				end
 			else
-				BankPanel.TabSettingsMenu:Hide()
-				if BankPanel.SetBankType then
+				if BankPanel and BankPanel.TabSettingsMenu then
+					BankPanel.TabSettingsMenu:Hide()
+				end
+				if BankPanel and BankPanel.SetBankType then
 					BankPanel:SetBankType(Enum.BankType.Character)
 				end
 			end
@@ -226,27 +233,96 @@ function bank.proto:OnCreate(ctx)
 			return true -- Tab switch handled, allow selection
 		elseif tabID == 1 then
 			-- Bank tab
-			BankPanel.TabSettingsMenu:Hide()
-			if BankPanel.SetBankType then
+			if BankPanel and BankPanel.TabSettingsMenu then
+				BankPanel.TabSettingsMenu:Hide()
+			end
+			if BankPanel and BankPanel.SetBankType then
 				BankPanel:SetBankType(Enum.BankType.Character)
 			end
 			behavior:SwitchToBank(ectx)
 			return true -- Tab switch handled, allow selection
 		else
 			-- Warbank tabs
-			if button == "RightButton" or BankPanel.TabSettingsMenu:IsShown() then
-				if BankPanel.SetBankType then
+			local showSettings = button == "RightButton"
+			if BankPanel and BankPanel.TabSettingsMenu then
+				showSettings = showSettings or BankPanel.TabSettingsMenu:IsShown()
+			end
+			if showSettings then
+				if BankPanel and BankPanel.SetBankType then
 					BankPanel:SetBankType(Enum.BankType.Account)
 				end
-				BankPanel:FetchPurchasedBankTabData()
-				BankPanel.TabSettingsMenu:Show()
-				BankPanel.TabSettingsMenu:SetSelectedTab(tabID)
-				BankPanel.TabSettingsMenu:Update()
+				if BankPanel and BankPanel.FetchPurchasedBankTabData then
+					BankPanel:FetchPurchasedBankTabData()
+				end
+				if BankPanel and BankPanel.TabSettingsMenu then
+					BankPanel.TabSettingsMenu:Show()
+					BankPanel.TabSettingsMenu:SetSelectedTab(tabID)
+					BankPanel.TabSettingsMenu:Update()
+				end
 			end
 			behavior:SwitchToAccountBank(ectx, tabID)
 			return true -- Tab switch handled, allow selection
 		end
 	end)
+
+	-- Create character bank purchase button (like Baganator pattern)
+	-- Button is parented to bank frame (secure context) to avoid taint
+	self.characterPurchaseButton = CreateFrame("Button", nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
+	self.characterPurchaseButton:SetAttribute("overrideBankType", Enum.BankType.Character)
+	self.characterPurchaseButton:SetSize(32, 32)
+	self.characterPurchaseButton:HookScript("OnClick", function()
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+	end)
+	self.characterPurchaseButton:SetScript("OnEnter", function(btn)
+		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L:G("Purchase Character Bank Tab"))
+		if C_Bank and C_Bank.FetchNextPurchasableBankTabData then
+			local tabData = C_Bank.FetchNextPurchasableBankTabData(Enum.BankType.Character)
+			if tabData and tabData.tabCost then
+				local cost = tabData.tabCost
+				if cost > GetMoney() then
+					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 0, 0)
+				else
+					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 1, 1)
+				end
+			end
+		end
+		GameTooltip:Show()
+	end)
+	self.characterPurchaseButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	self.characterPurchaseButton:SetNormalTexture("Interface\\GuildBankFrame\\UI-GuildBankFrame-NewTab")
+	self.characterPurchaseButton:Hide() -- Hidden by default, shown in GenerateCharacterBankTabs
+
+	-- Create account bank purchase button
+	self.accountPurchaseButton = CreateFrame("Button", nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
+	self.accountPurchaseButton:SetAttribute("overrideBankType", Enum.BankType.Account)
+	self.accountPurchaseButton:SetSize(32, 32)
+	self.accountPurchaseButton:HookScript("OnClick", function()
+		PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+	end)
+	self.accountPurchaseButton:SetScript("OnEnter", function(btn)
+		GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L:G("Purchase Warbank Tab"))
+		if C_Bank and C_Bank.FetchNextPurchasableBankTabData then
+			local tabData = C_Bank.FetchNextPurchasableBankTabData(Enum.BankType.Account)
+			if tabData and tabData.tabCost then
+				local cost = tabData.tabCost
+				if cost > GetMoney() then
+					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 0, 0)
+				else
+					GameTooltip:AddLine(L:G("Cost") .. ": " .. GetMoneyString(cost, true), 1, 1, 1)
+				end
+			end
+		end
+		GameTooltip:Show()
+	end)
+	self.accountPurchaseButton:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
+	self.accountPurchaseButton:SetNormalTexture("Interface\\GuildBankFrame\\UI-GuildBankFrame-NewTab")
+	self.accountPurchaseButton:Hide() -- Hidden by default, shown in GenerateWarbankTabs
 end
 
 function bank.proto:OnRefresh()
@@ -346,6 +422,18 @@ function bank.proto:GenerateCharacterBankTabs(ctx)
 	-- Sort tabs by ID to ensure proper order
 	self.bag.tabs:SortTabsByID()
 
+	-- Show character bank purchase button if available
+	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+		and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
+		and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
+		self.characterPurchaseButton:ClearAllPoints()
+		-- Position below the tabs container
+		self.characterPurchaseButton:SetPoint("TOPLEFT", self.bag.tabs.frame, "BOTTOMLEFT", 0, -5)
+		self.characterPurchaseButton:Show()
+	else
+		self.characterPurchaseButton:Hide()
+	end
+
 	-- Adjust frame width if needed
 	local w = self.bag.tabs.width
 	if
@@ -365,6 +453,18 @@ function bank.proto:GenerateWarbankTabs(ctx)
 		elseif not self.bag.tabs:TabExistsByID(data.ID) then
 			self.bag.tabs:AddTab(ctx, data.name, data.ID)
 		end
+	end
+
+	-- Show account bank purchase button if available
+	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
+		and C_Bank.CanPurchaseBankTab(Enum.BankType.Account)
+		and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
+		self.accountPurchaseButton:ClearAllPoints()
+		-- Position below the tabs container
+		self.accountPurchaseButton:SetPoint("TOPLEFT", self.bag.tabs.frame, "BOTTOMLEFT", 0, -5)
+		self.accountPurchaseButton:Show()
+	else
+		self.accountPurchaseButton:Hide()
 	end
 
 	local w = self.bag.tabs.width
@@ -421,12 +521,10 @@ end
 ---@param ctx Context
 function bank.proto:SwitchToBank(ctx)
 	self.bag.bankTab = Enum.BagIndex.Characterbanktab
-	BankFrame.selectedTab = 1
 	self.bag:SetTitle(L:G("Bank"))
 	self.bag.currentItemCount = -1
-	BankFrame.activeTabIndex = 1
-	BankPanel.selectedTabID = nil
 	-- Set the active bank type so right-click item movement works correctly
+	-- Let Blizzard handle BankFrame field updates via events
 	if BankPanel and BankPanel.SetBankType then
 		BankPanel:SetBankType(Enum.BankType.Character)
 	end
@@ -446,10 +544,8 @@ end
 ---@param tabID number
 function bank.proto:SwitchToCharacterBankTab(ctx, tabID)
 	self.bag.bankTab = tabID
-	BankFrame.selectedTab = 1
-	BankFrame.activeTabIndex = 1
-	BankPanel.selectedTabID = nil
 	-- Set the active bank type so right-click item movement works correctly
+	-- Let Blizzard handle BankFrame field updates via events
 	if BankPanel and BankPanel.SetBankType then
 		BankPanel:SetBankType(Enum.BankType.Character)
 	end
@@ -472,24 +568,24 @@ end
 ---@return boolean
 function bank.proto:SwitchToAccountBank(ctx, tabIndex)
 	self.bag.bankTab = tabIndex
-	BankFrame.selectedTab = 1
-	BankFrame.activeTabIndex = 3
 	-- Set the active bank type so right-click item movement works correctly
+	-- Let Blizzard handle BankFrame field updates via events
 	if BankPanel and BankPanel.SetBankType then
 		BankPanel:SetBankType(Enum.BankType.Account)
 	end
 	local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
 	for _, data in pairs(tabData) do
 		if data.ID == tabIndex then
-			if BankPanel.SelectTab then
+			-- Use SelectTab method instead of direct field assignment
+			if BankPanel and BankPanel.SelectTab then
 				BankPanel:SelectTab(data.ID)
-			else
-				BankPanel.selectedTabID = data.ID
 			end
 			break
 		end
 	end
-	BankPanel:TriggerEvent(BankPanelMixin.Event.BankTabClicked, tabIndex)
+	if BankPanel and BankPanel.TriggerEvent then
+		BankPanel:TriggerEvent(BankPanelMixin.Event.BankTabClicked, tabIndex)
+	end
 	self.bag:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
 	self.bag.currentItemCount = -1
 	self.bag:Wipe(ctx)
@@ -508,9 +604,8 @@ function bank.proto:SwitchToBankAndWipe(ctx)
 	-- Set bankTab first to ensure it's always valid for refresh operations
 	-- Use Characterbanktab as Bank was removed in TWW 11.2
 	self.bag.bankTab = Enum.BagIndex.Characterbanktab
-	BankFrame.selectedTab = 1
-	BankFrame.activeTabIndex = 1
 	-- Set the active bank type so right-click item movement works correctly
+	-- Let Blizzard handle BankFrame field updates via events
 	if BankPanel and BankPanel.SetBankType then
 		BankPanel:SetBankType(Enum.BankType.Character)
 	end
