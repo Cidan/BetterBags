@@ -191,11 +191,6 @@ function config:CreateConfig()
       end,
     })
 
-    f:AddSubSection({
-      title = 'Categories',
-      description = 'Settings for Blizzard item categories in the ' .. string.lower(bagType.name) .. '.',
-    })
-
     f:AddLabel({
       description = 'To create a custom category, drag an item into the bag button on the top of your bag and let go.',
     })
@@ -284,11 +279,6 @@ function config:CreateConfig()
       end
     })
 
-    f:AddSubSection({
-      title = 'Item Stacking',
-      description = 'Settings for item stacking in the ' .. string.lower(bagType.name) .. '.',
-    })
-
     f:AddCheckbox({
       title = 'All Items Recent',
       description = 'All new items you loot, pickup, or move into the bag will be marked as recent.',
@@ -371,12 +361,6 @@ function config:CreateConfig()
       end
     })
 
-
-    f:AddSubSection({
-      title = 'Item Level',
-      description = 'Settings for item level in the ' .. string.lower(bagType.name) .. '.',
-    })
-
     f:AddCheckbox({
       title = 'Show Item Level',
       description = 'Show the item level on item buttons in the ' .. string.lower(bagType.name) .. '.',
@@ -399,12 +383,6 @@ function config:CreateConfig()
         db:GetItemLevelOptions(bagType.kind).color = value
         events:SendMessage(ctx, 'bags/FullRefreshAll')
       end
-    })
-
-
-    f:AddSubSection({
-      title = 'Display',
-      description = 'Settings that adjust layout and visual aspects of the ' .. string.lower(bagType.name) .. '.',
     })
 
     f:AddCheckbox({
