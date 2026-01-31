@@ -242,6 +242,12 @@ function stackedLayout:SwitchToTab(tabIndex)
     -- Update the target frame (inner) height to match the new tab
     self.targetFrame:SetHeight(newTabHeight)
 
+    -- Notify the scroll box that content size has changed
+    if self.scrollBox and self.scrollBox.FullUpdate then
+      local _ = self.targetFrame:GetHeight() -- Force layout update
+      self.scrollBox:FullUpdate(true)
+    end
+
     -- Fade in new tab
     newContainer:Show()
     newContainer:SetAlpha(0)

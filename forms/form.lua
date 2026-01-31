@@ -71,6 +71,8 @@ function form:Create(opts)
   l.ScrollBar:SetHideIfUnscrollable(true)
 
   l.inner = CreateFrame('Frame', nil, l.ScrollBox)
+  l.inner:SetPoint("TOPLEFT", l.ScrollBox)
+  l.inner:SetPoint("TOPRIGHT", l.ScrollBox)
   l.inner.scrollable = true
 
   local view = CreateScrollBoxLinearView()
@@ -98,25 +100,23 @@ end
 
 function formFrame:Resize()
   if self.layout.tabbed then
-    -- In tabbed mode, find the tallest tab and set inner frame to that height
-    -- This ensures scrolling works consistently regardless of which tab is active
-    local maxHeight = 0
-    for _, height in ipairs(self.layout.tabHeights) do
-      if height > maxHeight then
-        maxHeight = height
-      end
-    end
-    maxHeight = maxHeight + 25
-
     -- Update all tab container heights to their calculated values
     for i, container in ipairs(self.layout.tabContainers) do
       local tabHeight = (self.layout.tabHeights[i] or 0) + 25
       container:SetHeight(tabHeight)
     end
 
-    -- Set inner frame to the tallest tab's height
-    self.inner:SetHeight(maxHeight)
+    -- Set inner frame to the ACTIVE tab's height, not the max
+    -- This allows the scroll area to resize dynamically when switching tabs
+    local activeTabHeight = (self.layout.tabHeights[self.layout.activeTab] or 0) + 25
+    self.inner:SetHeight(activeTabHeight)
     self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
+
+    -- Force a layout update by reading the height, then notify scroll box
+    local _ = self.inner:GetHeight()
+    if self.ScrollBox and self.ScrollBox.FullUpdate then
+      self.ScrollBox:FullUpdate(true)
+    end
   else
     self.inner:SetHeight(self.layout.height + 25)
     self.inner:SetWidth(self.ScrollBox:GetWidth() - 18)
