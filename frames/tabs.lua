@@ -259,10 +259,12 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 
 	decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
 
-	-- For purchase tabs (negative IDs), disable mouse on decoration to let clicks pass through to secure tab button
+	-- For purchase tabs (negative IDs), make decoration forward clicks to the secure tab button
+	-- while keeping mouse enabled for hover effects (highlighting from PanelTabButtonTemplate)
 	if tab.id and tab.id < 0 then
-		decoration:EnableMouse(false)
-		decoration:EnableMouseWheel(false)
+		-- Make decoration act as a click forwarder to the secure purchase button
+		decoration:SetAttribute("type", "click")
+		decoration:SetAttribute("clickbutton", tab)
 		return
 	end
 
