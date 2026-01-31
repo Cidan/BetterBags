@@ -146,6 +146,12 @@ function bank.proto:OnShow(ctx)
 end
 
 function bank.proto:OnHide()
+	-- IMPORTANT: Do NOT touch BankPanel or call CloseBankFrame() here.
+	-- OnHide runs in protected context when triggered by UISpecialFrames (ESC key).
+	-- Any BankPanel manipulation here causes persistent taint that breaks UseContainerItem()
+	-- for ALL containers (including backpack) after the bank is closed.
+	-- See patterns.md for details.
+
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
 
@@ -153,35 +159,11 @@ function bank.proto:OnHide()
 	if database:GetEnableBagFading() then
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-
-			-- Hide BankPanel after fade completes to prevent taint
-			if BankPanel then
-				BankPanel:Hide()
-			end
-
-			if C_Bank then
-				C_Bank.CloseBankFrame()
-			else
-				CloseBankFrame()
-			end
-
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 		end
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
-
-		-- Hide BankPanel to prevent taint from affecting other container operations
-		if BankPanel then
-			BankPanel:Hide()
-		end
-
-		if C_Bank then
-			C_Bank.CloseBankFrame()
-		else
-			CloseBankFrame()
-		end
-
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 	end
 end

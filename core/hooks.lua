@@ -125,11 +125,11 @@ function addon:CloseSpecialWindows(interactingFrame)
     end)
   end
   events:SendMessage(ctx, 'addon/CloseSpecialWindows')
-  if C_Bank then
-    C_Bank.CloseBankFrame()
-  else
-    CloseBankFrame()
-  end
+
+  -- Don't call CloseBankFrame() here - Blizzard's CloseSpecialWindows() already
+  -- handles closing the bank if it's open. Our BANKFRAME_CLOSED handler will
+  -- clean up BankPanel safely.
+
   events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 
@@ -142,5 +142,12 @@ function addon.CloseBank(ctx, _, interactingFrame)
     addon.Bags.Bank:Hide(ctx)
     addon.Bags.Bank:SwitchToBankAndWipe(ctx)
   end
+
+  -- Hide BankPanel in event handler context (safe from taint)
+  -- This must happen AFTER the bank frame is hidden to prevent taint
+  if BankPanel then
+    BankPanel:Hide()
+  end
+
   events:SendMessage(ctx, 'bags/BankClosed')
 end

@@ -122,6 +122,81 @@ end)
 
 **When to Apply**: Any time you need to hook mouse events on buttons that use `ContainerFrameItemButtonTemplate` or any button where clicks can trigger protected functions.
 
+### Pattern: Never Manipulate Blizzard Frames from OnHide/OnShow Scripts Triggered by UISpecialFrames
+**Problem**: Touching BankPanel or calling CloseBankFrame() from frame OnHide/OnShow scripts causes persistent taint that breaks UseContainerItem() for ALL containers (including backpack) after the bank is closed via ESC key.
+
+**Why**: When ESC is pressed, WoW's engine calls `CloseSpecialWindows()` which iterates through `UISpecialFrames` and hides each frame. This hiding happens in a protected execution context. Any frame scripts (OnHide/OnShow) that execute during this process are still within the protected context. If these scripts touch Blizzard frames like BankPanel or call protected functions like CloseBankFrame(), they create persistent taint. Later, when the user opens their backpack and uses an item, Blizzard's protected `UseContainerItem()` calls `BankFrame:GetActiveBankType()` which reads from the tainted BankPanel, causing the action to be blocked.
+
+**Solution Pattern**:
+1. **Never touch BankPanel in OnHide/OnShow scripts** - move all BankPanel manipulation to event handlers
+2. **Never call CloseBankFrame() in OnHide** - let Blizzard's CloseSpecialWindows handle it, or call it from event handlers
+3. **Use BANKFRAME_OPENED/CLOSED event handlers** for safe BankPanel manipulation (these run in addon context, not protected context)
+4. **Keep OnHide/OnShow scripts minimal** - only handle your own addon's UI cleanup (sounds, animations, frame hiding)
+
+**Example**:
+```lua
+-- BAD: OnHide touches BankPanel (runs in protected context from UISpecialFrames)
+function bank.proto:OnHide()
+  addon.ForceHideBlizzardBags()
+  PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
+
+  -- WRONG: These calls create persistent taint!
+  if BankPanel then
+    BankPanel:Hide()  -- Taints BankPanel
+  end
+  if C_Bank then
+    C_Bank.CloseBankFrame()  -- Duplicate call in protected context
+  end
+end
+
+-- GOOD: OnHide only handles own UI, no Blizzard frame manipulation
+function bank.proto:OnHide()
+  -- IMPORTANT: Do NOT touch BankPanel or call CloseBankFrame() here.
+  -- OnHide runs in protected context when triggered by UISpecialFrames (ESC key).
+  -- Any BankPanel manipulation here causes persistent taint.
+
+  addon.ForceHideBlizzardBags()
+  PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
+
+  if database:GetEnableBagFading() then
+    self.bag.fadeOutGroup.callback = function()
+      self.bag.fadeOutGroup.callback = nil
+      ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+    end
+    self.bag.fadeOutGroup:Play()
+  else
+    self.bag.frame:Hide()
+    ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+  end
+end
+
+-- GOOD: BankPanel manipulation in event handler (safe context)
+function addon.CloseBank(ctx, _, interactingFrame)
+  if interactingFrame ~= nil then return end
+  if addon.Bags.Bank then
+    addon.Bags.Bank:Hide(ctx)
+    addon.Bags.Bank:SwitchToBankAndWipe(ctx)
+  end
+
+  -- Safe to hide BankPanel here - event handler runs in addon context
+  if BankPanel then
+    BankPanel:Hide()
+  end
+
+  events:SendMessage(ctx, 'bags/BankClosed')
+end
+```
+
+**When to Apply**:
+- Any time implementing custom bank frame behavior with UISpecialFrames registration
+- When hooking CloseSpecialWindows or handling BANKFRAME_OPENED/CLOSED events
+- Any frame that can be closed via ESC key and interacts with Blizzard's protected frames
+
+**Related Files**:
+- bags/bank.lua:148-187 (OnHide method)
+- core/hooks.lua:111-134 (CloseSpecialWindows hook)
+- core/hooks.lua:138-153 (CloseBank event handler)
+
 ## State Management Across Events
 
 ### Pattern: Context Filter Propagation
