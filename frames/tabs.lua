@@ -274,13 +274,14 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				tab.onClick()
 				return
 			end
-			if self.clickHandler and (self.selectedTab ~= index or button == "RightButton") then
+			-- Use tab.index instead of captured index parameter to handle re-indexing after sort
+			if self.clickHandler and (self.selectedTab ~= tab.index or button == "RightButton") then
 				local shouldSelect = self.clickHandler(ectx, tab.id or tab.index, button)
 				if shouldSelect ~= false then
 					if tab.id then
 						self:SetTabByID(ectx, tab.id)
 					else
-						self:SetTabByIndex(ectx, index)
+						self:SetTabByIndex(ectx, tab.index)
 					end
 				end
 			end
