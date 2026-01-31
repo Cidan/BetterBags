@@ -172,6 +172,30 @@ function stackedLayout:addIndex(title, point, sub)
   -- Change OnClick behavior based on mode
   if self.tabbed then
     local tabIndex = #self.sections + 1
+    indexButton.tabIndex = tabIndex -- Store tab index for hover logic
+
+    -- Add hover glow effect
+    indexButton:SetScript("OnEnter", function()
+      -- Animate the text with a subtle glow
+      fs:SetTextColor(1, 0.9, 0.5) -- Warm golden color
+      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+      fs:SetShadowOffset(0, 0) -- No offset creates a glow effect
+    end)
+
+    indexButton:SetScript("OnLeave", function()
+      -- Only reset if not the active tab
+      if self.activeTab ~= tabIndex then
+        fs:SetTextColor(1, 1, 1)
+        fs:SetShadowColor(0, 0, 0, 1)
+        fs:SetShadowOffset(1, -1)
+      else
+        -- Keep active tab golden with glow
+        fs:SetTextColor(1, 0.82, 0)
+        fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+        fs:SetShadowOffset(0, 0)
+      end
+    end)
+
     indexButton:SetScript("OnClick", function()
       self:SwitchToTab(tabIndex)
     end)
@@ -289,11 +313,15 @@ function stackedLayout:UpdateTabHighlighting(activeIndex)
     local button = section.button
     local fs = button:GetFontString()
     if i == activeIndex then
-      -- Highlight active tab
+      -- Highlight active tab with golden color and glow
       fs:SetTextColor(1, 0.82, 0)  -- Gold color
+      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+      fs:SetShadowOffset(0, 0)  -- No offset creates a glow effect
     else
       -- Normal color for inactive tabs
       fs:SetTextColor(1, 1, 1)
+      fs:SetShadowColor(0, 0, 0, 1)
+      fs:SetShadowOffset(1, -1)
     end
   end
 end
