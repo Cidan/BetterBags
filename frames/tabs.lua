@@ -47,9 +47,12 @@ local tabFrame = {}
 ---@param id? number
 ---@param onClick? fun()
 ---@param sabtClick? Button
-function tabFrame:AddTab(ctx, name, id, onClick, sabtClick)
+---@param customParent? Frame
+---@param template? string
+function tabFrame:AddTab(ctx, name, id, onClick, sabtClick, customParent, template)
 	---@type TabButton
-	local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), self.tabCount), self.frame) --[[@as TabButton]]
+	local parent = customParent or self.frame
+	local tab = CreateFrame("Button", format("%sTab%d", self.frame:GetName(), self.tabCount), parent, template) --[[@as TabButton]]
 	tab.sabtClick = sabtClick
 	tab.onClick = onClick
 	tab.name = name
@@ -161,6 +164,12 @@ function tabFrame:SortTabsByID()
 			return true
 		end
 
+		-- If both have negative IDs (purchase tabs), sort by absolute value
+		-- This ensures -1 (Purchase Bank Tab) comes before -2 (Purchase Warbank Tab)
+		if a.id and b.id and a.id < 0 and b.id < 0 then
+			return math.abs(a.id) < math.abs(b.id)
+		end
+
 		-- If both have IDs, sort by ID
 		if a.id and b.id then
 			return a.id < b.id
@@ -249,6 +258,14 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 	tab:SetHeight(32)
 
 	decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
+
+	-- For purchase tabs (negative IDs), disable mouse on decoration to let clicks pass through to secure tab button
+	if tab.id and tab.id < 0 then
+		decoration:EnableMouse(false)
+		decoration:EnableMouseWheel(false)
+		return
+	end
+
 	if not tab.sabtClick then
 		addon.SetScript(decoration, "OnClick", function(ectx, _, button)
 			if tab.onClick then

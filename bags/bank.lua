@@ -408,11 +408,14 @@ function bank.proto:GenerateCharacterBankTabs(ctx)
 		and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
 		-- Add purchase tab if it doesn't exist
 		if not self.bag.tabs:TabExistsByID(-1) then
-			local behavior = self
-			self.bag.tabs:AddTab(ctx, L:G("Purchase Bank Tab"), -1, function(tabCtx)
-				-- Custom click handler: trigger purchase dialog instead of switching views
-				behavior:TriggerPurchaseDialog(Enum.BankType.Character)
-			end)
+			-- Use secure template without custom onClick - let template handle purchase
+			self.bag.tabs:AddTab(ctx, L:G("Purchase Bank Tab"), -1, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
+
+			-- Set the bank type attribute required by the secure template
+			local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Bank Tab"))
+			if purchaseTab then
+				purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Character)
+			end
 		else
 			self.bag.tabs:ShowTabByID(-1)
 		end
@@ -453,11 +456,14 @@ function bank.proto:GenerateWarbankTabs(ctx)
 		and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
 		-- Add purchase tab if it doesn't exist
 		if not self.bag.tabs:TabExistsByID(-2) then
-			local behavior = self
-			self.bag.tabs:AddTab(ctx, L:G("Purchase Warbank Tab"), -2, function(tabCtx)
-				-- Custom click handler: trigger purchase dialog instead of switching views
-				behavior:TriggerPurchaseDialog(Enum.BankType.Account)
-			end)
+			-- Use secure template without custom onClick - let template handle purchase
+			self.bag.tabs:AddTab(ctx, L:G("Purchase Warbank Tab"), -2, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
+
+			-- Set the bank type attribute required by the secure template
+			local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Warbank Tab"))
+			if purchaseTab then
+				purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Account)
+			end
 		else
 			self.bag.tabs:ShowTabByID(-2)
 		end
