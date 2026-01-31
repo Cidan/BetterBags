@@ -277,6 +277,7 @@ const.EXPANSION_TYPE = {
   LE_EXPANSION_SHADOWLANDS = 8,
   LE_EXPANSION_DRAGONFLIGHT = 9,
   LE_EXPANSION_WAR_WITHIN = 10,
+  LE_EXPANSION_MIDNIGHT = 11,
 }
 
 const.OFFSETS = {
@@ -447,6 +448,7 @@ const.EXPANSION_MAP = {
 
 if addon.isRetail then
   const.EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = _G.EXPANSION_NAME10
+  const.EXPANSION_MAP[_G.LE_EXPANSION_MIDNIGHT] = _G.EXPANSION_NAME11
 end
 
 -- TBC Anniversary uses special expansion ID 254 for TBC items
@@ -471,6 +473,7 @@ const.BRIEF_EXPANSION_MAP = {
 
 if addon.isRetail then
   const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = "tww"
+  const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_MIDNIGHT] = "midnight"
 end
 
 -- TBC Anniversary uses special expansion ID 254 for TBC items
