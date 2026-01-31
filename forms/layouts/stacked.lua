@@ -518,7 +518,12 @@ function stackedLayout:AddSubSection(opts)
   div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 33)
-  self:addIndex(opts.title, container, true)
+
+  -- Only create index/tab button if skipIndex is not set
+  if not opts.skipIndex then
+    self:addIndex(opts.title, container, true)
+  end
+
   self.nextFrame = container
   self:addHeight(container:GetHeight())
 end

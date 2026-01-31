@@ -74,6 +74,7 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormSubSectionOptions
 ---@field title string
 ---@field description string
+---@field skipIndex? boolean -- If true, don't create a tab/index button for this subsection
 
 ---@class (exact) FormCheckboxOptions
 ---@field title string
