@@ -288,15 +288,15 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		if not decoration.tabIcon then
 			local icon = decoration:CreateTexture(nil, "OVERLAY")
 			icon:SetSize(16, 16)
-			icon:SetPoint("CENTER", decoration, "CENTER", 0, -2)
+			icon:SetPoint("CENTER", decoration, "CENTER", 0, 1)
 			decoration.tabIcon = icon
 		end
 		decoration.tabIcon:SetAtlas(tab.icon)
 		decoration.tabIcon:Show()
 
-		-- Set fixed width for icon tabs
-		tab:SetWidth(36)
-		decoration:SetWidth(36)
+		-- Let PanelTemplates handle the width (minimum is enforced by template textures)
+		PanelTemplates_TabResize(decoration)
+		tab:SetWidth(decoration:GetWidth())
 	else
 		-- Text tab: show text, hide icon if it exists
 		decoration.Text:SetText(tab.name)
