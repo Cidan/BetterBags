@@ -15,10 +15,14 @@ local animations = addon:GetModule('Animations')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class SearchCategoryConfig: AceModule
 ---@field frame Frame
 ---@field openedName string
 ---@field queryBox InputScrollFrameTemplate
+---@field selectedGroupBy number
 local searchCategoryConfig = addon:NewModule('SearchCategoryConfig')
 
 function searchCategoryConfig:CheckNameboxText()
@@ -36,7 +40,7 @@ function searchCategoryConfig:OnEnable()
   self.frame = CreateFrame("Frame", addonName .. "SearchCategoryConfig", UIParent)
   themes:RegisterFlatWindow(self.frame, "Configure Search Category")
 
-  self.frame:SetSize(430, 380)
+  self.frame:SetSize(430, 450)
   self.frame:SetPoint("CENTER")
   self.frame:SetMovable(true)
   self.frame:EnableMouse(true)
@@ -104,8 +108,60 @@ function searchCategoryConfig:OnEnable()
     end
   end)
 
+  -- Group By dropdown
+  self.groupByLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.groupByLabel:SetPoint("TOPLEFT", self.priorityBox, "BOTTOMLEFT", -2, -20)
+  self.groupByLabel:SetText("Group By")
+
+  self.selectedGroupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE
+
+  local groupByOptions = {
+    {text = "None", value = const.SEARCH_CATEGORY_GROUP_BY.NONE},
+    {text = "Type", value = const.SEARCH_CATEGORY_GROUP_BY.TYPE},
+    {text = "Subtype", value = const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE},
+    {text = "Expansion", value = const.SEARCH_CATEGORY_GROUP_BY.EXPANSION},
+  }
+
+  if addon.isRetail then
+    self.groupByDropdown = CreateFrame("DropdownButton", addonName .. "SearchCategoryGroupByDropdown", self.frame, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
+    self.groupByDropdown:SetPoint("TOPLEFT", self.groupByLabel, "BOTTOMLEFT", 0, -5)
+    self.groupByDropdown:SetWidth(200)
+
+    self.groupByDropdown:SetupMenu(function(_, root)
+      for _, option in ipairs(groupByOptions) do
+        root:CreateRadio(option.text, function()
+          return self.selectedGroupBy == option.value
+        end, function()
+          self.selectedGroupBy = option.value
+        end)
+      end
+    end)
+  else
+    -- Classic/Era dropdown using UIDropDownMenuTemplate
+    self.groupByDropdown = CreateFrame("Frame", addonName .. "SearchCategoryGroupByDropdown", self.frame, "UIDropDownMenuTemplate") --[[@as Frame]]
+    self.groupByDropdown:SetPoint("TOPLEFT", self.groupByLabel, "BOTTOMLEFT", -15, -5)
+
+    UIDropDownMenu_SetWidth(self.groupByDropdown, 185)
+    UIDropDownMenu_SetText(self.groupByDropdown, "None")
+
+    UIDropDownMenu_Initialize(self.groupByDropdown, function(_, level, _)
+      for _, option in ipairs(groupByOptions) do
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = option.text
+        info.checked = function()
+          return self.selectedGroupBy == option.value
+        end
+        info.func = function()
+          self.selectedGroupBy = option.value
+          UIDropDownMenu_SetText(self.groupByDropdown, option.text)
+        end
+        UIDropDownMenu_AddButton(info, level)
+      end
+    end)
+  end
+
   self.errorText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  self.errorText:SetPoint("TOPLEFT", self.priorityBox, "BOTTOMLEFT", 0, -20)
+  self.errorText:SetPoint("TOPLEFT", self.groupByDropdown, "BOTTOMLEFT", addon.isRetail and 0 or 15, -20)
   self.errorText:SetWidth(self.frame:GetWidth() - 40)
   self.errorText:SetText("")
   self.errorText:SetTextColor(1, 0, 0)
@@ -133,6 +189,7 @@ function searchCategoryConfig:OnEnable()
       itemList = {},
       searchCategory = {
         query = query,
+        groupBy = self.selectedGroupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE,
       }
     })
     if self.openedName ~= name and self.openedName ~= nil and self.openedName ~= "" then
@@ -175,6 +232,23 @@ function searchCategoryConfig:Open(filter, f)
   self.openedName = filter.name
   self.queryBox.EditBox:SetText(filter.searchCategory.query)
   self.priorityBox:SetText(tostring(filter.priority) or "10")
+
+  -- Load groupBy value
+  self.selectedGroupBy = filter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+
+  -- Update dropdown display
+  local groupByTexts = {
+    [const.SEARCH_CATEGORY_GROUP_BY.NONE] = "None",
+    [const.SEARCH_CATEGORY_GROUP_BY.TYPE] = "Type",
+    [const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE] = "Subtype",
+    [const.SEARCH_CATEGORY_GROUP_BY.EXPANSION] = "Expansion",
+  }
+  if addon.isRetail then
+    self.groupByDropdown:GenerateMenu()
+  else
+    UIDropDownMenu_SetText(self.groupByDropdown, groupByTexts[self.selectedGroupBy])
+  end
+
   self.fadeInGroup.callback = function()
     self.nameBox:SetFocus()
     self:CheckNameboxText()

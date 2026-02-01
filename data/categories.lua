@@ -20,6 +20,7 @@ local context = addon:GetModule('Context')
 
 ---@class SearchCategory
 ---@field query string The search query for the category.
+---@field groupBy? number The groupBy type (0=None, 1=Type, 2=Subtype, 3=Expansion). Default is 0 (None).
 
 ---@class (exact) CustomCategoryFilter
 ---@field name string The name of this category as it appears for the user.

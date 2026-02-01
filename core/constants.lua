@@ -257,6 +257,14 @@ const.SECTION_SORT_TYPE = {
   SIZE_ASCENDING = 3,
 }
 
+---@enum SearchCategoryGroupBy
+const.SEARCH_CATEGORY_GROUP_BY = {
+  NONE = 0,
+  TYPE = 1,
+  SUBTYPE = 2,
+  EXPANSION = 3,
+}
+
 ---@enum ItemSortType
 const.ITEM_SORT_TYPE = {
   ALPHABETICALLY_THEN_QUALITY = 1,

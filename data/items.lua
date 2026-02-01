@@ -931,13 +931,50 @@ function items:RefreshSearchCache(kind)
 	for _, categoryFilter in ipairs(categoryTable) do
 		if categoryFilter.enabled[kind] then
 			local results = search:Search(categoryFilter.searchCategory.query)
+			local groupBy = categoryFilter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+
 			for slotkey, match in pairs(results) do
 				if match then
-					self.searchCache[kind][slotkey] = categoryFilter.name
+					local categoryName = categoryFilter.name
+
+					-- Apply groupBy logic to generate dynamic category name
+					if groupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
+						local itemData = self:GetItemDataFromSlotKey(slotkey)
+						if itemData and not itemData.isItemEmpty then
+							local suffix = self:GetGroupBySuffix(itemData, groupBy)
+							if suffix and suffix ~= "" then
+								categoryName = categoryFilter.name .. " - " .. suffix
+							end
+						end
+					end
+
+					self.searchCache[kind][slotkey] = categoryName
 				end
 			end
 		end
 	end
+end
+
+---@param data ItemData
+---@param groupBy number
+---@return string|nil
+function items:GetGroupBySuffix(data, groupBy)
+	if not data or data.isItemEmpty then
+		return nil
+	end
+
+	if groupBy == const.SEARCH_CATEGORY_GROUP_BY.TYPE then
+		return data.itemInfo.itemType
+	elseif groupBy == const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE then
+		return data.itemInfo.itemSubType
+	elseif groupBy == const.SEARCH_CATEGORY_GROUP_BY.EXPANSION then
+		if data.itemInfo.expacID and const.EXPANSION_MAP[data.itemInfo.expacID] then
+			return const.EXPANSION_MAP[data.itemInfo.expacID]
+		end
+		return L:G("Unknown")
+	end
+
+	return nil
 end
 
 ---@param ctx Context
