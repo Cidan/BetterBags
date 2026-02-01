@@ -390,6 +390,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   end
 
   -- Check if we should show the empty group message (for non-Backpack groups with no visible sections)
+  local isEmptyGroup = false
   if view.emptyGroupFrame and activeGroup and activeGroup > 1 then
     -- Count visible non-special sections
     local visibleSectionCount = 0
@@ -410,7 +411,24 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end
 
     if visibleSectionCount == 0 then
+      isEmptyGroup = true
       view.emptyGroupFrame:Show()
+      -- Hide special sections too when group is empty
+      for sectionName, section in pairs(view:GetAllSections()) do
+        local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
+        if isSpecialSection then
+          local alreadyHidden = false
+          for _, hiddenSection in ipairs(hiddenCells) do
+            if hiddenSection == section then
+              alreadyHidden = true
+              break
+            end
+          end
+          if not alreadyHidden then
+            table.insert(hiddenCells, section)
+          end
+        end
+      end
     else
       view.emptyGroupFrame:Hide()
     end

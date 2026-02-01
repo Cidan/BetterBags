@@ -384,6 +384,16 @@ end
 ---@return number, number
 function gridProto:stage(options)
   if not options then return 0, 0 end
+
+  -- Explicitly hide masked cells so they don't remain visible at old positions
+  if options.mask then
+    for _, maskCell in ipairs(options.mask) do
+      if maskCell.frame then
+        maskCell.frame:Hide()
+      end
+    end
+  end
+
   local w = 0
   local h = 0
   local columns = self:calculateColumns(options)
