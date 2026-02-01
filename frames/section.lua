@@ -395,6 +395,25 @@ function sectionFrame:HideDragGhost()
   end
 end
 
+-- Reset tab highlights after dragging ends
+function sectionFrame:ResetTabHighlights()
+  local bag = addon.Bags.Backpack
+  if not bag or not bag.tabs then return end
+
+  local ctx = context:New("ResetTabHighlights")
+  for i, tab in ipairs(bag.tabs.tabIndex) do
+    if tab:IsShown() and i ~= bag.tabs.selectedTab then
+      -- Reset to deselected state
+      local themes = addon:GetModule("Themes")
+      local decoration = themes:GetTabButton(ctx, tab)
+      decoration.LeftActive:Hide()
+      decoration.MiddleActive:Hide()
+      decoration.RightActive:Hide()
+    end
+  end
+  GameTooltip:Hide()
+end
+
 -- Perform the drop action on the target tab
 function sectionFrame:PerformDrop()
   if not self.draggingCategory then return end
@@ -606,6 +625,7 @@ function sectionFrame:_DoCreate()
     sectionFrame.draggingCategory = nil
     sectionFrame.dragTargetTab = nil
     sectionFrame:HideDragGhost()
+    sectionFrame:ResetTabHighlights()
   end)
 
   addon.SetScript(title, "OnClick", function(ctx, _, e)
