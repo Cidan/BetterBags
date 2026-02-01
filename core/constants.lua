@@ -583,6 +583,11 @@ const.FORM_LAYOUT = {
 ---@class (exact) CategoryOptions
 ---@field shown boolean
 
+---@class (exact) Group
+---@field id number Unique auto-incremented ID
+---@field name string Display name for the tab
+---@field order number Sort order for tab positioning
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
@@ -822,6 +827,23 @@ const.DATABASE_DEFAULTS = {
     lockedItems = {},
     ---@type number
     newItemTime = 300,
+    -- Groups feature: virtual tabs for organizing categories in backpack
+    ---@type table<number, Group>
+    groups = {
+      [1] = {
+        id = 1,
+        name = "Backpack",
+        order = 1,
+      },
+    },
+    ---@type number
+    groupCounter = 1,
+    ---@type table<string, number>
+    categoryToGroup = {},
+    ---@type table<BagKind, number>
+    activeGroup = {
+      [const.BAG_KIND.BACKPACK] = 1,
+    },
   },
   char = {}
 }

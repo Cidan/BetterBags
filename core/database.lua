@@ -552,6 +552,109 @@ function DB:SetShowAllFreeSpace(kind, value)
   DB.data.profile.showAllFreeSpace[kind] = value
 end
 
+-------
+--- Groups Feature
+-------
+
+---@return table<number, Group>
+function DB:GetAllGroups()
+  return DB.data.profile.groups
+end
+
+---@param groupID number
+---@return Group?
+function DB:GetGroup(groupID)
+  return DB.data.profile.groups[groupID]
+end
+
+---@param name string
+---@return number The new group ID
+function DB:CreateGroup(name)
+  local newID = DB.data.profile.groupCounter + 1
+  DB.data.profile.groupCounter = newID
+  DB.data.profile.groups[newID] = {
+    id = newID,
+    name = name,
+    order = newID,
+  }
+  return newID
+end
+
+---@param groupID number
+function DB:DeleteGroup(groupID)
+  -- Don't allow deleting the default Backpack group (ID 1)
+  if groupID == 1 then return end
+
+  -- Remove category associations for this group
+  for categoryName, gID in pairs(DB.data.profile.categoryToGroup) do
+    if gID == groupID then
+      DB.data.profile.categoryToGroup[categoryName] = nil
+    end
+  end
+
+  -- Remove the group
+  DB.data.profile.groups[groupID] = nil
+
+  -- If this was the active group, switch to Backpack (ID 1)
+  if DB.data.profile.activeGroup[const.BAG_KIND.BACKPACK] == groupID then
+    DB.data.profile.activeGroup[const.BAG_KIND.BACKPACK] = 1
+  end
+end
+
+---@param groupID number
+---@param name string
+function DB:RenameGroup(groupID, name)
+  if DB.data.profile.groups[groupID] then
+    DB.data.profile.groups[groupID].name = name
+  end
+end
+
+---@return number
+function DB:GetNextGroupID()
+  return DB.data.profile.groupCounter + 1
+end
+
+---@param categoryName string
+---@return number? The group ID, or nil if not assigned (belongs to Backpack)
+function DB:GetCategoryGroup(categoryName)
+  return DB.data.profile.categoryToGroup[categoryName]
+end
+
+---@param categoryName string
+---@param groupID number
+function DB:SetCategoryGroup(categoryName, groupID)
+  DB.data.profile.categoryToGroup[categoryName] = groupID
+end
+
+---@param categoryName string
+function DB:RemoveCategoryFromGroup(categoryName)
+  DB.data.profile.categoryToGroup[categoryName] = nil
+end
+
+---@param groupID number
+---@return table<string, boolean> Category names in this group
+function DB:GetGroupCategories(groupID)
+  local categories = {}
+  for categoryName, gID in pairs(DB.data.profile.categoryToGroup) do
+    if gID == groupID then
+      categories[categoryName] = true
+    end
+  end
+  return categories
+end
+
+---@param kind BagKind
+---@return number The active group ID (defaults to 1 for Backpack)
+function DB:GetActiveGroup(kind)
+  return DB.data.profile.activeGroup[kind] or 1
+end
+
+---@param kind BagKind
+---@param groupID number
+function DB:SetActiveGroup(kind, groupID)
+  DB.data.profile.activeGroup[kind] = groupID
+end
+
 -- Export category configuration to a base64-encoded string
 ---@return string
 function DB:ExportSettings()
