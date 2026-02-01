@@ -69,7 +69,8 @@ end
 ---@return string query with group by clause stripped
 function searchCategoryConfig:StripGroupByFromQuery(query)
   -- Remove the group by clause from the end, preserving original case
-  return query:gsub("%s+[Gg][Rr][Oo][Uu][Pp]%s+[Bb][Yy]%s+%w+%s*$", "")
+  local v, _ = query:gsub("%s+[Gg][Rr][Oo][Uu][Pp]%s+[Bb][Yy]%s+%w+%s*$", "")
+  return v
 end
 
 ---@param query string
