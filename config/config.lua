@@ -202,6 +202,21 @@ function config:CreateConfig()
       end,
     })
 
+    -- Enable Groups checkbox - only for Backpack
+    if bagType.kind == const.BAG_KIND.BACKPACK then
+      f:AddCheckbox({
+        title = 'Enable Groups',
+        description = 'Show group tabs at the bottom of the backpack. Groups allow you to organize categories into separate tabs. When disabled, all categories are shown in a single view.',
+        getValue = function(_)
+          return db:GetGroupsEnabled(bagType.kind)
+        end,
+        setValue = function(ctx, value)
+          db:SetGroupsEnabled(bagType.kind, value)
+          events:SendMessage(ctx, 'bags/FullRefreshAll')
+        end
+      })
+    end
+
     f:AddSubSection({
       title = 'Categories',
       description = 'Settings for Blizzard item categories in the ' .. string.lower(bagType.name) .. '.',

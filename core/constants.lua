@@ -844,6 +844,10 @@ const.DATABASE_DEFAULTS = {
     activeGroup = {
       [const.BAG_KIND.BACKPACK] = 1,
     },
+    ---@type table<BagKind, boolean>
+    groupsEnabled = {
+      [const.BAG_KIND.BACKPACK] = true,
+    },
   },
   char = {}
 }

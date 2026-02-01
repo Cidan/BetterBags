@@ -140,6 +140,27 @@ function DB:GetEnableBagFading()
 end
 
 ---@param kind BagKind
+---@return boolean
+function DB:GetGroupsEnabled(kind)
+  if DB.data.profile.groupsEnabled == nil then
+    return true
+  end
+  if DB.data.profile.groupsEnabled[kind] == nil then
+    return true
+  end
+  return DB.data.profile.groupsEnabled[kind]
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetGroupsEnabled(kind, value)
+  if DB.data.profile.groupsEnabled == nil then
+    DB.data.profile.groupsEnabled = {}
+  end
+  DB.data.profile.groupsEnabled[kind] = value
+end
+
+---@param kind BagKind
 ---@param view BagView
 ---@return SizeInfo
 function DB:GetBagSizeInfo(kind, view)

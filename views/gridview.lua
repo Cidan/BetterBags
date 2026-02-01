@@ -362,9 +362,9 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   view:ClearDirtySections()
 
   -- Hide sections that are not shown.
-  -- Also filter by active group for backpack.
+  -- Also filter by active group for backpack (only if groups are enabled).
   local activeGroup = nil
-  if bag.kind == const.BAG_KIND.BACKPACK then
+  if bag.kind == const.BAG_KIND.BACKPACK and database:GetGroupsEnabled(const.BAG_KIND.BACKPACK) then
     activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
   end
 

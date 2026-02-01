@@ -134,12 +134,17 @@ function backpack.proto:OnCreate(ctx)
 		return behavior:OnTabClicked(ectx, tabID, button)
 	end)
 
-	-- Generate initial group tabs
-	self:GenerateGroupTabs(ctx)
+	-- Only show tabs if groups are enabled
+	if database:GetGroupsEnabled(const.BAG_KIND.BACKPACK) then
+		-- Generate initial group tabs
+		self:GenerateGroupTabs(ctx)
 
-	-- Set the active group tab
-	local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
-	self.bag.tabs:SetTabByID(ctx, activeGroup)
+		-- Set the active group tab
+		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
+		self.bag.tabs:SetTabByID(ctx, activeGroup)
+	else
+		self.bag.tabs.frame:Hide()
+	end
 end
 
 ---@param ctx Context
@@ -214,6 +219,15 @@ local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 -- GenerateGroupTabs creates tabs for all groups.
 ---@param ctx Context
 function backpack.proto:GenerateGroupTabs(ctx)
+	-- Skip tab generation if groups are disabled
+	if not database:GetGroupsEnabled(const.BAG_KIND.BACKPACK) then
+		self.bag.tabs.frame:Hide()
+		return
+	end
+
+	-- Show tabs frame in case it was hidden
+	self.bag.tabs.frame:Show()
+
 	local allGroups = groups:GetAllGroups()
 
 	-- Create tabs for each group that doesn't exist yet
