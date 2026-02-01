@@ -294,8 +294,8 @@ function backpack.proto:SetupPlusTabTooltip(ctx)
 	for _, tab in pairs(self.bag.tabs.tabIndex) do
 		if tab.id == NEW_GROUP_TAB_ID then
 			local decoration = themes:GetTabButton(ctx, tab)
-			decoration:SetScript("OnEnter", function(self)
-				GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			decoration:SetScript("OnEnter", function(f)
+				GameTooltip:SetOwner(f, "ANCHOR_TOP")
 				GameTooltip:SetText(L:G("New Group..."))
 				GameTooltip:AddLine(L:G("Click to create a new group for organizing categories."), 1, 1, 1, true)
 				GameTooltip:Show()
@@ -336,8 +336,8 @@ function backpack.proto:ShowCreateGroupDialog()
 			hasEditBox = true,
 			button1 = L:G("Create"),
 			button2 = L:G("Cancel"),
-			OnAccept = function(self)
-				local name = self.EditBox:GetText()
+			OnAccept = function(f)
+				local name = f.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
 					local newGroup = groups:CreateGroup(ctx, name)
@@ -348,11 +348,11 @@ function backpack.proto:ShowCreateGroupDialog()
 					end
 				end
 			end,
-			OnShow = function(self)
-				self.EditBox:SetFocus()
+			OnShow = function(f)
+				f.EditBox:SetFocus()
 			end,
-			EditBoxOnEnterPressed = function(self)
-				local parent = self:GetParent()
+			EditBoxOnEnterPressed = function(f)
+				local parent = f:GetParent()
 				local name = parent.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
@@ -365,8 +365,8 @@ function backpack.proto:ShowCreateGroupDialog()
 				end
 				parent:Hide()
 			end,
-			EditBoxOnEscapePressed = function(self)
-				self:GetParent():Hide()
+			EditBoxOnEscapePressed = function(f)
+				f:GetParent():Hide()
 			end,
 			timeout = 0,
 			whileDead = true,
@@ -443,23 +443,23 @@ function backpack.proto:ShowRenameGroupDialog(groupID)
 			hasEditBox = true,
 			button1 = L:G("Rename"),
 			button2 = L:G("Cancel"),
-			OnAccept = function(self)
-				local name = self.EditBox:GetText()
+			OnAccept = function(f)
+				local name = f.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("RenameGroup")
-					groups:RenameGroup(ctx, self.data.groupID, name)
+					groups:RenameGroup(ctx, f.data.groupID, name)
 				end
 			end,
-			OnShow = function(self)
-				local currentGroup = groups:GetGroup(self.data.groupID)
+			OnShow = function(f)
+				local currentGroup = groups:GetGroup(f.data.groupID)
 				if currentGroup then
-					self.EditBox:SetText(currentGroup.name)
-					self.EditBox:HighlightText()
+					f.EditBox:SetText(currentGroup.name)
+					f.EditBox:HighlightText()
 				end
-				self.EditBox:SetFocus()
+				f.EditBox:SetFocus()
 			end,
-			EditBoxOnEnterPressed = function(self)
-				local parent = self:GetParent()
+			EditBoxOnEnterPressed = function(f)
+				local parent = f:GetParent()
 				local name = parent.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("RenameGroup")
@@ -467,8 +467,8 @@ function backpack.proto:ShowRenameGroupDialog(groupID)
 				end
 				parent:Hide()
 			end,
-			EditBoxOnEscapePressed = function(self)
-				self:GetParent():Hide()
+			EditBoxOnEscapePressed = function(f)
+				f:GetParent():Hide()
 			end,
 			timeout = 0,
 			whileDead = true,
@@ -495,9 +495,9 @@ function backpack.proto:ShowDeleteGroupConfirm(groupID)
 			text = L:G("Are you sure you want to delete the group '%s'? Categories in this group will be moved back to Backpack."),
 			button1 = L:G("Delete"),
 			button2 = L:G("Cancel"),
-			OnAccept = function(self)
+			OnAccept = function(f)
 				local ctx = context:New("DeleteGroup")
-				groups:DeleteGroup(ctx, self.data.groupID)
+				groups:DeleteGroup(ctx, f.data.groupID)
 			end,
 			timeout = 0,
 			whileDead = true,

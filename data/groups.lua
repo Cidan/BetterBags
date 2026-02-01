@@ -197,9 +197,8 @@ end
 -------
 
 -- OnCategoryDeleted cleans up group references when a category is deleted.
----@param ctx Context
 ---@param categoryName string
-function groups:OnCategoryDeleted(ctx, categoryName)
+function groups:OnCategoryDeleted(_, categoryName)
   local groupID = database:GetCategoryGroup(categoryName)
   if groupID then
     database:RemoveCategoryFromGroup(categoryName)

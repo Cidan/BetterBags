@@ -404,7 +404,6 @@ function sectionFrame:ResetTabHighlights()
   for i, tab in ipairs(bag.tabs.tabIndex) do
     if tab:IsShown() and i ~= bag.tabs.selectedTab then
       -- Reset to deselected state
-      local themes = addon:GetModule("Themes")
       local decoration = themes:GetTabButton(ctx, tab)
       decoration.LeftActive:Hide()
       decoration.MiddleActive:Hide()
