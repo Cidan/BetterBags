@@ -51,6 +51,9 @@ local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
 ---@class SectionConfig: AceModule
 local sectionConfig = addon:NewModule('SectionConfig')
 

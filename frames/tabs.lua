@@ -12,6 +12,21 @@ local themes = addon:GetModule("Themes")
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
+---@class SectionFrame: AceModule
+local sectionFrame = addon:GetModule("SectionFrame")
+
+---@class Groups: AceModule
+local groups = addon:GetModule("Groups")
+
+---@class Context: AceModule
+local context = addon:GetModule("Context")
+
+---@class Events: AceModule
+local events = addon:GetModule("Events")
+
+---@class Constants: AceModule
+local const = addon:GetModule("Constants")
+
 ---@class PanelTabButtonTemplate: Button
 ---@field Text FontString
 ---@field Left Texture
@@ -338,6 +353,89 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 						self:SetTabByIndex(ectx, tab.index)
 					end
 				end
+			end
+		end)
+	end
+
+	-- Set up drag-and-drop handling for group tabs (id > 0, not the "+" tab)
+	if tab.id and tab.id > 0 then
+		-- Store original highlight state
+		local originalOnEnter = decoration:GetScript("OnEnter")
+		local originalOnLeave = decoration:GetScript("OnLeave")
+
+		decoration:SetScript("OnEnter", function(frame)
+			-- Check if we're dragging a category
+			if sectionFrame.draggingCategory then
+				-- Highlight the tab to indicate it's a valid drop target
+				decoration.MiddleActive:Show()
+				decoration.LeftActive:Show()
+				decoration.RightActive:Show()
+				-- Show tooltip indicating what will happen
+				GameTooltip:SetOwner(frame, "ANCHOR_TOP")
+				if tab.id == 1 then
+					GameTooltip:SetText("Move to Backpack")
+					GameTooltip:AddLine("Remove group assignment from: " .. sectionFrame.draggingCategory, 1, 1, 1, true)
+				else
+					GameTooltip:SetText("Move to " .. tab.name)
+					GameTooltip:AddLine("Assign " .. sectionFrame.draggingCategory .. " to this group", 1, 1, 1, true)
+				end
+				GameTooltip:Show()
+			elseif originalOnEnter then
+				originalOnEnter(frame)
+			end
+		end)
+
+		decoration:SetScript("OnLeave", function(frame)
+			-- Reset highlight if we were dragging
+			if sectionFrame.draggingCategory then
+				-- Restore to normal deselected state (unless this tab is selected)
+				if self.selectedTab ~= tab.index then
+					decoration.MiddleActive:Hide()
+					decoration.LeftActive:Hide()
+					decoration.RightActive:Hide()
+				end
+				GameTooltip:Hide()
+			elseif originalOnLeave then
+				originalOnLeave(frame)
+			end
+		end)
+
+		-- Handle the drop
+		decoration:SetScript("OnReceiveDrag", function()
+			if sectionFrame.draggingCategory then
+				local category = sectionFrame.draggingCategory
+				sectionFrame.draggingCategory = nil
+				ResetCursor()
+
+				local dropCtx = context:New("CategoryDropOnTab")
+				if tab.id == 1 then
+					-- Dropping on Backpack removes group assignment
+					groups:RemoveCategoryFromGroup(dropCtx, category)
+				else
+					-- Dropping on other group assigns to that group
+					groups:AssignCategoryToGroup(dropCtx, category, tab.id)
+				end
+				events:SendMessage(dropCtx, "bags/FullRefreshAll")
+			end
+		end)
+
+		-- Also handle mouse up in case OnReceiveDrag doesn't fire
+		local existingMouseUp = decoration:GetScript("OnMouseUp")
+		decoration:SetScript("OnMouseUp", function(frame, button)
+			if sectionFrame.draggingCategory and button == "LeftButton" then
+				local category = sectionFrame.draggingCategory
+				sectionFrame.draggingCategory = nil
+				ResetCursor()
+
+				local dropCtx = context:New("CategoryDropOnTab")
+				if tab.id == 1 then
+					groups:RemoveCategoryFromGroup(dropCtx, category)
+				else
+					groups:AssignCategoryToGroup(dropCtx, category, tab.id)
+				end
+				events:SendMessage(dropCtx, "bags/FullRefreshAll")
+			elseif existingMouseUp then
+				existingMouseUp(frame, button)
 			end
 		end)
 	end

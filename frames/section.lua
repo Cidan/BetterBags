@@ -43,6 +43,18 @@ local movementFlow = addon:GetModule('MovementFlow')
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')
 
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+-- Module-level variable to track dragged category
+sectionFrame.draggingCategory = nil
+
 -------
 --- Section Prototype
 -------
@@ -428,6 +440,22 @@ function sectionProto:onTitleMouseEnter()
     "Item Count: " .. #self.content.cells
   )
   GameTooltip:AddLine(info, 1, 1, 1)
+
+  -- Show group assignment info for backpack sections
+  local kind = self:GetKind()
+  local category = self:GetTitleWithoutIndicator()
+  if kind == const.BAG_KIND.BACKPACK and category ~= L:G("Free Space") and category ~= L:G("Recent Items") then
+    local groupID = groups:GetGroupForCategory(category)
+    if groupID then
+      local group = groups:GetGroup(groupID)
+      if group then
+        GameTooltip:AddLine("Group: " .. group.name, 0.5, 0.8, 1)
+      end
+    end
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    GameTooltip:AddLine("Drag to a group tab to assign this category.", 0.7, 0.7, 0.7)
+  end
+
   local cursorType, _, itemLink = GetCursorInfo()
   if CursorHasItem() and IsShiftKeyDown() then
     if cursorType == "item" then
@@ -475,6 +503,28 @@ function sectionFrame:_DoCreate()
   end)
 
   title:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  title:RegisterForDrag("LeftButton")
+
+  title:SetScript("OnDragStart", function()
+    if s.headerDisabled then return end
+    local category = s:GetTitleWithoutIndicator()
+    -- Don't allow dragging special sections
+    if category == L:G("Free Space") or category == L:G("Recent Items") then
+      return
+    end
+    -- Only allow dragging for backpack sections
+    local kind = s:GetKind()
+    if kind ~= const.BAG_KIND.BACKPACK then return end
+
+    sectionFrame.draggingCategory = category
+    -- Visual feedback - change cursor or show drag texture
+    SetCursor("CAST_CURSOR")
+  end)
+
+  title:SetScript("OnDragStop", function()
+    sectionFrame.draggingCategory = nil
+    ResetCursor()
+  end)
 
   addon.SetScript(title, "OnClick", function(ctx, _, e)
     if s.headerDisabled then return end

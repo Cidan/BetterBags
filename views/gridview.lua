@@ -31,6 +31,9 @@ local L =  addon:GetModule('Localization')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
 ---@class Async: AceModule
 local async = addon:GetModule('Async')
 
@@ -359,8 +362,29 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   view:ClearDirtySections()
 
   -- Hide sections that are not shown.
+  -- Also filter by active group for backpack.
+  local activeGroup = nil
+  if bag.kind == const.BAG_KIND.BACKPACK then
+    activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
+  end
+
   for sectionName, section in pairs(view:GetAllSections()) do
+    local shouldHide = false
+
+    -- Check category visibility
     if categories:IsCategoryShown(sectionName) == false then
+      shouldHide = true
+    end
+
+    -- Check group membership for backpack (skip special sections like "Free Space", "Recent Items")
+    if not shouldHide and activeGroup and bag.kind == const.BAG_KIND.BACKPACK then
+      local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
+      if not isSpecialSection and not groups:CategoryBelongsToGroup(sectionName, activeGroup) then
+        shouldHide = true
+      end
+    end
+
+    if shouldHide then
       table.insert(hiddenCells, section)
     end
   end
