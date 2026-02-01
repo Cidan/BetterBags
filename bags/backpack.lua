@@ -206,6 +206,10 @@ end
 --- Group Tab Methods
 -------
 
+-- Special ID for the "New Group" tab (using 0 to avoid negative ID secure button handling)
+local NEW_GROUP_TAB_ID = 0
+local NEW_GROUP_TAB_NAME = " " -- Use space as name (will be replaced by icon)
+
 -- GenerateGroupTabs creates tabs for all groups.
 ---@param ctx Context
 function backpack.proto:GenerateGroupTabs(ctx)
@@ -224,26 +228,30 @@ function backpack.proto:GenerateGroupTabs(ctx)
 		end
 	end
 
-	-- Hide tabs for groups that no longer exist
+	-- Hide tabs for groups that no longer exist (skip the "+" tab with ID 0)
 	for _, tab in pairs(self.bag.tabs.tabIndex) do
 		if tab.id and tab.id > 0 and not allGroups[tab.id] then
 			self.bag.tabs:HideTabByID(tab.id)
 		end
 	end
 
-	-- Add "+" tab for creating new groups (ID = -1)
-	if not self.bag.tabs:TabExistsByID(-1) then
-		self.bag.tabs:AddTab(ctx, "+", -1, function()
-			-- Show create group dialog
-			self:ShowCreateGroupDialog()
-		end)
+	-- Add "+" tab for creating new groups (using special ID 0)
+	if not self.bag.tabs:TabExistsByID(NEW_GROUP_TAB_ID) then
+		self.bag.tabs:AddTab(ctx, NEW_GROUP_TAB_NAME, NEW_GROUP_TAB_ID)
+		-- Set up the icon for the "+" tab (find by ID since name is a space)
+		for _, tab in pairs(self.bag.tabs.tabIndex) do
+			if tab.id == NEW_GROUP_TAB_ID then
+				self:SetupPlusTabIcon(ctx, tab)
+				break
+			end
+		end
 	end
 
 	-- Sort tabs: groups by ID, "+" tab always last
 	self.bag.tabs:SortTabsByID()
 
 	-- Move "+" tab to end
-	self.bag.tabs:MoveToEnd("+")
+	self.bag.tabs:MoveToEnd(NEW_GROUP_TAB_NAME)
 end
 
 -- OnTabClicked handles tab click events.
@@ -252,14 +260,19 @@ end
 ---@param button string
 ---@return boolean? shouldSelect
 function backpack.proto:OnTabClicked(ctx, tabID, button)
-	-- "+" tab (ID = -1) - show create dialog, don't select
-	if tabID == -1 then
+	-- "+" tab (ID = 0) - show create dialog, don't select
+	if tabID == NEW_GROUP_TAB_ID then
 		self:ShowCreateGroupDialog()
 		return false -- Prevent selection
 	end
 
-	-- Right-click on group tab - show context menu
+	-- Right-click handling
 	if button == "RightButton" and tabID then
+		-- Backpack (ID 1) should not show context menu
+		if tabID == 1 then
+			return false -- Do nothing on right-click for Backpack
+		end
+		-- Other groups show context menu
 		self:ShowGroupContextMenu(ctx, tabID)
 		return false -- Don't change selection on right-click
 	end
@@ -271,6 +284,46 @@ function backpack.proto:OnTabClicked(ctx, tabID, button)
 	end
 
 	return true
+end
+
+-- SetupPlusTabIcon configures the "+" tab to display an icon instead of text.
+---@param ctx Context
+---@param tab TabButton
+function backpack.proto:SetupPlusTabIcon(ctx, tab)
+	---@class Themes: AceModule
+	local themes = addon:GetModule("Themes")
+	local decoration = themes:GetTabButton(ctx, tab)
+
+	-- Hide the text by making it transparent and empty
+	if decoration.Text then
+		decoration.Text:SetText("")
+		decoration.Text:SetAlpha(0)
+	end
+
+	-- Create an icon texture if it doesn't exist
+	if not decoration.plusIcon then
+		local icon = decoration:CreateTexture(nil, "OVERLAY")
+		icon:SetAtlas("communities-icon-addchannelplus")
+		icon:SetSize(16, 16)
+		icon:SetPoint("CENTER", decoration, "CENTER", 0, -2)
+		decoration.plusIcon = icon
+	end
+	decoration.plusIcon:Show()
+
+	-- Resize the tab to be smaller since it's just an icon
+	tab:SetWidth(36)
+	decoration:SetWidth(36)
+
+	-- Add tooltip
+	decoration:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(L:G("New Group..."))
+		GameTooltip:AddLine(L:G("Click to create a new group for organizing categories."), 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	decoration:SetScript("OnLeave", function()
+		GameTooltip:Hide()
+	end)
 end
 
 -- SwitchToGroup switches to a specific group.
