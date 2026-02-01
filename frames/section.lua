@@ -54,6 +54,8 @@ local L = addon:GetModule('Localization')
 
 -- Module-level variable to track dragged category
 sectionFrame.draggingCategory = nil
+sectionFrame.dragGhost = nil
+sectionFrame.dragTargetTab = nil  -- Track the tab we're hovering over while dragging
 
 -------
 --- Section Prototype
@@ -339,6 +341,81 @@ function sectionFrame:OnInitialize()
   end)
 end
 
+-- Create and return the drag ghost frame (created once, reused)
+function sectionFrame:GetDragGhost()
+  if not self.dragGhost then
+    local ghost = CreateFrame("Frame", "BetterBagsSectionDragGhost", UIParent, "BackdropTemplate")
+    ghost:SetFrameStrata("TOOLTIP")
+    ghost:SetFrameLevel(100)
+    ghost:SetBackdrop({
+      bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+      edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+      edgeSize = 12,
+      insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    ghost:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    ghost:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8)
+
+    local text = ghost:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    text:SetPoint("CENTER", ghost, "CENTER", 0, 0)
+    text:SetTextColor(1, 1, 1, 1)
+    ghost.text = text
+
+    ghost:SetSize(100, 24)
+    ghost:Hide()
+
+    -- Update position to follow cursor
+    ghost:SetScript("OnUpdate", function(frame)
+      local x, y = GetCursorPosition()
+      local scale = UIParent:GetEffectiveScale()
+      frame:ClearAllPoints()
+      frame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale + 20, y / scale - 10)
+    end)
+
+    self.dragGhost = ghost
+  end
+  return self.dragGhost
+end
+
+-- Show the drag ghost with the given category name
+function sectionFrame:ShowDragGhost(categoryName)
+  local ghost = self:GetDragGhost()
+  ghost.text:SetText(categoryName)
+  -- Size to fit text
+  local textWidth = ghost.text:GetStringWidth()
+  ghost:SetSize(math.max(textWidth + 20, 80), 24)
+  ghost:ClearAllPoints()
+  ghost:Show()
+end
+
+-- Hide the drag ghost
+function sectionFrame:HideDragGhost()
+  if self.dragGhost then
+    self.dragGhost:Hide()
+  end
+end
+
+-- Perform the drop action on the target tab
+function sectionFrame:PerformDrop()
+  if not self.draggingCategory then return end
+  if not self.dragTargetTab then return end
+
+  local category = self.draggingCategory
+  local tabID = self.dragTargetTab
+
+  local dropCtx = context:New("CategoryDropOnTab")
+  if tabID == 1 then
+    -- Dropping on Backpack removes group assignment
+    groups:RemoveCategoryFromGroup(dropCtx, category)
+  else
+    -- Dropping on other group assigns to that group
+    groups:AssignCategoryToGroup(dropCtx, category, tabID)
+  end
+
+  local eventsModule = addon:GetModule("Events")
+  eventsModule:SendMessage(dropCtx, "bags/FullRefreshAll")
+end
+
 ---@param ctx Context
 ---@param f Section
 function sectionFrame._DoReset(ctx, f)
@@ -517,13 +594,18 @@ function sectionFrame:_DoCreate()
     if kind ~= const.BAG_KIND.BACKPACK then return end
 
     sectionFrame.draggingCategory = category
-    -- Visual feedback - change cursor or show drag texture
-    SetCursor("CAST_CURSOR")
+    sectionFrame.dragTargetTab = nil
+    sectionFrame:ShowDragGhost(category)
   end)
 
   title:SetScript("OnDragStop", function()
+    if sectionFrame.draggingCategory then
+      -- Perform the drop if we have a valid target
+      sectionFrame:PerformDrop()
+    end
     sectionFrame.draggingCategory = nil
-    ResetCursor()
+    sectionFrame.dragTargetTab = nil
+    sectionFrame:HideDragGhost()
   end)
 
   addon.SetScript(title, "OnClick", function(ctx, _, e)

@@ -366,6 +366,8 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		decoration:SetScript("OnEnter", function(frame)
 			-- Check if we're dragging a category
 			if sectionFrame.draggingCategory then
+				-- Track this as the drop target
+				sectionFrame.dragTargetTab = tab.id
 				-- Highlight the tab to indicate it's a valid drop target
 				decoration.MiddleActive:Show()
 				decoration.LeftActive:Show()
@@ -388,6 +390,10 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		decoration:SetScript("OnLeave", function(frame)
 			-- Reset highlight if we were dragging
 			if sectionFrame.draggingCategory then
+				-- Clear the drop target if we're leaving this tab
+				if sectionFrame.dragTargetTab == tab.id then
+					sectionFrame.dragTargetTab = nil
+				end
 				-- Restore to normal deselected state (unless this tab is selected)
 				if self.selectedTab ~= tab.index then
 					decoration.MiddleActive:Hide()
@@ -397,45 +403,6 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				GameTooltip:Hide()
 			elseif originalOnLeave then
 				originalOnLeave(frame)
-			end
-		end)
-
-		-- Handle the drop
-		decoration:SetScript("OnReceiveDrag", function()
-			if sectionFrame.draggingCategory then
-				local category = sectionFrame.draggingCategory
-				sectionFrame.draggingCategory = nil
-				ResetCursor()
-
-				local dropCtx = context:New("CategoryDropOnTab")
-				if tab.id == 1 then
-					-- Dropping on Backpack removes group assignment
-					groups:RemoveCategoryFromGroup(dropCtx, category)
-				else
-					-- Dropping on other group assigns to that group
-					groups:AssignCategoryToGroup(dropCtx, category, tab.id)
-				end
-				events:SendMessage(dropCtx, "bags/FullRefreshAll")
-			end
-		end)
-
-		-- Also handle mouse up in case OnReceiveDrag doesn't fire
-		local existingMouseUp = decoration:GetScript("OnMouseUp")
-		decoration:SetScript("OnMouseUp", function(frame, button)
-			if sectionFrame.draggingCategory and button == "LeftButton" then
-				local category = sectionFrame.draggingCategory
-				sectionFrame.draggingCategory = nil
-				ResetCursor()
-
-				local dropCtx = context:New("CategoryDropOnTab")
-				if tab.id == 1 then
-					groups:RemoveCategoryFromGroup(dropCtx, category)
-				else
-					groups:AssignCategoryToGroup(dropCtx, category, tab.id)
-				end
-				events:SendMessage(dropCtx, "bags/FullRefreshAll")
-			elseif existingMouseUp then
-				existingMouseUp(frame, button)
 			end
 		end)
 	end
