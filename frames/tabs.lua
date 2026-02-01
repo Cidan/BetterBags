@@ -29,6 +29,7 @@ local debug = addon:GetModule("Debug")
 ---@field name string
 ---@field index number
 ---@field id? number
+---@field icon? string Optional atlas name to display instead of text
 ---@field onClick? fun()
 ---@field sabtClick? Button
 
@@ -247,16 +248,69 @@ function tabFrame:RenameTabByID(ctx, id, name)
 end
 
 ---@param ctx Context
+---@param id number
+---@param icon string Atlas name to use as the tab icon
+function tabFrame:SetTabIconByID(ctx, id, icon)
+	for index, tab in pairs(self.tabIndex) do
+		if tab.id == id then
+			tab.icon = icon
+			self:ResizeTabByIndex(ctx, index)
+			return
+		end
+	end
+end
+
+---@param ctx Context
+---@param id number
+function tabFrame:ClearTabIconByID(ctx, id)
+	for index, tab in pairs(self.tabIndex) do
+		if tab.id == id then
+			tab.icon = nil
+			self:ResizeTabByIndex(ctx, index)
+			return
+		end
+	end
+end
+
+---@param ctx Context
 ---@param index number
 function tabFrame:ResizeTabByIndex(ctx, index)
 	local tab = self.tabIndex[index]
 	local decoration = themes:GetTabButton(ctx, tab)
-	decoration.Text:SetText(tab.name)
 
-	PanelTemplates_TabResize(decoration)
-	tab:SetWidth(decoration:GetWidth())
+	-- Handle icon tabs vs text tabs
+	if tab.icon then
+		-- Icon tab: hide text, show icon
+		decoration.Text:SetText("")
+		decoration.Text:SetAlpha(0)
+
+		-- Create icon texture if it doesn't exist
+		if not decoration.tabIcon then
+			local icon = decoration:CreateTexture(nil, "OVERLAY")
+			icon:SetSize(16, 16)
+			icon:SetPoint("CENTER", decoration, "CENTER", 0, -2)
+			decoration.tabIcon = icon
+		end
+		decoration.tabIcon:SetAtlas(tab.icon)
+		decoration.tabIcon:Show()
+
+		-- Set fixed width for icon tabs
+		tab:SetWidth(36)
+		decoration:SetWidth(36)
+	else
+		-- Text tab: show text, hide icon if it exists
+		decoration.Text:SetText(tab.name)
+		decoration.Text:SetAlpha(1)
+
+		if decoration.tabIcon then
+			decoration.tabIcon:Hide()
+		end
+
+		PanelTemplates_TabResize(decoration)
+		tab:SetWidth(decoration:GetWidth())
+	end
+
 	tab:SetHeight(32)
-
 	decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
 
 	-- For purchase tabs (negative IDs), make decoration forward clicks to the secure tab button
