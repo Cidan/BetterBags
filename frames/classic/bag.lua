@@ -55,9 +55,6 @@ local themeConfig = addon:GetModule('ThemeConfig')
 ---@class WindowGroup: AceModule
 local windowGroup = addon:GetModule('WindowGroup')
 
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
-
 ---@class Anchor: AceModule
 local anchor = addon:GetModule('Anchor')
 
@@ -177,9 +174,6 @@ function bagFrame:Create(ctx, kind)
   if kind == const.BAG_KIND.BANK then
     b.behavior:OnCreate(ctx)
   end
-
-  b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
-  b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)

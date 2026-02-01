@@ -29,7 +29,6 @@ libs/WagoAnalytics/Shim.lua
 
 templates\container.xml
 templates\debug.xml
-templates\sectionconfig.xml
 
 core\boot.lua
 
@@ -100,8 +99,6 @@ frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
 frames\list.lua
-frames\sectionitemlist.lua
-frames\sectionconfig.lua
 frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
@@ -122,6 +119,7 @@ themes\simpledark.lua
 themes\gw2.lua
 themes\elvui.lua
 
+config\categorypane.lua
 config\config.lua
 config\plugin.lua
 

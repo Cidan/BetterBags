@@ -63,9 +63,6 @@ local simpleItemLevel = addon:GetModule('SimpleItemLevel')
 ---@class Refresh: AceModule
 local refresh = addon:GetModule('Refresh')
 
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
-
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 

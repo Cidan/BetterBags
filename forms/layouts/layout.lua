@@ -57,6 +57,11 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormLabel: Frame
 ---@field description FontString
 
+---@class (exact) FormPaneLink: Frame
+---@field title FontString
+---@field description FontString
+---@field arrow FontString
+
 --[[
 -- Widget Options
 ]]--
@@ -127,6 +132,12 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormLabelOptions
 ---@field description string
 
+---@class (exact) FormPaneLinkOptions
+---@field title string
+---@field description string
+---@field createPane fun(parent: Frame, kind: BagKind): Frame
+---@field bagKind BagKind
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -142,3 +153,4 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddInputBox fun(self: FormLayout, opts: FormInputBoxOptions)
 ---@field AddColor fun(self: FormLayout, opts: FormColorOptions)
 ---@field AddLabel fun(self: FormLayout, opts: FormLabelOptions)
+---@field AddPaneLink fun(self: FormLayout, opts: FormPaneLinkOptions)

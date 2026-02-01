@@ -80,6 +80,43 @@ Listens to:
 Sends:
 - Various refresh and update events when settings change
 
+### categorypane.lua
+
+The CategoryPane module provides a comprehensive category management interface within the main settings screen. It replaces the previous sidebar-based category configuration.
+
+#### Key Features
+
+- **Master-Detail Layout**: Left side shows a scrollable list of categories, right side shows detailed configuration for the selected category
+- **Category List**:
+  - Shows all categories organized into "Pinned" (top-priority) and "Automatically Sorted" sections
+  - Drag-and-drop reordering of categories
+  - Visual indicators for hidden or disabled categories
+- **Detail Panel**:
+  - For Search Categories: Query editor, Group By dropdown, Priority input, Color picker
+  - For Manual Categories: Item list with remove buttons, Color picker
+  - For Dynamic Categories: Read-only display of category information
+- **Common Controls**: Enable/Disable toggle, Hide/Show toggle, Delete button (for custom categories)
+
+#### Functions
+
+- **`categoryPane:Create(parent, kind)`**: Creates a new category pane for the specified bag kind (Backpack or Bank)
+- Category management integrates with the Categories module for persistence
+- Sends refresh events when categories are modified
+
+#### UI Structure
+
+```
++-------------------+--------------------------------------+
+| Pinned            | [Selected Category Name]             |
+| > Category 1      | Query: [text area]                   |
+| > Category 2      | Group By: [dropdown]                 |
+| Auto Sorted       | Priority: [input]                    |
+| > Category 3      | Color: [picker]                      |
+| > Category 4      | [x] Enabled  [ ] Hidden              |
+|                   | [Delete Category]                    |
++-------------------+--------------------------------------+
+```
+
 ### plugin.lua
 
 Manages integration of third-party plugin configurations into the main BetterBags settings interface.

@@ -30,6 +30,9 @@ local bucket = addon:GetModule('Bucket')
 ---@class Form: AceModule
 local form = addon:GetModule('Form')
 
+---@class CategoryPane: AceModule
+local categoryPane = addon:GetModule('CategoryPane')
+
 ---@class Config: AceModule
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
@@ -537,6 +540,15 @@ function config:CreateConfig()
         bag.frame:SetScale(value / 100)
         db:SetBagViewSizeScale(bagType.kind, db:GetBagView(bagType.kind), value)
       end,
+    })
+
+    f:AddPaneLink({
+      title = 'Categories',
+      description = 'Manage and reorder categories for the ' .. string.lower(bagType.name) .. '.',
+      createPane = function(parent, kind)
+        return categoryPane:Create(parent, kind)
+      end,
+      bagKind = bagType.kind,
     })
   end
 

@@ -19,6 +19,12 @@ local themes = addon:GetModule('Themes')
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
 
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class GuildWarsDecoration: Frame
 ---@field panelButtons Button[]
 ---@field gwHeader GuildWarsHeader
@@ -137,12 +143,9 @@ local gw2Theme = {
         end)
       end
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/questlogmicrobutton-up.png", "Show Categories", function()
-        if frame.Owner.sectionConfigFrame:IsShown() then
-          frame.Owner.sectionConfigFrame:Hide()
-        else
-          frame.Owner.windowGrouping:Show("sectionConfig")
-        end
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/questlogmicrobutton-up.png", "Open Settings", function()
+        local ctx = context:New("GW2OpenSettings")
+        events:SendMessage(ctx, "config/Open")
       end)
 
       if frame.Owner.kind == const.BAG_KIND.BACKPACK then

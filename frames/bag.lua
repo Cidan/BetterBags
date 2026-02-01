@@ -70,9 +70,6 @@ local searchBox = addon:GetModule("SearchBox")
 ---@class Search: AceModule
 local search = addon:GetModule("Search")
 
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule("SectionConfig")
-
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:GetModule("ThemeConfig")
 
@@ -109,7 +106,6 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
 ---@field currencyFrame CurrencyFrame The currency frame.
----@field sectionConfigFrame SectionConfigFrame The section config frame.
 ---@field themeConfigFrame ThemeConfigFrame The theme config frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
@@ -483,9 +479,6 @@ function bagFrame:Create(ctx, kind)
 
 	-- Call behavior-specific creation (search, slots, currency, tabs, etc.)
 	b.behavior:OnCreate(ctx)
-
-	b.sectionConfigFrame = sectionConfig:Create(kind, b.sideAnchor)
-	b.windowGrouping:AddWindow("sectionConfig", b.sectionConfigFrame)
 
 	-- Enable dragging of the bag frame.
 	b.frame:SetMovable(true)

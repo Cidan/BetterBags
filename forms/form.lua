@@ -186,6 +186,26 @@ function formFrame:AddLabel(opts)
   self:Resize()
 end
 
+---@param opts FormPaneLinkOptions
+function formFrame:AddPaneLink(opts)
+  self.layout:AddPaneLink(opts)
+  self:Resize()
+end
+
+---@param paneIndex number
+function formFrame:ShowPane(paneIndex)
+  self.layout:ShowPane(paneIndex)
+end
+
+function formFrame:HidePane()
+  self.layout:HidePane()
+end
+
+---@return boolean
+function formFrame:IsPaneActive()
+  return self.layout:IsPaneActive()
+end
+
 ---@return Frame
 function formFrame:GetFrame()
   return self.frame

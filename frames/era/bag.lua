@@ -43,9 +43,6 @@ local Window = LibStub('LibWindow-1.1')
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
 
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
-
 ---@class ThemeConfig: AceModule
 local themeConfig = addon:GetModule('ThemeConfig')
 
@@ -170,9 +167,6 @@ function bagFrame:Create(ctx, kind)
   if kind == const.BAG_KIND.BANK then
     b.behavior:OnCreate(ctx)
   end
-
-  b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
-  b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
