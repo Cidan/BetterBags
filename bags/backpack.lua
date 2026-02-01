@@ -196,6 +196,11 @@ function backpack.proto:RegisterEvents()
 	events:RegisterMessage("groups/Changed", function(_, ectx)
 		behavior:GenerateGroupTabs(ectx)
 	end)
+
+	-- Listen for groups enabled/disabled toggle
+	events:RegisterMessage("groups/EnabledChanged", function(_, ectx)
+		behavior:GenerateGroupTabs(ectx)
+	end)
 end
 
 ---@return boolean

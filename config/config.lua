@@ -212,6 +212,7 @@ function config:CreateConfig()
         end,
         setValue = function(ctx, value)
           db:SetGroupsEnabled(bagType.kind, value)
+          events:SendMessage(ctx, 'groups/EnabledChanged', bagType.kind, value)
           events:SendMessage(ctx, 'bags/FullRefreshAll')
         end
       })
