@@ -233,10 +233,6 @@ function backpack.proto:GenerateGroupTabs(ctx)
 	-- Show tabs frame in case it was hidden
 	self.bag.tabs.frame:Show()
 
-	-- Ensure tab 1 (Backpack) is selected
-	self.bag.tabs:SetTabByID(ctx, 1)
-	database:SetActiveGroup(const.BAG_KIND.BACKPACK, 1)
-
 	local allGroups = groups:GetAllGroups()
 
 	-- Create tabs for each group that doesn't exist yet
@@ -273,6 +269,10 @@ function backpack.proto:GenerateGroupTabs(ctx)
 
 	-- Move "+" tab to end
 	self.bag.tabs:MoveToEnd(NEW_GROUP_TAB_NAME)
+
+	-- Ensure tab 1 (Backpack) is selected with proper highlight
+	self.bag.tabs:SetTabByID(ctx, 1)
+	database:SetActiveGroup(const.BAG_KIND.BACKPACK, 1)
 end
 
 -- OnTabClicked handles tab click events.
