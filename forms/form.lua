@@ -133,9 +133,18 @@ function formFrame:AddSection(opts)
   self:Resize()
 end
 
----@param opts FormSubSectionOptions
-function formFrame:AddSubSection(opts)
-  self.layout:AddSubSection(opts)
+--- Adds a subsection header inline in the pane content (title, description, divider).
+--- Does NOT add to the sidebar index. Use for visual grouping within a tab.
+---@param opts FormInlineSubSectionOptions
+function formFrame:AddInlineSubSection(opts)
+  self.layout:AddInlineSubSection(opts)
+end
+
+--- Adds a navigation entry to the sidebar index only.
+--- Does NOT render any content in the pane. Use for sub-navigation items.
+---@param opts FormSubIndexOptions
+function formFrame:AddSubIndex(opts)
+  self.layout:AddSubIndex(opts)
 end
 
 ---@param opts FormSliderOptions

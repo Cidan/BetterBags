@@ -32,9 +32,8 @@ function config:AddPluginConfig(title, c)
     })
   end
   local f = self.configFrame
-  f:AddSubSection({
+  f:AddSubIndex({
     title = title,
-    description = "Configuration for the '" .. title .. "' plugin.",
   })
   ---@type AceConfig.OptionsTable[]
   local options = {}

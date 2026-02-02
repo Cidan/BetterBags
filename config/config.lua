@@ -233,10 +233,9 @@ function config:CreateConfig()
       })
     end
 
-    f:AddSubSection({
+    f:AddInlineSubSection({
       title = 'Categories',
       description = 'Settings for Blizzard item categories in the ' .. string.lower(bagType.name) .. '.',
-      skipIndex = true,
     })
 
     f:AddLabel({
@@ -327,10 +326,9 @@ function config:CreateConfig()
       end
     })
 
-    f:AddSubSection({
+    f:AddInlineSubSection({
       title = 'Item Stacking',
       description = 'Settings for item stacking in the ' .. string.lower(bagType.name) .. '.',
-      skipIndex = true,
     })
 
     f:AddCheckbox({
@@ -415,10 +413,9 @@ function config:CreateConfig()
       end
     })
 
-    f:AddSubSection({
+    f:AddInlineSubSection({
       title = 'Item Level',
       description = 'Settings for item level in the ' .. string.lower(bagType.name) .. '.',
-      skipIndex = true,
     })
 
     f:AddCheckbox({
@@ -445,10 +442,9 @@ function config:CreateConfig()
       end
     })
 
-    f:AddSubSection({
+    f:AddInlineSubSection({
       title = 'Display',
       description = 'Settings that adjust layout and visual aspects of the ' .. string.lower(bagType.name) .. '.',
-      skipIndex = true,
     })
 
     f:AddCheckbox({

@@ -602,8 +602,10 @@ function stackedLayout:AddSection(opts)
   end
 end
 
----@param opts FormSubSectionOptions
-function stackedLayout:AddSubSection(opts)
+--- Adds a subsection header inline in the pane content (title, description, divider).
+--- Does NOT add to the sidebar index. Use for visual grouping within a tab.
+---@param opts FormInlineSubSectionOptions
+function stackedLayout:AddInlineSubSection(opts)
   local t = self.nextFrame
   local container = CreateFrame("Frame", nil, t) --[[@as FormSubSection]]
   self:alignFrame(t, container)
@@ -621,13 +623,17 @@ function stackedLayout:AddSubSection(opts)
   div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 33)
 
-  -- Only create index/tab button if skipIndex is not set
-  if not opts.skipIndex then
-    self:addIndex(opts.title, container, true)
-  end
-
   self.nextFrame = container
   self:addHeight(container:GetHeight())
+end
+
+--- Adds a navigation entry to the sidebar index only.
+--- Does NOT render any content in the pane. Use for sub-navigation items.
+---@param opts FormSubIndexOptions
+function stackedLayout:AddSubIndex(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormSubSection]]
+  self:addIndex(opts.title, container, true)
 end
 
 ---@param opts FormCheckboxOptions

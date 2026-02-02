@@ -76,10 +76,14 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field title string
 ---@field description string
 
----@class (exact) FormSubSectionOptions
+--- Options for inline subsection header (renders in pane content, no sidebar entry)
+---@class (exact) FormInlineSubSectionOptions
 ---@field title string
 ---@field description string
----@field skipIndex? boolean -- If true, don't create a tab/index button for this subsection
+
+--- Options for sidebar sub-navigation entry (adds to sidebar only, no pane content)
+---@class (exact) FormSubIndexOptions
+---@field title string
 
 ---@class (exact) FormCheckboxOptions
 ---@field title string
@@ -146,7 +150,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddSection fun(self: FormLayout, opts: FormSectionOptions)
 ---@field AddCheckbox fun(self: FormLayout, opts: FormCheckboxOptions)
 ---@field AddDropdown fun(self: FormLayout, opts: FormDropdownOptions)
----@field AddSubSection fun(self: FormLayout, opts: FormSubSectionOptions)
+---@field AddInlineSubSection fun(self: FormLayout, opts: FormInlineSubSectionOptions)
+---@field AddSubIndex fun(self: FormLayout, opts: FormSubIndexOptions)
 ---@field AddSlider fun(self: FormLayout, opts: FormSliderOptions)
 ---@field AddButtonGroup fun(self: FormLayout, opts: FormButtonGroupOptions)
 ---@field AddTextArea fun(self: FormLayout, opts: FormTextAreaOptions)
