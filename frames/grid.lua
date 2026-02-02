@@ -312,7 +312,7 @@ function gridProto:calculateColumns(options)
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
         if currentHeight + cell.frame:GetHeight() > splitAt then
           currentColumn = currentColumn + 1
-          currentHeight = 0
+          currentHeight = cell.frame:GetHeight()
         else
           currentHeight = currentHeight + cell.frame:GetHeight()
         end

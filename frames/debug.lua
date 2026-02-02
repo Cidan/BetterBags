@@ -80,9 +80,8 @@ function debugWindow:Create(ctx)
 
   -- Use existing CloseButton from template if available, otherwise create one
   local closeButton = self.frame.CloseButton or CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
-  if not self.frame.CloseButton then
-    closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -5, -5)
-  end
+  closeButton:ClearAllPoints()
+  closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 2, 2)
   closeButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 
   closeButton:SetScript("OnClick", function(_, e)
@@ -143,8 +142,8 @@ end
 ---@return ListFrame
 function debugWindow:CreateDebugLogFrame()
   local frame = list:Create(self.frame)
-  frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
-  frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
+  frame.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5, -25)
+  frame.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -5, 5)
   frame:SetupDataSource("BetterBagsDebugListButton", initDebugListItem, function()end)
   return frame
 end
@@ -153,8 +152,8 @@ end
 ---@return ItemBrowserFrame
 function debugWindow:CreateItemsFrame()
   local frame = itemBrowser:Create(self.frame)
-  frame:GetFrame():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -5)
-  frame:GetFrame():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", 0, 5)
+  frame:GetFrame():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5, -25)
+  frame:GetFrame():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -5, 5)
   frame:Hide() -- Hide by default as Debug Log is the initial tab
   return frame
 end
