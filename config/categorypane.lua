@@ -113,15 +113,11 @@ function categoryPaneProto:initListItem(button, elementData)
     button.Category:SetFontObject(fonts.UnitFrame12White)
 
     -- Show note based on category state
-    if not categories:IsCategoryShown(elementData.title) then
-      button.Note:SetText("(hidden)")
+    local filter = categories:GetCategoryByName(elementData.title)
+    if filter and filter.searchCategory then
+      button.Note:SetText(format("P:%d", filter.priority or 0))
     else
-      local filter = categories:GetCategoryByName(elementData.title)
-      if filter and filter.searchCategory then
-        button.Note:SetText(format("P:%d", filter.priority or 0))
-      else
-        button.Note:SetText("")
-      end
+      button.Note:SetText("")
     end
 
     -- Background based on enabled state
@@ -248,24 +244,7 @@ function categoryPaneProto:ShowContextMenu(category)
   ---@type MenuList[]
   local menuOptions = {}
 
-  table.insert(menuOptions, {
-    text = L:G("Hide Category"),
-    hasArrow = false,
-    checked = function()
-      return not categories:IsCategoryShown(category)
-    end,
-    func = function()
-      local ectx = context:New('CategoryPane_HideCategory')
-      categories:ToggleCategoryShown(ectx, category)
-      self:RefreshList()
-      if self.selectedCategory == category then
-        self:UpdateDetailPanel()
-      end
-    end
-  })
-
   if categories:DoesCategoryExist(category) and not categories:IsDynamicCategory(category) then
-    contextMenu:AddDivider(menuOptions)
     table.insert(menuOptions, {
       text = L:G("Delete Category"),
       notCheckable = true,
@@ -284,7 +263,9 @@ function categoryPaneProto:ShowContextMenu(category)
     })
   end
 
-  contextMenu:Show(ctx, menuOptions)
+  if #menuOptions > 0 then
+    contextMenu:Show(ctx, menuOptions)
+  end
 end
 
 function categoryPaneProto:UpdateDetailPanel()
@@ -349,10 +330,6 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
   end
   self.searchDetail.selectedGroupBy = groupBy
 
-  -- Update checkboxes
-  self.searchDetail.enabledCheckbox:SetChecked(categories:IsCategoryEnabled(self.kind, filter.name))
-  self.searchDetail.hiddenCheckbox:SetChecked(not categories:IsCategoryShown(filter.name))
-
   -- Update color
   if filter.color then
     self.searchDetail.colorTexture:SetVertexColor(filter.color[1], filter.color[2], filter.color[3], 1)
@@ -400,16 +377,68 @@ function categoryPaneProto:CreateSearchDetailPanel()
 
   yOffset = yOffset - 20
 
-  -- Query EditBox
-  local queryBox = CreateFrame("EditBox", nil, self.searchDetail, "InputBoxTemplate")
-  queryBox:SetPoint("TOPLEFT", 15, yOffset)
-  queryBox:SetPoint("RIGHT", self.searchDetail, "RIGHT", -15, 0)
-  queryBox:SetHeight(25)
+  -- Query multi-line text area
+  local queryScrollBox = CreateFrame("Frame", nil, self.searchDetail, "WowScrollBox") --[[@as WowScrollBox]]
+  queryScrollBox:SetPoint("TOPLEFT", 10, yOffset)
+  queryScrollBox:SetPoint("RIGHT", self.searchDetail, "RIGHT", -30, 0)
+  queryScrollBox:SetHeight(60)
+  queryScrollBox:EnableMouseWheel(false)
+
+  local queryScrollBar = CreateFrame("EventFrame", nil, self.searchDetail, "MinimalScrollBar") --[[@as MinimalScrollBar]]
+  queryScrollBar:SetPoint("TOPLEFT", queryScrollBox, "TOPRIGHT", 4, -2)
+  queryScrollBar:SetPoint("BOTTOMLEFT", queryScrollBox, "BOTTOMRIGHT", 2, 0)
+  queryScrollBar:SetHideIfUnscrollable(true)
+  queryScrollBox:SetInterpolateScroll(true)
+  queryScrollBar:SetInterpolateScroll(true)
+
+  -- Background for the text area
+  local queryBackground = CreateFrame("Frame", nil, queryScrollBox, "BackdropTemplate") --[[@as Frame]]
+  queryBackground:SetBackdrop({
+    bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+    edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]], edgeSize = 4,
+    insets = { left = 0, right = 0, top = 0, bottom = 0 }
+  })
+  queryBackground:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+  queryBackground:SetBackdropBorderColor(0.4, 0.4, 0.4)
+  queryBackground:SetPoint("TOPLEFT", queryScrollBox, "TOPLEFT", 0, 0)
+  queryBackground:SetPoint("BOTTOMRIGHT", queryScrollBox, "BOTTOMRIGHT", 0, 0)
+
+  local queryView = CreateScrollBoxLinearView()
+  queryView:SetPanExtent(10)
+
+  local queryBox = CreateFrame("EditBox", nil, queryScrollBox) --[[@as EditBox]]
+  queryBox:SetFontObject("ChatFontNormal")
+  queryBox:SetMultiLine(true)
+  queryBox:EnableMouse(true)
+  queryBox:SetCountInvisibleLetters(false)
   queryBox:SetAutoFocus(false)
-  queryBox:SetFontObject("GameFontHighlight")
+  queryBox.scrollable = true
+
+  queryBox:SetScript("OnEscapePressed", function()
+    queryBox:ClearFocus()
+    queryScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+  end)
+
+  queryBox:SetScript("OnEditFocusGained", function()
+    queryScrollBox:EnableMouseWheel(true)
+  end)
+
+  queryBox:SetScript("OnEditFocusLost", function()
+    queryScrollBox:EnableMouseWheel(false)
+  end)
+
+  queryBox:SetScript("OnTextChanged", function()
+    queryScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+  end)
+
+  queryScrollBox:SetScript("OnMouseDown", function()
+    queryBox:SetFocus()
+  end)
+
+  ScrollUtil.InitScrollBoxWithScrollBar(queryScrollBox, queryScrollBar, queryView)
   self.searchDetail.queryBox = queryBox
 
-  yOffset = yOffset - 40
+  yOffset = yOffset - 75
 
   -- Priority Label
   local priorityLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -520,35 +549,6 @@ function categoryPaneProto:CreateSearchDetailPanel()
     ColorPickerFrame:SetupColorPickerAndShow(options)
   end)
 
-  yOffset = yOffset - 35
-
-  -- Divider 2
-  local divider2 = self.searchDetail:CreateTexture(nil, "ARTWORK")
-  divider2:SetPoint("TOPLEFT", 10, yOffset)
-  divider2:SetPoint("RIGHT", self.searchDetail, "RIGHT", -10, 0)
-  divider2:SetHeight(1)
-  divider2:SetColorTexture(0.5, 0.5, 0.5, 0.5)
-
-  yOffset = yOffset - 20
-
-  -- Enabled Checkbox
-  local enabledCheckbox = CreateFrame("CheckButton", nil, self.searchDetail, "UICheckButtonTemplate")
-  enabledCheckbox:SetPoint("TOPLEFT", 5, yOffset)
-  local enabledLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  enabledLabel:SetPoint("LEFT", enabledCheckbox, "RIGHT", 5, 0)
-  enabledLabel:SetText("Enabled for " .. (self.kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
-  self.searchDetail.enabledCheckbox = enabledCheckbox
-
-  yOffset = yOffset - 30
-
-  -- Hidden Checkbox
-  local hiddenCheckbox = CreateFrame("CheckButton", nil, self.searchDetail, "UICheckButtonTemplate")
-  hiddenCheckbox:SetPoint("TOPLEFT", 5, yOffset)
-  local hiddenLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  hiddenLabel:SetPoint("LEFT", hiddenCheckbox, "RIGHT", 5, 0)
-  hiddenLabel:SetText("Hidden (not shown in bag)")
-  self.searchDetail.hiddenCheckbox = hiddenCheckbox
-
   yOffset = yOffset - 50
 
   -- Save Button
@@ -592,22 +592,6 @@ function categoryPaneProto:SaveSearchCategory()
   local newPriority = tonumber(self.searchDetail.priorityBox:GetText()) or 10
   local newGroupBy = self.searchDetail.selectedGroupBy
 
-  -- Update enabled state
-  local enabled = self.searchDetail.enabledCheckbox:GetChecked()
-  if enabled then
-    categories:EnableCategory(self.kind, self.selectedCategory)
-  else
-    categories:DisableCategory(self.kind, self.selectedCategory)
-  end
-
-  -- Update hidden state
-  local hidden = self.searchDetail.hiddenCheckbox:GetChecked()
-  if hidden then
-    categories:HideCategory(ctx, self.selectedCategory)
-  else
-    categories:ShowCategory(ctx, self.selectedCategory)
-  end
-
   -- Update color
   local r, g, b = self.searchDetail.colorTexture:GetVertexColor()
 
@@ -642,10 +626,6 @@ function categoryPaneProto:ShowManualCategoryDetail(filter)
 
   -- Populate fields
   self.manualDetail.nameLabel:SetText(filter.name)
-
-  -- Update checkboxes
-  self.manualDetail.enabledCheckbox:SetChecked(categories:IsCategoryEnabled(self.kind, filter.name))
-  self.manualDetail.hiddenCheckbox:SetChecked(not categories:IsCategoryShown(filter.name))
 
   -- Update color
   if filter.color then
@@ -729,26 +709,6 @@ function categoryPaneProto:CreateManualDetailPanel()
     }
     ColorPickerFrame:SetupColorPickerAndShow(options)
   end)
-
-  yOffset = yOffset - 35
-
-  -- Enabled Checkbox
-  local enabledCheckbox = CreateFrame("CheckButton", nil, self.manualDetail, "UICheckButtonTemplate")
-  enabledCheckbox:SetPoint("TOPLEFT", 5, yOffset)
-  local enabledLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  enabledLabel:SetPoint("LEFT", enabledCheckbox, "RIGHT", 5, 0)
-  enabledLabel:SetText("Enabled for " .. (self.kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"))
-  self.manualDetail.enabledCheckbox = enabledCheckbox
-
-  yOffset = yOffset - 30
-
-  -- Hidden Checkbox
-  local hiddenCheckbox = CreateFrame("CheckButton", nil, self.manualDetail, "UICheckButtonTemplate")
-  hiddenCheckbox:SetPoint("TOPLEFT", 5, yOffset)
-  local hiddenLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  hiddenLabel:SetPoint("LEFT", hiddenCheckbox, "RIGHT", 5, 0)
-  hiddenLabel:SetText("Hidden (not shown in bag)")
-  self.manualDetail.hiddenCheckbox = hiddenCheckbox
 
   yOffset = yOffset - 40
 
@@ -878,22 +838,6 @@ function categoryPaneProto:SaveManualCategory()
   if not filter then return end
 
   local ctx = context:New('CategoryPane_SaveManualCategory')
-
-  -- Update enabled state
-  local enabled = self.manualDetail.enabledCheckbox:GetChecked()
-  if enabled then
-    categories:EnableCategory(self.kind, self.selectedCategory)
-  else
-    categories:DisableCategory(self.kind, self.selectedCategory)
-  end
-
-  -- Update hidden state
-  local hidden = self.manualDetail.hiddenCheckbox:GetChecked()
-  if hidden then
-    categories:HideCategory(ctx, self.selectedCategory)
-  else
-    categories:ShowCategory(ctx, self.selectedCategory)
-  end
 
   -- Update color
   local r, g, b = self.manualDetail.colorTexture:GetVertexColor()
