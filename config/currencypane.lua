@@ -1,3 +1,4 @@
+---@diagnostic disable: duplicate-doc-field
 local addonName = ... ---@type string
 
 ---@class BetterBags: AceAddon

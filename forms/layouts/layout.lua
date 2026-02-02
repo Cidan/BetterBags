@@ -139,8 +139,8 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormPaneLinkOptions
 ---@field title string
 ---@field description string
----@field createPane fun(parent: Frame, kind: BagKind): Frame
----@field bagKind BagKind
+---@field createPane fun(parent: Frame, kind: BagKind?): Frame
+---@field bagKind BagKind?
 
 ---@class (exact) FormLayout
 ---@field targetFrame Frame

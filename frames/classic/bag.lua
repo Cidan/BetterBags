@@ -161,7 +161,7 @@ function bagFrame:Create(ctx, kind)
   if kind == const.BAG_KIND.BACKPACK then
     b.searchFrame = searchBox:Create(ctx, b.frame)
 
-    local currencyFrame = currency:Create(b.frame)
+    local currencyFrame = currency:CreateIconGrid(b.frame)
     currencyFrame:Hide()
     b.currencyFrame = currencyFrame
 

@@ -105,7 +105,7 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field anchor AnchorFrame The anchor frame for the bag.
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
----@field currencyFrame CurrencyFrame The currency frame.
+---@field currencyFrame CurrencyIconGrid The currency frame.
 ---@field themeConfigFrame ThemeConfigFrame The theme config frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
