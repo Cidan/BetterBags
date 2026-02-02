@@ -198,16 +198,17 @@ function stackedLayout:addIndex(title, point, sub)
     end)
 
     indexButton:SetScript("OnLeave", function()
-      -- Only reset if not the active tab
-      if self.activeTab ~= tabIndex then
-        fs:SetTextColor(1, 1, 1)
-        fs:SetShadowColor(0, 0, 0, 1)
-        fs:SetShadowOffset(1, -1)
-      else
+      -- Only keep highlighted if this is the active tab AND no pane is active
+      if self.activeTab == tabIndex and not self.activePane then
         -- Keep active tab golden with glow
         fs:SetTextColor(1, 0.82, 0)
         fs:SetShadowColor(1, 0.8, 0.3, 0.8)
         fs:SetShadowOffset(0, 0)
+      else
+        -- Reset to normal
+        fs:SetTextColor(1, 1, 1)
+        fs:SetShadowColor(0, 0, 0, 1)
+        fs:SetShadowOffset(1, -1)
       end
     end)
 
