@@ -116,6 +116,7 @@ views\gridview.lua
 views\bagview.lua
 
 bags\backpack.lua
+bags\era\backpack.lua
 bags\bank.lua
 bags\era\bank.lua
 
@@ -130,6 +131,7 @@ themes\elvui.lua
 config\categorypane.lua
 config\themepane.lua
 config\currencypane.lua
+config\era\currencypane.lua
 config\config.lua
 config\plugin.lua
 

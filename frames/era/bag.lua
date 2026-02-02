@@ -163,10 +163,8 @@ function bagFrame:Create(ctx, kind)
     b.windowGrouping:AddWindow('themeConfig', b.themeConfigFrame)
   end
 
-  -- Bank-specific initialization via behavior
-  if kind == const.BAG_KIND.BANK then
-    b.behavior:OnCreate(ctx)
-  end
+  -- Initialize behavior (creates tabs/groups for backpack, bank-specific setup for bank)
+  b.behavior:OnCreate(ctx)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)
