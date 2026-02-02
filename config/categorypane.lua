@@ -1137,6 +1137,10 @@ function categoryPane:Create(parent, kind)
   events:RegisterMessage(drawEvent, function()
     if pane.initialized then
       pane:RefreshList()
+      -- Also refresh the item list if a manual category is selected
+      if pane.selectedCategory and pane.detailContent == pane.manualDetail then
+        pane:LoadItemList(pane.selectedCategory)
+      end
     end
   end)
 
