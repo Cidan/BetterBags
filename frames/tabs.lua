@@ -310,7 +310,8 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		decoration.tabIcon:Show()
 
 		-- Let PanelTemplates handle the width (minimum is enforced by template textures)
-		PanelTemplates_TabResize(decoration)
+		-- Wrap in pcall to handle Classic/Anniversary editions where atlas textures may not exist
+		pcall(PanelTemplates_TabResize, decoration)
 		tab:SetWidth(decoration:GetWidth())
 	else
 		-- Text tab: show text, hide icon if it exists
@@ -321,7 +322,8 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 			decoration.tabIcon:Hide()
 		end
 
-		PanelTemplates_TabResize(decoration)
+		-- Wrap in pcall to handle Classic/Anniversary editions where atlas textures may not exist
+		pcall(PanelTemplates_TabResize, decoration)
 		tab:SetWidth(decoration:GetWidth())
 	end
 

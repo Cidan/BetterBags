@@ -87,6 +87,99 @@
       <AbsDimension y="30"/>
     </Size>
   </Button>
-  <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="PanelTabButtonTemplate,InsecureActionButtonTemplate">
+  <!-- Classic/Era: Define our own tab template without atlas textures -->
+  <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="InsecureActionButtonTemplate">
+    <Size>
+      <AbsDimension x="115" y="32"/>
+    </Size>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <Texture name="$parentLeft" file="Interface\PaperDollInfoFrame\UI-Character-Tab-L">
+          <Size>
+            <AbsDimension x="20" y="32"/>
+          </Size>
+          <Anchors>
+            <Anchor point="BOTTOMLEFT"/>
+          </Anchors>
+          <TexCoords left="0" right="0.15625" top="0" bottom="1.0"/>
+        </Texture>
+        <Texture name="$parentMiddle" file="Interface\PaperDollInfoFrame\UI-Character-Tab-M">
+          <Size>
+            <AbsDimension x="75" y="32"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeTo="$parentLeft" relativePoint="RIGHT"/>
+          </Anchors>
+          <TexCoords left="0" right="1.0" top="0" bottom="1.0"/>
+        </Texture>
+        <Texture name="$parentRight" file="Interface\PaperDollInfoFrame\UI-Character-Tab-R">
+          <Size>
+            <AbsDimension x="20" y="32"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeTo="$parentMiddle" relativePoint="RIGHT"/>
+          </Anchors>
+          <TexCoords left="0" right="0.15625" top="0" bottom="1.0"/>
+        </Texture>
+      </Layer>
+      <Layer level="BACKGROUND">
+        <Texture name="$parentLeftActive" file="Interface\PaperDollInfoFrame\UI-Character-ActiveTab-L">
+          <Size>
+            <AbsDimension x="20" y="32"/>
+          </Size>
+          <Anchors>
+            <Anchor point="BOTTOMLEFT"/>
+          </Anchors>
+          <TexCoords left="0" right="0.15625" top="0" bottom="1.0"/>
+        </Texture>
+        <Texture name="$parentMiddleActive" file="Interface\PaperDollInfoFrame\UI-Character-ActiveTab-M">
+          <Size>
+            <AbsDimension x="75" y="32"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeTo="$parentLeftActive" relativePoint="RIGHT"/>
+          </Anchors>
+          <TexCoords left="0" right="1.0" top="0" bottom="1.0"/>
+        </Texture>
+        <Texture name="$parentRightActive" file="Interface\PaperDollInfoFrame\UI-Character-ActiveTab-R">
+          <Size>
+            <AbsDimension x="20" y="32"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeTo="$parentMiddleActive" relativePoint="RIGHT"/>
+          </Anchors>
+          <TexCoords left="0" right="0.15625" top="0" bottom="1.0"/>
+        </Texture>
+      </Layer>
+      <Layer level="ARTWORK">
+        <FontString name="$parentText" inherits="GameFontNormalSmall">
+          <Anchors>
+            <Anchor point="CENTER">
+              <Offset>
+                <AbsDimension x="0" y="2"/>
+              </Offset>
+            </Anchor>
+          </Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
+    <Scripts>
+      <OnLoad>
+        self.Text = _G[self:GetName().."Text"];
+        self.Left = _G[self:GetName().."Left"];
+        self.Middle = _G[self:GetName().."Middle"];
+        self.Right = _G[self:GetName().."Right"];
+        self.LeftActive = _G[self:GetName().."LeftActive"];
+        self.MiddleActive = _G[self:GetName().."MiddleActive"];
+        self.RightActive = _G[self:GetName().."RightActive"];
+        self.LeftActive:Hide();
+        self.MiddleActive:Hide();
+        self.RightActive:Hide();
+        self.selectedTextX = 0;
+        self.selectedTextY = -3;
+        self.deselectedTextX = 0;
+        self.deselectedTextY = 2;
+      </OnLoad>
+    </Scripts>
   </Button>	
 </Ui>
