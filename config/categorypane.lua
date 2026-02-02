@@ -89,6 +89,7 @@ function categoryPaneProto:initListItem(button, elementData)
     end
     button.Category = button:CreateFontString(nil, "OVERLAY")
     button.Category:SetHeight(30)
+    button.Category:SetJustifyH("LEFT")
     button.Category:SetPoint("LEFT", button, "LEFT", 10, 0)
     button.Category:SetPoint("RIGHT", button, "RIGHT", -40, 0)
     button.Note = button:CreateFontString(nil, "OVERLAY")
