@@ -417,6 +417,10 @@ end
 ---@param category string
 ---@return boolean
 function categories:IsDynamicCategory(category)
+  -- If there's a saved category with this name, it's not dynamic (user created it)
+  if database:GetItemCategory(category) then
+    return false
+  end
   return self.ephemeralCategories[category] and self.ephemeralCategories[category].dynamic or false
 end
 

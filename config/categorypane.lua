@@ -77,6 +77,60 @@ local groupByEnumToDisplayText = {
   [const.SEARCH_CATEGORY_GROUP_BY.EXPANSION] = "Expansion",
 }
 
+-- Mapping from query text to enum value (case-insensitive)
+local groupByTextToEnum = {
+  ["none"] = const.SEARCH_CATEGORY_GROUP_BY.NONE,
+  ["type"] = const.SEARCH_CATEGORY_GROUP_BY.TYPE,
+  ["subtype"] = const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE,
+  ["expansion"] = const.SEARCH_CATEGORY_GROUP_BY.EXPANSION,
+  ["exp"] = const.SEARCH_CATEGORY_GROUP_BY.EXPANSION,
+}
+
+-- Mapping from enum value to query text
+local groupByEnumToText = {
+  [const.SEARCH_CATEGORY_GROUP_BY.NONE] = "none",
+  [const.SEARCH_CATEGORY_GROUP_BY.TYPE] = "type",
+  [const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE] = "subtype",
+  [const.SEARCH_CATEGORY_GROUP_BY.EXPANSION] = "expansion",
+}
+
+-- Pattern to match "group by <value>" at the end of a query (case-insensitive)
+local groupByPattern = "%s+group%s+by%s+(%w+)%s*$"
+
+---@param query string
+---@return number|nil groupBy enum value if found, nil otherwise
+local function parseGroupByFromQuery(query)
+  local match = query:lower():match(groupByPattern)
+  if match then
+    return groupByTextToEnum[match]
+  end
+  return nil
+end
+
+---@param query string
+---@return string query with group by clause stripped
+local function stripGroupByFromQuery(query)
+  local v, _ = query:gsub("%s+[Gg][Rr][Oo][Uu][Pp]%s+[Bb][Yy]%s+%w+%s*$", "")
+  return v
+end
+
+---@param query string
+---@param groupBy number
+---@return string query with group by clause added/updated
+local function setGroupByInQuery(query, groupBy)
+  local cleanQuery = stripGroupByFromQuery(query)
+  if groupBy == const.SEARCH_CATEGORY_GROUP_BY.NONE then
+    return cleanQuery
+  end
+  local groupByText = groupByEnumToText[groupBy]
+  if groupByText and cleanQuery ~= "" then
+    return cleanQuery .. " group by " .. groupByText
+  elseif groupByText then
+    return "group by " .. groupByText
+  end
+  return cleanQuery
+end
+
 ---@param button CategoryPaneListButton
 ---@param elementData table
 function categoryPaneProto:initListItem(button, elementData)
@@ -318,17 +372,34 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
 
   -- Populate fields
   self.searchDetail.nameLabel:SetText(filter.name)
-  self.searchDetail.queryBox:SetText(filter.searchCategory.query or "")
+  local query = filter.searchCategory.query or ""
+  local storedGroupBy = filter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+
+  -- Parse group by from query string to ensure sync
+  local parsedGroupBy = parseGroupByFromQuery(query)
+
+  -- Determine the effective group by: prefer what's in the query string
+  local effectiveGroupBy
+  if parsedGroupBy ~= nil then
+    effectiveGroupBy = parsedGroupBy
+  else
+    effectiveGroupBy = storedGroupBy
+    -- If there's a stored groupBy but it's not in the query, add it
+    if effectiveGroupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
+      query = setGroupByInQuery(query, effectiveGroupBy)
+    end
+  end
+
+  self.searchDetail.queryBox:SetText(query)
   self.searchDetail.priorityBox:SetText(tostring(filter.priority or 10))
 
   -- Update group by dropdown
-  local groupBy = filter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+  self.searchDetail.selectedGroupBy = effectiveGroupBy
   if addon.isRetail then
     self.searchDetail.groupByDropdown:GenerateMenu()
   else
-    UIDropDownMenu_SetText(self.searchDetail.groupByDropdown, groupByEnumToDisplayText[groupBy])
+    UIDropDownMenu_SetText(self.searchDetail.groupByDropdown, groupByEnumToDisplayText[effectiveGroupBy])
   end
-  self.searchDetail.selectedGroupBy = groupBy
 
   -- Update color
   if filter.color then
@@ -427,8 +498,28 @@ function categoryPaneProto:CreateSearchDetailPanel()
     queryScrollBox:EnableMouseWheel(false)
   end)
 
-  queryBox:SetScript("OnTextChanged", function()
+  queryBox:SetScript("OnTextChanged", function(_, isUserInput)
     queryScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately)
+    -- Sync dropdown from query string when user types
+    if isUserInput and self.searchDetail.groupByDropdown then
+      local parsedGroupBy = parseGroupByFromQuery(queryBox:GetText())
+      if parsedGroupBy ~= nil and parsedGroupBy ~= self.searchDetail.selectedGroupBy then
+        self.searchDetail.selectedGroupBy = parsedGroupBy
+        if addon.isRetail then
+          self.searchDetail.groupByDropdown:GenerateMenu()
+        else
+          UIDropDownMenu_SetText(self.searchDetail.groupByDropdown, groupByEnumToDisplayText[parsedGroupBy])
+        end
+      elseif parsedGroupBy == nil and self.searchDetail.selectedGroupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
+        -- Query has no group by clause, reset dropdown to None
+        self.searchDetail.selectedGroupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE
+        if addon.isRetail then
+          self.searchDetail.groupByDropdown:GenerateMenu()
+        else
+          UIDropDownMenu_SetText(self.searchDetail.groupByDropdown, groupByEnumToDisplayText[const.SEARCH_CATEGORY_GROUP_BY.NONE])
+        end
+      end
+    end
   end)
 
   queryScrollBox:SetScript("OnMouseDown", function()
@@ -484,6 +575,11 @@ function categoryPaneProto:CreateSearchDetailPanel()
           return self.searchDetail.selectedGroupBy == option.value
         end, function()
           self.searchDetail.selectedGroupBy = option.value
+          -- Sync query string from dropdown
+          if self.searchDetail.queryBox then
+            local newQuery = setGroupByInQuery(self.searchDetail.queryBox:GetText(), option.value)
+            self.searchDetail.queryBox:SetText(newQuery)
+          end
         end)
       end
     end)
@@ -500,6 +596,11 @@ function categoryPaneProto:CreateSearchDetailPanel()
         info.func = function()
           self.searchDetail.selectedGroupBy = option.value
           UIDropDownMenu_SetText(groupByDropdown, option.text)
+          -- Sync query string from dropdown
+          if self.searchDetail.queryBox then
+            local newQuery = setGroupByInQuery(self.searchDetail.queryBox:GetText(), option.value)
+            self.searchDetail.queryBox:SetText(newQuery)
+          end
         end
         UIDropDownMenu_AddButton(info, level)
       end
@@ -587,8 +688,8 @@ function categoryPaneProto:SaveSearchCategory()
 
   local ctx = context:New('CategoryPane_SaveSearchCategory')
 
-  -- Update query
-  local newQuery = self.searchDetail.queryBox:GetText()
+  -- Update query (strip group by clause since it's stored separately)
+  local newQuery = stripGroupByFromQuery(self.searchDetail.queryBox:GetText())
   local newPriority = tonumber(self.searchDetail.priorityBox:GetText()) or 10
   local newGroupBy = self.searchDetail.selectedGroupBy
 
