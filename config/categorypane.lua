@@ -52,7 +52,6 @@ local itemRowFrame = addon:GetModule('ItemRowFrame')
 local categoryPane = addon:NewModule('CategoryPane')
 
 ---@class CategoryPaneListButton: Button
----@field Expand Button
 ---@field Category FontString
 ---@field Note FontString
 ---@field Init boolean
@@ -88,12 +87,9 @@ function categoryPaneProto:initListItem(button, elementData)
     if not button.SetBackdrop then
       Mixin(button, BackdropTemplateMixin)
     end
-    button.Expand = CreateFrame("Button", nil, button)
-    button.Expand:SetSize(16, 16)
-    button.Expand:SetPoint("LEFT", button, "LEFT", 5, 0)
     button.Category = button:CreateFontString(nil, "OVERLAY")
     button.Category:SetHeight(30)
-    button.Category:SetPoint("LEFT", button.Expand, "RIGHT", 5, 0)
+    button.Category:SetPoint("LEFT", button, "LEFT", 10, 0)
     button.Category:SetPoint("RIGHT", button, "RIGHT", -40, 0)
     button.Note = button:CreateFontString(nil, "OVERLAY")
     button.Note:SetHeight(30)
@@ -105,21 +101,15 @@ function categoryPaneProto:initListItem(button, elementData)
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
     })
     button:SetBackdropColor(0, 0, 0, 0)
-    button.Expand:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
-    button.Expand:SetPushedTexture("Interface\\Buttons\\UI-PlusButton-Down")
-    button.Expand:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
   end
 
   -- Header styling
   if elementData.header then
     button.Category:SetFontObject(fonts.UnitFrame12Yellow)
     button.Note:SetText("")
-    button.Expand:Hide()
     button:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
-    button.Expand:Show()
-    button.Expand:SetNormalTexture("Interface\\Buttons\\UI-PlusButton-Up")
 
     -- Show note based on category state
     if not categories:IsCategoryShown(elementData.title) then
