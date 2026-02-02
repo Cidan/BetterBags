@@ -1146,6 +1146,18 @@ function stackedLayout:ShowPane(paneIndex)
 
   -- Show the new pane
   self.activePane = paneIndex
+
+  -- Set targetFrame height to match the scrollBox's visible area.
+  -- This ensures the pane fills exactly the viewport without causing outer scrolling.
+  -- Panes are designed to fill available space with their own internal scrolling.
+  if self.scrollBox then
+    local viewportHeight = self.scrollBox:GetHeight()
+    if viewportHeight and viewportHeight > 0 then
+      self.targetFrame:SetHeight(viewportHeight)
+      self.scrollBox:FullUpdate(true)
+    end
+  end
+
   paneFrame:Show()
   paneFrame:SetAlpha(0)
   local fadeIn = self.paneFadeIns[paneIndex]

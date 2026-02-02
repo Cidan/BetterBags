@@ -1085,6 +1085,17 @@ function categoryPane:Create(parent, kind)
     end
   end)
 
+  -- Handle size changes to ensure the list updates when pane dimensions are set.
+  -- This fixes intermittent issues where the list extends beyond the pane boundaries.
+  pane.frame:SetScript("OnSizeChanged", function()
+    if pane.initialized and pane.listFrame and pane.listFrame.ScrollBox then
+      -- Trigger a full update on the list's ScrollBox to recalculate its extent
+      if pane.listFrame.ScrollBox.FullUpdate then
+        pane.listFrame.ScrollBox:FullUpdate(true)
+      end
+    end
+  end)
+
   -- Register for category updates
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()
