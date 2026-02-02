@@ -56,6 +56,10 @@ function debugWindow:Create(ctx)
 
   -- Create tab frame
   self.tabFrame = tabs:Create(self.frame)
+  -- Shift tabs right to align with frame edge
+  self.tabFrame.frame:ClearAllPoints()
+  self.tabFrame.frame:SetPoint("TOPLEFT", self.frame, "BOTTOMLEFT", 10, 2)
+  self.tabFrame.frame:SetPoint("TOPRIGHT", self.frame, "BOTTOMRIGHT", 0, 2)
   self.tabFrame:SetClickHandler(function(_, id, button)
     if button == "LeftButton" then
       self:SwitchTab(id)
