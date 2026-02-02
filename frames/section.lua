@@ -97,13 +97,23 @@ function sectionProto:SetTitle(text, color)
   self.title:SetText(text)
   themes:UpdateSectionFont(self.title:GetFontString())
 
-  -- Apply custom color if provided, otherwise use theme default
+  -- SetFontObject doesn't clear explicit SetTextColor overrides in WoW's API.
+  -- We must always explicitly set the color to ensure pooled sections don't bleed colors.
+  local fontString = self.title:GetFontString()
   if color and color[1] and color[2] and color[3] then
-    self.title:GetFontString():SetTextColor(color[1], color[2], color[3], 1)
+    -- Apply custom color
+    fontString:SetTextColor(color[1], color[2], color[3], 1)
+  else
+    -- Reset to the font object's default color to clear any previous override
+    local fontObject = fontString:GetFontObject()
+    if fontObject then
+      local r, g, b, a = fontObject:GetTextColor()
+      fontString:SetTextColor(r, g, b, a or 1)
+    end
   end
 
-  -- Store the current text color (either custom or theme default) as the original
-  local r, g, b, a = self.title:GetFontString():GetTextColor()
+  -- Store the current text color as the original for collapse dimming
+  local r, g, b, a = fontString:GetTextColor()
   self.originalTextColor = {r = r, g = g, b = b, a = a}
 end
 
@@ -185,15 +195,9 @@ function sectionProto:Wipe()
   self.frame:SetAlpha(1)
   self.collapsed = false
   self.shouldShrinkWhenCollapsed = true
-  -- Restore original text color before clearing it
-  if self.originalTextColor then
-    self.title:GetFontString():SetTextColor(
-      self.originalTextColor.r,
-      self.originalTextColor.g,
-      self.originalTextColor.b,
-      self.originalTextColor.a
-    )
-  end
+  -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
+  -- Note: We don't restore the color here because SetTitle always explicitly sets it,
+  -- ensuring pooled sections don't bleed custom colors to other categories.
   self.originalTextColor = nil
 end
 
