@@ -1076,8 +1076,12 @@ function categoryPane:Create(parent, kind)
     -- Only run once on first show
     if not pane.initialized then
       pane.initialized = true
-      pane:RefreshList()
-      pane:UpdateDetailPanel()
+      -- Use C_Timer.After(0) to defer until the next frame when parent layout is complete.
+      -- This ensures the list container has its proper height calculated before RefreshList.
+      C_Timer.After(0, function()
+        pane:RefreshList()
+        pane:UpdateDetailPanel()
+      end)
     end
   end)
 

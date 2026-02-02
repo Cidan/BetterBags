@@ -260,6 +260,7 @@ end
 ---@param tabIndex number
 function stackedLayout:SwitchToTab(tabIndex)
   -- If a pane is active, hide it and show the requested tab
+  local wasShowingPane = self.activePane ~= nil
   if self.activePane then
     local paneFrame = self.panes[self.activePane]
     if paneFrame and paneFrame:IsShown() then
@@ -273,7 +274,29 @@ function stackedLayout:SwitchToTab(tabIndex)
     self.previousTab = nil
   end
 
-  if tabIndex == self.activeTab and not self.activePane then return end
+  -- If clicking the same tab we were already on (but coming from a pane),
+  -- we need to show the tab container and update highlighting
+  if tabIndex == self.activeTab then
+    if wasShowingPane then
+      -- Tab container was hidden when pane was shown, need to restore it
+      local tabContainer = self.tabContainers[tabIndex]
+      if tabContainer then
+        local tabHeight = self.tabHeights[tabIndex] + 25
+        tabContainer:SetHeight(tabHeight)
+        self.targetFrame:SetHeight(tabHeight)
+        if self.scrollBox and self.scrollBox.FullUpdate then
+          local _ = self.targetFrame:GetHeight()
+          self.scrollBox:FullUpdate(true)
+        end
+        tabContainer:Show()
+        tabContainer:SetAlpha(0)
+        local fadeIn = self.tabFadeIns[tabIndex]
+        fadeIn:Play()
+      end
+      self:UpdateTabHighlighting(tabIndex)
+    end
+    return
+  end
 
   local currentContainer = self.tabContainers[self.activeTab]
   local newContainer = self.tabContainers[tabIndex]
