@@ -138,7 +138,8 @@ function currencyPaneProto:initListItem(button, elementData)
     end)
 
     button:SetScript("OnEnter", function()
-      if self.selectedIndex ~= elementData.index then
+      -- Only show hover highlight for non-selected items that aren't shown in backpack
+      if self.selectedIndex ~= elementData.index and not isShownInBackpack then
         button:SetBackdropColor(0.3, 0.3, 0.3, 0.5)
       end
       GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
