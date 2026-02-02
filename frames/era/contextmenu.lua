@@ -225,19 +225,6 @@ function contextMenu:CreateContextMenu(bag)
     end
   })
 
-  if bag.kind == const.BAG_KIND.BACKPACK then
-    -- Show theme selection window.
-    table.insert(menuList, {
-      text = L:G("Themes"),
-      checked = function() return bag.themeConfigFrame:IsShown() end,
-      tooltipTitle = L:G("Themes"),
-      tooltipText = L:G("Click to toggle the display of the theme configuration side panel."),
-      func = function()
-        bag.windowGrouping:Show('themeConfig')
-      end
-    })
-  end
-
   table.insert(menuList, {
     text = L:G("Open Options Screen"),
     notCheckable = true,

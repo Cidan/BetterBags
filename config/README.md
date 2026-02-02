@@ -117,6 +117,43 @@ The CategoryPane module provides a comprehensive category management interface w
 +-------------------+--------------------------------------+
 ```
 
+### themepane.lua
+
+The ThemePane module provides a theme selection interface within the main settings screen. It allows users to browse and apply visual themes for BetterBags.
+
+#### Key Features
+
+- **Master-Detail Layout**: Left side shows a scrollable list of available themes, right side shows detailed information about the selected theme
+- **Theme List**:
+  - Displays all available themes sorted alphabetically
+  - Currently active theme highlighted in yellow
+  - Visual indicators for selected theme (gold highlight)
+- **Detail Panel**:
+  - Theme name (large gold title)
+  - Theme description
+  - Availability status (Currently Active, Available, or Unavailable)
+  - Apply Theme button to switch themes
+
+#### Functions
+
+- **`themePane:Create(parent)`**: Creates a new theme pane for the settings interface
+- Integrates with the Themes module for theme switching
+- Applies themes immediately when the Apply button is clicked
+
+#### UI Structure
+
+```
++-------------------+--------------------------------------+
+| > Default         | [Selected Theme Name]                |
+| > ElvUI           | Description:                         |
+| > Simple Dark     | A clean, minimal theme for...        |
+|                   |                                      |
+|                   | Status: Currently Active             |
+|                   |                                      |
+|                   | [Apply Theme]                        |
++-------------------+--------------------------------------+
+```
+
 ### plugin.lua
 
 Manages integration of third-party plugin configurations into the main BetterBags settings interface.

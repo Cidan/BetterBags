@@ -120,6 +120,7 @@ themes\gw2.lua
 themes\elvui.lua
 
 config\categorypane.lua
+config\themepane.lua
 config\config.lua
 config\plugin.lua
 

@@ -33,6 +33,9 @@ local form = addon:GetModule('Form')
 ---@class CategoryPane: AceModule
 local categoryPane = addon:GetModule('CategoryPane')
 
+---@class ThemePane: AceModule
+local themePane = addon:GetModule('ThemePane')
+
 ---@class Config: AceModule
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
@@ -157,6 +160,15 @@ function config:CreateConfig()
     setValue = function(_, value)
       db:GetData().profile.newItemTime = value * 60
     end,
+  })
+
+  f:AddPaneLink({
+    title = 'Theme',
+    description = 'Change the visual appearance of BetterBags.',
+    createPane = function(parent, _)
+      return themePane:Create(parent)
+    end,
+    bagKind = nil,
   })
 
   local bagTypes = {
