@@ -183,7 +183,10 @@ function stackedLayout:addIndex(title, point, sub)
 
   -- Change OnClick behavior based on mode
   if self.tabbed then
-    local tabIndex = #self.sections + 1
+    -- Use tabContainers count, not sections count, because sections includes pane links
+    -- which don't have tab containers. This ensures the tab index matches the actual
+    -- tabContainers array index.
+    local tabIndex = #self.tabContainers
     indexButton.tabIndex = tabIndex -- Store tab index for hover logic
 
     -- Add hover glow effect
