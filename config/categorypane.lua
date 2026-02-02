@@ -1046,10 +1046,11 @@ function categoryPane:Create(parent, kind)
   pane.frame:SetAllPoints()
 
   -- Create list frame (left side)
+  -- Width: 200 for content + 18 for scrollbar outside = 218
   local listContainer = CreateFrame("Frame", nil, pane.frame)
   listContainer:SetPoint("TOPLEFT", 0, 0)
   listContainer:SetPoint("BOTTOMLEFT", 0, 0)
-  listContainer:SetWidth(200)
+  listContainer:SetWidth(218)
 
   pane.listFrame = list:Create(listContainer)
   pane.listFrame.frame:SetPoint("TOPLEFT", 0, 0)
@@ -1070,14 +1071,22 @@ function categoryPane:Create(parent, kind)
   pane.detailFrame:SetPoint("TOPLEFT", listContainer, "TOPRIGHT", 10, 0)
   pane.detailFrame:SetPoint("BOTTOMRIGHT", 0, 0)
 
-  -- Initial load
-  pane:RefreshList()
-  pane:UpdateDetailPanel()
+  -- Initial load - delay to allow parent frame to finish layout
+  pane.frame:SetScript("OnShow", function()
+    -- Only run once on first show
+    if not pane.initialized then
+      pane.initialized = true
+      pane:RefreshList()
+      pane:UpdateDetailPanel()
+    end
+  end)
 
   -- Register for category updates
   local drawEvent = kind == const.BAG_KIND.BACKPACK and 'bags/Draw/Backpack/Done' or 'bags/Draw/Bank/Done'
   events:RegisterMessage(drawEvent, function()
-    pane:RefreshList()
+    if pane.initialized then
+      pane:RefreshList()
+    end
   end)
 
   return pane.frame

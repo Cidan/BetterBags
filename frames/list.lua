@@ -135,12 +135,12 @@ function list:Create(parent)
   l.frame = CreateFrame("Frame", nil, parent)
 
   l.ScrollBox = CreateFrame("Frame", nil, l.frame, "WowScrollBoxList") --[[@as WowScrollBox]]
-  l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -22)
-  l.ScrollBox:SetPoint("BOTTOM", 0, 4)
+  l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -4)
+  l.ScrollBox:SetPoint("BOTTOMRIGHT", l.frame, "BOTTOMRIGHT", -18, 4)
 
-  l.ScrollBar = CreateFrame("EventFrame", nil, l.ScrollBox, "MinimalScrollBar") --[[@as MinimalScrollBar]]
-  l.ScrollBar:SetPoint("TOPLEFT", l.frame, "TOPRIGHT", -16, -28)
-  l.ScrollBar:SetPoint("BOTTOMLEFT", l.frame, "BOTTOMRIGHT", -16, 6)
+  l.ScrollBar = CreateFrame("EventFrame", nil, l.frame, "MinimalScrollBar") --[[@as MinimalScrollBar]]
+  l.ScrollBar:SetPoint("TOPLEFT", l.frame, "TOPRIGHT", -14, -4)
+  l.ScrollBar:SetPoint("BOTTOMLEFT", l.frame, "BOTTOMRIGHT", -14, 4)
 
   l.ScrollBox:SetInterpolateScroll(true)
   l.ScrollBar:SetInterpolateScroll(true)
