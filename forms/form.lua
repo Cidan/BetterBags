@@ -59,11 +59,11 @@ function form:Create(opts)
   l.frame:SetFrameLevel(500)
 
   l.ScrollBox = CreateFrame("Frame", nil, l.frame, "WowScrollBox") --[[@as WowScrollBox]]
-  l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -22)
+  l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -30)
   l.ScrollBox:SetPoint("BOTTOMRIGHT", l.frame, "BOTTOMRIGHT", 0, 4)
 
   l.ScrollBar = CreateFrame("EventFrame", nil, l.ScrollBox, "MinimalScrollBar") --[[@as MinimalScrollBar]]
-  l.ScrollBar:SetPoint("TOPLEFT", l.frame, "TOPRIGHT", -16, -28)
+  l.ScrollBar:SetPoint("TOPLEFT", l.frame, "TOPRIGHT", -16, -36)
   l.ScrollBar:SetPoint("BOTTOMLEFT", l.frame, "BOTTOMRIGHT", -16, 6)
 
   l.ScrollBox:SetInterpolateScroll(true)

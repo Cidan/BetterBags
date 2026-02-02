@@ -504,7 +504,7 @@ function stackedLayout:AddSection(opts)
     local tabContainer = CreateFrame("Frame", nil, self.targetFrame)
     -- Position tab container to the right of the index frame
     local leftOffset = (self.indexFrame and self.indexFrame:GetWidth() or 0) + 10
-    tabContainer:SetPoint("TOPLEFT", self.targetFrame, "TOPLEFT", leftOffset, 0)
+    tabContainer:SetPoint("TOPLEFT", self.targetFrame, "TOPLEFT", leftOffset, -10)
     tabContainer:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
     tabContainer:SetHeight(2000)  -- Start with large height, will be updated by Resize()
     tabContainer:Hide()  -- Start hidden
@@ -1222,7 +1222,7 @@ function stackedLayout:AddPaneLink(opts)
   local paneFrame = opts.createPane(self.targetFrame, opts.bagKind)
   -- Position pane to the right of the index frame
   local leftOffset = (self.indexFrame and self.indexFrame:GetWidth() or 0) + 10
-  paneFrame:SetPoint("TOPLEFT", self.targetFrame, "TOPLEFT", leftOffset, 0)
+  paneFrame:SetPoint("TOPLEFT", self.targetFrame, "TOPLEFT", leftOffset, -10)
   paneFrame:SetPoint("BOTTOMRIGHT", self.targetFrame, "BOTTOMRIGHT", 0, 0)
   paneFrame:Hide()
 
