@@ -372,17 +372,18 @@ function stackedLayout:addHeight(amount)
   end
 end
 
----@param activeIndex number
-function stackedLayout:UpdateTabHighlighting(activeIndex)
-  for i, section in ipairs(self.sections) do
+---@param activeTabIndex number
+function stackedLayout:UpdateTabHighlighting(activeTabIndex)
+  for _, section in ipairs(self.sections) do
     local button = section.button
     local fs = button:GetFontString()
     local isActive = false
 
-    -- Check if this is the active tab or if this section's pane is active
+    -- Check if this is the active pane or the active tab
+    -- Pane links have section.paneIndex, tabs have button.tabIndex
     if self.activePane and section.paneIndex == self.activePane then
       isActive = true
-    elseif not self.activePane and i == activeIndex then
+    elseif not self.activePane and button.tabIndex == activeTabIndex then
       isActive = true
     end
 
