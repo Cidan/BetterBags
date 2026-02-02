@@ -133,30 +133,10 @@ local gw2Theme = {
         frame.Owner:Sort(ctx)
       end)
 
-      if frame.Owner.kind == const.BAG_KIND.BACKPACK then
-        newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/storemicrobutton-up.png", "Show Currency", function()
-          if frame.Owner.currencyFrame:IsShown() then
-            frame.Owner.currencyFrame:Hide()
-          else
-            frame.Owner.windowGrouping:Show("currencyConfig")
-          end
-        end)
-      end
-
       newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/questlogmicrobutton-up.png", "Open Settings", function()
         local ctx = context:New("GW2OpenSettings")
         events:SendMessage(ctx, "config/Open")
       end)
-
-      if frame.Owner.kind == const.BAG_KIND.BACKPACK then
-        newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/ejmicrobutton-up.png", "Show Themes", function()
-          if frame.Owner.themeConfigFrame:IsShown() then
-            frame.Owner.themeConfigFrame:Hide()
-          else
-            frame.Owner.windowGrouping:Show("themeConfig")
-          end
-        end)
-      end
 
       newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/mainmenumicrobutton-up", "Open Settings", function(ctx)
         contextMenu:Show(ctx, frame.Owner.menuList)
