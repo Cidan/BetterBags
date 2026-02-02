@@ -129,10 +129,14 @@ end
 ---@return Section
 function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
   local section = self.sections[category]
+  -- Look up category color
+  local filter = categories:GetCategoryByName(category)
+  local color = filter and filter.color or nil
+
   if section == nil then
     section = sectionFrame:Create(ctx)
     section.frame:SetParent(self.content:GetScrollView())
-    section:SetTitle(category)
+    section:SetTitle(category, color)
     if not onlyCreate then
       self.content:AddCell(category, section)
     end
@@ -144,8 +148,12 @@ function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
         dynamic = true,
       })
     end
-  elseif self.content:GetCell(category) == nil and not onlyCreate then
-    self.content:AddCell(category, section)
+  else
+    -- Section already exists - update the color in case it changed
+    section:SetTitle(category, color)
+    if self.content:GetCell(category) == nil and not onlyCreate then
+      self.content:AddCell(category, section)
+    end
   end
   return section
 end

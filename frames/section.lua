@@ -92,14 +92,19 @@ end
 
 -- SetTitle will set the title of the section.
 ---@param text string The text to set the title to.
-function sectionProto:SetTitle(text)
+---@param color? number[] Optional RGB color array {r, g, b} to apply to the title.
+function sectionProto:SetTitle(text, color)
   self.title:SetText(text)
   themes:UpdateSectionFont(self.title:GetFontString())
-  -- Store the original text color after the theme has been applied
-  if not self.originalTextColor then
-    local r, g, b, a = self.title:GetFontString():GetTextColor()
-    self.originalTextColor = {r = r, g = g, b = b, a = a}
+
+  -- Apply custom color if provided, otherwise use theme default
+  if color and color[1] and color[2] and color[3] then
+    self.title:GetFontString():SetTextColor(color[1], color[2], color[3], 1)
   end
+
+  -- Store the current text color (either custom or theme default) as the original
+  local r, g, b, a = self.title:GetFontString():GetTextColor()
+  self.originalTextColor = {r = r, g = g, b = b, a = a}
 end
 
 -- GetTitleWithoutIndicator returns the title text without the collapse indicator.
