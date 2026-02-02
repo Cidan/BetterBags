@@ -1226,40 +1226,14 @@ function stackedLayout:IsPaneActive()
   return self.activePane ~= nil
 end
 
+--- Adds a pane link to the sidebar index that navigates to a separate pane.
+--- Does NOT render any inline content. Only adds sidebar navigation entry.
 ---@param opts FormPaneLinkOptions
 function stackedLayout:AddPaneLink(opts)
   if not self.tabbed then
     -- PaneLinks only work in tabbed mode
     return
   end
-
-  local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormPaneLink]]
-  self:alignFrame(t, container)
-
-  -- Create a clickable row that looks like a subsection but navigates to a pane
-  local titleContainer = CreateFrame("Frame", nil, container)
-  titleContainer:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
-  titleContainer:SetPoint("RIGHT", container, "RIGHT", 0, 0)
-
-  container.title = self:createTitle(titleContainer, opts.title, {0.75, 0.75, 0.75})
-  container.title:SetPoint("TOPLEFT", titleContainer, "TOPLEFT")
-
-  container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
-  container.description:SetPoint("RIGHT", container, "RIGHT", -30, 0)
-
-  -- Add an arrow indicator to show this is clickable
-  container.arrow = container:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  container.arrow:SetText(">")
-  container.arrow:SetTextColor(0.75, 0.75, 0.75)
-  container.arrow:SetPoint("RIGHT", container, "RIGHT", -10, 0)
-
-  local div = self:createDividerLineMiddle(container)
-  div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
-  div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
-
-  container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 33)
 
   -- Create the pane frame that will be shown when this link is clicked
   local paneIndex = #self.panes + 1
@@ -1277,7 +1251,7 @@ function stackedLayout:AddPaneLink(opts)
   table.insert(self.paneFadeIns, fadeIn)
   table.insert(self.paneFadeOuts, fadeOut)
 
-  -- Add to index with pane navigation
+  -- Add to index with pane navigation (no inline content)
   local indexButton = CreateFrame("Button", nil, self.indexFrame) --[[@as Button]]
   indexButton:SetSize(100, 24)
   local font = indexButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1318,10 +1292,6 @@ function stackedLayout:AddPaneLink(opts)
     indexButton:SetPoint("TOPLEFT", self.nextIndex, "BOTTOMLEFT", 0, -5)
   end
 
-  table.insert(self.sections, {point = container, button = indexButton, paneIndex = paneIndex})
+  table.insert(self.sections, {button = indexButton, paneIndex = paneIndex})
   self.nextIndex = indexButton
-
-  self.nextFrame = container
-  self:addHeight(container:GetHeight())
-  self.paneLinks[container] = opts
 end
