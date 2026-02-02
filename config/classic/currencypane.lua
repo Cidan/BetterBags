@@ -104,24 +104,22 @@ function currencyPaneProto:initListItem(button, elementData)
     button.CurrencyIcon:Hide()
   end
 
-  -- Font styling based on header/active state
+  -- Font styling based on header state
   if isHeader then
     button.CurrencyName:SetFontObject(fonts.UnitFrame12Yellow)
     button.CurrencyCount:SetText("")
-  elseif isShownInBackpack then
-    button.CurrencyName:SetFontObject(fonts.UnitFrame12Yellow)
-    button.CurrencyCount:SetText(BreakUpLargeNumbers(info.quantity or 0))
   else
     button.CurrencyName:SetFontObject(fonts.UnitFrame12White)
     button.CurrencyCount:SetText(BreakUpLargeNumbers(info.quantity or 0))
   end
 
-  -- Background based on selection state
+  -- Background based on selection and shown-in-backpack state
   if self.selectedIndex == elementData.index then
     button:SetBackdropColor(1, 0.82, 0, 0.3)
     self.selectedButton = button
   elseif isShownInBackpack then
-    button:SetBackdropColor(0.3, 0.3, 0.1, 0.3)
+    -- Yellow background highlight for currencies shown in backpack (like old list)
+    button:SetBackdropColor(1, 1, 0, 0.2)
   elseif not isHeader then
     button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
   else
@@ -149,7 +147,7 @@ function currencyPaneProto:initListItem(button, elementData)
       if self.selectedIndex == elementData.index then
         button:SetBackdropColor(1, 0.82, 0, 0.3)
       elseif isShownInBackpack then
-        button:SetBackdropColor(0.3, 0.3, 0.1, 0.3)
+        button:SetBackdropColor(1, 1, 0, 0.2)
       else
         button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
       end
@@ -179,7 +177,7 @@ function currencyPaneProto:SelectCurrency(index)
     if prevIndex then
       local prevInfo = getCurrencyInfo(prevIndex)
       if prevInfo and prevInfo.isShowInBackpack then
-        self.selectedButton:SetBackdropColor(0.3, 0.3, 0.1, 0.3)
+        self.selectedButton:SetBackdropColor(1, 1, 0, 0.2)
       else
         self.selectedButton:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
       end
