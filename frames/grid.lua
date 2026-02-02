@@ -288,6 +288,7 @@ function gridProto:calculateColumns(options)
   end
   local rowWidth = 0
   local totalHeight = 0
+  local maxCellHeight = 0
   ---@type Cell[][]
   local columns = {}
   for i, cell in ipairs(maskedCells) do
@@ -299,11 +300,17 @@ function gridProto:calculateColumns(options)
         rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
       end
     else
-      totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
+      totalHeight = totalHeight + cell.frame:GetHeight()
+      rowWidth = cell.frame:GetWidth()
+    end
+
+    if cell.frame:GetHeight() > maxCellHeight then
+      maxCellHeight = math.ceil(cell.frame:GetHeight())
     end
   end
 
-  local splitAt = math.ceil(totalHeight / options.columns) + 20
+  -- Consider the largest cell for calculating splitAt. Don't split before reaching that height, to avoid will be unnecessary columns
+  local splitAt = math.ceil(math.max((totalHeight / options.columns) + 20, maxCellHeight))
   local currentHeight = 0
   local currentColumn = 1
   rowWidth = 0
@@ -312,9 +319,9 @@ function gridProto:calculateColumns(options)
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
         if currentHeight + cell.frame:GetHeight() > splitAt then
           currentColumn = currentColumn + 1
-          currentHeight = 0
+          currentHeight = cell.frame:GetHeight()
         else
-          currentHeight = currentHeight + cell.frame:GetHeight()
+          currentHeight = currentHeight + cell.frame:GetHeight() + self.spacing
         end
         rowWidth = cell.frame:GetWidth()
       else
@@ -322,6 +329,7 @@ function gridProto:calculateColumns(options)
       end
     else
       currentHeight = currentHeight + cell.frame:GetHeight()
+      rowWidth = cell.frame:GetWidth()
     end
     if not columns[currentColumn] then
       columns[currentColumn] = {}
