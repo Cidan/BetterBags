@@ -115,15 +115,12 @@ function backpack.proto:OnCreate(ctx)
 	slots.frame:Hide()
 	self.bag.slots = slots
 
-	-- Currency frame
-	local currencyFrame = currency:Create(self.bag.sideAnchor, self.bag.frame)
-	currencyFrame:Hide()
-	self.bag.currencyFrame = currencyFrame
+	-- Currency icon grid (bottom of backpack)
+	self.bag.currencyIconGrid = currency:CreateIconGrid(self.bag.frame)
 
 	-- Theme config
 	self.bag.themeConfigFrame = themeConfig:Create(self.bag.sideAnchor)
 	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
-	self.bag.windowGrouping:AddWindow("currencyConfig", self.bag.currencyFrame)
 
 	-- Group tabs
 	self.bag.tabs = tabs:Create(self.bag.frame)

@@ -121,6 +121,7 @@ themes\elvui.lua
 
 config\categorypane.lua
 config\themepane.lua
+config\currencypane.lua
 config\config.lua
 config\plugin.lua
 

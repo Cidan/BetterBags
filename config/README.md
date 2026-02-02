@@ -154,6 +154,54 @@ The ThemePane module provides a theme selection interface within the main settin
 +-------------------+--------------------------------------+
 ```
 
+### currencypane.lua
+
+The CurrencyPane module provides a currency configuration interface within the main settings screen. It allows users to select which currencies are displayed in the icon grid at the bottom of the backpack.
+
+#### Key Features
+
+- **Master-Detail Layout**: Left side shows a scrollable list of all currencies, right side shows detailed information about the selected currency
+- **Currency List**:
+  - Displays all currencies organized by their in-game headers
+  - Currencies shown in backpack are highlighted in yellow
+  - Shows quantity next to each currency
+  - Visual indicators for selected currency (gold highlight)
+- **Detail Panel**:
+  - Currency icon and name (large gold title)
+  - Current quantity
+  - Maximum quantity (if applicable)
+  - Weekly earned amount (if applicable)
+  - Status indicator (shown/hidden in backpack)
+  - Toggle button to show/hide in backpack
+
+#### Functions
+
+- **`currencyPane:Create(parent)`**: Creates a new currency pane for the settings interface
+- Uses C_CurrencyInfo API for retail or GetCurrencyListInfo for classic
+- Updates automatically when currencies change via CURRENCY_DISPLAY_UPDATE event
+
+#### UI Structure
+
+```
++-------------------+--------------------------------------+
+| Currencies        | [Currency Icon] Honor Points         |
+| > PvP             |                                      |
+|   > Honor Points  | Quantity: 1,250                      |
+|   > Conquest      | Maximum: 15,000                      |
+| > Dungeon         |                                      |
+|   > Valor         | Status: Shown in backpack            |
+|                   |                                      |
+|                   | [Hide in Backpack]                   |
++-------------------+--------------------------------------+
+```
+
+#### Classic Variant
+
+The `classic/currencypane.lua` file provides the same functionality for Classic versions of WoW, using the older API functions:
+- `GetCurrencyListInfo()` instead of `C_CurrencyInfo.GetCurrencyListInfo()`
+- `SetCurrencyBackpack()` instead of `C_CurrencyInfo.SetCurrencyBackpack()`
+- `GetCurrencyListSize()` instead of `C_CurrencyInfo.GetCurrencyListSize()`
+
 ### plugin.lua
 
 Manages integration of third-party plugin configurations into the main BetterBags settings interface.

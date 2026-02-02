@@ -128,6 +128,7 @@ themes\elvui.lua
 
 config\categorypane.lua
 config\themepane.lua
+config\classic\currencypane.lua
 config\config.lua
 config\plugin.lua
 

@@ -36,6 +36,9 @@ local categoryPane = addon:GetModule('CategoryPane')
 ---@class ThemePane: AceModule
 local themePane = addon:GetModule('ThemePane')
 
+---@class CurrencyPane: AceModule
+local currencyPane = addon:GetModule('CurrencyPane')
+
 ---@class Config: AceModule
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
@@ -167,6 +170,15 @@ function config:CreateConfig()
     description = 'Change the visual appearance of BetterBags.',
     createPane = function(parent, _)
       return themePane:Create(parent)
+    end,
+    bagKind = nil,
+  })
+
+  f:AddPaneLink({
+    title = 'Currency',
+    description = 'Configure which currencies are shown in your backpack.',
+    createPane = function(parent, _)
+      return currencyPane:Create(parent)
     end,
     bagKind = nil,
   })

@@ -298,25 +298,6 @@ function contextMenu:CreateContextMenu(bag)
 	end
 
 	if bag.kind == const.BAG_KIND.BACKPACK then
-		-- Show bag slot toggle.
-		table.insert(menuList, {
-			text = L:G("Show Currencies"),
-			checked = function()
-				return bag.currencyFrame:IsShown()
-			end,
-			tooltipTitle = L:G("Show Currencies"),
-			tooltipText = L:G("Click to toggle the display of the currencies side panel."),
-			func = function()
-				if bag.currencyFrame:IsShown() then
-					bag.currencyFrame:Hide()
-				else
-					bag.windowGrouping:Show("currencyConfig")
-				end
-			end,
-		})
-	end
-
-	if bag.kind == const.BAG_KIND.BACKPACK then
 		-- Show the Blizzard bag button toggle.
 		table.insert(menuList, {
 			text = L:G("Show Bag Button"),
