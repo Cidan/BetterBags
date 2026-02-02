@@ -125,5 +125,9 @@ function currency:CreateIconGrid(parent)
   events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()
     b:Update()
   end)
+  -- Listen for manual updates from the currency options pane
+  events:RegisterMessage('currency/Updated', function()
+    b:Update()
+  end)
   return b
 end

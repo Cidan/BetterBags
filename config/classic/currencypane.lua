@@ -18,6 +18,9 @@ local fonts = addon:GetModule('Fonts')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class CurrencyPane: AceModule
 local currencyPane = addon:NewModule('CurrencyPane')
 
@@ -376,6 +379,9 @@ function currencyPaneProto:CreateCurrencyDetailPanel()
         C_Timer.After(0.1, function()
           self:RefreshList()
           self:UpdateDetailPanel()
+          -- Notify the icon grid to update
+          local ctx = context:New('CurrencyPane_Toggle')
+          events:SendMessage(ctx, 'currency/Updated')
         end)
       end
     end
