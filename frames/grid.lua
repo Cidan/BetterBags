@@ -309,7 +309,7 @@ function gridProto:calculateColumns(options)
     end
   end
 
-  -- Consider the largest cell for calculating splitAt. Don't split before reaching that height, to avoid will be unnecessary columns
+  -- Consider the largest cell for calculating splitAt. Don't split before reaching that height, to avoid unnecessary columns
   local splitAt = math.ceil(math.max((totalHeight / options.columns) + 20, maxCellHeight))
   local currentHeight = 0
   local currentColumn = 1
