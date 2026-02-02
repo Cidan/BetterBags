@@ -119,7 +119,7 @@ end
 ---@package
 function stackedLayout:setupIndex()
   self.indexFrame = CreateFrame("Frame", nil, self.baseFrame) --[[@as Frame]]
-  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -20)
+  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -34)
   self.indexFrame:SetPoint("BOTTOM", self.baseFrame, "BOTTOM", 0, 0)
   self.indexFrame:SetWidth(120)
 
