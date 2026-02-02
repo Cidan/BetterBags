@@ -290,7 +290,6 @@ function gridProto:calculateColumns(options)
   local totalHeight = 0
   local maxCellHeight = 0
   ---@type Cell[][]
-  local columns = {}
   for i, cell in ipairs(maskedCells) do
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
@@ -300,7 +299,7 @@ function gridProto:calculateColumns(options)
         rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
       end
     else
-      totalHeight = totalHeight + cell.frame:GetHeight()
+      totalHeight = cell.frame:GetHeight()
       rowWidth = cell.frame:GetWidth()
     end
 
@@ -311,32 +310,58 @@ function gridProto:calculateColumns(options)
 
   -- Consider the largest cell for calculating splitAt. Don't split before reaching that height, to avoid unnecessary columns
   local splitAt = math.ceil(math.max((totalHeight / options.columns) + 20, maxCellHeight))
-  local currentHeight = 0
-  local currentColumn = 1
-  rowWidth = 0
-  for i, cell in ipairs(maskedCells) do
-    if i ~= 1 then
-      if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-        if currentHeight + cell.frame:GetHeight() > splitAt then
-          currentColumn = currentColumn + 1
-          currentHeight = cell.frame:GetHeight()
+  local algorithmAttempt = 0
+
+  while true do
+    local currentHeight = 0
+    local currentColumn = 1
+    rowWidth = 0
+    local overshoot = 0
+    local columns = {}
+    algorithmAttempt = algorithmAttempt + 1
+
+    for i, cell in ipairs(maskedCells) do
+      if i ~= 1 then
+        if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
+          if currentHeight + cell.frame:GetHeight() > splitAt then
+            currentColumn = currentColumn + 1
+            currentHeight = cell.frame:GetHeight()
+          else
+            currentHeight = currentHeight + cell.frame:GetHeight() + self.spacing
+          end
+          rowWidth = cell.frame:GetWidth()
         else
-          currentHeight = currentHeight + cell.frame:GetHeight() + self.spacing
+          rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
         end
-        rowWidth = cell.frame:GetWidth()
       else
-        rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+        currentHeight = cell.frame:GetHeight()
+        rowWidth = cell.frame:GetWidth()
       end
+
+      if not columns[currentColumn] then
+        columns[currentColumn] = {}
+      end
+      table.insert(columns[currentColumn], cell)
+
+      if currentColumn > options.columns then
+        overshoot = overshoot + cell.frame:GetHeight()
+      end
+    end
+
+    if currentColumn > options.columns then
+      if algorithmAttempt > 5 then
+        -- The algorithm should be pretty fast and we should get to a valid distribution in a 1-3 attempts, but let's cut it off after 5 attempts to be safe
+        debug:Log("calculateColumns", "Couldn't fit cells in", options.columns, "columns after 5 attempts. Using current solution.")
+        return columns
+      end
+
+      -- Need to increase splitAt to reduce number of columns, try evenly increasing by the overshot height/2 and try again
+      splitAt = splitAt + math.ceil(overshoot / (2 * options.columns))
+      columns = nil
     else
-      currentHeight = currentHeight + cell.frame:GetHeight()
-      rowWidth = cell.frame:GetWidth()
+      return columns
     end
-    if not columns[currentColumn] then
-      columns[currentColumn] = {}
-    end
-    table.insert(columns[currentColumn], cell)
   end
-  return columns
 end
 
 ---@param cells Cell[]
