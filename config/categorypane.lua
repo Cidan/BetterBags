@@ -816,7 +816,7 @@ function categoryPaneProto:CreateManualDetailPanel()
   -- Items Label
   local itemsLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   itemsLabel:SetPoint("TOPLEFT", 10, yOffset)
-  itemsLabel:SetText("Items in Category")
+  itemsLabel:SetText("Items in Category (drag items here to add)")
 
   yOffset = yOffset - 20
 
@@ -835,6 +835,25 @@ function categoryPaneProto:CreateManualDetailPanel()
     ---@cast f CategoryPaneItemFrame
     self:resetItemRow(f, data)
   end)
+
+  -- Enable drag-and-drop to add items to the category
+  -- Set up handlers on both the container and the list frame's scroll box
+  local function onReceiveDrag()
+    self:OnItemListDrop()
+  end
+  local function onMouseUp(_, button)
+    if button == "LeftButton" and CursorHasItem() then
+      self:OnItemListDrop()
+    end
+  end
+
+  itemListContainer:EnableMouse(true)
+  itemListContainer:SetScript("OnReceiveDrag", onReceiveDrag)
+  itemListContainer:SetScript("OnMouseUp", onMouseUp)
+
+  -- Also set on the scroll box so drops work over the list area
+  self.manualDetail.itemListFrame.ScrollBox:SetScript("OnReceiveDrag", onReceiveDrag)
+  self.manualDetail.itemListFrame.ScrollBox:HookScript("OnMouseUp", onMouseUp)
 
   yOffset = yOffset - 170
 
@@ -887,6 +906,24 @@ function categoryPaneProto:LoadItemList(categoryName)
   for id in pairs(itemDataList.itemList) do
     self.manualDetail.itemListFrame:AddToStart({id = id, category = categoryName})
   end
+end
+
+-- Handle dropping an item onto the item list to add it to the category
+function categoryPaneProto:OnItemListDrop()
+  if not self.selectedCategory then return end
+  if not CursorHasItem() then return end
+
+  local cursorType, itemID = GetCursorInfo()
+  if cursorType ~= "item" then return end
+
+  -- Add the item to the category
+  local ctx = context:New('CategoryPane_DropItem')
+  categories:AddPermanentItemToCategory(ctx, itemID, self.selectedCategory)
+  ClearCursor()
+
+  -- Refresh the bags and the item list
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  self:LoadItemList(self.selectedCategory)
 end
 
 ---@param frame CategoryPaneItemFrame
