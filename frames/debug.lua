@@ -78,7 +78,11 @@ function debugWindow:Create(ctx)
   self.contentFrames[1] = self:CreateDebugLogFrame()
   self.contentFrames[2] = self:CreateItemsFrame()
 
-  local closeButton = CreateFrame("Button", nil, self.frame, "UIPanelCloseButtonDefaultAnchors")
+  -- Use existing CloseButton from template if available, otherwise create one
+  local closeButton = self.frame.CloseButton or CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
+  if not self.frame.CloseButton then
+    closeButton:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -5, -5)
+  end
   closeButton:RegisterForClicks("RightButtonUp", "LeftButtonUp")
 
   closeButton:SetScript("OnClick", function(_, e)
