@@ -59,8 +59,16 @@ local contextMenu = addon:GetModule("ContextMenu")
 ---@field bag Bag Reference to the parent bag
 backpack.proto = {}
 
-function backpack.proto:OnShow()
+function backpack.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_BACKPACK_OPEN)
+
+	-- Lazy resize tabs on first show to account for fonts loaded by other addons (e.g., GW2 UI)
+	if not self.bag.tabsResizedAfterLoad then
+		if self.bag.tabs then
+			self.bag.tabs:ResizeAllTabs(ctx)
+			self.bag.tabsResizedAfterLoad = true
+		end
+	end
 
 	-- Use fade animation if enabled
 	if database:GetEnableBagFading() then

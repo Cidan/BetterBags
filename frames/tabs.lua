@@ -293,6 +293,16 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 	local tab = self.tabIndex[index]
 	local decoration = themes:GetTabButton(ctx, tab)
 
+	-- Ensure decoration is shown before measuring/resizing
+	-- PanelTemplates_TabResize needs the frame to be visible to properly measure text width
+	decoration:Show()
+
+	-- Ensure the decoration's text uses the same font as the tab button
+	-- This fixes incorrect text width measurements on initial tab creation
+	if decoration.Text then
+		decoration.Text:SetFontObject(GameFontNormalSmall)
+	end
+
 	-- Handle icon tabs vs text tabs
 	if tab.icon then
 		-- Icon tab: hide text, show icon
@@ -539,6 +549,16 @@ function tabFrame:SetClickHandler(fn)
 end
 
 ---@param parent Frame
+-- ResizeAllTabs recalculates the width of all tabs.
+-- This is useful when fonts change after initial tab creation (e.g., theme addons loading).
+---@param ctx Context
+function tabFrame:ResizeAllTabs(ctx)
+	for index, _ in ipairs(self.tabIndex) do
+		self:ResizeTabByIndex(ctx, index)
+	end
+	self:ReanchorTabs()
+end
+
 ---@return Tab
 function tabs:Create(parent)
 	local container = setmetatable({}, { __index = tabFrame })

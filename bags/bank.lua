@@ -42,6 +42,14 @@ bank.proto = {}
 function bank.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
 
+	-- Lazy resize tabs on first show to account for fonts loaded by other addons (e.g., GW2 UI)
+	if not self.bag.tabsResizedAfterLoad then
+		if self.bag.tabs then
+			self.bag.tabs:ResizeAllTabs(ctx)
+			self.bag.tabsResizedAfterLoad = true
+		end
+	end
+
 	-- Generate tabs before showing frame
 	self:GenerateCharacterBankTabs(ctx)
 	self:GenerateWarbankTabs(ctx)
