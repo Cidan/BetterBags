@@ -39,6 +39,7 @@ tabs.dragOffsetX = nil              ---@type number? Cursor offset from tab left
 tabs.currentTabFrame = nil          ---@type Tab? Reference to Tab object being dragged from
 tabs.isDragging = false             ---@type boolean Whether drag is in progress
 tabs.lastOverlapIndex = nil         ---@type number? Last detected overlap target (for debouncing)
+tabs.dropPlaceholder = nil          ---@type Frame? Visual placeholder showing where tab will land
 
 ---@class PanelTabButtonTemplate: Button
 ---@field Text FontString
@@ -139,16 +140,14 @@ function tabFrame:ReanchorTabs()
 		end
 	end
 
-	-- Reanchor visible tabs (dragging tab follows cursor instead)
-	for i, tab in ipairs(visibleTabs) do
+	-- Calculate absolute positions and anchor all tabs directly to container frame
+	-- This prevents tabs from dragging along when anchored to each other
+	local currentX = 5  -- Start with initial spacing
+	for _, tab in ipairs(visibleTabs) do
 		tab:ClearAllPoints()
-		local anchorFrame = self.frame
-		local anchorPoint = "TOPLEFT"
-		if i > 1 then
-			anchorFrame = visibleTabs[i - 1]
-			anchorPoint = "TOPRIGHT"
-		end
-		tab:SetPoint("TOPLEFT", anchorFrame, anchorPoint, 5, 0)
+		-- Anchor directly to container frame with calculated X position
+		tab:SetPoint("TOPLEFT", self.frame, "TOPLEFT", currentX, 0)
+		currentX = currentX + tab:GetWidth() + 5  -- Add tab width plus spacing
 		self.width = self.width + tab:GetWidth() + 5
 	end
 end
@@ -619,6 +618,58 @@ end
 -- Tab Drag-to-Reorder Functions
 -----------------------------------------------
 
+---@param ctx Context
+---@param tab TabButton
+function tabs:CreateDropPlaceholder(ctx, tab)
+	if not self.dropPlaceholder then
+		-- Create a thin vertical line as the insertion indicator
+		self.dropPlaceholder = CreateFrame("Frame", nil, self.currentTabFrame.frame)
+		self.dropPlaceholder:SetFrameStrata("HIGH")
+		self.dropPlaceholder:SetFrameLevel(100)
+		self.dropPlaceholder:SetSize(3, 32)  -- Thin line, tab height
+
+		-- Create the line texture
+		local line = self.dropPlaceholder:CreateTexture(nil, "OVERLAY")
+		line:SetAllPoints()
+		line:SetColorTexture(0.2, 0.8, 1.0, 0.95)  -- Bright blue, nearly opaque
+		self.dropPlaceholder.line = line
+	end
+
+	self.dropPlaceholder:Hide()  -- Hidden until we detect overlap
+end
+
+---@param targetIndex number
+function tabs:UpdateDropPlaceholder(targetIndex)
+	if not self.dropPlaceholder or not self.currentTabFrame or not self.draggingTab then return end
+
+	-- Position the insertion line at the left edge of where the dragged tab will land
+	-- Calculate X position by summing widths of all visible tabs before targetIndex
+	local insertX = 5  -- Start with initial spacing
+
+	for i, tab in ipairs(self.currentTabFrame.tabIndex) do
+		if i >= targetIndex then
+			-- We've reached the target position, place line here
+			break
+		end
+		if tab:IsShown() and tab ~= self.draggingTab then
+			-- Add width of tabs that come before target position
+			insertX = insertX + tab:GetWidth() + 5
+		end
+	end
+
+	-- Position the line slightly to the left so it appears between tabs
+	-- Subtract 2px to center the 3px line in the gap
+	self.dropPlaceholder:ClearAllPoints()
+	self.dropPlaceholder:SetPoint("TOPLEFT", self.currentTabFrame.frame, "TOPLEFT", insertX - 2, 0)
+	self.dropPlaceholder:Show()
+end
+
+function tabs:HideDropPlaceholder()
+	if self.dropPlaceholder then
+		self.dropPlaceholder:Hide()
+	end
+end
+
 ---@param tab TabButton
 ---@return boolean
 function tabs:IsTabReorderable(tab)
@@ -642,20 +693,25 @@ function tabs:StartTabDrag(tab, tabFrame)
 	self.currentTabFrame = tabFrame
 	self.lastOverlapIndex = nil
 
-	-- Capture cursor position and tab position
+	-- Capture cursor position relative to tab
 	local cursorX, cursorY = GetCursorPosition()
-	local scale = UIParent:GetEffectiveScale()
-	local tabLeft = tab:GetLeft() * scale
+	local scale = tab:GetEffectiveScale()
 
-	self.dragStartX = tabLeft
-	self.dragStartY = tab:GetTop() * scale
-	self.dragOffsetX = (cursorX - tabLeft)
+	-- Get tab's current screen position
+	local tabLeft = tab:GetLeft()
+	local tabTop = tab:GetTop()
+
+	-- Calculate offset from tab's top-left corner to cursor (in frame coords)
+	self.dragOffsetX = (cursorX / scale) - tabLeft
 
 	-- Visual feedback: raise frame level and dim slightly
 	local ctx = context:New("StartTabDrag")
 	local decoration = themes:GetTabButton(ctx, tab)
 	tab:SetFrameLevel(tab:GetFrameLevel() + 10)
 	decoration:SetAlpha(0.8)
+
+	-- Create drop placeholder (shows where tab will land)
+	self:CreateDropPlaceholder(ctx, tab)
 
 	-- Start OnUpdate tracking
 	decoration:SetScript("OnUpdate", function()
@@ -669,25 +725,39 @@ end
 function tabs:UpdateTabDrag()
 	if not self.isDragging or not self.draggingTab then return end
 
-	-- Get current cursor position
-	local cursorX = GetCursorPosition()
-	local scale = UIParent:GetEffectiveScale()
+	-- Get current cursor position in screen coordinates
+	local cursorX, cursorY = GetCursorPosition()
+	local scale = self.draggingTab:GetEffectiveScale()
 
-	-- Calculate new X position (locked Y position)
-	local newX = (cursorX - self.dragOffsetX) / scale
-	local lockedY = self.dragStartY / scale
+	-- Calculate where the tab's left edge should be (cursor minus offset)
+	local tabLeftScreen = (cursorX / scale) - self.dragOffsetX
 
-	-- Move the tab frame (horizontal only)
+	-- Get the container frame's position to calculate relative offset
+	local containerLeft = self.currentTabFrame.frame:GetLeft()
+
+	-- Calculate X offset relative to container frame (subtract initial spacing of 5)
+	local offsetX = tabLeftScreen - containerLeft - 5
+
+	-- Move the tab frame (horizontal only, Y stays at 0 relative to container)
 	self.draggingTab:ClearAllPoints()
-	self.draggingTab:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", newX, lockedY)
+	self.draggingTab:SetPoint("TOPLEFT", self.currentTabFrame.frame, "TOPLEFT", offsetX, 0)
 
 	-- Check for overlap with other tabs
 	local targetIndex = self:CalculateOverlapTarget()
 
-	-- If overlap target changed, trigger slide
-	if targetIndex and targetIndex ~= self.lastOverlapIndex then
-		self:TriggerSlide(targetIndex)
-		self.lastOverlapIndex = targetIndex
+	-- Update visual feedback based on overlap
+	if targetIndex then
+		if targetIndex ~= self.lastOverlapIndex then
+			-- Overlap target changed, trigger slide and update placeholder
+			self:TriggerSlide(targetIndex)
+			self.lastOverlapIndex = targetIndex
+		end
+		-- Show placeholder at target position
+		self:UpdateDropPlaceholder(targetIndex)
+	else
+		-- No overlap, hide placeholder
+		self:HideDropPlaceholder()
+		self.lastOverlapIndex = nil
 	end
 end
 
@@ -715,7 +785,14 @@ function tabs:CalculateOverlapTarget()
 					local distance = math.abs(draggedCenter - tabCenter)
 					local threshold = (tabRight - tabLeft) / 2
 
+					-- Debug output
+					print(string.format("Checking overlap: dragged='%s' center=%.1f, target='%s'[%d] center=%.1f, distance=%.1f, threshold=%.1f",
+						self.draggingTab.name or "?", draggedCenter,
+						tab.name or "?", i, tabCenter,
+						distance, threshold))
+
 					if distance < threshold then
+						print(string.format("OVERLAP DETECTED! Target index=%d", i))
 						return i  -- Return index of overlap target
 					end
 				end
@@ -729,11 +806,14 @@ end
 ---@param targetIndex number
 function tabs:TriggerSlide(targetIndex)
 	if not targetIndex or targetIndex == self.draggingTab.index then
+		print(string.format("TriggerSlide: skipping (targetIndex=%s, currentIndex=%s)", tostring(targetIndex), tostring(self.draggingTab.index)))
 		return
 	end
 
 	local currentIndex = self.draggingTab.index
 	local tabArray = self.currentTabFrame.tabIndex
+
+	print(string.format("TriggerSlide: moving '%s' from index %d to %d", self.draggingTab.name, currentIndex, targetIndex))
 
 	-- Remove dragged tab from array
 	table.remove(tabArray, currentIndex)
@@ -746,6 +826,11 @@ function tabs:TriggerSlide(targetIndex)
 		tab.index = i
 	end
 
+	print("TriggerSlide: new order:")
+	for i, tab in ipairs(tabArray) do
+		print(string.format("  [%d] %s (id=%s)", i, tab.name, tostring(tab.id)))
+	end
+
 	-- Reanchor all tabs (except the dragging one, which follows cursor)
 	self.currentTabFrame:ReanchorTabs()
 end
@@ -755,6 +840,8 @@ function tabs:StopTabDrag()
 
 	local ctx = context:New("StopTabDrag")
 	local decoration = themes:GetTabButton(ctx, self.draggingTab)
+	local savedTabFrame = self.currentTabFrame
+	local finalIndex = self.draggingTab.index
 
 	-- Clear OnUpdate handler
 	decoration:SetScript("OnUpdate", nil)
@@ -764,31 +851,34 @@ function tabs:StopTabDrag()
 	decoration:SetAlpha(1.0)
 	ResetCursor()
 
-	-- Check if drop is valid (tab moved to new position)
-	local finalIndex = self.draggingTab.index
-	if finalIndex ~= self.dragStartIndex then
-		-- Valid drop: persist new order
-		self:SaveTabOrder()
-	else
-		-- No change: just reanchor everything
-		self.currentTabFrame:ReanchorTabs()
-	end
+	-- Hide drop placeholder
+	self:HideDropPlaceholder()
 
-	-- Clear drag state
+	-- Clear drag state BEFORE reanchoring (so ReanchorTabs includes this tab)
+	local orderChanged = finalIndex ~= self.dragStartIndex
 	self.isDragging = false
 	self.draggingTab = nil
 	self.dragStartIndex = nil
 	self.currentTabFrame = nil
 	self.lastOverlapIndex = nil
+
+	-- Reanchor all tabs to their proper positions
+	savedTabFrame:ReanchorTabs()
+
+	-- If order changed, persist to database
+	if orderChanged then
+		self:SaveTabOrder(savedTabFrame)
+	end
 end
 
-function tabs:SaveTabOrder()
+---@param tabFrame Tab
+function tabs:SaveTabOrder(tabFrame)
 	local ctx = context:New("SaveTabOrder")
 
 	-- Update Group.order for all reorderable tabs based on current position
 	local orderCounter = 2  -- Start at 2 (Bank is always 1)
 
-	for _, tab in ipairs(self.currentTabFrame.tabIndex) do
+	for _, tab in ipairs(tabFrame.tabIndex) do
 		if tab.id and tab.id > 1 then  -- Skip Bank (1), "+" (0), purchase (<0)
 			database:SetGroupOrder(tab.id, orderCounter)
 			orderCounter = orderCounter + 1
