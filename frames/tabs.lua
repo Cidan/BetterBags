@@ -642,17 +642,24 @@ end
 function tabs:UpdateDropPlaceholder(targetIndex)
 	if not self.dropPlaceholder or not self.currentTabFrame or not self.draggingTab then return end
 
-	-- Position the insertion line at the left edge of where the dragged tab will land
-	-- Calculate X position by summing widths of all visible tabs before targetIndex
+	local startIndex = self.dragStartIndex
+	local movingRight = targetIndex > startIndex
+
+	-- Calculate where to show the insertion line
+	-- When moving right, line appears AFTER the target tab
+	-- When moving left, line appears BEFORE the target tab (at target position)
 	local insertX = 5  -- Start with initial spacing
 
 	for i, tab in ipairs(self.currentTabFrame.tabIndex) do
-		if i >= targetIndex then
-			-- We've reached the target position, place line here
+		-- When moving right, include the target tab's width
+		-- When moving left, stop before the target tab
+		local stopAt = movingRight and targetIndex or (targetIndex - 1)
+
+		if i > stopAt then
 			break
 		end
+
 		if tab:IsShown() and tab ~= self.draggingTab then
-			-- Add width of tabs that come before target position
 			insertX = insertX + tab:GetWidth() + 5
 		end
 	end
@@ -662,6 +669,9 @@ function tabs:UpdateDropPlaceholder(targetIndex)
 	self.dropPlaceholder:ClearAllPoints()
 	self.dropPlaceholder:SetPoint("TOPLEFT", self.currentTabFrame.frame, "TOPLEFT", insertX - 2, 0)
 	self.dropPlaceholder:Show()
+
+	print(string.format("UpdateDropPlaceholder: startIndex=%d, targetIndex=%d, movingRight=%s, insertX=%d",
+		startIndex, targetIndex, tostring(movingRight), insertX))
 end
 
 function tabs:HideDropPlaceholder()
