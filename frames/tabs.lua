@@ -39,6 +39,7 @@ tabs.dragOffsetX = nil              ---@type number? Cursor offset from tab left
 tabs.currentTabFrame = nil          ---@type Tab? Reference to Tab object being dragged from
 tabs.isDragging = false             ---@type boolean Whether drag is in progress
 tabs.lastOverlapIndex = nil         ---@type number? Last detected overlap target (for debouncing)
+tabs.lastInsertAfter = nil          ---@type boolean? Whether to insert after (true) or before (false) the overlap target
 tabs.dropPlaceholder = nil          ---@type Frame? Visual placeholder showing where tab will land
 
 ---@class PanelTabButtonTemplate: Button
@@ -639,39 +640,37 @@ function tabs:CreateDropPlaceholder(ctx, tab)
 end
 
 ---@param targetIndex number
-function tabs:UpdateDropPlaceholder(targetIndex)
+---@param insertAfter boolean If true, show line after target tab; if false, show before
+function tabs:UpdateDropPlaceholder(targetIndex, insertAfter)
 	if not self.dropPlaceholder or not self.currentTabFrame or not self.draggingTab then return end
 
-	local startIndex = self.dragStartIndex
-	local movingRight = targetIndex > startIndex
+	-- Get the target tab from the array
+	local targetTab = self.currentTabFrame.tabIndex[targetIndex]
+	if not targetTab then return end
 
-	-- Calculate where to show the insertion line
-	-- When moving right, line appears AFTER the target tab
-	-- When moving left, line appears BEFORE the target tab (at target position)
-	local insertX = 5  -- Start with initial spacing
+	-- Get the target tab's actual current screen position
+	local targetLeft = targetTab:GetLeft()
+	local targetRight = targetTab:GetRight()
+	if not targetLeft or not targetRight then return end
 
-	for i, tab in ipairs(self.currentTabFrame.tabIndex) do
-		-- When moving right, include the target tab's width
-		-- When moving left, stop before the target tab
-		local stopAt = movingRight and targetIndex or (targetIndex - 1)
+	-- Get container's left edge to calculate relative offset
+	local containerLeft = self.currentTabFrame.frame:GetLeft()
+	if not containerLeft then return end
 
-		if i > stopAt then
-			break
-		end
-
-		if tab:IsShown() and tab ~= self.draggingTab then
-			insertX = insertX + tab:GetWidth() + 5
-		end
+	-- Calculate insertion position based on which side of target tab
+	local insertX
+	if insertAfter then
+		-- Line goes to the RIGHT of target tab (after it)
+		insertX = targetRight - containerLeft + 5  -- Right edge + spacing
+	else
+		-- Line goes to the LEFT of target tab (before it)
+		insertX = targetLeft - containerLeft  -- Left edge
 	end
 
-	-- Position the line slightly to the left so it appears between tabs
-	-- Subtract 2px to center the 3px line in the gap
+	-- Position the line (center the 3px line)
 	self.dropPlaceholder:ClearAllPoints()
-	self.dropPlaceholder:SetPoint("TOPLEFT", self.currentTabFrame.frame, "TOPLEFT", insertX - 2, 0)
+	self.dropPlaceholder:SetPoint("TOPLEFT", self.currentTabFrame.frame, "TOPLEFT", insertX - 1.5, 0)
 	self.dropPlaceholder:Show()
-
-	print(string.format("UpdateDropPlaceholder: startIndex=%d, targetIndex=%d, movingRight=%s, insertX=%d",
-		startIndex, targetIndex, tostring(movingRight), insertX))
 end
 
 function tabs:HideDropPlaceholder()
@@ -753,27 +752,29 @@ function tabs:UpdateTabDrag()
 	self.draggingTab:SetPoint("TOPLEFT", self.currentTabFrame.frame, "TOPLEFT", offsetX, 0)
 
 	-- Check for overlap with other tabs
-	local targetIndex = self:CalculateOverlapTarget()
+	local targetIndex, insertAfter = self:CalculateOverlapTarget()
 
 	-- Update visual feedback based on overlap
 	if targetIndex then
 		-- Show insertion line at target position (but don't reorder yet)
-		self:UpdateDropPlaceholder(targetIndex)
+		self:UpdateDropPlaceholder(targetIndex, insertAfter)
 		self.lastOverlapIndex = targetIndex
+		self.lastInsertAfter = insertAfter
 	else
 		-- No overlap, hide placeholder
 		self:HideDropPlaceholder()
 		self.lastOverlapIndex = nil
+		self.lastInsertAfter = nil
 	end
 end
 
----@return number?
+---@return number?, boolean? Returns target index and whether to insert after (true) or before (false)
 function tabs:CalculateOverlapTarget()
-	if not self.draggingTab then return nil end
+	if not self.draggingTab then return nil, nil end
 
 	local draggedLeft = self.draggingTab:GetLeft()
 	local draggedRight = self.draggingTab:GetRight()
-	if not draggedLeft or not draggedRight then return nil end
+	if not draggedLeft or not draggedRight then return nil, nil end
 	local draggedCenter = (draggedLeft + draggedRight) / 2
 
 	-- Check each visible tab (skip the dragged one)
@@ -786,27 +787,24 @@ function tabs:CalculateOverlapTarget()
 				if tabLeft and tabRight then
 					local tabCenter = (tabLeft + tabRight) / 2
 
-					-- Check if dragged center is within 50% of this tab's bounds
-					-- This means: distance from centers < half of tab width
+					-- Check if dragged center is within this tab's bounds
 					local distance = math.abs(draggedCenter - tabCenter)
 					local threshold = (tabRight - tabLeft) / 2
 
-					-- Debug output
-					print(string.format("Checking overlap: dragged='%s' center=%.1f, target='%s'[%d] center=%.1f, distance=%.1f, threshold=%.1f",
-						self.draggingTab.name or "?", draggedCenter,
-						tab.name or "?", i, tabCenter,
-						distance, threshold))
-
 					if distance < threshold then
-						print(string.format("OVERLAP DETECTED! Target index=%d", i))
-						return i  -- Return index of overlap target
+						-- Determine if we should insert before or after based on which half
+						local insertAfter = draggedCenter > tabCenter
+						print(string.format("OVERLAP: dragged='%s' center=%.1f, target='%s'[%d] center=%.1f, insertAfter=%s",
+							self.draggingTab.name or "?", draggedCenter,
+							tab.name or "?", i, tabCenter, tostring(insertAfter)))
+						return i, insertAfter
 					end
 				end
 			end
 		end
 	end
 
-	return nil  -- No valid overlap
+	return nil, nil  -- No valid overlap
 end
 
 ---@param targetIndex number
@@ -850,6 +848,7 @@ function tabs:StopTabDrag()
 	local draggedTab = self.draggingTab
 	local startIndex = self.dragStartIndex
 	local targetIndex = self.lastOverlapIndex
+	local insertAfter = self.lastInsertAfter
 
 	-- Clear OnUpdate handler
 	decoration:SetScript("OnUpdate", nil)
@@ -868,29 +867,50 @@ function tabs:StopTabDrag()
 	self.dragStartIndex = nil
 	self.currentTabFrame = nil
 	self.lastOverlapIndex = nil
+	self.lastInsertAfter = nil
 
 	-- If we have a valid drop target, perform the reorder
-	if targetIndex and targetIndex ~= startIndex then
-		print(string.format("StopTabDrag: Reordering '%s' from %d to %d", draggedTab.name, startIndex, targetIndex))
-
-		-- Perform the actual reorder
-		local tabArray = savedTabFrame.tabIndex
-		table.remove(tabArray, startIndex)
-		table.insert(tabArray, targetIndex, draggedTab)
-
-		-- Re-index all tabs
-		for i, tab in ipairs(tabArray) do
-			tab.index = i
+	if targetIndex then
+		-- Calculate the actual insertion index
+		-- If insertAfter=true, we want to insert AFTER the target (index + 1)
+		-- If insertAfter=false, we want to insert AT the target position
+		-- But we also need to account for the fact that we remove the dragged tab first
+		local finalIndex
+		if insertAfter then
+			-- Insert after target: if target is at 3, insert at 4
+			-- But if we're moving left (startIndex > targetIndex), indices shift after remove
+			finalIndex = targetIndex < startIndex and (targetIndex + 1) or targetIndex
+		else
+			-- Insert before target: if target is at 3, insert at 3
+			finalIndex = targetIndex < startIndex and targetIndex or (targetIndex - 1)
 		end
 
-		-- Reanchor all tabs to their new positions
-		savedTabFrame:ReanchorTabs()
+		if finalIndex ~= startIndex then
+			print(string.format("StopTabDrag: Reordering '%s' from %d to %d (target=%d, insertAfter=%s)",
+				draggedTab.name, startIndex, finalIndex, targetIndex, tostring(insertAfter)))
 
-		-- Persist new order to database
-		self:SaveTabOrder(savedTabFrame)
+			-- Perform the actual reorder
+			local tabArray = savedTabFrame.tabIndex
+			table.remove(tabArray, startIndex)
+			table.insert(tabArray, finalIndex, draggedTab)
+
+			-- Re-index all tabs
+			for i, tab in ipairs(tabArray) do
+				tab.index = i
+			end
+
+			-- Reanchor all tabs to their new positions
+			savedTabFrame:ReanchorTabs()
+
+			-- Persist new order to database
+			self:SaveTabOrder(savedTabFrame)
+		else
+			print("StopTabDrag: No reorder, same position")
+			savedTabFrame:ReanchorTabs()
+		end
 	else
 		-- No reorder, just reanchor to original positions
-		print("StopTabDrag: No reorder, returning to original position")
+		print("StopTabDrag: No overlap, returning to original position")
 		savedTabFrame:ReanchorTabs()
 	end
 end
