@@ -676,6 +676,22 @@ function DB:SetActiveGroup(kind, groupID)
   DB.data.profile.activeGroup[kind] = groupID
 end
 
+---@param groupID number
+---@param order number
+function DB:SetGroupOrder(groupID, order)
+  local group = DB.data.profile.groups[groupID]
+  if group then
+    group.order = order
+  end
+end
+
+---@param groupID number
+---@return number
+function DB:GetGroupOrder(groupID)
+  local group = DB.data.profile.groups[groupID]
+  return group and group.order or groupID  -- Default to ID if order not set
+end
+
 -- Export category configuration to a base64-encoded string
 ---@return string
 function DB:ExportSettings()

@@ -27,6 +27,19 @@ local events = addon:GetModule("Events")
 ---@class Constants: AceModule
 local const = addon:GetModule("Constants")
 
+---@class Database: AceModule
+local database = addon:GetModule("Database")
+
+-- Tab drag state (module-level to match section.lua pattern)
+tabs.draggingTab = nil              ---@type TabButton? Tab button being dragged
+tabs.dragStartIndex = nil           ---@type number? Original index before drag started
+tabs.dragStartX = nil               ---@type number? Original X position (screen coords)
+tabs.dragStartY = nil               ---@type number? Original Y position (LOCKED during drag)
+tabs.dragOffsetX = nil              ---@type number? Cursor offset from tab left edge
+tabs.currentTabFrame = nil          ---@type Tab? Reference to Tab object being dragged from
+tabs.isDragging = false             ---@type boolean Whether drag is in progress
+tabs.lastOverlapIndex = nil         ---@type number? Last detected overlap target (for debouncing)
+
 ---@class PanelTabButtonTemplate: Button
 ---@field Text FontString
 ---@field Left Texture
@@ -119,14 +132,14 @@ function tabFrame:ReanchorTabs()
 	self.width = 0
 	local visibleTabs = {}
 
-	-- Collect visible tabs
+	-- Collect visible tabs (skip the one being dragged)
 	for _, tab in ipairs(self.tabIndex) do
-		if tab:IsShown() then
+		if tab:IsShown() and tab ~= tabs.draggingTab then
 			table.insert(visibleTabs, tab)
 		end
 	end
 
-	-- Reanchor visible tabs
+	-- Reanchor visible tabs (dragging tab follows cursor instead)
 	for i, tab in ipairs(visibleTabs) do
 		tab:ClearAllPoints()
 		local anchorFrame = self.frame
@@ -184,6 +197,17 @@ function tabFrame:SortTabsByID()
 		-- This ensures -1 (Purchase Bank Tab) comes before -2 (Purchase Warbank Tab)
 		if a.id and b.id and a.id < 0 and b.id < 0 then
 			return math.abs(a.id) < math.abs(b.id)
+		end
+
+		-- If both have IDs > 1 (reorderable groups), sort by their Group.order value
+		if a.id and b.id and a.id > 1 and b.id > 1 then
+			local orderA = database:GetGroupOrder(a.id)
+			local orderB = database:GetGroupOrder(b.id)
+			if orderA ~= orderB then
+				return orderA < orderB
+			end
+			-- Fallback to ID if orders are equal
+			return a.id < b.id
 		end
 
 		-- If both have IDs, sort by ID
@@ -365,6 +389,21 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				end
 			end
 		end)
+
+		-- Enable drag-to-reorder for reorderable tabs (group tabs, not Bank/"+" tabs)
+		if tabs:IsTabReorderable(tab) then
+			decoration:SetScript("OnMouseDown", function(_, button)
+				if button == "LeftButton" and IsShiftKeyDown() then
+					tabs:StartTabDrag(tab, self)
+				end
+			end)
+
+			decoration:SetScript("OnMouseUp", function(_, button)
+				if button == "LeftButton" and tabs.isDragging and tabs.draggingTab == tab then
+					tabs:StopTabDrag()
+				end
+			end)
+		end
 	end
 
 	-- Set up drag-and-drop handling for group tabs (id > 0, not the "+" tab)
@@ -574,4 +613,188 @@ function tabs:Create(parent)
 	container.tabCount = 0
 	container.selectedTab = nil  -- Initialize to nil to avoid undefined state
 	return container
+end
+
+-----------------------------------------------
+-- Tab Drag-to-Reorder Functions
+-----------------------------------------------
+
+---@param tab TabButton
+---@return boolean
+function tabs:IsTabReorderable(tab)
+	if not tab.id then return false end
+	if tab.id == 1 then return false end    -- Bank tab always first
+	if tab.id == 0 then return false end    -- "+" tab always last
+	if tab.id < 0 then return false end     -- Purchase tabs always at end
+	return true
+end
+
+---@param tab TabButton
+---@param tabFrame Tab
+function tabs:StartTabDrag(tab, tabFrame)
+	-- Prevent dragging if already dragging
+	if self.isDragging then return end
+
+	-- Store drag state
+	self.isDragging = true
+	self.draggingTab = tab
+	self.dragStartIndex = tab.index
+	self.currentTabFrame = tabFrame
+	self.lastOverlapIndex = nil
+
+	-- Capture cursor position and tab position
+	local cursorX, cursorY = GetCursorPosition()
+	local scale = UIParent:GetEffectiveScale()
+	local tabLeft = tab:GetLeft() * scale
+
+	self.dragStartX = tabLeft
+	self.dragStartY = tab:GetTop() * scale
+	self.dragOffsetX = (cursorX - tabLeft)
+
+	-- Visual feedback: raise frame level and dim slightly
+	local ctx = context:New("StartTabDrag")
+	local decoration = themes:GetTabButton(ctx, tab)
+	tab:SetFrameLevel(tab:GetFrameLevel() + 10)
+	decoration:SetAlpha(0.8)
+
+	-- Start OnUpdate tracking
+	decoration:SetScript("OnUpdate", function()
+		tabs:UpdateTabDrag()
+	end)
+
+	-- Set cursor to indicate dragging
+	SetCursor("Interface\\Cursor\\UI-Cursor-Move")
+end
+
+function tabs:UpdateTabDrag()
+	if not self.isDragging or not self.draggingTab then return end
+
+	-- Get current cursor position
+	local cursorX = GetCursorPosition()
+	local scale = UIParent:GetEffectiveScale()
+
+	-- Calculate new X position (locked Y position)
+	local newX = (cursorX - self.dragOffsetX) / scale
+	local lockedY = self.dragStartY / scale
+
+	-- Move the tab frame (horizontal only)
+	self.draggingTab:ClearAllPoints()
+	self.draggingTab:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", newX, lockedY)
+
+	-- Check for overlap with other tabs
+	local targetIndex = self:CalculateOverlapTarget()
+
+	-- If overlap target changed, trigger slide
+	if targetIndex and targetIndex ~= self.lastOverlapIndex then
+		self:TriggerSlide(targetIndex)
+		self.lastOverlapIndex = targetIndex
+	end
+end
+
+---@return number?
+function tabs:CalculateOverlapTarget()
+	if not self.draggingTab then return nil end
+
+	local draggedLeft = self.draggingTab:GetLeft()
+	local draggedRight = self.draggingTab:GetRight()
+	if not draggedLeft or not draggedRight then return nil end
+	local draggedCenter = (draggedLeft + draggedRight) / 2
+
+	-- Check each visible tab (skip the dragged one)
+	for i, tab in ipairs(self.currentTabFrame.tabIndex) do
+		if tab ~= self.draggingTab and tab:IsShown() then
+			-- Only check reorderable tabs (skip Bank, +, purchase)
+			if self:IsTabReorderable(tab) then
+				local tabLeft = tab:GetLeft()
+				local tabRight = tab:GetRight()
+				if tabLeft and tabRight then
+					local tabCenter = (tabLeft + tabRight) / 2
+
+					-- Check if dragged center is within 50% of this tab's bounds
+					-- This means: distance from centers < half of tab width
+					local distance = math.abs(draggedCenter - tabCenter)
+					local threshold = (tabRight - tabLeft) / 2
+
+					if distance < threshold then
+						return i  -- Return index of overlap target
+					end
+				end
+			end
+		end
+	end
+
+	return nil  -- No valid overlap
+end
+
+---@param targetIndex number
+function tabs:TriggerSlide(targetIndex)
+	if not targetIndex or targetIndex == self.draggingTab.index then
+		return
+	end
+
+	local currentIndex = self.draggingTab.index
+	local tabArray = self.currentTabFrame.tabIndex
+
+	-- Remove dragged tab from array
+	table.remove(tabArray, currentIndex)
+
+	-- Insert at target position
+	table.insert(tabArray, targetIndex, self.draggingTab)
+
+	-- Re-index all tabs
+	for i, tab in ipairs(tabArray) do
+		tab.index = i
+	end
+
+	-- Reanchor all tabs (except the dragging one, which follows cursor)
+	self.currentTabFrame:ReanchorTabs()
+end
+
+function tabs:StopTabDrag()
+	if not self.isDragging then return end
+
+	local ctx = context:New("StopTabDrag")
+	local decoration = themes:GetTabButton(ctx, self.draggingTab)
+
+	-- Clear OnUpdate handler
+	decoration:SetScript("OnUpdate", nil)
+
+	-- Restore visual state
+	self.draggingTab:SetFrameLevel(self.draggingTab:GetFrameLevel() - 10)
+	decoration:SetAlpha(1.0)
+	ResetCursor()
+
+	-- Check if drop is valid (tab moved to new position)
+	local finalIndex = self.draggingTab.index
+	if finalIndex ~= self.dragStartIndex then
+		-- Valid drop: persist new order
+		self:SaveTabOrder()
+	else
+		-- No change: just reanchor everything
+		self.currentTabFrame:ReanchorTabs()
+	end
+
+	-- Clear drag state
+	self.isDragging = false
+	self.draggingTab = nil
+	self.dragStartIndex = nil
+	self.currentTabFrame = nil
+	self.lastOverlapIndex = nil
+end
+
+function tabs:SaveTabOrder()
+	local ctx = context:New("SaveTabOrder")
+
+	-- Update Group.order for all reorderable tabs based on current position
+	local orderCounter = 2  -- Start at 2 (Bank is always 1)
+
+	for _, tab in ipairs(self.currentTabFrame.tabIndex) do
+		if tab.id and tab.id > 1 then  -- Skip Bank (1), "+" (0), purchase (<0)
+			database:SetGroupOrder(tab.id, orderCounter)
+			orderCounter = orderCounter + 1
+		end
+	end
+
+	-- Notify other parts of addon
+	events:SendMessage(ctx, 'groups/OrderChanged')
 end

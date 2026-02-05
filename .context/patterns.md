@@ -505,6 +505,154 @@ end
 - When implementing user-configurable sorting, filtering, or transformation functions
 - At module boundaries where external code provides function parameters
 
+## UI Interaction Patterns
+
+### Pattern: Drag-to-Reorder with Module-Level State
+**Problem**: Need to implement drag-to-reorder functionality for UI elements (like tabs) that persists order across sessions while avoiding taint.
+
+**Why**: Drag operations span multiple frames and event handlers (OnMouseDown, OnUpdate, OnMouseUp). State must be accessible across these handlers while keeping UI responsive. Module-level state (not frame-level) allows centralized drag management across all tab instances.
+
+**Solution Pattern**:
+1. **Module-level state variables**: Store drag state at module level (not per-instance)
+2. **Locked axis movement**: Lock Y-axis during horizontal drag to prevent visual jank
+3. **50% overlap threshold**: Only trigger reorder when dragged element is 50%+ over target
+4. **Debounced slide triggers**: Use `lastOverlapIndex` to prevent redundant reordering
+5. **Skip dragging element in reanchor**: Don't reposition the element being dragged
+6. **Persist to database**: Save final order to saved variables on drop
+7. **Context objects for all handlers**: Use `context:New()` to avoid taint
+
+**Example** (from frames/tabs.lua:29-42, 624-804):
+```lua
+-- Module-level state (accessible to all tab instances)
+tabs.draggingTab = nil              ---@type TabButton?
+tabs.dragStartIndex = nil           ---@type number?
+tabs.isDragging = false             ---@type boolean
+tabs.lastOverlapIndex = nil         ---@type number?
+
+-- Validation helper
+function tabs:IsTabReorderable(tab)
+  if not tab.id then return false end
+  if tab.id == 1 then return false end    -- Bank always first
+  if tab.id == 0 then return false end    -- "+" always last
+  if tab.id < 0 then return false end     -- Purchase tabs at end
+  return true
+end
+
+-- Start drag on Shift+LeftClick
+decoration:SetScript("OnMouseDown", function(_, button)
+  if button == "LeftButton" and IsShiftKeyDown() then
+    tabs:StartTabDrag(tab, self)
+  end
+end)
+
+-- Track cursor position every frame
+function tabs:UpdateTabDrag()
+  local cursorX = GetCursorPosition()
+  local newX = (cursorX - self.dragOffsetX) / scale
+  local lockedY = self.dragStartY / scale  -- Y-axis locked
+
+  self.draggingTab:ClearAllPoints()
+  self.draggingTab:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", newX, lockedY)
+
+  local targetIndex = self:CalculateOverlapTarget()
+  if targetIndex and targetIndex ~= self.lastOverlapIndex then
+    self:TriggerSlide(targetIndex)
+    self.lastOverlapIndex = targetIndex  -- Debounce
+  end
+end
+
+-- 50% overlap detection
+function tabs:CalculateOverlapTarget()
+  local draggedCenter = (self.draggingTab:GetLeft() + self.draggingTab:GetRight()) / 2
+
+  for i, tab in ipairs(self.currentTabFrame.tabIndex) do
+    if tab ~= self.draggingTab and self:IsTabReorderable(tab) then
+      local tabCenter = (tab:GetLeft() + tab:GetRight()) / 2
+      local distance = math.abs(draggedCenter - tabCenter)
+      local threshold = (tab:GetRight() - tab:GetLeft()) / 2
+
+      if distance < threshold then
+        return i  -- 50%+ overlap detected
+      end
+    end
+  end
+  return nil
+end
+
+-- Reorder array and reanchor (skip dragging element)
+function tabs:TriggerSlide(targetIndex)
+  table.remove(self.currentTabFrame.tabIndex, self.draggingTab.index)
+  table.insert(self.currentTabFrame.tabIndex, targetIndex, self.draggingTab)
+
+  for i, tab in ipairs(self.currentTabFrame.tabIndex) do
+    tab.index = i  -- Re-index
+  end
+
+  self.currentTabFrame:ReanchorTabs()  -- Repositions all except draggingTab
+end
+
+-- Persist order on drop
+function tabs:SaveTabOrder()
+  local orderCounter = 2  -- Bank is always 1
+  for _, tab in ipairs(self.currentTabFrame.tabIndex) do
+    if tab.id and tab.id > 1 then
+      database:SetGroupOrder(tab.id, orderCounter)
+      orderCounter = orderCounter + 1
+    end
+  end
+  events:SendMessage(ctx, 'groups/OrderChanged')
+end
+
+-- Skip dragging element in reanchor
+function tabFrame:ReanchorTabs()
+  for _, tab in ipairs(self.tabIndex) do
+    if tab:IsShown() and tab ~= tabs.draggingTab then  -- Skip dragging tab
+      -- Position tab...
+    end
+  end
+end
+```
+
+**Database Integration** (core/database.lua:681-694):
+```lua
+-- Persist order per group
+function DB:SetGroupOrder(groupID, order)
+  local group = DB.data.profile.groups[groupID]
+  if group then
+    group.order = order
+  end
+end
+
+-- Retrieve order for sorting
+function DB:GetGroupOrder(groupID)
+  local group = DB.data.profile.groups[groupID]
+  return group and group.order or groupID  -- Default to ID
+end
+```
+
+**Sorting Integration** (frames/tabs.lua:197-212):
+```lua
+-- Sort by custom order instead of ID
+if a.id and b.id and a.id > 1 and b.id > 1 then
+  local orderA = database:GetGroupOrder(a.id)
+  local orderB = database:GetGroupOrder(b.id)
+  if orderA ~= orderB then
+    return orderA < orderB  -- Use custom order
+  end
+  return a.id < b.id  -- Fallback to ID
+end
+```
+
+**When to Apply**:
+- Drag-to-reorder for tabs, list items, or any UI elements
+- Any reordering that needs to persist across sessions
+- When multiple instances share drag behavior (module-level state)
+- Horizontal or vertical constrained dragging
+
+**Critical Files**:
+- `frames/tabs.lua`: Drag state (29-42), handlers (394-407), functions (624-804)
+- `core/database.lua`: Persistence (681-694)
+
 ## Object Pooling Patterns
 
 ### Pattern: Always Reset ALL Properties When Releasing Pooled Objects
