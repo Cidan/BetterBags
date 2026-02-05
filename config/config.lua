@@ -572,6 +572,276 @@ function config:CreateConfig()
     })
   end
 
+  -- ============================================================
+  -- Profiles Section
+  -- ============================================================
+  f:AddSection({
+    title = 'Profiles',
+    description = 'Profiles allow you to save different bag configurations and switch between them on any character. The "Default" profile is shared across all characters by default.',
+  })
+
+  -- Get character counts for display
+  local characterCounts = db:GetProfileCharacterCounts()
+
+  f:AddDropdown({
+    title = 'Active Profile',
+    description = 'Select which profile to use. Switching profiles will reload the UI.',
+    itemsFunction = function(ctx)
+      local profiles = db:GetAvailableProfiles()
+      local items = {}
+      for _, profileName in ipairs(profiles) do
+        local count = characterCounts[profileName] or 0
+        local charText = count == 1 and "character" or "characters"
+        items[profileName] = string.format("%s (%d %s)", profileName, count, charText)
+      end
+      return items
+    end,
+    getValue = function(ctx, value)
+      return db:GetCurrentProfileName() == value
+    end,
+    setValue = function(ctx, value)
+      -- Confirmation dialog for profile switch
+      StaticPopupDialogs["BETTERBAGS_SWITCH_PROFILE"] = {
+        text = string.format("Switch to profile '%s'?\n\nThis will reload the UI.", value),
+        button1 = "Switch",
+        button2 = "Cancel",
+        OnAccept = function()
+          db:SwitchToProfile(value)
+          ReloadUI()
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+      }
+      StaticPopup_Show("BETTERBAGS_SWITCH_PROFILE")
+    end
+  })
+
+  f:AddButtonGroup({
+    ButtonOptions = {
+      {
+        title = 'Create New Profile',
+        onClick = function(ctx)
+          StaticPopupDialogs["BETTERBAGS_CREATE_PROFILE"] = {
+            text = "Enter a name for the new profile:",
+            button1 = "Create",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 48,
+            OnAccept = function(self)
+              local name = self.editBox:GetText()
+              if name and name ~= "" then
+                local success, message = db:CreateProfile(name)
+                if success then
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_CREATED"] = {
+                    text = string.format("Profile '%s' created!\n\nSwitch to it now?", name),
+                    button1 = "Switch",
+                    button2 = "Later",
+                    OnAccept = function()
+                      db:SwitchToProfile(name)
+                      ReloadUI()
+                    end,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_CREATED")
+                else
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                    text = message,
+                    button1 = "OK",
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                end
+              end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_CREATE_PROFILE")
+        end
+      },
+      {
+        title = 'Copy Current Profile',
+        onClick = function(ctx)
+          local currentName = db:GetCurrentProfileName()
+          StaticPopupDialogs["BETTERBAGS_COPY_PROFILE"] = {
+            text = string.format("Create a copy of '%s'?\n\nEnter name for the new profile:", currentName),
+            button1 = "Copy",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 48,
+            OnAccept = function(self)
+              local name = self.editBox:GetText()
+              if name and name ~= "" then
+                local success, message = db:CreateProfile(name)
+                if success then
+                  db:SwitchToProfile(name)
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_COPIED"] = {
+                    text = string.format("Profile copied to '%s'.\n\nThe UI will reload now.", name),
+                    button1 = "OK",
+                    OnAccept = function()
+                      ReloadUI()
+                    end,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_COPIED")
+                else
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                    text = message,
+                    button1 = "OK",
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                end
+              end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_COPY_PROFILE")
+        end
+      }
+    }
+  })
+
+  f:AddButtonGroup({
+    ButtonOptions = {
+      {
+        title = 'Rename Profile',
+        onClick = function(ctx)
+          local current = db:GetCurrentProfileName()
+          if current == "Default" then
+            StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+              text = "Cannot rename the Default profile.",
+              button1 = "OK",
+              timeout = 0,
+              whileDead = true,
+              hideOnEscape = true,
+              preferredIndex = 3,
+            }
+            StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+            return
+          end
+
+          StaticPopupDialogs["BETTERBAGS_RENAME_PROFILE"] = {
+            text = string.format("Rename profile '%s' to:", current),
+            button1 = "Rename",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 48,
+            OnShow = function(self)
+              self.editBox:SetText(current)
+              self.editBox:HighlightText()
+            end,
+            OnAccept = function(self)
+              local newName = self.editBox:GetText()
+              if newName and newName ~= "" and newName ~= current then
+                local success, message = db:RenameProfile(current, newName)
+                if success then
+                  ReloadUI()
+                else
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                    text = message,
+                    button1 = "OK",
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                end
+              end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_RENAME_PROFILE")
+        end
+      },
+      {
+        title = 'Delete Profile',
+        onClick = function(ctx)
+          local current = db:GetCurrentProfileName()
+          if current == "Default" then
+            StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+              text = "Cannot delete the Default profile.",
+              button1 = "OK",
+              timeout = 0,
+              whileDead = true,
+              hideOnEscape = true,
+              preferredIndex = 3,
+            }
+            StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+            return
+          end
+
+          StaticPopupDialogs["BETTERBAGS_DELETE_PROFILE"] = {
+            text = string.format("Delete profile '%s'?\n\nThis cannot be undone.\n\nYou will be switched to the Default profile.", current),
+            button1 = "Delete",
+            button2 = "Cancel",
+            OnAccept = function()
+              db:SwitchToProfile("Default")
+              db:DeleteProfile(current)
+              ReloadUI()
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_DELETE_PROFILE")
+        end
+      },
+      {
+        title = 'Reset to Defaults',
+        onClick = function(ctx)
+          local current = db:GetCurrentProfileName()
+          StaticPopupDialogs["BETTERBAGS_RESET_PROFILE"] = {
+            text = string.format("Reset profile '%s' to default settings?\n\nThis will delete all your customizations for this profile.\n\nThis cannot be undone.", current),
+            button1 = "Reset",
+            button2 = "Cancel",
+            OnAccept = function()
+              db:ResetCurrentProfile()
+              ReloadUI()
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_RESET_PROFILE")
+        end
+      }
+    }
+  })
+
+  -- Spacer between Profiles and Import/Export
+  f:AddLabel({
+    description = ' ',
+  })
+
+  -- ============================================================
+  -- Import/Export Section
+  -- ============================================================
   f:AddSection({
     title = 'Import/Export',
     description = 'Export your category configuration to share with others or import category configurations from another user.',

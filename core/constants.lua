@@ -856,6 +856,8 @@ const.DATABASE_DEFAULTS = {
     groupsEnabled = {
       [const.BAG_KIND.BACKPACK] = true,
     },
+    -- Profile system migration flag
+    __profileSystemMigrated = false,
   },
   char = {}
 }

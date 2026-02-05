@@ -847,6 +847,178 @@ function DB:Migrate()
     [const.BAG_KIND.BACKPACK] = {},
     [const.BAG_KIND.BANK] = {},
   }
+
+  -- ============================================================
+  -- Profile System Migration (Q1'26)
+  -- Do not remove before Q3'26
+  -- ============================================================
+  if not DB.data.profile.__profileSystemMigrated then
+    -- Detect current profile name
+    local currentProfile = DB.data:GetCurrentProfile()
+    local playerName = UnitName("player")
+    local realmName = GetRealmName()
+    local autoProfile = playerName .. " - " .. realmName
+
+    -- If using auto-generated character name profile, migrate to Default
+    if currentProfile == autoProfile then
+      local profiles = {}
+      DB.data:GetProfiles(profiles)
+
+      local hasDefault = false
+      for _, name in ipairs(profiles) do
+        if name == "Default" then
+          hasDefault = true
+          break
+        end
+      end
+
+      if not hasDefault then
+        -- Create Default and copy current settings
+        DB.data:SetProfile("Default")
+        DB.data:CopyProfile(autoProfile)
+      else
+        -- Switch to existing Default
+        DB.data:SetProfile("Default")
+      end
+    end
+
+    -- Mark migration complete
+    DB.data.profile.__profileSystemMigrated = true
+  end
+end
+
+-- ============================================================
+-- Profile Management
+-- ============================================================
+
+--- Get the name of the currently active profile
+---@return string
+function DB:GetCurrentProfileName()
+  return DB.data:GetCurrentProfile()
+end
+
+--- Get list of all available profiles
+---@return table<number, string>
+function DB:GetAvailableProfiles()
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  return profiles
+end
+
+--- Get how many characters are using each profile
+---@return table<string, number>
+function DB:GetProfileCharacterCounts()
+  local counts = {}
+
+  -- Initialize all profiles with 0 count
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  for _, profileName in ipairs(profiles) do
+    counts[profileName] = 0
+  end
+
+  -- Count characters per profile from profileKeys
+  if DB.data.sv.profileKeys then
+    for _, profileName in pairs(DB.data.sv.profileKeys) do
+      counts[profileName] = (counts[profileName] or 0) + 1
+    end
+  end
+
+  return counts
+end
+
+--- Switch to a different profile (creates if doesn't exist)
+---@param name string
+---@return boolean success
+function DB:SwitchToProfile(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+  DB.data:SetProfile(name)
+  return true
+end
+
+--- Create a new profile with the given name
+---@param name string
+---@return boolean success
+---@return string message
+function DB:CreateProfile(name)
+  if type(name) ~= "string" or name == "" then
+    return false, "Profile name cannot be empty"
+  end
+
+  -- Check if profile already exists
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  for _, existingName in ipairs(profiles) do
+    if existingName == name then
+      return false, "A profile with this name already exists"
+    end
+  end
+
+  -- SetProfile creates new profile if doesn't exist
+  DB.data:SetProfile(name)
+  return true, "Profile created successfully"
+end
+
+--- Rename the current profile
+---@param oldName string
+---@param newName string
+---@return boolean success
+---@return string message
+function DB:RenameProfile(oldName, newName)
+  if oldName == "Default" then
+    return false, "Cannot rename the Default profile"
+  end
+
+  if type(newName) ~= "string" or newName == "" then
+    return false, "Profile name cannot be empty"
+  end
+
+  -- Check if new name already exists
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  for _, existingName in ipairs(profiles) do
+    if existingName == newName then
+      return false, "A profile with this name already exists"
+    end
+  end
+
+  -- Switch to old profile, copy to new name, delete old
+  DB.data:SetProfile(oldName)
+  DB.data:SetProfile(newName)
+  DB.data:CopyProfile(oldName)
+
+  -- Delete old profile
+  DB.data:DeleteProfile(oldName, true)
+
+  return true, "Profile renamed successfully"
+end
+
+--- Delete a profile (cannot delete Default or active profile)
+---@param name string
+---@return boolean success
+---@return string message
+function DB:DeleteProfile(name)
+  if name == "Default" then
+    return false, "Cannot delete the Default profile"
+  end
+
+  local currentProfile = DB.data:GetCurrentProfile()
+  if currentProfile == name then
+    return false, "Cannot delete the active profile. Switch to another profile first."
+  end
+
+  DB.data:DeleteProfile(name, true)
+  return true, "Profile deleted successfully"
+end
+
+--- Reset the current profile to default settings
+---@return boolean success
+---@return string message
+function DB:ResetCurrentProfile()
+  DB.data:ResetProfile(false, true)
+  return true, "Profile reset to defaults"
 end
 
 DB:Enable()
