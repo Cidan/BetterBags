@@ -129,5 +129,6 @@ integrations\consoleport.lua
 integrations\pawn.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
+integrations\quickfind.lua
 
 core\init.lua
