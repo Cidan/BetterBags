@@ -573,6 +573,50 @@ function config:CreateConfig()
   end
 
   -- ============================================================
+  -- Integrations Section
+  -- ============================================================
+  f:AddSection({
+    title = 'Integrations',
+    description = 'Settings for third-party addon integrations.',
+  })
+
+  f:AddPaneLink({
+    title = 'QuickFind',
+    description = 'Information about QuickFind addon integration.',
+    createPane = function(parent)
+      local pane = CreateFrame("Frame", nil, parent)
+      pane:SetAllPoints()
+
+      -- Title
+      local title = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+      title:SetPoint("TOPLEFT", 10, -10)
+      title:SetText("QuickFind Integration")
+
+      -- Description
+      local desc = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+      desc:SetPoint("RIGHT", pane, "RIGHT", -10, 0)
+      desc:SetWordWrap(true)
+      desc:SetJustifyH("LEFT")
+      desc:SetText("BetterBags integrates with the QuickFind addon to make your items searchable.")
+
+      -- How it works section
+      local howItWorksTitle = pane:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+      howItWorksTitle:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -20)
+      howItWorksTitle:SetText("How It Works:")
+
+      local howItWorksText = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      howItWorksText:SetPoint("TOPLEFT", howItWorksTitle, "BOTTOMLEFT", 0, -10)
+      howItWorksText:SetPoint("RIGHT", pane, "RIGHT", -10, 0)
+      howItWorksText:SetWordWrap(true)
+      howItWorksText:SetJustifyH("LEFT")
+      howItWorksText:SetText("• All items in your backpack and bank are registered as a QuickFind source\n\n• When you press Enter on an item in QuickFind, BetterBags will:\n  - Open the appropriate bag (backpack or bank)\n  - Switch to the tab containing the item\n  - Fill the search box with the item's name\n\n• Items are tagged with their type, category, and location for easy filtering")
+
+      return pane
+    end
+  })
+
+  -- ============================================================
   -- Profiles Section
   -- ============================================================
   f:AddSection({

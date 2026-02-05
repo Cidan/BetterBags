@@ -12,6 +12,15 @@ local items = addon:GetModule('Items')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class QuickFindIntegration: AceModule
 local quickfind = addon:NewModule('QuickFind')
 
@@ -79,9 +88,8 @@ function quickfind:CreateResultEntry(itemData, location)
       text = location,
       color = {0.6, 0.8, 1}  -- Pale blue
     },
-    lua = function()
-      -- Placeholder: Future enhancement could highlight/flash the item
-      -- For now, just a no-op
+    lua = function(id)
+      self:OnItemSelected(id)
     end
   }
 end
@@ -94,4 +102,79 @@ function quickfind:RegisterBetterBagsSource()
       return self:GetItemResults()
     end
   })
+end
+
+---Called when user presses Enter on an item in QuickFind
+---@param id string Format: "backpack:bagid_slotid" or "bank:bagid_slotid"
+function quickfind:OnItemSelected(id)
+  self:ShowInBag(id)
+end
+
+---Shows the item in the bag
+---@param id string
+function quickfind:ShowInBag(id)
+  local ctx = context:New('quickfind_show')
+  local bagKind, slotkey = self:ParseID(id)
+
+  -- Get item data
+  local itemData = items:GetItemDataFromSlotKey(slotkey)
+  if not itemData or not itemData.itemInfo then
+    return
+  end
+
+  -- Get the bag frame
+  local bag = bagKind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank
+  if not bag then
+    return
+  end
+
+  -- Open the bag
+  bag:Show(ctx)
+
+  -- Find and switch to the appropriate tab
+  local tabID = self:GetTabIDForItem(itemData, bagKind)
+  if tabID and bag.bag.tabs then
+    bag.bag.tabs:SetTabByID(ctx, tabID)
+  end
+
+  -- Set search to the exact item name
+  if bag.bag.search then
+    bag.bag.search:SetText(itemData.itemInfo.itemName)
+  end
+end
+
+---Gets the tab ID for an item based on its category/group
+---@param itemData ItemData
+---@param bagKind BagKind
+---@return number?
+function quickfind:GetTabIDForItem(itemData, bagKind)
+  if bagKind == const.BAG_KIND.BACKPACK then
+    -- For backpack, tabs are groups
+    if database:GetGroupsEnabled(bagKind) and itemData.itemInfo.category then
+      local groupID = groups:GetGroupForCategory(itemData.itemInfo.category)
+      return groupID
+    end
+    return nil
+  else
+    -- For bank, tabs are bag IDs for character bank, or special handling for account bank
+    -- For now, just return the bag ID as the tab
+    return itemData.bagid
+  end
+end
+
+---Parses the QuickFind ID into bag kind and slotkey
+---@param id string Format: "backpack:bagid_slotid" or "bank:bagid_slotid"
+---@return BagKind, string
+function quickfind:ParseID(id)
+  local bagKindStr, slotkey = id:match("^([^:]+):(.+)$")
+  local bagKind = bagKindStr == "backpack" and const.BAG_KIND.BACKPACK or const.BAG_KIND.BANK
+  return bagKind, slotkey
+end
+
+---Parses slotkey into bagid and slotid
+---@param slotkey string Format: "bagid_slotid"
+---@return number, number
+function quickfind:ParseSlotKey(slotkey)
+  local bagid, slotid = slotkey:match("^(%d+)_(%d+)$")
+  return tonumber(bagid), tonumber(slotid)
 end
