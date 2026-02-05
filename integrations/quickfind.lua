@@ -136,8 +136,37 @@ function quickfind:ShowInBag(id)
 
   -- Find and switch to the appropriate tab
   local tabID = self:GetTabIDForItem(itemData, bagKind)
-  if tabID and bag.tabs then
-    bag.tabs:SetTabByID(ctx, tabID)
+  if tabID and bag.behavior then
+    -- Dispatch to correct behavior method based on bag type
+    if bagKind == const.BAG_KIND.BACKPACK then
+      -- Backpack uses group-based tabs
+      if bag.behavior.SwitchToGroup then
+        bag.behavior:SwitchToGroup(ctx, tabID)
+      end
+    elseif bagKind == const.BAG_KIND.BANK then
+      -- Bank has multiple tab types based on ID range
+      if tabID == 1 then
+        -- Single bank tab (when character bank tabs disabled)
+        if bag.behavior.SwitchToBank then
+          bag.behavior:SwitchToBank(ctx)
+        end
+      elseif tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
+        -- Character bank tabs (6-11)
+        if bag.behavior.SwitchToCharacterBankTab then
+          bag.behavior:SwitchToCharacterBankTab(ctx, tabID)
+        end
+      elseif tabID >= Enum.BagIndex.AccountBankTab_1 and tabID <= Enum.BagIndex.AccountBankTab_5 then
+        -- Account bank tabs (13-17)
+        if bag.behavior.SwitchToAccountBank then
+          bag.behavior:SwitchToAccountBank(ctx, tabID)
+        end
+      else
+        -- Fallback: unknown tab type, use visual-only
+        if bag.tabs then
+          bag.tabs:SetTabByID(ctx, tabID)
+        end
+      end
+    end
   end
 
   -- Set search to the exact item name in the embedded in-bag search box

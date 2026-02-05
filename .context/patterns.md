@@ -249,6 +249,99 @@ else
 end
 ```
 
+### Pattern: Always Use Behavior Methods for Programmatic Tab/View Switching
+**Problem**: Calling visual-only methods like `tabs:SetTabByID()` or `tabs:SetTabByIndex()` programmatically highlights the tab button but doesn't update bag contents. The tab looks selected but displays the wrong items.
+
+**Why**: WoW addons separate visual presentation from state management for good reason. Visual methods only update the UI (button highlights, colors, borders) but don't:
+- Update state variables (`database:SetActiveGroup()`, `bag.bankTab`)
+- Set context filters (`ctx:Set("filterBagID", ...)`) that propagate through event chains
+- Clear cached data (`items:ClearBankCache()`)
+- Trigger refresh events (`bags/RefreshBackpack`, `bags/RefreshBank`)
+- Call `ItemButtonUtil.TriggerEvent()` for UI synchronization
+- Update Blizzard integration (`BankPanel:SetBankType()`)
+
+**This is the architectural split:**
+- **Visual methods** (`SetTabByID`, `SelectTab`): Update button appearance only
+- **Behavior methods** (`SwitchToGroup`, `SwitchToCharacterBankTab`, etc.): Complete state management + visual update
+
+Manual clicks work because click handlers call behavior methods, which then call visual methods at the end. Programmatic code that calls visual methods directly bypasses the entire state management chain.
+
+**Solution Pattern**: Always dispatch to the appropriate behavior method based on bag type and context. Never call visual-only methods when you need content to update.
+
+**Example** (from QuickFind integration fix):
+```lua
+-- BAD: Visual update only, bag contents don't change
+local tabID = self:GetTabIDForItem(itemData, bagKind)
+if tabID and bag.tabs then
+  bag.tabs:SetTabByID(ctx, tabID)  -- Wrong! Only highlights tab
+end
+
+-- GOOD: Complete state management via behavior methods
+local tabID = self:GetTabIDForItem(itemData, bagKind)
+if tabID and bag.behavior then
+  if bagKind == const.BAG_KIND.BACKPACK then
+    -- Backpack uses group-based tabs
+    if bag.behavior.SwitchToGroup then
+      bag.behavior:SwitchToGroup(ctx, tabID)
+    end
+  elseif bagKind == const.BAG_KIND.BANK then
+    -- Bank has multiple tab types based on ID range
+    if tabID == 1 then
+      -- Single bank tab (when character bank tabs disabled)
+      if bag.behavior.SwitchToBank then
+        bag.behavior:SwitchToBank(ctx)
+      end
+    elseif tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
+      -- Character bank tabs (6-11)
+      if bag.behavior.SwitchToCharacterBankTab then
+        bag.behavior:SwitchToCharacterBankTab(ctx, tabID)
+      end
+    elseif tabID >= Enum.BagIndex.AccountBankTab_1 and tabID <= Enum.BagIndex.AccountBankTab_5 then
+      -- Account bank tabs (13-17)
+      if bag.behavior.SwitchToAccountBank then
+        bag.behavior:SwitchToAccountBank(ctx, tabID)
+      end
+    else
+      -- Fallback for unknown tab types
+      if bag.tabs then
+        bag.tabs:SetTabByID(ctx, tabID)
+      end
+    end
+  end
+end
+```
+
+**What Behavior Methods Do** (bags/backpack.lua:342-356, bags/bank.lua:590-667):
+1. **Update state**: Set active group/tab in database and bag object
+2. **Set context filters**: Add `filterBagID` to context for event chain propagation
+3. **Clear caches**: Invalidate stale item data
+4. **Update Blizzard integration**: Call `BankPanel:SetBankType()` for right-click behavior
+5. **Trigger refresh events**: Send `bags/RefreshBackpack` or `bags/RefreshBank` messages
+6. **Synchronize UI**: Call `ItemButtonUtil.TriggerEvent()`
+7. **Update visual state**: Call `SetTabByID()` at the end for button highlight
+
+**Debugging Symptom Checklist**:
+- ✅ Tab button highlights correctly
+- ❌ Bag contents don't update to match tab
+- ❌ Previous tab's items still visible
+- ❌ Search/filter shows items from wrong tab
+- 🔍 **Root cause**: Calling visual methods instead of behavior methods
+
+**When to Apply**:
+- Programmatic tab switching (QuickFind integration, slash commands, macros)
+- Restoring saved UI state on login/reload
+- Automated testing that simulates user clicks
+- Any code that needs to "switch tabs as if the user clicked"
+- Integration with external addons that trigger view changes
+
+**Related Files**:
+- `integrations/quickfind.lua:137-170` - Example fix
+- `bags/backpack.lua:342-356` - `SwitchToGroup()` behavior method
+- `bags/bank.lua:590-609` - `SwitchToBank()` behavior method
+- `bags/bank.lua:613-632` - `SwitchToCharacterBankTab()` behavior method
+- `bags/bank.lua:637-667` - `SwitchToAccountBank()` behavior method
+- `frames/tabs.lua` - Visual-only methods (for reference, don't call directly)
+
 ## WoW Bank System Architecture
 
 ### Bank Type Hierarchy
