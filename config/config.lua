@@ -580,21 +580,12 @@ function config:CreateConfig()
     description = 'Profiles allow you to save different bag configurations and switch between them on any character. The "Default" profile is shared across all characters by default.',
   })
 
-  -- Get character counts for display
-  local characterCounts = db:GetProfileCharacterCounts()
-
   f:AddDropdown({
     title = 'Active Profile',
     description = 'Select which profile to use. Switching profiles will reload the UI.',
     itemsFunction = function(ctx)
-      local profiles = db:GetAvailableProfiles()
-      local items = {}
-      for _, profileName in ipairs(profiles) do
-        local count = characterCounts[profileName] or 0
-        local charText = count == 1 and "character" or "characters"
-        items[profileName] = string.format("%s (%d %s)", profileName, count, charText)
-      end
-      return items
+      -- Return simple array of profile names (dropdown requires string[])
+      return db:GetAvailableProfiles()
     end,
     getValue = function(ctx, value)
       return db:GetCurrentProfileName() == value
@@ -616,6 +607,24 @@ function config:CreateConfig()
       }
       StaticPopup_Show("BETTERBAGS_SWITCH_PROFILE")
     end
+  })
+
+  -- Show character counts for profiles
+  local function getProfileCountsText()
+    local counts = db:GetProfileCharacterCounts()
+    local parts = {}
+    for profileName, count in pairs(counts) do
+      if count > 0 then
+        local charText = count == 1 and "character" or "characters"
+        table.insert(parts, string.format("%s: %d %s", profileName, count, charText))
+      end
+    end
+    table.sort(parts)
+    return table.concat(parts, "  |  ")
+  end
+
+  f:AddLabel({
+    description = getProfileCountsText(),
   })
 
   f:AddButtonGroup({
