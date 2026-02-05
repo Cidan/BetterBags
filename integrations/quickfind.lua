@@ -21,6 +21,9 @@ local groups = addon:GetModule('Groups')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Themes: AceModule
+local themes = addon:GetModule('Themes')
+
 ---@class QuickFindIntegration: AceModule
 local quickfind = addon:NewModule('QuickFind')
 
@@ -133,14 +136,27 @@ function quickfind:ShowInBag(id)
 
   -- Find and switch to the appropriate tab
   local tabID = self:GetTabIDForItem(itemData, bagKind)
-  if tabID and bag.bag.tabs then
-    bag.bag.tabs:SetTabByID(ctx, tabID)
+  if tabID and bag.tabs then
+    bag.tabs:SetTabByID(ctx, tabID)
   end
 
-  -- Set search to the exact item name
-  if bag.bag.search then
-    bag.bag.search:SetText(itemData.itemInfo.itemName)
-  end
+  -- Set search to the exact item name in the embedded in-bag search box
+  -- Delay to ensure the bag is fully rendered and search box is ready
+  local itemName = itemData.itemInfo.itemName
+  C_Timer.After(0.1, function()
+    if not database:GetInBagSearch() then
+      print("QuickFind: In-bag search is disabled. Enable it in BetterBags settings.")
+      return
+    end
+
+    -- Get the in-bag search box from the themes module
+    local searchBox = themes:GetInBagSearchBox(bag.frame)
+    if searchBox and searchBox.textBox then
+      searchBox.textBox:SetText(itemName)
+      searchBox.textBox:SetFocus()
+      searchBox.textBox:HighlightText()
+    end
+  end)
 end
 
 ---Gets the tab ID for an item based on its category/group

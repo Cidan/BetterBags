@@ -184,6 +184,21 @@ function themes:SetSearchState(ctx, frame, shown)
   events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
+-- GetInBagSearchBox returns the in-bag search box for the given frame, if it exists.
+-- This works by finding the themed decoration frame (a child of the bag frame) that contains the search box.
+---@param frame Frame
+---@return SearchFrame?
+function themes:GetInBagSearchBox(frame)
+  -- Iterate through children to find the decoration that has a search box
+  local children = {frame:GetChildren()}
+  for _, child in ipairs(children) do
+    if child.search and child.search.textBox then
+      return child.search
+    end
+  end
+  return nil
+end
+
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.
 ---@param frame Frame
 ---@param title string
