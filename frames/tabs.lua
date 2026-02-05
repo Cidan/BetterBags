@@ -794,9 +794,6 @@ function tabs:CalculateOverlapTarget()
 					if distance < threshold then
 						-- Determine if we should insert before or after based on which half
 						local insertAfter = draggedCenter > tabCenter
-						print(string.format("OVERLAP: dragged='%s' center=%.1f, target='%s'[%d] center=%.1f, insertAfter=%s",
-							self.draggingTab.name or "?", draggedCenter,
-							tab.name or "?", i, tabCenter, tostring(insertAfter)))
 						return i, insertAfter
 					end
 				end
@@ -810,14 +807,11 @@ end
 ---@param targetIndex number
 function tabs:TriggerSlide(targetIndex)
 	if not targetIndex or targetIndex == self.draggingTab.index then
-		print(string.format("TriggerSlide: skipping (targetIndex=%s, currentIndex=%s)", tostring(targetIndex), tostring(self.draggingTab.index)))
 		return
 	end
 
 	local currentIndex = self.draggingTab.index
 	local tabArray = self.currentTabFrame.tabIndex
-
-	print(string.format("TriggerSlide: moving '%s' from index %d to %d", self.draggingTab.name, currentIndex, targetIndex))
 
 	-- Remove dragged tab from array
 	table.remove(tabArray, currentIndex)
@@ -828,11 +822,6 @@ function tabs:TriggerSlide(targetIndex)
 	-- Re-index all tabs
 	for i, tab in ipairs(tabArray) do
 		tab.index = i
-	end
-
-	print("TriggerSlide: new order:")
-	for i, tab in ipairs(tabArray) do
-		print(string.format("  [%d] %s (id=%s)", i, tab.name, tostring(tab.id)))
 	end
 
 	-- Reanchor all tabs (except the dragging one, which follows cursor)
@@ -886,9 +875,6 @@ function tabs:StopTabDrag()
 		end
 
 		if finalIndex ~= startIndex then
-			print(string.format("StopTabDrag: Reordering '%s' from %d to %d (target=%d, insertAfter=%s)",
-				draggedTab.name, startIndex, finalIndex, targetIndex, tostring(insertAfter)))
-
 			-- Perform the actual reorder
 			local tabArray = savedTabFrame.tabIndex
 			table.remove(tabArray, startIndex)
@@ -899,18 +885,32 @@ function tabs:StopTabDrag()
 				tab.index = i
 			end
 
+			-- Update selectedTab to track the tab that was selected before reordering
+			-- If the dragged tab was selected, update to its new index
+			if savedTabFrame.selectedTab == startIndex then
+				savedTabFrame.selectedTab = finalIndex
+			elseif startIndex < finalIndex then
+				-- Dragged tab moved right, tabs between startIndex and finalIndex shifted left
+				if savedTabFrame.selectedTab > startIndex and savedTabFrame.selectedTab <= finalIndex then
+					savedTabFrame.selectedTab = savedTabFrame.selectedTab - 1
+				end
+			else
+				-- Dragged tab moved left, tabs between finalIndex and startIndex shifted right
+				if savedTabFrame.selectedTab >= finalIndex and savedTabFrame.selectedTab < startIndex then
+					savedTabFrame.selectedTab = savedTabFrame.selectedTab + 1
+				end
+			end
+
 			-- Reanchor all tabs to their new positions
 			savedTabFrame:ReanchorTabs()
 
 			-- Persist new order to database
 			self:SaveTabOrder(savedTabFrame)
 		else
-			print("StopTabDrag: No reorder, same position")
 			savedTabFrame:ReanchorTabs()
 		end
 	else
 		-- No reorder, just reanchor to original positions
-		print("StopTabDrag: No overlap, returning to original position")
 		savedTabFrame:ReanchorTabs()
 	end
 end
