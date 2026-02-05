@@ -33,14 +33,14 @@ function quickfind:GetItemResults()
   local allSlotInfo = items:GetAllSlotInfo()
 
   -- Process backpack items
-  for slotKey, itemData in pairs(allSlotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+  for _, itemData in pairs(allSlotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
     if not itemData.isItemEmpty and itemData.itemInfo then
       table.insert(results, self:CreateResultEntry(itemData, "Backpack"))
     end
   end
 
   -- Process bank items
-  for slotKey, itemData in pairs(allSlotInfo[const.BAG_KIND.BANK].itemsBySlotKey) do
+  for _, itemData in pairs(allSlotInfo[const.BAG_KIND.BANK].itemsBySlotKey) do
     if not itemData.isItemEmpty and itemData.itemInfo then
       table.insert(results, self:CreateResultEntry(itemData, "Bank"))
     end
@@ -56,12 +56,13 @@ end
 function quickfind:CreateResultEntry(itemData, location)
   local info = itemData.itemInfo
 
-  -- Build tags for searching
-  local tags = string.format("%s %s %s %s",
+  -- Build tags for searching (include location in tags, not name)
+  local tags = string.format("%s %s %s %s %s",
     info.itemType or "",
     info.itemSubType or "",
     info.category or "",
-    info.itemEquipLoc or ""
+    info.itemEquipLoc or "",
+    location
   )
 
   -- Build unique ID with location prefix
@@ -70,10 +71,11 @@ function quickfind:CreateResultEntry(itemData, location)
 
   return {
     type = QuickFind.LOOKUP_TYPE.LUA,
-    name = string.format("%s (%s)", info.itemName, location),
+    name = info.itemName,
+    icon = info.itemIcon,
     tags = tags,
     id = uniqueID,
-    lua = function(id)
+    lua = function()
       -- Placeholder: Future enhancement could highlight/flash the item
       -- For now, just a no-op
     end
