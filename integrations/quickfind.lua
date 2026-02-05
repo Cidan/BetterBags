@@ -141,22 +141,18 @@ function quickfind:ShowInBag(id)
   end
 
   -- Set search to the exact item name in the embedded in-bag search box
-  -- Delay to ensure the bag is fully rendered and search box is ready
-  local itemName = itemData.itemInfo.itemName
-  C_Timer.After(0.1, function()
-    if not database:GetInBagSearch() then
-      print("QuickFind: In-bag search is disabled. Enable it in BetterBags settings.")
-      return
-    end
+  if not database:GetInBagSearch() then
+    print("QuickFind: In-bag search is disabled. Enable it in BetterBags settings.")
+    return
+  end
 
-    -- Get the in-bag search box from the themes module
-    local searchBox = themes:GetInBagSearchBox(bag.frame)
-    if searchBox and searchBox.textBox then
-      searchBox.textBox:SetText(itemName)
-      searchBox.textBox:SetFocus()
-      searchBox.textBox:HighlightText()
-    end
-  end)
+  -- Get the in-bag search box from the themes module
+  local searchBox = themes:GetInBagSearchBox(bag.frame)
+  if searchBox and searchBox.textBox then
+    searchBox.textBox:SetText(itemData.itemInfo.itemName)
+    searchBox.textBox:SetFocus()
+    searchBox.textBox:HighlightText()
+  end
 end
 
 ---Gets the tab ID for an item based on its category/group
