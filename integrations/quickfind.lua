@@ -75,6 +75,10 @@ function quickfind:CreateResultEntry(itemData, location)
     icon = info.itemIcon,
     tags = tags,
     id = uniqueID,
+    label = {
+      text = location,
+      color = {0.6, 0.8, 1}  -- Pale blue
+    },
     lua = function()
       -- Placeholder: Future enhancement could highlight/flash the item
       -- For now, just a no-op
