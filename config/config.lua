@@ -639,7 +639,7 @@ function config:CreateConfig()
             hasEditBox = true,
             maxLetters = 48,
             OnAccept = function(self)
-              local name = self.editBox:GetText()
+              local name = self.EditBox:GetText()
               if name and name ~= "" then
                 local success, message = db:CreateProfile(name)
                 if success then
@@ -689,7 +689,7 @@ function config:CreateConfig()
             hasEditBox = true,
             maxLetters = 48,
             OnAccept = function(self)
-              local name = self.editBox:GetText()
+              local name = self.EditBox:GetText()
               if name and name ~= "" then
                 local success, message = db:CreateProfile(name)
                 if success then
@@ -756,11 +756,11 @@ function config:CreateConfig()
             hasEditBox = true,
             maxLetters = 48,
             OnShow = function(self)
-              self.editBox:SetText(current)
-              self.editBox:HighlightText()
+              self.EditBox:SetText(current)
+              self.EditBox:HighlightText()
             end,
             OnAccept = function(self)
-              local newName = self.editBox:GetText()
+              local newName = self.EditBox:GetText()
               if newName and newName ~= "" and newName ~= current then
                 local success, message = db:RenameProfile(current, newName)
                 if success then

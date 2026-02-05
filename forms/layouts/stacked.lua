@@ -901,7 +901,7 @@ function stackedLayout:AddButtonGroup(opts)
     if #container.buttons == 0 then
       button:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
     else
-      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", -10, 0)
+      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", 10, 0)
     end
     table.insert(container.buttons, button)
   end
