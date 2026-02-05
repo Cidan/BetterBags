@@ -747,13 +747,9 @@ function tabs:UpdateTabDrag()
 
 	-- Update visual feedback based on overlap
 	if targetIndex then
-		if targetIndex ~= self.lastOverlapIndex then
-			-- Overlap target changed, trigger slide and update placeholder
-			self:TriggerSlide(targetIndex)
-			self.lastOverlapIndex = targetIndex
-		end
-		-- Show placeholder at target position
+		-- Show insertion line at target position (but don't reorder yet)
 		self:UpdateDropPlaceholder(targetIndex)
+		self.lastOverlapIndex = targetIndex
 	else
 		-- No overlap, hide placeholder
 		self:HideDropPlaceholder()
@@ -841,33 +837,51 @@ function tabs:StopTabDrag()
 	local ctx = context:New("StopTabDrag")
 	local decoration = themes:GetTabButton(ctx, self.draggingTab)
 	local savedTabFrame = self.currentTabFrame
-	local finalIndex = self.draggingTab.index
+	local draggedTab = self.draggingTab
+	local startIndex = self.dragStartIndex
+	local targetIndex = self.lastOverlapIndex
 
 	-- Clear OnUpdate handler
 	decoration:SetScript("OnUpdate", nil)
 
 	-- Restore visual state
-	self.draggingTab:SetFrameLevel(self.draggingTab:GetFrameLevel() - 10)
+	draggedTab:SetFrameLevel(draggedTab:GetFrameLevel() - 10)
 	decoration:SetAlpha(1.0)
 	ResetCursor()
 
 	-- Hide drop placeholder
 	self:HideDropPlaceholder()
 
-	-- Clear drag state BEFORE reanchoring (so ReanchorTabs includes this tab)
-	local orderChanged = finalIndex ~= self.dragStartIndex
+	-- Clear drag state BEFORE reordering (so ReanchorTabs includes this tab)
 	self.isDragging = false
 	self.draggingTab = nil
 	self.dragStartIndex = nil
 	self.currentTabFrame = nil
 	self.lastOverlapIndex = nil
 
-	-- Reanchor all tabs to their proper positions
-	savedTabFrame:ReanchorTabs()
+	-- If we have a valid drop target, perform the reorder
+	if targetIndex and targetIndex ~= startIndex then
+		print(string.format("StopTabDrag: Reordering '%s' from %d to %d", draggedTab.name, startIndex, targetIndex))
 
-	-- If order changed, persist to database
-	if orderChanged then
+		-- Perform the actual reorder
+		local tabArray = savedTabFrame.tabIndex
+		table.remove(tabArray, startIndex)
+		table.insert(tabArray, targetIndex, draggedTab)
+
+		-- Re-index all tabs
+		for i, tab in ipairs(tabArray) do
+			tab.index = i
+		end
+
+		-- Reanchor all tabs to their new positions
+		savedTabFrame:ReanchorTabs()
+
+		-- Persist new order to database
 		self:SaveTabOrder(savedTabFrame)
+	else
+		-- No reorder, just reanchor to original positions
+		print("StopTabDrag: No reorder, returning to original position")
+		savedTabFrame:ReanchorTabs()
 	end
 end
 
