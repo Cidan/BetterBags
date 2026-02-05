@@ -961,6 +961,35 @@ function DB:CreateProfile(name)
   return true, "Profile created successfully"
 end
 
+--- Copy data from another profile to the current profile
+---@param sourceName string
+---@return boolean success
+---@return string message
+function DB:CopyFromProfile(sourceName)
+  if type(sourceName) ~= "string" or sourceName == "" then
+    return false, "Source profile name cannot be empty"
+  end
+
+  -- Verify source profile exists
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  local found = false
+  for _, existingName in ipairs(profiles) do
+    if existingName == sourceName then
+      found = true
+      break
+    end
+  end
+
+  if not found then
+    return false, "Source profile does not exist"
+  end
+
+  -- Copy from source to current profile
+  DB.data:CopyProfile(sourceName)
+  return true, "Profile copied successfully"
+end
+
 --- Rename the current profile
 ---@param oldName string
 ---@param newName string

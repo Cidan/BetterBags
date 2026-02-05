@@ -691,21 +691,35 @@ function config:CreateConfig()
             OnAccept = function(self)
               local name = self.EditBox:GetText()
               if name and name ~= "" then
+                -- Create new profile (automatically switches to it)
                 local success, message = db:CreateProfile(name)
                 if success then
-                  db:SwitchToProfile(name)
-                  StaticPopupDialogs["BETTERBAGS_PROFILE_COPIED"] = {
-                    text = string.format("Profile copied to '%s'.\n\nThe UI will reload now.", name),
-                    button1 = "OK",
-                    OnAccept = function()
-                      ReloadUI()
-                    end,
-                    timeout = 0,
-                    whileDead = true,
-                    hideOnEscape = true,
-                    preferredIndex = 3,
-                  }
-                  StaticPopup_Show("BETTERBAGS_PROFILE_COPIED")
+                  -- Copy data from source profile to new (current) profile
+                  local copySuccess, copyMessage = db:CopyFromProfile(currentName)
+                  if copySuccess then
+                    StaticPopupDialogs["BETTERBAGS_PROFILE_COPIED"] = {
+                      text = string.format("Profile copied to '%s'.\n\nThe UI will reload now.", name),
+                      button1 = "OK",
+                      OnAccept = function()
+                        ReloadUI()
+                      end,
+                      timeout = 0,
+                      whileDead = true,
+                      hideOnEscape = true,
+                      preferredIndex = 3,
+                    }
+                    StaticPopup_Show("BETTERBAGS_PROFILE_COPIED")
+                  else
+                    StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                      text = copyMessage,
+                      button1 = "OK",
+                      timeout = 0,
+                      whileDead = true,
+                      hideOnEscape = true,
+                      preferredIndex = 3,
+                    }
+                    StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                  end
                 else
                   StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
                     text = message,
