@@ -32,6 +32,8 @@ local themePane = addon:NewModule('ThemePane')
 
 ---@class ThemePaneListButton: Button
 ---@field ThemeName FontString
+---@field CheckmarkIcon Texture
+---@field CheckmarkFadeIn AnimationGroup
 ---@field Init boolean
 
 ---@class ThemePaneFrame
@@ -56,7 +58,23 @@ function themePaneProto:initListItem(button, elementData)
     button.ThemeName:SetHeight(30)
     button.ThemeName:SetJustifyH("LEFT")
     button.ThemeName:SetPoint("LEFT", button, "LEFT", 10, 0)
-    button.ThemeName:SetPoint("RIGHT", button, "RIGHT", -10, 0)
+    button.ThemeName:SetPoint("RIGHT", button, "RIGHT", -25, 0)
+
+    -- Checkmark icon for currently active theme
+    button.CheckmarkIcon = button:CreateTexture(nil, "OVERLAY", nil, 7)
+    button.CheckmarkIcon:SetSize(16, 16)
+    button.CheckmarkIcon:SetPoint("RIGHT", button, "RIGHT", -5, 0)
+    button.CheckmarkIcon:SetAtlas("common-icon-checkmark")
+    button.CheckmarkIcon:Hide()
+
+    -- Fade-in animation for checkmark
+    button.CheckmarkFadeIn = button.CheckmarkIcon:CreateAnimationGroup()
+    local fade = button.CheckmarkFadeIn:CreateAnimation("Alpha")
+    fade:SetFromAlpha(0)
+    fade:SetToAlpha(1)
+    fade:SetDuration(0.2)
+    fade:SetSmoothing("IN")
+
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
@@ -67,14 +85,26 @@ function themePaneProto:initListItem(button, elementData)
   local currentTheme = database:GetTheme()
   local isCurrentTheme = elementData.key == currentTheme
 
-  -- Font styling
+  -- Font styling (keep yellow text for active theme)
   if isCurrentTheme then
     button.ThemeName:SetFontObject(fonts.UnitFrame12Yellow)
   else
     button.ThemeName:SetFontObject(fonts.UnitFrame12White)
   end
 
-  -- Background based on selection state
+  -- Checkmark for currently active theme
+  if isCurrentTheme then
+    if not button.CheckmarkIcon:IsShown() then
+      button.CheckmarkIcon:SetAlpha(0)
+      button.CheckmarkIcon:Show()
+      button.CheckmarkFadeIn:Play()
+    end
+  else
+    button.CheckmarkIcon:Hide()
+    button.CheckmarkFadeIn:Stop()
+  end
+
+  -- Background based on selection state only
   if self.selectedTheme == elementData.key then
     button:SetBackdropColor(1, 0.82, 0, 0.3)
     self.selectedButton = button
