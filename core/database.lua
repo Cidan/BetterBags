@@ -673,10 +673,26 @@ function DB:RenameCategory(oldName, newName)
     DB.data.profile.ephemeralCategoryFilters[oldName] = nil
   end
 
+  -- Delete grouped sub-categories from ephemeral filters (e.g., "OldName - Consumable")
+  -- These will be recreated with the new name on next refresh
+  local groupedPrefix = oldName .. " - "
+  for categoryName, _ in pairs(DB.data.profile.ephemeralCategoryFilters) do
+    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+      DB.data.profile.ephemeralCategoryFilters[categoryName] = nil
+    end
+  end
+
   -- 5. Update display options
   if DB.data.profile.categoryOptions[oldName] then
     DB.data.profile.categoryOptions[newName] = DB.data.profile.categoryOptions[oldName]
     DB.data.profile.categoryOptions[oldName] = nil
+  end
+
+  -- Delete grouped sub-categories from display options
+  for categoryName, _ in pairs(DB.data.profile.categoryOptions) do
+    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+      DB.data.profile.categoryOptions[categoryName] = nil
+    end
   end
 
   -- 6. Update collapse state for all bag kinds
@@ -685,6 +701,15 @@ function DB:RenameCategory(oldName, newName)
       DB.data.profile.collapsedSections[kind][newName] = DB.data.profile.collapsedSections[kind][oldName]
       DB.data.profile.collapsedSections[kind][oldName] = nil
     end
+
+    -- Delete grouped sub-categories from collapsed sections
+    if DB.data.profile.collapsedSections[kind] then
+      for categoryName, _ in pairs(DB.data.profile.collapsedSections[kind]) do
+        if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+          DB.data.profile.collapsedSections[kind][categoryName] = nil
+        end
+      end
+    end
   end
 
   -- 7. Update custom section sort (pinned position) for all bag kinds
@@ -692,6 +717,15 @@ function DB:RenameCategory(oldName, newName)
     if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
       DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
       DB.data.profile.customSectionSort[kind][oldName] = nil
+    end
+
+    -- Delete grouped sub-categories from custom section sort
+    if DB.data.profile.customSectionSort[kind] then
+      for categoryName, _ in pairs(DB.data.profile.customSectionSort[kind]) do
+        if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+          DB.data.profile.customSectionSort[kind][categoryName] = nil
+        end
+      end
     end
   end
 

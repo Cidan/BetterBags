@@ -419,6 +419,24 @@ function categories:RenameCategory(ctx, oldName, newName)
     end
   end
 
+  -- Delete grouped sub-categories (e.g., "OldName - Consumable", "OldName - Quest")
+  -- These will be recreated with the new name on next refresh
+  local groupedPrefix = oldName .. " - "
+  local categoriesToDelete = {}
+  for categoryName, _ in pairs(self.ephemeralCategories) do
+    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+      table.insert(categoriesToDelete, categoryName)
+    end
+  end
+  for _, categoryName in ipairs(categoriesToDelete) do
+    if self.ephemeralCategories[categoryName] then
+      for itemID, _ in pairs(self.ephemeralCategories[categoryName].itemList) do
+        self.ephemeralCategoryByItemID[itemID] = nil
+      end
+      self.ephemeralCategories[categoryName] = nil
+    end
+  end
+
   -- Call database layer to update all data structures
   local success = database:RenameCategory(oldName, newName)
   if not success then
