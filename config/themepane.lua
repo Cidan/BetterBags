@@ -33,7 +33,6 @@ local themePane = addon:NewModule('ThemePane')
 ---@class ThemePaneListButton: Button
 ---@field ThemeName FontString
 ---@field CheckmarkIcon Texture
----@field CheckmarkFadeIn AnimationGroup
 ---@field Init boolean
 
 ---@class ThemePaneFrame
@@ -65,15 +64,8 @@ function themePaneProto:initListItem(button, elementData)
     button.CheckmarkIcon:SetSize(16, 16)
     button.CheckmarkIcon:SetPoint("RIGHT", button, "RIGHT", -5, 0)
     button.CheckmarkIcon:SetAtlas("common-icon-checkmark")
+    button.CheckmarkIcon:SetAlpha(1)
     button.CheckmarkIcon:Hide()
-
-    -- Fade-in animation for checkmark
-    button.CheckmarkFadeIn = button.CheckmarkIcon:CreateAnimationGroup()
-    local fade = button.CheckmarkFadeIn:CreateAnimation("Alpha")
-    fade:SetFromAlpha(0)
-    fade:SetToAlpha(1)
-    fade:SetDuration(0.2)
-    fade:SetSmoothing("IN")
 
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -85,23 +77,14 @@ function themePaneProto:initListItem(button, elementData)
   local currentTheme = database:GetTheme()
   local isCurrentTheme = elementData.key == currentTheme
 
-  -- Font styling (keep yellow text for active theme)
-  if isCurrentTheme then
-    button.ThemeName:SetFontObject(fonts.UnitFrame12Yellow)
-  else
-    button.ThemeName:SetFontObject(fonts.UnitFrame12White)
-  end
+  -- Font styling - uniform white for all themes
+  button.ThemeName:SetFontObject(fonts.UnitFrame12White)
 
   -- Checkmark for currently active theme
   if isCurrentTheme then
-    if not button.CheckmarkIcon:IsShown() then
-      button.CheckmarkIcon:SetAlpha(0)
-      button.CheckmarkIcon:Show()
-      button.CheckmarkFadeIn:Play()
-    end
+    button.CheckmarkIcon:Show()
   else
     button.CheckmarkIcon:Hide()
-    button.CheckmarkFadeIn:Stop()
   end
 
   -- Background based on selection state only

@@ -30,7 +30,6 @@ local currencyPane = addon:NewModule('CurrencyPane')
 ---@field CurrencyName FontString
 ---@field CurrencyCount FontString
 ---@field CheckmarkIcon Texture
----@field CheckmarkFadeIn AnimationGroup
 ---@field Init boolean
 
 ---@class CurrencyPaneFrame
@@ -73,15 +72,8 @@ function currencyPaneProto:initListItem(button, elementData)
     button.CheckmarkIcon:SetSize(16, 16)
     button.CheckmarkIcon:SetPoint("RIGHT", button, "RIGHT", -5, 0)
     button.CheckmarkIcon:SetAtlas("common-icon-checkmark")
+    button.CheckmarkIcon:SetAlpha(1)
     button.CheckmarkIcon:Hide()
-
-    -- Fade-in animation for checkmark
-    button.CheckmarkFadeIn = button.CheckmarkIcon:CreateAnimationGroup()
-    local fade = button.CheckmarkFadeIn:CreateAnimation("Alpha")
-    fade:SetFromAlpha(0)
-    fade:SetToAlpha(1)
-    fade:SetDuration(0.2)
-    fade:SetSmoothing("IN")
 
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -113,14 +105,9 @@ function currencyPaneProto:initListItem(button, elementData)
 
   -- Checkmark for currencies shown in backpack
   if isShownInBackpack and not isHeader then
-    if not button.CheckmarkIcon:IsShown() then
-      button.CheckmarkIcon:SetAlpha(0)
-      button.CheckmarkIcon:Show()
-      button.CheckmarkFadeIn:Play()
-    end
+    button.CheckmarkIcon:Show()
   else
     button.CheckmarkIcon:Hide()
-    button.CheckmarkFadeIn:Stop()
   end
 
   -- Background based on selection state only (no more yellow for shown-in-backpack)

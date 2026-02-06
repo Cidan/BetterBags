@@ -54,8 +54,6 @@ local categoryPane = addon:NewModule('CategoryPane')
 ---@class CategoryPaneListButton: Button
 ---@field Category FontString
 ---@field Note FontString
----@field CheckmarkIcon Texture
----@field CheckmarkFadeIn AnimationGroup
 ---@field Init boolean
 
 ---@class CategoryPaneItemFrame: Frame
@@ -150,25 +148,9 @@ function categoryPaneProto:initListItem(button, elementData)
     button.Category:SetPoint("RIGHT", button, "RIGHT", -40, 0)
     button.Note = button:CreateFontString(nil, "OVERLAY")
     button.Note:SetHeight(30)
-    button.Note:SetPoint("RIGHT", button, "RIGHT", -25, 0)
+    button.Note:SetPoint("RIGHT", button, "RIGHT", -10, 0)
     button.Note:SetTextColor(0.6, 0.6, 0.6, 1)
     button.Note:SetFontObject(fonts.UnitFrame12White)
-
-    -- Checkmark icon for enabled categories
-    button.CheckmarkIcon = button:CreateTexture(nil, "OVERLAY", nil, 7)
-    button.CheckmarkIcon:SetSize(16, 16)
-    button.CheckmarkIcon:SetPoint("RIGHT", button, "RIGHT", -5, 0)
-    button.CheckmarkIcon:SetAtlas("common-icon-checkmark")
-    button.CheckmarkIcon:Hide()
-
-    -- Fade-in animation for checkmark
-    button.CheckmarkFadeIn = button.CheckmarkIcon:CreateAnimationGroup()
-    local fade = button.CheckmarkFadeIn:CreateAnimation("Alpha")
-    fade:SetFromAlpha(0)
-    fade:SetToAlpha(1)
-    fade:SetDuration(0.2)
-    fade:SetSmoothing("IN")
-
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
@@ -181,8 +163,6 @@ function categoryPaneProto:initListItem(button, elementData)
     button.Category:SetFontObject(fonts.UnitFrame12Yellow)
     button.Note:SetText("")
     button:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
-    button.CheckmarkIcon:Hide()
-    button.CheckmarkFadeIn:Stop()
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
 
@@ -194,20 +174,7 @@ function categoryPaneProto:initListItem(button, elementData)
       button.Note:SetText("")
     end
 
-    -- Checkmark for enabled categories
-    local isEnabled = categories:IsCategoryEnabled(self.kind, elementData.title) or not categories:DoesCategoryExist(elementData.title)
-    if isEnabled then
-      if not button.CheckmarkIcon:IsShown() then
-        button.CheckmarkIcon:SetAlpha(0)
-        button.CheckmarkIcon:Show()
-        button.CheckmarkFadeIn:Play()
-      end
-    else
-      button.CheckmarkIcon:Hide()
-      button.CheckmarkFadeIn:Stop()
-    end
-
-    -- Background based on selection state only (no more yellow for enabled)
+    -- Background based on selection state only
     if self.selectedCategory == elementData.title then
       button:SetBackdropColor(1, 0.82, 0, 0.3)
       self.selectedButton = button
