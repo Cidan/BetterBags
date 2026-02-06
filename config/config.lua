@@ -627,14 +627,14 @@ function config:CreateConfig()
   f:AddDropdown({
     title = 'Active Profile',
     description = 'Select which profile to use. Switching profiles will reload the UI.',
-    itemsFunction = function(ctx)
+    itemsFunction = function(_)
       -- Return simple array of profile names (dropdown requires string[])
       return db:GetAvailableProfiles()
     end,
-    getValue = function(ctx, value)
+    getValue = function(_, value)
       return db:GetCurrentProfileName() == value
     end,
-    setValue = function(ctx, value)
+    setValue = function(_, value)
       -- Confirmation dialog for profile switch
       StaticPopupDialogs["BETTERBAGS_SWITCH_PROFILE"] = {
         text = string.format("Switch to profile '%s'?\n\nThis will reload the UI.", value),
@@ -675,15 +675,15 @@ function config:CreateConfig()
     ButtonOptions = {
       {
         title = 'Create New Profile',
-        onClick = function(ctx)
+        onClick = function(_)
           StaticPopupDialogs["BETTERBAGS_CREATE_PROFILE"] = {
             text = "Enter a name for the new profile:",
             button1 = "Create",
             button2 = "Cancel",
             hasEditBox = true,
             maxLetters = 48,
-            OnAccept = function(self)
-              local name = self.EditBox:GetText()
+            OnAccept = function(s)
+              local name = s.EditBox:GetText()
               if name and name ~= "" then
                 local success, message = db:CreateProfile(name)
                 if success then
@@ -724,7 +724,7 @@ function config:CreateConfig()
       },
       {
         title = 'Copy Current Profile',
-        onClick = function(ctx)
+        onClick = function(_)
           local currentName = db:GetCurrentProfileName()
           StaticPopupDialogs["BETTERBAGS_COPY_PROFILE"] = {
             text = string.format("Create a copy of '%s'?\n\nEnter name for the new profile:", currentName),
@@ -732,8 +732,8 @@ function config:CreateConfig()
             button2 = "Cancel",
             hasEditBox = true,
             maxLetters = 48,
-            OnAccept = function(self)
-              local name = self.EditBox:GetText()
+            OnAccept = function(s)
+              local name = s.EditBox:GetText()
               if name and name ~= "" then
                 -- Create new profile (automatically switches to it)
                 local success, message = db:CreateProfile(name)
@@ -792,7 +792,7 @@ function config:CreateConfig()
     ButtonOptions = {
       {
         title = 'Rename Profile',
-        onClick = function(ctx)
+        onClick = function(_)
           local current = db:GetCurrentProfileName()
           if current == "Default" then
             StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
@@ -813,12 +813,12 @@ function config:CreateConfig()
             button2 = "Cancel",
             hasEditBox = true,
             maxLetters = 48,
-            OnShow = function(self)
-              self.EditBox:SetText(current)
-              self.EditBox:HighlightText()
+            OnShow = function(s)
+              s.EditBox:SetText(current)
+              s.EditBox:HighlightText()
             end,
-            OnAccept = function(self)
-              local newName = self.EditBox:GetText()
+            OnAccept = function(s)
+              local newName = s.EditBox:GetText()
               if newName and newName ~= "" and newName ~= current then
                 local success, message = db:RenameProfile(current, newName)
                 if success then
@@ -846,7 +846,7 @@ function config:CreateConfig()
       },
       {
         title = 'Delete Profile',
-        onClick = function(ctx)
+        onClick = function(_)
           local current = db:GetCurrentProfileName()
           if current == "Default" then
             StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
@@ -880,7 +880,7 @@ function config:CreateConfig()
       },
       {
         title = 'Reset to Defaults',
-        onClick = function(ctx)
+        onClick = function(_)
           local current = db:GetCurrentProfileName()
           StaticPopupDialogs["BETTERBAGS_RESET_PROFILE"] = {
             text = string.format("Reset profile '%s' to default settings?\n\nThis will delete all your customizations for this profile.\n\nThis cannot be undone.", current),

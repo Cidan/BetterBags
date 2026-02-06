@@ -587,7 +587,7 @@ function tabFrame:SetClickHandler(fn)
 	self.clickHandler = fn
 end
 
----@param parent Frame
+
 -- ResizeAllTabs recalculates the width of all tabs.
 -- This is useful when fonts change after initial tab creation (e.g., theme addons loading).
 ---@param ctx Context
@@ -598,6 +598,7 @@ function tabFrame:ResizeAllTabs(ctx)
 	self:ReanchorTabs()
 end
 
+---@param parent Frame
 ---@return Tab
 function tabs:Create(parent)
 	local container = setmetatable({}, { __index = tabFrame })
@@ -619,9 +620,7 @@ end
 -- Tab Drag-to-Reorder Functions
 -----------------------------------------------
 
----@param ctx Context
----@param tab TabButton
-function tabs:CreateDropPlaceholder(ctx, tab)
+function tabs:CreateDropPlaceholder(_, _)
 	if not self.dropPlaceholder then
 		-- Create a thin vertical line as the insertion indicator
 		self.dropPlaceholder = CreateFrame("Frame", nil, self.currentTabFrame.frame)
@@ -690,8 +689,8 @@ function tabs:IsTabReorderable(tab)
 end
 
 ---@param tab TabButton
----@param tabFrame Tab
-function tabs:StartTabDrag(tab, tabFrame)
+---@param frame Tab
+function tabs:StartTabDrag(tab, frame)
 	-- Prevent dragging if already dragging
 	if self.isDragging then return end
 
@@ -699,16 +698,15 @@ function tabs:StartTabDrag(tab, tabFrame)
 	self.isDragging = true
 	self.draggingTab = tab
 	self.dragStartIndex = tab.index
-	self.currentTabFrame = tabFrame
+	self.currentTabFrame = frame
 	self.lastOverlapIndex = nil
 
 	-- Capture cursor position relative to tab
-	local cursorX, cursorY = GetCursorPosition()
+	local cursorX = GetCursorPosition()
 	local scale = tab:GetEffectiveScale()
 
 	-- Get tab's current screen position
 	local tabLeft = tab:GetLeft()
-	local tabTop = tab:GetTop()
 
 	-- Calculate offset from tab's top-left corner to cursor (in frame coords)
 	self.dragOffsetX = (cursorX / scale) - tabLeft
@@ -735,7 +733,7 @@ function tabs:UpdateTabDrag()
 	if not self.isDragging or not self.draggingTab then return end
 
 	-- Get current cursor position in screen coordinates
-	local cursorX, cursorY = GetCursorPosition()
+	local cursorX = GetCursorPosition()
 	local scale = self.draggingTab:GetEffectiveScale()
 
 	-- Calculate where the tab's left edge should be (cursor minus offset)
@@ -915,14 +913,14 @@ function tabs:StopTabDrag()
 	end
 end
 
----@param tabFrame Tab
-function tabs:SaveTabOrder(tabFrame)
+---@param frame Tab
+function tabs:SaveTabOrder(frame)
 	local ctx = context:New("SaveTabOrder")
 
 	-- Update Group.order for all reorderable tabs based on current position
 	local orderCounter = 2  -- Start at 2 (Bank is always 1)
 
-	for _, tab in ipairs(tabFrame.tabIndex) do
+	for _, tab in ipairs(frame.tabIndex) do
 		if tab.id and tab.id > 1 then  -- Skip Bank (1), "+" (0), purchase (<0)
 			database:SetGroupOrder(tab.id, orderCounter)
 			orderCounter = orderCounter + 1
