@@ -630,6 +630,66 @@ function DB:RenameGroup(groupID, name)
   end
 end
 
+-- RenameCategory renames a category by updating all data structures that use the category name as a key.
+---@param oldName string
+---@param newName string
+---@return boolean success
+function DB:RenameCategory(oldName, newName)
+  -- Trim whitespace and validate new name
+  newName = strtrim(newName)
+  if newName == "" then
+    return false
+  end
+
+  -- Validate old category exists and new name doesn't conflict
+  if not DB.data.profile.customCategoryFilters[oldName] then
+    return false
+  end
+  if DB.data.profile.customCategoryFilters[newName] then
+    return false
+  end
+
+  -- 1. Move main category data structure
+  DB.data.profile.customCategoryFilters[newName] = DB.data.profile.customCategoryFilters[oldName]
+  DB.data.profile.customCategoryFilters[newName].name = newName
+  DB.data.profile.customCategoryFilters[oldName] = nil
+
+  -- 2. Update item index for all items pointing to old category
+  for itemID, categoryName in pairs(DB.data.profile.customCategoryIndex) do
+    if categoryName == oldName then
+      DB.data.profile.customCategoryIndex[itemID] = newName
+    end
+  end
+
+  -- 3. Update group mapping
+  if DB.data.profile.categoryToGroup[oldName] then
+    DB.data.profile.categoryToGroup[newName] = DB.data.profile.categoryToGroup[oldName]
+    DB.data.profile.categoryToGroup[oldName] = nil
+  end
+
+  -- 4. Update ephemeral filters
+  if DB.data.profile.ephemeralCategoryFilters[oldName] then
+    DB.data.profile.ephemeralCategoryFilters[newName] = DB.data.profile.ephemeralCategoryFilters[oldName]
+    DB.data.profile.ephemeralCategoryFilters[oldName] = nil
+  end
+
+  -- 5. Update display options
+  if DB.data.profile.categoryOptions[oldName] then
+    DB.data.profile.categoryOptions[newName] = DB.data.profile.categoryOptions[oldName]
+    DB.data.profile.categoryOptions[oldName] = nil
+  end
+
+  -- 6. Update collapse state for all bag kinds
+  for _, kind in pairs(const.BAG_KIND) do
+    if DB.data.profile.collapsedSections[kind] and DB.data.profile.collapsedSections[kind][oldName] ~= nil then
+      DB.data.profile.collapsedSections[kind][newName] = DB.data.profile.collapsedSections[kind][oldName]
+      DB.data.profile.collapsedSections[kind][oldName] = nil
+    end
+  end
+
+  return true
+end
+
 ---@return number
 function DB:GetNextGroupID()
   return DB.data.profile.groupCounter + 1

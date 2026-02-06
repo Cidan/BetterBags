@@ -382,6 +382,56 @@ function categories:DeleteCategory(ctx, category)
   events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
+-- RenameCategory renames a category.
+---@param ctx Context
+---@param oldName string
+---@param newName string
+---@return boolean success
+function categories:RenameCategory(ctx, oldName, newName)
+  -- Trim whitespace and validate new name
+  newName = strtrim(newName)
+  if newName == "" then
+    debug:Log("categories", "Cannot rename category to empty name")
+    return false
+  end
+
+  -- Validate category exists
+  if not self:DoesCategoryExist(oldName) then
+    debug:Log("categories", "Category not found: %s", oldName)
+    return false
+  end
+
+  -- Validate new name doesn't conflict
+  if self:DoesCategoryExist(newName) then
+    debug:Log("categories", "Category already exists: %s", newName)
+    return false
+  end
+
+  -- Update module-level ephemeral caches
+  if self.ephemeralCategories[oldName] then
+    self.ephemeralCategories[newName] = self.ephemeralCategories[oldName]
+    self.ephemeralCategories[newName].name = newName
+    self.ephemeralCategories[oldName] = nil
+
+    -- Update item lookup cache
+    for itemID, _ in pairs(self.ephemeralCategories[newName].itemList) do
+      self.ephemeralCategoryByItemID[itemID] = newName
+    end
+  end
+
+  -- Call database layer to update all data structures
+  local success = database:RenameCategory(oldName, newName)
+  if not success then
+    debug:Log("categories", "Failed to rename category in database: %s -> %s", oldName, newName)
+    return false
+  end
+
+  debug:Log("categories", "Renamed category: %s -> %s", oldName, newName)
+  events:SendMessage(ctx, 'categories/Changed', newName, oldName)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  return true
+end
+
 ---@param ctx Context
 ---@param category string
 function categories:HideCategory(ctx, category)

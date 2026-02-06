@@ -198,8 +198,6 @@ function categoryPaneProto:initListItem(button, elementData)
         else
           self:SelectCategory(elementData.title)
         end
-      elseif mouseButton == "RightButton" then
-        self:ShowContextMenu(elementData.title)
       end
     end)
 
@@ -280,33 +278,76 @@ function categoryPaneProto:SelectCategory(category)
   end)
 end
 
----@param category string
-function categoryPaneProto:ShowContextMenu(category)
-  local ctx = context:New('CategoryPane_ContextMenu')
-  ---@type MenuList[]
-  local menuOptions = {}
+-- ShowRenameCategoryDialog shows a dialog to rename a category.
+---@param categoryName string
+function categoryPaneProto:ShowRenameCategoryDialog(categoryName)
+  if not categories:DoesCategoryExist(categoryName) then return end
 
-  if categories:DoesCategoryExist(category) and not categories:IsDynamicCategory(category) then
-    table.insert(menuOptions, {
-      text = L:G("Delete Category"),
-      notCheckable = true,
-      hasArrow = false,
-      func = function()
-        question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", category), function()
-          local ectx = context:New('CategoryPane_DeleteCategory')
-          categories:DeleteCategory(ectx, category)
-          if self.selectedCategory == category then
-            self.selectedCategory = nil
-            self:UpdateDetailPanel()
+  -- Define the static popup if not already defined
+  if not StaticPopupDialogs["BETTERBAGS_RENAME_CATEGORY"] then
+    StaticPopupDialogs["BETTERBAGS_RENAME_CATEGORY"] = {
+      text = L:G("Enter new category name:"),
+      hasEditBox = true,
+      button1 = L:G("Rename"),
+      button2 = L:G("Cancel"),
+      OnAccept = function(f)
+        local newName = f.EditBox:GetText()
+        if newName and newName ~= "" then
+          newName = strtrim(newName)
+          local ctx = context:New("RenameCategory")
+          local success = categories:RenameCategory(ctx, f.data.categoryName, newName)
+          if success then
+            -- Update selected category if it was the renamed one
+            if f.data.pane.selectedCategory == f.data.categoryName then
+              f.data.pane.selectedCategory = newName
+            end
+            f.data.pane:RefreshList()
+            f.data.pane:UpdateDetailPanel()
+          else
+            -- Show error message
+            print(format(L:G("Failed to rename category. A category named '%s' may already exist."), newName))
           end
-          self:RefreshList()
-        end, function() end)
-      end
-    })
+        end
+      end,
+      OnShow = function(f)
+        f.EditBox:SetText(f.data.categoryName)
+        f.EditBox:HighlightText()
+        f.EditBox:SetFocus()
+      end,
+      EditBoxOnEnterPressed = function(f)
+        local parent = f:GetParent()
+        local newName = parent.EditBox:GetText()
+        if newName and newName ~= "" then
+          newName = strtrim(newName)
+          local ctx = context:New("RenameCategory")
+          local success = categories:RenameCategory(ctx, parent.data.categoryName, newName)
+          if success then
+            -- Update selected category if it was the renamed one
+            if parent.data.pane.selectedCategory == parent.data.categoryName then
+              parent.data.pane.selectedCategory = newName
+            end
+            parent.data.pane:RefreshList()
+            parent.data.pane:UpdateDetailPanel()
+          else
+            -- Show error message
+            print(format(L:G("Failed to rename category. A category named '%s' may already exist."), newName))
+          end
+        end
+        parent:Hide()
+      end,
+      EditBoxOnEscapePressed = function(f)
+        f:GetParent():Hide()
+      end,
+      timeout = 0,
+      whileDead = true,
+      hideOnEscape = true,
+      preferredIndex = 3,
+    }
   end
 
-  if #menuOptions > 0 then
-    contextMenu:Show(ctx, menuOptions)
+  local dialog = StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY")
+  if dialog then
+    dialog.data = { categoryName = categoryName, pane = self }
   end
 end
 
@@ -396,12 +437,15 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
     self.searchDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
   end
 
-  -- Show/hide delete button based on category type
+  -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
+  self.searchDetail.renameButton:SetEnabled(not isDynamic)
   self.searchDetail.deleteButton:SetEnabled(not isDynamic)
   if isDynamic then
+    self.searchDetail.renameButton:SetText("Cannot Rename")
     self.searchDetail.deleteButton:SetText("Cannot Delete")
   else
+    self.searchDetail.renameButton:SetText("Rename")
     self.searchDetail.deleteButton:SetText("Delete Category")
   end
 end
@@ -650,9 +694,20 @@ function categoryPaneProto:CreateSearchDetailPanel()
   end)
   self.searchDetail.saveButton = saveButton
 
+  -- Rename Button
+  local renameButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
+  renameButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
+  renameButton:SetSize(100, 25)
+  renameButton:SetText("Rename")
+  renameButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    self:ShowRenameCategoryDialog(self.selectedCategory)
+  end)
+  self.searchDetail.renameButton = renameButton
+
   -- Delete Button
   local deleteButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
-  deleteButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
+  deleteButton:SetPoint("LEFT", renameButton, "RIGHT", 10, 0)
   deleteButton:SetSize(120, 25)
   deleteButton:SetText("Delete Category")
   deleteButton:SetScript("OnClick", function()
@@ -723,12 +778,15 @@ function categoryPaneProto:ShowManualCategoryDetail(filter)
     self.manualDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
   end
 
-  -- Show/hide delete button based on category type
+  -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
+  self.manualDetail.renameButton:SetEnabled(not isDynamic)
   self.manualDetail.deleteButton:SetEnabled(not isDynamic)
   if isDynamic then
+    self.manualDetail.renameButton:SetText("Cannot Rename")
     self.manualDetail.deleteButton:SetText("Cannot Delete")
   else
+    self.manualDetail.renameButton:SetText("Rename")
     self.manualDetail.deleteButton:SetText("Delete Category")
   end
 
@@ -808,11 +866,56 @@ function categoryPaneProto:CreateManualDetailPanel()
 
   yOffset = yOffset - 20
 
-  -- Item List Frame
+  -- Save Button (anchored to bottom)
+  local saveButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
+  saveButton:SetPoint("BOTTOMLEFT", self.manualDetail, "BOTTOMLEFT", 10, 10)
+  saveButton:SetSize(100, 25)
+  saveButton:SetText("Save")
+  saveButton:SetScript("OnClick", function()
+    self:SaveManualCategory()
+  end)
+  self.manualDetail.saveButton = saveButton
+
+  -- Rename Button (anchored to save button)
+  local renameButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
+  renameButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
+  renameButton:SetSize(100, 25)
+  renameButton:SetText("Rename")
+  renameButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    self:ShowRenameCategoryDialog(self.selectedCategory)
+  end)
+  self.manualDetail.renameButton = renameButton
+
+  -- Delete Button (anchored to rename button)
+  local deleteButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
+  deleteButton:SetPoint("LEFT", renameButton, "RIGHT", 10, 0)
+  deleteButton:SetSize(120, 25)
+  deleteButton:SetText("Delete Category")
+  deleteButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", self.selectedCategory), function()
+      local ctx = context:New('CategoryPane_DeleteManualCategory')
+      categories:DeleteCategory(ctx, self.selectedCategory)
+      self.selectedCategory = nil
+      self:UpdateDetailPanel()
+      self:RefreshList()
+    end, function() end)
+  end)
+  self.manualDetail.deleteButton = deleteButton
+
+  -- Divider 2 (anchored above buttons)
+  local divider2 = self.manualDetail:CreateTexture(nil, "ARTWORK")
+  divider2:SetPoint("BOTTOMLEFT", self.manualDetail, "BOTTOMLEFT", 10, 45)
+  divider2:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
+  divider2:SetHeight(1)
+  divider2:SetColorTexture(0.5, 0.5, 0.5, 0.5)
+
+  -- Item List Frame (expands to fill available space)
   local itemListContainer = CreateFrame("Frame", nil, self.manualDetail)
   itemListContainer:SetPoint("TOPLEFT", 10, yOffset)
   itemListContainer:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
-  itemListContainer:SetHeight(150)
+  itemListContainer:SetPoint("BOTTOM", divider2, "TOP", 0, 20)
 
   self.manualDetail.itemListFrame = list:Create(itemListContainer)
   self.manualDetail.itemListFrame.frame:SetAllPoints()
@@ -842,44 +945,6 @@ function categoryPaneProto:CreateManualDetailPanel()
   -- Also set on the scroll box so drops work over the list area
   self.manualDetail.itemListFrame.ScrollBox:SetScript("OnReceiveDrag", onReceiveDrag)
   self.manualDetail.itemListFrame.ScrollBox:HookScript("OnMouseUp", onMouseUp)
-
-  yOffset = yOffset - 170
-
-  -- Divider 2
-  local divider2 = self.manualDetail:CreateTexture(nil, "ARTWORK")
-  divider2:SetPoint("TOPLEFT", 10, yOffset)
-  divider2:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
-  divider2:SetHeight(1)
-  divider2:SetColorTexture(0.5, 0.5, 0.5, 0.5)
-
-  yOffset = yOffset - 20
-
-  -- Save Button
-  local saveButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
-  saveButton:SetPoint("TOPLEFT", 10, yOffset)
-  saveButton:SetSize(100, 25)
-  saveButton:SetText("Save")
-  saveButton:SetScript("OnClick", function()
-    self:SaveManualCategory()
-  end)
-  self.manualDetail.saveButton = saveButton
-
-  -- Delete Button
-  local deleteButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
-  deleteButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
-  deleteButton:SetSize(120, 25)
-  deleteButton:SetText("Delete Category")
-  deleteButton:SetScript("OnClick", function()
-    if not self.selectedCategory then return end
-    question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", self.selectedCategory), function()
-      local ctx = context:New('CategoryPane_DeleteManualCategory')
-      categories:DeleteCategory(ctx, self.selectedCategory)
-      self.selectedCategory = nil
-      self:UpdateDetailPanel()
-      self:RefreshList()
-    end, function() end)
-  end)
-  self.manualDetail.deleteButton = deleteButton
 end
 
 ---@param categoryName string
