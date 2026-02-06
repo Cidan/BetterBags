@@ -190,12 +190,22 @@ end
 ---@return number?
 function quickfind:GetTabIDForItem(itemData, bagKind)
   if bagKind == const.BAG_KIND.BACKPACK then
-    -- For backpack, tabs are groups
-    if database:GetGroupsEnabled(bagKind) and itemData.itemInfo.category then
-      local groupID = groups:GetGroupForCategory(itemData.itemInfo.category)
-      return groupID
+    -- For backpack, tabs are groups (only if groups are enabled)
+    if not database:GetGroupsEnabled(bagKind) then
+      -- Groups disabled: no tabs exist, return nil
+      return nil
     end
-    return nil
+
+    -- Groups enabled: find the group for this item
+    if itemData.itemInfo.category then
+      local groupID = groups:GetGroupForCategory(itemData.itemInfo.category)
+      if groupID then
+        return groupID
+      end
+    end
+
+    -- Default to group 1 (Backpack) for items without a group
+    return 1
   else
     -- For bank, tabs are bag IDs for character bank, or special handling for account bank
     -- For now, just return the bag ID as the tab
