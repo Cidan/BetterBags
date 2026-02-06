@@ -11,16 +11,15 @@
 <img src="https://i.imgur.com/AyITAAV.png" alt="BetterBags Logo">
 
 BetterBags is a bag replacement addon for World of Warcraft, inspired by AdiBags.  
-It has a fresh, clean look, updated to the 2024 World of Warcraft art style.
+It has a fresh, clean look, updated to the 2026 World of Warcraft art style.
 
 It currently includes most of the features of AdiBags and is being worked on daily.  
 One of the last major features currently missing is user selectable themes.  
 If you have any feedback, please let us know in the [Discord](https://discord.gg/a6DQuK8hV7).
 
 BetterBags currently supports the following versions of World of Warcraft:  
-Retail (including WoW: Remix and The War Within Pre-Patch)  
-Classic (Era, Cataclysm Classic, SoD, etc.)  
-The War Within Beta
+Retail (including Midnight and the various WoW: Remix versions as they come out)  
+Classic (Era, MoP Classic, SoD, BC Anniversary, etc.)  
 </div>
 
 # Screenshots
@@ -31,7 +30,7 @@ The War Within Beta
 			<a href="https://i.imgur.com/3gYANZp.png" target="_blank"><img src="https://i.imgur.com/3gYANZp.png" alt="The Retail main player bag view with multiple custom categories."></a></td>
 		</td>
 		<td align="middle">
-			<a href="https://i.imgur.com/JFkb968.png" target="_blank"><img src="https://i.imgur.com/JFkb968.png" alt="Currency selection in Retail."></a></td>
+			<a href="https://i.imgur.com/nSjeaev.png" target="_blank"><img src="https://i.imgur.com/nSjeaev.png" alt="Currency selection in Retail."></a></td>
 		</td>
 	</tr>
 	<tr>
@@ -44,15 +43,15 @@ The War Within Beta
 	</tr>
 	<tr>
 		<td align="middle">
-			<a href="https://i.imgur.com/vJmB95P.png" target="_blank"><img src="https://i.imgur.com/vJmB95P.png" alt="Configure Categories in Retail, allows you to pin and enable (highlighted) and disable a category."></a></td>
+			<a href="https://i.imgur.com/LzdVdH0.png" target="_blank"><img src="https://i.imgur.com/LzdVdH0.png" alt="Configure Categories in Retail, allows you to pin and sort categories."></a></td>
 		</td>
 		<td align="middle">	
-			<a href="https://i.imgur.com/COhpLdo.png" target="_blank"><img src="https://i.imgur.com/COhpLdo.png" alt="Extensive View options that can be fine-tuned by the user."></a></td>
+			<a href="https://i.imgur.com/hMHiCDz.png" target="_blank"><img src="https://i.imgur.com/hMHiCDz.png" alt="Extensive View options that can be fine-tuned by the user."></a></td>
 		</td>
 	</tr>
 	<tr>
 		<td align="middle">
-			Configure Categories in Retail, allows you to pin and enable (highlighted) and disable a category.
+			Configure Categories in Retail, allows you to pin and sort categories.
 		</td>
 		<td align="middle">
 			Extensive View options that can be fine-tuned by the user.
@@ -62,6 +61,7 @@ The War Within Beta
 
 # Summary
 - Items are organized into categories and displayed in a Section Grid.
+- Optionally, categories are organized into groups/tabs.
 - Support for bags, bank, reagent bank, and Warband bank.
 - The bag and bank can be anchored to a location and grow in specified directions.
 - Customizable categories that hold items with multiple sorting options that can be pinned and toggled.
@@ -71,6 +71,8 @@ The War Within Beta
 - Right-click category header to move or vendor all items currently in the category.
 - Comprehensive Search that allows you to find an item most properties of an item (`Type`, `Subtype`, `iLvl`, and many more).
 - Multiple built-in themes with plugin support for the creation of more themes.
+- Profiles to allow easy swapping of layouts and categories between characters.
+- Category import and export strings to easily share your categories between friends.
 - Robust plugin system allows for custom categories, configurations for user fine-tuning and even localization.
 - Integration support for [Pawn](https://www.curseforge.com/wow/addons/pawn) (upgrade arrows) and [Simple Item Levels](https://www.curseforge.com/wow/addons/simple-item-level) (item level coloring).
 
@@ -92,7 +94,7 @@ The Section Grid offers:
 - Multiple stacking options for fine-tuning your own experience.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/JLlOHxR.png" alt="Section Grid View in Retail.">
+<a href="https://i.imgur.com/JLlOHxR.png" target="_blank"><img src="https://i.imgur.com/JLlOHxR.png" alt="Section Grid View in Retail."></a>
 
 *Section Grid View in Retail.*
 </div>
@@ -101,7 +103,7 @@ The Section Grid offers:
 Most options and other important information in BetterBags can be reached by left-clicking on the bag button in the top-left corner of the bag (or bank) and bringing up the menu. Hovering over the bag icon will bring up a list of mouse-clicks that can be done for various functions. Some of the important functions in the menu are described in the following sections. Any options not in the menu directly are instead in the options screen (access by choosing `Open Options Screen` in the menu or the slash command `/bb`).
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/CYBu1p2.png" alt="Menu in Retail.">
+<a href="https://i.imgur.com/jpMjAcP.png" target="_blank"><img src="https://i.imgur.com/jpMjAcP.png" alt="Menu in Retail."></a>
 
 *Menu in Retail.*
 </div>
@@ -110,7 +112,7 @@ Most options and other important information in BetterBags can be reached by lef
 This temporary view allows you to see your bags and the items within them how they currently are. It also allows you to swap out which bags are equipped for both the backpack and the bank.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/4YAG0Rm.png" alt="Show Bags in Retail.">
+<a href="https://i.imgur.com/4YAG0Rm.png" target="_blank"><img src="https://i.imgur.com/4YAG0Rm.png" alt="Show Bags in Retail."></a>
 
 *Show Bags in Retail.*
 </div>
@@ -121,7 +123,7 @@ A specific anchor can be turned on by left-clicking the bag icon in the top-left
 You can also enable and show the anchors with the slash command `/bbanchor`. To hide the anchor (but keep it enabled), simply right-click anywhere in the blue anchor.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/ZiyLfvF.png" alt="Bag Anchor in Retail.">
+<a href="https://i.imgur.com/USio26V.png" target="_blank"><img src="https://i.imgur.com/USio26V.png" alt="Bag Anchor in Retail."></a>
 
 *Bag Anchor in Retail.*
 </div>
@@ -177,56 +179,54 @@ If you would like more glow on the action buttons (more like what AdiBags had), 
 Equipment in your bags that is an item level upgrade compared to the gear you are currently wearing will have a green upgrade arrow in the top corner of the item in your bags. This lets you easily see which pieces of gear in your bags might be an upgrade, such as when you're leveling and your item level is rapidly increasing.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/QGjlIYX.png" alt="Item Level Upgrade in Retail.">  
+<a href="https://i.imgur.com/QGjlIYX.png" target="_blank"><img src="https://i.imgur.com/QGjlIYX.png" alt="Item Level Upgrade in Retail.">  </a>
 
 *Item Level Upgrade in Retail.*
 </div>
 
 ### Show Currencies
-Currencies can be tracked at the bottom of the bag window. Up to 7 currencies can be shown at a time and tracking them is as simple as clicking on the currencies in the `Show Currencies` side window. Any currency that is highlighted is currently tracked. If you attempt to track more than 7 currencies, only the first 7 in the list will be shown at the bottom of the bag.
+Currencies can be tracked at the bottom of the bag window. Up to 7 currencies can be shown at a time and tracking them is as simple as clicking on the currencies in the `Currency` screen in the Settings and choosing `Show in Backpack`. Any currency that is highlighted is currently tracked. If you attempt to track more than 7 currencies, only the first 7 in the list will be shown at the bottom of the bag.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/R4neqb2.png" alt="Currencies Side Window in Retail.">  
+<a href="https://i.imgur.com/I8B0zn3.png" target="_blank"><img src="https://i.imgur.com/I8B0zn3.png" alt="Currencies Options in Retail."></a>
 
-*Currencies Side Window in Retail.*
+*Currencies Options in Retail.*
 </div>
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/2HeRBue.png" alt="Tracked Currencies in Retail.">  
+<a href="https://i.imgur.com/2HeRBue.png" target="_blank"><img src="https://i.imgur.com/2HeRBue.png" alt="Tracked Currencies in Retail."></a>
 
 *Tracked Currencies in Retail.*
 </div>
 
 ### Configure Categories
-Categories have a few ways in which they can be configured. All categories can be pinned or hidden. Non-dynamic categories can also be enabled or disabled. Custom categories can be deleted. Hovering over a category will bring up a tooltip that describes the actions that can be taken for that category.  
-- Pinning categories (Drag or Shift Left Click) will display them in the listed order at the top of the bags. Any categories that are not pinned will be automatically ordered based on the `Section Sorting` option chosen in config.
-- Hiding categories (Right Click) will keep the items sorted into the category, but the category and all items within it will not be displayed in your bags.
-- Enabling or Disabling a category (Left Click) will stop items from being sorted into that category and will show as the category name not being high-lighted in the list.
-- Deleting a category (Right Click) will permanently delete the category. If a category is created by a plugin, the plugin might create the category again when reloading the game.
+Categories have a few ways in which they can be configured. All categories can be pinned. Custom categories can be deleted.  
+- Pinning categories (Drag to the `Pinned` section) will display them in the listed order at the top of the bags. Any categories that are not pinned will be automatically ordered based on the `Section Sorting` option chosen in config.
+- Deleting a category (`Delete Category` button after selecting the category) will permanently delete the category. If a category is created by a plugin, the plugin might create the category again when reloading the game.
 
 <table>
 	<tr>
 		<td align="middle">
-			<a href="https://i.imgur.com/0UwlZst.png" target="_blank"><img src="https://i.imgur.com/0UwlZst.png" alt="The Configure Categories Side Window in Retail."></a></td>
+			<a href="https://i.imgur.com/Ux8j5nM.png" target="_blank"><img src="https://i.imgur.com/Ux8j5nM.png" alt="The Configure Categories Options in Retail."></a></td>
 		</td>
 		<td align="middle">
-			<a href="https://i.imgur.com/Mr2bmzO.png" target="_blank"><img src="https://i.imgur.com/Mr2bmzO.png" alt="Category Options in Configure Categories in Retail."></a></td>
-		</td>
-	</tr>
-	<tr>
-		<td align="middle">
-			The Configure Categories Side Window in Retail.
-		</td>
-		<td align="middle">
-			Category Options in Configure Categories in Retail.
+			<a href="https://i.imgur.com/Ke069nk.gif" target="_blank"><img src="https://i.imgur.com/Ke069nk.gif" alt="Moving a Category in Configure Categories in Retail."></a></td>
 		</td>
 	</tr>
 	<tr>
 		<td align="middle">
-			<a href="https://i.imgur.com/vJmB95P.png" target="_blank"><img src="https://i.imgur.com/vJmB95P.png" alt="Configure Custom Categories in Retail."></a></td>
+			The Configure Categories Options in Retail.
+		</td>
+		<td align="middle">
+			Moving a Category in Configure Categories in Retail.
+		</td>
+	</tr>
+	<tr>
+		<td align="middle">
+			<a href="https://i.imgur.com/XlO0Ab4.png" target="_blank"><img src="https://i.imgur.com/XlO0Ab4.png" alt="Configure Custom Categories in Retail."></a></td>
 		</td>
 		<td align="middle">	
-			<a href="https://i.imgur.com/sR9V9Cb.png" target="_blank"><img src="https://i.imgur.com/sR9V9Cb.png" alt="Configure Search Category in Retail."></a></td>
+			<a href="https://i.imgur.com/fdDvwRI.png" target="_blank"><img src="https://i.imgur.com/fdDvwRI.png" alt="Configure Search Category in Retail."></a></td>
 		</td>
 	</tr>
 	<tr>
@@ -239,16 +239,53 @@ Categories have a few ways in which they can be configured. All categories can b
 	</tr>
 </table>
 
+### Category Groups
+Category Groups allow you to put different categories onto different tabs to minimize the space required for your bags and focus on the most important items in your bags. Just hit the green plus icon to create a new group, then drag any categories you want onto the tab at the bottom of your bags. The default "Backpack" tab is always first and includes all categories that haven't been moved into a different group. Other groups can be renamed and deleted.  
+If you don't want to use groups, you can turn it off in the settings.
+
+<table>
+	<tr>
+		<td align="middle">
+			<a href="https://i.imgur.com/JtzBCFm.gif" target="_blank"><img src="https://i.imgur.com/JtzBCFm.gif" alt="Moving a Category to a New Group in Retail."></a></td>
+		</td>
+		<td align="middle">
+			<a href="https://i.imgur.com/jJ8DPfv.png" target="_blank"><img src="https://i.imgur.com/jJ8DPfv.png" alt="Create a New Group in Retail."></a></td>
+		</td>
+	</tr>
+	<tr>
+		<td align="middle">
+			Moving a category to a new group in Retail.
+		</td>
+		<td align="middle">
+			Create a New Group in Retail.
+		</td>
+	</tr>
+		<td align="middle">	
+			<a href="https://i.imgur.com/mkPGOzj.png" target="_blank"><img src="https://i.imgur.com/mkPGOzj.png" alt="An Empty Group in Retail."></a></td>
+		</td>
+		<td align="middle">	
+			<a href="https://i.imgur.com/TmbFBBn.png" target="_blank"><img src="https://i.imgur.com/TmbFBBn.png" alt="Group Options in Retail."></a></td>
+		</td>
+	</tr>
+	<tr>
+		<td align="middle">
+			An Empty Group in Retail.
+		</td>
+		<td align="middle">
+			Group Options in Retail.
+		</td>
+	</tr>
+</table>
+
 ## Bank
 ### Bank Tabs
 BetterBags displays the different types of bank as tabs along the bottom of the bank window. It also includes the option to purchase the Reagent Bank and any available Warband Bank tabs.  
 Tabs include:
-- Bank (Showing all base bank slots as well as bank bags).
-- Reagent Bank.
+- Bank (Showing all base bank tabs as well as bank bags for older versions).
 - Warband Bank Tabs 1-5 (Called `Warbank Tab` in BetterBags).
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/sxbCWNT.png" alt="Bank Tabs in Retail.">  
+<a href="https://i.imgur.com/sxbCWNT.png" target="_blank"><img src="https://i.imgur.com/sxbCWNT.png" alt="Bank Tabs in Retail."></a>
 
 *Bank Tabs in Retail.*
 </div>
@@ -257,9 +294,24 @@ Tabs include:
 To purchase bank bag slots, turn on `Show Bags` and click on any red bag slot.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/UTl2bDg.png" alt="Purchasing Bank Bag Slots in Retail.">  
+<a href="https://i.imgur.com/UTl2bDg.png" target="_blank"><img src="https://i.imgur.com/UTl2bDg.png" alt="Purchasing Bank Bag Slots in Retail."></a>
 
 *Purchasing Bank Bag Slots in Retail.*
+</div>
+
+### Character Bank Tabs
+To show Character Bank Tabs, turn on the option in the Bank Menu. This allows all of the Bank Tabs to become tabs on the bottom of the Bank, beside the Warbank Tabs. When the tabs are shown, they act just like Warbank Tabs described below.
+
+<div align="center" style="text-align:center">
+<a href="https://i.imgur.com/UdAJJAZ.png" target="_blank"><img src="https://i.imgur.com/UdAJJAZ.png" alt="Showing Character Bank Tabs in Retail."></a>
+
+*Showing Character Bank Tabs in Retail.*
+</div>
+
+<div align="center" style="text-align:center">
+<a href="https://i.imgur.com/8zHRoGY.png" target="_blank"><img src="https://i.imgur.com/8zHRoGY.png" alt="Character Bank Tabs and Warbank Tabs in Retail."></a>
+
+*Character Bank Tabs and Warbank Tabs in Retail.*
 </div>
 
 ### Warbank Tabs
@@ -267,7 +319,7 @@ To purchase Warbank tabs, click on the `Purchase Warbank Tab` button, then click
 Warbank tabs can be renamed and certain item types can be assigned to them by right-clicking on the tab at the bottom of the bank. This will bring up the Blizzard prompt to make any changes. Depositing items into the Warbank tabs will deposit them using Blizzard's rules for depositting items into the Warbank.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/98Hgf2I.png" alt="Editing Warbank Tab in Retail.">  
+<a href="https://i.imgur.com/98Hgf2I.png" target="_blank"><img src="https://i.imgur.com/98Hgf2I.png" alt="Editing Warbank Tab in Retail."></a>
 
 *Editing Warbank Tab in Retail.*
 </div>
@@ -275,7 +327,7 @@ Warbank tabs can be renamed and certain item types can be assigned to them by ri
 To deposit or withdraw gold from the Warbank, hover over the gold amount at the bottom of the bank/warbank window and left or right click. This works from any tab in the bank window.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/LQmRp1m.png" alt="Manipulating Warbank Money in Retail.">  
+<a href="https://i.imgur.com/LQmRp1m.png" target="_blank"><img src="https://i.imgur.com/LQmRp1m.png" alt="Manipulating Warbank Money in Retail."></a>
 
 *Manipulating Warbank Money in Retail.*
 </div>
@@ -290,7 +342,7 @@ These can be further fine-tuned by:
 - Flashing new items in the stack to help the user find updated stacks more quickly.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/svPb2eT.gif" alt="Recent Items in Retail">
+<a href="https://i.imgur.com/svPb2eT.gif" target="_blank"><img src="https://i.imgur.com/svPb2eT.gif" alt="Recent Items in Retail"></a>
 
 *Recent Items in Retail.*
 </div>
@@ -302,7 +354,7 @@ Right-clicking on a category header in your bank or bags will move the entire co
 Supported windows include bags, all bank tabs, the mailbox, the trade window, and vendor windows. Selling items to vendors by right-clicking the header must be turned on in settings.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/b8BZTlX.gif" alt="Move Category in Retail">
+<a href="https://i.imgur.com/b8BZTlX.gif" target="_blank"><img src="https://i.imgur.com/b8BZTlX.gif" alt="Move Category in Retail"></a>
 
 *Move Category in Retail.*
 </div>
@@ -315,7 +367,7 @@ If you would like to exclude items in gear sets from your searches, the easiest 
 Search allows you to find items by the following indices (based on the item below):
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/Sc0JHZX.png" alt="Example Item in Retail.">
+<a href="https://i.imgur.com/Sc0JHZX.png" target="_blank"><img src="https://i.imgur.com/Sc0JHZX.png" alt="Example Item in Retail."></a>
 
 *Example Item in Retail.*
 </div>
@@ -326,7 +378,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `subtype` (subtype = Miscellaneous) The subtype of the item. Some examples include Leather, Potion, Bag, and Bows. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding type and subtype.
 - `category` (category = "Gear: MW DPS") The category that the item is sorted into in BetterBags.
 - `equipmentLocation` or `slot` (slot = Trinket) The item slot that the gear is for. Examples include Head, Legs, Main-Hand, and Finger.
-- `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW.
+- `expansion` or `exp` (expansion = DF) The expansion that the item is originally from. Shorthands are: Classic, BC, WotLK, Cata, MoP, WoD, Legion, BfA, SL, DF, TWW, Mid.
 - `equipmentSet` (equipmentSet = "MW DPS") The equipment set(s) that a piece of gear is part of.
 - `guid` (guid = 'item-60-0-4000000CAEA5CBE3') The globally unique identifier of the item. This string is unique to the specific instance of an item.
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
@@ -338,7 +390,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. **NOTE:** Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
 - `class` (class = 4) The numeric representation of itemType.
 - `subclass` (subclass = 0) The numeric representation of itemSubtype. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding class and subclass.
-- `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 6-12 for bank bags, -3 for the reagent bank, -2 for the keyring (Classic only), and 13-17 for warbank tabs.
+- `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 5-10 (Classic) / 5-11 (MoP) / 6-11 (Retail) for bank bags, -1 for the bank (Classic/MoP), -2 for the keyring (Classic only), and 12-16 for warbank tabs. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/BagID) for specifics for each version of the game.
 - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
 - `bindtype` (bindtype = 1) The binding type of the item returned by GetItemInfo(). 1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Enum.ItemBind) for specifics.
 
@@ -367,7 +419,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `<=` Items with a value less than or equal to the number on the right side.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail.">
+<a href="https://i.imgur.com/H2jgRO8.png" target="_blank"><img src="https://i.imgur.com/H2jgRO8.png" alt="Complex Search in Retail."></a>
 
 *Complex Search in Retail.*
 </div>
@@ -375,13 +427,14 @@ Search allows you to find items by the following indices (based on the item belo
 BetterBags also allows you to turn on a search bar near the top of the bag instead of the floating search box.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/S0W5Gmw.png" alt="In-Bag Search Bar in Retail.">
+<a href="https://i.imgur.com/S0W5Gmw.png" target="_blank"><img src="https://i.imgur.com/S0W5Gmw.png" alt="In-Bag Search Bar in Retail."></a>
 
 *In-Bag Search Bar in Retail.*
 </div>
 
 ## Custom Categories
-BetterBags allows items to be grouped into custom categories. These categories can be manually populated by the user, created by plugins, or created from a search.
+BetterBags allows items to be grouped into custom categories. These categories can be manually populated by the user, created by plugins, or created from a search.  
+The title colour of the category can be chosen. Make a beautiful rainbow with all your categories!
 
 ### Manual Custom Categories
 To manually create custom categories that you can add items to, left-click on an item, then hover over the bag button in the top-left of the bag, and left-click again. You can also left-click and drag the item to the bag button, then drop it. Enter in a name for the new category and your item will be added to it. To add new items into categories, you can do the same procedure with any category name, but hold shift while dropping the item.
@@ -397,6 +450,9 @@ To manually create custom categories that you can add items to, left-click on an
 		<td align="middle">
 			<a href="https://i.imgur.com/mRnottG.png" target="_blank"><img src="https://i.imgur.com/mRnottG.png" alt="Add an Item to a Category in Retail."></a></td>
 		</td>
+		<td align="middle">
+			<a href="https://i.imgur.com/PztK78R.png" target="_blank"><img src="https://i.imgur.com/PztK78R.png" alt="Remove an Item from a Category in Retail."></a></td>
+		</td>
 	</tr>
 	<tr>
 		<td align="middle">
@@ -408,6 +464,9 @@ To manually create custom categories that you can add items to, left-click on an
 		<td align="middle">
 			Add an Item to a Category in Retail.
 		</td>
+		<td align="middle">
+			Remove an Item from a Category in Retail.
+		</td>
 	</tr>
 </table>
 
@@ -417,6 +476,8 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 - Category Name (string) is what the new category will be named.
 - Search Query (string) is the search that will be run to determine which items will be in the category. Any search options (described above) will work in the query.
 - Priority (number) is the order in which search categories will "steal" items. Items can only be in 1 category at a time and higher priority will get items first.
+- Group By (string) allows you to create multiple categories from 1 string. Valid options are none, type, subtype, and expansion. This can be chosen as an option or included directly in the search string.  
+`exp = mid and not "housing decor" group by type` will create a category for every type of item from the Midnight expansion, eg. "Midnight - Armor", "Midnight - Weapon", etc.
 
 <table>
 	<tr>
@@ -424,7 +485,7 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 			<a href="https://i.imgur.com/wOUmfRi.png" target="_blank"><img src="https://i.imgur.com/wOUmfRi.png" alt="Creating a Search Category in Retail."></a></td>
 		</td>
 		<td align="middle">
-			<a href="https://i.imgur.com/AqFBVrp.png" target="_blank"><img src="https://i.imgur.com/AqFBVrp.png" alt="Configure Search Category in Retail."></a></td>
+			<a href="https://i.imgur.com/DpdkrYT.png" target="_blank"><img src="https://i.imgur.com/DpdkrYT.png" alt="Configure Search Category in Retail."></a></td>
 		</td>
 	</tr>
 	<tr>
@@ -444,18 +505,51 @@ BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon 
 <table>
 	<tr>
 		<td align="middle">
-			<a href="https://i.imgur.com/wf62OjY.png" target="_blank"><img src="https://i.imgur.com/wf62OjY.png" alt="Simple Dark Theme in Retail."></a></td>
+			<a href="https://i.imgur.com/P2clwi6.png" target="_blank"><img src="https://i.imgur.com/P2clwi6.png" alt="Simple Dark Theme in Retail (with additional theme options from BetterBags - Themes)."></a></td>
 		</td>
 		<td align="middle">
-			<a href="https://i.imgur.com/AYL78rY.png" target="_blank"><img src="https://i.imgur.com/AYL78rY.png" alt="GW2 UI Theme in Retail."></a></td>
+			<a href="https://i.imgur.com/pddxrSV.png" target="_blank"><img src="https://i.imgur.com/pddxrSV.png" alt="GW2 UI Theme in Retail."></a></td>
 		</td>
 	</tr>
 	<tr>
 		<td align="middle">
-			Simple Dark Theme in Retail.
+			Simple Dark Theme in Retail (with additional theme options from <a href="https://www.curseforge.com/wow/addons/betterbags-themes">BetterBags - Themes</a>).
 		</td>
 		<td align="middle">
 			GW2 UI Theme in Retail.
+		</td>
+	</tr>
+</table>
+
+## Profiles
+BetterBags allows you to set up profiles per character. By default, all characters will use the "Default" profile.  
+Profiles will save all settings, including categories, anchor, theme, etc.
+
+<div align="center" style="text-align:center">
+<a href="https://i.imgur.com/iaoX1vE.png" target="_blank"><img src="https://i.imgur.com/iaoX1vE.png" alt="Profile Options in Retail."></a>
+
+*Profile Options in Retail.*
+</div>
+
+## Import/Export
+BetterBags supports import and export strings to easily share your category settings with other users.  
+Import and Export strings only contain category information. Set your own style for the bags, then import the best category setup!
+
+<table>
+	<tr>
+		<td align="middle">
+			<a href="https://i.imgur.com/KzaicF4.png" target="_blank"><img src="https://i.imgur.com/KzaicF4.png" alt="Import/Export Options in Retail."></a></td>
+		</td>
+		<td align="middle">
+			<a href="https://i.imgur.com/daQTr5L.png" target="_blank"><img src="https://i.imgur.com/daQTr5L.png" alt="Example Export String."></a></td>
+		</td>
+	</tr>
+	<tr>
+		<td align="middle">
+			Import/Export Options in Retail.
+		</td>
+		<td align="middle">
+			Example Export String.
 		</td>
 	</tr>
 </table>
@@ -470,7 +564,7 @@ Plugins have the following options:
 - Localization module, which allows the plugin author to localize their text.
 
 <div align="center" style="text-align:center">
-<img src="https://i.imgur.com/B6KTWAJ.png" alt="Plugin System (BetterBags - Appearances) in Retail">
+<a href="https://i.imgur.com/XgGTR18.png" target="_blank"><img src="https://i.imgur.com/XgGTR18.png" alt="Plugin System (BetterBags - Appearances) in Retail"></a>
 
 *Plugin System (<a href="https://www.curseforge.com/wow/addons/betterbags-appearances">BetterBags - Appearances</a>) in Retail.*
 </div>
@@ -480,11 +574,12 @@ BetterBags is constantly getting new features and updates.
 Github hosts both our [Progress Board](https://github.com/users/Cidan/projects/2) and means to [report bugs and request new features](https://github.com/Cidan/BetterBags/issues/new/choose).
 
 The following features are under active development:
-- A new config system using a forms style like the search-based category window.
+- Virtual Bank Groups, just like Category Groups in Bags!
+- Integration with [QuickFind](https://www.curseforge.com/wow/addons/quickfind).
 
 These features are planned for the long term:
+- Feature parity between search categories and manual categories.
 - User customizable themes.
-- Character specific profiles.
 - Dynamic number of columns.
 - Reagent bag markers for items in the reagent bag.
 - Faster/smoother item updates.
