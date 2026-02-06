@@ -301,8 +301,11 @@ function categoryPaneProto:ShowRenameCategoryDialog(categoryName)
             if f.data.pane.selectedCategory == f.data.categoryName then
               f.data.pane.selectedCategory = newName
             end
-            f.data.pane:RefreshList()
-            f.data.pane:UpdateDetailPanel()
+            -- Delay refresh to allow bags/FullRefreshAll event to complete
+            C_Timer.After(0.1, function()
+              f.data.pane:RefreshList()
+              f.data.pane:UpdateDetailPanel()
+            end)
           else
             -- Show error message
             print(format(L:G("Failed to rename category. A category named '%s' may already exist."), newName))
@@ -326,8 +329,11 @@ function categoryPaneProto:ShowRenameCategoryDialog(categoryName)
             if parent.data.pane.selectedCategory == parent.data.categoryName then
               parent.data.pane.selectedCategory = newName
             end
-            parent.data.pane:RefreshList()
-            parent.data.pane:UpdateDetailPanel()
+            -- Delay refresh to allow bags/FullRefreshAll event to complete
+            C_Timer.After(0.1, function()
+              parent.data.pane:RefreshList()
+              parent.data.pane:UpdateDetailPanel()
+            end)
           else
             -- Show error message
             print(format(L:G("Failed to rename category. A category named '%s' may already exist."), newName))

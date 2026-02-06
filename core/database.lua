@@ -687,6 +687,14 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
+  -- 7. Update custom section sort (pinned position) for all bag kinds
+  for _, kind in pairs(const.BAG_KIND) do
+    if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
+      DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
+      DB.data.profile.customSectionSort[kind][oldName] = nil
+    end
+  end
+
   return true
 end
 
