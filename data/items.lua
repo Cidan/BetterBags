@@ -776,7 +776,8 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
 	if ctx:GetBool("wipe") then
 		self:WipeSlotInfo(kind)
 	end
-	self:WipeSearchCache(kind)
+	-- Note: We no longer wipe the search cache here. Instead, RefreshSearchCache
+	-- will incrementally update only changed items (or rebuild all items on wipe/redraw).
 
 	if equipmentCache then
 		self.equipmentCache = equipmentCache
@@ -895,7 +896,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
 	end
 
 	-- Refresh the search cache.
-	self:RefreshSearchCache(kind)
+	self:RefreshSearchCache(kind, ctx)
 
 	-- Get the categories for each item.
 	for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
@@ -925,34 +926,87 @@ function items:WipeSearchCache(kind)
 end
 
 ---@param kind BagKind
-function items:RefreshSearchCache(kind)
-	self:WipeSearchCache(kind)
+---@param item ItemData
+function items:RemoveItemFromSearchCache(kind, item)
+	if item and item.slotkey then
+		self.searchCache[kind][item.slotkey] = nil
+	end
+end
+
+---@param kind BagKind
+---@param item ItemData
+function items:UpdateSearchCacheForItem(kind, item)
+	if not item or item.isItemEmpty then
+		return
+	end
+
 	local categoryTable = categories:GetSortedSearchCategories()
 	for _, categoryFilter in ipairs(categoryTable) do
 		if categoryFilter.enabled[kind] then
-			local results = search:Search(categoryFilter.searchCategory.query)
+			-- Use search:Find() to check if this specific item matches the query
+			-- This is much faster than search:Search() which evaluates all items
+			local match = search:Find(categoryFilter.searchCategory.query, item)
 			local groupBy = categoryFilter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
 
-			for slotkey, match in pairs(results) do
-				if match then
-					local categoryName = categoryFilter.name
+			if match then
+				local categoryName = categoryFilter.name
 
-					-- Apply groupBy logic to generate dynamic category name
-					if groupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
-						local itemData = self:GetItemDataFromSlotKey(slotkey)
-						if itemData and not itemData.isItemEmpty then
-							local suffix = self:GetGroupBySuffix(itemData, groupBy)
-							if suffix and suffix ~= "" then
-								categoryName = categoryFilter.name .. " - " .. suffix
-							end
-						end
+				-- Apply groupBy logic to generate dynamic category name
+				if groupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
+					local suffix = self:GetGroupBySuffix(item, groupBy)
+					if suffix and suffix ~= "" then
+						categoryName = categoryFilter.name .. " - " .. suffix
 					end
-
-					self.searchCache[kind][slotkey] = categoryName
 				end
+
+				self.searchCache[kind][item.slotkey] = categoryName
+				-- Once we find a matching category, use it and stop searching
+				break
 			end
 		end
 	end
+end
+
+---@param kind BagKind
+---@param ctx Context
+function items:RefreshSearchCache(kind, ctx)
+	debug:StartProfile("RefreshSearchCache")
+
+	local slotInfo = self.slotInfo[kind]
+	local added, removed, changed = slotInfo:GetChangeset()
+
+	-- For full refreshes (wipe/redraw), rebuild the entire cache
+	if ctx:GetBool("wipe") or ctx:GetBool("redraw") then
+		debug:Log("RefreshSearchCache", "Full refresh: rebuilding entire cache")
+		self:WipeSearchCache(kind)
+		for _, item in pairs(slotInfo:GetCurrentItems()) do
+			self:UpdateSearchCacheForItem(kind, item)
+		end
+	else
+		-- Performance optimization: Only update items that have actually changed.
+		-- This reduces complexity from O(n × m) to O(k × m) where k is the number
+		-- of changed items (typically 1-5 instead of 150+).
+		debug:Log("RefreshSearchCache", "Incremental update:", #added, "added,", #removed, "removed,", #changed, "changed")
+
+		-- Remove cache entries for removed items
+		for _, item in pairs(removed) do
+			self:RemoveItemFromSearchCache(kind, item)
+		end
+
+		-- Update cache entries for added items
+		for _, item in pairs(added) do
+			self:UpdateSearchCacheForItem(kind, item)
+		end
+
+		-- Update cache entries for changed items (remove old, add new)
+		for _, item in pairs(changed) do
+			-- Note: changed items are still in the current items table with updated data
+			self:RemoveItemFromSearchCache(kind, item)
+			self:UpdateSearchCacheForItem(kind, item)
+		end
+	end
+
+	debug:EndProfile("RefreshSearchCache")
 end
 
 ---@param data ItemData
