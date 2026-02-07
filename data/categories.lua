@@ -415,7 +415,7 @@ function categories:RenameCategory(ctx, oldName, newName)
 
     -- Update item lookup cache
     for itemID, _ in pairs(self.ephemeralCategories[newName].itemList) do
-      self.ephemeralCategoryByItemID[itemID] = newName
+      self.ephemeralCategoryByItemID[itemID].name = newName
     end
   end
 
