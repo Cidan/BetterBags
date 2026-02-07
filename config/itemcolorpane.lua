@@ -66,8 +66,8 @@ function itemColorPane:Create(parent)
     "Current maximum item level: |cffffffff%d|r\n\n" ..
     "Color ranges:\n" ..
     "  • Low: |cff9d9d9d1-%d|r\n" ..
-    "  • Mid: |cff008dde%d-%d|r (61%% of max)\n" ..
-    "  • High: |cffffffff%d-%d|r (86%% of max)\n" ..
+    "  • Mid: |cffffffff%d-%d|r (61%% of max)\n" ..
+    "  • High: |cff008dde%d-%d|r (86%% of max)\n" ..
     "  • Max: |cffff8000%d+|r\n\n" ..
     "These ranges update automatically as you obtain higher item level gear.",
     maxIlvl,

@@ -241,11 +241,13 @@ function DB:SetItemLevelColor(colorKey, color)
 end
 
 function DB:ResetItemLevelColors()
+  -- Deep copy the colors from constants to avoid reference issues
+  local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor.colors
   DB.data.profile.itemLevelColor.colors = {
-    low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },
-    mid = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },
-    high = { red = 1, green = 1, blue = 1, alpha = 1 },
-    max = { red = 1, green = 0.5, blue = 0, alpha = 1 }
+    low = { red = defaults.low.red, green = defaults.low.green, blue = defaults.low.blue, alpha = defaults.low.alpha },
+    mid = { red = defaults.mid.red, green = defaults.mid.green, blue = defaults.mid.blue, alpha = defaults.mid.alpha },
+    high = { red = defaults.high.red, green = defaults.high.green, blue = defaults.high.blue, alpha = defaults.high.alpha },
+    max = { red = defaults.max.red, green = defaults.max.green, blue = defaults.max.blue, alpha = defaults.max.alpha }
   }
 end
 
@@ -988,26 +990,29 @@ function DB:Migrate()
   -- Do not remove before Q3'27
   -- ============================================================
   if not DB.data.profile.itemLevelColor then
+    -- Use defaults from constants
+    local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor
     DB.data.profile.itemLevelColor = {
-      maxItemLevel = 489,
+      maxItemLevel = defaults.maxItemLevel,
       colors = {
-        low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },
-        mid = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },
-        high = { red = 1, green = 1, blue = 1, alpha = 1 },
-        max = { red = 1, green = 0.5, blue = 0, alpha = 1 }
+        low = { red = defaults.colors.low.red, green = defaults.colors.low.green, blue = defaults.colors.low.blue, alpha = defaults.colors.low.alpha },
+        mid = { red = defaults.colors.mid.red, green = defaults.colors.mid.green, blue = defaults.colors.mid.blue, alpha = defaults.colors.mid.alpha },
+        high = { red = defaults.colors.high.red, green = defaults.colors.high.green, blue = defaults.colors.high.blue, alpha = defaults.colors.high.alpha },
+        max = { red = defaults.colors.max.red, green = defaults.colors.max.green, blue = defaults.colors.max.blue, alpha = defaults.colors.max.alpha }
       }
     }
   end
   -- Add missing fields if partial migration occurred
   if not DB.data.profile.itemLevelColor.maxItemLevel then
-    DB.data.profile.itemLevelColor.maxItemLevel = 489
+    DB.data.profile.itemLevelColor.maxItemLevel = const.DATABASE_DEFAULTS.profile.itemLevelColor.maxItemLevel
   end
   if not DB.data.profile.itemLevelColor.colors then
+    local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor.colors
     DB.data.profile.itemLevelColor.colors = {
-      low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },
-      mid = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },
-      high = { red = 1, green = 1, blue = 1, alpha = 1 },
-      max = { red = 1, green = 0.5, blue = 0, alpha = 1 }
+      low = { red = defaults.low.red, green = defaults.low.green, blue = defaults.low.blue, alpha = defaults.low.alpha },
+      mid = { red = defaults.mid.red, green = defaults.mid.green, blue = defaults.mid.blue, alpha = defaults.mid.alpha },
+      high = { red = defaults.high.red, green = defaults.high.green, blue = defaults.high.blue, alpha = defaults.high.alpha },
+      max = { red = defaults.max.red, green = defaults.max.green, blue = defaults.max.blue, alpha = defaults.max.alpha }
     }
   end
 
