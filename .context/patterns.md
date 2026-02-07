@@ -801,3 +801,101 @@ end
 - When debugging issues where state "randomly" appears or disappears
 - During code review of features that modify pooled object properties
 - When implementing new visual indicators or state tracking on existing pooled types
+
+## WindowGrouping Integration
+
+### Pattern: Frame-like Objects Must Implement Show/Hide/IsShown and Fade Animations
+**Problem**: Custom UI objects added to WindowGrouping (via `windowGrouping:AddWindow()`) fail with "Frame must have fadeIn and fadeOut animations" or cause errors when methods like `Hide()` or `IsShown()` are called.
+
+**Why**: The WindowGrouping system expects all registered frames to behave like standard WoW frames with:
+1. **Standard frame methods**: `Show()`, `Hide()`, `IsShown()`
+2. **Fade animation groups**: `fadeIn`, `fadeOut` properties
+3. **Callback support**: `Hide(callback)` must support optional callback parameter for chained animations
+
+When these requirements aren't met, the window grouping system can't properly coordinate showing/hiding multiple windows with fade animations.
+
+**Solution Pattern**:
+1. **Implement Show/Hide/IsShown methods** that delegate to the actual UI frame
+2. **Attach fade animations** using `animations:AttachFadeGroup()` on the frame
+3. **Support optional callback in Hide()** for animation chaining
+4. **Store fadeIn/fadeOut** as properties on the object itself
+
+**Example** (from frames/classic/currency.lua fix):
+```lua
+-- At module level, import animations
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
+-- Define the frame-like class with animation properties
+---@class CurrencyIconGrid
+---@field iconGrid Grid
+---@field fadeIn AnimationGroup
+---@field fadeOut AnimationGroup
+local CurrencyIconGrid = {}
+
+-- Implement Show/Hide/IsShown methods
+function CurrencyIconGrid:Show()
+  self.iconGrid.frame:Show()
+end
+
+function CurrencyIconGrid:Hide(callback)
+  -- Support optional callback parameter used by windowGrouping
+  if callback then
+    self.fadeOut.callback = callback
+    self.fadeOut:Play()
+  else
+    self.iconGrid.frame:Hide()
+  end
+end
+
+function CurrencyIconGrid:IsShown()
+  return self.iconGrid.frame:IsShown()
+end
+
+-- In the constructor, attach fade animations
+function currency:CreateIconGrid(parent)
+  local b = {}
+  setmetatable(b, {__index = CurrencyIconGrid})
+
+  -- Create the grid frame
+  local g = grid:Create(parent)
+  -- ... configure grid ...
+  b.iconGrid = g
+
+  -- Attach fade animations for windowGrouping compatibility
+  b.fadeIn, b.fadeOut = animations:AttachFadeGroup(g:GetContainer())
+
+  return b
+end
+
+-- Now safe to add to window grouping
+b.windowGrouping:AddWindow('currencyConfig', b.currencyFrame)
+```
+
+**Reference Implementation** (frames/themeconfig.lua:98):
+```lua
+-- ThemeConfig frame with proper windowGrouping integration
+tc.fadeIn, tc.fadeOut = animations:AttachFadeAndSlideLeft(tc.frame)
+-- Methods are inherited from the frame itself
+```
+
+**When to Apply**:
+- Any custom UI object added to WindowGrouping via `AddWindow()`
+- Objects that wrap or encapsulate WoW frames but don't expose frame methods directly
+- When seeing errors: "Frame must have fadeIn and fadeOut animations"
+- When seeing errors about missing `Hide()`, `Show()`, or `IsShown()` methods
+- Before registering a new window type with the window grouping system
+
+**Critical Requirements Checklist**:
+- ✅ `Show()` method exists and shows the frame
+- ✅ `Hide()` method exists with optional callback parameter
+- ✅ `Hide(callback)` plays fadeOut animation and triggers callback when provided
+- ✅ `IsShown()` method exists and returns boolean
+- ✅ `fadeIn` property contains AnimationGroup from AttachFadeGroup
+- ✅ `fadeOut` property contains AnimationGroup from AttachFadeGroup
+
+**Related Files**:
+- `util/windowgroup.lua:16` - Assertion that checks for fadeIn/fadeOut
+- `util/windowgroup.lua:21,28,33,34,41` - Calls to IsShown(), Hide(), Show()
+- `frames/classic/currency.lua:65-81,168` - Example implementation
+- `frames/themeconfig.lua:98` - Reference implementation with AttachFadeAndSlideLeft
