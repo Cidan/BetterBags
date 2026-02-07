@@ -20,12 +20,42 @@ local itemColorPane = addon:NewModule('ItemColorPane')
 
 ---@class ItemColorPaneFrame
 ---@field frame Frame
+---@field breakpointsLabel FontString
+---@field colorPickerLabels table<string, FontString>
 local itemColorPaneProto = {}
+
+function itemColorPaneProto:UpdateBreakpoints()
+  local maxIlvl = database:GetMaxItemLevel()
+  local midPoint = math.floor(maxIlvl * 0.61)
+  local highPoint = math.floor(maxIlvl * 0.86)
+
+  self.breakpointsLabel:SetText(string.format(
+    "Current maximum item level: |cffffffff%d|r\n\n" ..
+    "Color ranges:\n" ..
+    "  • Low: |cff9d9d9d1-%d|r\n" ..
+    "  • Mid: |cffffffff%d-%d|r (61%% of max)\n" ..
+    "  • High: |cff008dde%d-%d|r (86%% of max)\n" ..
+    "  • Max: |cffff8000%d+|r\n\n" ..
+    "These ranges update automatically as you obtain higher item level gear.",
+    maxIlvl,
+    midPoint - 1,
+    midPoint, highPoint - 1,
+    highPoint, maxIlvl - 1,
+    maxIlvl
+  ))
+
+  -- Update color picker labels
+  self.colorPickerLabels.low:SetText("Low Item Level Color (1-" .. (midPoint - 1) .. ")")
+  self.colorPickerLabels.mid:SetText("Mid Item Level Color (" .. midPoint .. "-" .. (highPoint - 1) .. ")")
+  self.colorPickerLabels.high:SetText("High Item Level Color (" .. highPoint .. "-" .. (maxIlvl - 1) .. ")")
+  self.colorPickerLabels.max:SetText("Max Item Level Color (" .. maxIlvl .. "+)")
+end
 
 ---@param parent Frame
 ---@return Frame
 function itemColorPane:Create(parent)
   local pane = setmetatable({}, {__index = itemColorPaneProto})
+  pane.colorPickerLabels = {}
 
   -- Create main frame
   pane.frame = CreateFrame("Frame", nil, parent)
@@ -54,28 +84,10 @@ function itemColorPane:Create(parent)
   yOffset = yOffset - 50
 
   -- Current breakpoints info
-  local maxIlvl = database:GetMaxItemLevel()
-  local midPoint = math.floor(maxIlvl * 0.61)
-  local highPoint = math.floor(maxIlvl * 0.86)
-
-  local breakpointsLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  breakpointsLabel:SetPoint("TOPLEFT", 0, yOffset)
-  breakpointsLabel:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-  breakpointsLabel:SetJustifyH("LEFT")
-  breakpointsLabel:SetText(string.format(
-    "Current maximum item level: |cffffffff%d|r\n\n" ..
-    "Color ranges:\n" ..
-    "  • Low: |cff9d9d9d1-%d|r\n" ..
-    "  • Mid: |cffffffff%d-%d|r (61%% of max)\n" ..
-    "  • High: |cff008dde%d-%d|r (86%% of max)\n" ..
-    "  • Max: |cffff8000%d+|r\n\n" ..
-    "These ranges update automatically as you obtain higher item level gear.",
-    maxIlvl,
-    midPoint - 1,
-    midPoint, highPoint - 1,
-    highPoint, maxIlvl - 1,
-    maxIlvl
-  ))
+  pane.breakpointsLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  pane.breakpointsLabel:SetPoint("TOPLEFT", 0, yOffset)
+  pane.breakpointsLabel:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+  pane.breakpointsLabel:SetJustifyH("LEFT")
   yOffset = yOffset - 150
 
   -- Color pickers section
@@ -85,10 +97,10 @@ function itemColorPane:Create(parent)
   yOffset = yOffset - 30
 
   -- Helper function to create color picker
-  local function CreateColorPicker(labelText, colorKey, yPos)
+  local function CreateColorPicker(colorKey, yPos)
     local label = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     label:SetPoint("TOPLEFT", 20, yPos)
-    label:SetText(labelText)
+    pane.colorPickerLabels[colorKey] = label
 
     local colorSwatch = CreateFrame("Button", nil, content)
     colorSwatch:SetPoint("TOPLEFT", 200, yPos + 3)
@@ -127,10 +139,13 @@ function itemColorPane:Create(parent)
     return yPos - 25
   end
 
-  yOffset = CreateColorPicker("Low Item Level Color (1-" .. (midPoint - 1) .. ")", "low", yOffset)
-  yOffset = CreateColorPicker("Mid Item Level Color (" .. midPoint .. "-" .. (highPoint - 1) .. ")", "mid", yOffset)
-  yOffset = CreateColorPicker("High Item Level Color (" .. highPoint .. "-" .. (maxIlvl - 1) .. ")", "high", yOffset)
-  yOffset = CreateColorPicker("Max Item Level Color (" .. maxIlvl .. "+)", "max", yOffset)
+  yOffset = CreateColorPicker("low", yOffset)
+  yOffset = CreateColorPicker("mid", yOffset)
+  yOffset = CreateColorPicker("high", yOffset)
+  yOffset = CreateColorPicker("max", yOffset)
+
+  -- Initial update of breakpoints
+  pane:UpdateBreakpoints()
 
   yOffset = yOffset - 20
 
@@ -148,6 +163,22 @@ function itemColorPane:Create(parent)
     pane.frame:GetParent():GetParent().currentPane = nil
     local newFrame = itemColorPane:Create(parent)
     newFrame:Show()
+  end)
+
+  -- Register for max item level changes
+  pane.frame:RegisterEvent("BAG_UPDATE")
+  pane.frame:SetScript("OnEvent", function()
+    -- Check if we're still visible
+    if pane.frame:IsShown() then
+      pane:UpdateBreakpoints()
+    end
+  end)
+
+  -- Also listen for the custom event via Events module
+  events:RegisterMessage('itemLevel/MaxChanged', function()
+    if pane.frame:IsShown() then
+      pane:UpdateBreakpoints()
+    end
   end)
 
   return pane.frame

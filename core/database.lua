@@ -230,6 +230,12 @@ function DB:UpdateMaxItemLevel(itemLevel)
   local current = byCharacter[characterKey] or 1
   if itemLevel > current then
     byCharacter[characterKey] = itemLevel
+    -- Trigger refresh of items and options pane
+    local events = addon:GetModule('Events')
+    local context = addon:GetModule('Context')
+    local ctx = context:New('UpdateMaxItemLevel')
+    events:SendMessage(ctx, 'itemLevel/MaxChanged', itemLevel)
+    events:SendMessage(ctx, 'bags/FullRefreshAll')
   end
 end
 
