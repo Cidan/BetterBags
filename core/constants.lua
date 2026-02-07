@@ -661,7 +661,7 @@ const.DATABASE_DEFAULTS = {
       },
     },
     itemLevelColor = {
-      maxItemLevel = 1,  -- Starts at 1 and grows with player's gear
+      maxItemLevelByCharacter = {},  -- Per-character max item level tracking
       colors = {
         low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },   -- Gray
         mid = { red = 1, green = 1, blue = 1, alpha = 1 },            -- White

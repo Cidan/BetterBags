@@ -218,14 +218,18 @@ end
 
 ---@return number
 function DB:GetMaxItemLevel()
-  return DB.data.profile.itemLevelColor.maxItemLevel or 489
+  local characterKey = UnitName("player") .. "-" .. GetRealmName()
+  local byCharacter = DB.data.profile.itemLevelColor.maxItemLevelByCharacter
+  return byCharacter[characterKey] or 1
 end
 
 ---@param itemLevel number
 function DB:UpdateMaxItemLevel(itemLevel)
-  local current = DB:GetMaxItemLevel()
+  local characterKey = UnitName("player") .. "-" .. GetRealmName()
+  local byCharacter = DB.data.profile.itemLevelColor.maxItemLevelByCharacter
+  local current = byCharacter[characterKey] or 1
   if itemLevel > current then
-    DB.data.profile.itemLevelColor.maxItemLevel = itemLevel
+    byCharacter[characterKey] = itemLevel
   end
 end
 
@@ -993,7 +997,7 @@ function DB:Migrate()
     -- Use defaults from constants
     local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor
     DB.data.profile.itemLevelColor = {
-      maxItemLevel = defaults.maxItemLevel,
+      maxItemLevelByCharacter = {},
       colors = {
         low = { red = defaults.colors.low.red, green = defaults.colors.low.green, blue = defaults.colors.low.blue, alpha = defaults.colors.low.alpha },
         mid = { red = defaults.colors.mid.red, green = defaults.colors.mid.green, blue = defaults.colors.mid.blue, alpha = defaults.colors.mid.alpha },
@@ -1002,9 +1006,23 @@ function DB:Migrate()
       }
     }
   end
+
+  -- Migrate old single maxItemLevel to per-character tracking
+  if DB.data.profile.itemLevelColor.maxItemLevel then
+    local oldMax = DB.data.profile.itemLevelColor.maxItemLevel
+    local characterKey = UnitName("player") .. "-" .. GetRealmName()
+    if not DB.data.profile.itemLevelColor.maxItemLevelByCharacter then
+      DB.data.profile.itemLevelColor.maxItemLevelByCharacter = {}
+    end
+    -- Preserve old value for current character
+    DB.data.profile.itemLevelColor.maxItemLevelByCharacter[characterKey] = oldMax
+    -- Remove old field
+    DB.data.profile.itemLevelColor.maxItemLevel = nil
+  end
+
   -- Add missing fields if partial migration occurred
-  if not DB.data.profile.itemLevelColor.maxItemLevel then
-    DB.data.profile.itemLevelColor.maxItemLevel = const.DATABASE_DEFAULTS.profile.itemLevelColor.maxItemLevel
+  if not DB.data.profile.itemLevelColor.maxItemLevelByCharacter then
+    DB.data.profile.itemLevelColor.maxItemLevelByCharacter = {}
   end
   if not DB.data.profile.itemLevelColor.colors then
     local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor.colors
