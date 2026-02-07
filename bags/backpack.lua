@@ -505,10 +505,7 @@ function backpack.proto:ShowRenameGroupDialog(groupID)
 		}
 	end
 
-	local dialog = StaticPopup_Show("BETTERBAGS_RENAME_GROUP")
-	if dialog then
-		dialog.data = { groupID = groupID }
-	end
+	StaticPopup_Show("BETTERBAGS_RENAME_GROUP", nil, nil, { groupID = groupID })
 end
 
 -- ShowDeleteGroupConfirm shows a confirmation dialog to delete a group.
@@ -534,10 +531,7 @@ function backpack.proto:ShowDeleteGroupConfirm(groupID)
 		}
 	end
 
-	local dialog = StaticPopup_Show("BETTERBAGS_DELETE_GROUP", group.name)
-	if dialog then
-		dialog.data = { groupID = groupID }
-	end
+	StaticPopup_Show("BETTERBAGS_DELETE_GROUP", group.name, nil, { groupID = groupID })
 end
 
 -------

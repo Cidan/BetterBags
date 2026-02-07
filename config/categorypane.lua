@@ -351,10 +351,7 @@ function categoryPaneProto:ShowRenameCategoryDialog(categoryName)
     }
   end
 
-  local dialog = StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY")
-  if dialog then
-    dialog.data = { categoryName = categoryName, pane = self }
-  end
+  StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY", nil, nil, { categoryName = categoryName, pane = self })
 end
 
 function categoryPaneProto:UpdateDetailPanel()

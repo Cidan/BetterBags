@@ -746,6 +746,63 @@ end
 - `frames/tabs.lua`: Drag state (29-42), handlers (394-407), functions (624-804)
 - `core/database.lua`: Persistence (681-694)
 
+### Pattern: StaticPopup Dialog Data Race Condition
+**Problem**: When calling `StaticPopup_Show()` and then setting `dialog.data` on the returned frame, the dialog's `OnShow` callback tries to access `f.data` and gets nil, causing "attempt to index field 'data' (a nil value)" errors.
+
+**Why**: WoW's `StaticPopup_Show()` API triggers the dialog's `OnShow` script synchronously during the Show() call, before the function returns the dialog frame reference. This means:
+1. `StaticPopup_Show()` is called
+2. Dialog frame is created/retrieved from pool
+3. `OnShow` callback executes immediately
+4. Function returns dialog frame reference
+5. Code tries to set `dialog.data` - too late!
+
+Any code in `OnShow` that accesses `f.data` will fail because the data hasn't been assigned yet.
+
+**Solution Pattern**: Use `StaticPopup_Show()`'s built-in data parameter (4th argument) to pass data to the dialog. The data is assigned to the dialog frame **before** `OnShow` is called:
+
+```lua
+-- BAD: Data assignment happens after OnShow fires
+local dialog = StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY")
+if dialog then
+  dialog.data = { categoryName = categoryName, pane = self }  -- Too late!
+end
+
+-- Dialog definition with OnShow that fails:
+OnShow = function(f)
+  f.EditBox:SetText(f.data.categoryName)  -- ERROR: f.data is nil
+end
+
+-- GOOD: Pass data as 4th parameter
+StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY", nil, nil, { categoryName = categoryName, pane = self })
+
+-- Now OnShow can safely access data:
+OnShow = function(f)
+  f.EditBox:SetText(f.data.categoryName)  -- Works! f.data is set
+end
+```
+
+**API Signature**:
+```lua
+StaticPopup_Show(which, text_arg1, text_arg2, data)
+```
+- `which`: Dialog name (string)
+- `text_arg1`: First text replacement argument (optional)
+- `text_arg2`: Second text replacement argument (optional)
+- `data`: Data table assigned to `dialog.data` before OnShow (optional)
+
+**When to Apply**:
+- Any StaticPopup dialog that has an `OnShow` callback accessing `f.data`
+- When you see "attempt to index field 'data' (a nil value)" errors from dialog callbacks
+- As a best practice for all dialogs that need data, even without `OnShow` callbacks (for consistency and future-proofing)
+- When refactoring existing dialogs that set `dialog.data` after `StaticPopup_Show()`
+
+**Note**: Dialogs that only use data in `OnAccept` or other callbacks (that fire after show) won't error with the old pattern, but should still be updated for consistency and to prevent bugs if someone later adds an `OnShow` callback.
+
+**Related Files**:
+- `config/categorypane.lua:354` - Category rename dialog (fixed)
+- `bags/backpack.lua:508` - Group rename dialog (fixed)
+- `bags/backpack.lua:534` - Group delete confirmation (fixed for consistency)
+
 ## Object Pooling Patterns
 
 ### Pattern: Always Reset ALL Properties When Releasing Pooled Objects
