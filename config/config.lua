@@ -39,6 +39,9 @@ local themePane = addon:GetModule('ThemePane')
 ---@class CurrencyPane: AceModule
 local currencyPane = addon:GetModule('CurrencyPane')
 
+---@class ItemColorPane: AceModule
+local itemColorPane = addon:GetModule('ItemColorPane')
+
 ---@class Config: AceModule
 ---@field configFrame FormFrame
 local config = addon:NewModule('Config')
@@ -179,6 +182,15 @@ function config:CreateConfig()
     description = 'Configure which currencies are shown in your backpack.',
     createPane = function(parent, _)
       return currencyPane:Create(parent)
+    end,
+    bagKind = nil,
+  })
+
+  f:AddPaneLink({
+    title = 'Item Colors',
+    description = 'Configure item level color gradients. Colors scale automatically based on your highest seen item level.',
+    createPane = function(parent, _)
+      return itemColorPane:Create(parent)
     end,
     bagKind = nil,
   })

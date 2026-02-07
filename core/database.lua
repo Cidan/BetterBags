@@ -216,6 +216,39 @@ function DB:SetItemLevelColorEnabled(kind, enabled)
   DB.data.profile.itemLevel[kind].color = enabled
 end
 
+---@return number
+function DB:GetMaxItemLevel()
+  return DB.data.profile.itemLevelColor.maxItemLevel or 489
+end
+
+---@param itemLevel number
+function DB:UpdateMaxItemLevel(itemLevel)
+  local current = DB:GetMaxItemLevel()
+  if itemLevel > current then
+    DB.data.profile.itemLevelColor.maxItemLevel = itemLevel
+  end
+end
+
+---@return {low: ColorDef, mid: ColorDef, high: ColorDef, max: ColorDef}
+function DB:GetItemLevelColors()
+  return DB.data.profile.itemLevelColor.colors
+end
+
+---@param colorKey "low"|"mid"|"high"|"max"
+---@param color {red: number, green: number, blue: number, alpha: number}
+function DB:SetItemLevelColor(colorKey, color)
+  DB.data.profile.itemLevelColor.colors[colorKey] = color
+end
+
+function DB:ResetItemLevelColors()
+  DB.data.profile.itemLevelColor.colors = {
+    low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },
+    mid = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },
+    high = { red = 1, green = 1, blue = 1, alpha = 1 },
+    max = { red = 1, green = 0.5, blue = 0, alpha = 1 }
+  }
+end
+
 function DB:GetFirstTimeMenu()
   return DB.data.profile.firstTimeMenu
 end
@@ -949,6 +982,34 @@ function DB:Migrate()
     [const.BAG_KIND.BACKPACK] = {},
     [const.BAG_KIND.BANK] = {},
   }
+
+  -- ============================================================
+  -- Dynamic Item Level Coloring Migration (Q1'27)
+  -- Do not remove before Q3'27
+  -- ============================================================
+  if not DB.data.profile.itemLevelColor then
+    DB.data.profile.itemLevelColor = {
+      maxItemLevel = 489,
+      colors = {
+        low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },
+        mid = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },
+        high = { red = 1, green = 1, blue = 1, alpha = 1 },
+        max = { red = 1, green = 0.5, blue = 0, alpha = 1 }
+      }
+    }
+  end
+  -- Add missing fields if partial migration occurred
+  if not DB.data.profile.itemLevelColor.maxItemLevel then
+    DB.data.profile.itemLevelColor.maxItemLevel = 489
+  end
+  if not DB.data.profile.itemLevelColor.colors then
+    DB.data.profile.itemLevelColor.colors = {
+      low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },
+      mid = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },
+      high = { red = 1, green = 1, blue = 1, alpha = 1 },
+      max = { red = 1, green = 0.5, blue = 0, alpha = 1 }
+    }
+  end
 
   -- ============================================================
   -- Profile System Migration (Q1'26)

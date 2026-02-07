@@ -1357,6 +1357,10 @@ function items:GetEquipmentInfo(itemMixin)
 		currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
 		equipmentSets = nil,
 	}
+	-- Track max item level for dynamic coloring
+	if data.currentItemLevel and data.currentItemLevel > 0 then
+		database:UpdateMaxItemLevel(data.currentItemLevel)
+	end
 	return data
 end
 
@@ -1447,6 +1451,10 @@ function items:AttachItemInfo(data, kind)
 		equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
 		tooltipText = tooltipText or "",
 	}
+	-- Track max item level for dynamic coloring
+	if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
+		database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
+	end
 
 	if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
 		self._newItemTimers[data.itemInfo.itemGUID] = time()

@@ -660,6 +660,15 @@ const.DATABASE_DEFAULTS = {
         color = true
       },
     },
+    itemLevelColor = {
+      maxItemLevel = 489,  -- Global max (default 489 for existing users)
+      colors = {
+        low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },   -- Gray
+        mid = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },      -- Blue
+        high = { red = 1, green = 1, blue = 1, alpha = 1 },           -- White
+        max = { red = 1, green = 0.5, blue = 0, alpha = 1 }           -- Orange
+      }
+    },
     positions = {
       [const.BAG_KIND.BACKPACK] = {},
       [const.BAG_KIND.BANK] = {},
