@@ -859,6 +859,49 @@ end
 - During code review of features that modify pooled object properties
 - When implementing new visual indicators or state tracking on existing pooled types
 
+### Pattern: Track Active Pooled Frames for Incremental UI Updates
+**Problem**: UI elements backed by object pools need lightweight visual refreshes (e.g., recoloring item level text) without forcing full redraws. Pools do not track which objects are currently in use, so there is no safe way to iterate only visible items.
+
+**Why**: The pool only stores inactive objects. Active objects live in other structures and are not centrally tracked. Without an active registry, the only option is expensive full refreshes or unreliable traversal of UI hierarchies.
+
+**Solution Pattern**:
+1. Maintain an `activeItems` (or similar) set on the module (prefer weak-key tables to avoid retaining items)
+2. Add items to the set on `Acquire`/`Create`
+3. Remove items from the set on `Release`
+4. Respond to lightweight events (e.g., `itemLevel/MaxChanged`) by iterating the active set and updating visuals
+
+**Example**:
+```lua
+function itemFrame:OnInitialize()
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
+  self.activeItems = setmetatable({}, { __mode = "k" })
+end
+
+function itemFrame:Create(ctx)
+  local item = self._pool:Acquire(ctx)
+  self.activeItems[item] = true
+  return item
+end
+
+function itemFrame.itemProto:Release(ctx)
+  itemFrame.activeItems[self] = nil
+  itemFrame._pool:Release(ctx, self)
+end
+
+function itemFrame:RefreshItemLevelColors(ctx)
+  for item in pairs(self.activeItems) do
+    if item.slotkey and item.slotkey ~= "" and not item.isFreeSlot then
+      item:DrawItemLevel()
+    end
+  end
+end
+```
+
+**When to Apply**:
+- When a visual update affects many items but does not require data refresh
+- When replacing full redraws with lightweight UI updates
+- When pooled objects must be updated on global setting changes
+
 ## WindowGrouping Integration
 
 ### Pattern: Frame-like Objects Must Implement Show/Hide/IsShown and Fade Animations
@@ -942,6 +985,32 @@ tc.fadeIn, tc.fadeOut = animations:AttachFadeAndSlideLeft(tc.frame)
 - When seeing errors: "Frame must have fadeIn and fadeOut animations"
 - When seeing errors about missing `Hide()`, `Show()`, or `IsShown()` methods
 - Before registering a new window type with the window grouping system
+
+### Pattern: Use Discrete Color Tiers to Avoid Unwanted Midpoint Hues
+**Problem**: Smooth color blending between distant hues (e.g., blue → orange) can produce unexpected intermediate colors (gray/green) that feel incorrect for item level display.
+
+**Why**: Interpolation traverses hue space, and even with HSV biasing the midpoint can land on colors users do not associate with a given range.
+
+**Solution Pattern**:
+1. Compute dynamic breakpoints (low/mid/high/max)
+2. Pick the tier color directly based on which range the item level falls into
+3. Avoid blending between tiers
+
+**Example**:
+```lua
+if itemLevel >= maxIlvl then
+  return maxColor
+elseif itemLevel >= highPoint then
+  return highColor
+elseif itemLevel >= midPoint then
+  return midColor
+end
+return lowColor
+```
+
+**When to Apply**:
+- When users expect categorical colors, not gradients
+- When midpoints produce unexpected hues
 
 **Critical Requirements Checklist**:
 - ✅ `Show()` method exists and shows the frame

@@ -1412,8 +1412,8 @@ function items:GetEquipmentInfo(itemMixin)
 		equipmentSets = nil,
 	}
 	-- Track max item level for dynamic coloring
-	if data.currentItemLevel and data.currentItemLevel > 0 then
-		database:UpdateMaxItemLevel(data.currentItemLevel)
+	if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
+		database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
 	end
 	return data
 end

@@ -66,7 +66,7 @@ end)
 
 ### Color Interpolation (`color.lua`)
 
-Calculates appropriate colors for item level display using interpolation between defined color points.
+Calculates appropriate colors for item level display using discrete tiers (low/mid/high/max) based on dynamic breakpoints.
 
 **Color Table:**
 ```lua

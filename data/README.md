@@ -24,6 +24,7 @@ The main item management module that handles all item data operations including 
 #### Key Features
 - **Unified Item Loading**: Uses ContinuableContainer for efficient async item data loading
 - **Item Data Management**: Stores and manages all item information including stats, quality, binding status, etc.
+- **Item Level Tracking**: Updates per-character max item level and notifies listeners for dynamic color scaling
 - **Bag Type Detection**: Identifies different bag types (normal, profession, reagent)
 - **Item Hashing**: Generates unique hashes for item stacking
 - **Category Assignment**: Determines item categories based on filters

@@ -62,6 +62,38 @@ function itemFrame.itemProto:UpdateCooldown(ctx)
   ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
 
+function itemFrame.itemProto:DrawItemLevel()
+  if not self.slotkey then
+    return
+  end
+  if not self.kind then
+    return
+  end
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if not data or data.isItemEmpty then
+    self.ilvlText:Hide()
+    return
+  end
+  local ilvlOpts = database:GetItemLevelOptions(self.kind)
+  if
+    (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1)
+    and (data.itemInfo.classID == Enum.ItemClass.Armor
+      or data.itemInfo.classID == Enum.ItemClass.Weapon
+      or data.itemInfo.classID == Enum.ItemClass.Gem)
+  then
+    self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
+    if ilvlOpts.color then
+      local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
+      self.ilvlText:SetTextColor(r, g, b, 1)
+    else
+      self.ilvlText:SetTextColor(1, 1, 1, 1)
+    end
+    self.ilvlText:Show()
+  else
+    self.ilvlText:Hide()
+  end
+end
+
 ---@param ctx Context
 function itemFrame.itemProto:ResetSize(ctx)
   self:SetSize(ctx, 37, 37)
@@ -104,22 +136,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   end
 
 
-  local ilvlOpts = database:GetItemLevelOptions(self.kind)
-  if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1) and
-    (data.itemInfo.classID == Enum.ItemClass.Armor or
-    data.itemInfo.classID == Enum.ItemClass.Weapon or
-    data.itemInfo.classID == Enum.ItemClass.Gem) then
-      self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
-      if ilvlOpts.color then
-        local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
-        self.ilvlText:SetTextColor(r, g, b, 1)
-      else
-        self.ilvlText:SetTextColor(1, 1, 1, 1)
-      end
-      self.ilvlText:Show()
-  else
-    self.ilvlText:Hide()
-  end
+  self:DrawItemLevel()
 
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality)
   decoration.minDisplayCount = 1
