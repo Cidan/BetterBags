@@ -56,6 +56,7 @@ end
 function itemColorPane:Create(parent)
   local pane = setmetatable({}, {__index = itemColorPaneProto})
   pane.colorPickerLabels = {}
+  pane.colorSwatches = {}
 
   -- Create main frame
   pane.frame = CreateFrame("Frame", nil, parent)
@@ -111,6 +112,7 @@ function itemColorPane:Create(parent)
     local colors = database:GetItemLevelColors()
     local color = colors[colorKey]
     texture:SetColorTexture(color.red, color.green, color.blue, color.alpha)
+    pane.colorSwatches[colorKey] = texture
 
     colorSwatch:SetScript("OnClick", function()
       local currentColors = database:GetItemLevelColors()
@@ -128,7 +130,7 @@ function itemColorPane:Create(parent)
           texture:SetColorTexture(r, g, b, a)
           local ctx = context:New('ItemColorPane_ColorChange')
           database:SetItemLevelColor(colorKey, {red = r, green = g, blue = b, alpha = a})
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          events:SendMessage(ctx, 'itemLevel/MaxChanged', database:GetMaxItemLevel())
         end,
         cancelFunc = function()
           texture:SetColorTexture(currentColor.red, currentColor.green, currentColor.blue, currentColor.alpha)
@@ -157,12 +159,13 @@ function itemColorPane:Create(parent)
   resetButton:SetScript("OnClick", function()
     local ctx = context:New('ItemColorPane_Reset')
     database:ResetItemLevelColors()
-    events:SendMessage(ctx, 'bags/FullRefreshAll')
-    -- Refresh the pane
-    pane.frame:Hide()
-    pane.frame:GetParent():GetParent().currentPane = nil
-    local newFrame = itemColorPane:Create(parent)
-    newFrame:Show()
+    local colors = database:GetItemLevelColors()
+    for key, texture in pairs(pane.colorSwatches) do
+      local color = colors[key]
+      texture:SetColorTexture(color.red, color.green, color.blue, color.alpha)
+    end
+    pane:UpdateBreakpoints()
+    events:SendMessage(ctx, 'itemLevel/MaxChanged', database:GetMaxItemLevel())
   end)
 
   -- Register for max item level changes
