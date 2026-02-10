@@ -437,7 +437,7 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
   if filter.color then
     self.searchDetail.colorTexture:SetVertexColor(filter.color[1], filter.color[2], filter.color[3], 1)
   else
-    self.searchDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
+    self.searchDetail.colorTexture:SetVertexColor(1, 0.82, 0, 1)  -- Default to Warcraft yellow
   end
 
   -- Update show checkbox state
@@ -669,7 +669,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   colorPicker:SetScript("OnMouseDown", function()
     if not self.selectedCategory then return end
     local filter = categories:GetCategoryByName(self.selectedCategory)
-    local r, g, b = 1, 1, 1
+    local r, g, b = 1, 0.82, 0  -- Default to Warcraft yellow (matches fonts.UnitFrame12Yellow)
     if filter and filter.color then
       r, g, b = filter.color[1], filter.color[2], filter.color[3]
     end
@@ -688,6 +688,17 @@ function categoryPaneProto:CreateSearchDetailPanel()
       b = b,
     }
     ColorPickerFrame:SetupColorPickerAndShow(options)
+  end)
+
+  -- Clear Color Button (to reset to default yellow)
+  local clearColorButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
+  clearColorButton:SetPoint("LEFT", colorPicker, "RIGHT", 5, 0)
+  clearColorButton:SetSize(90, 24)
+  clearColorButton:SetText("Reset Color")
+  clearColorButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    -- Reset swatch to default yellow
+    colorTex:SetVertexColor(1, 0.82, 0, 1)
   end)
 
   yOffset = yOffset - 50
@@ -771,13 +782,18 @@ function categoryPaneProto:SaveSearchCategory()
   -- Update color
   local r, g, b = self.searchDetail.colorTexture:GetVertexColor()
 
+  -- Check if color matches default yellow (with small epsilon for floating point comparison)
+  local isDefaultColor = (math.abs(r - 1.0) < 0.01 and
+                          math.abs(g - 0.82) < 0.01 and
+                          math.abs(b - 0.0) < 0.01)
+
   -- Recreate the category with updated values
   categories:CreateCategory(ctx, {
     name = self.selectedCategory,
     priority = newPriority,
     save = true,
     itemList = filter.itemList or {},
-    color = {r, g, b},
+    color = isDefaultColor and nil or {r, g, b},  -- nil for default, explicit RGB otherwise
     searchCategory = {
       query = newQuery,
       groupBy = newGroupBy,
@@ -807,7 +823,7 @@ function categoryPaneProto:ShowManualCategoryDetail(filter)
   if filter.color then
     self.manualDetail.colorTexture:SetVertexColor(filter.color[1], filter.color[2], filter.color[3], 1)
   else
-    self.manualDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
+    self.manualDetail.colorTexture:SetVertexColor(1, 0.82, 0, 1)  -- Default to Warcraft yellow
   end
 
   -- Update show checkbox state
@@ -873,7 +889,7 @@ function categoryPaneProto:CreateManualDetailPanel()
   colorPicker:SetScript("OnMouseDown", function()
     if not self.selectedCategory then return end
     local filter = categories:GetCategoryByName(self.selectedCategory)
-    local r, g, b = 1, 1, 1
+    local r, g, b = 1, 0.82, 0  -- Default to Warcraft yellow (matches fonts.UnitFrame12Yellow)
     if filter and filter.color then
       r, g, b = filter.color[1], filter.color[2], filter.color[3]
     end
@@ -892,6 +908,17 @@ function categoryPaneProto:CreateManualDetailPanel()
       b = b,
     }
     ColorPickerFrame:SetupColorPickerAndShow(options)
+  end)
+
+  -- Clear Color Button (to reset to default yellow)
+  local clearColorButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
+  clearColorButton:SetPoint("LEFT", colorPicker, "RIGHT", 5, 0)
+  clearColorButton:SetSize(90, 24)
+  clearColorButton:SetText("Reset Color")
+  clearColorButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    -- Reset swatch to default yellow
+    colorTex:SetVertexColor(1, 0.82, 0, 1)
   end)
 
   yOffset = yOffset - 40
@@ -1094,12 +1121,17 @@ function categoryPaneProto:SaveManualCategory()
   -- Update color
   local r, g, b = self.manualDetail.colorTexture:GetVertexColor()
 
+  -- Check if color matches default yellow (with small epsilon for floating point comparison)
+  local isDefaultColor = (math.abs(r - 1.0) < 0.01 and
+                          math.abs(g - 0.82) < 0.01 and
+                          math.abs(b - 0.0) < 0.01)
+
   -- Update the category with new color
   categories:CreateCategory(ctx, {
     name = self.selectedCategory,
     save = filter.save,
     itemList = filter.itemList or {},
-    color = {r, g, b},
+    color = isDefaultColor and nil or {r, g, b},  -- nil for default, explicit RGB otherwise
   })
 
   events:SendMessage(ctx, 'bags/FullRefreshAll')
