@@ -440,6 +440,11 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
     self.searchDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
   end
 
+  -- Update show checkbox state
+  if self.searchDetail.showCheckbox then
+    self.searchDetail.showCheckbox:SetChecked(categories:IsCategoryShown(filter.name))
+  end
+
   -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
   self.searchDetail.renameButton:SetEnabled(not isDynamic)
@@ -687,6 +692,30 @@ function categoryPaneProto:CreateSearchDetailPanel()
 
   yOffset = yOffset - 50
 
+  -- Show Section Checkbox
+  local showCheckbox = CreateFrame("CheckButton", nil, self.searchDetail, "UICheckButtonTemplate")
+  showCheckbox:SetPoint("TOPLEFT", 10, yOffset)
+  self.searchDetail.showCheckbox = showCheckbox
+
+  local showLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showLabel:SetPoint("LEFT", showCheckbox, "RIGHT", 5, 0)
+  showLabel:SetText("Show Section")
+
+  local showDesc = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showDesc:SetPoint("TOPLEFT", showLabel, "BOTTOMLEFT", 0, -5)
+  showDesc:SetPoint("RIGHT", self.searchDetail, "RIGHT", -10, 0)
+  showDesc:SetText("When unchecked, this category will be hidden from the bag view.")
+  showDesc:SetTextColor(0.6, 0.6, 0.6)
+  showDesc:SetFontObject(fonts.UnitFrame12White)
+
+  showCheckbox:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    local ctx = context:New('CategoryPane_ToggleShow')
+    categories:ToggleCategoryShown(ctx, self.selectedCategory)
+  end)
+
+  yOffset = yOffset - 60
+
   -- Save Button
   local saveButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
   saveButton:SetPoint("TOPLEFT", 10, yOffset)
@@ -781,6 +810,11 @@ function categoryPaneProto:ShowManualCategoryDetail(filter)
     self.manualDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
   end
 
+  -- Update show checkbox state
+  if self.manualDetail.showCheckbox then
+    self.manualDetail.showCheckbox:SetChecked(categories:IsCategoryShown(filter.name))
+  end
+
   -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
   self.manualDetail.renameButton:SetEnabled(not isDynamic)
@@ -861,6 +895,30 @@ function categoryPaneProto:CreateManualDetailPanel()
   end)
 
   yOffset = yOffset - 40
+
+  -- Show Section Checkbox
+  local showCheckbox = CreateFrame("CheckButton", nil, self.manualDetail, "UICheckButtonTemplate")
+  showCheckbox:SetPoint("TOPLEFT", 10, yOffset)
+  self.manualDetail.showCheckbox = showCheckbox
+
+  local showLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showLabel:SetPoint("LEFT", showCheckbox, "RIGHT", 5, 0)
+  showLabel:SetText("Show Section")
+
+  local showDesc = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showDesc:SetPoint("TOPLEFT", showLabel, "BOTTOMLEFT", 0, -5)
+  showDesc:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
+  showDesc:SetText("When unchecked, this category will be hidden from the bag view.")
+  showDesc:SetTextColor(0.6, 0.6, 0.6)
+  showDesc:SetFontObject(fonts.UnitFrame12White)
+
+  showCheckbox:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    local ctx = context:New('CategoryPane_ToggleShow')
+    categories:ToggleCategoryShown(ctx, self.selectedCategory)
+  end)
+
+  yOffset = yOffset - 60
 
   -- Items Label
   local itemsLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
