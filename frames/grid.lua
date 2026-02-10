@@ -142,6 +142,7 @@ function gridProto:GetScrollView()
 end
 
 function gridProto:HideScrollBar()
+  self.bar:Hide()
   self.bar:SetAlpha(0)
   self.bar:SetAttribute("nodeignore", true)
 end
@@ -157,6 +158,7 @@ end
 function gridProto:ShowScrollBar()
   self.bar:SetAttribute("nodeignore", false)
   self.bar:SetAlpha(1)
+  self.bar:Show()
 end
 
 -- DislocateCell will dislocate a cell from this grid, making it so
