@@ -1,4 +1,4 @@
-## Interface: 110200, 120000
+## Interface: 120001
 
 ## Title: BetterBags
 ## Category: Inventory
