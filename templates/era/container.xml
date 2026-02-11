@@ -87,6 +87,11 @@
       <AbsDimension y="30"/>
     </Size>
   </Button>
+  <Frame name="BetterBagsCategoryPaneItemFrame" virtual="true">
+    <Size>
+      <AbsDimension y="30"/>
+    </Size>
+  </Frame>
   <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="InsecureActionButtonTemplate">
     <Size>
       <AbsDimension x="115" y="32"/>
