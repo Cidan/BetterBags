@@ -713,5 +713,23 @@ function bank:Create(bag)
 	local b = {}
 	setmetatable(b, { __index = bank.proto })
 	b.bag = bag
+
+	-- Hook the bag's Hide method to automatically exit banking mode.
+	-- This fixes the X button issue for ALL themes (including external themes)
+	-- by ensuring CloseBankFrame() is called whenever the bank is hidden.
+	hooksecurefunc(bag, "Hide", function(selfBag, ctx)
+		-- After bag hides, call CloseBankFrame() to exit banking mode.
+		-- This is safe because:
+		-- 1. CloseBankFrame() is idempotent (safe to call multiple times)
+		-- 2. ESC key path already calls this (will be a no-op here)
+		-- 3. X button path needs this (only place it gets called)
+		-- 4. Hook runs AFTER original Hide completes (can't break original behavior)
+		if C_Bank then
+			C_Bank.CloseBankFrame()
+		elseif CloseBankFrame then
+			CloseBankFrame()
+		end
+	end)
+
 	return b
 end
