@@ -416,6 +416,8 @@ function DB:CreateOrUpdateCategory(category)
       name = category.name,
       enabled = category.enabled,
       dynamic = category.dynamic,
+      isGroupBySubcategory = category.isGroupBySubcategory,
+      groupByParent = category.groupByParent,
       itemList = {},
     }
   end

@@ -33,6 +33,8 @@ local context = addon:GetModule('Context')
 ---@field color? number[] The RGB color of the category name.
 ---@field priority? number The priority of the category. A higher number has a higher priority.
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
+---@field isGroupBySubcategory? boolean If true, this category is a groupBy subcategory and should not be manually deleted.
+---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -311,6 +313,8 @@ function categories:CreateCategory(ctx, category)
     if savedState and savedState.enabled then
       category.enabled = savedState.enabled
       category.dynamic = savedState.dynamic
+      category.isGroupBySubcategory = savedState.isGroupBySubcategory
+      category.groupByParent = savedState.groupByParent
     end
     self.ephemeralCategories[category.name] = category
     for id in pairs(category.itemList) do
@@ -490,6 +494,15 @@ function categories:IsDynamicCategory(category)
     return false
   end
   return self.ephemeralCategories[category] and self.ephemeralCategories[category].dynamic or false
+end
+
+-- IsGroupBySubcategory returns true if a category is a grouped sub-category
+-- (created by a search category with groupBy enabled).
+---@param category string
+---@return boolean
+function categories:IsGroupBySubcategory(category)
+  local filter = self:GetCategoryByName(category)
+  return filter and filter.isGroupBySubcategory or false
 end
 
 ---@param ctx Context

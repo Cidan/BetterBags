@@ -447,13 +447,25 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
 
   -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
-  self.searchDetail.renameButton:SetEnabled(not isDynamic)
-  self.searchDetail.deleteButton:SetEnabled(not isDynamic)
-  if isDynamic then
+  local isGroupBy = categories:IsGroupBySubcategory(filter.name)
+
+  -- Dynamic categories: cannot rename (Blizzard data), but CAN delete (except groupBy subcategories)
+  -- Non-dynamic categories: can both rename and delete
+  local canRename = not isDynamic
+  local canDelete = not isGroupBy  -- Can delete dynamic categories, but not groupBy subcategories
+
+  self.searchDetail.renameButton:SetEnabled(canRename)
+  self.searchDetail.deleteButton:SetEnabled(canDelete)
+
+  if not canRename then
     self.searchDetail.renameButton:SetText("Cannot Rename")
-    self.searchDetail.deleteButton:SetText("Cannot Delete")
   else
     self.searchDetail.renameButton:SetText("Rename")
+  end
+
+  if not canDelete then
+    self.searchDetail.deleteButton:SetText("Cannot Delete")
+  else
     self.searchDetail.deleteButton:SetText("Delete Category")
   end
 end
@@ -833,13 +845,25 @@ function categoryPaneProto:ShowManualCategoryDetail(filter)
 
   -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
-  self.manualDetail.renameButton:SetEnabled(not isDynamic)
-  self.manualDetail.deleteButton:SetEnabled(not isDynamic)
-  if isDynamic then
+  local isGroupBy = categories:IsGroupBySubcategory(filter.name)
+
+  -- Dynamic categories: cannot rename (Blizzard data), but CAN delete (except groupBy subcategories)
+  -- Non-dynamic categories: can both rename and delete
+  local canRename = not isDynamic
+  local canDelete = not isGroupBy  -- Can delete dynamic categories, but not groupBy subcategories
+
+  self.manualDetail.renameButton:SetEnabled(canRename)
+  self.manualDetail.deleteButton:SetEnabled(canDelete)
+
+  if not canRename then
     self.manualDetail.renameButton:SetText("Cannot Rename")
-    self.manualDetail.deleteButton:SetText("Cannot Delete")
   else
     self.manualDetail.renameButton:SetText("Rename")
+  end
+
+  if not canDelete then
+    self.manualDetail.deleteButton:SetText("Cannot Delete")
+  else
     self.manualDetail.deleteButton:SetText("Delete Category")
   end
 

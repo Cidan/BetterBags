@@ -927,7 +927,10 @@ end
 ---@param kind BagKind
 function items:RefreshSearchCache(kind)
 	self:WipeSearchCache(kind)
+	local ctx = context:New('RefreshSearchCache')
 	local categoryTable = categories:GetSortedSearchCategories()
+	local createdGroupByCategories = {} -- Track created groupBy categories to avoid duplicates
+
 	for _, categoryFilter in ipairs(categoryTable) do
 		if categoryFilter.enabled[kind] then
 			local results = search:Search(categoryFilter.searchCategory.query)
@@ -944,6 +947,21 @@ function items:RefreshSearchCache(kind)
 							local suffix = self:GetGroupBySuffix(itemData, groupBy)
 							if suffix and suffix ~= "" then
 								categoryName = categoryFilter.name .. " - " .. suffix
+
+								-- Create the groupBy subcategory object if it doesn't exist yet
+								if not createdGroupByCategories[categoryName] and not categories:DoesCategoryExist(categoryName) then
+									categories:CreateCategory(ctx, {
+										name = categoryName,
+										itemList = {},
+										enabled = categoryFilter.enabled,
+										dynamic = true,
+										isGroupBySubcategory = true,
+										groupByParent = categoryFilter.name,
+										priority = categoryFilter.priority,
+										color = categoryFilter.color,
+									})
+									createdGroupByCategories[categoryName] = true
+								end
 							end
 						end
 					end
