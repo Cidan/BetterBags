@@ -41,6 +41,12 @@ function bank.proto:OnShow()
 end
 
 function bank.proto:OnHide()
+	-- Guard against re-entry to prevent recursion.
+	if self.isHiding then
+		return
+	end
+	self.isHiding = true
+
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
 
@@ -48,12 +54,14 @@ function bank.proto:OnHide()
 	if database:GetEnableBagFading() then
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
+			self.isHiding = false  -- Clear flag after animation completes
 			CloseBankFrame()
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 		end
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
+		self.isHiding = false  -- Clear flag immediately
 		CloseBankFrame()
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 	end

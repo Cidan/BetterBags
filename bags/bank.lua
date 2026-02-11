@@ -717,8 +717,16 @@ function bank:Create(bag)
 	-- Hook the bag's Hide method to automatically exit banking mode.
 	-- This fixes the X button issue for ALL themes (including external themes)
 	-- by ensuring CloseBankFrame() is called whenever the bank is hidden.
+	-- NOTE: Only needed for Retail - Classic/Era handle bank closing differently.
 	hooksecurefunc(bag, "Hide", function(selfBag, ctx)
-		-- After bag hides, call CloseBankFrame() to exit banking mode.
+		-- Skip CloseBankFrame() call in Classic/Era to avoid recursion.
+		-- Classic/Era versions handle bank closing through their OnHide methods
+		-- and BANKFRAME_CLOSED event handlers without needing this hook.
+		if not addon.isRetail then
+			return
+		end
+
+		-- After bag hides, call CloseBankFrame() to exit banking mode (Retail only).
 		-- This is safe because:
 		-- 1. CloseBankFrame() is idempotent (safe to call multiple times)
 		-- 2. ESC key path already calls this (will be a no-op here)
