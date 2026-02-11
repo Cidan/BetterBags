@@ -1096,6 +1096,17 @@ function categoryPaneProto:initItemRow(frame, elementData)
 
   items:GetItemData(ctx, {elementData.id}, function(ectx, itemData)
     frame.item:SetStaticItemFromData(ectx, itemData[1])
+
+    -- In Classic/Era, hide the NormalTexture on the decoration button that creates the border.
+    if not addon.isRetail then
+      local decoration = themes:GetItemButton(ectx, frame.item.button)
+      if decoration then
+        -- The decoration button (ContainerFrameItemButtonTemplate) has a NormalTexture
+        -- that creates a visible border frame around the icon in Classic/Era
+        decoration:GetNormalTexture():Hide()
+        decoration:GetNormalTexture():SetTexture(nil)
+      end
+    end
   end)
 end
 
