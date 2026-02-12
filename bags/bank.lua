@@ -33,6 +33,10 @@ local tabs = addon:GetModule("Tabs")
 --- Bank Behavior Prototype
 -------
 
+-- Guard flag to prevent recursive CloseBankFrame() calls from the Hide hook.
+-- Set to true when the hook calls CloseBankFrame(), cleared after event processing.
+local isClosingBank = false
+
 --- BankBehaviorProto defines the behavior specific to the player's bank.
 ---@class BankBehaviorProto
 ---@field bag Bag Reference to the parent bag
@@ -726,17 +730,30 @@ function bank:Create(bag)
 			return
 		end
 
+		-- Guard against recursion: if we're already closing the bank, don't call CloseBankFrame() again.
+		-- This prevents infinite recursion when BANKFRAME_CLOSED event handler calls Hide():
+		--   Hide() → hook calls CloseBankFrame() → BANKFRAME_CLOSED → addon.CloseBank() → Hide() → loop
+		if isClosingBank then
+			return
+		end
+
+		-- Set guard flag before calling CloseBankFrame()
+		isClosingBank = true
+
 		-- After bag hides, call CloseBankFrame() to exit banking mode (Retail only).
-		-- This is safe because:
-		-- 1. CloseBankFrame() is idempotent (safe to call multiple times)
-		-- 2. ESC key path already calls this (will be a no-op here)
-		-- 3. X button path needs this (only place it gets called)
-		-- 4. Hook runs AFTER original Hide completes (can't break original behavior)
+		-- This handles the X button close path (ESC key path already calls CloseBankFrame()).
 		if C_Bank then
 			C_Bank.CloseBankFrame()
 		elseif CloseBankFrame then
 			CloseBankFrame()
 		end
+
+		-- Clear the guard flag after event processing completes.
+		-- Using C_Timer.After(0, ...) ensures the flag is cleared after the current
+		-- event chain finishes, allowing future bank closes to work properly.
+		C_Timer.After(0, function()
+			isClosingBank = false
+		end)
 	end)
 
 	return b

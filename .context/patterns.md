@@ -224,44 +224,54 @@ end
 - core/hooks.lua:111-134 (CloseSpecialWindows hook)
 - core/hooks.lua:138-153 (CloseBank event handler)
 
-### Pattern: Version-Specific Bank Closing to Prevent Recursion
-**Problem**: Stack overflow/infinite recursion when closing the bank in Classic/Era (not Retail), caused by duplicate `CloseBankFrame()` calls creating a loop: Hide() → hooksecurefunc → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → repeat.
+### Pattern: Bank Closing Recursion Prevention with Guard Flags
+**Problem**: Stack overflow/infinite recursion when closing the bank, caused by `CloseBankFrame()` calls creating event loops that call `Hide()` again.
 
-**Why**: Retail and Classic/Era have fundamentally different bank closing mechanisms:
-- **Retail**: Requires a hooksecurefunc on `bag:Hide()` to call `CloseBankFrame()` for X button closes (added in commit 8735c8f)
-- **Classic/Era**: Handle bank closing directly in `OnHide()` methods; the hooksecurefunc creates duplicate calls leading to recursion
+**Why**: Bank closing involves multiple paths that can trigger each other:
+- **hooksecurefunc on Hide()**: Calls `CloseBankFrame()` when bank hides (needed for X button in Retail)
+- **BANKFRAME_CLOSED event**: Calls `addon.CloseBank()` which calls `Hide()`
+- **OnHide methods** (Classic/Era): Called when frame hides, may call `CloseBankFrame()`
 
-The hooksecurefunc fires immediately after `bag:Hide()` completes, even if the frame is still visible (during fade animations). This causes:
-1. bag:Hide() → OnHide() starts fade animation (frame still shown)
-2. hooksecurefunc fires → calls CloseBankFrame()
-3. BANKFRAME_CLOSED event → CloseBank() → Hide() again
-4. Frame still shown (animating) → OnHide() runs again → **RECURSION**
+Without guards, these create recursion loops:
+1. Hide() is called → hooksecurefunc fires → calls CloseBankFrame()
+2. BANKFRAME_CLOSED event → addon.CloseBank() → Hide() again
+3. Frame may still be visible (fade animation) → triggers hooksecurefunc again → **RECURSION**
 
-**Solution Pattern**:
-1. **Skip hooksecurefunc for Classic/Era** - Check `addon.isRetail` and return early for non-Retail versions
-2. **Keep CloseBankFrame() in Classic/Era OnHide()** - These versions need direct calls for X button support
-3. **Add isHiding guard flag** - Prevent re-entry into OnHide() while it's already executing
-4. **Clear flag appropriately** - After fade completes (callback) or immediately (non-fade path)
+**Solution Pattern**: Use guard flags at each potential recursion point:
 
-**Example** (bags/bank.lua:720-741):
+**1. Retail hooksecurefunc** - Module-level guard flag prevents re-entry (bags/bank.lua):
 ```lua
--- Hook only needed for Retail
+-- Module-level guard flag
+local isClosingBank = false
+
 hooksecurefunc(bag, "Hide", function(selfBag, ctx)
-  -- Skip CloseBankFrame() call in Classic/Era to avoid recursion
+  -- Skip for Classic/Era (they handle it differently)
   if not addon.isRetail then
     return
   end
 
-  -- Retail: call CloseBankFrame() to handle X button closes
+  -- Guard against recursion
+  if isClosingBank then
+    return
+  end
+
+  isClosingBank = true
+
+  -- Call CloseBankFrame() to handle X button closes
   if C_Bank then
     C_Bank.CloseBankFrame()
   elseif CloseBankFrame then
     CloseBankFrame()
   end
+
+  -- Clear flag after event processing completes
+  C_Timer.After(0, function()
+    isClosingBank = false
+  end)
 end)
 ```
 
-**Example** (bags/classic/bank.lua & bags/era/bank.lua):
+**2. Classic/Era OnHide** - Instance-level guard flag prevents re-entry (bags/classic/bank.lua & bags/era/bank.lua):
 ```lua
 function bank.proto:OnHide()
   -- Guard against re-entry to prevent recursion
@@ -270,6 +280,10 @@ function bank.proto:OnHide()
   end
   self.isHiding = true
 
+  -- IMPORTANT: Do NOT call CloseBankFrame() here.
+  -- The hooksecurefunc would create recursion. Instead, Classic/Era
+  -- rely on the CloseSpecialWindows hook to call CloseBankFrame().
+
   addon.ForceHideBlizzardBags()
   PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
 
@@ -277,32 +291,42 @@ function bank.proto:OnHide()
     self.bag.fadeOutGroup.callback = function()
       self.bag.fadeOutGroup.callback = nil
       self.isHiding = false  -- Clear after animation
-      CloseBankFrame()
       ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
     end
     self.bag.fadeOutGroup:Play()
   else
     self.bag.frame:Hide()
     self.isHiding = false  -- Clear immediately
-    CloseBankFrame()
     ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
   end
 end
 ```
 
 **How It Prevents Recursion**:
-- **ESC key**: CloseSpecialWindows → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → isHiding check returns early ✅
-- **X button**: Hide() → OnHide() sets isHiding → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → isHiding check returns early ✅
+
+**Retail:**
+- **ESC key**: CloseSpecialWindows → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → isClosingBank=true, so hooksecurefunc returns early ✅
+- **X button**: Hide() → hooksecurefunc sets isClosingBank=true → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → isClosingBank=true, returns early ✅
+
+**Classic/Era:**
+- **ESC key**: CloseSpecialWindows → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → OnHide() sets isHiding=true → subsequent Hide() calls return early ✅
+- **X button**: Hide() → OnHide() sets isHiding=true → subsequent Hide() calls return early ✅
+
+**Key Differences**:
+- **Retail**: Uses module-level `isClosingBank` flag in hooksecurefunc + NO CloseBankFrame() in OnHide
+- **Classic/Era**: Uses instance-level `isHiding` flag in OnHide + NO hooksecurefunc (skipped via isRetail check)
 
 **When to Apply**:
-- Any version-specific WoW API behavior that differs between Retail and Classic/Era
+- Any hooks that call functions triggering events that can loop back
 - When debugging stack overflow/recursion issues in event chains
-- When implementing hooks that call functions triggering events that loop back
+- When implementing bank closing or similar multi-path close mechanisms
+- Any version-specific WoW API behavior that differs between Retail and Classic/Era
 
 **Related Files**:
-- bags/bank.lua:717-741 (Version-specific hooksecurefunc)
-- bags/era/bank.lua:43-75 (OnHide with CloseBankFrame and guard)
-- bags/classic/bank.lua:43-75 (OnHide with CloseBankFrame and guard)
+- bags/bank.lua:32-38 (Module-level isClosingBank guard flag)
+- bags/bank.lua:723-757 (Retail hooksecurefunc with guard flag)
+- bags/era/bank.lua:43-60 (OnHide with isHiding guard, no CloseBankFrame)
+- bags/classic/bank.lua:43-60 (OnHide with isHiding guard, no CloseBankFrame)
 - core/constants.lua:18-23 (Version detection flags)
 
 ## State Management Across Events
