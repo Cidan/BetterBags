@@ -9,9 +9,6 @@ local const = addon:GetModule('Constants')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -41,7 +38,7 @@ local context = addon:GetModule('Context')
 ---@field SetTitle fun(frame: Frame, title: string) A function that sets the title of the frame.
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
----@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
+---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels.
 ---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
 ---@field Tab? fun(tab: Button): PanelTabButtonTemplate A function that applies the theme to a tab.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.

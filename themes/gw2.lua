@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
 
