@@ -3,9 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -14,7 +11,6 @@ local grid = addon:NewModule('Grid')
 
 ---@class Cell
 ---@field frame Frame
-local cellProto = {}
 
 ------
 --- Grid Proto

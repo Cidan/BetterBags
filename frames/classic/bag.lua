@@ -7,14 +7,8 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class BagFrame: AceModule
 local bagFrame = addon:GetModule('BagFrame')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
-
----@class Items: AceModule
-local items = addon:GetModule('Items')
 
 ---@class BagSlots: AceModule
 local bagSlots = addon:GetModule('BagSlots')
@@ -24,9 +18,6 @@ local database = addon:GetModule('Database')
 
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')
-
----@class MoneyFrame: AceModule
-local money = addon:GetModule('MoneyFrame')
 
 ---@class Views: AceModule
 local views = addon:GetModule('Views')

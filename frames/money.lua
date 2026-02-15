@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class MoneyFrame: AceModule
 local money = addon:NewModule('MoneyFrame')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -23,7 +20,7 @@ local events = addon:GetModule('Events')
 money.moneyProto = {}
 
 function money.moneyProto:Update()
-  local currentMoney = 0
+  local currentMoney
   if self.warbank then
     currentMoney = C_Bank.FetchDepositedMoney(Enum.BankType.Account)
   else

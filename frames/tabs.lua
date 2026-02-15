@@ -9,23 +9,14 @@ local tabs = addon:NewModule("Tabs")
 ---@class Themes: AceModule
 local themes = addon:GetModule("Themes")
 
----@class Debug: AceModule
-local debug = addon:GetModule("Debug")
-
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule("SectionFrame")
-
----@class Groups: AceModule
-local groups = addon:GetModule("Groups")
 
 ---@class Context: AceModule
 local context = addon:GetModule("Context")
 
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
-
----@class Constants: AceModule
-local const = addon:GetModule("Constants")
 
 ---@class Database: AceModule
 local database = addon:GetModule("Database")

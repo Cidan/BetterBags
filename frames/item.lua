@@ -20,12 +20,6 @@ local database = addon:GetModule("Database")
 ---@class Color: AceModule
 local color = addon:GetModule("Color")
 
----@class Categories: AceModule
-local categories = addon:GetModule("Categories")
-
----@class EquipmentSets: AceModule
-local equipmentSets = addon:GetModule("EquipmentSets")
-
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
 
@@ -34,9 +28,6 @@ local items = addon:GetModule("Items")
 
 ---@class Themes: AceModule
 local themes = addon:GetModule("Themes")
-
----@class Search: AceModule
-local search = addon:GetModule("Search")
 
 ---@class Context: AceModule
 local context = addon:GetModule("Context")

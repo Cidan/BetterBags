@@ -141,7 +141,7 @@ function CurrencyIconGrid:CreateCurrencyItem(index)
 
   item.count = item.frame:CreateFontString(nil, "ARTWORK", "Number12Font")
   item.count:SetPoint("RIGHT", item.frame, "RIGHT", -5, 0)
-  _ = index
+  local _ = index
 
   return item
 end

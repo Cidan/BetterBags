@@ -19,9 +19,6 @@ local const = addon:GetModule('Constants')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -446,7 +443,7 @@ end
 ---@param ctx Context
 ---@param f Section
 function sectionFrame._DoReset(ctx, f)
-  _ = ctx
+  local _ = ctx
   f:EnableHeader()
   f:GetContent():SortHorizontal()
   f:Wipe()
@@ -525,7 +522,7 @@ function sectionFrame:OnTitleRightClick(section)
     list = newlist
   end
 
-  -- Only DF since warbank has Enum.BankType 
+  -- Only DF since warbank has Enum.BankType
   local containerType = nil
   if Enum.BankType and flow == const.MOVEMENT_FLOW.WARBANK then
     containerType = Enum.BankType.Account

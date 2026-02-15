@@ -13,29 +13,14 @@ local L = addon:GetModule("Localization")
 ---@class Constants: AceModule
 local const = addon:GetModule("Constants")
 
----@class GridFrame: AceModule
-local grid = addon:GetModule("Grid")
-
 ---@class Items: AceModule
 local items = addon:GetModule("Items")
-
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule("ItemFrame")
-
----@class BagSlots: AceModule
-local bagSlots = addon:GetModule("BagSlots")
-
----@class SectionFrame: AceModule
-local sectionFrame = addon:GetModule("SectionFrame")
 
 ---@class Database: AceModule
 local database = addon:GetModule("Database")
 
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule("ContextMenu")
-
----@class MoneyFrame: AceModule
-local money = addon:GetModule("MoneyFrame")
 
 ---@class Views: AceModule
 local views = addon:GetModule("Views")
@@ -58,20 +43,11 @@ local categories = addon:GetModule("Categories")
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub("LibWindow-1.1")
 
----@class Currency: AceModule
-local currency = addon:GetModule("Currency")
-
----@class Context: AceModule
-local context = addon:GetModule("Context")
-
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule("SearchBox")
 
 ---@class Search: AceModule
 local search = addon:GetModule("Search")
-
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule("ThemeConfig")
 
 ---@class Themes: AceModule
 local themes = addon:GetModule("Themes")
@@ -81,9 +57,6 @@ local windowGroup = addon:GetModule("WindowGroup")
 
 ---@class Anchor: AceModule
 local anchor = addon:GetModule("Anchor")
-
----@class Tabs: AceModule
-local tabs = addon:GetModule("Tabs")
 
 ---@class BackpackBehavior: AceModule
 local backpackBehavior = addon:GetModule("BackpackBehavior")

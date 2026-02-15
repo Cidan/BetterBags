@@ -8,23 +8,11 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field frame Frame
 local contextMenu = addon:NewModule('ContextMenu')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class SliderFrame: AceModule
-local slider = addon:GetModule('Slider')
-
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
-
----@class Items: AceModule
-local items = addon:GetModule('Items')
 
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
@@ -49,7 +37,6 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field menuList? MenuList[]
 ---@field keepShownOnClick? boolean
 ---@field tooltipOnButton? boolean
-local menuListProto = {}
 
 function contextMenu:OnInitialize()
   --self:CreateContext()
