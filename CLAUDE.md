@@ -14,3 +14,7 @@ Never make any changes without directly confirming that the functions, code, API
 ## Pattern Learning
 
 As you work through problems and discover new abstract patterns (especially debugging techniques, API workarounds, or architectural decisions), update `.context/patterns.md` with the new pattern. This helps future contexts understand the codebase's design decisions.
+
+## Commit Requirement
+
+If any file changes are made, create a new git commit in the same task. Commit messages must be detailed and explain what changed and why.
