@@ -18,3 +18,7 @@ As you work through problems and discover new abstract patterns (especially debu
 ## Commit Requirement
 
 If any file changes are made, create a new git commit in the same task. Commit messages must be detailed and explain what changed and why.
+
+## Luacheck Requirement
+
+For any code changes, always run `luacheck .` from the repository root before finishing. Add any newly introduced WoW API globals to `.luacheckrc` as needed.

@@ -3,7 +3,9 @@ max_line_length = false
 codes = true
 exclude_files = {
 	"**/.libraries",
-    "**/libs"
+    "**/libs",
+	"annotations.lua",
+	"**/examples"
 }
 
 ignore = {
