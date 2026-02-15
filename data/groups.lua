@@ -12,9 +12,6 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class (exact) Groups: AceModule
 local groups = addon:NewModule('Groups')
 

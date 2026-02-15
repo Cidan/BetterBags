@@ -57,6 +57,34 @@ _ = item
 
 **When to Apply**: Stub methods, callbacks, or compatibility shims where arguments are intentionally unused.
 
+### Pattern: Compute Toggle State Inside the Active Branch
+**Problem**: Declaring a shared `enabled` variable and only assigning it in one branch can pass `nil` into state setters in other branches.
+
+**Why**: Lua locals default to `nil`. If branch A assigns `enabled` but branch B does not, branch B still calls setters with `nil`, causing silent no-op behavior or inconsistent state.
+
+**Solution Pattern**: Derive `enabled` from the currently selected data source inside each branch:
+```lua
+-- BAD: branch-specific assignment with shared variable
+local enabled
+if isEphemeral then
+  enabled = not ephemeral.enabled[kind]
+else
+  -- enabled is still nil here
+end
+setEnabled(kind, category, enabled)
+
+-- GOOD: compute per branch
+if isEphemeral then
+  local enabled = not ephemeral.enabled[kind]
+  setEphemeralEnabled(kind, category, enabled)
+else
+  local enabled = not persistent.enabled[kind]
+  setPersistentEnabled(kind, category, enabled)
+end
+```
+
+**When to Apply**: Toggle handlers that support multiple storage backends (ephemeral/persistent, cache/db, etc.).
+
 ### Pattern: Cannot Override Functions Called in Protected Contexts
 **Problem**: Overriding Blizzard functions that are called during protected actions (combat, secure actions like UseContainerItem) causes `ADDON_ACTION_FORBIDDEN` errors.
 

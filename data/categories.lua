@@ -227,16 +227,15 @@ end
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:ToggleCategory(kind, category)
-  ---@type boolean
-  local enabled
   if self.ephemeralCategories[category] then
-    enabled = not self.ephemeralCategories[category].enabled[kind]
+    local enabled = not self.ephemeralCategories[category].enabled[kind]
     self.ephemeralCategories[category].enabled[kind] = enabled
     database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
     return
   end
   local filter = database:GetItemCategory(category)
   if filter then
+    local enabled = not (filter.enabled and filter.enabled[kind])
     database:SetItemCategoryEnabled(kind, category, enabled)
   end
 end
@@ -552,8 +551,9 @@ function categories:GetCustomCategory(ctx, kind, data)
   -- registered functions for every item.
   if self.itemsWithNoCategory[itemID] then return nil end
 
+  local errorHandler = (_G.geterrorhandler and _G.geterrorhandler()) or error
   for _, func in pairs(self.categoryFunctions) do
-    local success, args = xpcall(func, geterrorhandler(), data)
+    local success, args = xpcall(func, errorHandler, data)
     if success and args ~= nil then
       local category = select(1, args) --[[@as string]]
       local found = self.ephemeralCategories[category] and true or false
