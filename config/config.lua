@@ -3,9 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
@@ -20,9 +17,6 @@ local events = addon:GetModule('Events')
 
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
 
 ---@class Bucket: AceModule
 local bucket = addon:GetModule('Bucket')

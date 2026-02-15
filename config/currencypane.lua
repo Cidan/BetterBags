@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
@@ -156,7 +153,7 @@ end
 ---@param button CurrencyPaneListButton
 ---@param elementData table
 function currencyPaneProto:resetListItem(button, elementData)
-  _ = elementData
+  local _ = elementData
   button:SetScript("OnClick", nil)
   button:SetScript("OnEnter", nil)
   button:SetScript("OnLeave", nil)

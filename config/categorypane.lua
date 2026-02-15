@@ -9,17 +9,11 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
-
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
@@ -224,7 +218,7 @@ end
 ---@param button CategoryPaneListButton
 ---@param elementData table
 function categoryPaneProto:resetListItem(button, elementData)
-  _ = elementData
+  local _ = elementData
   button:SetScript("OnClick", nil)
   button:SetScript("OnEnter", nil)
   button:SetScript("OnLeave", nil)
@@ -1137,7 +1131,7 @@ end
 ---@param frame CategoryPaneItemFrame
 ---@param elementData table
 function categoryPaneProto:resetItemRow(frame, elementData)
-  _ = elementData
+  local _ = elementData
   local ctx = context:New("CategoryPane_ItemRow_Reset")
   if frame.item then
     frame.item:ClearItem(ctx)

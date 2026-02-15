@@ -12,9 +12,6 @@ local database = addon:GetModule('Database')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
-
 ---@class ItemColorPane: AceModule
 local itemColorPane = addon:NewModule('ItemColorPane')
 

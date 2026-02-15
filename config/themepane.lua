@@ -3,12 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
-
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
@@ -17,9 +11,6 @@ local themes = addon:GetModule('Themes')
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
-
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
 
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
@@ -124,7 +115,7 @@ end
 ---@param button ThemePaneListButton
 ---@param elementData table
 function themePaneProto:resetListItem(button, elementData)
-  _ = elementData
+  local _ = elementData
   button:SetScript("OnClick", nil)
   button:SetScript("OnEnter", nil)
   button:SetScript("OnLeave", nil)
