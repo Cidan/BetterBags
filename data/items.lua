@@ -258,7 +258,7 @@ end
 ---@param targets table<string, MoveTargetData>
 ---@param movePairs table<string, MoveTargetData>
 function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
-	_ = ctx
+	local _ = ctx
 
 	-- Don't move items that are already full.
 	if item.itemInfo.currentItemCount == item.itemInfo.itemStackCount then
@@ -363,7 +363,7 @@ end
 ---@param movePairs table<string, MoveTargetData>
 ---@param takenEmptySlots table<string, boolean>
 function items:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
-	_ = ctx
+	local _ = ctx
 	_ = targets
 	_ = movePairs
 	_ = takenEmptySlots
@@ -439,7 +439,7 @@ function items:Restack(ctx, kind, callback)
 		debug:Inspect("MovePairs", movePairs)
 	end
 	async:Until(ctx, function(ectx)
-		_ = ectx
+		local _ = ectx
 		for _, movePair in ipairs(movePairs) do
 			if not movePair.done then
 				if movePair.partial and movePair.partial > 0 then

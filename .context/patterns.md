@@ -39,6 +39,24 @@ end
 
 **When to Apply**: Any time you use `_` as a throwaway variable. Always verify assignments have `local` in the SAME statement.
 
+### Pattern: Mark Unused Parameters with a Local Throwaway
+**Problem**: Using `_ = arg` to silence unused-parameter warnings writes to global `_`, which creates taint risk and triggers `luacheck` `W111`.
+
+**Why**: In Lua 5.1/WoW, `_` is global unless explicitly declared local in the current scope.
+
+**Solution Pattern**: Localize `_` once per scope before throwaway assignments:
+```lua
+-- BAD: global write
+_ = ctx
+_ = item
+
+-- GOOD: local throwaway in this scope
+local _ = ctx
+_ = item
+```
+
+**When to Apply**: Stub methods, callbacks, or compatibility shims where arguments are intentionally unused.
+
 ### Pattern: Cannot Override Functions Called in Protected Contexts
 **Problem**: Overriding Blizzard functions that are called during protected actions (combat, secure actions like UseContainerItem) causes `ADDON_ACTION_FORBIDDEN` errors.
 
