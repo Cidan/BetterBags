@@ -45,6 +45,7 @@ globals = {
 	"CreateFont",
 	"CreateScrollBoxLinearView",
 	"CursorHasItem",
+	"debugprofilestop",
 	"debugstack",
 	"DragIntersectionArea",
 	"EquipmentManager_GetLocationData",
