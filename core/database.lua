@@ -10,6 +10,12 @@ local const = addon:GetModule('Constants')
 ---@field private data databaseOptions
 local DB = addon:NewModule('Database')
 
+---@class (exact) ColorDef
+---@field red number
+---@field green number
+---@field blue number
+---@field alpha number
+
 function DB:OnInitialize()
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
@@ -244,7 +250,7 @@ function DB:GetItemLevelColors()
 end
 
 ---@param colorKey "low"|"mid"|"high"|"max"
----@param color {red: number, green: number, blue: number, alpha: number}
+---@param color ColorDef
 function DB:SetItemLevelColor(colorKey, color)
   DB.data.profile.itemLevelColor.colors[colorKey] = color
 end
