@@ -3,9 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
@@ -844,8 +841,6 @@ function stackedLayout:AddSlider(opts)
       end
       container.slider:SetValue(value)
       container.input:SetText(tostring(value))
-    else
-      value = opts.min
     end
     container.input:SetText(tostring(container.slider:GetValue()))
     self:ReloadAllFormElements()
@@ -861,8 +856,6 @@ function stackedLayout:AddSlider(opts)
         end
         container.slider:SetValue(value)
         container.input:SetText(tostring(value))
-      else
-        value = opts.min
       end
     else
       container.input:SetText(tostring(container.slider:GetValue()))
