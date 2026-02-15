@@ -9,9 +9,6 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
@@ -20,9 +17,6 @@ local items = addon:GetModule('Items')
 
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
 
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
@@ -61,7 +55,7 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 function views.viewProto:Render(ctx, bag, slotInfo, callback)
-  _ = ctx
+  local _ = ctx
   _ = bag
   _ = slotInfo
   _ = callback
@@ -71,14 +65,14 @@ end
 ---@param oldSlotKey string
 ---@param newSlotKey? string
 function views.viewProto:ReindexSlot(oldSlotKey, newSlotKey)
-  _ = oldSlotKey
+  local _ = oldSlotKey
   _ = newSlotKey
   error('ReindexSlot method not implemented')
 end
 
 ---@param newSlotKey string
 function views.viewProto:AddSlot(newSlotKey)
-  _ = newSlotKey
+  local _ = newSlotKey
   error('AddSlot method not implemented')
 end
 
@@ -280,7 +274,7 @@ end
 
 ---@param bag Bag
 function views.viewProto:UpdateListSize(bag)
-  _ = bag
+  local _ = bag
 end
 
 ---@param ctx Context

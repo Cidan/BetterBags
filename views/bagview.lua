@@ -15,9 +15,6 @@ local const = addon:GetModule('Constants')
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
