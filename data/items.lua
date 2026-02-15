@@ -740,7 +740,7 @@ function items:UpdateFreeSlots(ctx, kind)
 	end
 	for bagid in pairs(baglist) do
 		local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
-		local name = ""
+		local name
 		local invid = C_Container.ContainerIDToInventoryID(bagid)
 		local baglink = GetInventoryItemLink("player", invid)
 		if baglink ~= nil and invid ~= nil then
@@ -798,7 +798,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
 	for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
 		local bagid = currentItem.bagid
 		local slotid = currentItem.slotid
-		local name = ""
+		local name
 		local previousItem = slotInfo:GetPreviousItemByBagAndSlot(bagid, slotid)
 		local invid = C_Container.ContainerIDToInventoryID(bagid)
 		local baglink = GetInventoryItemLink("player", invid)

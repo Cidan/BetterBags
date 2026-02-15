@@ -6,18 +6,42 @@ exclude_files = {
     "**/libs"
 }
 
+ignore = {
+    "212/self",
+}
 globals = {
 
 	"bit",
+	"C_Container",
+	"C_Item",
+	"C_NewItems",
+	"C_TransmogCollection",
+	"ClearCursor",
+	"ContinuableContainer",
 	"debugstack",
+	"Enum",
 	"floor",
 	"format",
-	"gsub",
+	"GameMenuFrame",
+	"GetCursorInfo",
+	"GetDetailedItemLevelInfo",
+	"GetInventoryItemLink",
+	"GetInventoryItemQuality",
+	"GetItemInfo",
+	"GetTalentTabInfo",
 	"hooksecurefunc",
+	"INVSLOT_FIRST_EQUIPPED",
+	"INVSLOT_LAST_EQUIPPED",
+	"Item",
+	"ItemLocation",
+	"LibStub",
+	"gsub",
 	"sort",
 	"strfind",
 	"string.join",
+	"string.split",
 	"strjoin",
+	"strsplittable",
 	"strlen",
 	"strlower",
 	"strmatch",
@@ -28,11 +52,9 @@ globals = {
 	"strupper",
 	"table.wipe",
 	"tan",
+	"time",
 	"tinsert",
 	"tremove",
 	"tContains",
-	"GetTalentTabInfo",
-    "C_Item",
-    "Enum",
-    "strsplittable"
+	"wipe",
 }
