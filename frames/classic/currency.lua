@@ -63,7 +63,7 @@ end
 local CurrencyIconGrid = {}
 
 function CurrencyIconGrid:Show()
-  self.iconGrid.frame:Show()
+  self.iconGrid:GetFrame():Show()
 end
 
 function CurrencyIconGrid:Hide(callback)
@@ -72,12 +72,12 @@ function CurrencyIconGrid:Hide(callback)
     self.fadeOut.callback = callback
     self.fadeOut:Play()
   else
-    self.iconGrid.frame:Hide()
+    self.iconGrid:GetFrame():Hide()
   end
 end
 
 function CurrencyIconGrid:IsShown()
-  return self.iconGrid.frame:IsShown()
+  return self.iconGrid:GetFrame():IsShown()
 end
 
 function CurrencyIconGrid:Update()

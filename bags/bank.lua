@@ -722,7 +722,7 @@ function bank:Create(bag)
 	-- This fixes the X button issue for ALL themes (including external themes)
 	-- by ensuring CloseBankFrame() is called whenever the bank is hidden.
 	-- NOTE: Only needed for Retail - Classic/Era handle bank closing differently.
-	hooksecurefunc(bag, "Hide", function(selfBag, ctx)
+	hooksecurefunc(bag, "Hide", function()
 		-- Skip CloseBankFrame() call in Classic/Era to avoid recursion.
 		-- Classic/Era versions handle bank closing through their OnHide methods
 		-- and BANKFRAME_CLOSED event handlers without needing this hook.

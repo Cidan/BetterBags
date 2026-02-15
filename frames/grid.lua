@@ -124,7 +124,6 @@ function gridProto:GetAllCells()
   return self.idToCell
 end
 
----@private
 ---@return Frame|WowScrollBox
 function gridProto:GetFrame()
   if self.scrollable then

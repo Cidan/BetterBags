@@ -733,8 +733,8 @@ function itemFrame:OnEnable()
 	self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
 	self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
 
-	events:RegisterMessage("itemLevel/MaxChanged", function(ctx)
-		self:RefreshItemLevelColors(ctx)
+	events:RegisterMessage("itemLevel/MaxChanged", function()
+		self:RefreshItemLevelColors()
 	end)
 
 	local ctx = context:New("itemFrame_OnEnable")
@@ -866,8 +866,7 @@ function itemFrame:Create(ctx)
 	return item
 end
 
----@param ctx Context
-function itemFrame:RefreshItemLevelColors(ctx)
+function itemFrame:RefreshItemLevelColors()
 	for item in pairs(self.activeItems) do
 		if item.slotkey and item.slotkey ~= "" and not item.isFreeSlot then
 			local data = items:GetItemDataFromSlotKey(item.slotkey)
