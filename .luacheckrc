@@ -4,6 +4,7 @@ codes = true
 exclude_files = {
 	"**/.libraries",
     "**/libs",
+	"**/.luarocks",
 	"annotations.lua",
 	"**/examples"
 }
