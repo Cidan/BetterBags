@@ -524,7 +524,8 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
----@return string|nil
+---@return string|nil categoryName
+---@return number|nil priority
 function categories:GetCustomCategory(ctx, kind, data)
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
@@ -534,22 +535,22 @@ function categories:GetCustomCategory(ctx, kind, data)
     ctx = context:New('GetCustomCategory')
   end
   local itemID = data.itemInfo.itemID
-  if not itemID then return nil end
+  if not itemID then return nil, nil end
   local filter = database:GetItemCategoryByItemID(itemID)
   if filter.enabled and filter.enabled[kind] then
-    return filter.name
+    return filter.name, filter.priority or 10
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
 
   if filter and filter.enabled[kind] then
-    return filter.name
+    return filter.name, filter.priority or 10
   end
 
   -- Check for items that had no category previously. This
   -- is a performance optimization to avoid calling all
   -- registered functions for every item.
-  if self.itemsWithNoCategory[itemID] then return nil end
+  if self.itemsWithNoCategory[itemID] then return nil, nil end
 
   local errorHandler = (_G.geterrorhandler and _G.geterrorhandler()) or error
   for _, func in pairs(self.categoryFunctions) do
@@ -563,12 +564,15 @@ function categories:GetCustomCategory(ctx, kind, data)
         events:SendMessage(ctx, 'categories/Changed')
       end
       if self:IsCategoryEnabled(kind, category) then
-        return category
+        -- Get priority from the category if it exists
+        local categoryFilter = self.ephemeralCategories[category]
+        local priority = categoryFilter and categoryFilter.priority or 10
+        return category, priority
       end
     end
   end
   self.itemsWithNoCategory[itemID] = true
-  return nil
+  return nil, nil
 end
 
 ---@param id number The ItemID of the item to remove from a custom category.

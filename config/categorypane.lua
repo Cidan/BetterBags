@@ -160,10 +160,10 @@ function categoryPaneProto:initListItem(button, elementData)
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
 
-    -- Show note based on category state
+    -- Show note based on category state (priority for both search and item list categories)
     local filter = categories:GetCategoryByName(elementData.title)
-    if filter and filter.searchCategory then
-      button.Note:SetText(format("P:%d", filter.priority or 0))
+    if filter and filter.priority then
+      button.Note:SetText(format("P:%d", filter.priority))
     else
       button.Note:SetText("")
     end
@@ -832,6 +832,11 @@ function categoryPaneProto:ShowManualCategoryDetail(filter)
     self.manualDetail.colorTexture:SetVertexColor(1, 0.82, 0, 1)  -- Default to Warcraft yellow
   end
 
+  -- Update priority
+  if self.manualDetail.priorityBox then
+    self.manualDetail.priorityBox:SetText(tostring(filter.priority or 10))
+  end
+
   -- Update show checkbox state
   if self.manualDetail.showCheckbox then
     self.manualDetail.showCheckbox:SetChecked(categories:IsCategoryShown(filter.name))
@@ -938,6 +943,24 @@ function categoryPaneProto:CreateManualDetailPanel()
     -- Reset swatch to default yellow
     colorTex:SetVertexColor(1, 0.82, 0, 1)
   end)
+
+  yOffset = yOffset - 40
+
+  -- Priority Label
+  local priorityLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  priorityLabel:SetPoint("TOPLEFT", 10, yOffset)
+  priorityLabel:SetText("Priority (0-99)")
+
+  yOffset = yOffset - 20
+
+  -- Priority EditBox
+  local priorityBox = CreateFrame("EditBox", nil, self.manualDetail, "InputBoxTemplate")
+  priorityBox:SetPoint("TOPLEFT", 15, yOffset)
+  priorityBox:SetSize(60, 25)
+  priorityBox:SetAutoFocus(false)
+  priorityBox:SetNumeric(true)
+  priorityBox:SetMaxLetters(2)
+  self.manualDetail.priorityBox = priorityBox
 
   yOffset = yOffset - 40
 
@@ -1147,6 +1170,9 @@ function categoryPaneProto:SaveManualCategory()
 
   local ctx = context:New('CategoryPane_SaveManualCategory')
 
+  -- Update priority
+  local newPriority = tonumber(self.manualDetail.priorityBox:GetText()) or 10
+
   -- Update color
   local r, g, b = self.manualDetail.colorTexture:GetVertexColor()
 
@@ -1155,11 +1181,12 @@ function categoryPaneProto:SaveManualCategory()
                           math.abs(g - 0.82) < 0.01 and
                           math.abs(b - 0.0) < 0.01)
 
-  -- Update the category with new color
+  -- Update the category with new color and priority
   categories:CreateCategory(ctx, {
     name = self.selectedCategory,
     save = filter.save,
     itemList = filter.itemList or {},
+    priority = newPriority,
     color = isDefaultColor and nil or {r, g, b},  -- nil for default, explicit RGB otherwise
   })
 
