@@ -1,0 +1,28 @@
+name: Luacheck
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  luacheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Lua and LuaRocks
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.1"
+
+      - name: Install LuaRocks
+        uses: leafo/gh-actions-luarocks@v4
+
+      - name: Install luacheck
+        run: luarocks install luacheck
+
+      - name: Run luacheck
+        run: luacheck .
