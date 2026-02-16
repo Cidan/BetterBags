@@ -31,7 +31,7 @@ local context = addon:GetModule('Context')
 ---@field searchCategory? SearchCategory If defined, this category is a search category.
 ---@field note? string A note about the category.
 ---@field color? number[] The RGB color of the category name.
----@field priority? number The priority of the category. A higher number has a higher priority.
+---@field priority? number The priority of the category. Lower numbers have higher priority (e.g., 1 > 10). Default is 10.
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 ---@field isGroupBySubcategory? boolean If true, this category is a groupBy subcategory and should not be manually deleted.
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
@@ -348,7 +348,8 @@ function categories:GetAllSearchCategories()
   return results
 end
 
--- Returns a reverse sorted list of search categories, by priority.
+-- Returns a sorted list of search categories, by priority (ascending).
+-- Lower priority numbers have higher priority (1 > 10).
 ---@return CustomCategoryFilter[]
 function categories:GetSortedSearchCategories()
   ---@type CustomCategoryFilter[]
@@ -358,7 +359,9 @@ function categories:GetSortedSearchCategories()
     table.insert(results, searchCategory)
   end
   table.sort(results, function(a, b)
-    return a.priority > b.priority
+    local aPriority = a.priority or 10
+    local bPriority = b.priority or 10
+    return aPriority < bPriority
   end)
   return results
 end
@@ -524,7 +527,8 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
----@return string|nil
+---@return string|nil categoryName
+---@return number|nil priority
 function categories:GetCustomCategory(ctx, kind, data)
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
@@ -534,22 +538,22 @@ function categories:GetCustomCategory(ctx, kind, data)
     ctx = context:New('GetCustomCategory')
   end
   local itemID = data.itemInfo.itemID
-  if not itemID then return nil end
+  if not itemID then return nil, nil end
   local filter = database:GetItemCategoryByItemID(itemID)
   if filter.enabled and filter.enabled[kind] then
-    return filter.name
+    return filter.name, filter.priority or 10
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
 
   if filter and filter.enabled[kind] then
-    return filter.name
+    return filter.name, filter.priority or 10
   end
 
   -- Check for items that had no category previously. This
   -- is a performance optimization to avoid calling all
   -- registered functions for every item.
-  if self.itemsWithNoCategory[itemID] then return nil end
+  if self.itemsWithNoCategory[itemID] then return nil, nil end
 
   local errorHandler = (_G.geterrorhandler and _G.geterrorhandler()) or error
   for _, func in pairs(self.categoryFunctions) do
@@ -563,12 +567,15 @@ function categories:GetCustomCategory(ctx, kind, data)
         events:SendMessage(ctx, 'categories/Changed')
       end
       if self:IsCategoryEnabled(kind, category) then
-        return category
+        -- Get priority from the category if it exists
+        local categoryFilter = self.ephemeralCategories[category]
+        local priority = categoryFilter and categoryFilter.priority or 10
+        return category, priority
       end
     end
   end
   self.itemsWithNoCategory[itemID] = true
-  return nil
+  return nil, nil
 end
 
 ---@param id number The ItemID of the item to remove from a custom category.
