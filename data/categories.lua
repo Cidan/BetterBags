@@ -31,7 +31,7 @@ local context = addon:GetModule('Context')
 ---@field searchCategory? SearchCategory If defined, this category is a search category.
 ---@field note? string A note about the category.
 ---@field color? number[] The RGB color of the category name.
----@field priority? number The priority of the category. A higher number has a higher priority.
+---@field priority? number The priority of the category. Lower numbers have higher priority (e.g., 1 > 10). Default is 10.
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
 ---@field isGroupBySubcategory? boolean If true, this category is a groupBy subcategory and should not be manually deleted.
 ---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
@@ -348,7 +348,8 @@ function categories:GetAllSearchCategories()
   return results
 end
 
--- Returns a reverse sorted list of search categories, by priority.
+-- Returns a sorted list of search categories, by priority (ascending).
+-- Lower priority numbers have higher priority (1 > 10).
 ---@return CustomCategoryFilter[]
 function categories:GetSortedSearchCategories()
   ---@type CustomCategoryFilter[]
@@ -358,7 +359,9 @@ function categories:GetSortedSearchCategories()
     table.insert(results, searchCategory)
   end
   table.sort(results, function(a, b)
-    return a.priority > b.priority
+    local aPriority = a.priority or 10
+    local bPriority = b.priority or 10
+    return aPriority < bPriority
   end)
   return results
 end

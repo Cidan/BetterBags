@@ -974,8 +974,9 @@ function items:RefreshSearchCache(kind)
 					end
 
 					-- Only set if this is higher priority than existing entry
+					-- Lower priority numbers have higher priority (1 > 10)
 					local existingPriority = self.categoryPriorityCache[kind][slotkey]
-					if not existingPriority or priority > existingPriority then
+					if not existingPriority or priority < existingPriority then
 						self.searchCache[kind][slotkey] = categoryName
 						self.categoryPriorityCache[kind][slotkey] = priority
 					end
@@ -1233,8 +1234,8 @@ function items:GetCategory(ctx, data)
 	if searchCategory and customCategory then
 		local sPriority = searchPriority or 10
 		local cPriority = customPriority or 10
-		-- Higher priority wins; if equal, search category wins (tie-breaker)
-		if cPriority > sPriority then
+		-- Lower priority number wins (1 > 10); if equal, search category wins (tie-breaker)
+		if cPriority < sPriority then
 			return customCategory
 		else
 			return searchCategory
