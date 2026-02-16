@@ -7,12 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field bagAndSlotToSet table<number, table<number, string[]>>
 local equipmentSets = addon:NewModule('EquipmentSets')
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 function equipmentSets:OnInitialize()
   self.bagAndSlotToSet = {}
 end

@@ -66,6 +66,7 @@ data\search.lua
 data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua
+data\groups.lua
 data\items.lua
 data\stacks.lua
 data\slots.lua
@@ -115,6 +116,7 @@ views\gridview.lua
 views\bagview.lua
 
 bags\backpack.lua
+bags\classic\backpack.lua
 bags\bank.lua
 bags\classic\bank.lua
 
@@ -129,6 +131,7 @@ themes\elvui.lua
 config\categorypane.lua
 config\themepane.lua
 config\classic\currencypane.lua
+config\itemcolorpane.lua
 config\config.lua
 config\plugin.lua
 
@@ -136,6 +139,7 @@ integrations\consoleport.lua
 integrations\pawn.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
+integrations\quickfind.lua
 
 core\init.lua
 core\era\init.lua

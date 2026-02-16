@@ -9,9 +9,6 @@ local database = addon:GetModule('Database')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Sort: AceModule
 local sort = addon:NewModule('Sort')
 

@@ -33,6 +33,10 @@ local tabs = addon:GetModule("Tabs")
 --- Bank Behavior Prototype
 -------
 
+-- Guard flag to prevent recursive CloseBankFrame() calls from the Hide hook.
+-- Set to true when the hook calls CloseBankFrame(), cleared after event processing.
+local isClosingBank = false
+
 --- BankBehaviorProto defines the behavior specific to the player's bank.
 ---@class BankBehaviorProto
 ---@field bag Bag Reference to the parent bag
@@ -41,6 +45,14 @@ bank.proto = {}
 ---@param ctx Context
 function bank.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
+
+	-- Lazy resize tabs on first show to account for fonts loaded by other addons (e.g., GW2 UI)
+	if not self.bag.tabsResizedAfterLoad then
+		if self.bag.tabs then
+			self.bag.tabs:ResizeAllTabs(ctx)
+			self.bag.tabsResizedAfterLoad = true
+		end
+	end
 
 	-- Generate tabs before showing frame
 	self:GenerateCharacterBankTabs(ctx)
@@ -705,5 +717,44 @@ function bank:Create(bag)
 	local b = {}
 	setmetatable(b, { __index = bank.proto })
 	b.bag = bag
+
+	-- Hook the bag's Hide method to automatically exit banking mode.
+	-- This fixes the X button issue for ALL themes (including external themes)
+	-- by ensuring CloseBankFrame() is called whenever the bank is hidden.
+	-- NOTE: Only needed for Retail - Classic/Era handle bank closing differently.
+	hooksecurefunc(bag, "Hide", function()
+		-- Skip CloseBankFrame() call in Classic/Era to avoid recursion.
+		-- Classic/Era versions handle bank closing through their OnHide methods
+		-- and BANKFRAME_CLOSED event handlers without needing this hook.
+		if not addon.isRetail then
+			return
+		end
+
+		-- Guard against recursion: if we're already closing the bank, don't call CloseBankFrame() again.
+		-- This prevents infinite recursion when BANKFRAME_CLOSED event handler calls Hide():
+		--   Hide() → hook calls CloseBankFrame() → BANKFRAME_CLOSED → addon.CloseBank() → Hide() → loop
+		if isClosingBank then
+			return
+		end
+
+		-- Set guard flag before calling CloseBankFrame()
+		isClosingBank = true
+
+		-- After bag hides, call CloseBankFrame() to exit banking mode (Retail only).
+		-- This handles the X button close path (ESC key path already calls CloseBankFrame()).
+		if C_Bank then
+			C_Bank.CloseBankFrame()
+		elseif CloseBankFrame then
+			CloseBankFrame()
+		end
+
+		-- Clear the guard flag after event processing completes.
+		-- Using C_Timer.After(0, ...) ensures the flag is cleared after the current
+		-- event chain finishes, allowing future bank closes to work properly.
+		C_Timer.After(0, function()
+			isClosingBank = false
+		end)
+	end)
+
 	return b
 end

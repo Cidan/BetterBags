@@ -12,9 +12,6 @@ local list = addon:GetModule('List')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
@@ -47,7 +44,7 @@ end
 ---@param f BetterBagsPlainTextListButton
 ---@param data table
 function themeConfigFrame:resetThemeItem(f, data)
-  _ = data
+  local _ = data
   f:SetText('')
   f:SetScript("OnClick", nil)
 end

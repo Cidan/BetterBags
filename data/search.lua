@@ -12,9 +12,6 @@ local QueryParser = addon:GetModule('QueryParser')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Binding: AceModule
-local binding = addon:GetModule('Binding')
-
 ---@class Trees: AceModule
 local trees = addon:GetModule('Trees')
 
@@ -642,7 +639,7 @@ function search:EvaluateAST(node)
               return {}
           end
           local result = self:EvaluateAST(node.expression)
-         ---@type table<string, boolean> 
+         ---@type table<string, boolean>
           local negated = {}
           for k in pairs(result) do
               negated[k] = false

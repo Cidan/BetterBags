@@ -3,12 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
-
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
@@ -17,9 +11,6 @@ local themes = addon:GetModule('Themes')
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
-
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
 
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
@@ -32,6 +23,7 @@ local themePane = addon:NewModule('ThemePane')
 
 ---@class ThemePaneListButton: Button
 ---@field ThemeName FontString
+---@field CheckmarkIcon Texture
 ---@field Init boolean
 
 ---@class ThemePaneFrame
@@ -56,7 +48,16 @@ function themePaneProto:initListItem(button, elementData)
     button.ThemeName:SetHeight(30)
     button.ThemeName:SetJustifyH("LEFT")
     button.ThemeName:SetPoint("LEFT", button, "LEFT", 10, 0)
-    button.ThemeName:SetPoint("RIGHT", button, "RIGHT", -10, 0)
+    button.ThemeName:SetPoint("RIGHT", button, "RIGHT", -25, 0)
+
+    -- Checkmark icon for currently active theme
+    button.CheckmarkIcon = button:CreateTexture(nil, "OVERLAY", nil, 7)
+    button.CheckmarkIcon:SetSize(16, 16)
+    button.CheckmarkIcon:SetPoint("RIGHT", button, "RIGHT", -5, 0)
+    button.CheckmarkIcon:SetAtlas("common-icon-checkmark")
+    button.CheckmarkIcon:SetAlpha(1)
+    button.CheckmarkIcon:Hide()
+
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
@@ -67,14 +68,17 @@ function themePaneProto:initListItem(button, elementData)
   local currentTheme = database:GetTheme()
   local isCurrentTheme = elementData.key == currentTheme
 
-  -- Font styling
+  -- Font styling - uniform white for all themes
+  button.ThemeName:SetFontObject(fonts.UnitFrame12White)
+
+  -- Checkmark for currently active theme
   if isCurrentTheme then
-    button.ThemeName:SetFontObject(fonts.UnitFrame12Yellow)
+    button.CheckmarkIcon:Show()
   else
-    button.ThemeName:SetFontObject(fonts.UnitFrame12White)
+    button.CheckmarkIcon:Hide()
   end
 
-  -- Background based on selection state
+  -- Background based on selection state only
   if self.selectedTheme == elementData.key then
     button:SetBackdropColor(1, 0.82, 0, 0.3)
     self.selectedButton = button
@@ -111,7 +115,7 @@ end
 ---@param button ThemePaneListButton
 ---@param elementData table
 function themePaneProto:resetListItem(button, elementData)
-  _ = elementData
+  local _ = elementData
   button:SetScript("OnClick", nil)
   button:SetScript("OnEnter", nil)
   button:SetScript("OnLeave", nil)

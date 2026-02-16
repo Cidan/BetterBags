@@ -9,9 +9,6 @@ local const = addon:GetModule('Constants')
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -41,7 +38,7 @@ local context = addon:GetModule('Context')
 ---@field SetTitle fun(frame: Frame, title: string) A function that sets the title of the frame.
 ---@field ToggleSearch fun(frame: Frame, shown: boolean) A function that toggles the search box on the frame.
 ---@field PositionBagSlots? fun(frame: Frame, bagSlotWindow: Frame) A function that positions the bag slots on the frame.
----@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels. 
+---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels.
 ---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
 ---@field Tab? fun(tab: Button): PanelTabButtonTemplate A function that applies the theme to a tab.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
@@ -182,6 +179,21 @@ function themes:SetSearchState(ctx, frame, shown)
   local theme = self.themes[db:GetTheme()]
   theme.ToggleSearch(frame, shown)
   events:SendMessage(ctx, 'bags/FullRefreshAll')
+end
+
+-- GetInBagSearchBox returns the in-bag search box for the given frame, if it exists.
+-- This works by finding the themed decoration frame (a child of the bag frame) that contains the search box.
+---@param frame Frame
+---@return SearchFrame?
+function themes:GetInBagSearchBox(frame)
+  -- Iterate through children to find the decoration that has a search box
+  local children = {frame:GetChildren()}
+  for _, child in ipairs(children) do
+    if child.search and child.search.textBox then
+      return child.search
+    end
+  end
+  return nil
 end
 
 -- RegisterPortraitWindow is used to register a protrait window frame to be themed by themes.

@@ -23,12 +23,6 @@ local bagButton = addon:GetModule('BagButton')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 

@@ -129,7 +129,7 @@ local theme = {
   end,
   Opacity = function (frame, opacity)
     -- This function isn't used, as ElvUI manages the opacity of its frames.
-    _ = frame
+    local _ = frame
     _ = opacity
   end,
   Reset = function ()

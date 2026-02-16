@@ -19,9 +19,6 @@ local const = addon:GetModule('Constants')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -92,14 +89,29 @@ end
 
 -- SetTitle will set the title of the section.
 ---@param text string The text to set the title to.
-function sectionProto:SetTitle(text)
+---@param color? number[] Optional RGB color array {r, g, b} to apply to the title.
+function sectionProto:SetTitle(text, color)
   self.title:SetText(text)
   themes:UpdateSectionFont(self.title:GetFontString())
-  -- Store the original text color after the theme has been applied
-  if not self.originalTextColor then
-    local r, g, b, a = self.title:GetFontString():GetTextColor()
-    self.originalTextColor = {r = r, g = g, b = b, a = a}
+
+  -- SetFontObject doesn't clear explicit SetTextColor overrides in WoW's API.
+  -- We must always explicitly set the color to ensure pooled sections don't bleed colors.
+  local fontString = self.title:GetFontString()
+  if color and color[1] and color[2] and color[3] then
+    -- Apply custom color
+    fontString:SetTextColor(color[1], color[2], color[3], 1)
+  else
+    -- Reset to the font object's default color to clear any previous override
+    local fontObject = fontString:GetFontObject()
+    if fontObject then
+      local r, g, b, a = fontObject:GetTextColor()
+      fontString:SetTextColor(r, g, b, a or 1)
+    end
   end
+
+  -- Store the current text color as the original for collapse dimming
+  local r, g, b, a = fontString:GetTextColor()
+  self.originalTextColor = {r = r, g = g, b = b, a = a}
 end
 
 -- GetTitleWithoutIndicator returns the title text without the collapse indicator.
@@ -180,15 +192,9 @@ function sectionProto:Wipe()
   self.frame:SetAlpha(1)
   self.collapsed = false
   self.shouldShrinkWhenCollapsed = true
-  -- Restore original text color before clearing it
-  if self.originalTextColor then
-    self.title:GetFontString():SetTextColor(
-      self.originalTextColor.r,
-      self.originalTextColor.g,
-      self.originalTextColor.b,
-      self.originalTextColor.a
-    )
-  end
+  -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
+  -- Note: We don't restore the color here because SetTitle always explicitly sets it,
+  -- ensuring pooled sections don't bleed custom colors to other categories.
   self.originalTextColor = nil
 end
 
@@ -437,7 +443,7 @@ end
 ---@param ctx Context
 ---@param f Section
 function sectionFrame._DoReset(ctx, f)
-  _ = ctx
+  local _ = ctx
   f:EnableHeader()
   f:GetContent():SortHorizontal()
   f:Wipe()
@@ -516,7 +522,7 @@ function sectionFrame:OnTitleRightClick(section)
     list = newlist
   end
 
-  -- Only DF since warbank has Enum.BankType 
+  -- Only DF since warbank has Enum.BankType
   local containerType = nil
   if Enum.BankType and flow == const.MOVEMENT_FLOW.WARBANK then
     containerType = Enum.BankType.Account

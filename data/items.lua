@@ -96,6 +96,7 @@ local itemDataProto = {}
 ---@class (exact) Items: AceModule
 ---@field private slotInfo table<BagKind, SlotInfo>
 ---@field private searchCache table<BagKind, table<string, string>> A table of slotid's to categories.
+---@field private categoryPriorityCache table<BagKind, table<string, number>> A table of slotid's to priorities.
 ---@field private equipmentCache table<number, ItemData>
 ---@field _doingRefresh boolean
 ---@field previousItemGUID table<number, table<number, string>>
@@ -110,6 +111,10 @@ function items:OnInitialize()
 	self:ResetSlotInfo()
 
 	self.searchCache = {
+		[const.BAG_KIND.BACKPACK] = {},
+		[const.BAG_KIND.BANK] = {},
+	}
+	self.categoryPriorityCache = {
 		[const.BAG_KIND.BACKPACK] = {},
 		[const.BAG_KIND.BANK] = {},
 	}
@@ -258,7 +263,7 @@ end
 ---@param targets table<string, MoveTargetData>
 ---@param movePairs table<string, MoveTargetData>
 function items:findBestFit(ctx, item, stackInfo, targets, movePairs)
-	_ = ctx
+	local _ = ctx
 
 	-- Don't move items that are already full.
 	if item.itemInfo.currentItemCount == item.itemInfo.itemStackCount then
@@ -363,7 +368,7 @@ end
 ---@param movePairs table<string, MoveTargetData>
 ---@param takenEmptySlots table<string, boolean>
 function items:fitForMoveClassic(ctx, item, targets, movePairs, takenEmptySlots)
-	_ = ctx
+	local _ = ctx
 	_ = targets
 	_ = movePairs
 	_ = takenEmptySlots
@@ -439,7 +444,7 @@ function items:Restack(ctx, kind, callback)
 		debug:Inspect("MovePairs", movePairs)
 	end
 	async:Until(ctx, function(ectx)
-		_ = ectx
+		local _ = ectx
 		for _, movePair in ipairs(movePairs) do
 			if not movePair.done then
 				if movePair.partial and movePair.partial > 0 then
@@ -740,7 +745,7 @@ function items:UpdateFreeSlots(ctx, kind)
 	end
 	for bagid in pairs(baglist) do
 		local freeSlots = C_Container.GetContainerNumFreeSlots(bagid)
-		local name = ""
+		local name
 		local invid = C_Container.ContainerIDToInventoryID(bagid)
 		local baglink = GetInventoryItemLink("player", invid)
 		if baglink ~= nil and invid ~= nil then
@@ -798,7 +803,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
 	for _, currentItem in pairs(slotInfo:GetCurrentItems()) do
 		local bagid = currentItem.bagid
 		local slotid = currentItem.slotid
-		local name = ""
+		local name
 		local previousItem = slotInfo:GetPreviousItemByBagAndSlot(bagid, slotid)
 		local invid = C_Container.ContainerIDToInventoryID(bagid)
 		local baglink = GetInventoryItemLink("player", invid)
@@ -922,16 +927,21 @@ end
 ---@param kind BagKind
 function items:WipeSearchCache(kind)
 	wipe(self.searchCache[kind])
+	wipe(self.categoryPriorityCache[kind])
 end
 
 ---@param kind BagKind
 function items:RefreshSearchCache(kind)
 	self:WipeSearchCache(kind)
+	local ctx = context:New('RefreshSearchCache')
 	local categoryTable = categories:GetSortedSearchCategories()
+	local createdGroupByCategories = {} -- Track created groupBy categories to avoid duplicates
+
 	for _, categoryFilter in ipairs(categoryTable) do
 		if categoryFilter.enabled[kind] then
 			local results = search:Search(categoryFilter.searchCategory.query)
 			local groupBy = categoryFilter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+			local priority = categoryFilter.priority or 10
 
 			for slotkey, match in pairs(results) do
 				if match then
@@ -944,11 +954,32 @@ function items:RefreshSearchCache(kind)
 							local suffix = self:GetGroupBySuffix(itemData, groupBy)
 							if suffix and suffix ~= "" then
 								categoryName = categoryFilter.name .. " - " .. suffix
+
+								-- Create the groupBy subcategory object if it doesn't exist yet
+								if not createdGroupByCategories[categoryName] and not categories:DoesCategoryExist(categoryName) then
+									categories:CreateCategory(ctx, {
+										name = categoryName,
+										itemList = {},
+										enabled = categoryFilter.enabled,
+										dynamic = true,
+										isGroupBySubcategory = true,
+										groupByParent = categoryFilter.name,
+										priority = priority,
+										color = categoryFilter.color,
+									})
+									createdGroupByCategories[categoryName] = true
+								end
 							end
 						end
 					end
 
-					self.searchCache[kind][slotkey] = categoryName
+					-- Only set if this is higher priority than existing entry
+					-- Lower priority numbers have higher priority (1 > 10)
+					local existingPriority = self.categoryPriorityCache[kind][slotkey]
+					if not existingPriority or priority < existingPriority then
+						self.searchCache[kind][slotkey] = categoryName
+						self.categoryPriorityCache[kind][slotkey] = priority
+					end
 				end
 			end
 		end
@@ -1187,18 +1218,35 @@ function items:GetCategory(ctx, data)
 		end
 	end
 
-	-- Search categories come before all.
-	if self.searchCache[data.kind][data.slotkey] ~= nil then
-		return self.searchCache[data.kind][data.slotkey]
-	end
-
 	-- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
 	if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
 		return "Gear: " .. data.itemInfo.equipmentSets[1] -- Always use the first set, for now.
 	end
 
-	-- Return the custom category if it exists next.
-	local customCategory = categories:GetCustomCategory(ctx, data.kind, data)
+	-- Unified priority-based category selection
+	-- Check both search cache (from search categories) and item list categories,
+	-- returning the one with higher priority
+	local searchCategory = self.searchCache[data.kind][data.slotkey]
+	local searchPriority = self.categoryPriorityCache[data.kind][data.slotkey]
+	local customCategory, customPriority = categories:GetCustomCategory(ctx, data.kind, data)
+
+	-- If both exist, compare priorities
+	if searchCategory and customCategory then
+		local sPriority = searchPriority or 10
+		local cPriority = customPriority or 10
+		-- Lower priority number wins (1 > 10); if equal, search category wins (tie-breaker)
+		if cPriority < sPriority then
+			return customCategory
+		else
+			return searchCategory
+		end
+	end
+
+	-- If only one exists, return it
+	if searchCategory then
+		return searchCategory
+	end
+
 	if customCategory then
 		return customCategory
 	end
@@ -1357,6 +1405,10 @@ function items:GetEquipmentInfo(itemMixin)
 		currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
 		equipmentSets = nil,
 	}
+	-- Track max item level for dynamic coloring
+	if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
+		database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
+	end
 	return data
 end
 
@@ -1447,6 +1499,10 @@ function items:AttachItemInfo(data, kind)
 		equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
 		tooltipText = tooltipText or "",
 	}
+	-- Track max item level for dynamic coloring
+	if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
+		database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
+	end
 
 	if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
 		self._newItemTimers[data.itemInfo.itemGUID] = time()

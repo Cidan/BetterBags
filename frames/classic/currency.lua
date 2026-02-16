@@ -16,6 +16,9 @@ local const = addon:GetModule('Constants')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
 ---@class CurrencyItem: Item
 ---@field frame Frame
 ---@field icon Texture
@@ -55,7 +58,27 @@ end
 ---@class CurrencyIconGrid
 ---@field iconGrid Grid
 ---@field private iconIndex CurrencyItem[]
+---@field fadeIn AnimationGroup
+---@field fadeOut AnimationGroup
 local CurrencyIconGrid = {}
+
+function CurrencyIconGrid:Show()
+  self.iconGrid:GetFrame():Show()
+end
+
+function CurrencyIconGrid:Hide(callback)
+  -- Support optional callback parameter used by windowGrouping
+  if callback then
+    self.fadeOut.callback = callback
+    self.fadeOut:Play()
+  else
+    self.iconGrid:GetFrame():Hide()
+  end
+end
+
+function CurrencyIconGrid:IsShown()
+  return self.iconGrid:GetFrame():IsShown()
+end
 
 function CurrencyIconGrid:Update()
   for _, cell in pairs(self.iconGrid.cells) do
@@ -118,7 +141,7 @@ function CurrencyIconGrid:CreateCurrencyItem(index)
 
   item.count = item.frame:CreateFontString(nil, "ARTWORK", "Number12Font")
   item.count:SetPoint("RIGHT", item.frame, "RIGHT", -5, 0)
-  _ = index
+  local _ = index
 
   return item
 end
@@ -140,6 +163,9 @@ function currency:CreateIconGrid(parent)
   g:HideScrollBar()
   g.maxCellWidth = 7
   b.iconGrid = g
+
+  -- Attach fade animations for windowGrouping compatibility
+  b.fadeIn, b.fadeOut = animations:AttachFadeGroup(g:GetContainer())
 
   b:Update()
   events:RegisterEvent('CURRENCY_DISPLAY_UPDATE', function()

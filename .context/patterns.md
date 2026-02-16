@@ -39,6 +39,52 @@ end
 
 **When to Apply**: Any time you use `_` as a throwaway variable. Always verify assignments have `local` in the SAME statement.
 
+### Pattern: Mark Unused Parameters with a Local Throwaway
+**Problem**: Using `_ = arg` to silence unused-parameter warnings writes to global `_`, which creates taint risk and triggers `luacheck` `W111`.
+
+**Why**: In Lua 5.1/WoW, `_` is global unless explicitly declared local in the current scope.
+
+**Solution Pattern**: Localize `_` once per scope before throwaway assignments:
+```lua
+-- BAD: global write
+_ = ctx
+_ = item
+
+-- GOOD: local throwaway in this scope
+local _ = ctx
+_ = item
+```
+
+**When to Apply**: Stub methods, callbacks, or compatibility shims where arguments are intentionally unused.
+
+### Pattern: Compute Toggle State Inside the Active Branch
+**Problem**: Declaring a shared `enabled` variable and only assigning it in one branch can pass `nil` into state setters in other branches.
+
+**Why**: Lua locals default to `nil`. If branch A assigns `enabled` but branch B does not, branch B still calls setters with `nil`, causing silent no-op behavior or inconsistent state.
+
+**Solution Pattern**: Derive `enabled` from the currently selected data source inside each branch:
+```lua
+-- BAD: branch-specific assignment with shared variable
+local enabled
+if isEphemeral then
+  enabled = not ephemeral.enabled[kind]
+else
+  -- enabled is still nil here
+end
+setEnabled(kind, category, enabled)
+
+-- GOOD: compute per branch
+if isEphemeral then
+  local enabled = not ephemeral.enabled[kind]
+  setEphemeralEnabled(kind, category, enabled)
+else
+  local enabled = not persistent.enabled[kind]
+  setPersistentEnabled(kind, category, enabled)
+end
+```
+
+**When to Apply**: Toggle handlers that support multiple storage backends (ephemeral/persistent, cache/db, etc.).
+
 ### Pattern: Cannot Override Functions Called in Protected Contexts
 **Problem**: Overriding Blizzard functions that are called during protected actions (combat, secure actions like UseContainerItem) causes `ADDON_ACTION_FORBIDDEN` errors.
 
@@ -224,6 +270,111 @@ end
 - core/hooks.lua:111-134 (CloseSpecialWindows hook)
 - core/hooks.lua:138-153 (CloseBank event handler)
 
+### Pattern: Bank Closing Recursion Prevention with Guard Flags
+**Problem**: Stack overflow/infinite recursion when closing the bank, caused by `CloseBankFrame()` calls creating event loops that call `Hide()` again.
+
+**Why**: Bank closing involves multiple paths that can trigger each other:
+- **hooksecurefunc on Hide()**: Calls `CloseBankFrame()` when bank hides (needed for X button in Retail)
+- **BANKFRAME_CLOSED event**: Calls `addon.CloseBank()` which calls `Hide()`
+- **OnHide methods** (Classic/Era): Called when frame hides, may call `CloseBankFrame()`
+
+Without guards, these create recursion loops:
+1. Hide() is called → hooksecurefunc fires → calls CloseBankFrame()
+2. BANKFRAME_CLOSED event → addon.CloseBank() → Hide() again
+3. Frame may still be visible (fade animation) → triggers hooksecurefunc again → **RECURSION**
+
+**Solution Pattern**: Use guard flags at each potential recursion point:
+
+**1. Retail hooksecurefunc** - Module-level guard flag prevents re-entry (bags/bank.lua):
+```lua
+-- Module-level guard flag
+local isClosingBank = false
+
+hooksecurefunc(bag, "Hide", function(selfBag, ctx)
+  -- Skip for Classic/Era (they handle it differently)
+  if not addon.isRetail then
+    return
+  end
+
+  -- Guard against recursion
+  if isClosingBank then
+    return
+  end
+
+  isClosingBank = true
+
+  -- Call CloseBankFrame() to handle X button closes
+  if C_Bank then
+    C_Bank.CloseBankFrame()
+  elseif CloseBankFrame then
+    CloseBankFrame()
+  end
+
+  -- Clear flag after event processing completes
+  C_Timer.After(0, function()
+    isClosingBank = false
+  end)
+end)
+```
+
+**2. Classic/Era OnHide** - Instance-level guard flag prevents re-entry (bags/classic/bank.lua & bags/era/bank.lua):
+```lua
+function bank.proto:OnHide()
+  -- Guard against re-entry to prevent recursion
+  if self.isHiding then
+    return
+  end
+  self.isHiding = true
+
+  -- IMPORTANT: Do NOT call CloseBankFrame() here.
+  -- The hooksecurefunc would create recursion. Instead, Classic/Era
+  -- rely on the CloseSpecialWindows hook to call CloseBankFrame().
+
+  addon.ForceHideBlizzardBags()
+  PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
+
+  if database:GetEnableBagFading() then
+    self.bag.fadeOutGroup.callback = function()
+      self.bag.fadeOutGroup.callback = nil
+      self.isHiding = false  -- Clear after animation
+      ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+    end
+    self.bag.fadeOutGroup:Play()
+  else
+    self.bag.frame:Hide()
+    self.isHiding = false  -- Clear immediately
+    ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+  end
+end
+```
+
+**How It Prevents Recursion**:
+
+**Retail:**
+- **ESC key**: CloseSpecialWindows → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → isClosingBank=true, so hooksecurefunc returns early ✅
+- **X button**: Hide() → hooksecurefunc sets isClosingBank=true → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → isClosingBank=true, returns early ✅
+
+**Classic/Era:**
+- **ESC key**: CloseSpecialWindows → CloseBankFrame() → BANKFRAME_CLOSED → CloseBank() → Hide() → OnHide() sets isHiding=true → subsequent Hide() calls return early ✅
+- **X button**: Hide() → OnHide() sets isHiding=true → subsequent Hide() calls return early ✅
+
+**Key Differences**:
+- **Retail**: Uses module-level `isClosingBank` flag in hooksecurefunc + NO CloseBankFrame() in OnHide
+- **Classic/Era**: Uses instance-level `isHiding` flag in OnHide + NO hooksecurefunc (skipped via isRetail check)
+
+**When to Apply**:
+- Any hooks that call functions triggering events that can loop back
+- When debugging stack overflow/recursion issues in event chains
+- When implementing bank closing or similar multi-path close mechanisms
+- Any version-specific WoW API behavior that differs between Retail and Classic/Era
+
+**Related Files**:
+- bags/bank.lua:32-38 (Module-level isClosingBank guard flag)
+- bags/bank.lua:723-757 (Retail hooksecurefunc with guard flag)
+- bags/era/bank.lua:43-60 (OnHide with isHiding guard, no CloseBankFrame)
+- bags/classic/bank.lua:43-60 (OnHide with isHiding guard, no CloseBankFrame)
+- core/constants.lua:18-23 (Version detection flags)
+
 ## State Management Across Events
 
 ### Pattern: Context Filter Propagation
@@ -248,6 +399,99 @@ else
   refreshCtx:Set('filterBagID', currentTab) -- Character bank filters to tab
 end
 ```
+
+### Pattern: Always Use Behavior Methods for Programmatic Tab/View Switching
+**Problem**: Calling visual-only methods like `tabs:SetTabByID()` or `tabs:SetTabByIndex()` programmatically highlights the tab button but doesn't update bag contents. The tab looks selected but displays the wrong items.
+
+**Why**: WoW addons separate visual presentation from state management for good reason. Visual methods only update the UI (button highlights, colors, borders) but don't:
+- Update state variables (`database:SetActiveGroup()`, `bag.bankTab`)
+- Set context filters (`ctx:Set("filterBagID", ...)`) that propagate through event chains
+- Clear cached data (`items:ClearBankCache()`)
+- Trigger refresh events (`bags/RefreshBackpack`, `bags/RefreshBank`)
+- Call `ItemButtonUtil.TriggerEvent()` for UI synchronization
+- Update Blizzard integration (`BankPanel:SetBankType()`)
+
+**This is the architectural split:**
+- **Visual methods** (`SetTabByID`, `SelectTab`): Update button appearance only
+- **Behavior methods** (`SwitchToGroup`, `SwitchToCharacterBankTab`, etc.): Complete state management + visual update
+
+Manual clicks work because click handlers call behavior methods, which then call visual methods at the end. Programmatic code that calls visual methods directly bypasses the entire state management chain.
+
+**Solution Pattern**: Always dispatch to the appropriate behavior method based on bag type and context. Never call visual-only methods when you need content to update.
+
+**Example** (from QuickFind integration fix):
+```lua
+-- BAD: Visual update only, bag contents don't change
+local tabID = self:GetTabIDForItem(itemData, bagKind)
+if tabID and bag.tabs then
+  bag.tabs:SetTabByID(ctx, tabID)  -- Wrong! Only highlights tab
+end
+
+-- GOOD: Complete state management via behavior methods
+local tabID = self:GetTabIDForItem(itemData, bagKind)
+if tabID and bag.behavior then
+  if bagKind == const.BAG_KIND.BACKPACK then
+    -- Backpack uses group-based tabs
+    if bag.behavior.SwitchToGroup then
+      bag.behavior:SwitchToGroup(ctx, tabID)
+    end
+  elseif bagKind == const.BAG_KIND.BANK then
+    -- Bank has multiple tab types based on ID range
+    if tabID == 1 then
+      -- Single bank tab (when character bank tabs disabled)
+      if bag.behavior.SwitchToBank then
+        bag.behavior:SwitchToBank(ctx)
+      end
+    elseif tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
+      -- Character bank tabs (6-11)
+      if bag.behavior.SwitchToCharacterBankTab then
+        bag.behavior:SwitchToCharacterBankTab(ctx, tabID)
+      end
+    elseif tabID >= Enum.BagIndex.AccountBankTab_1 and tabID <= Enum.BagIndex.AccountBankTab_5 then
+      -- Account bank tabs (13-17)
+      if bag.behavior.SwitchToAccountBank then
+        bag.behavior:SwitchToAccountBank(ctx, tabID)
+      end
+    else
+      -- Fallback for unknown tab types
+      if bag.tabs then
+        bag.tabs:SetTabByID(ctx, tabID)
+      end
+    end
+  end
+end
+```
+
+**What Behavior Methods Do** (bags/backpack.lua:342-356, bags/bank.lua:590-667):
+1. **Update state**: Set active group/tab in database and bag object
+2. **Set context filters**: Add `filterBagID` to context for event chain propagation
+3. **Clear caches**: Invalidate stale item data
+4. **Update Blizzard integration**: Call `BankPanel:SetBankType()` for right-click behavior
+5. **Trigger refresh events**: Send `bags/RefreshBackpack` or `bags/RefreshBank` messages
+6. **Synchronize UI**: Call `ItemButtonUtil.TriggerEvent()`
+7. **Update visual state**: Call `SetTabByID()` at the end for button highlight
+
+**Debugging Symptom Checklist**:
+- ✅ Tab button highlights correctly
+- ❌ Bag contents don't update to match tab
+- ❌ Previous tab's items still visible
+- ❌ Search/filter shows items from wrong tab
+- 🔍 **Root cause**: Calling visual methods instead of behavior methods
+
+**When to Apply**:
+- Programmatic tab switching (QuickFind integration, slash commands, macros)
+- Restoring saved UI state on login/reload
+- Automated testing that simulates user clicks
+- Any code that needs to "switch tabs as if the user clicked"
+- Integration with external addons that trigger view changes
+
+**Related Files**:
+- `integrations/quickfind.lua:137-170` - Example fix
+- `bags/backpack.lua:342-356` - `SwitchToGroup()` behavior method
+- `bags/bank.lua:590-609` - `SwitchToBank()` behavior method
+- `bags/bank.lua:613-632` - `SwitchToCharacterBankTab()` behavior method
+- `bags/bank.lua:637-667` - `SwitchToAccountBank()` behavior method
+- `frames/tabs.lua` - Visual-only methods (for reference, don't call directly)
 
 ## WoW Bank System Architecture
 
@@ -505,6 +749,211 @@ end
 - When implementing user-configurable sorting, filtering, or transformation functions
 - At module boundaries where external code provides function parameters
 
+## UI Interaction Patterns
+
+### Pattern: Drag-to-Reorder with Module-Level State
+**Problem**: Need to implement drag-to-reorder functionality for UI elements (like tabs) that persists order across sessions while avoiding taint.
+
+**Why**: Drag operations span multiple frames and event handlers (OnMouseDown, OnUpdate, OnMouseUp). State must be accessible across these handlers while keeping UI responsive. Module-level state (not frame-level) allows centralized drag management across all tab instances.
+
+**Solution Pattern**:
+1. **Module-level state variables**: Store drag state at module level (not per-instance)
+2. **Locked axis movement**: Lock Y-axis during horizontal drag to prevent visual jank
+3. **50% overlap threshold**: Only trigger reorder when dragged element is 50%+ over target
+4. **Debounced slide triggers**: Use `lastOverlapIndex` to prevent redundant reordering
+5. **Skip dragging element in reanchor**: Don't reposition the element being dragged
+6. **Persist to database**: Save final order to saved variables on drop
+7. **Context objects for all handlers**: Use `context:New()` to avoid taint
+
+**Example** (from frames/tabs.lua:29-42, 624-804):
+```lua
+-- Module-level state (accessible to all tab instances)
+tabs.draggingTab = nil              ---@type TabButton?
+tabs.dragStartIndex = nil           ---@type number?
+tabs.isDragging = false             ---@type boolean
+tabs.lastOverlapIndex = nil         ---@type number?
+
+-- Validation helper
+function tabs:IsTabReorderable(tab)
+  if not tab.id then return false end
+  if tab.id == 1 then return false end    -- Bank always first
+  if tab.id == 0 then return false end    -- "+" always last
+  if tab.id < 0 then return false end     -- Purchase tabs at end
+  return true
+end
+
+-- Start drag on Shift+LeftClick
+decoration:SetScript("OnMouseDown", function(_, button)
+  if button == "LeftButton" and IsShiftKeyDown() then
+    tabs:StartTabDrag(tab, self)
+  end
+end)
+
+-- Track cursor position every frame
+function tabs:UpdateTabDrag()
+  local cursorX = GetCursorPosition()
+  local newX = (cursorX - self.dragOffsetX) / scale
+  local lockedY = self.dragStartY / scale  -- Y-axis locked
+
+  self.draggingTab:ClearAllPoints()
+  self.draggingTab:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", newX, lockedY)
+
+  local targetIndex = self:CalculateOverlapTarget()
+  if targetIndex and targetIndex ~= self.lastOverlapIndex then
+    self:TriggerSlide(targetIndex)
+    self.lastOverlapIndex = targetIndex  -- Debounce
+  end
+end
+
+-- 50% overlap detection
+function tabs:CalculateOverlapTarget()
+  local draggedCenter = (self.draggingTab:GetLeft() + self.draggingTab:GetRight()) / 2
+
+  for i, tab in ipairs(self.currentTabFrame.tabIndex) do
+    if tab ~= self.draggingTab and self:IsTabReorderable(tab) then
+      local tabCenter = (tab:GetLeft() + tab:GetRight()) / 2
+      local distance = math.abs(draggedCenter - tabCenter)
+      local threshold = (tab:GetRight() - tab:GetLeft()) / 2
+
+      if distance < threshold then
+        return i  -- 50%+ overlap detected
+      end
+    end
+  end
+  return nil
+end
+
+-- Reorder array and reanchor (skip dragging element)
+function tabs:TriggerSlide(targetIndex)
+  table.remove(self.currentTabFrame.tabIndex, self.draggingTab.index)
+  table.insert(self.currentTabFrame.tabIndex, targetIndex, self.draggingTab)
+
+  for i, tab in ipairs(self.currentTabFrame.tabIndex) do
+    tab.index = i  -- Re-index
+  end
+
+  self.currentTabFrame:ReanchorTabs()  -- Repositions all except draggingTab
+end
+
+-- Persist order on drop
+function tabs:SaveTabOrder()
+  local orderCounter = 2  -- Bank is always 1
+  for _, tab in ipairs(self.currentTabFrame.tabIndex) do
+    if tab.id and tab.id > 1 then
+      database:SetGroupOrder(tab.id, orderCounter)
+      orderCounter = orderCounter + 1
+    end
+  end
+  events:SendMessage(ctx, 'groups/OrderChanged')
+end
+
+-- Skip dragging element in reanchor
+function tabFrame:ReanchorTabs()
+  for _, tab in ipairs(self.tabIndex) do
+    if tab:IsShown() and tab ~= tabs.draggingTab then  -- Skip dragging tab
+      -- Position tab...
+    end
+  end
+end
+```
+
+**Database Integration** (core/database.lua:681-694):
+```lua
+-- Persist order per group
+function DB:SetGroupOrder(groupID, order)
+  local group = DB.data.profile.groups[groupID]
+  if group then
+    group.order = order
+  end
+end
+
+-- Retrieve order for sorting
+function DB:GetGroupOrder(groupID)
+  local group = DB.data.profile.groups[groupID]
+  return group and group.order or groupID  -- Default to ID
+end
+```
+
+**Sorting Integration** (frames/tabs.lua:197-212):
+```lua
+-- Sort by custom order instead of ID
+if a.id and b.id and a.id > 1 and b.id > 1 then
+  local orderA = database:GetGroupOrder(a.id)
+  local orderB = database:GetGroupOrder(b.id)
+  if orderA ~= orderB then
+    return orderA < orderB  -- Use custom order
+  end
+  return a.id < b.id  -- Fallback to ID
+end
+```
+
+**When to Apply**:
+- Drag-to-reorder for tabs, list items, or any UI elements
+- Any reordering that needs to persist across sessions
+- When multiple instances share drag behavior (module-level state)
+- Horizontal or vertical constrained dragging
+
+**Critical Files**:
+- `frames/tabs.lua`: Drag state (29-42), handlers (394-407), functions (624-804)
+- `core/database.lua`: Persistence (681-694)
+
+### Pattern: StaticPopup Dialog Data Race Condition
+**Problem**: When calling `StaticPopup_Show()` and then setting `dialog.data` on the returned frame, the dialog's `OnShow` callback tries to access `f.data` and gets nil, causing "attempt to index field 'data' (a nil value)" errors.
+
+**Why**: WoW's `StaticPopup_Show()` API triggers the dialog's `OnShow` script synchronously during the Show() call, before the function returns the dialog frame reference. This means:
+1. `StaticPopup_Show()` is called
+2. Dialog frame is created/retrieved from pool
+3. `OnShow` callback executes immediately
+4. Function returns dialog frame reference
+5. Code tries to set `dialog.data` - too late!
+
+Any code in `OnShow` that accesses `f.data` will fail because the data hasn't been assigned yet.
+
+**Solution Pattern**: Use `StaticPopup_Show()`'s built-in data parameter (4th argument) to pass data to the dialog. The data is assigned to the dialog frame **before** `OnShow` is called:
+
+```lua
+-- BAD: Data assignment happens after OnShow fires
+local dialog = StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY")
+if dialog then
+  dialog.data = { categoryName = categoryName, pane = self }  -- Too late!
+end
+
+-- Dialog definition with OnShow that fails:
+OnShow = function(f)
+  f.EditBox:SetText(f.data.categoryName)  -- ERROR: f.data is nil
+end
+
+-- GOOD: Pass data as 4th parameter
+StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY", nil, nil, { categoryName = categoryName, pane = self })
+
+-- Now OnShow can safely access data:
+OnShow = function(f)
+  f.EditBox:SetText(f.data.categoryName)  -- Works! f.data is set
+end
+```
+
+**API Signature**:
+```lua
+StaticPopup_Show(which, text_arg1, text_arg2, data)
+```
+- `which`: Dialog name (string)
+- `text_arg1`: First text replacement argument (optional)
+- `text_arg2`: Second text replacement argument (optional)
+- `data`: Data table assigned to `dialog.data` before OnShow (optional)
+
+**When to Apply**:
+- Any StaticPopup dialog that has an `OnShow` callback accessing `f.data`
+- When you see "attempt to index field 'data' (a nil value)" errors from dialog callbacks
+- As a best practice for all dialogs that need data, even without `OnShow` callbacks (for consistency and future-proofing)
+- When refactoring existing dialogs that set `dialog.data` after `StaticPopup_Show()`
+
+**Note**: Dialogs that only use data in `OnAccept` or other callbacks (that fire after show) won't error with the old pattern, but should still be updated for consistency and to prevent bugs if someone later adds an `OnShow` callback.
+
+**Related Files**:
+- `config/categorypane.lua:354` - Category rename dialog (fixed)
+- `bags/backpack.lua:508` - Group rename dialog (fixed)
+- `bags/backpack.lua:534` - Group delete confirmation (fixed for consistency)
+
 ## Object Pooling Patterns
 
 ### Pattern: Always Reset ALL Properties When Releasing Pooled Objects
@@ -560,3 +1009,170 @@ end
 - When debugging issues where state "randomly" appears or disappears
 - During code review of features that modify pooled object properties
 - When implementing new visual indicators or state tracking on existing pooled types
+
+### Pattern: Track Active Pooled Frames for Incremental UI Updates
+**Problem**: UI elements backed by object pools need lightweight visual refreshes (e.g., recoloring item level text) without forcing full redraws. Pools do not track which objects are currently in use, so there is no safe way to iterate only visible items.
+
+**Why**: The pool only stores inactive objects. Active objects live in other structures and are not centrally tracked. Without an active registry, the only option is expensive full refreshes or unreliable traversal of UI hierarchies.
+
+**Solution Pattern**:
+1. Maintain an `activeItems` (or similar) set on the module (prefer weak-key tables to avoid retaining items)
+2. Add items to the set on `Acquire`/`Create`
+3. Remove items from the set on `Release`
+4. Respond to lightweight events (e.g., `itemLevel/MaxChanged`) by iterating the active set and updating visuals
+
+**Example**:
+```lua
+function itemFrame:OnInitialize()
+  self._pool = pool:Create(self._DoCreate, self._DoReset)
+  self.activeItems = setmetatable({}, { __mode = "k" })
+end
+
+function itemFrame:Create(ctx)
+  local item = self._pool:Acquire(ctx)
+  self.activeItems[item] = true
+  return item
+end
+
+function itemFrame.itemProto:Release(ctx)
+  itemFrame.activeItems[self] = nil
+  itemFrame._pool:Release(ctx, self)
+end
+
+function itemFrame:RefreshItemLevelColors(ctx)
+  for item in pairs(self.activeItems) do
+    if item.slotkey and item.slotkey ~= "" and not item.isFreeSlot then
+      item:DrawItemLevel()
+    end
+  end
+end
+```
+
+**When to Apply**:
+- When a visual update affects many items but does not require data refresh
+- When replacing full redraws with lightweight UI updates
+- When pooled objects must be updated on global setting changes
+
+## WindowGrouping Integration
+
+### Pattern: Frame-like Objects Must Implement Show/Hide/IsShown and Fade Animations
+**Problem**: Custom UI objects added to WindowGrouping (via `windowGrouping:AddWindow()`) fail with "Frame must have fadeIn and fadeOut animations" or cause errors when methods like `Hide()` or `IsShown()` are called.
+
+**Why**: The WindowGrouping system expects all registered frames to behave like standard WoW frames with:
+1. **Standard frame methods**: `Show()`, `Hide()`, `IsShown()`
+2. **Fade animation groups**: `fadeIn`, `fadeOut` properties
+3. **Callback support**: `Hide(callback)` must support optional callback parameter for chained animations
+
+When these requirements aren't met, the window grouping system can't properly coordinate showing/hiding multiple windows with fade animations.
+
+**Solution Pattern**:
+1. **Implement Show/Hide/IsShown methods** that delegate to the actual UI frame
+2. **Attach fade animations** using `animations:AttachFadeGroup()` on the frame
+3. **Support optional callback in Hide()** for animation chaining
+4. **Store fadeIn/fadeOut** as properties on the object itself
+
+**Example** (from frames/classic/currency.lua fix):
+```lua
+-- At module level, import animations
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
+
+-- Define the frame-like class with animation properties
+---@class CurrencyIconGrid
+---@field iconGrid Grid
+---@field fadeIn AnimationGroup
+---@field fadeOut AnimationGroup
+local CurrencyIconGrid = {}
+
+-- Implement Show/Hide/IsShown methods
+function CurrencyIconGrid:Show()
+  self.iconGrid.frame:Show()
+end
+
+function CurrencyIconGrid:Hide(callback)
+  -- Support optional callback parameter used by windowGrouping
+  if callback then
+    self.fadeOut.callback = callback
+    self.fadeOut:Play()
+  else
+    self.iconGrid.frame:Hide()
+  end
+end
+
+function CurrencyIconGrid:IsShown()
+  return self.iconGrid.frame:IsShown()
+end
+
+-- In the constructor, attach fade animations
+function currency:CreateIconGrid(parent)
+  local b = {}
+  setmetatable(b, {__index = CurrencyIconGrid})
+
+  -- Create the grid frame
+  local g = grid:Create(parent)
+  -- ... configure grid ...
+  b.iconGrid = g
+
+  -- Attach fade animations for windowGrouping compatibility
+  b.fadeIn, b.fadeOut = animations:AttachFadeGroup(g:GetContainer())
+
+  return b
+end
+
+-- Now safe to add to window grouping
+b.windowGrouping:AddWindow('currencyConfig', b.currencyFrame)
+```
+
+**Reference Implementation** (frames/themeconfig.lua:98):
+```lua
+-- ThemeConfig frame with proper windowGrouping integration
+tc.fadeIn, tc.fadeOut = animations:AttachFadeAndSlideLeft(tc.frame)
+-- Methods are inherited from the frame itself
+```
+
+**When to Apply**:
+- Any custom UI object added to WindowGrouping via `AddWindow()`
+- Objects that wrap or encapsulate WoW frames but don't expose frame methods directly
+- When seeing errors: "Frame must have fadeIn and fadeOut animations"
+- When seeing errors about missing `Hide()`, `Show()`, or `IsShown()` methods
+- Before registering a new window type with the window grouping system
+
+### Pattern: Use Discrete Color Tiers to Avoid Unwanted Midpoint Hues
+**Problem**: Smooth color blending between distant hues (e.g., blue → orange) can produce unexpected intermediate colors (gray/green) that feel incorrect for item level display.
+
+**Why**: Interpolation traverses hue space, and even with HSV biasing the midpoint can land on colors users do not associate with a given range.
+
+**Solution Pattern**:
+1. Compute dynamic breakpoints (low/mid/high/max)
+2. Pick the tier color directly based on which range the item level falls into
+3. Avoid blending between tiers
+
+**Example**:
+```lua
+if itemLevel >= maxIlvl then
+  return maxColor
+elseif itemLevel >= highPoint then
+  return highColor
+elseif itemLevel >= midPoint then
+  return midColor
+end
+return lowColor
+```
+
+**When to Apply**:
+- When users expect categorical colors, not gradients
+- When midpoints produce unexpected hues
+
+**Critical Requirements Checklist**:
+- ✅ `Show()` method exists and shows the frame
+- ✅ `Hide()` method exists with optional callback parameter
+- ✅ `Hide(callback)` plays fadeOut animation and triggers callback when provided
+- ✅ `IsShown()` method exists and returns boolean
+- ✅ `fadeIn` property contains AnimationGroup from AttachFadeGroup
+- ✅ `fadeOut` property contains AnimationGroup from AttachFadeGroup
+
+**Related Files**:
+- `util/windowgroup.lua:16` - Assertion that checks for fadeIn/fadeOut
+- `util/windowgroup.lua:21,28,33,34,41` - Calls to IsShown(), Hide(), Show()
+- `frames/classic/currency.lua:65-81,168` - Example implementation
+- `frames/themeconfig.lua:98` - Reference implementation with AttachFadeAndSlideLeft

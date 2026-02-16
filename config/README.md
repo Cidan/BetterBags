@@ -282,6 +282,15 @@ config:AddPluginConfig("My Plugin", pluginOptions)
 - **Events Module**: Event messaging system
 - **Themes Module**: Visual theming support
 
+### itemcolorpane.lua
+
+Provides the item level color configuration pane.
+
+#### Key Features
+- Displays dynamic breakpoints based on highest seen item level
+- Allows per-tier color customization (low/mid/high/max)
+- Reset restores defaults in place without recreating the pane
+
 ## Performance Considerations
 
 - Some settings use bucket timers to delay refreshes (0.2 seconds)

@@ -10,23 +10,11 @@ local const = addon:GetModule('Constants')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
-
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
 
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')

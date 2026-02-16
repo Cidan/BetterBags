@@ -1,4 +1,4 @@
-## Interface: 110200, 120000
+## Interface: 120000, 120001
 
 ## Title: BetterBags
 ## Category: Inventory
@@ -122,6 +122,7 @@ themes\elvui.lua
 config\categorypane.lua
 config\themepane.lua
 config\currencypane.lua
+config\itemcolorpane.lua
 config\config.lua
 config\plugin.lua
 
@@ -129,5 +130,6 @@ integrations\consoleport.lua
 integrations\pawn.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
+integrations\quickfind.lua
 
 core\init.lua

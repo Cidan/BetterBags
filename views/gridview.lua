@@ -10,9 +10,6 @@ local const = addon:GetModule('Constants')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
-
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
@@ -33,9 +30,6 @@ local categories = addon:GetModule('Categories')
 
 ---@class Groups: AceModule
 local groups = addon:GetModule('Groups')
-
----@class Async: AceModule
-local async = addon:GetModule('Async')
 
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
@@ -626,4 +620,3 @@ function views:NewGrid(parent, kind)
 
   return view
 end
-

@@ -20,12 +20,6 @@ local database = addon:GetModule("Database")
 ---@class Color: AceModule
 local color = addon:GetModule("Color")
 
----@class Categories: AceModule
-local categories = addon:GetModule("Categories")
-
----@class EquipmentSets: AceModule
-local equipmentSets = addon:GetModule("EquipmentSets")
-
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
 
@@ -34,9 +28,6 @@ local items = addon:GetModule("Items")
 
 ---@class Themes: AceModule
 local themes = addon:GetModule("Themes")
-
----@class Search: AceModule
-local search = addon:GetModule("Search")
 
 ---@class Context: AceModule
 local context = addon:GetModule("Context")
@@ -179,6 +170,10 @@ function itemFrame.itemProto:DrawItemLevel()
 	local ilvlOpts = database:GetItemLevelOptions(self.kind)
 	local mergeOpts = database:GetStackingOptions(self.kind)
 	local data = items:GetItemDataFromSlotKey(self.slotkey)
+	if not data or data.isItemEmpty then
+		self.ilvlText:Hide()
+		return
+	end
 	local ilvl = data.itemInfo.currentItemLevel
 
 	if not ilvlOpts.enabled then
@@ -653,6 +648,9 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:Release(ctx)
+	if itemFrame.activeItems then
+		itemFrame.activeItems[self] = nil
+	end
 	itemFrame._pool:Release(ctx, self)
 end
 
@@ -719,11 +717,16 @@ end
 function itemFrame:OnInitialize()
 	self._pool = pool:Create(self._DoCreate, self._DoReset)
 	--self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+	self.activeItems = setmetatable({}, { __mode = "k" })
 end
 
 function itemFrame:OnEnable()
 	self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
 	self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
+
+	events:RegisterMessage("itemLevel/MaxChanged", function()
+		self:RefreshItemLevelColors()
+	end)
 
 	local ctx = context:New("itemFrame_OnEnable")
 	-- Pre-populate the pool with 600 items. This is done
@@ -847,5 +850,20 @@ end
 ---@return Item
 function itemFrame:Create(ctx)
 	---@return Item
-	return self._pool:Acquire(ctx)
+	local item = self._pool:Acquire(ctx)
+	if self.activeItems then
+		self.activeItems[item] = true
+	end
+	return item
+end
+
+function itemFrame:RefreshItemLevelColors()
+	for item in pairs(self.activeItems) do
+		if item.slotkey and item.slotkey ~= "" and not item.isFreeSlot then
+			local data = items:GetItemDataFromSlotKey(item.slotkey)
+			if data and not data.isItemEmpty then
+				item:DrawItemLevel()
+			end
+		end
+	end
 end

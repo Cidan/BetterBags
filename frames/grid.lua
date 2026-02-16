@@ -3,9 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -14,7 +11,6 @@ local grid = addon:NewModule('Grid')
 
 ---@class Cell
 ---@field frame Frame
-local cellProto = {}
 
 ------
 --- Grid Proto
@@ -124,7 +120,6 @@ function gridProto:GetAllCells()
   return self.idToCell
 end
 
----@private
 ---@return Frame|WowScrollBox
 function gridProto:GetFrame()
   if self.scrollable then
@@ -142,6 +137,7 @@ function gridProto:GetScrollView()
 end
 
 function gridProto:HideScrollBar()
+  self.bar:Hide()
   self.bar:SetAlpha(0)
   self.bar:SetAttribute("nodeignore", true)
 end
@@ -157,6 +153,7 @@ end
 function gridProto:ShowScrollBar()
   self.bar:SetAttribute("nodeignore", false)
   self.bar:SetAlpha(1)
+  self.bar:Show()
 end
 
 -- DislocateCell will dislocate a cell from this grid, making it so

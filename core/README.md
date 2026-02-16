@@ -71,7 +71,7 @@ Manages all persistent data storage and settings using AceDB-3.0.
 - **Bag Settings**: Position, view, size, opacity, scale management
 - **Category Management**: Custom category creation, deletion, and item assignment
 - **Filter Settings**: Category filters, stacking options, sorting preferences
-- **Item Settings**: Item level display, new item marking, item locking
+- **Item Settings**: Item level display, new item marking, item locking, and per-character max item level tracking (emits `itemLevel/MaxChanged` for color refresh)
 - **Migration**: Handles database schema updates between versions
 
 ### events.lua

@@ -9,9 +9,6 @@ local sectionFrame = addon:GetModule('SectionFrame')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
@@ -20,9 +17,6 @@ local items = addon:GetModule('Items')
 
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
 
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
@@ -61,7 +55,7 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 function views.viewProto:Render(ctx, bag, slotInfo, callback)
-  _ = ctx
+  local _ = ctx
   _ = bag
   _ = slotInfo
   _ = callback
@@ -71,14 +65,14 @@ end
 ---@param oldSlotKey string
 ---@param newSlotKey? string
 function views.viewProto:ReindexSlot(oldSlotKey, newSlotKey)
-  _ = oldSlotKey
+  local _ = oldSlotKey
   _ = newSlotKey
   error('ReindexSlot method not implemented')
 end
 
 ---@param newSlotKey string
 function views.viewProto:AddSlot(newSlotKey)
-  _ = newSlotKey
+  local _ = newSlotKey
   error('AddSlot method not implemented')
 end
 
@@ -129,10 +123,14 @@ end
 ---@return Section
 function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
   local section = self.sections[category]
+  -- Look up category color
+  local filter = categories:GetCategoryByName(category)
+  local color = filter and filter.color or nil
+
   if section == nil then
     section = sectionFrame:Create(ctx)
     section.frame:SetParent(self.content:GetScrollView())
-    section:SetTitle(category)
+    section:SetTitle(category, color)
     if not onlyCreate then
       self.content:AddCell(category, section)
     end
@@ -144,8 +142,12 @@ function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
         dynamic = true,
       })
     end
-  elseif self.content:GetCell(category) == nil and not onlyCreate then
-    self.content:AddCell(category, section)
+  else
+    -- Section already exists - update the color in case it changed
+    section:SetTitle(category, color)
+    if self.content:GetCell(category) == nil and not onlyCreate then
+      self.content:AddCell(category, section)
+    end
   end
   return section
 end
@@ -272,7 +274,7 @@ end
 
 ---@param bag Bag
 function views.viewProto:UpdateListSize(bag)
-  _ = bag
+  local _ = bag
 end
 
 ---@param ctx Context

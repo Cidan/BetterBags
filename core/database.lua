@@ -10,6 +10,12 @@ local const = addon:GetModule('Constants')
 ---@field private data databaseOptions
 local DB = addon:NewModule('Database')
 
+---@class (exact) ColorDef
+---@field red number
+---@field green number
+---@field blue number
+---@field alpha number
+
 function DB:OnInitialize()
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
@@ -216,6 +222,50 @@ function DB:SetItemLevelColorEnabled(kind, enabled)
   DB.data.profile.itemLevel[kind].color = enabled
 end
 
+---@return number
+function DB:GetMaxItemLevel()
+  local characterKey = UnitName("player") .. "-" .. GetRealmName()
+  local byCharacter = DB.data.profile.itemLevelColor.maxItemLevelByCharacter
+  return byCharacter[characterKey] or 1
+end
+
+---@param itemLevel number
+function DB:UpdateMaxItemLevel(itemLevel)
+  local characterKey = UnitName("player") .. "-" .. GetRealmName()
+  local byCharacter = DB.data.profile.itemLevelColor.maxItemLevelByCharacter
+  local current = byCharacter[characterKey] or 1
+	if itemLevel > current then
+		byCharacter[characterKey] = itemLevel
+		-- Notify listeners to refresh item level visuals and options pane.
+		local events = addon:GetModule('Events')
+		local context = addon:GetModule('Context')
+		local ctx = context:New('UpdateMaxItemLevel')
+		events:SendMessage(ctx, 'itemLevel/MaxChanged', itemLevel)
+	end
+end
+
+---@return {low: ColorDef, mid: ColorDef, high: ColorDef, max: ColorDef}
+function DB:GetItemLevelColors()
+  return DB.data.profile.itemLevelColor.colors
+end
+
+---@param colorKey "low"|"mid"|"high"|"max"
+---@param color ColorDef
+function DB:SetItemLevelColor(colorKey, color)
+  DB.data.profile.itemLevelColor.colors[colorKey] = color
+end
+
+function DB:ResetItemLevelColors()
+  -- Deep copy the colors from constants to avoid reference issues
+  local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor.colors
+  DB.data.profile.itemLevelColor.colors = {
+    low = { red = defaults.low.red, green = defaults.low.green, blue = defaults.low.blue, alpha = defaults.low.alpha },
+    mid = { red = defaults.mid.red, green = defaults.mid.green, blue = defaults.mid.blue, alpha = defaults.mid.alpha },
+    high = { red = defaults.high.red, green = defaults.high.green, blue = defaults.high.blue, alpha = defaults.high.alpha },
+    max = { red = defaults.max.red, green = defaults.max.green, blue = defaults.max.blue, alpha = defaults.max.alpha }
+  }
+end
+
 function DB:GetFirstTimeMenu()
   return DB.data.profile.firstTimeMenu
 end
@@ -372,6 +422,8 @@ function DB:CreateOrUpdateCategory(category)
       name = category.name,
       enabled = category.enabled,
       dynamic = category.dynamic,
+      isGroupBySubcategory = category.isGroupBySubcategory,
+      groupByParent = category.groupByParent,
       itemList = {},
     }
   end
@@ -630,6 +682,108 @@ function DB:RenameGroup(groupID, name)
   end
 end
 
+-- RenameCategory renames a category by updating all data structures that use the category name as a key.
+---@param oldName string
+---@param newName string
+---@return boolean success
+function DB:RenameCategory(oldName, newName)
+  -- Trim whitespace and validate new name
+  newName = strtrim(newName)
+  if newName == "" then
+    return false
+  end
+
+  -- Validate old category exists and new name doesn't conflict
+  if not DB.data.profile.customCategoryFilters[oldName] then
+    return false
+  end
+  if DB.data.profile.customCategoryFilters[newName] then
+    return false
+  end
+
+  -- 1. Move main category data structure
+  DB.data.profile.customCategoryFilters[newName] = DB.data.profile.customCategoryFilters[oldName]
+  DB.data.profile.customCategoryFilters[newName].name = newName
+  DB.data.profile.customCategoryFilters[oldName] = nil
+
+  -- 2. Update item index for all items pointing to old category
+  for itemID, categoryName in pairs(DB.data.profile.customCategoryIndex) do
+    if categoryName == oldName then
+      DB.data.profile.customCategoryIndex[itemID] = newName
+    end
+  end
+
+  -- 3. Update group mapping
+  if DB.data.profile.categoryToGroup[oldName] then
+    DB.data.profile.categoryToGroup[newName] = DB.data.profile.categoryToGroup[oldName]
+    DB.data.profile.categoryToGroup[oldName] = nil
+  end
+
+  -- 4. Update ephemeral filters
+  if DB.data.profile.ephemeralCategoryFilters[oldName] then
+    DB.data.profile.ephemeralCategoryFilters[newName] = DB.data.profile.ephemeralCategoryFilters[oldName]
+    DB.data.profile.ephemeralCategoryFilters[oldName] = nil
+  end
+
+  -- Delete grouped sub-categories from ephemeral filters (e.g., "OldName - Consumable")
+  -- These will be recreated with the new name on next refresh
+  local groupedPrefix = oldName .. " - "
+  for categoryName, _ in pairs(DB.data.profile.ephemeralCategoryFilters) do
+    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+      DB.data.profile.ephemeralCategoryFilters[categoryName] = nil
+    end
+  end
+
+  -- 5. Update display options
+  if DB.data.profile.categoryOptions[oldName] then
+    DB.data.profile.categoryOptions[newName] = DB.data.profile.categoryOptions[oldName]
+    DB.data.profile.categoryOptions[oldName] = nil
+  end
+
+  -- Delete grouped sub-categories from display options
+  for categoryName, _ in pairs(DB.data.profile.categoryOptions) do
+    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+      DB.data.profile.categoryOptions[categoryName] = nil
+    end
+  end
+
+  -- 6. Update collapse state for all bag kinds
+  for _, kind in pairs(const.BAG_KIND) do
+    if DB.data.profile.collapsedSections[kind] and DB.data.profile.collapsedSections[kind][oldName] ~= nil then
+      DB.data.profile.collapsedSections[kind][newName] = DB.data.profile.collapsedSections[kind][oldName]
+      DB.data.profile.collapsedSections[kind][oldName] = nil
+    end
+
+    -- Delete grouped sub-categories from collapsed sections
+    if DB.data.profile.collapsedSections[kind] then
+      for categoryName, _ in pairs(DB.data.profile.collapsedSections[kind]) do
+        if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+          DB.data.profile.collapsedSections[kind][categoryName] = nil
+        end
+      end
+    end
+  end
+
+  -- 7. Update custom section sort (pinned position) for all bag kinds
+  for _, kind in pairs(const.BAG_KIND) do
+    if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
+      DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
+      DB.data.profile.customSectionSort[kind][oldName] = nil
+    end
+
+    -- Delete grouped sub-categories from custom section sort
+    if DB.data.profile.customSectionSort[kind] then
+      for categoryName, _ in pairs(DB.data.profile.customSectionSort[kind]) do
+        if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+          DB.data.profile.customSectionSort[kind][categoryName] = nil
+        end
+      end
+    end
+  end
+
+  return true
+end
+
 ---@return number
 function DB:GetNextGroupID()
   return DB.data.profile.groupCounter + 1
@@ -674,6 +828,22 @@ end
 ---@param groupID number
 function DB:SetActiveGroup(kind, groupID)
   DB.data.profile.activeGroup[kind] = groupID
+end
+
+---@param groupID number
+---@param order number
+function DB:SetGroupOrder(groupID, order)
+  local group = DB.data.profile.groups[groupID]
+  if group then
+    group.order = order
+  end
+end
+
+---@param groupID number
+---@return number
+function DB:GetGroupOrder(groupID)
+  local group = DB.data.profile.groups[groupID]
+  return group and group.order or groupID  -- Default to ID if order not set
 end
 
 -- Export category configuration to a base64-encoded string
@@ -831,6 +1001,252 @@ function DB:Migrate()
     [const.BAG_KIND.BACKPACK] = {},
     [const.BAG_KIND.BANK] = {},
   }
+
+  -- ============================================================
+  -- Dynamic Item Level Coloring Migration (Q1'27)
+  -- Do not remove before Q3'27
+  -- ============================================================
+  if not DB.data.profile.itemLevelColor then
+    -- Use defaults from constants
+    local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor
+    DB.data.profile.itemLevelColor = {
+      maxItemLevelByCharacter = {},
+      colors = {
+        low = { red = defaults.colors.low.red, green = defaults.colors.low.green, blue = defaults.colors.low.blue, alpha = defaults.colors.low.alpha },
+        mid = { red = defaults.colors.mid.red, green = defaults.colors.mid.green, blue = defaults.colors.mid.blue, alpha = defaults.colors.mid.alpha },
+        high = { red = defaults.colors.high.red, green = defaults.colors.high.green, blue = defaults.colors.high.blue, alpha = defaults.colors.high.alpha },
+        max = { red = defaults.colors.max.red, green = defaults.colors.max.green, blue = defaults.colors.max.blue, alpha = defaults.colors.max.alpha }
+      }
+    }
+  end
+
+  -- Migrate old single maxItemLevel to per-character tracking
+  if DB.data.profile.itemLevelColor.maxItemLevel then
+    local oldMax = DB.data.profile.itemLevelColor.maxItemLevel
+    local characterKey = UnitName("player") .. "-" .. GetRealmName()
+    if not DB.data.profile.itemLevelColor.maxItemLevelByCharacter then
+      DB.data.profile.itemLevelColor.maxItemLevelByCharacter = {}
+    end
+    -- Preserve old value for current character
+    DB.data.profile.itemLevelColor.maxItemLevelByCharacter[characterKey] = oldMax
+    -- Remove old field
+    DB.data.profile.itemLevelColor.maxItemLevel = nil
+  end
+
+  -- Add missing fields if partial migration occurred
+  if not DB.data.profile.itemLevelColor.maxItemLevelByCharacter then
+    DB.data.profile.itemLevelColor.maxItemLevelByCharacter = {}
+  end
+  if not DB.data.profile.itemLevelColor.colors then
+    local defaults = const.DATABASE_DEFAULTS.profile.itemLevelColor.colors
+    DB.data.profile.itemLevelColor.colors = {
+      low = { red = defaults.low.red, green = defaults.low.green, blue = defaults.low.blue, alpha = defaults.low.alpha },
+      mid = { red = defaults.mid.red, green = defaults.mid.green, blue = defaults.mid.blue, alpha = defaults.mid.alpha },
+      high = { red = defaults.high.red, green = defaults.high.green, blue = defaults.high.blue, alpha = defaults.high.alpha },
+      max = { red = defaults.max.red, green = defaults.max.green, blue = defaults.max.blue, alpha = defaults.max.alpha }
+    }
+  end
+
+  -- ============================================================
+  -- Profile System Migration (Q1'26)
+  -- Do not remove before Q3'26
+  -- ============================================================
+  if not DB.data.profile.__profileSystemMigrated then
+    -- Detect current profile name
+    local currentProfile = DB.data:GetCurrentProfile()
+    local playerName = UnitName("player")
+    local realmName = GetRealmName()
+    local autoProfile = playerName .. " - " .. realmName
+
+    -- If using auto-generated character name profile, migrate to Default
+    if currentProfile == autoProfile then
+      local profiles = {}
+      DB.data:GetProfiles(profiles)
+
+      local hasDefault = false
+      for _, name in ipairs(profiles) do
+        if name == "Default" then
+          hasDefault = true
+          break
+        end
+      end
+
+      if not hasDefault then
+        -- Create Default and copy current settings
+        DB.data:SetProfile("Default")
+        DB.data:CopyProfile(autoProfile)
+      else
+        -- Switch to existing Default
+        DB.data:SetProfile("Default")
+      end
+    end
+
+    -- Mark migration complete
+    DB.data.profile.__profileSystemMigrated = true
+  end
+end
+
+-- ============================================================
+-- Profile Management
+-- ============================================================
+
+--- Get the name of the currently active profile
+---@return string
+function DB:GetCurrentProfileName()
+  return DB.data:GetCurrentProfile()
+end
+
+--- Get list of all available profiles
+---@return table<number, string>
+function DB:GetAvailableProfiles()
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  return profiles
+end
+
+--- Get how many characters are using each profile
+---@return table<string, number>
+function DB:GetProfileCharacterCounts()
+  local counts = {}
+
+  -- Initialize all profiles with 0 count
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  for _, profileName in ipairs(profiles) do
+    counts[profileName] = 0
+  end
+
+  -- Count characters per profile from profileKeys
+  if DB.data.sv.profileKeys then
+    for _, profileName in pairs(DB.data.sv.profileKeys) do
+      counts[profileName] = (counts[profileName] or 0) + 1
+    end
+  end
+
+  return counts
+end
+
+--- Switch to a different profile (creates if doesn't exist)
+---@param name string
+---@return boolean success
+function DB:SwitchToProfile(name)
+  if type(name) ~= "string" or name == "" then
+    return false
+  end
+  DB.data:SetProfile(name)
+  return true
+end
+
+--- Create a new profile with the given name
+---@param name string
+---@return boolean success
+---@return string message
+function DB:CreateProfile(name)
+  if type(name) ~= "string" or name == "" then
+    return false, "Profile name cannot be empty"
+  end
+
+  -- Check if profile already exists
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  for _, existingName in ipairs(profiles) do
+    if existingName == name then
+      return false, "A profile with this name already exists"
+    end
+  end
+
+  -- SetProfile creates new profile if doesn't exist
+  DB.data:SetProfile(name)
+  return true, "Profile created successfully"
+end
+
+--- Copy data from another profile to the current profile
+---@param sourceName string
+---@return boolean success
+---@return string message
+function DB:CopyFromProfile(sourceName)
+  if type(sourceName) ~= "string" or sourceName == "" then
+    return false, "Source profile name cannot be empty"
+  end
+
+  -- Verify source profile exists
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  local found = false
+  for _, existingName in ipairs(profiles) do
+    if existingName == sourceName then
+      found = true
+      break
+    end
+  end
+
+  if not found then
+    return false, "Source profile does not exist"
+  end
+
+  -- Copy from source to current profile
+  DB.data:CopyProfile(sourceName)
+  return true, "Profile copied successfully"
+end
+
+--- Rename the current profile
+---@param oldName string
+---@param newName string
+---@return boolean success
+---@return string message
+function DB:RenameProfile(oldName, newName)
+  if oldName == "Default" then
+    return false, "Cannot rename the Default profile"
+  end
+
+  if type(newName) ~= "string" or newName == "" then
+    return false, "Profile name cannot be empty"
+  end
+
+  -- Check if new name already exists
+  local profiles = {}
+  DB.data:GetProfiles(profiles)
+  for _, existingName in ipairs(profiles) do
+    if existingName == newName then
+      return false, "A profile with this name already exists"
+    end
+  end
+
+  -- Switch to old profile, copy to new name, delete old
+  DB.data:SetProfile(oldName)
+  DB.data:SetProfile(newName)
+  DB.data:CopyProfile(oldName)
+
+  -- Delete old profile
+  DB.data:DeleteProfile(oldName, true)
+
+  return true, "Profile renamed successfully"
+end
+
+--- Delete a profile (cannot delete Default or active profile)
+---@param name string
+---@return boolean success
+---@return string message
+function DB:DeleteProfile(name)
+  if name == "Default" then
+    return false, "Cannot delete the Default profile"
+  end
+
+  local currentProfile = DB.data:GetCurrentProfile()
+  if currentProfile == name then
+    return false, "Cannot delete the active profile. Switch to another profile first."
+  end
+
+  DB.data:DeleteProfile(name, true)
+  return true, "Profile deleted successfully"
+end
+
+--- Reset the current profile to default settings
+---@return boolean success
+---@return string message
+function DB:ResetCurrentProfile()
+  DB.data:ResetProfile(false, true)
+  return true, "Profile reset to defaults"
 end
 
 DB:Enable()

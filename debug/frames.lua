@@ -102,7 +102,7 @@ end
 -- WalkAndFixAnchorGraph will fix the anchor graph of a frame. Use this function
 -- to fix the dreaded "frames disappear unless you move the parent" bug.
 ---@param frame Frame
----@param visited? table<Frame, boolean> 
+---@param visited? table<Frame, boolean>
 function debug:WalkAndFixAnchorGraph(frame, visited)
   visited = visited or {};
 

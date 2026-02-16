@@ -5,6 +5,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class FormLayouts: AceModule
 local layouts = addon:NewModule('FormLayouts')
+local _ = layouts
 
 --[[
 -- Widgets

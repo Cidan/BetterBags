@@ -9,17 +9,11 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
-
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
@@ -166,25 +160,20 @@ function categoryPaneProto:initListItem(button, elementData)
   else
     button.Category:SetFontObject(fonts.UnitFrame12White)
 
-    -- Show note based on category state
+    -- Show note based on category state (priority for both search and item list categories)
     local filter = categories:GetCategoryByName(elementData.title)
-    if filter and filter.searchCategory then
-      button.Note:SetText(format("P:%d", filter.priority or 0))
+    if filter and filter.priority then
+      button.Note:SetText(format("P:%d", filter.priority))
     else
       button.Note:SetText("")
     end
 
-    -- Background based on enabled state
-    if categories:IsCategoryEnabled(self.kind, elementData.title) or not categories:DoesCategoryExist(elementData.title) then
-      button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
-    else
-      button:SetBackdropColor(0, 0, 0, 0)
-    end
-
-    -- Highlight selected category
+    -- Background based on selection state only
     if self.selectedCategory == elementData.title then
       button:SetBackdropColor(1, 0.82, 0, 0.3)
       self.selectedButton = button
+    else
+      button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
     end
   end
 
@@ -203,8 +192,6 @@ function categoryPaneProto:initListItem(button, elementData)
         else
           self:SelectCategory(elementData.title)
         end
-      elseif mouseButton == "RightButton" then
-        self:ShowContextMenu(elementData.title)
       end
     end)
 
@@ -217,10 +204,8 @@ function categoryPaneProto:initListItem(button, elementData)
     button:SetScript("OnLeave", function()
       if self.selectedCategory == elementData.title then
         button:SetBackdropColor(1, 0.82, 0, 0.3)
-      elseif categories:IsCategoryEnabled(self.kind, elementData.title) then
-        button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
       else
-        button:SetBackdropColor(0, 0, 0, 0)
+        button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
       end
     end)
   else
@@ -233,7 +218,7 @@ end
 ---@param button CategoryPaneListButton
 ---@param elementData table
 function categoryPaneProto:resetListItem(button, elementData)
-  _ = elementData
+  local _ = elementData
   button:SetScript("OnClick", nil)
   button:SetScript("OnEnter", nil)
   button:SetScript("OnLeave", nil)
@@ -270,12 +255,7 @@ end
 function categoryPaneProto:SelectCategory(category)
   -- Deselect previous
   if self.selectedButton then
-    local prevCategory = self.selectedCategory
-    if prevCategory and categories:IsCategoryEnabled(self.kind, prevCategory) then
-      self.selectedButton:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
-    else
-      self.selectedButton:SetBackdropColor(0, 0, 0, 0)
-    end
+    self.selectedButton:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
   end
 
   self.selectedCategory = category
@@ -292,34 +272,80 @@ function categoryPaneProto:SelectCategory(category)
   end)
 end
 
----@param category string
-function categoryPaneProto:ShowContextMenu(category)
-  local ctx = context:New('CategoryPane_ContextMenu')
-  ---@type MenuList[]
-  local menuOptions = {}
+-- ShowRenameCategoryDialog shows a dialog to rename a category.
+---@param categoryName string
+function categoryPaneProto:ShowRenameCategoryDialog(categoryName)
+  if not categories:DoesCategoryExist(categoryName) then return end
 
-  if categories:DoesCategoryExist(category) and not categories:IsDynamicCategory(category) then
-    table.insert(menuOptions, {
-      text = L:G("Delete Category"),
-      notCheckable = true,
-      hasArrow = false,
-      func = function()
-        question:YesNo("Delete Category", format("Are you sure you want to delete the category %s?", category), function()
-          local ectx = context:New('CategoryPane_DeleteCategory')
-          categories:DeleteCategory(ectx, category)
-          if self.selectedCategory == category then
-            self.selectedCategory = nil
-            self:UpdateDetailPanel()
+  -- Define the static popup if not already defined
+  if not StaticPopupDialogs["BETTERBAGS_RENAME_CATEGORY"] then
+    StaticPopupDialogs["BETTERBAGS_RENAME_CATEGORY"] = {
+      text = L:G("Enter new category name:"),
+      hasEditBox = true,
+      button1 = L:G("Rename"),
+      button2 = L:G("Cancel"),
+      OnAccept = function(f)
+        local newName = f.EditBox:GetText()
+        if newName and newName ~= "" then
+          newName = strtrim(newName)
+          local ctx = context:New("RenameCategory")
+          local success = categories:RenameCategory(ctx, f.data.categoryName, newName)
+          if success then
+            -- Update selected category if it was the renamed one
+            if f.data.pane.selectedCategory == f.data.categoryName then
+              f.data.pane.selectedCategory = newName
+            end
+            -- Delay refresh to allow bags/FullRefreshAll event to complete
+            C_Timer.After(0.1, function()
+              f.data.pane:RefreshList()
+              f.data.pane:UpdateDetailPanel()
+            end)
+          else
+            -- Show error message
+            print(format(L:G("Failed to rename category. A category named '%s' may already exist."), newName))
           end
-          self:RefreshList()
-        end, function() end)
-      end
-    })
+        end
+      end,
+      OnShow = function(f)
+        f.EditBox:SetText(f.data.categoryName)
+        f.EditBox:HighlightText()
+        f.EditBox:SetFocus()
+      end,
+      EditBoxOnEnterPressed = function(f)
+        local parent = f:GetParent()
+        local newName = parent.EditBox:GetText()
+        if newName and newName ~= "" then
+          newName = strtrim(newName)
+          local ctx = context:New("RenameCategory")
+          local success = categories:RenameCategory(ctx, parent.data.categoryName, newName)
+          if success then
+            -- Update selected category if it was the renamed one
+            if parent.data.pane.selectedCategory == parent.data.categoryName then
+              parent.data.pane.selectedCategory = newName
+            end
+            -- Delay refresh to allow bags/FullRefreshAll event to complete
+            C_Timer.After(0.1, function()
+              parent.data.pane:RefreshList()
+              parent.data.pane:UpdateDetailPanel()
+            end)
+          else
+            -- Show error message
+            print(format(L:G("Failed to rename category. A category named '%s' may already exist."), newName))
+          end
+        end
+        parent:Hide()
+      end,
+      EditBoxOnEscapePressed = function(f)
+        f:GetParent():Hide()
+      end,
+      timeout = 0,
+      whileDead = true,
+      hideOnEscape = true,
+      preferredIndex = 3,
+    }
   end
 
-  if #menuOptions > 0 then
-    contextMenu:Show(ctx, menuOptions)
-  end
+  StaticPopup_Show("BETTERBAGS_RENAME_CATEGORY", nil, nil, { categoryName = categoryName, pane = self })
 end
 
 function categoryPaneProto:UpdateDetailPanel()
@@ -405,13 +431,33 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
   if filter.color then
     self.searchDetail.colorTexture:SetVertexColor(filter.color[1], filter.color[2], filter.color[3], 1)
   else
-    self.searchDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
+    self.searchDetail.colorTexture:SetVertexColor(1, 0.82, 0, 1)  -- Default to Warcraft yellow
   end
 
-  -- Show/hide delete button based on category type
+  -- Update show checkbox state
+  if self.searchDetail.showCheckbox then
+    self.searchDetail.showCheckbox:SetChecked(categories:IsCategoryShown(filter.name))
+  end
+
+  -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
-  self.searchDetail.deleteButton:SetEnabled(not isDynamic)
-  if isDynamic then
+  local isGroupBy = categories:IsGroupBySubcategory(filter.name)
+
+  -- Dynamic categories: cannot rename (Blizzard data), but CAN delete (except groupBy subcategories)
+  -- Non-dynamic categories: can both rename and delete
+  local canRename = not isDynamic
+  local canDelete = not isGroupBy  -- Can delete dynamic categories, but not groupBy subcategories
+
+  self.searchDetail.renameButton:SetEnabled(canRename)
+  self.searchDetail.deleteButton:SetEnabled(canDelete)
+
+  if not canRename then
+    self.searchDetail.renameButton:SetText("Cannot Rename")
+  else
+    self.searchDetail.renameButton:SetText("Rename")
+  end
+
+  if not canDelete then
     self.searchDetail.deleteButton:SetText("Cannot Delete")
   else
     self.searchDetail.deleteButton:SetText("Delete Category")
@@ -629,7 +675,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   colorPicker:SetScript("OnMouseDown", function()
     if not self.selectedCategory then return end
     local filter = categories:GetCategoryByName(self.selectedCategory)
-    local r, g, b = 1, 1, 1
+    local r, g, b = 1, 0.82, 0  -- Default to Warcraft yellow (matches fonts.UnitFrame12Yellow)
     if filter and filter.color then
       r, g, b = filter.color[1], filter.color[2], filter.color[3]
     end
@@ -650,7 +696,42 @@ function categoryPaneProto:CreateSearchDetailPanel()
     ColorPickerFrame:SetupColorPickerAndShow(options)
   end)
 
+  -- Clear Color Button (to reset to default yellow)
+  local clearColorButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
+  clearColorButton:SetPoint("LEFT", colorPicker, "RIGHT", 5, 0)
+  clearColorButton:SetSize(90, 24)
+  clearColorButton:SetText("Reset Color")
+  clearColorButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    -- Reset swatch to default yellow
+    colorTex:SetVertexColor(1, 0.82, 0, 1)
+  end)
+
   yOffset = yOffset - 50
+
+  -- Show Section Checkbox
+  local showCheckbox = CreateFrame("CheckButton", nil, self.searchDetail, "UICheckButtonTemplate")
+  showCheckbox:SetPoint("TOPLEFT", 10, yOffset)
+  self.searchDetail.showCheckbox = showCheckbox
+
+  local showLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showLabel:SetPoint("LEFT", showCheckbox, "RIGHT", 5, 0)
+  showLabel:SetText("Show Section")
+
+  local showDesc = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showDesc:SetPoint("TOPLEFT", showLabel, "BOTTOMLEFT", 0, -5)
+  showDesc:SetPoint("RIGHT", self.searchDetail, "RIGHT", -10, 0)
+  showDesc:SetText("When unchecked, this category will be hidden from the bag view.")
+  showDesc:SetTextColor(0.6, 0.6, 0.6)
+  showDesc:SetFontObject(fonts.UnitFrame12White)
+
+  showCheckbox:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    local ctx = context:New('CategoryPane_ToggleShow')
+    categories:ToggleCategoryShown(ctx, self.selectedCategory)
+  end)
+
+  yOffset = yOffset - 60
 
   -- Save Button
   local saveButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
@@ -662,9 +743,20 @@ function categoryPaneProto:CreateSearchDetailPanel()
   end)
   self.searchDetail.saveButton = saveButton
 
+  -- Rename Button
+  local renameButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
+  renameButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
+  renameButton:SetSize(100, 25)
+  renameButton:SetText("Rename")
+  renameButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    self:ShowRenameCategoryDialog(self.selectedCategory)
+  end)
+  self.searchDetail.renameButton = renameButton
+
   -- Delete Button
   local deleteButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
-  deleteButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
+  deleteButton:SetPoint("LEFT", renameButton, "RIGHT", 10, 0)
   deleteButton:SetSize(120, 25)
   deleteButton:SetText("Delete Category")
   deleteButton:SetScript("OnClick", function()
@@ -696,13 +788,18 @@ function categoryPaneProto:SaveSearchCategory()
   -- Update color
   local r, g, b = self.searchDetail.colorTexture:GetVertexColor()
 
+  -- Check if color matches default yellow (with small epsilon for floating point comparison)
+  local isDefaultColor = (math.abs(r - 1.0) < 0.01 and
+                          math.abs(g - 0.82) < 0.01 and
+                          math.abs(b - 0.0) < 0.01)
+
   -- Recreate the category with updated values
   categories:CreateCategory(ctx, {
     name = self.selectedCategory,
     priority = newPriority,
     save = true,
     itemList = filter.itemList or {},
-    color = {r, g, b},
+    color = isDefaultColor and nil or {r, g, b},  -- nil for default, explicit RGB otherwise
     searchCategory = {
       query = newQuery,
       groupBy = newGroupBy,
@@ -732,13 +829,38 @@ function categoryPaneProto:ShowManualCategoryDetail(filter)
   if filter.color then
     self.manualDetail.colorTexture:SetVertexColor(filter.color[1], filter.color[2], filter.color[3], 1)
   else
-    self.manualDetail.colorTexture:SetVertexColor(1, 1, 1, 1)
+    self.manualDetail.colorTexture:SetVertexColor(1, 0.82, 0, 1)  -- Default to Warcraft yellow
   end
 
-  -- Show/hide delete button based on category type
+  -- Update priority
+  if self.manualDetail.priorityBox then
+    self.manualDetail.priorityBox:SetText(tostring(filter.priority or 10))
+  end
+
+  -- Update show checkbox state
+  if self.manualDetail.showCheckbox then
+    self.manualDetail.showCheckbox:SetChecked(categories:IsCategoryShown(filter.name))
+  end
+
+  -- Show/hide rename and delete buttons based on category type
   local isDynamic = categories:IsDynamicCategory(filter.name)
-  self.manualDetail.deleteButton:SetEnabled(not isDynamic)
-  if isDynamic then
+  local isGroupBy = categories:IsGroupBySubcategory(filter.name)
+
+  -- Dynamic categories: cannot rename (Blizzard data), but CAN delete (except groupBy subcategories)
+  -- Non-dynamic categories: can both rename and delete
+  local canRename = not isDynamic
+  local canDelete = not isGroupBy  -- Can delete dynamic categories, but not groupBy subcategories
+
+  self.manualDetail.renameButton:SetEnabled(canRename)
+  self.manualDetail.deleteButton:SetEnabled(canDelete)
+
+  if not canRename then
+    self.manualDetail.renameButton:SetText("Cannot Rename")
+  else
+    self.manualDetail.renameButton:SetText("Rename")
+  end
+
+  if not canDelete then
     self.manualDetail.deleteButton:SetText("Cannot Delete")
   else
     self.manualDetail.deleteButton:SetText("Delete Category")
@@ -790,7 +912,7 @@ function categoryPaneProto:CreateManualDetailPanel()
   colorPicker:SetScript("OnMouseDown", function()
     if not self.selectedCategory then return end
     local filter = categories:GetCategoryByName(self.selectedCategory)
-    local r, g, b = 1, 1, 1
+    local r, g, b = 1, 0.82, 0  -- Default to Warcraft yellow (matches fonts.UnitFrame12Yellow)
     if filter and filter.color then
       r, g, b = filter.color[1], filter.color[2], filter.color[3]
     end
@@ -811,45 +933,71 @@ function categoryPaneProto:CreateManualDetailPanel()
     ColorPickerFrame:SetupColorPickerAndShow(options)
   end)
 
+  -- Clear Color Button (to reset to default yellow)
+  local clearColorButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
+  clearColorButton:SetPoint("LEFT", colorPicker, "RIGHT", 5, 0)
+  clearColorButton:SetSize(90, 24)
+  clearColorButton:SetText("Reset Color")
+  clearColorButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    -- Reset swatch to default yellow
+    colorTex:SetVertexColor(1, 0.82, 0, 1)
+  end)
+
   yOffset = yOffset - 40
+
+  -- Priority Label
+  local priorityLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  priorityLabel:SetPoint("TOPLEFT", 10, yOffset)
+  priorityLabel:SetText("Priority (0-99)")
+
+  yOffset = yOffset - 20
+
+  -- Priority EditBox
+  local priorityBox = CreateFrame("EditBox", nil, self.manualDetail, "InputBoxTemplate")
+  priorityBox:SetPoint("TOPLEFT", 15, yOffset)
+  priorityBox:SetSize(60, 25)
+  priorityBox:SetAutoFocus(false)
+  priorityBox:SetNumeric(true)
+  priorityBox:SetMaxLetters(2)
+  self.manualDetail.priorityBox = priorityBox
+
+  yOffset = yOffset - 40
+
+  -- Show Section Checkbox
+  local showCheckbox = CreateFrame("CheckButton", nil, self.manualDetail, "UICheckButtonTemplate")
+  showCheckbox:SetPoint("TOPLEFT", 10, yOffset)
+  self.manualDetail.showCheckbox = showCheckbox
+
+  local showLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showLabel:SetPoint("LEFT", showCheckbox, "RIGHT", 5, 0)
+  showLabel:SetText("Show Section")
+
+  local showDesc = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  showDesc:SetPoint("TOPLEFT", showLabel, "BOTTOMLEFT", 0, -5)
+  showDesc:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
+  showDesc:SetText("When unchecked, this category will be hidden from the bag view.")
+  showDesc:SetTextColor(0.6, 0.6, 0.6)
+  showDesc:SetFontObject(fonts.UnitFrame12White)
+
+  showCheckbox:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    local ctx = context:New('CategoryPane_ToggleShow')
+    categories:ToggleCategoryShown(ctx, self.selectedCategory)
+  end)
+
+  yOffset = yOffset - 60
 
   -- Items Label
   local itemsLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   itemsLabel:SetPoint("TOPLEFT", 10, yOffset)
-  itemsLabel:SetText("Items in Category")
+  itemsLabel:SetText("Items in Category (drag items here to add)")
 
   yOffset = yOffset - 20
 
-  -- Item List Frame
-  local itemListContainer = CreateFrame("Frame", nil, self.manualDetail)
-  itemListContainer:SetPoint("TOPLEFT", 10, yOffset)
-  itemListContainer:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
-  itemListContainer:SetHeight(150)
-
-  self.manualDetail.itemListFrame = list:Create(itemListContainer)
-  self.manualDetail.itemListFrame.frame:SetAllPoints()
-  self.manualDetail.itemListFrame:SetupDataSource("BetterBagsCategoryPaneItemFrame", function(f, data)
-    ---@cast f CategoryPaneItemFrame
-    self:initItemRow(f, data)
-  end, function(f, data)
-    ---@cast f CategoryPaneItemFrame
-    self:resetItemRow(f, data)
-  end)
-
-  yOffset = yOffset - 170
-
-  -- Divider 2
-  local divider2 = self.manualDetail:CreateTexture(nil, "ARTWORK")
-  divider2:SetPoint("TOPLEFT", 10, yOffset)
-  divider2:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
-  divider2:SetHeight(1)
-  divider2:SetColorTexture(0.5, 0.5, 0.5, 0.5)
-
-  yOffset = yOffset - 20
-
-  -- Save Button
+  -- Save Button (anchored to bottom)
   local saveButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
-  saveButton:SetPoint("TOPLEFT", 10, yOffset)
+  saveButton:SetPoint("BOTTOMLEFT", self.manualDetail, "BOTTOMLEFT", 10, 10)
   saveButton:SetSize(100, 25)
   saveButton:SetText("Save")
   saveButton:SetScript("OnClick", function()
@@ -857,9 +1005,20 @@ function categoryPaneProto:CreateManualDetailPanel()
   end)
   self.manualDetail.saveButton = saveButton
 
-  -- Delete Button
+  -- Rename Button (anchored to save button)
+  local renameButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
+  renameButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
+  renameButton:SetSize(100, 25)
+  renameButton:SetText("Rename")
+  renameButton:SetScript("OnClick", function()
+    if not self.selectedCategory then return end
+    self:ShowRenameCategoryDialog(self.selectedCategory)
+  end)
+  self.manualDetail.renameButton = renameButton
+
+  -- Delete Button (anchored to rename button)
   local deleteButton = CreateFrame("Button", nil, self.manualDetail, "UIPanelButtonTemplate")
-  deleteButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
+  deleteButton:SetPoint("LEFT", renameButton, "RIGHT", 10, 0)
   deleteButton:SetSize(120, 25)
   deleteButton:SetText("Delete Category")
   deleteButton:SetScript("OnClick", function()
@@ -873,6 +1032,48 @@ function categoryPaneProto:CreateManualDetailPanel()
     end, function() end)
   end)
   self.manualDetail.deleteButton = deleteButton
+
+  -- Divider 2 (anchored above buttons)
+  local divider2 = self.manualDetail:CreateTexture(nil, "ARTWORK")
+  divider2:SetPoint("BOTTOMLEFT", self.manualDetail, "BOTTOMLEFT", 10, 45)
+  divider2:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
+  divider2:SetHeight(1)
+  divider2:SetColorTexture(0.5, 0.5, 0.5, 0.5)
+
+  -- Item List Frame (expands to fill available space)
+  local itemListContainer = CreateFrame("Frame", nil, self.manualDetail)
+  itemListContainer:SetPoint("TOPLEFT", 10, yOffset)
+  itemListContainer:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
+  itemListContainer:SetPoint("BOTTOM", divider2, "TOP", 0, 20)
+
+  self.manualDetail.itemListFrame = list:Create(itemListContainer)
+  self.manualDetail.itemListFrame.frame:SetAllPoints()
+  self.manualDetail.itemListFrame:SetupDataSource("BetterBagsCategoryPaneItemFrame", function(f, data)
+    ---@cast f CategoryPaneItemFrame
+    self:initItemRow(f, data)
+  end, function(f, data)
+    ---@cast f CategoryPaneItemFrame
+    self:resetItemRow(f, data)
+  end)
+
+  -- Enable drag-and-drop to add items to the category
+  -- Set up handlers on both the container and the list frame's scroll box
+  local function onReceiveDrag()
+    self:OnItemListDrop()
+  end
+  local function onMouseUp(_, button)
+    if button == "LeftButton" and CursorHasItem() then
+      self:OnItemListDrop()
+    end
+  end
+
+  itemListContainer:EnableMouse(true)
+  itemListContainer:SetScript("OnReceiveDrag", onReceiveDrag)
+  itemListContainer:SetScript("OnMouseUp", onMouseUp)
+
+  -- Also set on the scroll box so drops work over the list area
+  self.manualDetail.itemListFrame.ScrollBox:SetScript("OnReceiveDrag", onReceiveDrag)
+  self.manualDetail.itemListFrame.ScrollBox:HookScript("OnMouseUp", onMouseUp)
 end
 
 ---@param categoryName string
@@ -887,6 +1088,24 @@ function categoryPaneProto:LoadItemList(categoryName)
   for id in pairs(itemDataList.itemList) do
     self.manualDetail.itemListFrame:AddToStart({id = id, category = categoryName})
   end
+end
+
+-- Handle dropping an item onto the item list to add it to the category
+function categoryPaneProto:OnItemListDrop()
+  if not self.selectedCategory then return end
+  if not CursorHasItem() then return end
+
+  local cursorType, itemID = GetCursorInfo()
+  if cursorType ~= "item" then return end
+
+  -- Add the item to the category
+  local ctx = context:New('CategoryPane_DropItem')
+  categories:AddPermanentItemToCategory(ctx, itemID, self.selectedCategory)
+  ClearCursor()
+
+  -- Refresh the bags and the item list
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  self:LoadItemList(self.selectedCategory)
 end
 
 ---@param frame CategoryPaneItemFrame
@@ -918,13 +1137,24 @@ function categoryPaneProto:initItemRow(frame, elementData)
 
   items:GetItemData(ctx, {elementData.id}, function(ectx, itemData)
     frame.item:SetStaticItemFromData(ectx, itemData[1])
+
+    -- In Classic/Era, hide the NormalTexture on the decoration button that creates the border.
+    if not addon.isRetail then
+      local decoration = themes:GetItemButton(ectx, frame.item.button)
+      if decoration then
+        -- The decoration button (ContainerFrameItemButtonTemplate) has a NormalTexture
+        -- that creates a visible border frame around the icon in Classic/Era
+        decoration:GetNormalTexture():Hide()
+        decoration:GetNormalTexture():SetTexture(nil)
+      end
+    end
   end)
 end
 
 ---@param frame CategoryPaneItemFrame
 ---@param elementData table
 function categoryPaneProto:resetItemRow(frame, elementData)
-  _ = elementData
+  local _ = elementData
   local ctx = context:New("CategoryPane_ItemRow_Reset")
   if frame.item then
     frame.item:ClearItem(ctx)
@@ -940,15 +1170,24 @@ function categoryPaneProto:SaveManualCategory()
 
   local ctx = context:New('CategoryPane_SaveManualCategory')
 
+  -- Update priority
+  local newPriority = tonumber(self.manualDetail.priorityBox:GetText()) or 10
+
   -- Update color
   local r, g, b = self.manualDetail.colorTexture:GetVertexColor()
 
-  -- Update the category with new color
+  -- Check if color matches default yellow (with small epsilon for floating point comparison)
+  local isDefaultColor = (math.abs(r - 1.0) < 0.01 and
+                          math.abs(g - 0.82) < 0.01 and
+                          math.abs(b - 0.0) < 0.01)
+
+  -- Update the category with new color and priority
   categories:CreateCategory(ctx, {
     name = self.selectedCategory,
     save = filter.save,
     itemList = filter.itemList or {},
-    color = {r, g, b},
+    priority = newPriority,
+    color = isDefaultColor and nil or {r, g, b},  -- nil for default, explicit RGB otherwise
   })
 
   events:SendMessage(ctx, 'bags/FullRefreshAll')
@@ -1137,6 +1376,10 @@ function categoryPane:Create(parent, kind)
   events:RegisterMessage(drawEvent, function()
     if pane.initialized then
       pane:RefreshList()
+      -- Also refresh the item list if a manual category is selected
+      if pane.selectedCategory and pane.detailContent == pane.manualDetail then
+        pane:LoadItemList(pane.selectedCategory)
+      end
     end
   end)
 

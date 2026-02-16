@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
@@ -29,6 +26,7 @@ local currencyPane = addon:NewModule('CurrencyPane')
 ---@field CurrencyIcon Texture
 ---@field CurrencyName FontString
 ---@field CurrencyCount FontString
+---@field CheckmarkIcon Texture
 ---@field Init boolean
 
 ---@class CurrencyPaneFrame
@@ -63,8 +61,16 @@ function currencyPaneProto:initListItem(button, elementData)
     button.CurrencyCount = button:CreateFontString(nil, "OVERLAY")
     button.CurrencyCount:SetHeight(30)
     button.CurrencyCount:SetJustifyH("RIGHT")
-    button.CurrencyCount:SetPoint("RIGHT", button, "RIGHT", -10, 0)
+    button.CurrencyCount:SetPoint("RIGHT", button, "RIGHT", -25, 0)
     button.CurrencyCount:SetFontObject(fonts.UnitFrame12White)
+
+    -- Checkmark icon for currencies shown in backpack
+    button.CheckmarkIcon = button:CreateTexture(nil, "OVERLAY", nil, 7)
+    button.CheckmarkIcon:SetSize(16, 16)
+    button.CheckmarkIcon:SetPoint("RIGHT", button, "RIGHT", -5, 0)
+    button.CheckmarkIcon:SetAtlas("common-icon-checkmark")
+    button.CheckmarkIcon:SetAlpha(1)
+    button.CheckmarkIcon:Hide()
 
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -94,13 +100,17 @@ function currencyPaneProto:initListItem(button, elementData)
     button.CurrencyCount:SetText(BreakUpLargeNumbers(info.quantity or 0))
   end
 
-  -- Background based on selection and shown-in-backpack state
+  -- Checkmark for currencies shown in backpack
+  if isShownInBackpack and not isHeader then
+    button.CheckmarkIcon:Show()
+  else
+    button.CheckmarkIcon:Hide()
+  end
+
+  -- Background based on selection state only (no more yellow for shown-in-backpack)
   if self.selectedIndex == elementData.index then
     button:SetBackdropColor(1, 0.82, 0, 0.3)
     self.selectedButton = button
-  elseif isShownInBackpack then
-    -- Yellow background highlight for currencies shown in backpack (like old list)
-    button:SetBackdropColor(1, 1, 0, 0.2)
   elseif not isHeader then
     button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
   else
@@ -116,8 +126,8 @@ function currencyPaneProto:initListItem(button, elementData)
     end)
 
     button:SetScript("OnEnter", function()
-      -- Only show hover highlight for non-selected items that aren't shown in backpack
-      if self.selectedIndex ~= elementData.index and not isShownInBackpack then
+      -- Show hover highlight for non-selected items
+      if self.selectedIndex ~= elementData.index then
         button:SetBackdropColor(0.3, 0.3, 0.3, 0.5)
       end
       GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
@@ -128,8 +138,6 @@ function currencyPaneProto:initListItem(button, elementData)
     button:SetScript("OnLeave", function()
       if self.selectedIndex == elementData.index then
         button:SetBackdropColor(1, 0.82, 0, 0.3)
-      elseif isShownInBackpack then
-        button:SetBackdropColor(1, 1, 0, 0.2)
       else
         button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
       end
@@ -145,7 +153,7 @@ end
 ---@param button CurrencyPaneListButton
 ---@param elementData table
 function currencyPaneProto:resetListItem(button, elementData)
-  _ = elementData
+  local _ = elementData
   button:SetScript("OnClick", nil)
   button:SetScript("OnEnter", nil)
   button:SetScript("OnLeave", nil)
@@ -155,15 +163,7 @@ end
 function currencyPaneProto:SelectCurrency(index)
   -- Deselect previous
   if self.selectedButton then
-    local prevIndex = self.selectedIndex
-    if prevIndex then
-      local prevInfo = C_CurrencyInfo.GetCurrencyListInfo(prevIndex)
-      if prevInfo and prevInfo.isShowInBackpack then
-        self.selectedButton:SetBackdropColor(1, 1, 0, 0.2)
-      else
-        self.selectedButton:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
-      end
-    end
+    self.selectedButton:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
   end
 
   self.selectedIndex = index
