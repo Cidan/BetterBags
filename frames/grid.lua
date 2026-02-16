@@ -9,6 +9,9 @@ local const = addon:GetModule('Constants')
 ---@class GridFrame: AceModule
 local grid = addon:NewModule('Grid')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Cell
 ---@field frame Frame
 
@@ -354,7 +357,6 @@ function gridProto:calculateColumns(options)
 
       -- Need to increase splitAt to reduce number of columns, try evenly increasing by the overshot height/2 and try again
       splitAt = splitAt + math.ceil(overshoot / (2 * options.columns))
-      columns = nil
     else
       return columns
     end
