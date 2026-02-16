@@ -1130,15 +1130,23 @@ end
 
 ---@param categoryName string
 function categoryPaneProto:LoadItemList(categoryName)
-  if not self.manualDetail or not self.manualDetail.itemListFrame then return end
+  -- Determine which detail panel is currently active and update the correct item list frame
+  local itemListFrame
+  if self.detailContent == self.searchDetail and self.searchDetail and self.searchDetail.itemListFrame then
+    itemListFrame = self.searchDetail.itemListFrame
+  elseif self.detailContent == self.manualDetail and self.manualDetail and self.manualDetail.itemListFrame then
+    itemListFrame = self.manualDetail.itemListFrame
+  else
+    return
+  end
 
-  self.manualDetail.itemListFrame:Wipe()
+  itemListFrame:Wipe()
 
   local itemDataList = categories:GetMergedCategory(categoryName)
   if not itemDataList then return end
 
   for id in pairs(itemDataList.itemList) do
-    self.manualDetail.itemListFrame:AddToStart({id = id, category = categoryName})
+    itemListFrame:AddToStart({id = id, category = categoryName})
   end
 end
 
@@ -1428,8 +1436,8 @@ function categoryPane:Create(parent, kind)
   events:RegisterMessage(drawEvent, function()
     if pane.initialized then
       pane:RefreshList()
-      -- Also refresh the item list if a manual category is selected
-      if pane.selectedCategory and pane.detailContent == pane.manualDetail then
+      -- Also refresh the item list if a manual or search category is selected
+      if pane.selectedCategory and (pane.detailContent == pane.manualDetail or pane.detailContent == pane.searchDetail) then
         pane:LoadItemList(pane.selectedCategory)
       end
     end
