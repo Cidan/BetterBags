@@ -172,18 +172,12 @@ function categories:AddItemToCategory(ctx, id, category)
   end
 
   if self.ephemeralCategories[category] then
-    if self.ephemeralCategories[category].searchCategory then
-      return
-    end
     self.ephemeralCategories[category].itemList[id] = true
     self.ephemeralCategoryByItemID[id] = self.ephemeralCategories[category]
     return
   end
 
   assert(database:ItemCategoryExists(category), format("Attempted to add item %d to category %s, but the category does not exist.", id, category))
-  if database:GetItemCategory(category).searchCategory then
-    return
-  end
   database:SaveItemToCategory(id, category)
 end
 

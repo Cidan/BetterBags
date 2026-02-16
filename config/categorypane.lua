@@ -462,6 +462,9 @@ function categoryPaneProto:ShowSearchCategoryDetail(filter)
   else
     self.searchDetail.deleteButton:SetText("Delete Category")
   end
+
+  -- Load item list for the search category
+  self:LoadItemList(filter.name)
 end
 
 function categoryPaneProto:CreateSearchDetailPanel()
@@ -733,9 +736,16 @@ function categoryPaneProto:CreateSearchDetailPanel()
 
   yOffset = yOffset - 60
 
-  -- Save Button
+  -- Items Label
+  local itemsLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  itemsLabel:SetPoint("TOPLEFT", 10, yOffset)
+  itemsLabel:SetText("Additional Items (drag items here to add)")
+
+  yOffset = yOffset - 20
+
+  -- Save Button (anchored to bottom)
   local saveButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
-  saveButton:SetPoint("TOPLEFT", 10, yOffset)
+  saveButton:SetPoint("BOTTOMLEFT", self.searchDetail, "BOTTOMLEFT", 10, 10)
   saveButton:SetSize(100, 25)
   saveButton:SetText("Save")
   saveButton:SetScript("OnClick", function()
@@ -743,7 +753,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   end)
   self.searchDetail.saveButton = saveButton
 
-  -- Rename Button
+  -- Rename Button (anchored to save button)
   local renameButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
   renameButton:SetPoint("LEFT", saveButton, "RIGHT", 10, 0)
   renameButton:SetSize(100, 25)
@@ -754,7 +764,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   end)
   self.searchDetail.renameButton = renameButton
 
-  -- Delete Button
+  -- Delete Button (anchored to rename button)
   local deleteButton = CreateFrame("Button", nil, self.searchDetail, "UIPanelButtonTemplate")
   deleteButton:SetPoint("LEFT", renameButton, "RIGHT", 10, 0)
   deleteButton:SetSize(120, 25)
@@ -770,6 +780,48 @@ function categoryPaneProto:CreateSearchDetailPanel()
     end, function() end)
   end)
   self.searchDetail.deleteButton = deleteButton
+
+  -- Divider 2 (anchored above buttons)
+  local divider2 = self.searchDetail:CreateTexture(nil, "ARTWORK")
+  divider2:SetPoint("BOTTOMLEFT", self.searchDetail, "BOTTOMLEFT", 10, 45)
+  divider2:SetPoint("RIGHT", self.searchDetail, "RIGHT", -10, 0)
+  divider2:SetHeight(1)
+  divider2:SetColorTexture(0.5, 0.5, 0.5, 0.5)
+
+  -- Item List Frame (expands to fill available space)
+  local itemListContainer = CreateFrame("Frame", nil, self.searchDetail)
+  itemListContainer:SetPoint("TOPLEFT", 10, yOffset)
+  itemListContainer:SetPoint("RIGHT", self.searchDetail, "RIGHT", -10, 0)
+  itemListContainer:SetPoint("BOTTOM", divider2, "TOP", 0, 20)
+
+  self.searchDetail.itemListFrame = list:Create(itemListContainer)
+  self.searchDetail.itemListFrame.frame:SetAllPoints()
+  self.searchDetail.itemListFrame:SetupDataSource("BetterBagsCategoryPaneItemFrame", function(f, data)
+    ---@cast f CategoryPaneItemFrame
+    self:initItemRow(f, data)
+  end, function(f, data)
+    ---@cast f CategoryPaneItemFrame
+    self:resetItemRow(f, data)
+  end)
+
+  -- Enable drag-and-drop to add items to the category
+  -- Set up handlers on both the container and the list frame's scroll box
+  local function onReceiveDrag()
+    self:OnItemListDrop()
+  end
+  local function onMouseUp(_, button)
+    if button == "LeftButton" and CursorHasItem() then
+      self:OnItemListDrop()
+    end
+  end
+
+  itemListContainer:EnableMouse(true)
+  itemListContainer:SetScript("OnReceiveDrag", onReceiveDrag)
+  itemListContainer:SetScript("OnMouseUp", onMouseUp)
+
+  -- Also set on the scroll box so drops work over the list area
+  self.searchDetail.itemListFrame.ScrollBox:SetScript("OnReceiveDrag", onReceiveDrag)
+  self.searchDetail.itemListFrame.ScrollBox:HookScript("OnMouseUp", onMouseUp)
 end
 
 function categoryPaneProto:SaveSearchCategory()
@@ -1078,15 +1130,23 @@ end
 
 ---@param categoryName string
 function categoryPaneProto:LoadItemList(categoryName)
-  if not self.manualDetail or not self.manualDetail.itemListFrame then return end
+  -- Determine which detail panel is currently active and update the correct item list frame
+  local itemListFrame
+  if self.detailContent == self.searchDetail and self.searchDetail and self.searchDetail.itemListFrame then
+    itemListFrame = self.searchDetail.itemListFrame
+  elseif self.detailContent == self.manualDetail and self.manualDetail and self.manualDetail.itemListFrame then
+    itemListFrame = self.manualDetail.itemListFrame
+  else
+    return
+  end
 
-  self.manualDetail.itemListFrame:Wipe()
+  itemListFrame:Wipe()
 
   local itemDataList = categories:GetMergedCategory(categoryName)
   if not itemDataList then return end
 
   for id in pairs(itemDataList.itemList) do
-    self.manualDetail.itemListFrame:AddToStart({id = id, category = categoryName})
+    itemListFrame:AddToStart({id = id, category = categoryName})
   end
 end
 
@@ -1376,8 +1436,8 @@ function categoryPane:Create(parent, kind)
   events:RegisterMessage(drawEvent, function()
     if pane.initialized then
       pane:RefreshList()
-      -- Also refresh the item list if a manual category is selected
-      if pane.selectedCategory and pane.detailContent == pane.manualDetail then
+      -- Also refresh the item list if a manual or search category is selected
+      if pane.selectedCategory and (pane.detailContent == pane.manualDetail or pane.detailContent == pane.searchDetail) then
         pane:LoadItemList(pane.selectedCategory)
       end
     end
