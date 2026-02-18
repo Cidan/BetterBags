@@ -199,6 +199,9 @@ function categoryPaneProto:initListItem(button, elementData)
       if self.selectedCategory ~= elementData.title then
         button:SetBackdropColor(0.3, 0.3, 0.3, 0.5)
       end
+      GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+      GameTooltip:SetText(L:G("Shift-click to move this category to the pinned category section"), 1, 1, 1, 1, true)
+      GameTooltip:Show()
     end)
 
     button:SetScript("OnLeave", function()
@@ -207,6 +210,7 @@ function categoryPaneProto:initListItem(button, elementData)
       else
         button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
       end
+      GameTooltip:Hide()
     end)
   else
     button:SetScript("OnClick", nil)
