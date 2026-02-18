@@ -1176,3 +1176,41 @@ return lowColor
 - `util/windowgroup.lua:21,28,33,34,41` - Calls to IsShown(), Hide(), Show()
 - `frames/classic/currency.lua:65-81,168` - Example implementation
 - `frames/themeconfig.lua:98` - Reference implementation with AttachFadeAndSlideLeft
+
+## Tooltip API Patterns
+
+### Pattern: GameTooltip:SetText vs AddLine Have Different Signatures (alpha param)
+**Problem**: Tooltip text appears off-screen or invisible when using `GameTooltip:SetText()` with word wrap.
+
+**Why**: `SetText` and `AddLine` have **different signatures**:
+- `GameTooltip:SetText(text, r, g, b, alpha, textWrap)` — has `alpha` (6 args)
+- `GameTooltip:AddLine(text, r, g, b, textWrap)` — NO alpha (5 args)
+
+Passing `true` as the 5th argument to `SetText` sets `alpha=true` (coerced to 1) and leaves `textWrap=nil` (false). Long text without wrapping extends off-screen and is invisible.
+
+**Solution Pattern**:
+```lua
+-- BAD: true is interpreted as alpha, not textWrap
+GameTooltip:SetText("Long tooltip text here...", 1, 1, 1, true)
+
+-- GOOD: include alpha=1 before textWrap=true
+GameTooltip:SetText("Long tooltip text here...", 1, 1, 1, 1, true)
+
+-- AddLine does NOT have alpha:
+GameTooltip:AddLine("Additional line", 1, 1, 1, true)  -- correct, 5 args
+```
+
+**Full tooltip pattern**:
+```lua
+button:SetScript("OnEnter", function()
+  GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+  GameTooltip:SetText("Main title", 1, 1, 1, 1, true)  -- r, g, b, alpha, wrap
+  GameTooltip:AddLine("Extra info", 0.8, 0.8, 0.8, true)  -- r, g, b, wrap (no alpha)
+  GameTooltip:Show()
+end)
+button:SetScript("OnLeave", function()
+  GameTooltip:Hide()
+end)
+```
+
+**When to Apply**: Any use of `GameTooltip:SetText()`. Remember alpha comes before textWrap in SetText but AddLine has no alpha parameter.
