@@ -356,10 +356,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   view:ClearDirtySections()
 
   -- Hide sections that are not shown.
-  -- Also filter by active group for backpack (only if groups are enabled).
+  -- Also filter by active group (if groups are enabled).
   local activeGroup = nil
-  if bag.kind == const.BAG_KIND.BACKPACK and database:GetGroupsEnabled(const.BAG_KIND.BACKPACK) then
-    activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
+  if database:GetGroupsEnabled(bag.kind) then
+    activeGroup = database:GetActiveGroup(bag.kind)
   end
 
   for sectionName, section in pairs(view:GetAllSections()) do
@@ -370,8 +370,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       shouldHide = true
     end
 
-    -- Check group membership for backpack (skip special sections like "Free Space", "Recent Items")
-    if not shouldHide and activeGroup and bag.kind == const.BAG_KIND.BACKPACK then
+    -- Check group membership (skip special sections like "Free Space", "Recent Items")
+    if not shouldHide and activeGroup then
       local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
       if not isSpecialSection and not groups:CategoryBelongsToGroup(sectionName, activeGroup) then
         shouldHide = true
@@ -569,13 +569,20 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   if database:GetInBagSearch() then
     h = h + 20
   end
-  view.content:HideScrollBar()
-  --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-  -- than the screen space.
-  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+
   local bagHeight = h +
   const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
   const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+
+  local maxHeight = UIParent:GetHeight() * 0.90
+  if bagHeight > maxHeight then
+    bagHeight = maxHeight
+    view.content:ShowScrollBar()
+  else
+    view.content:HideScrollBar()
+  end
+
+  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
   bag.frame:SetHeight(bagHeight)
   UpdateViewSize(view)
   view.itemCount = slotInfo.totalItems

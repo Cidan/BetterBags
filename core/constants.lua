@@ -604,7 +604,6 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     enableBagFading = false,
     showBagButton = true,
-    characterBankTabsEnabled = false,
     enableBankBag = true,
     debug = false,
     inBagSearch = true,
@@ -852,19 +851,36 @@ const.DATABASE_DEFAULTS = {
         id = 1,
         name = "Backpack",
         order = 1,
+        kind = const.BAG_KIND.BACKPACK,
+      },
+      [2] = {
+        id = 2,
+        name = "Bank",
+        order = 2,
+        kind = const.BAG_KIND.BANK,
+        bankType = Enum.BankType and Enum.BankType.Character or 1,
+      },
+      [3] = {
+        id = 3,
+        name = "Warbank",
+        order = 3,
+        kind = const.BAG_KIND.BANK,
+        bankType = Enum.BankType and Enum.BankType.Account or 2,
       },
     },
     ---@type number
-    groupCounter = 1,
+    groupCounter = 3,
     ---@type table<string, number>
     categoryToGroup = {},
     ---@type table<BagKind, number>
     activeGroup = {
       [const.BAG_KIND.BACKPACK] = 1,
+      [const.BAG_KIND.BANK] = 2,
     },
     ---@type table<BagKind, boolean>
     groupsEnabled = {
       [const.BAG_KIND.BACKPACK] = true,
+      [const.BAG_KIND.BANK] = true,
     },
     -- Profile system migration flag
     __profileSystemMigrated = false,

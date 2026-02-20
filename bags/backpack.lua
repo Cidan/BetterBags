@@ -238,7 +238,7 @@ function backpack.proto:GenerateGroupTabs(ctx)
 	-- Show tabs frame in case it was hidden
 	self.bag.tabs.frame:Show()
 
-	local allGroups = groups:GetAllGroups()
+	local allGroups = groups:GetGroupsByKind(const.BAG_KIND.BACKPACK)
 
 	-- Create tabs for each group that doesn't exist yet
 	for groupID, group in pairs(allGroups) do
@@ -368,7 +368,7 @@ function backpack.proto:ShowCreateGroupDialog()
 				local name = f.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name)
+					local newGroup = groups:CreateGroup(ctx, name, const.BAG_KIND.BACKPACK)
 					-- Switch to the new group
 					local bag = addon.Bags.Backpack
 					if bag and bag.behavior then
@@ -384,7 +384,7 @@ function backpack.proto:ShowCreateGroupDialog()
 				local name = parent.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name)
+					local newGroup = groups:CreateGroup(ctx, name, const.BAG_KIND.BACKPACK)
 					-- Switch to the new group
 					local bag = addon.Bags.Backpack
 					if bag and bag.behavior then

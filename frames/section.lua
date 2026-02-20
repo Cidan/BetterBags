@@ -428,8 +428,8 @@ function sectionFrame:PerformDrop()
   local tabID = self.dragTargetTab
 
   local dropCtx = context:New("CategoryDropOnTab")
-  if tabID == 1 then
-    -- Dropping on Backpack removes group assignment
+  if tabID == 1 or tabID == 2 or tabID == 3 then
+    -- Dropping on default tabs removes group assignment
     groups:RemoveCategoryFromGroup(dropCtx, category)
   else
     -- Dropping on other group assigns to that group

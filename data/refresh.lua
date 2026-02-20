@@ -135,7 +135,6 @@ function refresh:ExecutePendingUpdates()
       addon.Bags.Bank.bankTab = accountBankStart
     end
 
-    local database = addon:GetModule('Database')
     local refreshCtx = ctx:Copy()
 
     -- Check if the context already has a filterBagID set (from tab switching)
@@ -155,12 +154,6 @@ function refresh:ExecutePendingUpdates()
 
       if currentTab >= accountBankStart then
         refreshCtx:Set('filterBagID', nil)
-      elseif database:GetCharacterBankTabsEnabled() then
-        if currentTab >= Enum.BagIndex.CharacterBankTab_1 and currentTab <= Enum.BagIndex.CharacterBankTab_6 then
-          refreshCtx:Set('filterBagID', currentTab)
-        else
-          refreshCtx:Set('filterBagID', Enum.BagIndex.CharacterBankTab_1)
-        end
       else
         refreshCtx:Set('filterBagID', nil)
       end

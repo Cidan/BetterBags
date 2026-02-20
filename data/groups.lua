@@ -9,6 +9,9 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -32,9 +35,11 @@ end
 -- CreateGroup creates a new group with the given name.
 ---@param ctx Context
 ---@param name string
+---@param kind? BagKind
+---@param bankType? number
 ---@return Group
-function groups:CreateGroup(ctx, name)
-  local newID = database:CreateGroup(name)
+function groups:CreateGroup(ctx, name, kind, bankType)
+  local newID = database:CreateGroup(name, kind, bankType)
   local group = database:GetGroup(newID)
   debug:Log("groups", "Created group: %s (ID: %d)", name, newID)
   events:SendMessage(ctx, 'groups/Created', group)
@@ -93,6 +98,19 @@ function groups:GetAllGroups()
   return database:GetAllGroups()
 end
 
+-- GetGroupsByKind returns all groups for a specific bag kind.
+---@param kind BagKind
+---@return table<number, Group>
+function groups:GetGroupsByKind(kind)
+  local result = {}
+  for id, group in pairs(database:GetAllGroups()) do
+    if group.kind == kind then
+      result[id] = group
+    end
+  end
+  return result
+end
+
 -------
 --- Category-Group Assignment
 -------
@@ -102,8 +120,8 @@ end
 ---@param categoryName string
 ---@param groupID number
 function groups:AssignCategoryToGroup(ctx, categoryName, groupID)
-  -- If assigning to Backpack (ID 1), just remove the explicit assignment
-  if groupID == 1 then
+  -- If assigning to Backpack (ID 1), Bank (ID 2), or Warbank (ID 3), just remove the explicit assignment
+  if groupID == 1 or groupID == 2 or groupID == 3 then
     self:RemoveCategoryFromGroup(ctx, categoryName)
     return
   end
@@ -154,8 +172,18 @@ end
 function groups:CategoryBelongsToGroup(categoryName, groupID)
   local assignedGroup = database:GetCategoryGroup(categoryName)
   if groupID == 1 then
-    -- Backpack group includes all categories without explicit assignment
-    return assignedGroup == nil
+    -- Backpack group includes all categories not assigned to a Backpack group
+    if assignedGroup == nil then return true end
+    local g = database:GetGroup(assignedGroup)
+    return g and g.kind ~= const.BAG_KIND.BACKPACK
+  elseif groupID == 2 or groupID == 3 then
+    -- Default Bank and Warbank tabs include all categories not assigned to a Bank group
+    -- or assigned to this specific group
+    if assignedGroup == groupID then return true end
+    if assignedGroup == nil then return true end
+    local g = database:GetGroup(assignedGroup)
+    -- If it's assigned to a backpack group, we still want to show it in Bank/Warbank
+    return g and g.kind ~= const.BAG_KIND.BANK
   else
     -- Other groups only include explicitly assigned categories
     return assignedGroup == groupID

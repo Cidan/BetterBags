@@ -571,33 +571,21 @@ function items:RefreshBags(ctx, kind)
 			GetInventoryItemQuality("player", id)
 		end
 
-		local filterBagID = ctx:Get("filterBagID")
-		-- Reagent bank was removed in TWW 11.2 for retail, only exists in classic/era
+		local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
+		local activeGroup = database:GetGroup(activeGroupID)
 		local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
-		local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
 
-		-- Determine which bank bags to show
-		if filterBagID ~= nil and const.BANK_BAGS[filterBagID] then
-			-- Specific character bank tab
-			ctx:Set("bagid", filterBagID)
-			bagList[filterBagID] = filterBagID
-			-- Include main bank bag for first character bank tab
-			if filterBagID == const.BANK_ONLY_BAGS_LIST[1] then
-				local mainBank = addon.isRetail and Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank
-				bagList[mainBank] = mainBank
+		if activeGroup and addon.isRetail and activeGroup.bankType == Enum.BankType.Account then
+			ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1) -- just a marker
+			for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+				bagList[bag] = bag
 			end
-		elseif addon.Bags.Bank.bankTab and reagentBank and addon.Bags.Bank.bankTab == reagentBank then
-			-- Reagent bank
-			ctx:Set("bagid", reagentBank)
-			bagList[reagentBank] = reagentBank
-		elseif addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab >= accountBankStart then
-			-- Account bank tab
-			ctx:Set("bagid", addon.Bags.Bank.bankTab)
-			bagList[addon.Bags.Bank.bankTab] = addon.Bags.Bank.bankTab
 		else
-			-- All bank bags
 			ctx:Set("bagid", const.BANK_TAB.BANK)
 			bagList = const.BANK_BAGS
+			if reagentBank then
+				bagList[reagentBank] = reagentBank
+			end
 		end
 	end
 

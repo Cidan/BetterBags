@@ -215,23 +215,7 @@ function contextMenu:CreateContextMenu(bag)
 
 	if bag.kind == const.BAG_KIND.BANK then
 		-- Add character bank tabs toggle
-		if addon.isRetail then
-			table.insert(menuList, {
-				text = L:G("Show Character Bank Tabs"),
-				checked = function()
-					return database:GetCharacterBankTabsEnabled()
-				end,
-				tooltipTitle = L:G("Show Character Bank Tabs"),
-				tooltipText = L:G(
-					"Display individual tabs for each character bank slot instead of a single Bank tab. Requires UI reload."
-				),
-				func = function()
-					database:SetCharacterBankTabsEnabled(not database:GetCharacterBankTabsEnabled())
-					-- Reload UI to ensure clean state
-					C_UI.Reload()
-				end,
-			})
-		end
+
 
 		-- Purchase bank tab buttons removed from context menu.
 		-- They are now implemented as persistent tab buttons on the bank frame

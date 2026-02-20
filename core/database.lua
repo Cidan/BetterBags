@@ -116,16 +116,6 @@ function DB:GetShowBagButton()
 end
 
 ---@param enabled boolean
-function DB:SetCharacterBankTabsEnabled(enabled)
-  DB.data.profile.characterBankTabsEnabled = enabled
-end
-
----@return boolean
-function DB:GetCharacterBankTabsEnabled()
-  return DB.data.profile.characterBankTabsEnabled
-end
-
----@param enabled boolean
 function DB:SetEnableBankBag(enabled)
   DB.data.profile.enableBankBag = enabled
 end
@@ -641,22 +631,30 @@ function DB:GetGroup(groupID)
 end
 
 ---@param name string
+---@param kind? BagKind
+---@param bankType? number
 ---@return number The new group ID
-function DB:CreateGroup(name)
+function DB:CreateGroup(name, kind, bankType)
   local newID = DB.data.profile.groupCounter + 1
   DB.data.profile.groupCounter = newID
   DB.data.profile.groups[newID] = {
     id = newID,
     name = name,
     order = newID,
+    kind = kind or const.BAG_KIND.BACKPACK,
+    bankType = bankType,
   }
   return newID
 end
 
 ---@param groupID number
 function DB:DeleteGroup(groupID)
-  -- Don't allow deleting the default Backpack group (ID 1)
+  local group = DB.data.profile.groups[groupID]
+  if not group then return end
+
+  -- Don't allow deleting default groups
   if groupID == 1 then return end
+  if group.kind == const.BAG_KIND.BANK and (group.name == "Bank" or group.name == "Warbank") then return end
 
   -- Remove category associations for this group
   for categoryName, gID in pairs(DB.data.profile.categoryToGroup) do
@@ -668,9 +666,18 @@ function DB:DeleteGroup(groupID)
   -- Remove the group
   DB.data.profile.groups[groupID] = nil
 
-  -- If this was the active group, switch to Backpack (ID 1)
+  -- If this was the active group, switch to Backpack (ID 1) or Bank (default Bank ID)
   if DB.data.profile.activeGroup[const.BAG_KIND.BACKPACK] == groupID then
     DB.data.profile.activeGroup[const.BAG_KIND.BACKPACK] = 1
+  end
+  if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == groupID then
+    -- Find the Bank group ID
+    for id, g in pairs(DB.data.profile.groups) do
+      if g.name == "Bank" and g.kind == const.BAG_KIND.BANK then
+        DB.data.profile.activeGroup[const.BAG_KIND.BANK] = id
+        break
+      end
+    end
   end
 end
 
@@ -1045,6 +1052,58 @@ function DB:Migrate()
       high = { red = defaults.high.red, green = defaults.high.green, blue = defaults.high.blue, alpha = defaults.high.alpha },
       max = { red = defaults.max.red, green = defaults.max.green, blue = defaults.max.blue, alpha = defaults.max.alpha }
     }
+  end
+
+  -- Migrate existing groups to have a kind
+  for _, group in pairs(DB.data.profile.groups) do
+    if group.kind == nil then
+      group.kind = const.BAG_KIND.BACKPACK
+    end
+  end
+
+  -- Add Bank and Warbank groups if they don't exist
+  local hasBank = false
+  local hasWarbank = false
+  for _, group in pairs(DB.data.profile.groups) do
+    if group.name == "Bank" and group.kind == const.BAG_KIND.BANK then
+      hasBank = true
+    elseif group.name == "Warbank" and group.kind == const.BAG_KIND.BANK then
+      hasWarbank = true
+    end
+  end
+
+  if not hasBank then
+    local newID = DB.data.profile.groupCounter + 1
+    DB.data.profile.groupCounter = newID
+    DB.data.profile.groups[newID] = {
+      id = newID,
+      name = "Bank",
+      order = newID,
+      kind = const.BAG_KIND.BANK,
+      bankType = Enum.BankType and Enum.BankType.Character or 1,
+    }
+    if not DB.data.profile.activeGroup[const.BAG_KIND.BANK] then
+      DB.data.profile.activeGroup[const.BAG_KIND.BANK] = newID
+    end
+  end
+
+  if not hasWarbank and addon.isRetail then
+    local newID = DB.data.profile.groupCounter + 1
+    DB.data.profile.groupCounter = newID
+    DB.data.profile.groups[newID] = {
+      id = newID,
+      name = "Warbank",
+      order = newID,
+      kind = const.BAG_KIND.BANK,
+      bankType = Enum.BankType and Enum.BankType.Account or 2,
+    }
+  end
+
+  if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == nil then
+    DB.data.profile.activeGroup[const.BAG_KIND.BANK] = 2 -- Default to Bank group
+  end
+  if DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] == nil then
+    DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] = true
   end
 
   -- ============================================================
