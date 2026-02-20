@@ -19,6 +19,17 @@ _G.C_Timer = {
   After = function(delay, callback) end
 }
 _G.IsLoggedIn = function() return true end
+_G.SlashCmdList = {}
+_G.hash_SlashCmdList = {}
+_G.GetLocale = function() return "enUS" end
+_G.GetBuildInfo = function() return "10.0.0", "12345", "Jan 1 2024", 100000 end
+_G.GetRealmName = function() return "TestRealm" end
+_G.UnitName = function() return "TestChar", "TestRealm" end
+_G.UnitClass = function() return "Warrior", "WARRIOR" end
+_G.UnitFactionGroup = function() return "Alliance", "Alliance" end
+_G.UnitRace = function() return "Human", "Human" end
+_G.GetCurrentRegion = function() return 1 end
+_G.GetCurrentRegionName = function() return "US" end
 
 if not _G.unpack and _G.table and _G.table.unpack then
   _G.unpack = _G.table.unpack
@@ -74,3 +85,23 @@ dofile("libs/CallbackHandler-1.0/CallbackHandler-1.0.lua")
 
 -- Load AceAddon-3.0
 dofile("libs/AceAddon-3.0/AceAddon-3.0.lua")
+
+-- Load AceEvent-3.0
+dofile("libs/AceEvent-3.0/AceEvent-3.0.lua")
+
+-- Load AceDB-3.0
+dofile("libs/AceDB-3.0/AceDB-3.0.lua")
+
+-- Load AceHook-3.0
+dofile("libs/AceHook-3.0/AceHook-3.0.lua")
+
+-- Load AceConsole-3.0
+dofile("libs/AceConsole-3.0/AceConsole-3.0.lua")
+
+-- Load AceDBOptions-3.0
+dofile("libs/AceDBOptions-3.0/AceDBOptions-3.0.lua")
+
+-- Load AceConfig-3.0 (Skip AceConfigDialog as it requires AceGUI)
+dofile("libs/AceConfig-3.0/AceConfigRegistry-3.0/AceConfigRegistry-3.0.lua")
+dofile("libs/AceConfig-3.0/AceConfigCmd-3.0/AceConfigCmd-3.0.lua")
+dofile("libs/AceConfig-3.0/AceConfig-3.0.lua")
