@@ -1142,6 +1142,14 @@ function DB:Migrate()
     DB.data.profile.__bankDefaultTabsFixed = true
   end
 
+  -- Catch-all for users who may have slipped past the migration or had AceDB merge incorrectly
+  if type(DB.data.profile.groupCounter) == "number" then
+    DB.data.profile.groupCounter = {
+      [const.BAG_KIND.BACKPACK] = DB.data.profile.groupCounter,
+      [const.BAG_KIND.BANK] = 0
+    }
+  end
+
   -- Ensure defaults exist
   local charBankType = Enum.BankType and Enum.BankType.Character or 1
   local accountBankType = Enum.BankType and Enum.BankType.Account or 2
