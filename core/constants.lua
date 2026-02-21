@@ -863,7 +863,7 @@ const.DATABASE_DEFAULTS = {
     ---@type table<BagKind, number>
     groupCounter = {
       [const.BAG_KIND.BACKPACK] = 1,
-      [const.BAG_KIND.BANK] = 2,
+      [const.BAG_KIND.BANK] = 0,
     },
     ---@type table<BagKind, table<string, number>>
     categoryToGroup = {
