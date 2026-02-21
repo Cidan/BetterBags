@@ -217,7 +217,29 @@ Tab management for bank views.
 - Click handlers
 - Toggle between single bank tab and multiple character bank tabs (retail only)
 - Tab visibility management (ShowTabByID/HideTabByID)
-- Automatic tab sorting by ID for consistent display order
+- Bank-type-aware tab sorting with strict section ordering
+- Drag-to-reorder with cross-section drag constraint
+
+**Bank Tab Sort Order (Retail):**
+
+Bank tabs are sorted into two distinct sections separated by their `bankType`:
+
+1. **Bank** (default, `Enum.BankType.Character`, `isDefault=true`) — always first
+2. User-created Bank tabs (`bankType=Character`), sorted by their saved order
+3. Purchase Bank tab (when available)
+4. **Warbank** (default, `Enum.BankType.Account`, `isDefault=true`) — always first in Warbank section
+5. User-created Warbank tabs (`bankType=Account`), sorted by their saved order
+6. Purchase Warbank tab (when available)
+7. **+** create tab — always last
+
+**Drag-to-Reorder Constraints:**
+
+User-created tabs can be reordered within their section via Shift+drag:
+- Bank tabs (Character bankType) can only be dropped within the Bank section
+- Warbank tabs (Account bankType) can only be dropped within the Warbank section
+- Cross-section drops are silently ignored
+
+This constraint is enforced in `CalculateOverlapTarget` by comparing the dragged tab's `bankType` against each candidate drop target's `bankType` before registering an overlap.
 
 ### Bag Slots (`bagslots.lua`)
 
