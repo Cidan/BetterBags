@@ -54,6 +54,12 @@ if addon.isRetail then
     [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
     [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
   }
+  -- Named aliases used as context markers by UpdateFreeSlots to distinguish
+  -- character bank from account bank (warbank) mode. The retail BANK_TAB table
+  -- uses integer enum keys only, so these named keys are required for the
+  -- ctx:Set("bagid", ...) calls in RefreshBags to produce non-nil values.
+  const.BANK_TAB.BANK = Enum.BagIndex.Characterbanktab
+  const.BANK_TAB.ACCOUNT_BANK_1 = Enum.BagIndex.AccountBankTab_1
 else
   -- BankTab is an enum for the different bank tabs.
   ---@enum BankTab
