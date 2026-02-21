@@ -374,13 +374,17 @@ function bank.proto:ShowCreateGroupDialog()
 
 				f.bankTypeDropdown:Show()
 
-				if f.button1 and f.button2 then
-					f.button1:ClearAllPoints()
-					f.button1:SetPoint("TOPRIGHT", f.bankTypeDropdown, "BOTTOM", -6, -16)
-					f.button2:ClearAllPoints()
-					f.button2:SetPoint("TOPLEFT", f.bankTypeDropdown, "BOTTOM", 6, -16)
-				end
-				f:SetHeight(180)
+				C_Timer.After(0, function()
+					if f:IsShown() then
+						if f.button1 and f.button2 then
+							f.button1:ClearAllPoints()
+							f.button1:SetPoint("TOPRIGHT", f.bankTypeDropdown, "BOTTOM", -6, -16)
+							f.button2:ClearAllPoints()
+							f.button2:SetPoint("TOPLEFT", f.bankTypeDropdown, "BOTTOM", 6, -16)
+						end
+						f:SetHeight(180)
+					end
+				end)
 			end,
 			OnAccept = function(f)
 				local name = f.EditBox:GetText()
