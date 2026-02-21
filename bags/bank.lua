@@ -204,33 +204,32 @@ function bank.proto:RegisterEvents()
 		behavior:GenerateGroupTabs(ectx)
 	end)
 
-	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ectx, _)
-		behavior:GenerateGroupTabs(ectx)
+	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ctx, _)
+		behavior:GenerateGroupTabs(ctx)
 	end)
 
-	events:RegisterMessage("groups/Created", function(_, ectx, group)
+	events:RegisterMessage("groups/Created", function(ctx, group)
 		if group.kind == const.BAG_KIND.BANK then
-			behavior:GenerateGroupTabs(ectx)
+			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
 
-	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
-		local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
-		if group and group.kind == const.BAG_KIND.BANK then
-			behavior:GenerateGroupTabs(ectx)
+	events:RegisterMessage("groups/Changed", function(ctx, _, _, _, kind)
+		if kind == const.BAG_KIND.BANK then
+			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+	events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
 		if kind ~= const.BAG_KIND.BANK then return end
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
 		if activeGroup == groupID then
 			local defaultBankGroup = groups:GetDefaultBankGroup()
 			if defaultBankGroup then
-				behavior:SwitchToGroup(ectx, defaultBankGroup.id)
+				behavior:SwitchToGroup(ctx, defaultBankGroup.id)
 			end
 		end
-		behavior:GenerateGroupTabs(ectx)
+		behavior:GenerateGroupTabs(ctx)
 	end)
 end
 

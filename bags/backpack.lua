@@ -185,34 +185,33 @@ function backpack.proto:RegisterEvents()
 	end)
 
 	-- Listen for group changes to regenerate tabs
-	events:RegisterMessage("groups/Created", function(_, ectx)
-		behavior:GenerateGroupTabs(ectx)
-	end)
-
-	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
-		local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
-		if group and group.kind == const.BAG_KIND.BACKPACK then
-			behavior:GenerateGroupTabs(ectx)
+	events:RegisterMessage("groups/Created", function(ctx, group)
+		if group.kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+	events:RegisterMessage("groups/Changed", function(ctx, _, _, _, kind)
+		if kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ctx)
+		end
+	end)
+
+	events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
 		if kind ~= const.BAG_KIND.BACKPACK then return end
 		-- If the deleted group was active, switch to Backpack
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
 		if activeGroup == groupID then
-			behavior:SwitchToGroup(ectx, 1) -- Switch to Backpack
+			behavior:SwitchToGroup(ctx, 1) -- Switch to Backpack
 		end
-		behavior:GenerateGroupTabs(ectx)
-	end)
-
-	events:RegisterMessage("groups/Changed", function(_, ectx)
-		behavior:GenerateGroupTabs(ectx)
+		behavior:GenerateGroupTabs(ctx)
 	end)
 
 	-- Listen for groups enabled/disabled toggle
-	events:RegisterMessage("groups/EnabledChanged", function(_, ectx)
-		behavior:GenerateGroupTabs(ectx)
+	events:RegisterMessage("groups/EnabledChanged", function(ctx, kind, _)
+		if kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ctx)
+		end
 	end)
 end
 
