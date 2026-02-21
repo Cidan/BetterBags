@@ -726,7 +726,11 @@ function items:UpdateFreeSlots(ctx, kind)
 	local tab = ctx:Get("bagid")
 	if kind == const.BAG_KIND.BANK then
 		if tab == const.BANK_TAB.BANK then
+			-- Character bank: sum free slots across all character bank tabs.
 			baglist = const.BANK_BAGS
+		elseif const.ACCOUNT_BANK_BAGS and tab == const.BANK_TAB.ACCOUNT_BANK_1 then
+			-- Account bank (warbank): sum free slots across all warbank tabs.
+			baglist = const.ACCOUNT_BANK_BAGS
 		else
 			baglist = { [tab] = tab }
 		end
