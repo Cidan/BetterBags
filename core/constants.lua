@@ -290,6 +290,8 @@ const.EXPANSION_TYPE = {
 }
 
 const.OFFSETS = {
+  -- Width allocated for the scrollbar when it appears.
+  SCROLLBAR_WIDTH = 14,
   -- The left inset for the search box.
   SEARCH_LEFT_INSET = 46,
   -- The right inset for the search box.

@@ -575,12 +575,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
 
   local maxHeight = UIParent:GetHeight() * 0.90
-  local bagWidth = w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET
+  local bagWidth = w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH
   if bagHeight > maxHeight then
     bagHeight = maxHeight
     view.content:ShowScrollBar()
-    -- Add extra width for the scrollbar so it doesn't overlap the items
-    bagWidth = bagWidth + 14
   else
     view.content:HideScrollBar()
   end
