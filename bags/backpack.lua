@@ -196,7 +196,8 @@ function backpack.proto:RegisterEvents()
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID)
+	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+		if kind ~= const.BAG_KIND.BACKPACK then return end
 		-- If the deleted group was active, switch to Backpack
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
 		if activeGroup == groupID then
@@ -244,7 +245,7 @@ function backpack.proto:GenerateGroupTabs(ctx)
 	-- Show tabs frame in case it was hidden
 	self.bag.tabs.frame:Show()
 
-	local allGroups = groups:GetGroupsByKind(const.BAG_KIND.BACKPACK)
+	local allGroups = groups:GetAllGroups(const.BAG_KIND.BACKPACK)
 
 	-- Create tabs for each group that doesn't exist yet
 	for groupID, group in pairs(allGroups) do

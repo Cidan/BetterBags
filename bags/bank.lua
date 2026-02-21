@@ -221,7 +221,8 @@ function bank.proto:RegisterEvents()
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID)
+	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+		if kind ~= const.BAG_KIND.BANK then return end
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
 		if activeGroup == groupID then
 			local defaultBankGroup = groups:GetDefaultBankGroup()
@@ -251,7 +252,7 @@ function bank.proto:GenerateGroupTabs(ctx)
 
 	self.bag.tabs.frame:Show()
 
-	local allGroups = groups:GetGroupsByKind(const.BAG_KIND.BANK)
+	local allGroups = groups:GetAllGroups(const.BAG_KIND.BANK)
 
 	for groupID, group in pairs(allGroups) do
 		if not self.bag.tabs:TabExistsByID(groupID) then

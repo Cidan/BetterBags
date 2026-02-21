@@ -124,13 +124,6 @@ function groups:GetAllGroups(kind)
   return database:GetAllGroups(kind)
 end
 
--- GetGroupsByKind returns all groups for a specific bag kind.
----@param kind BagKind
----@return table<number, Group>
-function groups:GetGroupsByKind(kind)
-  return database:GetAllGroups(kind)
-end
-
 -------
 --- Category-Group Assignment
 -------

@@ -572,7 +572,7 @@ function items:RefreshBags(ctx, kind)
 		end
 
 		local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
-		local activeGroup = database:GetGroup(activeGroupID)
+		local activeGroup = database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
 		local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
 
 		if activeGroup and addon.isRetail and activeGroup.bankType == Enum.BankType.Account then

@@ -1076,55 +1076,63 @@ function DB:Migrate()
     local oldGroups = DB.data.profile.groups
     local oldCategoryToGroup = DB.data.profile.categoryToGroup
     local oldGroupCounter = DB.data.profile.groupCounter
-
-    DB.data.profile.groups = {
-      [const.BAG_KIND.BACKPACK] = {},
-      [const.BAG_KIND.BANK] = {}
-    }
-    DB.data.profile.categoryToGroup = {
-      [const.BAG_KIND.BACKPACK] = {},
-      [const.BAG_KIND.BANK] = {}
-    }
-
-    if type(oldGroupCounter) == "number" then
-      DB.data.profile.groupCounter = {
-        [const.BAG_KIND.BACKPACK] = oldGroupCounter,
-        [const.BAG_KIND.BANK] = 0
-      }
+    
+    -- Check if it's already scoped (e.g. fresh install with new defaults)
+    local isAlreadyScoped = false
+    if oldGroups and type(oldGroups) == "table" and (oldGroups[const.BAG_KIND.BACKPACK] or oldGroups[const.BAG_KIND.BANK]) then
+      isAlreadyScoped = true
     end
 
-    if oldGroups then
-      -- First, move all groups to their respective kind
-      for id, group in pairs(oldGroups) do
-        if type(group) == "table" then
-          local kind = group.kind or const.BAG_KIND.BACKPACK
+    if not isAlreadyScoped then
+      DB.data.profile.groups = {
+        [const.BAG_KIND.BACKPACK] = {},
+        [const.BAG_KIND.BANK] = {}
+      }
+      DB.data.profile.categoryToGroup = {
+        [const.BAG_KIND.BACKPACK] = {},
+        [const.BAG_KIND.BANK] = {}
+      }
 
-          -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3.
-          if id ~= 1 and group.isDefault then
-            kind = const.BAG_KIND.BACKPACK
-            group.kind = const.BAG_KIND.BACKPACK
-            group.isDefault = nil
-            group.bankType = nil
+      if type(oldGroupCounter) == "number" then
+        DB.data.profile.groupCounter = {
+          [const.BAG_KIND.BACKPACK] = oldGroupCounter,
+          [const.BAG_KIND.BANK] = 0
+        }
+      end
+
+      if oldGroups then
+        -- First, move all groups to their respective kind
+        for id, group in pairs(oldGroups) do
+          if type(group) == "table" then
+            local kind = group.kind or const.BAG_KIND.BACKPACK
+
+            -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3.
+            if id ~= 1 and group.isDefault then
+              kind = const.BAG_KIND.BACKPACK
+              group.kind = const.BAG_KIND.BACKPACK
+              group.isDefault = nil
+              group.bankType = nil
+            end
+
+            if id == 1 then
+              group.isDefault = true
+              kind = const.BAG_KIND.BACKPACK
+              group.kind = const.BAG_KIND.BACKPACK
+            end
+
+            DB.data.profile.groups[kind][id] = group
           end
-
-          if id == 1 then
-            group.isDefault = true
-            kind = const.BAG_KIND.BACKPACK
-            group.kind = const.BAG_KIND.BACKPACK
-          end
-
-          DB.data.profile.groups[kind][id] = group
         end
       end
-    end
 
-    if oldCategoryToGroup then
-      for categoryName, groupID in pairs(oldCategoryToGroup) do
-        if type(groupID) == "number" then
-          -- We only know the old categoryToGroup mapped to backpacks
-          local group = DB.data.profile.groups[const.BAG_KIND.BACKPACK] and DB.data.profile.groups[const.BAG_KIND.BACKPACK][groupID]
-          if group then
-            DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK][categoryName] = groupID
+      if oldCategoryToGroup then
+        for categoryName, groupID in pairs(oldCategoryToGroup) do
+          if type(groupID) == "number" then
+            -- We only know the old categoryToGroup mapped to backpacks
+            local group = DB.data.profile.groups[const.BAG_KIND.BACKPACK] and DB.data.profile.groups[const.BAG_KIND.BACKPACK][groupID]
+            if group then
+              DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK][categoryName] = groupID
+            end
           end
         end
       end
