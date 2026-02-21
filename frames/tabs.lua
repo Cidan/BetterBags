@@ -21,6 +21,9 @@ local events = addon:GetModule("Events")
 ---@class Database: AceModule
 local database = addon:GetModule("Database")
 
+---@class Groups: AceModule
+local groups = addon:GetModule("Groups")
+
 -- Tab drag state (module-level to match section.lua pattern)
 tabs.draggingTab = nil              ---@type TabButton? Tab button being dragged
 tabs.dragStartIndex = nil           ---@type number? Original index before drag started
@@ -190,8 +193,8 @@ function tabFrame:SortTabsByID()
 			return math.abs(a.id) < math.abs(b.id)
 		end
 
-		-- If both have IDs > 1 (reorderable groups), sort by their Group.order value
-		if a.id and b.id and a.id > 3 and b.id > 3 then
+		-- If both are reorderable groups, sort by their Group.order value
+		if a.id and b.id and a.id > 0 and b.id > 0 and not groups:IsDefaultGroup(a.id) and not groups:IsDefaultGroup(b.id) then
 			local orderA = database:GetGroupOrder(a.id)
 			local orderB = database:GetGroupOrder(b.id)
 			if orderA ~= orderB then
@@ -414,7 +417,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				decoration.RightActive:Show()
 				-- Show tooltip indicating what will happen
 				GameTooltip:SetOwner(frame, "ANCHOR_TOP")
-				if tab.id == 1 or tab.id == 2 or tab.id == 3 then
+				if groups:IsDefaultGroup(tab.id) then
 					GameTooltip:SetText("Move to " .. tab.name)
 					GameTooltip:AddLine("Remove group assignment from: " .. sectionFrame.draggingCategory, 1, 1, 1, true)
 				else
@@ -673,7 +676,7 @@ end
 ---@return boolean
 function tabs:IsTabReorderable(tab)
 	if not tab.id then return false end
-	if tab.id == 1 or tab.id == 2 or tab.id == 3 then return false end    -- Default tabs always first
+	if groups:IsDefaultGroup(tab.id) then return false end    -- Default tabs always first
 	if tab.id == 0 then return false end    -- "+" tab always last
 	if tab.id < 0 then return false end     -- Purchase tabs always at end
 	return true
@@ -912,7 +915,7 @@ function tabs:SaveTabOrder(frame)
 	local orderCounter = 2  -- Start at 2 (Bank is always 1)
 
 	for _, tab in ipairs(frame.tabIndex) do
-		if tab.id and tab.id > 3 then  -- Skip Backpack (1), Bank (2), Warbank (3), "+" (0), purchase (<0)
+		if tab.id and tab.id > 0 and not groups:IsDefaultGroup(tab.id) then  -- Skip default groups, "+" (0), purchase (<0)
 			database:SetGroupOrder(tab.id, orderCounter)
 			orderCounter = orderCounter + 1
 		end

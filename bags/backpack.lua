@@ -189,6 +189,13 @@ function backpack.proto:RegisterEvents()
 		behavior:GenerateGroupTabs(ectx)
 	end)
 
+	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
+		local group = groups:GetGroup(groupID)
+		if group and group.kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ectx)
+		end
+	end)
+
 	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID)
 		-- If the deleted group was active, switch to Backpack
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
@@ -223,7 +230,6 @@ end
 
 -- Special ID for the "New Group" tab (using 0 to avoid negative ID secure button handling)
 local NEW_GROUP_TAB_ID = 0
-local NEW_GROUP_TAB_NAME = "New Group"
 local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 
 -- GenerateGroupTabs creates tabs for all groups.
@@ -262,7 +268,7 @@ function backpack.proto:GenerateGroupTabs(ctx)
 
 	-- Add "+" tab for creating new groups (using special ID 0)
 	if not self.bag.tabs:TabExistsByID(NEW_GROUP_TAB_ID) then
-		self.bag.tabs:AddTab(ctx, NEW_GROUP_TAB_NAME, NEW_GROUP_TAB_ID)
+		self.bag.tabs:AddTab(ctx, L:G("New Group"), NEW_GROUP_TAB_ID)
 		-- Set the icon for the tab (this will hide the text and show the icon)
 		self.bag.tabs:SetTabIconByID(ctx, NEW_GROUP_TAB_ID, NEW_GROUP_TAB_ICON)
 		-- Set up tooltip for the "+" tab
@@ -273,7 +279,7 @@ function backpack.proto:GenerateGroupTabs(ctx)
 	self.bag.tabs:SortTabsByID()
 
 	-- Move "+" tab to end
-	self.bag.tabs:MoveToEnd(NEW_GROUP_TAB_NAME)
+	self.bag.tabs:MoveToEnd(L:G("New Group"))
 
 	-- Ensure tab 1 (Backpack) is selected with proper highlight
 	self.bag.tabs:SetTabByID(ctx, 1)
@@ -324,7 +330,7 @@ function backpack.proto:SetupPlusTabTooltip(ctx)
 			local decoration = themes:GetTabButton(ctx, tab)
 			decoration:SetScript("OnEnter", function(f)
 				GameTooltip:SetOwner(f, "ANCHOR_TOP")
-				GameTooltip:SetText(L:G("New Group..."))
+				GameTooltip:SetText(L:G("New Group..."), 1, 1, 1, 1, true)
 				GameTooltip:AddLine(L:G("Click to create a new group for organizing categories."), 1, 1, 1, true)
 				GameTooltip:Show()
 			end)

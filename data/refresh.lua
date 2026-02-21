@@ -137,28 +137,6 @@ function refresh:ExecutePendingUpdates()
 
     local refreshCtx = ctx:Copy()
 
-    -- Check if the context already has a filterBagID set (from tab switching)
-    local existingFilter = ctx:Get('filterBagID')
-    if existingFilter ~= nil then
-      refreshCtx:Set('filterBagID', existingFilter)
-    elseif addon.atWarbank then
-      refreshCtx:Set('filterBagID', addon.Bags.Bank.bankTab)
-    else
-      local currentTab = addon.Bags.Bank.bankTab
-      -- Guard against nil bankTab (can happen if refresh fires before OnShow completes)
-      -- Use hardcoded -1 as fallback (bank bag ID) since Enum.BagIndex.Bank may not exist in all contexts
-      if currentTab == nil then
-        currentTab = -1
-      end
-      accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or 13
-
-      if currentTab >= accountBankStart then
-        refreshCtx:Set('filterBagID', nil)
-      else
-        refreshCtx:Set('filterBagID', nil)
-      end
-    end
-
     items:RefreshBank(refreshCtx)
   end
 

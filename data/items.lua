@@ -582,7 +582,9 @@ function items:RefreshBags(ctx, kind)
 			end
 		else
 			ctx:Set("bagid", const.BANK_TAB.BANK)
-			bagList = const.BANK_BAGS
+			for _, bag in pairs(const.BANK_BAGS) do
+				bagList[bag] = bag
+			end
 			if reagentBank then
 				bagList[reagentBank] = reagentBank
 			end

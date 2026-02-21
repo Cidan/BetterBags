@@ -36,7 +36,6 @@ local groups = addon:GetModule("Groups")
 local context = addon:GetModule("Context")
 
 local NEW_GROUP_TAB_ID = 0
-local NEW_GROUP_TAB_NAME = "New Group"
 local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 
 -------
@@ -215,11 +214,20 @@ function bank.proto:RegisterEvents()
 		end
 	end)
 
+	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
+		local group = groups:GetGroup(groupID)
+		if group and group.kind == const.BAG_KIND.BANK then
+			behavior:GenerateGroupTabs(ectx)
+		end
+	end)
+
 	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID)
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
 		if activeGroup == groupID then
-			-- Switch to Bank
-			behavior:SwitchToGroup(ectx, 2)
+			local defaultBankGroup = groups:GetDefaultBankGroup()
+			if defaultBankGroup then
+				behavior:SwitchToGroup(ectx, defaultBankGroup.id)
+			end
 		end
 		behavior:GenerateGroupTabs(ectx)
 	end)
@@ -263,7 +271,7 @@ function bank.proto:GenerateGroupTabs(ctx)
 	end
 
 	if not self.bag.tabs:TabExistsByID(NEW_GROUP_TAB_ID) then
-		self.bag.tabs:AddTab(ctx, NEW_GROUP_TAB_NAME, NEW_GROUP_TAB_ID)
+		self.bag.tabs:AddTab(ctx, L:G("New Group"), NEW_GROUP_TAB_ID)
 		self.bag.tabs:SetTabIconByID(ctx, NEW_GROUP_TAB_ID, NEW_GROUP_TAB_ICON)
 		self:SetupPlusTabTooltip(ctx)
 	end
@@ -295,7 +303,7 @@ function bank.proto:GenerateGroupTabs(ctx)
 	end
 
 	self.bag.tabs:SortTabsByID()
-	self.bag.tabs:MoveToEnd(NEW_GROUP_TAB_NAME)
+	self.bag.tabs:MoveToEnd(L:G("New Group"))
 
 	local w = self.bag.tabs.width
 	if self.bag.frame:GetWidth() + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET < w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET then
@@ -304,11 +312,11 @@ function bank.proto:GenerateGroupTabs(ctx)
 end
 
 function bank.proto:SetupPlusTabTooltip(_)
-	local plusTab = self.bag.tabs:GetTabByName(NEW_GROUP_TAB_NAME)
+	local plusTab = self.bag.tabs:GetTabByName(L:G("New Group"))
 	if plusTab then
 		plusTab:SetScript("OnEnter", function(button)
 			GameTooltip:SetOwner(button, "ANCHOR_TOP")
-			GameTooltip:SetText(L:G("Create New Group Tab"))
+			GameTooltip:SetText(L:G("Create New Group Tab"), 1, 1, 1, 1, true)
 			GameTooltip:AddLine(L:G("Click to create a new group tab for organizing your items."), 1, 1, 1)
 			GameTooltip:Show()
 		end)
@@ -415,7 +423,7 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 		if BankPanel and BankPanel.SetBankType then
 			BankPanel:SetBankType(Enum.BankType.Character)
 		end
-		self.bag.bankTab = Enum.BagIndex.Characterbanktab
+		self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	end
 
 	self.bag:SetTitle(group.name)
@@ -424,7 +432,6 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	items:ClearBankCache(ctx)
 	self.bag:Wipe(ctx)
 	ctx:Set("wipe", true)
-	ctx:Set("filterBagID", nil)
 
 	events:SendMessage(ctx, "bags/RefreshBank")
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
@@ -433,7 +440,7 @@ end
 function bank.proto:SwitchToBankAndWipe(ctx)
 	-- Fallback used in event hooks when closing bank
 	ctx:Set("wipe", true)
-	self.bag.bankTab = Enum.BagIndex.Characterbanktab
+	self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	if BankPanel and BankPanel.SetBankType then
 		BankPanel:SetBankType(Enum.BankType.Character)
 	end

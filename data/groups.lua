@@ -92,6 +92,26 @@ function groups:GetGroup(groupID)
   return database:GetGroup(groupID)
 end
 
+-- IsDefaultGroup returns whether the group ID belongs to a default system group.
+---@param groupID number
+---@return boolean
+function groups:IsDefaultGroup(groupID)
+  if groupID == 1 then return true end
+  local group = database:GetGroup(groupID)
+  return group and group.isDefault == true
+end
+
+-- GetDefaultBankGroup returns the default Bank group.
+---@return Group?
+function groups:GetDefaultBankGroup()
+  for _, group in pairs(database:GetAllGroups()) do
+    if group.kind == const.BAG_KIND.BANK and group.isDefault and group.name == "Bank" then
+      return group
+    end
+  end
+  return nil
+end
+
 -- GetAllGroups returns all groups.
 ---@return table<number, Group>
 function groups:GetAllGroups()
@@ -120,8 +140,8 @@ end
 ---@param categoryName string
 ---@param groupID number
 function groups:AssignCategoryToGroup(ctx, categoryName, groupID)
-  -- If assigning to Backpack (ID 1), Bank (ID 2), or Warbank (ID 3), just remove the explicit assignment
-  if groupID == 1 or groupID == 2 or groupID == 3 then
+  -- If assigning to a default group, just remove the explicit assignment
+  if self:IsDefaultGroup(groupID) then
     self:RemoveCategoryFromGroup(ctx, categoryName)
     return
   end
@@ -176,7 +196,7 @@ function groups:CategoryBelongsToGroup(categoryName, groupID)
     if assignedGroup == nil then return true end
     local g = database:GetGroup(assignedGroup)
     return g and g.kind ~= const.BAG_KIND.BACKPACK
-  elseif groupID == 2 or groupID == 3 then
+  elseif self:IsDefaultGroup(groupID) then
     -- Default Bank and Warbank tabs include all categories not assigned to a Bank group
     -- or assigned to this specific group
     if assignedGroup == groupID then return true end

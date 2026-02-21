@@ -653,8 +653,7 @@ function DB:DeleteGroup(groupID)
   if not group then return end
 
   -- Don't allow deleting default groups
-  if groupID == 1 then return end
-  if group.kind == const.BAG_KIND.BANK and (group.name == "Bank" or group.name == "Warbank") then return end
+  if group.isDefault then return end
 
   -- Remove category associations for this group
   for categoryName, gID in pairs(DB.data.profile.categoryToGroup) do
@@ -673,7 +672,7 @@ function DB:DeleteGroup(groupID)
   if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == groupID then
     -- Find the Bank group ID
     for id, g in pairs(DB.data.profile.groups) do
-      if g.name == "Bank" and g.kind == const.BAG_KIND.BANK then
+      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.name == "Bank" then
         DB.data.profile.activeGroup[const.BAG_KIND.BANK] = id
         break
       end
@@ -1054,10 +1053,17 @@ function DB:Migrate()
     }
   end
 
-  -- Migrate existing groups to have a kind
-  for _, group in pairs(DB.data.profile.groups) do
+  -- Migrate existing groups to have a kind and default flags
+  for id, group in pairs(DB.data.profile.groups) do
     if group.kind == nil then
       group.kind = const.BAG_KIND.BACKPACK
+    end
+    if id == 1 then
+      group.isDefault = true
+    elseif group.kind == const.BAG_KIND.BANK and group.name == "Bank" then
+      group.isDefault = true
+    elseif group.kind == const.BAG_KIND.BANK and group.name == "Warbank" then
+      group.isDefault = true
     end
   end
 
@@ -1081,6 +1087,7 @@ function DB:Migrate()
       order = newID,
       kind = const.BAG_KIND.BANK,
       bankType = Enum.BankType and Enum.BankType.Character or 1,
+      isDefault = true,
     }
     if not DB.data.profile.activeGroup[const.BAG_KIND.BANK] then
       DB.data.profile.activeGroup[const.BAG_KIND.BANK] = newID
@@ -1096,11 +1103,18 @@ function DB:Migrate()
       order = newID,
       kind = const.BAG_KIND.BANK,
       bankType = Enum.BankType and Enum.BankType.Account or 2,
+      isDefault = true,
     }
   end
 
   if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == nil then
-    DB.data.profile.activeGroup[const.BAG_KIND.BANK] = 2 -- Default to Bank group
+    -- Find the default Bank group ID
+    for id, g in pairs(DB.data.profile.groups) do
+      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.name == "Bank" then
+        DB.data.profile.activeGroup[const.BAG_KIND.BANK] = id
+        break
+      end
+    end
   end
   if DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] == nil then
     DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] = true
