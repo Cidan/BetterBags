@@ -385,7 +385,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		end)
 
 		-- Enable drag-to-reorder for reorderable tabs (group tabs, not Bank/"+" tabs)
-		if tabs:IsTabReorderable(tab) then
+		if tabs:IsTabReorderable(self.kind, tab) then
 			decoration:SetScript("OnMouseDown", function(_, button)
 				if button == "LeftButton" and IsShiftKeyDown() then
 					tabs:StartTabDrag(tab, self)
@@ -674,11 +674,12 @@ function tabs:HideDropPlaceholder()
 	end
 end
 
+---@param kind BagKind
 ---@param tab TabButton
 ---@return boolean
-function tabs:IsTabReorderable(tab)
+function tabs:IsTabReorderable(kind, tab)
 	if not tab.id then return false end
-	if groups:IsDefaultGroup(self.currentTabFrame.kind, tab.id) then return false end    -- Default tabs always first
+	if groups:IsDefaultGroup(kind, tab.id) then return false end    -- Default tabs always first
 	if tab.id == 0 then return false end    -- "+" tab always last
 	if tab.id < 0 then return false end     -- Purchase tabs always at end
 	return true
@@ -775,7 +776,7 @@ function tabs:CalculateOverlapTarget()
 	for i, tab in ipairs(self.currentTabFrame.tabIndex) do
 		if tab ~= self.draggingTab and tab:IsShown() then
 			-- Only check reorderable tabs (skip Bank, +, purchase)
-			if self:IsTabReorderable(tab) then
+			if self:IsTabReorderable(self.currentTabFrame.kind, tab) then
 				local tabLeft = tab:GetLeft()
 				local tabRight = tab:GetRight()
 				if tabLeft and tabRight then
