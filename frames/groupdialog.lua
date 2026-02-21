@@ -7,7 +7,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local L = addon:GetModule('Localization')
 
 ---@class (exact) GroupDialog: AceModule
----@field frame Frame|DefaultPanelFlatTemplate
+---@field frame Frame
 ---@field text FontString
 ---@field yes Button|UIPanelButtonTemplate
 ---@field no Button|UIPanelButtonTemplate
@@ -22,13 +22,20 @@ function groupDialog:Initialize()
 
 	self.bankType = Enum.BankType and Enum.BankType.Character or 1
 
-	local f = CreateFrame('Frame', "BetterBagsGroupDialog", UIParent, "DefaultPanelFlatTemplate")
+	---@class Themes: AceModule
+	local themes = addon:GetModule('Themes')
+
+	local f = CreateFrame('Frame', "BetterBagsGroupDialog", UIParent)
 	self.frame = f
 	f:SetFrameStrata("DIALOG")
 	f:SetFrameLevel(600)
 	f:SetSize(300, 200)
 	f:SetPoint("CENTER")
 	f:Hide()
+
+	-- Apply the active theme's Simple decoration so the dialog matches the addon UI.
+	themes:RegisterSimpleWindow(f, L:G("New Group"))
+	themes:GetCurrentTheme().Simple(f)
 
 	self.text = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	self.text:SetTextColor(1, 1, 1)
@@ -93,16 +100,27 @@ function groupDialog:Hide()
 	end
 end
 
-function groupDialog:Show(title, text, showDropdown, defaultBankType, onInput)
+---@param title string
+---@param text string
+---@param showDropdown boolean
+---@param defaultBankType? number
+---@param onInput fun(name: string, bankType: number)
+---@param initialValue? string Pre-fill the input box with this value (e.g., current group name for rename).
+---@param confirmText? string Label for the confirm button (defaults to "Create").
+function groupDialog:Show(title, text, showDropdown, defaultBankType, onInput, initialValue, confirmText)
 	if self.open then return end
 
 	if not self.frame then
 		self:Initialize()
 	end
 
-	self.frame:SetTitle(title)
+	---@class Themes: AceModule
+	local themes = addon:GetModule('Themes')
+	themes:SetTitle(self.frame, title)
+
 	self.text:SetText(text)
-	self.input:SetText("")
+	self.input:SetText(initialValue or "")
+	self.yes:SetText(confirmText or L:G("Create"))
 
 	self.bankType = defaultBankType or (Enum.BankType and Enum.BankType.Character or 1)
 

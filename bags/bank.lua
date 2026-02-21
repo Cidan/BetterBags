@@ -35,6 +35,9 @@ local groups = addon:GetModule("Groups")
 ---@class Context: AceModule
 local context = addon:GetModule("Context")
 
+---@class ContextMenu: AceModule
+local contextMenu = addon:GetModule("ContextMenu")
+
 local NEW_GROUP_TAB_ID = 0
 local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 
@@ -158,7 +161,7 @@ function bank.proto:OnCreate(_)
 
 	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BANK)
 
-	self.bag.tabs:SetClickHandler(function(ectx, tabID, _)
+	self.bag.tabs:SetClickHandler(function(ectx, tabID, button)
 		if tabID == NEW_GROUP_TAB_ID then
 			behavior:ShowCreateGroupDialog()
 			return false
@@ -166,6 +169,14 @@ function bank.proto:OnCreate(_)
 
 		if tabID == -1 or tabID == -2 then
 			return false -- Purchase tabs handled by secure templates
+		end
+
+		-- Right-click on non-default groups shows context menu
+		if button == "RightButton" and tabID and tabID > 0 then
+			if not groups:IsDefaultGroup(const.BAG_KIND.BANK, tabID) then
+				behavior:ShowGroupContextMenu(ectx, tabID)
+			end
+			return false
 		end
 
 		behavior:SwitchToGroup(ectx, tabID)
@@ -343,6 +354,95 @@ function bank.proto:ShowCreateGroupDialog()
 				bag.behavior:SwitchToGroup(ctx, newGroup.id)
 			end
 		end
+	)
+end
+
+-- ShowGroupContextMenu shows a context menu for a bank group tab.
+---@param ctx Context
+---@param groupID number
+function bank.proto:ShowGroupContextMenu(ctx, groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
+	if not group then return end
+
+	local behavior = self
+	---@type MenuList[]
+	local menuList = {}
+
+	-- Title
+	table.insert(menuList, {
+		text = group.name,
+		isTitle = true,
+		notCheckable = true,
+	})
+
+	-- Rename option
+	table.insert(menuList, {
+		text = L:G("Rename Group"),
+		notCheckable = true,
+		func = function()
+			contextMenu:Hide(ctx)
+			behavior:ShowRenameGroupDialog(groupID)
+		end,
+	})
+
+	-- Delete option
+	table.insert(menuList, {
+		text = L:G("Delete Group"),
+		notCheckable = true,
+		func = function()
+			contextMenu:Hide(ctx)
+			behavior:ShowDeleteGroupConfirm(groupID)
+		end,
+	})
+
+	-- Close menu option
+	table.insert(menuList, {
+		text = L:G("Close Menu"),
+		notCheckable = true,
+		func = function()
+			contextMenu:Hide(ctx)
+		end,
+	})
+
+	contextMenu:Show(ctx, menuList)
+end
+
+-- ShowRenameGroupDialog shows a dialog to rename a bank group.
+---@param groupID number
+function bank.proto:ShowRenameGroupDialog(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
+	if not group then return end
+
+	local groupDialog = addon:GetModule('GroupDialog')
+	groupDialog:Show(
+		L:G("Rename Group"),
+		L:G("Enter new group name:"),
+		false,
+		nil,
+		function(name)
+			local ctx = context:New("RenameGroup")
+			groups:RenameGroup(ctx, const.BAG_KIND.BANK, groupID, name)
+		end,
+		group.name,
+		L:G("Rename")
+	)
+end
+
+-- ShowDeleteGroupConfirm shows a confirmation dialog to delete a bank group.
+---@param groupID number
+function bank.proto:ShowDeleteGroupConfirm(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
+	if not group then return end
+
+	local question = addon:GetModule('Question')
+	question:YesNo(
+		L:G("Delete Group"),
+		string.format(L:G("Are you sure you want to delete the group '%s'? Categories in this group will be moved back to Bank."), group.name),
+		function()
+			local ctx = context:New("DeleteGroup")
+			groups:DeleteGroup(ctx, const.BAG_KIND.BANK, groupID)
+		end,
+		function() end
 	)
 end
 

@@ -305,6 +305,32 @@ Individual bag slot buttons.
 - Purchase integration
 - Empty slot handling
 
+### Group Dialog (`groupdialog.lua`)
+
+Dialog for creating or renaming a group tab. Used by the bank to accept a name and optional bank type (Character Bank / Warbank).
+
+**Features:**
+- Pre-fillable input (for rename workflows — pass `initialValue` to `Show()`)
+- Configurable confirm-button label (pass `confirmText` to `Show()`)
+- Optional bank-type dropdown (shown when `showDropdown = true`)
+- Themed via the addon's active theme: the dialog is registered as a Simple window with the Themes module so it visually matches the rest of the UI
+
+**`Show()` Signature:**
+```lua
+groupDialog:Show(title, text, showDropdown, defaultBankType, onInput, initialValue, confirmText)
+```
+- `initialValue` — optional; pre-fills the edit box (used for rename)
+- `confirmText` — optional; overrides the confirm button label (default: "Create")
+
+### Question (`question.lua`)
+
+General-purpose modal dialog with pooled frame instances.
+
+**Modes:**
+- `AskForInput(title, text, onInput)` — edit-box prompt; calls `onInput(text)` on OK
+- `YesNo(title, text, yes, no)` — two-button confirmation
+- `Alert(title, text)` — single OK dismissal
+
 ## Version-Specific Implementations
 
 ### Classic Era (`era/`)

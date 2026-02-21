@@ -72,6 +72,10 @@ Implements `BackpackBehavior` for the player's inventory bags.
 - Theme configuration
 - Cooldown event handling
 - Bag sorting
+- Group tab management with right-click context menu (Rename/Delete)
+
+**Group Tab Context Menu:**
+Right-clicking any user-created tab (ID > 1) shows a context menu with Rename and Delete options. The default "Backpack" tab (ID 1) does not show a context menu. Both `groups:RenameGroup` and `groups:DeleteGroup` are called with `const.BAG_KIND.BACKPACK` as the `kind` argument.
 
 ### bank.lua
 
@@ -83,6 +87,10 @@ Implements `BankBehavior` for the player's bank (retail version).
 - Warbank/Account bank tabs
 - Tab settings menu integration
 - Bank-specific event handling
+- Group tab management with right-click context menu (Rename/Delete)
+
+**Bank Group Tab Context Menu:**
+Right-clicking any user-created bank tab (non-default, ID > 0) shows a context menu with Rename and Delete options. Default bank groups (those with `isDefault = true`) do not show the context menu. Rename uses the `GroupDialog` module (pre-filled with the current name). Delete uses the `Question` module's `YesNo` dialog.
 
 **Critical Notes:**
 - BankPanel must be shown for `GetActiveBankType()` to work
