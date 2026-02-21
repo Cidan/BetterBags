@@ -145,6 +145,14 @@ function gridProto:HideScrollBar()
   self.bar:SetAttribute("nodeignore", true)
 end
 
+-- EnableMouseWheelScroll enables or disables mouse wheel scrolling on this grid's
+-- scroll box. Disable this on non-scrollable grids (e.g. section content grids)
+-- so mouse wheel events fall through to the outer scrollable bag container.
+---@param enabled boolean
+function gridProto:EnableMouseWheelScroll(enabled)
+  self.frame:EnableMouseWheel(enabled)
+end
+
 function gridProto:SortVertical()
   self.sortVertical = true
 end

@@ -113,6 +113,9 @@ function BagSlots:CreatePanel(ctx, kind)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
   b.content.maxCellWidth = 10
   b.content:HideScrollBar()
+  -- Bag slots grid is not scrollable; disable mouse wheel so scroll events
+  -- pass through to the outer scrollable bag container.
+  b.content:EnableMouseWheelScroll(false)
   b.content:Show()
 
   local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS_LIST or const.BANK_ONLY_BAGS_LIST

@@ -146,6 +146,15 @@ Flexible grid system for arranging UI elements.
 - Flexible spacing
 - Sort support
 
+**Mouse Wheel Scroll Propagation:**
+
+WoW does not bubble mouse wheel events up the parent-child hierarchy. Each WowScrollBox (created by `grid:Create`) automatically registers an `OnMouseWheel` handler via the template, which would intercept all scroll events — even on non-scrollable inner grids (e.g. section content grids).
+
+To ensure scroll events reach the outer bag container:
+- `EnableMouseWheelScroll(false)` is called on all section content grids (non-scrollable inner grids)
+- Mouse wheel is disabled on all item buttons (`ContainerFrameItemButtonTemplate` enables it via its mixin)
+- Events then fall through to the outer bag grid's WowScrollBox, which handles scrolling
+
 **Main Class:**
 ```lua
 ---@class Grid
@@ -161,6 +170,7 @@ Flexible grid system for arranging UI elements.
 - `Draw(options)` - Render grid layout
 - `Sort(fn)` - Sort cells
 - `DislocateCell(id)` - Remove cell visually
+- `EnableMouseWheelScroll(enabled)` - Enable or disable mouse wheel scrolling on this grid's scroll box
 
 ### List Layout (`list.lua`)
 

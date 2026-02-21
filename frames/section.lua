@@ -690,6 +690,9 @@ function sectionFrame:_DoCreate()
   local content = grid:Create(s.frame)
   content:Show()
   content:HideScrollBar()
+  -- Section content grids are not scrollable; disable mouse wheel so scroll
+  -- events pass through to the outer scrollable bag container instead.
+  content:EnableMouseWheelScroll(false)
   s.content = content
   f:Show()
   return s

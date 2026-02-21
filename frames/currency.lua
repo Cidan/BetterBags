@@ -118,6 +118,9 @@ function currency:CreateIconGrid(parent)
   g:GetContainer():SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", const.OFFSETS.BAG_LEFT_INSET+4, const.OFFSETS.BAG_BOTTOM_INSET+3)
   g:GetContainer():SetWidth(200)
   g:HideScrollBar()
+  -- Currency grid is not scrollable; disable mouse wheel so scroll events
+  -- pass through to the outer scrollable bag container.
+  g:EnableMouseWheelScroll(false)
   g.maxCellWidth = 7
   b.iconGrid = g
 

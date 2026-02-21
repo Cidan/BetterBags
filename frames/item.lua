@@ -824,6 +824,12 @@ function itemFrame:_DoCreate(_)
 
 	button:RegisterForDrag("LeftButton")
 	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	-- ContainerFrameItemButtonTemplate enables mouse wheel via its mixin, which would
+	-- intercept scroll events before they reach the parent WowScrollBox container.
+	-- Clear the handler and explicitly disable mouse wheel on this button so that
+	-- scroll events fall through to the outer scrollable bag frame.
+	button:SetScript("OnMouseWheel", nil)
+	button:EnableMouseWheel(false)
 	i.button = button
 	button:SetAllPoints(p)
 
