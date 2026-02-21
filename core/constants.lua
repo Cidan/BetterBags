@@ -854,25 +854,9 @@ const.DATABASE_DEFAULTS = {
         kind = const.BAG_KIND.BACKPACK,
         isDefault = true,
       },
-      [2] = {
-        id = 2,
-        name = "Bank",
-        order = 2,
-        kind = const.BAG_KIND.BANK,
-        bankType = Enum.BankType and Enum.BankType.Character or 1,
-        isDefault = true,
-      },
-      [3] = {
-        id = 3,
-        name = "Warbank",
-        order = 3,
-        kind = const.BAG_KIND.BANK,
-        bankType = Enum.BankType and Enum.BankType.Account or 2,
-        isDefault = true,
-      },
     },
     ---@type number
-    groupCounter = 3,
+    groupCounter = 1,
     ---@type table<string, number>
     categoryToGroup = {},
     ---@type table<BagKind, number>

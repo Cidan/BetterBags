@@ -1058,6 +1058,14 @@ function DB:Migrate()
     if group.kind == nil then
       group.kind = const.BAG_KIND.BACKPACK
     end
+
+    -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3
+    if group.isDefault and group.kind == const.BAG_KIND.BANK and group.name ~= "Bank" and group.name ~= "Warbank" then
+      group.kind = const.BAG_KIND.BACKPACK
+      group.isDefault = false
+      group.bankType = nil
+    end
+
     if id == 1 then
       group.isDefault = true
     elseif group.kind == const.BAG_KIND.BANK and group.name == "Bank" then
