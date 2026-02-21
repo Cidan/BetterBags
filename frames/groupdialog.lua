@@ -17,8 +17,9 @@ local L = addon:GetModule('Localization')
 ---@field bankType number
 local groupDialog = addon:NewModule('GroupDialog')
 
-function groupDialog:OnEnable()
-	self.open = false
+function groupDialog:Initialize()
+	if self.frame then return end
+
 	self.bankType = Enum.BankType and Enum.BankType.Character or 1
 
 	local f = CreateFrame('Frame', "BetterBagsGroupDialog", UIParent, "DefaultPanelFlatTemplate")
@@ -87,11 +88,17 @@ function groupDialog:OnEnable()
 end
 
 function groupDialog:Hide()
-	self.frame:Hide()
+	if self.frame then
+		self.frame:Hide()
+	end
 end
 
 function groupDialog:Show(title, text, showDropdown, defaultBankType, onInput)
 	if self.open then return end
+
+	if not self.frame then
+		self:Initialize()
+	end
 
 	self.frame:SetTitle(title)
 	self.text:SetText(text)
