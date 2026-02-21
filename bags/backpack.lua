@@ -447,7 +447,7 @@ function backpack.proto:ShowRenameGroupDialog(groupID)
 				local name = f.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("RenameGroup")
-					groups:RenameGroup(ctx, f.data.groupID, name)
+					groups:RenameGroup(ctx, const.BAG_KIND.BACKPACK, f.data.groupID, name)
 				end
 			end,
 			OnShow = function(f)
@@ -463,7 +463,7 @@ function backpack.proto:ShowRenameGroupDialog(groupID)
 				local name = parent.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("RenameGroup")
-					groups:RenameGroup(ctx, parent.data.groupID, name)
+					groups:RenameGroup(ctx, const.BAG_KIND.BACKPACK, parent.data.groupID, name)
 				end
 				parent:Hide()
 			end,
@@ -494,7 +494,7 @@ function backpack.proto:ShowDeleteGroupConfirm(groupID)
 			button2 = L:G("Cancel"),
 			OnAccept = function(f)
 				local ctx = context:New("DeleteGroup")
-				groups:DeleteGroup(ctx, f.data.groupID)
+				groups:DeleteGroup(ctx, const.BAG_KIND.BACKPACK, f.data.groupID)
 			end,
 			timeout = 0,
 			whileDead = true,
