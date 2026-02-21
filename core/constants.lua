@@ -290,6 +290,8 @@ const.EXPANSION_TYPE = {
 }
 
 const.OFFSETS = {
+  -- Width allocated for the scrollbar when it appears.
+  SCROLLBAR_WIDTH = 14,
   -- The left inset for the search box.
   SEARCH_LEFT_INSET = 46,
   -- The right inset for the search box.
@@ -604,7 +606,6 @@ const.DATABASE_DEFAULTS = {
     enabled = true,
     enableBagFading = false,
     showBagButton = true,
-    characterBankTabsEnabled = false,
     enableBankBag = true,
     debug = false,
     inBagSearch = true,
@@ -846,25 +847,38 @@ const.DATABASE_DEFAULTS = {
     ---@type number
     newItemTime = 300,
     -- Groups feature: virtual tabs for organizing categories in backpack
-    ---@type table<number, Group>
+    ---@type table<BagKind, table<number, Group>>
     groups = {
-      [1] = {
-        id = 1,
-        name = "Backpack",
-        order = 1,
+      [const.BAG_KIND.BACKPACK] = {
+        [1] = {
+          id = 1,
+          name = "Backpack",
+          order = 1,
+          kind = const.BAG_KIND.BACKPACK,
+          isDefault = true,
+        },
       },
+      [const.BAG_KIND.BANK] = {},
     },
-    ---@type number
-    groupCounter = 1,
-    ---@type table<string, number>
-    categoryToGroup = {},
+    ---@type table<BagKind, number>
+    groupCounter = {
+      [const.BAG_KIND.BACKPACK] = 1,
+      [const.BAG_KIND.BANK] = 0,
+    },
+    ---@type table<BagKind, table<string, number>>
+    categoryToGroup = {
+      [const.BAG_KIND.BACKPACK] = {},
+      [const.BAG_KIND.BANK] = {},
+    },
     ---@type table<BagKind, number>
     activeGroup = {
       [const.BAG_KIND.BACKPACK] = 1,
+      [const.BAG_KIND.BANK] = 1,
     },
     ---@type table<BagKind, boolean>
     groupsEnabled = {
       [const.BAG_KIND.BACKPACK] = true,
+      [const.BAG_KIND.BANK] = true,
     },
     -- Profile system migration flag
     __profileSystemMigrated = false,

@@ -21,6 +21,9 @@ local events = addon:GetModule("Events")
 ---@class Database: AceModule
 local database = addon:GetModule("Database")
 
+---@class Groups: AceModule
+local groups = addon:GetModule("Groups")
+
 -- Tab drag state (module-level to match section.lua pattern)
 tabs.draggingTab = nil              ---@type TabButton? Tab button being dragged
 tabs.dragStartIndex = nil           ---@type number? Original index before drag started
@@ -190,10 +193,10 @@ function tabFrame:SortTabsByID()
 			return math.abs(a.id) < math.abs(b.id)
 		end
 
-		-- If both have IDs > 1 (reorderable groups), sort by their Group.order value
-		if a.id and b.id and a.id > 1 and b.id > 1 then
-			local orderA = database:GetGroupOrder(a.id)
-			local orderB = database:GetGroupOrder(b.id)
+		-- If both are reorderable groups, sort by their Group.order value
+		if a.id and b.id and a.id > 0 and b.id > 0 and not groups:IsDefaultGroup(self.kind, a.id) and not groups:IsDefaultGroup(self.kind, b.id) then
+			local orderA = database:GetGroupOrder(self.kind, a.id)
+			local orderB = database:GetGroupOrder(self.kind, b.id)
 			if orderA ~= orderB then
 				return orderA < orderB
 			end
@@ -203,8 +206,11 @@ function tabFrame:SortTabsByID()
 
 		-- If both have IDs, sort by ID
 		if a.id and b.id then
-			return a.id < b.id
+			if a.id ~= b.id then
+				return a.id < b.id
+			end
 		end
+
 		-- If only one has an ID, put the one with ID first
 		if a.id and not b.id then
 			return true
@@ -212,7 +218,15 @@ function tabFrame:SortTabsByID()
 		if not a.id and b.id then
 			return false
 		end
-		-- If neither has an ID, maintain current order (by index)
+
+		-- If neither have IDs or IDs are identical, sort by name to guarantee deterministic order
+		local nameA = a.name or ""
+		local nameB = b.name or ""
+		if nameA ~= nameB then
+			return nameA < nameB
+		end
+
+		-- Absolute fallback to maintain stable order if names are identical
 		return a.index < b.index
 	end)
 
@@ -382,7 +396,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		end)
 
 		-- Enable drag-to-reorder for reorderable tabs (group tabs, not Bank/"+" tabs)
-		if tabs:IsTabReorderable(tab) then
+		if tabs:IsTabReorderable(self.kind, tab) then
 			decoration:SetScript("OnMouseDown", function(_, button)
 				if button == "LeftButton" and IsShiftKeyDown() then
 					tabs:StartTabDrag(tab, self)
@@ -414,8 +428,8 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				decoration.RightActive:Show()
 				-- Show tooltip indicating what will happen
 				GameTooltip:SetOwner(frame, "ANCHOR_TOP")
-				if tab.id == 1 then
-					GameTooltip:SetText("Move to Backpack")
+				if groups:IsDefaultGroup(self.kind, tab.id) then
+					GameTooltip:SetText("Move to " .. tab.name)
 					GameTooltip:AddLine("Remove group assignment from: " .. sectionFrame.draggingCategory, 1, 1, 1, true)
 				else
 					GameTooltip:SetText("Move to " .. tab.name)
@@ -590,9 +604,11 @@ function tabFrame:ResizeAllTabs(ctx)
 end
 
 ---@param parent Frame
+---@param kind BagKind
 ---@return Tab
-function tabs:Create(parent)
+function tabs:Create(parent, kind)
 	local container = setmetatable({}, { __index = tabFrame })
+	container.kind = kind
 	container.frame = CreateFrame("Frame", parent:GetName() .. "TabContainer", parent)
 	container.frame:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 0, 2)
 	container.frame:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 2)
@@ -669,11 +685,12 @@ function tabs:HideDropPlaceholder()
 	end
 end
 
+---@param kind BagKind
 ---@param tab TabButton
 ---@return boolean
-function tabs:IsTabReorderable(tab)
+function tabs:IsTabReorderable(kind, tab)
 	if not tab.id then return false end
-	if tab.id == 1 then return false end    -- Bank tab always first
+	if groups:IsDefaultGroup(kind, tab.id) then return false end    -- Default tabs always first
 	if tab.id == 0 then return false end    -- "+" tab always last
 	if tab.id < 0 then return false end     -- Purchase tabs always at end
 	return true
@@ -770,7 +787,7 @@ function tabs:CalculateOverlapTarget()
 	for i, tab in ipairs(self.currentTabFrame.tabIndex) do
 		if tab ~= self.draggingTab and tab:IsShown() then
 			-- Only check reorderable tabs (skip Bank, +, purchase)
-			if self:IsTabReorderable(tab) then
+			if self:IsTabReorderable(self.currentTabFrame.kind, tab) then
 				local tabLeft = tab:GetLeft()
 				local tabRight = tab:GetRight()
 				if tabLeft and tabRight then
@@ -912,8 +929,8 @@ function tabs:SaveTabOrder(frame)
 	local orderCounter = 2  -- Start at 2 (Bank is always 1)
 
 	for _, tab in ipairs(frame.tabIndex) do
-		if tab.id and tab.id > 1 then  -- Skip Bank (1), "+" (0), purchase (<0)
-			database:SetGroupOrder(tab.id, orderCounter)
+		if tab.id and tab.id > 0 and not groups:IsDefaultGroup(frame.kind, tab.id) then  -- Skip default groups, "+" (0), purchase (<0)
+			database:SetGroupOrder(frame.kind, tab.id, orderCounter)
 			orderCounter = orderCounter + 1
 		end
 	end

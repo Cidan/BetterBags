@@ -428,12 +428,12 @@ function sectionFrame:PerformDrop()
   local tabID = self.dragTargetTab
 
   local dropCtx = context:New("CategoryDropOnTab")
-  if tabID == 1 then
-    -- Dropping on Backpack removes group assignment
-    groups:RemoveCategoryFromGroup(dropCtx, category)
+  if groups:IsDefaultGroup(self.kind, tabID) then
+    -- Dropping on default tabs removes group assignment
+    groups:RemoveCategoryFromGroup(dropCtx, self.kind, category)
   else
     -- Dropping on other group assigns to that group
-    groups:AssignCategoryToGroup(dropCtx, category, tabID)
+    groups:AssignCategoryToGroup(dropCtx, self.kind, category, tabID)
   end
 
   local eventsModule = addon:GetModule("Events")
@@ -546,9 +546,9 @@ function sectionProto:onTitleMouseEnter()
   local kind = self:GetKind()
   local category = self:GetTitleWithoutIndicator()
   if kind == const.BAG_KIND.BACKPACK and category ~= L:G("Free Space") and category ~= L:G("Recent Items") then
-    local groupID = groups:GetGroupForCategory(category)
+    local groupID = groups:GetGroupForCategory(kind, category)
     if groupID then
-      local group = groups:GetGroup(groupID)
+      local group = groups:GetGroup(kind, groupID)
       if group then
         GameTooltip:AddLine("Group: " .. group.name, 0.5, 0.8, 1)
       end

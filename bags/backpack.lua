@@ -131,7 +131,7 @@ function backpack.proto:OnCreate(ctx)
 	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
 
 	-- Group tabs
-	self.bag.tabs = tabs:Create(self.bag.frame)
+	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)
 
 	-- Set up tab click handler
 	local behavior = self
@@ -189,7 +189,15 @@ function backpack.proto:RegisterEvents()
 		behavior:GenerateGroupTabs(ectx)
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID)
+	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
+		local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
+		if group and group.kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ectx)
+		end
+	end)
+
+	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+		if kind ~= const.BAG_KIND.BACKPACK then return end
 		-- If the deleted group was active, switch to Backpack
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
 		if activeGroup == groupID then
@@ -223,7 +231,6 @@ end
 
 -- Special ID for the "New Group" tab (using 0 to avoid negative ID secure button handling)
 local NEW_GROUP_TAB_ID = 0
-local NEW_GROUP_TAB_NAME = "New Group"
 local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 
 -- GenerateGroupTabs creates tabs for all groups.
@@ -238,7 +245,7 @@ function backpack.proto:GenerateGroupTabs(ctx)
 	-- Show tabs frame in case it was hidden
 	self.bag.tabs.frame:Show()
 
-	local allGroups = groups:GetAllGroups()
+	local allGroups = groups:GetAllGroups(const.BAG_KIND.BACKPACK)
 
 	-- Create tabs for each group that doesn't exist yet
 	for groupID, group in pairs(allGroups) do
@@ -262,7 +269,7 @@ function backpack.proto:GenerateGroupTabs(ctx)
 
 	-- Add "+" tab for creating new groups (using special ID 0)
 	if not self.bag.tabs:TabExistsByID(NEW_GROUP_TAB_ID) then
-		self.bag.tabs:AddTab(ctx, NEW_GROUP_TAB_NAME, NEW_GROUP_TAB_ID)
+		self.bag.tabs:AddTab(ctx, L:G("New Group"), NEW_GROUP_TAB_ID)
 		-- Set the icon for the tab (this will hide the text and show the icon)
 		self.bag.tabs:SetTabIconByID(ctx, NEW_GROUP_TAB_ID, NEW_GROUP_TAB_ICON)
 		-- Set up tooltip for the "+" tab
@@ -273,7 +280,7 @@ function backpack.proto:GenerateGroupTabs(ctx)
 	self.bag.tabs:SortTabsByID()
 
 	-- Move "+" tab to end
-	self.bag.tabs:MoveToEnd(NEW_GROUP_TAB_NAME)
+	self.bag.tabs:MoveToEnd(L:G("New Group"))
 
 	-- Ensure tab 1 (Backpack) is selected with proper highlight
 	self.bag.tabs:SetTabByID(ctx, 1)
@@ -324,7 +331,7 @@ function backpack.proto:SetupPlusTabTooltip(ctx)
 			local decoration = themes:GetTabButton(ctx, tab)
 			decoration:SetScript("OnEnter", function(f)
 				GameTooltip:SetOwner(f, "ANCHOR_TOP")
-				GameTooltip:SetText(L:G("New Group..."))
+				GameTooltip:SetText(L:G("New Group..."), 1, 1, 1, 1, true)
 				GameTooltip:AddLine(L:G("Click to create a new group for organizing categories."), 1, 1, 1, true)
 				GameTooltip:Show()
 			end)
@@ -340,7 +347,7 @@ end
 ---@param ctx Context
 ---@param groupID number
 function backpack.proto:SwitchToGroup(ctx, groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then
 		debug:Log("groups", "Cannot switch to non-existent group: %d", groupID)
 		return
@@ -368,7 +375,7 @@ function backpack.proto:ShowCreateGroupDialog()
 				local name = f.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name)
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
 					-- Switch to the new group
 					local bag = addon.Bags.Backpack
 					if bag and bag.behavior then
@@ -384,7 +391,7 @@ function backpack.proto:ShowCreateGroupDialog()
 				local name = parent.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name)
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
 					-- Switch to the new group
 					local bag = addon.Bags.Backpack
 					if bag and bag.behavior then
@@ -410,7 +417,7 @@ end
 ---@param ctx Context
 ---@param groupID number
 function backpack.proto:ShowGroupContextMenu(ctx, groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then return end
 
 	local behavior = self
@@ -461,7 +468,7 @@ end
 -- ShowRenameGroupDialog shows a dialog to rename a group.
 ---@param groupID number
 function backpack.proto:ShowRenameGroupDialog(groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then return end
 
 	-- Define the static popup if not already defined
@@ -479,7 +486,7 @@ function backpack.proto:ShowRenameGroupDialog(groupID)
 				end
 			end,
 			OnShow = function(f)
-				local currentGroup = groups:GetGroup(f.data.groupID)
+				local currentGroup = groups:GetGroup(const.BAG_KIND.BACKPACK, f.data.groupID)
 				if currentGroup then
 					f.EditBox:SetText(currentGroup.name)
 					f.EditBox:HighlightText()
@@ -511,7 +518,7 @@ end
 -- ShowDeleteGroupConfirm shows a confirmation dialog to delete a group.
 ---@param groupID number
 function backpack.proto:ShowDeleteGroupConfirm(groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then return end
 
 	-- Define the static popup if not already defined

@@ -29,6 +29,15 @@ local money = addon:GetModule("MoneyFrame")
 ---@class Tabs: AceModule
 local tabs = addon:GetModule("Tabs")
 
+---@class Groups: AceModule
+local groups = addon:GetModule("Groups")
+
+---@class Context: AceModule
+local context = addon:GetModule("Context")
+
+local NEW_GROUP_TAB_ID = 0
+local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
+
 -------
 --- Bank Behavior Prototype
 -------
@@ -55,8 +64,7 @@ function bank.proto:OnShow(ctx)
 	end
 
 	-- Generate tabs before showing frame
-	self:GenerateCharacterBankTabs(ctx)
-	self:GenerateWarbankTabs(ctx)
+	self:GenerateGroupTabs(ctx)
 
 	-- Use fade animation if enabled
 	if database:GetEnableBagFading() then
@@ -82,28 +90,9 @@ function bank.proto:OnShow(ctx)
 				BankPanel:Show()
 			end
 
-			-- Set initial tab after frame is shown
-			if addon.atWarbank then
-				self:HideBankAndReagentTabs()
-				self.bag.tabs:SetTabByID(ctx, 13)
-				if BankPanel and BankPanel.SetBankType then
-					BankPanel:SetBankType(Enum.BankType.Account)
-				end
-			else
-				self:ShowBankAndReagentTabs()
-				if database:GetCharacterBankTabsEnabled() then
-					local firstTabID = const.BANK_ONLY_BAGS_LIST[1]
-					self.bag.bankTab = firstTabID
-					self.bag.tabs:SetTabByID(ctx, firstTabID)
-					ctx:Set("filterBagID", firstTabID)
-				else
-					self.bag.bankTab = Enum.BagIndex.Characterbanktab
-					self.bag.tabs:SetTabByID(ctx, 1)
-				end
-				if BankPanel and BankPanel.SetBankType then
-					BankPanel:SetBankType(Enum.BankType.Character)
-				end
-			end
+			local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
+			self.bag.tabs:SetTabByID(ctx, activeGroup)
+			self:SwitchToGroup(ctx, activeGroup)
 
 			self.bag.moneyFrame:Update()
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
@@ -129,27 +118,9 @@ function bank.proto:OnShow(ctx)
 			BankPanel:Show()
 		end
 
-		if addon.atWarbank then
-			self:HideBankAndReagentTabs()
-			self.bag.tabs:SetTabByID(ctx, 13)
-			if BankPanel and BankPanel.SetBankType then
-				BankPanel:SetBankType(Enum.BankType.Account)
-			end
-		else
-			self:ShowBankAndReagentTabs()
-			if database:GetCharacterBankTabsEnabled() then
-				local firstTabID = const.BANK_ONLY_BAGS_LIST[1]
-				self.bag.bankTab = firstTabID
-				self.bag.tabs:SetTabByID(ctx, firstTabID)
-				ctx:Set("filterBagID", firstTabID)
-			else
-				self.bag.bankTab = Enum.BagIndex.Characterbanktab
-				self.bag.tabs:SetTabByID(ctx, 1)
-			end
-			if BankPanel and BankPanel.SetBankType then
-				BankPanel:SetBankType(Enum.BankType.Character)
-			end
-		end
+		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
+		self.bag.tabs:SetTabByID(ctx, activeGroup)
+		self:SwitchToGroup(ctx, activeGroup)
 
 		self.bag.moneyFrame:Update()
 		self.bag.frame:Show()
@@ -181,155 +152,24 @@ function bank.proto:OnHide()
 end
 
 ---@param ctx Context
-function bank.proto:OnCreate(ctx)
+function bank.proto:OnCreate(_)
 	-- Capture behavior reference for closures
 	local behavior = self
 
-	-- Move the settings menu to the bag frame (with validation)
-	if BankPanel and BankPanel.TabSettingsMenu then
-		BankPanel.TabSettingsMenu:SetParent(self.bag.frame)
-		BankPanel.TabSettingsMenu:ClearAllPoints()
-		BankPanel.TabSettingsMenu:SetPoint("BOTTOMLEFT", self.bag.frame, "BOTTOMRIGHT", 10, 0)
+	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BANK)
 
-		-- Adjust the settings function so the tab settings menu is populated correctly.
-		BankPanel.TabSettingsMenu.GetBankFrame = function()
-		return {
-			GetTabData = function(_, id)
-				-- Check if this is a character bank tab request using addon state
-				-- instead of reading BankPanel.bankType field (avoids taint)
-				if not addon.atWarbank then
-					-- For character bank tabs, we need to get the bag information
-					local bagID = const.BANK_ONLY_BAGS_LIST[id]
-					if bagID then
-						local invid = C_Container.ContainerIDToInventoryID(bagID)
-						local baglink = GetInventoryItemLink("player", invid)
-						local icon = nil
-						local tabName = format("Bank Tab %d", id)
-
-						if baglink then
-							icon = C_Item.GetItemIconByID(baglink)
-							local itemName = C_Item.GetItemNameByID(baglink)
-							if itemName and itemName ~= "" then
-								tabName = itemName
-							end
-						end
-
-						-- Try to get character bank tab data from API if available
-						local characterTabData = C_Bank
-							and C_Bank.FetchPurchasedBankTabData
-							and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
-						local depositFlags = nil
-
-						if characterTabData then
-							for _, data in pairs(characterTabData) do
-								if data.ID == id then
-									tabName = data.name or tabName
-									icon = data.icon or icon
-									depositFlags = data.depositFlags
-									break
-								end
-							end
-						end
-
-						return {
-							ID = id,
-							icon = icon or 133633, -- Default bag icon
-							name = tabName,
-							depositFlags = depositFlags,
-							bankType = Enum.BankType.Character,
-						}
-					end
-				else
-					-- Original warbank tab data handling
-					local bankTabData = behavior:GetWarbankTabDataByID(id)
-					return {
-						ID = id,
-						icon = bankTabData.icon,
-						name = behavior.bag.tabs:GetTabNameByID(id),
-						depositFlags = bankTabData.depositFlags,
-						bankType = Enum.BankType.Account,
-					}
-				end
-			end,
-		}
-	end
-	end -- Close BankPanel validation check
-
-	self.bag.tabs = tabs:Create(self.bag.frame)
-
-	-- Always create Bank tab
-	if not self.bag.tabs:TabExistsByID(1) then
-		self.bag.tabs:AddTab(ctx, "Bank", 1)
-	end
-
-	-- Set initial tab if not using character bank tabs
-	if not database:GetCharacterBankTabsEnabled() then
-		self.bag.tabs:SetTabByID(ctx, 1)
-	end
-
-	self.bag.tabs:SetClickHandler(function(ectx, tabID, button)
-		-- Check if this is a character bank tab
-		if tabID and tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
-			if button == "RightButton" then
-				-- Show settings menu for character bank tabs
-				if BankPanel and BankPanel.SetBankType then
-					BankPanel:SetBankType(Enum.BankType.Character)
-				end
-				local bagIndex = tabID
-				-- Try to get character bank tab data if available
-				local characterTabData = C_Bank
-					and C_Bank.FetchPurchasedBankTabData
-					and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
-				if characterTabData and BankPanel and BankPanel.FetchPurchasedBankTabData then
-					BankPanel:FetchPurchasedBankTabData()
-				end
-				if BankPanel and BankPanel.TabSettingsMenu then
-					BankPanel.TabSettingsMenu:Show()
-					BankPanel.TabSettingsMenu:SetSelectedTab(bagIndex)
-					BankPanel.TabSettingsMenu:Update()
-				end
-			else
-				if BankPanel and BankPanel.TabSettingsMenu then
-					BankPanel.TabSettingsMenu:Hide()
-				end
-				if BankPanel and BankPanel.SetBankType then
-					BankPanel:SetBankType(Enum.BankType.Character)
-				end
-			end
-			behavior:SwitchToCharacterBankTab(ectx, tabID)
-			return true -- Tab switch handled, allow selection
-		elseif tabID == 1 then
-			-- Bank tab
-			if BankPanel and BankPanel.TabSettingsMenu then
-				BankPanel.TabSettingsMenu:Hide()
-			end
-			if BankPanel and BankPanel.SetBankType then
-				BankPanel:SetBankType(Enum.BankType.Character)
-			end
-			behavior:SwitchToBank(ectx)
-			return true -- Tab switch handled, allow selection
-		else
-			-- Warbank tabs
-			local showSettings = button == "RightButton"
-			if BankPanel and BankPanel.TabSettingsMenu then
-				showSettings = showSettings or BankPanel.TabSettingsMenu:IsShown()
-			end
-			if showSettings then
-				if BankPanel and BankPanel.SetBankType then
-					BankPanel:SetBankType(Enum.BankType.Account)
-				end
-				if BankPanel and BankPanel.FetchPurchasedBankTabData then
-					BankPanel:FetchPurchasedBankTabData()
-				end
-				if BankPanel and BankPanel.TabSettingsMenu then
-					BankPanel.TabSettingsMenu:Show()
-					BankPanel.TabSettingsMenu:SetSelectedTab(tabID)
-					BankPanel.TabSettingsMenu:Update()
-				end
-			end
-			behavior:SwitchToAccountBank(ectx, tabID)
-			return true -- Tab switch handled, allow selection
+	self.bag.tabs:SetClickHandler(function(ectx, tabID, _)
+		if tabID == NEW_GROUP_TAB_ID then
+			behavior:ShowCreateGroupDialog()
+			return false
 		end
+
+		if tabID == -1 or tabID == -2 then
+			return false -- Purchase tabs handled by secure templates
+		end
+
+		behavior:SwitchToGroup(ectx, tabID)
+		return true
 	end)
 end
 
@@ -361,51 +201,36 @@ function bank.proto:RegisterEvents()
 	local behavior = self
 
 	events:RegisterEvent("PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", function(ectx)
-		-- Track tab count before regeneration to detect new purchases
-		local oldTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
-		local oldCount = #oldTabData
+		behavior:GenerateGroupTabs(ectx)
+	end)
 
-		behavior:GenerateWarbankTabs(ectx)
+	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ectx, _)
+		behavior:GenerateGroupTabs(ectx)
+	end)
 
-		-- If new tab was added, auto-select it
-		local newTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
-		if #newTabData > oldCount and #newTabData > 0 then
-			local newestTab = newTabData[#newTabData]
-			behavior:SwitchToAccountBank(ectx, newestTab.ID)
+	events:RegisterMessage("groups/Created", function(_, ectx, group)
+		if group.kind == const.BAG_KIND.BANK then
+			behavior:GenerateGroupTabs(ectx)
 		end
 	end)
 
-	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ectx, bankType)
-		-- Update tabs based on which bank type changed
-		if bankType == Enum.BankType.Account then
-			local oldTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
-			local oldCount = #oldTabData
+	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
+		local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
+		if group and group.kind == const.BAG_KIND.BANK then
+			behavior:GenerateGroupTabs(ectx)
+		end
+	end)
 
-			behavior:GenerateWarbankTabs(ectx)
-
-			local newTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account) or {}
-			if #newTabData > oldCount and #newTabData > 0 then
-				local newestTab = newTabData[#newTabData]
-				behavior:SwitchToAccountBank(ectx, newestTab.ID)
-			end
-		elseif bankType == Enum.BankType.Character and database:GetCharacterBankTabsEnabled() then
-			local oldTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character) or {}
-			local oldCount = #oldTabData
-
-			behavior:GenerateCharacterBankTabs(ectx)
-
-			local newTabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character) or {}
-			if #newTabData > oldCount and #newTabData > 0 then
-				local newestTab = newTabData[#newTabData]
-				behavior:SwitchToCharacterBankTab(ectx, newestTab.ID)
-			end
-		else
-			-- Fallback for other bank types or when character tabs are disabled
-			behavior:GenerateWarbankTabs(ectx)
-			if database:GetCharacterBankTabsEnabled() then
-				behavior:GenerateCharacterBankTabs(ectx)
+	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+		if kind ~= const.BAG_KIND.BANK then return end
+		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
+		if activeGroup == groupID then
+			local defaultBankGroup = groups:GetDefaultBankGroup()
+			if defaultBankGroup then
+				behavior:SwitchToGroup(ectx, defaultBankGroup.id)
 			end
 		end
+		behavior:GenerateGroupTabs(ectx)
 	end)
 end
 
@@ -419,292 +244,216 @@ end
 -------
 
 ---@param ctx Context
-function bank.proto:GenerateCharacterBankTabs(ctx)
-	-- Only generate individual tabs if enabled
-	if not database:GetCharacterBankTabsEnabled() then
-		-- Hide all character bank tabs
-		local bankBags = const.BANK_ONLY_BAGS_LIST
-		for _, bagID in ipairs(bankBags) do
-			if self.bag.tabs:TabExistsByID(bagID) then
-				self.bag.tabs:HideTabByID(bagID)
-			end
-		end
-
-		-- Show single bank tab
-		if not self.bag.tabs:TabExistsByID(1) then
-			self.bag.tabs:AddTab(ctx, "Bank", 1)
-		else
-			self.bag.tabs:ShowTabByID(1)
-		end
-
-		-- Sort tabs to ensure Bank tab is first
-		self.bag.tabs:SortTabsByID()
+function bank.proto:GenerateGroupTabs(ctx)
+	if not database:GetGroupsEnabled(const.BAG_KIND.BANK) then
+		self.bag.tabs.frame:Hide()
 		return
 	end
 
-	-- Hide the single bank tab when multiple tabs are enabled
-	if self.bag.tabs:TabExistsByID(1) then
-		self.bag.tabs:HideTabByID(1)
-	end
+	self.bag.tabs.frame:Show()
 
-	-- Try to get character bank tab data from the API
-	local characterTabData = C_Bank
-		and C_Bank.FetchPurchasedBankTabData
-		and C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)
+	local allGroups = groups:GetAllGroups(const.BAG_KIND.BANK)
 
-	for _, data in pairs(characterTabData) do
-		if not self.bag.tabs:TabExistsByID(data.ID) then
-			self.bag.tabs:AddTab(ctx, data.name, data.ID)
+	for groupID, group in pairs(allGroups) do
+		if not self.bag.tabs:TabExistsByID(groupID) then
+			self.bag.tabs:AddTab(ctx, group.name, groupID)
 		else
-			-- Update the name if it changed
-			if self.bag.tabs:GetTabNameByID(data.ID) ~= data.name then
-				self.bag.tabs:RenameTabByID(ctx, data.ID, data.name)
+			if self.bag.tabs:GetTabNameByID(groupID) ~= group.name then
+				self.bag.tabs:RenameTabByID(ctx, groupID, group.name)
 			end
-			self.bag.tabs:ShowTabByID(data.ID)
+			self.bag.tabs:ShowTabByID(groupID)
 		end
 	end
 
-	-- Sort tabs by ID to ensure proper order
-	self.bag.tabs:SortTabsByID()
-
-	-- Add character bank purchase tab (special ID: -1) if available
-	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
-		and C_Bank.CanPurchaseBankTab(Enum.BankType.Character)
-		and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
-		-- Add purchase tab if it doesn't exist
-		if not self.bag.tabs:TabExistsByID(-1) then
-			-- Use secure template without custom onClick - let template handle purchase
-			self.bag.tabs:AddTab(ctx, L:G("Purchase Bank Tab"), -1, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
-
-			-- Set the bank type attribute required by the secure template
-			local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Bank Tab"))
-			if purchaseTab then
-				purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Character)
-			end
-		else
-			self.bag.tabs:ShowTabByID(-1)
+	for _, tab in pairs(self.bag.tabs.tabIndex) do
+		if tab.id and tab.id > 0 and not allGroups[tab.id] then
+			self.bag.tabs:HideTabByID(tab.id)
 		end
-	else
-		-- Hide purchase tab if max tabs reached
-		if self.bag.tabs:TabExistsByID(-1) then
+	end
+
+	if not self.bag.tabs:TabExistsByID(NEW_GROUP_TAB_ID) then
+		self.bag.tabs:AddTab(ctx, L:G("New Group"), NEW_GROUP_TAB_ID)
+		self.bag.tabs:SetTabIconByID(ctx, NEW_GROUP_TAB_ID, NEW_GROUP_TAB_ICON)
+		self:SetupPlusTabTooltip(ctx)
+	end
+
+	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs then
+		if C_Bank.CanPurchaseBankTab(Enum.BankType.Character) and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
+			if not self.bag.tabs:TabExistsByID(-1) then
+				self.bag.tabs:AddTab(ctx, L:G("Purchase Bank Tab"), -1, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
+				local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Bank Tab"))
+				if purchaseTab then purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Character) end
+			else
+				self.bag.tabs:ShowTabByID(-1)
+			end
+		elseif self.bag.tabs:TabExistsByID(-1) then
 			self.bag.tabs:HideTabByID(-1)
 		end
-	end
 
-	-- Adjust frame width if needed
-	local w = self.bag.tabs.width
-	if
-		self.bag.frame:GetWidth() + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET
-		< w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET
-	then
-		self.bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
-	end
-end
-
----@param ctx Context
-function bank.proto:GenerateWarbankTabs(ctx)
-	local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
-	for _, data in pairs(tabData) do
-		if self.bag.tabs:TabExistsByID(data.ID) and self.bag.tabs:GetTabNameByID(data.ID) ~= data.name then
-			self.bag.tabs:RenameTabByID(ctx, data.ID, data.name)
-		elseif not self.bag.tabs:TabExistsByID(data.ID) then
-			self.bag.tabs:AddTab(ctx, data.name, data.ID)
-		end
-	end
-
-	-- Sort tabs by ID to ensure proper order (was missing - caused tab selection bugs)
-	self.bag.tabs:SortTabsByID()
-
-	-- Add account bank purchase tab (special ID: -2) if available
-	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs
-		and C_Bank.CanPurchaseBankTab(Enum.BankType.Account)
-		and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
-		-- Add purchase tab if it doesn't exist
-		if not self.bag.tabs:TabExistsByID(-2) then
-			-- Use secure template without custom onClick - let template handle purchase
-			self.bag.tabs:AddTab(ctx, L:G("Purchase Warbank Tab"), -2, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
-
-			-- Set the bank type attribute required by the secure template
-			local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Warbank Tab"))
-			if purchaseTab then
-				purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Account)
+		-- Disable rendering the purchase warbank tab button for now
+		local ENABLE_WARBANK_PURCHASE_TAB = false
+		if ENABLE_WARBANK_PURCHASE_TAB and addon.isRetail and C_Bank.CanPurchaseBankTab(Enum.BankType.Account) and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
+			if not self.bag.tabs:TabExistsByID(-2) then
+				self.bag.tabs:AddTab(ctx, L:G("Purchase Warbank Tab"), -2, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
+				local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Warbank Tab"))
+				if purchaseTab then purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Account) end
+			else
+				self.bag.tabs:ShowTabByID(-2)
 			end
-		else
-			self.bag.tabs:ShowTabByID(-2)
-		end
-	else
-		-- Hide purchase tab if max tabs reached
-		if self.bag.tabs:TabExistsByID(-2) then
+		elseif self.bag.tabs:TabExistsByID(-2) then
 			self.bag.tabs:HideTabByID(-2)
 		end
 	end
 
+	self.bag.tabs:SortTabsByID()
+	self.bag.tabs:MoveToEnd(L:G("New Group"))
+
 	local w = self.bag.tabs.width
-	if
-		self.bag.frame:GetWidth() + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET
-		< w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET
-	then
+	if self.bag.frame:GetWidth() + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET < w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET then
 		self.bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
 	end
 end
 
----@param id number
----@return BankTabData
-function bank.proto:GetWarbankTabDataByID(id)
-	local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
-	for _, data in pairs(tabData) do
-		if data.ID == id then
-			return data
-		end
+function bank.proto:SetupPlusTabTooltip(_)
+	local plusTab = self.bag.tabs:GetTabByName(L:G("New Group"))
+	if plusTab then
+		plusTab:SetScript("OnEnter", function(button)
+			GameTooltip:SetOwner(button, "ANCHOR_TOP")
+			GameTooltip:SetText(L:G("Create New Group Tab"), 1, 1, 1, 1, true)
+			GameTooltip:AddLine(L:G("Click to create a new group tab for organizing your items."), 1, 1, 1)
+			GameTooltip:Show()
+		end)
+		plusTab:SetScript("OnLeave", function()
+			GameTooltip:Hide()
+		end)
 	end
-	return {}
 end
 
-function bank.proto:HideBankAndReagentTabs()
-	if database:GetCharacterBankTabsEnabled() then
-		-- Hide all character bank tabs
-		local bankBags = const.BANK_ONLY_BAGS_LIST
-		for _, bagID in ipairs(bankBags) do
-			local tabID = bagID
-			if self.bag.tabs:TabExistsByID(tabID) then
-				self.bag.tabs:HideTabByID(tabID)
-			end
+function bank.proto:ShowCreateGroupDialog()
+	if not StaticPopupDialogs["BETTERBAGS_CREATE_BANK_GROUP"] then
+		StaticPopupDialogs["BETTERBAGS_CREATE_BANK_GROUP"] = {
+			text = L:G("Create New Bank Tab") .. "\n\n" .. L:G("1. Enter group name:"),
+			hasEditBox = true,
+			button1 = L:G("Create"),
+			button2 = L:G("Cancel"),
+			OnShow = function(f)
+				f.EditBox:SetFocus()
+				f.EditBox:SetText("")
+
+				if not f.bankTypeDropdown then
+					local dropdown = CreateFrame("Frame", "BetterBagsBankTypeDropdown", f, "UIDropDownMenuTemplate")
+					dropdown:SetPoint("TOP", f.EditBox, "BOTTOM", 0, -15)
+					UIDropDownMenu_SetWidth(dropdown, 120)
+					UIDropDownMenu_SetText(dropdown, L:G("Bank"))
+					f.bankType = Enum.BankType and Enum.BankType.Character or 1
+
+					UIDropDownMenu_Initialize(dropdown, function(_, _, _)
+						local info = UIDropDownMenu_CreateInfo()
+
+						info.text = L:G("Bank")
+						info.func = function()
+							UIDropDownMenu_SetText(dropdown, L:G("Bank"))
+							f.bankType = Enum.BankType and Enum.BankType.Character or 1
+						end
+						UIDropDownMenu_AddButton(info)
+
+						if addon.isRetail then
+							info.text = L:G("Warbank")
+							info.func = function()
+								UIDropDownMenu_SetText(dropdown, L:G("Warbank"))
+								f.bankType = Enum.BankType and Enum.BankType.Account or 2
+							end
+							UIDropDownMenu_AddButton(info)
+						end
+					end)
+					f.bankTypeDropdown = dropdown
+				end
+				-- Reset to Bank by default
+				UIDropDownMenu_SetText(f.bankTypeDropdown, L:G("Bank"))
+				f.bankType = Enum.BankType and Enum.BankType.Character or 1
+
+				f:SetHeight(180)
+			end,
+			OnAccept = function(f)
+				local name = f.EditBox:GetText()
+				if name and name ~= "" then
+					local ctx = context:New("CreateGroup")
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BANK, name, f.bankType)
+					local bag = addon.Bags.Bank
+					if bag and bag.behavior then
+						bag.behavior:SwitchToGroup(ctx, newGroup.id)
+					end
+				end
+			end,
+			EditBoxOnEnterPressed = function(f)
+				local parent = f:GetParent()
+				local name = parent.EditBox:GetText()
+				if name and name ~= "" then
+					local ctx = context:New("CreateGroup")
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BANK, name, parent.bankType)
+					local bag = addon.Bags.Bank
+					if bag and bag.behavior then
+						bag.behavior:SwitchToGroup(ctx, newGroup.id)
+					end
+				end
+				parent:Hide()
+			end,
+			EditBoxOnEscapePressed = function(f)
+				f:GetParent():Hide()
+			end,
+			timeout = 0,
+			whileDead = true,
+			hideOnEscape = true,
+		}
+	end
+	StaticPopup_Show("BETTERBAGS_CREATE_BANK_GROUP")
+end
+
+function bank.proto:SwitchToGroup(ctx, groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
+	if not group then return end
+
+	database:SetActiveGroup(const.BAG_KIND.BANK, groupID)
+	self.bag.tabs:SetTabByID(ctx, groupID)
+
+	-- Update bankType
+	if addon.isRetail and group.bankType == Enum.BankType.Account then
+		if BankPanel and BankPanel.SetBankType then
+			BankPanel:SetBankType(Enum.BankType.Account)
 		end
+		self.bag.bankTab = Enum.BagIndex.AccountBankTab_1 -- Set a default so right-click deposits know it's a Warbank tab
 	else
-		self.bag.tabs:HideTabByID(1) -- Hide Bank tab
-	end
-end
-
-function bank.proto:ShowBankAndReagentTabs()
-	if database:GetCharacterBankTabsEnabled() then
-		-- Show all character bank tabs
-		local bankBags = const.BANK_ONLY_BAGS_LIST
-		for _, bagID in ipairs(bankBags) do
-			local tabID = bagID
-			if self.bag.tabs:TabExistsByID(tabID) then
-				self.bag.tabs:ShowTabByID(tabID)
-			end
+		if BankPanel and BankPanel.SetBankType then
+			BankPanel:SetBankType(Enum.BankType.Character)
 		end
-	else
-		self.bag.tabs:ShowTabByID(1)
+		self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	end
-end
 
----@param ctx Context
-function bank.proto:SwitchToBank(ctx)
-	self.bag.bankTab = Enum.BagIndex.Characterbanktab
-	self.bag:SetTitle(L:G("Bank"))
+	self.bag:SetTitle(group.name)
 	self.bag.currentItemCount = -1
-	-- Set the active bank type so right-click item movement works correctly
-	-- Let Blizzard handle BankFrame field updates via events
-	if BankPanel and BankPanel.SetBankType then
-		BankPanel:SetBankType(Enum.BankType.Character)
-	end
-	-- Clear bank cache to ensure clean state
+
 	items:ClearBankCache(ctx)
 	self.bag:Wipe(ctx)
 	ctx:Set("wipe", true)
-	ctx:Set("filterBagID", nil) -- Clear filter for single bank tab
-	-- Update visual tab selection
-	self.bag.tabs:SetTabByID(ctx, 1)
-	-- Trigger a full refresh and redraw
+
 	events:SendMessage(ctx, "bags/RefreshBank")
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
----@param ctx Context
----@param tabID number
-function bank.proto:SwitchToCharacterBankTab(ctx, tabID)
-	self.bag.bankTab = tabID
-	-- Set the active bank type so right-click item movement works correctly
-	-- Let Blizzard handle BankFrame field updates via events
-	if BankPanel and BankPanel.SetBankType then
-		BankPanel:SetBankType(Enum.BankType.Character)
-	end
-	self.bag:SetTitle(format(L:G("Bank Tab %d"), tabID - const.BANK_ONLY_BAGS_LIST[1] + 1))
-	self.bag.currentItemCount = -1
-	-- Clear bank cache to ensure no items from other tabs remain
-	items:ClearBankCache(ctx)
-	self.bag:Wipe(ctx)
-	ctx:Set("wipe", true)
-	ctx:Set("filterBagID", tabID)
-	-- Update visual tab selection
-	self.bag.tabs:SetTabByID(ctx, tabID)
-	-- Trigger a full refresh and redraw
-	events:SendMessage(ctx, "bags/RefreshBank")
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-end
-
----@param ctx Context
----@param tabIndex number
----@return boolean
-function bank.proto:SwitchToAccountBank(ctx, tabIndex)
-	self.bag.bankTab = tabIndex
-	-- Set the active bank type so right-click item movement works correctly
-	-- Let Blizzard handle BankFrame field updates via events
-	if BankPanel and BankPanel.SetBankType then
-		BankPanel:SetBankType(Enum.BankType.Account)
-	end
-	local tabData = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
-	for _, data in pairs(tabData) do
-		if data.ID == tabIndex then
-			-- Use SelectTab method instead of direct field assignment
-			if BankPanel and BankPanel.SelectTab then
-				BankPanel:SelectTab(data.ID)
-			end
-			break
-		end
-	end
-	if BankPanel and BankPanel.TriggerEvent then
-		BankPanel:TriggerEvent(BankPanelMixin.Event.BankTabClicked, tabIndex)
-	end
-	self.bag:SetTitle(ACCOUNT_BANK_PANEL_TITLE)
-	self.bag.currentItemCount = -1
-	self.bag:Wipe(ctx)
-	ctx:Set("wipe", true)
-	ctx:Set("filterBagID", nil) -- Clear filter for account bank
-	-- Update visual tab selection
-	self.bag.tabs:SetTabByID(ctx, tabIndex)
-	items:RefreshBank(ctx)
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
-	return true
-end
-
----@param ctx Context
 function bank.proto:SwitchToBankAndWipe(ctx)
+	-- Fallback used in event hooks when closing bank
 	ctx:Set("wipe", true)
-	-- Set bankTab first to ensure it's always valid for refresh operations
-	-- Use Characterbanktab as Bank was removed in TWW 11.2
-	self.bag.bankTab = Enum.BagIndex.Characterbanktab
-	-- Set the active bank type so right-click item movement works correctly
-	-- Let Blizzard handle BankFrame field updates via events
+	self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	if BankPanel and BankPanel.SetBankType then
 		BankPanel:SetBankType(Enum.BankType.Character)
 	end
 	if self.bag.tabs then
-		self.bag.tabs:SetTabByID(ctx, 1)
+		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
+		self.bag.tabs:SetTabByID(ctx, activeGroup)
 	end
 	self.bag:SetTitle(L:G("Bank"))
 	items:ClearBankCache(ctx)
 	self.bag:Wipe(ctx)
-end
-
----@param bankType number
-function bank.proto:TriggerPurchaseDialog(bankType)
-	-- Use Blizzard's native purchase confirmation dialog
-	if not C_Bank or not C_Bank.FetchNextPurchasableBankTabData then
-		return
-	end
-
-	local tabData = C_Bank.FetchNextPurchasableBankTabData(bankType)
-	if not tabData or not tabData.tabCost then
-		return
-	end
-
-	-- Blizzard's CONFIRM_BUY_BANK_TAB dialog expects bankType in data parameter
-	StaticPopup_Show("CONFIRM_BUY_BANK_TAB", tabData.tabCost, nil, {
-		bankType = bankType
-	})
 end
 
 -------

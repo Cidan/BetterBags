@@ -205,13 +205,21 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   if database:GetInBagSearch() then
     h = h + 20
   end
-  view.content:HideScrollBar()
-  --TODO(lobato): Implement SafeSetSize that prevents the window from being larger
-  -- than the screen space.
-  bag.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET)
+
   local bagHeight = h +
   const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
   const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+
+  local maxHeight = UIParent:GetHeight() * 0.90
+  local bagWidth = w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH
+  if bagHeight > maxHeight then
+    bagHeight = maxHeight
+    view.content:ShowScrollBar()
+  else
+    view.content:HideScrollBar()
+  end
+
+  bag.frame:SetWidth(bagWidth)
   bag.frame:SetHeight(bagHeight)
   UpdateViewSize(view)
   callback()
