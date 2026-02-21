@@ -216,7 +216,7 @@ end
 ---@param kind BagKind
 ---@param groupID number
 function groups:SetActiveGroup(ctx, kind, groupID)
-  local group = database:GetGroup(groupID)
+  local group = database:GetGroup(kind, groupID)
   if not group then
     debug:Log("groups", "Cannot set active group to non-existent group: %d", groupID)
     return
@@ -234,10 +234,12 @@ end
 -- OnCategoryDeleted cleans up group references when a category is deleted.
 ---@param categoryName string
 function groups:OnCategoryDeleted(_, categoryName)
-  local groupID = database:GetCategoryGroup(categoryName)
-  if groupID then
-    database:RemoveCategoryFromGroup(categoryName)
-    debug:Log("groups", "Cleaned up deleted category '%s' from group ID: %d", categoryName, groupID)
+  for _, kind in pairs(const.BAG_KIND) do
+    local groupID = database:GetCategoryGroup(kind, categoryName)
+    if groupID then
+      database:RemoveCategoryFromGroup(kind, categoryName)
+      debug:Log("groups", "Cleaned up deleted category '%s' from group ID: %d in bag kind: %s", categoryName, groupID, kind)
+    end
   end
 end
 

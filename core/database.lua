@@ -1078,9 +1078,18 @@ function DB:Migrate()
     local oldGroupCounter = DB.data.profile.groupCounter
     
     -- Check if it's already scoped (e.g. fresh install with new defaults)
+    -- We must ensure oldGroups[1] isn't just the old Backpack group.
+    -- A scoped namespace will NOT have a 'name' field, whereas a group object will.
     local isAlreadyScoped = false
-    if oldGroups and type(oldGroups) == "table" and (oldGroups[const.BAG_KIND.BACKPACK] or oldGroups[const.BAG_KIND.BANK]) then
-      isAlreadyScoped = true
+    if oldGroups and type(oldGroups) == "table" then
+      local maybeBackpackNamespace = oldGroups[const.BAG_KIND.BACKPACK]
+      local maybeBankNamespace = oldGroups[const.BAG_KIND.BANK]
+      
+      -- If it's a namespace, it shouldn't have an 'id' or 'name' directly on it
+      if (maybeBackpackNamespace and type(maybeBackpackNamespace) == "table" and maybeBackpackNamespace.name == nil) or
+         (maybeBankNamespace and type(maybeBankNamespace) == "table" and maybeBankNamespace.name == nil) then
+        isAlreadyScoped = true
+      end
     end
 
     if not isAlreadyScoped then
