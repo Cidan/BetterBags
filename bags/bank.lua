@@ -290,7 +290,8 @@ function bank.proto:GenerateGroupTabs(ctx)
 			self.bag.tabs:HideTabByID(-1)
 		end
 
-		if addon.isRetail and C_Bank.CanPurchaseBankTab(Enum.BankType.Account) and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
+		-- Disable rendering the purchase warbank tab button for now
+		if false and addon.isRetail and C_Bank.CanPurchaseBankTab(Enum.BankType.Account) and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
 			if not self.bag.tabs:TabExistsByID(-2) then
 				self.bag.tabs:AddTab(ctx, L:G("Purchase Warbank Tab"), -2, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
 				local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Warbank Tab"))

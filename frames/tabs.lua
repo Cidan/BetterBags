@@ -206,8 +206,11 @@ function tabFrame:SortTabsByID()
 
 		-- If both have IDs, sort by ID
 		if a.id and b.id then
-			return a.id < b.id
+			if a.id ~= b.id then
+				return a.id < b.id
+			end
 		end
+
 		-- If only one has an ID, put the one with ID first
 		if a.id and not b.id then
 			return true
@@ -215,7 +218,15 @@ function tabFrame:SortTabsByID()
 		if not a.id and b.id then
 			return false
 		end
-		-- If neither has an ID, maintain current order (by index)
+
+		-- If neither have IDs or IDs are identical, sort by name to guarantee deterministic order
+		local nameA = a.name or ""
+		local nameB = b.name or ""
+		if nameA ~= nameB then
+			return nameA < nameB
+		end
+
+		-- Absolute fallback to maintain stable order if names are identical
 		return a.index < b.index
 	end)
 
