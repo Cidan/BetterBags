@@ -103,9 +103,22 @@ Container for grouping items into categorized sections.
 **Key Features:**
 - Category-based item grouping
 - Expandable/collapsible sections
-- Drag-and-drop category assignment
+- Drag-and-drop category assignment (backpack and bank, with cross-type constraints)
 - Right-click section actions
 - Automatic sorting
+
+**Category Drag-and-Drop:**
+
+Section titles can be dragged onto group tabs to assign the category to a group. The following constraints are enforced:
+- Backpack categories can only be dropped onto backpack tabs.
+- Bank categories can only be dropped onto bank tabs.
+- Character Bank categories can only be dropped onto Character Bank group tabs (`bankType = Enum.BankType.Character`).
+- Warbank categories can only be dropped onto Warbank group tabs (`bankType = Enum.BankType.Account`).
+
+The `sectionFrame` module tracks three module-level fields during a drag:
+- `draggingCategory` — name of the category being dragged
+- `draggingKind` — `BagKind` of the source section (backpack or bank)
+- `draggingBankType` — `bankType` of the active bank group at drag start (nil for backpack drags)
 
 **Main Class:**
 ```lua

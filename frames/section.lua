@@ -51,6 +51,8 @@ local L = addon:GetModule('Localization')
 
 -- Module-level variable to track dragged category
 sectionFrame.draggingCategory = nil
+sectionFrame.draggingKind = nil       -- BAG_KIND of the section being dragged
+sectionFrame.draggingBankType = nil   -- bankType of the active bank group when dragging a bank section
 sectionFrame.dragGhost = nil
 sectionFrame.dragTargetTab = nil  -- Track the tab we're hovering over while dragging
 
@@ -403,19 +405,32 @@ end
 
 -- Reset tab highlights after dragging ends
 function sectionFrame:ResetTabHighlights()
-  local bag = addon.Bags.Backpack
-  if not bag or not bag.tabs then return end
-
   local ctx = context:New("ResetTabHighlights")
-  for i, tab in ipairs(bag.tabs.tabIndex) do
-    if tab:IsShown() and i ~= bag.tabs.selectedTab then
-      -- Reset to deselected state
-      local decoration = themes:GetTabButton(ctx, tab)
-      decoration.LeftActive:Hide()
-      decoration.MiddleActive:Hide()
-      decoration.RightActive:Hide()
+
+  local backpackBag = addon.Bags.Backpack
+  if backpackBag and backpackBag.tabs then
+    for i, tab in ipairs(backpackBag.tabs.tabIndex) do
+      if tab:IsShown() and i ~= backpackBag.tabs.selectedTab then
+        local decoration = themes:GetTabButton(ctx, tab)
+        decoration.LeftActive:Hide()
+        decoration.MiddleActive:Hide()
+        decoration.RightActive:Hide()
+      end
     end
   end
+
+  local bankBag = addon.Bags.Bank
+  if bankBag and bankBag.tabs then
+    for i, tab in ipairs(bankBag.tabs.tabIndex) do
+      if tab:IsShown() and i ~= bankBag.tabs.selectedTab then
+        local decoration = themes:GetTabButton(ctx, tab)
+        decoration.LeftActive:Hide()
+        decoration.MiddleActive:Hide()
+        decoration.RightActive:Hide()
+      end
+    end
+  end
+
   GameTooltip:Hide()
 end
 
@@ -427,13 +442,16 @@ function sectionFrame:PerformDrop()
   local category = self.draggingCategory
   local tabID = self.dragTargetTab
 
+  local kind = self.draggingKind
+  if not kind then return end
+
   local dropCtx = context:New("CategoryDropOnTab")
-  if groups:IsDefaultGroup(self.kind, tabID) then
+  if groups:IsDefaultGroup(kind, tabID) then
     -- Dropping on default tabs removes group assignment
-    groups:RemoveCategoryFromGroup(dropCtx, self.kind, category)
+    groups:RemoveCategoryFromGroup(dropCtx, kind, category)
   else
     -- Dropping on other group assigns to that group
-    groups:AssignCategoryToGroup(dropCtx, self.kind, category, tabID)
+    groups:AssignCategoryToGroup(dropCtx, kind, category, tabID)
   end
 
   local eventsModule = addon:GetModule("Events")
@@ -542,10 +560,10 @@ function sectionProto:onTitleMouseEnter()
   )
   GameTooltip:AddLine(info, 1, 1, 1)
 
-  -- Show group assignment info for backpack sections
+  -- Show group assignment info and drag hint for draggable sections
   local kind = self:GetKind()
   local category = self:GetTitleWithoutIndicator()
-  if kind == const.BAG_KIND.BACKPACK and category ~= L:G("Free Space") and category ~= L:G("Recent Items") then
+  if category ~= L:G("Free Space") and category ~= L:G("Recent Items") then
     local groupID = groups:GetGroupForCategory(kind, category)
     if groupID then
       local group = groups:GetGroup(kind, groupID)
@@ -613,11 +631,24 @@ function sectionFrame:_DoCreate()
     if category == L:G("Free Space") or category == L:G("Recent Items") then
       return
     end
-    -- Only allow dragging for backpack sections
     local kind = s:GetKind()
-    if kind ~= const.BAG_KIND.BACKPACK then return end
+    if not kind then return end
+
+    -- Determine bank type for bank sections so drop targets can be validated.
+    local bankType = nil
+    if kind == const.BAG_KIND.BANK then
+      local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
+      if activeGroupID then
+        local activeGroup = database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
+        if activeGroup then
+          bankType = activeGroup.bankType
+        end
+      end
+    end
 
     sectionFrame.draggingCategory = category
+    sectionFrame.draggingKind = kind
+    sectionFrame.draggingBankType = bankType
     sectionFrame.dragTargetTab = nil
     sectionFrame:ShowDragGhost(category)
   end)
@@ -628,6 +659,8 @@ function sectionFrame:_DoCreate()
       sectionFrame:PerformDrop()
     end
     sectionFrame.draggingCategory = nil
+    sectionFrame.draggingKind = nil
+    sectionFrame.draggingBankType = nil
     sectionFrame.dragTargetTab = nil
     sectionFrame:HideDragGhost()
     sectionFrame:ResetTabHighlights()

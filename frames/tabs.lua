@@ -482,6 +482,23 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		decoration:SetScript("OnEnter", function(frame)
 			-- Check if we're dragging a category
 			if sectionFrame.draggingCategory then
+				-- Validate that this tab accepts the dragged category:
+				-- 1. Tab frame kind must match the section's kind (no cross-bag drops).
+				-- 2. For bank tabs, the group's bankType must match draggingBankType
+				--    (Character Bank categories cannot go to Warbank groups and vice versa).
+				local isValidTarget = (sectionFrame.draggingKind == self.kind)
+				if isValidTarget and self.kind == const.BAG_KIND.BANK and sectionFrame.draggingBankType ~= nil then
+					local tabGroup = database:GetGroup(self.kind, tab.id)
+					if tabGroup and tabGroup.bankType ~= sectionFrame.draggingBankType then
+						isValidTarget = false
+					end
+				end
+
+				if not isValidTarget then
+					if originalOnEnter then originalOnEnter(frame) end
+					return
+				end
+
 				-- Track this as the drop target
 				sectionFrame.dragTargetTab = tab.id
 				-- Highlight the tab to indicate it's a valid drop target
