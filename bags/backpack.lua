@@ -364,56 +364,19 @@ end
 
 -- ShowCreateGroupDialog shows a dialog to create a new group.
 function backpack.proto:ShowCreateGroupDialog()
-	-- Define the static popup if not already defined
-	if not StaticPopupDialogs["BETTERBAGS_CREATE_GROUP"] then
-		StaticPopupDialogs["BETTERBAGS_CREATE_GROUP"] = {
-			text = L:G("Enter group name:"),
-			hasEditBox = true,
-			button1 = L:G("Create"),
-			button2 = L:G("Cancel"),
-			OnAccept = function(f)
-				local name = f.EditBox:GetText()
-				if name and name ~= "" then
-					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
-					-- Switch to the new group
-					local bag = addon.Bags.Backpack
-					if bag and bag.behavior then
-						bag.behavior:SwitchToGroup(ctx, newGroup.id)
-					end
-				end
-			end,
-			OnShow = function(f)
-				f.EditBox:SetFocus()
-				if f.bankTypeDropdown then
-					f.bankTypeDropdown:Hide()
-				end
-			end,
-			EditBoxOnEnterPressed = function(f)
-				local parent = f:GetParent()
-				local name = parent.EditBox:GetText()
-				if name and name ~= "" then
-					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
-					-- Switch to the new group
-					local bag = addon.Bags.Backpack
-					if bag and bag.behavior then
-						bag.behavior:SwitchToGroup(ctx, newGroup.id)
-					end
-				end
-				parent:Hide()
-			end,
-			EditBoxOnEscapePressed = function(f)
-				f:GetParent():Hide()
-			end,
-			timeout = 0,
-			whileDead = true,
-			hideOnEscape = true,
-			preferredIndex = 3,
-		}
-	end
-
-	StaticPopup_Show("BETTERBAGS_CREATE_GROUP")
+	local question = addon:GetModule('Question')
+	question:AskForInput(
+		L:G("Create New Backpack Tab"),
+		L:G("Enter group name:"),
+		function(name)
+			local ctx = context:New("CreateGroup")
+			local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
+			local bag = addon.Bags.Backpack
+			if bag and bag.behavior then
+				bag.behavior:SwitchToGroup(ctx, newGroup.id)
+			end
+		end
+	)
 end
 
 -- ShowGroupContextMenu shows a context menu for a group tab.
