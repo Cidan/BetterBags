@@ -862,7 +862,6 @@ const.DATABASE_DEFAULTS = {
     ---@type table<BagKind, number>
     activeGroup = {
       [const.BAG_KIND.BACKPACK] = 1,
-      [const.BAG_KIND.BANK] = 2,
     },
     ---@type table<BagKind, boolean>
     groupsEnabled = {

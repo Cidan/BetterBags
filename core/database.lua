@@ -671,8 +671,9 @@ function DB:DeleteGroup(groupID)
   end
   if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == groupID then
     -- Find the Bank group ID
+    local charBankType = Enum.BankType and Enum.BankType.Character or 1
     for id, g in pairs(DB.data.profile.groups) do
-      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.name == "Bank" then
+      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.bankType == charBankType then
         DB.data.profile.activeGroup[const.BAG_KIND.BANK] = id
         break
       end
@@ -1053,39 +1054,50 @@ function DB:Migrate()
     }
   end
 
-  -- Migrate existing groups to have a kind and default flags
-  for id, group in pairs(DB.data.profile.groups) do
-    if group.kind == nil then
-      group.kind = const.BAG_KIND.BACKPACK
+    -- Migrate existing groups to have a kind and default flags
+    for id, group in pairs(DB.data.profile.groups) do
+      if group.kind == nil then
+        group.kind = const.BAG_KIND.BACKPACK
+      end
+
+      -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3
+      -- If it's a corrupted user group, we can tell because it existed before Bank groups were added,
+      -- meaning it was a backpack group. The only way it's a real Bank group is if it was created
+      -- by the previous refactor migration (which means it's ID 2 or 3 AND we are recovering it).
+      -- Actually, to be completely safe, we remove the `isDefault` and `bankType` from ANY group
+      -- that was improperly merged. The only safe way to identify a genuine default Bank/Warbank group
+      -- from the buggy migration is to check if it has the exact default properties AND no custom name.
+      if group.isDefault and group.kind == const.BAG_KIND.BANK then
+        -- If the user renamed it, or it was a custom user group that AceDB merged into,
+        -- it's safer to strip the bank properties and let the migration below re-create the real ones
+        -- if they don't exist. We check if the name matches the default to spare genuine untouched tabs.
+        if group.name ~= "Bank" and group.name ~= "Warbank" then
+          group.kind = const.BAG_KIND.BACKPACK
+          group.isDefault = nil
+          group.bankType = nil
+        end
+      end
+
+      if id == 1 then
+        group.isDefault = true
+      end
     end
 
-    -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3
-    if group.isDefault and group.kind == const.BAG_KIND.BANK and group.name ~= "Bank" and group.name ~= "Warbank" then
-      group.kind = const.BAG_KIND.BACKPACK
-      group.isDefault = false
-      group.bankType = nil
-    end
+    -- Add Bank and Warbank groups if they don't exist
+    local hasBank = false
+    local hasWarbank = false
+    local charBankType = Enum.BankType and Enum.BankType.Character or 1
+    local accountBankType = Enum.BankType and Enum.BankType.Account or 2
 
-    if id == 1 then
-      group.isDefault = true
-    elseif group.kind == const.BAG_KIND.BANK and group.name == "Bank" then
-      group.isDefault = true
-    elseif group.kind == const.BAG_KIND.BANK and group.name == "Warbank" then
-      group.isDefault = true
+    for _, group in pairs(DB.data.profile.groups) do
+      if group.isDefault and group.kind == const.BAG_KIND.BANK then
+        if group.bankType == charBankType then
+          hasBank = true
+        elseif group.bankType == accountBankType then
+          hasWarbank = true
+        end
+      end
     end
-  end
-
-  -- Add Bank and Warbank groups if they don't exist
-  local hasBank = false
-  local hasWarbank = false
-  for _, group in pairs(DB.data.profile.groups) do
-    if group.name == "Bank" and group.kind == const.BAG_KIND.BANK then
-      hasBank = true
-    elseif group.name == "Warbank" and group.kind == const.BAG_KIND.BANK then
-      hasWarbank = true
-    end
-  end
-
   if not hasBank then
     local newID = DB.data.profile.groupCounter + 1
     DB.data.profile.groupCounter = newID
@@ -1118,7 +1130,7 @@ function DB:Migrate()
   if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == nil then
     -- Find the default Bank group ID
     for id, g in pairs(DB.data.profile.groups) do
-      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.name == "Bank" then
+      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.bankType == charBankType then
         DB.data.profile.activeGroup[const.BAG_KIND.BANK] = id
         break
       end

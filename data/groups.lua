@@ -50,9 +50,9 @@ end
 ---@param ctx Context
 ---@param groupID number
 function groups:DeleteGroup(ctx, groupID)
-  -- Don't allow deleting the default Backpack group
-  if groupID == 1 then
-    debug:Log("groups", "Cannot delete default Backpack group")
+  -- Don't allow deleting any default groups
+  if self:IsDefaultGroup(groupID) then
+    debug:Log("groups", "Cannot delete a default group: %d", groupID)
     return
   end
 
@@ -104,8 +104,9 @@ end
 -- GetDefaultBankGroup returns the default Bank group.
 ---@return Group?
 function groups:GetDefaultBankGroup()
+  local charBankType = Enum.BankType and Enum.BankType.Character or 1
   for _, group in pairs(database:GetAllGroups()) do
-    if group.kind == const.BAG_KIND.BANK and group.isDefault and group.name == "Bank" then
+    if group.kind == const.BAG_KIND.BANK and group.isDefault and group.bankType == charBankType then
       return group
     end
   end
