@@ -88,6 +88,7 @@ forms\form.lua
 
 frames\searchcategory.lua
 frames\question.lua
+frames\groupdialog.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua

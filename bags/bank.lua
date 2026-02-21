@@ -204,33 +204,32 @@ function bank.proto:RegisterEvents()
 		behavior:GenerateGroupTabs(ectx)
 	end)
 
-	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ectx, _)
-		behavior:GenerateGroupTabs(ectx)
+	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ctx, _)
+		behavior:GenerateGroupTabs(ctx)
 	end)
 
-	events:RegisterMessage("groups/Created", function(_, ectx, group)
+	events:RegisterMessage("groups/Created", function(ctx, group)
 		if group.kind == const.BAG_KIND.BANK then
-			behavior:GenerateGroupTabs(ectx)
+			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
 
-	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
-		local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
-		if group and group.kind == const.BAG_KIND.BANK then
-			behavior:GenerateGroupTabs(ectx)
+	events:RegisterMessage("groups/Changed", function(ctx, _, _, _, kind)
+		if kind == const.BAG_KIND.BANK then
+			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+	events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
 		if kind ~= const.BAG_KIND.BANK then return end
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
 		if activeGroup == groupID then
 			local defaultBankGroup = groups:GetDefaultBankGroup()
 			if defaultBankGroup then
-				behavior:SwitchToGroup(ectx, defaultBankGroup.id)
+				behavior:SwitchToGroup(ctx, defaultBankGroup.id)
 			end
 		end
-		behavior:GenerateGroupTabs(ectx)
+		behavior:GenerateGroupTabs(ctx)
 	end)
 end
 
@@ -330,83 +329,21 @@ function bank.proto:SetupPlusTabTooltip(_)
 end
 
 function bank.proto:ShowCreateGroupDialog()
-	if not StaticPopupDialogs["BETTERBAGS_CREATE_BANK_GROUP"] then
-		StaticPopupDialogs["BETTERBAGS_CREATE_BANK_GROUP"] = {
-			text = L:G("Create New Bank Tab") .. "\n\n" .. L:G("1. Enter group name:"),
-			hasEditBox = true,
-			button1 = L:G("Create"),
-			button2 = L:G("Cancel"),
-			OnShow = function(f)
-				f.EditBox:SetFocus()
-				f.EditBox:SetText("")
-
-				if not f.bankTypeDropdown then
-					local dropdown = CreateFrame("Frame", "BetterBagsBankTypeDropdown", f, "UIDropDownMenuTemplate")
-					dropdown:SetPoint("TOP", f.EditBox, "BOTTOM", 0, -15)
-					UIDropDownMenu_SetWidth(dropdown, 120)
-					UIDropDownMenu_SetText(dropdown, L:G("Bank"))
-					f.bankType = Enum.BankType and Enum.BankType.Character or 1
-
-					UIDropDownMenu_Initialize(dropdown, function(_, _, _)
-						local info = UIDropDownMenu_CreateInfo()
-
-						info.text = L:G("Bank")
-						info.func = function()
-							UIDropDownMenu_SetText(dropdown, L:G("Bank"))
-							f.bankType = Enum.BankType and Enum.BankType.Character or 1
-						end
-						UIDropDownMenu_AddButton(info)
-
-						if addon.isRetail then
-							info.text = L:G("Warbank")
-							info.func = function()
-								UIDropDownMenu_SetText(dropdown, L:G("Warbank"))
-								f.bankType = Enum.BankType and Enum.BankType.Account or 2
-							end
-							UIDropDownMenu_AddButton(info)
-						end
-					end)
-					f.bankTypeDropdown = dropdown
-				end
-				-- Reset to Bank by default
-				UIDropDownMenu_SetText(f.bankTypeDropdown, L:G("Bank"))
-				f.bankType = Enum.BankType and Enum.BankType.Character or 1
-
-				f:SetHeight(180)
-			end,
-			OnAccept = function(f)
-				local name = f.EditBox:GetText()
-				if name and name ~= "" then
-					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BANK, name, f.bankType)
-					local bag = addon.Bags.Bank
-					if bag and bag.behavior then
-						bag.behavior:SwitchToGroup(ctx, newGroup.id)
-					end
-				end
-			end,
-			EditBoxOnEnterPressed = function(f)
-				local parent = f:GetParent()
-				local name = parent.EditBox:GetText()
-				if name and name ~= "" then
-					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BANK, name, parent.bankType)
-					local bag = addon.Bags.Bank
-					if bag and bag.behavior then
-						bag.behavior:SwitchToGroup(ctx, newGroup.id)
-					end
-				end
-				parent:Hide()
-			end,
-			EditBoxOnEscapePressed = function(f)
-				f:GetParent():Hide()
-			end,
-			timeout = 0,
-			whileDead = true,
-			hideOnEscape = true,
-		}
-	end
-	StaticPopup_Show("BETTERBAGS_CREATE_BANK_GROUP")
+	local groupDialog = addon:GetModule('GroupDialog')
+	groupDialog:Show(
+		L:G("Create New Bank Tab"),
+		L:G("1. Enter group name:"),
+		addon.isRetail,
+		Enum.BankType and Enum.BankType.Character or 1,
+		function(name, bankType)
+			local ctx = context:New("CreateGroup")
+			local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BANK, name, bankType)
+			local bag = addon.Bags.Bank
+			if bag and bag.behavior then
+				bag.behavior:SwitchToGroup(ctx, newGroup.id)
+			end
+		end
+	)
 end
 
 function bank.proto:SwitchToGroup(ctx, groupID)

@@ -185,34 +185,33 @@ function backpack.proto:RegisterEvents()
 	end)
 
 	-- Listen for group changes to regenerate tabs
-	events:RegisterMessage("groups/Created", function(_, ectx)
-		behavior:GenerateGroupTabs(ectx)
-	end)
-
-	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
-		local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
-		if group and group.kind == const.BAG_KIND.BACKPACK then
-			behavior:GenerateGroupTabs(ectx)
+	events:RegisterMessage("groups/Created", function(ctx, group)
+		if group.kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ctx)
 		end
 	end)
 
-	events:RegisterMessage("groups/Deleted", function(_, ectx, groupID, _, kind)
+	events:RegisterMessage("groups/Changed", function(ctx, _, _, _, kind)
+		if kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ctx)
+		end
+	end)
+
+	events:RegisterMessage("groups/Deleted", function(ctx, groupID, _, kind)
 		if kind ~= const.BAG_KIND.BACKPACK then return end
 		-- If the deleted group was active, switch to Backpack
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
 		if activeGroup == groupID then
-			behavior:SwitchToGroup(ectx, 1) -- Switch to Backpack
+			behavior:SwitchToGroup(ctx, 1) -- Switch to Backpack
 		end
-		behavior:GenerateGroupTabs(ectx)
-	end)
-
-	events:RegisterMessage("groups/Changed", function(_, ectx)
-		behavior:GenerateGroupTabs(ectx)
+		behavior:GenerateGroupTabs(ctx)
 	end)
 
 	-- Listen for groups enabled/disabled toggle
-	events:RegisterMessage("groups/EnabledChanged", function(_, ectx)
-		behavior:GenerateGroupTabs(ectx)
+	events:RegisterMessage("groups/EnabledChanged", function(ctx, kind, _)
+		if kind == const.BAG_KIND.BACKPACK then
+			behavior:GenerateGroupTabs(ctx)
+		end
 	end)
 end
 
@@ -364,53 +363,19 @@ end
 
 -- ShowCreateGroupDialog shows a dialog to create a new group.
 function backpack.proto:ShowCreateGroupDialog()
-	-- Define the static popup if not already defined
-	if not StaticPopupDialogs["BETTERBAGS_CREATE_GROUP"] then
-		StaticPopupDialogs["BETTERBAGS_CREATE_GROUP"] = {
-			text = L:G("Enter group name:"),
-			hasEditBox = true,
-			button1 = L:G("Create"),
-			button2 = L:G("Cancel"),
-			OnAccept = function(f)
-				local name = f.EditBox:GetText()
-				if name and name ~= "" then
-					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
-					-- Switch to the new group
-					local bag = addon.Bags.Backpack
-					if bag and bag.behavior then
-						bag.behavior:SwitchToGroup(ctx, newGroup.id)
-					end
-				end
-			end,
-			OnShow = function(f)
-				f.EditBox:SetFocus()
-			end,
-			EditBoxOnEnterPressed = function(f)
-				local parent = f:GetParent()
-				local name = parent.EditBox:GetText()
-				if name and name ~= "" then
-					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
-					-- Switch to the new group
-					local bag = addon.Bags.Backpack
-					if bag and bag.behavior then
-						bag.behavior:SwitchToGroup(ctx, newGroup.id)
-					end
-				end
-				parent:Hide()
-			end,
-			EditBoxOnEscapePressed = function(f)
-				f:GetParent():Hide()
-			end,
-			timeout = 0,
-			whileDead = true,
-			hideOnEscape = true,
-			preferredIndex = 3,
-		}
-	end
-
-	StaticPopup_Show("BETTERBAGS_CREATE_GROUP")
+	local question = addon:GetModule('Question')
+	question:AskForInput(
+		L:G("Create New Backpack Tab"),
+		L:G("Enter group name:"),
+		function(name)
+			local ctx = context:New("CreateGroup")
+			local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
+			local bag = addon.Bags.Backpack
+			if bag and bag.behavior then
+				bag.behavior:SwitchToGroup(ctx, newGroup.id)
+			end
+		end
+	)
 end
 
 -- ShowGroupContextMenu shows a context menu for a group tab.
