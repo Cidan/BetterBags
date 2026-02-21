@@ -347,9 +347,8 @@ function bank.proto:ShowCreateGroupDialog()
 					UIDropDownMenu_SetText(dropdown, L:G("Bank"))
 					f.bankType = Enum.BankType and Enum.BankType.Character or 1
 
-					UIDropDownMenu_Initialize(dropdown, function(_, _, _)
+					UIDropDownMenu_Initialize(dropdown, function()
 						local info = UIDropDownMenu_CreateInfo()
-
 						info.text = L:G("Bank")
 						info.func = function()
 							UIDropDownMenu_SetText(dropdown, L:G("Bank"))
@@ -358,12 +357,13 @@ function bank.proto:ShowCreateGroupDialog()
 						UIDropDownMenu_AddButton(info)
 
 						if addon.isRetail then
-							info.text = L:G("Warbank")
-							info.func = function()
+							local info2 = UIDropDownMenu_CreateInfo()
+							info2.text = L:G("Warbank")
+							info2.func = function()
 								UIDropDownMenu_SetText(dropdown, L:G("Warbank"))
 								f.bankType = Enum.BankType and Enum.BankType.Account or 2
 							end
-							UIDropDownMenu_AddButton(info)
+							UIDropDownMenu_AddButton(info2)
 						end
 					end)
 					f.bankTypeDropdown = dropdown
@@ -372,6 +372,14 @@ function bank.proto:ShowCreateGroupDialog()
 				UIDropDownMenu_SetText(f.bankTypeDropdown, L:G("Bank"))
 				f.bankType = Enum.BankType and Enum.BankType.Character or 1
 
+				f.bankTypeDropdown:Show()
+
+				if f.button1 and f.button2 then
+					f.button1:ClearAllPoints()
+					f.button1:SetPoint("TOPRIGHT", f.bankTypeDropdown, "BOTTOM", -6, -16)
+					f.button2:ClearAllPoints()
+					f.button2:SetPoint("TOPLEFT", f.bankTypeDropdown, "BOTTOM", 6, -16)
+				end
 				f:SetHeight(180)
 			end,
 			OnAccept = function(f)
@@ -400,6 +408,11 @@ function bank.proto:ShowCreateGroupDialog()
 			end,
 			EditBoxOnEscapePressed = function(f)
 				f:GetParent():Hide()
+			end,
+			OnHide = function(f)
+				if f.bankTypeDropdown then
+					f.bankTypeDropdown:Hide()
+				end
 			end,
 			timeout = 0,
 			whileDead = true,

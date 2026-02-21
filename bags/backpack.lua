@@ -385,6 +385,9 @@ function backpack.proto:ShowCreateGroupDialog()
 			end,
 			OnShow = function(f)
 				f.EditBox:SetFocus()
+				if f.bankTypeDropdown then
+					f.bankTypeDropdown:Hide()
+				end
 			end,
 			EditBoxOnEnterPressed = function(f)
 				local parent = f:GetParent()
