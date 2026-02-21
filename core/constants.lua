@@ -847,23 +847,50 @@ const.DATABASE_DEFAULTS = {
     ---@type number
     newItemTime = 300,
     -- Groups feature: virtual tabs for organizing categories in backpack
-    ---@type table<number, Group>
+    ---@type table<BagKind, table<number, Group>>
     groups = {
-      [1] = {
-        id = 1,
-        name = "Backpack",
-        order = 1,
-        kind = const.BAG_KIND.BACKPACK,
-        isDefault = true,
+      [const.BAG_KIND.BACKPACK] = {
+        [1] = {
+          id = 1,
+          name = "Backpack",
+          order = 1,
+          kind = const.BAG_KIND.BACKPACK,
+          isDefault = true,
+        },
+      },
+      [const.BAG_KIND.BANK] = {
+        [1] = {
+          id = 1,
+          name = "Bank",
+          order = 1,
+          kind = const.BAG_KIND.BANK,
+          bankType = Enum.BankType and Enum.BankType.Character or 1,
+          isDefault = true,
+        },
+        [2] = {
+          id = 2,
+          name = "Warbank",
+          order = 2,
+          kind = const.BAG_KIND.BANK,
+          bankType = Enum.BankType and Enum.BankType.Account or 2,
+          isDefault = true,
+        },
       },
     },
-    ---@type number
-    groupCounter = 1,
-    ---@type table<string, number>
-    categoryToGroup = {},
+    ---@type table<BagKind, number>
+    groupCounter = {
+      [const.BAG_KIND.BACKPACK] = 1,
+      [const.BAG_KIND.BANK] = 2,
+    },
+    ---@type table<BagKind, table<string, number>>
+    categoryToGroup = {
+      [const.BAG_KIND.BACKPACK] = {},
+      [const.BAG_KIND.BANK] = {},
+    },
     ---@type table<BagKind, number>
     activeGroup = {
       [const.BAG_KIND.BACKPACK] = 1,
+      [const.BAG_KIND.BANK] = 1,
     },
     ---@type table<BagKind, boolean>
     groupsEnabled = {

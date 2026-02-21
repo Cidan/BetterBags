@@ -373,7 +373,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     -- Check group membership (skip special sections like "Free Space", "Recent Items")
     if not shouldHide and activeGroup then
       local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
-      if not isSpecialSection and not groups:CategoryBelongsToGroup(sectionName, activeGroup) then
+      if not isSpecialSection and not groups:CategoryBelongsToGroup(bag.kind, sectionName, activeGroup) then
         shouldHide = true
       end
     end

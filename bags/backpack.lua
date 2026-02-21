@@ -131,7 +131,7 @@ function backpack.proto:OnCreate(ctx)
 	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
 
 	-- Group tabs
-	self.bag.tabs = tabs:Create(self.bag.frame)
+	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)
 
 	-- Set up tab click handler
 	local behavior = self
@@ -190,7 +190,7 @@ function backpack.proto:RegisterEvents()
 	end)
 
 	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
-		local group = groups:GetGroup(groupID)
+		local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 		if group and group.kind == const.BAG_KIND.BACKPACK then
 			behavior:GenerateGroupTabs(ectx)
 		end
@@ -346,7 +346,7 @@ end
 ---@param ctx Context
 ---@param groupID number
 function backpack.proto:SwitchToGroup(ctx, groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then
 		debug:Log("groups", "Cannot switch to non-existent group: %d", groupID)
 		return
@@ -374,7 +374,7 @@ function backpack.proto:ShowCreateGroupDialog()
 				local name = f.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name, const.BAG_KIND.BACKPACK)
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
 					-- Switch to the new group
 					local bag = addon.Bags.Backpack
 					if bag and bag.behavior then
@@ -390,7 +390,7 @@ function backpack.proto:ShowCreateGroupDialog()
 				local name = parent.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name, const.BAG_KIND.BACKPACK)
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, name)
 					-- Switch to the new group
 					local bag = addon.Bags.Backpack
 					if bag and bag.behavior then
@@ -416,7 +416,7 @@ end
 ---@param ctx Context
 ---@param groupID number
 function backpack.proto:ShowGroupContextMenu(ctx, groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then return end
 
 	local behavior = self
@@ -467,7 +467,7 @@ end
 -- ShowRenameGroupDialog shows a dialog to rename a group.
 ---@param groupID number
 function backpack.proto:ShowRenameGroupDialog(groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then return end
 
 	-- Define the static popup if not already defined
@@ -485,7 +485,7 @@ function backpack.proto:ShowRenameGroupDialog(groupID)
 				end
 			end,
 			OnShow = function(f)
-				local currentGroup = groups:GetGroup(f.data.groupID)
+				local currentGroup = groups:GetGroup(const.BAG_KIND.BACKPACK, f.data.groupID)
 				if currentGroup then
 					f.EditBox:SetText(currentGroup.name)
 					f.EditBox:HighlightText()
@@ -517,7 +517,7 @@ end
 -- ShowDeleteGroupConfirm shows a confirmation dialog to delete a group.
 ---@param groupID number
 function backpack.proto:ShowDeleteGroupConfirm(groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BACKPACK, groupID)
 	if not group then return end
 
 	-- Define the static popup if not already defined

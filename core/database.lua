@@ -622,73 +622,77 @@ end
 --- Groups Feature
 -------
 
+---@param kind BagKind
 ---@return table<number, Group>
-function DB:GetAllGroups()
-  return DB.data.profile.groups
+function DB:GetAllGroups(kind)
+  return DB.data.profile.groups[kind]
 end
 
+---@param kind BagKind
 ---@param groupID number
 ---@return Group?
-function DB:GetGroup(groupID)
-  return DB.data.profile.groups[groupID]
+function DB:GetGroup(kind, groupID)
+  return DB.data.profile.groups[kind][groupID]
 end
 
+---@param kind BagKind
 ---@param name string
----@param kind? BagKind
 ---@param bankType? number
 ---@return number The new group ID
-function DB:CreateGroup(name, kind, bankType)
-  local newID = DB.data.profile.groupCounter + 1
-  DB.data.profile.groupCounter = newID
-  DB.data.profile.groups[newID] = {
+function DB:CreateGroup(kind, name, bankType)
+  local newID = DB.data.profile.groupCounter[kind] + 1
+  DB.data.profile.groupCounter[kind] = newID
+  DB.data.profile.groups[kind][newID] = {
     id = newID,
     name = name,
     order = newID,
-    kind = kind or const.BAG_KIND.BACKPACK,
+    kind = kind,
     bankType = bankType,
   }
   return newID
 end
 
+---@param kind BagKind
 ---@param groupID number
-function DB:DeleteGroup(groupID)
-  local group = DB.data.profile.groups[groupID]
+function DB:DeleteGroup(kind, groupID)
+  local group = DB.data.profile.groups[kind][groupID]
   if not group then return end
 
   -- Don't allow deleting default groups
   if group.isDefault then return end
 
   -- Remove category associations for this group
-  for categoryName, gID in pairs(DB.data.profile.categoryToGroup) do
+  for categoryName, gID in pairs(DB.data.profile.categoryToGroup[kind]) do
     if gID == groupID then
-      DB.data.profile.categoryToGroup[categoryName] = nil
+      DB.data.profile.categoryToGroup[kind][categoryName] = nil
     end
   end
 
   -- Remove the group
-  DB.data.profile.groups[groupID] = nil
+  DB.data.profile.groups[kind][groupID] = nil
 
-  -- If this was the active group, switch to Backpack (ID 1) or Bank (default Bank ID)
-  if DB.data.profile.activeGroup[const.BAG_KIND.BACKPACK] == groupID then
-    DB.data.profile.activeGroup[const.BAG_KIND.BACKPACK] = 1
-  end
-  if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == groupID then
-    -- Find the Bank group ID
-    local charBankType = Enum.BankType and Enum.BankType.Character or 1
-    for id, g in pairs(DB.data.profile.groups) do
-      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.bankType == charBankType then
-        DB.data.profile.activeGroup[const.BAG_KIND.BANK] = id
-        break
+  -- If this was the active group, switch to default
+  if DB.data.profile.activeGroup[kind] == groupID then
+    if kind == const.BAG_KIND.BACKPACK then
+      DB.data.profile.activeGroup[kind] = 1
+    elseif kind == const.BAG_KIND.BANK then
+      local charBankType = Enum.BankType and Enum.BankType.Character or 1
+      for id, g in pairs(DB.data.profile.groups[kind]) do
+        if g.isDefault and g.bankType == charBankType then
+          DB.data.profile.activeGroup[kind] = id
+          break
+        end
       end
     end
   end
 end
 
+---@param kind BagKind
 ---@param groupID number
 ---@param name string
-function DB:RenameGroup(groupID, name)
-  if DB.data.profile.groups[groupID] then
-    DB.data.profile.groups[groupID].name = name
+function DB:RenameGroup(kind, groupID, name)
+  if DB.data.profile.groups[kind][groupID] then
+    DB.data.profile.groups[kind][groupID].name = name
   end
 end
 
@@ -724,9 +728,11 @@ function DB:RenameCategory(oldName, newName)
   end
 
   -- 3. Update group mapping
-  if DB.data.profile.categoryToGroup[oldName] then
-    DB.data.profile.categoryToGroup[newName] = DB.data.profile.categoryToGroup[oldName]
-    DB.data.profile.categoryToGroup[oldName] = nil
+  for _, kind in pairs(const.BAG_KIND) do
+    if DB.data.profile.categoryToGroup[kind] and DB.data.profile.categoryToGroup[kind][oldName] then
+      DB.data.profile.categoryToGroup[kind][newName] = DB.data.profile.categoryToGroup[kind][oldName]
+      DB.data.profile.categoryToGroup[kind][oldName] = nil
+    end
   end
 
   -- 4. Update ephemeral filters
@@ -794,33 +800,38 @@ function DB:RenameCategory(oldName, newName)
   return true
 end
 
+---@param kind BagKind
 ---@return number
-function DB:GetNextGroupID()
-  return DB.data.profile.groupCounter + 1
+function DB:GetNextGroupID(kind)
+  return DB.data.profile.groupCounter[kind] + 1
 end
 
+---@param kind BagKind
 ---@param categoryName string
----@return number? The group ID, or nil if not assigned (belongs to Backpack)
-function DB:GetCategoryGroup(categoryName)
-  return DB.data.profile.categoryToGroup[categoryName]
+---@return number? The group ID, or nil if not assigned (belongs to Backpack/Bank default)
+function DB:GetCategoryGroup(kind, categoryName)
+  return DB.data.profile.categoryToGroup[kind][categoryName]
 end
 
+---@param kind BagKind
 ---@param categoryName string
 ---@param groupID number
-function DB:SetCategoryGroup(categoryName, groupID)
-  DB.data.profile.categoryToGroup[categoryName] = groupID
+function DB:SetCategoryGroup(kind, categoryName, groupID)
+  DB.data.profile.categoryToGroup[kind][categoryName] = groupID
 end
 
+---@param kind BagKind
 ---@param categoryName string
-function DB:RemoveCategoryFromGroup(categoryName)
-  DB.data.profile.categoryToGroup[categoryName] = nil
+function DB:RemoveCategoryFromGroup(kind, categoryName)
+  DB.data.profile.categoryToGroup[kind][categoryName] = nil
 end
 
+---@param kind BagKind
 ---@param groupID number
 ---@return table<string, boolean> Category names in this group
-function DB:GetGroupCategories(groupID)
+function DB:GetGroupCategories(kind, groupID)
   local categories = {}
-  for categoryName, gID in pairs(DB.data.profile.categoryToGroup) do
+  for categoryName, gID in pairs(DB.data.profile.categoryToGroup[kind]) do
     if gID == groupID then
       categories[categoryName] = true
     end
@@ -840,19 +851,21 @@ function DB:SetActiveGroup(kind, groupID)
   DB.data.profile.activeGroup[kind] = groupID
 end
 
+---@param kind BagKind
 ---@param groupID number
 ---@param order number
-function DB:SetGroupOrder(groupID, order)
-  local group = DB.data.profile.groups[groupID]
+function DB:SetGroupOrder(kind, groupID, order)
+  local group = DB.data.profile.groups[kind][groupID]
   if group then
     group.order = order
   end
 end
 
+---@param kind BagKind
 ---@param groupID number
 ---@return number
-function DB:GetGroupOrder(groupID)
-  local group = DB.data.profile.groups[groupID]
+function DB:GetGroupOrder(kind, groupID)
+  local group = DB.data.profile.groups[kind][groupID]
   return group and group.order or groupID  -- Default to ID if order not set
 end
 
@@ -1057,83 +1070,133 @@ function DB:Migrate()
     }
   end
 
-      -- Migrate existing groups to have a kind and default flags
-      for id, group in pairs(DB.data.profile.groups) do
-        if group.kind == nil then
-          group.kind = const.BAG_KIND.BACKPACK
-        end
-        if id == 1 then
-          group.isDefault = true
-        end
-      end
 
-      -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3.
-      -- By stripping isDefault from non-1 groups, they safely become Backpack tabs, and the real
-      -- Bank/Warbank tabs will be freshly generated at new IDs if they don't exist.
-      if not DB.data.profile.__bankDefaultTabsFixed then
-        for id, group in pairs(DB.data.profile.groups) do
+  -- Migrate to kind-scoped groups, groupCounter, and categoryToGroup
+  if not DB.data.profile.__groupsScopedByKind then
+    local oldGroups = DB.data.profile.groups
+    local oldCategoryToGroup = DB.data.profile.categoryToGroup
+    local oldGroupCounter = DB.data.profile.groupCounter
+
+    DB.data.profile.groups = {
+      [const.BAG_KIND.BACKPACK] = {},
+      [const.BAG_KIND.BANK] = {}
+    }
+    DB.data.profile.categoryToGroup = {
+      [const.BAG_KIND.BACKPACK] = {},
+      [const.BAG_KIND.BANK] = {}
+    }
+
+    if type(oldGroupCounter) == "number" then
+      DB.data.profile.groupCounter = {
+        [const.BAG_KIND.BACKPACK] = oldGroupCounter,
+        [const.BAG_KIND.BANK] = 0
+      }
+    end
+
+    if oldGroups then
+      -- First, move all groups to their respective kind
+      for id, group in pairs(oldGroups) do
+        if type(group) == "table" then
+          local kind = group.kind or const.BAG_KIND.BACKPACK
+
+          -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3.
           if id ~= 1 and group.isDefault then
+            kind = const.BAG_KIND.BACKPACK
             group.kind = const.BAG_KIND.BACKPACK
             group.isDefault = nil
             group.bankType = nil
           end
+
+          if id == 1 then
+            group.isDefault = true
+            kind = const.BAG_KIND.BACKPACK
+            group.kind = const.BAG_KIND.BACKPACK
+          end
+
+          DB.data.profile.groups[kind][id] = group
         end
-        DB.data.profile.__bankDefaultTabsFixed = true
       end
+    end
 
-      -- Add Bank and Warbank groups if they don't exist
-      local hasBank = false
-      local hasWarbank = false
-      local charBankType = Enum.BankType and Enum.BankType.Character or 1
-      local accountBankType = Enum.BankType and Enum.BankType.Account or 2
-
-        for _, group in pairs(DB.data.profile.groups) do
-          if group.isDefault and group.kind == const.BAG_KIND.BANK then
-            if group.bankType == charBankType then
-              hasBank = true
-            elseif group.bankType == accountBankType then
-              hasWarbank = true
-            end
+    if oldCategoryToGroup then
+      for categoryName, groupID in pairs(oldCategoryToGroup) do
+        if type(groupID) == "number" then
+          -- We only know the old categoryToGroup mapped to backpacks
+          local group = DB.data.profile.groups[const.BAG_KIND.BACKPACK] and DB.data.profile.groups[const.BAG_KIND.BACKPACK][groupID]
+          if group then
+            DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK][categoryName] = groupID
           end
         end
+      end
+    end
 
-        if not hasBank then
-          local newID = DB.data.profile.groupCounter + 1
-          DB.data.profile.groupCounter = newID
-          DB.data.profile.groups[newID] = {
-            id = newID,
-            name = L:G("Bank"),
-            order = newID,
-            kind = const.BAG_KIND.BANK,
-            bankType = Enum.BankType and Enum.BankType.Character or 1,
-            isDefault = true,
-          }
-          if not DB.data.profile.activeGroup[const.BAG_KIND.BANK] then
-            DB.data.profile.activeGroup[const.BAG_KIND.BANK] = newID
-          end
-        end
+    DB.data.profile.__groupsScopedByKind = true
+    DB.data.profile.__bankDefaultTabsFixed = true
+  end
 
-        if not hasWarbank and addon.isRetail then
-          local newID = DB.data.profile.groupCounter + 1
-          DB.data.profile.groupCounter = newID
-          DB.data.profile.groups[newID] = {
-            id = newID,
-            name = L:G("Warbank"),
-            order = newID,
-            kind = const.BAG_KIND.BANK,
-            bankType = Enum.BankType and Enum.BankType.Account or 2,
-            isDefault = true,
-          }
-        end
+  -- Ensure defaults exist
+  local charBankType = Enum.BankType and Enum.BankType.Character or 1
+  local accountBankType = Enum.BankType and Enum.BankType.Account or 2
+
+  if not DB.data.profile.groups[const.BAG_KIND.BACKPACK] then
+    DB.data.profile.groups[const.BAG_KIND.BACKPACK] = {}
+  end
+  if not DB.data.profile.groups[const.BAG_KIND.BANK] then
+    DB.data.profile.groups[const.BAG_KIND.BANK] = {}
+  end
+
+  local hasBank = false
+  local hasWarbank = false
+
+  for _, group in pairs(DB.data.profile.groups[const.BAG_KIND.BANK]) do
+    if group.isDefault then
+      if group.bankType == charBankType then
+        hasBank = true
+      elseif group.bankType == accountBankType then
+        hasWarbank = true
+      end
+    end
+  end
+
+  if not hasBank then
+    local newID = DB.data.profile.groupCounter[const.BAG_KIND.BANK] + 1
+    DB.data.profile.groupCounter[const.BAG_KIND.BANK] = newID
+    DB.data.profile.groups[const.BAG_KIND.BANK][newID] = {
+      id = newID,
+      name = L:G("Bank"),
+      order = newID,
+      kind = const.BAG_KIND.BANK,
+      bankType = charBankType,
+      isDefault = true,
+    }
+    if not DB.data.profile.activeGroup[const.BAG_KIND.BANK] then
+      DB.data.profile.activeGroup[const.BAG_KIND.BANK] = newID
+    end
+  end
+
+  if not hasWarbank and addon.isRetail then
+    local newID = DB.data.profile.groupCounter[const.BAG_KIND.BANK] + 1
+    DB.data.profile.groupCounter[const.BAG_KIND.BANK] = newID
+    DB.data.profile.groups[const.BAG_KIND.BANK][newID] = {
+      id = newID,
+      name = L:G("Warbank"),
+      order = newID,
+      kind = const.BAG_KIND.BANK,
+      bankType = accountBankType,
+      isDefault = true,
+    }
+  end
+
   if DB.data.profile.activeGroup[const.BAG_KIND.BANK] == nil then
     -- Find the default Bank group ID
-    for id, g in pairs(DB.data.profile.groups) do
-      if g.isDefault and g.kind == const.BAG_KIND.BANK and g.bankType == charBankType then
+    for id, g in pairs(DB.data.profile.groups[const.BAG_KIND.BANK]) do
+      if g.isDefault and g.bankType == charBankType then
         DB.data.profile.activeGroup[const.BAG_KIND.BANK] = id
         break
       end
     end
   end
+
   if DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] == nil then
     DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] = true
   end

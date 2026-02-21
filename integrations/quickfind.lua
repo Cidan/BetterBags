@@ -195,7 +195,7 @@ function quickfind:GetTabIDForItem(itemData, bagKind)
 
     -- Groups enabled: find the group for this item
     if itemData.itemInfo.category then
-      local groupID = groups:GetGroupForCategory(itemData.itemInfo.category)
+      local groupID = groups:GetGroupForCategory(bagKind, itemData.itemInfo.category)
       if groupID then
         return groupID
       end

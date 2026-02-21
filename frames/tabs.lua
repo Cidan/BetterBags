@@ -194,9 +194,9 @@ function tabFrame:SortTabsByID()
 		end
 
 		-- If both are reorderable groups, sort by their Group.order value
-		if a.id and b.id and a.id > 0 and b.id > 0 and not groups:IsDefaultGroup(a.id) and not groups:IsDefaultGroup(b.id) then
-			local orderA = database:GetGroupOrder(a.id)
-			local orderB = database:GetGroupOrder(b.id)
+		if a.id and b.id and a.id > 0 and b.id > 0 and not groups:IsDefaultGroup(self.kind, a.id) and not groups:IsDefaultGroup(self.kind, b.id) then
+			local orderA = database:GetGroupOrder(self.kind, a.id)
+			local orderB = database:GetGroupOrder(self.kind, b.id)
 			if orderA ~= orderB then
 				return orderA < orderB
 			end
@@ -417,7 +417,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				decoration.RightActive:Show()
 				-- Show tooltip indicating what will happen
 				GameTooltip:SetOwner(frame, "ANCHOR_TOP")
-				if groups:IsDefaultGroup(tab.id) then
+				if groups:IsDefaultGroup(self.kind, tab.id) then
 					GameTooltip:SetText("Move to " .. tab.name)
 					GameTooltip:AddLine("Remove group assignment from: " .. sectionFrame.draggingCategory, 1, 1, 1, true)
 				else
@@ -593,9 +593,11 @@ function tabFrame:ResizeAllTabs(ctx)
 end
 
 ---@param parent Frame
+---@param kind BagKind
 ---@return Tab
-function tabs:Create(parent)
+function tabs:Create(parent, kind)
 	local container = setmetatable({}, { __index = tabFrame })
+	container.kind = kind
 	container.frame = CreateFrame("Frame", parent:GetName() .. "TabContainer", parent)
 	container.frame:SetPoint("TOPLEFT", parent, "BOTTOMLEFT", 0, 2)
 	container.frame:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, 2)
@@ -676,7 +678,7 @@ end
 ---@return boolean
 function tabs:IsTabReorderable(tab)
 	if not tab.id then return false end
-	if groups:IsDefaultGroup(tab.id) then return false end    -- Default tabs always first
+	if groups:IsDefaultGroup(self.currentTabFrame.kind, tab.id) then return false end    -- Default tabs always first
 	if tab.id == 0 then return false end    -- "+" tab always last
 	if tab.id < 0 then return false end     -- Purchase tabs always at end
 	return true
@@ -915,8 +917,8 @@ function tabs:SaveTabOrder(frame)
 	local orderCounter = 2  -- Start at 2 (Bank is always 1)
 
 	for _, tab in ipairs(frame.tabIndex) do
-		if tab.id and tab.id > 0 and not groups:IsDefaultGroup(tab.id) then  -- Skip default groups, "+" (0), purchase (<0)
-			database:SetGroupOrder(tab.id, orderCounter)
+		if tab.id and tab.id > 0 and not groups:IsDefaultGroup(frame.kind, tab.id) then  -- Skip default groups, "+" (0), purchase (<0)
+			database:SetGroupOrder(frame.kind, tab.id, orderCounter)
 			orderCounter = orderCounter + 1
 		end
 	end

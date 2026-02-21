@@ -156,7 +156,7 @@ function bank.proto:OnCreate(_)
 	-- Capture behavior reference for closures
 	local behavior = self
 
-	self.bag.tabs = tabs:Create(self.bag.frame)
+	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BANK)
 
 	self.bag.tabs:SetClickHandler(function(ectx, tabID, _)
 		if tabID == NEW_GROUP_TAB_ID then
@@ -215,7 +215,7 @@ function bank.proto:RegisterEvents()
 	end)
 
 	events:RegisterMessage("groups/Changed", function(_, ectx, groupID)
-		local group = groups:GetGroup(groupID)
+		local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
 		if group and group.kind == const.BAG_KIND.BANK then
 			behavior:GenerateGroupTabs(ectx)
 		end
@@ -375,7 +375,7 @@ function bank.proto:ShowCreateGroupDialog()
 				local name = f.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name, const.BAG_KIND.BANK, f.bankType)
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BANK, name, f.bankType)
 					local bag = addon.Bags.Bank
 					if bag and bag.behavior then
 						bag.behavior:SwitchToGroup(ctx, newGroup.id)
@@ -387,7 +387,7 @@ function bank.proto:ShowCreateGroupDialog()
 				local name = parent.EditBox:GetText()
 				if name and name ~= "" then
 					local ctx = context:New("CreateGroup")
-					local newGroup = groups:CreateGroup(ctx, name, const.BAG_KIND.BANK, parent.bankType)
+					local newGroup = groups:CreateGroup(ctx, const.BAG_KIND.BANK, name, parent.bankType)
 					local bag = addon.Bags.Bank
 					if bag and bag.behavior then
 						bag.behavior:SwitchToGroup(ctx, newGroup.id)
@@ -407,7 +407,7 @@ function bank.proto:ShowCreateGroupDialog()
 end
 
 function bank.proto:SwitchToGroup(ctx, groupID)
-	local group = groups:GetGroup(groupID)
+	local group = groups:GetGroup(const.BAG_KIND.BANK, groupID)
 	if not group then return end
 
 	database:SetActiveGroup(const.BAG_KIND.BANK, groupID)

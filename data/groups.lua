@@ -34,13 +34,13 @@ end
 
 -- CreateGroup creates a new group with the given name.
 ---@param ctx Context
+---@param kind BagKind
 ---@param name string
----@param kind? BagKind
 ---@param bankType? number
 ---@return Group
-function groups:CreateGroup(ctx, name, kind, bankType)
-  local newID = database:CreateGroup(name, kind, bankType)
-  local group = database:GetGroup(newID)
+function groups:CreateGroup(ctx, kind, name, bankType)
+  local newID = database:CreateGroup(kind, name, bankType)
+  local group = database:GetGroup(kind, newID)
   debug:Log("groups", "Created group: %s (ID: %d)", name, newID)
   events:SendMessage(ctx, 'groups/Created', group)
   return group
@@ -48,56 +48,60 @@ end
 
 -- DeleteGroup deletes a group and moves its categories back to Backpack.
 ---@param ctx Context
+---@param kind BagKind
 ---@param groupID number
-function groups:DeleteGroup(ctx, groupID)
+function groups:DeleteGroup(ctx, kind, groupID)
   -- Don't allow deleting any default groups
-  if self:IsDefaultGroup(groupID) then
+  if self:IsDefaultGroup(kind, groupID) then
     debug:Log("groups", "Cannot delete a default group: %d", groupID)
     return
   end
 
-  local group = database:GetGroup(groupID)
+  local group = database:GetGroup(kind, groupID)
   if not group then
     debug:Log("groups", "Group not found: %d", groupID)
     return
   end
 
   local groupName = group.name
-  database:DeleteGroup(groupID)
+  database:DeleteGroup(kind, groupID)
   debug:Log("groups", "Deleted group: %s (ID: %d)", groupName, groupID)
-  events:SendMessage(ctx, 'groups/Deleted', groupID, groupName)
+  events:SendMessage(ctx, 'groups/Deleted', groupID, groupName, kind)
 end
 
 -- RenameGroup renames a group.
 ---@param ctx Context
+---@param kind BagKind
 ---@param groupID number
 ---@param name string
-function groups:RenameGroup(ctx, groupID, name)
-  local group = database:GetGroup(groupID)
+function groups:RenameGroup(ctx, kind, groupID, name)
+  local group = database:GetGroup(kind, groupID)
   if not group then
     debug:Log("groups", "Group not found: %d", groupID)
     return
   end
 
   local oldName = group.name
-  database:RenameGroup(groupID, name)
+  database:RenameGroup(kind, groupID, name)
   debug:Log("groups", "Renamed group: %s -> %s (ID: %d)", oldName, name, groupID)
-  events:SendMessage(ctx, 'groups/Changed', groupID, name, oldName)
+  events:SendMessage(ctx, 'groups/Changed', groupID, name, oldName, kind)
 end
 
 -- GetGroup returns a group by its ID.
+---@param kind BagKind
 ---@param groupID number
 ---@return Group?
-function groups:GetGroup(groupID)
-  return database:GetGroup(groupID)
+function groups:GetGroup(kind, groupID)
+  return database:GetGroup(kind, groupID)
 end
 
 -- IsDefaultGroup returns whether the group ID belongs to a default system group.
+---@param kind BagKind
 ---@param groupID number
 ---@return boolean
-function groups:IsDefaultGroup(groupID)
-  if groupID == 1 then return true end
-  local group = database:GetGroup(groupID)
+function groups:IsDefaultGroup(kind, groupID)
+  if kind == const.BAG_KIND.BACKPACK and groupID == 1 then return true end
+  local group = database:GetGroup(kind, groupID)
   return group and group.isDefault == true
 end
 
@@ -105,8 +109,8 @@ end
 ---@return Group?
 function groups:GetDefaultBankGroup()
   local charBankType = Enum.BankType and Enum.BankType.Character or 1
-  for _, group in pairs(database:GetAllGroups()) do
-    if group.kind == const.BAG_KIND.BANK and group.isDefault and group.bankType == charBankType then
+  for _, group in pairs(database:GetAllGroups(const.BAG_KIND.BANK)) do
+    if group.isDefault and group.bankType == charBankType then
       return group
     end
   end
@@ -114,22 +118,17 @@ function groups:GetDefaultBankGroup()
 end
 
 -- GetAllGroups returns all groups.
+---@param kind BagKind
 ---@return table<number, Group>
-function groups:GetAllGroups()
-  return database:GetAllGroups()
+function groups:GetAllGroups(kind)
+  return database:GetAllGroups(kind)
 end
 
 -- GetGroupsByKind returns all groups for a specific bag kind.
 ---@param kind BagKind
 ---@return table<number, Group>
 function groups:GetGroupsByKind(kind)
-  local result = {}
-  for id, group in pairs(database:GetAllGroups()) do
-    if group.kind == kind then
-      result[id] = group
-    end
-  end
-  return result
+  return database:GetAllGroups(kind)
 end
 
 -------
@@ -138,73 +137,70 @@ end
 
 -- AssignCategoryToGroup assigns a category to a group.
 ---@param ctx Context
+---@param kind BagKind
 ---@param categoryName string
 ---@param groupID number
-function groups:AssignCategoryToGroup(ctx, categoryName, groupID)
+function groups:AssignCategoryToGroup(ctx, kind, categoryName, groupID)
   -- If assigning to a default group, just remove the explicit assignment
-  if self:IsDefaultGroup(groupID) then
-    self:RemoveCategoryFromGroup(ctx, categoryName)
+  if self:IsDefaultGroup(kind, groupID) then
+    self:RemoveCategoryFromGroup(ctx, kind, categoryName)
     return
   end
 
-  local group = database:GetGroup(groupID)
+  local group = database:GetGroup(kind, groupID)
   if not group then
     debug:Log("groups", "Cannot assign to non-existent group: %d", groupID)
     return
   end
 
-  database:SetCategoryGroup(categoryName, groupID)
+  database:SetCategoryGroup(kind, categoryName, groupID)
   debug:Log("groups", "Assigned category '%s' to group '%s' (ID: %d)", categoryName, group.name, groupID)
-  events:SendMessage(ctx, 'groups/CategoryAssigned', categoryName, groupID)
+  events:SendMessage(ctx, 'groups/CategoryAssigned', categoryName, groupID, kind)
 end
 
 -- RemoveCategoryFromGroup removes a category's group assignment (moves it to Backpack).
 ---@param ctx Context
+---@param kind BagKind
 ---@param categoryName string
-function groups:RemoveCategoryFromGroup(ctx, categoryName)
-  local previousGroup = database:GetCategoryGroup(categoryName)
-  database:RemoveCategoryFromGroup(categoryName)
+function groups:RemoveCategoryFromGroup(ctx, kind, categoryName)
+  local previousGroup = database:GetCategoryGroup(kind, categoryName)
+  database:RemoveCategoryFromGroup(kind, categoryName)
   if previousGroup then
     debug:Log("groups", "Removed category '%s' from group (ID: %d)", categoryName, previousGroup)
-    events:SendMessage(ctx, 'groups/CategoryRemoved', categoryName, previousGroup)
+    events:SendMessage(ctx, 'groups/CategoryRemoved', categoryName, previousGroup, kind)
   end
 end
 
 -- GetGroupForCategory returns the group ID for a category.
 -- Returns nil if the category has no explicit assignment (belongs to Backpack).
+---@param kind BagKind
 ---@param categoryName string
----@return number? The group ID, or nil if unassigned (belongs to Backpack)
-function groups:GetGroupForCategory(categoryName)
-  return database:GetCategoryGroup(categoryName)
+---@return number? The group ID, or nil if unassigned (belongs to default)
+function groups:GetGroupForCategory(kind, categoryName)
+  return database:GetCategoryGroup(kind, categoryName)
 end
 
 -- GetCategoriesInGroup returns all categories explicitly assigned to a group.
+---@param kind BagKind
 ---@param groupID number
 ---@return table<string, boolean>
-function groups:GetCategoriesInGroup(groupID)
-  return database:GetGroupCategories(groupID)
+function groups:GetCategoriesInGroup(kind, groupID)
+  return database:GetGroupCategories(kind, groupID)
 end
 
 -- CategoryBelongsToGroup checks if a category belongs to a specific group.
 -- Categories without explicit assignment belong to Backpack (ID 1).
+---@param kind BagKind
 ---@param categoryName string
 ---@param groupID number
 ---@return boolean
-function groups:CategoryBelongsToGroup(categoryName, groupID)
-  local assignedGroup = database:GetCategoryGroup(categoryName)
-  if groupID == 1 then
-    -- Backpack group includes all categories not assigned to a Backpack group
+function groups:CategoryBelongsToGroup(kind, categoryName, groupID)
+  local assignedGroup = database:GetCategoryGroup(kind, categoryName)
+  if self:IsDefaultGroup(kind, groupID) then
+    -- Default groups include all categories not explicitly assigned to another group of the same kind
     if assignedGroup == nil then return true end
-    local g = database:GetGroup(assignedGroup)
-    return g and g.kind ~= const.BAG_KIND.BACKPACK
-  elseif self:IsDefaultGroup(groupID) then
-    -- Default Bank and Warbank tabs include all categories not assigned to a Bank group
-    -- or assigned to this specific group
     if assignedGroup == groupID then return true end
-    if assignedGroup == nil then return true end
-    local g = database:GetGroup(assignedGroup)
-    -- If it's assigned to a backpack group, we still want to show it in Bank/Warbank
-    return g and g.kind ~= const.BAG_KIND.BANK
+    return false
   else
     -- Other groups only include explicitly assigned categories
     return assignedGroup == groupID
