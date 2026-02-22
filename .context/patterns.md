@@ -1262,3 +1262,70 @@ end)
 ```
 
 **When to Apply**: Any use of `GameTooltip:SetText()`. Remember alpha comes before textWrap in SetText but AddLine has no alpha parameter.
+
+## Context Propagation and View State
+
+### Pattern: Use View-Level Flags to Bridge Context Boundary Gaps for Post-Wipe Actions
+**Problem**: Operations that need to happen after a view is wiped and rebuilt fail because the wipe and the rebuild use different context objects. Classic example: sections are not sorted after opening the bank or switching bank tabs.
+
+**Why**: The refresh pipeline creates a fresh context in `refresh:ExecutePendingUpdates` (`context:New('BagUpdate')`) that doesn't carry any flags set on the original context used for the wipe. Specifically:
+1. `bank.proto:SwitchToGroup` calls `self.bag:Wipe(ctx)` with an original context that has `wipe=true`
+2. It then calls `events:SendMessage(ctx, "bags/RefreshBank")`
+3. The `bags/RefreshBank` message handler calls `refresh:RequestUpdate({ wipe=nil, bank=true })` - the `wipe` flag is NOT propagated
+4. `ExecutePendingUpdates` creates a **new** context (`context:New('BagUpdate')`) without `wipe=true`
+5. `GridView` is called with this new context
+6. `ctx:GetBool('wipe')` is `false`, so the post-rebuild sort is skipped
+
+**Solution Pattern**: Track the required post-wipe action on the view object itself (not the context) so it persists across context boundaries:
+
+```lua
+-- In the Wipe function: set a flag on the view object
+local function Wipe(view, ctx)
+  -- ... normal wipe logic ...
+
+  -- Mark that a sort is required after rebuild.
+  -- Persists across context boundaries so that even when Wipe() is called
+  -- with one context and GridView() runs with a different fresh context,
+  -- the sort still happens.
+  view.sortRequired = true
+end
+
+-- In the render function: check the flag in addition to ctx
+local function GridView(view, ctx, bag, slotInfo, callback)
+  -- ...
+
+  -- Sort when explicitly requested (ctx wipe) OR when the view was wiped
+  -- externally under a different context (sortRequired flag).
+  if ctx:GetBool('wipe') or view.sortRequired then
+    view.sortRequired = false  -- clear before sorting
+    view.content.maxCellWidth = sizeInfo.columnCount
+    view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
+  end
+end
+
+-- In the constructor: initialize the flag
+function views:NewGrid(parent, kind)
+  local view = views:NewBlankView()
+  -- ...
+  view.sortRequired = false
+  -- ...
+end
+```
+
+**Key Points**:
+- The `view` object is long-lived (created once per bag instance) while contexts are short-lived (created per operation)
+- The flag is set on the view when `Wipe()` runs (regardless of which context triggered it)
+- The flag is cleared once the sort actually runs
+- This pattern also handles `redraw=true` paths since `view:Wipe(ctx)` is called inside `GridView` when `redraw=true`, which sets `sortRequired=true`, and the sort condition then finds it true
+- The same pattern applies to any operation that must fire once after a full rebuild but the rebuild context differs from the trigger context
+
+**When to Apply**:
+- When a view/frame operation must occur after a rebuild but the rebuild runs under a different context than the trigger
+- When the `refresh:RequestUpdate` / `ExecutePendingUpdates` pipeline loses context flags set by the triggering code
+- When debugging "X doesn't happen on first open or tab switch, but works after a full reload"
+
+**Related Files**:
+- `views/gridview.lua` – `Wipe` (sets `sortRequired`), `GridView` (checks and clears `sortRequired`), `NewGrid` (initializes flag)
+- `bags/bank.lua:489-518` – `SwitchToGroup` (triggers external wipe, then bag/RefreshBank)
+- `bags/bank.lua:165-185` – `SwitchToBlizzardTab` (same pattern)
+- `data/refresh.lua:112-152` – `ExecutePendingUpdates` (creates fresh context, losing wipe flag)

@@ -54,6 +54,13 @@ local function Wipe(view, ctx)
   end
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
+  -- Mark that a section sort is required after the view is rebuilt.
+  -- This flag persists across context boundaries so that even when
+  -- Wipe() is called with one context (e.g. SwitchToGroup) and
+  -- GridView() is later called with a fresh context (from the
+  -- RequestUpdate / ExecutePendingUpdates pipeline), the sort still
+  -- runs once all sections have been re-created.
+  view.sortRequired = true
 end
 
 -- ClearButton clears a button and makes it empty while preserving the slot,
@@ -430,8 +437,13 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     view.emptyGroupFrame:Hide()
   end
 
-  -- Sort the sections.
-  if ctx:GetBool('wipe') then
+  -- Sort the sections whenever the view was wiped (either via ctx flag or the
+  -- persistent view.sortRequired flag set by Wipe()).  The persistent flag is
+  -- needed because SwitchToGroup/SwitchToBlizzardTab call bag:Wipe() with one
+  -- context but the subsequent refresh runs with a fresh context that no longer
+  -- carries wipe=true.  Checking view.sortRequired bridges that gap.
+  if ctx:GetBool('wipe') or view.sortRequired then
+    view.sortRequired = false
     view.content.maxCellWidth = sizeInfo.columnCount
     view.content:Sort(sort:GetSectionSortFunction(bag.kind, const.BAG_VIEW.SECTION_GRID))
   end
@@ -607,6 +619,7 @@ function views:NewGrid(parent, kind)
   view.content:Hide()
   view.Render = GridView
   view.WipeHandler = Wipe
+  view.sortRequired = false
 
   -- Create empty group state frame (only for backpack)
   if kind == const.BAG_KIND.BACKPACK then
