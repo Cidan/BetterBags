@@ -45,9 +45,8 @@ local buttonCount = 0
 ---@field purchased boolean Whether this tab slot has been purchased
 ---@field isSelected boolean Whether this tab slot is currently selected
 ---@field iconTexture Texture The icon texture (shown when purchased)
----@field emptyBg Texture The empty slot background texture
 ---@field selectedHighlight Texture The highlight shown when selected
----@field plusText FontString The green '+' shown for unpurchased slots
+---@field plusText Texture The green '+' atlas icon shown for unpurchased slots
 local bankSlotButtonProto = {}
 
 -- Update refreshes the button's visual state based on current tab data.
@@ -212,6 +211,54 @@ function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
   -- Determine bank type: account bank tabs start at AccountBankTab_1
   local isAccountTab = Enum.BagIndex.AccountBankTab_1 and bagIndex >= Enum.BagIndex.AccountBankTab_1
 
+  -- Re-connect the icon selector callback so that clicking an icon in the grid
+  -- updates the selected-icon preview.  After reparenting and Update() calls the
+  -- callback set in OnLoad can become stale; explicitly re-setting it here ensures
+  -- icon selection always works.
+  ---@param menu table The TabSettingsMenu frame
+  local function reconnectIconCallback(menu)
+    if not (menu.IconSelector and menu.BorderBox and menu.BorderBox.SelectedIconArea) then return end
+    local previewButton = menu.BorderBox.SelectedIconArea.SelectedIconButton
+    local descText = menu.BorderBox.SelectedIconArea.SelectedIconText
+      and menu.BorderBox.SelectedIconArea.SelectedIconText.SelectedIconDescription
+    if previewButton and menu.IconSelector.SetSelectedCallback then
+      menu.IconSelector:SetSelectedCallback(function(_, icon)
+        previewButton:SetIconTexture(icon)
+        if descText then
+          if ICON_SELECTION_CLICK then
+            descText:SetText(ICON_SELECTION_CLICK)
+          end
+          descText:SetFontObject(GameFontHighlightSmall)
+        end
+      end)
+    end
+  end
+
+  -- Populate selectedTabData directly from C_Bank API so Update() can run even
+  -- when BankPanel.purchasedBankTabData has not yet been populated (e.g. the first
+  -- time the bank is opened and BankPanel was hidden during BANKFRAME_OPENED).
+  ---@param menu table The TabSettingsMenu frame
+  ---@param bankType BankType Enum.BankType value for the tab
+  ---@param id number bagIndex to look up
+  local function ensureSelectedTabData(menu, bankType, id)
+    -- Reset so SetSelectedTab always performs a fresh lookup (bypasses the
+    -- "alreadySelected" early-exit which could skip the data refresh).
+    menu.selectedTabData = nil
+    menu:SetSelectedTab(id)
+    -- Fallback: if BankPanel.purchasedBankTabData was empty, fetch directly.
+    if not menu.selectedTabData and C_Bank and C_Bank.FetchPurchasedBankTabData then
+      local tabList = C_Bank.FetchPurchasedBankTabData(bankType)
+      if tabList then
+        for _, tab in ipairs(tabList) do
+          if tab.ID == id then
+            menu.selectedTabData = tab
+            break
+          end
+        end
+      end
+    end
+  end
+
   if isAccountTab then
     -- Account/warbank tab: use AccountBankPanel.TabSettingsMenu
     if AccountBankPanel and AccountBankPanel.TabSettingsMenu then
@@ -220,8 +267,8 @@ function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
         menu:SetParent(bagFrame)
         menu:ClearAllPoints()
         menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
-        -- Override GetBankFrame so the settings menu retrieves correct tab data.
-        -- This mirrors the pattern from the original warbank tab config (commit 0f191b8).
+        -- Keep GetBankFrame override so the menu can look up tab data via the
+        -- real AccountBankPanel hierarchy when needed.
         menu.GetBankFrame = function()
           return {
             GetTabData = function(_, id)
@@ -238,9 +285,10 @@ function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
           }
         end
       end
-      menu:SetSelectedTab(bagIndex)
+      ensureSelectedTabData(menu, Enum.BankType.Account, bagIndex)
       menu:Show()
       if menu.Update then menu:Update() end
+      reconnectIconCallback(menu)
     end
   else
     -- Character bank tab: use BankPanel.TabSettingsMenu (added in The War Within)
@@ -251,9 +299,10 @@ function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
         menu:ClearAllPoints()
         menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
       end
-      menu:SetSelectedTab(bagIndex)
+      ensureSelectedTabData(menu, Enum.BankType.Character, bagIndex)
       menu:Show()
       if menu.Update then menu:Update() end
+      reconnectIconCallback(menu)
     end
   end
 end
@@ -325,13 +374,6 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     buttonFrame:SetSize(37, 37)
     buttonFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-    -- Empty slot background texture
-    local emptyBg = buttonFrame:CreateTexture(nil, "BACKGROUND")
-    emptyBg:SetAllPoints()
-    emptyBg:SetTexture("Interface\\Buttons\\UI-EmptySlot-Disabled")
-    emptyBg:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-    btn.emptyBg = emptyBg
-
     -- Icon texture displayed when the tab has been purchased
     local iconTex = buttonFrame:CreateTexture(nil, "ARTWORK")
     iconTex:SetAllPoints()
@@ -347,12 +389,17 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     selectedHL:Hide()
     btn.selectedHighlight = selectedHL
 
-    -- Green '+' text indicating an unpurchased tab slot
-    local plusText = buttonFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    plusText:SetPoint("CENTER", buttonFrame, "CENTER", 0, 0)
-    plusText:SetText("|cff00ff00+|r")
-    plusText:Hide()
-    btn.plusText = plusText
+    -- Atlas texture for unpurchased tab slots.  SetAtlas ignores anchor-based sizing
+    -- (SetAllPoints) and falls back to the atlas's native dimensions, which are smaller
+    -- than the 37×37 button.  Use explicit SetPoint + SetSize BEFORE SetAtlas so the
+    -- rendered size is controlled by us, not by the atlas metadata — matching the same
+    -- pattern used for icon textures in tabs.lua and item.lua.
+    local plusIcon = buttonFrame:CreateTexture(nil, "ARTWORK")
+    plusIcon:SetPoint("CENTER", buttonFrame, "CENTER", 0, 0)
+    plusIcon:SetSize(37, 37)
+    plusIcon:SetAtlas("Garr_Building-AddFollowerPlus")
+    plusIcon:Hide()
+    btn.plusText = plusIcon
 
     btn.frame = buttonFrame
 
@@ -368,9 +415,16 @@ function BankSlots:CreatePanel(ctx, bagFrame)
           capturedPanel:OpenTabConfig(capturedBtn.bagIndex)
         end
       else
-        -- Left-click: select this tab and filter bank to its items
-        local ectx = context:New('BankSlotSelect')
-        capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
+        if capturedBtn.purchased then
+          -- Left-click on purchased slot: select and filter bank to this tab's items
+          local ectx = context:New('BankSlotSelect')
+          capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
+        else
+          -- Left-click on unpurchased slot: open the Blizzard bank tab purchase dialog.
+          -- BankPanelPurchaseTabButtonMixin:OnClick does exactly this same call.
+          PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+          StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, {bankType = capturedBtn.bankType})
+        end
       end
     end)
 
@@ -391,12 +445,19 @@ function BankSlots:CreatePanel(ctx, bagFrame)
       end
       if tabData then
         GameTooltip:SetText(tabData.name, 1, 1, 1, 1, true)
+        if capturedSlotInfo.bankType == Enum.BankType.Character then
+          GameTooltip:AddLine(L:G("Bank"), 0.6, 0.8, 1.0, true)
+        else
+          GameTooltip:AddLine(L:G("Warbank"), 1.0, 0.85, 0.1, true)
+        end
         GameTooltip:AddLine(L:G("Left-click to view this tab"), 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine(L:G("Right-click to configure this tab"), 0.8, 0.8, 0.8, true)
       elseif capturedSlotInfo.bankType == Enum.BankType.Character then
         GameTooltip:SetText(L:G("Unpurchased Bank Tab"), 1, 1, 1, 1, true)
+        GameTooltip:AddLine(L:G("Click to purchase this tab"), 0.8, 0.8, 0.8, true)
       else
         GameTooltip:SetText(L:G("Unpurchased Warbank Tab"), 1, 1, 1, 1, true)
+        GameTooltip:AddLine(L:G("Click to purchase this tab"), 0.8, 0.8, 0.8, true)
       end
       GameTooltip:Show()
     end)

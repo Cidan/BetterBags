@@ -103,6 +103,7 @@ globals = {
 	"GetTalentTabInfo",
 	"GW2_ADDON",
 	"HideUIPanel",
+	"ICON_SELECTION_CLICK",
 	"INVSLOT_AMMO",
 	"INVSLOT_BACK",
 	"INVSLOT_BODY",

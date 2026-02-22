@@ -410,8 +410,11 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		decoration.tabIcon:SetAtlas(tab.icon)
 		decoration.tabIcon:Show()
 
-		-- Let PanelTemplates handle the width (minimum is enforced by template textures)
-		PanelTemplates_TabResize(decoration)
+		-- Ensure icon-only tabs are at least as wide as a short text tab (e.g. "Bank").
+		-- Without a minimum, the tab only spans the left+right edge textures (~20px),
+		-- making it noticeably smaller than text tabs.  50px matches a typical
+		-- short-label tab width so the '+' button is the same size as its neighbours.
+		PanelTemplates_TabResize(decoration, nil, 50)
 		tab:SetWidth(decoration:GetWidth())
 	else
 		-- Text tab: show text, hide icon if it exists
