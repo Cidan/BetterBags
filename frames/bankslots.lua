@@ -397,9 +397,13 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     selectedHL:Hide()
     btn.selectedHighlight = selectedHL
 
-    -- Green '+' text indicating an unpurchased tab slot
+    -- Green '+' text indicating an unpurchased tab slot.
+    -- The font size is bumped to 26pt so the '+' fills ~70% of the 37×37 slot
+    -- and looks proportional to the icon textures on purchased tabs.
     local plusText = buttonFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     plusText:SetPoint("CENTER", buttonFrame, "CENTER", 0, 0)
+    local face, _, flags = plusText:GetFont()
+    plusText:SetFont(face, 26, flags or "OUTLINE")
     plusText:SetText("|cff00ff00+|r")
     plusText:Hide()
     btn.plusText = plusText
