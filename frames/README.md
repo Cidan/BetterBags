@@ -287,8 +287,9 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 **Features:**
 - 11 slot buttons: 6 character bank tabs (`CharacterBankTab_1`–`_6`) followed by 5 warbank tabs (`AccountBankTab_1`–`_5`), in order left to right
 - Purchased tabs show the tab's configured icon (from `C_Bank.FetchPurchasedBankTabData`)
-- Unpurchased tabs show the `Garr_Building-AddFollowerPlus` atlas icon as a bare 46×46 borderless button (no slot background texture), matching the visual weight of purchased tab icons
-- Left-click selects a tab and filters the bank to show only items from that specific Blizzard bag index
+- Unpurchased tabs show the `Garr_Building-AddFollowerPlus` atlas icon as a bare 37×37 borderless button (no slot background texture), matching the visual weight of purchased tab icons
+- Left-click on a **purchased** tab selects it and filters the bank to show only items from that specific Blizzard bag index
+- Left-click on an **unpurchased** tab opens the Blizzard bank tab purchase dialog (`CONFIRM_BUY_BANK_TAB` static popup) for the appropriate bank type, replicating the behavior of `BankPanelPurchaseTabButtonMixin:OnClick`
 - Right-click opens the Blizzard tab settings dialog (for purchased tabs only); character bank tabs use `BankPanel.TabSettingsMenu`, warbank tabs use `AccountBankPanel.TabSettingsMenu`
 - Auto-selects `CharacterBankTab_1` when the panel is first shown (after the fade-in animation)
 - Clears the single-tab filter and restores the normal bank view when the panel is hidden (after fade-out)
@@ -325,10 +326,9 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 
 **Tab Button Tooltips:**
 
-Each slot button's `OnEnter` handler shows a three-line tooltip:
-1. **Tab name** (white) — from `C_Bank.FetchPurchasedBankTabData`
-2. **Bank type** (colored) — blue `"Bank"` for `Enum.BankType.Character`, gold `"Warbank"` for `Enum.BankType.Account`
-3. **Interaction hints** (grey) — "Left-click to view this tab" / "Right-click to configure this tab"
+Each slot button's `OnEnter` handler shows a tooltip:
+- **Purchased tabs**: tab name (white), bank type (colored — blue `"Bank"` or gold `"Warbank"`), and grey interaction hints: "Left-click to view this tab" / "Right-click to configure this tab"
+- **Unpurchased tabs**: localized name ("Unpurchased Bank Tab" / "Unpurchased Warbank Tab") and grey hint: "Click to purchase this tab"
 
 **Integration with Bag Filtering:**
 

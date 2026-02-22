@@ -371,7 +371,7 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     buttonCount = buttonCount + 1
     local frameName = format("BetterBagsBankSlotButton%d", buttonCount)
     local buttonFrame = CreateFrame("Button", frameName, b.frame)
-    buttonFrame:SetSize(46, 46)
+    buttonFrame:SetSize(37, 37)
     buttonFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
     -- Icon texture displayed when the tab has been purchased
@@ -391,12 +391,12 @@ function BankSlots:CreatePanel(ctx, bagFrame)
 
     -- Atlas texture for unpurchased tab slots.  SetAtlas ignores anchor-based sizing
     -- (SetAllPoints) and falls back to the atlas's native dimensions, which are smaller
-    -- than the 46×46 button.  Use explicit SetPoint + SetSize BEFORE SetAtlas so the
+    -- than the 37×37 button.  Use explicit SetPoint + SetSize BEFORE SetAtlas so the
     -- rendered size is controlled by us, not by the atlas metadata — matching the same
     -- pattern used for icon textures in tabs.lua and item.lua.
     local plusIcon = buttonFrame:CreateTexture(nil, "ARTWORK")
     plusIcon:SetPoint("CENTER", buttonFrame, "CENTER", 0, 0)
-    plusIcon:SetSize(46, 46)
+    plusIcon:SetSize(37, 37)
     plusIcon:SetAtlas("Garr_Building-AddFollowerPlus")
     plusIcon:Hide()
     btn.plusText = plusIcon
@@ -415,9 +415,16 @@ function BankSlots:CreatePanel(ctx, bagFrame)
           capturedPanel:OpenTabConfig(capturedBtn.bagIndex)
         end
       else
-        -- Left-click: select this tab and filter bank to its items
-        local ectx = context:New('BankSlotSelect')
-        capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
+        if capturedBtn.purchased then
+          -- Left-click on purchased slot: select and filter bank to this tab's items
+          local ectx = context:New('BankSlotSelect')
+          capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
+        else
+          -- Left-click on unpurchased slot: open the Blizzard bank tab purchase dialog.
+          -- BankPanelPurchaseTabButtonMixin:OnClick does exactly this same call.
+          PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
+          StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, {bankType = capturedBtn.bankType})
+        end
       end
     end)
 
@@ -447,8 +454,10 @@ function BankSlots:CreatePanel(ctx, bagFrame)
         GameTooltip:AddLine(L:G("Right-click to configure this tab"), 0.8, 0.8, 0.8, true)
       elseif capturedSlotInfo.bankType == Enum.BankType.Character then
         GameTooltip:SetText(L:G("Unpurchased Bank Tab"), 1, 1, 1, 1, true)
+        GameTooltip:AddLine(L:G("Click to purchase this tab"), 0.8, 0.8, 0.8, true)
       else
         GameTooltip:SetText(L:G("Unpurchased Warbank Tab"), 1, 1, 1, 1, true)
+        GameTooltip:AddLine(L:G("Click to purchase this tab"), 0.8, 0.8, 0.8, true)
       end
       GameTooltip:Show()
     end)
