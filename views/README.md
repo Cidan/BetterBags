@@ -110,6 +110,7 @@ Implements the category-based grid view with sections.
 - **Free Space Display**: Shows available bag slots
 - **Smart Sorting**: Sorts sections and items within sections
 - **Dynamic Sections**: Creates/removes sections as needed
+- **Sort After Wipe**: Tracks a `sortRequired` flag so that a section sort always runs after the view is wiped, even when the wipe and the subsequent rebuild happen under different context objects (e.g. `SwitchToGroup` wipes with one context, but the refresh pipeline creates a fresh context without `wipe=true`).
 
 #### Key Functions
 
