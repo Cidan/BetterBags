@@ -129,6 +129,7 @@ function item.itemRowProto:ClearItem(ctx)
   self.frame:Hide()
   self.rowButton:Hide()
   self.rowButton:SetScript("OnMouseWheel", nil)
+  self.rowButton:EnableMouseWheel(false)
   self.rowButton:SetScript("OnEnter", function(s)
     ---@cast s ItemButton
     s.HighlightTexture:Show()
@@ -203,6 +204,11 @@ function item:_DoCreate(ctx)
   ---@class ItemButton
   local rowButton = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
   rowButton:SetAllPoints(i.frame)
+  -- ContainerFrameItemButtonTemplate enables mouse wheel via its mixin, which would
+  -- intercept scroll events before they reach the parent WowScrollBox container.
+  -- Clear the handler and explicitly disable mouse wheel so scroll events fall through.
+  rowButton:SetScript("OnMouseWheel", nil)
+  rowButton:EnableMouseWheel(false)
   i.rowButton = rowButton
 
   -- Button properties are set when setting the item,

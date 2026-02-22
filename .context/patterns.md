@@ -1177,6 +1177,54 @@ return lowColor
 - `frames/classic/currency.lua:65-81,168` - Example implementation
 - `frames/themeconfig.lua:98` - Reference implementation with AttachFadeAndSlideLeft
 
+## Mouse Wheel Scroll Event Propagation
+
+### Pattern: Disable Mouse Wheel on Child Frames to Allow Scroll Events to Reach WowScrollBox
+**Problem**: Scrolling the mouse wheel over item buttons or section grids inside a `WowScrollBox` has no effect. The outer scrollable bag container does not scroll.
+
+**Why**: WoW does **not** bubble mouse wheel events up the parent-child hierarchy. Instead, scroll events are delivered to the **topmost interactive frame under the cursor** that has mouse wheel enabled. If that frame has `EnableMouseWheel(true)` (or an `OnMouseWheel` script set), it consumes the event and no other frame sees it.
+
+Two sources of interception exist in BetterBags' grid view:
+
+1. **`ContainerFrameItemButtonTemplate`** — Blizzard's mixin enables mouse wheel on the button as part of its `OnLoad`. Without explicit disabling, item buttons silently swallow all scroll events.
+2. **Section content grids** — Every `grid:Create()` call creates a `WowScrollBox` (even for non-scrollable section content). Because `WowScrollBox` registers its own `OnMouseWheel` handler in its template XML, these inner boxes also intercept scroll events before they reach the outer scrollable bag grid.
+
+**There is no automatic propagation API:**
+- `SetPropagateMouseClicks` — explicitly excludes mouse wheel (per [WoW wiki](https://warcraft.wiki.gg/wiki/API_ScriptRegion_SetPropagateMouseClicks))
+- `PropagateKeyboardInput` — only for keyboard events, not mouse wheel
+- No `SetPropagateMouseWheel` exists
+
+**Solution Pattern**: On every frame that must NOT consume scroll events, call:
+```lua
+frame:SetScript("OnMouseWheel", nil)  -- clear any handler from templates
+frame:EnableMouseWheel(false)          -- prevent future interception
+```
+
+Apply this to:
+1. **Item buttons** (created from `ContainerFrameItemButtonTemplate`) — both grid view (`frames/item.lua`, `frames/era/item.lua`) and list view row buttons (`frames/itemrow.lua`, `frames/era/itemrow.lua`)
+2. **Section content grids** — in `frames/section.lua` after `grid:Create`, call `content:EnableMouseWheelScroll(false)` to disable mouse wheel on the content grid's `WowScrollBox`
+
+The scroll event then falls through to the **outer bag grid's WowScrollBox** (which remains mouse wheel enabled and correctly scrolls the bag contents).
+
+**The `EnableMouseWheelScroll` method** is exposed on `gridProto` in `frames/grid.lua` for this purpose:
+```lua
+function gridProto:EnableMouseWheelScroll(enabled)
+  self.frame:EnableMouseWheel(enabled)
+end
+```
+
+**When to Apply**:
+- Any non-scrollable `WowScrollBox` (e.g. section content grids) should have mouse wheel disabled
+- Any child frame that uses `ContainerFrameItemButtonTemplate` and lives inside a scrollable parent
+- Whenever debugging "scrolling doesn't work" — check if an intermediate frame has mouse wheel enabled
+
+**Related Files**:
+- `frames/grid.lua:148-156` — `EnableMouseWheelScroll` method
+- `frames/section.lua:690-696` — Disabling on section content grids
+- `frames/item.lua:825-830` — Disabling on grid view item buttons
+- `frames/era/item.lua` — Same for Classic Era
+- `frames/itemrow.lua:205-210,131-132` — Disabling on list view row buttons
+
 ## Tooltip API Patterns
 
 ### Pattern: GameTooltip:SetText vs AddLine Have Different Signatures (alpha param)
