@@ -12,6 +12,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install SVN
+        run: sudo apt-get update && sudo apt-get install -y subversion
+
+      - name: Cache addon dependencies
+        uses: actions/cache@v4
+        with:
+          path: ./libs
+          key: addon-deps-${{ hashFiles('install-deps.sh') }}
+
+      - name: Install addon dependencies
+        run: bash install-deps.sh
+
       - name: Install Lua
         uses: leafo/gh-actions-lua@v10
         with:
