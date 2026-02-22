@@ -17,6 +17,7 @@ The frames module contains all UI frame components for the BetterBags addon, pro
   - [Context Menu](#context-menu-contextmenulua)
   - [Tabs](#tabs-tabslua)
   - [Bag Slots](#bag-slots-bagslotslua)
+  - [Bank Tab Slots Panel](#bank-tab-slots-panel-bankslotslua)
 - [Support Components](#support-components)
   - [Anchor System](#anchor-system-anchorlua)
   - [Money Frame](#money-frame-moneylua)
@@ -274,6 +275,48 @@ Display panel for equipped bags.
 - Purchase prompts
 - Animation support
 
+### Bank Tab Slots Panel (`bankslots.lua`)
+
+Slide-out panel that appears above the bank frame showing all possible Blizzard bank tab slots (retail only). Replaces the normal group-based bank view with a per-Blizzard-tab filtered view.
+
+**Features:**
+- 11 slot buttons: 6 character bank tabs (`CharacterBankTab_1`–`_6`) followed by 5 warbank tabs (`AccountBankTab_1`–`_5`), in order left to right
+- Purchased tabs show the tab's configured icon (from `C_Bank.FetchPurchasedBankTabData`)
+- Unpurchased tabs show an empty slot background with a green `+` in the center
+- Left-click selects a tab and filters the bank to show only items from that specific Blizzard bag index
+- Right-click opens the Blizzard tab settings dialog (for purchased tabs only); character bank tabs use `BankPanel.TabSettingsMenu`, warbank tabs use `AccountBankPanel.TabSettingsMenu`
+- Auto-selects `CharacterBankTab_1` when the panel is first shown (after the fade-in animation)
+- Clears the single-tab filter and restores the normal bank view when the panel is hidden (after fade-out)
+- Redraws automatically on `BANK_TAB_SETTINGS_UPDATED` and `PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED` events
+- Mouse wheel events are forwarded to the outer bag container (not consumed by the inner grid)
+
+**Main Class:**
+```lua
+---@class bankSlotsPanel
+---@field frame Frame
+---@field content Grid
+---@field fadeInGroup AnimationGroup
+---@field fadeOutGroup AnimationGroup
+---@field buttons BankSlotButton[]
+---@field selectedBagIndex number?
+```
+
+**Key Methods:**
+- `CreatePanel(ctx, bagFrame)` — factory; returns a `bankSlotsPanel` attached above `bagFrame` (retail-only; returns nil on Classic/Era)
+- `Draw(ctx)` — refreshes all slot button visuals from the current C_Bank tab data
+- `SelectTab(ctx, bagIndex)` — selects the given tab, deselects others, and calls `bank.behavior:SwitchToBlizzardTab()`
+- `SelectFirstTab(ctx)` — selects the first available tab (called automatically on fade-in)
+- `OpenTabConfig(bagIndex)` — opens the Blizzard tab settings dialog for the given bag index
+- `Show(callback?)` / `Hide(callback?)` / `IsShown()` — animation-aware show/hide
+
+**Integration with Bag Filtering:**
+
+When a tab is selected the panel sets `bag.blizzardBankTab` to the chosen `Enum.BagIndex` value and calls `bank.behavior:SwitchToBlizzardTab(ctx, bagIndex)`. The items module (`data/items.lua`) checks this field during `RefreshBags()` and narrows the bag list to only the selected Blizzard bag index. When the panel is hidden the field is cleared and the normal group-based view is restored.
+
+**Context Menu Integration:**
+
+The existing context menu already shows the "Show Bags" option whenever `bag.slots` is set. Since `bags/bank.lua` assigns the created panel to `bag.slots`, no context menu changes are needed.
+
 ## Support Components
 
 ### Anchor System (`anchor.lua`)
@@ -425,6 +468,8 @@ BAG_VIEW = {
 ### Frame Hierarchy
 ```
 BetterBagsBag (Main Container)
+├── BetterBagsBankSlots (Bank Tab Slots Panel — retail bank only, slides above)
+│   └── Grid (11 BankSlotButton frames)
 ├── SearchFrame
 ├── Tabs
 ├── Content Area

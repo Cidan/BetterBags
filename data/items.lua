@@ -571,22 +571,34 @@ function items:RefreshBags(ctx, kind)
 			GetInventoryItemQuality("player", id)
 		end
 
-		local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
-		local activeGroup = database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
-		local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
-
-		if activeGroup and addon.isRetail and activeGroup.bankType == Enum.BankType.Account then
-			ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1) -- just a marker
-			for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
-				bagList[bag] = bag
+		-- If the bank slots panel has selected a specific Blizzard tab, only
+		-- load items from that single bag index instead of all bank bags.
+		local blizzardTab = addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
+		if blizzardTab and addon.isRetail then
+			if Enum.BagIndex.AccountBankTab_1 and blizzardTab >= Enum.BagIndex.AccountBankTab_1 then
+				ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1)
+			else
+				ctx:Set("bagid", const.BANK_TAB.BANK)
 			end
+			bagList[blizzardTab] = blizzardTab
 		else
-			ctx:Set("bagid", const.BANK_TAB.BANK)
-			for _, bag in pairs(const.BANK_BAGS) do
-				bagList[bag] = bag
-			end
-			if reagentBank then
-				bagList[reagentBank] = reagentBank
+			local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
+			local activeGroup = database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
+			local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
+
+			if activeGroup and addon.isRetail and activeGroup.bankType == Enum.BankType.Account then
+				ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1) -- just a marker
+				for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+					bagList[bag] = bag
+				end
+			else
+				ctx:Set("bagid", const.BANK_TAB.BANK)
+				for _, bag in pairs(const.BANK_BAGS) do
+					bagList[bag] = bag
+				end
+				if reagentBank then
+					bagList[reagentBank] = reagentBank
+				end
 			end
 		end
 	end

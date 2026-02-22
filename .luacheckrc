@@ -23,6 +23,7 @@ globals = {
 	"ACCOUNT_BANK_PANEL_TITLE",
 	"BagsBar",
 	"BankFrame",
+	"AccountBankPanel",
 	"BankPanel",
 	"BankPanelMixin",
 	"BetterBags_ToggleBags",

@@ -450,6 +450,13 @@ Enum.BankType = {
   Account = 2,
 }
 
+---@class BankTabData
+---@field ID number The Enum.BagIndex value for this bank tab
+---@field name string The display name of this bank tab
+---@field icon number The FileID of the icon texture for this tab
+---@field depositFlags BagSlotFlags Flags controlling what can be deposited
+---@field bankType BankType Whether this is a Character or Account bank tab
+
 ---@class TabSettingsMenu: Frame
 TabSettingsMenu = {}
 function TabSettingsMenu:Show() end
@@ -457,6 +464,13 @@ function TabSettingsMenu:Hide() end
 function TabSettingsMenu:SetSelectedTab(index) end
 function TabSettingsMenu:Update() end
 function TabSettingsMenu:GetBankFrame() end
+
+---@class BankPanel: Frame
+---@field TabSettingsMenu TabSettingsMenu
+BankPanel = {}
+---@param bankType BankType
+function BankPanel:SetBankType(bankType) end
+function BankPanel:GetActiveBankType() end
 
 ---@class AccountBankPanel: Frame
 ---@field TabSettingsMenu TabSettingsMenu

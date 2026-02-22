@@ -38,6 +38,9 @@ local context = addon:GetModule("Context")
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule("ContextMenu")
 
+---@class BankSlots: AceModule
+local bankSlots = addon:GetModule("BankSlots")
+
 local NEW_GROUP_TAB_ID = 0
 local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 
@@ -154,12 +157,49 @@ function bank.proto:OnHide()
 	end
 end
 
+-- SwitchToBlizzardTab filters the bank view to show only items from the
+-- specific Blizzard bank tab identified by bagIndex. This is called by the
+-- bank slots panel when the player selects a tab slot.
 ---@param ctx Context
-function bank.proto:OnCreate(_)
+---@param bagIndex number The Enum.BagIndex value of the tab to display
+function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
+	-- Store the selected Blizzard tab so items.lua can filter to it
+	self.bag.blizzardBankTab = bagIndex
+
+	-- Update BankPanel bank type so right-click item deposits go to the
+	-- correct bank (character vs account/warbank).
+	if addon.isRetail and BankPanel and BankPanel.SetBankType then
+		if Enum.BagIndex.AccountBankTab_1 and bagIndex >= Enum.BagIndex.AccountBankTab_1 then
+			BankPanel:SetBankType(Enum.BankType.Account)
+		else
+			BankPanel:SetBankType(Enum.BankType.Character)
+		end
+	end
+
+	self.bag.currentItemCount = -1
+	items:ClearBankCache(ctx)
+	self.bag:Wipe(ctx)
+	ctx:Set("wipe", true)
+	events:SendMessage(ctx, "bags/RefreshBank")
+	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+end
+
+---@param ctx Context
+function bank.proto:OnCreate(ctx)
 	-- Capture behavior reference for closures
 	local behavior = self
 
 	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BANK)
+
+	-- Create the bank tab slots panel (retail only). This slide-out panel
+	-- shows all possible Blizzard bank tabs and lets the player filter the
+	-- bank view to a single tab.
+	if addon.isRetail then
+		local slots = bankSlots:CreatePanel(ctx, self.bag.frame)
+		if slots then
+			self.bag.slots = slots
+		end
+	end
 
 	self.bag.tabs:SetClickHandler(function(ectx, tabID, button)
 		if tabID == NEW_GROUP_TAB_ID then

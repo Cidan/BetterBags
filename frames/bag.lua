@@ -100,6 +100,7 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
 ---@field bankTab BankTab
+---@field blizzardBankTab number? When set, the bank is filtered to show only items from this specific Blizzard bag index (set by the bank slots panel).
 ---@field behavior BackpackBehaviorProto|BankBehaviorProto The bag-type-specific behavior
 bagFrame.bagProto = {}
 
