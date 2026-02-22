@@ -243,6 +243,11 @@ Tab management for bank views.
 - Tab visibility management (ShowTabByID/HideTabByID)
 - Bank-type-aware tab sorting with strict section ordering
 - Drag-to-reorder with cross-section drag constraint
+- Icon-only tab minimum width enforcement (50px)
+
+**Icon-Only Tab Sizing:**
+
+Tabs that display only an icon (no text label), such as the '+' purchase-new-tab button, use `PanelTemplates_TabResize(decoration, nil, 50)` to enforce a 50-pixel minimum width. Without this minimum, the tab renderer returns only the width of the left and right edge textures (~20px), making icon-only tabs noticeably narrower than adjacent text tabs. Passing `50` as the third argument ensures they visually match a typical short-label tab (e.g. "Bank").
 
 **Bank Tab Sort Order (Retail):**
 
@@ -289,6 +294,7 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 - Clears the single-tab filter and restores the normal bank view when the panel is hidden (after fade-out)
 - Redraws automatically on `BANK_TAB_SETTINGS_UPDATED` and `PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED` events
 - Mouse wheel events are forwarded to the outer bag container (not consumed by the inner grid)
+- Slot button tooltips show the tab name, bank type (blue "Bank" / gold "Warbank"), and interaction hints
 
 **Main Class:**
 ```lua
@@ -308,6 +314,21 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 - `SelectFirstTab(ctx)` — selects the first available tab (called automatically on fade-in)
 - `OpenTabConfig(bagIndex)` — opens the Blizzard tab settings dialog for the given bag index
 - `Show(callback?)` / `Hide(callback?)` / `IsShown()` — animation-aware show/hide
+
+**Tab Config Dialog — Reliable Icon Selection:**
+
+`OpenTabConfig` uses two internal helpers to work around timing and reparenting issues with Blizzard's `TabSettingsMenu`:
+
+1. **`ensureSelectedTabData(menu, bankType, id)`** — Forces a fresh tab data lookup every time the config dialog is opened, bypassing Blizzard's internal `alreadySelected` early-exit guard. It first resets `menu.selectedTabData = nil` to force `SetSelectedTab` to re-fetch, then falls back to a direct `C_Bank.FetchPurchasedBankTabData(bankType)` call if the menu's data is still nil. This is necessary because BetterBags shows `BankPanel` only after a fade-in animation, so `BankPanel.purchasedBankTabData` may be empty during `BANKFRAME_OPENED`; the fallback ensures icon data is always available.
+
+2. **`reconnectIconCallback(menu)`** — Explicitly re-wires `menu.IconSelector:SetSelectedCallback` with a fresh closure after the menu is reparented. Without this, the callback installed in `BankPanelTabSettingsMenuMixin:OnLoad` may become stale, causing icon clicks in the grid to silently do nothing. The closure updates `BorderBox.SelectedIconArea.SelectedIconButton` with the chosen icon texture.
+
+**Tab Button Tooltips:**
+
+Each slot button's `OnEnter` handler shows a three-line tooltip:
+1. **Tab name** (white) — from `C_Bank.FetchPurchasedBankTabData`
+2. **Bank type** (colored) — blue `"Bank"` for `Enum.BankType.Character`, gold `"Warbank"` for `Enum.BankType.Account`
+3. **Interaction hints** (grey) — "Left-click to view this tab" / "Right-click to configure this tab"
 
 **Integration with Bag Filtering:**
 
