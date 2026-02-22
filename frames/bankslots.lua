@@ -45,7 +45,6 @@ local buttonCount = 0
 ---@field purchased boolean Whether this tab slot has been purchased
 ---@field isSelected boolean Whether this tab slot is currently selected
 ---@field iconTexture Texture The icon texture (shown when purchased)
----@field emptyBg Texture The empty slot background texture
 ---@field selectedHighlight Texture The highlight shown when selected
 ---@field plusText Texture The green '+' atlas icon shown for unpurchased slots
 local bankSlotButtonProto = {}
@@ -372,15 +371,8 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     buttonCount = buttonCount + 1
     local frameName = format("BetterBagsBankSlotButton%d", buttonCount)
     local buttonFrame = CreateFrame("Button", frameName, b.frame)
-    buttonFrame:SetSize(37, 37)
+    buttonFrame:SetSize(46, 46)
     buttonFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-
-    -- Empty slot background texture
-    local emptyBg = buttonFrame:CreateTexture(nil, "BACKGROUND")
-    emptyBg:SetAllPoints()
-    emptyBg:SetTexture("Interface\\Buttons\\UI-EmptySlot-Disabled")
-    emptyBg:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-    btn.emptyBg = emptyBg
 
     -- Icon texture displayed when the tab has been purchased
     local iconTex = buttonFrame:CreateTexture(nil, "ARTWORK")
@@ -399,12 +391,12 @@ function BankSlots:CreatePanel(ctx, bagFrame)
 
     -- Atlas texture for unpurchased tab slots.  SetAtlas ignores anchor-based sizing
     -- (SetAllPoints) and falls back to the atlas's native dimensions, which are smaller
-    -- than the 37×37 button.  Use explicit SetPoint + SetSize BEFORE SetAtlas so the
+    -- than the 46×46 button.  Use explicit SetPoint + SetSize BEFORE SetAtlas so the
     -- rendered size is controlled by us, not by the atlas metadata — matching the same
     -- pattern used for icon textures in tabs.lua and item.lua.
     local plusIcon = buttonFrame:CreateTexture(nil, "ARTWORK")
     plusIcon:SetPoint("CENTER", buttonFrame, "CENTER", 0, 0)
-    plusIcon:SetSize(37, 37)
+    plusIcon:SetSize(46, 46)
     plusIcon:SetAtlas("Garr_Building-AddFollowerPlus")
     plusIcon:Hide()
     btn.plusText = plusIcon
