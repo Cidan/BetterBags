@@ -22,3 +22,7 @@ If any file changes are made, create a new git commit in the same task. Commit m
 ## Luacheck Requirement
 
 For any code changes, always run `luacheck .` from the repository root before finishing. Add any newly introduced WoW API globals to `.luacheckrc` as needed.
+
+## Deps Requirements
+
+Before starting a brand new task, make sure you always run `install-deps.sh` so that deps are installed. This will also let you look at the wow source code directly as needed.
