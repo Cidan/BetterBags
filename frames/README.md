@@ -287,7 +287,7 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 **Features:**
 - 11 slot buttons: 6 character bank tabs (`CharacterBankTab_1`–`_6`) followed by 5 warbank tabs (`AccountBankTab_1`–`_5`), in order left to right
 - Purchased tabs show the tab's configured icon (from `C_Bank.FetchPurchasedBankTabData`)
-- Unpurchased tabs show an empty slot background with a green `+` in the center
+- Unpurchased tabs show an empty slot background with the `Garr_Building-AddFollowerPlus` atlas icon scaled to fill the button (matching purchased tab icon coverage)
 - Left-click selects a tab and filters the bank to show only items from that specific Blizzard bag index
 - Right-click opens the Blizzard tab settings dialog (for purchased tabs only); character bank tabs use `BankPanel.TabSettingsMenu`, warbank tabs use `AccountBankPanel.TabSettingsMenu`
 - Auto-selects `CharacterBankTab_1` when the panel is first shown (after the fade-in animation)

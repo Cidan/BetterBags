@@ -47,7 +47,7 @@ local buttonCount = 0
 ---@field iconTexture Texture The icon texture (shown when purchased)
 ---@field emptyBg Texture The empty slot background texture
 ---@field selectedHighlight Texture The highlight shown when selected
----@field plusText FontString The green '+' shown for unpurchased slots
+---@field plusText Texture The green '+' atlas icon shown for unpurchased slots
 local bankSlotButtonProto = {}
 
 -- Update refreshes the button's visual state based on current tab data.
@@ -397,16 +397,16 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     selectedHL:Hide()
     btn.selectedHighlight = selectedHL
 
-    -- Green '+' text indicating an unpurchased tab slot.
-    -- The font size is bumped to 26pt so the '+' fills ~70% of the 37×37 slot
-    -- and looks proportional to the icon textures on purchased tabs.
-    local plusText = buttonFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    plusText:SetPoint("CENTER", buttonFrame, "CENTER", 0, 0)
-    local face, _, flags = plusText:GetFont()
-    plusText:SetFont(face, 26, flags or "OUTLINE")
-    plusText:SetText("|cff00ff00+|r")
-    plusText:Hide()
-    btn.plusText = plusText
+    -- Atlas texture for unpurchased tab slots.  Blizzard uses the same atlas
+    -- (Garr_Building-AddFollowerPlus) in BankPanelPurchaseTabTemplate, but renders
+    -- it at native atlas size via UseAtlasSize which makes it smaller than purchased
+    -- tab icons.  We use SetAllPoints instead so the '+' fills the same 37×37 area
+    -- as purchased tab icon textures, keeping all slot buttons visually consistent.
+    local plusIcon = buttonFrame:CreateTexture(nil, "ARTWORK")
+    plusIcon:SetAllPoints()
+    plusIcon:SetAtlas("Garr_Building-AddFollowerPlus")
+    plusIcon:Hide()
+    btn.plusText = plusIcon
 
     btn.frame = buttonFrame
 
