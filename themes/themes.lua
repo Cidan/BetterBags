@@ -287,24 +287,6 @@ function themes:SetTitle(frame, title)
   self.titles[frame:GetName()] = title
 end
 
--- ToggleTitleContainer shows or hides the title element in the theme decoration
--- of the given frame. Used by the bank slots panel to remove the window title
--- from its normal position when bank slot icons are rendered at the bottom instead.
----@param frame Frame
----@param shown boolean
-function themes:ToggleTitleContainer(frame, shown)
-  for _, child in ipairs({frame:GetChildren()}) do
-    -- Default theme uses Blizzard's DefaultPanelTemplate which provides TitleContainer.
-    if child.TitleContainer then
-      child.TitleContainer:SetShown(shown)
-    end
-    -- Other themes (SimpleDark, GW2, ElvUI) expose a FontString named 'title'.
-    if child.title then
-      child.title:SetShown(shown)
-    end
-  end
-end
-
 ---@param ctx Context
 ---@param item Item
 ---@return ItemButton

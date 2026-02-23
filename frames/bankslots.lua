@@ -35,9 +35,6 @@ local themes = addon:GetModule('Themes')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
-
 local buttonCount = 0
 
 -- BankSlotButton represents a single bank tab slot button in the panel.
@@ -114,8 +111,6 @@ end
 ---@field buttons BankSlotButton[]
 ---@field selectedBagIndex number?
 ---@field bagFrame Frame The parent bag frame this panel is attached to
----@field titleLabel Frame External title label shown below the panel when open
----@field titleText FontString The font string inside the title label
 ---@field tabsWereShown boolean Whether group tabs were visible before panel opened
 BankSlots.bankSlotsPanelProto = {}
 
@@ -187,11 +182,6 @@ function BankSlots.bankSlotsPanelProto:Show(callback)
   else
     self.tabsWereShown = false
   end
-  -- Hide the bag window's title bar text and show the external title label
-  -- positioned below the bank slots panel instead.
-  themes:ToggleTitleContainer(self.bagFrame, false)
-  self.titleText:SetText(themes.titles[self.bagFrame:GetName()] or "")
-  self.titleLabel:Show()
   self.fadeInGroup:Play()
 end
 
@@ -362,7 +352,9 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.frame = f
   b.bagFrame = bagFrame
 
-  themes:RegisterFlatWindow(f, L:G("Bank Tabs"))
+  -- Register with an empty title so no title text is rendered in the window
+  -- decoration across any theme. The panel has no title bar text by design.
+  themes:RegisterFlatWindow(f, "")
 
   b.content = grid:Create(b.frame)
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
@@ -378,21 +370,6 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.buttons = {}
   b.selectedBagIndex = nil
   b.tabsWereShown = false
-
-  -- External title label shown below the bank slots panel when it is open,
-  -- replacing the title that is hidden from the bag window's top bar during
-  -- bank-slot view mode.
-  local titleLabel = CreateFrame("Frame", nil, bagFrame)
-  titleLabel:SetHeight(20)
-  titleLabel:SetPoint("TOPLEFT", b.frame, "BOTTOMLEFT", 0, -4)
-  titleLabel:SetPoint("TOPRIGHT", b.frame, "BOTTOMRIGHT", 0, -4)
-  local titleText = titleLabel:CreateFontString(nil, "OVERLAY")
-  titleText:SetFontObject(fonts.UnitFrame12Yellow)
-  titleText:SetJustifyH("CENTER")
-  titleText:SetAllPoints()
-  titleLabel:Hide()
-  b.titleLabel = titleLabel
-  b.titleText = titleText
 
   -- All possible bank tab slots in order:
   --   6 character bank tabs (CharacterBankTab_1 through _6)
@@ -564,9 +541,6 @@ function BankSlots:CreatePanel(ctx, bagFrame)
       bankBag.tabs.frame:Show()
     end
     b.tabsWereShown = false
-    -- Restore the bag window title and hide the external label below.
-    themes:ToggleTitleContainer(bagFrame, true)
-    b.titleLabel:Hide()
   end)
 
   -- Redraw when tab settings are updated (name/icon changed)

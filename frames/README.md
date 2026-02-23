@@ -308,8 +308,8 @@ When `Show()` is called the panel transitions into an active mode that fully tra
 
 1. The panel frame is reanchored from **above** the bag window (`BOTTOMLEFT` → `TOPLEFT`) to **below** it (`TOPLEFT` → `BOTTOMLEFT`), occupying the space where group tabs normally sit.
 2. The group tabs frame is **completely hidden** (not just disabled). The previous visibility state is saved in `tabsWereShown` so it can be restored correctly.
-3. `themes:ToggleTitleContainer(bagFrame, false)` hides the window title from the top bar of the bag frame decoration (works for all built-in themes: Default's `TitleContainer`, and SimpleDark/GW2/ElvUI's `title` FontString).
-4. An **external title label** (`titleLabel`) is shown directly below the panel, displaying the title that was removed from the top bar.
+
+The Bank Tabs window itself is registered with an empty title (`""`), so no title text is ever rendered in the window decoration across any theme. This is permanent — the title is absent by design, not toggled.
 
 **Toggle Behavior (Hide):**
 
@@ -317,8 +317,6 @@ After the fade-out animation completes (`fadeOutGroup.OnFinished`):
 
 1. The panel frame is reanchored back to above the bag window (`BOTTOMLEFT` → `TOPLEFT`, 14px gap).
 2. Group tabs visibility is restored from `tabsWereShown`.
-3. `themes:ToggleTitleContainer(bagFrame, true)` re-shows the window title in the top bar.
-4. The external title label is hidden.
 
 **Main Class:**
 ```lua
@@ -329,10 +327,8 @@ After the fade-out animation completes (`fadeOutGroup.OnFinished`):
 ---@field fadeOutGroup AnimationGroup
 ---@field buttons BankSlotButton[]
 ---@field selectedBagIndex number?
----@field bagFrame Frame          -- parent bag frame, stored for Show/Hide title manipulation
----@field titleLabel Frame        -- external label shown below panel when open
----@field titleText FontString    -- FontString inside titleLabel
----@field tabsWereShown boolean   -- whether group tabs were visible before panel opened
+---@field bagFrame Frame        -- parent bag frame, stored for Show/Hide reanchoring
+---@field tabsWereShown boolean -- whether group tabs were visible before panel opened
 ```
 
 **Key Methods:**
@@ -341,7 +337,7 @@ After the fade-out animation completes (`fadeOutGroup.OnFinished`):
 - `SelectTab(ctx, bagIndex)` — selects the given tab, deselects others, and calls `bank.behavior:SwitchToBlizzardTab()`
 - `SelectFirstTab(ctx)` — selects the first available tab (called automatically on fade-in)
 - `OpenTabConfig(bagIndex)` — opens the Blizzard tab settings dialog for the given bag index
-- `Show(callback?)` — reanchors panel to bottom, hides group tabs, hides window title, shows external title label, then plays fade-in animation
+- `Show(callback?)` — reanchors panel to bottom, hides group tabs, then plays fade-in animation
 - `Hide(callback?)` — plays fade-out animation; all layout changes are reversed in `fadeOutGroup.OnFinished`
 - `IsShown()` — returns whether the underlying frame is visible
 
