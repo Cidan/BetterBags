@@ -370,7 +370,11 @@ function BankSlots:CreatePanel(ctx, bagFrame)
 
     buttonCount = buttonCount + 1
     local frameName = format("BetterBagsBankSlotButton%d", buttonCount)
-    local buttonFrame = CreateFrame("Button", frameName, b.frame)
+    -- Use BankPanelPurchaseButtonScriptTemplate so that unpurchased slots
+    -- open the bank tab purchase dialog via Blizzard's protected mixin.
+    -- The overrideBankType attribute tells the mixin which bank type to purchase.
+    local buttonFrame = CreateFrame("Button", frameName, b.frame, "BankPanelPurchaseButtonScriptTemplate")
+    buttonFrame:SetAttribute("overrideBankType", slotInfo.bankType)
     buttonFrame:SetSize(37, 37)
     buttonFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
@@ -408,7 +412,7 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     local capturedPanel = b
     local capturedSlotInfo = slotInfo
 
-    buttonFrame:SetScript("OnClick", function(_, mouseButton)
+    buttonFrame:SetScript("OnClick", function(clickedFrame, mouseButton)
       if mouseButton == "RightButton" then
         -- Right-click: open Blizzard tab configuration (purchased tabs only)
         if capturedBtn.purchased then
@@ -420,10 +424,11 @@ function BankSlots:CreatePanel(ctx, bagFrame)
           local ectx = context:New('BankSlotSelect')
           capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
         else
-          -- Left-click on unpurchased slot: open the Blizzard bank tab purchase dialog.
-          -- BankPanelPurchaseTabButtonMixin:OnClick does exactly this same call.
-          PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
-          StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, {bankType = capturedBtn.bankType})
+          -- Left-click on unpurchased slot: delegate to BankPanelPurchaseTabButtonMixin:OnClick.
+          -- The button was created with BankPanelPurchaseButtonScriptTemplate and has the
+          -- overrideBankType attribute set, so the mixin will call StaticPopup_Show with
+          -- the correct bank type via Blizzard's protected purchase handler.
+          BankPanelPurchaseTabButtonMixin.OnClick(clickedFrame)
         end
       end
     end)

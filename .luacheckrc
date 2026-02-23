@@ -26,6 +26,7 @@ globals = {
 	"AccountBankPanel",
 	"BankPanel",
 	"BankPanelMixin",
+	"BankPanelPurchaseTabButtonMixin",
 	"BetterBags_ToggleBags",
 	"BetterBags_ToggleSearch",
 	"ButtonInventorySlot",
