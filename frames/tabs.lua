@@ -176,7 +176,7 @@ function tabFrame:SortTabsByID()
 	if self.kind == const.BAG_KIND.BANK then
 		-- Bank tab sort order:
 		--   Bank (default, Character) → user Bank tabs → Warbank (default, Account)
-		--   → user Warbank tabs → purchase tabs → "+" tab
+		--   → user Warbank tabs → "+" tab
 		-- This groups bank and warbank tabs into clearly separated sections.
 		local charBankType = Enum.BankType and Enum.BankType.Character or 1
 		local accountBankType = Enum.BankType and Enum.BankType.Account or 2
@@ -185,16 +185,12 @@ function tabFrame:SortTabsByID()
 		-- Section values:
 		--   1 = Bank default (Character bankType, isDefault)
 		--   2 = User-created Bank tabs (Character bankType)
-		--   3 = Purchase Bank tab (id=-1)
 		--   4 = Warbank default (Account bankType, isDefault)
 		--   5 = User-created Warbank tabs (Account bankType)
-		--   6 = Purchase Warbank tab (id=-2)
 		--   7 = "+" create tab (id=0)
 		--   8 = Unknown/fallback
 		local function getBankTabSection(tab)
 			if tab.id == 0 then return 7, 0 end   -- "+" always last
-			if tab.id == -1 then return 3, 0 end   -- Purchase Bank tab
-			if tab.id == -2 then return 6, 0 end   -- Purchase Warbank tab
 			if tab.id and tab.id > 0 then
 				local group = database:GetGroup(self.kind, tab.id)
 				if group then

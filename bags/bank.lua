@@ -327,34 +327,6 @@ function bank.proto:GenerateGroupTabs(ctx)
 		self:SetupPlusTabTooltip(ctx)
 	end
 
-	if C_Bank and C_Bank.CanPurchaseBankTab and C_Bank.HasMaxBankTabs then
-		if C_Bank.CanPurchaseBankTab(Enum.BankType.Character) and not C_Bank.HasMaxBankTabs(Enum.BankType.Character) then
-			if not self.bag.tabs:TabExistsByID(-1) then
-				self.bag.tabs:AddTab(ctx, L:G("Purchase Bank Tab"), -1, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
-				local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Bank Tab"))
-				if purchaseTab then purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Character) end
-			else
-				self.bag.tabs:ShowTabByID(-1)
-			end
-		elseif self.bag.tabs:TabExistsByID(-1) then
-			self.bag.tabs:HideTabByID(-1)
-		end
-
-		-- Disable rendering the purchase warbank tab button for now
-		local ENABLE_WARBANK_PURCHASE_TAB = false
-		if ENABLE_WARBANK_PURCHASE_TAB and addon.isRetail and C_Bank.CanPurchaseBankTab(Enum.BankType.Account) and not C_Bank.HasMaxBankTabs(Enum.BankType.Account) then
-			if not self.bag.tabs:TabExistsByID(-2) then
-				self.bag.tabs:AddTab(ctx, L:G("Purchase Warbank Tab"), -2, nil, nil, self.bag.frame, "BankPanelPurchaseButtonScriptTemplate")
-				local purchaseTab = self.bag.tabs:GetTabByName(L:G("Purchase Warbank Tab"))
-				if purchaseTab then purchaseTab:SetAttribute("overrideBankType", Enum.BankType.Account) end
-			else
-				self.bag.tabs:ShowTabByID(-2)
-			end
-		elseif self.bag.tabs:TabExistsByID(-2) then
-			self.bag.tabs:HideTabByID(-2)
-		end
-	end
-
 	self.bag.tabs:SortTabsByID()
 	self.bag.tabs:MoveToEnd(L:G("New Group"))
 

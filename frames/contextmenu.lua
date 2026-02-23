@@ -214,9 +214,6 @@ function contextMenu:CreateContextMenu(bag)
 	})
 
 	if bag.kind == const.BAG_KIND.BANK then
-		-- Purchase bank tab buttons removed from context menu.
-		-- They are now implemented as persistent tab buttons on the bank frame
-		-- to avoid taint issues (see bags/bank.lua OnCreate).
 		table.insert(menuList, {
 			text = L:G("Sort Bank"),
 			notCheckable = true,

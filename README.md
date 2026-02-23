@@ -315,7 +315,6 @@ To show Character Bank Tabs, turn on the option in the Bank Menu. This allows al
 </div>
 
 ### Warbank Tabs
-To purchase Warbank tabs, click on the `Purchase Warbank Tab` button, then click purchase on the Blizzard pop-up.  
 Warbank tabs can be renamed and certain item types can be assigned to them by right-clicking on the tab at the bottom of the bank. This will bring up the Blizzard prompt to make any changes. Depositing items into the Warbank tabs will deposit them using Blizzard's rules for depositting items into the Warbank.
 
 <div align="center" style="text-align:center">
