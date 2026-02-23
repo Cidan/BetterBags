@@ -81,9 +81,12 @@ function bankSlotButtonProto:Update(charTabData, accountTabData)
     -- BankPanelPurchaseTabButtonMixin:OnClick runs in clean (Blizzard) code context.
     -- This prevents the bankType argument from being tainted, which would otherwise
     -- cause C_Bank.PurchaseBankTab to be blocked as an insecure call.
+    -- RegisterForClicks("LeftButtonDown") matches the old purchase tab decoration which also
+    -- used LeftButtonDown. SecureActionButton_OnClick fires the click action on down=true
+    -- when the ActionButtonUseKeyDown CVar is true (the default in modern WoW retail).
     self.frame:SetAttribute("type", "click")
     self.frame:SetAttribute("clickbutton", self.purchaseFwdBtn)
-    self.frame:RegisterForClicks("LeftButtonUp")
+    self.frame:RegisterForClicks("LeftButtonDown", "RightButtonDown")
   end
 
   -- Update selected highlight
@@ -354,20 +357,6 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.buttons = {}
   b.selectedBagIndex = nil
 
-  -- Hidden secure purchase buttons used for click forwarding on unpurchased slot buttons.
-  -- BankPanelPurchaseButtonScriptTemplate provides BankPanelPurchaseTabButtonMixin:OnClick,
-  -- which calls StaticPopup_Show from Blizzard code context so that the bankType passed to
-  -- C_Bank.PurchaseBankTab is never tainted by addon code.
-  local charPurchaseBtn = CreateFrame("Button", "BetterBagsBankSlotsCharPurchaseBtn", b.frame, "BankPanelPurchaseButtonScriptTemplate")
-  charPurchaseBtn:SetSize(1, 1)
-  charPurchaseBtn:SetPoint("TOPLEFT", b.frame, "TOPLEFT", -1000, -1000)
-  charPurchaseBtn:SetAttribute("overrideBankType", Enum.BankType.Character)
-
-  local accountPurchaseBtn = CreateFrame("Button", "BetterBagsBankSlotsAccountPurchaseBtn", b.frame, "BankPanelPurchaseButtonScriptTemplate")
-  accountPurchaseBtn:SetSize(1, 1)
-  accountPurchaseBtn:SetPoint("TOPLEFT", b.frame, "TOPLEFT", -1000, -1000)
-  accountPurchaseBtn:SetAttribute("overrideBankType", Enum.BankType.Account)
-
   -- All possible bank tab slots in order:
   --   6 character bank tabs (CharacterBankTab_1 through _6)
   --   5 account/warbank tabs (AccountBankTab_1 through _5)
@@ -402,6 +391,16 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     buttonFrame:SetSize(37, 37)
     buttonFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
+    -- Per-slot hidden BankPanelPurchaseButtonScriptTemplate button for secure click forwarding.
+    -- BankPanelPurchaseTabButtonMixin:OnClick calls StaticPopup_Show from Blizzard code context
+    -- so that the bankType passed to C_Bank.PurchaseBankTab is never tainted by addon code.
+    -- Each slot button has its own dedicated purchase button (child of the slot button),
+    -- matching the old bottom-tab mechanism where each tab was its own BankPanelPurchaseButtonScriptTemplate.
+    local purchaseBtn = CreateFrame("Button", frameName .. "Purchase", buttonFrame, "BankPanelPurchaseButtonScriptTemplate")
+    purchaseBtn:SetSize(1, 1)
+    purchaseBtn:SetPoint("TOPLEFT", buttonFrame, "TOPLEFT", -1000, -1000)
+    purchaseBtn:SetAttribute("overrideBankType", slotInfo.bankType)
+
     -- Icon texture displayed when the tab has been purchased
     local iconTex = buttonFrame:CreateTexture(nil, "ARTWORK")
     iconTex:SetAllPoints()
@@ -430,7 +429,7 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     btn.plusText = plusIcon
 
     btn.frame = buttonFrame
-    btn.purchaseFwdBtn = (slotInfo.bankType == Enum.BankType.Character) and charPurchaseBtn or accountPurchaseBtn
+    btn.purchaseFwdBtn = purchaseBtn
 
     -- Capture loop variables for use in closures below
     local capturedBtn = btn
