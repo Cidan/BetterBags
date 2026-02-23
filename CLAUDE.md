@@ -4,6 +4,9 @@
 @.context/api.md
 @.context/documentation.md
 @.context/patterns.md
+@.context/patterns-taint.md
+@.context/patterns-ui.md
+@.context/patterns-state.md
 @.context/project.md
 
 
@@ -13,7 +16,12 @@ Never make any changes without directly confirming that the functions, code, API
 
 ## Pattern Learning
 
-As you work through problems and discover new abstract patterns (especially debugging techniques, API workarounds, or architectural decisions), update `.context/patterns.md` with the new pattern. This helps future contexts understand the codebase's design decisions.
+As you work through problems and discover new abstract patterns (especially debugging techniques, API workarounds, or architectural decisions), update the appropriate pattern file in `.context/`:
+- Taint/protected code → `patterns-taint.md`
+- UI patterns → `patterns-ui.md`
+- State/architecture → `patterns-state.md`
+
+This helps future contexts understand the codebase's design decisions.
 
 ## Commit Requirement
 
