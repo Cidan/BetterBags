@@ -38,15 +38,21 @@ local context = addon:GetModule('Context')
 local buttonCount = 0
 
 -- BankSlotButton represents a single bank tab slot button in the panel.
+-- Each slot has two sub-buttons inside a container frame:
+--   viewButton    – a plain Button, shown when the slot is purchased (select tab / open config)
+--   purchaseButton – a BankPanelPurchaseButtonScriptTemplate Button, shown when unpurchased
+-- Only one sub-button is visible at a time; Update() switches between them.
 ---@class BankSlotButton
----@field frame Button
+---@field frame Frame The container frame holding both sub-buttons
+---@field viewButton Button Plain button shown when the slot is purchased
+---@field purchaseButton Button Template button shown when the slot is unpurchased
 ---@field bagIndex number The Enum.BagIndex value for this tab slot
 ---@field bankType BankType Whether this is a Character or Account bank tab
 ---@field purchased boolean Whether this tab slot has been purchased
 ---@field isSelected boolean Whether this tab slot is currently selected
----@field iconTexture Texture The icon texture (shown when purchased)
----@field selectedHighlight Texture The highlight shown when selected
----@field plusText Texture The green '+' atlas icon shown for unpurchased slots
+---@field iconTexture Texture The icon texture (shown when purchased, child of viewButton)
+---@field selectedHighlight Texture The highlight shown when selected (child of viewButton)
+---@field plusText Texture The green '+' atlas icon shown for unpurchased slots (child of purchaseButton)
 local bankSlotButtonProto = {}
 
 -- Update refreshes the button's visual state based on current tab data.
@@ -61,20 +67,24 @@ function bankSlotButtonProto:Update(charTabData, accountTabData)
   end
 
   if tabData then
-    -- Purchased slot: show the configured icon
+    -- Purchased slot: show the view button with the configured icon
     self.purchased = true
     self.iconTexture:SetTexture(tabData.icon)
     self.iconTexture:Show()
     self.plusText:Hide()
+    self.viewButton:Show()
+    self.purchaseButton:Hide()
   else
-    -- Unpurchased slot: show empty appearance with green '+'
+    -- Unpurchased slot: show the purchase button with the green '+'
     self.purchased = false
     self.iconTexture:SetTexture(nil)
     self.iconTexture:Hide()
     self.plusText:Show()
+    self.viewButton:Hide()
+    self.purchaseButton:Show()
   end
 
-  -- Update selected highlight
+  -- Update selected highlight (only relevant when the slot is purchased)
   if self.isSelected then
     self.selectedHighlight:Show()
   else
@@ -368,74 +378,81 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     btn.purchased = false
     btn.isSelected = false
 
-    buttonCount = buttonCount + 1
-    local frameName = format("BetterBagsBankSlotButton%d", buttonCount)
-    -- Use BankPanelPurchaseButtonScriptTemplate so that unpurchased slots
-    -- open the bank tab purchase dialog via Blizzard's protected mixin.
-    -- The overrideBankType attribute tells the mixin which bank type to purchase.
-    local buttonFrame = CreateFrame("Button", frameName, b.frame, "BankPanelPurchaseButtonScriptTemplate")
-    buttonFrame:SetAttribute("overrideBankType", slotInfo.bankType)
-    buttonFrame:SetSize(37, 37)
-    buttonFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- Container frame holds both sub-buttons; only one is visible at a time.
+    local container = CreateFrame("Frame", nil, b.frame)
+    container:SetSize(37, 37)
+    btn.frame = container
 
-    -- Icon texture displayed when the tab has been purchased
-    local iconTex = buttonFrame:CreateTexture(nil, "ARTWORK")
+    -- View button: plain Button shown when the slot is purchased.
+    -- Handles left-click (select tab) and right-click (open tab config).
+    buttonCount = buttonCount + 1
+    local viewButton = CreateFrame("Button", format("BetterBagsBankSlotButton%d", buttonCount), container)
+    viewButton:SetAllPoints()
+    viewButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    viewButton:Hide()
+    btn.viewButton = viewButton
+
+    -- Purchase button: shown when the slot is unpurchased.
+    -- Created with BankPanelPurchaseButtonScriptTemplate so its OnClick natively
+    -- opens the Blizzard bank tab purchase dialog. The overrideBankType attribute
+    -- tells the mixin whether to purchase a Character or Account bank tab.
+    buttonCount = buttonCount + 1
+    local purchaseButton = CreateFrame("Button", format("BetterBagsBankSlotButton%d", buttonCount), container, "BankPanelPurchaseButtonScriptTemplate")
+    purchaseButton:SetAllPoints()
+    if slotInfo.bankType == Enum.BankType.Character then
+      purchaseButton:SetAttribute("overrideBankType", Enum.BankType.Character)
+    else
+      purchaseButton:SetAttribute("overrideBankType", Enum.BankType.Account)
+    end
+    purchaseButton:Hide()
+    btn.purchaseButton = purchaseButton
+
+    -- Icon texture on the view button (shown when purchased)
+    local iconTex = viewButton:CreateTexture(nil, "ARTWORK")
     iconTex:SetAllPoints()
     iconTex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     iconTex:Hide()
     btn.iconTexture = iconTex
 
-    -- Highlight shown when this tab slot is selected
-    local selectedHL = buttonFrame:CreateTexture(nil, "OVERLAY")
+    -- Selection highlight on the view button
+    local selectedHL = viewButton:CreateTexture(nil, "OVERLAY")
     selectedHL:SetAllPoints()
     selectedHL:SetTexture("Interface\\Buttons\\CheckButtonHilight")
     selectedHL:SetBlendMode("ADD")
     selectedHL:Hide()
     btn.selectedHighlight = selectedHL
 
-    -- Atlas texture for unpurchased tab slots.  SetAtlas ignores anchor-based sizing
-    -- (SetAllPoints) and falls back to the atlas's native dimensions, which are smaller
-    -- than the 37×37 button.  Use explicit SetPoint + SetSize BEFORE SetAtlas so the
-    -- rendered size is controlled by us, not by the atlas metadata — matching the same
-    -- pattern used for icon textures in tabs.lua and item.lua.
-    local plusIcon = buttonFrame:CreateTexture(nil, "ARTWORK")
-    plusIcon:SetPoint("CENTER", buttonFrame, "CENTER", 0, 0)
+    -- Plus atlas icon on the purchase button (shown when unpurchased).
+    -- Use explicit SetPoint + SetSize BEFORE SetAtlas so the rendered size is
+    -- controlled by us, not by the atlas metadata (SetAtlas ignores SetAllPoints).
+    local plusIcon = purchaseButton:CreateTexture(nil, "ARTWORK")
+    plusIcon:SetPoint("CENTER", purchaseButton, "CENTER", 0, 0)
     plusIcon:SetSize(37, 37)
     plusIcon:SetAtlas("Garr_Building-AddFollowerPlus")
     plusIcon:Hide()
     btn.plusText = plusIcon
-
-    btn.frame = buttonFrame
 
     -- Capture loop variables for use in closures below
     local capturedBtn = btn
     local capturedPanel = b
     local capturedSlotInfo = slotInfo
 
-    buttonFrame:SetScript("OnClick", function(clickedFrame, mouseButton)
+    -- Click handler on the view button only.
+    -- The purchase button's clicks are handled entirely by the template.
+    viewButton:SetScript("OnClick", function(_, mouseButton)
       if mouseButton == "RightButton" then
-        -- Right-click: open Blizzard tab configuration (purchased tabs only)
-        if capturedBtn.purchased then
-          capturedPanel:OpenTabConfig(capturedBtn.bagIndex)
-        end
+        -- Right-click: open Blizzard tab configuration
+        capturedPanel:OpenTabConfig(capturedBtn.bagIndex)
       else
-        if capturedBtn.purchased then
-          -- Left-click on purchased slot: select and filter bank to this tab's items
-          local ectx = context:New('BankSlotSelect')
-          capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
-        else
-          -- Left-click on unpurchased slot: delegate to BankPanelPurchaseTabButtonMixin:OnClick.
-          -- The button was created with BankPanelPurchaseButtonScriptTemplate and has the
-          -- overrideBankType attribute set, so the mixin will call StaticPopup_Show with
-          -- the correct bank type via Blizzard's protected purchase handler.
-          BankPanelPurchaseTabButtonMixin.OnClick(clickedFrame)
-        end
+        -- Left-click: select this tab and filter bank to its items
+        local ectx = context:New('BankSlotSelect')
+        capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
       end
     end)
 
-    buttonFrame:SetScript("OnEnter", function()
-      GameTooltip:SetOwner(buttonFrame, "ANCHOR_LEFT")
-      -- Look up tab name from C_Bank if available
+    -- Shared tooltip builder used by both sub-buttons.
+    local function showSlotTooltip(anchorFrame)
+      GameTooltip:SetOwner(anchorFrame, "ANCHOR_LEFT")
       local tabData
       if C_Bank and C_Bank.FetchPurchasedBankTabData then
         local tabs = C_Bank.FetchPurchasedBankTabData(capturedSlotInfo.bankType)
@@ -465,11 +482,12 @@ function BankSlots:CreatePanel(ctx, bagFrame)
         GameTooltip:AddLine(L:G("Click to purchase this tab"), 0.8, 0.8, 0.8, true)
       end
       GameTooltip:Show()
-    end)
+    end
 
-    buttonFrame:SetScript("OnLeave", function()
-      GameTooltip:Hide()
-    end)
+    viewButton:SetScript("OnEnter", showSlotTooltip)
+    viewButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    purchaseButton:SetScript("OnEnter", showSlotTooltip)
+    purchaseButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     b.content:AddCell(tostring(i), btn)
     table.insert(b.buttons, btn)
