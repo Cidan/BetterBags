@@ -613,6 +613,7 @@ const.DATABASE_DEFAULTS = {
     enableBagFading = false,
     showBagButton = true,
     enableBankBag = true,
+    showBankTabs = false,
     debug = false,
     inBagSearch = true,
     categorySell = false,

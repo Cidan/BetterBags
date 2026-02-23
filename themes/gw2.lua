@@ -22,6 +22,12 @@ local events = addon:GetModule('Events')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class GuildWarsDecoration: Frame
 ---@field panelButtons Button[]
 ---@field gwHeader GuildWarsHeader
@@ -119,8 +125,15 @@ local gw2Theme = {
 
       newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/bagmicrobutton-up", "Show Bags", function(ctx)
         if frame.Owner.slots:IsShown() then
+          -- Persist bank-slots visibility to DB so re-opening the bank restores the correct state.
+          if frame.Owner.kind == const.BAG_KIND.BANK then
+            database:SetShowBankTabs(false)
+          end
           frame.Owner.slots:Hide()
         else
+          if frame.Owner.kind == const.BAG_KIND.BANK then
+            database:SetShowBankTabs(true)
+          end
           frame.Owner.slots:Draw(ctx)
           frame.Owner.slots:Show()
         end

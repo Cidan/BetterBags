@@ -239,9 +239,15 @@ function contextMenu:CreateContextMenu(bag)
 
 	-- Show bag slot toggle (only if slots are available).
 	if bag.slots then
+		local isBank = bag.kind == const.BAG_KIND.BANK
 		table.insert(menuList, {
 			text = L:G("Show Bags"),
 			checked = function()
+				-- For the bank, use the persisted setting so the checkmark
+				-- reflects the state that will be restored on next open.
+				if isBank then
+					return database:GetShowBankTabs()
+				end
 				return bag.slots and bag.slots:IsShown()
 			end,
 			tooltipTitle = L:G("Show Bags"),
@@ -256,8 +262,14 @@ function contextMenu:CreateContextMenu(bag)
 				end
 				local ctx = context:New("ToggleBagSlots")
 				if bag.slots and bag.slots:IsShown() then
+					if isBank then
+						database:SetShowBankTabs(false)
+					end
 					bag.slots:Hide()
 				elseif bag.slots then
+					if isBank then
+						database:SetShowBankTabs(true)
+					end
 					bag.slots:Draw(ctx)
 					bag.slots:Show()
 				end

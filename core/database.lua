@@ -128,6 +128,16 @@ function DB:GetEnableBankBag()
   return DB.data.profile.enableBankBag
 end
 
+---@param shown boolean
+function DB:SetShowBankTabs(shown)
+  DB.data.profile.showBankTabs = shown
+end
+
+---@return boolean
+function DB:GetShowBankTabs()
+  return DB.data.profile.showBankTabs
+end
+
 ---@param enabled boolean
 function DB:SetEnableBagFading(enabled)
   DB.data.profile.enableBagFading = enabled

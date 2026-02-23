@@ -244,11 +244,11 @@ Tab management for bank views.
 - Bank-type-aware tab sorting with strict section ordering
 - Drag-to-reorder with cross-section drag constraint
 - Icon-only tab minimum width enforcement (50px)
-- Functional disable state (`SetTabsDisabled`) used by the bank slots panel
+- Functional disable state (`SetTabsDisabled`) available for external use
 
 **Tab Disable State:**
 
-`SetTabsDisabled(disabled)` sets a `tabsDisabled` flag on the tab container and dims the tab bar to 50% alpha when disabled. While disabled, all `OnClick` and `OnMouseDown` handlers silently return early, preventing tab switching and drag-to-reorder. The bank slots panel calls this when opening (disable) and after the fade-out animation completes (re-enable), so bottom tabs are inert while the per-Blizzard-tab slot filter is active.
+`SetTabsDisabled(disabled)` sets a `tabsDisabled` flag on the tab container and dims the tab bar to 50% alpha when disabled. While disabled, all `OnClick` and `OnMouseDown` handlers silently return early, preventing tab switching and drag-to-reorder. Note: the bank slots panel no longer uses `SetTabsDisabled`; it instead completely hides the tabs frame via `frame:Hide()` / `frame:Show()` for a cleaner visual transition.
 
 **Icon-Only Tab Sizing:**
 
@@ -287,7 +287,7 @@ Display panel for equipped bags.
 
 ### Bank Tab Slots Panel (`bankslots.lua`)
 
-Slide-out panel that appears above the bank frame showing all possible Blizzard bank tab slots (retail only). Replaces the normal group-based bank view with a per-Blizzard-tab filtered view.
+Slide-out panel showing all possible Blizzard bank tab slots (retail only). When toggled **on**, the panel appears at the **bottom** of the bank window (where the group tabs normally sit) and replaces the normal group-based bank view with a per-Blizzard-tab filtered view. When toggled **off**, everything reverts: the panel moves back above the window, group tabs reappear, and the window title is restored.
 
 **Features:**
 - 11 slot buttons: 6 character bank tabs (`CharacterBankTab_1`–`_6`) followed by 5 warbank tabs (`AccountBankTab_1`–`_5`), in order left to right
@@ -302,6 +302,22 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 - Mouse wheel events are forwarded to the outer bag container (not consumed by the inner grid)
 - Slot button tooltips show the tab name, bank type (blue "Bank" / gold "Warbank"), and interaction hints
 
+**Toggle Behavior (Show):**
+
+When `Show()` is called the panel transitions into an active mode that fully transforms the bank window layout:
+
+1. The panel frame is reanchored from **above** the bag window (`BOTTOMLEFT` → `TOPLEFT`) to **below** it (`TOPLEFT` → `BOTTOMLEFT`), occupying the space where group tabs normally sit.
+2. The group tabs frame is **completely hidden** (not just disabled). The previous visibility state is saved in `tabsWereShown` so it can be restored correctly.
+
+The Bank Tabs window itself is registered with an empty title (`""`), so no title text is ever rendered in the window decoration across any theme. This is permanent — the title is absent by design, not toggled. In the Default theme, `TitleContainer` is also explicitly hidden when the title is empty so its visual bar does not create a top gap. The content grid uses a symmetric 12 px inset on both top and bottom (matching `BAG_LEFT_INSET`-style padding) so the slot icons appear vertically centred.
+
+**Toggle Behavior (Hide):**
+
+After the fade-out animation completes (`fadeOutGroup.OnFinished`):
+
+1. The panel frame is reanchored back to above the bag window (`BOTTOMLEFT` → `TOPLEFT`, 14px gap).
+2. Group tabs visibility is restored from `tabsWereShown`.
+
 **Main Class:**
 ```lua
 ---@class bankSlotsPanel
@@ -311,16 +327,18 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 ---@field fadeOutGroup AnimationGroup
 ---@field buttons BankSlotButton[]
 ---@field selectedBagIndex number?
+---@field bagFrame Frame        -- parent bag frame, stored for Show/Hide reanchoring
+---@field tabsWereShown boolean -- whether group tabs were visible before panel opened
 ```
 
 **Key Methods:**
-- `CreatePanel(ctx, bagFrame)` — factory; returns a `bankSlotsPanel` attached above `bagFrame` (retail-only; returns nil on Classic/Era)
+- `CreatePanel(ctx, bagFrame)` — factory; returns a `bankSlotsPanel` (retail-only; returns nil on Classic/Era)
 - `Draw(ctx)` — refreshes all slot button visuals from the current C_Bank tab data
 - `SelectTab(ctx, bagIndex)` — selects the given tab, deselects others, and calls `bank.behavior:SwitchToBlizzardTab()`
 - `SelectFirstTab(ctx)` — selects the first available tab (called automatically on fade-in)
 - `OpenTabConfig(bagIndex)` — opens the Blizzard tab settings dialog for the given bag index
-- `Show(callback?)` — plays fade-in animation; **immediately calls `tabs:SetTabsDisabled(true)`** so the bottom group tabs are non-interactive while the panel is open
-- `Hide(callback?)` — plays fade-out animation; `SetTabsDisabled(false)` is called after the animation completes (in `fadeOutGroup.OnFinished`)
+- `Show(callback?)` — reanchors panel to bottom, hides group tabs, then plays fade-in animation
+- `Hide(callback?)` — plays fade-out animation; all layout changes are reversed in `fadeOutGroup.OnFinished`
 - `IsShown()` — returns whether the underlying frame is visible
 
 **Tab Config Dialog — Reliable Icon Selection:**
@@ -496,7 +514,8 @@ BAG_VIEW = {
 ### Frame Hierarchy
 ```
 BetterBagsBag (Main Container)
-├── BetterBagsBankSlots (Bank Tab Slots Panel — retail bank only, slides above)
+├── BetterBagsBankSlots (Bank Tab Slots Panel — retail bank only)
+│   │   Normally hidden above the bag; when open, reanchored to below the bag
 │   └── Grid (11 BankSlotButton frames)
 ├── SearchFrame
 ├── Tabs

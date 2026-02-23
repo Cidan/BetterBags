@@ -102,6 +102,13 @@ function bank.proto:OnShow(ctx)
 
 			self.bag.moneyFrame:Update()
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+
+			-- Restore the bank tab slots panel when the setting is enabled,
+			-- so re-opening the bank shows the same mode as when it was closed.
+			if self.bag.slots and database:GetShowBankTabs() then
+				self.bag.slots:Draw(ctx)
+				self.bag.slots:Show()
+			end
 		end
 		self.bag.fadeInGroup:Play()
 	else
@@ -131,6 +138,13 @@ function bank.proto:OnShow(ctx)
 		self.bag.moneyFrame:Update()
 		self.bag.frame:Show()
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+
+		-- Restore the bank tab slots panel when the setting is enabled,
+		-- so re-opening the bank shows the same mode as when it was closed.
+		if self.bag.slots and database:GetShowBankTabs() then
+			self.bag.slots:Draw(ctx)
+			self.bag.slots:Show()
+		end
 	end
 end
 
@@ -148,11 +162,21 @@ function bank.proto:OnHide()
 	if database:GetEnableBagFading() then
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
+			-- Explicitly reset the bank slots panel's shown state so it does not
+			-- auto-reappear when the bank is reopened (bag.frame:Show() would
+			-- otherwise re-show any child whose IsShown() is still true).
+			if self.bag.slots then
+				self.bag.slots.frame:Hide()
+			end
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 		end
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
+		-- Explicitly reset the bank slots panel's shown state (see fade path above).
+		if self.bag.slots then
+			self.bag.slots.frame:Hide()
+		end
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 	end
 end
@@ -300,7 +324,13 @@ function bank.proto:GenerateGroupTabs(ctx)
 		return
 	end
 
-	self.bag.tabs.frame:Show()
+	-- Keep group tabs hidden when the bank tab slots panel is active so
+	-- both UI elements are never visible simultaneously on open.
+	if self.bag.slots and database:GetShowBankTabs() then
+		self.bag.tabs.frame:Hide()
+	else
+		self.bag.tabs.frame:Show()
+	end
 
 	local allGroups = groups:GetAllGroups(const.BAG_KIND.BANK)
 

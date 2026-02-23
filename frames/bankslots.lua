@@ -110,6 +110,8 @@ end
 ---@field fadeOutGroup AnimationGroup
 ---@field buttons BankSlotButton[]
 ---@field selectedBagIndex number?
+---@field bagFrame Frame The parent bag frame this panel is attached to
+---@field tabsWereShown boolean Whether group tabs were visible before panel opened
 BankSlots.bankSlotsPanelProto = {}
 
 -- Draw refreshes all button visuals from the current C_Bank tab data.
@@ -147,7 +149,8 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
     maxWidthPerRow = 1024,
   })
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
-  self.frame:SetHeight(h + 42)
+  -- Height = content height + top inset (12) + bottom inset (12).
+  self.frame:SetHeight(h + 24)
 end
 
 function BankSlots.bankSlotsPanelProto:SetShown(shown)
@@ -167,10 +170,18 @@ function BankSlots.bankSlotsPanelProto:Show(callback)
       callback()
     end
   end
-  -- Disable bottom tabs while the bank slots panel is open so clicking them
-  -- does nothing (they have no effect while filtering by Blizzard tab slot).
-  if addon.Bags and addon.Bags.Bank and addon.Bags.Bank.tabs then
-    addon.Bags.Bank.tabs:SetTabsDisabled(true)
+  -- Reanchor the bank slots panel to the bottom of the bank window, occupying
+  -- the space where the group tabs normally sit.
+  self.frame:ClearAllPoints()
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
+  -- Completely hide the group tabs and remember whether they were visible so
+  -- they can be restored correctly when the bank slots panel is closed.
+  local bankBag = addon.Bags and addon.Bags.Bank
+  if bankBag and bankBag.tabs then
+    self.tabsWereShown = bankBag.tabs.frame:IsShown()
+    bankBag.tabs.frame:Hide()
+  else
+    self.tabsWereShown = false
   end
   self.fadeInGroup:Play()
 end
@@ -340,11 +351,17 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", "BetterBagsBankSlots", bagFrame)
   b.frame = f
+  b.bagFrame = bagFrame
 
-  themes:RegisterFlatWindow(f, L:G("Bank Tabs"))
+  -- Register with an empty title so no title text is rendered in the window
+  -- decoration across any theme. The panel has no title bar text by design.
+  themes:RegisterFlatWindow(f, "")
 
   b.content = grid:Create(b.frame)
-  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
+  -- Use the same inset on top and bottom so the slot icons are vertically
+  -- centred. The -30 used by other flat panels reserves space for a title bar;
+  -- this panel has no title, so we match the 12 px bottom gap.
+  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -12)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
   -- Allow all 11 slots on one row
   b.content.maxCellWidth = 11
@@ -356,6 +373,7 @@ function BankSlots:CreatePanel(ctx, bagFrame)
 
   b.buttons = {}
   b.selectedBagIndex = nil
+  b.tabsWereShown = false
 
   -- All possible bank tab slots in order:
   --   6 character bank tabs (CharacterBankTab_1 through _6)
@@ -517,11 +535,16 @@ function BankSlots:CreatePanel(ctx, bagFrame)
       addon.Bags.Bank.blizzardBankTab = nil
       items:ClearBankCache(ectx)
       events:SendMessage(ectx, 'bags/RefreshBank')
-      -- Re-enable the bottom tabs now that the bank slots panel is fully hidden.
-      if addon.Bags.Bank.tabs then
-        addon.Bags.Bank.tabs:SetTabsDisabled(false)
-      end
     end
+    -- Restore panel anchor to above the bag frame (original position).
+    b.frame:ClearAllPoints()
+    b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
+    -- Restore group tabs visibility to what it was before the panel opened.
+    local bankBag = addon.Bags and addon.Bags.Bank
+    if b.tabsWereShown and bankBag and bankBag.tabs then
+      bankBag.tabs.frame:Show()
+    end
+    b.tabsWereShown = false
   end)
 
   -- Redraw when tab settings are updated (name/icon changed)
