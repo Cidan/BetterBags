@@ -309,7 +309,7 @@ When `Show()` is called the panel transitions into an active mode that fully tra
 1. The panel frame is reanchored from **above** the bag window (`BOTTOMLEFT` → `TOPLEFT`) to **below** it (`TOPLEFT` → `BOTTOMLEFT`), occupying the space where group tabs normally sit.
 2. The group tabs frame is **completely hidden** (not just disabled). The previous visibility state is saved in `tabsWereShown` so it can be restored correctly.
 
-The Bank Tabs window itself is registered with an empty title (`""`), so no title text is ever rendered in the window decoration across any theme. This is permanent — the title is absent by design, not toggled.
+The Bank Tabs window itself is registered with an empty title (`""`), so no title text is ever rendered in the window decoration across any theme. This is permanent — the title is absent by design, not toggled. In the Default theme, `TitleContainer` is also explicitly hidden when the title is empty so its visual bar does not create a top gap. The content grid uses a symmetric 12 px inset on both top and bottom (matching `BAG_LEFT_INSET`-style padding) so the slot icons appear vertically centred.
 
 **Toggle Behavior (Hide):**
 

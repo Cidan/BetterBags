@@ -86,8 +86,14 @@ local defaultTheme = {
       decoration = CreateFrame("Frame", frame:GetName().."ThemeDefault", frame, "DefaultPanelFlatTemplate") --[[@as DefaultThemeTemplate]]
       decoration:SetAllPoints()
       decoration.TitleContainer.TitleText:SetFontObject(fonts.UnitFrame12Yellow)
-      if themes.titles[frame:GetName()] then
-        decoration:SetTitle(themes.titles[frame:GetName()])
+      local title = themes.titles[frame:GetName()]
+      if title and title ~= "" then
+        decoration:SetTitle(title)
+      else
+        -- No title: hide TitleContainer so its visual bar does not create a
+        -- top gap inside the flat window (DefaultPanelFlatTemplate keeps the
+        -- container frame visible even when no text is set).
+        decoration.TitleContainer:Hide()
       end
       decoratorFrames[frame:GetName()] = decoration
     else

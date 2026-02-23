@@ -149,7 +149,8 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
     maxWidthPerRow = 1024,
   })
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
-  self.frame:SetHeight(h + 42)
+  -- Height = content height + top inset (12) + bottom inset (12).
+  self.frame:SetHeight(h + 24)
 end
 
 function BankSlots.bankSlotsPanelProto:SetShown(shown)
@@ -357,7 +358,10 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   themes:RegisterFlatWindow(f, "")
 
   b.content = grid:Create(b.frame)
-  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
+  -- Use the same inset on top and bottom so the slot icons are vertically
+  -- centred. The -30 used by other flat panels reserves space for a title bar;
+  -- this panel has no title, so we match the 12 px bottom gap.
+  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -12)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
   -- Allow all 11 slots on one row
   b.content.maxCellWidth = 11
