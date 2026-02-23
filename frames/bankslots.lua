@@ -167,6 +167,11 @@ function BankSlots.bankSlotsPanelProto:Show(callback)
       callback()
     end
   end
+  -- Disable bottom tabs while the bank slots panel is open so clicking them
+  -- does nothing (they have no effect while filtering by Blizzard tab slot).
+  if addon.Bags and addon.Bags.Bank and addon.Bags.Bank.tabs then
+    addon.Bags.Bank.tabs:SetTabsDisabled(true)
+  end
   self.fadeInGroup:Play()
 end
 
@@ -512,6 +517,10 @@ function BankSlots:CreatePanel(ctx, bagFrame)
       addon.Bags.Bank.blizzardBankTab = nil
       items:ClearBankCache(ectx)
       events:SendMessage(ectx, 'bags/RefreshBank')
+      -- Re-enable the bottom tabs now that the bank slots panel is fully hidden.
+      if addon.Bags.Bank.tabs then
+        addon.Bags.Bank.tabs:SetTabsDisabled(false)
+      end
     end
   end)
 
