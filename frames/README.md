@@ -290,7 +290,7 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 - Unpurchased tabs show the `Garr_Building-AddFollowerPlus` atlas icon as a bare 37×37 borderless button (no slot background texture), matching the visual weight of purchased tab icons
 - Left-click on a **purchased** tab selects it and filters the bank to show only items from that specific Blizzard bag index
 - Left-click on an **unpurchased** tab opens the Blizzard bank tab purchase dialog (`CONFIRM_BUY_BANK_TAB` static popup) for the appropriate bank type, replicating the behavior of `BankPanelPurchaseTabButtonMixin:OnClick`
-- Right-click opens the Blizzard tab settings dialog (for purchased tabs only); character bank tabs use `BankPanel.TabSettingsMenu`, warbank tabs use `AccountBankPanel.TabSettingsMenu`
+- Right-click opens the Blizzard tab settings dialog (for purchased tabs only); both character bank tabs and warbank tabs use `BankPanel.TabSettingsMenu` — `AccountBankPanel` does not exist as a separate global frame; `BankPanel` handles all bank types
 - Auto-selects `CharacterBankTab_1` when the panel is first shown (after the fade-in animation)
 - Clears the single-tab filter and restores the normal bank view when the panel is hidden (after fade-out)
 - Redraws automatically on `BANK_TAB_SETTINGS_UPDATED` and `PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED` events
@@ -318,11 +318,9 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 
 **Tab Config Dialog — Reliable Icon Selection:**
 
-`OpenTabConfig` uses two internal helpers to work around timing and reparenting issues with Blizzard's `TabSettingsMenu`:
+`OpenTabConfig` sets `menu.selectedTabData` directly from `C_Bank.FetchPurchasedBankTabData` before showing the menu. This bypasses `menu:SetSelectedTab()` which internally calls `BankPanel:GetTabData()` — a method that searches `BankPanel.purchasedBankTabData`. Because BetterBags keeps `BankPanel` hidden, `purchasedBankTabData` is never populated by Blizzard, so `GetTabData()` always returns nil and leaves `selectedTabData` nil. Without `selectedTabData` the menu's `Update()` returns early, the icon grid is never populated, and `SelectedIconButton:OnClick()` (which checks `GetSelectedIndex()`) silently does nothing.
 
-1. **`ensureSelectedTabData(menu, bankType, id)`** — Forces a fresh tab data lookup every time the config dialog is opened, bypassing Blizzard's internal `alreadySelected` early-exit guard. It first resets `menu.selectedTabData = nil` to force `SetSelectedTab` to re-fetch, then falls back to a direct `C_Bank.FetchPurchasedBankTabData(bankType)` call if the menu's data is still nil. This is necessary because BetterBags shows `BankPanel` only after a fade-in animation, so `BankPanel.purchasedBankTabData` may be empty during `BANKFRAME_OPENED`; the fallback ensures icon data is always available.
-
-2. **`reconnectIconCallback(menu)`** — Explicitly re-wires `menu.IconSelector:SetSelectedCallback` with a fresh closure after the menu is reparented. Without this, the callback installed in `BankPanelTabSettingsMenuMixin:OnLoad` may become stale, causing icon clicks in the grid to silently do nothing. The closure updates `BorderBox.SelectedIconArea.SelectedIconButton` with the chosen icon texture.
+By setting `menu.selectedTabData` directly before calling `menu:Show()`, `OnShow()` fires `Update()` with valid tab data, the icon grid is populated, and `GetSelectedIndex()` returns a non-nil value so clicking the preview icon scrolls the grid to the selected icon.
 
 **Tab Button Tooltips:**
 

@@ -202,109 +202,51 @@ function BankSlots.bankSlotsPanelProto:SelectFirstTab(ctx)
 end
 
 -- OpenTabConfig opens the Blizzard tab configuration dialog for the given
--- bank tab. Uses BankPanel.TabSettingsMenu for character bank tabs and
--- AccountBankPanel.TabSettingsMenu for account/warbank tabs.
+-- bank tab slot. Both character and account bank tabs use BankPanel.TabSettingsMenu
+-- (AccountBankPanel does not exist as a separate global frame in Blizzard's UI;
+-- BankPanel handles all bank types via SetBankType).
 ---@param bagIndex number
 function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
+  -- BankPanel.TabSettingsMenu is the only settings menu for all bank tab types.
+  if not (BankPanel and BankPanel.TabSettingsMenu) then return end
+
   local bagFrame = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.frame
+  local menu = BankPanel.TabSettingsMenu
 
-  -- Determine bank type: account bank tabs start at AccountBankTab_1
+  -- Determine bank type: account bank tabs start at AccountBankTab_1.
   local isAccountTab = Enum.BagIndex.AccountBankTab_1 and bagIndex >= Enum.BagIndex.AccountBankTab_1
+  local bankType = isAccountTab and Enum.BankType.Account or Enum.BankType.Character
 
-  -- Re-connect the icon selector callback so that clicking an icon in the grid
-  -- updates the selected-icon preview.  After reparenting and Update() calls the
-  -- callback set in OnLoad can become stale; explicitly re-setting it here ensures
-  -- icon selection always works.
-  ---@param menu table The TabSettingsMenu frame
-  local function reconnectIconCallback(menu)
-    if not (menu.IconSelector and menu.BorderBox and menu.BorderBox.SelectedIconArea) then return end
-    local previewButton = menu.BorderBox.SelectedIconArea.SelectedIconButton
-    local descText = menu.BorderBox.SelectedIconArea.SelectedIconText
-      and menu.BorderBox.SelectedIconArea.SelectedIconText.SelectedIconDescription
-    if previewButton and menu.IconSelector.SetSelectedCallback then
-      menu.IconSelector:SetSelectedCallback(function(_, icon)
-        previewButton:SetIconTexture(icon)
-        if descText then
-          if ICON_SELECTION_CLICK then
-            descText:SetText(ICON_SELECTION_CLICK)
-          end
-          descText:SetFontObject(GameFontHighlightSmall)
-        end
-      end)
-    end
+  if bagFrame then
+    menu:SetParent(bagFrame)
+    menu:ClearAllPoints()
+    menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
   end
 
-  -- Populate selectedTabData directly from C_Bank API so Update() can run even
-  -- when BankPanel.purchasedBankTabData has not yet been populated (e.g. the first
-  -- time the bank is opened and BankPanel was hidden during BANKFRAME_OPENED).
-  ---@param menu table The TabSettingsMenu frame
-  ---@param bankType BankType Enum.BankType value for the tab
-  ---@param id number bagIndex to look up
-  local function ensureSelectedTabData(menu, bankType, id)
-    -- Reset so SetSelectedTab always performs a fresh lookup (bypasses the
-    -- "alreadySelected" early-exit which could skip the data refresh).
-    menu.selectedTabData = nil
-    menu:SetSelectedTab(id)
-    -- Fallback: if BankPanel.purchasedBankTabData was empty, fetch directly.
-    if not menu.selectedTabData and C_Bank and C_Bank.FetchPurchasedBankTabData then
-      local tabList = C_Bank.FetchPurchasedBankTabData(bankType)
-      if tabList then
-        for _, tab in ipairs(tabList) do
-          if tab.ID == id then
-            menu.selectedTabData = tab
-            break
-          end
+  -- Set selectedTabData directly via C_Bank API.
+  -- We bypass menu:SetSelectedTab() because BankPanel.purchasedBankTabData is
+  -- unpopulated when BankPanel is hidden (BetterBags replaces the default bank UI).
+  -- SetSelectedTab() calls BankPanel:GetTabData() which searches purchasedBankTabData
+  -- and returns nil, leaving selectedTabData nil so menu:Update() returns early and
+  -- the icon grid is never populated.
+  menu.selectedTabData = nil
+  if C_Bank and C_Bank.FetchPurchasedBankTabData then
+    local tabList = C_Bank.FetchPurchasedBankTabData(bankType)
+    if tabList then
+      for _, tab in ipairs(tabList) do
+        if tab.ID == bagIndex then
+          menu.selectedTabData = tab
+          break
         end
       end
     end
   end
 
-  if isAccountTab then
-    -- Account/warbank tab: use AccountBankPanel.TabSettingsMenu
-    if AccountBankPanel and AccountBankPanel.TabSettingsMenu then
-      local menu = AccountBankPanel.TabSettingsMenu
-      if bagFrame then
-        menu:SetParent(bagFrame)
-        menu:ClearAllPoints()
-        menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
-        -- Keep GetBankFrame override so the menu can look up tab data via the
-        -- real AccountBankPanel hierarchy when needed.
-        menu.GetBankFrame = function()
-          return {
-            GetTabData = function(_, id)
-              if C_Bank and C_Bank.FetchPurchasedBankTabData then
-                local tabs = C_Bank.FetchPurchasedBankTabData(Enum.BankType.Account)
-                if tabs then
-                  for _, tab in ipairs(tabs) do
-                    if tab.ID == id then return tab end
-                  end
-                end
-              end
-              return nil
-            end,
-          }
-        end
-      end
-      ensureSelectedTabData(menu, Enum.BankType.Account, bagIndex)
-      menu:Show()
-      if menu.Update then menu:Update() end
-      reconnectIconCallback(menu)
-    end
-  else
-    -- Character bank tab: use BankPanel.TabSettingsMenu (added in The War Within)
-    if BankPanel and BankPanel.TabSettingsMenu then
-      local menu = BankPanel.TabSettingsMenu
-      if bagFrame then
-        menu:SetParent(bagFrame)
-        menu:ClearAllPoints()
-        menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
-      end
-      ensureSelectedTabData(menu, Enum.BankType.Character, bagIndex)
-      menu:Show()
-      if menu.Update then menu:Update() end
-      reconnectIconCallback(menu)
-    end
-  end
+  -- Show the menu (triggers OnShow -> iconDataProvider creation -> Update() if
+  -- the menu was hidden). Then call Update() explicitly for the case where the
+  -- menu is already shown (OnShow does not re-fire on an already-visible frame).
+  menu:Show()
+  if menu.Update then menu:Update() end
 end
 
 -- CreatePanel creates the bank tab slots panel, attaches it above the given
