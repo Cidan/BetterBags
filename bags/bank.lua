@@ -162,11 +162,21 @@ function bank.proto:OnHide()
 	if database:GetEnableBagFading() then
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
+			-- Explicitly reset the bank slots panel's shown state so it does not
+			-- auto-reappear when the bank is reopened (bag.frame:Show() would
+			-- otherwise re-show any child whose IsShown() is still true).
+			if self.bag.slots then
+				self.bag.slots.frame:Hide()
+			end
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 		end
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
+		-- Explicitly reset the bank slots panel's shown state (see fade path above).
+		if self.bag.slots then
+			self.bag.slots.frame:Hide()
+		end
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 	end
 end

@@ -182,6 +182,7 @@ Integration with the GW2_UI addon for Guild Wars 2 styling.
 - Side button panel for quick actions
 - Custom positioning for bag slots
 - Offset sidebar support
+- "Show Bags" side button persists bank-slots visibility to `database:SetShowBankTabs()` so that the slots panel state is restored on next bank open (same behaviour as the context menu toggle)
 
 ## Theme Architecture
 
