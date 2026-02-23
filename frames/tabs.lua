@@ -439,6 +439,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 
 	if not tab.sabtClick then
 		addon.SetScript(decoration, "OnClick", function(ectx, _, button)
+			if self.tabsDisabled then return end
 			if tab.onClick then
 				tab.onClick()
 				return
@@ -459,6 +460,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		-- Enable drag-to-reorder for reorderable tabs (group tabs, not Bank/"+" tabs)
 		if tabs:IsTabReorderable(self.kind, tab) then
 			decoration:SetScript("OnMouseDown", function(_, button)
+				if self.tabsDisabled then return end
 				if button == "LeftButton" and IsShiftKeyDown() then
 					tabs:StartTabDrag(tab, self)
 				end
@@ -564,6 +566,15 @@ function tabFrame:SetTabByIndex(ctx, index)
 			end
 		end
 	end
+end
+
+-- SetTabsDisabled disables or re-enables all tab click interactions and
+-- dims the tab bar to signal that tabs are not interactive. Used by the
+-- bank slots panel to prevent tab switching while it is open.
+---@param disabled boolean
+function tabFrame:SetTabsDisabled(disabled)
+	self.tabsDisabled = disabled
+	self.frame:SetAlpha(disabled and 0.5 or 1.0)
 end
 
 ---@param index number
@@ -698,6 +709,7 @@ function tabs:Create(parent, kind)
 	container.buttonToName = {}
 	container.tabCount = 0
 	container.selectedTab = nil  -- Initialize to nil to avoid undefined state
+	container.tabsDisabled = false
 	return container
 end
 

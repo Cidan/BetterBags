@@ -244,6 +244,11 @@ Tab management for bank views.
 - Bank-type-aware tab sorting with strict section ordering
 - Drag-to-reorder with cross-section drag constraint
 - Icon-only tab minimum width enforcement (50px)
+- Functional disable state (`SetTabsDisabled`) used by the bank slots panel
+
+**Tab Disable State:**
+
+`SetTabsDisabled(disabled)` sets a `tabsDisabled` flag on the tab container and dims the tab bar to 50% alpha when disabled. While disabled, all `OnClick` and `OnMouseDown` handlers silently return early, preventing tab switching and drag-to-reorder. The bank slots panel calls this when opening (disable) and after the fade-out animation completes (re-enable), so bottom tabs are inert while the per-Blizzard-tab slot filter is active.
 
 **Icon-Only Tab Sizing:**
 
@@ -314,7 +319,9 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 - `SelectTab(ctx, bagIndex)` — selects the given tab, deselects others, and calls `bank.behavior:SwitchToBlizzardTab()`
 - `SelectFirstTab(ctx)` — selects the first available tab (called automatically on fade-in)
 - `OpenTabConfig(bagIndex)` — opens the Blizzard tab settings dialog for the given bag index
-- `Show(callback?)` / `Hide(callback?)` / `IsShown()` — animation-aware show/hide
+- `Show(callback?)` — plays fade-in animation; **immediately calls `tabs:SetTabsDisabled(true)`** so the bottom group tabs are non-interactive while the panel is open
+- `Hide(callback?)` — plays fade-out animation; `SetTabsDisabled(false)` is called after the animation completes (in `fadeOutGroup.OnFinished`)
+- `IsShown()` — returns whether the underlying frame is visible
 
 **Tab Config Dialog — Reliable Icon Selection:**
 
