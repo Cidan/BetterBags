@@ -247,6 +247,22 @@ function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
   -- menu is already shown (OnShow does not re-fire on an already-visible frame).
   menu:Show()
   if menu.Update then menu:Update() end
+
+  -- BankPanelTabSettingsMenuMixin:Update() sets the icon grid's selectedIndex via
+  -- self.IconSelector:SetSelectedIndex(self:GetIndexOfIcon(selectedTabData.icon)).
+  -- GetIndexOfIcon returns nil when: the tab has no custom icon (icon = nil), or
+  -- the icon format from C_Bank.FetchPurchasedBankTabData doesn't match what the
+  -- data provider stores (e.g. integer file data ID vs string path mismatch).
+  -- When selectedIndex is nil, SelectedIconButton:OnClick() returns early without
+  -- scrolling, so left-clicking the icon preview appears to do nothing.
+  -- Fix: fall back to index 1 (question mark) so the icon browser is always
+  -- scrollable when the user clicks the preview button.
+  if menu.IconSelector then
+    if menu.IconSelector:GetSelectedIndex() == nil then
+      menu.IconSelector:SetSelectedIndex(1)
+      menu.IconSelector:ScrollToSelectedIndex()
+    end
+  end
 end
 
 -- CreatePanel creates the bank tab slots panel, attaches it above the given

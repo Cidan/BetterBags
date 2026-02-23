@@ -318,9 +318,17 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 
 **Tab Config Dialog — Reliable Icon Selection:**
 
-`OpenTabConfig` sets `menu.selectedTabData` directly from `C_Bank.FetchPurchasedBankTabData` before showing the menu. This bypasses `menu:SetSelectedTab()` which internally calls `BankPanel:GetTabData()` — a method that searches `BankPanel.purchasedBankTabData`. Because BetterBags keeps `BankPanel` hidden, `purchasedBankTabData` is never populated by Blizzard, so `GetTabData()` always returns nil and leaves `selectedTabData` nil. Without `selectedTabData` the menu's `Update()` returns early, the icon grid is never populated, and `SelectedIconButton:OnClick()` (which checks `GetSelectedIndex()`) silently does nothing.
+`OpenTabConfig` performs two critical steps after showing the menu to ensure the icon browser is interactive:
 
-By setting `menu.selectedTabData` directly before calling `menu:Show()`, `OnShow()` fires `Update()` with valid tab data, the icon grid is populated, and `GetSelectedIndex()` returns a non-nil value so clicking the preview icon scrolls the grid to the selected icon.
+**Step 1 — Bypass `SetSelectedTab` / inject `selectedTabData` directly:**
+
+`OpenTabConfig` sets `menu.selectedTabData` directly from `C_Bank.FetchPurchasedBankTabData` before showing the menu. This bypasses `menu:SetSelectedTab()` which internally calls `BankPanel:GetTabData()` — a method that searches `BankPanel.purchasedBankTabData`. Because BetterBags keeps `BankPanel` hidden, `purchasedBankTabData` is never populated by Blizzard, so `GetTabData()` always returns nil and leaves `selectedTabData` nil. Without `selectedTabData` the menu's `Update()` returns early and the icon grid is never populated.
+
+**Step 2 — Ensure a non-nil `selectedIndex` after `Update()`:**
+
+`BankPanelTabSettingsMenuMixin:Update()` calls `self.IconSelector:SetSelectedIndex(self:GetIndexOfIcon(selectedTabData.icon))`. `GetIndexOfIcon` (from `IconDataProviderMixin`) returns nil when `tab.icon` from C_Bank is nil (unconfigured tab) or when the icon format doesn't match what the data provider stores (e.g. integer file data ID vs string path). When `selectedIndex` is nil, `SelectedIconButton:OnClick()` returns early without scrolling — the click produces no visible effect.
+
+After `Update()`, `OpenTabConfig` checks `menu.IconSelector:GetSelectedIndex()`. If nil, it sets `selectedIndex = 1` (question mark, the first icon) and calls `ScrollToSelectedIndex()` so the grid shows the start position. This ensures clicking the preview button always scrolls the icon grid.
 
 **Tab Button Tooltips:**
 
