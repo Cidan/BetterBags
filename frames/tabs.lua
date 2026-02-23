@@ -176,7 +176,7 @@ function tabFrame:SortTabsByID()
 	if self.kind == const.BAG_KIND.BANK then
 		-- Bank tab sort order:
 		--   Bank (default, Character) → user Bank tabs → Warbank (default, Account)
-		--   → user Warbank tabs → purchase tabs → "+" tab
+		--   → user Warbank tabs → "+" tab
 		-- This groups bank and warbank tabs into clearly separated sections.
 		local charBankType = Enum.BankType and Enum.BankType.Character or 1
 		local accountBankType = Enum.BankType and Enum.BankType.Account or 2
@@ -185,16 +185,12 @@ function tabFrame:SortTabsByID()
 		-- Section values:
 		--   1 = Bank default (Character bankType, isDefault)
 		--   2 = User-created Bank tabs (Character bankType)
-		--   3 = Purchase Bank tab (id=-1)
-		--   4 = Warbank default (Account bankType, isDefault)
-		--   5 = User-created Warbank tabs (Account bankType)
-		--   6 = Purchase Warbank tab (id=-2)
-		--   7 = "+" create tab (id=0)
-		--   8 = Unknown/fallback
+		--   3 = Warbank default (Account bankType, isDefault)
+		--   4 = User-created Warbank tabs (Account bankType)
+		--   5 = "+" create tab (id=0)
+		--   6 = Unknown/fallback
 		local function getBankTabSection(tab)
-			if tab.id == 0 then return 7, 0 end   -- "+" always last
-			if tab.id == -1 then return 3, 0 end   -- Purchase Bank tab
-			if tab.id == -2 then return 6, 0 end   -- Purchase Warbank tab
+			if tab.id == 0 then return 5, 0 end   -- "+" always last
 			if tab.id and tab.id > 0 then
 				local group = database:GetGroup(self.kind, tab.id)
 				if group then
@@ -202,18 +198,18 @@ function tabFrame:SortTabsByID()
 						if group.bankType == charBankType then
 							return 1, 0  -- Bank default (always first in Bank section)
 						elseif group.bankType == accountBankType then
-							return 4, 0  -- Warbank default (always first in Warbank section)
+							return 3, 0  -- Warbank default (always first in Warbank section)
 						end
 					else
 						if group.bankType == charBankType then
 							return 2, database:GetGroupOrder(self.kind, tab.id)  -- User Bank tab
 						elseif group.bankType == accountBankType then
-							return 5, database:GetGroupOrder(self.kind, tab.id)  -- User Warbank tab
+							return 4, database:GetGroupOrder(self.kind, tab.id)  -- User Warbank tab
 						end
 					end
 				end
 			end
-			return 8, 0  -- Fallback
+			return 6, 0  -- Fallback
 		end
 
 		table.sort(self.tabIndex, function(a, b)
@@ -239,19 +235,6 @@ function tabFrame:SortTabsByID()
 			end
 			if b.id == 1 then
 				return false
-			end
-
-			-- Special case: Purchase tabs (negative IDs) should always be last
-			if a.id and a.id < 0 and b.id and b.id > 0 then
-				return false
-			end
-			if b.id and b.id < 0 and a.id and a.id > 0 then
-				return true
-			end
-
-			-- If both have negative IDs (purchase tabs), sort by absolute value
-			if a.id and b.id and a.id < 0 and b.id < 0 then
-				return math.abs(a.id) < math.abs(b.id)
 			end
 
 			-- If both are reorderable groups, sort by their Group.order value
@@ -431,15 +414,6 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 
 	tab:SetHeight(32)
 	decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
-
-	-- For purchase tabs (negative IDs), make decoration forward clicks to the secure tab button
-	-- while keeping mouse enabled for hover effects (highlighting from PanelTabButtonTemplate)
-	if tab.id and tab.id < 0 then
-		-- Make decoration act as a click forwarder to the secure purchase button
-		decoration:SetAttribute("type", "click")
-		decoration:SetAttribute("clickbutton", tab)
-		return
-	end
 
 	if not tab.sabtClick then
 		addon.SetScript(decoration, "OnClick", function(ectx, _, button)
@@ -774,7 +748,6 @@ function tabs:IsTabReorderable(kind, tab)
 	if not tab.id then return false end
 	if groups:IsDefaultGroup(kind, tab.id) then return false end    -- Default tabs always first
 	if tab.id == 0 then return false end    -- "+" tab always last
-	if tab.id < 0 then return false end     -- Purchase tabs always at end
 	return true
 end
 
@@ -1032,7 +1005,7 @@ function tabs:SaveTabOrder(frame)
 	local orderCounter = 2  -- Start at 2 (Bank is always 1)
 
 	for _, tab in ipairs(frame.tabIndex) do
-		if tab.id and tab.id > 0 and not groups:IsDefaultGroup(frame.kind, tab.id) then  -- Skip default groups, "+" (0), purchase (<0)
+		if tab.id and tab.id > 0 and not groups:IsDefaultGroup(frame.kind, tab.id) then  -- Skip default groups and "+" (0)
 			database:SetGroupOrder(frame.kind, tab.id, orderCounter)
 			orderCounter = orderCounter + 1
 		end

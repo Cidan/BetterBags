@@ -47,6 +47,7 @@ local buttonCount = 0
 ---@field iconTexture Texture The icon texture (shown when purchased)
 ---@field selectedHighlight Texture The highlight shown when selected
 ---@field plusText Texture The green '+' atlas icon shown for unpurchased slots
+---@field purchaseFwdBtn Button Hidden BankPanelPurchaseButtonScriptTemplate button used for secure click forwarding when unpurchased
 local bankSlotButtonProto = {}
 
 -- Update refreshes the button's visual state based on current tab data.
@@ -66,12 +67,23 @@ function bankSlotButtonProto:Update(charTabData, accountTabData)
     self.iconTexture:SetTexture(tabData.icon)
     self.iconTexture:Show()
     self.plusText:Hide()
+    -- Purchased: disable secure click forwarding and enable right-click for tab config.
+    self.frame:SetAttribute("type", nil)
+    self.frame:SetAttribute("clickbutton", nil)
+    self.frame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   else
     -- Unpurchased slot: show empty appearance with green '+'
     self.purchased = false
     self.iconTexture:SetTexture(nil)
     self.iconTexture:Hide()
     self.plusText:Show()
+    -- Unpurchased: route left-click through Blizzard's secure purchase button so that
+    -- BankPanelPurchaseTabButtonMixin:OnClick runs in clean (Blizzard) code context.
+    -- This prevents the bankType argument from being tainted, which would otherwise
+    -- cause C_Bank.PurchaseBankTab to be blocked as an insecure call.
+    self.frame:SetAttribute("type", "click")
+    self.frame:SetAttribute("clickbutton", self.purchaseFwdBtn)
+    self.frame:RegisterForClicks("LeftButtonUp")
   end
 
   -- Update selected highlight
@@ -342,6 +354,20 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.buttons = {}
   b.selectedBagIndex = nil
 
+  -- Hidden secure purchase buttons used for click forwarding on unpurchased slot buttons.
+  -- BankPanelPurchaseButtonScriptTemplate provides BankPanelPurchaseTabButtonMixin:OnClick,
+  -- which calls StaticPopup_Show from Blizzard code context so that the bankType passed to
+  -- C_Bank.PurchaseBankTab is never tainted by addon code.
+  local charPurchaseBtn = CreateFrame("Button", "BetterBagsBankSlotsCharPurchaseBtn", b.frame, "BankPanelPurchaseButtonScriptTemplate")
+  charPurchaseBtn:SetSize(1, 1)
+  charPurchaseBtn:SetPoint("TOPLEFT", b.frame, "TOPLEFT", -1000, -1000)
+  charPurchaseBtn:SetAttribute("overrideBankType", Enum.BankType.Character)
+
+  local accountPurchaseBtn = CreateFrame("Button", "BetterBagsBankSlotsAccountPurchaseBtn", b.frame, "BankPanelPurchaseButtonScriptTemplate")
+  accountPurchaseBtn:SetSize(1, 1)
+  accountPurchaseBtn:SetPoint("TOPLEFT", b.frame, "TOPLEFT", -1000, -1000)
+  accountPurchaseBtn:SetAttribute("overrideBankType", Enum.BankType.Account)
+
   -- All possible bank tab slots in order:
   --   6 character bank tabs (CharacterBankTab_1 through _6)
   --   5 account/warbank tabs (AccountBankTab_1 through _5)
@@ -370,7 +396,9 @@ function BankSlots:CreatePanel(ctx, bagFrame)
 
     buttonCount = buttonCount + 1
     local frameName = format("BetterBagsBankSlotButton%d", buttonCount)
-    local buttonFrame = CreateFrame("Button", frameName, b.frame)
+    -- InsecureActionButtonTemplate provides secure attribute-based click forwarding
+    -- (type=click / clickbutton) used to trigger the hidden purchase button in clean context.
+    local buttonFrame = CreateFrame("Button", frameName, b.frame, "InsecureActionButtonTemplate")
     buttonFrame:SetSize(37, 37)
     buttonFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
@@ -402,28 +430,32 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     btn.plusText = plusIcon
 
     btn.frame = buttonFrame
+    btn.purchaseFwdBtn = (slotInfo.bankType == Enum.BankType.Character) and charPurchaseBtn or accountPurchaseBtn
 
     -- Capture loop variables for use in closures below
     local capturedBtn = btn
     local capturedPanel = b
     local capturedSlotInfo = slotInfo
 
-    buttonFrame:SetScript("OnClick", function(_, mouseButton)
+    -- HookScript preserves InsecureActionButtonTemplate's built-in OnClick handler,
+    -- which evaluates the type="click" / clickbutton attributes for secure forwarding.
+    -- SetScript would overwrite that handler and silently break the click forwarding.
+    buttonFrame:HookScript("OnClick", function(_, mouseButton)
       if mouseButton == "RightButton" then
-        -- Right-click: open Blizzard tab configuration (purchased tabs only)
+        -- Right-click: open Blizzard tab configuration (purchased tabs only).
+        -- Right-click is only registered when the slot is purchased (see Update()),
+        -- so capturedBtn.purchased is always true here.
         if capturedBtn.purchased then
           capturedPanel:OpenTabConfig(capturedBtn.bagIndex)
         end
       else
+        -- Left-click on purchased slot: select and filter bank to this tab's items.
+        -- Left-click on unpurchased slot is handled via secure click forwarding set up
+        -- in Update() (type=click + clickbutton=purchaseFwdBtn), which calls
+        -- BankPanelPurchaseTabButtonMixin:OnClick in clean (Blizzard) code context.
         if capturedBtn.purchased then
-          -- Left-click on purchased slot: select and filter bank to this tab's items
           local ectx = context:New('BankSlotSelect')
           capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
-        else
-          -- Left-click on unpurchased slot: open the Blizzard bank tab purchase dialog.
-          -- BankPanelPurchaseTabButtonMixin:OnClick does exactly this same call.
-          PlaySound(SOUNDKIT.IG_MAINMENU_OPTION)
-          StaticPopup_Show("CONFIRM_BUY_BANK_TAB", nil, nil, {bankType = capturedBtn.bankType})
         end
       end
     end)

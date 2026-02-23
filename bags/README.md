@@ -89,6 +89,9 @@ Implements `BankBehavior` for the player's bank (retail version).
 - Bank-specific event handling
 - Group tab management with right-click context menu (Rename/Delete)
 
+**Bank Tab Purchase:**
+Purchasing new bank or warbank tabs is handled entirely by the Bank Tab Slots Panel (`frames/bankslots.lua`) using secure click forwarding. The old bottom-of-tab-bar purchase tab buttons (id=-1 and id=-2) have been removed; `bags/bank.lua` no longer adds any negative-ID tabs to the tab bar.
+
 **Bank Group Tab Context Menu:**
 Right-clicking any user-created bank tab (non-default, ID > 0) shows a context menu with Rename and Delete options. Default bank groups (those with `isDefault = true`) do not show the context menu. Rename uses the `GroupDialog` module (pre-filled with the current name). Delete uses the `Question` module's `YesNo` dialog.
 

@@ -255,11 +255,9 @@ Bank tabs are sorted into two distinct sections separated by their `bankType`:
 
 1. **Bank** (default, `Enum.BankType.Character`, `isDefault=true`) — always first
 2. User-created Bank tabs (`bankType=Character`), sorted by their saved order
-3. Purchase Bank tab (when available)
-4. **Warbank** (default, `Enum.BankType.Account`, `isDefault=true`) — always first in Warbank section
-5. User-created Warbank tabs (`bankType=Account`), sorted by their saved order
-6. Purchase Warbank tab (when available)
-7. **+** create tab — always last
+3. **Warbank** (default, `Enum.BankType.Account`, `isDefault=true`) — always first in Warbank section
+4. User-created Warbank tabs (`bankType=Account`), sorted by their saved order
+5. **+** create tab — always last
 
 **Drag-to-Reorder Constraints:**
 
@@ -289,7 +287,7 @@ Slide-out panel that appears above the bank frame showing all possible Blizzard 
 - Purchased tabs show the tab's configured icon (from `C_Bank.FetchPurchasedBankTabData`)
 - Unpurchased tabs show the `Garr_Building-AddFollowerPlus` atlas icon as a bare 37×37 borderless button (no slot background texture), matching the visual weight of purchased tab icons
 - Left-click on a **purchased** tab selects it and filters the bank to show only items from that specific Blizzard bag index
-- Left-click on an **unpurchased** tab opens the Blizzard bank tab purchase dialog (`CONFIRM_BUY_BANK_TAB` static popup) for the appropriate bank type, replicating the behavior of `BankPanelPurchaseTabButtonMixin:OnClick`
+- Left-click on an **unpurchased** tab opens the Blizzard bank tab purchase dialog via secure click forwarding: each slot button is created with `InsecureActionButtonTemplate` and, when unpurchased, has its `type=click` and `clickbutton` attributes set to a hidden `BankPanelPurchaseButtonScriptTemplate` button (one per bank type). This causes `BankPanelPurchaseTabButtonMixin:OnClick` to execute in clean (Blizzard) code context, keeping the `bankType` argument untainted so that `C_Bank.PurchaseBankTab` is not blocked as an insecure call
 - Right-click opens the Blizzard tab settings dialog (for purchased tabs only); character bank tabs use `BankPanel.TabSettingsMenu`, warbank tabs use `AccountBankPanel.TabSettingsMenu`
 - Auto-selects `CharacterBankTab_1` when the panel is first shown (after the fade-in animation)
 - Clears the single-tab filter and restores the normal bank view when the panel is hidden (after fade-out)
