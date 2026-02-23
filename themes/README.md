@@ -63,6 +63,7 @@ WINDOW_KIND = {
 | `GetAllThemes()` | Get available themes | - | `table<string, Theme>` |
 | `UpdateOpacity()` | Update frame opacity | - | - |
 | `SetTitle(frame, title)` | Set frame title | `Frame`, `string` | - |
+| `ToggleTitleContainer(frame, shown)` | Show/hide title element in decoration | `Frame`, `boolean` | - |
 
 ### Theme Registration
 
@@ -237,6 +238,11 @@ Every theme must implement the following interface:
 **SetTitle(frame, title)** - Update frame titles
 - Set title text
 - Update decoration
+
+**ToggleTitleContainer(frame, shown)** - Show or hide the title element (module-level, not per-theme)
+- Iterates `frame:GetChildren()` looking for either a `TitleContainer` (Default theme, from `DefaultPanelTemplate`) or a `title` FontString (SimpleDark/GW2/ElvUI)
+- Called by the bank slots panel in `Show()` to hide the window title from its normal position, and in `fadeOutGroup.OnFinished` to restore it
+- Works automatically with all built-in themes without per-theme implementation
 
 **Reset()** - Clean up theme
 - Hide all decorations
