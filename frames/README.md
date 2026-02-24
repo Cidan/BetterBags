@@ -296,7 +296,7 @@ Slide-out panel showing all possible Blizzard bank tab slots (retail only). When
 - Left-click on a **purchased** tab selects it and filters the bank to show only items from that specific Blizzard bag index
 - Left-click on an **unpurchased** tab opens the Blizzard bank tab purchase dialog (`CONFIRM_BUY_BANK_TAB` static popup) for the appropriate bank type, replicating the behavior of `BankPanelPurchaseTabButtonMixin:OnClick`
 - Right-click opens the Blizzard tab settings dialog (for purchased tabs only); character bank tabs use `BankPanel.TabSettingsMenu`, warbank tabs use `AccountBankPanel.TabSettingsMenu`
-- Auto-selects `CharacterBankTab_1` when the panel is first shown (after the fade-in animation)
+- Auto-selects `CharacterBankTab_1` when the panel is first shown (after the fade-in animation), but skips the re-render if `selectedBagIndex` already matches (set by `OnShow` pre-configuration to prevent the initial flash)
 - Clears the single-tab filter and restores the normal bank view when the panel is hidden (after fade-out)
 - Redraws automatically on `BANK_TAB_SETTINGS_UPDATED` and `PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED` events
 - Mouse wheel events are forwarded to the outer bag container (not consumed by the inner grid)
