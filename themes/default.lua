@@ -90,10 +90,15 @@ local defaultTheme = {
       if title and title ~= "" then
         decoration:SetTitle(title)
       else
-        -- No title: hide TitleContainer so its visual bar does not create a
-        -- top gap inside the flat window (DefaultPanelFlatTemplate keeps the
-        -- container frame visible even when no text is set).
+        -- No title: hide TitleContainer and pull Bg up to fill the gap.
+        -- DefaultPanelFlatTemplate anchors Bg at TOPLEFT(6, -20) to reserve
+        -- 20 px for the title area. Hiding TitleContainer removes the text but
+        -- leaves that 20 px strip empty, so the NineSlice border renders over
+        -- a transparent gap producing a visible title-bar-like top section.
+        -- Re-anchoring Bg to TOPLEFT(6, 0) extends the flat background fill
+        -- flush with the top of the frame, eliminating the gap.
         decoration.TitleContainer:Hide()
+        decoration.Bg:SetPoint("TOPLEFT", 6, 0)
       end
       decoratorFrames[frame:GetName()] = decoration
     else
