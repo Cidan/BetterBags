@@ -223,7 +223,15 @@ end
 ---@param ctx Context
 function BankSlots.bankSlotsPanelProto:SelectFirstTab(ctx)
   if #self.buttons > 0 then
-    self:SelectTab(ctx, self.buttons[1].bagIndex)
+    local firstBagIndex = self.buttons[1].bagIndex
+    -- Skip if the first tab is already selected. OnShow pre-configures
+    -- selectedBagIndex and blizzardBankTab so that the initial Bank:Draw()
+    -- renders with the correct filter from the start. Calling SelectTab here
+    -- would trigger a redundant full re-render for no visual change.
+    if self.selectedBagIndex == firstBagIndex then
+      return
+    end
+    self:SelectTab(ctx, firstBagIndex)
   end
 end
 

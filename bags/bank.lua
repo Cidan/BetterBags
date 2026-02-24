@@ -72,6 +72,25 @@ function bank.proto:OnShow(ctx)
 	-- Generate tabs before showing frame
 	self:GenerateGroupTabs(ctx)
 
+	-- When the bank tab slots panel is enabled, pre-configure blizzardBankTab
+	-- and the panel's selected state BEFORE any render occurs. This mirrors the
+	-- backpack's 'show bags' approach: the correct display state is determined
+	-- once upfront so that the first Bank:Draw() call (issued by init.lua
+	-- immediately after Bank:Show() returns) already renders with the tab filter
+	-- applied. Without this, the initial render would show the full grouped bank
+	-- for as long as the panel's fade-in animation takes to complete, producing
+	-- a visible flash of unstyled content before the panel auto-selects tab 1.
+	if self.bag.slots and database:GetShowBankTabs() then
+		local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
+		if firstButton then
+			self.bag.blizzardBankTab = firstButton.bagIndex
+			for _, btn in ipairs(self.bag.slots.buttons) do
+				btn:SetSelected(btn == firstButton)
+			end
+			self.bag.slots.selectedBagIndex = firstButton.bagIndex
+		end
+	end
+
 	-- Use fade animation if enabled
 	if database:GetEnableBagFading() then
 		-- Set up callback to handle BankPanel and tab initialization
@@ -106,6 +125,18 @@ function bank.proto:OnShow(ctx)
 			-- Restore the bank tab slots panel when the setting is enabled,
 			-- so re-opening the bank shows the same mode as when it was closed.
 			if self.bag.slots and database:GetShowBankTabs() then
+				-- Ensure BankPanel bank type matches the pre-selected first tab.
+				-- SwitchToGroup() above may have set it to Account if the active
+				-- group is a Warbank group; correct it here so right-click item
+				-- deposits go to the right bank type for the displayed tab.
+				local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
+				if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
+					if firstButton.bankType == Enum.BankType.Account then
+						BankPanel:SetBankType(Enum.BankType.Account)
+					else
+						BankPanel:SetBankType(Enum.BankType.Character)
+					end
+				end
 				self.bag.slots:Draw(ctx)
 				self.bag.slots:Show()
 			end
@@ -142,6 +173,18 @@ function bank.proto:OnShow(ctx)
 		-- Restore the bank tab slots panel when the setting is enabled,
 		-- so re-opening the bank shows the same mode as when it was closed.
 		if self.bag.slots and database:GetShowBankTabs() then
+			-- Ensure BankPanel bank type matches the pre-selected first tab.
+			-- SwitchToGroup() above may have set it to Account if the active
+			-- group is a Warbank group; correct it here so right-click item
+			-- deposits go to the right bank type for the displayed tab.
+			local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
+			if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
+				if firstButton.bankType == Enum.BankType.Account then
+					BankPanel:SetBankType(Enum.BankType.Account)
+				else
+					BankPanel:SetBankType(Enum.BankType.Character)
+				end
+			end
 			self.bag.slots:Draw(ctx)
 			self.bag.slots:Show()
 		end
