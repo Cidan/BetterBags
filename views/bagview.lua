@@ -199,6 +199,19 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   if bag.tabs and w < bag.tabs.width then
     w = bag.tabs.width
   end
+  -- When the bank tab slots panel is visible it is anchored to the bottom-left
+  -- of the bag frame and may be wider than the item grid.  Compute the minimum
+  -- content width so that bagWidth (w + insets + scrollbar) exactly equals the
+  -- panel frame width, preventing the panel from overflowing past the right edge.
+  if bag.slots and bag.slots:IsShown() then
+    local minW = bag.slots.frame:GetWidth()
+      - const.OFFSETS.BAG_LEFT_INSET
+      + const.OFFSETS.BAG_RIGHT_INSET
+      - const.OFFSETS.SCROLLBAR_WIDTH
+    if w < minW then
+      w = minW
+    end
+  end
   if h == 0 then
     h = 40
   end

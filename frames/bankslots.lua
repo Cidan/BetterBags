@@ -151,6 +151,13 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
   -- Height = content height + top inset (12) + bottom inset (12).
   self.frame:SetHeight(h + 24)
+
+  -- Enforce minimum bag frame width so the main bank window is never
+  -- narrower than the bank tab panel anchored below it.
+  local panelWidth = self.frame:GetWidth()
+  if self.bagFrame:GetWidth() < panelWidth then
+    self.bagFrame:SetWidth(panelWidth)
+  end
 end
 
 function BankSlots.bankSlotsPanelProto:SetShown(shown)

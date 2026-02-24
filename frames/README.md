@@ -333,7 +333,7 @@ After the fade-out animation completes (`fadeOutGroup.OnFinished`):
 
 **Key Methods:**
 - `CreatePanel(ctx, bagFrame)` — factory; returns a `bankSlotsPanel` (retail-only; returns nil on Classic/Era)
-- `Draw(ctx)` — refreshes all slot button visuals from the current C_Bank tab data
+- `Draw(ctx)` — refreshes all slot button visuals from the current C_Bank tab data; also enforces that `bagFrame` width is at least as wide as the panel
 - `SelectTab(ctx, bagIndex)` — selects the given tab, deselects others, and calls `bank.behavior:SwitchToBlizzardTab()`
 - `SelectFirstTab(ctx)` — selects the first available tab (called automatically on fade-in)
 - `OpenTabConfig(bagIndex)` — opens the Blizzard tab settings dialog for the given bag index
