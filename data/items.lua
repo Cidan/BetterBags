@@ -138,6 +138,20 @@ function items:OnEnable()
 				return
 			end
 			addon.atBank = true
+			-- Pre-configure blizzardBankTab when the bank tab slots panel is enabled.
+			-- BANKFRAME_OPENED fires before BAG_UPDATE_DELAYED triggers the first
+			-- items:RefreshBank() call. Setting blizzardBankTab here ensures the very
+			-- first slotInfo is built with the correct tab filter applied, preventing
+			-- the initial render flash of all bank items before the panel's fade-in
+			-- animation completes and auto-selects the first tab.
+			if addon.isRetail and database:GetShowBankTabs()
+				and addon.Bags and addon.Bags.Bank then
+				local slots = addon.Bags.Bank.slots
+				local firstButton = slots and slots.buttons and slots.buttons[1]
+				if firstButton then
+					addon.Bags.Bank.blizzardBankTab = firstButton.bagIndex
+				end
+			end
 		end)
 
 		events:RegisterEvent("BANKFRAME_CLOSED", function()
