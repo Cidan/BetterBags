@@ -124,6 +124,8 @@ if addon.isRetail then
     [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
     [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
     [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
+    [Enum.BagIndex.CharacterBankTab_7] = Enum.BagIndex.CharacterBankTab_7,
+    [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
   }
   const.BANK_ONLY_BAGS = {
     [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
@@ -132,6 +134,8 @@ if addon.isRetail then
     [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
     [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
     [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
+    [Enum.BagIndex.CharacterBankTab_7] = Enum.BagIndex.CharacterBankTab_7,
+    [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
   }
   const.BANK_ONLY_BAGS_LIST = {
     Enum.BagIndex.CharacterBankTab_1,
@@ -140,6 +144,8 @@ if addon.isRetail then
     Enum.BagIndex.CharacterBankTab_4,
     Enum.BagIndex.CharacterBankTab_5,
     Enum.BagIndex.CharacterBankTab_6,
+    Enum.BagIndex.CharacterBankTab_7,
+    Enum.BagIndex.Reagentbank,
   }
 else
 -- BANK_BAGS contains all the bags that are part of the bank, including
@@ -153,6 +159,7 @@ else
     [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
     [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
     [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+    [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
   }
   const.BANK_ONLY_BAGS = {
     [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
@@ -162,6 +169,7 @@ else
     [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
     [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
     [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+    [Enum.BagIndex.Reagentbank] = Enum.BagIndex.Reagentbank,
   }
   const.BANK_ONLY_BAGS_LIST = {
     Enum.BagIndex.BankBag_1,
@@ -171,6 +179,7 @@ else
     Enum.BagIndex.BankBag_5,
     Enum.BagIndex.BankBag_6,
     Enum.BagIndex.BankBag_7,
+    Enum.BagIndex.Reagentbank,
   }
 end
 
@@ -181,6 +190,7 @@ if addon.isRetail then
     [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
     [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
     [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
+    [Enum.BagIndex.AccountBankTab_6] = Enum.BagIndex.AccountBankTab_6,
   }
 end
 
