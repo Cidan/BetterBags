@@ -323,6 +323,10 @@ end
 function itemFrame.itemProto:SetItem(ctx, slotkey)
 	assert(slotkey, "item must be provided")
 	local data = items:GetItemDataFromSlotKey(slotkey)
+	if not data then
+		debug:Log("SetItem", "No item data found for slotkey", slotkey, "-- bag index may not be registered in constants")
+		return
+	end
 	self:SetItemFromData(ctx, data)
 end
 

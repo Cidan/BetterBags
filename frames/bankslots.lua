@@ -378,8 +378,8 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   -- this panel has no title, so we match the 12 px bottom gap.
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -12)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
-  -- Allow all 11 slots on one row
-  b.content.maxCellWidth = 11
+  -- Allow all slots on one row (13 max: 7 character + 6 account)
+  b.content.maxCellWidth = 13
   b.content:HideScrollBar()
   -- Bank tab slots grid is not scrollable; disable mouse wheel so scroll
   -- events pass through to the outer scrollable bag container.
@@ -391,8 +391,8 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.tabsWereShown = false
 
   -- All possible bank tab slots in order:
-  --   6 character bank tabs (CharacterBankTab_1 through _6)
-  --   5 account/warbank tabs (AccountBankTab_1 through _5)
+  --   6 character bank tabs (CharacterBankTab_1 through _6), plus _7 if present
+  --   5 account/warbank tabs (AccountBankTab_1 through _5), plus _6 if present
   local allTabSlots = {
     {bagIndex = Enum.BagIndex.CharacterBankTab_1, bankType = Enum.BankType.Character},
     {bagIndex = Enum.BagIndex.CharacterBankTab_2, bankType = Enum.BankType.Character},
@@ -406,6 +406,14 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     {bagIndex = Enum.BagIndex.AccountBankTab_4, bankType = Enum.BankType.Account},
     {bagIndex = Enum.BagIndex.AccountBankTab_5, bankType = Enum.BankType.Account},
   }
+  -- New tab slots added in Midnight (12.x) or later patches are inserted after
+  -- their respective last-known tab in order (character before account).
+  if Enum.BagIndex.CharacterBankTab_7 then
+    table.insert(allTabSlots, 7, {bagIndex = Enum.BagIndex.CharacterBankTab_7, bankType = Enum.BankType.Character})
+  end
+  if Enum.BagIndex.AccountBankTab_6 then
+    table.insert(allTabSlots, {bagIndex = Enum.BagIndex.AccountBankTab_6, bankType = Enum.BankType.Account})
+  end
 
   for i, slotInfo in ipairs(allTabSlots) do
     ---@type BankSlotButton

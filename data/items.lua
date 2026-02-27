@@ -1595,6 +1595,12 @@ function items:GetBagKindFromBagID(bagid)
 	if const.BANK_BAGS[tonumber(bagid)] or const.ACCOUNT_BANK_BAGS[tonumber(bagid)] then
 		return const.BAG_KIND.BANK
 	end
+	-- Defensive fallback: if the bank slots panel has this bag selected as the
+	-- active Blizzard tab, treat it as a bank bag even if it is not yet in the
+	-- constant tables (e.g. a new bag index added by a WoW patch).
+	if addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab == tonumber(bagid) then
+		return const.BAG_KIND.BANK
+	end
 	return const.BAG_KIND.BACKPACK
 end
 

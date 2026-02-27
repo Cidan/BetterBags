@@ -54,6 +54,14 @@ if addon.isRetail then
     [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
     [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
   }
+  -- Midnight (12.x) and later may add additional bank tab slots.
+  -- Guard each new enum so the code is a no-op on clients that don't have it.
+  if Enum.BagIndex.CharacterBankTab_7 then
+    const.BANK_TAB[Enum.BagIndex.CharacterBankTab_7] = Enum.BagIndex.CharacterBankTab_7
+  end
+  if Enum.BagIndex.AccountBankTab_6 then
+    const.BANK_TAB[Enum.BagIndex.AccountBankTab_6] = Enum.BagIndex.AccountBankTab_6
+  end
   -- Named aliases used as context markers by UpdateFreeSlots to distinguish
   -- character bank from account bank (warbank) mode. The retail BANK_TAB table
   -- uses integer enum keys only, so these named keys are required for the
@@ -125,6 +133,9 @@ if addon.isRetail then
     [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
     [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
   }
+  if Enum.BagIndex.CharacterBankTab_7 then
+    const.BANK_BAGS[Enum.BagIndex.CharacterBankTab_7] = Enum.BagIndex.CharacterBankTab_7
+  end
   const.BANK_ONLY_BAGS = {
     [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
     [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
@@ -133,6 +144,9 @@ if addon.isRetail then
     [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
     [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
   }
+  if Enum.BagIndex.CharacterBankTab_7 then
+    const.BANK_ONLY_BAGS[Enum.BagIndex.CharacterBankTab_7] = Enum.BagIndex.CharacterBankTab_7
+  end
   const.BANK_ONLY_BAGS_LIST = {
     Enum.BagIndex.CharacterBankTab_1,
     Enum.BagIndex.CharacterBankTab_2,
@@ -141,6 +155,9 @@ if addon.isRetail then
     Enum.BagIndex.CharacterBankTab_5,
     Enum.BagIndex.CharacterBankTab_6,
   }
+  if Enum.BagIndex.CharacterBankTab_7 then
+    table.insert(const.BANK_ONLY_BAGS_LIST, Enum.BagIndex.CharacterBankTab_7)
+  end
 else
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
@@ -182,6 +199,9 @@ if addon.isRetail then
     [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
     [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
   }
+  if Enum.BagIndex.AccountBankTab_6 then
+    const.ACCOUNT_BANK_BAGS[Enum.BagIndex.AccountBankTab_6] = Enum.BagIndex.AccountBankTab_6
+  end
 end
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
