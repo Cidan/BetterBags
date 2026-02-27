@@ -85,7 +85,9 @@ local function ClearButton(ctx, view, slotkey)
     view.itemsByBagAndSlot[slotkey] = nil
     view:RemoveSlotSection(slotkey)
   end
-  addon:GetBagFromBagID(item.bagid).drawOnClose = true
+  if item then
+    addon:GetBagFromBagID(item.bagid).drawOnClose = true
+  end
 end
 
 -- CreateButton creates a button for an item and adds it to the view.
@@ -104,6 +106,10 @@ local function CreateButton(ctx, view, slotkey)
     end
   end
   local item = items:GetItemDataFromSlotKey(slotkey)
+  if not item then
+    debug:Log("CreateButton", "No item data for slotkey", slotkey, "- skipping stale draw")
+    return false
+  end
   debug:Log("CreateButton", "Creating button for item", slotkey)
   local oldSection = view:GetSlotSection(slotkey)
   if oldSection then
@@ -170,6 +176,10 @@ local function ReconcileWithPartial(ctx, view, stackInfo)
   local opts = database:GetStackingOptions(view.kind)
   if not opts.dontMergePartial then return end
   local rootItem = items:GetItemDataFromSlotKey(stackInfo.rootItem)
+  if not rootItem then
+    -- Root item data missing (stale stack info from a replaced slotInfo); skip reconcile.
+    return
+  end
 
   -- If the root item is not full, all items in the stack will be partial,
   -- so let's make sure they all are drawn.
@@ -191,9 +201,9 @@ local function ReconcileWithPartial(ctx, view, stackInfo)
   -- if it's not, clear it.
   for slotkey in pairs(stackInfo.slotkeys) do
     local childData = items:GetItemDataFromSlotKey(slotkey)
-    if childData.itemInfo.currentItemCount ~= childData.itemInfo.itemStackCount then
+    if childData and childData.itemInfo.currentItemCount ~= childData.itemInfo.itemStackCount then
       CreateButton(ctx, view, slotkey)
-    else
+    elseif childData then
       ClearButton(ctx, view, slotkey)
     end
   end

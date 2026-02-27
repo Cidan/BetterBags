@@ -323,6 +323,13 @@ end
 function itemFrame.itemProto:SetItem(ctx, slotkey)
 	assert(slotkey, "item must be provided")
 	local data = items:GetItemDataFromSlotKey(slotkey)
+	if not data then
+		-- Item data can be nil when the global slotInfo was replaced by WipeSlotInfo
+		-- between when the draw was queued (via SendMessageLater) and when it fires.
+		-- Silently skip stale slotkeys rather than crashing.
+		debug:Log("SetItem", "No item data for slotkey", slotkey, "- skipping stale draw")
+		return
+	end
 	self:SetItemFromData(ctx, data)
 end
 
