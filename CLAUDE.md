@@ -1,6 +1,5 @@
 # Claude
 
-@.context/wow-addon-architect.md
 @.context/api.md
 @.context/documentation.md
 @.context/patterns.md
