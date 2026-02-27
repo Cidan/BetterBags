@@ -81,6 +81,43 @@ function gridProto:Sort(fn)
 end
 ```
 
+## WipeSlotInfo / SendMessageLater Race: Stale SlotInfo in Deferred Draws
+**Problem**: `items:GetItemDataFromSlotKey(slotkey)` returns nil for slotkeys that were valid at time of refresh but are gone by the time the deferred draw fires. Error: `"data must be provided"` in `SetItemFromData`.
+
+**Root cause**: `events:SendMessageLater` defers the draw by one frame (`C_Timer.After(0, ...)`). If `items:WipeSlotInfo(kind)` fires during that frame (replacing the SlotInfo object and resetting `itemsBySlotKey`), slotkeys from the now-orphaned previous changeset are no longer in `items.slotInfo[kind].itemsBySlotKey`.
+
+**Why it happens**: The refresh pipeline is:
+1. `LoadBagItems` → `ContinuableContainer:ContinueOnLoad` (async)
+2. Callback → `LoadItems` → `slotInfo:Update` (builds changeset) → `SendMessageLater`
+3. `C_Timer.After(0)` fires → Draw → `SetItem` → `GetItemDataFromSlotKey`
+
+Between steps 2 and 3, a new `BAG_UPDATE_DELAYED` or `wipe=true` refresh can fire `WipeSlotInfo`, replacing `items.slotInfo[kind]` with a brand-new empty object. The draw then looks up stale slotkeys in the new (empty or different) `itemsBySlotKey`.
+
+**Solution**: Nil-guard all direct lookups via `GetItemDataFromSlotKey` before dereferencing the result:
+```lua
+-- In SetItem (frames/item.lua):
+local data = items:GetItemDataFromSlotKey(slotkey)
+if not data then
+  debug:Log("SetItem", "No item data for slotkey", slotkey, "- skipping stale draw")
+  return
+end
+
+-- In CreateButton (views/gridview.lua):
+local item = items:GetItemDataFromSlotKey(slotkey)
+if not item then return false end
+
+-- In ClearButton (views/gridview.lua):
+if item then addon:GetBagFromBagID(item.bagid).drawOnClose = true end
+
+-- In ReconcileWithPartial (views/gridview.lua):
+local rootItem = items:GetItemDataFromSlotKey(stackInfo.rootItem)
+if not rootItem then return end
+-- ... and for child items:
+if childData and childData.itemInfo.currentItemCount ~= ... then
+```
+
+**Key files**: `frames/item.lua:323-333`, `views/gridview.lua:75-91`, `views/gridview.lua:99-120`, `views/gridview.lua:175-210`
+
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds
