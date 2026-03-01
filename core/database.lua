@@ -354,12 +354,16 @@ function DB:SetItemCategoryEnabled(kind, category, enabled)
 end
 
 function DB:SetEphemeralItemCategoryEnabled(kind, category, enabled)
-  DB.data.profile.ephemeralCategoryFilters[category].enabled[kind] = enabled
+  local filter = DB.data.profile.ephemeralCategoryFilters[category]
+  if filter then
+    filter.enabled[kind] = enabled
+  end
 end
 
 ---@param category string
 function DB:DeleteItemCategory(category)
   if DB.data.profile.customCategoryFilters[category] ~= nil then
+    DB.data.profile.customCategoryFilters[category].itemList = DB.data.profile.customCategoryFilters[category].itemList or {}
     for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
       DB:DeleteItemFromCategory(itemID, category)
     end
@@ -371,6 +375,7 @@ end
 ---@param category string
 function DB:WipeItemCategory(category)
   if DB.data.profile.customCategoryFilters[category] then
+    DB.data.profile.customCategoryFilters[category].itemList = DB.data.profile.customCategoryFilters[category].itemList or {}
     for itemID, _ in pairs(DB.data.profile.customCategoryFilters[category].itemList) do
       DB:DeleteItemFromCategory(itemID, category)
     end
@@ -417,6 +422,7 @@ end
 function DB:CreateOrUpdateCategory(category)
   if category.save then
     DB.data.profile.customCategoryFilters[category.name] = category
+    category.itemList = category.itemList or {}
     for itemID, _ in pairs(category.itemList) do
       DB.data.profile.customCategoryIndex[itemID] = category.name
     end
