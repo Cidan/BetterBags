@@ -101,12 +101,14 @@ function categories:GetMergedCategory(name)
   local filter = database:GetItemCategory(name)
 
   if filter then
+    filter.itemList = filter.itemList or {}
     for id, _ in pairs(filter.itemList) do
       results.itemList[id] = true
     end
   end
 
   if self.ephemeralCategories[name] then
+    self.ephemeralCategories[name].itemList = self.ephemeralCategories[name].itemList or {}
     for id, _ in pairs(self.ephemeralCategories[name].itemList) do
       results.itemList[id] = true
     end
@@ -193,6 +195,7 @@ function categories:WipeCategory(ctx, category)
   end
   database:WipeItemCategory(category)
   if self.ephemeralCategories[category] then
+    self.ephemeralCategories[category].itemList = self.ephemeralCategories[category].itemList or {}
     for id, _ in pairs(self.ephemeralCategories[category].itemList) do
       self.ephemeralCategoryByItemID[id] = nil
     end
@@ -207,7 +210,11 @@ end
 ---@return boolean
 function categories:IsCategoryEnabled(kind, category)
   if self.ephemeralCategories[category] then
-    return database:GetEphemeralItemCategory(category).enabled[kind]
+    local filter = database:GetEphemeralItemCategory(category)
+    if filter and filter.enabled then
+      return filter.enabled[kind]
+    end
+    return false
   end
   if database:GetItemCategory(category) then
     if database:GetItemCategory(category).itemList then
@@ -280,7 +287,8 @@ function categories:SetCategoryState(kind, category, enabled)
     self.ephemeralCategories[category].enabled[kind] = enabled
     database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
   end
-  if database:GetItemCategory(category).itemList then
+  local filter = database:GetItemCategory(category)
+  if filter and filter.itemList then
     database:SetItemCategoryEnabled(kind, category, enabled)
   end
 end
@@ -310,6 +318,7 @@ function categories:CreateCategory(ctx, category)
       category.groupByParent = savedState.groupByParent
     end
     self.ephemeralCategories[category.name] = category
+    category.itemList = category.itemList or {}
     for id in pairs(category.itemList) do
       self.ephemeralCategoryByItemID[id] = category
     end
@@ -371,6 +380,7 @@ function categories:DeleteCategory(ctx, category)
   end
 
   if self.ephemeralCategories[category] then
+    self.ephemeralCategories[category].itemList = self.ephemeralCategories[category].itemList or {}
     for id, _ in pairs(self.ephemeralCategories[category].itemList) do
       self.ephemeralCategoryByItemID[id] = nil
     end
@@ -414,6 +424,7 @@ function categories:RenameCategory(ctx, oldName, newName)
     self.ephemeralCategories[oldName] = nil
 
     -- Update item lookup cache
+    self.ephemeralCategories[newName].itemList = self.ephemeralCategories[newName].itemList or {}
     for itemID, _ in pairs(self.ephemeralCategories[newName].itemList) do
       self.ephemeralCategoryByItemID[itemID].name = newName
     end
@@ -430,6 +441,7 @@ function categories:RenameCategory(ctx, oldName, newName)
   end
   for _, categoryName in ipairs(categoriesToDelete) do
     if self.ephemeralCategories[categoryName] then
+      self.ephemeralCategories[categoryName].itemList = self.ephemeralCategories[categoryName].itemList or {}
       for itemID, _ in pairs(self.ephemeralCategories[categoryName].itemList) do
         self.ephemeralCategoryByItemID[itemID] = nil
       end
@@ -579,7 +591,10 @@ function categories:RemoveItemFromCategory(id)
     filter.itemList[id] = nil
     self.ephemeralCategoryByItemID[id] = nil
   end
-  database:DeleteItemFromCategory(id, database:GetItemCategoryByItemID(id).name)
+  local persistedCategory = database:GetItemCategoryByItemID(id)
+  if persistedCategory.name then
+    database:DeleteItemFromCategory(id, persistedCategory.name)
+  end
 end
 
 -- RegisterCategoryFunction registers a function that will be called to get the category name for all items.
