@@ -24,6 +24,7 @@ local debug = addon:GetModule('Debug')
 ---@field private pendingWipe boolean
 ---@field private debounceTimer table?
 ---@field private isSorting boolean
+---@field private specSwapPending boolean
 local refresh = addon:NewModule('Refresh')
 
 function refresh:OnInitialize()
@@ -32,6 +33,7 @@ function refresh:OnInitialize()
   self.pendingWipe = false
   self.debounceTimer = nil
   self.isSorting = false
+  self.specSwapPending = false
 end
 
 ---@param ctx Context
@@ -156,8 +158,14 @@ function refresh:OnEnable()
   -- Register for main bag update events from the WoW client.
   -- BAG_UPDATE_DELAYED signals that all bag updates are complete and data is available.
   -- Always refresh all bags when this fires - bank will only actually update if addon.atBank is true.
+  -- If a spec swap is in progress, force a wipe so gear moved from equipment slots to bags is
+  -- not incorrectly marked as "Recent Items" by the new-item detection logic.
   events:RegisterEvent('BAG_UPDATE_DELAYED', function()
-    self:RequestUpdate({ backpack = true, bank = true })
+    if self.specSwapPending then
+      self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+    else
+      self:RequestUpdate({ backpack = true, bank = true })
+    end
   end)
 
   if not addon.isRetail then
@@ -176,9 +184,26 @@ function refresh:OnEnable()
   end)
 
   -- Register when equipment sets change.
+  -- Also clears the spec swap pending flag since EQUIPMENT_SETS_CHANGED fires after gear has
+  -- finished swapping, meaning any subsequent bag updates are not from the spec swap.
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
+    self.specSwapPending = false
     self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
+
+  -- Register for spec/talent group changes to suppress "Recent Items" tagging on gear swaps.
+  -- When a spec swap occurs, equipped gear moves back to bags and would otherwise be treated
+  -- as newly acquired items. We set specSwapPending so the next BAG_UPDATE_DELAYED forces a
+  -- wipe refresh, which suppresses MarkItemAsNew via the existing wipe context guard.
+  -- The flag is cleared by EQUIPMENT_SETS_CHANGED (normal case) or after 3 seconds (safety).
+  if addon.isRetail then
+    events:RegisterEvent('ACTIVE_TALENT_GROUP_CHANGED', function()
+      self.specSwapPending = true
+      C_Timer.After(3, function()
+        self.specSwapPending = false
+      end)
+    end)
+  end
 
   -- Register when combat ends and execute any pending updates
   events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
