@@ -9,6 +9,9 @@ local events = addon:GetModule('Events')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Zygor: AceModule
 local zygor = addon:NewModule('Zygor')
 
@@ -32,6 +35,7 @@ local function onBagRendered(_, bag, _)
     addon.Bags.Backpack.drawAfterCombat = true
     return
   end
+  if database:GetUpgradeIconProvider() ~= 'Zygor' then return end
   if not ZGV.ItemScore.ActiveRuleSet then return end
   items:PreLoadAllEquipmentSlots(function()
     for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
