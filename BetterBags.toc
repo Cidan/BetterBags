@@ -10,7 +10,7 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
 ## X-Wago-ID: aNDmy96o
-## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, WagoAnalytics, GW2_UI, ElvUI, DevTool
+## OptionalDeps: LibStub, Masque, CallbackHandler-1.0, Ace3, LibSharedMedia-3.0, _DebugLog, ConsolePort, Pawn, ZygorGuidesViewer, WagoAnalytics, GW2_UI, ElvUI, DevTool
 
 libs\LibStub\LibStub.lua
 libs\CallbackHandler-1.0\CallbackHandler-1.0.xml
@@ -130,6 +130,7 @@ config\plugin.lua
 
 integrations\consoleport.lua
 integrations\pawn.lua
+integrations\zygor.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
 integrations\quickfind.lua
