@@ -32,6 +32,7 @@ local function onBagRendered(_, bag, _)
     addon.Bags.Backpack.drawAfterCombat = true
     return
   end
+  if not ZGV.ItemScore.ActiveRuleSet then return end
   items:PreLoadAllEquipmentSlots(function()
     for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
       onItemUpdate(item)
@@ -41,9 +42,6 @@ end
 
 function zygor:OnEnable()
   if not ZGV or not ZGV.ItemScore or not ZGV.ItemScore.Upgrades then
-    return
-  end
-  if not ZGV.ItemScore.ActiveRuleSet then
     return
   end
   events:RegisterMessage('bag/Rendered', onBagRendered)
