@@ -72,10 +72,6 @@ Implements `BackpackBehavior` for the player's inventory bags.
 - Theme configuration
 - Cooldown event handling
 - Bag sorting
-- Group tab management with right-click context menu (Rename/Delete)
-
-**Group Tab Context Menu:**
-Right-clicking any user-created tab (ID > 1) shows a context menu with Rename and Delete options. The default "Backpack" tab (ID 1) does not show a context menu. Both `groups:RenameGroup` and `groups:DeleteGroup` are called with `const.BAG_KIND.BACKPACK` as the `kind` argument.
 
 ### bank.lua
 
@@ -87,22 +83,6 @@ Implements `BankBehavior` for the player's bank (retail version).
 - Warbank/Account bank tabs
 - Tab settings menu integration
 - Bank-specific event handling
-- Group tab management with right-click context menu (Rename/Delete)
-
-**Bank Group Tab Context Menu:**
-Right-clicking any user-created bank tab (non-default, ID > 0) shows a context menu with Rename and Delete options. Default bank groups (those with `isDefault = true`) do not show the context menu. Rename uses the `GroupDialog` module (pre-filled with the current name). Delete uses the `Question` module's `YesNo` dialog.
-
-**Bank Slots Panel Persistence (`showBankTabs`):**
-The bank tab slots panel (Blizzard bank tabs with icons) can be toggled via the context menu. When toggled, `database:SetShowBankTabs(true/false)` persists the preference. On bank open (`OnShow`), if `GetShowBankTabs()=true`, the group tabs are hidden and the slots panel is shown.
-
-**Initial Render Flash Prevention:**
-The flash prevention requires two coordinated pieces:
-
-1. **`data/items.lua` `BANKFRAME_OPENED` handler** — sets `bag.blizzardBankTab` to the first tab's `bagIndex` *before* `BAG_UPDATE_DELAYED` fires. This is the critical fix: the event sequence is `BANKFRAME_OPENED` → `BAG_UPDATE_DELAYED` → debounce → `items:RefreshBank()` → `items/RefreshBank/Done` → `Bank:Show()` + `Bank:Draw(ctx, slotInfo)`. The `slotInfo` passed to `Bank:Draw()` is built during `items:RefreshBank()`, which checks `blizzardBankTab` to decide which bag items to load. By setting `blizzardBankTab` in `BANKFRAME_OPENED` (before `BAG_UPDATE_DELAYED` triggers `items:RefreshBank()`), the very first `slotInfo` is already filtered to tab 1 — so the first render shows the correct filtered view with no flash.
-
-2. **`OnShow()` pre-configuration block** — when `GetShowBankTabs()` is true, sets `bag.blizzardBankTab` (redundant with the `BANKFRAME_OPENED` fix, but kept for correctness), sets button `SetSelected` visual states, and sets `selectedBagIndex = firstButton.bagIndex`. The panel's `SelectFirstTab()` call (triggered by the fade-in `OnFinished` hook) checks `selectedBagIndex` and skips the redundant re-render when the tab is already pre-selected.
-
-When the bank closes (`OnHide`), `slots.frame:Hide()` is called explicitly in both the fade and non-fade paths. This is critical: `slots.frame` is a child of `bag.frame`. When `bag.frame:Hide()` is called, `slots.frame:IsVisible()` becomes false but `slots.frame:IsShown()` remains `true`. Without the explicit `Hide()`, reopening the bank would cause `bag.frame:Show()` to immediately re-show the slots panel — and if `GetShowBankTabs()` returned `false` at that moment (e.g. from the GW2 theme toggle not updating the DB), BOTH the group tabs AND the slots panel would be visible simultaneously.
 
 **Critical Notes:**
 - BankPanel must be shown for `GetActiveBankType()` to work
