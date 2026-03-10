@@ -117,7 +117,14 @@ Main initialization module that coordinates addon startup.
 - Creates main bag instances (Backpack and Bank)
 - Initializes all submodules in correct order
 - Registers core event handlers
-- Manages compatibility with other addons
+- Manages compatibility with other addons via `applyCompat()`
+
+#### Addon Compatibility Checks (`applyCompat`)
+
+`applyCompat()` runs deferred checks for known conflicting addons:
+
+- **BetterBagsElvUISkin** (5s delay): Detected via `C_AddOns.IsAddOnLoaded`; disabled via `C_AddOns.DisableAddOn` and an alert shown via `question:Alert`.
+- **PatchWerk** (2s delay): Detected via `C_AddOns.IsAddOnLoaded("PatchWerk")`; shows an undismissable `StaticPopupDialogs` popup (`hideOnEscape = false`, no cancel button). The single "Disable & Reload" button calls `C_AddOns.DisableAddOn("PatchWerk")` then `ReloadUI()`. PatchWerk globally patches WoW functions in a way that breaks all addons, so the user must disable it entirely.
 
 ### localization.lua
 
