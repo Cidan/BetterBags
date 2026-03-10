@@ -248,6 +248,26 @@ local function applyCompat()
       C_AddOns.DisableAddOn("BetterBagsElvUISkin")
     end
   end)
+
+  -- PatchWerk breaks every WoW addon by patching functions globally, even addons
+  -- it is not configured to patch. Detect it early and force the user to disable it.
+  C_Timer.After(2, function()
+    if C_AddOns.IsAddOnLoaded("PatchWerk") then
+      StaticPopupDialogs["BETTERBAGS_PATCHWERK_CONFLICT"] = {
+        text = "BetterBags has detected that the addon |cFFFF4400PatchWerk|r is loaded.\n\nPatchWerk breaks every WoW addon, even addons it is not configured to patch. You must disable PatchWerk entirely for BetterBags and other addons to work correctly.\n\nClick 'Disable & Reload' to disable PatchWerk and reload your UI.",
+        button1 = "Disable & Reload",
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = false,
+        preferredIndex = 3,
+        OnAccept = function()
+          C_AddOns.DisableAddOn("PatchWerk")
+          ReloadUI()
+        end,
+      }
+      StaticPopup_Show("BETTERBAGS_PATCHWERK_CONFLICT")
+    end
+  end)
 end
 
 -- OnEnable is called when the addon is enabled.
