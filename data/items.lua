@@ -539,11 +539,15 @@ function items:LoadBagItems(ctx, kind, bagList, includeEquipment, callback)
 			local size = C_Container.GetContainerNumSlots(bagid)
 			if size and size > 0 then
 				for slotid = 1, size do
-					local data = {}
-					---@cast data +ItemData
-					data.bagid, data.slotid = bagid, slotid
-					self:AttachItemInfo(data, kind)
-					itemData[self:GetSlotKey(data)] = data
+					local itemID = C_Container.GetContainerItemID(bagid, slotid)
+					-- Skip empty keyring slots
+					if bagid ~= Enum.BagIndex.Keyring or itemID then
+						local data = {}
+						---@cast data +ItemData
+						data.bagid, data.slotid = bagid, slotid
+						self:AttachItemInfo(data, kind)
+						itemData[self:GetSlotKey(data)] = data
+					end
 				end
 			end
 		end
