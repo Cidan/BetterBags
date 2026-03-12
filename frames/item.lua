@@ -225,8 +225,17 @@ function itemFrame.itemProto:UpdateUpgrade(ctx, data)
 		return
 	end
 
-	if database:GetUpgradeIconProvider() == "None" then
+	local provider = database:GetUpgradeIconProvider()
+	if provider == "None" then
 		decoration.UpgradeIcon:SetShown(false)
+		return
+	end
+
+	-- External providers (Zygor, Pawn) handle upgrade icons in their own
+	-- bag/Rendered callback.  The built-in ilvl comparison below should only
+	-- run for "BetterBags"; otherwise an external provider's score-based
+	-- result gets overwritten by a naïve ilvl check.
+	if provider ~= "BetterBags" then
 		return
 	end
 
