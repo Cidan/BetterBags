@@ -25,7 +25,29 @@ local function onItemUpdate(item)
     return
   end
   local isUpgrade, _, _, _, comment = ZGV.ItemScore.Upgrades:IsUpgrade(data.itemInfo.itemLink)
-  if comment == "not scored" or comment == "no link" then return end
+  if comment == "not scored" or comment == "no link" then
+    -- For unscored trinkets, fall back to ilvl-based comparison.
+    -- A trinket is an upgrade if its ilvl exceeds at least one equipped
+    -- trinket slot, or if a slot is empty.
+    -- This does not imply full stat/effect evaluation.
+    if data.itemInfo.itemEquipLoc == "INVTYPE_TRINKET" and data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
+      local isIlvlUpgrade = false
+      for _, slot in pairs({INVSLOT_TRINKET1, INVSLOT_TRINKET2}) do
+        local equippedItem = items:GetItemDataFromInventorySlot(slot)
+        if equippedItem and not equippedItem.isItemEmpty then
+          if data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
+            isIlvlUpgrade = true
+            break
+          end
+        else
+          isIlvlUpgrade = true
+          break
+        end
+      end
+      item.button.UpgradeIcon:SetShown(isIlvlUpgrade)
+    end
+    return
+  end
   item.button.UpgradeIcon:SetShown(isUpgrade or false)
 end
 
