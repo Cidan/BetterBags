@@ -44,7 +44,7 @@ end
 ---@param group string
 ---@return boolean
 function masque:IsGroupEnabled(group)
-  _ = group
+  local _ = group
   if not Masque then
     return false
   end

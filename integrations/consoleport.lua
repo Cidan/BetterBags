@@ -7,12 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class ContextMenu: AceModule
-local contextMenu = addon:GetModule('ContextMenu')
-
----@class Config: AceModule
-local config = addon:GetModule('Config')
-
 ---@class ConsolePort: AceModule
 ---@field private enabled boolean
 local consoleport = addon:NewModule('ConsolePort')

@@ -3,18 +3,17 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
 ---@class GridFrame: AceModule
 local grid = addon:NewModule('Grid')
 
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Cell
 ---@field frame Frame
-local cellProto = {}
 
 ------
 --- Grid Proto
@@ -124,7 +123,6 @@ function gridProto:GetAllCells()
   return self.idToCell
 end
 
----@private
 ---@return Frame|WowScrollBox
 function gridProto:GetFrame()
   if self.scrollable then
@@ -142,6 +140,7 @@ function gridProto:GetScrollView()
 end
 
 function gridProto:HideScrollBar()
+  self.bar:Hide()
   self.bar:SetAlpha(0)
   self.bar:SetAttribute("nodeignore", true)
 end
@@ -157,6 +156,7 @@ end
 function gridProto:ShowScrollBar()
   self.bar:SetAttribute("nodeignore", false)
   self.bar:SetAlpha(1)
+  self.bar:Show()
 end
 
 -- DislocateCell will dislocate a cell from this grid, making it so
@@ -288,8 +288,8 @@ function gridProto:calculateColumns(options)
   end
   local rowWidth = 0
   local totalHeight = 0
+  local maxCellHeight = 0
   ---@type Cell[][]
-  local columns = {}
   for i, cell in ipairs(maskedCells) do
     if i ~= 1 then
       if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
@@ -299,36 +299,68 @@ function gridProto:calculateColumns(options)
         rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
       end
     else
-      totalHeight = totalHeight + cell.frame:GetHeight() + self.spacing
+      totalHeight = cell.frame:GetHeight()
+      rowWidth = cell.frame:GetWidth()
+    end
+
+    if cell.frame:GetHeight() > maxCellHeight then
+      maxCellHeight = math.ceil(cell.frame:GetHeight())
     end
   end
 
-  local splitAt = math.ceil(totalHeight / options.columns) + 20
-  local currentHeight = 0
-  local currentColumn = 1
-  rowWidth = 0
-  for i, cell in ipairs(maskedCells) do
-    if i ~= 1 then
-      if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
-        if currentHeight + cell.frame:GetHeight() > splitAt then
-          currentColumn = currentColumn + 1
-          currentHeight = 0
+  -- Consider the largest cell for calculating splitAt. Don't split before reaching that height, to avoid unnecessary columns
+  local splitAt = math.ceil(math.max((totalHeight / options.columns) + 20, maxCellHeight))
+  local algorithmAttempt = 0
+
+  while true do
+    local currentHeight = 0
+    local currentColumn = 1
+    rowWidth = 0
+    local overshoot = 0
+    local columns = {}
+    algorithmAttempt = algorithmAttempt + 1
+
+    for i, cell in ipairs(maskedCells) do
+      if i ~= 1 then
+        if rowWidth + cell.frame:GetWidth() > options.maxWidthPerRow then
+          if currentHeight + cell.frame:GetHeight() > splitAt then
+            currentColumn = currentColumn + 1
+            currentHeight = cell.frame:GetHeight()
+          else
+            currentHeight = currentHeight + cell.frame:GetHeight() + self.spacing
+          end
+          rowWidth = cell.frame:GetWidth()
         else
-          currentHeight = currentHeight + cell.frame:GetHeight()
+          rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
         end
-        rowWidth = cell.frame:GetWidth()
       else
-        rowWidth = rowWidth + cell.frame:GetWidth() + self.spacing
+        currentHeight = cell.frame:GetHeight()
+        rowWidth = cell.frame:GetWidth()
       end
+
+      if not columns[currentColumn] then
+        columns[currentColumn] = {}
+      end
+      table.insert(columns[currentColumn], cell)
+
+      if currentColumn > options.columns then
+        overshoot = overshoot + cell.frame:GetHeight()
+      end
+    end
+
+    if currentColumn > options.columns then
+      if algorithmAttempt > 5 then
+        -- The algorithm should be pretty fast and we should get to a valid distribution in a 1-3 attempts, but let's cut it off after 5 attempts to be safe
+        debug:Log("calculateColumns", "Couldn't fit cells in", options.columns, "columns after 5 attempts. Using current solution.")
+        return columns
+      end
+
+      -- Need to increase splitAt to reduce number of columns, try evenly increasing by the overshot height/2 and try again
+      splitAt = splitAt + math.ceil(overshoot / (2 * options.columns))
     else
-      currentHeight = currentHeight + cell.frame:GetHeight()
+      return columns
     end
-    if not columns[currentColumn] then
-      columns[currentColumn] = {}
-    end
-    table.insert(columns[currentColumn], cell)
   end
-  return columns
 end
 
 ---@param cells Cell[]
@@ -384,6 +416,16 @@ end
 ---@return number, number
 function gridProto:stage(options)
   if not options then return 0, 0 end
+
+  -- Explicitly hide masked cells so they don't remain visible at old positions
+  if options.mask then
+    for _, maskCell in ipairs(options.mask) do
+      if maskCell.frame then
+        maskCell.frame:Hide()
+      end
+    end
+  end
+
   local w = 0
   local h = 0
   local columns = self:calculateColumns(options)

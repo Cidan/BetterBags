@@ -7,14 +7,8 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class BagFrame: AceModule
 local bagFrame = addon:GetModule('BagFrame')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
-
----@class Items: AceModule
-local items = addon:GetModule('Items')
 
 ---@class BagSlots: AceModule
 local bagSlots = addon:GetModule('BagSlots')
@@ -24,9 +18,6 @@ local database = addon:GetModule('Database')
 
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')
-
----@class MoneyFrame: AceModule
-local money = addon:GetModule('MoneyFrame')
 
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
@@ -54,9 +45,6 @@ local themeConfig = addon:GetModule('ThemeConfig')
 
 ---@class WindowGroup: AceModule
 local windowGroup = addon:GetModule('WindowGroup')
-
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
 
 ---@class Anchor: AceModule
 local anchor = addon:GetModule('Anchor')
@@ -127,6 +115,10 @@ function bagFrame:Create(ctx, kind)
   b.frame:Hide()
   b.frame:SetSize(200, 200)
 
+  -- Attach fade animations (created once, used conditionally based on settings)
+  local animations = addon:GetModule('Animations')
+  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
+
   b.views = {
     [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
     [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
@@ -160,7 +152,7 @@ function bagFrame:Create(ctx, kind)
   if kind == const.BAG_KIND.BACKPACK then
     b.searchFrame = searchBox:Create(ctx, b.frame)
 
-    local currencyFrame = currency:Create(b.frame)
+    local currencyFrame = currency:CreateIconGrid(b.frame)
     currencyFrame:Hide()
     b.currencyFrame = currencyFrame
 
@@ -169,13 +161,8 @@ function bagFrame:Create(ctx, kind)
     b.windowGrouping:AddWindow('currencyConfig', b.currencyFrame)
   end
 
-  -- Bank-specific initialization via behavior
-  if kind == const.BAG_KIND.BANK then
-    b.behavior:OnCreate(ctx)
-  end
-
-  b.sectionConfigFrame = sectionConfig:Create(kind, b.frame)
-  b.windowGrouping:AddWindow('sectionConfig', b.sectionConfigFrame)
+  -- Initialize behavior (creates tabs/groups for backpack, bank-specific setup for bank)
+  b.behavior:OnCreate(ctx)
 
   -- Enable dragging of the bag frame.
   b.frame:SetMovable(true)

@@ -15,11 +15,95 @@ local animations = addon:GetModule('Animations')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class SearchCategoryConfig: AceModule
 ---@field frame Frame
 ---@field openedName string
 ---@field queryBox InputScrollFrameTemplate
+---@field selectedGroupBy number
+---@field updatingFromDropdown boolean
+---@field updatingFromQuery boolean
 local searchCategoryConfig = addon:NewModule('SearchCategoryConfig')
+
+-- Mapping from query text to enum value (case-insensitive)
+local groupByTextToEnum = {
+  ["none"] = const.SEARCH_CATEGORY_GROUP_BY.NONE,
+  ["type"] = const.SEARCH_CATEGORY_GROUP_BY.TYPE,
+  ["subtype"] = const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE,
+  ["expansion"] = const.SEARCH_CATEGORY_GROUP_BY.EXPANSION,
+  ["exp"] = const.SEARCH_CATEGORY_GROUP_BY.EXPANSION,
+}
+
+-- Mapping from enum value to display text for query
+local groupByEnumToText = {
+  [const.SEARCH_CATEGORY_GROUP_BY.NONE] = "none",
+  [const.SEARCH_CATEGORY_GROUP_BY.TYPE] = "type",
+  [const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE] = "subtype",
+  [const.SEARCH_CATEGORY_GROUP_BY.EXPANSION] = "expansion",
+}
+
+-- Mapping from enum to dropdown display text
+local groupByEnumToDisplayText = {
+  [const.SEARCH_CATEGORY_GROUP_BY.NONE] = "None",
+  [const.SEARCH_CATEGORY_GROUP_BY.TYPE] = "Type",
+  [const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE] = "Subtype",
+  [const.SEARCH_CATEGORY_GROUP_BY.EXPANSION] = "Expansion",
+}
+
+-- Pattern to match "group by <value>" at the end of a query (case-insensitive)
+local groupByPattern = "%s+group%s+by%s+(%w+)%s*$"
+
+---@param query string
+---@return number|nil groupBy enum value if found, nil otherwise
+function searchCategoryConfig:ParseGroupByFromQuery(query)
+  local match = query:lower():match(groupByPattern)
+  if match then
+    return groupByTextToEnum[match]
+  end
+  return nil
+end
+
+---@param query string
+---@return string query with group by clause stripped
+function searchCategoryConfig:StripGroupByFromQuery(query)
+  -- Remove the group by clause from the end, preserving original case
+  local v, _ = query:gsub("%s+[Gg][Rr][Oo][Uu][Pp]%s+[Bb][Yy]%s+%w+%s*$", "")
+  return v
+end
+
+---@param query string
+---@param groupBy number
+---@return string query with group by clause added/updated
+function searchCategoryConfig:SetGroupByInQuery(query, groupBy)
+  -- First strip any existing group by
+  local cleanQuery = self:StripGroupByFromQuery(query)
+
+  -- If groupBy is NONE, just return the clean query
+  if groupBy == const.SEARCH_CATEGORY_GROUP_BY.NONE then
+    return cleanQuery
+  end
+
+  -- Add the group by clause
+  local groupByText = groupByEnumToText[groupBy]
+  if groupByText and cleanQuery ~= "" then
+    return cleanQuery .. " group by " .. groupByText
+  elseif groupByText then
+    return "group by " .. groupByText
+  end
+
+  return cleanQuery
+end
+
+---@private
+function searchCategoryConfig:UpdateDropdownDisplay()
+  if addon.isRetail then
+    self.groupByDropdown:GenerateMenu()
+  else
+    UIDropDownMenu_SetText(self.groupByDropdown, groupByEnumToDisplayText[self.selectedGroupBy])
+  end
+end
 
 function searchCategoryConfig:CheckNameboxText()
   local input = self.nameBox:GetText()
@@ -36,7 +120,7 @@ function searchCategoryConfig:OnEnable()
   self.frame = CreateFrame("Frame", addonName .. "SearchCategoryConfig", UIParent)
   themes:RegisterFlatWindow(self.frame, "Configure Search Category")
 
-  self.frame:SetSize(430, 380)
+  self.frame:SetSize(430, 450)
   self.frame:SetPoint("CENTER")
   self.frame:SetMovable(true)
   self.frame:EnableMouse(true)
@@ -81,6 +165,27 @@ function searchCategoryConfig:OnEnable()
     else
       self.errorText:SetText("")
     end
+
+    -- Sync group by from query to dropdown (if not already updating from dropdown)
+    if not self.updatingFromDropdown then
+      local parsedGroupBy = self:ParseGroupByFromQuery(input)
+      if parsedGroupBy ~= nil and parsedGroupBy ~= self.selectedGroupBy then
+        self.updatingFromQuery = true
+        self.selectedGroupBy = parsedGroupBy
+        self:UpdateDropdownDisplay()
+        self.updatingFromQuery = false
+      elseif parsedGroupBy == nil and self.selectedGroupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
+        -- No group by in query, but dropdown is set - check if user is still typing
+        -- Only reset if there's no partial "group by" match
+        local lowerInput = input:lower()
+        if not lowerInput:match("%s+group%s*$") and not lowerInput:match("%s+group%s+by%s*$") then
+          self.updatingFromQuery = true
+          self.selectedGroupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE
+          self:UpdateDropdownDisplay()
+          self.updatingFromQuery = false
+        end
+      end
+    end
   end)
 
   self.priorityBoxLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -104,8 +209,81 @@ function searchCategoryConfig:OnEnable()
     end
   end)
 
+  -- Group By dropdown
+  self.groupByLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.groupByLabel:SetPoint("TOPLEFT", self.priorityBox, "BOTTOMLEFT", -2, -20)
+  self.groupByLabel:SetText("Group By")
+
+  self.selectedGroupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE
+
+  local groupByOptions = {
+    {text = "None", value = const.SEARCH_CATEGORY_GROUP_BY.NONE},
+    {text = "Type", value = const.SEARCH_CATEGORY_GROUP_BY.TYPE},
+    {text = "Subtype", value = const.SEARCH_CATEGORY_GROUP_BY.SUBTYPE},
+    {text = "Expansion", value = const.SEARCH_CATEGORY_GROUP_BY.EXPANSION},
+  }
+
+  if addon.isRetail then
+    self.groupByDropdown = CreateFrame("DropdownButton", addonName .. "SearchCategoryGroupByDropdown", self.frame, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
+    self.groupByDropdown:SetPoint("TOPLEFT", self.groupByLabel, "BOTTOMLEFT", 0, -5)
+    self.groupByDropdown:SetWidth(200)
+
+    self.groupByDropdown:SetupMenu(function(_, root)
+      for _, option in ipairs(groupByOptions) do
+        root:CreateRadio(option.text, function()
+          return self.selectedGroupBy == option.value
+        end, function()
+          if not self.updatingFromQuery then
+            self.updatingFromDropdown = true
+            self.selectedGroupBy = option.value
+            -- Sync to query text
+            local currentQuery = self.queryBox.EditBox:GetText()
+            local newQuery = self:SetGroupByInQuery(currentQuery, option.value)
+            self.queryBox.EditBox:SetText(newQuery)
+            self.updatingFromDropdown = false
+          else
+            self.selectedGroupBy = option.value
+          end
+        end)
+      end
+    end)
+  else
+    -- Classic/Era dropdown using UIDropDownMenuTemplate
+    self.groupByDropdown = CreateFrame("Frame", addonName .. "SearchCategoryGroupByDropdown", self.frame, "UIDropDownMenuTemplate") --[[@as Frame]]
+    self.groupByDropdown:SetPoint("TOPLEFT", self.groupByLabel, "BOTTOMLEFT", -15, -5)
+
+    UIDropDownMenu_SetWidth(self.groupByDropdown, 185)
+    UIDropDownMenu_SetText(self.groupByDropdown, "None")
+
+    UIDropDownMenu_Initialize(self.groupByDropdown, function(_, level, _)
+      for _, option in ipairs(groupByOptions) do
+        local info = UIDropDownMenu_CreateInfo()
+        info.text = option.text
+        info.checked = function()
+          return self.selectedGroupBy == option.value
+        end
+        info.func = function()
+          if not self.updatingFromQuery then
+            self.updatingFromDropdown = true
+            self.selectedGroupBy = option.value
+            UIDropDownMenu_SetText(self.groupByDropdown, option.text)
+            -- Sync to query text
+            local currentQuery = self.queryBox.EditBox:GetText()
+            local newQuery = self:SetGroupByInQuery(currentQuery, option.value)
+            self.queryBox.EditBox:SetText(newQuery)
+            self.updatingFromDropdown = false
+          else
+            self.selectedGroupBy = option.value
+            UIDropDownMenu_SetText(self.groupByDropdown, option.text)
+          end
+        end
+        UIDropDownMenu_AddButton(info, level)
+      end
+    end)
+  end
+
   self.errorText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  self.errorText:SetPoint("TOPLEFT", self.priorityBox, "BOTTOMLEFT", 0, -20)
+  self.errorText:SetPoint("TOPLEFT", self.groupByDropdown, "BOTTOMLEFT", addon.isRetail and 0 or 15, -20)
   self.errorText:SetWidth(self.frame:GetWidth() - 40)
   self.errorText:SetText("")
   self.errorText:SetTextColor(1, 0, 0)
@@ -126,13 +304,16 @@ function searchCategoryConfig:OnEnable()
     if self.errorText:GetText() ~= "" and self.errorText:GetText() ~= nil then
       return
     end
+    -- Strip the group by clause from the stored query (it's stored separately in groupBy field)
+    local cleanQuery = self:StripGroupByFromQuery(query)
     categories:CreateCategory(ctx, {
       name = name,
       priority = tonumber(self.priorityBox:GetText()) or 10,
       save = true,
       itemList = {},
       searchCategory = {
-        query = query,
+        query = cleanQuery,
+        groupBy = self.selectedGroupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE,
       }
     })
     if self.openedName ~= name and self.openedName ~= nil and self.openedName ~= "" then
@@ -173,8 +354,22 @@ function searchCategoryConfig:Open(filter, f)
   end
   self.nameBox:SetText(filter.name)
   self.openedName = filter.name
-  self.queryBox.EditBox:SetText(filter.searchCategory.query)
+
+  -- Load groupBy value
+  self.selectedGroupBy = filter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+
+  -- Display query with group by clause appended (if groupBy is set)
+  local displayQuery = filter.searchCategory.query
+  if self.selectedGroupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
+    displayQuery = self:SetGroupByInQuery(displayQuery, self.selectedGroupBy)
+  end
+  self.queryBox.EditBox:SetText(displayQuery)
+
   self.priorityBox:SetText(tostring(filter.priority) or "10")
+
+  -- Update dropdown display
+  self:UpdateDropdownDisplay()
+
   self.fadeInGroup.callback = function()
     self.nameBox:SetFocus()
     self:CheckNameboxText()

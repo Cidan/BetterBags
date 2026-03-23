@@ -3,9 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -104,7 +101,7 @@ const.OFFSETS = {
   -- content frame.
   BAG_BOTTOM_INSET = 3,
 
-  -- This is the height of the bag window bottom bar. 
+  -- This is the height of the bag window bottom bar.
   BOTTOM_BAR_HEIGHT = 20,
   -- This is how far the bottom bar is inset from the bottom of the bag window.
   BOTTOM_BAR_BOTTOM_INSET = 6,

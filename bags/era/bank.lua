@@ -19,6 +19,9 @@ local events = addon:GetModule("Events")
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 -------
 --- Era Bank Behavior Overrides
 --- Classic Era doesn't have BankPanel, tabs, or warbank.
@@ -26,16 +29,42 @@ local L = addon:GetModule("Localization")
 
 function bank.proto:OnShow()
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-	self.bag.frame:Show()
+
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		self.bag.fadeInGroup:Play()
+	else
+		self.bag.frame:Show()
+	end
+
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
 function bank.proto:OnHide()
+	-- Guard against re-entry to prevent recursion.
+	if self.isHiding then
+		return
+	end
+	self.isHiding = true
+
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
-	self.bag.frame:Hide()
-	CloseBankFrame()
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+
+	-- Use fade animation if enabled
+	if database:GetEnableBagFading() then
+		self.bag.fadeOutGroup.callback = function()
+			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
+			self.isHiding = false  -- Clear flag after animation completes
+			CloseBankFrame()
+			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		end
+		self.bag.fadeOutGroup:Play()
+	else
+		self.bag.frame:Hide()
+		self.isHiding = false  -- Clear flag immediately
+		CloseBankFrame()
+		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	end
 end
 
 function bank.proto:OnCreate()

@@ -19,23 +19,11 @@ local database = addon:GetModule('Database')
 ---@class Color: AceModule
 local color = addon:GetModule('Color')
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
-
----@class EquipmentSets: AceModule
-local equipmentSets = addon:GetModule('EquipmentSets')
-
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
-
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
 
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
@@ -60,6 +48,38 @@ local children = {
 function itemFrame.itemProto:UpdateCooldown(ctx)
   local decoration = themes:GetItemButton(ctx, self)
   ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
+end
+
+function itemFrame.itemProto:DrawItemLevel()
+  if not self.slotkey then
+    return
+  end
+  if not self.kind then
+    return
+  end
+  local data = items:GetItemDataFromSlotKey(self.slotkey)
+  if not data or data.isItemEmpty then
+    self.ilvlText:Hide()
+    return
+  end
+  local ilvlOpts = database:GetItemLevelOptions(self.kind)
+  if
+    (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1)
+    and (data.itemInfo.classID == Enum.ItemClass.Armor
+      or data.itemInfo.classID == Enum.ItemClass.Weapon
+      or data.itemInfo.classID == Enum.ItemClass.Gem)
+  then
+    self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
+    if ilvlOpts.color then
+      local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
+      self.ilvlText:SetTextColor(r, g, b, 1)
+    else
+      self.ilvlText:SetTextColor(1, 1, 1, 1)
+    end
+    self.ilvlText:Show()
+  else
+    self.ilvlText:Hide()
+  end
 end
 
 ---@param ctx Context
@@ -104,22 +124,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   end
 
 
-  local ilvlOpts = database:GetItemLevelOptions(self.kind)
-  if (ilvlOpts.enabled and data.itemInfo.currentItemLevel > 0 and data.itemInfo.currentItemCount == 1) and
-    (data.itemInfo.classID == Enum.ItemClass.Armor or
-    data.itemInfo.classID == Enum.ItemClass.Weapon or
-    data.itemInfo.classID == Enum.ItemClass.Gem) then
-      self.ilvlText:SetText(tostring(data.itemInfo.currentItemLevel) or "")
-      if ilvlOpts.color then
-        local r, g, b = color:GetItemLevelColor(data.itemInfo.currentItemLevel)
-        self.ilvlText:SetTextColor(r, g, b, 1)
-      else
-        self.ilvlText:SetTextColor(1, 1, 1, 1)
-      end
-      self.ilvlText:Show()
-  else
-    self.ilvlText:Hide()
-  end
+  self:DrawItemLevel()
 
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality)
   decoration.minDisplayCount = 1

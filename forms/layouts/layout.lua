@@ -5,6 +5,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class FormLayouts: AceModule
 local layouts = addon:NewModule('FormLayouts')
+local _ = layouts
 
 --[[
 -- Widgets
@@ -57,6 +58,11 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormLabel: Frame
 ---@field description FontString
 
+---@class (exact) FormPaneLink: Frame
+---@field title FontString
+---@field description FontString
+---@field arrow FontString
+
 --[[
 -- Widget Options
 ]]--
@@ -71,9 +77,14 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field title string
 ---@field description string
 
----@class (exact) FormSubSectionOptions
+--- Options for inline subsection header (renders in pane content, no sidebar entry)
+---@class (exact) FormInlineSubSectionOptions
 ---@field title string
 ---@field description string
+
+--- Options for sidebar sub-navigation entry (adds to sidebar only, no pane content)
+---@class (exact) FormSubIndexOptions
+---@field title string
 
 ---@class (exact) FormCheckboxOptions
 ---@field title string
@@ -126,6 +137,12 @@ local layouts = addon:NewModule('FormLayouts')
 ---@class (exact) FormLabelOptions
 ---@field description string
 
+---@class (exact) FormPaneLinkOptions
+---@field title string
+---@field description string
+---@field createPane fun(parent: Frame, kind: BagKind?): Frame
+---@field bagKind BagKind?
+
 ---@class (exact) FormLayout
 ---@field targetFrame Frame
 ---@field height number
@@ -134,10 +151,12 @@ local layouts = addon:NewModule('FormLayouts')
 ---@field AddSection fun(self: FormLayout, opts: FormSectionOptions)
 ---@field AddCheckbox fun(self: FormLayout, opts: FormCheckboxOptions)
 ---@field AddDropdown fun(self: FormLayout, opts: FormDropdownOptions)
----@field AddSubSection fun(self: FormLayout, opts: FormSubSectionOptions)
+---@field AddInlineSubSection fun(self: FormLayout, opts: FormInlineSubSectionOptions)
+---@field AddSubIndex fun(self: FormLayout, opts: FormSubIndexOptions)
 ---@field AddSlider fun(self: FormLayout, opts: FormSliderOptions)
 ---@field AddButtonGroup fun(self: FormLayout, opts: FormButtonGroupOptions)
 ---@field AddTextArea fun(self: FormLayout, opts: FormTextAreaOptions)
 ---@field AddInputBox fun(self: FormLayout, opts: FormInputBoxOptions)
 ---@field AddColor fun(self: FormLayout, opts: FormColorOptions)
 ---@field AddLabel fun(self: FormLayout, opts: FormLabelOptions)
+---@field AddPaneLink fun(self: FormLayout, opts: FormPaneLinkOptions)

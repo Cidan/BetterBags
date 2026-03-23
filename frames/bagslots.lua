@@ -23,9 +23,6 @@ local bagButton = addon:GetModule('BagButton')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -37,9 +34,6 @@ local themes = addon:GetModule('Themes')
 
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
-
----@class Context: AceModule
-local context = addon:GetModule('Context')
 
 ---@class bagSlots
 ---@field frame Frame

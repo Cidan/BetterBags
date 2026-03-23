@@ -13,29 +13,14 @@ local L = addon:GetModule("Localization")
 ---@class Constants: AceModule
 local const = addon:GetModule("Constants")
 
----@class GridFrame: AceModule
-local grid = addon:GetModule("Grid")
-
 ---@class Items: AceModule
 local items = addon:GetModule("Items")
-
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule("ItemFrame")
-
----@class BagSlots: AceModule
-local bagSlots = addon:GetModule("BagSlots")
-
----@class SectionFrame: AceModule
-local sectionFrame = addon:GetModule("SectionFrame")
 
 ---@class Database: AceModule
 local database = addon:GetModule("Database")
 
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule("ContextMenu")
-
----@class MoneyFrame: AceModule
-local money = addon:GetModule("MoneyFrame")
 
 ---@class Views: AceModule
 local views = addon:GetModule("Views")
@@ -58,23 +43,11 @@ local categories = addon:GetModule("Categories")
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub("LibWindow-1.1")
 
----@class Currency: AceModule
-local currency = addon:GetModule("Currency")
-
----@class Context: AceModule
-local context = addon:GetModule("Context")
-
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule("SearchBox")
 
 ---@class Search: AceModule
 local search = addon:GetModule("Search")
-
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule("SectionConfig")
-
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule("ThemeConfig")
 
 ---@class Themes: AceModule
 local themes = addon:GetModule("Themes")
@@ -84,9 +57,6 @@ local windowGroup = addon:GetModule("WindowGroup")
 
 ---@class Anchor: AceModule
 local anchor = addon:GetModule("Anchor")
-
----@class Tabs: AceModule
-local tabs = addon:GetModule("Tabs")
 
 ---@class BackpackBehavior: AceModule
 local backpackBehavior = addon:GetModule("BackpackBehavior")
@@ -108,8 +78,7 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field anchor AnchorFrame The anchor frame for the bag.
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
----@field currencyFrame CurrencyFrame The currency frame.
----@field sectionConfigFrame SectionConfigFrame The section config frame.
+---@field currencyFrame CurrencyIconGrid The currency frame.
 ---@field themeConfigFrame ThemeConfigFrame The theme config frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
@@ -440,6 +409,10 @@ function bagFrame:Create(ctx, kind)
 	b.frame:Hide()
 	b.frame:SetSize(200, 200)
 
+	-- Attach fade animations (created once, used conditionally based on settings)
+	local animations = addon:GetModule('Animations')
+	b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
+
 	--b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
 	--b.frame.CloseButton:SetScript("OnClick", function()
 	--  b:Hide()
@@ -479,9 +452,6 @@ function bagFrame:Create(ctx, kind)
 
 	-- Call behavior-specific creation (search, slots, currency, tabs, etc.)
 	b.behavior:OnCreate(ctx)
-
-	b.sectionConfigFrame = sectionConfig:Create(kind, b.sideAnchor)
-	b.windowGrouping:AddWindow("sectionConfig", b.sectionConfigFrame)
 
 	-- Enable dragging of the bag frame.
 	b.frame:SetMovable(true)

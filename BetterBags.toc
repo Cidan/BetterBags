@@ -1,4 +1,4 @@
-## Interface: 110200, 120000
+## Interface: 120000, 120001
 
 ## Title: BetterBags
 ## Category: Inventory
@@ -29,7 +29,6 @@ libs/WagoAnalytics/Shim.lua
 
 templates\container.xml
 templates\debug.xml
-templates\sectionconfig.xml
 
 core\boot.lua
 
@@ -66,6 +65,7 @@ data\search.lua
 data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua
+data\groups.lua
 data\items.lua
 data\stacks.lua
 data\slots.lua
@@ -99,8 +99,6 @@ frames\bagbutton.lua
 frames\bagslots.lua
 frames\currency.lua
 frames\list.lua
-frames\sectionitemlist.lua
-frames\sectionconfig.lua
 frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
@@ -121,6 +119,10 @@ themes\simpledark.lua
 themes\gw2.lua
 themes\elvui.lua
 
+config\categorypane.lua
+config\themepane.lua
+config\currencypane.lua
+config\itemcolorpane.lua
 config\config.lua
 config\plugin.lua
 
@@ -128,5 +130,6 @@ integrations\consoleport.lua
 integrations\pawn.lua
 integrations\masque.lua
 integrations\simpleitemlevel.lua
+integrations\quickfind.lua
 
 core\init.lua

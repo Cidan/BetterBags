@@ -14,17 +14,8 @@ local const = addon:GetModule("Constants")
 ---@class Database: AceModule
 local database = addon:GetModule("Database")
 
----@class SliderFrame: AceModule
-local slider = addon:GetModule("Slider")
-
----@class Categories: AceModule
-local categories = addon:GetModule("Categories")
-
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
-
----@class Items: AceModule
-local items = addon:GetModule("Items")
 
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
@@ -49,47 +40,10 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field menuList? MenuList[]
 ---@field keepShownOnClick? boolean
 ---@field tooltipOnButton? boolean
-local menuListProto = {}
 
 function contextMenu:OnInitialize()
 	self.sabt = {}
 	--self:CreateContext()
-end
-
-function contextMenu:GetPurchaseSabt(title, bankType)
-	if self.sabt[title] ~= nil then
-		return self.sabt[title]
-	end
-	local clickFrame = CreateFrame("Frame", nil, nil, "UIDropDownCustomMenuEntryTemplate")
-	clickFrame:SetWidth(120)
-	clickFrame:SetHeight(16)
-
-	local p = CreateFrame("Button", nil, clickFrame, "BankPanelPurchaseButtonScriptTemplate")
-	p:SetAttribute("overrideBankType", bankType)
-	p:SetAllPoints()
-
-	local text1 = p:CreateFontString(name and (name .. "NormalText") or nil)
-	p:SetFontString(text1)
-	text1:SetPoint("LEFT", p, 0, 0)
-	p:SetNormalFontObject("GameFontHighlightSmallLeft")
-	p:SetHighlightFontObject("GameFontHighlightSmallLeft")
-	p:SetDisabledFontObject("GameFontDisableSmallLeft")
-
-	p.Highlight = p:CreateTexture(name and (name .. "Highlight") or nil, "BACKGROUND")
-	p.Highlight:SetTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
-	p.Highlight:SetBlendMode("ADD")
-	p.Highlight:SetAllPoints()
-	p.Highlight:Hide()
-
-	p:SetScript("OnEnter", function()
-		p.Highlight:Show()
-	end)
-	p:SetScript("OnLeave", function()
-		p.Highlight:Hide()
-	end)
-	p:SetText(title)
-	self.sabt[title] = clickFrame
-	return clickFrame
 end
 
 function contextMenu:OnEnable()
@@ -279,24 +233,9 @@ function contextMenu:CreateContextMenu(bag)
 			})
 		end
 
-		if C_Bank.HasMaxBankTabs(Enum.BankType.Account) == false then
-			table.insert(menuList, {
-				text = L:G("Purchase Warbank Tab"),
-				notCheckable = true,
-				tooltipTitle = L:G("Purchase Warbank Tab"),
-				tooltipText = L:G("Purchase a new Warbank tab"),
-				customFrame = self:GetPurchaseSabt("Purchase Warbank Tab", Enum.BankType.Account),
-			})
-		end
-		if C_Bank.HasMaxBankTabs(Enum.BankType.Character) == false then
-			table.insert(menuList, {
-				text = L:G("Purchase Character Tab"),
-				notCheckable = true,
-				tooltipTitle = L:G("Purchase Character Tab"),
-				tooltipText = L:G("Purchase a new Character tab"),
-				customFrame = self:GetPurchaseSabt("Purchase Bank Tab", Enum.BankType.Bank),
-			})
-		end
+		-- Purchase bank tab buttons removed from context menu.
+		-- They are now implemented as persistent tab buttons on the bank frame
+		-- to avoid taint issues (see bags/bank.lua OnCreate).
 		table.insert(menuList, {
 			text = L:G("Sort Bank"),
 			notCheckable = true,
@@ -349,59 +288,6 @@ function contextMenu:CreateContextMenu(bag)
 	end
 
 	if bag.kind == const.BAG_KIND.BACKPACK then
-		-- Show bag slot toggle.
-		table.insert(menuList, {
-			text = L:G("Show Currencies"),
-			checked = function()
-				return bag.currencyFrame:IsShown()
-			end,
-			tooltipTitle = L:G("Show Currencies"),
-			tooltipText = L:G("Click to toggle the display of the currencies side panel."),
-			func = function()
-				if bag.currencyFrame:IsShown() then
-					bag.currencyFrame:Hide()
-				else
-					bag.windowGrouping:Show("currencyConfig")
-				end
-			end,
-		})
-	end
-
-	-- Show bag slot toggle.
-	table.insert(menuList, {
-		text = L:G("Configure Categories"),
-		checked = function()
-			return bag.sectionConfigFrame:IsShown()
-		end,
-		tooltipTitle = L:G("Configure Categories"),
-		tooltipText = L:G("Click to toggle the display of the category configuration side panel."),
-		func = function()
-			if bag.sectionConfigFrame:IsShown() then
-				bag.sectionConfigFrame:Hide()
-			else
-				bag.windowGrouping:Show("sectionConfig")
-			end
-		end,
-	})
-
-	if bag.kind == const.BAG_KIND.BACKPACK then
-		-- Show theme selection window.
-		table.insert(menuList, {
-			text = L:G("Themes"),
-			checked = function()
-				return bag.themeConfigFrame:IsShown()
-			end,
-			tooltipTitle = L:G("Themes"),
-			tooltipText = L:G("Click to toggle the display of the theme configuration side panel."),
-			func = function()
-				if bag.themeConfigFrame:IsShown() then
-					bag.themeConfigFrame:Hide()
-				else
-					bag.windowGrouping:Show("themeConfig")
-				end
-			end,
-		})
-
 		-- Show the Blizzard bag button toggle.
 		table.insert(menuList, {
 			text = L:G("Show Bag Button"),

@@ -20,6 +20,7 @@ local context = addon:GetModule('Context')
 
 ---@class SearchCategory
 ---@field query string The search query for the category.
+---@field groupBy? number The groupBy type (0=None, 1=Type, 2=Subtype, 3=Expansion). Default is 0 (None).
 
 ---@class (exact) CustomCategoryFilter
 ---@field name string The name of this category as it appears for the user.
@@ -30,8 +31,10 @@ local context = addon:GetModule('Context')
 ---@field searchCategory? SearchCategory If defined, this category is a search category.
 ---@field note? string A note about the category.
 ---@field color? number[] The RGB color of the category name.
----@field priority? number The priority of the category. A higher number has a higher priority.
+---@field priority? number The priority of the category. Lower numbers have higher priority (e.g., 1 > 10). Default is 10.
 ---@field dynamic? boolean If true, this category is dynamic and added to the database at runtime.
+---@field isGroupBySubcategory? boolean If true, this category is a groupBy subcategory and should not be manually deleted.
+---@field groupByParent? string If this is a groupBy subcategory, this is the name of the parent search category.
 
 ---@class (exact) Categories: AceModule
 ---@field private itemsWithNoCategory table<number, boolean>
@@ -169,18 +172,12 @@ function categories:AddItemToCategory(ctx, id, category)
   end
 
   if self.ephemeralCategories[category] then
-    if self.ephemeralCategories[category].searchCategory then
-      return
-    end
     self.ephemeralCategories[category].itemList[id] = true
     self.ephemeralCategoryByItemID[id] = self.ephemeralCategories[category]
     return
   end
 
   assert(database:ItemCategoryExists(category), format("Attempted to add item %d to category %s, but the category does not exist.", id, category))
-  if database:GetItemCategory(category).searchCategory then
-    return
-  end
   database:SaveItemToCategory(id, category)
 end
 
@@ -224,16 +221,15 @@ end
 ---@param kind BagKind
 ---@param category string The name of the custom category to toggle.
 function categories:ToggleCategory(kind, category)
-  ---@type boolean
-  local enabled
   if self.ephemeralCategories[category] then
-    enabled = not self.ephemeralCategories[category].enabled[kind]
+    local enabled = not self.ephemeralCategories[category].enabled[kind]
     self.ephemeralCategories[category].enabled[kind] = enabled
     database:SetEphemeralItemCategoryEnabled(kind, category, enabled)
     return
   end
   local filter = database:GetItemCategory(category)
   if filter then
+    local enabled = not (filter.enabled and filter.enabled[kind])
     database:SetItemCategoryEnabled(kind, category, enabled)
   end
 end
@@ -310,6 +306,8 @@ function categories:CreateCategory(ctx, category)
     if savedState and savedState.enabled then
       category.enabled = savedState.enabled
       category.dynamic = savedState.dynamic
+      category.isGroupBySubcategory = savedState.isGroupBySubcategory
+      category.groupByParent = savedState.groupByParent
     end
     self.ephemeralCategories[category.name] = category
     for id in pairs(category.itemList) do
@@ -344,7 +342,8 @@ function categories:GetAllSearchCategories()
   return results
 end
 
--- Returns a reverse sorted list of search categories, by priority.
+-- Returns a sorted list of search categories, by priority (ascending).
+-- Lower priority numbers have higher priority (1 > 10).
 ---@return CustomCategoryFilter[]
 function categories:GetSortedSearchCategories()
   ---@type CustomCategoryFilter[]
@@ -354,7 +353,9 @@ function categories:GetSortedSearchCategories()
     table.insert(results, searchCategory)
   end
   table.sort(results, function(a, b)
-    return a.priority > b.priority
+    local aPriority = a.priority or 10
+    local bPriority = b.priority or 10
+    return aPriority < bPriority
   end)
   return results
 end
@@ -379,6 +380,74 @@ function categories:DeleteCategory(ctx, category)
   database:DeleteItemCategory(category)
   events:SendMessage(ctx, 'categories/Changed')
   events:SendMessage(ctx, 'bags/FullRefreshAll')
+end
+
+-- RenameCategory renames a category.
+---@param ctx Context
+---@param oldName string
+---@param newName string
+---@return boolean success
+function categories:RenameCategory(ctx, oldName, newName)
+  -- Trim whitespace and validate new name
+  newName = strtrim(newName)
+  if newName == "" then
+    debug:Log("categories", "Cannot rename category to empty name")
+    return false
+  end
+
+  -- Validate category exists
+  if not self:DoesCategoryExist(oldName) then
+    debug:Log("categories", "Category not found: %s", oldName)
+    return false
+  end
+
+  -- Validate new name doesn't conflict
+  if self:DoesCategoryExist(newName) then
+    debug:Log("categories", "Category already exists: %s", newName)
+    return false
+  end
+
+  -- Update module-level ephemeral caches
+  if self.ephemeralCategories[oldName] then
+    self.ephemeralCategories[newName] = self.ephemeralCategories[oldName]
+    self.ephemeralCategories[newName].name = newName
+    self.ephemeralCategories[oldName] = nil
+
+    -- Update item lookup cache
+    for itemID, _ in pairs(self.ephemeralCategories[newName].itemList) do
+      self.ephemeralCategoryByItemID[itemID].name = newName
+    end
+  end
+
+  -- Delete grouped sub-categories (e.g., "OldName - Consumable", "OldName - Quest")
+  -- These will be recreated with the new name on next refresh
+  local groupedPrefix = oldName .. " - "
+  local categoriesToDelete = {}
+  for categoryName, _ in pairs(self.ephemeralCategories) do
+    if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
+      table.insert(categoriesToDelete, categoryName)
+    end
+  end
+  for _, categoryName in ipairs(categoriesToDelete) do
+    if self.ephemeralCategories[categoryName] then
+      for itemID, _ in pairs(self.ephemeralCategories[categoryName].itemList) do
+        self.ephemeralCategoryByItemID[itemID] = nil
+      end
+      self.ephemeralCategories[categoryName] = nil
+    end
+  end
+
+  -- Call database layer to update all data structures
+  local success = database:RenameCategory(oldName, newName)
+  if not success then
+    debug:Log("categories", "Failed to rename category in database: %s -> %s", oldName, newName)
+    return false
+  end
+
+  debug:Log("categories", "Renamed category: %s -> %s", oldName, newName)
+  events:SendMessage(ctx, 'categories/Changed', newName, oldName)
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  return true
 end
 
 ---@param ctx Context
@@ -416,7 +485,20 @@ end
 ---@param category string
 ---@return boolean
 function categories:IsDynamicCategory(category)
+  -- If there's a saved category with this name, it's not dynamic (user created it)
+  if database:GetItemCategory(category) then
+    return false
+  end
   return self.ephemeralCategories[category] and self.ephemeralCategories[category].dynamic or false
+end
+
+-- IsGroupBySubcategory returns true if a category is a grouped sub-category
+-- (created by a search category with groupBy enabled).
+---@param category string
+---@return boolean
+function categories:IsGroupBySubcategory(category)
+  local filter = self:GetCategoryByName(category)
+  return filter and filter.isGroupBySubcategory or false
 end
 
 ---@param ctx Context
@@ -439,7 +521,8 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@param data ItemData The item data to get the custom category for.
----@return string|nil
+---@return string|nil categoryName
+---@return number|nil priority
 function categories:GetCustomCategory(ctx, kind, data)
   -- HACKFIX: This is a backwards compatibility shim for the old way of adding items to categories.
   -- To be removed eventually.
@@ -449,25 +532,26 @@ function categories:GetCustomCategory(ctx, kind, data)
     ctx = context:New('GetCustomCategory')
   end
   local itemID = data.itemInfo.itemID
-  if not itemID then return nil end
+  if not itemID then return nil, nil end
   local filter = database:GetItemCategoryByItemID(itemID)
   if filter.enabled and filter.enabled[kind] then
-    return filter.name
+    return filter.name, filter.priority or 10
   end
 
   filter = self.ephemeralCategoryByItemID[itemID]
 
   if filter and filter.enabled[kind] then
-    return filter.name
+    return filter.name, filter.priority or 10
   end
 
   -- Check for items that had no category previously. This
   -- is a performance optimization to avoid calling all
   -- registered functions for every item.
-  if self.itemsWithNoCategory[itemID] then return nil end
+  if self.itemsWithNoCategory[itemID] then return nil, nil end
 
+  local errorHandler = (_G.geterrorhandler and _G.geterrorhandler()) or error
   for _, func in pairs(self.categoryFunctions) do
-    local success, args = xpcall(func, geterrorhandler(), data)
+    local success, args = xpcall(func, errorHandler, data)
     if success and args ~= nil then
       local category = select(1, args) --[[@as string]]
       local found = self.ephemeralCategories[category] and true or false
@@ -477,12 +561,15 @@ function categories:GetCustomCategory(ctx, kind, data)
         events:SendMessage(ctx, 'categories/Changed')
       end
       if self:IsCategoryEnabled(kind, category) then
-        return category
+        -- Get priority from the category if it exists
+        local categoryFilter = self.ephemeralCategories[category]
+        local priority = categoryFilter and categoryFilter.priority or 10
+        return category, priority
       end
     end
   end
   self.itemsWithNoCategory[itemID] = true
-  return nil
+  return nil, nil
 end
 
 ---@param id number The ItemID of the item to remove from a custom category.

@@ -9,9 +9,6 @@ local database = addon:GetModule('Database')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Sort: AceModule
 local sort = addon:NewModule('Sort')
 
@@ -72,6 +69,8 @@ function sort:GetItemSortFunction(kind, view)
     return self.SortItemsByQualityThenAlpha
   elseif sortType == const.ITEM_SORT_TYPE.ITEM_LEVEL then
     return self.SortItemsByItemLevel
+  elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
+    return self.SortItemsByExpansion
   end
   assert(false, "Unknown sort type: " .. sortType)
   return function() end
@@ -208,6 +207,32 @@ function sort.SortItemsByItemLevel(a, b)
   elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
     return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
   end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+---@param a Item
+---@param b Item
+---@return boolean
+function sort.SortItemsByExpansion(a, b)
+  if a.isFreeSlot then return false end
+  if b.isFreeSlot then return true end
+  local aData, bData = a:GetItemData(), b:GetItemData()
+  if invalidData(aData, bData) then return false end
+
+  -- Get expansion IDs, defaulting to 0 (Classic) if missing
+  local aExpacID = aData.itemInfo.expacID or 0
+  local bExpacID = bData.itemInfo.expacID or 0
+
+  -- Sort by expansion (chronological order)
+  if aExpacID ~= bExpacID then
+    return aExpacID < bExpacID
+  -- If same expansion, fall back to alphabetical
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  -- If same name, fall back to item count
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  -- Finally, fall back to GUID for stable sort
   return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
 end
 ---@param a Item

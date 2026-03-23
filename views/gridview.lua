@@ -10,9 +10,6 @@ local const = addon:GetModule('Constants')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
-
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
@@ -31,8 +28,8 @@ local L =  addon:GetModule('Localization')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
----@class Async: AceModule
-local async = addon:GetModule('Async')
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
 
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
@@ -359,10 +356,78 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   view:ClearDirtySections()
 
   -- Hide sections that are not shown.
+  -- Also filter by active group for backpack (only if groups are enabled).
+  local activeGroup = nil
+  if bag.kind == const.BAG_KIND.BACKPACK and database:GetGroupsEnabled(const.BAG_KIND.BACKPACK) then
+    activeGroup = database:GetActiveGroup(const.BAG_KIND.BACKPACK)
+  end
+
   for sectionName, section in pairs(view:GetAllSections()) do
+    local shouldHide = false
+
+    -- Check category visibility
     if categories:IsCategoryShown(sectionName) == false then
+      shouldHide = true
+    end
+
+    -- Check group membership for backpack (skip special sections like "Free Space", "Recent Items")
+    if not shouldHide and activeGroup and bag.kind == const.BAG_KIND.BACKPACK then
+      local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
+      if not isSpecialSection and not groups:CategoryBelongsToGroup(sectionName, activeGroup) then
+        shouldHide = true
+      end
+    end
+
+    if shouldHide then
       table.insert(hiddenCells, section)
     end
+  end
+
+  -- Check if we should show the empty group message (for non-Backpack groups with no visible sections)
+  local isEmptyGroup = false
+  if view.emptyGroupFrame and activeGroup and activeGroup > 1 then
+    -- Count visible non-special sections
+    local visibleSectionCount = 0
+    for sectionName, section in pairs(view:GetAllSections()) do
+      local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
+      if not isSpecialSection then
+        local isHidden = false
+        for _, hiddenSection in ipairs(hiddenCells) do
+          if hiddenSection == section then
+            isHidden = true
+            break
+          end
+        end
+        if not isHidden then
+          visibleSectionCount = visibleSectionCount + 1
+        end
+      end
+    end
+
+    if visibleSectionCount == 0 then
+      isEmptyGroup = true
+      view.emptyGroupFrame:Show()
+      -- Hide special sections too when group is empty
+      for sectionName, section in pairs(view:GetAllSections()) do
+        local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
+        if isSpecialSection then
+          local alreadyHidden = false
+          for _, hiddenSection in ipairs(hiddenCells) do
+            if hiddenSection == section then
+              alreadyHidden = true
+              break
+            end
+          end
+          if not alreadyHidden then
+            table.insert(hiddenCells, section)
+          end
+        end
+      end
+    else
+      view.emptyGroupFrame:Hide()
+    end
+  elseif view.emptyGroupFrame then
+    view.emptyGroupFrame:Hide()
   end
 
   -- Sort the sections.
@@ -378,31 +443,34 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   end
 
   -- Get the free slots section and add the free slots to it.
-  local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
-  if database:GetShowAllFreeSpace(bag.kind) then
-    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-    freeSlotsSection:WipeOnlyContents()
-    for _, item in ipairs(slotInfo.emptySlotsSorted) do
-      local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-      itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
-      freeSlotsSection:AddCell(item.slotkey, itemButton)
-    end
-    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
-  else
-    freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
-    for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-      if slotInfo.freeSlotKeys[name] ~= nil then
-        local itemButton = view:GetOrCreateItemButton(ctx, name)
-        local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-        itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
-        freeSlotsSection:AddCell(name, itemButton)
-      else
-        local itemButton = view:GetOrCreateItemButton(ctx, name)
-        itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
-        freeSlotsSection:AddCell(name, itemButton)
+  -- Skip this entirely if we're in an empty group (no sections to show)
+  if not isEmptyGroup then
+    local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
+    if database:GetShowAllFreeSpace(bag.kind) then
+      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+      freeSlotsSection:WipeOnlyContents()
+      for _, item in ipairs(slotInfo.emptySlotsSorted) do
+        local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+        itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
+        freeSlotsSection:AddCell(item.slotkey, itemButton)
       end
+      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
+    else
+      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
+      for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+        if slotInfo.freeSlotKeys[name] ~= nil then
+          local itemButton = view:GetOrCreateItemButton(ctx, name)
+          local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
+          itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
+          freeSlotsSection:AddCell(name, itemButton)
+        else
+          local itemButton = view:GetOrCreateItemButton(ctx, name)
+          itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
+          freeSlotsSection:AddCell(name, itemButton)
+        end
+      end
+      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
     end
-    freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
   end
 
   debug:StartProfile('Content Draw Stage %d', bag.kind)
@@ -489,14 +557,14 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   debug:EndProfile('Content Draw Stage %d', bag.kind)
   -- Reposition the content frame if the recent items section is empty.
-  if w < 160 then
-    w = 220
+  if w < 260 then
+    w = 260
   end
   if bag.tabs and w < bag.tabs.width then
     w = bag.tabs.width
   end
-  if h == 0 then
-    h = 40
+  if h < 100 then
+    h = 100
   end
   if database:GetInBagSearch() then
     h = h + 20
@@ -531,6 +599,24 @@ function views:NewGrid(parent, kind)
   view.content:Hide()
   view.Render = GridView
   view.WipeHandler = Wipe
+
+  -- Create empty group state frame (only for backpack)
+  if kind == const.BAG_KIND.BACKPACK then
+    local emptyGroupFrame = CreateFrame("Frame", nil, parent)
+    emptyGroupFrame:SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+    emptyGroupFrame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+    emptyGroupFrame:SetFrameLevel(parent:GetFrameLevel() + 10)
+    emptyGroupFrame:Hide()
+
+    local helpText = emptyGroupFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    helpText:SetPoint("CENTER", emptyGroupFrame, "CENTER", 0, 0)
+    helpText:SetText(L:G("Drag a section header to this tab at the bottom of the window to add a section to this group!"))
+    helpText:SetTextColor(0.6, 0.6, 0.6, 1)
+    helpText:SetWidth(220)
+    helpText:SetJustifyH("CENTER")
+
+    view.emptyGroupFrame = emptyGroupFrame
+  end
+
   return view
 end
-

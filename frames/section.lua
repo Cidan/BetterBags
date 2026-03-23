@@ -19,9 +19,6 @@ local const = addon:GetModule('Constants')
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -42,6 +39,20 @@ local movementFlow = addon:GetModule('MovementFlow')
 
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')
+
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+-- Module-level variable to track dragged category
+sectionFrame.draggingCategory = nil
+sectionFrame.dragGhost = nil
+sectionFrame.dragTargetTab = nil  -- Track the tab we're hovering over while dragging
 
 -------
 --- Section Prototype
@@ -78,14 +89,29 @@ end
 
 -- SetTitle will set the title of the section.
 ---@param text string The text to set the title to.
-function sectionProto:SetTitle(text)
+---@param color? number[] Optional RGB color array {r, g, b} to apply to the title.
+function sectionProto:SetTitle(text, color)
   self.title:SetText(text)
   themes:UpdateSectionFont(self.title:GetFontString())
-  -- Store the original text color after the theme has been applied
-  if not self.originalTextColor then
-    local r, g, b, a = self.title:GetFontString():GetTextColor()
-    self.originalTextColor = {r = r, g = g, b = b, a = a}
+
+  -- SetFontObject doesn't clear explicit SetTextColor overrides in WoW's API.
+  -- We must always explicitly set the color to ensure pooled sections don't bleed colors.
+  local fontString = self.title:GetFontString()
+  if color and color[1] and color[2] and color[3] then
+    -- Apply custom color
+    fontString:SetTextColor(color[1], color[2], color[3], 1)
+  else
+    -- Reset to the font object's default color to clear any previous override
+    local fontObject = fontString:GetFontObject()
+    if fontObject then
+      local r, g, b, a = fontObject:GetTextColor()
+      fontString:SetTextColor(r, g, b, a or 1)
+    end
   end
+
+  -- Store the current text color as the original for collapse dimming
+  local r, g, b, a = fontString:GetTextColor()
+  self.originalTextColor = {r = r, g = g, b = b, a = a}
 end
 
 -- GetTitleWithoutIndicator returns the title text without the collapse indicator.
@@ -166,15 +192,9 @@ function sectionProto:Wipe()
   self.frame:SetAlpha(1)
   self.collapsed = false
   self.shouldShrinkWhenCollapsed = true
-  -- Restore original text color before clearing it
-  if self.originalTextColor then
-    self.title:GetFontString():SetTextColor(
-      self.originalTextColor.r,
-      self.originalTextColor.g,
-      self.originalTextColor.b,
-      self.originalTextColor.a
-    )
-  end
+  -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
+  -- Note: We don't restore the color here because SetTitle always explicitly sets it,
+  -- ensuring pooled sections don't bleed custom colors to other categories.
   self.originalTextColor = nil
 end
 
@@ -327,10 +347,103 @@ function sectionFrame:OnInitialize()
   end)
 end
 
+-- Create and return the drag ghost frame (created once, reused)
+function sectionFrame:GetDragGhost()
+  if not self.dragGhost then
+    local ghost = CreateFrame("Frame", "BetterBagsSectionDragGhost", UIParent, "BackdropTemplate")
+    ghost:SetFrameStrata("TOOLTIP")
+    ghost:SetFrameLevel(100)
+    ghost:SetBackdrop({
+      bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+      edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+      edgeSize = 12,
+      insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    ghost:SetBackdropColor(0.1, 0.1, 0.1, 0.9)
+    ghost:SetBackdropBorderColor(0.6, 0.6, 0.6, 0.8)
+
+    local text = ghost:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    text:SetPoint("CENTER", ghost, "CENTER", 0, 0)
+    text:SetTextColor(1, 1, 1, 1)
+    ghost.text = text
+
+    ghost:SetSize(100, 24)
+    ghost:Hide()
+
+    -- Update position to follow cursor
+    ghost:SetScript("OnUpdate", function(frame)
+      local x, y = GetCursorPosition()
+      local scale = UIParent:GetEffectiveScale()
+      frame:ClearAllPoints()
+      frame:SetPoint("CENTER", UIParent, "BOTTOMLEFT", x / scale + 20, y / scale - 10)
+    end)
+
+    self.dragGhost = ghost
+  end
+  return self.dragGhost
+end
+
+-- Show the drag ghost with the given category name
+function sectionFrame:ShowDragGhost(categoryName)
+  local ghost = self:GetDragGhost()
+  ghost.text:SetText(categoryName)
+  -- Size to fit text
+  local textWidth = ghost.text:GetStringWidth()
+  ghost:SetSize(math.max(textWidth + 20, 80), 24)
+  ghost:ClearAllPoints()
+  ghost:Show()
+end
+
+-- Hide the drag ghost
+function sectionFrame:HideDragGhost()
+  if self.dragGhost then
+    self.dragGhost:Hide()
+  end
+end
+
+-- Reset tab highlights after dragging ends
+function sectionFrame:ResetTabHighlights()
+  local bag = addon.Bags.Backpack
+  if not bag or not bag.tabs then return end
+
+  local ctx = context:New("ResetTabHighlights")
+  for i, tab in ipairs(bag.tabs.tabIndex) do
+    if tab:IsShown() and i ~= bag.tabs.selectedTab then
+      -- Reset to deselected state
+      local decoration = themes:GetTabButton(ctx, tab)
+      decoration.LeftActive:Hide()
+      decoration.MiddleActive:Hide()
+      decoration.RightActive:Hide()
+    end
+  end
+  GameTooltip:Hide()
+end
+
+-- Perform the drop action on the target tab
+function sectionFrame:PerformDrop()
+  if not self.draggingCategory then return end
+  if not self.dragTargetTab then return end
+
+  local category = self.draggingCategory
+  local tabID = self.dragTargetTab
+
+  local dropCtx = context:New("CategoryDropOnTab")
+  if tabID == 1 then
+    -- Dropping on Backpack removes group assignment
+    groups:RemoveCategoryFromGroup(dropCtx, category)
+  else
+    -- Dropping on other group assigns to that group
+    groups:AssignCategoryToGroup(dropCtx, category, tabID)
+  end
+
+  local eventsModule = addon:GetModule("Events")
+  eventsModule:SendMessage(dropCtx, "bags/FullRefreshAll")
+end
+
 ---@param ctx Context
 ---@param f Section
 function sectionFrame._DoReset(ctx, f)
-  _ = ctx
+  local _ = ctx
   f:EnableHeader()
   f:GetContent():SortHorizontal()
   f:Wipe()
@@ -409,7 +522,7 @@ function sectionFrame:OnTitleRightClick(section)
     list = newlist
   end
 
-  -- Only DF since warbank has Enum.BankType 
+  -- Only DF since warbank has Enum.BankType
   local containerType = nil
   if Enum.BankType and flow == const.MOVEMENT_FLOW.WARBANK then
     containerType = Enum.BankType.Account
@@ -428,6 +541,22 @@ function sectionProto:onTitleMouseEnter()
     "Item Count: " .. #self.content.cells
   )
   GameTooltip:AddLine(info, 1, 1, 1)
+
+  -- Show group assignment info for backpack sections
+  local kind = self:GetKind()
+  local category = self:GetTitleWithoutIndicator()
+  if kind == const.BAG_KIND.BACKPACK and category ~= L:G("Free Space") and category ~= L:G("Recent Items") then
+    local groupID = groups:GetGroupForCategory(category)
+    if groupID then
+      local group = groups:GetGroup(groupID)
+      if group then
+        GameTooltip:AddLine("Group: " .. group.name, 0.5, 0.8, 1)
+      end
+    end
+    GameTooltip:AddLine(" ", 1, 1, 1)
+    GameTooltip:AddLine("Drag to a group tab to assign this category.", 0.7, 0.7, 0.7)
+  end
+
   local cursorType, _, itemLink = GetCursorInfo()
   if CursorHasItem() and IsShiftKeyDown() then
     if cursorType == "item" then
@@ -475,6 +604,34 @@ function sectionFrame:_DoCreate()
   end)
 
   title:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  title:RegisterForDrag("LeftButton")
+
+  title:SetScript("OnDragStart", function()
+    if s.headerDisabled then return end
+    local category = s:GetTitleWithoutIndicator()
+    -- Don't allow dragging special sections
+    if category == L:G("Free Space") or category == L:G("Recent Items") then
+      return
+    end
+    -- Only allow dragging for backpack sections
+    local kind = s:GetKind()
+    if kind ~= const.BAG_KIND.BACKPACK then return end
+
+    sectionFrame.draggingCategory = category
+    sectionFrame.dragTargetTab = nil
+    sectionFrame:ShowDragGhost(category)
+  end)
+
+  title:SetScript("OnDragStop", function()
+    if sectionFrame.draggingCategory then
+      -- Perform the drop if we have a valid target
+      sectionFrame:PerformDrop()
+    end
+    sectionFrame.draggingCategory = nil
+    sectionFrame.dragTargetTab = nil
+    sectionFrame:HideDragGhost()
+    sectionFrame:ResetTabHighlights()
+  end)
 
   addon.SetScript(title, "OnClick", function(ctx, _, e)
     if s.headerDisabled then return end

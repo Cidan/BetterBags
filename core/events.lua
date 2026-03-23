@@ -11,7 +11,6 @@ local context = addon:GetModule('Context')
 ---@class Callback
 ---@field cb fun(...)
 ---@field a any
-local callbackProto = {}
 
 ---@class EventArg
 ---@field eventName string
@@ -120,7 +119,7 @@ end
 ---@param event string
 ---@param callback fun(ctx: Context, ...)
 function events:BucketEvent(event, callback)
- --TODO(lobato): Refine this so that timers only run when an event is in the queue. 
+ --TODO(lobato): Refine this so that timers only run when an event is in the queue.
   local bucketFunction = function()
     for _, cb in pairs(self._bucketCallbacks[event]) do
       xpcall(function(...)

@@ -3,11 +3,11 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
+
+---@class Animations: AceModule
+local animations = addon:GetModule('Animations')
 
 ---@class (exact) FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
@@ -18,7 +18,7 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field baseFrame Frame
 ---@field indexFrame Frame
 ---@field underline Frame
----@field sections {point: Frame, button: Button}[]
+---@field sections {point: Frame, button: Button, paneIndex?: number}[]
 ---@field checkboxes table<FormCheckbox, FormCheckboxOptions>
 ---@field dropdowns table<FormDropdown, FormDropdownOptions>
 ---@field sliders table<FormSlider, FormSliderOptions>
@@ -26,17 +26,30 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field textAreas table<FormTextArea, FormTextAreaOptions>
 ---@field inputBoxes table<FormInputBox, FormInputBoxOptions>
 ---@field colorPickers table<FormColor, FormColorOptions>
+---@field paneLinks table<FormPaneLink, FormPaneLinkOptions>
 ---@field scrollBox WowScrollBox
 ---@field height number
 ---@field index boolean
+---@field tabbed boolean
+---@field activeTab number
+---@field tabContainers Frame[]
+---@field tabFadeIns AnimationGroup[]
+---@field tabFadeOuts AnimationGroup[]
+---@field tabHeights number[]
+---@field panes Frame[]
+---@field paneFadeIns AnimationGroup[]
+---@field paneFadeOuts AnimationGroup[]
+---@field activePane number|nil
+---@field previousTab number|nil
 local stackedLayout = {}
 
 ---@param targetFrame Frame
 ---@param baseFrame Frame
 ---@param scrollBox WowScrollBox
 ---@param index boolean
+---@param tabbed boolean
 ---@return FormLayout
-function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
+function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index, tabbed)
   local l = setmetatable({}, {__index = stackedLayout}) --[[@as StackedLayout]]
   l.targetFrame = targetFrame
   l.nextFrame = targetFrame
@@ -44,6 +57,12 @@ function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   l.index = index
   l.baseFrame = baseFrame
   l.scrollBox = scrollBox
+  l.tabbed = tabbed or false
+  l.activeTab = 1
+  l.tabContainers = {}
+  l.tabFadeIns = {}
+  l.tabFadeOuts = {}
+  l.tabHeights = {}
   l.checkboxes = {}
   l.dropdowns = {}
   l.sliders = {}
@@ -51,7 +70,13 @@ function layouts:NewStackedLayout(targetFrame, baseFrame, scrollBox, index)
   l.textAreas = {}
   l.inputBoxes = {}
   l.colorPickers = {}
+  l.paneLinks = {}
   l.sections = {}
+  l.panes = {}
+  l.paneFadeIns = {}
+  l.paneFadeOuts = {}
+  l.activePane = nil
+  l.previousTab = nil
   if index then
     l:setupIndex()
   end
@@ -91,15 +116,18 @@ end
 ---@package
 function stackedLayout:setupIndex()
   self.indexFrame = CreateFrame("Frame", nil, self.baseFrame) --[[@as Frame]]
-  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -20)
+  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -34)
   self.indexFrame:SetPoint("BOTTOM", self.baseFrame, "BOTTOM", 0, 0)
   self.indexFrame:SetWidth(120)
 
-  local underline = self:createDividerLineLeft(self.indexFrame)
-  self.underline = underline
-  self.scrollBox:RegisterCallback(BaseScrollBoxEvents.OnScroll, function()
-    self:UpdateUnderline()
-  end)
+  if not self.tabbed then
+    -- Only create underline and scroll tracking for non-tabbed mode
+    local underline = self:createDividerLineLeft(self.indexFrame)
+    self.underline = underline
+    self.scrollBox:RegisterCallback(BaseScrollBoxEvents.OnScroll, function()
+      self:UpdateUnderline()
+    end)
+  end
   self.nextIndex = self.indexFrame
 end
 
@@ -150,15 +178,52 @@ function stackedLayout:addIndex(title, point, sub)
   fs:SetPoint("LEFT", indexButton, "LEFT", 5, 0)
   fs:SetJustifyH("LEFT")
 
-  indexButton:SetScript("OnClick", function()
-    local targetTop = point:GetTop()
-    local parentTop = self.targetFrame:GetTop()
-    if addon.isRetail then
-      self.scrollBox:ScrollToOffset((parentTop - targetTop) - 10)
-    else
-      self:scrollToOffset((parentTop - targetTop) - 10)
-    end
-  end)
+  -- Change OnClick behavior based on mode
+  if self.tabbed then
+    -- Use tabContainers count, not sections count, because sections includes pane links
+    -- which don't have tab containers. This ensures the tab index matches the actual
+    -- tabContainers array index.
+    local tabIndex = #self.tabContainers
+    indexButton.tabIndex = tabIndex -- Store tab index for hover logic
+
+    -- Add hover glow effect
+    indexButton:SetScript("OnEnter", function()
+      -- Animate the text with a subtle glow
+      fs:SetTextColor(1, 0.9, 0.5) -- Warm golden color
+      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+      fs:SetShadowOffset(0, 0) -- No offset creates a glow effect
+    end)
+
+    indexButton:SetScript("OnLeave", function()
+      -- Only keep highlighted if this is the active tab AND no pane is active
+      if self.activeTab == tabIndex and not self.activePane then
+        -- Keep active tab golden with glow
+        fs:SetTextColor(1, 0.82, 0)
+        fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+        fs:SetShadowOffset(0, 0)
+      else
+        -- Reset to normal
+        fs:SetTextColor(1, 1, 1)
+        fs:SetShadowColor(0, 0, 0, 1)
+        fs:SetShadowOffset(1, -1)
+      end
+    end)
+
+    indexButton:SetScript("OnClick", function()
+      self:SwitchToTab(tabIndex)
+    end)
+  else
+    -- Existing scroll behavior for non-tabbed mode
+    indexButton:SetScript("OnClick", function()
+      local targetTop = point:GetTop()
+      local parentTop = self.targetFrame:GetTop()
+      if addon.isRetail then
+        self.scrollBox:ScrollToOffset((parentTop - targetTop) - 10)
+      else
+        self:scrollToOffset((parentTop - targetTop) - 10)
+      end
+    end)
+  end
 
   if self.nextIndex == self.indexFrame then
     indexButton:SetPoint("TOPLEFT", self.indexFrame, "TOPLEFT", 5, -10)
@@ -171,7 +236,7 @@ function stackedLayout:addIndex(title, point, sub)
 end
 
 function stackedLayout:UpdateUnderline()
-  if not self.index then return end
+  if not self.index or self.tabbed then return end
   for i, section in ipairs(self.sections) do
     local targetTop = section.point:GetTop()
     local parentTop = self.targetFrame:GetTop()
@@ -193,24 +258,172 @@ function stackedLayout:UpdateUnderline()
   self.underline:GetTop()
 end
 
+---@param tabIndex number
+function stackedLayout:SwitchToTab(tabIndex)
+  -- If a pane is active, hide it and show the requested tab
+  local wasShowingPane = self.activePane ~= nil
+  if self.activePane then
+    local paneFrame = self.panes[self.activePane]
+    if paneFrame and paneFrame:IsShown() then
+      local fadeOut = self.paneFadeOuts[self.activePane]
+      fadeOut.callback = function()
+        paneFrame:Hide()
+      end
+      fadeOut:Play()
+    end
+    self.activePane = nil
+    self.previousTab = nil
+  end
+
+  -- If clicking the same tab we were already on (but coming from a pane),
+  -- we need to show the tab container and update highlighting
+  if tabIndex == self.activeTab then
+    if wasShowingPane then
+      -- Tab container was hidden when pane was shown, need to restore it
+      local tabContainer = self.tabContainers[tabIndex]
+      if tabContainer then
+        local tabHeight = self.tabHeights[tabIndex] + 25
+        tabContainer:SetHeight(tabHeight)
+        self.targetFrame:SetHeight(tabHeight)
+        if self.scrollBox and self.scrollBox.FullUpdate then
+          local _ = self.targetFrame:GetHeight()
+          self.scrollBox:FullUpdate(true)
+        end
+        tabContainer:Show()
+        tabContainer:SetAlpha(0)
+        local fadeIn = self.tabFadeIns[tabIndex]
+        fadeIn:Play()
+      end
+      self:UpdateTabHighlighting(tabIndex)
+    end
+    return
+  end
+
+  local currentContainer = self.tabContainers[self.activeTab]
+  local newContainer = self.tabContainers[tabIndex]
+
+  if not newContainer then return end
+
+  -- Update the new tab's height before showing
+  local newTabHeight = self.tabHeights[tabIndex] + 25
+  newContainer:SetHeight(newTabHeight)
+
+  -- Fade out current tab if it exists and is shown
+  if currentContainer and currentContainer:IsShown() then
+    local fadeOut = self.tabFadeOuts[self.activeTab]
+    fadeOut.callback = function()
+      currentContainer:Hide()
+
+      -- Update the target frame (inner) height to match the new tab
+      self.targetFrame:SetHeight(newTabHeight)
+
+      -- Notify the scroll box that content size has changed
+      if self.scrollBox and self.scrollBox.FullUpdate then
+        local _ = self.targetFrame:GetHeight() -- Force layout update
+        self.scrollBox:FullUpdate(true)
+      end
+
+      -- Fade in new tab
+      newContainer:Show()
+      newContainer:SetAlpha(0)
+      local fadeIn = self.tabFadeIns[tabIndex]
+      fadeIn:Play()
+    end
+    fadeOut:Play()
+  else
+    -- No current container shown (e.g., coming from a pane), just show new tab
+    self.targetFrame:SetHeight(newTabHeight)
+    if self.scrollBox and self.scrollBox.FullUpdate then
+      local _ = self.targetFrame:GetHeight()
+      self.scrollBox:FullUpdate(true)
+    end
+    newContainer:Show()
+    newContainer:SetAlpha(0)
+    local fadeIn = self.tabFadeIns[tabIndex]
+    fadeIn:Play()
+  end
+
+  -- Update active tab and button highlighting
+  self:UpdateTabHighlighting(tabIndex)
+  self.activeTab = tabIndex
+
+  -- Reset scroll to top for new tab
+  if self.scrollBox then
+    self.scrollBox:SetScrollPercentage(0)
+  end
+end
+
+---@private
+---@param amount number
+function stackedLayout:addHeight(amount)
+  if self.tabbed then
+    -- Find the current tab index by walking up the frame hierarchy
+    local frame = self.nextFrame
+    while frame and not frame.tabIndex do
+      frame = frame:GetParent()
+    end
+    if frame and frame.tabIndex then
+      self.tabHeights[frame.tabIndex] = self.tabHeights[frame.tabIndex] + amount
+    end
+  else
+    self.height = self.height + amount
+  end
+end
+
+---@param activeTabIndex number
+function stackedLayout:UpdateTabHighlighting(activeTabIndex)
+  for _, section in ipairs(self.sections) do
+    local button = section.button
+    local fs = button:GetFontString()
+    local isActive = false
+
+    -- Check if this is the active pane or the active tab
+    -- Pane links have section.paneIndex, tabs have button.tabIndex
+    if self.activePane and section.paneIndex == self.activePane then
+      isActive = true
+    elseif not self.activePane and button.tabIndex == activeTabIndex then
+      isActive = true
+    end
+
+    if isActive then
+      -- Highlight active tab with golden color and glow
+      fs:SetTextColor(1, 0.82, 0)  -- Gold color
+      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+      fs:SetShadowOffset(0, 0)  -- No offset creates a glow effect
+    else
+      -- Normal color for inactive tabs
+      fs:SetTextColor(1, 1, 1)
+      fs:SetShadowColor(0, 0, 0, 1)
+      fs:SetShadowOffset(1, -1)
+    end
+  end
+end
+
 ---@private
 ---@param t Frame
 ---@param container Frame
 ---@param indent? number
 function stackedLayout:alignFrame(t, container, indent)
   indent = indent or 0
-  if t == self.targetFrame then
+  -- Check if this is the first widget (aligning to targetFrame or a tab container)
+  local isFirstWidget = t == self.targetFrame or (self.tabbed and t.tabIndex ~= nil)
+
+  if isFirstWidget then
     if self.index then
-      container:SetPoint("TOPLEFT", t, "TOPLEFT", self.indexFrame:GetWidth() + 10 + indent, -10)
+      -- In tabbed mode, tab containers are already offset, so widgets inside don't need additional offset
+      -- In non-tabbed mode, widgets need to account for index width
+      local indexWidth = self.indexFrame and self.indexFrame:GetWidth() or 0
+      local leftOffset = (self.tabbed and t.tabIndex and 0 or indexWidth) + 10 + indent
+      container:SetPoint("TOPLEFT", t, "TOPLEFT", leftOffset, -10)
     else
       container:SetPoint("TOPLEFT", t, "TOPLEFT", 10 + indent, -10)
     end
     container:SetPoint("TOPRIGHT", t, "TOPRIGHT", -20, -10)
-    self.height = self.height + 10
+    self:addHeight(10)
   else
     container:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0 + indent, -20)
     container:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
-    self.height = self.height + 20
+    self:addHeight(20)
   end
 end
 
@@ -310,30 +523,88 @@ end
 
 ---@param opts FormSectionOptions
 function stackedLayout:AddSection(opts)
-  local t = self.nextFrame
-  local container = CreateFrame("Frame", nil, t) --[[@as FormSection]]
-  self:alignFrame(t, container)
+  if self.tabbed then
+    -- Create a new container frame for this tab as a direct child of targetFrame
+    -- This ensures proper scrolling behavior
+    local tabContainer = CreateFrame("Frame", nil, self.targetFrame)
+    -- Position tab container to the right of the index frame
+    local leftOffset = (self.indexFrame and self.indexFrame:GetWidth() or 0) + 10
+    tabContainer:SetPoint("TOPLEFT", self.targetFrame, "TOPLEFT", leftOffset, -10)
+    tabContainer:SetPoint("RIGHT", self.targetFrame, "RIGHT", -20, 0)
+    tabContainer:SetHeight(2000)  -- Start with large height, will be updated by Resize()
+    tabContainer:Hide()  -- Start hidden
 
-  container.title = self:createTitle(container, opts.title)
-  container.title:SetPoint("TOPLEFT", container, "TOPLEFT")
+    -- Create fade animations for this tab
+    local fadeIn, fadeOut = animations:AttachFadeGroup(tabContainer, true)
 
-  container.description = self:createDescription(container, opts.description)
-  container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
-  container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+    table.insert(self.tabContainers, tabContainer)
+    table.insert(self.tabFadeIns, fadeIn)
+    table.insert(self.tabFadeOuts, fadeOut)
+    table.insert(self.tabHeights, 0)  -- Initialize height tracker for this tab
 
-  local div = self:createDividerLineLeft(container)
-  div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
-  div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+    -- Store the current tab index for height tracking
+    local currentTabIndex = #self.tabContainers
 
-  container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 18)
+    -- Reset nextFrame to start of this tab's container
+    self.nextFrame = tabContainer
+    self.nextFrame.tabIndex = currentTabIndex  -- Tag the frame with its tab index for height tracking
 
-  self:addIndex(opts.title, container)
-  self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+    -- Create section header within the tab container
+    local container = CreateFrame("Frame", nil, tabContainer) --[[@as FormSection]]
+    self:alignFrame(tabContainer, container, 0)
+
+    container.title = self:createTitle(container, opts.title)
+    container.title:SetPoint("TOPLEFT", container, "TOPLEFT")
+
+    container.description = self:createDescription(container, opts.description)
+    container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+    container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+
+    local div = self:createDividerLineLeft(container)
+    div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+    div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+
+    container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 18)
+
+    self:addIndex(opts.title, container, false)
+    self.nextFrame = container
+    self:addHeight(container:GetHeight())
+
+    -- Show first tab by default (height will be set by Resize() as widgets are added)
+    if #self.tabContainers == 1 then
+      tabContainer:Show()
+      tabContainer:SetAlpha(1)
+      self:UpdateTabHighlighting(1)
+    end
+  else
+    -- Existing stacked behavior (unchanged)
+    local t = self.nextFrame
+    local container = CreateFrame("Frame", nil, t) --[[@as FormSection]]
+    self:alignFrame(t, container)
+
+    container.title = self:createTitle(container, opts.title)
+    container.title:SetPoint("TOPLEFT", container, "TOPLEFT")
+
+    container.description = self:createDescription(container, opts.description)
+    container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+    container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+
+    local div = self:createDividerLineLeft(container)
+    div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
+    div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
+
+    container:SetHeight(container.title:GetHeight() + container.description:GetHeight() + 18)
+
+    self:addIndex(opts.title, container)
+    self.nextFrame = container
+    self:addHeight(container:GetHeight())
+  end
 end
 
----@param opts FormSubSectionOptions
-function stackedLayout:AddSubSection(opts)
+--- Adds a subsection header inline in the pane content (title, description, divider).
+--- Does NOT add to the sidebar index. Use for visual grouping within a tab.
+---@param opts FormInlineSubSectionOptions
+function stackedLayout:AddInlineSubSection(opts)
   local t = self.nextFrame
   local container = CreateFrame("Frame", nil, t) --[[@as FormSubSection]]
   self:alignFrame(t, container)
@@ -350,9 +621,18 @@ function stackedLayout:AddSubSection(opts)
   div:SetPoint("TOPLEFT", container.description, "BOTTOMLEFT", 0, -5)
   div:SetPoint("RIGHT", container, "RIGHT", -10, 0)
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 33)
-  self:addIndex(opts.title, container, true)
+
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
+end
+
+--- Adds a navigation entry to the sidebar index only.
+--- Does NOT render any content in the pane. Use for sub-navigation items.
+---@param opts FormSubIndexOptions
+function stackedLayout:AddSubIndex(opts)
+  local t = self.nextFrame
+  local container = CreateFrame("Frame", nil, t) --[[@as FormSubSection]]
+  self:addIndex(opts.title, container, true)
 end
 
 ---@param opts FormCheckboxOptions
@@ -379,7 +659,7 @@ function stackedLayout:AddCheckbox(opts)
 
   container:SetHeight(container.title:GetLineHeight() + container.description:GetLineHeight() + 25)
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.checkboxes[container] = opts
 end
 
@@ -434,7 +714,7 @@ function stackedLayout:addDropdownRetail(opts)
     25
   )
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.dropdowns[container] = opts
 end
 
@@ -501,7 +781,7 @@ function stackedLayout:addDropdownClassic(opts)
     25
   )
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.dropdowns[container] = opts
 end
 
@@ -561,8 +841,6 @@ function stackedLayout:AddSlider(opts)
       end
       container.slider:SetValue(value)
       container.input:SetText(tostring(value))
-    else
-      value = opts.min
     end
     container.input:SetText(tostring(container.slider:GetValue()))
     self:ReloadAllFormElements()
@@ -578,8 +856,6 @@ function stackedLayout:AddSlider(opts)
         end
         container.slider:SetValue(value)
         container.input:SetText(tostring(value))
-      else
-        value = opts.min
       end
     else
       container.input:SetText(tostring(container.slider:GetValue()))
@@ -596,7 +872,7 @@ function stackedLayout:AddSlider(opts)
     30
   )
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.sliders[container] = opts
 end
 
@@ -618,14 +894,14 @@ function stackedLayout:AddButtonGroup(opts)
     if #container.buttons == 0 then
       button:SetPoint("TOPLEFT", container, "TOPLEFT", 37, 0)
     else
-      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", -10, 0)
+      button:SetPoint("TOPLEFT", container.buttons[#container.buttons], "TOPRIGHT", 10, 0)
     end
     table.insert(container.buttons, button)
   end
 
   container:SetHeight(container.buttons[1]:GetHeight() + 30)
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.buttonGroups[container] = opts
 end
 
@@ -709,7 +985,7 @@ function stackedLayout:AddTextArea(opts)
 
   ScrollUtil.InitScrollBoxWithScrollBar(ScrollBox, ScrollBar, view)
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.textAreas[container] = opts
 end
 
@@ -753,7 +1029,7 @@ function stackedLayout:AddInputBox(opts)
   )
 
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.inputBoxes[container] = opts
 end
 
@@ -820,7 +1096,7 @@ function stackedLayout:AddColor(opts)
   )
 
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
   self.colorPickers[container] = opts
 end
 
@@ -836,5 +1112,181 @@ function stackedLayout:AddLabel(opts)
 
   container:SetHeight(container.description:GetStringHeight() + 10)
   self.nextFrame = container
-  self.height = self.height + container:GetHeight()
+  self:addHeight(container:GetHeight())
+end
+
+---@param paneIndex number
+function stackedLayout:ShowPane(paneIndex)
+  if self.activePane == paneIndex then return end
+
+  local paneFrame = self.panes[paneIndex]
+  if not paneFrame then return end
+
+  -- Store the current tab so we can return to it
+  self.previousTab = self.activeTab
+
+  -- Hide all tab containers
+  for i, container in ipairs(self.tabContainers) do
+    if container:IsShown() then
+      local fadeOut = self.tabFadeOuts[i]
+      fadeOut.callback = function()
+        container:Hide()
+      end
+      fadeOut:Play()
+    end
+  end
+
+  -- Hide any currently active pane
+  if self.activePane then
+    local currentPane = self.panes[self.activePane]
+    if currentPane and currentPane:IsShown() then
+      local fadeOut = self.paneFadeOuts[self.activePane]
+      fadeOut.callback = function()
+        currentPane:Hide()
+      end
+      fadeOut:Play()
+    end
+  end
+
+  -- Show the new pane
+  self.activePane = paneIndex
+
+  -- Set targetFrame height to match the scrollBox's visible area.
+  -- This ensures the pane fills exactly the viewport without causing outer scrolling.
+  -- Panes are designed to fill available space with their own internal scrolling.
+  if self.scrollBox then
+    local viewportHeight = self.scrollBox:GetHeight()
+    if viewportHeight and viewportHeight > 0 then
+      self.targetFrame:SetHeight(viewportHeight)
+      self.scrollBox:FullUpdate(true)
+    end
+  end
+
+  paneFrame:Show()
+  paneFrame:SetAlpha(0)
+  local fadeIn = self.paneFadeIns[paneIndex]
+  fadeIn:Play()
+
+  -- Update tab highlighting to show the pane's index as active
+  for i, section in ipairs(self.sections) do
+    if section.paneIndex == paneIndex then
+      self:UpdateTabHighlighting(i)
+      break
+    end
+  end
+
+  -- Reset scroll to top
+  if self.scrollBox then
+    self.scrollBox:SetScrollPercentage(0)
+  end
+end
+
+function stackedLayout:HidePane()
+  if not self.activePane then return end
+
+  local paneFrame = self.panes[self.activePane]
+  if not paneFrame then return end
+
+  -- Hide the pane
+  local fadeOut = self.paneFadeOuts[self.activePane]
+  fadeOut.callback = function()
+    paneFrame:Hide()
+  end
+  fadeOut:Play()
+
+  self.activePane = nil
+
+  -- Show the previous tab
+  local tabToShow = self.previousTab or 1
+  local tabContainer = self.tabContainers[tabToShow]
+  if tabContainer then
+    tabContainer:Show()
+    tabContainer:SetAlpha(0)
+    local fadeIn = self.tabFadeIns[tabToShow]
+    fadeIn:Play()
+    self.activeTab = tabToShow
+    self:UpdateTabHighlighting(tabToShow)
+  end
+
+  self.previousTab = nil
+
+  -- Reset scroll to top
+  if self.scrollBox then
+    self.scrollBox:SetScrollPercentage(0)
+  end
+end
+
+---@return boolean
+function stackedLayout:IsPaneActive()
+  return self.activePane ~= nil
+end
+
+--- Adds a pane link to the sidebar index that navigates to a separate pane.
+--- Does NOT render any inline content. Only adds sidebar navigation entry.
+---@param opts FormPaneLinkOptions
+function stackedLayout:AddPaneLink(opts)
+  if not self.tabbed then
+    -- PaneLinks only work in tabbed mode
+    return
+  end
+
+  -- Create the pane frame that will be shown when this link is clicked
+  local paneIndex = #self.panes + 1
+  local paneFrame = opts.createPane(self.targetFrame, opts.bagKind)
+  -- Position pane to the right of the index frame
+  local leftOffset = (self.indexFrame and self.indexFrame:GetWidth() or 0) + 10
+  paneFrame:SetPoint("TOPLEFT", self.targetFrame, "TOPLEFT", leftOffset, -10)
+  paneFrame:SetPoint("BOTTOMRIGHT", self.targetFrame, "BOTTOMRIGHT", 0, 0)
+  paneFrame:Hide()
+
+  -- Create fade animations for this pane
+  local fadeIn, fadeOut = animations:AttachFadeGroup(paneFrame, true)
+
+  table.insert(self.panes, paneFrame)
+  table.insert(self.paneFadeIns, fadeIn)
+  table.insert(self.paneFadeOuts, fadeOut)
+
+  -- Add to index with pane navigation (no inline content)
+  local indexButton = CreateFrame("Button", nil, self.indexFrame) --[[@as Button]]
+  indexButton:SetSize(100, 24)
+  local font = indexButton:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  indexButton:SetFontString(font)
+  indexButton:SetText("  " .. opts.title)
+  local fs = indexButton:GetFontString()
+  fs:SetTextColor(1, 1, 1)
+  fs:ClearAllPoints()
+  fs:SetPoint("LEFT", indexButton, "LEFT", 5, 0)
+  fs:SetJustifyH("LEFT")
+
+  -- Hover effect
+  indexButton:SetScript("OnEnter", function()
+    fs:SetTextColor(1, 0.9, 0.5)
+    fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+    fs:SetShadowOffset(0, 0)
+  end)
+
+  indexButton:SetScript("OnLeave", function()
+    if self.activePane ~= paneIndex then
+      fs:SetTextColor(1, 1, 1)
+      fs:SetShadowColor(0, 0, 0, 1)
+      fs:SetShadowOffset(1, -1)
+    else
+      fs:SetTextColor(1, 0.82, 0)
+      fs:SetShadowColor(1, 0.8, 0.3, 0.8)
+      fs:SetShadowOffset(0, 0)
+    end
+  end)
+
+  indexButton:SetScript("OnClick", function()
+    self:ShowPane(paneIndex)
+  end)
+
+  if self.nextIndex == self.indexFrame then
+    indexButton:SetPoint("TOPLEFT", self.indexFrame, "TOPLEFT", 5, -10)
+  else
+    indexButton:SetPoint("TOPLEFT", self.nextIndex, "BOTTOMLEFT", 0, -5)
+  end
+
+  table.insert(self.sections, {button = indexButton, paneIndex = paneIndex})
+  self.nextIndex = indexButton
 end

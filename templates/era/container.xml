@@ -87,6 +87,105 @@
       <AbsDimension y="30"/>
     </Size>
   </Button>
-  <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="PanelTabButtonTemplate,InsecureActionButtonTemplate">
-  </Button>	
+  <Frame name="BetterBagsCategoryPaneItemFrame" virtual="true">
+    <Size>
+      <AbsDimension y="30"/>
+    </Size>
+  </Frame>
+  <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="InsecureActionButtonTemplate">
+    <Size>
+      <AbsDimension x="115" y="32"/>
+    </Size>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <!-- Active/Selected state textures (shown when tab is selected) -->
+        <Texture parentKey="LeftActive" file="Interface\HelpFrame\HelpFrameTab-Active">
+          <Size><AbsDimension x="16" y="32"/></Size>
+          <Anchors>
+            <Anchor point="BOTTOMLEFT"><Offset><AbsDimension x="0" y="3"/></Offset></Anchor>
+          </Anchors>
+          <TexCoords left="0" right="0.25" top="1.0" bottom="0"/>
+        </Texture>
+        <Texture parentKey="RightActive" file="Interface\HelpFrame\HelpFrameTab-Active">
+          <Size><AbsDimension x="16" y="32"/></Size>
+          <Anchors>
+            <Anchor point="BOTTOMRIGHT"><Offset><AbsDimension x="0" y="3"/></Offset></Anchor>
+          </Anchors>
+          <TexCoords left="0.75" right="1.0" top="1.0" bottom="0"/>
+        </Texture>
+        <Texture parentKey="MiddleActive" file="Interface\HelpFrame\HelpFrameTab-Active">
+          <Size><AbsDimension x="0" y="32"/></Size>
+          <Anchors>
+            <Anchor point="TOPLEFT" relativeKey="$parent.LeftActive" relativePoint="TOPRIGHT"/>
+            <Anchor point="BOTTOMRIGHT" relativeKey="$parent.RightActive" relativePoint="BOTTOMLEFT"/>
+          </Anchors>
+          <TexCoords left="0.25" right="0.75" top="1.0" bottom="0"/>
+        </Texture>
+        <!-- Inactive/Deselected state textures (shown when tab is not selected) -->
+        <Texture parentKey="Left" file="Interface\HelpFrame\HelpFrameTab-Inactive">
+          <Size><AbsDimension x="16" y="32"/></Size>
+          <Anchors>
+            <Anchor point="BOTTOMLEFT"/>
+          </Anchors>
+          <TexCoords left="0" right="0.25" top="1.0" bottom="0"/>
+        </Texture>
+        <Texture parentKey="Right" file="Interface\HelpFrame\HelpFrameTab-Inactive">
+          <Size><AbsDimension x="16" y="32"/></Size>
+          <Anchors>
+            <Anchor point="BOTTOMRIGHT"/>
+          </Anchors>
+          <TexCoords left="0.75" right="1.0" top="1.0" bottom="0"/>
+        </Texture>
+        <Texture parentKey="Middle" file="Interface\HelpFrame\HelpFrameTab-Inactive">
+          <Size><AbsDimension x="0" y="32"/></Size>
+          <Anchors>
+            <Anchor point="TOPLEFT" relativeKey="$parent.Left" relativePoint="TOPRIGHT"/>
+            <Anchor point="BOTTOMRIGHT" relativeKey="$parent.Right" relativePoint="BOTTOMLEFT"/>
+          </Anchors>
+          <TexCoords left="0.25" right="0.75" top="1.0" bottom="0"/>
+        </Texture>
+      </Layer>
+      <Layer level="HIGHLIGHT">
+        <!-- Highlight textures overlay the inactive textures with additive blending -->
+        <Texture parentKey="LeftHighlight" file="Interface\HelpFrame\HelpFrameTab-Inactive" alphaMode="ADD" alpha="0.4">
+          <Size><AbsDimension x="16" y="32"/></Size>
+          <Anchors>
+            <Anchor point="TOPLEFT" relativeKey="$parent.Left"/>
+          </Anchors>
+          <TexCoords left="0" right="0.25" top="1.0" bottom="0"/>
+        </Texture>
+        <Texture parentKey="RightHighlight" file="Interface\HelpFrame\HelpFrameTab-Inactive" alphaMode="ADD" alpha="0.4">
+          <Size><AbsDimension x="16" y="32"/></Size>
+          <Anchors>
+            <Anchor point="TOPRIGHT" relativeKey="$parent.Right"/>
+          </Anchors>
+          <TexCoords left="0.75" right="1.0" top="1.0" bottom="0"/>
+        </Texture>
+        <Texture parentKey="MiddleHighlight" file="Interface\HelpFrame\HelpFrameTab-Inactive" alphaMode="ADD" alpha="0.4">
+          <Size><AbsDimension x="0" y="32"/></Size>
+          <Anchors>
+            <Anchor point="TOPLEFT" relativeKey="$parent.Middle" relativePoint="TOPLEFT"/>
+            <Anchor point="BOTTOMRIGHT" relativeKey="$parent.Middle" relativePoint="BOTTOMRIGHT"/>
+          </Anchors>
+          <TexCoords left="0.25" right="0.75" top="1.0" bottom="0"/>
+        </Texture>
+      </Layer>
+    </Layers>
+    <Scripts>
+      <OnLoad>
+        self.deselectedTextY = 10;
+        self.selectedTextY = 7;
+        PanelTemplates_TabResize(self, 0, nil, self.minWidth);
+      </OnLoad>
+    </Scripts>
+    <ButtonText parentKey="Text">
+      <Size><AbsDimension x="0" y="10"/></Size>
+      <Anchors>
+        <Anchor point="CENTER"><Offset><AbsDimension x="0" y="10"/></Offset></Anchor>
+      </Anchors>
+    </ButtonText>
+    <NormalFont style="GameFontNormalSmall"/>
+    <HighlightFont style="GameFontHighlightSmall"/>
+    <DisabledFont style="GameFontDisableSmall"/>
+  </Button>
 </Ui>

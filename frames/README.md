@@ -71,6 +71,7 @@ Individual item button implementation with full WoW item functionality.
 **Key Features:**
 - Item display with icon, count, quality
 - Item level display
+- Item level colors refresh when max item level changes
 - Cooldown tracking
 - Search highlighting
 - Upgrade indicator

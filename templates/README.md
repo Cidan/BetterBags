@@ -8,7 +8,6 @@ The templates module contains XML template definitions and Lua mixins that defin
 - [Core Templates](#core-templates)
   - [Container Templates](#container-templates-containerxml)
   - [Debug Templates](#debug-templates-debugxml)
-  - [Section Config Templates](#section-config-templates-sectionconfigxml)
 - [Era-Specific Templates](#era-specific-templates)
   - [Era Container Templates](#era-container-templates-eracontainerxml)
   - [Scrolling Flat Panel](#scrolling-flat-panel-erascrollingflatpanellua)
@@ -109,34 +108,6 @@ Templates specifically for the debug interface.
     </Layer>
   </Layers>
 </Button>
-```
-
-### Section Config Templates (`sectionconfig.xml`)
-
-Templates for section configuration UI.
-
-#### BetterBagsSectionConfigListButton
-- **Inherits:** `BackdropTemplate`
-- **Purpose:** Section configuration list button
-- **Height:** 30 pixels
-- **Usage:** Category list items in config
-
-```xml
-<Button name="BetterBagsSectionConfigListButton" inherits="BackdropTemplate" virtual="true">
-  <Size><AbsDimension y="30"/></Size>
-</Button>
-```
-
-#### BetterBagsSectionConfigItemFrame
-- **Inherits:** `BackdropTemplate`
-- **Purpose:** Item frame in section config
-- **Height:** 32 pixels
-- **Usage:** Individual item displays in configuration
-
-```xml
-<Frame name="BetterBagsSectionConfigItemFrame" inherits="BackdropTemplate" virtual="true">
-  <Size><AbsDimension y="32"/></Size>
-</Frame>
 ```
 
 ## Era-Specific Templates

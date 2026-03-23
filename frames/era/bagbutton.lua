@@ -10,9 +10,6 @@ local const = addon:GetModule('Constants')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class BagButtonFrame: AceModule
 local BagButtonFrame = addon:GetModule('BagButton')
 

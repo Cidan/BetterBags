@@ -331,7 +331,8 @@ form:Create(opts: FormCreateOptions): FormFrame
 
 -- Add widgets
 formFrame:AddSection(opts: FormSectionOptions)
-formFrame:AddSubSection(opts: FormSubSectionOptions)
+formFrame:AddInlineSubSection(opts: FormInlineSubSectionOptions)
+formFrame:AddSubIndex(opts: FormSubIndexOptions)
 formFrame:AddCheckbox(opts: FormCheckboxOptions)
 formFrame:AddDropdown(opts: FormDropdownOptions)
 formFrame:AddSlider(opts: FormSliderOptions)
@@ -435,8 +436,16 @@ Use sections and subsections to organize:
 form:AddSection({title = "General"})
 -- General settings
 
-form:AddSubSection({title = "Advanced"})
--- Advanced settings
+-- Inline subsection renders a header within the pane content
+form:AddInlineSubSection({
+  title = "Advanced",
+  description = "Advanced settings for power users."
+})
+-- Advanced settings widgets...
+
+-- Sub-index adds a navigation entry to the sidebar only (no pane content)
+form:AddSubIndex({title = "Plugin Name"})
+-- Plugin widgets...
 ```
 
 ### 5. Provide Clear Descriptions

@@ -3,9 +3,6 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
@@ -21,14 +18,23 @@ local events = addon:GetModule('Events')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class Bucket: AceModule
 local bucket = addon:GetModule('Bucket')
 
 ---@class Form: AceModule
 local form = addon:GetModule('Form')
+
+---@class CategoryPane: AceModule
+local categoryPane = addon:GetModule('CategoryPane')
+
+---@class ThemePane: AceModule
+local themePane = addon:GetModule('ThemePane')
+
+---@class CurrencyPane: AceModule
+local currencyPane = addon:GetModule('CurrencyPane')
+
+---@class ItemColorPane: AceModule
+local itemColorPane = addon:GetModule('ItemColorPane')
 
 ---@class Config: AceModule
 ---@field configFrame FormFrame
@@ -38,7 +44,8 @@ function config:CreateConfig()
   local f = form:Create({
     title = 'BetterBags Settings',
     layout = const.FORM_LAYOUT.STACKED,
-    index = true
+    index = true,
+    tabbed = true
   })
  f:AddSection({
    title = 'General',
@@ -117,6 +124,17 @@ function config:CreateConfig()
     end
   })
 
+  f:AddCheckbox({
+    title = 'Enable Bag Fading',
+    description = 'If enabled, bags will smoothly fade in and out when opening/closing.',
+    getValue = function(_)
+      return db:GetEnableBagFading()
+    end,
+    setValue = function(_, value)
+      db:SetEnableBagFading(value)
+    end
+  })
+
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
@@ -142,6 +160,33 @@ function config:CreateConfig()
     setValue = function(_, value)
       db:GetData().profile.newItemTime = value * 60
     end,
+  })
+
+  f:AddPaneLink({
+    title = 'Theme',
+    description = 'Change the visual appearance of BetterBags.',
+    createPane = function(parent, _)
+      return themePane:Create(parent)
+    end,
+    bagKind = nil,
+  })
+
+  f:AddPaneLink({
+    title = 'Currency',
+    description = 'Configure which currencies are shown in your backpack.',
+    createPane = function(parent, _)
+      return currencyPane:Create(parent)
+    end,
+    bagKind = nil,
+  })
+
+  f:AddPaneLink({
+    title = 'Item Colors',
+    description = 'Configure item level color gradients. Colors scale automatically based on your highest seen item level.',
+    createPane = function(parent, _)
+      return itemColorPane:Create(parent)
+    end,
+    bagKind = nil,
   })
 
   local bagTypes = {
@@ -176,11 +221,12 @@ function config:CreateConfig()
       ["Alphabetically"] = const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY,
       ["Quality"] = const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY,
       ["Item Level"] = const.ITEM_SORT_TYPE.ITEM_LEVEL,
+      ["Expansion"] = const.ITEM_SORT_TYPE.EXPANSION,
     }
     f:AddDropdown({
       title = 'Item Order',
       description = 'The default order of items within each section.',
-      items = {'Alphabetically', 'Quality', 'Item Level'},
+      items = {'Alphabetically', 'Quality', 'Item Level', 'Expansion'},
       getValue = function(_, value)
         return itemOrders[value] == db:GetItemSortType(bagType.kind, db:GetBagView(bagType.kind))
       end,
@@ -190,7 +236,23 @@ function config:CreateConfig()
       end,
     })
 
-    f:AddSubSection({
+    -- Enable Groups checkbox - only for Backpack
+    if bagType.kind == const.BAG_KIND.BACKPACK then
+      f:AddCheckbox({
+        title = 'Enable Groups',
+        description = 'Show group tabs at the bottom of the backpack. Groups allow you to organize categories into separate tabs. When disabled, all categories are shown in a single view.',
+        getValue = function(_)
+          return db:GetGroupsEnabled(bagType.kind)
+        end,
+        setValue = function(ctx, value)
+          db:SetGroupsEnabled(bagType.kind, value)
+          events:SendMessage(ctx, 'groups/EnabledChanged', bagType.kind, value)
+          events:SendMessage(ctx, 'bags/FullRefreshAll')
+        end
+      })
+    end
+
+    f:AddInlineSubSection({
       title = 'Categories',
       description = 'Settings for Blizzard item categories in the ' .. string.lower(bagType.name) .. '.',
     })
@@ -283,7 +345,7 @@ function config:CreateConfig()
       end
     })
 
-    f:AddSubSection({
+    f:AddInlineSubSection({
       title = 'Item Stacking',
       description = 'Settings for item stacking in the ' .. string.lower(bagType.name) .. '.',
     })
@@ -370,8 +432,7 @@ function config:CreateConfig()
       end
     })
 
-
-    f:AddSubSection({
+    f:AddInlineSubSection({
       title = 'Item Level',
       description = 'Settings for item level in the ' .. string.lower(bagType.name) .. '.',
     })
@@ -400,8 +461,7 @@ function config:CreateConfig()
       end
     })
 
-
-    f:AddSubSection({
+    f:AddInlineSubSection({
       title = 'Display',
       description = 'Settings that adjust layout and visual aspects of the ' .. string.lower(bagType.name) .. '.',
     })
@@ -508,8 +568,354 @@ function config:CreateConfig()
         db:SetBagViewSizeScale(bagType.kind, db:GetBagView(bagType.kind), value)
       end,
     })
+
+    f:AddPaneLink({
+      title = 'Categories',
+      description = 'Manage and reorder categories for the ' .. string.lower(bagType.name) .. '.',
+      createPane = function(parent, kind)
+        return categoryPane:Create(parent, kind)
+      end,
+      bagKind = bagType.kind,
+    })
   end
 
+  -- ============================================================
+  -- Integrations Section
+  -- ============================================================
+  f:AddSection({
+    title = 'Integrations',
+    description = 'Settings for third-party addon integrations.',
+  })
+
+  f:AddPaneLink({
+    title = 'QuickFind',
+    description = 'Information about QuickFind addon integration.',
+    createPane = function(parent)
+      local pane = CreateFrame("Frame", nil, parent)
+      pane:SetAllPoints()
+
+      -- Title
+      local title = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+      title:SetPoint("TOPLEFT", 10, -10)
+      title:SetText("QuickFind Integration")
+
+      -- Description
+      local desc = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+      desc:SetPoint("RIGHT", pane, "RIGHT", -10, 0)
+      desc:SetWordWrap(true)
+      desc:SetJustifyH("LEFT")
+      desc:SetText("BetterBags integrates with the QuickFind addon to make your items searchable.")
+
+      -- How it works section
+      local howItWorksTitle = pane:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+      howItWorksTitle:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -20)
+      howItWorksTitle:SetText("How It Works:")
+
+      local howItWorksText = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      howItWorksText:SetPoint("TOPLEFT", howItWorksTitle, "BOTTOMLEFT", 0, -10)
+      howItWorksText:SetPoint("RIGHT", pane, "RIGHT", -10, 0)
+      howItWorksText:SetWordWrap(true)
+      howItWorksText:SetJustifyH("LEFT")
+      howItWorksText:SetText("• All items in your backpack and bank are registered as a QuickFind source\n\n• When you press Enter on an item in QuickFind, BetterBags will:\n  - Open the appropriate bag (backpack or bank)\n  - Switch to the tab containing the item\n  - Fill the search box with the item's name\n\n• Items are tagged with their type, category, and location for easy filtering")
+
+      return pane
+    end
+  })
+
+  -- ============================================================
+  -- Profiles Section
+  -- ============================================================
+  f:AddSection({
+    title = 'Profiles',
+    description = 'Profiles allow you to save different bag configurations and switch between them on any character. The "Default" profile is shared across all characters by default.',
+  })
+
+  f:AddDropdown({
+    title = 'Active Profile',
+    description = 'Select which profile to use. Switching profiles will reload the UI.',
+    itemsFunction = function(_)
+      -- Return simple array of profile names (dropdown requires string[])
+      return db:GetAvailableProfiles()
+    end,
+    getValue = function(_, value)
+      return db:GetCurrentProfileName() == value
+    end,
+    setValue = function(_, value)
+      -- Confirmation dialog for profile switch
+      StaticPopupDialogs["BETTERBAGS_SWITCH_PROFILE"] = {
+        text = string.format("Switch to profile '%s'?\n\nThis will reload the UI.", value),
+        button1 = "Switch",
+        button2 = "Cancel",
+        OnAccept = function()
+          db:SwitchToProfile(value)
+          ReloadUI()
+        end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+      }
+      StaticPopup_Show("BETTERBAGS_SWITCH_PROFILE")
+    end
+  })
+
+  -- Show character counts for profiles
+  local function getProfileCountsText()
+    local counts = db:GetProfileCharacterCounts()
+    local parts = {}
+    for profileName, count in pairs(counts) do
+      if count > 0 then
+        local charText = count == 1 and "character" or "characters"
+        table.insert(parts, string.format("%s: %d %s", profileName, count, charText))
+      end
+    end
+    table.sort(parts)
+    return table.concat(parts, "  |  ")
+  end
+
+  f:AddLabel({
+    description = getProfileCountsText(),
+  })
+
+  f:AddButtonGroup({
+    ButtonOptions = {
+      {
+        title = 'Create New Profile',
+        onClick = function(_)
+          StaticPopupDialogs["BETTERBAGS_CREATE_PROFILE"] = {
+            text = "Enter a name for the new profile:",
+            button1 = "Create",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 48,
+            OnAccept = function(s)
+              local name = s.EditBox:GetText()
+              if name and name ~= "" then
+                local success, message = db:CreateProfile(name)
+                if success then
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_CREATED"] = {
+                    text = string.format("Profile '%s' created!\n\nSwitch to it now?", name),
+                    button1 = "Switch",
+                    button2 = "Later",
+                    OnAccept = function()
+                      db:SwitchToProfile(name)
+                      ReloadUI()
+                    end,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_CREATED")
+                else
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                    text = message,
+                    button1 = "OK",
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                end
+              end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_CREATE_PROFILE")
+        end
+      },
+      {
+        title = 'Copy Current Profile',
+        onClick = function(_)
+          local currentName = db:GetCurrentProfileName()
+          StaticPopupDialogs["BETTERBAGS_COPY_PROFILE"] = {
+            text = string.format("Create a copy of '%s'?\n\nEnter name for the new profile:", currentName),
+            button1 = "Copy",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 48,
+            OnAccept = function(s)
+              local name = s.EditBox:GetText()
+              if name and name ~= "" then
+                -- Create new profile (automatically switches to it)
+                local success, message = db:CreateProfile(name)
+                if success then
+                  -- Copy data from source profile to new (current) profile
+                  local copySuccess, copyMessage = db:CopyFromProfile(currentName)
+                  if copySuccess then
+                    StaticPopupDialogs["BETTERBAGS_PROFILE_COPIED"] = {
+                      text = string.format("Profile copied to '%s'.\n\nThe UI will reload now.", name),
+                      button1 = "OK",
+                      OnAccept = function()
+                        ReloadUI()
+                      end,
+                      timeout = 0,
+                      whileDead = true,
+                      hideOnEscape = true,
+                      preferredIndex = 3,
+                    }
+                    StaticPopup_Show("BETTERBAGS_PROFILE_COPIED")
+                  else
+                    StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                      text = copyMessage,
+                      button1 = "OK",
+                      timeout = 0,
+                      whileDead = true,
+                      hideOnEscape = true,
+                      preferredIndex = 3,
+                    }
+                    StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                  end
+                else
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                    text = message,
+                    button1 = "OK",
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                end
+              end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_COPY_PROFILE")
+        end
+      }
+    }
+  })
+
+  f:AddButtonGroup({
+    ButtonOptions = {
+      {
+        title = 'Rename Profile',
+        onClick = function(_)
+          local current = db:GetCurrentProfileName()
+          if current == "Default" then
+            StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+              text = "Cannot rename the Default profile.",
+              button1 = "OK",
+              timeout = 0,
+              whileDead = true,
+              hideOnEscape = true,
+              preferredIndex = 3,
+            }
+            StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+            return
+          end
+
+          StaticPopupDialogs["BETTERBAGS_RENAME_PROFILE"] = {
+            text = string.format("Rename profile '%s' to:", current),
+            button1 = "Rename",
+            button2 = "Cancel",
+            hasEditBox = true,
+            maxLetters = 48,
+            OnShow = function(s)
+              s.EditBox:SetText(current)
+              s.EditBox:HighlightText()
+            end,
+            OnAccept = function(s)
+              local newName = s.EditBox:GetText()
+              if newName and newName ~= "" and newName ~= current then
+                local success, message = db:RenameProfile(current, newName)
+                if success then
+                  ReloadUI()
+                else
+                  StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+                    text = message,
+                    button1 = "OK",
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                  }
+                  StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+                end
+              end
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_RENAME_PROFILE")
+        end
+      },
+      {
+        title = 'Delete Profile',
+        onClick = function(_)
+          local current = db:GetCurrentProfileName()
+          if current == "Default" then
+            StaticPopupDialogs["BETTERBAGS_PROFILE_ERROR"] = {
+              text = "Cannot delete the Default profile.",
+              button1 = "OK",
+              timeout = 0,
+              whileDead = true,
+              hideOnEscape = true,
+              preferredIndex = 3,
+            }
+            StaticPopup_Show("BETTERBAGS_PROFILE_ERROR")
+            return
+          end
+
+          StaticPopupDialogs["BETTERBAGS_DELETE_PROFILE"] = {
+            text = string.format("Delete profile '%s'?\n\nThis cannot be undone.\n\nYou will be switched to the Default profile.", current),
+            button1 = "Delete",
+            button2 = "Cancel",
+            OnAccept = function()
+              db:SwitchToProfile("Default")
+              db:DeleteProfile(current)
+              ReloadUI()
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_DELETE_PROFILE")
+        end
+      },
+      {
+        title = 'Reset to Defaults',
+        onClick = function(_)
+          local current = db:GetCurrentProfileName()
+          StaticPopupDialogs["BETTERBAGS_RESET_PROFILE"] = {
+            text = string.format("Reset profile '%s' to default settings?\n\nThis will delete all your customizations for this profile.\n\nThis cannot be undone.", current),
+            button1 = "Reset",
+            button2 = "Cancel",
+            OnAccept = function()
+              db:ResetCurrentProfile()
+              ReloadUI()
+            end,
+            timeout = 0,
+            whileDead = true,
+            hideOnEscape = true,
+            preferredIndex = 3,
+          }
+          StaticPopup_Show("BETTERBAGS_RESET_PROFILE")
+        end
+      }
+    }
+  })
+
+  -- Spacer between Profiles and Import/Export
+  f:AddLabel({
+    description = ' ',
+  })
+
+  -- ============================================================
+  -- Import/Export Section
+  -- ============================================================
   f:AddSection({
     title = 'Import/Export',
     description = 'Export your category configuration to share with others or import category configurations from another user.',
@@ -655,7 +1061,7 @@ function config:CreateConfig()
     }
   })
 
-  f:GetFrame():SetSize(600, 800)
+  f:GetFrame():SetSize(850, 800)
   f:GetFrame():SetPoint("CENTER")
   self.configFrame = f
 end

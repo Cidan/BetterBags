@@ -60,11 +60,11 @@ local question = addon:GetModule('Question')
 ---@class SimpleItemLevel: AceModule
 local simpleItemLevel = addon:GetModule('SimpleItemLevel')
 
+---@class QuickFindIntegration: AceModule
+local quickfind = addon:GetModule('QuickFind')
+
 ---@class Refresh: AceModule
 local refresh = addon:GetModule('Refresh')
-
----@class SectionConfig: AceModule
-local sectionConfig = addon:GetModule('SectionConfig')
 
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
@@ -294,6 +294,7 @@ function addon:OnEnable()
   end
 
   consoleport:Enable()
+  quickfind:Enable()
 
   self:SecureHook('ToggleAllBags')
   self:SecureHook('CloseSpecialWindows')

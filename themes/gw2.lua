@@ -7,9 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule('SearchBox')
 
@@ -18,6 +15,12 @@ local themes = addon:GetModule('Themes')
 
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
+
+---@class Events: AceModule
+local events = addon:GetModule('Events')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
 
 ---@class GuildWarsDecoration: Frame
 ---@field panelButtons Button[]
@@ -114,7 +117,7 @@ local gw2Theme = {
       leftSide:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 25)
       leftSide:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 25)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/BagMicroButton-Up", "Show Bags", function(ctx)
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/bagmicrobutton-up", "Show Bags", function(ctx)
         if frame.Owner.slots:IsShown() then
           frame.Owner.slots:Hide()
         else
@@ -123,39 +126,16 @@ local gw2Theme = {
         end
       end)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/CollectionsMicroButton-Up", "Sort Bags", function(ctx)
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/collectionsmicrobutton-up", "Sort Bags", function(ctx)
         frame.Owner:Sort(ctx)
       end)
 
-      if frame.Owner.kind == const.BAG_KIND.BACKPACK then
-        newPanelButton(decoration,  "Interface/AddOns/GW2_UI/Textures/icons/microicons/StoreMicroButton-Up", "Show Currency", function()
-          if frame.Owner.currencyFrame:IsShown() then
-            frame.Owner.currencyFrame:Hide()
-          else
-            frame.Owner.windowGrouping:Show("currencyConfig")
-          end
-        end)
-      end
-
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/QuestLogMicroButton-Up", "Show Categories", function()
-        if frame.Owner.sectionConfigFrame:IsShown() then
-          frame.Owner.sectionConfigFrame:Hide()
-        else
-          frame.Owner.windowGrouping:Show("sectionConfig")
-        end
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/questlogmicrobutton-up.png", "Open Settings", function()
+        local ctx = context:New("GW2OpenSettings")
+        events:SendMessage(ctx, "config/Open")
       end)
 
-      if frame.Owner.kind == const.BAG_KIND.BACKPACK then
-        newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/EJMicroButton-Up", "Show Themes", function()
-          if frame.Owner.themeConfigFrame:IsShown() then
-            frame.Owner.themeConfigFrame:Hide()
-          else
-            frame.Owner.windowGrouping:Show("themeConfig")
-          end
-        end)
-      end
-
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/MainMenuMicroButton-Up", "Open Settings", function(ctx)
+      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/mainmenumicrobutton-up", "Open Settings", function(ctx)
         contextMenu:Show(ctx, frame.Owner.menuList)
       end)
 

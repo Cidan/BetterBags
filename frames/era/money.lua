@@ -7,13 +7,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule('MoneyFrame')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
----@class Events: AceModule
-local events = addon:GetModule('Events')
-
-
 function money:CreateButton(kind, parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(32, 13)

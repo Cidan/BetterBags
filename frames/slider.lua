@@ -6,9 +6,6 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class SliderFrame: AceModule
 local slider = addon:NewModule('Slider')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class BetterSlider
 ---@field private frame Frame
 ---@field private slider Slider

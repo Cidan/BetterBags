@@ -26,6 +26,7 @@ function question:_OnCreate()
   local q = setmetatable({}, {__index = questionProto})
   q.frame = CreateFrame('Frame', nil, UIParent, "DefaultPanelFlatTemplate")
   q.frame:SetFrameStrata("DIALOG")
+  q.frame:SetFrameLevel(600) -- Higher than config form (500) to appear on top
 
   q.input = CreateFrame('EditBox', nil, q.frame, "InputBoxTemplate")
   q.input:SetWidth(200)

@@ -10,6 +10,12 @@
     </Size>
   </Button>
 
+  <Frame name="BetterBagsCategoryPaneItemFrame" virtual="true">
+    <Size>
+      <AbsDimension y="30"/>
+    </Size>
+  </Frame>
+
   <Button name="BetterBagsSecureBagTabTemplate" virtual="true" inherits="PanelTabButtonTemplate,InsecureActionButtonTemplate">
   </Button>
 </Ui>

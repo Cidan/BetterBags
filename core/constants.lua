@@ -257,11 +257,20 @@ const.SECTION_SORT_TYPE = {
   SIZE_ASCENDING = 3,
 }
 
+---@enum SearchCategoryGroupBy
+const.SEARCH_CATEGORY_GROUP_BY = {
+  NONE = 0,
+  TYPE = 1,
+  SUBTYPE = 2,
+  EXPANSION = 3,
+}
+
 ---@enum ItemSortType
 const.ITEM_SORT_TYPE = {
   ALPHABETICALLY_THEN_QUALITY = 1,
   QUALITY_THEN_ALPHABETICALLY = 2,
   ITEM_LEVEL = 3,
+  EXPANSION = 4,
 }
 
 ---@enum ExpansionType
@@ -277,6 +286,7 @@ const.EXPANSION_TYPE = {
   LE_EXPANSION_SHADOWLANDS = 8,
   LE_EXPANSION_DRAGONFLIGHT = 9,
   LE_EXPANSION_WAR_WITHIN = 10,
+  LE_EXPANSION_MIDNIGHT = 11,
 }
 
 const.OFFSETS = {
@@ -300,7 +310,7 @@ const.OFFSETS = {
   -- content frame.
   BAG_BOTTOM_INSET = 3,
 
-  -- This is the height of the bag window bottom bar. 
+  -- This is the height of the bag window bottom bar.
   BOTTOM_BAR_HEIGHT = 20,
   -- This is how far the bottom bar is inset from the bottom of the bag window.
   BOTTOM_BAR_BOTTOM_INSET = 6,
@@ -447,6 +457,7 @@ const.EXPANSION_MAP = {
 
 if addon.isRetail then
   const.EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = _G.EXPANSION_NAME10
+  const.EXPANSION_MAP[_G.LE_EXPANSION_MIDNIGHT] = _G.EXPANSION_NAME11
 end
 
 -- TBC Anniversary uses special expansion ID 254 for TBC items
@@ -471,6 +482,7 @@ const.BRIEF_EXPANSION_MAP = {
 
 if addon.isRetail then
   const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_WAR_WITHIN] = "tww"
+  const.BRIEF_EXPANSION_MAP[_G.LE_EXPANSION_MIDNIGHT] = "midnight"
 end
 
 -- TBC Anniversary uses special expansion ID 254 for TBC items
@@ -580,11 +592,17 @@ const.FORM_LAYOUT = {
 ---@class (exact) CategoryOptions
 ---@field shown boolean
 
+---@class (exact) Group
+---@field id number Unique auto-incremented ID
+---@field name string Display name for the tab
+---@field order number Sort order for tab positioning
+
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
   profile = {
     firstTimeMenu = true,
     enabled = true,
+    enableBagFading = false,
     showBagButton = true,
     characterBankTabsEnabled = false,
     enableBankBag = true,
@@ -642,6 +660,15 @@ const.DATABASE_DEFAULTS = {
         enabled = true,
         color = true
       },
+    },
+    itemLevelColor = {
+      maxItemLevelByCharacter = {},  -- Per-character max item level tracking
+      colors = {
+        low = { red = 0.62, green = 0.62, blue = 0.62, alpha = 1 },   -- Gray
+        mid = { red = 1, green = 1, blue = 1, alpha = 1 },            -- White
+        high = { red = 0, green = 0.55, blue = 0.87, alpha = 1 },     -- Blue
+        max = { red = 1, green = 0.5, blue = 0, alpha = 1 }           -- Orange
+      }
     },
     positions = {
       [const.BAG_KIND.BACKPACK] = {},
@@ -818,6 +845,29 @@ const.DATABASE_DEFAULTS = {
     lockedItems = {},
     ---@type number
     newItemTime = 300,
+    -- Groups feature: virtual tabs for organizing categories in backpack
+    ---@type table<number, Group>
+    groups = {
+      [1] = {
+        id = 1,
+        name = "Backpack",
+        order = 1,
+      },
+    },
+    ---@type number
+    groupCounter = 1,
+    ---@type table<string, number>
+    categoryToGroup = {},
+    ---@type table<BagKind, number>
+    activeGroup = {
+      [const.BAG_KIND.BACKPACK] = 1,
+    },
+    ---@type table<BagKind, boolean>
+    groupsEnabled = {
+      [const.BAG_KIND.BACKPACK] = true,
+    },
+    -- Profile system migration flag
+    __profileSystemMigrated = false,
   },
   char = {}
 }

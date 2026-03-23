@@ -14,17 +14,9 @@ local const = addon:GetModule('Constants')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class SliderFrame: AceModule
-local slider = addon:GetModule('Slider')
-
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
-
----@class Items: AceModule
-local items = addon:GetModule('Items')
 
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
@@ -49,7 +41,6 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field menuList? MenuList[]
 ---@field keepShownOnClick? boolean
 ---@field tooltipOnButton? boolean
-local menuListProto = {}
 
 function contextMenu:OnInitialize()
   --self:CreateContext()
@@ -238,29 +229,6 @@ function contextMenu:CreateContextMenu(bag)
     })
   end
 
-  -- Show bag slot toggle.
-  table.insert(menuList, {
-    text = L:G("Configure Categories"),
-    checked = function() return bag.sectionConfigFrame:IsShown() end,
-    tooltipTitle = L:G("Configure Categories"),
-    tooltipText = L:G("Click to toggle the display of the category configuration side panel."),
-    func = function()
-      bag.windowGrouping:Show("sectionConfig")
-    end
-  })
-
-  if bag.kind == const.BAG_KIND.BACKPACK then
-    -- Show theme selection window.
-    table.insert(menuList, {
-      text = L:G("Themes"),
-      checked = function() return bag.themeConfigFrame:IsShown() end,
-      tooltipTitle = L:G("Themes"),
-      tooltipText = L:G("Click to toggle the display of the theme configuration side panel."),
-      func = function()
-        bag.windowGrouping:Show('themeConfig')
-      end
-    })
-  end
   table.insert(menuList, {
     text = L:G("Open Options Screen"),
     notCheckable = true,

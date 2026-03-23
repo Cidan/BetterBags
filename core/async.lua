@@ -30,7 +30,7 @@ function async:OnEnable()
 end
 
 -- DoWithDelay will run the coroutine function with a delay between each yield.
--- You must call async:Yield() in your function to yield when you wait for the next frame. 
+-- You must call async:Yield() in your function to yield when you wait for the next frame.
 ---@param ctx Context
 ---@param delay number
 ---@param fn fun(ctx: Context)

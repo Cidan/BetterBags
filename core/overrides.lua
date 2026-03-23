@@ -5,6 +5,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
+local _ = L
 
 --[[
   This file is safe to edit manually for translations. Do not overwrite an entire translation table
