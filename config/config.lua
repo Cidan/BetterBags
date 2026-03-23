@@ -138,7 +138,7 @@ function config:CreateConfig()
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
-    items = {'None', 'BetterBags', 'Zygor'},
+    items = {'None', 'BetterBags', 'Pawn', 'Zygor'},
     getValue = function(_, value)
       return value == db:GetUpgradeIconProvider()
     end,

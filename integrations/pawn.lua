@@ -9,6 +9,9 @@ local events = addon:GetModule('Events')
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Pawn: AceModule
 local pawn = addon:NewModule('Pawn')
 
@@ -45,6 +48,7 @@ local function onBagRendered(_, bag, _)
     addon.Bags.Backpack.drawAfterCombat = true
     return
   end
+  if database:GetUpgradeIconProvider() ~= 'Pawn' then return end
   items:PreLoadAllEquipmentSlots(function()
     for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
       if addon.isRetail then
