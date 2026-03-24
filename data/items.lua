@@ -106,6 +106,10 @@ local itemDataProto = {}
 ---@field _firstLoad table<BagKind, boolean>
 local items = addon:NewModule("Items")
 
+-- The keyring bag exists on Classic Era, TBC, and Wrath clients (removed in Cata patch 4.2).
+-- If present, exclude it from bag processing to prevent phantom empty slots.
+local KEYRING_BAG_ID = Enum.BagIndex and Enum.BagIndex.Keyring or nil
+
 function items:OnInitialize()
 	self.previousItemGUID = {}
 	self:ResetSlotInfo()
@@ -510,13 +514,16 @@ function items:LoadBagItems(ctx, kind, bagList, includeEquipment, callback)
 
 	-- Stage all bag items for loading (only non-empty items can be added to ContinuableContainer)
 	for bagid in pairs(bagList) do
-		local size = C_Container.GetContainerNumSlots(bagid)
-		if size and size > 0 then
-			for slotid = 1, size do
-				local itemID = C_Container.GetContainerItemID(bagid, slotid)
-				if itemID then
-					local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
-					container:AddContinuable(itemMixin)
+		-- Exclude keyring slots on clients where the keyring bag exists
+		if not KEYRING_BAG_ID or bagid ~= KEYRING_BAG_ID then
+			local size = C_Container.GetContainerNumSlots(bagid)
+			if size and size > 0 then
+				for slotid = 1, size do
+					local itemID = C_Container.GetContainerItemID(bagid, slotid)
+					if itemID then
+						local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+						container:AddContinuable(itemMixin)
+					end
 				end
 			end
 		end
@@ -536,14 +543,17 @@ function items:LoadBagItems(ctx, kind, bagList, includeEquipment, callback)
 	container:ContinueOnLoad(function()
 		-- Process all bag slots (including empty ones)
 		for bagid in pairs(bagList) do
-			local size = C_Container.GetContainerNumSlots(bagid)
-			if size and size > 0 then
-				for slotid = 1, size do
-					local data = {}
-					---@cast data +ItemData
-					data.bagid, data.slotid = bagid, slotid
-					self:AttachItemInfo(data, kind)
-					itemData[self:GetSlotKey(data)] = data
+			-- Exclude keyring slots on clients where the keyring bag exists
+			if not KEYRING_BAG_ID or bagid ~= KEYRING_BAG_ID then
+				local size = C_Container.GetContainerNumSlots(bagid)
+				if size and size > 0 then
+					for slotid = 1, size do
+						local data = {}
+						---@cast data +ItemData
+						data.bagid, data.slotid = bagid, slotid
+						self:AttachItemInfo(data, kind)
+						itemData[self:GetSlotKey(data)] = data
+					end
 				end
 			end
 		end
