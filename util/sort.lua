@@ -96,6 +96,7 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsAlphabetically(kind, a, b)
+  if not a or not b then return false end
   local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
   if shouldSort then return sortResult end
 
@@ -115,6 +116,7 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeDescending(kind, a, b)
+  if not a or not b then return false end
   local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
   if shouldSort then return sortResult end
 
@@ -138,6 +140,7 @@ end
 ---@param b Section
 ---@return boolean
 function sort.SortSectionsBySizeAscending(kind, a, b)
+  if not a or not b then return false end
   local shouldSort, sortResult = sort.SortSectionsByPriority(kind, a, b)
   if shouldSort then return sortResult end
 
