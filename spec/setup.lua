@@ -19,3 +19,6 @@ dofile("libs/AceConfig-3.0/AceConfig-3.0.lua")
 
 -- Step 3: Create the BetterBags addon and provide module loading helpers
 dofile("spec/helpers/addon_loader.lua")
+
+-- Step 4: Load shared mock data factories
+dofile("spec/helpers/mock_data.lua")

@@ -60,6 +60,23 @@ _G.CopyTable = function(t)
   return copy
 end
 
+-- Combat and gameplay state
+_G.InCombatLockdown = function() return false end
+_G.GetFramerate = function() return 60 end
+
+-- String utilities (WoW-specific)
+_G.format = string.format
+_G.strtrim = function(str)
+  if not str then return "" end
+  return str:match("^%s*(.-)%s*$")
+end
+
+-- Item info stub (used by categories for validation)
+_G.C_Item = _G.C_Item or {}
+if not _G.C_Item.GetItemInfoInstant then
+  _G.C_Item.GetItemInfoInstant = function(id) return id end
+end
+
 -- Lua 5.1/5.3 compatibility shims
 if not _G.unpack and _G.table and _G.table.unpack then
   _G.unpack = _G.table.unpack

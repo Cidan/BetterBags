@@ -14,17 +14,9 @@ end
 LoadBetterBagsModule("data/stacks.lua")
 local stacksMod = addon:GetModule("Stacks")
 
---- Helper: create mock ItemData
----@param opts table {slotkey, itemHash, count, isItemEmpty}
+--- Helper: create mock ItemData and register it in the store
 local function MockItemData(opts)
-  local data = {
-    slotkey = opts.slotkey or "bag:0:slot:0",
-    itemHash = opts.itemHash or "hash-default",
-    isItemEmpty = opts.isItemEmpty or false,
-    itemInfo = {
-      currentItemCount = opts.count or 1,
-    },
-  }
+  local data = MockData.ItemData(opts)
   -- Register in the store so Items:GetItemDataFromSlotKey can find it
   itemDataStore[data.slotkey] = data
   return data
