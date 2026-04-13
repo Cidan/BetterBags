@@ -280,6 +280,13 @@ describe("Sort", function()
       local freeSpace = MockSection({title = "Free Space"})
       assert.is_true(sort.SortSectionsAlphabetically(const.BAG_KIND.BACKPACK, recent, freeSpace))
     end)
+
+    it("returns false for nil sections instead of crashing", function()
+      local section = MockSection({title = "Armor"})
+      assert.is_false(sort.SortSectionsAlphabetically(const.BAG_KIND.BACKPACK, nil, section))
+      assert.is_false(sort.SortSectionsAlphabetically(const.BAG_KIND.BACKPACK, section, nil))
+      assert.is_false(sort.SortSectionsAlphabetically(const.BAG_KIND.BACKPACK, nil, nil))
+    end)
   end)
 
   -- ─── Section Sort: Size Descending ────────────────────────────────────────
@@ -308,6 +315,12 @@ describe("Sort", function()
       local big = MockSection({title = "Big", cellCount = 100})
       assert.is_true(sort.SortSectionsBySizeDescending(const.BAG_KIND.BACKPACK, recent, big))
     end)
+
+    it("returns false for nil sections instead of crashing", function()
+      local section = MockSection({title = "Armor", cellCount = 5})
+      assert.is_false(sort.SortSectionsBySizeDescending(const.BAG_KIND.BACKPACK, nil, section))
+      assert.is_false(sort.SortSectionsBySizeDescending(const.BAG_KIND.BACKPACK, section, nil))
+    end)
   end)
 
   -- ─── Section Sort: Size Ascending ─────────────────────────────────────────
@@ -329,6 +342,12 @@ describe("Sort", function()
       local armor = MockSection({title = "Armor", cellCount = 10})
       local weapons = MockSection({title = "Weapons", cellCount = 10})
       assert.is_true(sort.SortSectionsBySizeAscending(const.BAG_KIND.BACKPACK, armor, weapons))
+    end)
+
+    it("returns false for nil sections instead of crashing", function()
+      local section = MockSection({title = "Armor", cellCount = 5})
+      assert.is_false(sort.SortSectionsBySizeAscending(const.BAG_KIND.BACKPACK, nil, section))
+      assert.is_false(sort.SortSectionsBySizeAscending(const.BAG_KIND.BACKPACK, section, nil))
     end)
   end)
 
