@@ -33,6 +33,10 @@ spec/
   movementflow_spec.lua  # Game context detection (bank/mail/trade/merchant)
   stacks_spec.lua        # Stack data structure (add/remove/count/root promotion)
   events_spec.lua        # Event system (message register/send/catch)
+  search_spec.lua        # Search engine (indexing, queries, ngrams, comparisons)
+  binding_spec.lua       # Item binding detection (bound/unbound/BOE/soulbound/account)
+  slots_spec.lua         # SlotInfo data structure (changeset tracking, empty slots)
+  tooltip_spec.lua       # Tooltip cache management and retail extraction
   helpers/
     wow_mocks.lua        # WoW global API mocks (CreateFrame, C_Timer, string/table funcs, etc.)
     addon_loader.lua     # BetterBags addon creation + module loading helpers

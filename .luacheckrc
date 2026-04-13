@@ -225,5 +225,6 @@ files["spec/**/*.lua"] = {
 	globals = {
 		"LoadBetterBagsModule",
 		"StubBetterBagsModule",
+		"MockData",
 	},
 }
