@@ -42,41 +42,9 @@ function L:G(key) return key end
 LoadBetterBagsModule("util/sort.lua")
 local sort = addon:GetModule("Sort")
 
--- ─── Mock Factories ───────────────────────────────────────────────────────────
-
---- Create a mock Item for item sort tests.
----@param opts table {name, quality, count, guid, isFreeSlot, itemLevel, expacID}
-local function MockItem(opts)
-  local data = nil
-  if not opts.isFreeSlot then
-    data = {
-      itemInfo = {
-        itemName = opts.name or "Unknown",
-        itemQuality = opts.quality or 1,
-        currentItemCount = opts.count or 1,
-        itemGUID = opts.guid or "guid-0",
-        currentItemLevel = opts.itemLevel or 1,
-        expacID = opts.expacID,
-      },
-      slotid = opts.slotid or 0,
-      bagid = opts.bagid or 0,
-    }
-  end
-  return {
-    isFreeSlot = opts.isFreeSlot or false,
-    GetItemData = function() return data end,
-  }
-end
-
---- Create a mock Section for section sort tests.
----@param opts table {title, fillWidth, cellCount}
-local function MockSection(opts)
-  return {
-    title = { GetText = function() return opts.title or "" end },
-    GetFillWidth = function() return opts.fillWidth or false end,
-    GetCellCount = function() return opts.cellCount or 0 end,
-  }
-end
+-- Use shared mock factories
+local MockItem = MockData.Item
+local MockSection = MockData.Section
 
 -- ─── Tests ────────────────────────────────────────────────────────────────────
 
