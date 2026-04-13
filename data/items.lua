@@ -1243,6 +1243,10 @@ function items:GetCategory(ctx, data)
 		return "Gear: " .. data.itemInfo.equipmentSets[1] -- Always use the first set, for now.
 	end
 
+	if not data.kind then
+		return L:G("Everything")
+	end
+
 	-- Unified priority-based category selection
 	-- Check both search cache (from search categories) and item list categories,
 	-- returning the one with higher priority
@@ -1269,10 +1273,6 @@ function items:GetCategory(ctx, data)
 
 	if customCategory then
 		return customCategory
-	end
-
-	if not data.kind then
-		return L:G("Everything")
 	end
 
 	if data.containerInfo.quality == const.ITEM_QUALITY.Poor then

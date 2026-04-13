@@ -71,10 +71,31 @@ _G.strtrim = function(str)
   return str:match("^%s*(.-)%s*$")
 end
 
--- Item info stub (used by categories for validation)
+-- Item info stubs
 _G.C_Item = _G.C_Item or {}
 if not _G.C_Item.GetItemInfoInstant then
   _G.C_Item.GetItemInfoInstant = function(id) return id end
+end
+_G.C_Item.IsBound = _G.C_Item.IsBound or function() return false end
+
+-- New item tracking
+_G.C_NewItems = _G.C_NewItems or {
+  IsNewItem = function() return false end,
+  RemoveNewItem = function() end,
+  ClearAll = function() end,
+}
+
+-- Time function
+_G.time = _G.time or os.time
+
+-- string.split (WoW alias for strsplit, available as string method)
+string.split = string.split or function(sep, str)
+  return strsplit(sep, str)
+end
+
+-- strsplittable: like strsplit but returns a table
+_G.strsplittable = function(sep, str, max)
+  return {strsplit(sep, str, max)}
 end
 
 -- Lua 5.1/5.3 compatibility shims
@@ -98,12 +119,13 @@ _G.strchar = string.char
 _G.strrep = string.rep
 _G.strjoin = function(sep, ...) return table.concat({...}, sep) end
 
-_G.strsplit = function(sep, str)
+_G.strsplit = function(sep, str, max)
   if str == nil then return end
   local t = {}
   local start = 1
   local splitStart, splitEnd = string.find(str, sep, start, true)
   while splitStart do
+    if max and #t >= max - 1 then break end
     table.insert(t, string.sub(str, start, splitStart - 1))
     start = splitEnd + 1
     splitStart, splitEnd = string.find(str, sep, start, true)
