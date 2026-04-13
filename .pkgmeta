@@ -33,3 +33,4 @@ ignore:
   - spec
   - .github
   - .busted
+  - .omc
