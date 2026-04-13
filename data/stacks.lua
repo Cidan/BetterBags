@@ -119,7 +119,7 @@ function stack:HasItem(itemHash, slotkey)
   if stackinfo.rootItem == slotkey then
     return true
   end
-  return stackinfo.slotkeys[slotkey]
+  return stackinfo.slotkeys[slotkey] or false
 end
 
 --- Checks if a slotkey is the root item of a stack

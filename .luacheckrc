@@ -220,3 +220,10 @@ globals = {
 	"ItemButtonUtil",
 	"CloseBankFrame",
 }
+
+files["spec/**/*.lua"] = {
+	globals = {
+		"LoadBetterBagsModule",
+		"StubBetterBagsModule",
+	},
+}
