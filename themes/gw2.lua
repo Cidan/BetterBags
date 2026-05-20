@@ -1,6 +1,115 @@
 local addonName = ... ---@type string
 local gw = GW2_ADDON
 
+local GW2_UI_ADDON_IDS = {
+  "GW2_UI",
+  "GW2_UI_Mainline",
+  "GW2_UI_Mists",
+  "GW2_UI_TBC",
+  "GW2_UI_Vanilla",
+  "GW2_UI_Classic",
+  "GW2_UI_Wrath",
+}
+
+local function getAddonInfo(addonNameOrIndex)
+  local api = C_AddOns
+  local fn = api and api.GetAddOnInfo or GetAddOnInfo
+  if not fn then return nil end
+
+  local ok, name, title, notes, loadable, reason, security = pcall(fn, addonNameOrIndex)
+  if not ok or reason == "MISSING" then return nil end
+  return name, title, notes, loadable, reason, security
+end
+
+local function getAddonEnableState(gw2AddonName)
+  local fallbackState
+
+  if C_AddOns and C_AddOns.GetAddOnEnableState then
+    local checks = {
+      { gw2AddonName },
+      { gw2AddonName, "player" },
+      { "player", gw2AddonName },
+    }
+    for _, args in ipairs(checks) do
+      local ok, state = pcall(C_AddOns.GetAddOnEnableState, unpack(args))
+      if ok and state ~= nil then
+        if state > 0 then return state end
+        fallbackState = fallbackState or state
+      end
+    end
+  end
+
+  if GetAddOnEnableState then
+    local checks = {
+      { "player", gw2AddonName },
+      { gw2AddonName },
+    }
+    for _, args in ipairs(checks) do
+      local ok, state = pcall(GetAddOnEnableState, unpack(args))
+      if ok and state ~= nil then
+        if state > 0 then return state end
+        fallbackState = fallbackState or state
+      end
+    end
+  end
+
+  return fallbackState
+end
+
+local function getNumAddOns()
+  if C_AddOns and C_AddOns.GetNumAddOns then
+    local ok, count = pcall(C_AddOns.GetNumAddOns)
+    if ok then return count end
+  end
+  if GetNumAddOns then
+    local ok, count = pcall(GetNumAddOns)
+    if ok then return count end
+  end
+  return 0
+end
+
+local function addonEnabledById(gw2AddonName)
+  local name, _, _, loadable, reason = getAddonInfo(gw2AddonName)
+  if not name then return false end
+
+  local state = getAddonEnableState(name)
+  if state ~= nil then return state > 0 end
+
+  return loadable ~= false and reason ~= "DISABLED"
+end
+
+local function normalizeAddonTitle(value)
+  value = tostring(value or ""):lower()
+  value = value:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  value = value:gsub("[^%w]+", " ")
+  return value:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function addonTitleLooksLikeGW2UI(title)
+  local normalized = normalizeAddonTitle(title)
+  return normalized == "gw2 ui" or normalized:match("^gw2 ui ")
+end
+
+local function findEnabledGW2UIAddon()
+  for _, gw2AddonName in ipairs(GW2_UI_ADDON_IDS) do
+    if addonEnabledById(gw2AddonName) then return gw2AddonName end
+  end
+
+  for i = 1, getNumAddOns() do
+    local name, title = getAddonInfo(i)
+    if name and addonTitleLooksLikeGW2UI(title or name) and addonEnabledById(name) then
+      return name
+    end
+  end
+  return nil
+end
+
+local gw2AddonName = findEnabledGW2UIAddon() or (gw and "GW2_UI" or nil)
+
+local function gw2Texture(path)
+  return "Interface/AddOns/" .. (gw2AddonName or "GW2_UI") .. "/" .. path
+end
+
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
@@ -72,7 +181,7 @@ end
 local gw2Theme = {
   Name = "Guild Wars 2",
   Description = "A theme using the GW2_UI style.",
-  Available = gw ~= nil,
+  Available = gw ~= nil and gw2AddonName ~= nil,
   Portrait = function(frame)
     local decoration = decoratorFrames[frame:GetName()]
     if not decoration then
@@ -83,7 +192,7 @@ local gw2Theme = {
       decoration:SetAllPoints()
       decoration:SetFrameStrata("BACKGROUND")
 
-      gw.CreateFrameHeaderWithBody(decoration, decoration.title, "Interface/AddOns/GW2_UI/textures/bag/bagicon", {})
+      gw.CreateFrameHeaderWithBody(decoration, decoration.title, gw2Texture("textures/bag/bagicon"), {})
 
       decoration.gwHeader:ClearAllPoints()
       decoration.gwHeader:SetPoint("BOTTOMLEFT", decoration, "TOPLEFT", 0, -25)
@@ -112,18 +221,18 @@ local gw2Theme = {
       close:GwSkinButton(true)
 
       local footer = decoration:CreateTexture(decoration:GetName().."Footer", "BACKGROUND", nil, 7)
-      footer:SetTexture("Interface/AddOns/GW2_UI/textures/bag/bagfooter")
+      footer:SetTexture(gw2Texture("textures/bag/bagfooter"))
       footer:SetHeight(55)
       footer:SetPoint("TOPLEFT", decoration, "BOTTOMLEFT", 0, 30)
       footer:SetPoint("TOPRIGHT", decoration, "BOTTOMRIGHT", -3, 30)
 
       local leftSide = decoration:CreateTexture(decoration:GetName().."Left", "BACKGROUND", nil, 7)
-      leftSide:SetTexture("Interface/AddOns/GW2_UI/textures/bag/bagleftpanel")
+      leftSide:SetTexture(gw2Texture("textures/bag/bagleftpanel"))
       leftSide:SetWidth(40)
       leftSide:SetPoint("TOPRIGHT", frame, "TOPLEFT", 0, 25)
       leftSide:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 0, 25)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/bagmicrobutton-up", "Show Bags", function(ctx)
+      newPanelButton(decoration, gw2Texture("Textures/icons/bagmicrobutton-up"), "Show Bags", function(ctx)
         if frame.Owner.slots:IsShown() then
           -- Persist bank-slots visibility to DB so re-opening the bank restores the correct state.
           if frame.Owner.kind == const.BAG_KIND.BANK then
@@ -139,16 +248,16 @@ local gw2Theme = {
         end
       end)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/collectionsmicrobutton-up", "Sort Bags", function(ctx)
+      newPanelButton(decoration, gw2Texture("Textures/icons/microicons/collectionsmicrobutton-up"), "Sort Bags", function(ctx)
         frame.Owner:Sort(ctx)
       end)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/questlogmicrobutton-up.png", "Open Settings", function()
+      newPanelButton(decoration, gw2Texture("Textures/icons/microicons/questlogmicrobutton-up.png"), "Open Settings", function()
         local ctx = context:New("GW2OpenSettings")
         events:SendMessage(ctx, "config/Open")
       end)
 
-      newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/microicons/mainmenumicrobutton-up", "Open Settings", function(ctx)
+      newPanelButton(decoration, gw2Texture("Textures/icons/microicons/mainmenumicrobutton-up"), "Open Settings", function(ctx)
         contextMenu:Show(ctx, frame.Owner.menuList)
       end)
 
