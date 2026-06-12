@@ -36,7 +36,6 @@ end
 ---@param value number
 ---@param data table<any, any>
 function trees.IntervalTree:InsertRecursive(node, value, data)
-  -- Recursively insert a new value into the tree
   if value < node.value then
     if not node.left then
       node.left = { value = value, left = nil, right = nil, min = value, max = value, data = data }
@@ -54,6 +53,43 @@ function trees.IntervalTree:InsertRecursive(node, value, data)
       node.data[k] = v
     end
   end
+  -- Bubble up min/max after insertion.
+  self:RecalculateMinMax(node)
+end
+
+---@private
+---@param node IntervalTreeNode
+function trees.IntervalTree:RecalculateMinMax(node)
+  node.min = node.value
+  node.max = node.value
+  if node.left then
+    node.min = math.min(node.min, node.left.min)
+    node.max = math.max(node.max, node.left.max)
+  end
+  if node.right then
+    node.min = math.min(node.min, node.right.min)
+    node.max = math.max(node.max, node.right.max)
+  end
+end
+
+---@private
+---@param startNode IntervalTreeNode
+function trees.IntervalTree:RecalculateMinMaxPathToRoot(startNode)
+  local node = startNode
+  while node do
+    self:RecalculateMinMax(node)
+    node = self:FindParent(node)
+  end
+end
+
+---@private
+---@param node IntervalTreeNode
+---@param result IntervalTreeNode[]
+function trees.IntervalTree:CollectSubtree(node, result)
+  if not node then return end
+  table.insert(result, node)
+  self:CollectSubtree(node.left, result)
+  self:CollectSubtree(node.right, result)
 end
 
 -- LessThan will return a list of all nodes with values less than the
@@ -72,20 +108,23 @@ end
 ---@param value number
 ---@param result IntervalTreeNode[]
 function trees.IntervalTree:LessThanRecursive(node, value, result)
-  if node then
-    if node.max < value then
-      table.insert(result, node)
-      self:LessThanRecursive(node.left, value, result)
-      self:LessThanRecursive(node.right, value, result)
-    else
-      self:LessThanRecursive(node.left, value, result)
-      self:LessThanRecursive(node.right, value, result)
-    end
+  if not node then return end
+  if node.min >= value then
+    return
   end
+  if node.max < value then
+    self:CollectSubtree(node, result)
+    return
+  end
+  if node.value < value then
+    table.insert(result, node)
+  end
+  self:LessThanRecursive(node.left, value, result)
+  self:LessThanRecursive(node.right, value, result)
 end
 
--- LessThan will return a list of all nodes with values less than the
--- provided value.
+-- LessThanEqual will return a list of all nodes with values less than
+-- or equal to the provided value.
 ---@param value number
 ---@return IntervalTreeNode[]
 function trees.IntervalTree:LessThanEqual(value)
@@ -100,16 +139,19 @@ end
 ---@param value number
 ---@param result IntervalTreeNode[]
 function trees.IntervalTree:LessThanEqualRecursive(node, value, result)
-  if node then
-    if node.max <= value then
-      table.insert(result, node)
-      self:LessThanEqualRecursive(node.left, value, result)
-      self:LessThanEqualRecursive(node.right, value, result)
-    else
-      self:LessThanEqualRecursive(node.left, value, result)
-      self:LessThanEqualRecursive(node.right, value, result)
-    end
+  if not node then return end
+  if node.min > value then
+    return
   end
+  if node.max <= value then
+    self:CollectSubtree(node, result)
+    return
+  end
+  if node.value <= value then
+    table.insert(result, node)
+  end
+  self:LessThanEqualRecursive(node.left, value, result)
+  self:LessThanEqualRecursive(node.right, value, result)
 end
 
 -- GreaterThan will return a list of all nodes with values greater than
@@ -128,20 +170,23 @@ end
 ---@param value number
 ---@param result IntervalTreeNode[]
 function trees.IntervalTree:GreaterThanRecursive(node, value, result)
-  if node then
-    if node.min > value then
-      table.insert(result, node)
-      self:GreaterThanRecursive(node.left, value, result)
-      self:GreaterThanRecursive(node.right, value, result)
-    else
-      self:GreaterThanRecursive(node.right, value, result)
-      self:GreaterThanRecursive(node.left, value, result)
-    end
+  if not node then return end
+  if node.max <= value then
+    return
   end
+  if node.min > value then
+    self:CollectSubtree(node, result)
+    return
+  end
+  if node.value > value then
+    table.insert(result, node)
+  end
+  self:GreaterThanRecursive(node.left, value, result)
+  self:GreaterThanRecursive(node.right, value, result)
 end
 
--- GreaterThan will return a list of all nodes with values greater than
--- the provided value.
+-- GreaterThanEqual will return a list of all nodes with values greater
+-- than or equal to the provided value.
 ---@param value number
 ---@return IntervalTreeNode[]
 function trees.IntervalTree:GreaterThanEqual(value)
@@ -156,23 +201,26 @@ end
 ---@param value number
 ---@param result IntervalTreeNode[]
 function trees.IntervalTree:GreaterThanEqualRecursive(node, value, result)
-  if node then
-    if node.min >= value then
-      table.insert(result, node)
-      self:GreaterThanEqualRecursive(node.left, value, result)
-      self:GreaterThanEqualRecursive(node.right, value, result)
-    else
-      self:GreaterThanEqualRecursive(node.right, value, result)
-      self:GreaterThanEqualRecursive(node.left, value, result)
-    end
+  if not node then return end
+  if node.max < value then
+    return
   end
+  if node.min >= value then
+    self:CollectSubtree(node, result)
+    return
+  end
+  if node.value >= value then
+    table.insert(result, node)
+  end
+  self:GreaterThanEqualRecursive(node.left, value, result)
+  self:GreaterThanEqualRecursive(node.right, value, result)
 end
+
 -- ExactMatch will return the node with the exact matching value, or nil
 -- if no such node exists.
 ---@param value number
 ---@return IntervalTreeNode?
 function trees.IntervalTree:ExactMatch(value)
-  -- Return the node with the exact matching value
   return self:ExactMatchRecursive(self.root, value)
 end
 
@@ -181,7 +229,6 @@ end
 ---@param value number
 ---@return IntervalTreeNode?
 function trees.IntervalTree:ExactMatchRecursive(node, value)
-  -- Recursively search for the exact matching value
   if node then
     if node.value == value then
       return node
@@ -191,7 +238,7 @@ function trees.IntervalTree:ExactMatchRecursive(node, value)
       return self:ExactMatchRecursive(node.right, value)
     end
   end
-  return nil -- not found
+  return nil
 end
 
 -- RemoveData will remove the metadata for a given value and key.
@@ -200,12 +247,10 @@ end
 ---@param value number The node value to remove metadata from.
 ---@param key any The key to remove from the metadata table.
 function trees.IntervalTree:RemoveData(value, key)
-  -- Remove metadata for a given value
   local node = self:ExactMatch(value)
   if node then
     node.data[key] = nil
     if next(node.data) == nil then
-      -- Remove node if metadata table is empty
       self:RemoveNode(node)
     end
   end
@@ -214,57 +259,74 @@ end
 ---@private
 ---@param node IntervalTreeNode
 function trees.IntervalTree:RemoveNode(node)
-  -- Remove a node from the tree
-  if node.left then
-    self:RemoveNodeRecursive(node.left, node)
-  elseif node.right then
-    self:RemoveNodeRecursive(node.right, node)
-  else
-    -- Node has no children, remove it
-    if node == self.root then
-      self.root = nil
-    else
-      local parent = self:FindParent(node)
-      if not parent then
-        self.root = nil
-      elseif parent.left == node then
-        parent.left = nil
-      else
-        parent.right = nil
-      end
-    end
-  end
-end
+  local parent = self:FindParent(node)
 
----@private
----@param node IntervalTreeNode
----@param targetNode IntervalTreeNode
-function trees.IntervalTree:RemoveNodeRecursive(node, targetNode)
-  -- Recursively find the node to remove
-  if node == targetNode then
-    -- Node found, remove it
-    if node.left then
-      self:RemoveNodeRecursive(node.left, node)
-    elseif node.right then
-      self:RemoveNodeRecursive(node.right, node)
+  -- Leaf node: unlink directly.
+  if not node.left and not node.right then
+    if not parent then
+      self.root = nil
+    elseif parent.left == node then
+      parent.left = nil
     else
-      -- Node has no children, remove it
-      local parent = self:FindParent(node)
-      if not parent then
-        self.root = nil
-      elseif parent.left == node then
-        parent.left = nil
-      else
-        parent.right = nil
-      end
+      parent.right = nil
     end
+    if parent then
+      self:RecalculateMinMaxPathToRoot(parent)
+    end
+    return
+  end
+
+  -- Node with only right child.
+  if not node.left then
+    if not parent then
+      self.root = node.right
+    elseif parent.left == node then
+      parent.left = node.right
+    else
+      parent.right = node.right
+    end
+    if parent then
+      self:RecalculateMinMaxPathToRoot(parent)
+    else
+      self:RecalculateMinMaxPathToRoot(self.root)
+    end
+    return
+  end
+
+  -- Node with only left child.
+  if not node.right then
+    if not parent then
+      self.root = node.left
+    elseif parent.left == node then
+      parent.left = node.left
+    else
+      parent.right = node.left
+    end
+    if parent then
+      self:RecalculateMinMaxPathToRoot(parent)
+    else
+      self:RecalculateMinMaxPathToRoot(self.root)
+    end
+    return
+  end
+
+  -- Node with two children: replace with inorder predecessor.
+  local predecessor = node.left
+  local predParent = node
+  while predecessor.right do
+    predParent = predecessor
+    predecessor = predecessor.right
+  end
+
+  node.value = predecessor.value
+  node.data = predecessor.data
+
+  if predParent == node then
+    predParent.left = predecessor.left
+    self:RecalculateMinMaxPathToRoot(node)
   else
-    if node.left then
-      self:RemoveNodeRecursive(node.left, targetNode)
-    end
-    if node.right then
-      self:RemoveNodeRecursive(node.right, targetNode)
-    end
+    predParent.right = predecessor.left
+    self:RecalculateMinMaxPathToRoot(predParent)
   end
 end
 
@@ -272,7 +334,6 @@ end
 ---@param node IntervalTreeNode
 ---@return IntervalTreeNode?
 function trees.IntervalTree:FindParent(node)
-  -- Find the parent node of a given node
   if self.root == node then
     return nil
   end
