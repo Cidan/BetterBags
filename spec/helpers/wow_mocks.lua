@@ -144,3 +144,19 @@ _G.wipe = function(t)
   end
   return t
 end
+
+-- Equipment set API
+_G.C_EquipmentSet = {
+  GetEquipmentSetIDs = function() return {} end,
+  GetEquipmentSetInfo = function() return "" end,
+  GetItemLocations = function() return {} end,
+}
+
+-- Equipment location unpack helpers
+_G.EquipmentManager_UnpackLocation = function()
+  return 0, false, true, false, 1, 0
+end
+
+_G.EquipmentManager_GetLocationData = function()
+  return { isBank = false, isBags = true, slot = 1, bag = 0 }
+end

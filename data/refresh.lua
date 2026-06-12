@@ -89,6 +89,11 @@ function refresh:RequestUpdate(request)
   -- Handle sorting immediately
   if request.sort and not InCombatLockdown() then
     self.isSorting = true
+    -- Cancel any pending debounce timer before starting sort
+    if self.debounceTimer then
+      self.debounceTimer:Cancel()
+      self.debounceTimer = nil
+    end
     items:RemoveNewItemFromAllItems()
     local ctx = context:New('BagSort')
     items:Restack(ctx, const.BAG_KIND.BACKPACK, function()
