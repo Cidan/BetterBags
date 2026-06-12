@@ -1018,7 +1018,7 @@ function DB:Migrate()
       if DB.data.profile.size[bagView] then
         local t = DB.data.profile.size[bagView][bagKind]
         if t then
-          if t.itemsPerRow ~= nil and t.itemsPerRow > 30 or t.itemsPerRow < 1 then
+          if t.itemsPerRow and (t.itemsPerRow > 30 or t.itemsPerRow < 1) then
             t.itemsPerRow = 7
           end
         end

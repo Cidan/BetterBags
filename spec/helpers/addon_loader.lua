@@ -36,3 +36,20 @@ _G.StubBetterBagsModule = function(name)
   if ok and mod then return mod end
   return addon:NewModule(name)
 end
+
+--- Clear a previously-stubbed module so the real module file can be loaded safely.
+--- Only clears if the module exists and the real file hasn't been loaded yet.
+---@param name string Module name (e.g. "Database")
+---@param filePath string File path that would load the real module (e.g. "core/database.lua")
+_G.ResetModuleStub = function(name, filePath)
+  if loadedModules[filePath] then return end
+  if addon.modules[name] then
+    addon.modules[name] = nil
+  end
+  -- AceAddon registers modules as sub-addons via NewAddon with name "ParentName_ModuleName"
+  local subAddonName = "BetterBags_" .. name
+  local aceAddon = LibStub("AceAddon-3.0")
+  if aceAddon.addons[subAddonName] then
+    aceAddon.addons[subAddonName] = nil
+  end
+end

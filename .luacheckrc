@@ -225,6 +225,10 @@ files["spec/**/*.lua"] = {
 	globals = {
 		"LoadBetterBagsModule",
 		"StubBetterBagsModule",
+		"ResetModuleStub",
 		"MockData",
+	},
+	ignore = {
+		"212", -- unused argument (common in mock functions)
 	},
 }
