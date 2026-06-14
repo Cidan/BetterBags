@@ -8,3 +8,5 @@ cpp-ghost-text-preview-widget-anysphere://**
 /.libraries/**
 /logs/**
 /.omc/**
+/luacov.report.out
+/luacov.stats.out
