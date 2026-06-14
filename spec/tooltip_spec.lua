@@ -168,5 +168,202 @@ describe("TooltipScanner", function()
       tooltipScanner:GetTooltipText(0, 1, "guid-nil")
       assert.is_nil(tooltipScanner.cache["guid-nil"])
     end)
+
+    it("does not cache empty string extraction results", function()
+      _G.C_TooltipInfo = {
+        GetBagItem = function()
+          return {lines = {{leftText = "", rightText = ""}}}
+        end,
+      }
+      tooltipScanner:GetTooltipText(0, 1, "guid-empty")
+      assert.is_nil(tooltipScanner.cache["guid-empty"])
+    end)
+  end)
+
+  -- ─── ExtractClassic ─────────────────────────────────────────────────────────
+
+  describe("ExtractClassic", function()
+
+    local originalIsRetail
+    local originalScanTooltip
+
+    before_each(function()
+      originalIsRetail = addon.isRetail
+      addon.isRetail = false
+      -- Re-run OnInitialize so it creates the scanTooltip frame for Classic.
+      tooltipScanner:OnInitialize()
+      originalScanTooltip = tooltipScanner.scanTooltip
+    end)
+
+    after_each(function()
+      addon.isRetail = originalIsRetail
+      tooltipScanner.scanTooltip = originalScanTooltip
+    end)
+
+    it("returns nil when scanTooltip is not initialized", function()
+      tooltipScanner.scanTooltip = nil
+      local text = tooltipScanner:ExtractClassic(0, 1)
+      assert.is_nil(text)
+    end)
+
+    it("returns nil when the tooltip has no lines", function()
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 0 end,
+      }
+      local text = tooltipScanner:ExtractClassic(0, 1)
+      assert.is_nil(text)
+    end)
+
+    it("extracts text from left-aligned FontStrings", function()
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 2 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = {GetText = function() return "Item Name" end}
+      _G["BetterBagsScanTooltipTextRight1"] = nil
+      _G["BetterBagsScanTooltipTextLeft2"] = {GetText = function() return "Binds when picked up" end}
+      _G["BetterBagsScanTooltipTextRight2"] = nil
+      local text = tooltipScanner:ExtractClassic(0, 1)
+      assert.is_not_nil(text)
+      assert.is_truthy(text:find("Item Name"))
+      assert.is_truthy(text:find("Binds when picked up"))
+    end)
+
+    it("extracts text from right-aligned FontStrings (stat values)", function()
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 1 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = {GetText = function() return "Stamina" end}
+      _G["BetterBagsScanTooltipTextRight1"] = {GetText = function() return "+42" end}
+      local text = tooltipScanner:ExtractClassic(0, 1)
+      assert.is_not_nil(text)
+      assert.is_truthy(text:find("Stamina"))
+      assert.is_truthy(text:find("%+42"))
+    end)
+
+    it("skips FontStrings that return empty text", function()
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 2 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = {GetText = function() return "" end}
+      _G["BetterBagsScanTooltipTextRight1"] = nil
+      _G["BetterBagsScanTooltipTextLeft2"] = {GetText = function() return "Second Line" end}
+      _G["BetterBagsScanTooltipTextRight2"] = nil
+      local text = tooltipScanner:ExtractClassic(0, 1)
+      assert.is_not_nil(text)
+      assert.is_falsy(text:find("^%s*$"))
+      assert.is_truthy(text:find("Second Line"))
+    end)
+
+    it("caps iteration at 30 lines (Classic FontString bug workaround)", function()
+      -- Simulate 100 lines but only 30 should be read
+      local readCount = 0
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 100 end,
+      }
+      for i = 1, 100 do
+        _G["BetterBagsScanTooltipTextLeft" .. i] = {
+          GetText = function() readCount = readCount + 1; return "line" end,
+        }
+        _G["BetterBagsScanTooltipTextRight" .. i] = nil
+      end
+      tooltipScanner:ExtractClassic(0, 1)
+      assert.is_true(readCount <= 30)
+    end)
+
+    it("returns nil when all lines are empty", function()
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 2 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = {GetText = function() return "" end}
+      _G["BetterBagsScanTooltipTextRight1"] = nil
+      _G["BetterBagsScanTooltipTextLeft2"] = {GetText = function() return "" end}
+      _G["BetterBagsScanTooltipTextRight2"] = nil
+      local text = tooltipScanner:ExtractClassic(0, 1)
+      assert.is_nil(text)
+    end)
+  end)
+
+  -- ─── GetTooltipText Classic path ────────────────────────────────────────────
+
+  describe("GetTooltipText (Classic)", function()
+
+    local originalIsRetail
+    local originalScanTooltip
+
+    before_each(function()
+      originalIsRetail = addon.isRetail
+      addon.isRetail = false
+      tooltipScanner:OnInitialize()
+      originalScanTooltip = tooltipScanner.scanTooltip
+    end)
+
+    after_each(function()
+      addon.isRetail = originalIsRetail
+      tooltipScanner.scanTooltip = originalScanTooltip
+    end)
+
+    it("extracts via the Classic path when not on retail", function()
+      tooltipScanner.scanTooltip = {
+        ClearLines = function() end,
+        SetBagItem = function() end,
+        NumLines = function() return 1 end,
+      }
+      _G["BetterBagsScanTooltipTextLeft1"] = {GetText = function() return "Classic Tooltip" end}
+      _G["BetterBagsScanTooltipTextRight1"] = nil
+      local text = tooltipScanner:GetTooltipText(0, 1, "classic-guid")
+      assert.are.equal("Classic Tooltip", text)
+      assert.are.equal("Classic Tooltip", tooltipScanner.cache["classic-guid"])
+    end)
+  end)
+
+  -- ─── OnInitialize ───────────────────────────────────────────────────────────
+
+  describe("OnInitialize", function()
+
+    it("creates a scanTooltip frame for non-retail clients", function()
+      local originalIsRetail = addon.isRetail
+      addon.isRetail = false
+      local oldWorldFrame = _G.WorldFrame
+      _G.WorldFrame = {}
+      local frames = {}
+      _G.CreateFrame = function(_, name, _, _)
+        local f = {
+          SetOwner = function() end,
+        }
+        table.insert(frames, f)
+        return f
+      end
+      tooltipScanner:OnInitialize()
+      addon.isRetail = originalIsRetail
+      _G.WorldFrame = oldWorldFrame
+      assert.is_not_nil(tooltipScanner.scanTooltip)
+      assert.is_true(#frames >= 1)
+    end)
+
+    it("uses nil scanTooltip on retail clients (C_TooltipInfo path)", function()
+      local originalIsRetail = addon.isRetail
+      addon.isRetail = true
+      tooltipScanner:OnInitialize()
+      addon.isRetail = originalIsRetail
+      assert.is_nil(tooltipScanner.scanTooltip)
+    end)
+
+    it("resets the cache", function()
+      tooltipScanner.cache["x"] = "old"
+      tooltipScanner:OnInitialize()
+      assert.are.equal(0, tooltipScanner:GetCacheSize())
+    end)
   end)
 end)

@@ -253,4 +253,126 @@ describe("Groups", function()
       assert.are.equal(1, groups:GetActiveGroup(const.BAG_KIND.BACKPACK))
     end)
   end)
+
+  -- ─── GetGroup ───────────────────────────────────────────────────────────────
+
+  describe("GetGroup", function()
+
+    it("returns nil for an unknown group ID", function()
+      assert.is_nil(groups:GetGroup(const.BAG_KIND.BACKPACK, 9999))
+    end)
+
+    it("returns the default backpack group (ID 1)", function()
+      dbGroups[const.BAG_KIND.BACKPACK] = dbGroups[const.BAG_KIND.BACKPACK] or {}
+      dbGroups[const.BAG_KIND.BACKPACK][1] = {id = 1, name = "Backpack", isDefault = true}
+      local g = groups:GetGroup(const.BAG_KIND.BACKPACK, 1)
+      assert.is_not_nil(g)
+      assert.are.equal("Backpack", g.name)
+    end)
+  end)
+
+  -- ─── GetAllGroups ───────────────────────────────────────────────────────────
+
+  describe("GetAllGroups", function()
+
+    it("returns an empty table when no groups exist", function()
+      assert.same({}, groups:GetAllGroups(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("returns every group of a given kind", function()
+      local ctx = context:New("Test")
+      groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "A")
+      groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "B")
+      local all = groups:GetAllGroups(const.BAG_KIND.BACKPACK)
+      local count = 0
+      for _ in pairs(all) do count = count + 1 end
+      assert.are.equal(2, count)
+    end)
+  end)
+
+  -- ─── GetGroupForCategory ────────────────────────────────────────────────────
+
+  describe("GetGroupForCategory", function()
+
+    it("returns nil for an unassigned category", function()
+      assert.is_nil(groups:GetGroupForCategory(const.BAG_KIND.BACKPACK, "Unassigned"))
+    end)
+
+    it("returns the assigned group ID", function()
+      local ctx = context:New("Test")
+      local group = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "G")
+      groups:AssignCategoryToGroup(ctx, const.BAG_KIND.BACKPACK, "Cat", group.id)
+      assert.are.equal(group.id, groups:GetGroupForCategory(const.BAG_KIND.BACKPACK, "Cat"))
+    end)
+  end)
+
+  -- ─── GetCategoriesInGroup ───────────────────────────────────────────────────
+
+  describe("GetCategoriesInGroup", function()
+
+    it("returns the explicit list of categories in a group", function()
+      local ctx = context:New("Test")
+      local group = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "G")
+      groups:AssignCategoryToGroup(ctx, const.BAG_KIND.BACKPACK, "A", group.id)
+      groups:AssignCategoryToGroup(ctx, const.BAG_KIND.BACKPACK, "B", group.id)
+      local cats = groups:GetCategoriesInGroup(const.BAG_KIND.BACKPACK, group.id)
+      assert.is_true(cats["A"])
+      assert.is_true(cats["B"])
+    end)
+
+    it("returns an empty table for a group with no categories", function()
+      local ctx = context:New("Test")
+      local group = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "Empty")
+      assert.same({}, groups:GetCategoriesInGroup(const.BAG_KIND.BACKPACK, group.id))
+    end)
+  end)
+
+  -- ─── GetDefaultBankGroup ────────────────────────────────────────────────────
+
+  describe("GetDefaultBankGroup", function()
+
+    it("returns nil when no default bank group exists", function()
+      assert.is_nil(groups:GetDefaultBankGroup())
+    end)
+
+    it("returns the default character bank group", function()
+      dbGroups[const.BAG_KIND.BANK] = {
+        [10] = {id = 10, name = "Bank", isDefault = true, bankType = 1},
+        [11] = {id = 11, name = "Warbank", isDefault = true, bankType = 2},
+      }
+      local g = groups:GetDefaultBankGroup()
+      assert.is_not_nil(g)
+      assert.are.equal("Bank", g.name)
+    end)
+
+    it("skips the warbank when looking for the character bank", function()
+      dbGroups[const.BAG_KIND.BANK] = {
+        [11] = {id = 11, name = "Warbank", isDefault = true, bankType = 2},
+      }
+      assert.is_nil(groups:GetDefaultBankGroup())
+    end)
+  end)
+
+  -- ─── OnCategoryDeleted ──────────────────────────────────────────────────────
+
+  describe("OnCategoryDeleted", function()
+
+    it("removes the category from any group assignment across all bag kinds", function()
+      local ctx = context:New("Test")
+      local bg = groups:CreateGroup(ctx, const.BAG_KIND.BACKPACK, "BPGroup")
+      local bng = groups:CreateGroup(ctx, const.BAG_KIND.BANK, "BankGroup")
+      groups:AssignCategoryToGroup(ctx, const.BAG_KIND.BACKPACK, "Doomed", bg.id)
+      groups:AssignCategoryToGroup(ctx, const.BAG_KIND.BANK, "Doomed", bng.id)
+      assert.are.equal(bg.id, groups:GetGroupForCategory(const.BAG_KIND.BACKPACK, "Doomed"))
+      assert.are.equal(bng.id, groups:GetGroupForCategory(const.BAG_KIND.BANK, "Doomed"))
+      groups:OnCategoryDeleted(ctx, "Doomed")
+      assert.is_nil(groups:GetGroupForCategory(const.BAG_KIND.BACKPACK, "Doomed"))
+      assert.is_nil(groups:GetGroupForCategory(const.BAG_KIND.BANK, "Doomed"))
+    end)
+
+    it("is a no-op for categories that were never assigned", function()
+      local ctx = context:New("Test")
+      groups:OnCategoryDeleted(ctx, "NeverExisted") -- should not error
+    end)
+  end)
 end)

@@ -175,5 +175,32 @@ describe("Binding", function()
       assert.are.equal(7, receivedSlot)
       assert.is_false(receivedEquipped)
     end)
+
+    it("passes the equipment slot as the slotID only when slotID is nil", function()
+      _G.C_Item.IsBound = function() return true end
+      local receivedSlot
+      _G.C_Container.GetContainerItemPurchaseInfo = function(_, slot, _)
+        receivedSlot = slot
+        return nil
+      end
+      local loc = {
+        GetBagAndSlot = function() return 0, nil end,  -- slotID is nil
+        GetEquipmentSlot = function() return 12 end,
+        IsEquipmentSlot = function() return true end,
+      }
+      binding.GetItemBinding(loc, 1)
+      assert.are.equal(12, receivedSlot)
+    end)
+
+    it("SOULBOUND is the default for bound items (overwritten by later checks)", function()
+      _G.C_Item.IsBound = function() return true end
+      _G.C_Bank = {
+        IsItemAllowedInBankType = function() return false end,
+      }
+      -- No purchase info, no quest bind, so SOULBOUND should remain.
+      local loc = MockItemLocation()
+      local info = binding.GetItemBinding(loc, 1)
+      assert.are.equal(const.BINDING_SCOPE.SOULBOUND, info.binding)
+    end)
   end)
 end)
