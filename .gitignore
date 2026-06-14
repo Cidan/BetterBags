@@ -10,3 +10,4 @@ cpp-ghost-text-preview-widget-anysphere://**
 /.omc/**
 /luacov.report.out
 /luacov.stats.out
+.claude/worktrees/

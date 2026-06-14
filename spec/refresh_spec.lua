@@ -128,6 +128,95 @@ describe("Refresh", function()
     end)
   end)
 
+  -- ─── OnEnable ────────────────────────────────────────────────────────────────
+
+  describe("OnEnable", function()
+
+    it("registers BAG_UPDATE_DELAYED to refresh backpack+bank", function()
+      refresh:OnEnable()
+      -- Trigger the WoW event via the internal event map.
+      local eventMap = events._eventMap
+      if eventMap["BAG_UPDATE_DELAYED"] then
+        eventMap["BAG_UPDATE_DELAYED"].fn("BAG_UPDATE_DELAYED", "BAG_UPDATE_DELAYED")
+      end
+      assert.is_true(refresh.pendingBackpack)
+      assert.is_true(refresh.pendingBank)
+    end)
+
+    it("registers bags/RefreshBackpack to request a wipe+backpack update", function()
+      refresh:OnEnable()
+      local ctx = context:New("TestRefresh")
+      events:SendMessage(ctx, "bags/RefreshBackpack", true)
+      assert.is_true(refresh.pendingWipe)
+      assert.is_true(refresh.pendingBackpack)
+    end)
+
+    it("registers bags/RefreshBank to request a wipe+bank update", function()
+      refresh:OnEnable()
+      local ctx = context:New("TestRefresh")
+      events:SendMessage(ctx, "bags/RefreshBank", true)
+      assert.is_true(refresh.pendingWipe)
+      assert.is_true(refresh.pendingBank)
+    end)
+
+    it("registers bags/RefreshAll to refresh both backpack and bank", function()
+      refresh:OnEnable()
+      local ctx = context:New("TestRefresh")
+      events:SendMessage(ctx, "bags/RefreshAll")
+      assert.is_true(refresh.pendingBackpack)
+      assert.is_true(refresh.pendingBank)
+    end)
+
+    it("registers bags/SortBackpack to trigger a sort", function()
+      refresh:OnEnable()
+      _G.InCombatLockdown = function() return false end
+      local ctx = context:New("TestSort")
+      events:SendMessage(ctx, "bags/SortBackpack")
+      assert.is_true(refresh.isSorting)
+    end)
+
+    it("registers bags/FullRefreshAll to request a wipe+all update", function()
+      refresh:OnEnable()
+      local ctx = context:New("TestFull")
+      events:SendMessage(ctx, "bags/FullRefreshAll")
+      assert.is_true(refresh.pendingWipe)
+      assert.is_true(refresh.pendingBackpack)
+      assert.is_true(refresh.pendingBank)
+    end)
+
+    it("registers BAG_CONTAINER_UPDATE to request a wipe+backpack update", function()
+      refresh:OnEnable()
+      local eventMap = events._eventMap
+      if eventMap["BAG_CONTAINER_UPDATE"] then
+        eventMap["BAG_CONTAINER_UPDATE"].fn("BAG_CONTAINER_UPDATE", "BAG_CONTAINER_UPDATE")
+      end
+      assert.is_true(refresh.pendingWipe)
+      assert.is_true(refresh.pendingBackpack)
+    end)
+
+    it("registers EQUIPMENT_SETS_CHANGED to request a wipe+all update", function()
+      refresh:OnEnable()
+      local eventMap = events._eventMap
+      if eventMap["EQUIPMENT_SETS_CHANGED"] then
+        eventMap["EQUIPMENT_SETS_CHANGED"].fn("EQUIPMENT_SETS_CHANGED", "EQUIPMENT_SETS_CHANGED")
+      end
+      assert.is_true(refresh.pendingWipe)
+      assert.is_true(refresh.pendingBackpack)
+      assert.is_true(refresh.pendingBank)
+    end)
+
+    it("registers PLAYER_REGEN_ENABLED to flush pending updates", function()
+      refresh.pendingBackpack = true
+      refresh:OnEnable()
+      local eventMap = events._eventMap
+      if eventMap["PLAYER_REGEN_ENABLED"] then
+        eventMap["PLAYER_REGEN_ENABLED"].fn("PLAYER_REGEN_ENABLED", "PLAYER_REGEN_ENABLED")
+      end
+      -- After execute, pending flags should be reset.
+      assert.is_false(refresh.pendingBackpack)
+    end)
+  end)
+
   -- ─── RequestUpdate ─────────────────────────────────────────────────────────────
 
   describe("RequestUpdate", function()

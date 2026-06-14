@@ -10,6 +10,7 @@ _G.CreateFrame = function(_, name, _, _)
     Hide = function() end,
     RegisterEvent = function() end,
     UnregisterEvent = function() end,
+    SetOwner = function() end,
   }
   if name then
     _G[name] = frame

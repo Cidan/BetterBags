@@ -197,12 +197,12 @@ function refresh:OnEnable()
   end)
 
   -- Register when the backpack is manually refreshed.
-  events:RegisterMessage('bags/RefreshBackpack', function(_, _, shouldWipe)
+  events:RegisterMessage('bags/RefreshBackpack', function(_, shouldWipe)
     self:RequestUpdate({ wipe = shouldWipe, backpack = true })
   end)
 
   -- Register when the bank is manually refreshed.
-  events:RegisterMessage('bags/RefreshBank', function (_, _, shouldWipe)
+  events:RegisterMessage('bags/RefreshBank', function (_, shouldWipe)
     self:RequestUpdate({ wipe = shouldWipe, bank = true })
   end)
 
