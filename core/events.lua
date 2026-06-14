@@ -154,7 +154,12 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
 
   local bucketFunction = function()
     for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
-      xpcall(cb, geterrorhandler(), self._eventArguments[joinedEvents])
+      -- Note: use a wrapper function because xpcall in Lua 5.1 (the WoW
+      -- runtime) does NOT pass extra args to f, unlike Lua 5.4. Calling
+      -- cb directly via xpcall would silently drop the arg on WoW.
+      xpcall(function()
+        cb(self._eventArguments[joinedEvents])
+      end, geterrorhandler())
     end
     self._eventArguments[joinedEvents] = {}
   end
