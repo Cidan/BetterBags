@@ -341,13 +341,77 @@ describe("Events", function()
   end)
 
   -- ─── GroupBucketEvent ───────────────────────────────────────────────────────
-  -- NOTE: GroupBucketEvent coverage is intentionally limited here. The
-  -- integration test path (firing events through events._eventMap and
-  -- driving the captured C_Timer) produces different results on Lua 5.1
-  -- (CI) vs Lua 5.4 (local dev). The source is exercised by the BucketEvent
-  -- tests above, so the bucket/debounce logic is covered; the multi-source
-  -- message-bucketing path needs an integration test that can wait for a
-  -- follow-up.
+
+  describe("GroupBucketEvent", function()
+
+    local timerCallbacks
+    local originalNewTimer
+
+    before_each(function()
+      timerCallbacks = {}
+      originalNewTimer = _G.C_Timer.NewTimer
+      _G.C_Timer.NewTimer = function(delay, callback)
+        local entry = {delay = delay, callback = callback, cancelled = false}
+        table.insert(timerCallbacks, entry)
+        return {
+          Cancel = function() entry.cancelled = true end,
+        }
+      end
+    end)
+
+    after_each(function()
+      _G.C_Timer.NewTimer = originalNewTimer
+    end)
+
+    local function fireTimers()
+      for _, t in ipairs(timerCallbacks) do
+        if not t.cancelled then t.callback() end
+      end
+      timerCallbacks = {}
+    end
+
+    it("buckets events from multiple sources into one callback", function()
+      local received
+      events:GroupBucketEvent({"g/E1", "g/E2"}, {}, function(arg)
+        received = arg
+      end)
+      local eventMap = events._eventMap
+      if eventMap["g/E1"] then eventMap["g/E1"].fn("g/E1", "g/E1") end
+      if eventMap["g/E2"] then eventMap["g/E2"].fn("g/E2", "g/E2") end
+      fireTimers()
+      assert.is_not_nil(received)
+      assert.are.equal(2, #received)
+    end)
+
+    it("also buckets messages alongside events", function()
+      local received
+      events:GroupBucketEvent({"g/E3"}, {"g/M1"}, function(arg)
+        received = arg
+      end)
+      local eventMap = events._eventMap
+      if eventMap["g/E3"] then eventMap["g/E3"].fn("g/E3", "g/E3") end
+      local ctx = context:New("TestGroupBucket")
+      events:SendMessage(ctx, "g/M1", "msgarg")
+      fireTimers()
+      assert.is_not_nil(received)
+      assert.are.equal(2, #received)
+    end)
+
+    it("resets the arguments list after firing", function()
+      local batchSizes = {}
+      events:GroupBucketEvent({"g/E4"}, {}, function(arg)
+        table.insert(batchSizes, #arg)
+      end)
+      local eventMap = events._eventMap
+      if eventMap["g/E4"] then eventMap["g/E4"].fn("g/E4", "g/E4") end
+      fireTimers()
+      if eventMap["g/E4"] then eventMap["g/E4"].fn("g/E4", "g/E4") end
+      if eventMap["g/E4"] then eventMap["g/E4"].fn("g/E4", "g/E4") end
+      fireTimers()
+      assert.are.equal(1, batchSizes[1])
+      assert.are.equal(2, batchSizes[2])
+    end)
+  end)
 
   -- ─── SendMessageLater ───────────────────────────────────────────────────────
 
