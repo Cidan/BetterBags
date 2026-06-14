@@ -30,6 +30,22 @@ If any file changes are made, create a new git commit in the same task. Commit m
 
 For any code changes, always run `luacheck .` from the repository root before finishing. Add any newly introduced WoW API globals to `.luacheckrc` as needed.
 
+## Lua Version
+
+The project targets **Lua 5.1 only**. Not 5.2, not 5.3, not 5.4, not LuaJIT-in-5.2-mode. WoW's runtime is Lua 5.1; the addon's code, its libraries, its tests, and its linter all run on 5.1 and only on 5.1. There is no 5.4 support, there will never be 5.4 support, and any code or test that "happens to work" on 5.4 is not validated by anything in this repository.
+
+This is enforced in three places, redundantly, on purpose:
+
+- **CI pins Lua 5.1** — `.github/workflows/test.yml:32` and `.github/workflows/luacheck.yml:19` both install `leafo/gh-actions-lua@v10` with `luaVersion: "5.1"`, then install `busted` / `luacheck` against that interpreter. A PR that breaks 5.1 will fail CI even if it passes locally on a different runtime.
+- **Luacheck is locked to the 5.1 standard** — `.luacheckrc:1` sets `std = "lua51"`, so any 5.2+/5.3+/5.4-only construct (goto, `<close>`, integer division, `//`, etc.) is a lint error.
+- **The test suite runtime-asserts 5.1** — `spec/setup.lua:1-12` errors out before any test code runs if `_VERSION ~= "Lua 5.1"`. Running `busted` against any other interpreter fails immediately with a message naming the detected version and pointing at this section.
+
+Practical consequences:
+
+- Do not use any 5.2+ language feature or standard library function. If you are tempted to reach for one, stop and find the 5.1 equivalent. Luacheck will catch it; the test guard will catch it; CI will catch it.
+- The `lua` / `busted` binaries on `$PATH` must be 5.1 (or a 5.1-compatible LuaJIT 2.x, whose `_VERSION` is `"Lua 5.1"`). If `lua -v` reports anything other than `Lua 5.1.x`, fix that before running the suite — do not "just try it" on the wrong runtime and trust a green result. `install-deps.sh` does not install a Lua interpreter; you must provide 5.1 yourself.
+- When debugging a test failure, never conclude "this works on 5.4" as a workaround. 5.4 is irrelevant. Fix the 5.1 behavior.
+
 ## Deps Requirements
 
 Before starting a brand new task, make sure you always run `install-deps.sh` so that deps are installed. This will also let you look at the wow source code directly as needed.

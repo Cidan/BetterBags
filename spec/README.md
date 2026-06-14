@@ -2,6 +2,8 @@
 
 Unit tests for BetterBags, powered by [busted](https://olivinelabs.com/busted/) with Lua 5.1.
 
+> **The suite is Lua 5.1 only.** `spec/setup.lua` aborts before any test code runs if `_VERSION` is not `"Lua 5.1"`. If you see a "BetterBags test suite requires Lua 5.1" error, the `lua` / `busted` on your `PATH` is the wrong interpreter — install Lua 5.1 (or a 5.1-compatible LuaJIT 2.x) and `luarocks install busted` against it, then rerun. See `CLAUDE.md` § "Lua Version" for the full policy.
+
 ## Running Tests
 
 ```bash

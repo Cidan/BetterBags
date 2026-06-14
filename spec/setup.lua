@@ -1,3 +1,16 @@
+-- Step 0: Enforce Lua 5.1. The BetterBags suite targets WoW's Lua 5.1 runtime;
+-- running on any other interpreter (5.2, 5.3, 5.4, luajit-5.2-mode, etc.) is
+-- unsupported and will silently produce false confidence. This guard runs
+-- before any library load or test code so the failure is immediate and loud.
+if _VERSION ~= "Lua 5.1" then
+  error(string.format(
+    "BetterBags test suite requires Lua 5.1 (WoW's runtime). Detected %s. "
+    .. "Install Lua 5.1 and `luarocks install busted` against it; "
+    .. "see spec/README.md and CLAUDE.md (\"Lua Version\").",
+    _VERSION
+  ), 0)
+end
+
 -- setup.lua -- Busted test helper. Loaded before all spec files via .busted config.
 -- Delegates to modular helpers in spec/helpers/ for maintainability.
 
