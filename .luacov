@@ -1,0 +1,29 @@
+return {
+  default = {
+    -- Code to include in coverage analysis. luacov only reports coverage for
+    -- files actually loaded via require/dofile, so this list is a hint for
+    -- which package.path roots to look up -- not a filter on output.
+    include = {
+      "util",
+      "core",
+      "data",
+      "animations",
+      "integrations",
+      "themes",
+    },
+
+    -- Code to exclude from the coverage report. These are third-party
+    -- libraries and test code; we only want to measure our own source.
+    exclude = {
+      "spec",
+      "libs",
+      ".libraries",
+    },
+
+    -- Write report files into the project root (gitignored) so they don't
+    -- clutter the developer's HOME directory.
+    reportfile = "luacov.report.out",
+    statsfile  = "luacov.stats.out",
+    deletestats = false,
+  }
+}

@@ -37,5 +37,21 @@ jobs:
       - name: Install busted
         run: luarocks install busted
 
+      - name: Install luacov
+        run: luarocks install luacov
+
       - name: Run tests
-        run: busted
+        run: busted --coverage
+
+      - name: Generate coverage report
+        run: luacov
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: luacov-report
+          path: |
+            luacov.report.out
+            luacov.stats.out
+          retention-days: 14
