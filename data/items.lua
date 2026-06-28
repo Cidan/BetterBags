@@ -888,7 +888,7 @@ function items:LoadItems(ctx, kind, dataCache, equipmentCache, callback)
 				debug:Log("ItemChanged", "Bugged item detected during loading, skipping.")
 			else
 				slotInfo:AddToUpdatedItems(previousItem, currentItem)
-				search:Remove(currentItem)
+				search:Remove(previousItem)
 				search:Add(currentItem)
 			end
 		end

@@ -117,11 +117,8 @@ end
 function refresh:ExecutePendingUpdates()
   local ctx = context:New('BagUpdate')
 
-  -- Prevent wipes during combat
-  if self.pendingWipe and InCombatLockdown() then
-    self.pendingBackpack = false
-    self.pendingBank = false
-    self.pendingWipe = false
+  -- Prevent updates during combat
+  if InCombatLockdown() then
     return
   end
 

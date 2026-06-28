@@ -434,4 +434,39 @@ describe("Categories", function()
       assert.is_nil(categories.ephemeralCategoryByItemID[42])
     end)
   end)
+
+  -- ─── GetCustomCategory ──────────────────────────────────────────────────────
+
+  describe("GetCustomCategory", function()
+
+    it("correctly clears itemsWithNoCategory cache after manual addition and removal", function()
+      local ctx = context:New("Test")
+      local itemID = 12345
+      local mockItem = { itemInfo = { itemID = itemID } }
+      local _
+
+      -- Ensure it starts with no custom category (returns nil)
+      -- This will populate the cache `self.itemsWithNoCategory[itemID] = true`
+      local categoryName, priority = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK, mockItem)
+      assert.is_nil(categoryName)
+      assert.is_nil(priority)
+      assert.is_true(categories.itemsWithNoCategory[itemID])
+
+      -- Add it to a custom category
+      categories:AddItemToCategory(ctx, itemID, "MyManualCategory")
+
+      -- Assert that itemsWithNoCategory cache is cleared for this item
+      assert.is_nil(categories.itemsWithNoCategory[itemID])
+
+      -- Query it again. It should now return the category name "MyManualCategory"
+      categoryName, _ = categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK, mockItem)
+      assert.are.equal("MyManualCategory", categoryName)
+
+      -- Remove it from the custom category
+      categories:RemoveItemFromCategory(itemID)
+
+      -- Assert that itemsWithNoCategory cache is also cleared upon removal
+      assert.is_nil(categories.itemsWithNoCategory[itemID])
+    end)
+  end)
 end)
