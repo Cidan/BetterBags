@@ -9,14 +9,6 @@ LoadBetterBagsModule("core/events.lua")
 local events = addon:GetModule("Events")
 events:OnInitialize()
 
-LoadBetterBagsModule("util/query.lua")
-LoadBetterBagsModule("util/trees/trees.lua")
-LoadBetterBagsModule("util/trees/intervaltree.lua")
-LoadBetterBagsModule("data/search.lua")
-LoadBetterBagsModule("core/async.lua")
-LoadBetterBagsModule("data/stacks.lua")
-LoadBetterBagsModule("data/binding.lua")
-
 -- Stubs for modules items.lua depends on
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
@@ -30,12 +22,24 @@ function L:G(key) return key end
 local equipmentSets = StubBetterBagsModule("EquipmentSets")
 equipmentSets.GetItemSets = function() return nil end
 
+LoadBetterBagsModule("util/query.lua")
+LoadBetterBagsModule("util/trees/trees.lua")
+LoadBetterBagsModule("util/trees/intervaltree.lua")
+LoadBetterBagsModule("data/search.lua")
+LoadBetterBagsModule("core/async.lua")
+LoadBetterBagsModule("data/stacks.lua")
+LoadBetterBagsModule("data/binding.lua")
+
 -- Categories stub (items.lua calls GetModule('Categories'))
 -- Already created by categories_spec if it ran first, otherwise stub it
 local ok = pcall(function() return addon:GetModule("Categories") end)
+local categories
 if not ok then
-  StubBetterBagsModule("Categories")
+  categories = StubBetterBagsModule("Categories")
+else
+  categories = addon:GetModule("Categories")
 end
+categories.GetSortedSearchCategories = categories.GetSortedSearchCategories or function() return {} end
 
 -- Set up constants
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
@@ -47,6 +51,18 @@ const.ITEM_QUALITY = { Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, L
 const.SEARCH_CATEGORY_GROUP_BY = { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 const.EXPANSION_MAP = { [0] = "Classic", [1] = "Burning Crusade", [2] = "Wrath", [9] = "The War Within" }
 const.TRADESKILL_MAP = { [0] = "Tailoring", [1] = "Leatherworking", [2] = "Blacksmithing" }
+const.BINDING_MAP = {
+  [0] = "",
+  [1] = "boe",
+  [2] = "soulbound",
+}
+const.BRIEF_EXPANSION_MAP = {
+  [0] = "classic",
+  [1] = "bc",
+  [2] = "wotlk",
+  [3] = "cata",
+  [9] = "tww",
+}
 
 _G.Enum = _G.Enum or {}
 _G.Enum.ItemClass = _G.Enum.ItemClass or { Tradegoods = 7, Container = 1 }
@@ -58,6 +74,7 @@ database.GetStackingOptions = function()
 end
 database.GetCategoryFilter = function() return false end
 database.GetEnableBankBag = function() return false end
+database.GetMarkRecentItems = function() return false end
 
 -- Addon state
 addon.isRetail = true
@@ -730,6 +747,65 @@ describe("Items", function()
       assert.are.equal(1, #movePairs)
       -- Partial move: root has 18, max 20, so only 2 can move
       assert.are.equal(2, movePairs[1].partial)
+    end)
+  end)
+
+  -- ─── LoadItems ──────────────────────────────────────────────────────────────
+
+  describe("LoadItems", function()
+    local savedContainerIDToInventoryID
+    local savedGetItemSubClassInfo
+    local savedGetInventoryItemLink
+
+    before_each(function()
+      savedContainerIDToInventoryID = _G.C_Container.ContainerIDToInventoryID
+      savedGetItemSubClassInfo = _G.C_Item.GetItemSubClassInfo
+      savedGetInventoryItemLink = _G.GetInventoryItemLink
+
+      _G.C_Container.ContainerIDToInventoryID = function() return nil end
+      _G.C_Item.GetItemSubClassInfo = function() return "MockSubClass" end
+      _G.GetInventoryItemLink = function() return nil end
+    end)
+
+    after_each(function()
+      _G.C_Container.ContainerIDToInventoryID = savedContainerIDToInventoryID
+      _G.C_Item.GetItemSubClassInfo = savedGetItemSubClassInfo
+      _G.GetInventoryItemLink = savedGetInventoryItemLink
+    end)
+
+    it("correctly updates search index on item count change without leaking", function()
+      local ctx = addon:GetModule("Context"):New("LoadItemsTest")
+      local kind = const.BAG_KIND.BACKPACK
+
+      -- 1. Load an item with count = 1
+      local item1 = MockData.ItemData({
+        bagid = 1,
+        slotid = 1,
+        slotkey = "1_1",
+        count = 1,
+        name = "Iron Ore"
+      })
+      local dataCache1 = { ["1_1"] = item1 }
+      items:LoadItems(ctx, kind, dataCache1, nil, function() end)
+
+      -- Verify it was added to the search index with count = 1
+      assert.is_true(search:isInIndex("stackcount", 1)["1_1"])
+
+      -- 2. Load the same item slot with count = 5
+      local item2 = MockData.ItemData({
+        bagid = 1,
+        slotid = 1,
+        slotkey = "1_1",
+        count = 5,
+        name = "Iron Ore"
+      })
+      local dataCache2 = { ["1_1"] = item2 }
+      items:LoadItems(ctx, kind, dataCache2, nil, function() end)
+
+      -- Verify that the old stackcount attribute (1) was removed (no leak)
+      assert.is_nil(search:isInIndex("stackcount", 1)["1_1"])
+      -- Verify that the new stackcount attribute (5) was added
+      assert.is_true(search:isInIndex("stackcount", 5)["1_1"])
     end)
   end)
 

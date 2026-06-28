@@ -132,6 +132,8 @@ function categories:AddPermanentItemToCategory(ctx, id, category)
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
 
+  self.itemsWithNoCategory[id] = nil
+
   if not database:ItemCategoryExists(category) then
     self:CreateCategory(ctx, {
       name = category,
@@ -164,6 +166,8 @@ function categories:AddItemToCategory(ctx, id, category)
   assert(id, format("Attempted to add item to category %s, but the item ID is nil.", category))
   assert(category ~= nil, format("Attempted to add item %d to a nil category.", id))
   assert(C_Item.GetItemInfoInstant(id), format("Attempted to add item %d to category %s, but the item does not exist.", id, category))
+
+  self.itemsWithNoCategory[id] = nil
 
   -- Backwards compatability for the old way of adding items to categories.
   if not self.ephemeralCategories[category] then
@@ -586,6 +590,7 @@ end
 
 ---@param id number The ItemID of the item to remove from a custom category.
 function categories:RemoveItemFromCategory(id)
+  self.itemsWithNoCategory[id] = nil
   local filter = self.ephemeralCategoryByItemID[id]
   if filter then
     filter.itemList[id] = nil

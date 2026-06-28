@@ -76,6 +76,7 @@ function stack:RemoveFromStack(item)
       stackinfo.count = stackinfo.count - 1
     else
       self.stacksByItemHash[item.itemHash] = nil
+      return
     end
   elseif stackinfo.slotkeys[item.slotkey] then
     stackinfo.slotkeys[item.slotkey] = nil

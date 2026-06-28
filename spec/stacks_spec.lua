@@ -125,6 +125,23 @@ describe("Stacks", function()
       assert.is_nil(stack:GetStackInfo("h1"))
     end)
 
+    it("does not perform redundant lookup when the last item in a stack is removed", function()
+      local item = MockItemData({slotkey = "s1", itemHash = "h1", count = 1})
+      stack:AddToStack(item)
+
+      local lookupCount = 0
+      local originalGetItemData = items.GetItemDataFromSlotKey
+      items.GetItemDataFromSlotKey = function(self, slotkey)
+        lookupCount = lookupCount + 1
+        return originalGetItemData(self, slotkey)
+      end
+
+      stack:RemoveFromStack(item)
+
+      assert.are.equal(0, lookupCount, "GetItemDataFromSlotKey should not be called when removing the last item")
+      items.GetItemDataFromSlotKey = originalGetItemData
+    end)
+
     it("does nothing for a non-existent item hash", function()
       local item = MockItemData({slotkey = "s1", itemHash = "missing"})
       stack:RemoveFromStack(item) -- should not error

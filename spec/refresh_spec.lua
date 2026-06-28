@@ -335,12 +335,26 @@ describe("Refresh", function()
 
   describe("ExecutePendingUpdates", function()
 
-    it("clears pending flags on combat with pendingWipe", function()
+    it("retains pending flags during combat lockdown and executes them after combat ends", function()
       _G.InCombatLockdown = function() return true end
       refresh.pendingWipe = true
       refresh.pendingBackpack = true
       refresh.pendingBank = true
       refresh:ExecutePendingUpdates()
+      -- Assert that flags are retained during combat lockdown
+      assert.is_true(refresh.pendingWipe)
+      assert.is_true(refresh.pendingBackpack)
+      assert.is_true(refresh.pendingBank)
+
+      -- Simulating leaving combat
+      _G.InCombatLockdown = function() return false end
+      refresh:OnEnable()
+      local eventMap = events._eventMap
+      if eventMap["PLAYER_REGEN_ENABLED"] then
+        eventMap["PLAYER_REGEN_ENABLED"].fn("PLAYER_REGEN_ENABLED", "PLAYER_REGEN_ENABLED")
+      end
+
+      -- After execute, pending flags should be reset.
       assert.is_false(refresh.pendingWipe)
       assert.is_false(refresh.pendingBackpack)
       assert.is_false(refresh.pendingBank)
