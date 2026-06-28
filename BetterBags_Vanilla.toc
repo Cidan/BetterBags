@@ -1,4 +1,4 @@
-## Interface: 11507
+## Interface: 11508
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
