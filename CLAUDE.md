@@ -13,6 +13,14 @@
 
 Never make any changes without directly confirming that the functions, code, API's, and work you are implementing exists by directly observing it. You must either observe it as a WoW API, or as part of our addon. Never take any guesses or rely on internal memory -- always look at code and patterns in the code base and use a direct line of reference. Show your work in all your plans, and directly cite any API calls, both internal and external.
 
+## Mocking and WoW API Mocks
+
+To ensure the reliability of the addon and prevent regressions, adhere to the following strict mocking and testing rules:
+
+- **Test changes with mocks**: Whenever you make or introduce code changes, they must be validated and tested via mocks. Ensure that mocks exist for any functionality affected.
+- **Create missing WoW API mocks from source**: If mocks are missing for any World of Warcraft APIs, you must create them. Retrieve the precise behavior, return values, and parameters by reading Blizzard's official WoW UI source code (available under `.libraries/wow-ui-source`). Do not guess or invent API interfaces.
+- **Code must fit the mock (not vice versa)**: Mocks represent the contract of the World of Warcraft runtime environment. Never modify a mock to fit a shortcut or bug in our implementation code. The implementation code must always be corrected to fit the (accurate) mock contract. Never assume implementation code is correct over a verified mock of Blizzard's API.
+
 ## Pattern Learning
 
 As you work through problems and discover new abstract patterns (especially debugging techniques, API workarounds, or architectural decisions), update the appropriate pattern file in `.context/`:
