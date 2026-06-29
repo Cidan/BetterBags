@@ -317,4 +317,164 @@ describe("Themes", function()
       assert.is_true(slotsDrawCalled)
     end)
   end)
+
+  describe("GW2 theme PositionBagSlots", function()
+    local gw2Theme
+
+    before_each(function()
+      _G.GW2_ADDON = {
+        CreateFrameHeaderWithBody = function() end,
+        SkinBagSearchBox = function() end,
+        BackdropTemplates = { Default = {} },
+      }
+      StubBetterBagsModule("ContextMenu")
+      StubBetterBagsModule("SearchBox")
+      local fonts = StubBetterBagsModule("Fonts")
+      fonts.UnitFrame12White = {}
+
+      -- Load gw2.lua
+      local fn = assert(loadfile("themes/gw2.lua"))
+      fn("BetterBags")
+      gw2Theme = themes.themes["GW2"]
+    end)
+
+    after_each(function()
+      _G.GW2_ADDON = nil
+      ResetModuleStub("ContextMenu")
+      ResetModuleStub("SearchBox")
+      ResetModuleStub("Fonts")
+    end)
+
+    it("should anchor shown retail bank slots to the bottom", function()
+      addon.isRetail = true
+      local frame = CreateFrame("Frame", "TestGW2BankWindow")
+      local slotsFramePoints = {}
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestGW2BankSlotsFrame"),
+        IsShown = function() return true end,
+      }
+
+      slotsMock.frame.ClearAllPoints = function()
+        slotsFramePoints = {}
+      end
+      slotsMock.frame.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        table.insert(slotsFramePoints, { point = point, relFrame = relFrame, relPoint = relPoint, x = x, y = y })
+      end
+
+      frame.Owner = {
+        kind = const.BAG_KIND.BANK,
+        slots = slotsMock,
+      }
+
+      gw2Theme.PositionBagSlots(frame, slotsMock.frame)
+
+      assert.is_true(#slotsFramePoints > 0)
+      local lastPoint = slotsFramePoints[#slotsFramePoints]
+      assert.are.equal("TOPLEFT", lastPoint.point)
+      assert.are.equal(frame, lastPoint.relFrame)
+      assert.are.equal("BOTTOMLEFT", lastPoint.relPoint)
+      assert.are.equal(0, lastPoint.x)
+      assert.are.equal(-2, lastPoint.y)
+    end)
+
+    it("should anchor hidden retail bank slots to the top starting position", function()
+      addon.isRetail = true
+      local frame = CreateFrame("Frame", "TestGW2BankWindowHidden")
+      local slotsFramePoints = {}
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestGW2BankSlotsFrameHidden"),
+        IsShown = function() return false end,
+      }
+
+      slotsMock.frame.ClearAllPoints = function()
+        slotsFramePoints = {}
+      end
+      slotsMock.frame.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        table.insert(slotsFramePoints, { point = point, relFrame = relFrame, relPoint = relPoint, x = x, y = y })
+      end
+
+      frame.Owner = {
+        kind = const.BAG_KIND.BANK,
+        slots = slotsMock,
+      }
+
+      gw2Theme.PositionBagSlots(frame, slotsMock.frame)
+
+      assert.is_true(#slotsFramePoints > 0)
+      local lastPoint = slotsFramePoints[#slotsFramePoints]
+      assert.are.equal("BOTTOMLEFT", lastPoint.point)
+      assert.are.equal(frame, lastPoint.relFrame)
+      assert.are.equal("TOPLEFT", lastPoint.relPoint)
+      assert.are.equal(0, lastPoint.x)
+      assert.are.equal(14, lastPoint.y)
+    end)
+
+    it("should anchor retail backpack slots to the custom top position (8, 16)", function()
+      addon.isRetail = true
+      local frame = CreateFrame("Frame", "TestGW2BackpackWindow")
+      local slotsFramePoints = {}
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestGW2BackpackSlotsFrame"),
+        IsShown = function() return true end,
+      }
+
+      slotsMock.frame.ClearAllPoints = function()
+        slotsFramePoints = {}
+      end
+      slotsMock.frame.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        table.insert(slotsFramePoints, { point = point, relFrame = relFrame, relPoint = relPoint, x = x, y = y })
+      end
+
+      frame.Owner = {
+        kind = const.BAG_KIND.BACKPACK,
+        slots = slotsMock,
+      }
+
+      gw2Theme.PositionBagSlots(frame, slotsMock.frame)
+
+      assert.is_true(#slotsFramePoints > 0)
+      local lastPoint = slotsFramePoints[#slotsFramePoints]
+      assert.are.equal("BOTTOMLEFT", lastPoint.point)
+      assert.are.equal(frame, lastPoint.relFrame)
+      assert.are.equal("TOPLEFT", lastPoint.relPoint)
+      assert.are.equal(8, lastPoint.x)
+      assert.are.equal(16, lastPoint.y)
+    end)
+
+    it("should anchor classic bank slots to the custom top position (8, 16)", function()
+      addon.isRetail = false
+      local frame = CreateFrame("Frame", "TestGW2ClassicBankWindow")
+      local slotsFramePoints = {}
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestGW2ClassicBankSlotsFrame"),
+        IsShown = function() return true end,
+      }
+
+      slotsMock.frame.ClearAllPoints = function()
+        slotsFramePoints = {}
+      end
+      slotsMock.frame.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        table.insert(slotsFramePoints, { point = point, relFrame = relFrame, relPoint = relPoint, x = x, y = y })
+      end
+
+      frame.Owner = {
+        kind = const.BAG_KIND.BANK,
+        slots = slotsMock,
+      }
+
+      gw2Theme.PositionBagSlots(frame, slotsMock.frame)
+
+      assert.is_true(#slotsFramePoints > 0)
+      local lastPoint = slotsFramePoints[#slotsFramePoints]
+      assert.are.equal("BOTTOMLEFT", lastPoint.point)
+      assert.are.equal(frame, lastPoint.relFrame)
+      assert.are.equal("TOPLEFT", lastPoint.relPoint)
+      assert.are.equal(8, lastPoint.x)
+      assert.are.equal(16, lastPoint.y)
+    end)
+  end)
 end)
