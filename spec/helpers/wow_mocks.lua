@@ -161,6 +161,13 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetTexture(path)
     self._texturePath = path
   end
+  function widget:SetTexCoord(...)
+    self._texCoords = {...}
+  end
+  function widget:SetAtlas(atlas, useAtlasSize)
+    self._atlas = atlas
+    self._useAtlasSize = useAtlasSize
+  end
   function widget:SetColorTexture(r, g, b, a)
     self._colorTexture = {r = r, g = g, b = b, a = a or 1}
   end
@@ -252,6 +259,14 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:GetJustifyV()
     return self._justifyV
+  end
+
+  widget._attributes = {}
+  function widget:SetAttribute(attrName, value)
+    self._attributes[attrName] = value
+  end
+  function widget:GetAttribute(attrName)
+    return self._attributes[attrName]
   end
 
   -- Strata / Level / Backdrop

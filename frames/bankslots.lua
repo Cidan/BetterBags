@@ -193,10 +193,14 @@ function BankSlots.bankSlotsPanelProto:Show(callback)
   -- they can be restored correctly when the bank slots panel is closed.
   local bankBag = addon.Bags and addon.Bags.Bank
   if bankBag and bankBag.tabs then
-    self.tabsWereShown = bankBag.tabs.frame:IsShown()
+    if not self:IsShown() then
+      self.tabsWereShown = bankBag.tabs.frame:IsShown()
+    end
     bankBag.tabs.frame:Hide()
   else
-    self.tabsWereShown = false
+    if not self:IsShown() then
+      self.tabsWereShown = false
+    end
   end
   self.fadeInGroup:Play()
 end
@@ -248,6 +252,30 @@ function BankSlots.bankSlotsPanelProto:SelectFirstTab(ctx)
     end
     self:SelectTab(ctx, firstBagIndex)
   end
+end
+
+-- OnClose cleans up the bank slots panel state and restores normal view
+---@param ctx Context
+function BankSlots.bankSlotsPanelProto:OnClose(ctx)
+  -- Deselect all buttons
+  for _, btn in ipairs(self.buttons) do
+    btn:SetSelected(false)
+  end
+  self.selectedBagIndex = nil
+  -- Clear the single-tab filter and refresh the bank cache
+  if addon.Bags and addon.Bags.Bank then
+    addon.Bags.Bank.blizzardBankTab = nil
+    items:ClearBankCache(ctx)
+  end
+  -- Restore panel anchor to above the bag frame (original position).
+  self.frame:ClearAllPoints()
+  self.frame:SetPoint("BOTTOMLEFT", self.bagFrame, "TOPLEFT", 0, 14)
+  -- Restore group tabs visibility to what it was before the panel opened.
+  local bankBag = addon.Bags and addon.Bags.Bank
+  if self.tabsWereShown and bankBag and bankBag.tabs then
+    bankBag.tabs.frame:Show()
+  end
+  self.tabsWereShown = false
 end
 
 -- OpenTabConfig opens the Blizzard tab configuration dialog for the given
@@ -308,16 +336,19 @@ function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
     end
   end
 
+  local bankPanel = BankFrame and BankFrame.BankPanel or BankPanel
+  local accountBankPanel = BankFrame and BankFrame.AccountBankPanel or AccountBankPanel
+
   if isAccountTab then
-    -- Account/warbank tab: use AccountBankPanel.TabSettingsMenu
-    if AccountBankPanel and AccountBankPanel.TabSettingsMenu then
-      local menu = AccountBankPanel.TabSettingsMenu
+    -- Account/warbank tab: use AccountBankPanel.TabSettingsMenu or unified bankPanel.TabSettingsMenu
+    local menu = (accountBankPanel and accountBankPanel.TabSettingsMenu) or (bankPanel and bankPanel.TabSettingsMenu)
+    if menu then
       if bagFrame then
         menu:SetParent(bagFrame)
         menu:ClearAllPoints()
         menu:SetPoint("BOTTOMLEFT", bagFrame, "BOTTOMRIGHT", 10, 0)
         -- Keep GetBankFrame override so the menu can look up tab data via the
-        -- real AccountBankPanel hierarchy when needed.
+        -- real AccountBankPanel hierarchy when needed (for legacy frames).
         menu.GetBankFrame = function()
           return {
             GetTabData = function(_, id)
@@ -340,9 +371,9 @@ function BankSlots.bankSlotsPanelProto:OpenTabConfig(bagIndex)
       reconnectIconCallback(menu)
     end
   else
-    -- Character bank tab: use BankPanel.TabSettingsMenu (added in The War Within)
-    if BankPanel and BankPanel.TabSettingsMenu then
-      local menu = BankPanel.TabSettingsMenu
+    -- Character bank tab: use bankPanel.TabSettingsMenu (added in The War Within)
+    local menu = bankPanel and bankPanel.TabSettingsMenu
+    if menu then
       if bagFrame then
         menu:SetParent(bagFrame)
         menu:ClearAllPoints()
@@ -548,26 +579,8 @@ function BankSlots:CreatePanel(ctx, bagFrame)
 
   -- When fade-out finishes, clear the blizzardBankTab filter and restore normal view
   addon.HookScript(b.fadeOutGroup, "OnFinished", function(ectx)
-    -- Deselect all buttons
-    for _, btn in ipairs(b.buttons) do
-      btn:SetSelected(false)
-    end
-    b.selectedBagIndex = nil
-    -- Clear the single-tab filter and refresh the bank to show all items
-    if addon.Bags and addon.Bags.Bank then
-      addon.Bags.Bank.blizzardBankTab = nil
-      items:ClearBankCache(ectx)
-      events:SendMessage(ectx, 'bags/RefreshBank')
-    end
-    -- Restore panel anchor to above the bag frame (original position).
-    b.frame:ClearAllPoints()
-    b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
-    -- Restore group tabs visibility to what it was before the panel opened.
-    local bankBag = addon.Bags and addon.Bags.Bank
-    if b.tabsWereShown and bankBag and bankBag.tabs then
-      bankBag.tabs.frame:Show()
-    end
-    b.tabsWereShown = false
+    b:OnClose(ectx)
+    events:SendMessage(ectx, 'bags/RefreshBank')
   end)
 
   -- Redraw when tab settings are updated (name/icon changed)
@@ -579,6 +592,12 @@ function BankSlots:CreatePanel(ctx, bagFrame)
 
   -- Redraw when a bank tab is purchased
   events:RegisterEvent('PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED', function(ectx)
+    if b:IsShown() then
+      b:Draw(ectx)
+    end
+  end)
+
+  events:RegisterEvent('PLAYER_BANK_TAB_SLOTS_CHANGED', function(ectx)
     if b:IsShown() then
       b:Draw(ectx)
     end
