@@ -80,10 +80,14 @@ function BagSlots.bagSlotProto:Show(callback)
 
   local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
   if parentBag and parentBag.tabs then
-    self.tabsWereShown = parentBag.tabs.frame:IsShown()
+    if not self:IsShown() then
+      self.tabsWereShown = parentBag.tabs.frame:IsShown()
+    end
     parentBag.tabs.frame:Hide()
   else
-    self.tabsWereShown = false
+    if not self:IsShown() then
+      self.tabsWereShown = false
+    end
   end
 
   if callback then
@@ -172,7 +176,7 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
 
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ectx) b:Draw(ectx) end)
   if not addon.isRetail then
-    events:RegisterEvent('PLAYERBANKBAGSLOTS_CHANGED', function(ectx) b:Draw(ectx) end)
+    events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(ectx) b:Draw(ectx) end)
   end
   b.kind = kind
   b.frame:Hide()

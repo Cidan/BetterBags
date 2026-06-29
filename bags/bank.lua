@@ -209,6 +209,8 @@ function bank.proto:OnHide()
 			-- auto-reappear when the bank is reopened (bag.frame:Show() would
 			-- otherwise re-show any child whose IsShown() is still true).
 			if self.bag.slots then
+				local ctx = context:New("OnHide")
+				self.bag.slots:OnClose(ctx)
 				self.bag.slots.frame:Hide()
 			end
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
@@ -218,6 +220,8 @@ function bank.proto:OnHide()
 		self.bag.frame:Hide()
 		-- Explicitly reset the bank slots panel's shown state (see fade path above).
 		if self.bag.slots then
+			local ctx = context:New("OnHide")
+			self.bag.slots:OnClose(ctx)
 			self.bag.slots.frame:Hide()
 		end
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
@@ -319,6 +323,10 @@ function bank.proto:RegisterEvents()
 	local behavior = self
 
 	events:RegisterEvent("PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED", function(ectx)
+		behavior:GenerateGroupTabs(ectx)
+	end)
+
+	events:RegisterEvent("PLAYER_BANK_TAB_SLOTS_CHANGED", function(ectx)
 		behavior:GenerateGroupTabs(ectx)
 	end)
 
