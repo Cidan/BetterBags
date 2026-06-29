@@ -58,19 +58,19 @@ describe("ItemRow Frame Font Validation", function()
     ctx = context:New("ItemRowTest")
   end)
 
-  it("should successfully initialize because of the valid 'THICKOUTLINE' font flag in retail", function()
+  it("should successfully initialize because of the valid normal font flag in retail", function()
     ResetModuleStub("ItemRowFrame", "frames/itemrow.lua")
     LoadBetterBagsModule("frames/itemrow.lua")
     local itemRowFrame = addon:GetModule("ItemRowFrame")
     itemRowFrame:OnInitialize()
 
-    -- This should NOT throw a SetFont error anymore because 'THICKOUTLINE' is valid
+    -- This should NOT throw a SetFont error anymore because '' is valid
     assert.has_no_error(function()
       itemRowFrame:Create(ctx)
     end)
   end)
 
-  it("should successfully initialize because of the valid 'THICKOUTLINE' font flag in era", function()
+  it("should successfully initialize because of the valid normal font flag in era", function()
     -- First make sure the main ItemRowFrame is loaded
     ResetModuleStub("ItemRowFrame", "frames/itemrow.lua")
     LoadBetterBagsModule("frames/itemrow.lua")
@@ -79,7 +79,7 @@ describe("ItemRow Frame Font Validation", function()
     LoadBetterBagsModule("frames/era/itemrow.lua")
     local itemRowFrame = addon:GetModule("ItemRowFrame")
 
-    -- This should NOT throw a SetFont error anymore because 'THICKOUTLINE' is valid
+    -- This should NOT throw a SetFont error anymore because '' is valid
     assert.has_no_error(function()
       itemRowFrame:_DoCreate(ctx)
     end)
