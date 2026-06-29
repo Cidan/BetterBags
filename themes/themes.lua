@@ -41,6 +41,7 @@ local context = addon:GetModule('Context')
 ---@field OffsetSidebar? fun(): number A function that offsets the sidebar by x pixels.
 ---@field ItemButton? fun(button: Item): ItemButton A function that applies the theme to an item button.
 ---@field Tab? fun(tab: Button): PanelTabButtonTemplate A function that applies the theme to a tab.
+---@field GetFlatHeaderHeight? fun(frame: Frame): number A function that returns the height of the flat header.
 ---@field Reset fun() A function that resets the theme to its default state and removes any special styling.
 ---@field DisableMasque? boolean If set to true, Masque will not be used with this theme.
 
@@ -285,6 +286,33 @@ function themes:SetTitle(frame, title)
   local theme = self.themes[db:GetTheme()]
   theme.SetTitle(frame, title)
   self.titles[frame:GetName()] = title
+end
+
+-- GetFlatHeaderHeight returns the flat frame header height for layout purposes.
+---@param frame Frame
+---@return number
+function themes:GetFlatHeaderHeight(frame)
+  local title = self.titles[frame:GetName()]
+  if title and title ~= "" then
+    return 30
+  end
+
+  local activeThemeKey = db:GetTheme()
+  local activeTheme = self.themes[activeThemeKey]
+
+  -- If the theme implements a custom GetFlatHeaderHeight, call it.
+  if activeTheme and activeTheme.GetFlatHeaderHeight then
+    return activeTheme.GetFlatHeaderHeight(frame)
+  end
+
+  -- For the Default theme, even without a title, the flat frame template
+  -- (DefaultPanelFlatTemplate) renders a 30px visual top header/border area.
+  if activeThemeKey == 'Default' then
+    return 30
+  end
+
+  -- Default to 0 for other borderless/headerless flat windows (Simple Dark, GW2, etc.)
+  return 0
 end
 
 ---@param ctx Context

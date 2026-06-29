@@ -149,8 +149,16 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
     maxWidthPerRow = 1024,
   })
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
-  -- Height = content height + top inset (12) + bottom inset (12).
-  self.frame:SetHeight(h + 24)
+
+  local headerHeight = themes:GetFlatHeaderHeight(self.frame)
+  local topInset = headerHeight > 0 and headerHeight or 12
+
+  self.content:GetContainer():ClearAllPoints()
+  self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -topInset)
+  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
+
+  -- Height = content height + top inset + bottom inset (12).
+  self.frame:SetHeight(h + topInset + 12)
 
   -- Enforce minimum bag frame width so the main bank window is never
   -- narrower than the bank tab panel anchored below it.

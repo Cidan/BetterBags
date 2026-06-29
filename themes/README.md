@@ -63,6 +63,7 @@ WINDOW_KIND = {
 | `GetAllThemes()` | Get available themes | - | `table<string, Theme>` |
 | `UpdateOpacity()` | Update frame opacity | - | - |
 | `SetTitle(frame, title)` | Set frame title | `Frame`, `string` | - |
+| `GetFlatHeaderHeight(frame)` | Get flat frame header height for layout | `Frame` | `number` |
 
 ### Theme Registration
 
@@ -257,6 +258,8 @@ Every theme must implement the following interface:
 
 **Tab(tab)** - Custom tab styling
 
+**GetFlatHeaderHeight(frame)** - Return custom flat window header height for layout (returns `number`)
+
 ## Creating Custom Themes
 
 ### Basic Theme Template
@@ -406,6 +409,7 @@ end
 | `OffsetSidebar` | function | No | Sidebar offset |
 | `ItemButton` | function | No | Item button styling |
 | `Tab` | function | No | Tab styling |
+| `GetFlatHeaderHeight` | function | No | Flat window header height override |
 | `DisableMasque` | boolean | No | Disable Masque integration |
 
 ### Context Access
