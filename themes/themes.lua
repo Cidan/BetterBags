@@ -128,8 +128,21 @@ function themes:ApplyTheme(ctx, key)
       if theme.PositionBagSlots then
         theme.PositionBagSlots(frame, frame.Owner.slots.frame)
       else
-        frame.Owner.slots.frame:ClearAllPoints()
-        frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 14)
+        if frame.Owner.kind == const.BAG_KIND.BANK then
+          if frame.Owner.slots:IsShown() then
+            frame.Owner.slots.frame:ClearAllPoints()
+            frame.Owner.slots.frame:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
+          else
+            frame.Owner.slots.frame:ClearAllPoints()
+            frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 14)
+          end
+        else
+          frame.Owner.slots.frame:ClearAllPoints()
+          frame.Owner.slots.frame:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 14)
+        end
+      end
+      if frame.Owner.slots:IsShown() then
+        frame.Owner.slots:Draw(ctx)
       end
     end
 
