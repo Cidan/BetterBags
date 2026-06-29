@@ -89,6 +89,8 @@ const.BACKPACK_ONLY_REAGENT_BAGS = {
 }
 
 const.OFFSETS = {
+  -- Width allocated for the scrollbar when it appears.
+  SCROLLBAR_WIDTH = 14,
   -- This is the offset from the top of the bag window to the start of the
   -- content frame.
   BAG_TOP_INSET = -38,
