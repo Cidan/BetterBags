@@ -28,7 +28,7 @@ function backpack.proto:OnCreate(ctx)
 	-- Currency doesn't exist in Era (no GetCurrencyListInfo API)
 
 	-- Group tabs
-	self.bag.tabs = tabs:Create(self.bag.frame)
+	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)
 
 	-- Set up tab click handler
 	local behavior = self

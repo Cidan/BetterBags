@@ -652,6 +652,7 @@ end
 ---@param kind BagKind
 ---@return table<number, Group>
 function DB:GetAllGroups(kind)
+  if not kind or not DB.data.profile.groups[kind] then return {} end
   return DB.data.profile.groups[kind]
 end
 
@@ -659,6 +660,7 @@ end
 ---@param groupID number
 ---@return Group?
 function DB:GetGroup(kind, groupID)
+  if not kind or not DB.data.profile.groups[kind] then return nil end
   return DB.data.profile.groups[kind][groupID]
 end
 
