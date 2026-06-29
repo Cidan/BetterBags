@@ -597,7 +597,7 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     end
   end)
 
-  events:RegisterEvent('PLAYER_BANK_TAB_SLOTS_CHANGED', function(ectx)
+  events:RegisterEvent('BANK_TABS_CHANGED', function(ectx)
     if b:IsShown() then
       b:Draw(ectx)
     end

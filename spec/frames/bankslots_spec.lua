@@ -162,7 +162,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
   end)
 
   describe("2. Retail Character Bank Tab Purchase Event Registration", function()
-    it("should register PLAYER_BANK_TAB_SLOTS_CHANGED in frames/bankslots.lua and bags/bank.lua", function()
+    it("should register BANK_TABS_CHANGED in frames/bankslots.lua and bags/bank.lua", function()
       addon.isRetail = true
       local registeredEvents = {}
       local oldRegisterEvent = events.RegisterEvent
@@ -189,7 +189,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       events.RegisterEvent = oldRegisterEvent
 
       -- Assertions
-      assert.is_true(registeredEvents["PLAYER_BANK_TAB_SLOTS_CHANGED"], "PLAYER_BANK_TAB_SLOTS_CHANGED should be registered")
+      assert.is_true(registeredEvents["BANK_TABS_CHANGED"], "BANK_TABS_CHANGED should be registered")
     end)
   end)
 

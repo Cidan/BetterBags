@@ -330,7 +330,7 @@ function bank.proto:RegisterEvents()
 		behavior:GenerateGroupTabs(ectx)
 	end)
 
-	events:RegisterEvent("PLAYER_BANK_TAB_SLOTS_CHANGED", function(ectx)
+	events:RegisterEvent("BANK_TABS_CHANGED", function(ectx)
 		behavior:GenerateGroupTabs(ectx)
 	end)
 
