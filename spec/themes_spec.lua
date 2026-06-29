@@ -9,6 +9,10 @@ const.WINDOW_KIND = {
   SIMPLE = "simple",
   FLAT = "flat"
 }
+const.BAG_KIND = {
+  BACKPACK = 0,
+  BANK = 1
+}
 
 local L = StubBetterBagsModule("Localization")
 L.G = function(self, key) return key end
@@ -112,6 +116,205 @@ describe("Themes", function()
 
       -- Assert height is 45
       assert.are.equal(45, themes:GetFlatHeaderHeight(frame))
+    end)
+  end)
+
+  describe("ApplyTheme slot positioning and dynamic updates", function()
+    local ctx
+
+    before_each(function()
+      ctx = {}
+      -- Register Default theme
+      themes:RegisterTheme("Default", {
+        Name = "Default",
+        Available = true,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function() end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() end,
+        ToggleSearch = function() end,
+      })
+    end)
+
+    it("should correctly position and redraw shown bank slots at the bottom", function()
+      -- Create a mock portrait frame (like a bank window)
+      local frame = CreateFrame("Frame", "TestBankWindow")
+      local slotsDrawCalled = false
+      local slotsFramePoints = {}
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestBankSlotsFrame"),
+        IsShown = function() return true end,
+        Draw = function(self, context)
+          slotsDrawCalled = true
+        end
+      }
+
+      slotsMock.frame.ClearAllPoints = function()
+        slotsFramePoints = {}
+      end
+      slotsMock.frame.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        table.insert(slotsFramePoints, { point = point, relFrame = relFrame, relPoint = relPoint, x = x, y = y })
+      end
+
+      -- Owner represent the Bag/Bank controller
+      frame.Owner = {
+        kind = const.BAG_KIND.BANK,
+        slots = slotsMock,
+        sideAnchor = CreateFrame("Frame"),
+      }
+
+      -- Register as portrait window
+      themes:RegisterPortraitWindow(frame, "Bank")
+
+      -- Apply Default theme
+      themes:ApplyTheme(ctx, "Default")
+
+      -- Assert slots were positioned at the bottom of the bank window
+      assert.is_true(#slotsFramePoints > 0)
+      local lastPoint = slotsFramePoints[#slotsFramePoints]
+      assert.are.equal("TOPLEFT", lastPoint.point)
+      assert.are.equal(frame, lastPoint.relFrame)
+      assert.are.equal("BOTTOMLEFT", lastPoint.relPoint)
+      assert.are.equal(0, lastPoint.x)
+      assert.are.equal(-2, lastPoint.y)
+
+      -- Assert Draw was called on the shown bank slots
+      assert.is_true(slotsDrawCalled)
+    end)
+
+    it("should correctly position and redraw shown backpack slots at the top", function()
+      -- Create a mock portrait frame (like a backpack window)
+      local frame = CreateFrame("Frame", "TestBackpackWindow")
+      local slotsDrawCalled = false
+      local slotsFramePoints = {}
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestBackpackSlotsFrame"),
+        IsShown = function() return true end,
+        Draw = function(self, context)
+          slotsDrawCalled = true
+        end
+      }
+
+      slotsMock.frame.ClearAllPoints = function()
+        slotsFramePoints = {}
+      end
+      slotsMock.frame.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        table.insert(slotsFramePoints, { point = point, relFrame = relFrame, relPoint = relPoint, x = x, y = y })
+      end
+
+      -- Owner represent the Bag/Bank controller
+      frame.Owner = {
+        kind = const.BAG_KIND.BACKPACK,
+        slots = slotsMock,
+        sideAnchor = CreateFrame("Frame"),
+      }
+
+      -- Register as portrait window
+      themes:RegisterPortraitWindow(frame, "Backpack")
+
+      -- Apply Default theme
+      themes:ApplyTheme(ctx, "Default")
+
+      -- Assert slots were positioned at the top of the backpack window
+      assert.is_true(#slotsFramePoints > 0)
+      local lastPoint = slotsFramePoints[#slotsFramePoints]
+      assert.are.equal("BOTTOMLEFT", lastPoint.point)
+      assert.are.equal(frame, lastPoint.relFrame)
+      assert.are.equal("TOPLEFT", lastPoint.relPoint)
+      assert.are.equal(0, lastPoint.x)
+      assert.are.equal(14, lastPoint.y)
+
+      -- Assert Draw was called on the shown backpack slots
+      assert.is_true(slotsDrawCalled)
+    end)
+
+    it("should position hidden bank slots at the top starting position and NOT redraw them", function()
+      local frame = CreateFrame("Frame", "TestHiddenBankWindow")
+      local slotsDrawCalled = false
+      local slotsFramePoints = {}
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestHiddenBankSlotsFrame"),
+        IsShown = function() return false end,
+        Draw = function(self, context)
+          slotsDrawCalled = true
+        end
+      }
+
+      slotsMock.frame.ClearAllPoints = function()
+        slotsFramePoints = {}
+      end
+      slotsMock.frame.SetPoint = function(self, point, relFrame, relPoint, x, y)
+        table.insert(slotsFramePoints, { point = point, relFrame = relFrame, relPoint = relPoint, x = x, y = y })
+      end
+
+      frame.Owner = {
+        kind = const.BAG_KIND.BANK,
+        slots = slotsMock,
+        sideAnchor = CreateFrame("Frame"),
+      }
+
+      themes:RegisterPortraitWindow(frame, "Bank")
+      themes:ApplyTheme(ctx, "Default")
+
+      -- Assert slots were positioned at the top starting position
+      assert.is_true(#slotsFramePoints > 0)
+      local lastPoint = slotsFramePoints[#slotsFramePoints]
+      assert.are.equal("BOTTOMLEFT", lastPoint.point)
+      assert.are.equal(frame, lastPoint.relFrame)
+      assert.are.equal("TOPLEFT", lastPoint.relPoint)
+      assert.are.equal(0, lastPoint.x)
+      assert.are.equal(14, lastPoint.y)
+
+      -- Assert Draw was NOT called on hidden bank slots
+      assert.is_false(slotsDrawCalled)
+    end)
+
+    it("should prioritize custom PositionBagSlots theme callback if defined", function()
+      local frame = CreateFrame("Frame", "TestCustomCallbackWindow")
+      local customCallbackCalled = false
+      local slotsDrawCalled = false
+
+      themes:RegisterTheme("CustomPositionTheme", {
+        Name = "Custom Position Theme",
+        Available = true,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function() end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() end,
+        ToggleSearch = function() end,
+        PositionBagSlots = function(f, bagSlotWindow)
+          customCallbackCalled = true
+        end
+      })
+
+      local slotsMock = {
+        frame = CreateFrame("Frame", "TestCustomCallbackSlotsFrame"),
+        IsShown = function() return true end,
+        Draw = function(self, context)
+          slotsDrawCalled = true
+        end
+      }
+
+      frame.Owner = {
+        kind = const.BAG_KIND.BACKPACK,
+        slots = slotsMock,
+        sideAnchor = CreateFrame("Frame"),
+      }
+
+      themes:RegisterPortraitWindow(frame, "Backpack")
+      themes:ApplyTheme(ctx, "CustomPositionTheme")
+
+      assert.is_true(customCallbackCalled)
+      assert.is_true(slotsDrawCalled)
     end)
   end)
 end)
