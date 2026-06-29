@@ -233,12 +233,8 @@ local gw2Theme = {
   end,
   PositionBagSlots = function (frame, bagSlotWindow)
     bagSlotWindow:ClearAllPoints()
-    if addon.isRetail and frame.Owner.kind == const.BAG_KIND.BANK then
-      if frame.Owner.slots:IsShown() then
-        bagSlotWindow:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
-      else
-        bagSlotWindow:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 0, 14)
-      end
+    if frame.Owner.slots:IsShown() then
+      bagSlotWindow:SetPoint("TOPLEFT", frame, "BOTTOMLEFT", 0, -2)
     else
       bagSlotWindow:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 8, 16)
     end
