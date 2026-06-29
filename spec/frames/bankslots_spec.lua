@@ -113,6 +113,7 @@ _G.SetItemButtonQuality = function() end
 _G.SetItemButtonCount = function() end
 _G.SetItemButtonDesaturated = function() end
 _G.GetInventoryItemQuality = function() return 1 end
+_G.GetNumBankSlots = function() return 2 end
 _G.ItemButtonUtil = {
   Event = { ItemContextChanged = 1 },
   TriggerEvent = function() end,
@@ -295,6 +296,38 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       -- Assertions: filter should be cleared, selectedBagIndex nil, buttons deselected
       assert.is_nil(mockBag.blizzardBankTab, "blizzardBankTab should be cleared on bank OnHide")
       assert.is_nil(panel.selectedBagIndex, "selectedBagIndex should be cleared on bank OnHide")
+    end)
+  end)
+
+  describe("6. Classic/Era OnClose Method Compatibility", function()
+    it("should safely handle bank OnHide on Classic/Era without OnClose nil errors", function()
+      addon.isRetail = false
+      local bagFrame = CreateFrame("Frame")
+
+      -- Load BagSlots and create Classic/Era panel
+      local bagSlots = addon:GetModule("BagSlots")
+      local panel = bagSlots:CreatePanel(ctx:New("test"), const.BAG_KIND.BANK, bagFrame)
+
+      local mockBag = {
+        frame = bagFrame,
+        moneyFrame = { Update = function() end },
+        tabs = {
+          SetClickHandler = function() end,
+          frame = { Show = function() end, IsShown = function() return true end }
+        },
+        slots = panel,
+        Wipe = function() end,
+      }
+
+      local bankBehavior = addon:GetModule("BankBehavior")
+      local bInstance = setmetatable({ bag = mockBag }, { __index = bankBehavior.proto })
+      addon.Bags = { Bank = mockBag }
+      mockBag.behavior = bInstance
+
+      -- Closing the bank on Classic/Era should not throw "attempt to call method 'OnClose' (a nil value)"
+      assert.has_no.errors(function()
+        bInstance:OnHide()
+      end)
     end)
   end)
 end)

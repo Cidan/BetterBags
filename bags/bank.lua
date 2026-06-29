@@ -210,7 +210,9 @@ function bank.proto:OnHide()
 			-- otherwise re-show any child whose IsShown() is still true).
 			if self.bag.slots then
 				local ctx = context:New("OnHide")
-				self.bag.slots:OnClose(ctx)
+				if self.bag.slots.OnClose then
+					self.bag.slots:OnClose(ctx)
+				end
 				self.bag.slots.frame:Hide()
 			end
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
@@ -221,7 +223,9 @@ function bank.proto:OnHide()
 		-- Explicitly reset the bank slots panel's shown state (see fade path above).
 		if self.bag.slots then
 			local ctx = context:New("OnHide")
-			self.bag.slots:OnClose(ctx)
+			if self.bag.slots.OnClose then
+				self.bag.slots:OnClose(ctx)
+			end
 			self.bag.slots.frame:Hide()
 		end
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)

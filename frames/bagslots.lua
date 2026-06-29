@@ -115,6 +115,15 @@ function BagSlots.bagSlotProto:IsShown()
   return self.frame:IsShown()
 end
 
+---@param _ctx Context
+function BagSlots.bagSlotProto:OnClose(_ctx)
+  local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
+  if self.tabsWereShown and parentBag and parentBag.tabs then
+    parentBag.tabs.frame:Show()
+  end
+  self.tabsWereShown = false
+end
+
 ---@param ctx Context
 ---@param kind BagKind
 ---@param bagFrame Frame

@@ -262,11 +262,11 @@ local function CreateMockWidget(widgetType, name, parent)
   end
 
   widget._attributes = {}
-  function widget:SetAttribute(name, value)
-    self._attributes[name] = value
+  function widget:SetAttribute(attrName, value)
+    self._attributes[attrName] = value
   end
-  function widget:GetAttribute(name)
-    return self._attributes[name]
+  function widget:GetAttribute(attrName)
+    return self._attributes[attrName]
   end
 
   -- Strata / Level / Backdrop
