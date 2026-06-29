@@ -39,7 +39,7 @@ local context = addon:GetModule("Context")
 local contextMenu = addon:GetModule("ContextMenu")
 
 ---@class BankSlots: AceModule
-local bankSlots = addon:GetModule("BankSlots")
+local bankSlots = addon:GetModule("BankSlots", true)
 
 local NEW_GROUP_TAB_ID = 0
 local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
@@ -269,7 +269,7 @@ function bank.proto:OnCreate(ctx)
 	-- Create the bank tab slots panel (retail only). This slide-out panel
 	-- shows all possible Blizzard bank tabs and lets the player filter the
 	-- bank view to a single tab.
-	if addon.isRetail then
+	if addon.isRetail and bankSlots then
 		local slots = bankSlots:CreatePanel(ctx, self.bag.frame)
 		if slots then
 			self.bag.slots = slots
