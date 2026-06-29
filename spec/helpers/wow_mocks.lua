@@ -38,6 +38,9 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:IsShown()
     return self._shown
   end
+  function widget:SetShown(shown)
+    self._shown = shown
+  end
   function widget:RegisterEvent(event)
     self._events[event] = true
   end
@@ -96,6 +99,9 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:EnableMouse(enable)
     self._mouseEnabled = enable
   end
+  function widget:EnableMouseWheel(enable)
+    self._mouseWheelEnabled = enable
+  end
   function widget:RegisterForClicks(...)
     self._registeredClicks = {...}
   end
@@ -119,13 +125,25 @@ local function CreateMockWidget(widgetType, name, parent)
     return fs
   end
   function widget:SetNormalTexture(texture)
-    self._normalTexture = texture
+    self.NormalTexture = texture
   end
   function widget:GetNormalTexture()
-    if not self._normalTexture then
-      self._normalTexture = CreateMockWidget("Texture", nil, self)
+    if not self.NormalTexture and widgetType ~= "Texture" then
+      self.NormalTexture = CreateMockWidget("Texture", nil, self)
     end
-    return self._normalTexture
+    return self.NormalTexture
+  end
+  function widget:GetPushedTexture()
+    if not self.PushedTexture and widgetType ~= "Texture" then
+      self.PushedTexture = CreateMockWidget("Texture", nil, self)
+    end
+    return self.PushedTexture
+  end
+  function widget:GetHighlightTexture()
+    if not self.HighlightTexture and widgetType ~= "Texture" then
+      self.HighlightTexture = CreateMockWidget("Texture", nil, self)
+    end
+    return self.HighlightTexture
   end
   function widget:SetHighlightTexture(texture)
     self._highlightTexture = texture
@@ -133,8 +151,15 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetBlendMode(mode)
     self._blendMode = mode
   end
+  function widget:SetDrawLayer(layer, sublevel)
+    self._drawLayer = layer
+    self._sublevel = sublevel
+  end
   function widget:SetTexture(path)
     self._texturePath = path
+  end
+  function widget:SetColorTexture(r, g, b, a)
+    self._colorTexture = {r = r, g = g, b = b, a = a or 1}
   end
   function widget:SetNormalAtlas(atlas)
     self._normalAtlas = atlas
@@ -156,6 +181,15 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetText(text)
     self._text = tostring(text or "")
   end
+  function widget:SetTextHeight(height)
+    self._textHeight = height
+  end
+  function widget:SetWordWrap(wrap)
+    self._wordWrap = wrap
+  end
+  function widget:SetShadowColor(r, g, b, a)
+    self._shadowColor = {r = r, g = g, b = b, a = a or 1}
+  end
   function widget:GetText()
     return self._text
   end
@@ -166,6 +200,20 @@ local function CreateMockWidget(widgetType, name, parent)
     return #self._text * 6
   end
   function widget:SetFont(font, size, flags)
+    if flags and flags ~= "" then
+      for token in string.gmatch(flags, "[^,%s]+") do
+        local upperToken = string.upper(token)
+        if upperToken ~= "OUTLINE" and
+           upperToken ~= "THICKOUTLINE" and
+           upperToken ~= "MONOCHROME" and
+           upperToken ~= "FILTER" and
+           upperToken ~= "FIXEDHEIGHT" and
+           upperToken ~= "NEVERCULL" and
+           upperToken ~= "SLUG" then
+          error("bad argument #3 to 'SetFont' (supported flags: OUTLINE, THICKOUTLINE, MONOCHROME, FILTER, FIXEDHEIGHT, NEVERCULL, SLUG)", 2)
+        end
+      end
+    end
     self._font = font
     self._fontSize = size
     self._fontFlags = flags
@@ -235,6 +283,14 @@ local function CreateMockWidget(widgetType, name, parent)
       self._container = CreateMockWidget("Frame", nil, self)
     end
     return self._container
+  end
+
+  if widgetType ~= "Texture" then
+    widget.NormalTexture = widget:GetNormalTexture()
+    widget.PushedTexture = widget:GetPushedTexture()
+    widget.NewItemTexture = CreateMockWidget("Texture", nil, widget)
+    widget.BattlepayItemTexture = CreateMockWidget("Texture", nil, widget)
+    widget.HighlightTexture = widget:GetHighlightTexture()
   end
 
   return widget
@@ -314,6 +370,14 @@ if not _G.C_Item.GetItemInfoInstant then
   _G.C_Item.GetItemInfoInstant = function(id) return id end
 end
 _G.C_Item.IsBound = _G.C_Item.IsBound or function() return false end
+_G.C_Item.GetItemQuality = _G.C_Item.GetItemQuality or function() return 1 end
+_G.C_Item.GetDetailedItemLevelInfo = _G.C_Item.GetDetailedItemLevelInfo or function() return 1, false, 1 end
+_G.C_Item.GetCurrentItemLevel = _G.C_Item.GetCurrentItemLevel or function() return 1 end
+_G.C_Item.GetItemGUID = _G.C_Item.GetItemGUID or function() return "mock-guid" end
+_G.C_Item.GetStackCount = _G.C_Item.GetStackCount or function() return 1 end
+_G.C_Item.GetItemInfo = _G.C_Item.GetItemInfo or function()
+  return "Mock Item", "[Mock Item Link]", 1, 1, 0, "Weapon", "One-Handed Swords", 1, "INVTYPE_WEAPON", 12345, 100, 2, 0, 0, 0, 0
+end
 
 -- New item tracking
 _G.C_NewItems = _G.C_NewItems or {
@@ -476,6 +540,14 @@ _G.Enum.BankType = {
 _G.Enum.BagIndex = {
   Keyring = -2,
 }
+_G.Enum.ItemClass = {
+  Consumable = 0,
+  Container = 1,
+  Weapon = 2,
+  Gem = 3,
+  Armor = 4,
+  Tradegoods = 7,
+}
 
 -- C_Bank Setup
 _G.C_Bank = _G.C_Bank or {}
@@ -505,6 +577,12 @@ _G.C_Container.GetContainerItemLink = function(bagid, slotid)
 end
 _G.C_Container.GetContainerNumFreeSlots = function(bagid)
   return 4, nil
+end
+_G.C_Container.GetContainerItemQuestInfo = _G.C_Container.GetContainerItemQuestInfo or function(bagid, slotid)
+  return { isQuestItem = false, questID = nil, isActive = false }
+end
+_G.C_Container.GetContainerItemInfo = _G.C_Container.GetContainerItemInfo or function(bagid, slotid)
+  return { iconFileID = 12345, stackCount = 1, isLocked = false, quality = 1, isReadable = false, hasLoot = false, hyperlink = "[Mock Link]", isFiltered = false, hasNoValue = false, itemID = 123 }
 end
 _G.C_Container.UseContainerItem = function(bagid, slotid, target, bankType, isReagent)
   table.insert(_G.C_Container._usedItems, {

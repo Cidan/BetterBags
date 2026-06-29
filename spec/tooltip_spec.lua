@@ -12,13 +12,20 @@ addon.isRetail = true
 -- Mock WorldFrame for Classic path
 _G.WorldFrame = {}
 
+ResetModuleStub("TooltipScanner", "data/tooltip.lua")
 LoadBetterBagsModule("data/tooltip.lua")
 local tooltipScanner = addon:GetModule("TooltipScanner")
 
 describe("TooltipScanner", function()
+  local oldCTooltipInfo
 
   before_each(function()
+    oldCTooltipInfo = _G.C_TooltipInfo
     tooltipScanner:OnInitialize()
+  end)
+
+  after_each(function()
+    _G.C_TooltipInfo = oldCTooltipInfo
   end)
 
   -- ─── Cache ──────────────────────────────────────────────────────────────────
@@ -73,6 +80,25 @@ describe("TooltipScanner", function()
   -- ─── ExtractRetail ──────────────────────────────────────────────────────────
 
   describe("ExtractRetail", function()
+
+    it("returns nil and bypasses C_TooltipInfo.GetBagItem for battle pet links", function()
+      local oldGetContainerItemLink = C_Container.GetContainerItemLink
+      local getBagItemCalled = false
+      _G.C_TooltipInfo = {
+        GetBagItem = function()
+          getBagItemCalled = true
+          return {lines = {{leftText = "Some Battle Pet Text", rightText = ""}}}
+        end,
+      }
+      C_Container.GetContainerItemLink = function(bagid, slotid)
+        return "|cf10307ff|Hbattlepet:123:1:2:3:4:5:0000000000000000|h[Battle Pet Link]|h|r"
+      end
+
+      local text = tooltipScanner:ExtractRetail(0, 1)
+      C_Container.GetContainerItemLink = oldGetContainerItemLink
+      assert.is_nil(text)
+      assert.is_false(getBagItemCalled)
+    end)
 
     it("returns nil when C_TooltipInfo is unavailable", function()
       _G.C_TooltipInfo = nil
@@ -336,6 +362,7 @@ describe("TooltipScanner", function()
       local originalIsRetail = addon.isRetail
       addon.isRetail = false
       local oldWorldFrame = _G.WorldFrame
+      local oldCreateFrame = _G.CreateFrame
       _G.WorldFrame = {}
       local frames = {}
       _G.CreateFrame = function(_, name, _, _)
@@ -348,6 +375,7 @@ describe("TooltipScanner", function()
       tooltipScanner:OnInitialize()
       addon.isRetail = originalIsRetail
       _G.WorldFrame = oldWorldFrame
+      _G.CreateFrame = oldCreateFrame
       assert.is_not_nil(tooltipScanner.scanTooltip)
       assert.is_true(#frames >= 1)
     end)

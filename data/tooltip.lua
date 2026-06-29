@@ -67,6 +67,11 @@ function tooltipScanner:ExtractRetail(bagid, slotid)
     return nil
   end
 
+  local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
+  if itemLink and (string.find(itemLink, "battlepet:") or string.find(itemLink, "Hbattlepet:")) then
+    return nil
+  end
+
   local tooltipData = C_TooltipInfo.GetBagItem(bagid, slotid)
   if not tooltipData or not tooltipData.lines then
     debug:Log("TooltipScanner", "No tooltip data for bag %d slot %d", bagid, slotid)

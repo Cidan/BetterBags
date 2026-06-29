@@ -50,7 +50,7 @@ function binding.GetItemBinding(itemLocation, bindType)
       bindinginfo.binding = const.BINDING_SCOPE.SOULBOUND
     end
 
-    if C_Bank and C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, itemLocation) then
+    if C_Bank and C_Bank.IsItemAllowedInBankType and C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, itemLocation) then
       bindinginfo.binding = const.BINDING_SCOPE.ACCOUNT
     end
 
