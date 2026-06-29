@@ -26,7 +26,7 @@ function backpack.proto:OnCreate(ctx)
 	-- Classic: Search frame, bag slots, currency, and theme config are created inline in frames/classic/bag.lua
 
 	-- Group tabs
-	self.bag.tabs = tabs:Create(self.bag.frame)
+	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)
 
 	-- Set up tab click handler
 	local behavior = self

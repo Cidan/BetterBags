@@ -891,6 +891,16 @@ describe("Database", function()
       assert.is_nil(DB:GetGroup(const.BAG_KIND.BANK, 999))
     end)
 
+    it("GetAllGroups handles nil kind gracefully", function()
+      local groups = DB:GetAllGroups(nil)
+      assert.same({}, groups)
+    end)
+
+    it("GetGroup handles nil kind gracefully", function()
+      local group = DB:GetGroup(nil, 1)
+      assert.is_nil(group)
+    end)
+
     it("CreateGroup creates a new group and returns its ID", function()
       local id = DB:CreateGroup(const.BAG_KIND.BACKPACK, "Test Group")
       assert.are.equal(2, id)

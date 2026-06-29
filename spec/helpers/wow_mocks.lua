@@ -273,8 +273,14 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetFrameStrata(strata)
     self._frameStrata = strata
   end
+  function widget:GetFrameStrata()
+    return self._frameStrata or "MEDIUM"
+  end
   function widget:SetFrameLevel(level)
     self._frameLevel = level
+  end
+  function widget:GetFrameLevel()
+    return self._frameLevel or 1
   end
   function widget:SetBackdrop(backdrop)
     self._backdrop = backdrop
@@ -552,8 +558,8 @@ _G.GetCursorPosition = function() return _G._cursorX or 0, _G._cursorY or 0 end
 -- Enum Setup
 _G.Enum = _G.Enum or {}
 _G.Enum.BankType = {
-  Account = 1,
-  Character = 2,
+  Character = 1,
+  Account = 2,
 }
 _G.Enum.BagIndex = {
   Keyring = -2,
