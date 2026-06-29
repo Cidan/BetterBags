@@ -11,9 +11,6 @@ local BagSlots = addon:GetModule('BagSlots')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -37,17 +34,19 @@ local context = addon:GetModule('Context')
 
 ---@param ctx Context
 ---@param kind BagKind
+---@param bagFrame Frame
 ---@return bagSlots
-function BagSlots:CreatePanel(ctx, kind)
+function BagSlots:CreatePanel(ctx, kind, bagFrame)
   ---@class bagSlots
   local b = {}
   setmetatable(b, {__index = BagSlots.bagSlotProto})
+  b.bagFrame = bagFrame
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", name .. "BagSlots", UIParent)
   b.frame = f
 
-  themes:RegisterSimpleWindow(f, L:G("Equipped Bags"))
+  themes:RegisterFlatWindow(f, "")
   --ButtonFrameTemplate_HidePortrait(b.frame)
   --ButtonFrameTemplate_HideButtonBar(b.frame)
   --b.frame.Inset:Hide()
@@ -70,6 +69,7 @@ function BagSlots:CreatePanel(ctx, kind)
     b.content:AddCell(tostring(i), iframe)
   end
 
+  b.tabsWereShown = false
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
   b.fadeInGroup:HookScript("OnFinished", function()
     local ectx = context:New('bag_slots_fade_in_finished')
@@ -84,6 +84,15 @@ function BagSlots:CreatePanel(ctx, kind)
     local ectx = context:New('bag_slots_fade_out_finished')
     database:SetBagView(kind, database:GetPreviousView(kind))
     events:SendMessage(ectx, 'bags/FullRefreshAll')
+
+    b.frame:ClearAllPoints()
+    b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
+
+    local parentBag = addon.Bags and (kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
+    if b.tabsWereShown and parentBag and parentBag.tabs then
+      parentBag.tabs.frame:Show()
+    end
+    b.tabsWereShown = false
   end)
   events:RegisterEvent("BAG_CONTAINER_UPDATE", function(ectx) b:Draw(ectx) end)
   b.kind = kind

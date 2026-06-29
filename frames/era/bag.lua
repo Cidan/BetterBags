@@ -141,7 +141,7 @@ function bagFrame:Create(ctx, kind)
   b.menuList = contextMenu:CreateContextMenu(b)
 
   -- Era creates bag slots for both backpack and bank
-  local slots = bagSlots:CreatePanel(ctx, kind)
+  local slots = bagSlots:CreatePanel(ctx, kind, b.frame)
   slots.frame:SetPoint("BOTTOMLEFT", b.frame, "TOPLEFT", 0, 8)
   slots.frame:SetParent(b.frame)
   slots.frame:Hide()

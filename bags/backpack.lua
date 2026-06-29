@@ -117,7 +117,7 @@ function backpack.proto:OnCreate(ctx)
 	self.bag.searchFrame = searchBox:Create(ctx, self.bag.frame)
 
 	-- Bag slots panel
-	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BACKPACK)
+	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BACKPACK, self.bag.frame)
 	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
 	slots.frame:SetParent(self.bag.frame)
 	slots.frame:Hide()
@@ -237,6 +237,12 @@ local NEW_GROUP_TAB_ICON = "communities-icon-addchannelplus"
 function backpack.proto:GenerateGroupTabs(ctx)
 	-- Skip tab generation if groups are disabled
 	if not database:GetGroupsEnabled(const.BAG_KIND.BACKPACK) then
+		self.bag.tabs.frame:Hide()
+		return
+	end
+
+	-- If slots panel is active, hide tabs instead of showing them
+	if self.bag.slots and self.bag.slots:IsShown() then
 		self.bag.tabs.frame:Hide()
 		return
 	end

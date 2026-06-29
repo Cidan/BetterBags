@@ -11,9 +11,6 @@ local BagSlots = addon:NewModule('BagSlots')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Localization: AceModule
-local L = addon:GetModule('Localization')
-
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -78,6 +75,17 @@ end
 ---@param callback? fun()
 function BagSlots.bagSlotProto:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  self.frame:ClearAllPoints()
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
+
+  local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
+  if parentBag and parentBag.tabs then
+    self.tabsWereShown = parentBag.tabs.frame:IsShown()
+    parentBag.tabs.frame:Hide()
+  else
+    self.tabsWereShown = false
+  end
+
   if callback then
     self.fadeInGroup.callback = function()
       self.fadeInGroup.callback = nil
@@ -105,17 +113,19 @@ end
 
 ---@param ctx Context
 ---@param kind BagKind
+---@param bagFrame Frame
 ---@return bagSlots
-function BagSlots:CreatePanel(ctx, kind)
+function BagSlots:CreatePanel(ctx, kind, bagFrame)
   ---@class bagSlots
   local b = {}
   setmetatable(b, {__index = BagSlots.bagSlotProto})
+  b.bagFrame = bagFrame
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   ---@class Frame: BackdropTemplate
   local f = CreateFrame("Frame", name .. "BagSlots", UIParent)
   b.frame = f
 
-  themes:RegisterFlatWindow(f, L:G("Equipped Bags"))
+  themes:RegisterFlatWindow(f, "")
 
   b.content = grid:Create(b.frame)
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
@@ -134,6 +144,7 @@ function BagSlots:CreatePanel(ctx, kind)
     b.content:AddCell(tostring(i), iframe)
   end
 
+  b.tabsWereShown = false
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
 
   addon.HookScript(b.fadeInGroup, "OnFinished", function(ectx)
@@ -148,6 +159,15 @@ function BagSlots:CreatePanel(ctx, kind)
   addon.HookScript(b.fadeOutGroup, "OnFinished", function(ectx)
     database:SetBagView(kind, database:GetPreviousView(kind))
     events:SendMessage(ectx, 'bags/FullRefreshAll')
+
+    b.frame:ClearAllPoints()
+    b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
+
+    local parentBag = addon.Bags and (kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
+    if b.tabsWereShown and parentBag and parentBag.tabs then
+      parentBag.tabs.frame:Show()
+    end
+    b.tabsWereShown = false
   end)
 
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ectx) b:Draw(ectx) end)
