@@ -248,6 +248,17 @@ function DB:UpdateMaxItemLevel(itemLevel)
 end
 
 ---@return {low: ColorDef, mid: ColorDef, high: ColorDef, max: ColorDef}
+function DB:ResetMaxItemLevel()
+  local characterKey = UnitName("player") .. "-" .. GetRealmName()
+  local byCharacter = DB.data.profile.itemLevelColor.maxItemLevelByCharacter
+  byCharacter[characterKey] = 1
+  -- Notify listeners to refresh item level visuals and options pane.
+  local events = addon:GetModule('Events')
+  local context = addon:GetModule('Context')
+  local ctx = context:New('ResetMaxItemLevel')
+  events:SendMessage(ctx, 'itemLevel/MaxChanged', 1)
+end
+
 function DB:GetItemLevelColors()
   return DB.data.profile.itemLevelColor.colors
 end

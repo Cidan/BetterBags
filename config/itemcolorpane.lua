@@ -165,6 +165,16 @@ function itemColorPane:Create(parent)
     events:SendMessage(ctx, 'itemLevel/MaxChanged', database:GetMaxItemLevel())
   end)
 
+  -- Reset Max Item Level button
+  local resetMaxButton = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+  resetMaxButton:SetPoint("LEFT", resetButton, "RIGHT", 10, 0)
+  resetMaxButton:SetSize(200, 25)
+  resetMaxButton:SetText("Reset Max Item Level")
+  resetMaxButton:SetScript("OnClick", function()
+    database:ResetMaxItemLevel()
+    pane:UpdateBreakpoints()
+  end)
+
   -- Register for max item level changes
   pane.frame:RegisterEvent("BAG_UPDATE")
   pane.frame:SetScript("OnEvent", function()

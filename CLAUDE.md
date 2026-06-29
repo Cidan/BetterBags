@@ -9,6 +9,16 @@
 @.context/project.md
 
 
+## PRIME DIRECTIVE #1: Test-First TDD
+
+Always write TESTS FIRST to validate the bug or feature before writing any implementation/fix.
+1. Write a failing test that reproduces the bug or simulates the new feature.
+2. Run tests to observe and confirm the failure.
+3. Write/modify the implementation code.
+4. Run tests to confirm they are now passing.
+No implementation code should be modified or added without a corresponding test written and observed failing first.
+
+
 ## Evidence
 
 Never make any changes without directly confirming that the functions, code, API's, and work you are implementing exists by directly observing it. You must either observe it as a WoW API, or as part of our addon. Never take any guesses or rely on internal memory -- always look at code and patterns in the code base and use a direct line of reference. Show your work in all your plans, and directly cite any API calls, both internal and external.

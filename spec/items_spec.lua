@@ -22,12 +22,16 @@ function L:G(key) return key end
 local equipmentSets = StubBetterBagsModule("EquipmentSets")
 equipmentSets.GetItemSets = function() return nil end
 
+local tooltipScanner = StubBetterBagsModule("TooltipScanner")
+tooltipScanner.GetTooltipText = function() return "" end
+
 LoadBetterBagsModule("util/query.lua")
 LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
 LoadBetterBagsModule("data/search.lua")
 LoadBetterBagsModule("core/async.lua")
 LoadBetterBagsModule("data/stacks.lua")
+ResetModuleStub("Binding", "data/binding.lua")
 LoadBetterBagsModule("data/binding.lua")
 
 -- Categories stub (items.lua calls GetModule('Categories'))
@@ -46,7 +50,19 @@ const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BANK_BAGS = { [6] = 6, [7] = 7, [8] = 8, [9] = 9, [10] = 10, [11] = 11 }
 const.ACCOUNT_BANK_BAGS = { [13] = 13, [14] = 14, [15] = 15, [16] = 16, [17] = 17 }
 const.BACKPACK_BAGS = { [0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4 }
-const.BINDING_SCOPE = const.BINDING_SCOPE or { UNKNOWN = 0 }
+const.BINDING_SCOPE = {
+  UNKNOWN = 0,
+  NONBINDING = 1,
+  BOUND = 2,
+  BOE = 3,
+  BOU = 4,
+  QUEST = 5,
+  SOULBOUND = 6,
+  REFUNDABLE = 7,
+  ACCOUNT = 8,
+  BNET = 9,
+  WUE = 10,
+}
 const.ITEM_QUALITY = { Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5 }
 const.SEARCH_CATEGORY_GROUP_BY = { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 const.EXPANSION_MAP = { [0] = "Classic", [1] = "Burning Crusade", [2] = "Wrath", [9] = "The War Within" }
@@ -62,6 +78,9 @@ const.BRIEF_EXPANSION_MAP = {
   [2] = "wotlk",
   [3] = "cata",
   [9] = "tww",
+}
+const.INVENTORY_TYPE_TO_INVENTORY_SLOTS = {
+  [1] = {1},
 }
 
 _G.Enum = _G.Enum or {}
@@ -81,6 +100,7 @@ addon.isRetail = true
 addon.isClassic = false
 
 -- Load items.lua and its SlotInfo extension
+ResetModuleStub("Items", "data/items.lua")
 LoadBetterBagsModule("data/items.lua")
 LoadBetterBagsModule("data/slots.lua")
 local items = addon:GetModule("Items")
@@ -828,6 +848,92 @@ describe("Items", function()
       items:WipeSearchCache(const.BAG_KIND.BACKPACK)
       assert.is_nil(items.searchCache[const.BAG_KIND.BACKPACK]["0_1"])
       assert.is_nil(items.categoryPriorityCache[const.BAG_KIND.BACKPACK]["0_1"])
+    end)
+  end)
+
+  -- ─── Max Item Level Dynamic Coloring ───────────────────────────────────────
+
+  describe("Max Item Level Dynamic Coloring", function()
+    local savedGetItemInfo
+    local savedGetCurrentItemLevel
+    local savedContainerItems
+    local savedIsBound
+    local savedGetItemBinding
+    local savedItemClass
+    local savedUpdateMaxItemLevel
+    local binding = addon:GetModule("Binding")
+
+    before_each(function()
+      savedGetItemInfo = _G.C_Item.GetItemInfo
+      savedGetCurrentItemLevel = _G.C_Item.GetCurrentItemLevel
+      savedIsBound = _G.C_Item.IsBound
+      _G.C_Item.IsBound = function() return false end
+      savedItemClass = _G.Enum.ItemClass
+      _G.Enum.ItemClass = {
+        Weapon = 2,
+        Armor = 4,
+        Consumable = 0,
+      }
+      savedGetItemBinding = binding.GetItemBinding
+      binding.GetItemBinding = function()
+        return { binding = 1, bound = false }
+      end
+      savedContainerItems = _G._containerItems
+      _G._containerItems = {
+        [0] = {
+          [1] = 123,
+          [2] = 456,
+          [3] = 789,
+        }
+      }
+      savedUpdateMaxItemLevel = database.UpdateMaxItemLevel
+    end)
+
+    after_each(function()
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      _G.C_Item.GetCurrentItemLevel = savedGetCurrentItemLevel
+      _G.C_Item.IsBound = savedIsBound
+      _G.Enum.ItemClass = savedItemClass
+      binding.GetItemBinding = savedGetItemBinding
+      _G._containerItems = savedContainerItems
+      database.UpdateMaxItemLevel = savedUpdateMaxItemLevel
+    end)
+
+    it("should update max item level for armor and weapons, but NOT consumables", function()
+      local updateCalls = {}
+      database.UpdateMaxItemLevel = function(_, ilvl)
+        table.insert(updateCalls, ilvl)
+      end
+
+      _G.C_Item.GetCurrentItemLevel = function() return 250 end
+
+      -- Mock a weapon item info
+      _G.C_Item.GetItemInfo = function()
+        return "Sword", nil, nil, 250, nil, nil, nil, nil, nil, nil, nil, Enum.ItemClass.Weapon
+      end
+      local weaponData = MockData.ItemData({bagid = 0, slotid = 1})
+      items:AttachItemInfo(weaponData, const.BAG_KIND.BACKPACK)
+
+      -- Mock an armor item info
+      _G.C_Item.GetItemInfo = function()
+        return "Shield", nil, nil, 250, nil, nil, nil, nil, nil, nil, nil, Enum.ItemClass.Armor
+      end
+      local armorData = MockData.ItemData({bagid = 0, slotid = 2})
+      items:AttachItemInfo(armorData, const.BAG_KIND.BACKPACK)
+
+      -- Mock a consumable item info
+      _G.C_Item.GetItemInfo = function()
+        return "Potion", nil, nil, 580, nil, nil, nil, nil, nil, nil, nil, Enum.ItemClass.Consumable
+      end
+      _G.C_Item.GetCurrentItemLevel = function() return 580 end
+      local consumableData = MockData.ItemData({bagid = 0, slotid = 3})
+      items:AttachItemInfo(consumableData, const.BAG_KIND.BACKPACK)
+
+      -- Assert that UpdateMaxItemLevel was called for weapon (250) and armor (250)
+      -- but NOT called for consumable (580)
+      assert.are.equal(2, #updateCalls)
+      assert.are.equal(250, updateCalls[1])
+      assert.are.equal(250, updateCalls[2])
     end)
   end)
 end)

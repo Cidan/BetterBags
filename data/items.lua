@@ -1427,7 +1427,16 @@ function items:GetEquipmentInfo(itemMixin)
 	}
 	-- Track max item level for dynamic coloring
 	if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
-		database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
+		local cID = data.itemInfo.classID
+		local isGear
+		if Enum and Enum.ItemClass and Enum.ItemClass.Weapon and Enum.ItemClass.Armor then
+			isGear = (cID == Enum.ItemClass.Weapon or cID == Enum.ItemClass.Armor)
+		else
+			isGear = (cID == 2 or cID == 4)
+		end
+		if isGear then
+			database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
+		end
 	end
 	return data
 end
@@ -1521,7 +1530,16 @@ function items:AttachItemInfo(data, kind)
 	}
 	-- Track max item level for dynamic coloring
 	if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
-		database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
+		local cID = data.itemInfo.classID
+		local isGear
+		if Enum and Enum.ItemClass and Enum.ItemClass.Weapon and Enum.ItemClass.Armor then
+			isGear = (cID == Enum.ItemClass.Weapon or cID == Enum.ItemClass.Armor)
+		else
+			isGear = (cID == 2 or cID == 4)
+		end
+		if isGear then
+			database:UpdateMaxItemLevel(data.itemInfo.currentItemLevel)
+		end
 	end
 
 	if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
