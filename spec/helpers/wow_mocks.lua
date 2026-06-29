@@ -41,6 +41,9 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetShown(shown)
     self._shown = shown
   end
+  function widget:GetName()
+    return self._name
+  end
   function widget:RegisterEvent(event)
     self._events[event] = true
   end
