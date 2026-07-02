@@ -936,4 +936,177 @@ describe("Items", function()
       assert.are.equal(250, updateCalls[2])
     end)
   end)
+
+  -- ─── Secret and incomplete items (Issue 984) ───────────────────────────────
+
+  describe("Secret and incomplete items (Issue 984)", function()
+    local savedGetItemInfo
+    local savedGetDetailedItemLevelInfo
+    local savedGetItemQuality
+    local savedGetContainerItemInfo
+    local savedGetContainerItemQuestInfo
+    local savedGetItemIconByID
+    local savedGetItemGUID
+    local savedGetStackCount
+    local savedIsBound
+    local savedGetCurrentItemLevel
+
+    before_each(function()
+      savedGetItemInfo = _G.C_Item.GetItemInfo
+      savedGetDetailedItemLevelInfo = _G.C_Item.GetDetailedItemLevelInfo
+      savedGetItemQuality = _G.C_Item.GetItemQuality
+      savedGetContainerItemInfo = _G.C_Container.GetContainerItemInfo
+      savedGetContainerItemQuestInfo = _G.C_Container.GetContainerItemQuestInfo
+      savedGetItemIconByID = _G.C_Item.GetItemIconByID
+      savedGetItemGUID = _G.C_Item.GetItemGUID
+      savedGetStackCount = _G.C_Item.GetStackCount
+      savedIsBound = _G.C_Item.IsBound
+      savedGetCurrentItemLevel = _G.C_Item.GetCurrentItemLevel
+
+      -- Force APIs to return nil
+      _G.C_Item.GetItemInfo = function() return nil end
+      _G.C_Item.GetDetailedItemLevelInfo = function() return nil end
+      _G.C_Item.GetItemQuality = function() return nil end
+      _G.C_Container.GetContainerItemInfo = function() return nil end
+      _G.C_Container.GetContainerItemQuestInfo = function() return nil end
+      _G.C_Item.GetItemIconByID = function() return nil end
+      _G.C_Item.GetItemGUID = function() return nil end
+      _G.C_Item.GetStackCount = function() return nil end
+      _G.C_Item.IsBound = function() return nil end
+      _G.C_Item.GetCurrentItemLevel = function() return nil end
+    end)
+
+    after_each(function()
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      _G.C_Item.GetDetailedItemLevelInfo = savedGetDetailedItemLevelInfo
+      _G.C_Item.GetItemQuality = savedGetItemQuality
+      _G.C_Container.GetContainerItemInfo = savedGetContainerItemInfo
+      _G.C_Container.GetContainerItemQuestInfo = savedGetContainerItemQuestInfo
+      _G.C_Item.GetItemIconByID = savedGetItemIconByID
+      _G.C_Item.GetItemGUID = savedGetItemGUID
+      _G.C_Item.GetStackCount = savedGetStackCount
+      _G.C_Item.IsBound = savedIsBound
+      _G.C_Item.GetCurrentItemLevel = savedGetCurrentItemLevel
+    end)
+
+    it("AttachItemInfo should not crash on nil return values and populate defaults", function()
+      local savedGetContainerItemID = _G.C_Container.GetContainerItemID
+      _G.C_Container.GetContainerItemID = function() return 999999 end
+      local savedGetContainerItemLink = _G.C_Container.GetContainerItemLink
+      _G.C_Container.GetContainerItemLink = function() return "|cff0070dd|Hitem:999999|h[Test]|h|r" end
+
+      local data = { bagid = 0, slotid = 1 }
+      local success, err = pcall(function()
+        items:AttachItemInfo(data, const.BAG_KIND.BACKPACK)
+      end)
+
+      _G.C_Container.GetContainerItemID = savedGetContainerItemID
+      _G.C_Container.GetContainerItemLink = savedGetContainerItemLink
+
+      assert.is_true(success, "AttachItemInfo crashed: " .. tostring(err))
+      assert.are.equal(999999, data.itemInfo.itemID)
+      assert.are.equal("", data.itemInfo.itemName)
+      assert.are.equal(const.ITEM_QUALITY.Common, data.itemInfo.itemQuality)
+      assert.are.equal(134400, data.itemInfo.itemIcon)
+    end)
+
+    it("AttachBasicItemInfo should not crash on nil return values and populate defaults", function()
+      local data = {}
+      local success, err = pcall(function()
+        items:AttachBasicItemInfo(999999, data)
+      end)
+
+      assert.is_true(success, "AttachBasicItemInfo crashed: " .. tostring(err))
+      assert.are.equal(999999, data.itemInfo.itemID)
+      assert.are.equal("", data.itemInfo.itemName)
+      assert.are.equal(const.ITEM_QUALITY.Common, data.itemInfo.itemQuality)
+      assert.are.equal(134400, data.itemInfo.itemIcon)
+    end)
+
+    it("GetEquipmentInfo should not crash on nil return values and populate defaults", function()
+      local mockItemLocation = {
+        GetEquipmentSlot = function() return 1 end
+      }
+      local mockItemMixin = {
+        GetInventoryType = function() return 1 end,
+        GetItemLocation = function() return mockItemLocation end,
+        GetItemLink = function() return "|cff0070dd|Hitem:999999|h[Test]|h|r" end,
+        GetItemID = function() return 999999 end,
+        IsItemEmpty = function() return false end
+      }
+
+      local success, resultOrErr = pcall(function()
+        return items:GetEquipmentInfo(mockItemMixin)
+      end)
+
+      assert.is_true(success, "GetEquipmentInfo crashed: " .. tostring(resultOrErr))
+      assert.are.equal(999999, resultOrErr.itemInfo.itemID)
+      assert.are.equal("", resultOrErr.itemInfo.itemName)
+      assert.are.equal(const.ITEM_QUALITY.Common, resultOrErr.itemInfo.itemQuality)
+    end)
+
+    it("GetCategory should not crash on incomplete or missing itemInfo/containerInfo fields", function()
+      local ctx = addon:GetModule("Context"):New("TestContext")
+      local data = {
+        kind = const.BAG_KIND.BACKPACK,
+        slotkey = "0_1",
+        itemInfo = {
+          itemID = 999999,
+          itemEquipLoc = "INVTYPE_HEAD"
+        },
+        containerInfo = {}
+      }
+
+      -- Set up _G["INVTYPE_HEAD"] to be localized string
+      _G["INVTYPE_HEAD"] = "Head"
+
+      -- Verify we can run GetCategory and it falls back to Everything when fields are missing
+      local category
+      local success, err = pcall(function()
+        category = items:GetCategory(ctx, data)
+      end)
+
+      assert.is_true(success, "GetCategory crashed: " .. tostring(err))
+      -- If INVTYPE_HEAD is set, and EquipLoc matches, it might return "Head" or "Everything"
+      -- Let's make sure it doesn't crash regardless.
+      assert.is_not_nil(category)
+    end)
+
+    it("GenerateItemHash should handle nil/incomplete properties in its fields", function()
+      local data = {
+        kind = const.BAG_KIND.BACKPACK,
+        itemLinkInfo = {
+          itemID = 999999,
+          enchantID = "",
+          gemID1 = "",
+          gemID2 = "",
+          gemID3 = "",
+          suffixID = "",
+          bonusIDs = {},
+          relic1BonusIDs = {},
+          relic2BonusIDs = {},
+          relic3BonusIDs = {},
+          crafterGUID = nil,
+          extraEnchantID = nil
+        },
+        bindingInfo = {
+          binding = nil
+        },
+        itemInfo = {
+          currentItemLevel = nil
+        },
+        transmogInfo = {
+          transmogInfoMixin = nil
+        }
+      }
+
+      local hash
+      local success, err = pcall(function()
+        hash = items:GenerateItemHash(data)
+      end)
+
+      assert.is_true(success, "GenerateItemHash crashed: " .. tostring(err))
+      assert.is_string(hash)
+    end)
+  end)
 end)

@@ -1199,27 +1199,50 @@ end
 ---@return string
 function items:GenerateItemHash(data)
 	local stackOpts = database:GetStackingOptions(data.kind)
+	local itemLinkInfo = data.itemLinkInfo or {}
+	local bindingInfo = data.bindingInfo or {}
+	local itemInfo = data.itemInfo or {}
+	local transmogInfo = data.transmogInfo or {}
+
+	local itemID = itemLinkInfo.itemID or 0
+	local enchantID = itemLinkInfo.enchantID or ""
+	local gemID1 = itemLinkInfo.gemID1 or ""
+	local gemID2 = itemLinkInfo.gemID2 or ""
+	local gemID3 = itemLinkInfo.gemID3 or ""
+	local suffixID = itemLinkInfo.suffixID or ""
+	local bonusIDs = table.concat(itemLinkInfo.bonusIDs or {}, ",")
+	local relic1BonusIDs = table.concat(itemLinkInfo.relic1BonusIDs or {}, ",")
+	local relic2BonusIDs = table.concat(itemLinkInfo.relic2BonusIDs or {}, ",")
+	local relic3BonusIDs = table.concat(itemLinkInfo.relic3BonusIDs or {}, ",")
+	local crafterGUID = itemLinkInfo.crafterGUID or ""
+	local extraEnchantID = itemLinkInfo.extraEnchantID or ""
+	local bindingVal = bindingInfo.binding or 0
+	local currentItemLevel = itemInfo.currentItemLevel or 0
+
+	local appearanceID = 0
+	if stackOpts.dontMergeTransmog
+		and transmogInfo.transmogInfoMixin
+		and transmogInfo.transmogInfoMixin.appearanceID then
+		appearanceID = transmogInfo.transmogInfoMixin.appearanceID
+	end
+
 	local hash = format(
 		"%d%s%s%s%s%s%s%s%s%s%s%s%d%d%d",
-		data.itemLinkInfo.itemID,
-		data.itemLinkInfo.enchantID,
-		data.itemLinkInfo.gemID1,
-		data.itemLinkInfo.gemID2,
-		data.itemLinkInfo.gemID3,
-		data.itemLinkInfo.suffixID,
-		table.concat(data.itemLinkInfo.bonusIDs, ","),
-		--table.concat(data.itemLinkInfo.modifierIDs, ","),
-		table.concat(data.itemLinkInfo.relic1BonusIDs, ","),
-		table.concat(data.itemLinkInfo.relic2BonusIDs, ","),
-		table.concat(data.itemLinkInfo.relic3BonusIDs, ","),
-		data.itemLinkInfo.crafterGUID or "",
-		data.itemLinkInfo.extraEnchantID or "",
-		data.bindingInfo.binding,
-		data.itemInfo.currentItemLevel,
-		stackOpts.dontMergeTransmog
-				and data.transmogInfo.transmogInfoMixin
-				and data.transmogInfo.transmogInfoMixin.appearanceID
-			or 0
+		itemID,
+		enchantID,
+		gemID1,
+		gemID2,
+		gemID3,
+		suffixID,
+		bonusIDs,
+		relic1BonusIDs,
+		relic2BonusIDs,
+		relic3BonusIDs,
+		crafterGUID,
+		extraEnchantID,
+		bindingVal,
+		currentItemLevel,
+		appearanceID
 	)
 	return hash
 end
@@ -1230,6 +1253,10 @@ end
 function items:GetCategory(ctx, data)
 	if not data or data.isItemEmpty then
 		return L:G("Empty Slot")
+	end
+
+	if not data.itemInfo then
+		data.itemInfo = {}
 	end
 
 	if database:GetCategoryFilter(data.kind, "RecentItems") then
@@ -1250,8 +1277,8 @@ function items:GetCategory(ctx, data)
 	-- Unified priority-based category selection
 	-- Check both search cache (from search categories) and item list categories,
 	-- returning the one with higher priority
-	local searchCategory = self.searchCache[data.kind][data.slotkey]
-	local searchPriority = self.categoryPriorityCache[data.kind][data.slotkey]
+	local searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
+	local searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
 	local customCategory, customPriority = categories:GetCustomCategory(ctx, data.kind, data)
 
 	-- If both exist, compare priorities
@@ -1275,7 +1302,8 @@ function items:GetCategory(ctx, data)
 		return customCategory
 	end
 
-	if data.containerInfo.quality == const.ITEM_QUALITY.Poor then
+	local quality = data.containerInfo and data.containerInfo.quality
+	if quality == const.ITEM_QUALITY.Poor then
 		return L:G("Junk")
 	end
 
@@ -1283,6 +1311,7 @@ function items:GetCategory(ctx, data)
 	if
 		database:GetCategoryFilter(data.kind, "EquipmentLocation")
 		and data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+		and data.itemInfo.itemEquipLoc ~= nil
 		and _G[data.itemInfo.itemEquipLoc] ~= nil
 		and _G[data.itemInfo.itemEquipLoc] ~= ""
 	then
@@ -1376,8 +1405,29 @@ function items:GetEquipmentInfo(itemMixin)
 	local itemID = itemMixin:GetItemID() --[[@as number]]
 	local itemName, _, _, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID =
 		C_Item.GetItemInfo(itemLink)
-	local itemAppearanceID, itemModifiedAppearanceID =
-		C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
+
+	itemName = itemName or ""
+	itemLevel = itemLevel or 0
+	itemMinLevel = itemMinLevel or 0
+	itemType = itemType or ""
+	itemSubType = itemSubType or ""
+	itemStackCount = itemStackCount or 1
+	itemEquipLoc = itemEquipLoc or ""
+	itemTexture = itemTexture or 134400
+	sellPrice = sellPrice or 0
+	classID = classID or 0
+	subclassID = subclassID or 0
+	bindType = bindType or 0
+	expacID = expacID or 0
+	setID = setID or 0
+
+	local itemAppearanceID, itemModifiedAppearanceID = 0, 0
+	if C_TransmogCollection and itemLink then
+		local appID, modAppID = C_TransmogCollection.GetItemInfo(itemLink)
+		itemAppearanceID = appID or 0
+		itemModifiedAppearanceID = modAppID or 0
+	end
+
 	data.transmogInfo = {
 		transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
 			appearanceID = 0,
@@ -1387,15 +1437,20 @@ function items:GetEquipmentInfo(itemMixin)
 		},
 		itemAppearanceID = itemAppearanceID,
 		itemModifiedAppearanceID = itemModifiedAppearanceID,
-		hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID),
+		hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID) or false,
 	}
 	data.inventoryType = invType --[[@as number]]
 	data.inventorySlots = { itemMixin:GetItemLocation():GetEquipmentSlot() }
 	local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as ItemQuality]]
+	itemQuality = itemQuality or const.ITEM_QUALITY.Common
 	local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemLink)
+	effectiveIlvl = effectiveIlvl or itemLevel or 0
+	isPreview = not not isPreview
+	baseIlvl = baseIlvl or itemLevel or 0
+
 	data.itemInfo = {
 		itemID = itemID,
-		itemGUID = C_Item.GetItemGUID(itemLocation),
+		itemGUID = C_Item.GetItemGUID(itemLocation) or "",
 		itemName = itemName,
 		itemLink = itemLink,
 		itemQuality = itemQuality,
@@ -1416,13 +1471,13 @@ function items:GetEquipmentInfo(itemMixin)
 		effectiveIlvl = effectiveIlvl --[[@as number]],
 		isPreview = isPreview --[[@as boolean]],
 		baseIlvl = baseIlvl --[[@as number]],
-		itemIcon = 0,
-		isBound = C_Item.IsBound(itemLocation),
+		itemIcon = itemTexture or 134400,
+		isBound = C_Item.IsBound and C_Item.IsBound(itemLocation) or false,
 		isLocked = false,
 		isNewItem = false,
-		currentItemCount = C_Item.GetStackCount(itemLocation),
+		currentItemCount = C_Item.GetStackCount and C_Item.GetStackCount(itemLocation) or 1,
 		category = "",
-		currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
+		currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or effectiveIlvl or 0,
 		equipmentSets = nil,
 	}
 	-- Track max item level for dynamic coloring
@@ -1461,17 +1516,69 @@ function items:AttachItemInfo(data, kind)
 		return data
 	end
 	data.isItemEmpty = false
-	local _, _, _, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent =
+	local itemName, _, _, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent =
 		C_Item.GetItemInfo(itemID)
+
+	itemName = itemName or ""
+	itemLevel = itemLevel or 0
+	itemMinLevel = itemMinLevel or 0
+	itemType = itemType or ""
+	itemSubType = itemSubType or ""
+	itemStackCount = itemStackCount or 1
+	itemEquipLoc = itemEquipLoc or ""
+	itemTexture = itemTexture or 134400
+	sellPrice = sellPrice or 0
+	classID = classID or 0
+	subclassID = subclassID or 0
+	bindType = bindType or 0
+	expacID = expacID or 0
+	setID = setID or 0
+	isCraftingReagent = not not isCraftingReagent
+
 	bindType = self:GetBindTypeFromLink(itemLink) or bindType --link overrides itemID if set
 	local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as ItemQuality]]
+	itemQuality = itemQuality or const.ITEM_QUALITY.Common
+
 	local effectiveIlvl, isPreview, baseIlvl = C_Item.GetDetailedItemLevelInfo(itemID)
+	effectiveIlvl = effectiveIlvl or itemLevel or 0
+	isPreview = not not isPreview
+	baseIlvl = baseIlvl or itemLevel or 0
+
 	local invType = itemMixin:GetInventoryType()
 	data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
-	data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+	if not data.containerInfo then
+		data.containerInfo = {
+			iconFileID = itemTexture or 134400,
+			stackCount = 1,
+			isLocked = false,
+			quality = itemQuality,
+			isReadable = false,
+			hasLoot = false,
+			hyperlink = itemLink or "",
+			isFiltered = false,
+			hasNoValue = false,
+			itemID = itemID,
+			isBound = false,
+		}
+	end
+	data.containerInfo.itemName = data.containerInfo.itemName or itemName or ""
+	data.containerInfo.iconFileID = data.containerInfo.iconFileID or itemTexture or 134400
+	data.containerInfo.quality = data.containerInfo.quality or itemQuality
 
-	local itemAppearanceID, itemModifiedAppearanceID =
-		C_TransmogCollection and C_TransmogCollection.GetItemInfo(itemLink) or 0, 0
+	data.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+	if not data.questInfo then
+		data.questInfo = {
+			isQuestItem = false,
+			isActive = false,
+		}
+	end
+
+	local itemAppearanceID, itemModifiedAppearanceID = 0, 0
+	if C_TransmogCollection and itemLink then
+		local appID, modAppID = C_TransmogCollection.GetItemInfo(itemLink)
+		itemAppearanceID = appID or 0
+		itemModifiedAppearanceID = modAppID or 0
+	end
 	data.transmogInfo = {
 		transmogInfoMixin = C_Item.GetCurrentItemTransmogInfo and C_Item.GetCurrentItemTransmogInfo(itemLocation) or {
 			appearanceID = 0,
@@ -1481,15 +1588,16 @@ function items:AttachItemInfo(data, kind)
 		},
 		itemAppearanceID = itemAppearanceID,
 		itemModifiedAppearanceID = itemModifiedAppearanceID,
-		hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID),
+		hasTransmog = C_TransmogCollection and C_TransmogCollection.PlayerHasTransmog(itemID, itemModifiedAppearanceID) or false,
 	}
 
-	data.bindingInfo = binding.GetItemBinding(itemLocation, bindType)
+	data.bindingInfo = binding.GetItemBinding(itemLocation, bindType) or { binding = 0, bound = false }
 
 	-- Extract tooltip text for search indexing
 	---@class TooltipScanner: AceModule
 	local tooltipScanner = addon:GetModule('TooltipScanner')
-	local tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, C_Item.GetItemGUID(itemLocation))
+	local itemGUID = C_Item.GetItemGUID(itemLocation) or ""
+	local tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
 
 	data.inventoryType = invType --[[@as number]]
 	data.inventorySlots = const.INVENTORY_TYPE_TO_INVENTORY_SLOTS[invType]
@@ -1497,8 +1605,8 @@ function items:AttachItemInfo(data, kind)
 		or { 0 }
 	data.itemInfo = {
 		itemID = itemID,
-		itemGUID = C_Item.GetItemGUID(itemLocation),
-		itemName = data.containerInfo.itemName,
+		itemGUID = itemGUID,
+		itemName = data.containerInfo.itemName or itemName or "",
 		itemLink = itemLink,
 		itemQuality = itemQuality,
 		itemLevel = itemLevel,
@@ -1518,13 +1626,13 @@ function items:AttachItemInfo(data, kind)
 		effectiveIlvl = effectiveIlvl --[[@as number]],
 		isPreview = isPreview --[[@as boolean]],
 		baseIlvl = baseIlvl --[[@as number]],
-		itemIcon = data.containerInfo.iconFileID,
-		isBound = C_Item.IsBound(itemLocation),
+		itemIcon = data.containerInfo.iconFileID or itemTexture or 134400,
+		isBound = C_Item.IsBound and C_Item.IsBound(itemLocation) or false,
 		isLocked = false,
-		isNewItem = C_NewItems.IsNewItem(bagid, slotid),
-		currentItemCount = C_Item.GetStackCount(itemLocation),
+		isNewItem = C_NewItems.IsNewItem and C_NewItems.IsNewItem(bagid, slotid) or false,
+		currentItemCount = C_Item.GetStackCount and C_Item.GetStackCount(itemLocation) or 1,
 		category = "",
-		currentItemLevel = C_Item.GetCurrentItemLevel(itemLocation) --[[@as number]],
+		currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or effectiveIlvl or 0,
 		equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
 		tooltipText = tooltipText or "",
 	}
@@ -1557,9 +1665,48 @@ end
 ---@param itemID number
 ---@param data ItemData
 function items:AttachBasicItemInfo(itemID, data)
-	local effectiveIlvl, isPreview, baseIlvl = GetDetailedItemLevelInfo(itemID)
-	local itemName, itemLink, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent =
-		GetItemInfo(itemID)
+	local getDetailedItemLevelInfo = C_Item and C_Item.GetDetailedItemLevelInfo or _G.GetDetailedItemLevelInfo
+	local getItemInfo = C_Item and C_Item.GetItemInfo or _G.GetItemInfo
+	local getItemIconByID = C_Item and C_Item.GetItemIconByID or _G.GetItemIconByID
+
+	local effectiveIlvl, isPreview, baseIlvl
+	if getDetailedItemLevelInfo then
+		effectiveIlvl, isPreview, baseIlvl = getDetailedItemLevelInfo(itemID)
+	end
+
+	local itemName, itemLink, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent
+	if getItemInfo then
+		itemName, itemLink, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent =
+			getItemInfo(itemID)
+	end
+
+	itemName = itemName or ""
+	itemLink = itemLink or ""
+	itemQuality = itemQuality or const.ITEM_QUALITY.Common
+	itemLevel = itemLevel or 0
+	itemMinLevel = itemMinLevel or 0
+	itemType = itemType or ""
+	itemSubType = itemSubType or ""
+	itemStackCount = itemStackCount or 1
+	itemEquipLoc = itemEquipLoc or ""
+	itemTexture = itemTexture or 134400
+	sellPrice = sellPrice or 0
+	classID = classID or 0
+	subclassID = subclassID or 0
+	bindType = bindType or 0
+	expacID = expacID or 0
+	setID = setID or 0
+	isCraftingReagent = not not isCraftingReagent
+
+	effectiveIlvl = effectiveIlvl or itemLevel or 0
+	isPreview = not not isPreview
+	baseIlvl = baseIlvl or itemLevel or 0
+
+	local itemIcon = 134400
+	if getItemIconByID then
+		itemIcon = getItemIconByID(itemID) or 134400
+	end
+
 	data.questInfo = {
 		isActive = false,
 		isQuestItem = false,
@@ -1588,7 +1735,7 @@ function items:AttachBasicItemInfo(itemID, data)
 		effectiveIlvl = effectiveIlvl --[[@as number]],
 		isPreview = isPreview --[[@as boolean]],
 		baseIlvl = baseIlvl --[[@as number]],
-		itemIcon = C_Item.GetItemIconByID(itemID),
+		itemIcon = itemIcon,
 		isBound = false,
 		isLocked = false,
 		isNewItem = false,
