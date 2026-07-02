@@ -118,7 +118,7 @@ end
 ---@param _ctx Context
 function BagSlots.bagSlotProto:OnClose(_ctx)
   local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
-  if self.tabsWereShown and parentBag and parentBag.tabs then
+  if (self.tabsWereShown or database:GetGroupsEnabled(self.kind)) and parentBag and parentBag.tabs then
     parentBag.tabs.frame:Show()
   end
   self.tabsWereShown = false
@@ -177,7 +177,7 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
     b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
 
     local parentBag = addon.Bags and (kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
-    if b.tabsWereShown and parentBag and parentBag.tabs then
+    if (b.tabsWereShown or database:GetGroupsEnabled(kind)) and parentBag and parentBag.tabs then
       parentBag.tabs.frame:Show()
     end
     b.tabsWereShown = false

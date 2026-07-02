@@ -23,6 +23,7 @@ database.SetBagView = function() end
 database.GetPreviousView = function() return 1 end
 database.SetPreviousView = function() end
 database.GetEnableBagFading = function() return false end
+database.GetGroupsEnabled = function() return true end
 
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 1, BANK = 2 }
@@ -328,6 +329,34 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       assert.has_no.errors(function()
         bInstance:OnHide()
       end)
+    end)
+  end)
+
+  describe("7. Restore Group Tabs even if tabsWereShown was false (Bugfix)", function()
+    it("should restore group tabs on close if groups are enabled, even if tabsWereShown is false", function()
+      addon.isRetail = true
+      local bagFrame = CreateFrame("Frame")
+      local bankSlots = addon:GetModule("BankSlots")
+      local panel = bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+
+      local tabsShown = false
+      addon.Bags = {
+        Bank = {
+          tabs = {
+            frame = {
+              IsShown = function() return false end,
+              Show = function() tabsShown = true end,
+              Hide = function() end,
+            }
+          }
+        }
+      }
+
+      panel.tabsWereShown = false
+      database.GetGroupsEnabled = function(_, kind) return true end
+
+      panel:OnClose(ctx:New("test"))
+      assert.is_true(tabsShown, "group tabs should have been shown on close because groups are enabled")
     end)
   end)
 end)
