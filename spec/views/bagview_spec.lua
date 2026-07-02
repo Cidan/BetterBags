@@ -60,7 +60,7 @@ local sectionProto = {
   Draw = function() end,
 }
 sectionFrame.Create = function()
-  return setmetatable({ frame = CreateFrame("Frame") }, { __index = sectionProto })
+  return setmetatable({}, { __index = sectionProto })
 end
 
 -- Stub ItemFrame
