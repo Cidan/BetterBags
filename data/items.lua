@@ -751,7 +751,10 @@ function items:UpdateFreeSlots(ctx, kind)
 	local baglist
 	local tab = ctx:Get("bagid")
 	if kind == const.BAG_KIND.BANK then
-		if tab == const.BANK_TAB.BANK then
+		local blizzardTab = addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
+		if blizzardTab and addon.isRetail then
+			baglist = { [blizzardTab] = blizzardTab }
+		elseif tab == const.BANK_TAB.BANK then
 			-- Character bank: sum free slots across all character bank tabs.
 			baglist = const.BANK_BAGS
 		elseif const.ACCOUNT_BANK_BAGS and tab == const.BANK_TAB.ACCOUNT_BANK_1 then

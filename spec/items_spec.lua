@@ -829,6 +829,110 @@ describe("Items", function()
     end)
   end)
 
+  -- ─── UpdateFreeSlots ────────────────────────────────────────────────────────
+
+  describe("UpdateFreeSlots", function()
+    local savedContainerIDToInventoryID
+    local savedGetItemSubClassInfo
+    local savedGetInventoryItemLink
+    local savedGetContainerNumFreeSlots
+    local queriedBags
+
+    before_each(function()
+      savedContainerIDToInventoryID = _G.C_Container.ContainerIDToInventoryID
+      savedGetItemSubClassInfo = _G.C_Item.GetItemSubClassInfo
+      savedGetInventoryItemLink = _G.GetInventoryItemLink
+      savedGetContainerNumFreeSlots = _G.C_Container.GetContainerNumFreeSlots
+
+      const.BANK_TAB = {
+        BANK = -10,
+        ACCOUNT_BANK_1 = -11,
+      }
+
+      queriedBags = {}
+      _G.C_Container.ContainerIDToInventoryID = function() return nil end
+      _G.C_Item.GetItemSubClassInfo = function() return "MockSubClass" end
+      _G.GetInventoryItemLink = function() return nil end
+      _G.C_Container.GetContainerNumFreeSlots = function(bagid)
+        queriedBags[bagid] = true
+        return 5
+      end
+
+      -- Reset items slotInfo
+      items:ResetSlotInfo()
+    end)
+
+    after_each(function()
+      _G.C_Container.ContainerIDToInventoryID = savedContainerIDToInventoryID
+      _G.C_Item.GetItemSubClassInfo = savedGetItemSubClassInfo
+      _G.GetInventoryItemLink = savedGetInventoryItemLink
+      _G.C_Container.GetContainerNumFreeSlots = savedGetContainerNumFreeSlots
+      addon.Bags = nil
+    end)
+
+    it("restricts queried bags to blizzardBankTab when set on Retail", function()
+      addon.isRetail = true
+      addon.Bags = {
+        Bank = {
+          blizzardBankTab = 7
+        }
+      }
+
+      local ctx = addon:GetModule("Context"):New("UpdateFreeSlotsTest")
+      ctx:Set("bagid", const.BANK_TAB.BANK)
+
+      items:UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
+
+      assert.is_true(queriedBags[7])
+      for bagid in pairs(queriedBags) do
+        assert.are.equal(7, bagid)
+      end
+      assert.are.equal(5, items.slotInfo[const.BAG_KIND.BANK].emptySlots["MockSubClass"])
+    end)
+
+    it("queries all character bank bags when blizzardBankTab is nil on Retail", function()
+      addon.isRetail = true
+      addon.Bags = {
+        Bank = {}
+      }
+
+      local ctx = addon:GetModule("Context"):New("UpdateFreeSlotsTest")
+      ctx:Set("bagid", const.BANK_TAB.BANK)
+
+      items:UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
+
+      -- Verify that all BANK_BAGS were queried
+      local count = 0
+      for bagid in pairs(const.BANK_BAGS) do
+        assert.is_true(queriedBags[bagid])
+        count = count + 1
+      end
+      assert.are.equal(count * 5, items.slotInfo[const.BAG_KIND.BANK].emptySlots["MockSubClass"])
+    end)
+
+    it("does not restrict to blizzardBankTab when not on Retail", function()
+      addon.isRetail = false
+      addon.Bags = {
+        Bank = {
+          blizzardBankTab = 7
+        }
+      }
+
+      local ctx = addon:GetModule("Context"):New("UpdateFreeSlotsTest")
+      ctx:Set("bagid", const.BANK_TAB.BANK)
+
+      items:UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
+
+      -- Since not retail, it should query all BANK_BAGS as usual
+      local count = 0
+      for bagid in pairs(const.BANK_BAGS) do
+        assert.is_true(queriedBags[bagid])
+        count = count + 1
+      end
+      assert.are.equal(count * 5, items.slotInfo[const.BAG_KIND.BANK].emptySlots["MockSubClass"])
+    end)
+  end)
+
   -- ─── Search cache ───────────────────────────────────────────────────────────
 
   describe("Search cache", function()
