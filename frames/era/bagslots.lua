@@ -89,7 +89,7 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
     b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
 
     local parentBag = addon.Bags and (kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
-    if b.tabsWereShown and parentBag and parentBag.tabs then
+    if (b.tabsWereShown or database:GetGroupsEnabled(kind)) and parentBag and parentBag.tabs then
       parentBag.tabs.frame:Show()
     end
     b.tabsWereShown = false

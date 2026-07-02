@@ -35,6 +35,9 @@ local themes = addon:GetModule('Themes')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 local buttonCount = 0
 
 -- BankSlotButton represents a single bank tab slot button in the panel.
@@ -272,7 +275,7 @@ function BankSlots.bankSlotsPanelProto:OnClose(ctx)
   self.frame:SetPoint("BOTTOMLEFT", self.bagFrame, "TOPLEFT", 0, 14)
   -- Restore group tabs visibility to what it was before the panel opened.
   local bankBag = addon.Bags and addon.Bags.Bank
-  if self.tabsWereShown and bankBag and bankBag.tabs then
+  if (self.tabsWereShown or database:GetGroupsEnabled(const.BAG_KIND.BANK)) and bankBag and bankBag.tabs then
     bankBag.tabs.frame:Show()
   end
   self.tabsWereShown = false
