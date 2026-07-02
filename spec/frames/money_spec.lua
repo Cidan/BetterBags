@@ -11,6 +11,7 @@ events:OnInitialize()
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
+ResetModuleStub("MoneyFrame", "frames/money.lua")
 LoadBetterBagsModule("frames/money.lua")
 local money = addon:GetModule("MoneyFrame")
 

@@ -42,7 +42,6 @@ end
 ---@param name string Module name (e.g. "Database")
 ---@param filePath string File path that would load the real module (e.g. "core/database.lua")
 _G.ResetModuleStub = function(name, filePath)
-  if loadedModules[filePath] then return end
   if addon.modules[name] then
     addon.modules[name] = nil
   end
@@ -51,5 +50,8 @@ _G.ResetModuleStub = function(name, filePath)
   local aceAddon = LibStub("AceAddon-3.0")
   if aceAddon.addons[subAddonName] then
     aceAddon.addons[subAddonName] = nil
+  end
+  if filePath ~= nil then
+    loadedModules[filePath] = nil
   end
 end

@@ -375,7 +375,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   -- Hide sections that are not shown.
   -- Also filter by active group (if groups are enabled).
   local activeGroup = nil
-  if database:GetGroupsEnabled(bag.kind) then
+  if database:GetGroupsEnabled(bag.kind) and not (bag.kind == const.BAG_KIND.BANK and database:GetShowBankTabs()) then
     activeGroup = database:GetActiveGroup(bag.kind)
   end
 

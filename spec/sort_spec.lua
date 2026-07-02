@@ -39,6 +39,7 @@ const.ITEM_SORT_TYPE = {
 function L:G(key) return key end
 
 -- Now load the Sort module
+ResetModuleStub("Sort", "util/sort.lua")
 LoadBetterBagsModule("util/sort.lua")
 local sort = addon:GetModule("Sort")
 
