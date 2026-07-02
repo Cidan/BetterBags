@@ -376,7 +376,13 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   -- Also filter by active group (if groups are enabled).
   local activeGroup = nil
   if database:GetGroupsEnabled(bag.kind) then
-    activeGroup = database:GetActiveGroup(bag.kind)
+    -- When the bank slots panel (Show Bank Tabs) is active on Retail, we bypass group-filtering.
+    -- This is because the custom BetterBags group tabs are completely hidden in this mode,
+    -- and we are filtering specifically by individual Blizzard bank tabs.
+    local isBankSlotsActive = bag.kind == const.BAG_KIND.BANK and database:GetShowBankTabs()
+    if not isBankSlotsActive then
+      activeGroup = database:GetActiveGroup(bag.kind)
+    end
   end
 
   for sectionName, section in pairs(view:GetAllSections()) do
