@@ -29,6 +29,7 @@ local db = StubBetterBagsModule("Database")
 LoadBetterBagsModule("core/context.lua")
 
 -- Load the real Themes module
+ResetModuleStub("Themes", "themes/themes.lua")
 LoadBetterBagsModule("themes/themes.lua")
 local themes = addon:GetModule("Themes")
 
@@ -47,7 +48,7 @@ describe("Themes", function()
     themes:OnInitialize()
   end)
 
-  after_each(function()
+  teardown(function()
     ResetModuleStub("Themes", "themes/themes.lua")
     ResetModuleStub("Context", "core/context.lua")
   end)
