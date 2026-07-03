@@ -58,6 +58,13 @@ view.sortRequired = false
 ```
 **Related Files**: `views/gridview.lua`, `bags/bank.lua:489-518`, `data/refresh.lua:112-152`
 
+## First-Time Lazy Initialization of Tab Views
+**Problem**: Lazily-created tab views (such as custom groups/tabs selected for the first time) show up blank on click after reload/logging in because the initial changeset (containing all added items) has already been consumed by the primary backpack view. Subsequent clicks on custom tabs receive an empty delta changeset (`GetChangeset()` returns `{}`, `{}`, `{}`).
+
+**Solution**: Introduce a view-level `isNew` flag initialized to `true` upon view creation. On the view's first-render, if `isNew` is `true`, bypass the empty delta changeset, wipe the view, reset `isNew = false`, and perform a full draw by populating `added` with all non-empty items from `slotInfo:GetCurrentItems()`. This handles first-time lazy draws of tab views flawlessly while preserving subsequent high-performance delta changesets.
+
+**Related Files**: `views/views.lua`, `views/bagview.lua`, `views/gridview.lua`, `spec/views/persistent_tabs_spec.lua`
+
 ## Code Organization
 - **core/init.lua**: One-time setup, frame hiding/showing, Blizzard integration
 - **frames/bag.lua**: UI state management, tab switching, visual updates

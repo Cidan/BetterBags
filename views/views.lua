@@ -45,6 +45,7 @@ local stackProto = {}
 ---@field dirtySections table<string, boolean>
 ---@field private stacks table<string, Stack>
 ---@field WipeHandler fun(view: View, ctx: Context)
+---@field isNew boolean
 views.viewProto = {}
 
 function views:OnEnable()
@@ -109,7 +110,13 @@ end
 function views.viewProto:GetOrCreateItemButton(ctx, slotkey, createFunc)
   local item = self.itemsByBagAndSlot[slotkey]
   if item == nil then
-    item = self:GetItemFrame(ctx, createFunc)
+    if createFunc then
+      item = self:GetItemFrame(ctx, createFunc)
+    else
+      item = itemFrame:GetButton(ctx, slotkey)
+      self.itemFrames = self.itemFrames or {}
+      tinsert(self.itemFrames, item)
+    end
     self.itemsByBagAndSlot[slotkey] = item
   end
   return item

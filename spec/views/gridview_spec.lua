@@ -57,6 +57,7 @@ const.BACKPACK_BAGS = { [0] = true, [1] = true }
 
 local sort = StubBetterBagsModule("Sort")
 sort.SortSectionsAlphabetically = function() return true end
+sort.GetSectionSortFunction = function() return function() return true end end
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
@@ -92,6 +93,11 @@ end
 
 -- Stub ItemFrame
 local itemFrame = StubBetterBagsModule("ItemFrame")
+itemFrame.GetButton = function(self, ctx, slotkey)
+  local btn = self.Create()
+  btn.slotkey = slotkey
+  return btn
+end
 itemFrame.Create = function()
   return {
     SetItem = function() end,
@@ -166,6 +172,7 @@ describe("Grid View Category Filtering Bypass Tests", function()
   it("should hide categories that do not belong to the active group when bank slots panel is INACTIVE", function()
     local parent = CreateFrame("Frame")
     local view = views:NewGrid(parent, const.BAG_KIND.BANK)
+    view.isNew = false
 
     -- When GetShowBankTabs() is false
     database.GetShowBankTabs = function() return false end
@@ -208,6 +215,7 @@ describe("Grid View Category Filtering Bypass Tests", function()
   it("should NOT hide categories when bank slots panel is ACTIVE", function()
     local parent = CreateFrame("Frame")
     local view = views:NewGrid(parent, const.BAG_KIND.BANK)
+    view.isNew = false
 
     -- When GetShowBankTabs() is true
     database.GetShowBankTabs = function() return true end

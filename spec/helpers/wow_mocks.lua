@@ -29,6 +29,17 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetScript(scriptName)
     return self._scripts[scriptName]
   end
+  function widget:HookScript(scriptName, handler)
+    local original = self:GetScript(scriptName)
+    if original then
+      self:SetScript(scriptName, function(...)
+        original(...)
+        handler(...)
+      end)
+    else
+      self:SetScript(scriptName, handler)
+    end
+  end
   function widget:Show()
     self._shown = true
   end
@@ -61,6 +72,12 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:GetParent()
     return self._parent
+  end
+  function widget:SetID(id)
+    self._id = id
+  end
+  function widget:GetID()
+    return self._id or 0
   end
   function widget:SetSize(w, h)
     self._width = w
@@ -277,6 +294,9 @@ local function CreateMockWidget(widgetType, name, parent)
     return self._frameStrata or "MEDIUM"
   end
   function widget:SetFrameLevel(level)
+    if not level or type(level) ~= "number" or level < 0 or level > 65535 then
+      error("bad argument #1 to 'SetFrameLevel' (outside of expected range 0 to 65535 - Usage: self:SetFrameLevel(frameLevel))", 2)
+    end
     self._frameLevel = level
   end
   function widget:GetFrameLevel()
@@ -315,6 +335,22 @@ local function CreateMockWidget(widgetType, name, parent)
     widget.NewItemTexture = CreateMockWidget("Texture", nil, widget)
     widget.BattlepayItemTexture = CreateMockWidget("Texture", nil, widget)
     widget.HighlightTexture = widget:GetHighlightTexture()
+    widget.ItemContextOverlay = CreateMockWidget("Texture", nil, widget)
+    widget.UpgradeIcon = CreateMockWidget("Texture", nil, widget)
+    if widgetType == "ItemButton" then
+      widget.SetHasItem = function() end
+      widget.SetBagID = function(self, id)
+        self.bagID = id
+      end
+      widget.GetBagID = function(self)
+        return self.bagID or (self:GetParent() and self:GetParent():GetID() or nil)
+      end
+      widget.Initialize = function(self, bag, slot)
+        self:SetBagID(bag)
+        self:SetID(slot)
+        self:GetParent():IsCombinedBagContainer()
+      end
+    end
   end
 
   return widget

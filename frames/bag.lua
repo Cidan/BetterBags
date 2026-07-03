@@ -252,7 +252,6 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		end
 		return
 	end
-
 	local tabID = self:GetCurrentTabID()
 	local view = self:GetViewForTab(ctx, tabID)
 

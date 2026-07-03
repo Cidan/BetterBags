@@ -15,9 +15,6 @@ local const = addon:GetModule('Constants')
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -194,13 +191,25 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 local function BagView(view, ctx, bag, slotInfo, callback)
-  if ctx:GetBool('wipe') then
-    view:Wipe(ctx)
-  end
   -- Use the section grid sizing for this view type.
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
 
   local added, removed, changed = slotInfo:GetChangeset()
+
+  if ctx:GetBool('redraw') or view.isNew then
+    view:Wipe(ctx)
+    view.isNew = false
+    ---@type ItemData[]
+    local currentItems = {}
+    for _, item in pairs(slotInfo:GetCurrentItems()) do
+      if not item.isItemEmpty then
+        table.insert(currentItems, item)
+      end
+    end
+    added = currentItems
+  elseif ctx:GetBool('wipe') then
+    view:Wipe(ctx)
+  end
 
   added, removed, changed = FilterChangesetForTab(view, bag.kind, added, removed, changed)
 
@@ -220,11 +229,7 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     for slotid, data in pairs(emptyBagData) do
       local slotkey = view:GetSlotKey(data)
       if C_Container.GetBagName(bagid) ~= nil then
-        local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-        if itemButton == nil then
-          itemButton = itemFrame:Create(ctx)
-          view.itemsByBagAndSlot[slotkey] = itemButton
-        end
+        local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
         itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
         local section = view:GetOrCreateSection(ctx, GetBagName(bagid))
         section:AddCell(slotkey, itemButton)
@@ -326,6 +331,7 @@ function views:NewBagView(parent, kind, tabID)
   view.Render = BagView
   view.WipeHandler = Wipe
   view.AddSlot = AddSlot
+  view.isNew = true
 
   return view
 end

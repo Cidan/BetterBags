@@ -161,6 +161,11 @@ items.slotInfo = {
 
 -- Mock ItemFrame
 local itemFrame = StubBetterBagsModule("ItemFrame")
+itemFrame.GetButton = function(self, ctx, slotkey)
+  local btn = self.Create()
+  btn.slotkey = slotkey
+  return btn
+end
 itemFrame.Create = function()
   local i = {
     slotkey = nil,
@@ -178,6 +183,8 @@ itemFrame.Create = function()
     UpdateUpgrade = function(self, ctx)
       self:GetItemData()
     end,
+    UpdateCount = function(self, ctx) end,
+    SetFreeSlots = function(self, ctx, bagid, slotid, count, show) end,
   }
   return i
 end
@@ -185,9 +192,11 @@ end
 -- Load views modules
 ResetModuleStub("Views", "views/views.lua")
 ResetModuleStub("GridViewDummy", "views/gridview.lua")
+ResetModuleStub("BagViewDummy", "views/bagview.lua")
 LoadBetterBagsModule("views/views.lua")
 local views = addon:GetModule("Views")
 LoadBetterBagsModule("views/gridview.lua")
+LoadBetterBagsModule("views/bagview.lua")
 
 local context = addon:GetModule("Context")
 
@@ -223,7 +232,6 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     StubBetterBagsModule("BackpackBehavior")
     StubBetterBagsModule("BankBehavior")
   end
-
   before_each(function()
     _G.strsplit = function(sep, str, max)
       if str == nil then
@@ -520,5 +528,77 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     -- Clean up
     addon.isRetail = old_isRetail
     database.GetShowBankTabs = old_GetShowBankTabs
+  end)
+
+  it("should set view.isNew to true on bag view creation and load items on first Render when changeset is empty", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewBagView(parent, const.BAG_KIND.BACKPACK, 2)
+    assert.is_true(view.isNew)
+
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+    local mockItem = {
+      slotkey = "0_1",
+      bagid = 0,
+      slotid = 1,
+      itemHash = "hash_0_1",
+      isItemEmpty = false,
+      itemInfo = { currentItemCount = 1, itemStackCount = 20, isItemEmpty = false }
+    }
+
+    -- Put item in the mock database
+    items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"] = mockItem
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end, -- empty changeset
+      GetCurrentItems = function() return { ["0_1"] = mockItem } end,
+      emptySlotByBagAndSlot = {}
+    }
+
+    assert.is_nil(view.itemsByBagAndSlot["0_1"])
+
+    local callbackCalled = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
+
+    assert.is_true(callbackCalled)
+    assert.is_false(view.isNew)
+    assert.is_not_nil(view.itemsByBagAndSlot["0_1"])
+  end)
+
+  it("should set view.isNew to true on grid view creation and load items on first Render when changeset is empty", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 2)
+    assert.is_true(view.isNew)
+
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+    local mockItem = {
+      slotkey = "0_1",
+      bagid = 0,
+      slotid = 1,
+      itemHash = "hash_0_1",
+      isItemEmpty = false,
+      itemInfo = { currentItemCount = 1, itemStackCount = 20, isItemEmpty = false }
+    }
+
+    -- Put item in the mock database
+    items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"] = mockItem
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end, -- empty changeset
+      GetCurrentItems = function() return { ["0_1"] = mockItem } end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 1
+    }
+
+    assert.is_nil(view.itemsByBagAndSlot["0_1"])
+
+    local callbackCalled = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
+
+    assert.is_true(callbackCalled)
+    assert.is_false(view.isNew)
+    assert.is_not_nil(view.itemsByBagAndSlot["0_1"])
   end)
 end)

@@ -70,6 +70,11 @@ end
 
 -- Stub ItemFrame
 local itemFrame = StubBetterBagsModule("ItemFrame")
+itemFrame.GetButton = function(self, ctx, slotkey)
+  local btn = self.Create()
+  btn.slotkey = slotkey
+  return btn
+end
 itemFrame.Create = function()
   return {
     SetItem = function() end,
@@ -172,6 +177,7 @@ describe("Bag View", function()
       }
       local slotInfo = {
         GetChangeset = function() return {}, {}, {} end,
+        GetCurrentItems = function() return {} end,
         emptySlotByBagAndSlot = {}
       }
       local callbackCalled = false
