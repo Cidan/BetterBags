@@ -721,13 +721,26 @@ function itemFrame:OnEnable()
 	local ctx = context:New("itemFrame_OnEnable")
 	-- Pre-populate all possible physical buttons to avoid allocations in combat.
 	for bagID in pairs(const.BACKPACK_BAGS) do
-		for slotID = 1, 36 do
+		for slotID = 1, 40 do
 			self:GetButton(ctx, bagID .. "_" .. slotID)
 		end
 	end
 	for bagID in pairs(const.BANK_BAGS) do
-		for slotID = 1, 36 do
+		for slotID = 1, 40 do
 			self:GetButton(ctx, bagID .. "_" .. slotID)
+		end
+	end
+	if const.ACCOUNT_BANK_BAGS then
+		for bagID in pairs(const.ACCOUNT_BANK_BAGS) do
+			for slotID = 1, 98 do
+				self:GetButton(ctx, bagID .. "_" .. slotID)
+			end
+		end
+	end
+	if Enum and Enum.BagIndex and Enum.BagIndex.Reagentbank then
+		local reagentBagID = Enum.BagIndex.Reagentbank
+		for slotID = 1, 98 do
+			self:GetButton(ctx, reagentBagID .. "_" .. slotID)
 		end
 	end
 end
@@ -846,11 +859,19 @@ function itemFrame:GetButton(ctx, slotkey)
 		slotID = tonumber(slotID)
 		local item = self:Create(ctx)
 		-- Assign physical slot ID and bag ID exactly once on creation
-		item.button:SetID(slotID)
+		if item.button.Initialize then
+			item.button:Initialize(bagID, slotID)
+		else
+			item.button:SetID(slotID)
+			item.button.bagID = bagID
+		end
 		local decoration = themes:GetItemButton(ctx, item)
-		decoration:SetID(slotID)
-		item.button.bagID = bagID
-		decoration.bagID = bagID
+		if decoration.Initialize then
+			decoration:Initialize(bagID, slotID)
+		else
+			decoration:SetID(slotID)
+			decoration.bagID = bagID
+		end
 		item.slotkey = slotkey
 
 		self.buttonsBySlotkey[slotkey] = item

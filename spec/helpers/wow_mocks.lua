@@ -339,6 +339,16 @@ local function CreateMockWidget(widgetType, name, parent)
     widget.UpgradeIcon = CreateMockWidget("Texture", nil, widget)
     if widgetType == "ItemButton" then
       widget.SetHasItem = function() end
+      widget.SetBagID = function(self, id)
+        self.bagID = id
+      end
+      widget.GetBagID = function(self)
+        return self.bagID or (self:GetParent() and self:GetParent():GetID() or nil)
+      end
+      widget.Initialize = function(self, bag, slot)
+        self:SetBagID(bag)
+        self:SetID(slot)
+      end
     end
   end
 

@@ -543,14 +543,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     else
       freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
       for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-        if slotInfo.freeSlotKeys[name] ~= nil then
+        if freeSlotCount > 0 and slotInfo.freeSlotKeys[name] ~= nil then
           local itemButton = view:GetOrCreateItemButton(ctx, slotInfo.freeSlotKeys[name])
           local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
           itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
-          freeSlotsSection:AddCell(name, itemButton)
-        else
-          local itemButton = view:GetOrCreateItemButton(ctx, name)
-          itemButton:SetFreeSlots(ctx, 1, 1, freeSlotCount)
           freeSlotsSection:AddCell(name, itemButton)
         end
       end
