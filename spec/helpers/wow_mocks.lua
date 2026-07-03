@@ -349,6 +349,7 @@ local function CreateMockWidget(widgetType, name, parent)
         self:SetBagID(bag)
         self:SetID(slot)
         self:GetParent():IsCombinedBagContainer()
+<<<<<<< HEAD
       end
       widget.Enable = function() end
       widget.Disable = function() end
@@ -366,6 +367,8 @@ local function CreateMockWidget(widgetType, name, parent)
         local _, currentNumSlots = _G.ContainerFrame_GetContainerNumSlots(bagId)
         self:SetIsExtended(slotId > currentNumSlots)
         self.updateExtendedCalledCount = (self.updateExtendedCalledCount or 0) + 1
+=======
+>>>>>>> e536cd9 (fix: resolve GetBagID nil parent crash during template Initialize)
       end
     end
   end
