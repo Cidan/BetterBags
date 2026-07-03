@@ -252,7 +252,6 @@ function itemFrame.itemProto:ClearItem(ctx)
   self.freeSlotName = ""
   self.freeSlotCount = 0
   self.isFreeSlot = nil
-  self.slotkey = ""
   self.staticData = nil
   self:UpdateCooldown(ctx)
 end
