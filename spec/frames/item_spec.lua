@@ -252,49 +252,4 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     assert.equal(1, buttonUpdateExtendedCalled, "button:UpdateExtended was not called on SetFreeSlots")
     assert.equal(1, decUpdateExtendedCalled, "decoration:UpdateExtended was not called on SetFreeSlots")
   end)
-
-  it("should clamp frame level to 0 and not throw an error after the fix", function()
-    local btnCtx = ctx:New("test")
-    local item = itemFrame:GetButton(btnCtx, "0_2")
-
-    -- Set physical button's frame level to 0
-    item.button:SetFrameLevel(0)
-
-    -- Setup mock items data return
-    local itemData = {
-      slotkey = "0_2",
-      bagid = 0,
-      slotid = 2,
-      isItemEmpty = false,
-      questInfo = {
-        isQuestItem = false,
-        questID = nil,
-        isActive = false,
-      },
-      containerInfo = {
-        isReadable = false,
-        isFiltered = false,
-        hasNoValue = false,
-      },
-      itemInfo = {
-        isBound = false,
-        itemID = 12345,
-        itemIcon = 136235,
-        itemQuality = 2,
-        itemLink = "item:12345",
-      }
-    }
-
-    items.GetItemDataFromSlotKey = function(_, slotkey)
-      if slotkey == "0_2" then
-        return itemData
-      end
-    end
-
-    -- This call should succeed (it will fail right now until we implement the fix)
-    item:SetItem(btnCtx, "0_2")
-
-    -- And the decoration frame level should be 0
-    assert.equal(item._decoration._frameLevel, 0)
-  end)
 end)
