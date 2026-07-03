@@ -745,8 +745,10 @@ function itemFrame:OnEnable()
 	end
 end
 
+---@param bagID? number
 ---@return Item
-function itemFrame:_DoCreate(_)
+function itemFrame:_DoCreate(_, bagID)
+	bagID = bagID or -3
 	local i = setmetatable({}, { __index = itemFrame.itemProto })
 
 	-- Backwards compatibility for item data.
@@ -764,8 +766,13 @@ function itemFrame:_DoCreate(_)
 	-- button textures are named after the button itself.
 	local name = format("BetterBagsItemButton%d", buttonCount)
 	buttonCount = buttonCount + 1
+
+	local parent = CreateFrame("Frame", name .. "parent")
+	parent:SetID(bagID)
+	parent.IsCombinedBagContainer = function() return false end
+
 	---@class ItemButton
-	local button = CreateFrame("ItemButton", name, nil, "ContainerFrameItemButtonTemplate")
+	local button = CreateFrame("ItemButton", name, parent, "ContainerFrameItemButtonTemplate")
 
 	-- Install special handlers for themed interaction textures.
 	-- Use plain HookScript (not addon.HookScript) to avoid creating contexts during
@@ -833,7 +840,9 @@ function itemFrame:_DoCreate(_)
 		i:OnLeave()
 	end)
 
-	i.frame = button
+	parent:SetSize(37, 37)
+	button:SetAllPoints(parent)
+	i.frame = parent
 
 	local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
 	ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
@@ -857,7 +866,7 @@ function itemFrame:GetButton(ctx, slotkey)
 	if bagID and slotID then
 		bagID = tonumber(bagID)
 		slotID = tonumber(slotID)
-		local item = self:Create(ctx)
+		local item = self:Create(ctx, bagID)
 		-- Assign physical slot ID and bag ID exactly once on creation
 		if item.button.Initialize then
 			item.button:Initialize(bagID, slotID)
@@ -879,7 +888,7 @@ function itemFrame:GetButton(ctx, slotkey)
 	else
 		-- This is a virtual slotkey (like "Container", "Reagent Bag", etc.)
 		-- We can create a dynamic button on demand.
-		local item = self:Create(ctx)
+		local item = self:Create(ctx, -3)
 		item.slotkey = slotkey
 		self.buttonsBySlotkey[slotkey] = item
 		return item
@@ -887,9 +896,10 @@ function itemFrame:GetButton(ctx, slotkey)
 end
 
 ---@param ctx Context
+---@param bagID? number
 ---@return Item
-function itemFrame:Create(ctx)
-	local item = self:_DoCreate(ctx)
+function itemFrame:Create(ctx, bagID)
+	local item = self:_DoCreate(ctx, bagID)
 	if self.activeItems then
 		self.activeItems[item] = true
 	end

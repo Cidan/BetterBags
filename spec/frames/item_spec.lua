@@ -18,6 +18,7 @@ local database = StubBetterBagsModule("Database")
 database.GetItemLevelOptions = function() return { color = true, enabled = true } end
 database.GetStackingOptions = function() return { mergeUnstackable = false } end
 database.GetShowAllFreeSpace = function() return false end
+database.GetExtraGlowyButtons = function() return false end
 
 local color = StubBetterBagsModule("Color")
 color.GetItemLevelColor = function() return 1, 1, 1 end
@@ -113,10 +114,15 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     assert.equal(item.slotkey, "Container")
   end)
 
-  it("should remove parent frame and use the ItemButton directly as i.frame", function()
+  it("should use a permanent parent frame for the bag as i.frame", function()
     local btnCtx = ctx:New("test")
     local item = itemFrame:GetButton(btnCtx, "0_2")
-    assert.equal(item.frame, item.button)
+    assert.not_nil(item.frame)
+    assert.not_equal(item.frame, item.button)
+    assert.equal(item.button:GetParent(), item.frame)
+    assert.equal(item.frame:GetID(), 0)
+    assert.is_function(item.frame.IsCombinedBagContainer)
+    assert.is_false(item.frame:IsCombinedBagContainer())
   end)
 
   it("should clamp frame level to 0 and not throw an error after the fix", function()

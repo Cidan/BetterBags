@@ -265,8 +265,10 @@ function itemFrame.itemProto:UpdateTooltip()
   end
 end
 
+---@param bagID? number
 ---@return Item
-function itemFrame:_DoCreate()
+function itemFrame:_DoCreate(_, bagID)
+  bagID = bagID or -3
   local i = setmetatable({}, { __index = itemFrame.itemProto })
 
   -- Backwards compatibility for item data.
@@ -280,8 +282,13 @@ function itemFrame:_DoCreate()
   -- button textures are named after the button itself.
   local name = format("BetterBagsItemButton%d", buttonCount)
   buttonCount = buttonCount + 1
+
+  local parent = CreateFrame("Frame", name .. "parent")
+  parent:SetID(bagID)
+  parent.IsCombinedBagContainer = function() return false end
+
   ---@class Button
-  local button = CreateFrame("Button", name, nil, "ContainerFrameItemButtonTemplate") --[[@as Button]]
+  local button = CreateFrame("Button", name, parent, "ContainerFrameItemButtonTemplate") --[[@as Button]]
 
   button:GetPushedTexture():SetTexture("")
   button:GetNormalTexture():SetTexture("")
@@ -324,7 +331,8 @@ function itemFrame:_DoCreate()
   end
   button.BattlepayItemTexture:Hide()
 
-  button:SetSize(37, 37)
+  parent:SetSize(37, 37)
+  button:SetAllPoints(parent)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   -- ContainerFrameItemButtonTemplate enables mouse wheel via its mixin, which would
@@ -339,7 +347,7 @@ function itemFrame:_DoCreate()
     i:OnLeave()
   end)
 
-  i.frame = button
+  i.frame = parent
 
   button.GetInventorySlot = ButtonInventorySlot
   button.UpdateTooltip = function() i:UpdateTooltip() end

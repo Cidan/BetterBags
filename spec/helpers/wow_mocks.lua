@@ -348,6 +348,7 @@ local function CreateMockWidget(widgetType, name, parent)
       widget.Initialize = function(self, bag, slot)
         self:SetBagID(bag)
         self:SetID(slot)
+        self:GetParent():IsCombinedBagContainer()
       end
     end
   end
