@@ -45,6 +45,7 @@ local themes = StubBetterBagsModule("Themes")
 themes.GetItemButton = function(_, buttonCtx, item)
   if not item._decoration then
     item._decoration = {
+      SetSize = function() end,
       SetID = function(_, id) item._decoration.id = id end,
       SetMatchesSearch = function() end,
       ItemSlotBackground = { Hide = function() end, Show = function() end },
@@ -251,5 +252,13 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     -- Assert that UpdateExtended was called on both
     assert.equal(1, buttonUpdateExtendedCalled, "button:UpdateExtended was not called on SetFreeSlots")
     assert.equal(1, decUpdateExtendedCalled, "decoration:UpdateExtended was not called on SetFreeSlots")
+  end)
+
+  it("should preserve the slotkey when Wipe or ClearItem is called", function()
+    local btnCtx = ctx:New("test_wipe_preserves_slotkey")
+    local item = itemFrame:GetButton(btnCtx, "0_5")
+    assert.equal("0_5", item.slotkey)
+    item:Wipe(btnCtx)
+    assert.equal("0_5", item.slotkey)
   end)
 end)

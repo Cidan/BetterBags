@@ -705,7 +705,6 @@ function itemFrame.itemProto:ClearItem(ctx)
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
 	self:ResetSize(ctx)
-	self.slotkey = ""
 	self.stacks = {}
 	self.stackCount = 1
 	self.stackid = nil
