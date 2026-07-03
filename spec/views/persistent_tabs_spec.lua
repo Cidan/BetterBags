@@ -20,8 +20,9 @@ debug.WalkAndFixAnchorGraph = function() end
 
 local database = StubBetterBagsModule("Database")
 database.GetBagSizeInfo = function()
-  return { itemsPerRow = 5, columnCount = 4 }
+  return { itemsPerRow = 5, columnCount = 4, scale = 100 }
 end
+database.GetGroup = function() return nil end
 database.GetBagView = function() return 1 end
 database.GetInBagSearch = function() return false end
 database.GetShowNewItemFlash = function() return false end
@@ -43,6 +44,8 @@ local const = StubBetterBagsModule("Constants")
 const.BAG_VIEW = { SECTION_GRID = 1, SECTION_ALL_BAGS = 2 }
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.GRID_COMPACT_STYLE = { NONE = 0 }
+const.BANK_TAB = { BANK = -1, REAGENT = -2, ACCOUNT_BANK_1 = -3 }
+const.BANK_ONLY_BAGS = {}
 const.OFFSETS = {
   BAG_LEFT_INSET = 10,
   BAG_TOP_INSET = -40,
@@ -142,6 +145,10 @@ LoadBetterBagsModule("data/binding.lua")
 LoadBetterBagsModule("data/items.lua")
 
 local items = addon:GetModule("Items")
+items._firstLoad = {
+  [const.BAG_KIND.BACKPACK] = false,
+  [const.BAG_KIND.BANK] = false,
+}
 -- We can set up items.slotInfo map to use our mock
 items.slotInfo = {
   [const.BAG_KIND.BACKPACK] = {
@@ -193,6 +200,34 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   local old_strsplit = _G.strsplit
   local old_split = string.split
 
+  local function setupBagFrameStubs()
+    -- Register mock LibWindow-1.1 library
+    local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
+    libWindow.RestorePosition = libWindow.RestorePosition or function() end
+    libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
+
+    -- Stub remaining modules needed by frames/bag.lua
+    local contextMenu = StubBetterBagsModule("ContextMenu")
+    contextMenu.CreateContextMenu = function() return {} end
+
+    StubBetterBagsModule("BagSlots")
+    local resize = StubBetterBagsModule("Resize")
+    resize.MakeResizable = function() return { Hide = function() end } end
+
+    StubBetterBagsModule("Currency")
+    local searchBox = StubBetterBagsModule("SearchBox")
+    searchBox.GetText = function() return "" end
+
+    StubBetterBagsModule("ThemeConfig")
+    StubBetterBagsModule("WindowGroup")
+    local anchor = StubBetterBagsModule("Anchor")
+    anchor.New = function() return {} end
+
+    StubBetterBagsModule("Question")
+    StubBetterBagsModule("Search")
+    StubBetterBagsModule("BackpackBehavior")
+    StubBetterBagsModule("BankBehavior")
+  end
   before_each(function()
     _G.strsplit = function(sep, str, max)
       if str == nil then
@@ -297,32 +332,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   end)
 
   it("should cleanly wipe and recycle views and buttons when a tab is deleted", function()
-    -- Register mock LibWindow-1.1 library
-    local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
-    libWindow.RestorePosition = libWindow.RestorePosition or function() end
-    libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
-
-    -- Stub remaining modules needed by frames/bag.lua
-    local contextMenu = StubBetterBagsModule("ContextMenu")
-    contextMenu.CreateContextMenu = function() return {} end
-
-    StubBetterBagsModule("BagSlots")
-    local resize = StubBetterBagsModule("Resize")
-    resize.MakeResizable = function() return { Hide = function() end } end
-
-    StubBetterBagsModule("Currency")
-    local searchBox = StubBetterBagsModule("SearchBox")
-    searchBox.GetText = function() return "" end
-
-    StubBetterBagsModule("ThemeConfig")
-    StubBetterBagsModule("WindowGroup")
-    local anchor = StubBetterBagsModule("Anchor")
-    anchor.New = function() return {} end
-
-    StubBetterBagsModule("Question")
-    StubBetterBagsModule("Search")
-    StubBetterBagsModule("BackpackBehavior")
-    StubBetterBagsModule("BankBehavior")
+    setupBagFrameStubs()
 
     -- Mock a bag portrait window frame and load BagFrame
     LoadBetterBagsModule("frames/bag.lua")
@@ -352,5 +362,167 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(wipeCalled)
     assert.is_true(contentWipeCalled)
     assert.is_nil(bag.tabViews[database:GetBagView(bag.kind) .. "_2"])
+  end)
+
+  it("should parent emptyGroupFrame to content container instead of bag frame and respect view.tabID", function()
+    local parent = CreateFrame("Frame")
+    -- We can set up grid with a container mock
+    local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 1) -- Tab 1
+    assert.is_not_nil(view.emptyGroupFrame)
+    -- Verify parenting is view.content:GetContainer()
+    assert.equals(view.emptyGroupFrame:GetParent(), view.content:GetContainer())
+
+    -- Verify rendering tabID = 1 does NOT show emptyGroupFrame
+    local ctx = context:New("test")
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+    view:Render(ctx, bag, mockSlotInfo, function() end)
+    assert.is_false(view.emptyGroupFrame:IsShown())
+
+    -- Now test custom tab ID > 1 (e.g., 2)
+    local view2 = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 2) -- Tab 2
+    assert.is_not_nil(view2.emptyGroupFrame)
+    view2:Render(ctx, bag, mockSlotInfo, function() end)
+    -- Since totalItems is 0 and visible non-special section count is 0, emptyGroupFrame should show
+    assert.is_true(view2.emptyGroupFrame:IsShown())
+  end)
+
+  it("should render all instantiated views matching the current layout in bag:Draw()", function()
+    setupBagFrameStubs()
+    LoadBetterBagsModule("frames/bag.lua")
+    local frame = CreateFrame("Frame")
+    frame.SetScale = function() end
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      frame = frame,
+      tabViews = {},
+      GetCurrentTabID = function() return 1 end,
+      IsShown = function() return true end,
+      OnResize = function() end,
+      behavior = {
+        OnShow = function() end,
+      }
+    }
+    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+
+    local ctx = context:New("test")
+    -- Create view for Tab 1 and Tab 2
+    local view1 = bag:GetViewForTab(ctx, 1)
+    local view2 = bag:GetViewForTab(ctx, 2)
+
+    local render1_called = false
+    local render2_called = false
+    view1.Render = function(self, ...) render1_called = true; select(4, ...)(...) end
+    view2.Render = function(self, ...) render2_called = true; select(4, ...)(...) end
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+
+    bag:Draw(ctx, mockSlotInfo, function() end)
+
+    -- Assert both views were rendered
+    assert.is_true(render1_called)
+    assert.is_true(render2_called)
+  end)
+
+  it("should skip rendering in Draw() when the bag is not shown, and draw when shown", function()
+    setupBagFrameStubs()
+    LoadBetterBagsModule("frames/bag.lua")
+    local frame = CreateFrame("Frame")
+    frame.SetScale = function() end
+    local shown = false
+    frame.IsShown = function() return shown end
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      frame = frame,
+      tabViews = {},
+      GetCurrentTabID = function() return 1 end,
+      OnResize = function() end,
+      behavior = {
+        OnShow = function() shown = true end,
+      }
+    }
+    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+
+    local ctx = context:New("test")
+    local view = bag:GetViewForTab(ctx, 1)
+
+    local render_called = false
+    view.Render = function(self, ...) render_called = true; select(4, ...)(...) end
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+
+    -- Call Draw while hidden
+    bag:Draw(ctx, mockSlotInfo, function() end)
+    assert.is_false(render_called)
+    assert.is_true(bag.drawPendingOnShow)
+    assert.equals(bag.lastSlotInfo, mockSlotInfo)
+
+    -- Show the bag now
+    bag:Show(ctx)
+
+    -- Verify it rendered on show
+    assert.is_true(render_called)
+    assert.is_false(bag.drawPendingOnShow)
+  end)
+
+  it("should populate bagList with both BANK_BAGS and ACCOUNT_BANK_BAGS when GetShowBankTabs is true in Retail", function()
+    local old_isRetail = addon.isRetail
+    addon.isRetail = true
+    local old_GetShowBankTabs = database.GetShowBankTabs
+    database.GetShowBankTabs = function() return true end
+    equipmentSets.Update = function() end
+    addon.Bags = { Bank = {} }
+
+    -- Set up const values
+    const.ACCOUNT_BANK_BAGS = { [13] = 13, [14] = 14 }
+    const.BANK_BAGS = { [6] = 6, [7] = 7 }
+    const.BANK_ONLY_BAGS = {}
+
+    -- Mock LoadBagItems to observe bagList
+    local capturedBagList = nil
+    items.LoadBagItems = function(self, ctx, kind, bagList, save, callback)
+      capturedBagList = bagList
+      callback(ctx, {}, {})
+    end
+    items.LoadItems = function(self, ctx, kind, itemData, equipmentData, callback)
+      callback(ctx)
+    end
+
+    local ctx = context:New("test")
+    items:RefreshBank(ctx)
+
+    assert.is_not_nil(capturedBagList)
+    assert.is_not_nil(capturedBagList[6])
+    assert.is_not_nil(capturedBagList[7])
+    assert.is_not_nil(capturedBagList[13])
+    assert.is_not_nil(capturedBagList[14])
+
+    -- Clean up
+    addon.isRetail = old_isRetail
+    database.GetShowBankTabs = old_GetShowBankTabs
   end)
 end)

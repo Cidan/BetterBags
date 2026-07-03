@@ -439,7 +439,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   -- Also filter by active group (if groups are enabled).
   local activeGroup = nil
   if database:GetGroupsEnabled(bag.kind) and not (bag.kind == const.BAG_KIND.BANK and database:GetShowBankTabs()) then
-    activeGroup = database:GetActiveGroup(bag.kind)
+    activeGroup = view.tabID
   end
 
   for sectionName, section in pairs(view:GetAllSections()) do
@@ -711,10 +711,9 @@ function views:NewGrid(parent, kind, tabID)
 
   -- Create empty group state frame (only for backpack)
   if kind == const.BAG_KIND.BACKPACK then
-    local emptyGroupFrame = CreateFrame("Frame", nil, parent)
-    emptyGroupFrame:SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-    emptyGroupFrame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
-    emptyGroupFrame:SetFrameLevel(parent:GetFrameLevel() + 10)
+    local emptyGroupFrame = CreateFrame("Frame", nil, view.content:GetContainer())
+    emptyGroupFrame:SetAllPoints()
+    emptyGroupFrame:SetFrameLevel(view.content:GetContainer():GetFrameLevel() + 10)
     emptyGroupFrame:Hide()
 
     local helpText = emptyGroupFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
