@@ -103,3 +103,13 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ## Use Discrete Color Tiers to Avoid Unwanted Midpoint Hues
 **Problem**: Smooth blending between distant hues (e.g., blue→orange) produces unexpected intermediate colors (gray/green) at the midpoint.
 **Solution**: Compute breakpoints (low/mid/high/max) and pick the tier color directly — no interpolation between tiers.
+
+## WoW UI Parent Frame Pattern & Blizzard Mixin Contracts
+
+### Parent-less Frames Trigger Nil Pointer Crashes in Blizzard Mixins
+**Problem**: Parentless frames (e.g. `CreateFrame(type, name, nil, template)`) will crash if Blizzard's native initialization mixin calls `self:GetParent():SomeMethod()` (such as `self:GetParent():IsCombinedBagContainer()` inside `ContainerFrameItemButtonMixin:Initialize`).
+**Solution**: Always ensure that secure or template frames have a valid, unique parent frame on creation.
+
+### One Unique Parent Frame Per Item Button
+**Problem**: If multiple item buttons share the same parent frame, layout engines that position the parent frame (e.g. setting `item.frame:SetPoint(...)`) will stack all elements on top of each other and hide/wipe them together.
+**Solution**: Create a dedicated, unique unsecure parent frame per physical item button, configure it with the correct ID/attributes, and implement fallback methods (like `IsCombinedBagContainer()`) natively on that parent frame to safely bypass Blizzard's native checks without secure attribute taint.
