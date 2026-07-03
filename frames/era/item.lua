@@ -107,9 +107,6 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   local decoration = themes:GetItemButton(ctx, self)
   local bagid, slotid = data.bagid, data.slotid
   if bagid ~= nil and slotid ~= nil then
-    self.button:SetID(slotid)
-    decoration:SetID(slotid)
-    self.frame:SetID(bagid)
     if const.BANK_BAGS[bagid] then
       self.kind = const.BAG_KIND.BANK
     else
@@ -201,9 +198,6 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count)
     self.button:Enable()
   end
   self.button.minDisplayCount = -1
-  self.button:SetID(slotid)
-  decoration:SetID(slotid)
-  self.frame:SetID(bagid)
   self.freeSlotCount = count
   self.isFreeSlot = true
   local quality = self:GetBagTypeQuality(bagid)
@@ -250,9 +244,6 @@ function itemFrame.itemProto:ClearItem(ctx)
   SetItemButtonTexture(decoration, 0)
   decoration.BattlepayItemTexture:SetShown(false)
   decoration.NewItemTexture:Hide()
-  self.frame:SetID(0)
-  self.button:SetID(0)
-  decoration:SetID(0)
   decoration.minDisplayCount = 1
   self.button:Enable()
   self.ilvlText:SetText("")
@@ -289,12 +280,8 @@ function itemFrame:_DoCreate()
   -- button textures are named after the button itself.
   local name = format("BetterBagsItemButton%d", buttonCount)
   buttonCount = buttonCount + 1
-  -- Create a hidden parent to the ItemButton frame to work around
-  -- item taint introduced in 10.x
-  local p = CreateFrame("Button")
-
   ---@class Button
-  local button = CreateFrame("Button", name, p, "ContainerFrameItemButtonTemplate") --[[@as Button]]
+  local button = CreateFrame("Button", name, nil, "ContainerFrameItemButtonTemplate") --[[@as Button]]
 
   button:GetPushedTexture():SetTexture("")
   button:GetNormalTexture():SetTexture("")
@@ -337,7 +324,6 @@ function itemFrame:_DoCreate()
   end
   button.BattlepayItemTexture:Hide()
 
-  p:SetSize(37, 37)
   button:SetSize(37, 37)
   button:RegisterForDrag("LeftButton")
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -347,14 +333,13 @@ function itemFrame:_DoCreate()
   -- scroll events fall through to the outer scrollable bag frame.
   button:SetScript("OnMouseWheel", nil)
   button:EnableMouseWheel(false)
-  button:SetAllPoints(p)
   i.button = button
 
   button:HookScript("OnLeave", function()
     i:OnLeave()
   end)
 
-  i.frame = p
+  i.frame = button
 
   button.GetInventorySlot = ButtonInventorySlot
   button.UpdateTooltip = function() i:UpdateTooltip() end
@@ -370,6 +355,9 @@ end
 ---@param ctx Context
 ---@return Item
 function itemFrame:Create(ctx)
-  ---@return Item
-  return self._pool:Acquire(ctx)
+  local item = self:_DoCreate(ctx)
+  if self.activeItems then
+    self.activeItems[item] = true
+  end
+  return item
 end

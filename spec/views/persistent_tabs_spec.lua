@@ -154,6 +154,11 @@ items.slotInfo = {
 
 -- Mock ItemFrame
 local itemFrame = StubBetterBagsModule("ItemFrame")
+itemFrame.GetButton = function(self, ctx, slotkey)
+  local btn = self.Create()
+  btn.slotkey = slotkey
+  return btn
+end
 itemFrame.Create = function()
   local i = {
     slotkey = nil,

@@ -29,6 +29,17 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetScript(scriptName)
     return self._scripts[scriptName]
   end
+  function widget:HookScript(scriptName, handler)
+    local original = self:GetScript(scriptName)
+    if original then
+      self:SetScript(scriptName, function(...)
+        original(...)
+        handler(...)
+      end)
+    else
+      self:SetScript(scriptName, handler)
+    end
+  end
   function widget:Show()
     self._shown = true
   end
@@ -61,6 +72,12 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:GetParent()
     return self._parent
+  end
+  function widget:SetID(id)
+    self._id = id
+  end
+  function widget:GetID()
+    return self._id or 0
   end
   function widget:SetSize(w, h)
     self._width = w
@@ -315,6 +332,8 @@ local function CreateMockWidget(widgetType, name, parent)
     widget.NewItemTexture = CreateMockWidget("Texture", nil, widget)
     widget.BattlepayItemTexture = CreateMockWidget("Texture", nil, widget)
     widget.HighlightTexture = widget:GetHighlightTexture()
+    widget.ItemContextOverlay = CreateMockWidget("Texture", nil, widget)
+    widget.UpgradeIcon = CreateMockWidget("Texture", nil, widget)
   end
 
   return widget

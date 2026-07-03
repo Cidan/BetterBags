@@ -15,9 +15,6 @@ local const = addon:GetModule('Constants')
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
----@class ItemFrame: AceModule
-local itemFrame = addon:GetModule('ItemFrame')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -220,11 +217,7 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     for slotid, data in pairs(emptyBagData) do
       local slotkey = view:GetSlotKey(data)
       if C_Container.GetBagName(bagid) ~= nil then
-        local itemButton = view.itemsByBagAndSlot[slotkey] --[[@as Item]]
-        if itemButton == nil then
-          itemButton = itemFrame:Create(ctx)
-          view.itemsByBagAndSlot[slotkey] = itemButton
-        end
+        local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
         itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
         local section = view:GetOrCreateSection(ctx, GetBagName(bagid))
         section:AddCell(slotkey, itemButton)

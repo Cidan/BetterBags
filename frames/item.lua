@@ -32,9 +32,6 @@ local themes = addon:GetModule("Themes")
 ---@class Context: AceModule
 local context = addon:GetModule("Context")
 
----@class Pool: AceModule
-local pool = addon:GetModule("Pool")
-
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
@@ -386,10 +383,6 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	local tooltipOwner = GameTooltip:GetOwner()
 	local bagid, slotid = data.bagid, data.slotid
 	if bagid and slotid then
-		self.button:SetID(slotid)
-		decoration:SetID(slotid)
-		decoration.bagID = bagid
-		self.frame:SetID(bagid)
 		if const.BANK_BAGS[bagid] then
 			self.kind = const.BAG_KIND.BANK
 		else
@@ -593,9 +586,6 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
 		self.button:Disable()
 	else
 		self.button:Enable()
-		self.button:SetID(slotid)
-		decoration:SetID(slotid)
-		self.frame:SetID(bagid)
 	end
 
 	self.stackCount = 1
@@ -655,10 +645,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:Release(ctx)
-	if itemFrame.activeItems then
-		itemFrame.activeItems[self] = nil
-	end
-	itemFrame._pool:Release(ctx, self)
+	self:Wipe(ctx)
 end
 
 ---@param ctx Context
@@ -703,9 +690,6 @@ function itemFrame.itemProto:ClearItem(ctx)
 	ClearItemButtonOverlay(decoration)
 	decoration:UpdateCooldown(false)
 	decoration.ItemSlotBackground:Hide()
-	self.frame:SetID(0)
-	self.button:SetID(0)
-	decoration:SetID(0)
 	self.button:Enable()
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
@@ -722,8 +706,7 @@ function itemFrame.itemProto:ClearItem(ctx)
 end
 
 function itemFrame:OnInitialize()
-	self._pool = pool:Create(self._DoCreate, self._DoReset)
-	--self._pool = CreateObjectPool(self._DoCreate, self._DoReset)
+	self.buttonsBySlotkey = {}
 	self.activeItems = setmetatable({}, { __mode = "k" })
 end
 
@@ -736,23 +719,17 @@ function itemFrame:OnEnable()
 	end)
 
 	local ctx = context:New("itemFrame_OnEnable")
-	-- Pre-populate the pool with 600 items. This is done
-	-- so that items acquired during combat do not taint
-	-- the bag frame.
-	---@type Item[]
-	local frames = {}
-	for i = 1, 1100 do
-		frames[i] = self:Create(ctx)
+	-- Pre-populate all possible physical buttons to avoid allocations in combat.
+	for bagID in pairs(const.BACKPACK_BAGS) do
+		for slotID = 1, 36 do
+			self:GetButton(ctx, bagID .. "_" .. slotID)
+		end
 	end
-	for _, frame in pairs(frames) do
-		frame:Release(ctx)
+	for bagID in pairs(const.BANK_BAGS) do
+		for slotID = 1, 36 do
+			self:GetButton(ctx, bagID .. "_" .. slotID)
+		end
 	end
-end
-
----@param ctx Context
----@param i Item
-function itemFrame._DoReset(ctx, i)
-	i:ClearItem(ctx)
 end
 
 ---@return Item
@@ -774,12 +751,8 @@ function itemFrame:_DoCreate(_)
 	-- button textures are named after the button itself.
 	local name = format("BetterBagsItemButton%d", buttonCount)
 	buttonCount = buttonCount + 1
-	-- Create a hidden parent to the ItemButton frame to work around
-	-- item taint introduced in 10.x
-	local p = CreateFrame("Button", name .. "parent")
-
 	---@class ItemButton
-	local button = CreateFrame("ItemButton", name, p, "ContainerFrameItemButtonTemplate")
+	local button = CreateFrame("ItemButton", name, nil, "ContainerFrameItemButtonTemplate")
 
 	-- Install special handlers for themed interaction textures.
 	-- Use plain HookScript (not addon.HookScript) to avoid creating contexts during
@@ -838,7 +811,6 @@ function itemFrame:_DoCreate(_)
 	button:SetScript("OnMouseWheel", nil)
 	button:EnableMouseWheel(false)
 	i.button = button
-	button:SetAllPoints(p)
 
 	button:HookScript("OnEnter", function()
 		i:OnEnter()
@@ -848,7 +820,7 @@ function itemFrame:_DoCreate(_)
 		i:OnLeave()
 	end)
 
-	i.frame = p
+	i.frame = button
 
 	local ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
 	ilvlText:SetPoint("BOTTOMLEFT", 2, 2)
@@ -860,10 +832,43 @@ function itemFrame:_DoCreate(_)
 end
 
 ---@param ctx Context
+---@param slotkey string
+---@return Item
+function itemFrame:GetButton(ctx, slotkey)
+	if self.buttonsBySlotkey[slotkey] then
+		return self.buttonsBySlotkey[slotkey]
+	end
+
+	-- Check if slotkey is a physical slotkey, i.e., "bagID_slotID"
+	local bagID, slotID = slotkey:match("^(%-?%d+)_(%d+)$")
+	if bagID and slotID then
+		bagID = tonumber(bagID)
+		slotID = tonumber(slotID)
+		local item = self:Create(ctx)
+		-- Assign physical slot ID and bag ID exactly once on creation
+		item.button:SetID(slotID)
+		local decoration = themes:GetItemButton(ctx, item)
+		decoration:SetID(slotID)
+		item.button.bagID = bagID
+		decoration.bagID = bagID
+		item.slotkey = slotkey
+
+		self.buttonsBySlotkey[slotkey] = item
+		return item
+	else
+		-- This is a virtual slotkey (like "Container", "Reagent Bag", etc.)
+		-- We can create a dynamic button on demand.
+		local item = self:Create(ctx)
+		item.slotkey = slotkey
+		self.buttonsBySlotkey[slotkey] = item
+		return item
+	end
+end
+
+---@param ctx Context
 ---@return Item
 function itemFrame:Create(ctx)
-	---@return Item
-	local item = self._pool:Acquire(ctx)
+	local item = self:_DoCreate(ctx)
 	if self.activeItems then
 		self.activeItems[item] = true
 	end
