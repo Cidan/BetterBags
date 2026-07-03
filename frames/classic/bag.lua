@@ -19,9 +19,6 @@ local database = addon:GetModule('Database')
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule('ContextMenu')
 
----@class Views: AceModule
-local views = addon:GetModule('Views')
-
 ---@class Resize: AceModule
 local resize = addon:GetModule('Resize')
 
