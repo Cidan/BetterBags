@@ -119,10 +119,7 @@ function bagFrame:Create(ctx, kind)
   local animations = addon:GetModule('Animations')
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
 
-  b.views = {
-    [const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
-    [const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
-  }
+  b.tabViews = {}
 
   -- Register the bag frame so that window positions are saved.
   Window.RegisterConfig(b.frame, database:GetBagPosition(kind))

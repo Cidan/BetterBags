@@ -158,6 +158,22 @@ function bagFrame.bagProto:Wipe(ctx)
 	end
 end
 
+---@param ctx Context
+---@param tabID number
+function bagFrame.bagProto:DeleteTabView(ctx, tabID)
+	if not self.tabViews then return end
+	local layouts = {const.BAG_VIEW.SECTION_GRID, const.BAG_VIEW.SECTION_ALL_BAGS}
+	for _, layout in ipairs(layouts) do
+		local viewKey = layout .. "_" .. tostring(tabID)
+		local view = self.tabViews[viewKey]
+		if view then
+			view:Wipe(ctx)
+			view:GetContent():Wipe()
+			self.tabViews[viewKey] = nil
+		end
+	end
+end
+
 ---@return string
 function bagFrame.bagProto:GetName()
 	return self.frame:GetName()
@@ -191,20 +207,46 @@ function bagFrame.bagProto:ResetSearch(ctx)
 	end
 end
 
+function bagFrame.bagProto:GetCurrentTabID()
+	if self.kind == const.BAG_KIND.BANK and database:GetShowBankTabs() then
+		return self.blizzardBankTab or -1
+	end
+	if database:GetGroupsEnabled(self.kind) then
+		return database:GetActiveGroup(self.kind) or 1
+	end
+	return 1
+end
+
+function bagFrame.bagProto:GetViewForTab(_, tabID)
+	local layout = database:GetBagView(self.kind)
+	local viewKey = layout .. "_" .. tostring(tabID)
+	if not self.tabViews then
+		self.tabViews = {}
+	end
+	if not self.tabViews[viewKey] then
+		if layout == const.BAG_VIEW.SECTION_GRID then
+			self.tabViews[viewKey] = views:NewGrid(self.frame, self.kind, tabID)
+		else
+			self.tabViews[viewKey] = views:NewBagView(self.frame, self.kind, tabID)
+		end
+	end
+	return self.tabViews[viewKey]
+end
+
 -- Draw will draw the correct bag view based on the bag view configuration.
 ---@param ctx Context
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
-	local view = self.views[database:GetBagView(self.kind)]
+	local tabID = self:GetCurrentTabID()
+	local view = self:GetViewForTab(ctx, tabID)
 
 	if view == nil then
 		assert(view, "No view found for bag view: " .. database:GetBagView(self.kind))
 		return
 	end
 
-	if self.currentView and self.currentView:GetBagView() ~= view:GetBagView() then
-		self.currentView:Wipe(ctx)
+	if self.currentView and self.currentView ~= view then
 		self.currentView:GetContent():Hide()
 	end
 
@@ -420,10 +462,7 @@ function bagFrame:Create(ctx, kind)
 	--  if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
 	--end)
 
-	b.views = {
-		[const.BAG_VIEW.SECTION_GRID] = views:NewGrid(f, b.kind),
-		[const.BAG_VIEW.SECTION_ALL_BAGS] = views:NewBagView(f, b.kind),
-	}
+	b.tabViews = {}
 
 	-- Register the bag frame so that window positions are saved.
 	Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
@@ -499,6 +538,12 @@ function bagFrame:Create(ctx, kind)
 		end
 		for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
 			item:UpdateUpgrade(ectx)
+		end
+	end)
+
+	events:RegisterMessage("groups/Deleted", function(ectx, groupID, _, groupKind)
+		if groupKind == b.kind then
+			b:DeleteTabView(ectx, groupID)
 		end
 	end)
 	-- Setup the context menu.
