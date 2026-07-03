@@ -21,6 +21,12 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Items: AceModule
+local items = addon:GetModule('Items')
+
+---@class Groups: AceModule
+local groups = addon:GetModule('Groups')
+
 ---@class Sort: AceModule
 local sort = addon:GetModule('Sort')
 
@@ -96,6 +102,10 @@ end
 ---@param view View
 ---@param slotkey string
 local function UpdateButton(ctx, view, slotkey)
+  local item = items:GetItemDataFromSlotKey(slotkey)
+  if not item then
+    return
+  end
   view:RemoveDeferredItem(slotkey)
   local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
   itemButton:SetItem(ctx, slotkey)
@@ -122,6 +132,62 @@ local function UpdateViewSize(view)
   end
 end
 
+local function ItemBelongsToTab(view, bagKind, item)
+  if not item then return false end
+  if bagKind == const.BAG_KIND.BANK and database:GetShowBankTabs() then
+    return item.bagid == view.tabID
+  end
+  if database:GetGroupsEnabled(bagKind) then
+    local category = items:GetCategory(nil, item)
+    local isSpecialSection = category == L:G("Free Space") or category == L:G("Recent Items")
+    if isSpecialSection then
+      return true -- Special sections are shown on all tabs
+    end
+    return groups:CategoryBelongsToGroup(bagKind, category, view.tabID)
+  end
+  return true
+end
+
+local function FilterChangesetForTab(view, bagKind, added, removed, changed)
+  local tabAdded, tabRemoved, tabChanged = {}, {}, {}
+
+  -- 1. If an item was added globally, and belongs to our tab: add it.
+  for _, item in pairs(added) do
+    if ItemBelongsToTab(view, bagKind, item) then
+      table.insert(tabAdded, item)
+    end
+  end
+
+  -- 2. If an item was removed globally:
+  -- We can't always check ItemBelongsToTab on the current state if its category or bag changed.
+  -- But we can check if we currently have a button frame for this slotkey!
+  -- If we have a button frame for this slotkey, and it was removed globally: we must remove it from our tab!
+  for _, item in pairs(removed) do
+    if view.itemsByBagAndSlot[item.slotkey] then
+      table.insert(tabRemoved, item)
+    end
+  end
+
+  -- 3. If an item was changed globally:
+  for _, item in pairs(changed) do
+    local belongsNow = ItemBelongsToTab(view, bagKind, item)
+    local hadButton = (view.itemsByBagAndSlot[item.slotkey] ~= nil)
+
+    if belongsNow and not hadButton then
+      -- It now belongs to us, but we didn't have it before: treat as added!
+      table.insert(tabAdded, item)
+    elseif not belongsNow and hadButton then
+      -- It no longer belongs to us, but we had it before: treat as removed!
+      table.insert(tabRemoved, item)
+    elseif belongsNow and hadButton then
+      -- It belongs to us, and we had it before: keep as changed!
+      table.insert(tabChanged, item)
+    end
+  end
+
+  return tabAdded, tabRemoved, tabChanged
+end
+
 ---@param view View
 ---@param ctx Context
 ---@param bag Bag
@@ -135,6 +201,8 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
 
   local added, removed, changed = slotInfo:GetChangeset()
+
+  added, removed, changed = FilterChangesetForTab(view, bag.kind, added, removed, changed)
 
   for _, item in pairs(removed) do
     ClearButton(ctx, view, item)
@@ -240,13 +308,15 @@ end
 
 ---@param parent Frame
 ---@param kind BagKind
+---@param tabID? number
 ---@return View
-function views:NewBagView(parent, kind)
+function views:NewBagView(parent, kind, tabID)
   local view = views:NewBlankView()
   view.itemFrames = {}
   view.itemCount = 0
   view.bagview = const.BAG_VIEW.SECTION_ALL_BAGS
   view.kind = kind
+  view.tabID = tabID or 1
   view.content = grid:Create(parent)
   view.content:GetContainer():ClearAllPoints()
   view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)

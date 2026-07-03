@@ -129,6 +129,10 @@ end
 ---@param view View
 ---@param slotkey string
 local function UpdateButton(ctx, view, slotkey)
+  local item = items:GetItemDataFromSlotKey(slotkey)
+  if not item then
+    return
+  end
   debug:Log("UpdateButton", "Updating button for item", slotkey)
   local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
   itemButton:SetItem(ctx, slotkey)
@@ -226,11 +230,68 @@ local function ReconcileStack(ctx, view, stackInfo)
     end
   end
 
-  -- The root item is always drawn, so first, let's draw it.
-  if not CreateButton(ctx, view, stackInfo.rootItem) then
-   -- And update it just in case it aleady exists.
-   UpdateButton(ctx, view, stackInfo.rootItem)
+  -- The root item is always drawn, so let's draw or update it.
+  if view.itemsByBagAndSlot[stackInfo.rootItem] then
+    UpdateButton(ctx, view, stackInfo.rootItem)
+  else
+    CreateButton(ctx, view, stackInfo.rootItem)
   end
+end
+
+local function ItemBelongsToTab(view, bagKind, item)
+  if not item then return false end
+  if bagKind == const.BAG_KIND.BANK and database:GetShowBankTabs() then
+    return item.bagid == view.tabID
+  end
+  if database:GetGroupsEnabled(bagKind) then
+    local category = items:GetCategory(nil, item)
+    local isSpecialSection = category == L:G("Free Space") or category == L:G("Recent Items")
+    if isSpecialSection then
+      return true -- Special sections are shown on all tabs
+    end
+    return groups:CategoryBelongsToGroup(bagKind, category, view.tabID)
+  end
+  return true
+end
+
+local function FilterChangesetForTab(view, bagKind, added, removed, changed)
+  local tabAdded, tabRemoved, tabChanged = {}, {}, {}
+
+  -- 1. If an item was added globally, and belongs to our tab: add it.
+  for _, item in pairs(added) do
+    if ItemBelongsToTab(view, bagKind, item) then
+      table.insert(tabAdded, item)
+    end
+  end
+
+  -- 2. If an item was removed globally:
+  -- We can't always check ItemBelongsToTab on the current state if its category or bag changed.
+  -- But we can check if we currently have a button frame for this slotkey!
+  -- If we have a button frame for this slotkey, and it was removed globally: we must remove it from our tab!
+  for _, item in pairs(removed) do
+    if view.itemsByBagAndSlot[item.slotkey] then
+      table.insert(tabRemoved, item)
+    end
+  end
+
+  -- 3. If an item was changed globally:
+  for _, item in pairs(changed) do
+    local belongsNow = ItemBelongsToTab(view, bagKind, item)
+    local hadButton = (view.itemsByBagAndSlot[item.slotkey] ~= nil)
+
+    if belongsNow and not hadButton then
+      -- It now belongs to us, but we didn't have it before: treat as added!
+      table.insert(tabAdded, item)
+    elseif not belongsNow and hadButton then
+      -- It no longer belongs to us, but we had it before: treat as removed!
+      table.insert(tabRemoved, item)
+    elseif belongsNow and hadButton then
+      -- It belongs to us, and we had it before: keep as changed!
+      table.insert(tabChanged, item)
+    end
+  end
+
+  return tabAdded, tabRemoved, tabChanged
 end
 
 ---@param view View
@@ -259,6 +320,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   elseif ctx:GetBool('wipe') then
     view:Wipe(ctx)
   end
+
+  added, removed, changed = FilterChangesetForTab(view, bag.kind, added, removed, changed)
 
   local opts = database:GetStackingOptions(bag.kind)
 
@@ -376,7 +439,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   -- Also filter by active group (if groups are enabled).
   local activeGroup = nil
   if database:GetGroupsEnabled(bag.kind) and not (bag.kind == const.BAG_KIND.BANK and database:GetShowBankTabs()) then
-    activeGroup = database:GetActiveGroup(bag.kind)
+    activeGroup = view.tabID
   end
 
   for sectionName, section in pairs(view:GetAllSections()) do
@@ -627,12 +690,14 @@ end
 
 ---@param parent Frame
 ---@param kind BagKind
+---@param tabID? number
 ---@return View
-function views:NewGrid(parent, kind)
+function views:NewGrid(parent, kind, tabID)
   local view = views:NewBlankView()
   view.itemCount = 0
   view.bagview = const.BAG_VIEW.SECTION_GRID
   view.kind = kind
+  view.tabID = tabID or 1
   view.content = grid:Create(parent)
   view.content:SortVertical()
   view.content:GetContainer():ClearAllPoints()
@@ -646,10 +711,9 @@ function views:NewGrid(parent, kind)
 
   -- Create empty group state frame (only for backpack)
   if kind == const.BAG_KIND.BACKPACK then
-    local emptyGroupFrame = CreateFrame("Frame", nil, parent)
-    emptyGroupFrame:SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-    emptyGroupFrame:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
-    emptyGroupFrame:SetFrameLevel(parent:GetFrameLevel() + 10)
+    local emptyGroupFrame = CreateFrame("Frame", nil, view.content:GetContainer())
+    emptyGroupFrame:SetAllPoints()
+    emptyGroupFrame:SetFrameLevel(view.content:GetContainer():GetFrameLevel() + 10)
     emptyGroupFrame:Hide()
 
     local helpText = emptyGroupFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")

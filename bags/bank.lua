@@ -253,8 +253,7 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 
 	self.bag.currentItemCount = -1
 	items:ClearBankCache(ctx)
-	self.bag:Wipe(ctx)
-	ctx:Set("wipe", true)
+	ctx:Set("redraw", true)
 	events:SendMessage(ctx, "bags/RefreshBank")
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
@@ -567,8 +566,7 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	self.bag.currentItemCount = -1
 
 	items:ClearBankCache(ctx)
-	self.bag:Wipe(ctx)
-	ctx:Set("wipe", true)
+	ctx:Set("redraw", true)
 
 	events:SendMessage(ctx, "bags/RefreshBank")
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
