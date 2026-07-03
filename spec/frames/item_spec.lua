@@ -29,9 +29,11 @@ const.BANK_BAGS = { [5] = true }
 
 local items = StubBetterBagsModule("Items")
 items.GetSlotKeyFromBagAndSlot = function(bagid, slotid) return bagid .. "_" .. slotid end
+items.GetStackData = function() return nil end
+items.IsNewItem = function() return false end
 
 local themes = StubBetterBagsModule("Themes")
-themes.GetItemButton = function(_, item)
+themes.GetItemButton = function(_, buttonCtx, item)
   if not item._decoration then
     item._decoration = {
       SetID = function(_, id) item._decoration.id = id end,
@@ -57,7 +59,12 @@ themes.GetItemButton = function(_, item)
       UpdateCooldown = function() end,
       SetReadable = function() end,
       CheckUpdateTooltip = function() end,
-      SetFrameLevel = function() end,
+      SetFrameLevel = function(_, level)
+        if not level or type(level) ~= "number" or level < 0 or level > 65535 then
+          error("bad argument #1 to 'SetFrameLevel' (outside of expected range 0 to 65535 - Usage: self:SetFrameLevel(frameLevel))", 2)
+        end
+        item._decoration._frameLevel = level
+      end,
     }
   end
   return item._decoration
@@ -72,6 +79,11 @@ local itemFrame = addon:GetModule("ItemFrame")
 
 describe("ItemFrame Static Buttons and Parent Removal Tests", function()
   before_each(function()
+    _G.ClearItemButtonOverlay = _G.ClearItemButtonOverlay or function() end
+    _G.SetItemButtonQuality = _G.SetItemButtonQuality or function() end
+    _G.SetItemButtonCount = _G.SetItemButtonCount or function() end
+    _G.SetItemButtonDesaturated = _G.SetItemButtonDesaturated or function() end
+    _G.GameTooltip.GetOwner = _G.GameTooltip.GetOwner or function() return nil end
     itemFrame:OnInitialize()
   end)
 
@@ -105,5 +117,50 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     local btnCtx = ctx:New("test")
     local item = itemFrame:GetButton(btnCtx, "0_2")
     assert.equal(item.frame, item.button)
+  end)
+
+  it("should clamp frame level to 0 and not throw an error after the fix", function()
+    local btnCtx = ctx:New("test")
+    local item = itemFrame:GetButton(btnCtx, "0_2")
+
+    -- Set physical button's frame level to 0
+    item.button:SetFrameLevel(0)
+
+    -- Setup mock items data return
+    local itemData = {
+      slotkey = "0_2",
+      bagid = 0,
+      slotid = 2,
+      isItemEmpty = false,
+      questInfo = {
+        isQuestItem = false,
+        questID = nil,
+        isActive = false,
+      },
+      containerInfo = {
+        isReadable = false,
+        isFiltered = false,
+        hasNoValue = false,
+      },
+      itemInfo = {
+        isBound = false,
+        itemID = 12345,
+        itemIcon = 136235,
+        itemQuality = 2,
+        itemLink = "item:12345",
+      }
+    }
+
+    items.GetItemDataFromSlotKey = function(_, slotkey)
+      if slotkey == "0_2" then
+        return itemData
+      end
+    end
+
+    -- This call should succeed (it will fail right now until we implement the fix)
+    item:SetItem(btnCtx, "0_2")
+
+    -- And the decoration frame level should be 0
+    assert.equal(item._decoration._frameLevel, 0)
   end)
 end)

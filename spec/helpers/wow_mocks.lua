@@ -294,6 +294,9 @@ local function CreateMockWidget(widgetType, name, parent)
     return self._frameStrata or "MEDIUM"
   end
   function widget:SetFrameLevel(level)
+    if not level or type(level) ~= "number" or level < 0 or level > 65535 then
+      error("bad argument #1 to 'SetFrameLevel' (outside of expected range 0 to 65535 - Usage: self:SetFrameLevel(frameLevel))", 2)
+    end
     self._frameLevel = level
   end
   function widget:GetFrameLevel()
@@ -334,6 +337,9 @@ local function CreateMockWidget(widgetType, name, parent)
     widget.HighlightTexture = widget:GetHighlightTexture()
     widget.ItemContextOverlay = CreateMockWidget("Texture", nil, widget)
     widget.UpgradeIcon = CreateMockWidget("Texture", nil, widget)
+    if widgetType == "ItemButton" then
+      widget.SetHasItem = function() end
+    end
   end
 
   return widget
