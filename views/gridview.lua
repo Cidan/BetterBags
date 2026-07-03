@@ -307,8 +307,9 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
-  if ctx:GetBool('redraw') then
+  if ctx:GetBool('redraw') or view.isNew then
     view:Wipe(ctx)
+    view.isNew = false
     ---@type ItemData[]
     local currentItems = {}
     for _, item in pairs(slotInfo:GetCurrentItems()) do
@@ -704,6 +705,7 @@ function views:NewGrid(parent, kind, tabID)
   view.Render = GridView
   view.WipeHandler = Wipe
   view.sortRequired = false
+  view.isNew = true
 
   -- Create empty group state frame (only for backpack)
   if kind == const.BAG_KIND.BACKPACK then

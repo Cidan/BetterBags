@@ -177,6 +177,7 @@ describe("Bag View", function()
       }
       local slotInfo = {
         GetChangeset = function() return {}, {}, {} end,
+        GetCurrentItems = function() return {} end,
         emptySlotByBagAndSlot = {}
       }
       local callbackCalled = false

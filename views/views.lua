@@ -45,6 +45,7 @@ local stackProto = {}
 ---@field dirtySections table<string, boolean>
 ---@field private stacks table<string, Stack>
 ---@field WipeHandler fun(view: View, ctx: Context)
+---@field isNew boolean
 views.viewProto = {}
 
 function views:OnEnable()
