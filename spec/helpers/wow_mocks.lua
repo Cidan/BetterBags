@@ -350,10 +350,34 @@ local function CreateMockWidget(widgetType, name, parent)
         self:SetID(slot)
         self:GetParent():IsCombinedBagContainer()
       end
+      widget.Enable = function() end
+      widget.Disable = function() end
+      widget.GetSlotAndBagID = function(self)
+        return self:GetID(), self:GetBagID()
+      end
+      widget.IsExtended = function(self)
+        return self.isExtended or false
+      end
+      widget.SetIsExtended = function(self, isExtended)
+        self.isExtended = isExtended
+      end
+      widget.UpdateExtended = function(self)
+        local slotId, bagId = self:GetSlotAndBagID()
+        local _, currentNumSlots = _G.ContainerFrame_GetContainerNumSlots(bagId)
+        self:SetIsExtended(slotId > currentNumSlots)
+        self.updateExtendedCalledCount = (self.updateExtendedCalledCount or 0) + 1
+      end
     end
   end
 
   return widget
+end
+
+_G.IsAccountSecured = function() return true end
+
+_G.ContainerFrame_GetContainerNumSlots = function(bagID)
+  local numSlots = _G.C_Container and _G.C_Container.GetContainerNumSlots(bagID) or 16
+  return bagID, numSlots
 end
 
 _G.CreateFrame = function(frameType, name, parent, template)
@@ -437,6 +461,12 @@ _G.C_Item.GetItemGUID = _G.C_Item.GetItemGUID or function() return "mock-guid" e
 _G.C_Item.GetStackCount = _G.C_Item.GetStackCount or function() return 1 end
 _G.C_Item.GetItemInfo = _G.C_Item.GetItemInfo or function()
   return "Mock Item", "[Mock Item Link]", 1, 1, 0, "Weapon", "One-Handed Swords", 1, "INVTYPE_WEAPON", 12345, 100, 2, 0, 0, 0, 0
+end
+_G.C_Item.GetItemSubClassInfo = _G.C_Item.GetItemSubClassInfo or function(classID, subclassID)
+  return "Bag"
+end
+_G.GetInventoryItemLink = _G.GetInventoryItemLink or function(unit, invid)
+  return "|Hitem:12345|h[Mock Bag]|h"
 end
 
 -- New item tracking
@@ -618,6 +648,7 @@ end
 -- C_Container Setup
 _G.C_Container = _G.C_Container or {}
 _G.C_Container._usedItems = {}
+_G.C_Container.ContainerIDToInventoryID = function(bagid) return bagid and (bagid + 20) or nil end
 _G.C_Container.GetBagName = function(bagid)
   if bagid == -2 then return "Keyring" end
   return "Mock Bag " .. bagid
