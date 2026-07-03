@@ -110,6 +110,12 @@ function bagFrame.bagProto:Show(ctx)
 		return
 	end
 	self.behavior:OnShow(ctx)
+	if self.drawPendingOnShow then
+		self.drawPendingOnShow = false
+		if self.lastSlotInfo then
+			self:Draw(ctx, self.lastSlotInfo, function() end)
+		end
+	end
 end
 
 ---@param ctx Context
@@ -238,6 +244,15 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
+	if not self:IsShown() then
+		self.lastSlotInfo = slotInfo
+		self.drawPendingOnShow = true
+		if callback then
+			callback()
+		end
+		return
+	end
+
 	local tabID = self:GetCurrentTabID()
 	local view = self:GetViewForTab(ctx, tabID)
 
@@ -248,6 +263,20 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 
 	if self.currentView and self.currentView ~= view then
 		self.currentView:GetContent():Hide()
+	end
+
+	-- Render other background persistent views first to keep them in a consistent data state
+	local currentLayout = database:GetBagView(self.kind)
+	if self.tabViews then
+		for viewKey, tView in pairs(self.tabViews) do
+			local layoutStr, tabIDStr = string.split("_", viewKey)
+			local layout = tonumber(layoutStr)
+			local tTabID = tonumber(tabIDStr)
+			if layout == currentLayout and tTabID ~= tabID then
+				tView:Render(ctx, self, slotInfo, function() end)
+				tView:GetContent():Hide()
+			end
+		end
 	end
 
 	debug:StartProfile("Bag Render %d", self.kind)
