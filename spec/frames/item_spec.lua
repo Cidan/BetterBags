@@ -27,9 +27,17 @@ local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 0, BANK = 1 }
 const.BACKPACK_BAGS = { [0] = true, [1] = true }
 const.BANK_BAGS = { [5] = true }
+const.ITEM_QUALITY = { Common = 1, Uncommon = 2 }
+const.BACKPACK_ONLY_REAGENT_BAGS = {}
 
 local items = StubBetterBagsModule("Items")
-items.GetSlotKeyFromBagAndSlot = function(bagid, slotid) return bagid .. "_" .. slotid end
+items.GetSlotKeyFromBagAndSlot = function(_, bagid, slotid)
+  -- Support both method colon and normal dot calling syntax if needed
+  if type(bagid) == "table" then
+    bagid, slotid = slotid, nil
+  end
+  return bagid .. "_" .. slotid
+end
 items.GetStackData = function() return nil end
 items.IsNewItem = function() return false end
 
@@ -168,5 +176,80 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
 
     -- And the decoration frame level should be 0
     assert.equal(item._decoration._frameLevel, 0)
+  end)
+
+  it("should call UpdateExtended on both self.button and decoration during SetItem", function()
+    local btnCtx = ctx:New("test_update_extended_set_item")
+    local item = itemFrame:GetButton(btnCtx, "0_3")
+
+    -- Set up tracking
+    local buttonUpdateExtendedCalled = 0
+    item.button.UpdateExtended = function()
+      buttonUpdateExtendedCalled = buttonUpdateExtendedCalled + 1
+    end
+
+    local decUpdateExtendedCalled = 0
+    item._decoration.UpdateExtended = function()
+      decUpdateExtendedCalled = decUpdateExtendedCalled + 1
+    end
+
+    -- Setup mock items data return
+    local itemData = {
+      slotkey = "0_3",
+      bagid = 0,
+      slotid = 3,
+      isItemEmpty = false,
+      questInfo = {
+        isQuestItem = false,
+        questID = nil,
+        isActive = false,
+      },
+      containerInfo = {
+        isReadable = false,
+        isFiltered = false,
+        hasNoValue = false,
+      },
+      itemInfo = {
+        isBound = false,
+        itemID = 12345,
+        itemIcon = 136235,
+        itemQuality = 2,
+        itemLink = "item:12345",
+      }
+    }
+
+    items.GetItemDataFromSlotKey = function(_, slotkey)
+      if slotkey == "0_3" then
+        return itemData
+      end
+    end
+
+    item:SetItem(btnCtx, "0_3")
+
+    -- Assert that UpdateExtended was called on both
+    assert.equal(1, buttonUpdateExtendedCalled, "button:UpdateExtended was not called on SetItem")
+    assert.equal(1, decUpdateExtendedCalled, "decoration:UpdateExtended was not called on SetItem")
+  end)
+
+  it("should call UpdateExtended on both self.button and decoration during SetFreeSlots", function()
+    local btnCtx = ctx:New("test_update_extended_free_slots")
+    local item = itemFrame:GetButton(btnCtx, "0_4")
+
+    -- Set up tracking
+    local buttonUpdateExtendedCalled = 0
+    item.button.UpdateExtended = function()
+      buttonUpdateExtendedCalled = buttonUpdateExtendedCalled + 1
+    end
+
+    local decUpdateExtendedCalled = 0
+    item._decoration.UpdateExtended = function()
+      decUpdateExtendedCalled = decUpdateExtendedCalled + 1
+    end
+
+    item:SetFreeSlots(btnCtx, 0, 4, 1, false)
+
+    -- Assert that UpdateExtended was called on both
+    assert.equal(1, buttonUpdateExtendedCalled, "button:UpdateExtended was not called on SetFreeSlots")
+    assert.equal(1, decUpdateExtendedCalled, "decoration:UpdateExtended was not called on SetFreeSlots")
   end)
 end)

@@ -431,7 +431,12 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	self:UpdateCount(ctx)
 	--self:SetLock(data.itemInfo.isLocked)
-	decoration:UpdateExtended()
+	if self.button.UpdateExtended then
+		self.button:UpdateExtended()
+	end
+	if decoration.UpdateExtended then
+		decoration:UpdateExtended()
+	end
 	decoration:UpdateQuestItem(isQuestItem, questID, isActive)
 	if not self.staticData then
 		self:UpdateNewItem(ctx, data.itemInfo.itemQuality)
@@ -609,6 +614,12 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
 	decoration.UpgradeIcon:SetShown(false)
+	if self.button.UpdateExtended then
+		self.button:UpdateExtended()
+	end
+	if decoration.UpdateExtended then
+		decoration:UpdateExtended()
+	end
 
 	self.freeSlotName = self:GetBagType(bagid)
 	if database:GetShowAllFreeSpace(self.kind) and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
