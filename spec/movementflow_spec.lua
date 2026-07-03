@@ -27,6 +27,7 @@ addon.isRetail = false
 addon.atBank = false
 addon.Bags = {}
 
+ResetModuleStub("MovementFlow", "util/movementflow.lua")
 LoadBetterBagsModule("util/movementflow.lua")
 local movementFlow = addon:GetModule("MovementFlow")
 

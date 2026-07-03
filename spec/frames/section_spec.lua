@@ -95,6 +95,7 @@ end
 local context = addon:GetModule("Context")
 
 -- Load the SectionFrame module
+ResetModuleStub("SectionFrame", "frames/section.lua")
 LoadBetterBagsModule("frames/section.lua")
 local sectionFrame = addon:GetModule("SectionFrame")
 

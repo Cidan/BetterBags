@@ -124,6 +124,11 @@ _G.C_Container = _G.C_Container or {}
 _G.C_Container.ContainerIDToInventoryID = function(bagid) return bagid + 10 end
 
 -- Load modules
+ResetModuleStub("BagButton", "frames/bagbutton.lua")
+ResetModuleStub("BagSlots", "frames/bagslots.lua")
+ResetModuleStub("BankSlots", "frames/bankslots.lua")
+ResetModuleStub("MoneyFrame", "frames/money.lua")
+ResetModuleStub("Bank", "bags/bank.lua")
 LoadBetterBagsModule("frames/bagbutton.lua")
 LoadBetterBagsModule("frames/bagslots.lua")
 LoadBetterBagsModule("frames/bankslots.lua")

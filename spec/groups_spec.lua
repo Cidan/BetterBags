@@ -2,6 +2,9 @@
 
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
+ResetModuleStub("Database", "core/database.lua")
+ResetModuleStub("Groups", "data/groups.lua")
+
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 

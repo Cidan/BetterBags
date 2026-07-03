@@ -58,9 +58,14 @@ local sectionProto = {
   GetCellCount = function() return 1 end,
   SetMaxCellWidth = function() end,
   Draw = function() end,
+  SetTitle = function() end,
+  GetAllCells = function() return {} end,
+  AddCell = function() end,
 }
 sectionFrame.Create = function()
-  return setmetatable({}, { __index = sectionProto })
+  local s = setmetatable({}, { __index = sectionProto })
+  s.frame = CreateFrame("Frame")
+  return s
 end
 
 -- Stub ItemFrame
