@@ -590,7 +590,7 @@ function items:RefreshBags(ctx, kind)
 		-- If the bank slots panel has selected a specific Blizzard tab, only
 		-- load items from that single bag index instead of all bank bags.
 		local blizzardTab = addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
-		if database:GetShowBankTabs() and addon.isRetail then
+		if addon.isRetail then
 			-- When bank tabs setting is enabled in Retail, we load ALL bank bags (both Character and Account)
 			-- so that persistent tab-scoped views can filter and display them correctly.
 			ctx:Set("bagid", const.BANK_TAB.BANK)

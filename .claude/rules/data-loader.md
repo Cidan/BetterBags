@@ -27,3 +27,9 @@ To prevent visual flickers, blank slots, and lag-induced loading glitches, UI re
 - Pending bag slots are scanned, and their static mixins are queued into `ContinuableContainer`.
 - `ContinueOnLoad` executes the callbacks.
 - The `Refresh` module receives the callback and requests draws with a completely primed cache, allowing the draw stage to run 100% synchronously and instantly.
+
+### 4. Unified Retail Bank Loading and Persistent Tab Filtering
+To support instant, synchronous tab switching with zero visual flickers or loading stutters:
+- **Unified Cache:** On Retail, the data-loading pipeline (`data/items.lua`) always loads all bank bags (both Character Bank and Account/Warbank bags) into a single, unified `slotInfo` cache, regardless of the active tab.
+- **Strict Filtering:** Both `gridview.lua` and `bagview.lua` strictly partition this complete cache via `ItemBelongsToTab()`. Items in `ACCOUNT_BANK_BAGS` only render in Account/Warbank tabs, while items in `BANK_BAGS` only render in Character Bank tabs, preventing unassigned category leakage between tabs.
+- **Instant Swapping:** Since the cache is always complete, tab switching (`SwitchToGroup` or `SwitchToBlizzardTab`) does not wipe caches or trigger server-refresh messages. Instead, the UI simply hides the old view, fetches the new view, and calls `Draw()` synchronously and instantly.

@@ -40,6 +40,19 @@ const.OFFSETS = {
 
 local items = StubBetterBagsModule("Items")
 items.ClearBankCache = function() end
+items.GetAllSlotInfo = function()
+  return {
+    [const.BAG_KIND.BANK] = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+  }
+end
 
 StubBetterBagsModule("Tabs")
 StubBetterBagsModule("Groups")
@@ -283,6 +296,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
         },
         slots = panel,
         Wipe = function() end,
+        Draw = function() end,
         blizzardBankTab = 10,
       }
 
