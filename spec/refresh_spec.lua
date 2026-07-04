@@ -12,6 +12,7 @@ local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BANK_BAGS = { [6] = 6, [7] = 7 }
 const.BACKPACK_BAGS = { [0] = 0, [1] = 1 }
+const.BANK_TAB = { BANK = 1, REAGENT = 2, ACCOUNT_BANK_1 = 3 }
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
@@ -33,48 +34,55 @@ LoadBetterBagsModule("data/refresh.lua")
 local refresh = addon:GetModule("Refresh")
 
 describe("Refresh Module", function()
-  local savedNewTimer
-
   before_each(function()
     refresh:OnInitialize()
     registeredCallback = nil
-
-    savedNewTimer = _G.C_Timer.NewTimer
-    _G.C_Timer.NewTimer = function(seconds, callback)
-      _G.C_Timer._lastTimerCallback = callback
-      return {
-        Cancel = function()
-          _G.C_Timer._lastTimerCallback = nil
-        end
-      }
-    end
-  end)
-
-  after_each(function()
-    _G.C_Timer.NewTimer = savedNewTimer
+    addon.atBank = false
+    addon.Bags = {}
   end)
 
   it("should initialize with default states", function()
-    assert.is_false(refresh.pendingBackpack)
-    assert.is_false(refresh.pendingBank)
-    assert.is_false(refresh.pendingWipe)
+    assert.is_false(refresh.isSorting)
+    assert.is_nil(refresh.pendingBackpack)
+    assert.is_nil(refresh.pendingBank)
+    assert.is_nil(refresh.pendingWipe)
+    assert.is_nil(refresh.debounceTimer)
   end)
 
-  it("should queue updates and debounce them via timer", function()
-    spy.on(refresh, "ExecutePendingUpdates")
+  it("should process RequestUpdate instantly and synchronously for backpack", function()
+    spy.on(items, "RefreshBackpack")
+    spy.on(items, "RefreshBank")
 
-    refresh:RequestUpdate({ backpack = true, wipe = true })
+    refresh:RequestUpdate({ backpack = true })
 
-    assert.is_true(refresh.pendingBackpack)
-    assert.is_true(refresh.pendingWipe)
-    assert.is_not_nil(refresh.debounceTimer)
+    assert.spy(items.RefreshBackpack).was.called(1)
+    assert.spy(items.RefreshBank).was_not.called()
+  end)
 
-    -- Force the timer to fire synchronously by calling its callback
-    local callback = _G.C_Timer._lastTimerCallback
-    assert.is_not_nil(callback)
-    callback()
+  it("should process RequestUpdate instantly and synchronously for bank if at bank", function()
+    addon.atBank = true
+    addon.Bags = { Bank = { bankTab = 1 } }
+    spy.on(items, "RefreshBackpack")
+    spy.on(items, "RefreshBank")
 
-    assert.spy(refresh.ExecutePendingUpdates).was.called(1)
+    refresh:RequestUpdate({ bank = true })
+
+    assert.spy(items.RefreshBank).was.called(1)
+    assert.spy(items.RefreshBackpack).was_not.called()
+  end)
+
+  it("should process RequestUpdate instantly and synchronously for wipe", function()
+    addon.atBank = true
+    addon.Bags = { Bank = { bankTab = 1 } }
+    spy.on(items, "ClearItemCache")
+    spy.on(items, "RefreshBackpack")
+    spy.on(items, "RefreshBank")
+
+    refresh:RequestUpdate({ wipe = true })
+
+    assert.spy(items.ClearItemCache).was.called(1)
+    assert.spy(items.RefreshBackpack).was.called(1)
+    assert.spy(items.RefreshBank).was.called(1)
   end)
 
   it("should register callback with ItemLoader on OnEnable", function()

@@ -21,12 +21,13 @@ To prevent visual flickers, blank slots, and lag-induced loading glitches, UI re
 - **Mechanism:** Utilize Blizzard's native `ContinuableContainer` inside `ItemLoader` to batch and pre-load all changed item mixins.
 - **Callback:** The `ItemLoader:TellMeWhenABagIsUpdated(callback)` registry acts as the gatekeeper. The callback fires only after the `ContinuableContainer` completes loading all queued mixins.
 
-### 3. Unified Update Flow
+### 3. Unified Update Flow (Stateless, Zero-Debounce Execution)
 - `BAG_UPDATE` is registered and buckets updated bag IDs.
 - `BAG_UPDATE_DELAYED` triggers `ProcessPendingBagUpdates()`.
 - Pending bag slots are scanned, and their static mixins are queued into `ContinuableContainer`.
 - `ContinueOnLoad` executes the callbacks.
-- The `Refresh` module receives the callback and requests draws with a completely primed cache, allowing the draw stage to run 100% synchronously and instantly.
+- The `Refresh` module receives the callback and immediately requests draws/refreshes instantly and synchronously with a completely primed cache, allowing the entire pipeline to run 100% synchronously and instantly.
+- **Rule:** The `Refresh` module is completely stateless. It does not maintain arbitrary timer debounces (`C_Timer.NewTimer`), pending wipe flags, or stateful flags like `pendingBackpack` or `pendingBank`. Redraw requests trigger synchronously at the natural `BAG_UPDATE_DELAYED` frame boundary. Data sweeps can execute perfectly at any time, including during combat, as data-harvesting is fully decoupled from secure layout frames.
 
 ### 4. Unified Retail Bank Loading and Persistent Tab Filtering
 To support instant, synchronous tab switching with zero visual flickers or loading stutters:
