@@ -33,3 +33,15 @@ To support instant, synchronous tab switching with zero visual flickers or loadi
 - **Unified Cache:** On Retail, the data-loading pipeline (`data/items.lua`) always loads all bank bags (both Character Bank and Account/Warbank bags) into a single, unified `slotInfo` cache, regardless of the active tab.
 - **Strict Filtering:** Both `gridview.lua` and `bagview.lua` strictly partition this complete cache via `ItemBelongsToTab()`. Items in `ACCOUNT_BANK_BAGS` only render in Account/Warbank tabs, while items in `BANK_BAGS` only render in Character Bank tabs, preventing unassigned category leakage between tabs.
 - **Instant Swapping:** Since the cache is always complete, tab switching (`SwitchToGroup` or `SwitchToBlizzardTab`) does not wipe caches or trigger server-refresh messages. Instead, the UI simply hides the old view, fetches the new view, and calls `Draw()` synchronously and instantly.
+
+### 5. Butter-Smooth Tab Swapping (Context-Gated Bypass)
+To achieve sub-millisecond local tab swaps, tab switching operations are completely decoupled from active database rebuilds or view redraws.
+- **Bypass Flag:** Operations that only toggle active tab visibility (like clicking a tab or switching a group) tag the execution context with `tab_switch = true`.
+- **Render Bypass:** In `bagProto:Draw(ctx, slotInfo, callback)`, if the context carries the `tab_switch` flag, the engine completely bypasses background and active `view:Render` pipelines.
+- **Instant Swap:** Instead, visibility of the hidden and active views is toggled synchronously, scale and search states are adjusted, `self:OnResize()` is called, and the callback is invoked instantly. This avoids any sorting or layout calculation overhead entirely.
+
+### 6. Targeted Background Updates (Changeset Gating)
+When a real data update occurs (such as a database or server item change), every background/inactive tab view is rendered. To ensure background renders are computationally cheap, they are gated by tab-specific changeset changes.
+- **Rule:** Background views must only execute heavy layout, section sorting, and cell placement logic if item data belonging specifically to their tab has actually changed.
+- **Gating Mechanism:** Inside `GridView` and `BagView` rendering functions, if the view is a hidden background view (where `bag.GetCurrentTabID` is defined and `view.tabID ~= bag:GetCurrentTabID()`) and no global layout change is forced (i.e. not `redraw`, not `wipe`, and not `isNew`), the view filters the global changeset for its tab using `FilterChangesetForTab()`.
+- **Early-Exit:** If the tab-specific added, removed, and changed lists are all empty, the view early-exits instantly by invoking the callback and returning. This prevents wasting CPU sorting and laying out hidden tabs that are already in a consistent state.

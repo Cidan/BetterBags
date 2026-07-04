@@ -206,6 +206,14 @@ local function BagView(view, ctx, bag, slotInfo, callback)
 
   local added, removed, changed = slotInfo:GetChangeset()
 
+  if bag.GetCurrentTabID and view.tabID ~= bag:GetCurrentTabID() and not ctx:GetBool('redraw') and not view.isNew and not ctx:GetBool('wipe') then
+    local tabAdded, tabRemoved, tabChanged = FilterChangesetForTab(view, bag.kind, added, removed, changed)
+    if #tabAdded == 0 and #tabRemoved == 0 and #tabChanged == 0 then
+      if callback then callback() end
+      return
+    end
+  end
+
   if ctx:GetBool('redraw') or view.isNew then
     view:Wipe(ctx)
     view.isNew = false
