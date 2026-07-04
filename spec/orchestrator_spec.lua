@@ -178,4 +178,129 @@ describe("Phase 1-5 Orchestrator (ProcessRefresh)", function()
     items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
     assert.is_true(messageDispatched)
   end)
+
+  describe("Stack Resolution with dontMergePartial option", function()
+    local savedGetStackingOptions
+
+    before_each(function()
+      savedGetStackingOptions = database.GetStackingOptions
+    end)
+
+    after_each(function()
+      database.GetStackingOptions = savedGetStackingOptions
+    end)
+
+    it("should keep partial stack separate when dontMergePartial is true", function()
+      -- Stacking option: dontMergePartial = true, mergeStacks = true
+      database.GetStackingOptions = function()
+        return {
+          mergeStacks = true,
+          dontMergePartial = true,
+          mergeUnstackable = true,
+          unmergeAtShop = false,
+        }
+      end
+
+      -- Mock items:
+      -- 1. Slot 0_1: Silk Cloth (itemID 100, currentItemCount = 20, itemStackCount = 20) -> Full stack
+      -- 2. Slot 0_2: Silk Cloth (itemID 100, currentItemCount = 20, itemStackCount = 20) -> Full stack (this will be root as 0_2 > 0_1)
+      -- 3. Slot 1_1: Silk Cloth (itemID 100, currentItemCount = 5, itemStackCount = 20) -> Partial stack
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid)
+        if (bagid == 0 and slotid == 1) or (bagid == 0 and slotid == 2) or (bagid == 1 and slotid == 1) then
+          return 100
+        end
+        return nil
+      end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+        if (bagid == 0 and slotid == 1) or (bagid == 0 and slotid == 2) or (bagid == 1 and slotid == 1) then
+          return "|Hitem:100|h[Silk Cloth]|h"
+        end
+        return nil
+      end
+      _G.C_Item.GetItemInfo = function(itemID)
+        return "Silk Cloth", "|Hitem:100|h[Silk Cloth]|h", 1, 1, 1, "Tradegoods", "Material", 20, "INVTYPE_NON_EQUIP", 134400, 10, 7, 0, 1, 0, 0, false
+      end
+
+      -- We also need C_Container.GetContainerItemInfo to return correct stackCount
+      _G.C_Container.GetContainerItemInfo = function(bagid, slotid)
+        if bagid == 1 and slotid == 1 then
+          return { stackCount = 5, hyperlink = "|Hitem:100|h[Silk Cloth]|h", itemID = 100 }
+        elseif (bagid == 0 and slotid == 1) or (bagid == 0 and slotid == 2) then
+          return { stackCount = 20, hyperlink = "|Hitem:100|h[Silk Cloth]|h", itemID = 100 }
+        end
+        return nil
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestPartialStack")
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.is_not_nil(slotInfo)
+
+      -- With dontMergePartial = true, the visible slots should be:
+      -- 1. "0_2" (root of the full stacks: 0_2 + 0_1 = 40 count)
+      -- 2. "1_1" (partial stack, independent button with 5 count)
+      local visible = slotInfo:GetVisibleItems()
+      assert.is_not_nil(visible["0_2"])
+      assert.is_not_nil(visible["1_1"])
+      assert.is_nil(visible["0_1"]) -- Child merged under 0_2
+
+      assert.are.equal(40, visible["0_2"].stackedCount)
+      assert.is_nil(visible["1_1"].stackedCount) -- Not merged
+    end)
+
+    it("should merge partial stack when dontMergePartial is false", function()
+      -- Stacking option: dontMergePartial = false, mergeStacks = true
+      database.GetStackingOptions = function()
+        return {
+          mergeStacks = true,
+          dontMergePartial = false,
+          mergeUnstackable = true,
+          unmergeAtShop = false,
+        }
+      end
+
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid)
+        if (bagid == 0 and slotid == 1) or (bagid == 0 and slotid == 2) or (bagid == 1 and slotid == 1) then
+          return 100
+        end
+        return nil
+      end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+        if (bagid == 0 and slotid == 1) or (bagid == 0 and slotid == 2) or (bagid == 1 and slotid == 1) then
+          return "|Hitem:100|h[Silk Cloth]|h"
+        end
+        return nil
+      end
+      _G.C_Item.GetItemInfo = function(itemID)
+        return "Silk Cloth", "|Hitem:100|h[Silk Cloth]|h", 1, 1, 1, "Tradegoods", "Material", 20, "INVTYPE_NON_EQUIP", 134400, 10, 7, 0, 1, 0, 0, false
+      end
+
+      _G.C_Container.GetContainerItemInfo = function(bagid, slotid)
+        if bagid == 1 and slotid == 1 then
+          return { stackCount = 5, hyperlink = "|Hitem:100|h[Silk Cloth]|h", itemID = 100 }
+        elseif (bagid == 0 and slotid == 1) or (bagid == 0 and slotid == 2) then
+          return { stackCount = 20, hyperlink = "|Hitem:100|h[Silk Cloth]|h", itemID = 100 }
+        end
+        return nil
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestPartialStackMerge")
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.is_not_nil(slotInfo)
+
+      -- With dontMergePartial = false, the visible slots should be:
+      -- Only "0_2" (root of all stacks: 0_2 + 0_1 + 1_1 = 45 count)
+      local visible = slotInfo:GetVisibleItems()
+      assert.is_not_nil(visible["0_2"])
+      assert.is_nil(visible["0_1"])
+      assert.is_nil(visible["1_1"]) -- All merged under 0_2
+
+      assert.are.equal(45, visible["0_2"].stackedCount)
+    end)
+  end)
 end)
