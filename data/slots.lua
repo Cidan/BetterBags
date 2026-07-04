@@ -45,7 +45,8 @@ function items:NewSlotInfo()
       updatedItems = {},
       emptySlotsSorted = {},
       deferDelete = false,
-      stacks = stacks:Create()
+      stacks = stacks:Create(),
+      visibleItemsBySlotKey = {}
     }, {__index = SlotInfo})
 end
 
@@ -115,6 +116,11 @@ function SlotInfo:GetCurrentItems()
 end
 
 ---@return table<string, ItemData>
+function SlotInfo:GetVisibleItems()
+  return self.visibleItemsBySlotKey or self.itemsBySlotKey
+end
+
+---@return table<string, ItemData>
 function SlotInfo:GetPreviousItems()
   return self.previousItemsBySlotKey
 end
@@ -143,6 +149,7 @@ function SlotInfo:Update(ctx, newItems)
   self.dirtyItems = {}
   self.emptySlotsSorted = {}
   self.deferDelete = false
+  self.visibleItemsBySlotKey = {}
 end
 
 function SlotInfo:Wipe()
@@ -159,5 +166,6 @@ function SlotInfo:Wipe()
   self.updatedItems = {}
   self.emptySlotsSorted = {}
   self.deferDelete = false
+  self.visibleItemsBySlotKey = {}
   self.stacks:Clear()
 end

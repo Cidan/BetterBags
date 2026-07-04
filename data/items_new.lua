@@ -359,6 +359,48 @@ function items:ProcessRefresh(ctx, kind)
     end
   end
 
+  local function ShouldMergeItem(bagKind, item, stackInfo)
+    if not stackInfo then return false end
+    local opts = database:GetStackingOptions(bagKind)
+    if not opts.mergeStacks then return false end
+    if opts.unmergeAtShop and addon.atInteracting then return false end
+    if opts.dontMergePartial and item.itemInfo.itemStackCount ~= item.itemInfo.currentItemCount then return false end
+    if not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1 then return false end
+    return true
+  end
+
+  slotInfo.visibleItemsBySlotKey = {}
+  for slotkey, item in pairs(itemData) do
+    if not item.isItemEmpty then
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      local isRoot = true
+
+      if ShouldMergeItem(kind, item, stackInfo) then
+        if item.slotkey == stackInfo.rootItem then
+          -- Root item. Compute total count.
+          local totalCount = item.itemInfo.currentItemCount
+          for childSlotkey in pairs(stackInfo.slotkeys) do
+            local childItem = itemData[childSlotkey]
+            if childItem and not childItem.isItemEmpty then
+              if ShouldMergeItem(kind, childItem, stackInfo) then
+                totalCount = totalCount + childItem.itemInfo.currentItemCount
+              end
+            end
+          end
+          item.stackedCount = totalCount
+        else
+          isRoot = false
+        end
+      else
+        item.stackedCount = nil
+      end
+
+      if isRoot then
+        slotInfo.visibleItemsBySlotKey[slotkey] = item
+      end
+    end
+  end
+
   local search = addon:GetModule("Search")
   if search and search.IndexItems then
     search:IndexItems(itemData)

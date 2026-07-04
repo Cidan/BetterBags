@@ -146,16 +146,6 @@ local function FilterChangesetForTab(view, bagKind, added, removed, changed)
   return tabAdded, tabRemoved, tabChanged
 end
 
-local function ShouldMergeItem(bagKind, item, stackInfo)
-  if not stackInfo then return false end
-  local opts = database:GetStackingOptions(bagKind)
-  if not opts.mergeStacks then return false end
-  if opts.unmergeAtShop and addon.atInteracting then return false end
-  if opts.dontMergePartial and item.itemInfo.itemStackCount ~= item.itemInfo.currentItemCount then return false end
-  if not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1 then return false end
-  return true
-end
-
 ---@param view View
 ---@param ctx Context
 ---@param bag Bag
@@ -180,7 +170,8 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   -- Extract all items that belong to the active tab ID
   local currentItems = {}
-  for _, item in pairs(slotInfo:GetCurrentItems()) do
+  local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
+  for _, item in pairs(itemsGetter(slotInfo)) do
     if not item.isItemEmpty and ItemBelongsToTab(view, bag.kind, item) then
       table.insert(currentItems, item)
     end
@@ -188,51 +179,28 @@ local function GridView(view, ctx, bag, slotInfo, callback)
 
   -- Populate the sections
   for _, item in ipairs(currentItems) do
-    local stackInfo = slotInfo.stacks and slotInfo.stacks:GetStackInfo(item.itemHash) or nil
-    local isRoot = true
-
-    if ShouldMergeItem(bag.kind, item, stackInfo) then
-      if item.slotkey == stackInfo.rootItem then
-        -- Root item. Compute total count.
-        local totalCount = item.itemInfo.currentItemCount
-        for childSlotkey in pairs(stackInfo.slotkeys) do
-          local childItem = (slotInfo.itemsBySlotKey and slotInfo.itemsBySlotKey[childSlotkey]) or items:GetItemDataFromSlotKey(childSlotkey)
-          if childItem and not childItem.isItemEmpty then
-            totalCount = totalCount + childItem.itemInfo.currentItemCount
-          end
-        end
-        item.stackedCount = totalCount
+    local dbItem = items:GetItemDataFromSlotKey(item.slotkey)
+    if dbItem then
+      -- Get or create visual item button
+      local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
+      if itemButton.SetItemFromData then
+        itemButton:SetItemFromData(ctx, item)
       else
-        isRoot = false
+        itemButton.staticData = item
+        itemButton:SetItem(ctx, item.slotkey)
       end
-    else
-      item.stackedCount = nil
-    end
 
-    if isRoot then
-      local dbItem = items:GetItemDataFromSlotKey(item.slotkey)
-      if dbItem then
-        -- Get or create visual item button
-        local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-        if itemButton.SetItemFromData then
-          itemButton:SetItemFromData(ctx, item)
-        else
-          itemButton.staticData = item
-          itemButton:SetItem(ctx, item.slotkey)
-        end
-
-        -- Resolve polymorphic section name
-        local category = L:G("Items")
-        if view.bagview == const.BAG_VIEW.SECTION_GRID then
-          category = items:GetCategory(ctx, item)
-        elseif view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-          category = GetBagName(item.bagid)
-        end
-
-        local section = view:GetOrCreateSection(ctx, category)
-        section:AddCell(item.slotkey, itemButton)
-        view:SetSlotSection(item.slotkey, section)
+      -- Resolve polymorphic section name
+      local category = L:G("Items")
+      if view.bagview == const.BAG_VIEW.SECTION_GRID then
+        category = items:GetCategory(ctx, item)
+      elseif view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
+        category = GetBagName(item.bagid)
       end
+
+      local section = view:GetOrCreateSection(ctx, category)
+      section:AddCell(item.slotkey, itemButton)
+      view:SetSlotSection(item.slotkey, section)
     end
   end
 
