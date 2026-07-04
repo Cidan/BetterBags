@@ -69,6 +69,7 @@ data\groups.lua
 data\items.lua
 data\stacks.lua
 data\slots.lua
+data\loader.lua
 data\refresh.lua
 
 util\color.lua
