@@ -27,7 +27,7 @@ tooltipScanner.GetTooltipText = function() return "" end
 LoadBetterBagsModule("util/query.lua")
 LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
-LoadBetterBagsModule("data/search.lua")
+LoadBetterBagsModule("data/search_new.lua")
 LoadBetterBagsModule("core/async.lua")
 LoadBetterBagsModule("data/stacks_new.lua")
 ResetModuleStub("Binding", "data/binding.lua")
