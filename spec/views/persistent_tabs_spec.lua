@@ -82,6 +82,13 @@ categories.CreateCategory = function() end
 
 local groups = StubBetterBagsModule("Groups")
 groups.CategoryBelongsToGroup = function() return true end
+groups.GetGroup = function(self, kind, id)
+  return database:GetGroup(kind, id)
+end
+groups.IsDefaultGroup = function(self, kind, id)
+  local group = database:GetGroup(kind, id)
+  return group and group.isDefault == true
+end
 
 -- Stub SectionFrame
 local sectionFrame = StubBetterBagsModule("SectionFrame")
@@ -120,6 +127,7 @@ local mockGridProto = {
   Hide = function() end,
   AddCell = function() end,
   RemoveCell = function() end,
+  GetCell = function() return nil end,
 }
 local grid = StubBetterBagsModule("Grid")
 grid.Create = function()
@@ -600,5 +608,132 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(callbackCalled)
     assert.is_false(view.isNew)
     assert.is_not_nil(view.itemsByBagAndSlot["0_1"])
+  end)
+
+  it("should always load both BANK_BAGS and ACCOUNT_BANK_BAGS in Retail regardless of GetShowBankTabs", function()
+    local old_isRetail = addon.isRetail
+    addon.isRetail = true
+    local old_GetShowBankTabs = database.GetShowBankTabs
+    database.GetShowBankTabs = function() return false end
+    equipmentSets.Update = function() end
+    addon.Bags = { Bank = {} }
+
+    -- Set up const values
+    const.ACCOUNT_BANK_BAGS = { [13] = 13, [14] = 14 }
+    const.BANK_BAGS = { [6] = 6, [7] = 7 }
+    const.BANK_ONLY_BAGS = {}
+
+    -- Mock LoadBagItems to observe bagList
+    local capturedBagList = nil
+    items.LoadBagItems = function(self, ctx, kind, bagList, save, callback)
+      capturedBagList = bagList
+      callback(ctx, {}, {})
+    end
+    items.LoadItems = function(self, ctx, kind, itemData, equipmentData, callback)
+      callback(ctx)
+    end
+
+    local ctx = context:New("test")
+    items:RefreshBank(ctx)
+
+    assert.is_not_nil(capturedBagList)
+    assert.is_not_nil(capturedBagList[6])
+    assert.is_not_nil(capturedBagList[7])
+    assert.is_not_nil(capturedBagList[13])
+    assert.is_not_nil(capturedBagList[14])
+
+    -- Clean up
+    addon.isRetail = old_isRetail
+    database.GetShowBankTabs = old_GetShowBankTabs
+  end)
+
+  it("should filter bank items strictly by tab bankType in Retail when ShowBankTabs is false", function()
+    local old_isRetail = addon.isRetail
+    addon.isRetail = true
+    local old_Enum = _G.Enum
+    _G.Enum = _G.Enum or {}
+    _G.Enum.BankType = { Character = 1, Account = 2 }
+
+    local old_GetShowBankTabs = database.GetShowBankTabs
+    database.GetShowBankTabs = function() return false end
+
+    -- Mock database GetGroup to return character bank for Tab 1, account bank for Tab 2
+    local old_GetGroup = database.GetGroup
+    database.GetGroup = function(_, kind, id)
+      if id == 1 then
+        return { id = 1, isDefault = true, bankType = _G.Enum.BankType.Character }
+      elseif id == 2 then
+        return { id = 2, isDefault = true, bankType = _G.Enum.BankType.Account }
+      end
+      return nil
+    end
+
+    local old_CategoryBelongsToGroup = groups.CategoryBelongsToGroup
+    groups.CategoryBelongsToGroup = function() return true end
+
+    local old_IsDefaultGroup = groups.IsDefaultGroup
+    groups.IsDefaultGroup = function() return true end
+
+    -- Set up bag constants
+    const.BANK_BAGS = { [6] = 6 }
+    const.ACCOUNT_BANK_BAGS = { [13] = 13 }
+
+    -- Create mock items
+    local charItem = {
+      slotkey = "6_1",
+      bagid = 6,
+      slotid = 1,
+      itemHash = "hash_6_1",
+      isItemEmpty = false,
+      itemInfo = { currentItemCount = 1, itemStackCount = 20, isItemEmpty = false, category = "TestCategory" }
+    }
+    local warItem = {
+      slotkey = "13_1",
+      bagid = 13,
+      slotid = 1,
+      itemHash = "hash_13_1",
+      isItemEmpty = false,
+      itemInfo = { currentItemCount = 1, itemStackCount = 20, isItemEmpty = false, category = "TestCategory" }
+    }
+
+    items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey["6_1"] = charItem
+    items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey["13_1"] = warItem
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return { ["6_1"] = charItem, ["13_1"] = warItem } end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 2
+    }
+
+    local parent = CreateFrame("Frame")
+    local bag = { kind = const.BAG_KIND.BANK, frame = CreateFrame("Frame") }
+
+    -- Tab 1 (Character Bank)
+    local view1 = views:NewGrid(parent, const.BAG_KIND.BANK, 1)
+    view1:Render(context:New("test"), bag, mockSlotInfo, function() end)
+
+    -- Assert only charItem is drawn in view1
+    assert.is_not_nil(view1.itemsByBagAndSlot["6_1"])
+    assert.is_nil(view1.itemsByBagAndSlot["13_1"])
+
+    -- Tab 2 (Account Bank)
+    local view2 = views:NewGrid(parent, const.BAG_KIND.BANK, 2)
+    view2:Render(context:New("test"), bag, mockSlotInfo, function() end)
+
+    -- Assert only warItem is drawn in view2
+    assert.is_nil(view2.itemsByBagAndSlot["6_1"])
+    assert.is_not_nil(view2.itemsByBagAndSlot["13_1"])
+
+    -- Clean up
+    addon.isRetail = old_isRetail
+    _G.Enum = old_Enum
+    database.GetShowBankTabs = old_GetShowBankTabs
+    database.GetGroup = old_GetGroup
+    groups.CategoryBelongsToGroup = old_CategoryBelongsToGroup
+    groups.IsDefaultGroup = old_IsDefaultGroup
   end)
 end)

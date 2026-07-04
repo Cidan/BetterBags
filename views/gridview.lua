@@ -240,8 +240,18 @@ end
 
 local function ItemBelongsToTab(view, bagKind, item)
   if not item then return false end
-  if bagKind == const.BAG_KIND.BANK and database:GetShowBankTabs() then
-    return item.bagid == view.tabID
+  if bagKind == const.BAG_KIND.BANK then
+    if database:GetShowBankTabs() then
+      return item.bagid == view.tabID
+    end
+    local activeGroup = groups:GetGroup(const.BAG_KIND.BANK, view.tabID)
+    if activeGroup and addon.isRetail then
+      local itemIsAccountBank = (const.ACCOUNT_BANK_BAGS[item.bagid] ~= nil)
+      local tabIsAccountBank = (Enum.BankType and activeGroup.bankType == Enum.BankType.Account)
+      if itemIsAccountBank ~= tabIsAccountBank then
+        return false
+      end
+    end
   end
   if database:GetGroupsEnabled(bagKind) then
     local category = items:GetCategory(nil, item)
