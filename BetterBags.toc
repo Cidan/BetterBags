@@ -67,7 +67,7 @@ data\equipmentsets.lua
 data\categories.lua
 data\groups.lua
 data\items_new.lua
-data\stacks.lua
+data\stacks_new.lua
 data\slots.lua
 data\loader.lua
 data\refresh.lua

@@ -29,7 +29,7 @@ LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
 LoadBetterBagsModule("data/search.lua")
 LoadBetterBagsModule("core/async.lua")
-LoadBetterBagsModule("data/stacks.lua")
+LoadBetterBagsModule("data/stacks_new.lua")
 ResetModuleStub("Binding", "data/binding.lua")
 LoadBetterBagsModule("data/binding.lua")
 
