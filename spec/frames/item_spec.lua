@@ -261,4 +261,90 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     item:Wipe(btnCtx)
     assert.equal("0_5", item.slotkey)
   end)
+
+  describe("Phase 5: Decoupled Item Button Drawing", function()
+    local btnCtx
+    local item
+
+    before_each(function()
+      btnCtx = ctx:New("phase5_test")
+      item = itemFrame:GetButton(btnCtx, "0_6")
+      _G.Enum = _G.Enum or {}
+      _G.Enum.ItemClass = _G.Enum.ItemClass or {}
+      _G.Enum.ItemClass.Armor = _G.Enum.ItemClass.Armor or 4
+      _G.SetItemButtonCountCalled = nil
+      _G.SetItemButtonCountVal = nil
+      _G.SetItemButtonCount = function(_, count)
+        _G.SetItemButtonCountCalled = true
+        _G.SetItemButtonCountVal = count
+      end
+    end)
+
+    it("UpdateCount should render pre-computed stackedCount when present", function()
+      local itemData = {
+        slotkey = "0_6",
+        bagid = 0,
+        slotid = 6,
+        stackedCount = 42,
+        isItemEmpty = false,
+        itemInfo = {
+          currentItemCount = 5,
+        }
+      }
+      item:UpdateCount(btnCtx, itemData)
+      assert.is_true(_G.SetItemButtonCountCalled)
+      assert.equal(42, _G.SetItemButtonCountVal)
+    end)
+
+    it("UpdateCount should fall back to currentItemCount when stackedCount is nil", function()
+      local itemData = {
+        slotkey = "0_6",
+        bagid = 0,
+        slotid = 6,
+        isItemEmpty = false,
+        itemInfo = {
+          currentItemCount = 5,
+        }
+      }
+      item:UpdateCount(btnCtx, itemData)
+      assert.is_true(_G.SetItemButtonCountCalled)
+      assert.equal(5, _G.SetItemButtonCountVal)
+    end)
+
+    it("DrawItemLevel should utilize passed ItemData directly", function()
+      local itemData = {
+        slotkey = "0_6",
+        bagid = 0,
+        slotid = 6,
+        isItemEmpty = false,
+        itemInfo = {
+          currentItemLevel = 210,
+          classID = _G.Enum.ItemClass.Armor,
+        }
+      }
+      item.kind = const.BAG_KIND.BACKPACK
+      item:DrawItemLevel(itemData)
+      assert.equal("210", item.ilvlText:GetText())
+      assert.is_true(item.ilvlText:IsShown())
+    end)
+
+    it("UpdateUpgrade should show UpgradeIcon if isUpgrade is true", function()
+      local itemData = {
+        slotkey = "0_6",
+        bagid = 0,
+        slotid = 6,
+        isItemEmpty = false,
+        isUpgrade = true,
+        itemInfo = {
+          itemLink = "item:12345",
+        }
+      }
+      local shownVal = nil
+      item._decoration.UpgradeIcon.SetShown = function(_, val)
+        shownVal = val
+      end
+      item:UpdateUpgrade(btnCtx, itemData)
+      assert.is_true(shownVal)
+    end)
+  end)
 end)

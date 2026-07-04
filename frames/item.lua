@@ -119,11 +119,9 @@ function itemFrame.itemProto:OnLeave()
 end
 
 ---@param ctx Context
-function itemFrame.itemProto:UpdateCooldown(ctx)
-	if self.slotkey == nil then
-		return
-	end
-	local data = items:GetItemDataFromSlotKey(self.slotkey)
+---@param data? ItemData
+function itemFrame.itemProto:UpdateCooldown(ctx, data)
+	data = data or self:GetItemData()
 	if not data or data.isItemEmpty then
 		return
 	end
@@ -143,9 +141,9 @@ function itemFrame.itemProto:Unlock(ctx)
 	SetItemButtonDesaturated(decoration, false)
 end
 
-function itemFrame.itemProto:ShowItemLevel()
+---@param data ItemData
+function itemFrame.itemProto:ShowItemLevel(data)
 	local ilvlOpts = database:GetItemLevelOptions(self.kind)
-	local data = items:GetItemDataFromSlotKey(self.slotkey)
 	local ilvl = data.itemInfo.currentItemLevel
 	self.ilvlText:SetText(tostring(ilvl))
 	if ilvlOpts.color then
@@ -157,8 +155,11 @@ function itemFrame.itemProto:ShowItemLevel()
 	self.ilvlText:Show()
 end
 
-function itemFrame.itemProto:DrawItemLevel()
-	if not self.slotkey then
+---@param data? ItemData
+function itemFrame.itemProto:DrawItemLevel(data)
+	data = data or self:GetItemData()
+	if not data or data.isItemEmpty then
+		self.ilvlText:Hide()
 		return
 	end
 	if not self.kind then
@@ -166,11 +167,6 @@ function itemFrame.itemProto:DrawItemLevel()
 	end
 	local ilvlOpts = database:GetItemLevelOptions(self.kind)
 	local mergeOpts = database:GetStackingOptions(self.kind)
-	local data = items:GetItemDataFromSlotKey(self.slotkey)
-	if not data or data.isItemEmpty then
-		self.ilvlText:Hide()
-		return
-	end
 	local ilvl = data.itemInfo.currentItemLevel
 
 	if not ilvlOpts.enabled then
@@ -193,69 +189,38 @@ function itemFrame.itemProto:DrawItemLevel()
 		return
 	end
 
-	self:ShowItemLevel()
+	self:ShowItemLevel(data)
 end
 
 ---@param ctx Context
-function itemFrame.itemProto:UpdateCount(ctx)
-	if not self.slotkey then
-		return
-	end
-	if not self.kind then
-		return
-	end
-	local data = items:GetItemDataFromSlotKey(self.slotkey)
+---@param data? ItemData
+function itemFrame.itemProto:UpdateCount(ctx, data)
+	data = data or self:GetItemData()
 	if not data or data.isItemEmpty then
 		return
 	end
-	---@type number
-	local count = 0
-	local opts = database:GetStackingOptions(self.kind)
-	local stack = items:GetStackData(data)
-	if
-		not opts.mergeStacks
-		or (opts.unmergeAtShop and addon.atInteracting)
-		or (opts.dontMergePartial and data.itemInfo.currentItemCount < data.itemInfo.itemStackCount and data.itemInfo.itemStackCount ~= 1)
-		or (not opts.mergeUnstackable and data.itemInfo.itemStackCount == 1)
-		or database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS
-	then
-		count = data.itemInfo.currentItemCount
-	elseif opts.dontMergePartial and data.itemInfo.currentItemCount == data.itemInfo.itemStackCount and stack then
-		count = data.itemInfo.currentItemCount
-		for slotKey in pairs(stack.slotkeys) do
-			local childData = items:GetItemDataFromSlotKey(slotKey)
-			if childData.itemInfo.currentItemCount == childData.itemInfo.itemStackCount then
-				count = count + childData.itemInfo.currentItemCount
-			end
-		end
-	else
-		if stack then
-			count = items:GetItemDataFromSlotKey(stack.rootItem).itemInfo.currentItemCount
-			if stack.count > 1 then
-				for slotKey in pairs(stack.slotkeys) do
-					local itemData = items:GetItemDataFromSlotKey(slotKey)
-					count = count + itemData.itemInfo.currentItemCount
-				end
-			end
-		end
-	end
-
 	local decoration = themes:GetItemButton(ctx, self)
-	SetItemButtonCount(decoration, count)
+	SetItemButtonCount(decoration, data.stackedCount or data.itemInfo.currentItemCount)
 end
 
 ---@param ctx Context
-function itemFrame.itemProto:UpdateUpgrade(ctx)
-	local data = self:GetItemData()
+---@param data? ItemData
+function itemFrame.itemProto:UpdateUpgrade(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
-	if not data or not data.inventorySlots then
+	data = data or self:GetItemData()
+	if not data or data.isItemEmpty then
+		decoration.UpgradeIcon:SetShown(false)
 		return
 	end
 	if self.staticData then
 		return
 	end
+	if data.isUpgrade ~= nil then
+		decoration.UpgradeIcon:SetShown(data.isUpgrade)
+		return
+	end
 
-	if not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
+	if not data.inventorySlots or not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
 		decoration.UpgradeIcon:SetShown(false)
 		return
 	end
@@ -291,7 +256,6 @@ function itemFrame.itemProto:UpdateUpgrade(ctx)
 			and slot >= INVSLOT_FIRST_EQUIPPED
 			and slot <= INVSLOT_LAST_EQUIPPED
 		then
-			print("upgrade icon for secondary" .. data.itemInfo.itemLink)
 			decoration.UpgradeIcon:SetShown(true)
 			break
 		else
@@ -410,7 +374,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 
 	self.stackid = data.itemInfo.itemID
 	decoration.minDisplayCount = 1
-	self:DrawItemLevel()
+	self:DrawItemLevel(data)
 	decoration.ItemSlotBackground:Hide()
 	ClearItemButtonOverlay(decoration)
 	decoration:SetHasItem(data.itemInfo.itemIcon)
@@ -429,7 +393,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 		decoration.IconBorder:SetBlendMode("BLEND")
 		decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
 	end
-	self:UpdateCount(ctx)
+	self:UpdateCount(ctx, data)
 	--self:SetLock(data.itemInfo.isLocked)
 	if self.button.UpdateExtended then
 		self.button:UpdateExtended()
@@ -439,11 +403,11 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	decoration:UpdateQuestItem(isQuestItem, questID, isActive)
 	if not self.staticData then
-		self:UpdateNewItem(ctx, data.itemInfo.itemQuality)
+		self:UpdateNewItem(ctx, data)
 	end
 	decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue)
 	decoration:UpdateItemContextMatching()
-	decoration:UpdateCooldown(data.itemInfo.itemIcon)
+	decoration:UpdateCooldown(ctx, data)
 	decoration:SetReadable(readable)
 	decoration:CheckUpdateTooltip(tooltipOwner)
 	decoration:SetMatchesSearch(not isFiltered)
@@ -457,7 +421,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 		events:SendMessage(ctx, "item/Updated", self, decoration)
 	end
 	decoration:SetFrameLevel(math.max(0, self.button:GetFrameLevel() - 1))
-	self:UpdateUpgrade(ctx)
+	self:UpdateUpgrade(ctx, data)
 	self.frame:Show()
 	self.button:Show()
 end
@@ -485,14 +449,21 @@ function itemFrame.itemProto:ClearFlashItem(ctx)
 end
 
 ---@param ctx Context
----@param quality ItemQuality
-function itemFrame.itemProto:UpdateNewItem(ctx, quality)
+---@param data? ItemData
+function itemFrame.itemProto:UpdateNewItem(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
 	if not decoration.BattlepayItemTexture and not self.NewItemTexture then
 		return
 	end
+	data = data or self:GetItemData()
+	if not data or data.isItemEmpty then
+		decoration.BattlepayItemTexture:Hide()
+		decoration.NewItemTexture:Hide()
+		return
+	end
+	local quality = data.itemInfo.itemQuality
 
-	if items:IsNewItem(self:GetItemData()) then
+	if items:IsNewItem(data) then
 		if C_Container.IsBattlePayItem(self.button:GetBagID(), self.button:GetID()) then
 			decoration.NewItemTexture:Hide()
 			decoration.BattlepayItemTexture:Show()
