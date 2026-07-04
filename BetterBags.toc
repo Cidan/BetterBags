@@ -61,7 +61,7 @@ util\trees\intervaltree.lua
 util\query.lua
 
 data\binding.lua
-data\search.lua
+data\search_new.lua
 data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua

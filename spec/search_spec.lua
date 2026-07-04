@@ -40,7 +40,7 @@ const.ITEM_QUALITY_TO_ENUM = {
 local items = StubBetterBagsModule("Items")
 items.GetAllSlotInfo = function() return {} end
 
-LoadBetterBagsModule("data/search.lua")
+LoadBetterBagsModule("data/search_new.lua")
 local search = addon:GetModule("Search")
 
 -- Use shared mock factory
