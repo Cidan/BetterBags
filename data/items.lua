@@ -515,7 +515,9 @@ function items:LoadBagItems(ctx, kind, bagList, includeEquipment, callback)
 			for slotid = 1, size do
 				local itemID = C_Container.GetContainerItemID(bagid, slotid)
 				if itemID then
-					local itemMixin = Item:CreateFromBagAndSlot(bagid, slotid)
+					local slotkey = bagid .. "_" .. slotid
+					local itemLoader = addon:GetModule("ItemLoader", true)
+					local itemMixin = itemLoader and itemLoader:GetItemMixinFromSlotKey(slotkey) or Item:CreateFromBagAndSlot(bagid, slotid)
 					container:AddContinuable(itemMixin)
 				end
 			end
@@ -1517,10 +1519,11 @@ end
 ---@param kind BagKind
 ---@return ItemData
 function items:AttachItemInfo(data, kind)
-	local itemMixin = Item:CreateFromBagAndSlot(data.bagid, data.slotid) --[[@as ItemMixin]]
-	local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
 	local bagid, slotid = data.bagid, data.slotid
 	local slotkey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
+	local itemLoader = addon:GetModule("ItemLoader", true)
+	local itemMixin = itemLoader and itemLoader:GetItemMixinFromSlotKey(slotkey) or Item:CreateFromBagAndSlot(bagid, slotid) --[[@as ItemMixin]]
+	local itemLocation = itemMixin:GetItemLocation() --[[@as ItemLocationMixin]]
 	local itemID = C_Container.GetContainerItemID(bagid, slotid)
 	local itemLink = C_Container.GetContainerItemLink(bagid, slotid)
 	data.kind = kind

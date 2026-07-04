@@ -110,6 +110,7 @@ describe("Refresh", function()
     -- Reset combat state
     _G.InCombatLockdown = function() return false end
     -- Re-initialize module
+    addon.modules["ItemLoader"] = nil
     refresh:OnInitialize()
     events:OnInitialize()
   end)

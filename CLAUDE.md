@@ -8,6 +8,8 @@
 @.context/patterns-state.md
 @.context/project.md
 
+## PRIME DIRECTIVE: Document Changes in Rules Files
+All system refactors, major additions, structural changes, or new patterns must be documented inside a dedicated rules markdown file under `.claude/rules/` (and/or existing rules files must be updated). This document must explain what we're doing, why we're doing it, how the architecture works, and any relevant API contracts.
 
 ## PRIME DIRECTIVE #1: Test-First TDD
 

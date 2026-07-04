@@ -158,9 +158,16 @@ function refresh:OnEnable()
   -- Register for main bag update events from the WoW client.
   -- BAG_UPDATE_DELAYED signals that all bag updates are complete and data is available.
   -- Always refresh all bags when this fires - bank will only actually update if addon.atBank is true.
-  events:RegisterEvent('BAG_UPDATE_DELAYED', function()
-    self:RequestUpdate({ backpack = true, bank = true })
-  end)
+  local itemLoader = addon:GetModule('ItemLoader', true)
+  if itemLoader then
+    itemLoader:TellMeWhenABagIsUpdated(function()
+      self:RequestUpdate({ backpack = true, bank = true })
+    end)
+  else
+    events:RegisterEvent('BAG_UPDATE_DELAYED', function()
+      self:RequestUpdate({ backpack = true, bank = true })
+    end)
+  end
 
   if not addon.isRetail then
     -- Register when bank slots change for any reason.
