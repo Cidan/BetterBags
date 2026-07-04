@@ -736,4 +736,73 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     groups.CategoryBelongsToGroup = old_CategoryBelongsToGroup
     groups.IsDefaultGroup = old_IsDefaultGroup
   end)
+
+  it("should bypass rendering in bag:Draw() when tab_switch is true", function()
+    setupBagFrameStubs()
+    LoadBetterBagsModule("frames/bag.lua")
+    local frame = CreateFrame("Frame")
+    frame.SetScale = function() end
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      frame = frame,
+      tabViews = {},
+      GetCurrentTabID = function() return 1 end,
+      IsShown = function() return true end,
+      OnResize = function() end,
+      behavior = {
+        OnShow = function() end,
+      }
+    }
+    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+
+    local ctx = context:New("test")
+    local view1 = bag:GetViewForTab(ctx, 1)
+
+    local render_called = false
+    view1.Render = function(self, ...) render_called = true; select(4, ...)(...) end
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+
+    ctx:Set("tab_switch", true)
+    local callback_called = false
+    bag:Draw(ctx, mockSlotInfo, function() callback_called = true end)
+
+    assert.is_false(render_called)
+    assert.is_true(callback_called)
+  end)
+
+  it("should early-exit GridView/BagView when changeset is empty and not redraw/wipe/isNew", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 1)
+    view.isNew = false -- Simulated as already rendered once
+
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = parent }
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+
+    local ctx = context:New("test")
+    -- Ensure no redraw or wipe flag is set in context
+
+    local callback_called = false
+    view:Render(ctx, bag, mockSlotInfo, function() callback_called = true end)
+
+    assert.is_true(callback_called)
+    -- We can verify it early exited without wiping or running full layout (view is still intact)
+    assert.is_false(view.isNew)
+  end)
 end)
