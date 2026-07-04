@@ -734,6 +734,7 @@ _G.Item.CreateFromBagAndSlot = function(_, bagID, slotID)
   function item:GetItemName() return "Mock Item" end
   function item:GetItemIcon() return 12345 end
   function item:GetItemLink() return "[Mock Item]" end
+  function item:GetItemID() return 12345 end
   function item:IsItemEmpty() return false end
   return item
 end
@@ -751,6 +752,7 @@ _G.Item.CreateFromEquipmentSlot = function(_, slotID)
   function item:GetItemName() return "Mock Item" end
   function item:GetItemIcon() return 12345 end
   function item:GetItemLink() return "[Mock Item]" end
+  function item:GetItemID() return 12345 end
   function item:IsItemEmpty() return false end
   return item
 end
@@ -766,6 +768,7 @@ _G.Item.CreateFromItemLocation = function(_, itemLocation)
   function item:GetItemName() return "Mock Item" end
   function item:GetItemIcon() return 12345 end
   function item:GetItemLink() return "[Mock Item]" end
+  function item:GetItemID() return 12345 end
   function item:IsItemEmpty() return false end
   return item
 end
@@ -791,3 +794,7 @@ _G.ceil = math.ceil
 _G.abs = math.abs
 _G.max = math.max
 _G.min = math.min
+
+-- Equipment Slot constants
+_G.INVSLOT_FIRST_EQUIPPED = 1
+_G.INVSLOT_LAST_EQUIPPED = 19

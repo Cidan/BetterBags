@@ -26,7 +26,7 @@ local database = addon:GetModule("Database")
 --local search = addon:GetModule("Search")
 
 ---@class Localization: AceModule
---local L = addon:GetModule("Localization")
+local L = addon:GetModule("Localization")
 
 ---@class Binding: AceModule
 local binding = addon:GetModule("Binding")
@@ -153,12 +153,228 @@ function items:Restack(ctx, kind, callback)
   if callback then callback() end
 end
 
+-- UpdateFreeSlots updates the current free slot count for a given bag kind.
+---@param ctx Context
+---@param kind BagKind
+function items:UpdateFreeSlots(ctx, kind)
+  local baglist
+  local tab = ctx:Get("bagid")
+  if kind == const.BAG_KIND.BANK then
+    local blizzardTab = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
+    if blizzardTab and addon.isRetail then
+      baglist = { [blizzardTab] = blizzardTab }
+    elseif tab == const.BANK_TAB.BANK then
+      baglist = const.BANK_BAGS
+    elseif const.ACCOUNT_BANK_BAGS and tab == const.BANK_TAB.ACCOUNT_BANK_1 then
+      baglist = const.ACCOUNT_BANK_BAGS
+    else
+      baglist = { [tab] = tab }
+    end
+  else
+    baglist = const.BACKPACK_BAGS
+  end
+
+  self.slotInfo[kind].emptySlots = {}
+
+  for bagid in pairs(baglist) do
+    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid) or 0
+    local name
+    local invid = C_Container.ContainerIDToInventoryID(bagid)
+    local baglink = GetInventoryItemLink("player", invid)
+    if baglink ~= nil and invid ~= nil then
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      name = C_Item.GetItemSubClassInfo(class, subclass)
+    else
+      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+    end
+    if addon.isClassic and Enum.BagIndex and (bagid == Enum.BagIndex.Bank or (Enum.BagIndex.Reagentbank and bagid == Enum.BagIndex.Reagentbank)) then
+      freeSlots = freeSlots - 4
+    end
+    if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
+      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] or 0
+      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] + freeSlots
+    end
+  end
+end
+
+--- CENTRALIZED PIPELINE REFRESH ORCHESTRATOR (PHASES 1-5)
+---@param ctx Context
+---@param kind BagKind
+function items:ProcessRefresh(ctx, kind)
+  local bagList = {}
+  if kind == const.BAG_KIND.BACKPACK then
+    bagList = const.BACKPACK_BAGS
+  elseif kind == const.BAG_KIND.BANK then
+    if const.BANK_ONLY_BAGS then
+      for _, bag in pairs(const.BANK_ONLY_BAGS) do
+        local id = C_Container.ContainerIDToInventoryID(bag)
+        if id and GetInventoryItemQuality then
+          GetInventoryItemQuality("player", id)
+        end
+      end
+    end
+
+    local blizzardTab = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
+    if addon.isRetail then
+      ctx:Set("bagid", const.BANK_TAB.BANK)
+      for _, bag in pairs(const.BANK_BAGS) do
+        bagList[bag] = bag
+      end
+      if const.ACCOUNT_BANK_BAGS then
+        for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+          bagList[bag] = bag
+        end
+      end
+      local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
+      if reagentBank then
+        bagList[reagentBank] = reagentBank
+      end
+    elseif blizzardTab and addon.isRetail then
+      if Enum.BagIndex and Enum.BagIndex.AccountBankTab_1 and blizzardTab >= Enum.BagIndex.AccountBankTab_1 then
+        ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1)
+      else
+        ctx:Set("bagid", const.BANK_TAB.BANK)
+      end
+      bagList[blizzardTab] = blizzardTab
+    else
+      local activeGroupID = database:GetActiveGroup(const.BAG_KIND.BANK)
+      local activeGroup = activeGroupID and database:GetGroup(const.BAG_KIND.BANK, activeGroupID)
+      local reagentBank = not addon.isRetail and const.BANK_TAB.REAGENT or nil
+
+      if activeGroup and addon.isRetail and activeGroup.bankType == (Enum and Enum.BankType and Enum.BankType.Account) then
+        ctx:Set("bagid", const.BANK_TAB.ACCOUNT_BANK_1)
+        if const.ACCOUNT_BANK_BAGS then
+          for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+            bagList[bag] = bag
+          end
+        end
+      else
+        ctx:Set("bagid", const.BANK_TAB.BANK)
+        for _, bag in pairs(const.BANK_BAGS) do
+          bagList[bag] = bag
+        end
+        if reagentBank then
+          bagList[reagentBank] = reagentBank
+        end
+      end
+    end
+  end
+
+  local itemData, equipmentData = self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
+
+  local slotInfo = self.slotInfo[kind]
+  if not slotInfo then
+    self:WipeSlotInfo(kind)
+    slotInfo = self.slotInfo[kind]
+  end
+
+  local previousItems = slotInfo.itemsBySlotKey or {}
+  local added = {}
+  local removed = {}
+  local updated = {}
+
+  for slotkey, newItem in pairs(itemData) do
+    local oldItem = previousItems[slotkey]
+    if newItem.isItemEmpty then
+      if oldItem and not oldItem.isItemEmpty then
+        removed[slotkey] = oldItem
+      end
+    else
+      if not oldItem or oldItem.isItemEmpty then
+        added[slotkey] = newItem
+      else
+        if oldItem.itemHash ~= newItem.itemHash or
+           oldItem.itemInfo.currentItemCount ~= newItem.itemInfo.currentItemCount or
+           oldItem.itemInfo.isNewItem ~= newItem.itemInfo.isNewItem then
+          updated[slotkey] = newItem
+        end
+      end
+    end
+  end
+
+  for slotkey, oldItem in pairs(previousItems) do
+    if not itemData[slotkey] and not oldItem.isItemEmpty then
+      removed[slotkey] = oldItem
+    end
+  end
+
+  if self._firstLoad[kind] == true then
+    self._firstLoad[kind] = false
+    ctx:Set("wipe", true)
+  end
+
+  slotInfo:Update(ctx, itemData)
+  slotInfo.addedItems = added
+  slotInfo.removedItems = removed
+  slotInfo.updatedItems = updated
+
+  if kind == const.BAG_KIND.BACKPACK then
+    self.equipmentCache = equipmentData
+  end
+
+  self:UpdateFreeSlots(ctx, kind)
+
+  for _, currentItem in pairs(itemData) do
+    local bagid = currentItem.bagid
+    local slotid = currentItem.slotid
+    local name
+    local invid = C_Container.ContainerIDToInventoryID(bagid)
+    local baglink = GetInventoryItemLink("player", invid)
+
+    if Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
+      name = L:G("Keyring")
+    elseif baglink ~= nil and invid ~= nil then
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      name = C_Item.GetItemSubClassInfo(class, subclass)
+    else
+      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+    end
+
+    slotInfo:StoreIfEmptySlot(name, currentItem)
+
+    if not currentItem.isItemEmpty then
+      slotInfo.totalItems = slotInfo.totalItems + 1
+    end
+    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
+  end
+
+  slotInfo:SortEmptySlots()
+
+  for _, addedItem in pairs(slotInfo.addedItems) do
+    for _, removedItem in pairs(slotInfo.removedItems) do
+      if addedItem.itemInfo and removedItem.itemInfo and addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
+        self:ClearNewItem(ctx, addedItem.slotkey)
+      end
+    end
+  end
+
+  if slotInfo.totalItems < slotInfo.previousTotalItems then
+    slotInfo.deferDelete = true
+  end
+
+  slotInfo.stacks:Clear()
+  for _, item in pairs(itemData) do
+    if not item.isItemEmpty then
+      slotInfo.stacks:AddToStack(item)
+    end
+  end
+
+  local search = addon:GetModule("Search")
+  if search and search.IndexItems then
+    search:IndexItems(itemData)
+  end
+
+  local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
+  local events = addon:GetModule("Events")
+  events:SendMessage(ctx, ev, slotInfo)
+end
+
 function items:RefreshBackpack(ctx)
-  -- NOOP stub
+  self:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
 end
 
 function items:RefreshBank(ctx)
-  -- NOOP stub
+  self:ProcessRefresh(ctx, const.BAG_KIND.BANK)
 end
 
 function items:GetSearchCategory(kind, slotkey)

@@ -69,8 +69,25 @@ end
 ---@field sort? boolean Sort backpack items
 
 ---@param request RefreshRequest
-function refresh:RequestUpdate(_request)
-  -- STUBBED FOR NEW PIPELINE DEVELOPMENT (PHASE 2)
+function refresh:RequestUpdate(request)
+  if request.wipe then
+    self.pendingWipe = true
+  end
+  if request.backpack then
+    self.pendingBackpack = true
+  end
+  if request.bank then
+    self.pendingBank = true
+  end
+
+  if self.debounceTimer then
+    self.debounceTimer:Cancel()
+  end
+
+  self.debounceTimer = C_Timer.NewTimer(0.01, function()
+    self.debounceTimer = nil
+    self:ExecutePendingUpdates()
+  end)
 end
 
 -- ExecutePendingUpdates processes all pending update flags
@@ -114,5 +131,34 @@ function refresh:ExecutePendingUpdates()
 end
 
 function refresh:OnEnable()
-  -- STUBBED FOR NEW PIPELINE DEVELOPMENT (PHASE 2)
+  local itemLoader = addon:GetModule('ItemLoader')
+  itemLoader:TellMeWhenABagIsUpdated(function(updatedBags)
+    local backpackChanged = false
+    local bankChanged = false
+
+    for bagID in pairs(updatedBags) do
+      if const.BACKPACK_BAGS[bagID] then
+        backpackChanged = true
+      elseif const.BANK_BAGS[bagID] or (const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagID]) then
+        bankChanged = true
+      end
+    end
+
+    if backpackChanged or bankChanged then
+      self:RequestUpdate({
+        backpack = backpackChanged,
+        bank = bankChanged
+      })
+    end
+  end)
+
+  events:RegisterMessage('bags/RefreshAll', function()
+    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+  end)
+  events:RegisterMessage('bags/RefreshBackpack', function()
+    self:RequestUpdate({ backpack = true })
+  end)
+  events:RegisterMessage('bags/RefreshBank', function()
+    self:RequestUpdate({ bank = true })
+  end)
 end
