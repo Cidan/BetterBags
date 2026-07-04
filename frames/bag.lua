@@ -284,7 +284,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 
 	-- Render other background persistent views first to keep them in a consistent data state
 	local currentLayout = database:GetBagView(self.kind)
-	if self.tabViews then
+	if not ctx:GetBool("tab_switch") and self.tabViews then
 		for viewKey, tView in pairs(self.tabViews) do
 			local layoutStr, tabIDStr = string.split("_", viewKey)
 			local layout = tonumber(layoutStr)
