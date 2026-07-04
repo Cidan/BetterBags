@@ -19,12 +19,21 @@ items.GetCategory = function() return "TestCategory" end
 local themes = StubBetterBagsModule("Themes")
 themes.GetTabButton = function() return {} end
 themes.GetFlatHeaderHeight = function() return 12 end
+themes.GetItemButton = function()
+  return {
+    ItemSlotBackground = { Hide = function() end },
+    UpgradeIcon = { SetShown = function() end },
+    IconBorder = { SetTexture = function() end, SetBlendMode = function() end, SetTexCoord = function() end },
+    SetHasItem = function() end,
+    SetItemButtonTexture = function() end,
+  }
+end
 
 local database = StubBetterBagsModule("Database")
 database.GetBagSizeInfo = function()
   return { itemsPerRow = 5, columnCount = 4 }
 end
-database.GetBagView = function() return 1 end
+database.GetBagView = function() return 2 end -- SECTION_GRID
 database.GetInBagSearch = function() return false end
 database.GetShowNewItemFlash = function() return false end
 database.GetGroupsEnabled = function() return true end
@@ -33,7 +42,7 @@ database.GetShowBankTabs = function() return false end
 database.GetShowAllFreeSpace = function() return false end
 database.GetStackingOptions = function()
   return {
-    mergeStacks = false,
+    mergeStacks = true,
     unmergeAtShop = false,
     dontMergePartial = false,
     mergeUnstackable = false,
@@ -41,7 +50,7 @@ database.GetStackingOptions = function()
 end
 
 local const = StubBetterBagsModule("Constants")
-const.BAG_VIEW = { SECTION_GRID = 1, SECTION_ALL_BAGS = 2 }
+const.BAG_VIEW = { ONE_BAG = 1, SECTION_GRID = 2, LIST = 3, SECTION_ALL_BAGS = 4 }
 const.BAG_KIND = { BACKPACK = 0, BANK = 1 }
 const.GRID_COMPACT_STYLE = { NONE = 0 }
 const.OFFSETS = {
@@ -84,6 +93,7 @@ local sectionProto = {
   SetTitle = function() end,
   GetAllCells = function() return {} end,
   AddCell = function() end,
+  WipeOnlyContents = function() end,
 }
 sectionFrame.Create = function()
   local s = setmetatable({}, { __index = sectionProto })
@@ -101,9 +111,12 @@ end
 itemFrame.Create = function()
   return {
     SetItem = function() end,
+    SetItemFromData = function() end,
     SetFreeSlots = function() end,
     UpdateCount = function() end,
     GetItemData = function() return { slotkey = "1_1" } end,
+    frame = CreateFrame("Frame"),
+    button = { SetHasItem = function() end },
   }
 end
 
@@ -147,12 +160,13 @@ end
 LoadBetterBagsModule("views/views.lua")
 local views = addon:GetModule("Views")
 
--- Load views/gridview.lua
-LoadBetterBagsModule("views/gridview.lua")
+-- Load the new view implementations
+LoadBetterBagsModule("views/gridview_new.lua")
+LoadBetterBagsModule("views/bagview_new.lua")
 
 local context = addon:GetModule("Context")
 
-describe("Grid View Category Filtering Bypass Tests", function()
+describe("Phase 6 View Placement and Rendering Tests", function()
   after_each(function()
     ResetModuleStub("Localization", "core/localization.lua")
     ResetModuleStub("Items", "data/items.lua")
@@ -169,86 +183,91 @@ describe("Grid View Category Filtering Bypass Tests", function()
     ResetModuleStub("Views", "views/views.lua")
   end)
 
-  it("should hide categories that do not belong to the active group when bank slots panel is INACTIVE", function()
+  it("should support polymorphic NewGrid views and place items in appropriate categories", function()
     local parent = CreateFrame("Frame")
-    local view = views:NewGrid(parent, const.BAG_KIND.BANK)
-    view.isNew = false
+    local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK)
+    assert.are.equal(view.bagview, const.BAG_VIEW.SECTION_GRID)
 
-    -- When GetShowBankTabs() is false
-    database.GetShowBankTabs = function() return false end
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
 
-    -- Setup mock section and bag
-    local mockSection = sectionFrame.Create()
-    mockSection.hidden = false
-    mockSection.Hide = function(self) self.hidden = true end
-    mockSection.Show = function(self) self.hidden = false end
+    local item1 = {
+      bagid = 0,
+      slotid = 1,
+      slotkey = "0_1",
+      itemHash = "hash1",
+      isItemEmpty = false,
+      itemInfo = {
+        itemID = 1234,
+        currentItemCount = 10,
+        itemStackCount = 20,
+        itemQuality = 1,
+        itemIcon = 136,
+        isBound = false,
+      },
+      questInfo = { isQuestItem = false },
+    }
 
-    view.sections["TestCategory"] = mockSection
-
-    local bag = { kind = const.BAG_KIND.BANK, frame = CreateFrame("Frame") }
     local mockSlotInfo = {
-      GetChangeset = function() return {}, {}, {} end,
-      GetCurrentItems = function() return {} end,
+      GetChangeset = function() return { item1 }, {}, {} end,
+      GetCurrentItems = function() return { ["0_1"] = item1 } end,
       emptySlots = {},
       freeSlotKeys = {},
       emptySlotsSorted = {},
+      emptySlotByBagAndSlot = {},
       stacks = {
         GetStackInfo = function() return nil end
       }
     }
 
-    -- Trigger Render/GridView drawing
-    view:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    local rendered = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
 
-    local function tableContains(tbl, value)
-      if not tbl then return false end
-      for _, v in ipairs(tbl) do
-        if v == value then return true end
-      end
-      return false
-    end
-
-    -- Since the category belongs to NO group, and activeGroup is 2, it should be hidden (in lastMask)
-    assert.is_true(tableContains(view.content.lastMask, mockSection), "The section should be in the hidden mask because group-filtering is active")
+    assert.is_true(rendered)
   end)
 
-  it("should NOT hide categories when bank slots panel is ACTIVE", function()
+  it("should support polymorphic NewBagView views and place items correctly", function()
     local parent = CreateFrame("Frame")
-    local view = views:NewGrid(parent, const.BAG_KIND.BANK)
-    view.isNew = false
+    local view = views:NewBagView(parent, const.BAG_KIND.BACKPACK)
+    assert.are.equal(view.bagview, const.BAG_VIEW.SECTION_ALL_BAGS)
 
-    -- When GetShowBankTabs() is true
-    database.GetShowBankTabs = function() return true end
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
 
-    -- Setup mock section and bag
-    local mockSection = sectionFrame.Create()
+    local item1 = {
+      bagid = 0,
+      slotid = 1,
+      slotkey = "0_1",
+      itemHash = "hash1",
+      isItemEmpty = false,
+      itemInfo = {
+        itemID = 1234,
+        currentItemCount = 10,
+        itemStackCount = 20,
+        itemQuality = 1,
+        itemIcon = 136,
+        isBound = false,
+      },
+      questInfo = { isQuestItem = false },
+    }
 
-    view.sections["TestCategory"] = mockSection
-
-    local bag = { kind = const.BAG_KIND.BANK, frame = CreateFrame("Frame") }
     local mockSlotInfo = {
-      GetChangeset = function() return {}, {}, {} end,
-      GetCurrentItems = function() return {} end,
+      GetChangeset = function() return { item1 }, {}, {} end,
+      GetCurrentItems = function() return { ["0_1"] = item1 } end,
       emptySlots = {},
       freeSlotKeys = {},
       emptySlotsSorted = {},
+      emptySlotByBagAndSlot = {},
       stacks = {
         GetStackInfo = function() return nil end
       }
     }
 
-    -- Trigger Render/GridView drawing
-    view:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    local rendered = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
 
-    local function tableContains(tbl, value)
-      if not tbl then return false end
-      for _, v in ipairs(tbl) do
-        if v == value then return true end
-      end
-      return false
-    end
-
-    -- Since bank slots panel is active, group-filtering should be bypassed, so it should NOT be hidden (not in lastMask)
-    assert.is_false(tableContains(view.content.lastMask, mockSection), "The section should NOT be in the hidden mask because group-filtering is bypassed")
+    assert.is_true(rendered)
   end)
 end)

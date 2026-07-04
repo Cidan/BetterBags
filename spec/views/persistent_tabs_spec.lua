@@ -199,12 +199,12 @@ end
 
 -- Load views modules
 ResetModuleStub("Views", "views/views.lua")
-ResetModuleStub("GridViewDummy", "views/gridview.lua")
-ResetModuleStub("BagViewDummy", "views/bagview.lua")
+ResetModuleStub("GridViewDummy", "views/gridview_new.lua")
+ResetModuleStub("BagViewDummy", "views/bagview_new.lua")
 LoadBetterBagsModule("views/views.lua")
 local views = addon:GetModule("Views")
-LoadBetterBagsModule("views/gridview.lua")
-LoadBetterBagsModule("views/bagview.lua")
+LoadBetterBagsModule("views/gridview_new.lua")
+LoadBetterBagsModule("views/bagview_new.lua")
 
 local context = addon:GetModule("Context")
 

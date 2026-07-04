@@ -114,8 +114,8 @@ frames\itembrowser.lua
 frames\debug.lua
 
 views\views.lua
-views\gridview.lua
-views\bagview.lua
+views\gridview_new.lua
+views\bagview_new.lua
 
 bags\backpack.lua
 bags\era\backpack.lua
