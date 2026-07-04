@@ -822,7 +822,6 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(render_called)
     assert.is_true(callback_called)
   end)
-
   it("should early-exit GridView/BagView when changeset is empty and not redraw/wipe/isNew", function()
     local parent = CreateFrame("Frame")
     local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 1)
