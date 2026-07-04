@@ -50,16 +50,14 @@ function itemFrame.itemProto:UpdateCooldown(ctx)
   ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
 
-function itemFrame.itemProto:DrawItemLevel()
-  if not self.slotkey then
+---@param data? ItemData
+function itemFrame.itemProto:DrawItemLevel(data)
+  data = data or self:GetItemData()
+  if not data or data.isItemEmpty then
+    self.ilvlText:Hide()
     return
   end
   if not self.kind then
-    return
-  end
-  local data = items:GetItemDataFromSlotKey(self.slotkey)
-  if not data or data.isItemEmpty then
-    self.ilvlText:Hide()
     return
   end
   local ilvlOpts = database:GetItemLevelOptions(self.kind)
@@ -121,7 +119,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   end
 
 
-  self:DrawItemLevel()
+  self:DrawItemLevel(data)
 
   SetItemButtonQuality(decoration, data.itemInfo.itemQuality)
   decoration.minDisplayCount = 1
@@ -137,7 +135,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   end
   decoration.IconBorder:SetVertexColor(unpack(const.ITEM_QUALITY_COLOR[data.itemInfo.itemQuality]))
   decoration.IconBorder:Show()
-  self:UpdateCount(ctx)
+  self:UpdateCount(ctx, data)
   SetItemButtonDesaturated(decoration, data.itemInfo.isLocked)
   decoration.IconQuestTexture:Hide()
   --self:SetLock(data.itemInfo.isLocked)
@@ -174,7 +172,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
   if self.slotkey ~= nil then
     events:SendMessage(ctx, 'item/Updated', self, decoration)
   end
-  self:UpdateUpgrade(ctx)
+  self:UpdateUpgrade(ctx, data)
   self.frame:Show()
   self.button:Show()
 end
