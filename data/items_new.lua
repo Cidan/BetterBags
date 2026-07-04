@@ -583,7 +583,7 @@ end
 ---@param slotkey string
 ---@return BagKind|nil
 function items:GetBagKindFromSlotKey(slotkey)
-  local bagid = tonumber(strsplit("_", slotkey))
+  local bagid = tonumber((strsplit("_", slotkey)))
   if not bagid then return nil end
   return self:GetBagKindFromBagID(bagid)
 end
