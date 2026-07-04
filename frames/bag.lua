@@ -260,7 +260,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		return
 	end
 
-	if ctx:GetBool("tab_switch") then
+	if ctx:GetBool("tab_switch") and not view.isNew then
 		if self.currentView and self.currentView ~= view then
 			self.currentView:GetContent():Hide()
 		end
