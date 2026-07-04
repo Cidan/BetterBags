@@ -193,5 +193,27 @@ describe("Section Frame", function()
       assert.are.equal(w, 112)
       assert.are.equal(h, 74)
     end)
+
+    it("returns title-only height when collapsed and shouldShrinkWhenCollapsed is true", function()
+      local ctx = context:New("TestDrawCollapsed")
+      local s = sectionFrame:Create(ctx)
+      s:AddCell("cell1", {})
+      s:SetCollapsed(true)
+      s.shouldShrinkWhenCollapsed = true
+      local w, h = s:Draw(const.BAG_KIND.BACKPACK, nil, false)
+      assert.are.equal(w, 112)
+      assert.are.equal(h, 24) -- title:GetHeight() + 6 = 18 + 6 = 24
+    end)
+
+    it("returns full height when collapsed and shouldShrinkWhenCollapsed is false", function()
+      local ctx = context:New("TestDrawCollapsedNoShrink")
+      local s = sectionFrame:Create(ctx)
+      s:AddCell("cell1", {})
+      s:SetCollapsed(true)
+      s.shouldShrinkWhenCollapsed = false
+      local w, h = s:Draw(const.BAG_KIND.BACKPACK, nil, false)
+      assert.are.equal(w, 112)
+      assert.are.equal(h, 74) -- full height is still 74 even when collapsed if shrink is false
+    end)
   end)
 end)
