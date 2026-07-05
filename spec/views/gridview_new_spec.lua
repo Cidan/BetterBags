@@ -227,6 +227,63 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     assert.is_true(rendered)
   end)
 
+  it("should pass correct options to view.content:Draw and correctly update bag frame size (Phase 8)", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK)
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+
+    local item1 = {
+      bagid = 0,
+      slotid = 1,
+      slotkey = "0_1",
+      itemHash = "hash1",
+      isItemEmpty = false,
+      itemInfo = {
+        itemID = 1234,
+        currentItemCount = 10,
+        itemStackCount = 20,
+        itemQuality = 1,
+        itemIcon = 136,
+        isBound = false,
+      },
+      questInfo = { isQuestItem = false },
+    }
+
+    local mockSlotInfo = {
+      GetChangeset = function() return { item1 }, {}, {} end,
+      GetCurrentItems = function() return { ["0_1"] = item1 } end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      emptySlotByBagAndSlot = {},
+      stacks = {
+        GetStackInfo = function() return nil end
+      }
+    }
+
+    local drawSpy = spy.on(view.content, "Draw")
+    local frameWidthSpy = spy.on(bag.frame, "SetWidth")
+    local frameHeightSpy = spy.on(bag.frame, "SetHeight")
+
+    local rendered = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
+
+    assert.is_true(rendered)
+    assert.spy(drawSpy).was.called()
+
+    -- Assert on drawing parameters (Phase 8 contracts)
+    local drawCall = drawSpy.calls[1]
+    local drawOptions = drawCall.vals[2]
+    assert.are.equal(221, drawOptions.maxWidthPerRow) -- ((37 + 4) * 5) + 16
+    assert.are.equal(4, drawOptions.columns) -- sizeInfo.columnCount
+
+    -- Assert bag frame width/height were adjusted correctly
+    assert.spy(frameWidthSpy).was.called()
+    assert.spy(frameHeightSpy).was.called()
+  end)
+
   it("should support polymorphic NewBagView views and place items correctly", function()
     local parent = CreateFrame("Frame")
     local view = views:NewBagView(parent, const.BAG_KIND.BACKPACK)

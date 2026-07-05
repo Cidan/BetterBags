@@ -46,3 +46,12 @@ When a real data update occurs (such as a database or server item change), every
 - **Rule:** Background views must only execute heavy layout, section sorting, and cell placement logic if item data belonging specifically to their tab has actually changed.
 - **Gating Mechanism:** Inside `GridView` and `BagView` rendering functions, if the view is a hidden background view (where `bag.GetCurrentTabID` is defined and `view.tabID ~= bag:GetCurrentTabID()`) and no global layout change is forced (i.e. not `redraw`, not `wipe`, and not `isNew`), the view filters the global changeset for its tab using `FilterChangesetForTab()`.
 - **Early-Exit:** If the tab-specific added, removed, and changed lists are all empty, the view early-exits instantly by invoking the callback and returning. This prevents wasting CPU sorting and laying out hidden tabs that are already in a consistent state.
+
+### 7. Phase 8: Page Placement (Clean-Sweep Layout and Column-Packing)
+To achieve sub-millisecond redraw performance while ensuring that the grid layout remains perfectly aligned, visually fluid, and free of overlap/gaps:
+- **Rule:** Page placement is a pure, top-down clean-sweep operation. It is triggered synchronously when the data backend emits `items/RefreshBackpack/Done` or `items/RefreshBank/Done` messages.
+- **Unified Views:** GridView, OneBagView, and Blizzard Bag View are handled polymorphically within `views/gridview_new.lua` and `views/bagview_new.lua`. They avoid redundant layout files by treating views as alternative naming classifications.
+- **Two-Pass Column packing:**
+  - **Pass 1:** Determines the default height/width of all category sections and splits them into equal-height vertical columns using the `calculateColumns` algorithm inside `frames/grid.lua`.
+  - **Pass 2 (Row collapse shrink optimization):** Measures row-level layouts to shrink-wrap category sections when all items within a row are collapsed. This dynamically adjusts bounding heights and prevents massive blank gaps.
+- **Bounds Clamping:** The view calculates the total bag height and width, clamps the parent frame within safe screen limits (`UIParent:GetHeight() * 0.90`), and toggles the scrollbars and frame points dynamically.
