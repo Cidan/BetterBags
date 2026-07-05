@@ -69,3 +69,9 @@ To eliminate JIT (just-in-time) database and search engine queries during UI lay
   - Iterate over all items in `itemData` and resolve their final category using priority-based checks (custom categories, search matches, and system defaults).
   - Update `item.itemInfo.category` and optionally refresh the search index's category with `search:UpdateCategoryIndex(currentItem, oldCategory)`.
 - **Obsolete Views:** Obsolete `ONE_BAG` (value 1) and `LIST` (value 3) views have been completely removed from constants and database defaults. Existing users' databases are automatically migrated to `SECTION_GRID` (Category View) via `DB:Migrate()`.
+
+### 9. Unified Wipe-Phase to Prevent Section Double Release
+To permanently prevent ObjectPool contamination, cell leakage, and fatal `Cannot anchor to itself` crashes during layout recalculations:
+- **Rule:** Decouple the view `Wipe` phase from the individual view `Render` phase. All instantiated persistent `tabViews` must be completely wiped first, returning all pooled frames to their global stacks, before any rendering logic is executed in the current frame.
+- **Mechanism:** At the very start of `bagProto:Draw()`, immediately after bypassing local `tab_switch` toggles, iterate through all views in `self.tabViews` and execute `tView:Wipe(ctx)`.
+- **State Transition (`isNew` flag):** Inside the local `Wipe(view, ctx)` implementation, explicitly set `view.isNew = true`. This flags the view as completely empty and wiped, guaranteeing that the next `Render` pass correctly bypasses changeset-gating optimization checks and draws the full layout, setting `view.isNew = false` when complete.

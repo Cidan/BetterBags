@@ -55,6 +55,7 @@ local function Wipe(view, ctx)
   wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
   view.sortRequired = true
+  view.isNew = true
 end
 
 ---@param view View
@@ -167,8 +168,7 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     end
   end
 
-  -- Wipe view for clean sweep
-  view:Wipe(ctx)
+  -- Wipe is already handled in the unified wipe phase!
   view.isNew = false
 
   -- Extract all items that belong to the active tab ID

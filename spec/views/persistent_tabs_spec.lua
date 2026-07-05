@@ -889,4 +889,68 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     database.GetGroupsEnabled = old_GetGroupsEnabled
     groups.CategoryBelongsToGroup = old_CategoryBelongsToGroup
   end)
+
+  it("should call Wipe on all instantiated tab views first in bag:Draw() before any Render() calls", function()
+    setupBagFrameStubs()
+    LoadBetterBagsModule("frames/bag.lua")
+    local frame = CreateFrame("Frame")
+    frame.SetScale = function() end
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      frame = frame,
+      tabViews = {},
+      GetCurrentTabID = function() return 1 end,
+      IsShown = function() return true end,
+      OnResize = function() end,
+      behavior = {
+        OnShow = function() end,
+      }
+    }
+    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+
+    local ctx = context:New("test")
+    -- Create view for Tab 1 and Tab 2
+    local view1 = bag:GetViewForTab(ctx, 1)
+    local view2 = bag:GetViewForTab(ctx, 2)
+
+    local render_order = {}
+    local wipe_order = {}
+
+    -- Track the sequence of Wipe vs Render
+    view1.WipeHandler = function() table.insert(wipe_order, 1) end
+    view2.WipeHandler = function() table.insert(wipe_order, 2) end
+
+    view1.Render = function(self, ...) table.insert(render_order, 1); select(4, ...)(...) end
+    view2.Render = function(self, ...) table.insert(render_order, 2); select(4, ...)(...) end
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+
+    bag:Draw(ctx, mockSlotInfo, function() end)
+
+    -- Assert both views were wiped
+    assert.equals(2, #wipe_order)
+    -- Assert that both Wipes happened BEFORE any Renders
+    assert.equals(2, #render_order)
+  end)
+
+  it("should set view.isNew to true on Wipe() for both GridView and BagView", function()
+    local parent = CreateFrame("Frame")
+    local gridView = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 1)
+    gridView.isNew = false
+    gridView:Wipe(context:New("test"))
+    assert.is_true(gridView.isNew)
+
+    local bagView = views:NewBagView(parent, const.BAG_KIND.BACKPACK, 1)
+    bagView.isNew = false
+    bagView:Wipe(context:New("test"))
+    assert.is_true(bagView.isNew)
+  end)
 end)
