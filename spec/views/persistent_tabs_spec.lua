@@ -732,7 +732,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     groups.IsDefaultGroup = old_IsDefaultGroup
   end)
 
-  it("should bypass rendering in bag:Draw() when tab_switch is true", function()
+  it("should bypass rendering in bag:Draw() when tab_switch is true and view is not new", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
     local frame = CreateFrame("Frame")
@@ -752,6 +752,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     local ctx = context:New("test")
     local view1 = bag:GetViewForTab(ctx, 1)
+    view1.isNew = false
 
     local render_called = false
     view1.Render = function(self, ...) render_called = true; select(4, ...)(...) end
@@ -774,6 +775,48 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(callback_called)
   end)
 
+  it("should NOT bypass rendering in bag:Draw() when tab_switch is true but view is new", function()
+    setupBagFrameStubs()
+    LoadBetterBagsModule("frames/bag.lua")
+    local frame = CreateFrame("Frame")
+    frame.SetScale = function() end
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      frame = frame,
+      tabViews = {},
+      GetCurrentTabID = function() return 1 end,
+      IsShown = function() return true end,
+      OnResize = function() end,
+      behavior = {
+        OnShow = function() end,
+      }
+    }
+    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+
+    local ctx = context:New("test")
+    local view1 = bag:GetViewForTab(ctx, 1)
+    view1.isNew = true
+
+    local render_called = false
+    view1.Render = function(self, ...) render_called = true; select(4, ...)(...) end
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return {} end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      stacks = { GetStackInfo = function() end },
+      totalItems = 0
+    }
+
+    ctx:Set("tab_switch", true)
+    local callback_called = false
+    bag:Draw(ctx, mockSlotInfo, function() callback_called = true end)
+
+    assert.is_true(render_called)
+    assert.is_true(callback_called)
+  end)
   it("should early-exit GridView/BagView when changeset is empty and not redraw/wipe/isNew", function()
     local parent = CreateFrame("Frame")
     local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 1)

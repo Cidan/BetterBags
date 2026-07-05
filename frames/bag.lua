@@ -260,7 +260,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		return
 	end
 
-	if ctx:GetBool("tab_switch") then
+		if ctx:GetBool("tab_switch") and not view.isNew then
 		if self.currentView and self.currentView ~= view then
 			self.currentView:GetContent():Hide()
 		end
@@ -284,7 +284,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 
 	-- Render other background persistent views first to keep them in a consistent data state
 	local currentLayout = database:GetBagView(self.kind)
-	if self.tabViews then
+	if not ctx:GetBool("tab_switch") and self.tabViews then
 		for viewKey, tView in pairs(self.tabViews) do
 			local layoutStr, tabIDStr = string.split("_", viewKey)
 			local layout = tonumber(layoutStr)
