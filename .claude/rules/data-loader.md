@@ -59,3 +59,12 @@ To achieve sub-millisecond redraw performance while ensuring that the grid layou
   - **Pass 1:** Determines the default height/width of all category sections and splits them into equal-height vertical columns using the `calculateColumns` algorithm inside `frames/grid.lua`.
   - **Pass 2 (Row collapse shrink optimization):** Measures row-level layouts to shrink-wrap category sections when all items within a row are collapsed. This dynamically adjusts bounding heights and prevents massive blank gaps.
 - **Bounds Clamping:** The view calculates the total bag height and width, clamps the parent frame within safe screen limits (`UIParent:GetHeight() * 0.90`), and toggles the scrollbars and frame points dynamically.
+
+### 8. Phase 4.5: Category Enrichment & Data Enrichment
+To eliminate JIT (just-in-time) database and search engine queries during UI layout rendering, we assign final item categories and enrich item data right after search indexing and before layout/section placement occurs.
+- **Rule:** Item categories must never be resolved JIT on-the-fly inside the views (`GridView` or `BagView`). Instead, they are retrieved instantly from the enriched `item.itemInfo.category` field.
+- **Mechanism:** Immediately after Phase 4's search indexing `search:IndexItems(itemData)` completes:
+  - Call `self:RefreshSearchCache(kind)` to update search-based category matches using the search engine.
+  - Iterate over all items in `itemData` and resolve their final category using priority-based checks (custom categories, search matches, and system defaults).
+  - Update `item.itemInfo.category` and optionally refresh the search index's category with `search:UpdateCategoryIndex(currentItem, oldCategory)`.
+- **Obsolete Views:** Obsolete `ONE_BAG` (value 1) and `LIST` (value 3) views have been completely removed from constants and database defaults. Existing users' databases are automatically migrated to `SECTION_GRID` (Category View) via `DB:Migrate()`.

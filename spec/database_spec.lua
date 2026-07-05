@@ -72,7 +72,7 @@ function L:G(key) return key end
 -- Set up Constants module
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 0, BANK = 1, UNDEFINED = -1 }
-const.BAG_VIEW = { UNDEFINED = 0, ONE_BAG = 1, SECTION_GRID = 2, LIST = 3, SECTION_ALL_BAGS = 4 }
+const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.SECTION_SORT_TYPE = { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
 const.GRID_COMPACT_STYLE = { NONE = 0, SIMPLE = 1, COMPACT = 2 }
@@ -262,13 +262,13 @@ describe("Database", function()
     end)
 
     it("SetBagView changes the view", function()
-      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.LIST)
-      assert.are.equal(const.BAG_VIEW.LIST, DB:GetBagView(const.BAG_KIND.BACKPACK))
+      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_ALL_BAGS)
+      assert.are.equal(const.BAG_VIEW.SECTION_ALL_BAGS, DB:GetBagView(const.BAG_KIND.BACKPACK))
     end)
 
     it("GetPreviousView / SetPreviousView", function()
-      DB:SetPreviousView(const.BAG_KIND.BANK, const.BAG_VIEW.ONE_BAG)
-      assert.are.equal(const.BAG_VIEW.ONE_BAG, DB:GetPreviousView(const.BAG_KIND.BANK))
+      DB:SetPreviousView(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_GRID)
+      assert.are.equal(const.BAG_VIEW.SECTION_GRID, DB:GetPreviousView(const.BAG_KIND.BANK))
     end)
   end)
 
@@ -340,8 +340,8 @@ describe("Database", function()
     end)
 
     it("SetBagViewSizeScale changes scale", function()
-      DB:SetBagViewSizeScale(const.BAG_KIND.BANK, const.BAG_VIEW.LIST, 150)
-      local size = DB:GetBagSizeInfo(const.BAG_KIND.BANK, const.BAG_VIEW.LIST)
+      DB:SetBagViewSizeScale(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS, 150)
+      local size = DB:GetBagSizeInfo(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS)
       assert.are.equal(150, size.scale)
     end)
 
@@ -420,8 +420,8 @@ describe("Database", function()
     end)
 
     it("GetItemSortType / SetItemSortType", function()
-      DB:SetItemSortType(const.BAG_KIND.BANK, const.BAG_VIEW.LIST, const.ITEM_SORT_TYPE.ITEM_LEVEL)
-      assert.are.equal(const.ITEM_SORT_TYPE.ITEM_LEVEL, DB:GetItemSortType(const.BAG_KIND.BANK, const.BAG_VIEW.LIST))
+      DB:SetItemSortType(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS, const.ITEM_SORT_TYPE.ITEM_LEVEL)
+      assert.are.equal(const.ITEM_SORT_TYPE.ITEM_LEVEL, DB:GetItemSortType(const.BAG_KIND.BANK, const.BAG_VIEW.SECTION_ALL_BAGS))
     end)
   end)
 
