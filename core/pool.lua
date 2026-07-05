@@ -26,6 +26,11 @@ end
 ---@param ctx Context
 ---@param item any
 function poolItem:Release(ctx, item)
+  for _, existingItem in ipairs(self.items) do
+    if existingItem == item then
+      error("Double free detected: Object pool already contains this item")
+    end
+  end
   self.resetFn(ctx, item)
   table.insert(self.items, item)
 end

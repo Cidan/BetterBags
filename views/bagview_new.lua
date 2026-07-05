@@ -48,11 +48,13 @@ local function Wipe(view, ctx)
     view.freeReagentSlot = nil
   end
   view.itemCount = 0
-  for _, section in pairs(view.sections) do
+  local k, section = next(view.sections)
+  while k do
+    view.sections[k] = nil
     section:ReleaseAllCells(ctx)
     section:Release(ctx)
+    k, section = next(view.sections)
   end
-  wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
   view.sortRequired = true
   view.isNew = true
