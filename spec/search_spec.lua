@@ -8,6 +8,11 @@ LoadBetterBagsModule("util/query.lua")
 LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
 
+-- Ensure clean stubs and reload Search to prevent test pollution
+ResetModuleStub("Constants")
+ResetModuleStub("Items")
+ResetModuleStub("Search", "data/search_new.lua")
+
 -- Stub Debug (search uses debug:Log and debug:Inspect)
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
