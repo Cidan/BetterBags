@@ -150,6 +150,7 @@ function gridProto:GetScrollView()
 end
 
 function gridProto:HideScrollBar()
+  if not self.scrollable then return end
   self.bar:Hide()
   self.bar:SetAlpha(0)
   self.bar:SetAttribute("nodeignore", true)
@@ -160,6 +161,7 @@ end
 -- so mouse wheel events fall through to the outer scrollable bag container.
 ---@param enabled boolean
 function gridProto:EnableMouseWheelScroll(enabled)
+  if not self.scrollable then return end
   self.frame:EnableMouseWheel(enabled)
 end
 
@@ -172,6 +174,7 @@ function gridProto:SortHorizontal()
 end
 
 function gridProto:ShowScrollBar()
+  if not self.scrollable then return end
   self.bar:SetAttribute("nodeignore", false)
   self.bar:SetAlpha(1)
   self.bar:Show()
