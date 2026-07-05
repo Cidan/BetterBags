@@ -174,6 +174,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
 
     StubBetterBagsModule("ContextMenu")
     StubBetterBagsModule("SectionFrame")
+    StubBetterBagsModule("Items")
 
     -- Load real Context, Database, Groups, Tabs
     ResetModuleStub("Context", "core/context.lua")
@@ -277,5 +278,81 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     assert.has_no.errors(function()
       behavior:OnCreate({})
     end)
+  end)
+
+  it("should set tab_switch and draw directly when switching groups on backpack", function()
+    -- Load base backpack behavior
+    local loadBase = assert(loadfile("bags/backpack.lua"))
+    loadBase("BetterBags")
+    local backpack = addon:GetModule("BackpackBehavior")
+
+    -- Set up dependencies/mocks
+    local const = addon:GetModule("Constants")
+    const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0 }
+
+    local groups = addon:GetModule("Groups")
+    groups.GetGroup = function(self, kind, id)
+      if id == 2 then
+        return { id = 2, name = "Housing" }
+      end
+      return nil
+    end
+
+    local database = addon:GetModule("Database")
+    database.SetActiveGroup = spy.new(function() end)
+
+    local items = StubBetterBagsModule("Items")
+    items.GetAllSlotInfo = function()
+      return {
+        [0] = { mock_slot_info = true }
+      }
+    end
+
+    local mock_draw_called = false
+    local mock_tab_switch_set = false
+    local mock_context = {
+      Set = spy.new(function(self, key, value)
+        if key == "tab_switch" and value == true then
+          mock_tab_switch_set = true
+        end
+      end)
+    }
+
+    local mockBag = {
+      frame = CreateFrame("Frame"),
+      tabs = {
+        SetTabByID = spy.new(function() end)
+      },
+      SetTitle = spy.new(function() end),
+      currentItemCount = 0,
+      Draw = function(self, ctx, slotInfo, callback)
+        mock_draw_called = true
+        assert.equals(mock_context, ctx)
+        assert.is_true(slotInfo.mock_slot_info)
+        callback()
+      end
+    }
+
+    local behavior = backpack:Create(mockBag)
+    behavior:SwitchToGroup(mock_context, 2)
+
+    assert.is_true(mock_tab_switch_set)
+    assert.is_true(mock_draw_called)
+
+    assert.spy(database.SetActiveGroup).was_called()
+    local db_call = database.SetActiveGroup.calls[1]
+    assert.equals(const.BAG_KIND.BACKPACK, db_call.vals[2])
+    assert.equals(2, db_call.vals[3])
+
+    assert.spy(mockBag.tabs.SetTabByID).was_called()
+    local tab_call = mockBag.tabs.SetTabByID.calls[1]
+    assert.equals(mock_context.Set, tab_call.vals[2].Set)
+    assert.equals(2, tab_call.vals[3])
+
+    assert.spy(mockBag.SetTitle).was_called()
+    local title_call = mockBag.SetTitle.calls[1]
+    assert.equals("Housing", title_call.vals[2])
+
+    assert.equals(-1, mockBag.currentItemCount)
   end)
 end)

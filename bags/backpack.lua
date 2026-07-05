@@ -50,6 +50,9 @@ local context = addon:GetModule("Context")
 ---@class ContextMenu: AceModule
 local contextMenu = addon:GetModule("ContextMenu")
 
+---@class Items: AceModule
+local items = addon:GetModule("Items")
+
 -------
 --- Backpack Behavior Prototype
 -------
@@ -363,8 +366,13 @@ function backpack.proto:SwitchToGroup(ctx, groupID)
 
 	debug:Log("groups", "Switched to group: %s (ID: %d)", group.name, groupID)
 
-	-- Trigger a refresh to filter sections by group
-	events:SendMessage(ctx, "bags/RefreshBackpack")
+	self.bag:SetTitle(group.name)
+	self.bag.currentItemCount = -1
+
+	ctx:Set("tab_switch", true)
+	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK]
+	self.bag:Draw(ctx, slotInfo, function() end)
+	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
 -- ShowCreateGroupDialog shows a dialog to create a new group.

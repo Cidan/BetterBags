@@ -798,3 +798,8 @@ _G.min = math.min
 -- Equipment Slot constants
 _G.INVSLOT_FIRST_EQUIPPED = 1
 _G.INVSLOT_LAST_EQUIPPED = 19
+
+_G.ItemButtonUtil = {
+  Event = { ItemContextChanged = 1 },
+  TriggerEvent = function() end,
+}
