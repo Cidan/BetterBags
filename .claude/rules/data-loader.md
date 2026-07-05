@@ -40,8 +40,9 @@ To support instant, synchronous tab switching with zero visual flickers or loadi
 - **Instant Swapping:** Since the cache is always complete, tab switching (`SwitchToGroup` or `SwitchToBlizzardTab`) does not wipe caches or trigger server-refresh messages. Instead, the UI simply hides the old view, fetches the new view, and calls `Draw()` synchronously and instantly.
 
 ### 5. Butter-Smooth Tab Swapping (Context-Gated Bypass)
-To achieve sub-millisecond local tab swaps, tab switching operations are completely decoupled from active database rebuilds or view redraws.
-- **Bypass Flag:** Operations that only toggle active tab visibility (like clicking a tab or switching a group) tag the execution context with `tab_switch = true`.
+To achieve sub-millisecond local tab swaps across both the Backpack and the Bank, tab switching operations are completely decoupled from active database rebuilds or full view redraws.
+- **Uniform Mechanism:** Toggling active tab visibility (like clicking a tab or switching a group in either Backpack or Bank) tags the execution context with `tab_switch = true`. Both `backpack.proto:SwitchToGroup` and `bank.proto:SwitchToGroup` immediately trigger a fast local `Draw` using the existing static, pre-rendered `slotInfo` cache.
+- **Bypass Flag:** Operations that only toggle active tab visibility tag the execution context with `tab_switch = true`.
 - **Render Bypass:** In `bagProto:Draw(ctx, slotInfo, callback)`, if the context carries the `tab_switch` flag, the engine completely bypasses background and active `view:Render` pipelines, provided the target view is already initialized (`not view.isNew`). Newly instantiated views (`view.isNew = true`) are allowed to run their initial render to fetch and cache item buttons.
 - **Background Loop Bypass:** The background rendering loop that typically keeps inactive views in sync is entirely gated by `not ctx:GetBool("tab_switch")`. This completely skips background view rendering during local tab switches, preventing massive CPU spikes.
 - **Instant Swap:** Instead, visibility of the hidden and active views is toggled synchronously, scale and search states are adjusted, `self:OnResize()` is called, and the callback is invoked instantly. This avoids any sorting or layout calculation overhead entirely.
