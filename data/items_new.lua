@@ -5,25 +5,25 @@ local addonName = ... ---@type string
 local addon = LibStub("AceAddon-3.0"):GetAddon(addonName)
 
 ---@class Events: AceModule
---local events = addon:GetModule("Events")
+local events = addon:GetModule("Events")
 
 ---@class Constants: AceModule
 local const = addon:GetModule("Constants")
 
 ---@class EquipmentSets: AceModule
---local equipmentSets = addon:GetModule("EquipmentSets")
+local equipmentSets = addon:GetModule("EquipmentSets")
 
 ---@class Categories: AceModule
---local categories = addon:GetModule("Categories")
+local categories = addon:GetModule("Categories")
 
 ---@class Database: AceModule
 local database = addon:GetModule("Database")
 
 ---@class Context: AceModule
---local context = addon:GetModule("Context")
+local context = addon:GetModule("Context")
 
 ---@class Search: AceModule
---local search = addon:GetModule("Search")
+local search = addon:GetModule("Search")
 
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
@@ -138,10 +138,13 @@ end
 
 function items:ClearItemCache(ctx)
   self.previousItemGUID = {}
+  self:WipeSearchCache(const.BAG_KIND.BACKPACK)
+  self:WipeSearchCache(const.BAG_KIND.BANK)
   self:ResetSlotInfo()
 end
 
 function items:ClearBankCache(ctx)
+  self:WipeSearchCache(const.BAG_KIND.BANK)
   self:WipeSlotInfo(const.BAG_KIND.BANK)
 end
 
@@ -401,13 +404,28 @@ function items:ProcessRefresh(ctx, kind)
     end
   end
 
-  local search = addon:GetModule("Search")
   if search and search.IndexItems then
     search:IndexItems(itemData)
   end
 
+  self:RefreshSearchCache(kind)
+
+  for _, currentItem in pairs(itemData) do
+    if not currentItem.isItemEmpty then
+      local searchCategory = self:GetSearchCategory(kind, currentItem.slotkey)
+      if searchCategory then
+        local oldCategory = currentItem.itemInfo.category
+        if oldCategory ~= L:G("Recent Items") then
+          currentItem.itemInfo.category = searchCategory
+          if search.UpdateCategoryIndex then
+            search:UpdateCategoryIndex(currentItem, oldCategory)
+          end
+        end
+      end
+    end
+  end
+
   local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
-  local events = addon:GetModule("Events")
   events:SendMessage(ctx, ev, slotInfo)
 end
 
@@ -420,15 +438,69 @@ function items:RefreshBank(ctx)
 end
 
 function items:GetSearchCategory(kind, slotkey)
-  return nil
+  return self.searchCache[kind] and self.searchCache[kind][slotkey]
 end
 
 function items:WipeSearchCache(kind)
-  -- NOOP stub
+  if not self.searchCache or not self.categoryPriorityCache then return end
+  if self.searchCache[kind] then wipe(self.searchCache[kind]) end
+  if self.categoryPriorityCache[kind] then wipe(self.categoryPriorityCache[kind]) end
 end
 
 function items:RefreshSearchCache(kind)
-  -- NOOP stub
+  self:WipeSearchCache(kind)
+  if not categories or not categories.GetSortedSearchCategories then return end
+  local ctx = context:New('RefreshSearchCache')
+  local categoryTable = categories:GetSortedSearchCategories()
+  local createdGroupByCategories = {} -- Track created groupBy categories to avoid duplicates
+
+  for _, categoryFilter in ipairs(categoryTable) do
+    if categoryFilter.enabled[kind] then
+      local results = search:Search(categoryFilter.searchCategory.query)
+      local groupBy = categoryFilter.searchCategory.groupBy or const.SEARCH_CATEGORY_GROUP_BY.NONE
+      local priority = categoryFilter.priority or 10
+
+      for slotkey, match in pairs(results) do
+        if match then
+          local categoryName = categoryFilter.name
+
+          -- Apply groupBy logic to generate dynamic category name
+          if groupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
+            local itemData = self:GetItemDataFromSlotKey(slotkey)
+            if itemData and not itemData.isItemEmpty then
+              local suffix = self:GetGroupBySuffix(itemData, groupBy)
+              if suffix and suffix ~= "" then
+                categoryName = categoryFilter.name .. " - " .. suffix
+
+                -- Create the groupBy subcategory object if it doesn't exist yet
+                if not createdGroupByCategories[categoryName] and not categories:DoesCategoryExist(categoryName) then
+                  categories:CreateCategory(ctx, {
+                    name = categoryName,
+                    itemList = {},
+                    enabled = categoryFilter.enabled,
+                    dynamic = true,
+                    isGroupBySubcategory = true,
+                    groupByParent = categoryFilter.name,
+                    priority = priority,
+                    color = categoryFilter.color,
+                  })
+                  createdGroupByCategories[categoryName] = true
+                end
+              end
+            end
+          end
+
+          -- Only set if this is higher priority than existing entry
+          -- Lower priority numbers have higher priority (1 > 10)
+          local existingPriority = self.categoryPriorityCache[kind][slotkey]
+          if not existingPriority or priority < existingPriority then
+            self.searchCache[kind][slotkey] = categoryName
+            self.categoryPriorityCache[kind][slotkey] = priority
+          end
+        end
+      end
+    end
+  end
 end
 
 function items:GetGroupBySuffix(data, groupBy)
@@ -465,21 +537,39 @@ function items:IsNewItem(data)
 end
 
 function items:ClearNewItem(ctx, slotkey)
-  -- NOOP stub
+  if not slotkey then
+    return
+  end
+  local data = self:GetItemDataFromSlotKey(slotkey)
+  if not data or data.isItemEmpty then
+    return
+  end
+  if _G.C_NewItems and _G.C_NewItems.RemoveNewItem then
+    _G.C_NewItems.RemoveNewItem(data.bagid, data.slotid)
+  end
+  data.itemInfo.isNewItem = false
+  self._newItemTimers[data.itemInfo.itemGUID] = nil
+  data.itemInfo.category = self:GetCategory(ctx, data)
 end
 
 function items:ClearNewItems()
-  -- NOOP stub
+  if _G.C_NewItems and _G.C_NewItems.ClearAll then
+    _G.C_NewItems.ClearAll()
+  end
+  wipe(self._newItemTimers)
 end
 
 function items:MarkItemAsNew(ctx, data)
-  if data and data.itemInfo and data.itemInfo.itemGUID then
+  if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
     self._newItemTimers[data.itemInfo.itemGUID] = time()
+    data.itemInfo.isNewItem = true
+    data.itemInfo.category = self:GetCategory(ctx, data)
   end
 end
 
 function items:MarkItemSlotAsNew(ctx, slotkey)
-  -- NOOP stub
+  local data = self:GetItemDataFromSlotKey(slotkey)
+  self:MarkItemAsNew(ctx, data)
 end
 
 function items:GetItemDataFromSlotKey(slotkey)
@@ -862,7 +952,7 @@ function items:AttachItemInfo(data, kind)
     currentItemCount = data.containerInfo.stackCount or 1,
     category = "",
     currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or effectiveIlvl or 0,
-    equipmentSet = nil,
+    equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
   }
   -- Track max item level for dynamic coloring
   if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
@@ -976,7 +1066,136 @@ function items:AttachBasicItemInfo(itemID, data)
 end
 
 function items:GetCategory(ctx, data)
-  return "Everything"
+  if not data or data.isItemEmpty then
+    return L:G("Empty Slot")
+  end
+
+  if not data.itemInfo then
+    data.itemInfo = {}
+  end
+
+  if database:GetCategoryFilter(data.kind, "RecentItems") then
+    if items:IsNewItem(data) then
+      return L:G("Recent Items")
+    end
+  end
+
+  -- Check for equipment sets first, as it doesn't make sense to put them anywhere else.
+  if data.itemInfo.equipmentSets and database:GetCategoryFilter(data.kind, "GearSet") then
+    return "Gear: " .. data.itemInfo.equipmentSets[1] -- Always use the first set, for now.
+  end
+
+  if not data.kind then
+    return L:G("Everything")
+  end
+
+  -- Unified priority-based category selection
+  -- Check both search cache (from search categories) and item list categories,
+  -- returning the one with higher priority
+  local searchCategory = self.searchCache[data.kind] and self.searchCache[data.kind][data.slotkey]
+  local searchPriority = self.categoryPriorityCache[data.kind] and self.categoryPriorityCache[data.kind][data.slotkey]
+  local customCategory, customPriority = categories:GetCustomCategory(ctx, data.kind, data)
+
+  -- If both exist, compare priorities
+  if searchCategory and customCategory then
+    local sPriority = searchPriority or 10
+    local cPriority = customPriority or 10
+    -- Lower priority number wins (1 > 10); if equal, search category wins (tie-breaker)
+    if cPriority < sPriority then
+      return customCategory
+    else
+      return searchCategory
+    end
+  end
+
+  -- If only one exists, return it
+  if searchCategory then
+    return searchCategory
+  end
+
+  if customCategory then
+    return customCategory
+  end
+
+  local quality = data.containerInfo and data.containerInfo.quality
+  if quality == const.ITEM_QUALITY.Poor then
+    return L:G("Junk")
+  end
+
+  -- Item Equipment location takes precedence filters below and does not bisect.
+  if
+    database:GetCategoryFilter(data.kind, "EquipmentLocation")
+    and data.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE"
+    and data.itemInfo.itemEquipLoc ~= nil
+    and _G[data.itemInfo.itemEquipLoc] ~= nil
+    and _G[data.itemInfo.itemEquipLoc] ~= ""
+  then
+    return _G[data.itemInfo.itemEquipLoc]
+  end
+
+  local category = ""
+
+  -- Add the type filter to the category if enabled, but not to trade goods
+  -- when the tradeskill filter is enabled. This makes it so trade goods are
+  -- labeled as "Tailoring" and not "Tradeskill - Tailoring", which is redundent.
+  if
+    database:GetCategoryFilter(data.kind, "Type")
+    and not (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(
+      data.kind,
+      "TradeSkill"
+    ))
+    and data.itemInfo.itemType
+  then
+    category = category .. data.itemInfo.itemType --[[@as string]]
+  end
+
+  -- Add the subtype filter to the category if enabled, but same as with
+  -- the type filter we don't add it to trade goods when the tradeskill
+  -- filter is enabled.
+  if
+    database:GetCategoryFilter(data.kind, "Subtype")
+    and not (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(
+      data.kind,
+      "TradeSkill"
+    ))
+    and data.itemInfo.itemSubType
+  then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. data.itemInfo.itemSubType
+  end
+
+  -- Add the tradeskill filter to the category if enabled.
+  if data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(data.kind, "TradeSkill") then
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.TRADESKILL_MAP[data.itemInfo.subclassID]
+  end
+
+  -- Add the expansion filter to the category if enabled.
+  if database:GetCategoryFilter(data.kind, "Expansion") then
+    if not data.itemInfo.expacID then
+      return L:G("Unknown")
+    end
+    -- Guard against unmapped expansion IDs (e.g., future Anniversary editions).
+    -- This defensive check prevents nil concatenation crashes when Blizzard introduces
+    -- new expansion IDs that aren't yet in EXPANSION_MAP.
+    if not const.EXPANSION_MAP[data.itemInfo.expacID] then
+      return L:G("Unknown")
+    end
+    if category ~= "" then
+      category = category .. " - "
+    end
+    category = category .. const.EXPANSION_MAP[data.itemInfo.expacID] --[[@as string]]
+  end
+
+  if category == "" then
+    category = L:G("Everything")
+  end
+
+  return category
 end
 
 function items:ParseItemLink(link)

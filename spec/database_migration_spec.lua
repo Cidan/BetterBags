@@ -70,7 +70,7 @@ function L:G(key) return key end
 -- Set up Constants
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 0, BANK = 1, UNDEFINED = -1 }
-const.BAG_VIEW = { UNDEFINED = 0, ONE_BAG = 1, SECTION_GRID = 2, LIST = 3, SECTION_ALL_BAGS = 4 }
+const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.SECTION_SORT_TYPE = { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
 const.GRID_COMPACT_STYLE = { NONE = 0, SIMPLE = 1, COMPACT = 2 }
@@ -192,9 +192,9 @@ describe("Database Migration", function()
     end)
 
     it("leaves valid itemsPerRow alone", function()
-      local original = DB.data.profile.size[const.BAG_VIEW.LIST][const.BAG_KIND.BACKPACK].itemsPerRow
+      local original = DB.data.profile.size[const.BAG_VIEW.SECTION_ALL_BAGS][const.BAG_KIND.BACKPACK].itemsPerRow
       DB:Migrate()
-      assert.are.equal(original, DB.data.profile.size[const.BAG_VIEW.LIST][const.BAG_KIND.BACKPACK].itemsPerRow)
+      assert.are.equal(original, DB.data.profile.size[const.BAG_VIEW.SECTION_ALL_BAGS][const.BAG_KIND.BACKPACK].itemsPerRow)
     end)
   end)
 end)

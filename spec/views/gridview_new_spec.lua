@@ -50,7 +50,7 @@ database.GetStackingOptions = function()
 end
 
 local const = StubBetterBagsModule("Constants")
-const.BAG_VIEW = { ONE_BAG = 1, SECTION_GRID = 2, LIST = 3, SECTION_ALL_BAGS = 4 }
+const.BAG_VIEW = { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.BAG_KIND = { BACKPACK = 0, BANK = 1 }
 const.GRID_COMPACT_STYLE = { NONE = 0 }
 const.OFFSETS = {

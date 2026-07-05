@@ -331,9 +331,6 @@ function bagFrame.bagProto:KeepBagInBounds()
 end
 
 function bagFrame.bagProto:OnResize()
-	if database:GetBagView(self.kind) == const.BAG_VIEW.LIST and self.currentView ~= nil then
-		self.currentView:UpdateListSize(self)
-	end
 	if self.anchor:IsActive() then
 		self.frame:ClearAllPoints()
 		self.frame:SetPoint(self.anchor.anchorPoint, self.anchor.frame, self.anchor.anchorPoint)
@@ -344,7 +341,7 @@ function bagFrame.bagProto:OnResize()
 		return
 	end
 	--Window.RestorePosition(self.frame)
-	if self.previousSize and database:GetBagView(self.kind) ~= const.BAG_VIEW.LIST and self.loaded then
+	if self.previousSize and self.loaded then
 		local left = self.frame:GetLeft()
 		self.frame:ClearAllPoints()
 		self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, self.previousSize) --, left, self.previousSize * self.frame:GetScale())

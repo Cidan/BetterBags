@@ -105,7 +105,7 @@ local function ItemBelongsToTab(view, bagKind, item)
     end
   end
   if database:GetGroupsEnabled(bagKind) then
-    local category = items:GetCategory(nil, item)
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
     local isSpecialSection = category == L:G("Free Space") or category == L:G("Recent Items")
     if isSpecialSection then
       return true -- Special sections are shown on all tabs
@@ -193,7 +193,7 @@ local function BagView(view, ctx, bag, slotInfo, callback)
       -- Resolve polymorphic section name
       local category = L:G("Items")
       if view.bagview == const.BAG_VIEW.SECTION_GRID then
-        category = items:GetCategory(ctx, item)
+        category = item.itemInfo and item.itemInfo.category or L:G("Everything")
       elseif view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
         category = GetBagName(item.bagid)
       end

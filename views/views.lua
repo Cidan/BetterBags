@@ -279,11 +279,6 @@ function views.viewProto:RemoveDeferredItem(slotkey)
   self.deferredItems[slotkey] = nil
 end
 
----@param bag Bag
-function views.viewProto:UpdateListSize(bag)
-  local _ = bag
-end
-
 ---@param ctx Context
 ---@param slotkey string
 function views.viewProto:FlashStack(ctx, slotkey)

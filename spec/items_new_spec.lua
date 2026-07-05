@@ -41,6 +41,8 @@ else
   categories = addon:GetModule("Categories")
 end
 categories.GetSortedSearchCategories = categories.GetSortedSearchCategories or function() return {} end
+categories.GetCustomCategory = categories.GetCustomCategory or function() return nil, nil end
+categories.DoesCategoryExist = categories.DoesCategoryExist or function() return false end
 
 -- Set up constants
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
@@ -100,6 +102,8 @@ stacksMod.Create = function()
   return {
     RemoveFromStack = function() end,
     AddToStack = function() end,
+    Clear = function() end,
+    GetStackInfo = function() return nil end,
   }
 end
 
@@ -215,6 +219,124 @@ describe("Items (New Data Farming Engine)", function()
       -- Check slot 2 which was mocked empty
       assert.is_not_nil(itemsMap["0_2"])
       assert.is_true(itemsMap["0_2"].isItemEmpty)
+    end)
+  end)
+
+  describe("Category Enrichment & Search Cache", function()
+    local savedContainerIDToInventoryID
+    local savedGetItemSubClassInfo
+    local savedGetInventoryItemLink
+    local savedGetContainerNumSlots
+    local savedGetContainerItemID
+    local savedGetContainerItemLink
+    local savedGetContainerItemInfo
+
+    before_each(function()
+      savedContainerIDToInventoryID = _G.C_Container.ContainerIDToInventoryID
+      savedGetItemSubClassInfo = _G.C_Item.GetItemSubClassInfo
+      savedGetInventoryItemLink = _G.GetInventoryItemLink
+      savedGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+      savedGetContainerItemID = _G.C_Container.GetContainerItemID
+      savedGetContainerItemLink = _G.C_Container.GetContainerItemLink
+      savedGetContainerItemInfo = _G.C_Container.GetContainerItemInfo
+
+      _G.C_Container.ContainerIDToInventoryID = function() return nil end
+      _G.C_Item.GetItemSubClassInfo = function() return "MockSubClass" end
+      _G.GetInventoryItemLink = function() return nil end
+
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return nil end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return nil end
+      _G.C_Container.GetContainerItemInfo = function(bagid, slotid) return nil end
+
+      local search = addon:GetModule("Search")
+      search:OnInitialize()
+    end)
+
+    after_each(function()
+      _G.C_Container.ContainerIDToInventoryID = savedContainerIDToInventoryID
+      _G.C_Item.GetItemSubClassInfo = savedGetItemSubClassInfo
+      _G.GetInventoryItemLink = savedGetInventoryItemLink
+      _G.C_Container.GetContainerNumSlots = savedGetContainerNumSlots
+      _G.C_Container.GetContainerItemID = savedGetContainerItemID
+      _G.C_Container.GetContainerItemLink = savedGetContainerItemLink
+      _G.C_Container.GetContainerItemInfo = savedGetContainerItemInfo
+    end)
+
+    it("updates and cleans search cache, resolving search categories priority-wise", function()
+      local search = addon:GetModule("Search")
+      local originalSearch = search.Search
+      search.Search = function(self, query)
+        if query == "potion" then
+          return { ["0_1"] = true }
+        end
+        return {}
+      end
+
+      local originalGetSortedSearchCategories = categories.GetSortedSearchCategories
+      categories.GetSortedSearchCategories = function()
+        return {
+          {
+            name = "CustomSearchCat",
+            enabled = { [const.BAG_KIND.BACKPACK] = true, [const.BAG_KIND.BANK] = true },
+            searchCategory = { query = "potion", groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE },
+            priority = 5,
+          }
+        }
+      end
+
+      items:RefreshSearchCache(const.BAG_KIND.BACKPACK)
+      assert.are.equal("CustomSearchCat", items:GetSearchCategory(const.BAG_KIND.BACKPACK, "0_1"))
+
+      items:WipeSearchCache(const.BAG_KIND.BACKPACK)
+      assert.is_nil(items:GetSearchCategory(const.BAG_KIND.BACKPACK, "0_1"))
+
+      search.Search = originalSearch
+      categories.GetSortedSearchCategories = originalGetSortedSearchCategories
+    end)
+
+    it("assigns categories dynamically during ProcessRefresh after search indexing", function()
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 1 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return 12345 end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return "|cff0070dd|Hitem:12345|h[Test Sword]|h|r" end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        return "Test Sword", "|cff0070dd|Hitem:12345|h[Test Sword]|h|r", 3, 100, 1, "Weapon", "One-Handed Swords", 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      local search = addon:GetModule("Search")
+      local originalSearch = search.Search
+      search.Search = function(self, query)
+        if query == "sword" then
+          return { ["0_1"] = true }
+        end
+        return {}
+      end
+
+      local originalGetSortedSearchCategories = categories.GetSortedSearchCategories
+      categories.GetSortedSearchCategories = function()
+        return {
+          {
+            name = "MySwordCategory",
+            enabled = { [const.BAG_KIND.BACKPACK] = true },
+            searchCategory = { query = "sword", groupBy = const.SEARCH_CATEGORY_GROUP_BY.NONE },
+            priority = 1,
+          }
+        }
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestRefresh")
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      local item = slotInfo.itemsBySlotKey["0_1"]
+      assert.is_not_nil(item)
+      assert.are.equal("MySwordCategory", item.itemInfo.category)
+
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      search.Search = originalSearch
+      categories.GetSortedSearchCategories = originalGetSortedSearchCategories
     end)
   end)
 end)

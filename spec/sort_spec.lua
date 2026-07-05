@@ -16,9 +16,7 @@ const.BAG_KIND = {
 
 const.BAG_VIEW = {
   UNDEFINED = 0,
-  ONE_BAG = 1,
   SECTION_GRID = 2,
-  LIST = 3,
   SECTION_ALL_BAGS = 4,
 }
 
