@@ -6,7 +6,9 @@ exclude_files = {
     "**/libs",
 	"**/.luarocks",
 	"annotations.lua",
-	"**/examples"
+	"**/examples",
+	"**/.claude",
+	"lua51-rocks"
 }
 
 ignore = {

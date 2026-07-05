@@ -282,13 +282,6 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		self.currentView:GetContent():Hide()
 	end
 
-	-- Unified Wipe-Phase: Clear and release all cells/sections first across all views
-	if self.tabViews then
-		for _, tView in pairs(self.tabViews) do
-			tView:Wipe(ctx)
-		end
-	end
-
 	-- Render other background persistent views first to keep them in a consistent data state
 	local currentLayout = database:GetBagView(self.kind)
 	if not ctx:GetBool("tab_switch") and self.tabViews then
