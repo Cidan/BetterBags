@@ -843,6 +843,8 @@ const.DATABASE_DEFAULTS = {
     },
     -- Profile system migration flag
     __profileSystemMigrated = false,
+    -- Saved backpack dump for testing and debugging
+    debugBackpackDump = {},
   },
   char = {}
 }
