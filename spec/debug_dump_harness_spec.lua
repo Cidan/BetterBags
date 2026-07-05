@@ -1,11 +1,11 @@
 -- debug_dump_harness_spec.lua -- Integration testing via live saved variables item dumps.
 
-local dumpPath = "/home/antonio/git/test.lua"
+local dumpPath = "test.lua"
 local f = io.open(dumpPath, "r")
 if not f then
   describe("Debug Dump Harness [SKIPPED - test.lua not found]", function()
     it("should be skipped when test.lua is not present", function()
-      pending("test.lua is not present in /home/antonio/git/test.lua, skipping harness integration tests")
+      pending("test.lua is not present in the repository root, skipping harness integration tests")
     end)
   end)
   return
