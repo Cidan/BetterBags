@@ -1,0 +1,11 @@
+### Summary
+This PR implements the final stage of our 8-phase rendering pipeline refactor: Phase 8 Page Placement. It un-gates the rendering pipeline to restore the visual UI in-game and calculates the outer grid-packing logic, properly mapping sections into vertical columns and determining frame dimensions.
+
+### Motivation
+The legacy pipeline was heavily coupled and stateful, leading to ghost items, duplicate buttons, and visual lag due to redundant debounce timers. By moving to a 100% clean-sweep, stateless architecture (inspired by Moonlight), we eliminate these bugs permanently. Phase 8 completes the transition by un-gating the visual rendering step which leverages the new pre-calculated stacks and placement engine, officially removing all reliance on the legacy view code.
+
+### Testing and Validation
+- Added and executed unit test coverage for Phase 8 Page Placement in `spec/views/gridview_new_spec.lua`, verifying that row wrapping and column dimensions are correctly resolved (`maxWidthPerRow` and `columns`).
+- Verified all persistent tabs correctly load without indexing crashes by updating `spec/views/persistent_tabs_spec.lua`.
+- Executed the entire Lua 5.1 test suite resulting in 766 successes, 0 failures, and 0 errors.
+- Ran `luacheck` verifying 0 warnings across all pipeline files.

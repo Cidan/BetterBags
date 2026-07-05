@@ -1,0 +1,11 @@
+### Summary
+This PR resolves the `GetBagID` nil parent crash during container layout in the new static item buttons architecture by implementing a unique unsecure parent frame per item button. It maps `item.frame` to this dedicated parent frame and injects a fallback `IsCombinedBagContainer` method directly onto it. This safely bypasses Blizzard's native `IsCombinedBagContainer()` lookup on `self:GetParent()` when the `ItemButton` is natively initialized via `Initialize(bag, slot)`. Both retail and Classic/Era `item.lua` files are aligned to this safe architectural pattern.
+
+### Motivation
+With the transition to static `bag:slot` buttons, the custom per-item parent frames were initially removed. However, World of Warcraft's native `ContainerFrameItemButtonMixin:Initialize()` natively expects the secure `ItemButton` to have a parent frame that implements `IsCombinedBagContainer()`. Because the buttons were completely parentless, calling `Initialize()` triggered a fatal `attempt to index a nil value` crash. Reintroducing a lightweight, unsecure parent frame per physical slot fixes this crash and fully aligns BetterBags with Blizzard's layout and native API expectations without touching any secure attributes in combat.
+
+### Testing & Validation
+- Verified the fix by updating `spec/helpers/wow_mocks.lua` to simulate Blizzard's native `self:GetParent():IsCombinedBagContainer()` check on `Initialize()`.
+- Updated unit tests in `spec/frames/item_spec.lua` to assert that item buttons are correctly parented to a frame containing the `IsCombinedBagContainer` fallback method.
+- Verified that all 876 unit tests pass successfully (`busted`).
+- Validated code style and syntax with `luacheck` (0 warnings, 0 errors).

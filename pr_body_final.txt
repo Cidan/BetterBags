@@ -1,0 +1,11 @@
+### Summary
+Fixes an issue where custom tabs were blank upon first clicking them after UI load or reload. A full draw is now triggered for the newly initialized tab views to ensure they display correct items.
+
+### Motivation
+Previously, lazily-created tab views received an empty delta changeset when switching tabs for the first time, because all item additions were already consumed by the main backpack view during load. This resulted in a blank tab until a manual "sort bags" update was triggered. To solve this, newly instantiated views are now flagged with `isNew` and populate their initial state from `slotInfo:GetCurrentItems()` on their first render.
+
+### Testing and Validation
+- Created test cases in `spec/views/persistent_tabs_spec.lua` to simulate a freshly initialized `BagView` and `GridView` reacting to an empty initial changeset.
+- Updated mocks in `bagview_spec.lua` and `gridview_spec.lua` to properly simulate the initialization environment.
+- Validated all 878 unit tests pass successfully (100% green on Lua 5.1).
+- Linting checks via `luacheck` pass successfully with zero warnings.

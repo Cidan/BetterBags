@@ -1,0 +1,14 @@
+### Summary of Changes
+- Updated `SetItemFromData` and `SetFreeSlots` in `frames/item.lua` to call `UpdateExtended()` on both the physical `self.button` and the themed `decoration` frame.
+- Safely guarded the calls using optional-member checks (`if button.UpdateExtended then`) to maintain Classic Era WoW compatibility.
+- Expanded WoW mocks (`spec/helpers/wow_mocks.lua`) to support slot capacity checks (`ContainerFrame_GetContainerNumSlots`, `IsAccountSecured`) and the full `ContainerFrameItemButtonMixin` interface.
+- Added comprehensive unit tests in `spec/frames/item_spec.lua` to assert `UpdateExtended` is properly called on both buttons.
+
+### Motivation
+When the addon starts, the bank is closed, causing `C_Container.GetContainerNumSlots()` to return 0 for bank bags. This causes WoW's native item button mixin to flag all pre-populated static bank buttons as "extended" (locked), which displays a padlock overlay and disables mouse clicks. When the bank opens later, only the `decoration` frame was having its extended state updated for occupied slots, while `self.button` (the physical clickable button) remained locked. For empty slots, neither button was updated. This resulted in bank slots displaying "Increase Backpack Size" padlock overlays and remaining unclickable. Updating both frames for both occupied and free slots ensures the bank properly unlocks once opened.
+
+### Testing and Validation
+- **Test-Driven Development (TDD):** Wrote unit tests asserting the invocation of `UpdateExtended` on both `self.button` and `decoration` for empty and occupied slots, verifying failure before the fix and success after.
+- **Mock Accuracy:** Implemented highly accurate mocks of WoW's native slot capacity logic and button states.
+- **Suite Execution:** All 880 tests passed cleanly under the local Lua 5.1 environment.
+- **Linting:** `luacheck` passed with 0 warnings and 0 errors.
