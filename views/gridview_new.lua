@@ -91,6 +91,9 @@ end
 
 local function ItemBelongsToTab(view, bagKind, item)
   if not item then return false end
+  if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return true
+  end
   if bagKind == const.BAG_KIND.BANK then
     if database:GetShowBankTabs() then
       return item.bagid == view.tabID
@@ -273,7 +276,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     if categories:IsCategoryShown(sectionName) == false then
       shouldHide = true
     end
-    if not shouldHide and activeGroup then
+    if not shouldHide and activeGroup and view.bagview ~= const.BAG_VIEW.SECTION_ALL_BAGS then
       local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
       if not isSpecialSection and not groups:CategoryBelongsToGroup(bag.kind, sectionName, activeGroup) then
         shouldHide = true

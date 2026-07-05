@@ -36,6 +36,7 @@ To prevent visual flickers, blank slots, and lag-induced loading glitches, UI re
 To support instant, synchronous tab switching with zero visual flickers or loading stutters:
 - **Unified Cache:** On Retail, the data-loading pipeline (`data/items.lua`) always loads all bank bags (both Character Bank and Account/Warbank bags) into a single, unified `slotInfo` cache, regardless of the active tab.
 - **Strict Filtering:** Both `gridview.lua` and `bagview.lua` strictly partition this complete cache via `ItemBelongsToTab()`. Items in `ACCOUNT_BANK_BAGS` only render in Account/Warbank tabs, while items in `BANK_BAGS` only render in Character Bank tabs, preventing unassigned category leakage between tabs.
+- **Bypass for Blizzard Bag View:** If the active view mode is Blizzard's physical container view (`SECTION_ALL_BAGS`), the `ItemBelongsToTab()` partition filters and section group-hiding filters must be completely bypassed. This ensures that when a user switches to Blizzard Bag View, all physical bag containers and their items render completely and synchronously, regardless of the active custom tab/group.
 - **Instant Swapping:** Since the cache is always complete, tab switching (`SwitchToGroup` or `SwitchToBlizzardTab`) does not wipe caches or trigger server-refresh messages. Instead, the UI simply hides the old view, fetches the new view, and calls `Draw()` synchronously and instantly.
 
 ### 5. Butter-Smooth Tab Swapping (Context-Gated Bypass)

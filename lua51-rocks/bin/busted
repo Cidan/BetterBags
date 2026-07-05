@@ -1,0 +1,3 @@
+#!/bin/sh
+
+LUAROCKS_SYSCONFDIR='/home/antonio/.local/etc/luarocks' exec '/home/linuxbrew/.linuxbrew/bin/luajit' -e 'package.path="/home/antonio/git/BetterBags/lua51-rocks/share/lua/5.1/?.lua;/home/antonio/git/BetterBags/lua51-rocks/share/lua/5.1/?/init.lua;"..package.path;package.cpath="/home/antonio/git/BetterBags/lua51-rocks/lib/lua/5.1/?.so;"..package.cpath;local k,l,_=pcall(require,"luarocks.loader") _=k and l.add_context("busted","2.3.0-1")' '/home/antonio/git/BetterBags/lua51-rocks/lib/luarocks/rocks-5.1/busted/2.3.0-1/bin/busted' "$@"

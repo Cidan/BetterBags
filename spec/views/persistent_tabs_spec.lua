@@ -843,4 +843,50 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     -- We can verify it early exited without wiping or running full layout (view is still intact)
     assert.is_false(view.isNew)
   end)
+
+  it("should bypass group tab filtering and show all items/sections in SECTION_ALL_BAGS view regardless of activeGroup tabID", function()
+    -- Set up items.slotInfo with items in different bags
+    local charItem = {
+      slotkey = "0_1",
+      bagid = 0,
+      slotid = 1,
+      itemHash = "hash_0_1",
+      isItemEmpty = false,
+      itemInfo = { currentItemCount = 1, itemStackCount = 20, isItemEmpty = false, category = "TestCategory" }
+    }
+    items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"] = charItem
+
+    -- Setup database GetActiveGroup to be > 1 (e.g., 2)
+    local old_GetGroupsEnabled = database.GetGroupsEnabled
+    database.GetGroupsEnabled = function() return true end
+
+    local old_CategoryBelongsToGroup = groups.CategoryBelongsToGroup
+    groups.CategoryBelongsToGroup = function(self, kind, category, tabID)
+      -- Items in TestCategory do not belong to Tab 2
+      if tabID == 2 then return false end
+      return true
+    end
+
+    local parent = CreateFrame("Frame")
+    -- Create a BagView (which is SECTION_ALL_BAGS) with tabID = 2 (a custom group tab)
+    local view = views:NewBagView(parent, const.BAG_KIND.BACKPACK, 2)
+
+    local mockSlotInfo = {
+      GetChangeset = function() return {}, {}, {} end,
+      GetCurrentItems = function() return { ["0_1"] = charItem } end,
+      emptySlotByBagAndSlot = {}
+    }
+
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+    view:Render(context:New("test"), bag, mockSlotInfo, function() end)
+
+    -- Under the buggy behavior, the item would be filtered out (not in view.itemsByBagAndSlot),
+    -- and its section (which would be GetBagName(0) -> "#1: Backpack") would be hidden.
+    -- We assert that under the fixed behavior, charItem IS in view.itemsByBagAndSlot
+    assert.is_not_nil(view.itemsByBagAndSlot["0_1"])
+
+    -- Clean up database changes
+    database.GetGroupsEnabled = old_GetGroupsEnabled
+    groups.CategoryBelongsToGroup = old_CategoryBelongsToGroup
+  end)
 end)
