@@ -40,7 +40,6 @@ The base View class that all view types inherit from:
 **Rendering and Updates:**
 - `Render(ctx, bag, slotInfo, callback)` - Main render method (must be implemented by subclasses)
 - `Wipe(ctx)` - Clear all view contents
-- `UpdateListSize(bag)` - Update view size based on bag contents
 
 **Section Management:**
 - `GetOrCreateSection(ctx, category, onlyCreate)` - Get or create a section by category
