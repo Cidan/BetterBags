@@ -229,20 +229,6 @@ function views.viewProto:SetPoints()
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
 end
 
----@param bag Bag
----@param w? number
----@param h? number
-function views.viewProto:UpdateBagBounds(bag, w, h)
-  if bag and bag.UpdateBagBounds then
-    bag:UpdateBagBounds(w or 260, h or 200)
-  else
-    if bag and bag.frame then
-      bag.frame:SetWidth(w or 260)
-      bag.frame:SetHeight(h or 200)
-    end
-  end
-end
-
 ---@param slotkey string
 ---@param section Section
 function views.viewProto:SetSlotSection(slotkey, section)

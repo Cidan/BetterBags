@@ -237,7 +237,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     section.shouldShrinkWhenCollapsed = false
   end
 
-  local w, h = view.content:Draw({
+  view.content:Draw({
     cells = view.content.cells,
     maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
     columns = sizeInfo.columnCount,
@@ -293,7 +293,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     for _, section in ipairs(view.content.cells) do
       section:Draw(bag.kind, database:GetBagView(bag.kind), false)
     end
-    w, h = view.content:Draw({
+    view.content:Draw({
       cells = view.content.cells,
       maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
       columns = sizeInfo.columnCount,
@@ -305,7 +305,6 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     debug:WalkAndFixAnchorGraph(section.frame)
   end
 
-  view:UpdateBagBounds(bag, w, h)
   view.itemCount = slotInfo.totalItems
   callback()
 end

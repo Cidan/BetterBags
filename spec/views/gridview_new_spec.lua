@@ -262,8 +262,6 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     }
 
     local drawSpy = spy.on(view.content, "Draw")
-    local frameWidthSpy = spy.on(bag.frame, "SetWidth")
-    local frameHeightSpy = spy.on(bag.frame, "SetHeight")
 
     local rendered = false
     view:Render(context:New("test"), bag, mockSlotInfo, function()
@@ -278,10 +276,6 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     local drawOptions = drawCall.vals[2]
     assert.are.equal(221, drawOptions.maxWidthPerRow) -- ((37 + 4) * 5) + 16
     assert.are.equal(4, drawOptions.columns) -- sizeInfo.columnCount
-
-    -- Assert bag frame width/height were adjusted correctly
-    assert.spy(frameWidthSpy).was.called()
-    assert.spy(frameHeightSpy).was.called()
   end)
 
   it("should support polymorphic NewBagView views and place items correctly", function()
