@@ -236,9 +236,9 @@ end
 ---@param w? number
 ---@param h? number
 function views.viewProto:UpdateBagBounds(bag, w, h)
-  local inner = self.content and self.content.inner or nil
-  w = w or (inner and inner:GetWidth() or 0)
-  h = h or (inner and inner:GetHeight() or 0)
+  local grid = self.content
+  w = w or (grid and grid.contentWidth) or (grid and grid.inner and grid.inner:GetWidth()) or 0
+  h = h or (grid and grid.contentHeight) or (grid and grid.inner and grid.inner:GetHeight()) or 0
 
   -- Set size and scrollbars
   if w < 260 then w = 260 end

@@ -497,6 +497,8 @@ function gridProto:stage(options)
     w = w - 4 ---@type number
   end
   self.inner:SetSize(w, h)
+  self.contentWidth = w
+  self.contentHeight = h
   return w, h
 end
 
