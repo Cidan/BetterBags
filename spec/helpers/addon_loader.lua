@@ -54,4 +54,7 @@ _G.ResetModuleStub = function(name, filePath)
   if filePath ~= nil then
     loadedModules[filePath] = nil
   end
+  if name == "Items" then
+    loadedModules["data/slots.lua"] = nil
+  end
 end
