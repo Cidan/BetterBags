@@ -363,10 +363,12 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 
 	-- 1. Scan and draw Recent Items inside self.headerContainer
 	local recentItems = {}
-	local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
-	for _, item in pairs(itemsGetter(slotInfo)) do
-		if not item.isItemEmpty and item.itemInfo and item.itemInfo.category == L:G("Recent Items") then
-			table.insert(recentItems, item)
+	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+		local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
+		for _, item in pairs(itemsGetter(slotInfo)) do
+			if not item.isItemEmpty and item.itemInfo and item.itemInfo.category == L:G("Recent Items") then
+				table.insert(recentItems, item)
+			end
 		end
 	end
 

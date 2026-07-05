@@ -321,4 +321,91 @@ describe("Phase 6 View Placement and Rendering Tests", function()
 
     assert.is_true(rendered)
   end)
+
+  it("should filter out Recent Items and Free Space items in SECTION_GRID view", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK)
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+
+    items.GetItemDataFromSlotKey = function(self, slotkey)
+      return { slotkey = slotkey }
+    end
+
+    local item1 = {
+      bagid = 0,
+      slotid = 1,
+      slotkey = "0_1",
+      isItemEmpty = false,
+      itemInfo = {
+        category = "Recent Items",
+        itemID = 1234,
+      },
+    }
+
+    local mockSlotInfo = {
+      GetChangeset = function() return { item1 }, {}, {} end,
+      GetCurrentItems = function() return { ["0_1"] = item1 } end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      emptySlotByBagAndSlot = {},
+      stacks = {
+        GetStackInfo = function() return nil end
+      }
+    }
+
+    local rendered = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
+
+    assert.is_true(rendered)
+    assert.is_nil(view.sections["Recent Items"])
+  end)
+
+  it("should bypass Recent Items and Free Space filters in SECTION_ALL_BAGS view", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewBagView(parent, const.BAG_KIND.BACKPACK)
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+
+    items.GetItemDataFromSlotKey = function(self, slotkey)
+      return { slotkey = slotkey }
+    end
+
+    _G.C_Container = _G.C_Container or {}
+    _G.C_Container.GetBagName = function(bagid)
+      return "Backpack"
+    end
+
+    local item1 = {
+      bagid = 0,
+      slotid = 1,
+      slotkey = "0_1",
+      isItemEmpty = false,
+      itemInfo = {
+        category = "Recent Items",
+        itemID = 1234,
+      },
+    }
+
+    local mockSlotInfo = {
+      GetChangeset = function() return { item1 }, {}, {} end,
+      GetCurrentItems = function() return { ["0_1"] = item1 } end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      emptySlotByBagAndSlot = {},
+      stacks = {
+        GetStackInfo = function() return nil end
+      }
+    }
+
+    local rendered = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
+
+    assert.is_true(rendered)
+    assert.is_not_nil(view.sections["#1: Backpack"])
+  end)
 end)

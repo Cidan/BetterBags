@@ -84,12 +84,12 @@ end
 
 local function ItemBelongsToTab(view, bagKind, item)
   if not item then return false end
+  if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return true
+  end
   local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
   if category == L:G("Free Space") or category == L:G("Recent Items") then
     return false
-  end
-  if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-    return true
   end
   if bagKind == const.BAG_KIND.BANK then
     if database:GetShowBankTabs() then
