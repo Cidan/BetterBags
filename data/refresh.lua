@@ -15,6 +15,9 @@ local const = addon:GetModule('Constants')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
@@ -158,6 +161,26 @@ function refresh:OnEnable()
 
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
     self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+  end)
+
+  events:RegisterEvent('BANKFRAME_OPENED', function()
+    if GameMenuFrame:IsShown() then
+      return
+    end
+    addon.atBank = true
+    if addon.isRetail and database:GetShowBankTabs()
+      and addon.Bags and addon.Bags.Bank then
+      local slots = addon.Bags.Bank.slots
+      local firstButton = slots and slots.buttons and slots.buttons[1]
+      if firstButton then
+        addon.Bags.Bank.blizzardBankTab = firstButton.bagIndex
+      end
+    end
+    self:RequestUpdate({ bank = true })
+  end)
+
+  events:RegisterEvent('BANKFRAME_CLOSED', function()
+    addon.atBank = false
   end)
 
   if not addon.isRetail then
