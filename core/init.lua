@@ -66,6 +66,9 @@ local quickfind = addon:GetModule('QuickFind')
 ---@class Refresh: AceModule
 local refresh = addon:GetModule('Refresh')
 
+---@class ItemLoader: AceModule
+local itemLoader = addon:GetModule('ItemLoader')
+
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
@@ -286,6 +289,7 @@ function addon:OnEnable()
   search:Enable()
   pawn:Enable()
   question:Enable()
+  itemLoader:Enable()
   refresh:Enable()
   views:Enable()
   searchCategoryConfig:Enable()
