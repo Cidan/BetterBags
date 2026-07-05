@@ -953,4 +953,22 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     bagView:Wipe(context:New("test"))
     assert.is_true(bagView.isNew)
   end)
+
+  it("should support stateless sizing via bagProto:UpdateBagBounds", function()
+    setupBagFrameStubs()
+    LoadBetterBagsModule("frames/bag.lua")
+    local bagProto = addon:GetModule("BagFrame").bagProto
+    assert.is_not_nil(bagProto.UpdateBagBounds, "bagProto:UpdateBagBounds should be defined")
+
+    local frame = CreateFrame("Frame")
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      frame = frame,
+    }
+    setmetatable(bag, { __index = bagProto })
+
+    -- Assert that calling bagProto:UpdateBagBounds resizes the bag frame
+    bag:UpdateBagBounds(280, 200)
+    assert.are_equal(280 + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH, frame:GetWidth())
+  end)
 end)

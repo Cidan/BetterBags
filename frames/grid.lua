@@ -549,6 +549,7 @@ function grid:CreateScrollFrame(g, parent, child)
   g.bar = bar
   g.box = box
   g.view = view
+  g.scrollBox = box
   ScrollUtil.InitScrollBoxWithScrollBar(box, bar, view)
   scrollFrameCounter = scrollFrameCounter + 1
   return box
@@ -556,17 +557,25 @@ end
 
 -- Create will create a new grid frame.
 ---@param parent Frame
+---@param isScrollable? boolean
 ---@return Grid
-function grid:Create(parent)
+function grid:Create(parent, isScrollable)
   local g = setmetatable({}, { __index = gridProto })
   ---@class Frame
-  local c = CreateFrame("Frame")
+  local c = CreateFrame("Frame", nil, parent)
 
-  ---@class WowScrollBox
-  local f = grid:CreateScrollFrame(g, parent, c)
+  if isScrollable == false then
+    g.frame = c
+    g.inner = c
+    g.scrollable = false
+  else
+    ---@class WowScrollBox
+    local f = grid:CreateScrollFrame(g, parent, c)
+    g.frame = f
+    g.inner = c
+    g.scrollable = true
+  end
 
-  g.frame = f
-  g.inner = c
   g.cells = {}
   g.idToCell = {}
   g.cellToID = {}
@@ -578,7 +587,9 @@ function grid:Create(parent)
   g.compactStyle = const.GRID_COMPACT_STYLE.NONE
   g.spacing = 4
   g:SortHorizontal()
-  g.bar:Show()
+  if g.scrollable then
+    g.bar:Show()
+  end
   -- Fixes a bug where the frame is not visble when anchored to the parent.
   g.frame:SetSize(1,1)
   return g
