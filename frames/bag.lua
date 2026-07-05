@@ -260,12 +260,13 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		return
 	end
 
-		if ctx:GetBool("tab_switch") and not view.isNew then
+	if ctx:GetBool("tab_switch") and not view.isNew then
 		if self.currentView and self.currentView ~= view then
 			self.currentView:GetContent():Hide()
 		end
 		view:GetContent():Show()
 		self.currentView = view
+		view:UpdateBagBounds(self)
 		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
 		local text = searchBox:GetText()
 		if text ~= "" and text ~= nil then

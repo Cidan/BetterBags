@@ -40,8 +40,9 @@ To support instant, synchronous tab switching with zero visual flickers or loadi
 - **Instant Swapping:** Since the cache is always complete, tab switching (`SwitchToGroup` or `SwitchToBlizzardTab`) does not wipe caches or trigger server-refresh messages. Instead, the UI simply hides the old view, fetches the new view, and calls `Draw()` synchronously and instantly.
 
 ### 5. Butter-Smooth Tab Swapping (Context-Gated Bypass)
-To achieve sub-millisecond local tab swaps, tab switching operations are completely decoupled from active database rebuilds or view redraws.
-- **Bypass Flag:** Operations that only toggle active tab visibility (like clicking a tab or switching a group) tag the execution context with `tab_switch = true`.
+To achieve sub-millisecond local tab swaps across both the Backpack and the Bank, tab switching operations are completely decoupled from active database rebuilds or full view redraws.
+- **Uniform Mechanism:** Toggling active tab visibility (like clicking a tab or switching a group in either Backpack or Bank) tags the execution context with `tab_switch = true`. Both `backpack.proto:SwitchToGroup` and `bank.proto:SwitchToGroup` immediately trigger a fast local `Draw` using the existing static, pre-rendered `slotInfo` cache.
+- **Bypass Flag:** Operations that only toggle active tab visibility tag the execution context with `tab_switch = true`.
 - **Render Bypass:** In `bagProto:Draw(ctx, slotInfo, callback)`, if the context carries the `tab_switch` flag, the engine completely bypasses background and active `view:Render` pipelines, provided the target view is already initialized (`not view.isNew`). Newly instantiated views (`view.isNew = true`) are allowed to run their initial render to fetch and cache item buttons.
 - **Background Loop Bypass:** The background rendering loop that typically keeps inactive views in sync is entirely gated by `not ctx:GetBool("tab_switch")`. This completely skips background view rendering during local tab switches, preventing massive CPU spikes.
 - **Instant Swap:** Instead, visibility of the hidden and active views is toggled synchronously, scale and search states are adjusted, `self:OnResize()` is called, and the callback is invoked instantly. This avoids any sorting or layout calculation overhead entirely.
@@ -59,6 +60,7 @@ To achieve sub-millisecond redraw performance while ensuring that the grid layou
   - **Pass 1:** Determines the default height/width of all category sections and splits them into equal-height vertical columns using the `calculateColumns` algorithm inside `frames/grid.lua`.
   - **Pass 2 (Row collapse shrink optimization):** Measures row-level layouts to shrink-wrap category sections when all items within a row are collapsed. This dynamically adjusts bounding heights and prevents massive blank gaps.
 - **Bounds Clamping:** The view calculates the total bag height and width, clamps the parent frame within safe screen limits (`UIParent:GetHeight() * 0.90`), and toggles the scrollbars and frame points dynamically.
+- **Shared, Stateless Sizing (`UpdateBagBounds`):** To ensure uniform sizing when switching tabs instantly without caching state, all bag views call a shared, stateless helper method `view:UpdateBagBounds(bag, w, h)`. This centralizes the bounds calculations, clamping, scrollbar visibility, and search-offset positioning. It is invoked both at the end of the full rendering pipeline and during the `tab_switch = true` local bypass in `bagProto:Draw(ctx, slotInfo, callback)` (using the pre-rendered grid dimensions via `self.content.inner`), achieving visual size parity with zero state-holding overhead.
 
 ### 8. Phase 4.5: Category Enrichment & Data Enrichment
 To eliminate JIT (just-in-time) database and search engine queries during UI layout rendering, we assign final item categories and enrich item data right after search indexing and before layout/section placement occurs.

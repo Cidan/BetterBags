@@ -174,6 +174,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
 
     StubBetterBagsModule("ContextMenu")
     StubBetterBagsModule("SectionFrame")
+    StubBetterBagsModule("Items")
 
     -- Load real Context, Database, Groups, Tabs
     ResetModuleStub("Context", "core/context.lua")
@@ -277,5 +278,55 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     assert.has_no.errors(function()
       behavior:OnCreate({})
     end)
+  end)
+
+  it("should use instant pre-rendered tab swap on SwitchToGroup", function()
+    -- Load base backpack behavior
+    local loadBase = assert(loadfile("bags/backpack.lua"))
+    loadBase("BetterBags")
+    local backpack = addon:GetModule("BackpackBehavior")
+
+    -- Stub dependencies
+    local items = StubBetterBagsModule("Items")
+    local mockSlotInfo = { [0] = { "mock-slot-info-backpack" } }
+    items.GetAllSlotInfo = function()
+      return mockSlotInfo
+    end
+
+    local events = addon:GetModule("Events")
+    local refreshMessageSent = false
+    events.SendMessage = function(self, ctx, message)
+      if message == "bags/RefreshBackpack" then
+        refreshMessageSent = true
+      end
+    end
+
+    local parentFrame = CreateFrame("Frame", "BetterBagsBackpack")
+    local drawCalledWithCtx = nil
+    local drawCalledWithSlotInfo = nil
+    local mockBag = {
+      frame = parentFrame,
+      currentItemCount = 0,
+      tabs = {
+        SetTabByID = function() end
+      },
+      Draw = function(self, ctx, slotInfo, callback)
+        drawCalledWithCtx = ctx
+        drawCalledWithSlotInfo = slotInfo
+        callback()
+      end
+    }
+
+    local behavior = backpack:Create(mockBag)
+    local ctx = addon:GetModule("Context"):New("TestSwitch")
+
+    behavior:SwitchToGroup(ctx, 1)
+
+    -- Assertions
+    assert.is_false(refreshMessageSent, "Should NOT trigger bags/RefreshBackpack")
+    assert.equal(-1, mockBag.currentItemCount, "Should reset currentItemCount to -1")
+    assert.is_true(ctx:GetBool("tab_switch"), "Context tab_switch should be true")
+    assert.equal(ctx, drawCalledWithCtx, "Should call Draw with the correct context object")
+    assert.equal(mockSlotInfo[0], drawCalledWithSlotInfo, "Should call Draw with the correct backpack slotInfo")
   end)
 end)
