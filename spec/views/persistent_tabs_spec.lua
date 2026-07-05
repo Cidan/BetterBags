@@ -736,7 +736,10 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
     local frame = CreateFrame("Frame")
+    local set_width_called, set_height_called = false, false
     frame.SetScale = function() end
+    frame.SetWidth = function(self, w) set_width_called = true end
+    frame.SetHeight = function(self, h) set_height_called = true end
     local bag = {
       kind = const.BAG_KIND.BACKPACK,
       frame = frame,
@@ -773,6 +776,8 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     assert.is_false(render_called)
     assert.is_true(callback_called)
+    assert.is_true(set_width_called)
+    assert.is_true(set_height_called)
   end)
 
   it("should NOT bypass rendering in bag:Draw() when tab_switch is true but view is new", function()

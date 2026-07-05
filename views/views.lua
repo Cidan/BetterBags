@@ -18,6 +18,9 @@ local items = addon:GetModule('Items')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
 
@@ -227,6 +230,57 @@ function views.viewProto:SetPoints()
   self.content:GetContainer():ClearAllPoints()
   self.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+end
+
+---@param bag Bag
+---@param w? number
+---@param h? number
+function views.viewProto:UpdateBagBounds(bag, w, h)
+  local inner = self.content and self.content.inner or nil
+  w = w or (inner and inner:GetWidth() or 0)
+  h = h or (inner and inner:GetHeight() or 0)
+
+  -- Set size and scrollbars
+  if w < 260 then w = 260 end
+  if bag.tabs and w < bag.tabs.width then
+    w = bag.tabs.width
+  end
+  if bag.slots and bag.slots:IsShown() then
+    local minW = bag.slots.frame:GetWidth()
+      - const.OFFSETS.BAG_LEFT_INSET
+      + const.OFFSETS.BAG_RIGHT_INSET
+      - const.OFFSETS.SCROLLBAR_WIDTH
+    if w < minW then
+      w = minW
+    end
+  end
+  if h < 100 then h = 100 end
+  if database:GetInBagSearch() then
+    h = h + 20
+  end
+
+  local bagHeight = h +
+    const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+    const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+
+  local maxHeight = UIParent:GetHeight() * 0.90
+  local bagWidth = w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH
+  if bagHeight > maxHeight then
+    bagHeight = maxHeight
+    self.content:ShowScrollBar()
+  else
+    self.content:HideScrollBar()
+  end
+
+  bag.frame:SetWidth(bagWidth)
+  bag.frame:SetHeight(bagHeight)
+
+  local parent = self.content:GetContainer():GetParent()
+  if database:GetInBagSearch() then
+    self.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET - 20)
+  else
+    self.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+  end
 end
 
 ---@param slotkey string
