@@ -18,18 +18,59 @@ To prevent test side-effects and preserve local user configurations:
   local oldDB = _G.BetterBagsDB
   _G.BetterBagsDB = nil
 
-  -- Load the high-fidelity snapshot file
-  dofile("/home/antonio/git/test.lua")
+  -- Load the high-fidelity repository-relative snapshot file
+  dofile("test.lua")
 
   -- Initialize Database module using the loaded BetterBagsDB structure
   local DB = addon:GetModule("Database")
   DB:OnInitialize()
   ```
 
-### 3. Pipeline Validation against Dumped Items
-- **Rule:** The `debugBackpackDump` slot key dictionary must be used to seed the mock physical slot container when simulating game item scans.
-- **Harness Integration:**
-  - Mock `C_Container.GetContainerNumSlots` and `C_Container.GetContainerItemInfo` to return item data from the database's `debugBackpackDump` collection.
-  - Run `items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)` synchronously.
-  - Verify that the resulting `slotInfo` contains the exact items, resolved custom categories, and virtual stacks without any client-side or database-level crash.
-  - Validate that the search engine (`search:IndexItems`) successfully indexes the real items and handles custom queries on real-world datasets.
+### 3. High-Fidelity End-to-End Simulation (Phases 2 - 4.5)
+To test the pipeline with maximum fidelity, we do not mock high-level pipeline functions like `items:Harvest`. Instead, we mock the World of Warcraft client's low-level container and item C-APIs using our serialized dump as the game state seed. This forces the real physical scanning, data-farming, stacking, and indexing systems to execute on top of our dataset.
+- **Rule:** Mock the underlying WoW client C-level APIs (`C_Container` and `C_Item`) using raw dump fields, leaving `items:Harvest` completely unmocked.
+- **Mocks Implementation Pattern:**
+  ```lua
+  -- 1. Mock C_Container to read from dumpItems
+  _G.C_Container.GetContainerNumSlots = function(bagid)
+    local maxSlot = 0
+    for _, item in pairs(dumpItems) do
+      if item.bagid == bagid and item.slotid > maxSlot then
+        maxSlot = item.slotid
+      end
+    end
+    return maxSlot
+  end
+
+  _G.C_Container.GetContainerItemID = function(bagid, slotid)
+    local item = dumpItems[bagid .. "_" .. slotid]
+    return item and not item.isItemEmpty and item.containerInfo.itemID or nil
+  end
+
+  _G.C_Container.GetContainerItemInfo = function(bagid, slotid)
+    local item = dumpItems[bagid .. "_" .. slotid]
+    return item and not item.isItemEmpty and item.containerInfo or nil
+  end
+
+  -- 2. Mock C_Item to resolve item metadata from dumpItems
+  _G.C_Item.GetItemInfo = function(itemID)
+    for _, item in pairs(dumpItems) do
+      if item.containerInfo and item.containerInfo.itemID == itemID then
+        local info = item.itemInfo
+        return info.itemName, info.itemLink, info.itemQuality, info.itemLevel, 
+               info.itemMinLevel, info.itemType, info.itemSubType, info.itemStackCount, 
+               info.itemEquipLoc, info.itemIcon, info.sellPrice, info.classID, 
+               info.subclassID, info.bindType, info.expacID, info.setID, info.isCraftingReagent
+      end
+    end
+    return nil
+  end
+  ```
+
+### 4. Pipeline Execution & State Invalidation
+Once C-level APIs are mocked, triggering `items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)` executes:
+- **Phase 2 (Data Farming):** Sweeps physical bags and extracts physical `ItemData` using our mocked container APIs.
+- **Phase 3 (Virtual Stacks):** Resolves parent-child stack structures from a clean-slate.
+- **Phase 4 (Search Indexing):** Builds ngrams and full-text indexes over all items in the dataset.
+- **Phase 4.5 (Category & Data Enrichment):** Assigns final priority-based categories to each slot.
+- **Verification Rule:** Assert that specific items (including qualities, binding, counts, and custom classifications) resolve and group perfectly under their corresponding categories in the final generated `slotInfo.itemsBySlotKey`.
