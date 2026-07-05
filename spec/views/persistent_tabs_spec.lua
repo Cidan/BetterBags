@@ -146,11 +146,18 @@ tooltipScanner.GetTooltipText = function() return "" end
 LoadBetterBagsModule("util/query.lua")
 LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
+ResetModuleStub("Search", "data/search_new.lua")
 LoadBetterBagsModule("data/search_new.lua")
+local search = addon:GetModule("Search")
+search:OnInitialize()
 LoadBetterBagsModule("core/async.lua")
+ResetModuleStub("Stacks", "data/stacks_new.lua")
 LoadBetterBagsModule("data/stacks_new.lua")
 LoadBetterBagsModule("data/binding.lua")
-LoadBetterBagsModule("data/items.lua")
+ResetModuleStub("Items", "data/items_new.lua")
+LoadBetterBagsModule("data/items_new.lua")
+ResetModuleStub("Slots", "data/slots.lua")
+LoadBetterBagsModule("data/slots.lua")
 
 local items = addon:GetModule("Items")
 items._firstLoad = {
@@ -159,12 +166,8 @@ items._firstLoad = {
 }
 -- We can set up items.slotInfo map to use our mock
 items.slotInfo = {
-  [const.BAG_KIND.BACKPACK] = {
-    itemsBySlotKey = {},
-  },
-  [const.BAG_KIND.BANK] = {
-    itemsBySlotKey = {},
-  },
+  [const.BAG_KIND.BACKPACK] = items:NewSlotInfo(),
+  [const.BAG_KIND.BANK] = items:NewSlotInfo(),
 }
 
 -- Mock ItemFrame
@@ -236,7 +239,6 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     anchor.New = function() return {} end
 
     StubBetterBagsModule("Question")
-    StubBetterBagsModule("Search")
     StubBetterBagsModule("BackpackBehavior")
     StubBetterBagsModule("BankBehavior")
   end
@@ -269,7 +271,6 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     ResetModuleStub("WindowGroup", "util/windowgroup.lua")
     ResetModuleStub("Anchor")
     ResetModuleStub("Question")
-    ResetModuleStub("Search")
     ResetModuleStub("BackpackBehavior")
     ResetModuleStub("BankBehavior")
     ResetModuleStub("BagFrame", "frames/bag.lua")
@@ -514,14 +515,11 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     const.BANK_BAGS = { [6] = 6, [7] = 7 }
     const.BANK_ONLY_BAGS = {}
 
-    -- Mock LoadBagItems to observe bagList
+    -- Mock Harvest to observe bagList
     local capturedBagList = nil
-    items.LoadBagItems = function(self, ctx, kind, bagList, save, callback)
+    items.Harvest = function(self, kind, bagList, includeEquipment)
       capturedBagList = bagList
-      callback(ctx, {}, {})
-    end
-    items.LoadItems = function(self, ctx, kind, itemData, equipmentData, callback)
-      callback(ctx)
+      return {}, {}
     end
 
     local ctx = context:New("test")
@@ -623,14 +621,11 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     const.BANK_BAGS = { [6] = 6, [7] = 7 }
     const.BANK_ONLY_BAGS = {}
 
-    -- Mock LoadBagItems to observe bagList
+    -- Mock Harvest to observe bagList
     local capturedBagList = nil
-    items.LoadBagItems = function(self, ctx, kind, bagList, save, callback)
+    items.Harvest = function(self, kind, bagList, includeEquipment)
       capturedBagList = bagList
-      callback(ctx, {}, {})
-    end
-    items.LoadItems = function(self, ctx, kind, itemData, equipmentData, callback)
-      callback(ctx)
+      return {}, {}
     end
 
     local ctx = context:New("test")
