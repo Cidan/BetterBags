@@ -139,6 +139,7 @@ local DB = addon:GetModule("Database")
 
 ResetModuleStub("EquipmentSets", "data/equipmentsets.lua")
 LoadBetterBagsModule("data/equipmentsets.lua")
+local equipmentSets = addon:GetModule("EquipmentSets")
 
 ResetModuleStub("Categories", "data/categories.lua")
 LoadBetterBagsModule("data/categories.lua")
@@ -160,6 +161,10 @@ LoadBetterBagsModule("data/stacks_new.lua")
 
 ResetModuleStub("Binding", "data/binding.lua")
 LoadBetterBagsModule("data/binding.lua")
+
+ResetModuleStub("TooltipScanner", "data/tooltip.lua")
+LoadBetterBagsModule("data/tooltip.lua")
+local tooltipScanner = addon:GetModule("TooltipScanner")
 
 ResetModuleStub("Items", "data/items_new.lua")
 LoadBetterBagsModule("data/items_new.lua")
@@ -183,6 +188,8 @@ describe("Debug Dump Harness with test.lua", function()
 
     -- Initialize database with loaded values
     DB:OnInitialize()
+    tooltipScanner:OnInitialize()
+    equipmentSets:OnInitialize()
     categories:OnInitialize()
     categories:OnEnable()
     search:OnInitialize()
@@ -252,6 +259,142 @@ describe("Debug Dump Harness with test.lua", function()
     assert.are.equal("Lucky Horseshoe", item3.itemInfo.itemName)
     assert.are.equal(198400, item3.itemInfo.itemID)
     assert.are.equal("Miscellaneous", item3.itemInfo.category)
+
+    -- Ensure empty slots are also handled cleanly
+    local emptySlot = slotInfo.itemsBySlotKey["5_25"]
+    assert.is_not_nil(emptySlot)
+    assert.is_true(emptySlot.isItemEmpty)
+  end)
+
+  it("should run the full physical harvesting (Phase 2), stacking (Phase 3), and search indexing (Phase 4) by mocking low-level C-level APIs with test.lua dump data", function()
+    -- Set active profile to Default (where the dump resides)
+    DB.data:SetProfile("Default")
+
+    -- Retrieve the dumped items dictionary
+    local dumpItems = _G.BetterBagsDB.profiles.Default.debugBackpackDump
+    assert.is_not_nil(dumpItems)
+
+    -- Save original API references
+    local origGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+    local origGetContainerItemID = _G.C_Container.GetContainerItemID
+    local origGetContainerItemLink = _G.C_Container.GetContainerItemLink
+    local origGetContainerItemInfo = _G.C_Container.GetContainerItemInfo
+    local origGetContainerItemQuestInfo = _G.C_Container.GetContainerItemQuestInfo
+    local origGetItemInfo = _G.C_Item.GetItemInfo
+    local origGetDetailedItemLevelInfo = _G.C_Item.GetDetailedItemLevelInfo
+    local origGetItemGUID = _G.C_Item.GetItemGUID
+
+    -- Mock low-level APIs to pull data dynamically from test.lua dump
+    _G.C_Container.GetContainerNumSlots = function(bagid)
+      local maxSlot = 0
+      for _, item in pairs(dumpItems) do
+        if item.bagid == bagid then
+          if item.slotid > maxSlot then
+            maxSlot = item.slotid
+          end
+        end
+      end
+      return maxSlot > 0 and maxSlot or 0
+    end
+
+    _G.C_Container.GetContainerItemID = function(bagid, slotid)
+      local slotkey = bagid .. "_" .. slotid
+      local item = dumpItems[slotkey]
+      if item and not item.isItemEmpty then
+        return item.containerInfo.itemID
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+      local slotkey = bagid .. "_" .. slotid
+      local item = dumpItems[slotkey]
+      if item and not item.isItemEmpty then
+        return item.containerInfo.hyperlink
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemInfo = function(bagid, slotid)
+      local slotkey = bagid .. "_" .. slotid
+      local item = dumpItems[slotkey]
+      if item and not item.isItemEmpty then
+        return item.containerInfo
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemQuestInfo = function(bagid, slotid)
+      local slotkey = bagid .. "_" .. slotid
+      local item = dumpItems[slotkey]
+      if item and not item.isItemEmpty then
+        return item.questInfo
+      end
+      return nil
+    end
+
+    _G.C_Item.GetItemInfo = function(itemID)
+      for _, item in pairs(dumpItems) do
+        if item.containerInfo and item.containerInfo.itemID == itemID then
+          local info = item.itemInfo
+          return info.itemName, info.itemLink, info.itemQuality, info.itemLevel, info.itemMinLevel, info.itemType, info.itemSubType, info.itemStackCount, info.itemEquipLoc, info.itemIcon, info.sellPrice, info.classID, info.subclassID, info.bindType, info.expacID, info.setID, info.isCraftingReagent
+        end
+      end
+      return nil
+    end
+
+    _G.C_Item.GetDetailedItemLevelInfo = function(itemID)
+      for _, item in pairs(dumpItems) do
+        if item.containerInfo and item.containerInfo.itemID == itemID then
+          local info = item.itemInfo
+          return info.effectiveIlvl or info.itemLevel, info.isPreview or false, info.baseIlvl or info.itemLevel
+        end
+      end
+      return nil
+    end
+
+    _G.C_Item.GetItemGUID = function(_)
+      return "MockGUID"
+    end
+
+    -- Run the full items:ProcessRefresh pipeline.
+    -- This executes:
+    --   - Phase 2 (Data Farming): Calls items:Harvest() which invokes our mocked C-level container APIs to scan and build physical ItemData.
+    --   - Phase 3 (Virtual Stacks): Clears and resolves parent-child stacks.
+    --   - Phase 4 (Search Indexing): Decoupled rebuild and ngram/fulltext indexing of items.
+    --   - Phase 4.5 (Category & Data Enrichment): Assigns and priorities categories.
+    local ctx = context:New("TestDumpEndToEndRefresh")
+    items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+    -- Restore low-level APIs
+    _G.C_Container.GetContainerNumSlots = origGetContainerNumSlots
+    _G.C_Container.GetContainerItemID = origGetContainerItemID
+    _G.C_Container.GetContainerItemLink = origGetContainerItemLink
+    _G.C_Container.GetContainerItemInfo = origGetContainerItemInfo
+    _G.C_Container.GetContainerItemQuestInfo = origGetContainerItemQuestInfo
+    _G.C_Item.GetItemInfo = origGetItemInfo
+    _G.C_Item.GetDetailedItemLevelInfo = origGetDetailedItemLevelInfo
+    _G.C_Item.GetItemGUID = origGetItemGUID
+
+    -- Assert results of the end-to-end refresh pass
+    local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+    assert.is_not_nil(slotInfo)
+    assert.is_not_nil(slotInfo.itemsBySlotKey)
+
+    -- Verify specific item details from the dump are intact
+    -- Item: Ruia's Musings, Part 2 (itemID: 265819)
+    local item1 = slotInfo.itemsBySlotKey["1_25"]
+    assert.is_not_nil(item1)
+    assert.are.equal("Ruia's Musings, Part 2", item1.itemInfo.itemName)
+    assert.are.equal(265819, item1.itemInfo.itemID)
+    assert.are.equal("Midnight - Other", item1.itemInfo.category)
+
+    -- Item: Light's Preservation (itemID: 241287)
+    local item2 = slotInfo.itemsBySlotKey["1_3"]
+    assert.is_not_nil(item2)
+    assert.are.equal("Light's Preservation", item2.itemInfo.itemName)
+    assert.are.equal(241287, item2.itemInfo.itemID)
+    assert.are.equal("Midnight - Potions", item2.itemInfo.category)
 
     -- Ensure empty slots are also handled cleanly
     local emptySlot = slotInfo.itemsBySlotKey["5_25"]
