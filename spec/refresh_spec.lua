@@ -173,4 +173,30 @@ describe("Refresh Module", function()
     assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, bank = true })
     addon.isRetail = true -- reset
   end)
+
+  it("should register bags/SortBackpack message and trigger sorting", function()
+    refresh:OnEnable()
+    spy.on(refresh, "RequestUpdate")
+    events:SendMessage("bags/SortBackpack")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true })
+  end)
+
+  it("should invoke C_Container.SortBags on Retail or SortBags on Classic when sorting", function()
+    _G.C_Container = _G.C_Container or {}
+    _G.C_Container.SortBags = function() end
+    _G.SortBags = function() end
+
+    spy.on(_G.C_Container, "SortBags")
+    spy.on(_G, "SortBags")
+
+    addon.isRetail = true
+    refresh:RequestUpdate({ sort = true })
+    assert.spy(_G.C_Container.SortBags).was.called(1)
+    assert.spy(_G.SortBags).was_not.called()
+
+    addon.isRetail = false
+    refresh:RequestUpdate({ sort = true })
+    assert.spy(_G.SortBags).was.called(1)
+    addon.isRetail = true -- reset
+  end)
 end)

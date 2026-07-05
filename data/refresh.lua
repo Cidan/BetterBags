@@ -96,6 +96,14 @@ function refresh:RequestUpdate(request)
   if request.backpack then
     items:RefreshBackpack(ctx)
   end
+
+  if request.sort then
+    if addon.isRetail and C_Container and C_Container.SortBags then
+      C_Container.SortBags()
+    elseif _G.SortBags then
+      _G.SortBags()
+    end
+  end
 end
 
 function refresh:OnEnable()
@@ -131,6 +139,9 @@ function refresh:OnEnable()
   end)
   events:RegisterMessage('bags/RefreshBank', function()
     self:RequestUpdate({ bank = true })
+  end)
+  events:RegisterMessage('bags/SortBackpack', function()
+    self:RequestUpdate({ sort = true })
   end)
 
   events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
