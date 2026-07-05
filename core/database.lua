@@ -1457,4 +1457,16 @@ function DB:ResetCurrentProfile()
   return true, "Profile reset to defaults"
 end
 
+--- Get the saved backpack dump
+---@return table
+function DB:GetDebugBackpackDump()
+  return DB.data.profile.debugBackpackDump or {}
+end
+
+--- Save a backpack dump
+---@param dump table
+function DB:SetDebugBackpackDump(dump)
+  DB.data.profile.debugBackpackDump = dump
+end
+
 DB:Enable()

@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -27,6 +30,42 @@ local itemBrowser = addon:GetModule('ItemBrowser')
 ---@field tabFrame Tab
 ---@field contentFrames any[]
 local debugWindow = addon:NewModule('DebugWindow')
+
+local function sanitizeForDump(val, seen)
+  seen = seen or {}
+  local t = type(val)
+  if t == "function" or t == "userdata" or t == "thread" then
+    return nil
+  end
+  if t ~= "table" then
+    return val
+  end
+
+  -- Detect UIObject or frame
+  if val[0] and type(val[0]) == "userdata" then
+    return nil
+  end
+
+  if seen[val] then
+    return seen[val]
+  end
+
+  local copy = {}
+  seen[val] = copy
+
+  for k, v in pairs(val) do
+    local sk = sanitizeForDump(k, seen)
+    local sv = sanitizeForDump(v, seen)
+    if sk ~= nil and sv ~= nil then
+      copy[sk] = sv
+    end
+  end
+
+  -- Strip metatables as they can't be saved
+  setmetatable(copy, nil)
+
+  return copy
+end
 
 
 ---@param button BetterBagsDebugListButton
@@ -68,15 +107,17 @@ function debugWindow:Create(ctx)
     return false
   end)
 
-  -- Add default "Debug Log" tab and new "Items" tab
+  -- Add default "Debug Log", "Items", and "Dump" tabs
   self.tabFrame:AddTab(ctx, "Debug Log")
   self.tabFrame:AddTab(ctx, "Items")
+  self.tabFrame:AddTab(ctx, "Dump")
   self.tabFrame:SetTabByIndex(ctx, 1)
 
   -- Create content frames for each tab
   self.contentFrames = {}
   self.contentFrames[1] = self:CreateDebugLogFrame()
   self.contentFrames[2] = self:CreateItemsFrame()
+  self.contentFrames[3] = self:CreateDumpFrame()
 
   -- Use existing CloseButton from template if available, otherwise create one
   local closeButton = self.frame.CloseButton or CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
@@ -158,13 +199,83 @@ function debugWindow:CreateItemsFrame()
   return frame
 end
 
+---CreateDumpFrame creates the frame for the Dump tab.
+---@return Frame
+function debugWindow:CreateDumpFrame()
+  local f = CreateFrame("Frame", nil, self.frame)
+  f:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5, -25)
+  f:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -5, 5)
+  f:Hide()
+
+  -- Add title and description
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  title:SetPoint("TOPLEFT", 20, -20)
+  title:SetText("Debug Data Dump")
+
+  local desc = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+  desc:SetWidth(760)
+  desc:SetJustifyH("LEFT")
+  desc:SetText("Dump your current full backpack item data to saved variables. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
+
+  -- Status Label
+  local status = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  status:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -30)
+
+  -- Function to update status text
+  function f.Update()
+    local dump = database:GetDebugBackpackDump()
+    local count = 0
+    if dump then
+      for _ in pairs(dump) do
+        count = count + 1
+      end
+    end
+    status:SetText(format("Current Dumped Items Count: %d", count))
+  end
+
+  -- Dump Button
+  local dumpButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  dumpButton:SetSize(200, 35)
+  dumpButton:SetPoint("TOPLEFT", status, "BOTTOMLEFT", 0, -20)
+  dumpButton:SetText("Dump Backpack Items")
+
+  addon.SetScript(dumpButton, "OnClick", function(_ctx)
+    local itemsModule = addon:GetModule("Items")
+    local slotInfo = itemsModule.slotInfo and itemsModule.slotInfo[const.BAG_KIND.BACKPACK]
+    local backpackItems = slotInfo and slotInfo.itemsBySlotKey
+    if backpackItems then
+      local sanitized = sanitizeForDump(backpackItems)
+      database:SetDebugBackpackDump(sanitized)
+      f.Update()
+      print("BetterBags: Dumped backpack items to saved variables!")
+    else
+      print("BetterBags Error: Backpack items not loaded or unavailable!")
+    end
+  end)
+
+  -- Clear Button
+  local clearButton = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  clearButton:SetSize(200, 35)
+  clearButton:SetPoint("LEFT", dumpButton, "RIGHT", 20, 0)
+  clearButton:SetText("Clear Dumped Data")
+
+  addon.SetScript(clearButton, "OnClick", function(_ctx)
+    database:SetDebugBackpackDump({})
+    f.Update()
+    print("BetterBags: Cleared dumped backpack items!")
+  end)
+
+  return f
+end
+
 ---SwitchTab switches to the specified tab.
 ---@param tabId number
 function debugWindow:SwitchTab(tabId)
   for id, frame in pairs(self.contentFrames) do
     if id == tabId then
       frame:Show()
-      if id == 2 then
+      if id == 2 or id == 3 then
         frame:Update()
       end
     else

@@ -1204,4 +1204,21 @@ describe("Database", function()
       assert.is_not_nil(counts)
     end)
   end)
+
+  -- ─── Debug backpack dump ───────────────────────────────────────────────────────
+
+  describe("debug backpack dump", function()
+    it("GetDebugBackpackDump returns empty table by default", function()
+      local dump = DB:GetDebugBackpackDump()
+      assert.is_not_nil(dump)
+      assert.same({}, dump)
+    end)
+
+    it("SetDebugBackpackDump stores the given dump", function()
+      local myDump = { { slotKey = "0_1", itemID = 12345 } }
+      DB:SetDebugBackpackDump(myDump)
+      local dump = DB:GetDebugBackpackDump()
+      assert.are.same(myDump, dump)
+    end)
+  end)
 end)
