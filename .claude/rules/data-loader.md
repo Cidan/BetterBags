@@ -46,11 +46,10 @@ To achieve sub-millisecond local tab swaps, tab switching operations are complet
 - **Background Loop Bypass:** The background rendering loop that typically keeps inactive views in sync is entirely gated by `not ctx:GetBool("tab_switch")`. This completely skips background view rendering during local tab switches, preventing massive CPU spikes.
 - **Instant Swap:** Instead, visibility of the hidden and active views is toggled synchronously, scale and search states are adjusted, `self:OnResize()` is called, and the callback is invoked instantly. This avoids any sorting or layout calculation overhead entirely.
 
-### 6. Targeted Background Updates (Changeset Gating)
-When a real data update occurs (such as a database or server item change), every background/inactive tab view is rendered. To ensure background renders are computationally cheap, they are gated by tab-specific changeset changes.
-- **Rule:** Background views must only execute heavy layout, section sorting, and cell placement logic if item data belonging specifically to their tab has actually changed.
-- **Gating Mechanism:** Inside `GridView` and `BagView` rendering functions, if the view is a hidden background view (where `bag.GetCurrentTabID` is defined and `view.tabID ~= bag:GetCurrentTabID()`) and no global layout change is forced (i.e. not `redraw`, not `wipe`, and not `isNew`), the view filters the global changeset for its tab using `FilterChangesetForTab()`.
-- **Early-Exit:** If the tab-specific added, removed, and changed lists are all empty, the view early-exits instantly by invoking the callback and returning. This prevents wasting CPU sorting and laying out hidden tabs that are already in a consistent state.
+### 6. Idempotent Functional Rendering (No Changeset Gating)
+To enforce strict functional isolation and eliminate UI state leakage or out-of-order rendering bugs, changeset-gating and background rendering optimizations have been completely removed.
+- **Rule:** Every rendering pass for any view (whether active or background) must be 100% functional, idempotent, and built completely from scratch using the provided `slotInfo` dataset state.
+- **Benefits:** Eliminating incremental delta updates guarantees that the view state remains mathematically consistent with the underlying data model, preventing the visual accumulation of ghost or out-of-sync frames.
 
 ### 7. Phase 8: Page Placement (Clean-Sweep Layout and Column-Packing)
 To achieve sub-millisecond redraw performance while ensuring that the grid layout remains perfectly aligned, visually fluid, and free of overlap/gaps:
@@ -70,8 +69,8 @@ To eliminate JIT (just-in-time) database and search engine queries during UI lay
   - Update `item.itemInfo.category` and optionally refresh the search index's category with `search:UpdateCategoryIndex(currentItem, oldCategory)`.
 - **Obsolete Views:** Obsolete `ONE_BAG` (value 1) and `LIST` (value 3) views have been completely removed from constants and database defaults. Existing users' databases are automatically migrated to `SECTION_GRID` (Category View) via `DB:Migrate()`.
 
-### 9. Unified Wipe-Phase to Prevent Section Double Release
+### 9. Isolated Wipe-On-Render to Prevent Pool Contamination and Anchor Crashes
 To permanently prevent ObjectPool contamination, cell leakage, and fatal `Cannot anchor to itself` crashes during layout recalculations:
-- **Rule:** Decouple the view `Wipe` phase from the individual view `Render` phase. All instantiated persistent `tabViews` must be completely wiped first, returning all pooled frames to their global stacks, before any rendering logic is executed in the current frame.
-- **Mechanism:** At the very start of `bagProto:Draw()`, immediately after bypassing local `tab_switch` toggles, iterate through all views in `self.tabViews` and execute `tView:Wipe(ctx)`.
-- **State Transition (`isNew` flag):** Inside the local `Wipe(view, ctx)` implementation, explicitly set `view.isNew = true`. This flags the view as completely empty and wiped, guaranteeing that the next `Render` pass correctly bypasses changeset-gating optimization checks and draws the full layout, setting `view.isNew = false` when complete.
+- **Rule:** Every rendering pass for a view is functionally isolated and begins with a complete, synchronous wipe of its own frames, returning all of its pooled elements back to the global stacks before any rendering/population occurs.
+- **Mechanism:** The very first line of each view's `Render` method (e.g. `GridView` or `BagView`) executes `view:Wipe(ctx)`.
+- **State Transition (`isNew` flag):** Inside `Wipe(view, ctx)`, explicitly set `view.isNew = true` to flag the view as completely empty. At the beginning of the `Render` method (right after wiping), set `view.isNew = false` to indicate the view is populated and complete. This guarantees 100% clean-slate rendering on every single frame update.

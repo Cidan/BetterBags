@@ -62,6 +62,11 @@ function gridProto:AddCellToLastColumn(id, cell)
   assert(id, 'id is required')
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
+  for _, existingCell in ipairs(self.cells) do
+    if existingCell == cell then
+      error("Duplicate cell detected: Cell is already in the grid under a different ID")
+    end
+  end
   local position = 0
   for i, _ in ipairs(self.cells) do
     if i % self.maxCellWidth == self.maxCellWidth - 1 then
@@ -81,6 +86,11 @@ function gridProto:AddCell(id, cell)
   assert(cell, 'cell is required')
   assert(cell.frame, 'the added cell must have a frame')
   if self.idToCell[id] ~= nil then return end
+  for _, existingCell in ipairs(self.cells) do
+    if existingCell == cell then
+      error("Duplicate cell detected: Cell is already in the grid under a different ID")
+    end
+  end
   table.insert(self.cells, cell)
   self.idToCell[id] = cell
   self.cellToID[cell] = id

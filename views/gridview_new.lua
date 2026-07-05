@@ -48,11 +48,13 @@ local function Wipe(view, ctx)
     view.freeReagentSlot = nil
   end
   view.itemCount = 0
-  for _, section in pairs(view.sections) do
+  local k, section = next(view.sections)
+  while k do
+    view.sections[k] = nil
     section:ReleaseAllCells(ctx)
     section:Release(ctx)
+    k, section = next(view.sections)
   end
-  wipe(view.sections)
   wipe(view.itemsByBagAndSlot)
   view.sortRequired = true
   view.isNew = true
@@ -119,57 +121,16 @@ local function ItemBelongsToTab(view, bagKind, item)
   return true
 end
 
-local function FilterChangesetForTab(view, bagKind, added, removed, changed)
-  local tabAdded, tabRemoved, tabChanged = {}, {}, {}
-
-  for _, item in pairs(added) do
-    if ItemBelongsToTab(view, bagKind, item) then
-      table.insert(tabAdded, item)
-    end
-  end
-
-  for _, item in pairs(removed) do
-    if view.itemsByBagAndSlot[item.slotkey] then
-      table.insert(tabRemoved, item)
-    end
-  end
-
-  for _, item in pairs(changed) do
-    local belongsNow = ItemBelongsToTab(view, bagKind, item)
-    local hadButton = (view.itemsByBagAndSlot[item.slotkey] ~= nil)
-
-    if belongsNow and not hadButton then
-      table.insert(tabAdded, item)
-    elseif not belongsNow and hadButton then
-      table.insert(tabRemoved, item)
-    elseif belongsNow and hadButton then
-      table.insert(tabChanged, item)
-    end
-  end
-
-  return tabAdded, tabRemoved, tabChanged
-end
-
 ---@param view View
 ---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 local function GridView(view, ctx, bag, slotInfo, callback)
-  local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
-
-  -- Tab switch or background rendering changeset-gating optimization
-  local added, removed, changed = slotInfo:GetChangeset()
-  if bag.GetCurrentTabID and view.tabID ~= bag:GetCurrentTabID() and not ctx:GetBool('redraw') and not view.isNew and not ctx:GetBool('wipe') then
-    local tabAdded, tabRemoved, tabChanged = FilterChangesetForTab(view, bag.kind, added, removed, changed)
-    if #tabAdded == 0 and #tabRemoved == 0 and #tabChanged == 0 then
-      if callback then callback() end
-      return
-    end
-  end
-
-  -- Wipe is already handled in the unified wipe phase!
+  view:Wipe(ctx)
   view.isNew = false
+
+  local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
   -- Extract all items that belong to the active tab ID
   local currentItems = {}
@@ -251,21 +212,15 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     end
   end
 
-  -- Draw active sections and release empty ones
+  -- Draw active sections
   for sectionName, section in pairs(view:GetAllSections()) do
     if sectionName ~= L:G("Free Space") then
-      if section:GetCellCount() == 0 then
-        view:RemoveSection(sectionName)
-        section:ReleaseAllCells(ctx)
-        section:Release(ctx)
+      if sectionName == L:G("Recent Items") then
+        section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
       else
-        if sectionName == L:G("Recent Items") then
-          section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-        else
-          section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-        end
-        section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
       end
+      section:Draw(bag.kind, database:GetBagView(bag.kind), false)
     end
   end
 

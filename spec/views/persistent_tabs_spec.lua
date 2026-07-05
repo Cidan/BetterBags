@@ -890,7 +890,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     groups.CategoryBelongsToGroup = old_CategoryBelongsToGroup
   end)
 
-  it("should call Wipe on all instantiated tab views first in bag:Draw() before any Render() calls", function()
+  it("should not centrally call Wipe on all views in bag:Draw() but instead wipe when rendering", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
     local frame = CreateFrame("Frame")
@@ -913,15 +913,11 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     local view1 = bag:GetViewForTab(ctx, 1)
     local view2 = bag:GetViewForTab(ctx, 2)
 
-    local render_order = {}
-    local wipe_order = {}
+    local wipe_called = {}
 
-    -- Track the sequence of Wipe vs Render
-    view1.WipeHandler = function() table.insert(wipe_order, 1) end
-    view2.WipeHandler = function() table.insert(wipe_order, 2) end
-
-    view1.Render = function(self, ...) table.insert(render_order, 1); select(4, ...)(...) end
-    view2.Render = function(self, ...) table.insert(render_order, 2); select(4, ...)(...) end
+    -- Track the sequence of Wipe
+    view1.WipeHandler = function() table.insert(wipe_called, 1) end
+    view2.WipeHandler = function() table.insert(wipe_called, 2) end
 
     local mockSlotInfo = {
       GetChangeset = function() return {}, {}, {} end,
@@ -935,10 +931,9 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     bag:Draw(ctx, mockSlotInfo, function() end)
 
-    -- Assert both views were wiped
-    assert.equals(2, #wipe_order)
-    -- Assert that both Wipes happened BEFORE any Renders
-    assert.equals(2, #render_order)
+    -- Under the new pure functional design, each rendered view (active view1 and background view2)
+    -- will call Wipe synchronously during their Render call.
+    assert.equals(2, #wipe_called)
   end)
 
   it("should set view.isNew to true on Wipe() for both GridView and BagView", function()
