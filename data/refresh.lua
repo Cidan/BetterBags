@@ -62,6 +62,18 @@ end
 
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
+  if InCombatLockdown() then
+    if not self.pendingRequest then
+      self.pendingRequest = {}
+    end
+    for k, v in pairs(request) do
+      if v then
+        self.pendingRequest[k] = true
+      end
+    end
+    return
+  end
+
   local ctx = context:New('BagUpdate')
 
   if request.wipe then
@@ -111,10 +123,37 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/RefreshAll', function()
     self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
+  events:RegisterMessage('bags/FullRefreshAll', function()
+    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+  end)
   events:RegisterMessage('bags/RefreshBackpack', function()
     self:RequestUpdate({ backpack = true })
   end)
   events:RegisterMessage('bags/RefreshBank', function()
     self:RequestUpdate({ bank = true })
   end)
+
+  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
+    if self.pendingRequest then
+      local req = self.pendingRequest
+      self.pendingRequest = nil
+      self:RequestUpdate(req)
+    end
+  end)
+
+  events:RegisterEvent('BAG_CONTAINER_UPDATE', function()
+    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+  end)
+
+  events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
+    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+  end)
+
+  if not addon.isRetail then
+    events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+      self:RequestUpdate({ wipe = true, bank = true })
+    end)
+  end
+
+  self:RequestUpdate({ wipe = true, backpack = true, bank = true })
 end

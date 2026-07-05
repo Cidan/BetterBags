@@ -99,4 +99,78 @@ describe("Refresh Module", function()
     assert.is_true(calledArgs[2].backpack)
     assert.is_false(calledArgs[2].bank)
   end)
+
+  it("should trigger a full update on OnEnable (Startup Refresh Gap)", function()
+    spy.on(refresh, "RequestUpdate")
+    refresh:OnEnable()
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+  end)
+
+  it("should register bags/FullRefreshAll message and trigger full update", function()
+    refresh:OnEnable()
+    spy.on(refresh, "RequestUpdate")
+    events:SendMessage("bags/FullRefreshAll")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+  end)
+
+  it("should handle combat gating and queue requests", function()
+    -- Set to combat
+    _G.InCombatLockdown = function() return true end
+    addon.atBank = true
+    addon.Bags = { Bank = { bankTab = 1 } }
+    spy.on(items, "RefreshBackpack")
+    spy.on(items, "RefreshBank")
+
+    refresh:RequestUpdate({ backpack = true })
+    assert.spy(items.RefreshBackpack).was_not.called()
+    assert.is_not_nil(refresh.pendingRequest)
+    assert.is_true(refresh.pendingRequest.backpack)
+
+    refresh:RequestUpdate({ bank = true })
+    assert.spy(items.RefreshBank).was_not.called()
+    assert.is_true(refresh.pendingRequest.bank)
+
+    refresh:OnEnable() -- registers PLAYER_REGEN_ENABLED
+
+    -- Exit combat
+    _G.InCombatLockdown = function() return false end
+
+    local eventMap = events._eventMap
+    assert.is_not_nil(eventMap["PLAYER_REGEN_ENABLED"])
+
+    eventMap["PLAYER_REGEN_ENABLED"].fn("PLAYER_REGEN_ENABLED")
+
+    assert.spy(items.RefreshBackpack).was.called(1)
+    assert.spy(items.RefreshBank).was.called(1)
+    assert.is_nil(refresh.pendingRequest)
+  end)
+
+  it("should trigger a full update on BAG_CONTAINER_UPDATE", function()
+    refresh:OnEnable()
+    spy.on(refresh, "RequestUpdate")
+    local eventMap = events._eventMap
+    assert.is_not_nil(eventMap["BAG_CONTAINER_UPDATE"])
+    eventMap["BAG_CONTAINER_UPDATE"].fn("BAG_CONTAINER_UPDATE")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+  end)
+
+  it("should trigger a full update on EQUIPMENT_SETS_CHANGED", function()
+    refresh:OnEnable()
+    spy.on(refresh, "RequestUpdate")
+    local eventMap = events._eventMap
+    assert.is_not_nil(eventMap["EQUIPMENT_SETS_CHANGED"])
+    eventMap["EQUIPMENT_SETS_CHANGED"].fn("EQUIPMENT_SETS_CHANGED")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+  end)
+
+  it("should trigger a bank update on PLAYERBANKSLOTS_CHANGED for non-retail", function()
+    addon.isRetail = false
+    refresh:OnEnable()
+    spy.on(refresh, "RequestUpdate")
+    local eventMap = events._eventMap
+    assert.is_not_nil(eventMap["PLAYERBANKSLOTS_CHANGED"])
+    eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, bank = true })
+    addon.isRetail = true -- reset
+  end)
 end)

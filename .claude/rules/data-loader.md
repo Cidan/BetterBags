@@ -28,6 +28,9 @@ To prevent visual flickers, blank slots, and lag-induced loading glitches, UI re
 - `ContinueOnLoad` executes the callbacks.
 - The `Refresh` module receives the callback and immediately requests draws/refreshes instantly and synchronously with a completely primed cache, allowing the entire pipeline to run 100% synchronously and instantly.
 - **Rule:** The `Refresh` module is completely stateless. It does not maintain arbitrary timer debounces (`C_Timer.NewTimer`), pending wipe flags, or stateful flags like `pendingBackpack` or `pendingBank`. Redraw requests trigger synchronously at the natural `BAG_UPDATE_DELAYED` frame boundary. Data sweeps can execute perfectly at any time, including during combat, as data-harvesting is fully decoupled from secure layout frames.
+- **Combat Gating:** To prevent Blizzard "Action blocked" taint errors during active combat, any redraws requested while `InCombatLockdown()` is true must be deferred. The parameters are safely merged and queued into `self.pendingRequest`, then fully processed and cleared when `PLAYER_REGEN_ENABLED` fires.
+- **Initial Startup Refresh:** To prevent bags from appearing completely blank on initial login or UI reload, `Refresh:OnEnable()` must explicitly trigger an initial full-cache wipe update (`wipe = true, backpack = true, bank = true`) once all modules are active.
+- **Core Invalidation Events:** Standard events (`BAG_CONTAINER_UPDATE`, `EQUIPMENT_SETS_CHANGED`) and Classic-specific events (`PLAYERBANKSLOTS_CHANGED`) must be registered to trigger target cache-wipe redraws, ensuring perfect visual synchronization across all retail and classic environments.
 
 ### 4. Unified Retail Bank Loading and Persistent Tab Filtering
 To support instant, synchronous tab switching with zero visual flickers or loading stutters:
