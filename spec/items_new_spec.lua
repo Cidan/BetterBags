@@ -339,4 +339,49 @@ describe("Items (New Data Farming Engine)", function()
       categories.GetSortedSearchCategories = originalGetSortedSearchCategories
     end)
   end)
+
+  describe("Bug 2: Warbank free space counts by splitting empty slots", function()
+    it("should split emptySlots by bag id and populate emptySlotsByBag", function()
+      addon.isRetail = true
+      const.BANK_BAGS = { [6] = 6, [7] = 7 }
+      const.ACCOUNT_BANK_BAGS = { [13] = 13, [14] = 14 }
+      const.BANK_TAB = { BANK = -1, ACCOUNT_BANK_1 = -3 }
+
+      local originalGetContainerNumFreeSlots = _G.C_Container.GetContainerNumFreeSlots
+      _G.C_Container.GetContainerNumFreeSlots = function(bagid)
+        if bagid == 6 then return 5 end
+        if bagid == 7 then return 3 end
+        if bagid == 13 then return 10 end
+        if bagid == 14 then return 12 end
+        return 0
+      end
+
+      local originalGetItemSubClassInfo = _G.C_Item.GetItemSubClassInfo
+      _G.C_Item.GetItemSubClassInfo = function(class, subclass)
+        return "Bag"
+      end
+
+      local originalGetInventoryItemLink = _G.GetInventoryItemLink
+      _G.GetInventoryItemLink = function(player, invid)
+        return nil -- Fallback to general subclass container 0
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestFreeSlots")
+      items:WipeSlotInfo(const.BAG_KIND.BANK)
+      items:UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BANK]
+      assert.is_not_nil(slotInfo.emptySlotsByBag)
+      assert.are.equal(5, slotInfo.emptySlotsByBag[6].count)
+      assert.are.equal("Bag", slotInfo.emptySlotsByBag[6].name)
+      assert.are.equal(3, slotInfo.emptySlotsByBag[7].count)
+      assert.are.equal(10, slotInfo.emptySlotsByBag[13].count)
+      assert.are.equal(12, slotInfo.emptySlotsByBag[14].count)
+
+      -- Restore mocks
+      _G.C_Container.GetContainerNumFreeSlots = originalGetContainerNumFreeSlots
+      _G.C_Item.GetItemSubClassInfo = originalGetItemSubClassInfo
+      _G.GetInventoryItemLink = originalGetInventoryItemLink
+    end)
+  end)
 end)

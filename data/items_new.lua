@@ -163,21 +163,32 @@ function items:UpdateFreeSlots(ctx, kind)
   local baglist
   local tab = ctx:Get("bagid")
   if kind == const.BAG_KIND.BANK then
-    local blizzardTab = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
-    if blizzardTab and addon.isRetail then
-      baglist = { [blizzardTab] = blizzardTab }
-    elseif tab == const.BANK_TAB.BANK then
-      baglist = const.BANK_BAGS
-    elseif const.ACCOUNT_BANK_BAGS and tab == const.BANK_TAB.ACCOUNT_BANK_1 then
-      baglist = const.ACCOUNT_BANK_BAGS
+    if addon.isRetail then
+      baglist = {}
+      for _, bag in pairs(const.BANK_BAGS) do
+        baglist[bag] = bag
+      end
+      if const.ACCOUNT_BANK_BAGS then
+        for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+          baglist[bag] = bag
+        end
+      end
     else
-      baglist = { [tab] = tab }
+      local blizzardTab = addon.Bags and addon.Bags.Bank and addon.Bags.Bank.blizzardBankTab
+      if tab == const.BANK_TAB.BANK then
+        baglist = const.BANK_BAGS
+      elseif const.ACCOUNT_BANK_BAGS and tab == const.BANK_TAB.ACCOUNT_BANK_1 then
+        baglist = const.ACCOUNT_BANK_BAGS
+      else
+        baglist = { [tab] = tab }
+      end
     end
   else
     baglist = const.BACKPACK_BAGS
   end
 
   self.slotInfo[kind].emptySlots = {}
+  self.slotInfo[kind].emptySlotsByBag = {}
 
   for bagid in pairs(baglist) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid) or 0
@@ -196,6 +207,7 @@ function items:UpdateFreeSlots(ctx, kind)
     if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
       self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] or 0
       self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] + freeSlots
+      self.slotInfo[kind].emptySlotsByBag[bagid] = { name = name, count = freeSlots }
     end
   end
 end

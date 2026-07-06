@@ -408,4 +408,80 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     assert.is_true(rendered)
     assert.is_not_nil(view.sections["#1: Backpack"])
   end)
+
+  it("should restrict retail bank items mathematically to the viewed bank type in SECTION_ALL_BAGS view for Bug 3", function()
+    addon.isRetail = true
+    const.ACCOUNT_BANK_BAGS = { [13] = 13, [14] = 14 }
+    const.BANK_TAB = { BANK = -1 }
+
+    local parent = CreateFrame("Frame")
+    local view = views:NewBagView(parent, const.BAG_KIND.BANK)
+    view.tabID = const.BANK_TAB.BANK -- character bank
+    local bag = { kind = const.BAG_KIND.BANK, frame = CreateFrame("Frame") }
+
+    items.GetItemDataFromSlotKey = function(self, slotkey)
+      return { slotkey = slotkey }
+    end
+
+    _G.C_Container = _G.C_Container or {}
+    _G.C_Container.GetBagName = function(bagid)
+      if bagid == -1 then return "Character Bank" end
+      return "Warbank Tab " .. (bagid - 12)
+    end
+
+    local itemCharacter = {
+      bagid = -1,
+      slotid = 1,
+      slotkey = "-1_1",
+      isItemEmpty = false,
+      itemInfo = { category = "Default", itemID = 11 },
+    }
+    local itemWarbank1 = {
+      bagid = 13,
+      slotid = 1,
+      slotkey = "13_1",
+      isItemEmpty = false,
+      itemInfo = { category = "Default", itemID = 12 },
+    }
+
+    local mockSlotInfo = {
+      GetChangeset = function() return { itemCharacter, itemWarbank1 }, {}, {} end,
+      GetCurrentItems = function() return { ["-1_1"] = itemCharacter, ["13_1"] = itemWarbank1 } end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      emptySlotByBagAndSlot = {},
+      stacks = {
+        GetStackInfo = function() return nil end
+      }
+    }
+
+    local rendered = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
+
+    assert.is_true(rendered)
+    -- Under character bank tabID = -1, ONLY character bank section should be rendered!
+    assert.is_not_nil(view.sections["#1: Bank"])
+    assert.is_nil(view.sections["#9: Warbank Tab 1"])
+
+    -- Now let's switch tabID to 13 (Warbank Tab 1) and render again
+    local view2 = views:NewBagView(parent, const.BAG_KIND.BANK)
+    view2.tabID = 13
+    rendered = false
+    view2:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
+
+    assert.is_true(rendered)
+    -- Under Warbank tabID = 13, ONLY warbank tab 13 should be rendered!
+    assert.is_nil(view2.sections["#1: Bank"])
+    assert.is_not_nil(view2.sections["#9: Warbank Tab 1"])
+
+    -- Reset to clean up state
+    addon.isRetail = nil
+    const.ACCOUNT_BANK_BAGS = nil
+    const.BANK_TAB = nil
+  end)
 end)
