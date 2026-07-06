@@ -113,3 +113,13 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ### One Unique Parent Frame Per Item Button
 **Problem**: If multiple item buttons share the same parent frame, layout engines that position the parent frame (e.g. setting `item.frame:SetPoint(...)`) will stack all elements on top of each other and hide/wipe them together.
 **Solution**: Create a dedicated, unique unsecure parent frame per physical item button, configure it with the correct ID/attributes, and implement fallback methods (like `IsCombinedBagContainer()`) natively on that parent frame to safely bypass Blizzard's native checks without secure attribute taint.
+
+## Unified Global ScrollBox Architecture (Zero-Reparenting Secure Frame Design)
+
+**Problem**: WoW secure item buttons and empty slot buttons are bound to unique physical slot keys and cannot be reparented or dynamically moved between views during active combat without causing fatal "Action blocked" taint errors. Storing scrollboxes inside individual tab views requires secure buttons to be reparented on tab switches.
+**Solution**: Decouple the scrolling container from individual tab views.
+1. Implement exactly **one single global `WowScrollBox` and scrollbar** at the Bag window level (`frames/bag.lua`).
+2. Statically stack three containers vertically inside the global scroll child: `headerContainer` (Recent Items), `tabContainer` (active Tab View), and `footerContainer` (Free Space).
+3. Tab views become perfectly dumb and non-scrollable, rendering their layout grids directly into `tabContainer` via `grid:Create(parent, false)` and `SetAllPoints(parent)`.
+4. Switch tabs by simply toggling visibility of the layout grids in `tabContainer` with zero secure reparenting or combat taint.
+**Key Files**: `frames/bag.lua`, `frames/grid.lua`, `views/gridview_new.lua`, `views/bagview_new.lua`.

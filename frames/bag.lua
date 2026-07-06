@@ -43,6 +43,9 @@ local categories = addon:GetModule("Categories")
 ---@class LibWindow-1.1: AceAddon
 local Window = LibStub("LibWindow-1.1")
 
+---@class ItemFrame: AceModule
+local itemFrame = addon:GetModule("ItemFrame")
+
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule("SearchBox")
 
@@ -159,6 +162,7 @@ end
 -- Wipe will wipe the contents of the bag and release all cells.
 ---@param ctx Context
 function bagFrame.bagProto:Wipe(ctx)
+	self:WipeGlobalSections(ctx)
 	if self.currentView then
 		self.currentView:Wipe(ctx)
 	end
@@ -231,12 +235,204 @@ function bagFrame.bagProto:GetViewForTab(_, tabID)
 	end
 	if not self.tabViews[viewKey] then
 		if layout == const.BAG_VIEW.SECTION_GRID then
-			self.tabViews[viewKey] = views:NewGrid(self.frame, self.kind, tabID)
+			self.tabViews[viewKey] = views:NewGrid(self.tabContainer or self.frame, self.kind, tabID)
 		else
-			self.tabViews[viewKey] = views:NewBagView(self.frame, self.kind, tabID)
+			self.tabViews[viewKey] = views:NewBagView(self.tabContainer or self.frame, self.kind, tabID)
 		end
 	end
 	return self.tabViews[viewKey]
+end
+
+---@param slotkey string
+---@return number, number
+function bagFrame.bagProto:ParseSlotKey(slotkey)
+	local bagid, slotid = strsplit('_', slotkey)
+	return tonumber(bagid), tonumber(slotid)
+end
+
+---@param ctx Context
+---@param slotkey string
+---@return Item
+function bagFrame.bagProto:GetOrCreateGlobalItemButton(ctx, slotkey)
+	self.itemFrames = self.itemFrames or {}
+	local item = itemFrame:GetButton(ctx, slotkey)
+	tinsert(self.itemFrames, item)
+	return item
+end
+
+---@param ctx Context
+function bagFrame.bagProto:WipeGlobalSections(ctx)
+	if self.itemFrames then
+		for _, item in pairs(self.itemFrames) do
+			item:Release(ctx)
+		end
+		wipe(self.itemFrames)
+	end
+	if self.freeSlot then
+		self.freeSlot:Release(ctx)
+		self.freeSlot = nil
+	end
+	if self.freeReagentSlot then
+		self.freeReagentSlot:Release(ctx)
+		self.freeReagentSlot = nil
+	end
+	if self.globalSections then
+		local k, section = next(self.globalSections)
+		while k do
+			self.globalSections[k] = nil
+			section:ReleaseAllCells(ctx)
+			section:Release(ctx)
+			k, section = next(self.globalSections)
+		end
+	end
+end
+
+function bagFrame.bagProto:ShowScrollBar()
+	if not self.scrollBar then return end
+	self.scrollBar:SetAttribute("nodeignore", false)
+	self.scrollBar:SetAlpha(1)
+	self.scrollBar:Show()
+end
+
+function bagFrame.bagProto:HideScrollBar()
+	if not self.scrollBar then return end
+	self.scrollBar:Hide()
+	self.scrollBar:SetAlpha(0)
+	self.scrollBar:SetAttribute("nodeignore", true)
+end
+
+---@param w number
+---@param h number
+function bagFrame.bagProto:UpdateBagBounds(w, h)
+	-- Set size and scrollbars
+	if w < 260 then w = 260 end
+	if self.tabs and w < self.tabs.width then
+		w = self.tabs.width
+	end
+	if self.slots and self.slots:IsShown() then
+		local minW = self.slots.frame:GetWidth()
+			- const.OFFSETS.BAG_LEFT_INSET
+			+ const.OFFSETS.BAG_RIGHT_INSET
+			- const.OFFSETS.SCROLLBAR_WIDTH
+		if w < minW then
+			w = minW
+		end
+	end
+	if h < 100 then h = 100 end
+	if database:GetInBagSearch() then
+		h = h + 20
+	end
+
+	local bagHeight = h +
+		const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
+		const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
+
+	local maxHeight = UIParent:GetHeight() * 0.90
+	local bagWidth = w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH
+	if bagHeight > maxHeight then
+		bagHeight = maxHeight
+		self:ShowScrollBar()
+	else
+		self:HideScrollBar()
+	end
+
+	self.frame:SetWidth(bagWidth)
+	self.frame:SetHeight(bagHeight)
+
+	if self.scrollBox then
+		if database:GetInBagSearch() then
+			self.scrollBox:SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET - 20)
+		else
+			self.scrollBox:SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+		end
+	end
+end
+
+---@param ctx Context
+---@param slotInfo SlotInfo
+---@return number headerW, number headerH, number footerW, number footerH
+function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
+	self:WipeGlobalSections(ctx)
+
+	if not self.headerContainer then
+		return 0, 0, 0, 0
+	end
+
+	local currentView = database:GetBagView(self.kind)
+	local sizeInfo = database:GetBagSizeInfo(self.kind, currentView)
+
+	-- 1. Scan and draw Recent Items inside self.headerContainer
+	local recentItems = {}
+	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+		local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
+		for _, item in pairs(itemsGetter(slotInfo)) do
+			if not item.isItemEmpty and item.itemInfo and item.itemInfo.category == L:G("Recent Items") then
+				table.insert(recentItems, item)
+			end
+		end
+	end
+
+	local headerW, headerH = 0, 0
+	if #recentItems > 0 then
+		local sectionFrame = addon:GetModule("SectionFrame")
+		local recentSection = sectionFrame:Create(ctx)
+		recentSection.frame:SetParent(self.headerContainer)
+		recentSection.frame:ClearAllPoints()
+		recentSection.frame:SetPoint("TOPLEFT", self.headerContainer, "TOPLEFT", 0, 0)
+		recentSection:SetTitle(L:G("Recent Items"))
+		self.globalSections[L:G("Recent Items")] = recentSection
+
+		recentSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+
+		for _, item in ipairs(recentItems) do
+			local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
+			if itemButton.SetItemFromData then
+				itemButton:SetItemFromData(ctx, item)
+			else
+				itemButton.staticData = item
+				itemButton:SetItem(ctx, item.slotkey)
+			end
+			recentSection:AddCell(item.slotkey, itemButton)
+		end
+		headerW, headerH = recentSection:Draw(self.kind, currentView, false)
+	end
+	self.headerContainer:SetHeight(math.max(1, headerH))
+
+	-- 2. Scan and draw Free Space inside self.footerContainer (except SECTION_ALL_BAGS mode)
+	local footerW, footerH = 0, 0
+	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+		local sectionFrame = addon:GetModule("SectionFrame")
+		local freeSlotsSection = sectionFrame:Create(ctx)
+		freeSlotsSection.frame:SetParent(self.footerContainer)
+		freeSlotsSection.frame:ClearAllPoints()
+		freeSlotsSection.frame:SetPoint("TOPLEFT", self.footerContainer, "TOPLEFT", 0, 0)
+		freeSlotsSection:SetTitle(L:G("Free Space"))
+		self.globalSections[L:G("Free Space")] = freeSlotsSection
+
+		if database:GetShowAllFreeSpace(self.kind) then
+			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
+			for _, item in ipairs(slotInfo.emptySlotsSorted) do
+				local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
+				itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
+				freeSlotsSection:AddCell(item.slotkey, itemButton)
+			end
+			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, true, true)
+		else
+			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
+			for name, freeSlotCount in pairs(slotInfo.emptySlots) do
+				if freeSlotCount > 0 and slotInfo.freeSlotKeys[name] ~= nil then
+					local itemButton = self:GetOrCreateGlobalItemButton(ctx, slotInfo.freeSlotKeys[name])
+					local freeSlotBag, freeSlotID = self:ParseSlotKey(slotInfo.freeSlotKeys[name])
+					itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
+					freeSlotsSection:AddCell(name, itemButton)
+				end
+			end
+			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, false)
+		end
+	end
+	self.footerContainer:SetHeight(math.max(1, footerH))
+
+	return headerW, headerH, footerW, footerH
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
@@ -266,7 +462,36 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		end
 		view:GetContent():Show()
 		self.currentView = view
-		view:UpdateBagBounds(self)
+
+		local totalW = 0
+		local totalH = 0
+		if self.tabContainer then
+			local headerW, headerH = 0, 0
+			if self.globalSections and self.globalSections[L:G("Recent Items")] then
+				headerW, headerH = self.globalSections[L:G("Recent Items")].frame:GetSize()
+			end
+			local footerW, footerH = 0, 0
+			if self.globalSections and self.globalSections[L:G("Free Space")] then
+				footerW, footerH = self.globalSections[L:G("Free Space")].frame:GetSize()
+			end
+
+			local tabW, tabH = view.content.contentWidth or 0, view.content.contentHeight or 0
+			self.tabContainer:SetHeight(math.max(1, tabH))
+			self.tabContainer:SetWidth(math.max(1, tabW))
+
+			totalW = math.max(headerW, tabW, footerW)
+			totalH = headerH + tabH + footerH
+			if self.scrollChild then
+				self.scrollChild:SetSize(math.max(1, totalW), math.max(1, totalH))
+			end
+		end
+
+		self:UpdateBagBounds(totalW, totalH)
+
+		if self.scrollBox and self.scrollBox.FullUpdate then
+			self.scrollBox:FullUpdate(true)
+		end
+
 		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
 		local text = searchBox:GetText()
 		if text ~= "" and text ~= nil then
@@ -297,11 +522,34 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		end
 	end
 
+	local headerW, headerH, footerW, footerH = self:DrawGlobalSections(ctx, slotInfo)
+
 	debug:StartProfile("Bag Render %d", self.kind)
 	view:Render(ctx, self, slotInfo, function()
 		debug:EndProfile("Bag Render %d", self.kind)
 		view:GetContent():Show()
 		self.currentView = view
+
+		local tabW, tabH = view.content.contentWidth or 0, view.content.contentHeight or 0
+		local totalW = tabW
+		local totalH = tabH
+		if self.tabContainer then
+			self.tabContainer:SetHeight(math.max(1, tabH))
+			self.tabContainer:SetWidth(math.max(1, tabW))
+
+			totalW = math.max(headerW, tabW, footerW)
+			totalH = headerH + tabH + footerH
+			if self.scrollChild then
+				self.scrollChild:SetSize(math.max(1, totalW), math.max(1, totalH))
+			end
+		end
+
+		self:UpdateBagBounds(totalW, totalH)
+
+		if self.scrollBox and self.scrollBox.FullUpdate then
+			self.scrollBox:FullUpdate(true)
+		end
+
 		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
 		local text = searchBox:GetText()
 		if text ~= "" and text ~= nil then
@@ -507,6 +755,57 @@ function bagFrame:Create(ctx, kind)
 	--end)
 
 	b.tabViews = {}
+	b.itemFrames = {}
+	b.globalSections = {}
+
+	-- Create the single global scrollBox and scrollBar
+	local scrollBox = CreateFrame("Frame", "BetterBagsBagScroll" .. name, b.frame, "WowScrollBox")
+	scrollBox:SetInterpolateScroll(true)
+	local scrollBar = CreateFrame("EventFrame", nil, scrollBox, "MinimalScrollBar")
+	scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", -12, 0)
+	scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", -12, 0)
+	scrollBar:SetInterpolateScroll(true)
+	scrollBar:SetHideIfUnscrollable(true)
+
+	local scrollChild = CreateFrame("Frame", nil, scrollBox)
+	scrollChild:SetPoint("TOPLEFT", scrollBox, "TOPLEFT")
+	scrollChild:SetPoint("TOPRIGHT", scrollBox, "TOPRIGHT")
+	scrollChild:SetSize(200, 200)
+
+	local scrollView = CreateScrollBoxLinearView()
+	scrollView:SetPanExtent(100)
+	ScrollUtil.InitScrollBoxWithScrollBar(scrollBox, scrollBar, scrollView)
+
+	scrollChild:SetParent(scrollBox)
+	scrollChild.scrollable = true
+
+	b.scrollBox = scrollBox
+	b.scrollBar = scrollBar
+	b.scrollChild = scrollChild
+	b.scrollView = scrollView
+
+	-- Create headerContainer, tabContainer, and footerContainer inside scrollChild
+	local headerContainer = CreateFrame("Frame", nil, scrollChild)
+	headerContainer:SetPoint("TOPLEFT", scrollChild, "TOPLEFT")
+	headerContainer:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT")
+	headerContainer:SetHeight(1)
+
+	local tabContainer = CreateFrame("Frame", nil, scrollChild)
+	tabContainer:SetPoint("TOPLEFT", headerContainer, "BOTTOMLEFT", 0, 0)
+	tabContainer:SetPoint("TOPRIGHT", headerContainer, "BOTTOMRIGHT", 0, 0)
+	tabContainer:SetHeight(1)
+
+	local footerContainer = CreateFrame("Frame", nil, scrollChild)
+	footerContainer:SetPoint("TOPLEFT", tabContainer, "BOTTOMLEFT", 0, 0)
+	footerContainer:SetPoint("TOPRIGHT", tabContainer, "BOTTOMRIGHT", 0, 0)
+	footerContainer:SetHeight(1)
+
+	b.headerContainer = headerContainer
+	b.tabContainer = tabContainer
+	b.footerContainer = footerContainer
+
+	b.scrollBox:SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
+	b.scrollBox:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
 
 	-- Register the bag frame so that window positions are saved.
 	Window.RegisterConfig(b.frame, database:GetBagPosition(kind))

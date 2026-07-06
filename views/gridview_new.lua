@@ -87,6 +87,10 @@ local function ItemBelongsToTab(view, bagKind, item)
   if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
     return true
   end
+  local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+  if category == L:G("Free Space") or category == L:G("Recent Items") then
+    return false
+  end
   if bagKind == const.BAG_KIND.BANK then
     if database:GetShowBankTabs() then
       return item.bagid == view.tabID
@@ -101,11 +105,6 @@ local function ItemBelongsToTab(view, bagKind, item)
     end
   end
   if database:GetGroupsEnabled(bagKind) then
-    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-    local isSpecialSection = category == L:G("Free Space") or category == L:G("Recent Items")
-    if isSpecialSection then
-      return true -- Special sections are shown on all tabs
-    end
     return groups:CategoryBelongsToGroup(bagKind, category, view.tabID)
   end
   return true
@@ -176,42 +175,12 @@ local function GridView(view, ctx, bag, slotInfo, callback)
         end
       end
     end
-  else
-    -- Draw Free Space for SECTION_GRID or ONE_BAG
-    local freeSlotsSection = view:GetOrCreateSection(ctx, L:G("Free Space"))
-    if database:GetShowAllFreeSpace(bag.kind) then
-      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-      freeSlotsSection:WipeOnlyContents()
-      for _, item in ipairs(slotInfo.emptySlotsSorted) do
-        local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-        itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
-        freeSlotsSection:AddCell(item.slotkey, itemButton)
-      end
-      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), true, true)
-    else
-      freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
-      for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-        if freeSlotCount > 0 and slotInfo.freeSlotKeys[name] ~= nil then
-          local itemButton = view:GetOrCreateItemButton(ctx, slotInfo.freeSlotKeys[name])
-          local freeSlotBag, freeSlotID = view:ParseSlotKey(slotInfo.freeSlotKeys[name])
-          itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
-          freeSlotsSection:AddCell(name, itemButton)
-        end
-      end
-      freeSlotsSection:Draw(bag.kind, database:GetBagView(bag.kind), false)
-    end
   end
 
   -- Draw active sections
-  for sectionName, section in pairs(view:GetAllSections()) do
-    if sectionName ~= L:G("Free Space") then
-      if sectionName == L:G("Recent Items") then
-        section:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-      else
-        section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-      end
-      section:Draw(bag.kind, database:GetBagView(bag.kind), false)
-    end
+  for _, section in pairs(view:GetAllSections()) do
+    section:SetMaxCellWidth(sizeInfo.itemsPerRow)
+    section:Draw(bag.kind, database:GetBagView(bag.kind), false)
   end
 
   -- Hide filtered sections
@@ -222,8 +191,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       shouldHide = true
     end
     if not shouldHide and activeGroup and view.bagview ~= const.BAG_VIEW.SECTION_ALL_BAGS then
-      local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
-      if not isSpecialSection and not groups:CategoryBelongsToGroup(bag.kind, sectionName, activeGroup) then
+      if not groups:CategoryBelongsToGroup(bag.kind, sectionName, activeGroup) then
         shouldHide = true
       end
     end
@@ -235,39 +203,21 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   -- Handle empty group frame
   if view.emptyGroupFrame and activeGroup and activeGroup > 1 then
     local visibleSectionCount = 0
-    for sectionName, section in pairs(view:GetAllSections()) do
-      local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
-      if not isSpecialSection then
-        local isHidden = false
-        for _, hiddenSection in ipairs(hiddenCells) do
-          if hiddenSection == section then
-            isHidden = true
-            break
-          end
+    for _, section in pairs(view:GetAllSections()) do
+      local isHidden = false
+      for _, hiddenSection in ipairs(hiddenCells) do
+        if hiddenSection == section then
+          isHidden = true
+          break
         end
-        if not isHidden then
-          visibleSectionCount = visibleSectionCount + 1
-        end
+      end
+      if not isHidden then
+        visibleSectionCount = visibleSectionCount + 1
       end
     end
 
     if visibleSectionCount == 0 then
       view.emptyGroupFrame:Show()
-      for sectionName, section in pairs(view:GetAllSections()) do
-        local isSpecialSection = sectionName == L:G("Free Space") or sectionName == L:G("Recent Items")
-        if isSpecialSection then
-          local alreadyHidden = false
-          for _, hiddenSection in ipairs(hiddenCells) do
-            if hiddenSection == section then
-              alreadyHidden = true
-              break
-            end
-          end
-          if not alreadyHidden then
-            table.insert(hiddenCells, section)
-          end
-        end
-      end
     else
       view.emptyGroupFrame:Hide()
     end
@@ -287,12 +237,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     section.shouldShrinkWhenCollapsed = false
   end
 
-  local w, h = view.content:Draw({
+  view.content:Draw({
     cells = view.content.cells,
     maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
     columns = sizeInfo.columnCount,
-    header = view:RemoveSectionFromGrid(L:G("Recent Items")),
-    footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
     mask = hiddenCells,
   })
 
@@ -345,12 +293,10 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     for _, section in ipairs(view.content.cells) do
       section:Draw(bag.kind, database:GetBagView(bag.kind), false)
     end
-    w, h = view.content:Draw({
+    view.content:Draw({
       cells = view.content.cells,
       maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
       columns = sizeInfo.columnCount,
-      header = view:RemoveSectionFromGrid(L:G("Recent Items")),
-      footer = database:GetShowAllFreeSpace(bag.kind) and view:RemoveSectionFromGrid(L:G("Free Space")) or nil,
       mask = hiddenCells,
     })
   end
@@ -359,7 +305,6 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     debug:WalkAndFixAnchorGraph(section.frame)
   end
 
-  view:UpdateBagBounds(bag, w, h)
   view.itemCount = slotInfo.totalItems
   callback()
 end
@@ -374,11 +319,10 @@ function views:NewGrid(parent, kind, tabID)
   view.bagview = const.BAG_VIEW.SECTION_GRID
   view.kind = kind
   view.tabID = tabID or 1
-  view.content = grid:Create(parent)
+  view.content = grid:Create(parent, false)
   view.content:SortVertical()
   view.content:GetContainer():ClearAllPoints()
-  view.content:GetContainer():SetPoint("TOPLEFT", parent, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-  view.content:GetContainer():SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
+  view.content:GetContainer():SetAllPoints(parent)
   view.content.compactStyle = const.GRID_COMPACT_STYLE.NONE
   view.content:Hide()
   view.Render = GridView
