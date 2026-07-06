@@ -488,6 +488,10 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 
 		self:UpdateBagBounds(totalW, totalH)
 
+		if self.scrollBox and self.scrollBox.FullUpdate then
+			self.scrollBox:FullUpdate(true)
+		end
+
 		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
 		local text = searchBox:GetText()
 		if text ~= "" and text ~= nil then
@@ -541,6 +545,10 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		end
 
 		self:UpdateBagBounds(totalW, totalH)
+
+		if self.scrollBox and self.scrollBox.FullUpdate then
+			self.scrollBox:FullUpdate(true)
+		end
 
 		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
 		local text = searchBox:GetText()
@@ -760,6 +768,8 @@ function bagFrame:Create(ctx, kind)
 	scrollBar:SetHideIfUnscrollable(true)
 
 	local scrollChild = CreateFrame("Frame", nil, scrollBox)
+	scrollChild:SetPoint("TOPLEFT", scrollBox, "TOPLEFT")
+	scrollChild:SetPoint("TOPRIGHT", scrollBox, "TOPRIGHT")
 	scrollChild:SetSize(200, 200)
 
 	local scrollView = CreateScrollBoxLinearView()
