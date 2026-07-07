@@ -94,6 +94,7 @@ local sectionProto = {
   GetAllCells = function() return {} end,
   AddCell = function() end,
   WipeOnlyContents = function() end,
+  IsCollapsed = function() return false end,
 }
 sectionFrame.Create = function()
   local s = setmetatable({}, { __index = sectionProto })
@@ -483,5 +484,79 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     addon.isRetail = nil
     const.ACCOUNT_BANK_BAGS = nil
     const.BANK_TAB = nil
+  end)
+
+  describe("Pre-sorted rendering path", function()
+    it("should instantiate sections in correct pre-sorted order when sortedCategories is present", function()
+      local originalCategoryBelongsToGroup = groups.CategoryBelongsToGroup
+      groups.CategoryBelongsToGroup = function() return true end
+
+      local parent = CreateFrame("Frame")
+      local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK)
+      local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+
+      local item1 = {
+        bagid = 0,
+        slotid = 1,
+        slotkey = "0_1",
+        isItemEmpty = false,
+        itemInfo = { category = "Weapons", itemID = 1 },
+      }
+      local item2 = {
+        bagid = 0,
+        slotid = 2,
+        slotkey = "0_2",
+        isItemEmpty = false,
+        itemInfo = { category = "Armor", itemID = 2 },
+      }
+
+      items.GetItemDataFromSlotKey = function(self, slotkey)
+        if slotkey == "0_1" then return item1 end
+        if slotkey == "0_2" then return item2 end
+        return nil
+      end
+
+      local mockSlotInfo = {
+        sortedItems = { item1, item2 },
+        sortedCategories = {
+          { name = "Weapons", count = 1 },
+          { name = "Armor", count = 1 }
+        },
+        emptySlots = {},
+        freeSlotKeys = {},
+        emptySlotsSorted = {},
+        emptySlotByBagAndSlot = {},
+        totalItems = 2,
+        stacks = {
+          GetStackInfo = function() return nil end
+        }
+      }
+
+      -- Pre-create/mock section structure
+      view.sections = {}
+      local createdOrder = {}
+      view.GetOrCreateSection = function(self, ctx, category)
+        table.insert(createdOrder, category)
+        local sec = setmetatable({}, { __index = sectionProto })
+        sec.frame = CreateFrame("Frame")
+        view.sections[category] = sec
+        -- Mock content:AddCell to trace addition order
+        if not view.content.cells then view.content.cells = {} end
+        table.insert(view.content.cells, sec)
+        return sec
+      end
+
+      local rendered = false
+      view:Render(context:New("test"), bag, mockSlotInfo, function()
+        rendered = true
+      end)
+
+      assert.is_true(rendered)
+      -- The order of category creation must strictly follow sortedCategories: Weapons first, then Armor!
+      assert.are.equal("Weapons", createdOrder[1])
+      assert.are.equal("Armor", createdOrder[2])
+
+      groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
+    end)
   end)
 end)

@@ -384,4 +384,60 @@ describe("Items (New Data Farming Engine)", function()
       _G.GetInventoryItemLink = originalGetInventoryItemLink
     end)
   end)
+
+  describe("Synthesis of sortedCategories", function()
+    it("should synthesize and sort categories after ProcessRefresh", function()
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return 1000 + slotid end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return "|cff0070dd|Hitem:"..(1000+slotid).."|h[Item "..slotid.."]|h|r" end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        local id = tonumber(itemID)
+        if not id and type(itemID) == "string" then
+          id = tonumber(string.match(itemID, "item:(%d+)"))
+        end
+        id = id or 1001
+        local name = "Item " .. (id - 1000)
+        local quality = 1
+        local class = "Weapon"
+        local subclass = "One-Handed Swords"
+        if id == 1001 then
+          class = "Armor"
+          subclass = "Shields"
+        end
+        return name, "|cff0070dd|Hitem:"..id.."|h["..name.."]|h|r", quality, 100, 1, class, subclass, 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      -- Stub Database to return simple alphabetical sort for sections
+      local DB = addon:GetModule("Database")
+      DB.GetSectionSortType = function() return const.SECTION_SORT_TYPE.ALPHABETICALLY end
+      DB.GetCustomSectionSort = function() return {} end
+      local originalGetCategoryFilter = DB.GetCategoryFilter
+      function DB:GetCategoryFilter(kind, filter)
+        return filter == "Type"
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestCategorySynthesis")
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.is_not_nil(slotInfo.sortedCategories)
+      assert.is_true(#slotInfo.sortedCategories > 0)
+
+      -- Verify we have categories and they are sorted alphabetically by default
+      local hasWeapon = false
+      local hasArmor = false
+      for _, cat in ipairs(slotInfo.sortedCategories) do
+        if cat.name == "Weapon" then hasWeapon = true end
+        if cat.name == "Armor" then hasArmor = true end
+      end
+      -- Weapons and Armor categories should have been synthesized from class names
+      assert.is_true(hasWeapon or hasArmor)
+
+      -- Restore mocks
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      DB.GetCategoryFilter = originalGetCategoryFilter
+    end)
+  end)
 end)

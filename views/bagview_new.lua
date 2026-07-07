@@ -173,6 +173,27 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     end
   end
 
+  -- Determine which categories actually have visible items in this tab/view
+  local activeCategories = {}
+  for _, item in ipairs(sortedItems) do
+    if ItemBelongsToTab(view, bag.kind, item) then
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      activeCategories[category] = true
+    end
+  end
+
+  -- Pre-create only the active sections in their precise pre-sorted order
+  local fallbackSort = false
+  if slotInfo.sortedCategories then
+    for _, catData in ipairs(slotInfo.sortedCategories) do
+      if activeCategories[catData.name] then
+        view:GetOrCreateSection(ctx, catData.name)
+      end
+    end
+  else
+    fallbackSort = true
+  end
+
   for _, item in ipairs(sortedItems) do
     if ItemBelongsToTab(view, bag.kind, item) then
       local slotkey = item.slotkey
@@ -257,9 +278,9 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   end
 
   -- Sort sections if required
-  if ctx:GetBool('wipe') or view.sortRequired then
+  view.content.maxCellWidth = sizeInfo.columnCount
+  if fallbackSort and (ctx:GetBool('wipe') or view.sortRequired) then
     view.sortRequired = false
-    view.content.maxCellWidth = sizeInfo.columnCount
     view.content:Sort(sort:GetSectionSortFunction(bag.kind, database:GetBagView(bag.kind)))
   end
 

@@ -520,6 +520,33 @@ function items:ProcessRefresh(ctx, kind)
     end
   end
 
+  -- Synthesize Category Data (Phase 4.5)
+  slotInfo.sortedCategories = {}
+  local categoryTally = {}
+  local categoryOrder = {}
+  for _, item in ipairs(slotInfo.sortedItems) do
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+    if not categoryTally[category] then
+      categoryTally[category] = {
+        name = category,
+        count = 0,
+        isFreeSpace = (category == L:G("Free Space")),
+        isRecent = (category == L:G("Recent Items")),
+        fillWidth = false
+      }
+      table.insert(categoryOrder, categoryTally[category])
+    end
+    categoryTally[category].count = categoryTally[category].count + 1
+  end
+
+  if sortModule and sortModule.GetCategoryDataSortFunction then
+    local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
+    if sortFunc then
+      table.sort(categoryOrder, sortFunc)
+    end
+  end
+  slotInfo.sortedCategories = categoryOrder
+
   local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
   events:SendMessage(ctx, ev, slotInfo)
 end
