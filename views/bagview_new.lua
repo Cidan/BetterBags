@@ -155,7 +155,11 @@ local function BagView(view, ctx, bag, slotInfo, callback)
       if view.bagview == const.BAG_VIEW.SECTION_GRID then
         category = item.itemInfo and item.itemInfo.category or L:G("Everything")
       elseif view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-        category = GetBagName(item.bagid)
+        if bag.kind == const.BAG_KIND.BANK then
+          category = L:G("Bank")
+        else
+          category = GetBagName(item.bagid)
+        end
       end
 
       local section = view:GetOrCreateSection(ctx, category)
@@ -172,13 +176,22 @@ local function BagView(view, ctx, bag, slotInfo, callback)
 
   if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
     for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, data in pairs(emptyBagData) do
-        local slotkey = view:GetSlotKey(data)
-        if C_Container.GetBagName(bagid) ~= nil then
-          local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
-          itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
-          local section = view:GetOrCreateSection(ctx, GetBagName(bagid))
-          section:AddCell(slotkey, itemButton)
+      local dummyItem = { bagid = bagid }
+      if ItemBelongsToTab(view, bag.kind, dummyItem) then
+        for slotid, data in pairs(emptyBagData) do
+          local slotkey = view:GetSlotKey(data)
+          if C_Container.GetBagName(bagid) ~= nil then
+            local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+            itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
+            local category
+            if bag.kind == const.BAG_KIND.BANK then
+              category = L:G("Bank")
+            else
+              category = GetBagName(bagid)
+            end
+            local section = view:GetOrCreateSection(ctx, category)
+            section:AddCell(slotkey, itemButton)
+          end
         end
       end
     end
@@ -187,7 +200,12 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   -- Draw active sections
   for _, section in pairs(view:GetAllSections()) do
     section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-    section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+    if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS and bag.kind == const.BAG_KIND.BANK then
+      section:RemoveHeader()
+      section:Draw(bag.kind, database:GetBagView(bag.kind), true)
+    else
+      section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+    end
   end
 
   -- Hide filtered sections
@@ -298,7 +316,8 @@ local function BagView(view, ctx, bag, slotInfo, callback)
 
   if needsRedraw then
     for _, section in ipairs(view.content.cells) do
-      section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+      local freeSpaceShown = (view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS and bag.kind == const.BAG_KIND.BANK)
+      section:Draw(bag.kind, database:GetBagView(bag.kind), freeSpaceShown)
     end
     view.content:Draw({
       cells = view.content.cells,

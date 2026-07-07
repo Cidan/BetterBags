@@ -194,6 +194,7 @@ function sectionProto:Wipe()
   self.frame:SetAlpha(1)
   self.collapsed = false
   self.shouldShrinkWhenCollapsed = true
+  self.removeHeader = false
   -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
   -- Note: We don't restore the color here because SetTitle always explicitly sets it,
   -- ensuring pooled sections don't bleed custom colors to other categories.
@@ -215,6 +216,10 @@ end
 
 function sectionProto:EnableHeader()
   self.headerDisabled = false
+end
+
+function sectionProto:RemoveHeader()
+  self.removeHeader = true
 end
 
 ---@param item Item|ItemRow
@@ -292,9 +297,19 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
   end
 
   local fullWidth = w + 12
-  local fullHeight = h + self.title:GetHeight() + 6
+  local fullHeight = h
+  if not self.removeHeader then
+    fullHeight = fullHeight + self.title:GetHeight() + 6
+  end
 
-  self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  self.content:GetContainer():ClearAllPoints()
+  if self.removeHeader then
+    self.title:Hide()
+    self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", 6, 0)
+  else
+    self.title:Show()
+    self.content:GetContainer():SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, 0)
+  end
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
 
   -- If collapsed, hide content and optionally shrink frame
@@ -312,7 +327,7 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
     end
     -- Only shrink if we're allowed to (no other expanded sections in our row)
     if self.shouldShrinkWhenCollapsed then
-      local collapsedHeight = self.title:GetHeight() + 6
+      local collapsedHeight = self.removeHeader and 0 or (self.title:GetHeight() + 6)
       self.frame:SetSize(fullWidth, collapsedHeight)
     else
       -- Keep full height but hide content
@@ -333,7 +348,7 @@ function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
   end
 
   self.frame:Show()
-  return fullWidth, (self.collapsed and self.shouldShrinkWhenCollapsed) and (self.title:GetHeight() + 6) or fullHeight
+  return fullWidth, (self.collapsed and self.shouldShrinkWhenCollapsed) and (self.removeHeader and 0 or (self.title:GetHeight() + 6)) or fullHeight
 end
 
 -------

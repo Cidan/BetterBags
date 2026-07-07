@@ -102,6 +102,7 @@ local sectionProto = {
   GetAllCells = function() return {} end,
   AddCell = function() end,
   RemoveCell = function() end,
+  RemoveHeader = function(self) self.removeHeader = true end,
 }
 sectionFrame.Create = function()
   local s = setmetatable({}, { __index = sectionProto })

@@ -92,12 +92,28 @@ local sectionProto = {
   Draw = function() end,
   SetTitle = function() end,
   GetAllCells = function() return {} end,
-  AddCell = function() end,
+  AddCell = function(self, id, cell)
+    self.content:AddCell(id, cell)
+  end,
   WipeOnlyContents = function() end,
+  RemoveHeader = function(self) self.removeHeader = true end,
 }
 sectionFrame.Create = function()
   local s = setmetatable({}, { __index = sectionProto })
   s.frame = CreateFrame("Frame")
+  s.content = {
+    cells = {},
+    idToCell = {},
+    AddCell = function(self, id, cell)
+      self.idToCell[id] = cell
+      table.insert(self.cells, cell)
+    end,
+    GetCell = function(self, id)
+      return self.idToCell[id]
+    end,
+    Sort = function() end,
+    Draw = function() end,
+  }
   return s
 end
 
@@ -463,8 +479,9 @@ describe("Phase 6 View Placement and Rendering Tests", function()
 
     assert.is_true(rendered)
     -- Under character bank tabID = -1, ONLY character bank section should be rendered!
-    assert.is_not_nil(view.sections["#1: Bank"])
-    assert.is_nil(view.sections["#9: Warbank Tab 1"])
+    assert.is_not_nil(view.sections["Bank"])
+    assert.is_not_nil(view.sections["Bank"].content:GetCell("-1_1"))
+    assert.is_nil(view.sections["Bank"].content:GetCell("13_1"))
 
     -- Now let's switch tabID to 13 (Warbank Tab 1) and render again
     local view2 = views:NewBagView(parent, const.BAG_KIND.BANK)
@@ -476,12 +493,64 @@ describe("Phase 6 View Placement and Rendering Tests", function()
 
     assert.is_true(rendered)
     -- Under Warbank tabID = 13, ONLY warbank tab 13 should be rendered!
-    assert.is_nil(view2.sections["#1: Bank"])
-    assert.is_not_nil(view2.sections["#9: Warbank Tab 1"])
+    assert.is_not_nil(view2.sections["Bank"])
+    assert.is_nil(view2.sections["Bank"].content:GetCell("-1_1"))
+    assert.is_not_nil(view2.sections["Bank"].content:GetCell("13_1"))
 
     -- Reset to clean up state
     addon.isRetail = nil
     const.ACCOUNT_BANK_BAGS = nil
     const.BANK_TAB = nil
+  end)
+
+  it("should render bank items in a single, headerless, physical-slot sorted section in SECTION_ALL_BAGS view", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewBagView(parent, const.BAG_KIND.BANK)
+    local bag = { kind = const.BAG_KIND.BANK, frame = CreateFrame("Frame") }
+
+    items.GetItemDataFromSlotKey = function(self, slotkey)
+      return { slotkey = slotkey }
+    end
+
+    local itemCharacter1 = {
+      bagid = -1,
+      slotid = 1,
+      slotkey = "-1_1",
+      isItemEmpty = false,
+      itemInfo = { category = "Default", itemID = 11 },
+    }
+    local itemCharacter2 = {
+      bagid = -1,
+      slotid = 2,
+      slotkey = "-1_2",
+      isItemEmpty = false,
+      itemInfo = { category = "Default", itemID = 12 },
+    }
+
+    local mockSlotInfo = {
+      GetChangeset = function() return { itemCharacter1, itemCharacter2 }, {}, {} end,
+      GetCurrentItems = function() return { ["-1_1"] = itemCharacter1, ["-1_2"] = itemCharacter2 } end,
+      emptySlots = {},
+      freeSlotKeys = {},
+      emptySlotsSorted = {},
+      emptySlotByBagAndSlot = {},
+      stacks = {
+        GetStackInfo = function() return nil end
+      }
+    }
+
+    local rendered = false
+    view:Render(context:New("test"), bag, mockSlotInfo, function()
+      rendered = true
+    end)
+
+    assert.is_true(rendered)
+    -- There should be a section for "Bank" and NO sections for individual bag names like "#1: Bank"
+    assert.is_not_nil(view.sections["Bank"])
+    assert.is_nil(view.sections["#1: Bank"])
+
+    -- The section "Bank" should have been marked as headerless/removeHeader
+    local bankSection = view.sections["Bank"]
+    assert.is_true(bankSection.removeHeader)
   end)
 end)

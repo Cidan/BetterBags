@@ -76,3 +76,9 @@ To permanently prevent ObjectPool contamination, cell leakage, and fatal `Cannot
 - **Rule:** Every rendering pass for a view is functionally isolated and begins with a complete, synchronous wipe of its own frames, returning all of its pooled elements back to the global stacks before any rendering/population occurs.
 - **Mechanism:** The very first line of each view's `Render` method (e.g. `GridView` or `BagView`) executes `view:Wipe(ctx)`.
 - **State Transition (`isNew` flag):** Inside `Wipe(view, ctx)`, explicitly set `view.isNew = true` to flag the view as completely empty. At the beginning of the `Render` method (right after wiping), set `view.isNew = false` to indicate the view is populated and complete. This guarantees 100% clean-slate rendering on every single frame update.
+
+### 10. Flat "Blizzard Bags" View for Bank (Single Headerless Section)
+To support a flat view of the Bank bags resembling physical containers while maintaining visual alignment:
+- **Rule:** When the bank view is set to `SECTION_ALL_BAGS` (Blizzard Bags view), we bypass physical-bag individual sections. Instead, all physical bank slots (both items and empty slots) are consolidated into a single section named `"Bank"`.
+- **Headerless Layout:** The section uses `section:RemoveHeader()`, which hides its title text and anchors the grid content directly to the top left of the section frame, eliminating redundant title heights.
+- **Strict Physical Sorting:** To preserve the real locations and blank spaces of physical bags, this single consolidated section is rendered with `freeSpaceShown = true`, which enforces sorting by exact physical slot key (`sort.GetItemSortBySlot`).
