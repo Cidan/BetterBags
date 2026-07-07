@@ -29,9 +29,6 @@ local database = addon:GetModule('Database')
 ---@class Themes: AceModule
 local themes = addon:GetModule('Themes')
 
----@class Context: AceModule
-local context = addon:GetModule('Context')
-
 ---@param ctx Context
 ---@param kind BagKind
 ---@param bagFrame Frame
@@ -71,20 +68,7 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
 
   b.tabsWereShown = false
   b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
-  b.fadeInGroup:HookScript("OnFinished", function()
-    local ectx = context:New('bag_slots_fade_in_finished')
-    if database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-      return
-    end
-    database:SetPreviousView(kind, database:GetBagView(kind))
-    database:SetBagView(kind, const.BAG_VIEW.SECTION_ALL_BAGS)
-    events:SendMessage(ectx, 'bags/FullRefreshAll')
-  end)
   b.fadeOutGroup:HookScript("OnFinished", function()
-    local ectx = context:New('bag_slots_fade_out_finished')
-    database:SetBagView(kind, database:GetPreviousView(kind))
-    events:SendMessage(ectx, 'bags/FullRefreshAll')
-
     b.frame:ClearAllPoints()
     b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
 

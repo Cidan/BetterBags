@@ -208,10 +208,15 @@ function contextMenu:CreateContextMenu(bag)
     func = function()
       local ctx = context:New('ToggleBagSlots')
       if bag.slots:IsShown() then
+        database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
         bag.slots:Hide()
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
       else
+        database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
+        database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
         bag.slots:Draw(ctx)
         bag.slots:Show()
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
       end
     end
   })

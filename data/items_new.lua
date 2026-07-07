@@ -212,6 +212,28 @@ function items:UpdateFreeSlots(ctx, kind)
   end
 end
 
+---@param bagid number
+---@return string
+function items:GetBagName(bagid)
+  local isBackpack = const.BACKPACK_BAGS[bagid] ~= nil
+  if isBackpack then
+    local isKeyring = Enum and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
+    local bagname = isKeyring and L:G('Keyring') or C_Container.GetBagName(bagid)
+    local displayid = isKeyring and 6 or bagid+1
+    return string.format("#%d: %s", displayid, bagname or "Unknown")
+  end
+
+  local id = bagid
+  if id == -1 then
+    return string.format("#%d: %s", 1, L:G('Bank'))
+  elseif id == -3 then
+    return string.format("#%d: %s", 1, L:G('Reagent Bank'))
+  else
+    local bagname = C_Container.GetBagName(id)
+    return string.format("#%d: %s", id - 4, bagname or L:G("Bank Bag"))
+  end
+end
+
 --- CENTRALIZED PIPELINE REFRESH ORCHESTRATOR (PHASES 1-5)
 ---@param ctx Context
 ---@param kind BagKind
@@ -434,6 +456,21 @@ function items:ProcessRefresh(ctx, kind)
           end
         end
       end
+    end
+  end
+
+  slotInfo.sectionLayouts = {}
+  if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    for _, currentItem in pairs(itemData) do
+      if not currentItem.isItemEmpty then
+        local category = self:GetBagName(currentItem.bagid)
+        currentItem.itemInfo.category = category
+        slotInfo.sectionLayouts[category] = { hideHeader = true, sortMode = "physical" }
+      end
+    end
+    for bagid, _ in pairs(slotInfo.emptySlotByBagAndSlot) do
+      local category = self:GetBagName(bagid)
+      slotInfo.sectionLayouts[category] = { hideHeader = true, sortMode = "physical" }
     end
   end
 

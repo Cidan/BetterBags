@@ -151,12 +151,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
       end
 
       -- Resolve polymorphic section name
-      local category = L:G("Items")
-      if view.bagview == const.BAG_VIEW.SECTION_GRID then
-        category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-      elseif view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-        category = GetBagName(item.bagid)
-      end
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
 
       local section = view:GetOrCreateSection(ctx, category)
       section:AddCell(item.slotkey, itemButton)
@@ -185,9 +180,19 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   end
 
   -- Draw active sections
-  for _, section in pairs(view:GetAllSections()) do
+  for sectionName, section in pairs(view:GetAllSections()) do
     section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-    section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+    local layout = slotInfo.sectionLayouts and slotInfo.sectionLayouts[sectionName]
+    local nosort = false
+    if layout then
+      if layout.hideHeader then
+        section:RemoveHeader()
+      end
+      if layout.sortMode == "physical" then
+        nosort = true
+      end
+    end
+    section:Draw(bag.kind, database:GetBagView(bag.kind), false, nosort)
   end
 
   -- Hide filtered sections
