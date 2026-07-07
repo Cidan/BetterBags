@@ -85,6 +85,13 @@ end
 local function ItemBelongsToTab(view, bagKind, item)
   if not item then return false end
   if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
+    if bagKind == const.BAG_KIND.BANK and addon.isRetail then
+      if view.tabID == const.BANK_TAB.BANK then
+        return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[item.bagid] == nil
+      else
+        return item.bagid == view.tabID
+      end
+    end
     return true
   end
   local category = item.itemInfo and item.itemInfo.category or L:G("Everything")

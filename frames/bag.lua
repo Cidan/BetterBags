@@ -28,6 +28,9 @@ local views = addon:GetModule("Views")
 ---@class Resize: AceModule
 local resize = addon:GetModule("Resize")
 
+---@class Groups: AceModule
+local groups = addon:GetModule("Groups")
+
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
 
@@ -401,6 +404,33 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 	-- 2. Scan and draw Free Space inside self.footerContainer (except SECTION_ALL_BAGS mode)
 	local footerW, footerH = 0, 0
 	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
+		local function IncludeBagInFreeSpace(bagid)
+			if self.kind == const.BAG_KIND.BACKPACK then
+				return const.BACKPACK_BAGS[bagid] ~= nil
+			end
+			local tabID = self:GetCurrentTabID()
+			if database:GetShowBankTabs() then
+				if addon.isRetail then
+					if tabID == const.BANK_TAB.BANK then
+						return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[bagid] == nil
+					else
+						return bagid == tabID
+					end
+				else
+					return const.BANK_BAGS[bagid] ~= nil or bagid == -1
+				end
+			end
+			if database:GetGroupsEnabled(const.BAG_KIND.BANK) and addon.isRetail then
+				local activeGroup = groups:GetGroup(const.BAG_KIND.BANK, tabID)
+				if activeGroup then
+					local itemIsAccountBank = (const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid] ~= nil) or false
+					local tabIsAccountBank = (Enum.BankType and activeGroup.bankType == Enum.BankType.Account) or false
+					return itemIsAccountBank == tabIsAccountBank
+				end
+			end
+			return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[bagid] == nil
+		end
+
 		local sectionFrame = addon:GetModule("SectionFrame")
 		local freeSlotsSection = sectionFrame:Create(ctx)
 		freeSlotsSection.frame:SetParent(self.footerContainer)
@@ -412,17 +442,32 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		if database:GetShowAllFreeSpace(self.kind) then
 			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
 			for _, item in ipairs(slotInfo.emptySlotsSorted) do
-				local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
-				itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
-				freeSlotsSection:AddCell(item.slotkey, itemButton)
+				if IncludeBagInFreeSpace(item.bagid) then
+					local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
+					itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
+					freeSlotsSection:AddCell(item.slotkey, itemButton)
+				end
 			end
 			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, true, true)
 		else
 			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
-			for name, freeSlotCount in pairs(slotInfo.emptySlots) do
-				if freeSlotCount > 0 and slotInfo.freeSlotKeys[name] ~= nil then
-					local itemButton = self:GetOrCreateGlobalItemButton(ctx, slotInfo.freeSlotKeys[name])
-					local freeSlotBag, freeSlotID = self:ParseSlotKey(slotInfo.freeSlotKeys[name])
+			local aggregatedCounts = {}
+			local firstSlotKeyForSubclass = {}
+			if slotInfo.emptySlotsByBag then
+				for bagid, info in pairs(slotInfo.emptySlotsByBag) do
+					if IncludeBagInFreeSpace(bagid) then
+						aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
+						if not firstSlotKeyForSubclass[info.name] and slotInfo.freeSlotKeysByBag and slotInfo.freeSlotKeysByBag[bagid] then
+							firstSlotKeyForSubclass[info.name] = slotInfo.freeSlotKeysByBag[bagid]
+						end
+					end
+				end
+			end
+			for name, freeSlotCount in pairs(aggregatedCounts) do
+				local slotKey = firstSlotKeyForSubclass[name]
+				if freeSlotCount > 0 and slotKey ~= nil then
+					local itemButton = self:GetOrCreateGlobalItemButton(ctx, slotKey)
+					local freeSlotBag, freeSlotID = self:ParseSlotKey(slotKey)
 					itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
 					freeSlotsSection:AddCell(name, itemButton)
 				end
@@ -774,10 +819,9 @@ function bagFrame:Create(ctx, kind)
 
 	local scrollView = CreateScrollBoxLinearView()
 	scrollView:SetPanExtent(100)
-	ScrollUtil.InitScrollBoxWithScrollBar(scrollBox, scrollBar, scrollView)
-
 	scrollChild:SetParent(scrollBox)
 	scrollChild.scrollable = true
+	ScrollUtil.InitScrollBoxWithScrollBar(scrollBox, scrollBar, scrollView)
 
 	b.scrollBox = scrollBox
 	b.scrollBar = scrollBar
