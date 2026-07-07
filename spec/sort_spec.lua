@@ -476,4 +476,70 @@ describe("Sort", function()
       assert.is_true(items[5].isFreeSlot)
     end)
   end)
+
+  -- ─── Data Sort Functions ───────────────────────────────────────────────
+
+  describe("Data Sort Functions", function()
+    local MockItemData = MockData.ItemData
+
+    it("SortItemDataByQualityThenAlpha sorts higher quality first", function()
+      local epic = MockItemData({name = "Sword", quality = 4, guid = "a"})
+      local common = MockItemData({name = "Sword", quality = 1, guid = "b"})
+      assert.is_true(sort.SortItemDataByQualityThenAlpha(epic, common))
+      assert.is_false(sort.SortItemDataByQualityThenAlpha(common, epic))
+    end)
+
+    it("SortItemDataByAlphaThenQuality sorts alpha first", function()
+      local axe = MockItemData({name = "Axe", quality = 1, guid = "a"})
+      local sword = MockItemData({name = "Sword", quality = 4, guid = "b"})
+      assert.is_true(sort.SortItemDataByAlphaThenQuality(axe, sword))
+      assert.is_false(sort.SortItemDataByAlphaThenQuality(sword, axe))
+    end)
+
+    it("SortItemDataByItemLevel sorts higher level first", function()
+      local high = MockItemData({name = "A", quality = 1, itemLevel = 300, guid = "a"})
+      local low = MockItemData({name = "B", quality = 1, itemLevel = 100, guid = "b"})
+      assert.is_true(sort.SortItemDataByItemLevel(high, low))
+      assert.is_false(sort.SortItemDataByItemLevel(low, high))
+    end)
+
+    it("SortItemDataByExpansion sorts chronologically", function()
+      local classic = MockItemData({name = "A", quality = 1, expacID = 0, guid = "a"})
+      local wrath = MockItemData({name = "B", quality = 1, expacID = 2, guid = "b"})
+      assert.is_true(sort.SortItemDataByExpansion(classic, wrath))
+      assert.is_false(sort.SortItemDataByExpansion(wrath, classic))
+    end)
+
+    it("SortItemDataBySlot sorts by bagid and then slotid", function()
+      local slot1_1 = MockItemData({bagid = 1, slotid = 1})
+      local slot1_5 = MockItemData({bagid = 1, slotid = 5})
+      local slot2_1 = MockItemData({bagid = 2, slotid = 1})
+
+      assert.is_true(sort.SortItemDataBySlot(slot1_1, slot1_5))
+      assert.is_false(sort.SortItemDataBySlot(slot1_5, slot1_1))
+      assert.is_true(sort.SortItemDataBySlot(slot1_5, slot2_1))
+      assert.is_false(sort.SortItemDataBySlot(slot2_1, slot1_5))
+    end)
+
+    it("SortItemDataBySlot handles equal slots", function()
+      local slot1 = MockItemData({bagid = 1, slotid = 1})
+      local slot2 = MockItemData({bagid = 1, slotid = 1})
+      assert.is_false(sort.SortItemDataBySlot(slot1, slot2))
+    end)
+
+    it("GetItemDataSortFunction returns correct functions", function()
+      database.GetItemSortType = function(_, _, _)
+        return const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY
+      end
+      local fn = sort:GetItemDataSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+      assert.are.equal(sort.SortItemDataByQualityThenAlpha, fn)
+    end)
+
+    it("SortItemData functions always sort free slots to the end", function()
+      local item = MockItemData({name = "Sword", quality = 4, guid = "a"})
+      local freeSlot = { isFreeSlot = true, bagid = 0, slotid = 1 }
+      assert.is_false(sort.SortItemDataByQualityThenAlpha(freeSlot, item))
+      assert.is_true(sort.SortItemDataByQualityThenAlpha(item, freeSlot))
+    end)
+  end)
 end)

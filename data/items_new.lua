@@ -461,16 +461,62 @@ function items:ProcessRefresh(ctx, kind)
 
   slotInfo.sectionLayouts = {}
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    local shouldHideHeader = (kind == const.BAG_KIND.BANK)
     for _, currentItem in pairs(itemData) do
       if not currentItem.isItemEmpty then
         local category = self:GetBagName(currentItem.bagid)
         currentItem.itemInfo.category = category
-        slotInfo.sectionLayouts[category] = { hideHeader = true, sortMode = "physical" }
+        slotInfo.sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
       end
     end
     for bagid, _ in pairs(slotInfo.emptySlotByBagAndSlot) do
       local category = self:GetBagName(bagid)
-      slotInfo.sectionLayouts[category] = { hideHeader = true, sortMode = "physical" }
+      slotInfo.sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
+    end
+  end
+
+  slotInfo.sortedItems = {}
+  for _, item in pairs(slotInfo.visibleItemsBySlotKey) do
+    table.insert(slotInfo.sortedItems, item)
+  end
+
+  if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
+      for slotid, data in pairs(emptyBagData) do
+        if C_Container.GetBagName(bagid) ~= nil then
+          local category = self:GetBagName(bagid)
+          local dummy = {
+            isFreeSlot = true,
+            bagid = bagid,
+            slotid = slotid,
+            slotkey = data.slotkey or (bagid .. "_" .. slotid),
+            itemInfo = {
+              category = category,
+              itemName = "",
+              itemQuality = -1,
+              currentItemCount = 0,
+              itemGUID = "",
+              currentItemLevel = 0,
+              expacID = 0
+            }
+          }
+          table.insert(slotInfo.sortedItems, dummy)
+        end
+      end
+    end
+  end
+
+  local sortModule = addon:GetModule("Sort", true)
+  if sortModule then
+    local sortFunc
+    if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+      sortFunc = sortModule.SortItemDataBySlot
+    elseif sortModule.GetItemDataSortFunction then
+      sortFunc = sortModule:GetItemDataSortFunction(kind, database:GetBagView(kind))
+    end
+
+    if sortFunc then
+      table.sort(slotInfo.sortedItems, sortFunc)
     end
   end
 
