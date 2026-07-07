@@ -14,6 +14,9 @@ local database = addon:GetModule('Database')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
@@ -204,10 +207,15 @@ function contextMenu:CreateContextMenu(bag)
     func = function()
       local ctx = context:New('ShowBags')
       if bag.slots:IsShown() then
+        database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
         bag.slots:Hide()
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
       else
+        database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
+        database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
         bag.slots:Draw(ctx)
         bag.slots:Show()
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
       end
     end
   })

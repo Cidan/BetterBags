@@ -383,7 +383,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       slotkey = "0_1",
       isItemEmpty = false,
       itemInfo = {
-        category = "Recent Items",
+        category = "#1: Backpack",
         itemID = 1234,
       },
     }
@@ -434,14 +434,14 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       slotid = 1,
       slotkey = "-1_1",
       isItemEmpty = false,
-      itemInfo = { category = "Default", itemID = 11 },
+      itemInfo = { category = "#1: Bank", itemID = 11 },
     }
     local itemWarbank1 = {
       bagid = 13,
       slotid = 1,
       slotkey = "13_1",
       isItemEmpty = false,
-      itemInfo = { category = "Default", itemID = 12 },
+      itemInfo = { category = "#9: Warbank Tab 1", itemID = 12 },
     }
 
     local mockSlotInfo = {

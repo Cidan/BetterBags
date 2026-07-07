@@ -247,3 +247,108 @@ function sort.GetItemSortBySlot(a, b)
   if not bData then return true end
   return aData.slotid < bData.slotid
 end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByQualityThenAlpha(aData, bData)
+  if aData.isFreeSlot then return false end
+  if bData.isFreeSlot then return true end
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByAlphaThenQuality(aData, bData)
+  if aData.isFreeSlot then return false end
+  if bData.isFreeSlot then return true end
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
+    return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByItemLevel(aData, bData)
+  if aData.isFreeSlot then return false end
+  if bData.isFreeSlot then return true end
+  if invalidData(aData, bData) then return false end
+  if aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
+    return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataByExpansion(aData, bData)
+  if aData.isFreeSlot then return false end
+  if bData.isFreeSlot then return true end
+  if invalidData(aData, bData) then return false end
+
+  local aExpacID = aData.itemInfo.expacID or 0
+  local bExpacID = bData.itemInfo.expacID or 0
+
+  if aExpacID ~= bExpacID then
+    return aExpacID < bExpacID
+  elseif aData.itemInfo.itemName ~= bData.itemInfo.itemName then
+    return aData.itemInfo.itemName < bData.itemInfo.itemName
+  elseif aData.itemInfo.currentItemCount ~= bData.itemInfo.currentItemCount then
+    return aData.itemInfo.currentItemCount > bData.itemInfo.currentItemCount
+  end
+  return aData.itemInfo.itemGUID < bData.itemInfo.itemGUID
+end
+
+---@param aData ItemData
+---@param bData ItemData
+---@return boolean
+function sort.SortItemDataBySlot(aData, bData)
+  if not aData then return false end
+  if not bData then return true end
+  if aData.bagid ~= bData.bagid then
+    return aData.bagid < bData.bagid
+  end
+  return aData.slotid < bData.slotid
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetItemDataSortFunction(kind, view)
+  if kind == const.BAG_KIND.UNDEFINED then
+    return function() return false end
+  end
+  local sortType = database:GetItemSortType(kind, view)
+  if sortType == const.ITEM_SORT_TYPE.ALPHABETICALLY_THEN_QUALITY then
+    return self.SortItemDataByAlphaThenQuality
+  elseif sortType == const.ITEM_SORT_TYPE.QUALITY_THEN_ALPHABETICALLY then
+    return self.SortItemDataByQualityThenAlpha
+  elseif sortType == const.ITEM_SORT_TYPE.ITEM_LEVEL then
+    return self.SortItemDataByItemLevel
+  elseif sortType == const.ITEM_SORT_TYPE.EXPANSION then
+    return self.SortItemDataByExpansion
+  end
+  assert(false, "Unknown sort type: " .. sortType)
+  return function() end
+end

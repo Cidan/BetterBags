@@ -128,66 +128,90 @@ local function BagView(view, ctx, bag, slotInfo, callback)
 
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
-  -- Extract all items that belong to the active tab ID
-  local currentItems = {}
-  local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
-  for _, item in pairs(itemsGetter(slotInfo)) do
-    if not item.isItemEmpty and ItemBelongsToTab(view, bag.kind, item) then
-      table.insert(currentItems, item)
-    end
-  end
-
-  -- Populate the sections
-  for _, item in ipairs(currentItems) do
-    local dbItem = items:GetItemDataFromSlotKey(item.slotkey)
-    if dbItem then
-      -- Get or create visual item button
-      local itemButton = view:GetOrCreateItemButton(ctx, item.slotkey)
-      if itemButton.SetItemFromData then
-        itemButton:SetItemFromData(ctx, item)
-      else
-        itemButton.staticData = item
-        itemButton:SetItem(ctx, item.slotkey)
-      end
-
-      -- Resolve polymorphic section name
-      local category = L:G("Items")
-      if view.bagview == const.BAG_VIEW.SECTION_GRID then
-        category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-      elseif view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-        category = GetBagName(item.bagid)
-      end
-
-      local section = view:GetOrCreateSection(ctx, category)
-      section:AddCell(item.slotkey, itemButton)
-      view:SetSlotSection(item.slotkey, section)
-    end
-  end
-
   -- Draw empty slots depending on the bag view
   local activeGroup = nil
   if database:GetGroupsEnabled(bag.kind) and not (bag.kind == const.BAG_KIND.BANK and database:GetShowBankTabs()) then
     activeGroup = view.tabID
   end
 
-  if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-    for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, data in pairs(emptyBagData) do
-        local slotkey = view:GetSlotKey(data)
-        if C_Container.GetBagName(bagid) ~= nil then
-          local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
-          itemButton:SetFreeSlots(ctx, bagid, slotid, -1)
-          local section = view:GetOrCreateSection(ctx, GetBagName(bagid))
-          section:AddCell(slotkey, itemButton)
+  -- Populate the sections from pre-sorted items (both real items and free/empty slots)
+  local sortedItems = slotInfo.sortedItems
+  if not sortedItems then
+    sortedItems = {}
+    local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
+    if itemsGetter then
+      for _, item in pairs(itemsGetter(slotInfo)) do
+        if not item.isItemEmpty then
+          table.insert(sortedItems, item)
+        end
+      end
+    end
+    if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS and slotInfo.emptySlotByBagAndSlot then
+      for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
+        for slotid, data in pairs(emptyBagData) do
+          if C_Container.GetBagName(bagid) ~= nil then
+            local category = GetBagName(bagid)
+            local dummy = {
+              isFreeSlot = true,
+              bagid = bagid,
+              slotid = slotid,
+              slotkey = data.slotkey or (bagid .. "_" .. slotid),
+              itemInfo = {
+                category = category,
+                itemName = "",
+                itemQuality = -1,
+                currentItemCount = 0,
+                itemGUID = "",
+                currentItemLevel = 0,
+                expacID = 0
+              }
+            }
+            table.insert(sortedItems, dummy)
+          end
         end
       end
     end
   end
 
-  -- Draw active sections
-  for _, section in pairs(view:GetAllSections()) do
+  for _, item in ipairs(sortedItems) do
+    if ItemBelongsToTab(view, bag.kind, item) then
+      local slotkey = item.slotkey
+      if item.isFreeSlot then
+        local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+        itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, -1)
+        local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+        local section = view:GetOrCreateSection(ctx, category)
+        section:AddCell(slotkey, itemButton)
+        view:SetSlotSection(slotkey, section)
+      else
+        local dbItem = items:GetItemDataFromSlotKey(slotkey)
+        if dbItem then
+          local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+          if itemButton.SetItemFromData then
+            itemButton:SetItemFromData(ctx, item)
+          else
+            itemButton.staticData = item
+            itemButton:SetItem(ctx, slotkey)
+          end
+          local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+          local section = view:GetOrCreateSection(ctx, category)
+          section:AddCell(slotkey, itemButton)
+          view:SetSlotSection(slotkey, section)
+        end
+      end
+    end
+  end
+
+  -- Draw active sections (with sorting bypassed, since they are pre-sorted)
+  for sectionName, section in pairs(view:GetAllSections()) do
     section:SetMaxCellWidth(sizeInfo.itemsPerRow)
-    section:Draw(bag.kind, database:GetBagView(bag.kind), false)
+    local layout = slotInfo.sectionLayouts and slotInfo.sectionLayouts[sectionName]
+    if layout then
+      if layout.hideHeader then
+        section:RemoveHeader()
+      end
+    end
+    section:Draw(bag.kind, database:GetBagView(bag.kind), false, true)
   end
 
   -- Hide filtered sections
