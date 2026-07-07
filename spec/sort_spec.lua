@@ -542,4 +542,59 @@ describe("Sort", function()
       assert.is_true(sort.SortItemDataByQualityThenAlpha(item, freeSlot))
     end)
   end)
+
+  -- ─── Category Data Sort Functions ─────────────────────────────────────────
+
+  describe("Category Data Sort Functions", function()
+    before_each(function()
+      database.GetCustomSectionSort = function(_, _) return {} end
+    end)
+
+    it("SortCategoryDataAlphabetically sorts alphabetically", function()
+      local armor = { name = "Armor", count = 5, fillWidth = false }
+      local weapons = { name = "Weapons", count = 10, fillWidth = false }
+      assert.is_true(sort.SortCategoryDataAlphabetically(const.BAG_KIND.BACKPACK, armor, weapons))
+      assert.is_false(sort.SortCategoryDataAlphabetically(const.BAG_KIND.BACKPACK, weapons, armor))
+    end)
+
+    it("SortCategoryDataAlphabetically respects priority pins", function()
+      database.GetCustomSectionSort = function(_, _) return { ["Weapons"] = 1 } end
+      local armor = { name = "Armor", count = 5, fillWidth = false }
+      local weapons = { name = "Weapons", count = 10, fillWidth = false }
+      assert.is_true(sort.SortCategoryDataAlphabetically(const.BAG_KIND.BACKPACK, weapons, armor))
+    end)
+
+    it("SortCategoryDataAlphabetically puts Recent Items first and Free Space last", function()
+      local recent = { name = L:G("Recent Items"), count = 1, fillWidth = false }
+      local free = { name = L:G("Free Space"), count = 1, fillWidth = false }
+      local armor = { name = "Armor", count = 5, fillWidth = false }
+
+      assert.is_true(sort.SortCategoryDataAlphabetically(const.BAG_KIND.BACKPACK, recent, armor))
+      assert.is_true(sort.SortCategoryDataAlphabetically(const.BAG_KIND.BACKPACK, armor, free))
+    end)
+
+    it("SortCategoryDataBySizeDescending sorts by size descending", function()
+      local big = { name = "Armor", count = 20, fillWidth = false }
+      local small = { name = "Weapons", count = 5, fillWidth = false }
+      assert.is_true(sort.SortCategoryDataBySizeDescending(const.BAG_KIND.BACKPACK, big, small))
+      assert.is_false(sort.SortCategoryDataBySizeDescending(const.BAG_KIND.BACKPACK, small, big))
+    end)
+
+    it("SortCategoryDataBySizeAscending sorts by size ascending", function()
+      local big = { name = "Armor", count = 20, fillWidth = false }
+      local small = { name = "Weapons", count = 5, fillWidth = false }
+      assert.is_true(sort.SortCategoryDataBySizeAscending(const.BAG_KIND.BACKPACK, small, big))
+      assert.is_false(sort.SortCategoryDataBySizeAscending(const.BAG_KIND.BACKPACK, big, small))
+    end)
+
+    it("GetCategoryDataSortFunction returns correct functions", function()
+      database.GetSectionSortType = function(_, _, _)
+        return const.SECTION_SORT_TYPE.SIZE_DESCENDING
+      end
+      local fn = sort:GetCategoryDataSortFunction(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+      local big = { name = "A", count = 20, fillWidth = false }
+      local small = { name = "B", count = 5, fillWidth = false }
+      assert.is_true(fn(big, small))
+    end)
+  end)
 end)

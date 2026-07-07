@@ -352,3 +352,109 @@ function sort:GetItemDataSortFunction(kind, view)
   assert(false, "Unknown sort type: " .. sortType)
   return function() end
 end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean, boolean
+function sort.SortCategoryDataByPriority(kind, a, b)
+  if not a or not b then return false, false end
+  local aTitle, bTitle = a.name, b.name
+  local pinnedItems = database:GetCustomSectionSort(kind)
+  if not pinnedItems[aTitle] and not pinnedItems[bTitle] then return false, false end
+  if pinnedItems[aTitle] and not pinnedItems[bTitle] then return true, true end
+  if not pinnedItems[aTitle] and pinnedItems[bTitle] then return true, false end
+
+  return true, pinnedItems[aTitle] < pinnedItems[bTitle]
+end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean
+function sort.SortCategoryDataAlphabetically(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortCategoryDataByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.name == L:G("Recent Items") then return true end
+  if b.name == L:G("Recent Items") then return false end
+
+  if a.fillWidth then return false end
+  if b.fillWidth then return true end
+
+  if a.name == L:G("Free Space") then return false end
+  if b.name == L:G("Free Space") then return true end
+  return a.name < b.name
+end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean
+function sort.SortCategoryDataBySizeDescending(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortCategoryDataByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.name == L:G("Recent Items") then return true end
+  if b.name == L:G("Recent Items") then return false end
+
+  if a.fillWidth then return false end
+  if b.fillWidth then return true end
+
+  if a.name == L:G("Free Space") then return false end
+  if b.name == L:G("Free Space") then return true end
+  local aSize, bSize = a.count, b.count
+  if aSize ~= bSize then
+    return aSize > bSize
+  end
+  return a.name < b.name
+end
+
+---@param kind BagKind
+---@param a table
+---@param b table
+---@return boolean
+function sort.SortCategoryDataBySizeAscending(kind, a, b)
+  if not a or not b then return false end
+  local shouldSort, sortResult = sort.SortCategoryDataByPriority(kind, a, b)
+  if shouldSort then return sortResult end
+
+  if a.name == L:G("Recent Items") then return true end
+  if b.name == L:G("Recent Items") then return false end
+
+  if a.fillWidth then return false end
+  if b.fillWidth then return true end
+
+  if a.name == L:G("Free Space") then return false end
+  if b.name == L:G("Free Space") then return true end
+  local aSize, bSize = a.count, b.count
+  if aSize ~= bSize then
+    return aSize < bSize
+  end
+  return a.name < b.name
+end
+
+---@param kind BagKind
+---@param view BagView
+---@return function
+function sort:GetCategoryDataSortFunction(kind, view)
+  local sortType = database:GetSectionSortType(kind, view)
+  if sortType == const.SECTION_SORT_TYPE.ALPHABETICALLY then
+    return function(a, b)
+      return self.SortCategoryDataAlphabetically(kind, a, b)
+    end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_ASCENDING then
+    return function(a, b)
+      return self.SortCategoryDataBySizeAscending(kind, a, b)
+    end
+  elseif sortType == const.SECTION_SORT_TYPE.SIZE_DESCENDING then
+    return function(a, b)
+      return self.SortCategoryDataBySizeDescending(kind, a, b)
+    end
+  end
+  return function(a, b)
+    return self.SortCategoryDataAlphabetically(kind, a, b)
+  end
+end

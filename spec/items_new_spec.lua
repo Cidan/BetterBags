@@ -46,6 +46,7 @@ categories.DoesCategoryExist = categories.DoesCategoryExist or function() return
 
 -- Set up constants
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
+const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.BANK_BAGS = { [6] = 6, [7] = 7, [8] = 8, [9] = 9, [10] = 10, [11] = 11 }
 const.ACCOUNT_BANK_BAGS = { [13] = 13, [14] = 14, [15] = 15, [16] = 16, [17] = 17 }
 const.BACKPACK_BAGS = { [0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4 }
@@ -382,6 +383,165 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_Container.GetContainerNumFreeSlots = originalGetContainerNumFreeSlots
       _G.C_Item.GetItemSubClassInfo = originalGetItemSubClassInfo
       _G.GetInventoryItemLink = originalGetInventoryItemLink
+    end)
+  end)
+
+  describe("Synthesis of sortedCategories", function()
+    it("should synthesize and sort categories after ProcessRefresh", function()
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return 1000 + slotid end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return "|cff0070dd|Hitem:"..(1000+slotid).."|h[Item "..slotid.."]|h|r" end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        local id = tonumber(itemID)
+        if not id and type(itemID) == "string" then
+          id = tonumber(string.match(itemID, "item:(%d+)"))
+        end
+        id = id or 1001
+        local name = "Item " .. (id - 1000)
+        local quality = 1
+        local class = "Weapon"
+        local subclass = "One-Handed Swords"
+        if id == 1001 then
+          class = "Armor"
+          subclass = "Shields"
+        end
+        return name, "|cff0070dd|Hitem:"..id.."|h["..name.."]|h|r", quality, 100, 1, class, subclass, 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      -- Stub Database to return simple alphabetical sort for sections
+      local DB = addon:GetModule("Database")
+      DB.GetSectionSortType = function() return const.SECTION_SORT_TYPE.ALPHABETICALLY end
+      DB.GetCustomSectionSort = function() return {} end
+      local originalGetCategoryFilter = DB.GetCategoryFilter
+      function DB:GetCategoryFilter(kind, filter)
+        return filter == "Type"
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestCategorySynthesis")
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.is_not_nil(slotInfo.sortedCategories)
+      assert.is_true(#slotInfo.sortedCategories > 0)
+
+      -- Verify we have categories and they are sorted alphabetically by default
+      local hasWeapon = false
+      local hasArmor = false
+      for _, cat in ipairs(slotInfo.sortedCategories) do
+        if cat.name == "Weapon" then hasWeapon = true end
+        if cat.name == "Armor" then hasArmor = true end
+      end
+      -- Weapons and Armor categories should have been synthesized from class names
+      assert.is_true(hasWeapon or hasArmor)
+
+      -- Restore mocks
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      DB.GetCategoryFilter = originalGetCategoryFilter
+    end)
+
+    it("should retain physical order of categories in SECTION_ALL_BAGS mode and not sort them alphabetically", function()
+      -- Set up SECTION_ALL_BAGS view
+      local DB = addon:GetModule("Database")
+      local originalGetBagView = DB.GetBagView
+      DB.GetBagView = function() return const.BAG_VIEW.SECTION_ALL_BAGS end
+
+      -- Mock bags and their names
+      local savedGetBagName = _G.C_Container.GetBagName
+      _G.C_Container.GetBagName = function(bagid)
+        if bagid == 1 then return "#1: Bag 1" end
+        if bagid == 2 then return "#2: Bag 2" end
+        if bagid == 10 then return "#10: Bag 10" end
+        return nil
+      end
+
+      -- Mock items across those bag IDs
+      -- We return 1 slot for bags 1, 2, and 10
+      local savedGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+      _G.C_Container.GetContainerNumSlots = function(bagid)
+        if bagid == 1 or bagid == 2 or bagid == 10 then return 1 end
+        return 0
+      end
+
+      local savedGetContainerItemID = _G.C_Container.GetContainerItemID
+      _G.C_Container.GetContainerItemID = function(bagid, slotid)
+        if bagid == 1 or bagid == 2 or bagid == 10 then return 1000 + bagid end
+        return nil
+      end
+
+      local savedGetContainerItemLink = _G.C_Container.GetContainerItemLink
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+        if bagid == 1 or bagid == 2 or bagid == 10 then
+          return "|cff0070dd|Hitem:"..(1000+bagid).."|h[Item "..bagid.."]|h|r"
+        end
+        return nil
+      end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        local id = tonumber(itemID)
+        if not id and type(itemID) == "string" then
+          id = tonumber(string.match(itemID, "item:(%d+)"))
+        end
+        id = id or 1001
+        return "Item " .. id, "|cff0070dd|Hitem:"..id.."|h[Item "..id.."]|h|r", 1, 100, 1, "Misc", "Junk", 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      -- Force Sort module to be active with standard alphabetical category sort
+      local sortModule = StubBetterBagsModule("Sort")
+      sortModule.SortItemDataBySlot = function(a, b)
+        if not a then return false end
+        if not b then return true end
+        if a.bagid ~= b.bagid then
+          return a.bagid < b.bagid
+        end
+        return a.slotid < b.slotid
+      end
+      local originalGetCategoryDataSortFunction = sortModule.GetCategoryDataSortFunction
+      sortModule.GetCategoryDataSortFunction = function()
+        -- Return standard alphabetical sort logic for categories
+        return function(a, b)
+          return a.name < b.name
+        end
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestPhysicalCategoryOrder")
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+
+      -- Let's construct a list of active bags including 1, 2, 10
+      local activeBags = { [1] = 1, [2] = 2, [10] = 10 }
+
+      -- We override BACKPACK_BAGS temporarily so that ProcessRefresh knows these bags are active
+      local originalBackpackBags = const.BACKPACK_BAGS
+      const.BACKPACK_BAGS = activeBags
+
+      -- Let's use ProcessRefresh which internally calls Harvest and assigns categories
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.is_not_nil(slotInfo.sortedCategories)
+
+      -- If physical ordering is preserved, the order should be: Bag 1, Bag 2, Bag 10
+      -- If alphabetical sort was applied, Bag 10 would sort before Bag 2
+      local order = {}
+      for _, cat in ipairs(slotInfo.sortedCategories) do
+        table.insert(order, cat.name)
+      end
+
+      assert.are.equal("#2: #1: Bag 1", order[1])
+      assert.are.equal("#3: #2: Bag 2", order[2])
+      assert.are.equal("#11: #10: Bag 10", order[3])
+
+      -- Restore all mocks
+      DB.GetBagView = originalGetBagView
+      _G.C_Container.GetBagName = savedGetBagName
+      _G.C_Container.GetContainerNumSlots = savedGetContainerNumSlots
+      _G.C_Container.GetContainerItemID = savedGetContainerItemID
+      _G.C_Container.GetContainerItemLink = savedGetContainerItemLink
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      sortModule.GetCategoryDataSortFunction = originalGetCategoryDataSortFunction
+      const.BACKPACK_BAGS = originalBackpackBags
     end)
   end)
 end)
