@@ -280,9 +280,9 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   -- Sort sections if required
   view.content.maxCellWidth = sizeInfo.columnCount
   if fallbackSort and (ctx:GetBool('wipe') or view.sortRequired) then
-    view.sortRequired = false
     view.content:Sort(sort:GetSectionSortFunction(bag.kind, database:GetBagView(bag.kind)))
   end
+  view.sortRequired = false
 
   -- Pass 1: Draw layout
   for _, section in ipairs(view.content.cells) do

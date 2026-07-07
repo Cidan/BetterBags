@@ -1,50 +1,40 @@
-# Implementation Plan: Pre-Sorted Data Architecture & Physical Slot Ordering
+# Implementation Plan: Pre-Sorted Section Data Architecture
 
-## Overview
-The goal is to shift all item sorting logic entirely out of the UI rendering layers (`views/bagview_new.lua` and `views/gridview_new.lua`) and into the data enrichment phase (`data/items_new.lua`). A single, perfectly sorted array of real items and "dummy" empty slots will be synthesized, allowing the view layer to iterate over it sequentially and build sections without calling any sorting algorithms. Additionally, this fixes the issue where the Backpack did not properly sort by physical slot in Blizzard Bag mode (`SECTION_ALL_BAGS`).
+## Goal
+Move the responsibility of sorting sections (categories) out of the UI rendering phase and into the data enrichment phase (Phase 4.5). The UI layer will become a "dumb painter" that blindly creates and populates sections in the exact order specified by the pre-computed data structure. This optimizes rendering performance by eliminating expensive frame re-anchoring and algorithmic sorting on UI components.
 
-This implementation will be applied directly to the current branch (`refactor/data-driven-show-bags-layout`).
+## 1. Synthesize Category Data (Phase 4.5)
+**Target:** `data/items_new.lua`
+- After constructing the `slotInfo.sortedItems` array, create a new pass to tally up category metrics.
+- Build a lightweight array of category metadata: `slotInfo.sortedCategories = {}`.
+- Initialize a local tally dictionary to avoid duplicate entries and count sizes efficiently.
+- Iterate over `slotInfo.sortedItems`:
+  - For each item, look up or initialize its category entry in the tally dictionary.
+  - The entry should look like: `{ name = "Category Name", count = 0, isFreeSpace = false, isRecent = false, ... }`.
+  - Increment the `count` for each item.
+  - Set specific flags (like `isFreeSpace`, `isRecent`) based on the category name or item attributes, which will be useful for sorting priorities.
+- Convert the values of the tally dictionary into the `slotInfo.sortedCategories` flat array.
 
-## 1. Refactor Sorting Logic for Data (`util/sort.lua`)
-The existing sort functions expect `Item` UI frame instances. We need pure data equivalents.
-- **Action**: Create an `invalidItemData(aData, bData)` helper parallel to the existing `invalidData` function.
-- **Action**: Implement new sort functions that accept `ItemData` tables:
-  - `SortItemDataByQualityThenAlpha(aData, bData)`
-  - `SortItemDataByAlphaThenQuality(aData, bData)`
-  - `SortItemDataByItemLevel(aData, bData)`
-  - `SortItemDataByExpansion(aData, bData)`
-- **Action**: Implement `SortItemDataBySlot(aData, bData)` for physical sorting.
-  - **Logic**: Compare `aData.bagid` and `bData.bagid`. If they differ, return `aData.bagid < bData.bagid`. Otherwise, return `aData.slotid < bData.slotid`.
-- **Action**: Expose `sort:GetItemDataSortFunction(kind, view)` which reads `database:GetItemSortType(kind, view)` and returns the appropriate data-layer sort function.
+## 2. Refactor Section Sorting Logic
+**Target:** `util/sort.lua`
+- Add new data-layer sort functions that operate on the lightweight category metadata tables instead of UI section frames.
+- Example functions:
+  - `SortCategoryDataAlphabetically(aData, bData)`
+  - `SortCategoryDataBySizeDescending(aData, bData)`
+  - `SortCategoryDataBySizeAscending(aData, bData)`
+- These functions must replicate the exact logic currently used for UI frame sorting, including pinning specific categories (e.g., Free Space, Recent Items) to the top or bottom of the list according to their flags.
+- Add a new helper `sort:GetCategoryDataSortFunction(kind, view)` which reads `database:GetSectionSortType(kind, view)` and returns the appropriate data-layer sort function.
+- In `data/items_new.lua`, after building `slotInfo.sortedCategories`, apply the appropriate sort function to the array using `table.sort(slotInfo.sortedCategories, selectedSortFunc)`.
 
-## 2. Synthesize and Pre-Sort in the Data Phase (`data/items_new.lua`)
-Synthesize a single `sortedItems` array containing everything the view needs to render, fully ordered.
-- **Action**: In `items:ProcessRefresh(ctx, kind)` (Phase 4.5), right before `events:SendMessage(ctx, ev, slotInfo)`:
-  - Initialize `slotInfo.sortedItems = {}`.
-  - Iterate `slotInfo.visibleItemsBySlotKey` and insert all real `ItemData` objects into `sortedItems`.
-  - Iterate `slotInfo.emptySlotByBagAndSlot` and create dummy `ItemData` objects for every empty slot.
-    - **Dummy Object Shape**: `{ isFreeSlot = true, bagid = bagid, slotid = slotid, itemInfo = { category = category, itemName = "", itemQuality = 0, currentItemCount = 1, itemGUID = "" } }`. This ensures they do not cause nil errors in sorting functions.
-    - Insert these dummy objects into `sortedItems`.
-  - **Sort Resolution**:
-    - If `database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS`, force the sort function to `sort.SortItemDataBySlot`.
-    - Otherwise, fetch the user's preferred sort function via `sort:GetItemDataSortFunction(kind, view)`.
-  - Execute `table.sort(slotInfo.sortedItems, selectedSortFunction)`.
+## 3. Make View Instantiation 100% "Dumb"
+**Target:** `views/bagview_new.lua` and `views/gridview_new.lua`
+- Modify the rendering loop in `Render` (or equivalent method) to process the pre-sorted lists sequentially.
+- **Pre-create Sections:** Before looping over items, loop over `slotInfo.sortedCategories` using `ipairs`. For each category metadata object, call `view:GetOrCreateSection(ctx, catData.name)`. Because the UI grid naturally appends elements in the exact order they are added, creating them in this pre-sorted order guarantees the UI sections are positioned perfectly.
+- **Populate Sections:** Retain the existing loop over `slotInfo.sortedItems` using `ipairs`. Add each item button to its corresponding (already created) section.
+- **Remove UI Sorting:** Completely delete all calls to `view.content:Sort(...)`. The UI grid no longer needs to perform any expensive frame re-anchoring or algorithmic sorting.
 
-## 3. Make the View Layer 100% "Dumb" (`views/bagview_new.lua` & `views/gridview_new.lua`)
-Refactor the view layer to consume `sortedItems` iteratively, dropping all internal UI sorting logic.
-- **Action**: Remove the separate iteration loops for `itemsGetter(slotInfo)` and `slotInfo.emptySlotByBagAndSlot`.
-- **Action**: Implement a single master loop: `for _, itemData in ipairs(slotInfo.sortedItems) do`.
-- **Action**: Inside the loop:
-  - Check `itemData.isFreeSlot`.
-    - If true: generate an empty slot button via `itemButton:SetFreeSlots(ctx, itemData.bagid, itemData.slotid, -1)`.
-    - If false: generate a standard item button via `itemButton:SetItemFromData(ctx, itemData)`.
-  - Append the `itemButton` to the section matching `itemData.itemInfo.category`.
-- **Action**: **Delete all sorting calls**. Remove any `view.content:Sort()` and `section:Draw(..., nosort)` logic, as well as `section.content:Sort()` parameters from within the rendering passes. The items will naturally stack in the exact order they are encountered in `sortedItems`.
-
-## 4. Risks and Edge Cases
-- **Nil Reference in Dummy Objects**: Ensure all data-sort functions safely handle `isFreeSlot` exactly as the UI versions did (e.g., placing free slots at the end of the list where applicable).
-- **Section Layout Preservation**: The logic mapping `hideHeader` in `slotInfo.sectionLayouts` to specific bags (e.g., hiding for Bank but not Backpack) must remain intact and must apply equally to sections containing dummy empty slots.
-
-## 5. Finalizing
-- Update and run `luacheck` to catch any undefined variables or syntactical issues before committing.
-- Commit the changes to the active branch (`refactor/data-driven-show-bags-layout`) to update PR 1028.
+## Risks & Edge Cases
+- **Empty Sections:** Ensure we don't accidentally create empty sections. Since the tally is built directly from `slotInfo.sortedItems`, only categories with at least one item (or a dummy empty slot item) will be tallied and created.
+- **Sort Priority Rules:** Existing sort rules that pin specific categories (e.g., "Free Space" at the bottom, "Recent Items" at the top) must be carefully migrated to the new data-layer sort functions to prevent visual regressions.
+- **Blizzard Bag Mode (`SECTION_ALL_BAGS`):** Ensure the category metadata correctly captures the overridden physical bag names (e.g., `#1: Backpack`) when in Blizzard Bag Mode. The data-layer sort must correctly order these physical bags sequentially by ID.
+- **Filter Sync:** The view layer's logic to "Hide filtered sections" must still function. By creating sections in order, any filtered/hidden sections will simply be skipped or hidden without disrupting the established order of the remaining visible sections.

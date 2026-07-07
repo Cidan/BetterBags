@@ -539,7 +539,8 @@ function items:ProcessRefresh(ctx, kind)
     categoryTally[category].count = categoryTally[category].count + 1
   end
 
-  if sortModule and sortModule.GetCategoryDataSortFunction then
+  local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
+  if not isAllBags and sortModule and sortModule.GetCategoryDataSortFunction then
     local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
     if sortFunc then
       table.sort(categoryOrder, sortFunc)
