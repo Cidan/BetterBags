@@ -412,34 +412,21 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		freeSlotsSection:SetTitle(L:G("Free Space"))
 		self.globalSections[L:G("Free Space")] = freeSlotsSection
 
-		if database:GetShowAllFreeSpace(self.kind) then
+		local freeSpaceData = tabData.freeSpace or { showAll = true, buttons = {} }
+		if freeSpaceData.showAll then
 			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-			for _, item in ipairs(tabData.emptySlotsSorted or {}) do
-				local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
-				itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, 1, true)
-				freeSlotsSection:AddCell(item.slotkey, itemButton)
+			for _, btn in ipairs(freeSpaceData.buttons) do
+				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
+				itemButton:SetFreeSlots(ctx, btn.bagid, btn.slotid, 1, true)
+				freeSlotsSection:AddCell(btn.slotkey, itemButton)
 			end
 			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, true, true)
 		else
 			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
-			local aggregatedCounts = {}
-			local firstSlotKeyForSubclass = {}
-			if tabData.emptySlotsByBag then
-				for bagid, info in pairs(tabData.emptySlotsByBag) do
-					aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
-					if not firstSlotKeyForSubclass[info.name] and slotInfo.freeSlotKeysByBag and slotInfo.freeSlotKeysByBag[bagid] then
-						firstSlotKeyForSubclass[info.name] = slotInfo.freeSlotKeysByBag[bagid]
-					end
-				end
-			end
-			for name, freeSlotCount in pairs(aggregatedCounts) do
-				local slotKey = firstSlotKeyForSubclass[name]
-				if freeSlotCount > 0 and slotKey ~= nil then
-					local itemButton = self:GetOrCreateGlobalItemButton(ctx, slotKey)
-					local freeSlotBag, freeSlotID = self:ParseSlotKey(slotKey)
-					itemButton:SetFreeSlots(ctx, freeSlotBag, freeSlotID, freeSlotCount)
-					freeSlotsSection:AddCell(name, itemButton)
-				end
+			for _, btn in ipairs(freeSpaceData.buttons) do
+				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
+				itemButton:SetFreeSlots(ctx, btn.bagid, btn.slotid, btn.count)
+				freeSlotsSection:AddCell(btn.key, itemButton)
 			end
 			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, false)
 		end

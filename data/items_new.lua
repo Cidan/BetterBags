@@ -641,6 +641,8 @@ function items:ProcessRefresh(ctx, kind)
   possibleTabs[activeTabID] = true
   possibleTabs[1] = true -- fallback
 
+  local showAll = database:GetShowAllFreeSpace(kind)
+
   for tabID in pairs(possibleTabs) do
     slotInfo.tabs[tabID] = {
       items = {},
@@ -649,6 +651,10 @@ function items:ProcessRefresh(ctx, kind)
       emptySlotsByBag = {},
       emptySlots = {},
       totalItems = 0,
+      freeSpace = {
+        showAll = showAll,
+        buttons = {},
+      },
     }
 
     -- Filter emptySlotsSorted and emptySlotsByBag for this tab
@@ -663,6 +669,53 @@ function items:ProcessRefresh(ctx, kind)
         if IncludeBagInFreeSpace(kind, bagid, tabID) then
           slotInfo.tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
           slotInfo.tabs[tabID].emptySlots[info.name] = (slotInfo.tabs[tabID].emptySlots[info.name] or 0) + info.count
+        end
+      end
+    end
+
+    -- Populate tabData.freeSpace.buttons
+    if showAll then
+      for _, item in ipairs(slotInfo.tabs[tabID].emptySlotsSorted) do
+        table.insert(slotInfo.tabs[tabID].freeSpace.buttons, {
+          slotkey = item.slotkey,
+          bagid = item.bagid,
+          slotid = item.slotid,
+          count = 1,
+          isIndividual = true,
+          key = item.slotkey,
+        })
+      end
+    else
+      local aggregatedCounts = {}
+      local firstSlotKeyForSubclass = {}
+      for bagid, info in pairs(slotInfo.tabs[tabID].emptySlotsByBag) do
+        aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
+        if not firstSlotKeyForSubclass[info.name] and slotInfo.freeSlotKeysByBag and slotInfo.freeSlotKeysByBag[bagid] then
+          firstSlotKeyForSubclass[info.name] = slotInfo.freeSlotKeysByBag[bagid]
+        end
+      end
+
+      local sortedSubclasses = {}
+      for name in pairs(aggregatedCounts) do
+        table.insert(sortedSubclasses, name)
+      end
+      table.sort(sortedSubclasses)
+
+      for _, name in ipairs(sortedSubclasses) do
+        local freeSlotCount = aggregatedCounts[name]
+        local slotKey = firstSlotKeyForSubclass[name]
+        if freeSlotCount > 0 and slotKey ~= nil then
+          local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
+          if freeSlotBag and freeSlotID then
+            table.insert(slotInfo.tabs[tabID].freeSpace.buttons, {
+              slotkey = slotKey,
+              bagid = tonumber(freeSlotBag),
+              slotid = tonumber(freeSlotID),
+              count = freeSlotCount,
+              isIndividual = false,
+              key = name,
+            })
+          end
         end
       end
     end

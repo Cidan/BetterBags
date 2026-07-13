@@ -93,6 +93,7 @@ end
 database.GetCategoryFilter = function() return false end
 database.GetEnableBankBag = function() return false end
 database.GetMarkRecentItems = function() return false end
+database.GetShowAllFreeSpace = function() return true end
 
 addon.isRetail = true
 addon.isClassic = false
@@ -735,6 +736,81 @@ describe("Items (New Data Farming Engine)", function()
       groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
       categories.IsCategoryShown = originalIsCategoryShown
       _G.C_Item.GetItemInfo = savedGetItemInfo
+    end)
+
+    it("pre-evaluates Free Space settings and populates tabData.freeSpace", function()
+      -- Enable groups in Database
+      local DB = addon:GetModule("Database")
+      local originalGetGroupsEnabled = DB.GetGroupsEnabled
+      DB.GetGroupsEnabled = function() return true end
+
+      local originalGetShowAllFreeSpace = DB.GetShowAllFreeSpace
+      DB.GetShowAllFreeSpace = function(self, kind) return true end -- Test with showAll = true
+
+      -- Mock a group
+      local groups = addon:GetModule("Groups", true) or StubBetterBagsModule("Groups")
+      local originalGetAllGroups = groups.GetAllGroups
+      groups.GetAllGroups = function(self, kind)
+        return {
+          [1] = { id = 1, name = "Default Group", isDefault = true }
+        }
+      end
+
+      local originalCategoryBelongsToGroup = groups.CategoryBelongsToGroup
+      groups.CategoryBelongsToGroup = function(self, kind, category, tabID)
+        return true
+      end
+
+      -- Isolate BACKPACK_BAGS to only contain bag 0
+      local originalBackpackBags = const.BACKPACK_BAGS
+      const.BACKPACK_BAGS = { [0] = 0 }
+
+      -- Mock bags and free slots
+      local originalGetContainerNumFreeSlots = _G.C_Container.GetContainerNumFreeSlots
+      _G.C_Container.GetContainerNumFreeSlots = function(bagid)
+        if bagid == 0 then return 2 end
+        return 0
+      end
+
+      -- Mock item data
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return nil end -- empty slots
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return nil end
+
+      local ctx = addon:GetModule("Context"):New("TestFreeSpacePartitioning")
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+
+      -- Assertions for freeSpace payload
+      assert.is_not_nil(slotInfo.tabs)
+      assert.is_not_nil(slotInfo.tabs[1])
+      assert.is_not_nil(slotInfo.tabs[1].freeSpace)
+      assert.is_true(slotInfo.tabs[1].freeSpace.showAll)
+      assert.are.equal(2, #slotInfo.tabs[1].freeSpace.buttons)
+      assert.are.equal("0_1", slotInfo.tabs[1].freeSpace.buttons[1].slotkey)
+      assert.is_true(slotInfo.tabs[1].freeSpace.buttons[1].isIndividual)
+
+      -- Now test with showAll = false
+      DB.GetShowAllFreeSpace = function(self, kind) return false end
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.is_not_nil(slotInfo.tabs[1].freeSpace)
+      assert.is_false(slotInfo.tabs[1].freeSpace.showAll)
+      assert.are.equal(1, #slotInfo.tabs[1].freeSpace.buttons) -- only 1 aggregated button for subclass
+      assert.is_false(slotInfo.tabs[1].freeSpace.buttons[1].isIndividual)
+      assert.are.equal(2, slotInfo.tabs[1].freeSpace.buttons[1].count)
+
+      -- Clean up mocks
+      DB.GetGroupsEnabled = originalGetGroupsEnabled
+      DB.GetShowAllFreeSpace = originalGetShowAllFreeSpace
+      _G.C_Container.GetContainerNumFreeSlots = originalGetContainerNumFreeSlots
+      groups.GetAllGroups = originalGetAllGroups
+      groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
+      const.BACKPACK_BAGS = originalBackpackBags
     end)
   end)
 

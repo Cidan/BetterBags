@@ -10,9 +10,6 @@ local const = addon:GetModule('Constants')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
@@ -85,20 +82,17 @@ local function BagView(view, ctx, bag, slotInfo, callback)
       section:AddCell(slotkey, itemButton)
       view:SetSlotSection(slotkey, section)
     else
-      local dbItem = items:GetItemDataFromSlotKey(slotkey)
-      if dbItem then
-        local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
-        if itemButton.SetItemFromData then
-          itemButton:SetItemFromData(ctx, item)
-        else
-          itemButton.staticData = item
-          itemButton:SetItem(ctx, slotkey)
-        end
-        local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-        local section = view:GetOrCreateSection(ctx, category)
-        section:AddCell(slotkey, itemButton)
-        view:SetSlotSection(slotkey, section)
+      local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
+      if itemButton.SetItemFromData then
+        itemButton:SetItemFromData(ctx, item)
+      else
+        itemButton.staticData = item
+        itemButton:SetItem(ctx, slotkey)
       end
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      local section = view:GetOrCreateSection(ctx, category)
+      section:AddCell(slotkey, itemButton)
+      view:SetSlotSection(slotkey, section)
     end
   end
 
