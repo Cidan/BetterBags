@@ -670,11 +670,18 @@ function items:ProcessRefresh(ctx, kind)
 
   -- Filter and assign items to their respective tabs
   for _, item in ipairs(slotInfo.sortedItems) do
-    for tabID, tabData in pairs(slotInfo.tabs) do
-      if ItemBelongsToTab(kind, item, tabID, viewBagView) then
-        table.insert(tabData.items, item)
-        if not item.isFreeSlot then
-          tabData.totalItems = tabData.totalItems + 1
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+    local isShown = true
+    if viewBagView ~= const.BAG_VIEW.SECTION_ALL_BAGS and categories.IsCategoryShown then
+      isShown = categories:IsCategoryShown(category) ~= false
+    end
+    if isShown then
+      for tabID, tabData in pairs(slotInfo.tabs) do
+        if ItemBelongsToTab(kind, item, tabID, viewBagView) then
+          table.insert(tabData.items, item)
+          if not item.isFreeSlot then
+            tabData.totalItems = tabData.totalItems + 1
+          end
         end
       end
     end

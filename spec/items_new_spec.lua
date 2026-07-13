@@ -638,5 +638,103 @@ describe("Items (New Data Farming Engine)", function()
       groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
       _G.C_Item.GetItemInfo = savedGetItemInfo
     end)
+
+    it("filters out hidden categories and their items upstream from slotInfo.tabs", function()
+      -- Enable groups in Database
+      local DB = addon:GetModule("Database")
+      local originalGetGroupsEnabled = DB.GetGroupsEnabled
+      DB.GetGroupsEnabled = function() return true end
+
+      local originalGetCategoryFilter = DB.GetCategoryFilter
+      DB.GetCategoryFilter = function(self, kind, filter)
+        return filter == "Type"
+      end
+
+      -- Mock a group
+      local groups = addon:GetModule("Groups", true) or StubBetterBagsModule("Groups")
+      local originalGetAllGroups = groups.GetAllGroups
+      groups.GetAllGroups = function(self, kind)
+        return {
+          [1] = { id = 1, name = "Default Group", isDefault = true },
+          [100] = { id = 100, name = "Custom Group" }
+        }
+      end
+
+      local originalCategoryBelongsToGroup = groups.CategoryBelongsToGroup
+      groups.CategoryBelongsToGroup = function(self, kind, category, tabID)
+        if tabID == 100 and category == "Quest" then
+          return true
+        elseif tabID == 1 and category ~= "Quest" then
+          return true
+        end
+        return false
+      end
+
+      -- Mock category shown state (Quest is hidden)
+      local originalIsCategoryShown = categories.IsCategoryShown
+      categories.IsCategoryShown = function(self, category)
+        if category == "Quest" then return false end
+        return true
+      end
+
+      -- Mock some items in container
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return 1000 + slotid end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return "|cff0070dd|Hitem:"..(1000+slotid).."|h[Item "..slotid.."]|h|r" end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        local id = tonumber(itemID)
+        if not id and type(itemID) == "string" then
+          id = tonumber(string.match(itemID, "item:(%d+)"))
+        end
+        id = id or 1001
+        local name = "Item " .. id
+        local class = "Quest"
+        if id == 1001 then
+          class = "Armor"
+        end
+        return name, "|cff0070dd|Hitem:"..id.."|h["..name.."]|h|r", 1, 100, 1, class, class, 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestHiddenTabPartitioning")
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+
+      -- Assertions for partitioning
+      assert.is_not_nil(slotInfo.tabs)
+      assert.is_not_nil(slotInfo.tabs[1])
+      assert.is_not_nil(slotInfo.tabs[100])
+
+      -- Item 1001 (Armor) belongs to default group (tab 1) and is shown
+      local hasArmorInTab1 = false
+      for _, item in ipairs(slotInfo.tabs[1].items) do
+        if item.itemInfo and item.itemInfo.category == "Armor" then
+          hasArmorInTab1 = true
+        end
+      end
+      assert.is_true(hasArmorInTab1)
+
+      -- Item 1002 (Quest) belongs to Custom Group (tab 100) but is hidden,
+      -- so it should NOT be in tab 100.
+      local hasQuestInTab100 = false
+      for _, item in ipairs(slotInfo.tabs[100].items) do
+        if item.itemInfo and item.itemInfo.category == "Quest" then
+          hasQuestInTab100 = true
+        end
+      end
+      assert.is_false(hasQuestInTab100)
+      assert.are.equal(0, #slotInfo.tabs[100].categories)
+
+      -- Clean up mocks
+      DB.GetGroupsEnabled = originalGetGroupsEnabled
+      DB.GetCategoryFilter = originalGetCategoryFilter
+      groups.GetAllGroups = originalGetAllGroups
+      groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
+      categories.IsCategoryShown = originalIsCategoryShown
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+    end)
   end)
 end)

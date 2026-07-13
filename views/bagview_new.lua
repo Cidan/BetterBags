@@ -22,12 +22,6 @@ local views = addon:GetModule('Views')
 ---@class Localization: AceModule
 local L =  addon:GetModule('Localization')
 
----@class Categories: AceModule
-local categories = addon:GetModule('Categories')
-
----@class Groups: AceModule
-local groups = addon:GetModule('Groups')
-
 ---@class Debug : AceModule
 local debug = addon:GetModule('Debug')
 
@@ -71,98 +65,10 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
 
   -- Draw empty slots depending on the bag view
-  local tabData = slotInfo.tabs and slotInfo.tabs[view.tabID]
-  if not tabData then
-    tabData = {
-      items = {},
-      categories = {},
-    }
-
-    local function CompatItemBelongsToTab(item)
-      if not item then return false end
-      if view.bagview == const.BAG_VIEW.SECTION_ALL_BAGS then
-        if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
-          if view.tabID == const.BANK_TAB.BANK then
-            return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[item.bagid] == nil
-          else
-            return item.bagid == view.tabID
-          end
-        end
-        return true
-      end
-      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-      if category == L:G("Free Space") or category == L:G("Recent Items") then
-        return false
-      end
-      if bag.kind == const.BAG_KIND.BANK then
-        if database:GetShowBankTabs() then
-          return item.bagid == view.tabID
-        end
-        local activeGroup = groups:GetGroup(const.BAG_KIND.BANK, view.tabID)
-        if activeGroup and addon.isRetail then
-          local itemIsAccountBank = (const.ACCOUNT_BANK_BAGS[item.bagid] ~= nil)
-          local tabIsAccountBank = (Enum.BankType and activeGroup.bankType == Enum.BankType.Account)
-          if itemIsAccountBank ~= tabIsAccountBank then
-            return false
-          end
-        end
-      end
-      if database:GetGroupsEnabled(bag.kind) then
-        return groups:CategoryBelongsToGroup(bag.kind, category, view.tabID)
-      end
-      return true
-    end
-
-    -- Determine which categories actually have visible items in this tab/view
-    local sortedItems = slotInfo.sortedItems
-    if not sortedItems then
-      sortedItems = {}
-      local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
-      if itemsGetter then
-        for _, item in pairs(itemsGetter(slotInfo)) do
-          if not item.isItemEmpty then
-            table.insert(sortedItems, item)
-          end
-        end
-      end
-    end
-
-    local activeCategories = {}
-    for _, item in ipairs(sortedItems) do
-      if CompatItemBelongsToTab(item) then
-        table.insert(tabData.items, item)
-        local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-        activeCategories[category] = true
-      end
-    end
-
-    -- Pre-create only the active sections in their precise pre-sorted order
-    if slotInfo.sortedCategories then
-      for _, catData in ipairs(slotInfo.sortedCategories) do
-        if activeCategories[catData.name] then
-          local shownVal = true
-          if categories and categories.IsCategoryShown then
-            shownVal = categories:IsCategoryShown(catData.name) ~= false
-          end
-          table.insert(tabData.categories, {
-            name = catData.name,
-            shown = shownVal,
-          })
-        end
-      end
-    else
-      for catName in pairs(activeCategories) do
-        local shownVal = true
-        if categories and categories.IsCategoryShown then
-          shownVal = categories:IsCategoryShown(catName) ~= false
-        end
-        table.insert(tabData.categories, {
-          name = catName,
-          shown = shownVal,
-        })
-      end
-    end
-  end
+  local tabData = slotInfo.tabs and slotInfo.tabs[view.tabID] or {
+    items = {},
+    categories = {},
+  }
 
   -- Pre-create only the active sections in their precise pre-sorted order
   for _, catData in ipairs(tabData.categories) do
@@ -208,36 +114,9 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     section:Draw(bag.kind, database:GetBagView(bag.kind), false, true)
   end
 
-  -- Hide filtered sections
-  local hiddenCells = {}
-  local shownCategories = {}
-  for _, catData in ipairs(tabData.categories) do
-    shownCategories[catData.name] = catData.shown
-  end
-
-  for sectionName, section in pairs(view:GetAllSections()) do
-    if shownCategories[sectionName] == false then
-      table.insert(hiddenCells, section)
-    end
-  end
-
   -- Handle empty group frame
   if view.emptyGroupFrame and view.tabID and view.tabID > 1 then
-    local visibleSectionCount = 0
-    for _, section in pairs(view:GetAllSections()) do
-      local isHidden = false
-      for _, hiddenSection in ipairs(hiddenCells) do
-        if hiddenSection == section then
-          isHidden = true
-          break
-        end
-      end
-      if not isHidden then
-        visibleSectionCount = visibleSectionCount + 1
-      end
-    end
-
-    if visibleSectionCount == 0 then
+    if #tabData.categories == 0 then
       view.emptyGroupFrame:Show()
     else
       view.emptyGroupFrame:Hide()
@@ -259,7 +138,6 @@ local function BagView(view, ctx, bag, slotInfo, callback)
     cells = view.content.cells,
     maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
     columns = sizeInfo.columnCount,
-    mask = hiddenCells,
   })
 
   -- Pass 2: Row collapse shrink optimization
@@ -315,7 +193,6 @@ local function BagView(view, ctx, bag, slotInfo, callback)
       cells = view.content.cells,
       maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
       columns = sizeInfo.columnCount,
-      mask = hiddenCells,
     })
   end
 
