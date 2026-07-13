@@ -737,4 +737,31 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_Item.GetItemInfo = savedGetItemInfo
     end)
   end)
+
+  describe("GetItemData API", function()
+    it("should retrieve formatted item data asynchronously using ContinuableContainer", function()
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        return "Test Item " .. itemID, "|cff0070dd|Hitem:"..itemID.."|h[Test Item "..itemID.."]|h|r", 3, 100, 1, "Weapon", "One-Handed Swords", 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestGetItemData")
+      local callbackCtx, callbackData
+      items:GetItemData(ctx, { 12345, 67890 }, function(ectx, dataList)
+        callbackCtx = ectx
+        callbackData = dataList
+      end)
+
+      assert.is_not_nil(callbackCtx)
+      assert.are.equal(ctx, callbackCtx)
+      assert.is_not_nil(callbackData)
+      assert.are.equal(2, #callbackData)
+      assert.are.equal(12345, callbackData[1].itemInfo.itemID)
+      assert.are.equal("Test Item 12345", callbackData[1].itemInfo.itemName)
+      assert.are.equal(67890, callbackData[2].itemInfo.itemID)
+      assert.are.equal("Test Item 67890", callbackData[2].itemInfo.itemName)
+
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+    end)
+  end)
 end)

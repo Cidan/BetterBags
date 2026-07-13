@@ -772,6 +772,16 @@ _G.Item.CreateFromItemLocation = function(_, itemLocation)
   function item:IsItemEmpty() return false end
   return item
 end
+_G.Item.CreateFromItemID = function(_, itemID)
+  local item = {
+    _itemID = itemID,
+  }
+  function item:GetItemID() return self._itemID end
+  function item:IsItemEmpty() return false end
+  function item:IsItemDataLoaded() return true end
+  function item:ContinueOnItemLoad(callback) callback() end
+  return item
+end
 
 -- ContinuableContainer Setup
 _G.ContinuableContainer = _G.ContinuableContainer or {}
