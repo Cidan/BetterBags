@@ -234,6 +234,105 @@ function items:GetBagName(bagid)
   end
 end
 
+local function ItemBelongsToTab(kind, item, tabID, viewBagView)
+  if not item then return false end
+  if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
+    if kind == const.BAG_KIND.BANK and addon.isRetail then
+      if tabID == const.BANK_TAB.BANK then
+        return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[item.bagid] == nil
+      else
+        return item.bagid == tabID
+      end
+    end
+    return true
+  end
+  local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+  if category == L:G("Free Space") or category == L:G("Recent Items") then
+    return false
+  end
+  local groupsMod = addon:GetModule("Groups", true)
+  if kind == const.BAG_KIND.BANK then
+    if database.GetShowBankTabs and database:GetShowBankTabs() then
+      return item.bagid == tabID
+    end
+    if groupsMod then
+      local activeGroup = groupsMod:GetGroup(const.BAG_KIND.BANK, tabID)
+      if activeGroup and addon.isRetail then
+        local itemIsAccountBank = (const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[item.bagid] ~= nil) or false
+        local tabIsAccountBank = (Enum.BankType and activeGroup.bankType == Enum.BankType.Account) or false
+        if itemIsAccountBank ~= tabIsAccountBank then
+          return false
+        end
+      end
+    end
+  end
+  if database.GetGroupsEnabled and database:GetGroupsEnabled(kind) and groupsMod then
+    return groupsMod:CategoryBelongsToGroup(kind, category, tabID)
+  end
+  return true
+end
+
+local function IncludeBagInFreeSpace(kind, bagid, tabID)
+  if kind == const.BAG_KIND.BACKPACK then
+    return const.BACKPACK_BAGS[bagid] ~= nil
+  end
+  if database.GetShowBankTabs and database:GetShowBankTabs() then
+    if addon.isRetail then
+      if tabID == const.BANK_TAB.BANK then
+        return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[bagid] == nil
+      else
+        return bagid == tabID
+      end
+    else
+      return const.BANK_BAGS[bagid] ~= nil or bagid == -1
+    end
+  end
+  if database.GetGroupsEnabled and database:GetGroupsEnabled(const.BAG_KIND.BANK) and addon.isRetail then
+    local groupsMod = addon:GetModule("Groups", true)
+    if groupsMod then
+      local activeGroup = groupsMod:GetGroup(const.BAG_KIND.BANK, tabID)
+      if activeGroup then
+        local itemIsAccountBank = (const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid] ~= nil) or false
+        local tabIsAccountBank = (Enum.BankType and activeGroup.bankType == Enum.BankType.Account) or false
+        return itemIsAccountBank == tabIsAccountBank
+      end
+    end
+  end
+  return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[bagid] == nil
+end
+
+local function GetPossibleTabIDs(kind)
+  local tabs = {}
+  local groupsMod = addon:GetModule("Groups", true)
+  if kind == const.BAG_KIND.BACKPACK then
+    if database.GetGroupsEnabled and database:GetGroupsEnabled(kind) and groupsMod and groupsMod.GetAllGroups then
+      for _, group in pairs(groupsMod:GetAllGroups(kind)) do
+        tabs[group.id] = true
+      end
+    else
+      tabs[1] = true
+    end
+  elseif kind == const.BAG_KIND.BANK then
+    if database.GetShowBankTabs and database:GetShowBankTabs() then
+      tabs[const.BANK_TAB.BANK] = true -- which is -1
+      if addon.isRetail and const.ACCOUNT_BANK_BAGS then
+        for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
+          tabs[bag] = true
+        end
+      end
+    elseif database.GetGroupsEnabled and database:GetGroupsEnabled(kind) and groupsMod and groupsMod.GetAllGroups then
+      for _, group in pairs(groupsMod:GetAllGroups(kind)) do
+        tabs[group.id] = true
+      end
+    else
+      local activeGroup = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
+      tabs[activeGroup] = true
+      tabs[1] = true
+    end
+  end
+  return tabs
+end
+
 --- CENTRALIZED PIPELINE REFRESH ORCHESTRATOR (PHASES 1-5)
 ---@param ctx Context
 ---@param kind BagKind
@@ -518,6 +617,97 @@ function items:ProcessRefresh(ctx, kind)
     if sortFunc then
       table.sort(slotInfo.sortedItems, sortFunc)
     end
+  end
+
+  -- Partition slotInfo.tabs (Phase 4.5)
+  slotInfo.tabs = {}
+  local viewBagView = database.GetBagView and database:GetBagView(kind) or const.BAG_VIEW.SECTION_GRID
+  local possibleTabs = GetPossibleTabIDs(kind)
+
+  -- Get active tab ID
+  local activeTabID = 1
+  if kind == const.BAG_KIND.BACKPACK then
+    if database.GetGroupsEnabled and database:GetGroupsEnabled(kind) then
+      activeTabID = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
+    end
+  elseif kind == const.BAG_KIND.BANK then
+    if database.GetShowBankTabs and database:GetShowBankTabs() then
+      activeTabID = const.BANK_TAB.BANK
+    elseif database.GetGroupsEnabled and database:GetGroupsEnabled(kind) then
+      activeTabID = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
+    end
+  end
+
+  possibleTabs[activeTabID] = true
+  possibleTabs[1] = true -- fallback
+
+  for tabID in pairs(possibleTabs) do
+    slotInfo.tabs[tabID] = {
+      items = {},
+      categories = {},
+      emptySlotsSorted = {},
+      emptySlotsByBag = {},
+      emptySlots = {},
+      totalItems = 0,
+    }
+
+    -- Filter emptySlotsSorted and emptySlotsByBag for this tab
+    for _, item in ipairs(slotInfo.emptySlotsSorted or {}) do
+      if IncludeBagInFreeSpace(kind, item.bagid, tabID) then
+        table.insert(slotInfo.tabs[tabID].emptySlotsSorted, item)
+      end
+    end
+
+    if slotInfo.emptySlotsByBag then
+      for bagid, info in pairs(slotInfo.emptySlotsByBag) do
+        if IncludeBagInFreeSpace(kind, bagid, tabID) then
+          slotInfo.tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
+          slotInfo.tabs[tabID].emptySlots[info.name] = (slotInfo.tabs[tabID].emptySlots[info.name] or 0) + info.count
+        end
+      end
+    end
+  end
+
+  -- Filter and assign items to their respective tabs
+  for _, item in ipairs(slotInfo.sortedItems) do
+    for tabID, tabData in pairs(slotInfo.tabs) do
+      if ItemBelongsToTab(kind, item, tabID, viewBagView) then
+        table.insert(tabData.items, item)
+        if not item.isFreeSlot then
+          tabData.totalItems = tabData.totalItems + 1
+        end
+      end
+    end
+  end
+
+  -- Sort categories for each tab
+  for _, tabData in pairs(slotInfo.tabs) do
+    local categoryTally = {}
+    local categoryOrder = {}
+    for _, item in ipairs(tabData.items) do
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      if not categoryTally[category] then
+        categoryTally[category] = {
+          name = category,
+          count = 0,
+          isFreeSpace = (category == L:G("Free Space")),
+          isRecent = (category == L:G("Recent Items")),
+          fillWidth = false,
+          shown = (not categories.IsCategoryShown) or (categories:IsCategoryShown(category) ~= false),
+        }
+        table.insert(categoryOrder, categoryTally[category])
+      end
+      categoryTally[category].count = categoryTally[category].count + 1
+    end
+
+    local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
+    if not isAllBags and sortModule and sortModule.GetCategoryDataSortFunction then
+      local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
+      if sortFunc then
+        table.sort(categoryOrder, sortFunc)
+      end
+    end
+    tabData.categories = categoryOrder
   end
 
   -- Synthesize Category Data (Phase 4.5)
