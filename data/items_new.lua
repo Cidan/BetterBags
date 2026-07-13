@@ -837,7 +837,21 @@ function items:GetGroupBySuffix(data, groupBy)
 end
 
 function items:GetItemData(ctx, itemList, callback)
-  if callback then callback() end
+  local container = ContinuableContainer:Create()
+  for _, itemID in pairs(itemList) do
+    local itemMixin = Item:CreateFromItemID(itemID)
+    container:AddContinuable(itemMixin)
+  end
+  container:ContinueOnLoad(function()
+    ---@type ItemData[]
+    local dataList = {}
+    for _, itemID in pairs(itemList) do
+      local data = {} ---@type ItemData
+      self:AttachBasicItemInfo(itemID, data)
+      table.insert(dataList, data)
+    end
+    if callback then callback(ctx, dataList) end
+  end)
 end
 
 function items:IsNewItem(data)
