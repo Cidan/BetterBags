@@ -398,6 +398,14 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       emptySlotByBagAndSlot = {},
       stacks = {
         GetStackInfo = function() return nil end
+      },
+      tabs = {
+        [view.tabID] = {
+          items = { item1 },
+          categories = {
+            { name = "#1: Backpack", shown = true }
+          }
+        }
       }
     }
 
@@ -454,6 +462,20 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       emptySlotByBagAndSlot = {},
       stacks = {
         GetStackInfo = function() return nil end
+      },
+      tabs = {
+        [-1] = {
+          items = { itemCharacter },
+          categories = {
+            { name = "#1: Bank", shown = true }
+          }
+        },
+        [13] = {
+          items = { itemWarbank1 },
+          categories = {
+            { name = "#9: Warbank Tab 1", shown = true }
+          }
+        }
       }
     }
 
@@ -529,6 +551,15 @@ describe("Phase 6 View Placement and Rendering Tests", function()
         totalItems = 2,
         stacks = {
           GetStackInfo = function() return nil end
+        },
+        tabs = {
+          [view.tabID] = {
+            items = { item1, item2 },
+            categories = {
+              { name = "Weapons", shown = true },
+              { name = "Armor", shown = true }
+            }
+          }
         }
       }
 

@@ -557,7 +557,15 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     local mockSlotInfo = {
       GetChangeset = function() return {}, {}, {} end, -- empty changeset
       GetCurrentItems = function() return { ["0_1"] = mockItem } end,
-      emptySlotByBagAndSlot = {}
+      emptySlotByBagAndSlot = {},
+      tabs = {
+        [view.tabID] = {
+          items = { mockItem },
+          categories = {
+            { name = "Everything", shown = true }
+          }
+        }
+      }
     }
 
     assert.is_nil(view.itemsByBagAndSlot["0_1"])
@@ -595,7 +603,15 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       freeSlotKeys = {},
       emptySlotsSorted = {},
       stacks = { GetStackInfo = function() end },
-      totalItems = 1
+      totalItems = 1,
+      tabs = {
+        [view.tabID] = {
+          items = { mockItem },
+          categories = {
+            { name = "Everything", shown = true }
+          }
+        }
+      }
     }
 
     assert.is_nil(view.itemsByBagAndSlot["0_1"])
@@ -701,7 +717,21 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       freeSlotKeys = {},
       emptySlotsSorted = {},
       stacks = { GetStackInfo = function() end },
-      totalItems = 2
+      totalItems = 2,
+      tabs = {
+        [1] = {
+          items = { charItem },
+          categories = {
+            { name = "TestCategory", shown = true }
+          }
+        },
+        [2] = {
+          items = { warItem },
+          categories = {
+            { name = "TestCategory", shown = true }
+          }
+        }
+      }
     }
 
     local parent = CreateFrame("Frame")
@@ -879,7 +909,15 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     local mockSlotInfo = {
       GetChangeset = function() return {}, {}, {} end,
       GetCurrentItems = function() return { ["0_1"] = charItem } end,
-      emptySlotByBagAndSlot = {}
+      emptySlotByBagAndSlot = {},
+      tabs = {
+        [2] = {
+          items = { charItem },
+          categories = {
+            { name = "#1: Backpack", shown = true }
+          }
+        }
+      }
     }
 
     local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
