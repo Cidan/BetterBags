@@ -620,7 +620,10 @@ function bagFrame.bagProto:OnCooldown(ctx)
 		return
 	end
 	for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-		item:UpdateCooldown(ctx)
+		local data = item:GetItemData()
+		if data then
+			item:UpdateCooldown(ctx, data)
+		end
 	end
 end
 
@@ -880,7 +883,10 @@ function bagFrame:Create(ctx, kind)
 			return
 		end
 		for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
-			item:UpdateUpgrade(ectx)
+			local data = item:GetItemData()
+			if data then
+				item:UpdateUpgrade(ectx, data)
+			end
 		end
 	end)
 

@@ -156,8 +156,9 @@ function item.itemRowProto:UpdateSearch(text)
 end
 
 ---@param ctx Context
-function item.itemRowProto:UpdateCooldown(ctx)
-  self.button:UpdateCooldown(ctx)
+---@param data ItemData
+function item.itemRowProto:UpdateCooldown(ctx, data)
+  self.button:UpdateCooldown(ctx, data)
 end
 
 local buttonCount = 0

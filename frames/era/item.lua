@@ -45,7 +45,12 @@ local children = {
 }
 
 ---@param ctx Context
-function itemFrame.itemProto:UpdateCooldown(ctx)
+---@param data ItemData
+function itemFrame.itemProto:UpdateCooldown(ctx, data)
+  assert(data, "data must be provided")
+  if data.isItemEmpty then
+    return
+  end
   local decoration = themes:GetItemButton(ctx, self)
   ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
@@ -205,7 +210,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count)
   SetItemButtonQuality(decoration, false)
   SetItemButtonDesaturated(decoration, false)
   SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]])
-  self:UpdateCooldown(ctx)
+  self:UpdateCooldown(ctx, data)
   decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   decoration.IconBorder:SetBlendMode("BLEND")
   decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
@@ -252,7 +257,7 @@ function itemFrame.itemProto:ClearItem(ctx)
   self.freeSlotCount = 0
   self.isFreeSlot = nil
   self.staticData = nil
-  self:UpdateCooldown(ctx)
+  ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
 
 function itemFrame.itemProto:UpdateTooltip()
