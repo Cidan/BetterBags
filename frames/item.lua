@@ -119,10 +119,10 @@ function itemFrame.itemProto:OnLeave()
 end
 
 ---@param ctx Context
----@param data? ItemData
+---@param data ItemData
 function itemFrame.itemProto:UpdateCooldown(ctx, data)
-	data = data or self:GetItemData()
-	if not data or data.isItemEmpty then
+	assert(data, "data must be provided")
+	if data.isItemEmpty then
 		return
 	end
 	local decoration = themes:GetItemButton(ctx, self)
@@ -155,10 +155,10 @@ function itemFrame.itemProto:ShowItemLevel(data)
 	self.ilvlText:Show()
 end
 
----@param data? ItemData
+---@param data ItemData
 function itemFrame.itemProto:DrawItemLevel(data)
-	data = data or self:GetItemData()
-	if not data or data.isItemEmpty then
+	assert(data, "data must be provided")
+	if data.isItemEmpty then
 		self.ilvlText:Hide()
 		return
 	end
@@ -193,10 +193,10 @@ function itemFrame.itemProto:DrawItemLevel(data)
 end
 
 ---@param ctx Context
----@param data? ItemData
+---@param data ItemData
 function itemFrame.itemProto:UpdateCount(ctx, data)
-	data = data or self:GetItemData()
-	if not data or data.isItemEmpty then
+	assert(data, "data must be provided")
+	if data.isItemEmpty then
 		return
 	end
 	local decoration = themes:GetItemButton(ctx, self)
@@ -204,11 +204,11 @@ function itemFrame.itemProto:UpdateCount(ctx, data)
 end
 
 ---@param ctx Context
----@param data? ItemData
+---@param data ItemData
 function itemFrame.itemProto:UpdateUpgrade(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
-	data = data or self:GetItemData()
-	if not data or data.isItemEmpty then
+	assert(data, "data must be provided")
+	if data.isItemEmpty then
 		decoration.UpgradeIcon:SetShown(false)
 		return
 	end
@@ -449,22 +449,22 @@ function itemFrame.itemProto:ClearFlashItem(ctx)
 end
 
 ---@param ctx Context
----@param data? ItemData
+---@param data ItemData
 function itemFrame.itemProto:UpdateNewItem(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
 	if not decoration.BattlepayItemTexture and not self.NewItemTexture then
 		return
 	end
-	data = data or self:GetItemData()
-	if not data or data.isItemEmpty then
+	assert(data, "data must be provided")
+	if data.isItemEmpty then
 		decoration.BattlepayItemTexture:Hide()
 		decoration.NewItemTexture:Hide()
 		return
 	end
 	local quality = data.itemInfo.itemQuality
 
-	if items:IsNewItem(data) then
-		if C_Container.IsBattlePayItem(self.button:GetBagID(), self.button:GetID()) then
+	if data.itemInfo.isNewItem then
+		if data.itemInfo.isBattlePayItem then
 			decoration.NewItemTexture:Hide()
 			decoration.BattlepayItemTexture:Show()
 		else
@@ -512,46 +512,16 @@ function itemFrame.itemProto:SetSize(ctx, width, height)
 	decoration.IconOverlay:SetSize(width, height)
 end
 
----@param bagid number
----@return string
-function itemFrame.itemProto:GetBagType(bagid)
-	local invid = C_Container.ContainerIDToInventoryID(bagid)
-	local baglink = GetInventoryItemLink("player", invid)
-	if baglink ~= nil and invid ~= nil then
-		local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-		local name = C_Item.GetItemSubClassInfo(class, subclass)
-		return name
-	else
-		local name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
-		return name
-	end
-end
-
----@param bagid number
----@return ItemQuality
-function itemFrame.itemProto:GetBagTypeQuality(bagid)
-	local invid = C_Container.ContainerIDToInventoryID(bagid)
-	local baglink = GetInventoryItemLink("player", invid)
-	if baglink ~= nil and invid ~= nil then
-		local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-		if class == Enum.ItemClass.Quiver then
-			return const.BAG_SUBTYPE_TO_QUALITY[99]
-		end
-		return const.BAG_SUBTYPE_TO_QUALITY[subclass]
-	else
-		return const.BAG_SUBTYPE_TO_QUALITY[0]
-	end
-end
-
 -- SetFreeSlots will set the item button to a free slot.
 ---@param ctx Context
----@param bagid number
----@param slotid number
+---@param data ItemData
 ---@param count number
 ---@param nocount? boolean
-function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
+function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	local decoration = themes:GetItemButton(ctx, self)
-	self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+	assert(data, "data must be provided")
+	local bagid, slotid = data.bagid, data.slotid
+	self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
 	if const.BANK_BAGS[bagid] then
 		self.kind = const.BAG_KIND.BANK
 	else
@@ -592,7 +562,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count, nocount)
 		decoration:UpdateExtended()
 	end
 
-	self.freeSlotName = self:GetBagType(bagid)
+	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
 	if database:GetShowAllFreeSpace(self.kind) and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
 		SetItemButtonQuality(decoration, const.ITEM_QUALITY.Uncommon, nil, false, false)
 	else
@@ -613,11 +583,11 @@ end
 ---@return boolean
 function itemFrame.itemProto:IsNewItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
-	local data = items:GetItemDataFromSlotKey(self.slotkey)
 	if decoration.NewItemTexture:IsShown() then
 		return true
 	end
-	return data.itemInfo.isNewItem
+	local data = self:GetItemData()
+	return data and data.itemInfo and data.itemInfo.isNewItem or false
 end
 
 ---@param alpha number
@@ -892,7 +862,7 @@ function itemFrame:RefreshItemLevelColors()
 		if item.slotkey and item.slotkey ~= "" and not item.isFreeSlot then
 			local data = items:GetItemDataFromSlotKey(item.slotkey)
 			if data and not data.isItemEmpty then
-				item:DrawItemLevel()
+				item:DrawItemLevel(data)
 			end
 		end
 	end

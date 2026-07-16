@@ -247,7 +247,16 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       decUpdateExtendedCalled = decUpdateExtendedCalled + 1
     end
 
-    item:SetFreeSlots(btnCtx, 0, 4, 1, false)
+    local itemData = {
+      bagid = 0,
+      slotid = 4,
+      slotkey = "0_4",
+      itemInfo = {
+        emptySlotName = "Backpack",
+        itemQuality = 1,
+      }
+    }
+    item:SetFreeSlots(btnCtx, itemData, 1, false)
 
     -- Assert that UpdateExtended was called on both
     assert.equal(1, buttonUpdateExtendedCalled, "button:UpdateExtended was not called on SetFreeSlots")
@@ -269,6 +278,7 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     before_each(function()
       btnCtx = ctx:New("phase5_test")
       item = itemFrame:GetButton(btnCtx, "0_6")
+      _G.NEW_ITEM_ATLAS_BY_QUALITY = _G.NEW_ITEM_ATLAS_BY_QUALITY or { [1] = "bags-glow-white", [2] = "bags-glow-green" }
       _G.Enum = _G.Enum or {}
       _G.Enum.ItemClass = _G.Enum.ItemClass or {}
       _G.Enum.ItemClass.Armor = _G.Enum.ItemClass.Armor or 4
@@ -345,6 +355,57 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       end
       item:UpdateUpgrade(btnCtx, itemData)
       assert.is_true(shownVal)
+    end)
+
+    it("UpdateNewItem should use pre-computed isNewItem and isBattlePayItem", function()
+      local itemData = {
+        slotkey = "0_6",
+        bagid = 0,
+        slotid = 6,
+        isItemEmpty = false,
+        itemInfo = {
+          isNewItem = true,
+          isBattlePayItem = false,
+          itemQuality = 2,
+        }
+      }
+      local newItemShown = false
+      local battlepayShown = false
+      item._decoration.NewItemTexture.Show = function() newItemShown = true end
+      item._decoration.NewItemTexture.Hide = function() newItemShown = false end
+      item._decoration.NewItemTexture.SetAtlas = function() end
+      item._decoration.BattlepayItemTexture.Show = function() battlepayShown = true end
+      item._decoration.BattlepayItemTexture.Hide = function() battlepayShown = false end
+
+      item:UpdateNewItem(btnCtx, itemData)
+      assert.is_true(newItemShown)
+      assert.is_false(battlepayShown)
+
+      itemData.itemInfo.isBattlePayItem = true
+      item:UpdateNewItem(btnCtx, itemData)
+      assert.is_false(newItemShown)
+      assert.is_true(battlepayShown)
+    end)
+
+    it("SetFreeSlots should read emptySlotName and itemQuality from the passed data", function()
+      local itemData = {
+        slotkey = "0_6",
+        bagid = 0,
+        slotid = 6,
+        isItemEmpty = true,
+        itemInfo = {
+          emptySlotName = "Quiver",
+          itemQuality = 4,
+        }
+      }
+      local setQualityVal = nil
+      _G.SetItemButtonQuality = function(_, q)
+        setQualityVal = q
+      end
+
+      item:SetFreeSlots(btnCtx, itemData, 1, false)
+      assert.equal("Quiver", item.freeSlotName)
+      assert.equal(1, setQualityVal)
     end)
   end)
 end)

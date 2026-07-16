@@ -13,9 +13,6 @@ local events = addon:GetModule('Events')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 ---@class Pool: AceModule
 local pool = addon:GetModule('Pool')
 
@@ -48,9 +45,9 @@ function item.itemRowProto:SetStaticItemFromData(ctx, data)
 end
 
 ---@param ctx Context
----@param slotkey string
-function item.itemRowProto:SetItem(ctx, slotkey)
-  local data = items:GetItemDataFromSlotKey(slotkey)
+---@param data ItemData
+function item.itemRowProto:SetItem(ctx, data)
+  assert(data, "data must be provided")
   self:SetItemFromData(ctx, data)
 end
 

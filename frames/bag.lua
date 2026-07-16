@@ -417,7 +417,7 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
 			for _, btn in ipairs(freeSpaceData.buttons) do
 				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
-				itemButton:SetFreeSlots(ctx, btn.bagid, btn.slotid, 1, true)
+				itemButton:SetFreeSlots(ctx, btn, 1, true)
 				freeSlotsSection:AddCell(btn.slotkey, itemButton)
 			end
 			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, true, true)
@@ -425,7 +425,7 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
 			for _, btn in ipairs(freeSpaceData.buttons) do
 				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
-				itemButton:SetFreeSlots(ctx, btn.bagid, btn.slotid, btn.count)
+				itemButton:SetFreeSlots(ctx, btn, btn.count)
 				freeSlotsSection:AddCell(btn.key, itemButton)
 			end
 			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, false)
