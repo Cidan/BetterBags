@@ -264,12 +264,9 @@ function itemFrame.itemProto:UpdateUpgrade(ctx, data)
 	end
 end
 
----@return ItemData
+---@return ItemData?
 function itemFrame.itemProto:GetItemData()
-	if self.staticData then
-		return self.staticData
-	end
-	return items:GetItemDataFromSlotKey(self.slotkey)
+	return self.currentData or self.staticData
 end
 
 ---@param ctx Context
@@ -342,6 +339,7 @@ end
 ---@param data ItemData
 function itemFrame.itemProto:SetItemFromData(ctx, data)
 	assert(data, "data must be provided")
+	self.currentData = data
 	self.slotkey = data.slotkey
 	local decoration = themes:GetItemButton(ctx, self)
 	local tooltipOwner = GameTooltip:GetOwner()
@@ -579,17 +577,6 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.button:Show()
 end
 
----@param ctx Context
----@return boolean
-function itemFrame.itemProto:IsNewItem(ctx)
-	local decoration = themes:GetItemButton(ctx, self)
-	if decoration.NewItemTexture:IsShown() then
-		return true
-	end
-	local data = self:GetItemData()
-	return data and data.itemInfo and data.itemInfo.isNewItem or false
-end
-
 ---@param alpha number
 function itemFrame.itemProto:SetAlpha(alpha)
 	self.frame:SetAlpha(alpha)
@@ -622,6 +609,7 @@ end
 function itemFrame.itemProto:ClearItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
 	events:SendMessage(ctx, "item/Clearing", self, decoration)
+	self.currentData = nil
 	self.kind = nil
 	self.frame:ClearAllPoints()
 	self.frame:SetParent(nil)
@@ -701,17 +689,6 @@ end
 function itemFrame:_DoCreate(_, bagID)
 	bagID = bagID or -3
 	local i = setmetatable({}, { __index = itemFrame.itemProto })
-
-	-- Backwards compatibility for item data.
-	i.data = setmetatable({}, {
-		__index = function(_, key)
-			local d = items:GetItemDataFromSlotKey(i.slotkey)
-			if d == nil then
-				return nil
-			end
-			return d[key]
-		end,
-	})
 
 	-- Generate the item button name. This is needed because item
 	-- button textures are named after the button itself.
@@ -859,11 +836,8 @@ end
 
 function itemFrame:RefreshItemLevelColors()
 	for item in pairs(self.activeItems) do
-		if item.slotkey and item.slotkey ~= "" and not item.isFreeSlot then
-			local data = items:GetItemDataFromSlotKey(item.slotkey)
-			if data and not data.isItemEmpty then
-				item:DrawItemLevel(data)
-			end
+		if item.currentData and not item.currentData.isItemEmpty and not item.isFreeSlot then
+			item:DrawItemLevel(item.currentData)
 		end
 	end
 end

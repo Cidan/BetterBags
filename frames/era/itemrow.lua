@@ -20,6 +20,7 @@ local item = addon:GetModule('ItemRowFrame')
 ---@param data ItemData
 ---@param static? boolean
 function item.itemRowProto:SetItemFromData(ctx, data, static)
+  self.currentData = data
   self.slotkey = data.slotkey
   self.button:SetSize(ctx, 20, 20)
   if static then
@@ -70,13 +71,6 @@ local buttonCount = 0
 ---@return ItemRow
 function item:_DoCreate(ctx)
   local i = setmetatable({}, { __index = item.itemRowProto })
-
-  -- Backwards compatibility for item data.
-  i.data = setmetatable({}, { __index = function(_, key)
-    local d = i.button:GetItemData()
-    if d == nil then return nil end
-    return i.button:GetItemData()[key]
-  end})
 
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.

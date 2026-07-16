@@ -35,7 +35,7 @@ function item.itemRowProto:Lock()
 end
 
 function item.itemRowProto:GetItemData()
-  return self.button:GetItemData()
+  return self.currentData
 end
 
 ---@param ctx Context
@@ -55,6 +55,7 @@ end
 ---@param data ItemData
 ---@param static? boolean
 function item.itemRowProto:SetItemFromData(ctx, data, static)
+  self.currentData = data
   self.slotkey = data.slotkey
   self.button:SetSize(ctx, 20, 20)
   if static then
@@ -121,6 +122,7 @@ function item.itemRowProto:ClearItem(ctx)
   events:SendMessage(ctx, 'item/ClearingRow', self)
   self.button:ClearItem(ctx)
 
+  self.currentData = nil
   self.rowButton:SetID(0)
   self.frame:SetID(0)
   self.frame:Hide()
@@ -134,20 +136,14 @@ function item.itemRowProto:ClearItem(ctx)
   self.slotkey = ""
 end
 
----@return string
+---@return string?
 function item.itemRowProto:GetCategory()
-  return self.button:GetItemData().itemInfo.category
+  return self.currentData and self.currentData.itemInfo and self.currentData.itemInfo.category or nil
 end
 
----@param ctx Context
----@return boolean
-function item.itemRowProto:IsNewItem(ctx)
-  return self.button:IsNewItem(ctx)
-end
-
----@return string
+---@return string?
 function item.itemRowProto:GetGUID()
-  return self.button:GetItemData().itemInfo.itemGUID
+  return self.currentData and self.currentData.itemInfo and self.currentData.itemInfo.itemGUID or nil
 end
 
 ---@param ctx Context
@@ -180,13 +176,6 @@ end
 ---@return ItemRow
 function item:_DoCreate(ctx)
   local i = setmetatable({}, { __index = item.itemRowProto })
-
-  -- Backwards compatibility for item data.
-  i.data = setmetatable({}, { __index = function(_, key)
-    local d = i.button:GetItemData()
-    if d == nil then return nil end
-    return i.button:GetItemData()[key]
-  end})
 
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.

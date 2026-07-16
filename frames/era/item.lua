@@ -269,13 +269,6 @@ function itemFrame:_DoCreate(_, bagID)
   bagID = bagID or -3
   local i = setmetatable({}, { __index = itemFrame.itemProto })
 
-  -- Backwards compatibility for item data.
-  i.data = setmetatable({}, { __index = function(_, key)
-    local d = items:GetItemDataFromSlotKey(i.slotkey)
-    if d == nil then return nil end
-    return d[key]
-  end})
-
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.
   local name = format("BetterBagsItemButton%d", buttonCount)
