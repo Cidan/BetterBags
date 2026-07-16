@@ -561,11 +561,8 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
-	if database:GetShowAllFreeSpace(self.kind) and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
-		SetItemButtonQuality(decoration, const.ITEM_QUALITY.Uncommon, nil, false, false)
-	else
-		SetItemButtonQuality(decoration, const.ITEM_QUALITY.Common, nil, false, false)
-	end
+		local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
+		SetItemButtonQuality(decoration, quality, nil, false, false)
 	decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
 	decoration.IconBorder:SetBlendMode("BLEND")
 	decoration.IconBorder:SetTexCoord(0, 1, 0, 1)

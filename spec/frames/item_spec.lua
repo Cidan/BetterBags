@@ -405,7 +405,7 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
 
       item:SetFreeSlots(btnCtx, itemData, 1, false)
       assert.equal("Quiver", item.freeSlotName)
-      assert.equal(1, setQualityVal)
+      assert.equal(4, setQualityVal)
     end)
   end)
 end)

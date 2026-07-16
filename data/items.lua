@@ -1532,7 +1532,34 @@ function items:AttachItemInfo(data, kind)
 	if itemID == nil then
 		data.isItemEmpty = true
 		data.bindingInfo = {} --[[@as table]]
-		data.itemInfo = {} --[[@as table]]
+		local invid = C_Container.ContainerIDToInventoryID(bagid)
+		local baglink = GetInventoryItemLink("player", invid)
+		local name
+		if Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
+			name = L:G("Keyring")
+		elseif baglink ~= nil and invid ~= nil then
+			local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+			name = C_Item.GetItemSubClassInfo(class, subclass)
+		else
+			name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+		end
+
+		local quality
+		if baglink ~= nil and invid ~= nil then
+			local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink))
+			if class == Enum.ItemClass.Quiver then
+				quality = const.BAG_SUBTYPE_TO_QUALITY[99]
+			else
+				quality = const.BAG_SUBTYPE_TO_QUALITY[subclass]
+			end
+		else
+			quality = const.BAG_SUBTYPE_TO_QUALITY[0]
+		end
+
+		data.itemInfo = {
+			emptySlotName = name,
+			itemQuality = quality or const.ITEM_QUALITY.Common,
+		}
 		return data
 	end
 	data.isItemEmpty = false
@@ -1650,6 +1677,7 @@ function items:AttachItemInfo(data, kind)
 		isBound = C_Item.IsBound and C_Item.IsBound(itemLocation) or false,
 		isLocked = false,
 		isNewItem = C_NewItems.IsNewItem and C_NewItems.IsNewItem(bagid, slotid) or false,
+		isBattlePayItem = (_G.C_Container and _G.C_Container.IsBattlePayItem and _G.C_Container.IsBattlePayItem(bagid, slotid)) and true or false,
 		currentItemCount = C_Item.GetStackCount and C_Item.GetStackCount(itemLocation) or 1,
 		category = "",
 		currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or effectiveIlvl or 0,
