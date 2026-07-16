@@ -191,8 +191,8 @@ itemFrame.Create = function()
       if self.staticData then return self.staticData end
       return items:GetItemDataFromSlotKey(self.slotkey)
     end,
-    UpdateUpgrade = function(self, ctx)
-      self:GetItemData()
+    UpdateUpgrade = function(self, ctx, data)
+      assert(data, "data must be provided")
     end,
     UpdateCount = function(self, ctx) end,
     SetFreeSlots = function(self, ctx, bagid, slotid, count, show) end,
@@ -338,7 +338,10 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     -- safe and does not crash because no ghost buttons exist.
     for _, item in pairs(view:GetItemsByBagAndSlot()) do
       local success = pcall(function()
-        item:UpdateUpgrade(context:New("test"))
+        local data = item:GetItemData()
+        if data then
+          item:UpdateUpgrade(context:New("test"), data)
+        end
       end)
       assert.is_true(success)
     end

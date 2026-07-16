@@ -466,6 +466,23 @@ function items:ProcessRefresh(ctx, kind)
       name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
     end
 
+    if currentItem.isItemEmpty then
+      currentItem.itemInfo = currentItem.itemInfo or {}
+      currentItem.itemInfo.emptySlotName = name
+      local quality
+      if baglink ~= nil and invid ~= nil then
+        local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink))
+        if class == Enum.ItemClass.Quiver then
+          quality = const.BAG_SUBTYPE_TO_QUALITY[99]
+        else
+          quality = const.BAG_SUBTYPE_TO_QUALITY[subclass]
+        end
+      else
+        quality = const.BAG_SUBTYPE_TO_QUALITY[0]
+      end
+      currentItem.itemInfo.itemQuality = quality or const.ITEM_QUALITY.Common
+    end
+
     slotInfo:StoreIfEmptySlot(name, currentItem)
 
     if not currentItem.isItemEmpty then
@@ -683,6 +700,7 @@ function items:ProcessRefresh(ctx, kind)
           count = 1,
           isIndividual = true,
           key = item.slotkey,
+          itemInfo = item.itemInfo,
         })
       end
     else
@@ -707,6 +725,7 @@ function items:ProcessRefresh(ctx, kind)
         if freeSlotCount > 0 and slotKey ~= nil then
           local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
           if freeSlotBag and freeSlotID then
+            local originalItem = self:GetItemDataFromSlotKey(slotKey)
             table.insert(slotInfo.tabs[tabID].freeSpace.buttons, {
               slotkey = slotKey,
               bagid = tonumber(freeSlotBag),
@@ -714,6 +733,10 @@ function items:ProcessRefresh(ctx, kind)
               count = freeSlotCount,
               isIndividual = false,
               key = name,
+              itemInfo = originalItem and originalItem.itemInfo or {
+                emptySlotName = name,
+                itemQuality = const.ITEM_QUALITY.Common,
+              },
             })
           end
         end
@@ -1336,6 +1359,7 @@ function items:AttachItemInfo(data, kind)
     isBound = data.containerInfo.isBound or false,
     isLocked = data.containerInfo.isLocked or false,
     isNewItem = self:IsNewItem(data),
+    isBattlePayItem = (_G.C_Container and _G.C_Container.IsBattlePayItem and _G.C_Container.IsBattlePayItem(bagid, slotid)) and true or false,
     currentItemCount = data.containerInfo.stackCount or 1,
     category = "",
     currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or effectiveIlvl or 0,

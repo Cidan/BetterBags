@@ -74,7 +74,7 @@ local function GridView(view, ctx, bag, slotInfo, callback)
     local slotkey = item.slotkey
     if item.isFreeSlot then
       local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
-      itemButton:SetFreeSlots(ctx, item.bagid, item.slotid, -1)
+      itemButton:SetFreeSlots(ctx, item, -1)
       local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
       local section = view:GetOrCreateSection(ctx, category)
       section:AddCell(slotkey, itemButton)

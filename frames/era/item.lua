@@ -45,15 +45,20 @@ local children = {
 }
 
 ---@param ctx Context
-function itemFrame.itemProto:UpdateCooldown(ctx)
+---@param data ItemData
+function itemFrame.itemProto:UpdateCooldown(ctx, data)
+  assert(data, "data must be provided")
+  if data.isItemEmpty then
+    return
+  end
   local decoration = themes:GetItemButton(ctx, self)
   ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
 
----@param data? ItemData
+---@param data ItemData
 function itemFrame.itemProto:DrawItemLevel(data)
-  data = data or self:GetItemData()
-  if not data or data.isItemEmpty then
+  assert(data, 'data must be provided')
+  if data.isItemEmpty then
     self.ilvlText:Hide()
     return
   end
@@ -179,12 +184,13 @@ end
 
 -- SetFreeSlots will set the item button to a free slot.
 ---@param ctx Context
----@param bagid number
----@param slotid number
+---@param data ItemData
 ---@param count number
-function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count)
+function itemFrame.itemProto:SetFreeSlots(ctx, data, count)
   local decoration = themes:GetItemButton(ctx, self)
-  self.slotkey = items:GetSlotKeyFromBagAndSlot(bagid, slotid)
+  assert(data, 'data must be provided')
+  local bagid, slotid = data.bagid, data.slotid
+  self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
   if const.BANK_BAGS[bagid] then
     self.kind = const.BAG_KIND.BANK
   else
@@ -198,13 +204,13 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count)
   self.button.minDisplayCount = -1
   self.freeSlotCount = count
   self.isFreeSlot = true
-  local quality = self:GetBagTypeQuality(bagid)
+  local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
 
   SetItemButtonCount(decoration, count)
   SetItemButtonQuality(decoration, false)
   SetItemButtonDesaturated(decoration, false)
   SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]])
-  self:UpdateCooldown(ctx)
+  self:UpdateCooldown(ctx, data)
   decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
   decoration.IconBorder:SetBlendMode("BLEND")
   decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
@@ -216,7 +222,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, bagid, slotid, count)
   self.ilvlText:SetText("")
   decoration.UpgradeIcon:SetShown(false)
 
-  self.freeSlotName = self:GetBagType(bagid)
+  self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
   --SetItemButtonQuality(decoration, 4, nil, false, false)
   self:Unlock(ctx)
 
@@ -251,7 +257,7 @@ function itemFrame.itemProto:ClearItem(ctx)
   self.freeSlotCount = 0
   self.isFreeSlot = nil
   self.staticData = nil
-  self:UpdateCooldown(ctx)
+  ContainerFrame_UpdateCooldown(decoration:GetID(), decoration)
 end
 
 function itemFrame.itemProto:UpdateTooltip()
@@ -267,13 +273,6 @@ end
 function itemFrame:_DoCreate(_, bagID)
   bagID = bagID or -3
   local i = setmetatable({}, { __index = itemFrame.itemProto })
-
-  -- Backwards compatibility for item data.
-  i.data = setmetatable({}, { __index = function(_, key)
-    local d = items:GetItemDataFromSlotKey(i.slotkey)
-    if d == nil then return nil end
-    return d[key]
-  end})
 
   -- Generate the item button name. This is needed because item
   -- button textures are named after the button itself.

@@ -64,6 +64,7 @@ const.BINDING_SCOPE = {
   WUE = 10,
 }
 const.ITEM_QUALITY = { Poor = 0, Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5 }
+const.BAG_SUBTYPE_TO_QUALITY = { [0] = 1, [1] = 2, [2] = 2, [3] = 2, [4] = 2, [99] = 2 }
 const.SEARCH_CATEGORY_GROUP_BY = { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 const.EXPANSION_MAP = { [0] = "Classic", [1] = "Burning Crusade", [2] = "Wrath", [9] = "The War Within" }
 const.TRADESKILL_MAP = { [0] = "Tailoring", [1] = "Leatherworking", [2] = "Blacksmithing" }

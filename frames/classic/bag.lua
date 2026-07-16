@@ -207,7 +207,10 @@ function bagFrame:Create(ctx, kind)
   events:RegisterMessage('bag/RedrawIcons', function(ectx)
     if not b.currentView then return end
     for _, item in pairs(b.currentView:GetItemsByBagAndSlot()) do
-      item:UpdateUpgrade(ectx)
+      local data = item:GetItemData()
+      if data then
+        item:UpdateUpgrade(ectx, data)
+      end
     end
   end)
 
