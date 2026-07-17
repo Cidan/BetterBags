@@ -341,6 +341,49 @@ describe("Items (New Data Farming Engine)", function()
       search.Search = originalSearch
       categories.GetSortedSearchCategories = originalGetSortedSearchCategories
     end)
+
+    it("pre-computes currentItem.isUpgrade correctly during ProcessRefresh", function()
+      _G.C_Container.GetContainerNumSlots = function(bagid) return 1 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return 12345 end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return "|cff0070dd|Hitem:12345|h[Test Sword]|h|r" end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        return "Test Sword", "|cff0070dd|Hitem:12345|h[Test Sword]|h|r", 3, 100, 1, "Weapon", "One-Handed Swords", 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      local DB = addon:GetModule("Database")
+      local originalGetUpgradeIconProvider = DB.GetUpgradeIconProvider
+      DB.GetUpgradeIconProvider = function() return "BetterBags" end
+
+      local originalGetCurrentItemLevel = _G.C_Item.GetCurrentItemLevel
+      _G.C_Item.GetCurrentItemLevel = function() return 100 end
+
+      -- Let's mock GetItemDataFromInventorySlot
+      local originalGetItemDataFromInventorySlot = items.GetItemDataFromInventorySlot
+      items.GetItemDataFromInventorySlot = function(self, slot)
+        return {
+          isItemEmpty = false,
+          itemInfo = {
+            currentItemLevel = 90
+          }
+        }
+      end
+
+      local ctx = addon:GetModule("Context"):New("TestRefresh")
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      local item = slotInfo.itemsBySlotKey["0_1"]
+      assert.is_not_nil(item)
+      assert.is_true(item.isUpgrade)
+
+      -- Clean up
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      _G.C_Item.GetCurrentItemLevel = originalGetCurrentItemLevel
+      DB.GetUpgradeIconProvider = originalGetUpgradeIconProvider
+      items.GetItemDataFromInventorySlot = originalGetItemDataFromInventorySlot
+    end)
   end)
 
   describe("Bug 2: Warbank free space counts by splitting empty slots", function()

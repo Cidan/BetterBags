@@ -34,7 +34,11 @@ end
 _G.StubBetterBagsModule = function(name)
   local ok, mod = pcall(function() return addon:GetModule(name) end)
   if ok and mod then return mod end
-  return addon:NewModule(name)
+  local stub = addon:NewModule(name)
+  if name == "Database" then
+    stub.GetUpgradeIconProvider = stub.GetUpgradeIconProvider or function() return "None" end
+  end
+  return stub
 end
 
 --- Clear a previously-stubbed module so the real module file can be loaded safely.

@@ -16,9 +16,6 @@ local events = addon:GetModule('Events')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Sort: AceModule
-local sort = addon:GetModule('Sort')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
@@ -82,11 +79,10 @@ local sectionProto = {}
 ---@param kind BagKind
 ---@param view BagView
 ---@param freeSpaceShown boolean
----@param nosort? boolean
 ---@return number width
 ---@return number height
-function sectionProto:Draw(kind, view, freeSpaceShown, nosort)
-  return self:Grid(kind, view, freeSpaceShown, nosort)
+function sectionProto:Draw(kind, view, freeSpaceShown)
+  return self:Grid(kind, view, freeSpaceShown)
 end
 
 -- SetTitle will set the title of the section.
@@ -267,21 +263,12 @@ end
 
 -- Grid will render the section as a grid of icons.
 ---@param kind BagKind
----@param view BagView
----@param freeSpaceShown boolean
----@param nosort? boolean
+---@param _view BagView
+---@param _freeSpaceShown boolean
 ---@return number width
 ---@return number height
-function sectionProto:Grid(kind, view, freeSpaceShown, nosort)
+function sectionProto:Grid(kind, _view, _freeSpaceShown)
   self.kind = kind
-
-  if not nosort then
-    if freeSpaceShown then
-      self.content:Sort(sort.GetItemSortBySlot)
-    else
-      self.content:Sort(sort:GetItemSortFunction(kind, view))
-    end
-  end
 
   local w, h = self.content:Draw({
     cells = self.content.cells,

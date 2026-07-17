@@ -454,6 +454,7 @@ if not _G.C_Item.GetItemInfoInstant then
   _G.C_Item.GetItemInfoInstant = function(id) return id end
 end
 _G.C_Item.IsBound = _G.C_Item.IsBound or function() return false end
+_G.C_Item.IsEquippableItem = _G.C_Item.IsEquippableItem or function() return true end
 _G.C_Item.GetItemQuality = _G.C_Item.GetItemQuality or function() return 1 end
 _G.C_Item.GetDetailedItemLevelInfo = _G.C_Item.GetDetailedItemLevelInfo or function() return 1, false, 1 end
 _G.C_Item.GetCurrentItemLevel = _G.C_Item.GetCurrentItemLevel or function() return 1 end

@@ -17,7 +17,7 @@ Historically, item buttons queried the central inventory database (`data/items.l
 Attributes like stacked counts or upgrade arrows are computationally heavy and highly dependent on active options (e.g., merging partial stacks, merging unstackables, merchant interaction state, simple item level options).
 - **Rule:** The displayed count (`data.stackedCount`) and upgrade status (`data.isUpgrade`) must be computed upstream during the Stacking and Farming phases (Phases 2 & 3).
 - **Count Text:** Inside `UpdateCount(ctx, data)`, the count text is populated directly from `data.stackedCount or data.itemInfo.currentItemCount`. No database stacking state is evaluated.
-- **Upgrade Icon:** Inside `UpdateUpgrade(ctx, data)`, the upgrade icon uses `data.isUpgrade` directly. If not pre-computed, it safely falls back to a fast, synchronous lookup on Phase 2's `items:GetItemDataFromInventorySlot(slot)` cache, ensuring no raw slotkey-to-database queries are made.
+- **Upgrade Icon:** Inside `UpdateUpgrade(ctx, data)`, the upgrade icon uses `data.isUpgrade` directly. The data layer (`data/items_new.lua`) pre-computes `data.isUpgrade` using registered upgrade providers (e.g. BetterBags, Pawn, SimpleItemLevel) upstream, ensuring no raw slotkey-to-database queries are made during layout rendering.
 
 ### 4. Code Consistency Across SKU Environments
 BetterBags supports multiple World of Warcraft environments (Classic/Era vs. Retail) with separate `.toc` and script bindings.
