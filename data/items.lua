@@ -288,10 +288,12 @@ local function ItemBelongsToTab(kind, item, tabID, viewBagView)
   if not item then return false end
   if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
     if kind == const.BAG_KIND.BANK and addon.isRetail then
-      if tabID == const.BANK_TAB.BANK then
-        return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[item.bagid] == nil
-      else
-        return item.bagid == tabID
+      if database.GetShowBankTabs and database:GetShowBankTabs() then
+        if tabID == const.BANK_TAB.BANK then
+          return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[item.bagid] == nil
+        else
+          return item.bagid == tabID
+        end
       end
     end
     return true
@@ -650,25 +652,23 @@ function items:ProcessRefresh(ctx, kind)
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
-        if C_Container.GetBagName(bagid) ~= nil then
-          local category = self:GetBagName(bagid)
-          local dummy = {
-            isFreeSlot = true,
-            bagid = bagid,
-            slotid = slotid,
-            slotkey = data.slotkey or (bagid .. "_" .. slotid),
-            itemInfo = {
-              category = category,
-              itemName = "",
-              itemQuality = -1,
-              currentItemCount = 0,
-              itemGUID = "",
-              currentItemLevel = 0,
-              expacID = 0
-            }
+        local category = self:GetBagName(bagid)
+        local dummy = {
+          isFreeSlot = true,
+          bagid = bagid,
+          slotid = slotid,
+          slotkey = data.slotkey or (bagid .. "_" .. slotid),
+          itemInfo = {
+            category = category,
+            itemName = "",
+            itemQuality = -1,
+            currentItemCount = 0,
+            itemGUID = "",
+            currentItemLevel = 0,
+            expacID = 0
           }
-          table.insert(slotInfo.sortedItems, dummy)
-        end
+        }
+        table.insert(slotInfo.sortedItems, dummy)
       end
     end
   end

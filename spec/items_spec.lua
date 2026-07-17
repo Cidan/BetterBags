@@ -884,4 +884,135 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_Item.GetItemInfo = savedGetItemInfo
     end)
   end)
+
+  describe("Bank SECTION_ALL_BAGS view and ShowBankTabs logic", function()
+    it("should retain all items in SECTION_ALL_BAGS bank view when ShowBankTabs is disabled", function()
+      local DB = addon:GetModule("Database")
+      local originalGetBagView = DB.GetBagView
+      local originalGetShowBankTabs = DB.GetShowBankTabs
+      local originalBankBags = const.BANK_BAGS
+      const.BANK_BAGS = { [-1] = -1, [6] = 6, [7] = 7, [8] = 8, [9] = 9, [10] = 10, [11] = 11 }
+
+      DB.GetBagView = function(self, kind)
+        if kind == const.BAG_KIND.BANK then
+          return const.BAG_VIEW.SECTION_ALL_BAGS
+        end
+        return const.BAG_VIEW.SECTION_GRID
+      end
+      DB.GetShowBankTabs = function(self) return false end
+
+      -- Mock standard bag -1 (Bank) has an item
+      local savedGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+      _G.C_Container.GetContainerNumSlots = function(bagid)
+        if bagid == -1 then return 1 end
+        return 0
+      end
+
+      local savedGetContainerItemID = _G.C_Container.GetContainerItemID
+      _G.C_Container.GetContainerItemID = function(bagid, slotid)
+        if bagid == -1 and slotid == 1 then return 99999 end
+        return nil
+      end
+
+      local savedGetContainerItemLink = _G.C_Container.GetContainerItemLink
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+        if bagid == -1 and slotid == 1 then
+          return "|cff0070dd|Hitem:99999|h[Bank Item]|h|r"
+        end
+        return nil
+      end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        return "Bank Item", "|cff0070dd|Hitem:99999|h[Bank Item]|h|r", 1, 100, 1, "Misc", "Junk", 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      local savedGetBagName = _G.C_Container.GetBagName
+      _G.C_Container.GetBagName = function(bagid) return nil end -- -1 returns nil
+
+      local ctx = addon:GetModule("Context"):New("TestBankSectionAllBagsNoTabs")
+      items:WipeSlotInfo(const.BAG_KIND.BANK)
+      items:ProcessRefresh(ctx, const.BAG_KIND.BANK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BANK]
+      assert.is_not_nil(slotInfo.tabs)
+      assert.is_not_nil(slotInfo.tabs[1])
+
+      -- Let's verify that the item exists in the active tab (tab 1)
+      local hasBankItem = false
+      for _, item in ipairs(slotInfo.tabs[1].items) do
+        if item.bagid == -1 and item.slotid == 1 then
+          hasBankItem = true
+        end
+      end
+      assert.is_true(hasBankItem)
+
+      -- Restore all mocks
+      DB.GetBagView = originalGetBagView
+      DB.GetShowBankTabs = originalGetShowBankTabs
+      _G.C_Container.GetContainerNumSlots = savedGetContainerNumSlots
+      _G.C_Container.GetContainerItemID = savedGetContainerItemID
+      _G.C_Container.GetContainerItemLink = savedGetContainerItemLink
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      _G.C_Container.GetBagName = savedGetBagName
+      const.BANK_BAGS = originalBankBags
+    end)
+
+    it("should generate empty slot dummy items for bagid = -1 (Bank) in SECTION_ALL_BAGS view", function()
+      local DB = addon:GetModule("Database")
+      local originalGetBagView = DB.GetBagView
+      local originalGetShowBankTabs = DB.GetShowBankTabs
+      local originalBankBags = const.BANK_BAGS
+      const.BANK_BAGS = { [-1] = -1, [6] = 6, [7] = 7, [8] = 8, [9] = 9, [10] = 10, [11] = 11 }
+
+      DB.GetBagView = function(self, kind)
+        if kind == const.BAG_KIND.BANK then
+          return const.BAG_VIEW.SECTION_ALL_BAGS
+        end
+        return const.BAG_VIEW.SECTION_GRID
+      end
+      DB.GetShowBankTabs = function(self) return false end
+
+      -- Mock standard bag -1 (Bank) with empty slots
+      local savedGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+      _G.C_Container.GetContainerNumSlots = function(bagid)
+        if bagid == -1 then return 2 end
+        return 0
+      end
+
+      local savedGetContainerItemID = _G.C_Container.GetContainerItemID
+      _G.C_Container.GetContainerItemID = function(bagid, slotid) return nil end
+
+      local savedGetContainerItemLink = _G.C_Container.GetContainerItemLink
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid) return nil end
+
+      local savedGetBagName = _G.C_Container.GetBagName
+      _G.C_Container.GetBagName = function(bagid) return nil end -- -1 returns nil
+
+      local ctx = addon:GetModule("Context"):New("TestBankSectionAllBagsDummySlots")
+      items:WipeSlotInfo(const.BAG_KIND.BANK)
+      items:ProcessRefresh(ctx, const.BAG_KIND.BANK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BANK]
+      assert.is_not_nil(slotInfo.sortedItems)
+
+      -- Let's verify that the free/dummy slot items exist
+      local emptySlotsCount = 0
+      for _, item in ipairs(slotInfo.sortedItems) do
+        if item.isFreeSlot and item.bagid == -1 then
+          emptySlotsCount = emptySlotsCount + 1
+        end
+      end
+      assert.are.equal(2, emptySlotsCount)
+
+      -- Restore all mocks
+      DB.GetBagView = originalGetBagView
+      DB.GetShowBankTabs = originalGetShowBankTabs
+      _G.C_Container.GetContainerNumSlots = savedGetContainerNumSlots
+      _G.C_Container.GetContainerItemID = savedGetContainerItemID
+      _G.C_Container.GetContainerItemLink = savedGetContainerItemLink
+      _G.C_Container.GetBagName = savedGetBagName
+      const.BANK_BAGS = originalBankBags
+    end)
+  end)
 end)
