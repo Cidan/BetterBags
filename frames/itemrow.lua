@@ -46,13 +46,6 @@ end
 
 ---@param ctx Context
 ---@param data ItemData
-function item.itemRowProto:SetItem(ctx, data)
-  assert(data, "data must be provided")
-  self:SetItemFromData(ctx, data)
-end
-
----@param ctx Context
----@param data ItemData
 ---@param static? boolean
 function item.itemRowProto:SetItemFromData(ctx, data, static)
   self.currentData = data

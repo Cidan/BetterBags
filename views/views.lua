@@ -12,22 +12,11 @@ local const = addon:GetModule('Constants')
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule('ItemFrame')
 
----@class Items: AceModule
-local items = addon:GetModule('Items')
-
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
-
----@class (exact) Stack
----@field item string The slotkey of the item that is rendered.
----@field swap string The slotkey of the item to swap with when marked dirty.
----@field subItems table<string, boolean> All the sub items in this stack that are not rendered.
----@field hash string The item hash for this stack.
----@field dirty boolean If the stack needs to be updated.
-local stackProto = {}
 
 ---@class (exact) View
 ---@field sections table<string, Section>
@@ -43,7 +32,6 @@ local stackProto = {}
 ---@field itemFrames Item[]
 ---@field deferredItems table<string, boolean>
 ---@field dirtySections table<string, boolean>
----@field private stacks table<string, Stack>
 ---@field WipeHandler fun(view: View, ctx: Context)
 ---@field isNew boolean
 views.viewProto = {}
@@ -83,12 +71,7 @@ function views.viewProto:Wipe(ctx)
   self.WipeHandler(self, ctx)
   self:ClearDeferredItems()
   self:ClearDirtySections()
-  wipe(self.stacks)
   wipe(self.slotToSection)
-end
-
-function views.viewProto:WipeStacks()
-  wipe(self.stacks)
 end
 
 ---@return BagView
@@ -279,28 +262,6 @@ function views.viewProto:RemoveDeferredItem(slotkey)
   self.deferredItems[slotkey] = nil
 end
 
----@param ctx Context
----@param slotkey string
-function views.viewProto:FlashStack(ctx, slotkey)
-  -- HACKFIX: Disable this for non retail clients due to
-  -- a lack of stable sort API.
-  if not addon.isRetail then return end
-
-  local item = items:GetItemDataFromSlotKey(slotkey)
-  local stack = self.stacks[item.itemHash]
-  if not stack then return end
-  items:ClearNewItem(ctx, slotkey)
-  items:ClearNewItem(ctx, stack.item)
-  for subItemSlotKey in pairs(stack.subItems) do
-    items:ClearNewItem(ctx, subItemSlotKey)
-    if self.itemsByBagAndSlot[subItemSlotKey] then
-      self.itemsByBagAndSlot[subItemSlotKey]:ClearFlashItem(ctx)
-    end
-  end
-  local itemButton = self:GetOrCreateItemButton(ctx, slotkey)
-  itemButton:FlashItem(ctx)
-end
-
 
 ---@return View
 function views:NewBlankView()
@@ -308,102 +269,8 @@ function views:NewBlankView()
     sections = {},
     itemsByBagAndSlot = {},
     deferredItems = {},
-    stacks = {},
     slotToSection = {},
     dirtySections = {},
   }, {__index = views.viewProto}) --[[@as View]]
   return view
-end
-
----@param slotkey string
----@return Stack
-function views:NewStack(slotkey)
-  local data = items:GetItemDataFromSlotKey(slotkey)
-  return setmetatable({
-    item = slotkey,
-    subItems = {},
-    hash = data.itemHash,
-    dirty = false
-  }, {__index = stackProto})
-end
-
--- AddItem adds an item to the stack. If the stack has no main item, the item is added as the main item.
--- If the stack already has a main item, the item is added as a sub item.
--- Returns true if the item was added as the main item, false if it was added as a sub item.
----@param slotkey string
----@return boolean
-function stackProto:AddItem(slotkey)
-  if self.item == nil then
-    self.item = slotkey
-    return true
-  end
-  self.subItems[slotkey] = true
-  return false
-end
-
--- RemoveItem removes an item from the stack. If the item was the main item,
--- the first sub item is promoted to the main item. If the item was a sub item,
--- it is removed from the stack. Returns the slotkey of the main item, or nil if the
--- stack is now empty.
----@param slotkey string
----@return string?
-function stackProto:RemoveItem(slotkey)
-  if self.item == slotkey then
-    self.item = nil
-    local nextkey = next(self.subItems)
-    if nextkey then
-      self.item = nextkey
-      self.subItems[nextkey] = nil
-      self:UpdateCount()
-      return nextkey
-    end
-    return nil
-  end
-
-  assert(self.subItems[slotkey], "Slotkey not found in stack" .. slotkey)
-
-  self.subItems[slotkey] = nil
-  self:UpdateCount()
-  return self.item
-end
-
-function stackProto:UpdateCount()
-  if not self.item then return end
-  local itemData = items:GetItemDataFromSlotKey(self.item)
-  if itemData.isItemEmpty then return end
-  itemData.stackedCount = itemData.itemInfo.currentItemCount
-  for subItemSlotKey in pairs(self.subItems) do
-    local subItemData = items:GetItemDataFromSlotKey(subItemSlotKey)
-    if not subItemData.isItemEmpty then
-      itemData.stackedCount = itemData.stackedCount + subItemData.itemInfo.currentItemCount
-    end
-  end
-end
-
----@return number
-function stackProto:GetStackCount()
-  if not self.item then return 0 end
-  local itemData = items:GetItemDataFromSlotKey(self.item)
-  return itemData.stackedCount
-end
-
-function stackProto:HasSubItem(slotkey)
-  return self.subItems[slotkey] ~= nil
-end
-
-function stackProto:HasAnySubItems()
-  return next(self.subItems) ~= nil
-end
-
-function stackProto:IsInStack(slotkey)
-  return self.item == slotkey or self.subItems[slotkey] ~= nil
-end
-
----@return ItemData
-function stackProto:GetBackingItemData()
-  return items:GetItemDataFromSlotKey(self.item)
-end
-
-function stackProto:IsStackEmpty()
-  return self.item == nil and next(self.subItems) == nil
 end

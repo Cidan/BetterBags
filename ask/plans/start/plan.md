@@ -1,34 +1,39 @@
-# Implementation Plan: Pure Presentation Refactor (Items 1, 2, and 4)
+# Plan: Decouple Item Rendering from Database Lookups
 
-## Overview
-This plan outlines the refactoring of the item drawing phase to strictly enforce the "Zero On-the-Fly Database Queries" rule. All required data will be pre-computed during Phase 2 (Data Farming), and pure presentation functions will have their legacy `GetItemData` fallbacks removed.
+## Objective
+Remove all remaining gaps where item buttons and views perform side-effect database lookups (`GetItemDataFromSlotKey`). The rendering layer must act purely as a functional UI that exclusively uses the `ItemData` passed from the upstream pipeline.
 
-## 1. `UpdateNewItem` & `IsBattlePayItem` (Retail)
-**Files to change:** `data/items.lua`, `data/items_new.lua`, `frames/item.lua`
+## Implementation Steps
 
-**Approach:**
-- **Phase 2 Pre-computation:** Inside `Harvest` or `GetItemDataFromInventorySlot`, safely calculate `isBattlePayItem` using `_G.C_Container.IsBattlePayItem(bagid, slotid)` (with a `nil` check for Era compatibility) and assign it to `ItemData.itemInfo.isBattlePayItem`.
-- **New Item Pre-computation:** Ensure `ItemData.itemInfo.isNewItem` accurately captures the new item status using the existing `items:IsNewItem(data)` logic during data harvesting, instead of during the draw phase.
-- **Draw Phase Simplification:** In `frames/item.lua`, update `UpdateNewItem(ctx, data)` to strictly use `data.itemInfo.isNewItem` and `data.itemInfo.isBattlePayItem`. Remove all native API queries.
+### 1. Remove `SetItem` API from Item Buttons
+- **`frames/item.lua`**:
+  - Remove `itemFrame.itemProto:SetItem(ctx, slotkey)`. It performs a side-effect `items:GetItemDataFromSlotKey(slotkey)` lookup.
+- **`frames/itemrow.lua`**:
+  - Remove the `item.itemRowProto:SetItem(ctx, data)` alias to standardize on `SetItemFromData`.
 
-## 2. Free Space / Empty Slot Bag Types
-**Files to change:** `data/items.lua`, `data/items_new.lua`, `frames/item.lua`, `frames/era/item.lua`
+### 2. Remove Fallbacks in Views and Bag Frame
+Currently, `gridview_new.lua`, `bagview_new.lua`, and `bag.lua` contain conditional logic checking if `itemButton.SetItemFromData` exists, falling back to `itemButton:SetItem`. We will hardcode `SetItemFromData` usage.
+- **`views/gridview_new.lua`**:
+  - Replace the `if itemButton.SetItemFromData then ... else ... end` block with a direct call to `itemButton:SetItemFromData(ctx, item)`.
+- **`views/bagview_new.lua`**:
+  - Apply the exact same fix.
+- **`frames/bag.lua`**:
+  - Inside `DrawGlobalSections` (for Recent Items), replace the fallback block with `itemButton:SetItemFromData(ctx, item)`.
 
-**Approach:**
-- **Phase 2 Pre-computation:** When creating an `ItemData` node for an empty slot (`isItemEmpty == true`), use the existing `items:GetBagTypeFromBagID(bagid)` logic to compute the bag's type name and quality. Store these as `data.itemInfo.emptySlotName` and `data.itemInfo.itemQuality`.
-- **Draw Phase Simplification:** Update `itemProto:SetFreeSlots(ctx, data)` in both Retail and Era item frames to read these pre-computed values directly from `data`.
-- **Cleanup:** Remove `GetBagType` and `GetBagTypeQuality` helper methods from the `itemProto`.
+### 3. Remove Dead Stacking Engine Code in `views/views.lua`
+Virtual stacking is now handled entirely upstream during Phase 3 of the data pipeline. The view-level stacking code is dead code full of database lookups.
+- **`views/views.lua`**:
+  - Delete `stackProto` and all its methods (`AddItem`, `RemoveItem`, `UpdateCount`, `GetStackCount`, `HasSubItem`, `HasAnySubItems`, `IsInStack`, `GetBackingItemData`, `IsStackEmpty`).
+  - Delete `views:NewStack(slotkey)`.
+  - Delete `views.viewProto:FlashStack(ctx, slotkey)`.
+  - Remove references to `self.stacks` in `views.viewProto:Wipe`, `views.viewProto:WipeStacks` (delete method), and `views:NewBlankView`.
 
-## 4. Legacy `GetItemData` Fallbacks and Helpers
-**Files to change:** `frames/item.lua`, `frames/era/item.lua`, `frames/itemrow.lua`
+### 4. Update Test Suite
+- **`spec/frames/item_spec.lua`**:
+  - Update tests "should clamp frame level to 0 and not throw an error after the fix" and "should call UpdateExtended on both self.button and decoration during SetItem" to use `SetItemFromData` instead of `SetItem`. This requires passing the full `itemData` mock directly.
+- **`spec/views/persistent_tabs_spec.lua`**:
+  - Update the "should reproduce the nil slotkey crash when items data is transient/nil during UpdateButton" test description and logic. The test references `itemButton:SetItem`. It should reflect `SetItemFromData` logic.
 
-**Approach:**
-- **Remove Fallbacks:** In all drawing functions within `frames/item.lua` and `frames/era/item.lua` (e.g., `UpdateCount`, `DrawItemLevel`, `UpdateUpgrade`, `UpdateCooldown`, `SetFreeSlots`, `UpdateNewItem`), remove the fallback line `data = data or self:GetItemData()`. Enforce that `data` is explicitly passed in from the upstream refresh pipeline.
-- **Refactor `itemRowProto:SetItem`:** Update `itemRowProto:SetItem(slotkey)` in `frames/itemrow.lua` to accept the `data` parameter instead of performing a live database query (`items:GetItemDataFromSlotKey(slotkey)`). Ensure the caller passes `data`.
-- **Refactor `itemFrame:RefreshItemLevelColors()`:** Modify the function so that instead of querying `items:GetItemDataFromSlotKey` for every visible frame, it relies on cached frame data or triggers a standard pipeline redraw.
-- **Refactor `IsNewItem(ctx)` Helper:** Remove the `itemFrame.itemProto:IsNewItem(ctx)` function that queries `GetItemDataFromSlotKey`, replacing its usage with direct checks against the passed `data` object.
-
-## Risks & Edge Cases
-- **Missing Data Passed to Drawings:** Removing `data = data or self:GetItemData()` will cause Lua errors if any upstream caller or external plugin invokes drawing functions without passing `data`. A thorough search for callers of these functions is required.
-- **Test Invalidation:** Existing `item_spec.lua` tests may currently rely on `itemProto` fetching its own data. Tests will need to be updated to explicitly pass the mocked `ItemData`.
-- **Classic/Era Parity:** `C_NewItems` and `C_Container.IsBattlePayItem` do not exist in Classic/Era. Conditional checks must be strictly applied in Phase 2 during data harvesting to avoid script errors.
+### 5. Verification
+- Run `luacheck .` to ensure no linting errors.
+- Run `busted .` to ensure all integration and unit tests pass.

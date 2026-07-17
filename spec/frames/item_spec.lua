@@ -172,14 +172,14 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       end
     end
 
-    -- This call should succeed (it will fail right now until we implement the fix)
-    item:SetItem(btnCtx, "0_2")
+    -- This call should succeed
+    item:SetItemFromData(btnCtx, itemData)
 
     -- And the decoration frame level should be 0
     assert.equal(item._decoration._frameLevel, 0)
   end)
 
-  it("should call UpdateExtended on both self.button and decoration during SetItem", function()
+  it("should call UpdateExtended on both self.button and decoration during SetItemFromData", function()
     local btnCtx = ctx:New("test_update_extended_set_item")
     local item = itemFrame:GetButton(btnCtx, "0_3")
 
@@ -225,11 +225,11 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       end
     end
 
-    item:SetItem(btnCtx, "0_3")
+    item:SetItemFromData(btnCtx, itemData)
 
     -- Assert that UpdateExtended was called on both
-    assert.equal(1, buttonUpdateExtendedCalled, "button:UpdateExtended was not called on SetItem")
-    assert.equal(1, decUpdateExtendedCalled, "decoration:UpdateExtended was not called on SetItem")
+    assert.equal(1, buttonUpdateExtendedCalled, "button:UpdateExtended was not called on SetItemFromData")
+    assert.equal(1, decUpdateExtendedCalled, "decoration:UpdateExtended was not called on SetItemFromData")
   end)
 
   it("should call UpdateExtended on both self.button and decoration during SetFreeSlots", function()

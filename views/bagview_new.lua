@@ -83,12 +83,7 @@ local function BagView(view, ctx, bag, slotInfo, callback)
       view:SetSlotSection(slotkey, section)
     else
       local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
-      if itemButton.SetItemFromData then
-        itemButton:SetItemFromData(ctx, item)
-      else
-        itemButton.staticData = item
-        itemButton:SetItem(ctx, slotkey)
-      end
+      itemButton:SetItemFromData(ctx, item)
       local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
       local section = view:GetOrCreateSection(ctx, category)
       section:AddCell(slotkey, itemButton)

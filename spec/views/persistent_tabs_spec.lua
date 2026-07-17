@@ -180,12 +180,12 @@ end
 itemFrame.Create = function()
   local i = {
     slotkey = nil,
-    SetItem = function(self, ctx, slotkey)
-      local data = items:GetItemDataFromSlotKey(slotkey)
+    SetItemFromData = function(self, ctx, data)
       if data == nil then
         return
       end
-      self.slotkey = slotkey
+      self.slotkey = data.slotkey
+      self.staticData = data
     end,
     GetItemData = function(self)
       if self.staticData then return self.staticData end

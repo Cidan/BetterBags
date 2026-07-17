@@ -386,12 +386,7 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 
 		for _, item in ipairs(recentItems) do
 			local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
-			if itemButton.SetItemFromData then
-				itemButton:SetItemFromData(ctx, item)
-			else
-				itemButton.staticData = item
-				itemButton:SetItem(ctx, item.slotkey)
-			end
+			itemButton:SetItemFromData(ctx, item)
 			recentSection:AddCell(item.slotkey, itemButton)
 		end
 		headerW, headerH = recentSection:Draw(self.kind, currentView, false)
