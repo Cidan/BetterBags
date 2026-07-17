@@ -1,39 +1,52 @@
-# Plan: Decouple Item Rendering from Database Lookups
+# Implementation Plan: Retire Legacy Files and Promote `_new.lua` Files
 
-## Objective
-Remove all remaining gaps where item buttons and views perform side-effect database lookups (`GetItemDataFromSlotKey`). The rendering layer must act purely as a functional UI that exclusively uses the `ItemData` passed from the upstream pipeline.
+## Overview
+This plan outlines the steps to remove legacy rendering/data pipeline scripts and promote the `_new.lua` architecture to be the canonical files in the BetterBags addon.
 
-## Implementation Steps
+## 1. Delete Legacy Files
+Remove the old unused files from the repository:
+- `data/items.lua`
+- `data/search.lua`
+- `data/stacks.lua`
 
-### 1. Remove `SetItem` API from Item Buttons
-- **`frames/item.lua`**:
-  - Remove `itemFrame.itemProto:SetItem(ctx, slotkey)`. It performs a side-effect `items:GetItemDataFromSlotKey(slotkey)` lookup.
-- **`frames/itemrow.lua`**:
-  - Remove the `item.itemRowProto:SetItem(ctx, data)` alias to standardize on `SetItemFromData`.
+## 2. Rename `_new.lua` Files
+Promote the new architecture files by renaming them to their canonical names:
+- `data/items_new.lua` -> `data/items.lua`
+- `data/stacks_new.lua` -> `data/stacks.lua`
+- `data/search_new.lua` -> `data/search.lua`
+- `views/gridview_new.lua` -> `views/gridview.lua`
+- `views/bagview_new.lua` -> `views/bagview.lua`
 
-### 2. Remove Fallbacks in Views and Bag Frame
-Currently, `gridview_new.lua`, `bagview_new.lua`, and `bag.lua` contain conditional logic checking if `itemButton.SetItemFromData` exists, falling back to `itemButton:SetItem`. We will hardcode `SetItemFromData` usage.
-- **`views/gridview_new.lua`**:
-  - Replace the `if itemButton.SetItemFromData then ... else ... end` block with a direct call to `itemButton:SetItemFromData(ctx, item)`.
-- **`views/bagview_new.lua`**:
-  - Apply the exact same fix.
-- **`frames/bag.lua`**:
-  - Inside `DrawGlobalSections` (for Recent Items), replace the fallback block with `itemButton:SetItemFromData(ctx, item)`.
+## 3. Rename Corresponding Test Files
+Promote the spec tests corresponding to the renamed files:
+- `spec/items_new_spec.lua` -> `spec/items_spec.lua`
+- `spec/search_new_spec.lua` -> `spec/search_spec.lua`
+- `spec/stacks_new_spec.lua` -> `spec/stacks_spec.lua`
+- `spec/views/gridview_new_spec.lua` -> `spec/views/gridview_spec.lua`
+*(Note: If legacy `_spec.lua` files exist, they should be deleted/overwritten during the move).*
 
-### 3. Remove Dead Stacking Engine Code in `views/views.lua`
-Virtual stacking is now handled entirely upstream during Phase 3 of the data pipeline. The view-level stacking code is dead code full of database lookups.
-- **`views/views.lua`**:
-  - Delete `stackProto` and all its methods (`AddItem`, `RemoveItem`, `UpdateCount`, `GetStackCount`, `HasSubItem`, `HasAnySubItems`, `IsInStack`, `GetBackingItemData`, `IsStackEmpty`).
-  - Delete `views:NewStack(slotkey)`.
-  - Delete `views.viewProto:FlashStack(ctx, slotkey)`.
-  - Remove references to `self.stacks` in `views.viewProto:Wipe`, `views.viewProto:WipeStacks` (delete method), and `views:NewBlankView`.
+## 4. Update WoW TOC Files
+Update all project `.toc` files to load the new canonical `.lua` names instead of `_new.lua`:
+- `BetterBags.toc`
+- `BetterBags_Vanilla.toc`
+- `BetterBags_TBC.toc`
+- `BetterBags_Mists.toc`
 
-### 4. Update Test Suite
-- **`spec/frames/item_spec.lua`**:
-  - Update tests "should clamp frame level to 0 and not throw an error after the fix" and "should call UpdateExtended on both self.button and decoration during SetItem" to use `SetItemFromData` instead of `SetItem`. This requires passing the full `itemData` mock directly.
-- **`spec/views/persistent_tabs_spec.lua`**:
-  - Update the "should reproduce the nil slotkey crash when items data is transient/nil during UpdateButton" test description and logic. The test references `itemButton:SetItem`. It should reflect `SetItemFromData` logic.
+## 5. Update Spec & Dependency References
+Perform a global replace across the `spec/` folder to ensure all module loading refers to the correct canonical paths:
+- Replace `data/items_new.lua` -> `data/items.lua`
+- Replace `data/stacks_new.lua` -> `data/stacks.lua`
+- Replace `data/search_new.lua` -> `data/search.lua`
+- Replace `views/gridview_new.lua` -> `views/gridview.lua`
+- Replace `views/bagview_new.lua` -> `views/bagview.lua`
 
-### 5. Verification
-- Run `luacheck .` to ensure no linting errors.
-- Run `busted .` to ensure all integration and unit tests pass.
+## 6. Update Documentation and Rules
+Update project rules, handoff documentation, and architectural markdown to refer to the finalized filenames:
+- `.claude/rules/data-loader.md`
+- `.claude/rules/item-drawing.md`
+- `docs/render.md`
+- `docs/handoff.md`
+
+## Risks and Edge Cases
+- Ensure any leftover references to the legacy filenames in `Luacheck` or `Busted` configurations are properly tested.
+- Some legacy test files might share the target name (e.g. `items_spec.legacy`); these should be safely removed to prevent confusion.

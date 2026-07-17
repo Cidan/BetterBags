@@ -68,10 +68,10 @@ tooltipScanner.GetTooltipText = function() return "" end
 LoadBetterBagsModule("util/query.lua")
 LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
-LoadBetterBagsModule("data/search_new.lua")
+LoadBetterBagsModule("data/search.lua")
 LoadBetterBagsModule("core/async.lua")
-ResetModuleStub("Stacks", "data/stacks_new.lua")
-LoadBetterBagsModule("data/stacks_new.lua")
+ResetModuleStub("Stacks", "data/stacks.lua")
+LoadBetterBagsModule("data/stacks.lua")
 ResetModuleStub("Binding", "data/binding.lua")
 LoadBetterBagsModule("data/binding.lua")
 
@@ -79,8 +79,8 @@ local categories = StubBetterBagsModule("Categories")
 categories.GetSortedSearchCategories = function() return {} end
 
 -- Load items, slots, and stacks
-ResetModuleStub("Items", "data/items_new.lua")
-LoadBetterBagsModule("data/items_new.lua")
+ResetModuleStub("Items", "data/items.lua")
+LoadBetterBagsModule("data/items.lua")
 loadfile("data/slots.lua")("BetterBags")
 local items = addon:GetModule("Items")
 

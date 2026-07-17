@@ -62,13 +62,13 @@ util\trees\intervaltree.lua
 util\query.lua
 
 data\binding.lua
-data\search_new.lua
+data\search.lua
 data\tooltip.lua
 data\equipmentsets.lua
 data\categories.lua
 data\groups.lua
-data\items_new.lua
-data\stacks_new.lua
+data\items.lua
+data\stacks.lua
 data\slots.lua
 data\loader.lua
 data\refresh.lua
@@ -114,8 +114,8 @@ frames\itembrowser.lua
 frames\debug.lua
 
 views\views.lua
-views\gridview_new.lua
-views\bagview_new.lua
+views\gridview.lua
+views\bagview.lua
 
 bags\backpack.lua
 bags\classic\backpack.lua

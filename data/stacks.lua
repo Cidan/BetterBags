@@ -15,7 +15,6 @@ local stacks = addon:NewModule('Stacks')
 ---@field stacksByItemHash table<string, StackInfo>
 local stack = {}
 
---- Creates a new stack
 ---@return Stack
 function stacks:Create()
   local newState = setmetatable({}, {__index = stack})
@@ -23,80 +22,77 @@ function stacks:Create()
   return newState
 end
 
---- Initializes or updates stack information for an item
 ---@param item ItemData
 function stack:AddToStack(item)
   if item.isItemEmpty then
     return
   end
 
-  if not self.stacksByItemHash[item.itemHash] then
-    self.stacksByItemHash[item.itemHash] = {count = 1, rootItem = item.slotkey, slotkeys = {}}
+  local hash = item.itemHash
+  local stackinfo = self.stacksByItemHash[hash]
+
+  if not stackinfo then
+    self.stacksByItemHash[hash] = {count = 1, rootItem = item.slotkey, slotkeys = {}}
     return
   end
 
-  -- JIT load here due to import loop.
-
   ---@class Items: AceModule
   local items = addon:GetModule('Items')
-
-  local stackinfo = self.stacksByItemHash[item.itemHash]
-
   local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
 
   stackinfo.slotkeys[item.slotkey] = true
   stackinfo.count = stackinfo.count + 1
 
-  -- Always ensure the lead item in the stack is the one with the most count.
-  for slotkey in pairs(stackinfo.slotkeys) do
-    local childData = items:GetItemDataFromSlotKey(slotkey)
-    if rootItemData.isItemEmpty or
-    (not childData.isItemEmpty and ((childData.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount) or
-    (childData.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and childData.slotkey > stackinfo.rootItem))) then
-      stackinfo.slotkeys[stackinfo.rootItem] = true
-      stackinfo.slotkeys[slotkey] = nil
-      stackinfo.rootItem = slotkey
-    end
+  if not rootItemData or rootItemData.isItemEmpty or
+     ((item.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount) or
+      (item.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and item.slotkey > stackinfo.rootItem)) then
+    stackinfo.slotkeys[stackinfo.rootItem] = true
+    stackinfo.slotkeys[item.slotkey] = nil
+    stackinfo.rootItem = item.slotkey
   end
 end
 
---- Removes an item from a stack
 ---@param item ItemData
 function stack:RemoveFromStack(item)
-  ---@class Items: AceModule
-  local items = addon:GetModule('Items')
-
   local stackinfo = self.stacksByItemHash[item.itemHash]
   if not stackinfo then return end
 
+  ---@class Items: AceModule
+  local items = addon:GetModule('Items')
+
   if stackinfo.rootItem == item.slotkey then
-    if next(stackinfo.slotkeys) then
-      stackinfo.rootItem = next(stackinfo.slotkeys)
-      stackinfo.slotkeys[stackinfo.rootItem] = nil
+    local bestChildSlotkey = nil
+    local bestChildData = nil
+
+    for slotkey in pairs(stackinfo.slotkeys) do
+      local childData = items:GetItemDataFromSlotKey(slotkey)
+      if childData and not childData.isItemEmpty then
+        if not bestChildData then
+          bestChildSlotkey = slotkey
+          bestChildData = childData
+        else
+          if (childData.itemInfo.currentItemCount > bestChildData.itemInfo.currentItemCount) or
+             (childData.itemInfo.currentItemCount == bestChildData.itemInfo.currentItemCount and slotkey > bestChildSlotkey) then
+            bestChildSlotkey = slotkey
+            bestChildData = childData
+          end
+        end
+      end
+    end
+
+    if bestChildSlotkey then
+      stackinfo.rootItem = bestChildSlotkey
+      stackinfo.slotkeys[bestChildSlotkey] = nil
       stackinfo.count = stackinfo.count - 1
     else
       self.stacksByItemHash[item.itemHash] = nil
-      return
     end
   elseif stackinfo.slotkeys[item.slotkey] then
     stackinfo.slotkeys[item.slotkey] = nil
     stackinfo.count = stackinfo.count - 1
   end
-  local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
-  -- Always ensure the lead item in the stack is the one with the most count.
-  for slotkey in pairs(stackinfo.slotkeys) do
-    local childData = items:GetItemDataFromSlotKey(slotkey)
-    if rootItemData.isItemEmpty or
-    (not childData.isItemEmpty and ((childData.itemInfo.currentItemCount > rootItemData.itemInfo.currentItemCount) or
-    (childData.itemInfo.currentItemCount == rootItemData.itemInfo.currentItemCount and childData.slotkey > stackinfo.rootItem))) then
-      stackinfo.slotkeys[stackinfo.rootItem] = true
-      stackinfo.slotkeys[slotkey] = nil
-      stackinfo.rootItem = slotkey
-    end
-  end
 end
 
---- Gets the total count of an item across all stacks
 ---@param itemHash string
 ---@return number
 function stack:GetTotalCount(itemHash)
@@ -104,7 +100,6 @@ function stack:GetTotalCount(itemHash)
   return stackinfo and stackinfo.count or 0
 end
 
---- Gets stack information for an item
 ---@param itemHash string
 ---@return StackInfo?
 function stack:GetStackInfo(itemHash)
@@ -123,7 +118,6 @@ function stack:HasItem(itemHash, slotkey)
   return stackinfo.slotkeys[slotkey] or false
 end
 
---- Checks if a slotkey is the root item of a stack
 ---@param itemHash string
 ---@param slotkey string
 ---@return boolean
@@ -133,7 +127,6 @@ function stack:IsRootItem(itemHash, slotkey)
   return stackinfo.rootItem == slotkey
 end
 
---- Clears all stack information
 function stack:Clear()
   wipe(self.stacksByItemHash)
 end

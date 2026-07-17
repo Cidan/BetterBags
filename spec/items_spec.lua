@@ -1,14 +1,14 @@
--- items_new_spec.lua -- Unit tests for data/items_new.lua
+-- items_spec.lua -- Unit tests for data/items.lua
 
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
--- Ensure all dependencies exist before loading items_new.lua
+-- Ensure all dependencies exist before loading items.lua
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 local events = addon:GetModule("Events")
 events:OnInitialize()
 
--- Stubs for modules items_new.lua depends on
+-- Stubs for modules items.lua depends on
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 debug.Inspect = function() end
@@ -27,9 +27,9 @@ tooltipScanner.GetTooltipText = function() return "" end
 LoadBetterBagsModule("util/query.lua")
 LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
-LoadBetterBagsModule("data/search_new.lua")
+LoadBetterBagsModule("data/search.lua")
 LoadBetterBagsModule("core/async.lua")
-LoadBetterBagsModule("data/stacks_new.lua")
+LoadBetterBagsModule("data/stacks.lua")
 ResetModuleStub("Binding", "data/binding.lua")
 LoadBetterBagsModule("data/binding.lua")
 
@@ -111,8 +111,8 @@ stacksMod.Create = function()
 end
 
 -- Load the new items module
-ResetModuleStub("Items", "data/items_new.lua")
-LoadBetterBagsModule("data/items_new.lua")
+ResetModuleStub("Items", "data/items.lua")
+LoadBetterBagsModule("data/items.lua")
 LoadBetterBagsModule("data/slots.lua")
 local items = addon:GetModule("Items")
 

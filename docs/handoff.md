@@ -9,13 +9,13 @@ By decoupling the **Ideal state** (what items exist) from the **Execution state*
 
 The refactored pipeline consists of 8 discrete, breadth-first phases:
 - **Phase 1 (Item Loader):** Asynchronously pre-primes the client C-level item cache and holds a static slotkey-to-ItemMixin registry. *(Status: Active & Stable)*
-- **Phase 2 (Data Farming):** Performs pure, breadth-first, zero-allocation physical slot harvests (`data/items_new.lua`). *(Status: Active & Stable - Merged in PR 1002)*
-- **Phase 3 (Virtual Stacks):** Resolves parent-child stack groupings from a clean slate on every update (`data/stacks_new.lua`). *(Status: Active & Stable - Merged in PR 1003)*
-- **Phase 4 (Search Indexing):** Decoupled, clean-sweep indexing pass over the resolved layout models (`data/search_new.lua`). *(Status: Active & Stable - Merged in PR 1004)*
+- **Phase 2 (Data Farming):** Performs pure, breadth-first, zero-allocation physical slot harvests (`data/items.lua`). *(Status: Active & Stable - Merged in PR 1002)*
+- **Phase 3 (Virtual Stacks):** Resolves parent-child stack groupings from a clean slate on every update (`data/stacks.lua`). *(Status: Active & Stable - Merged in PR 1003)*
+- **Phase 4 (Search Indexing):** Decoupled, clean-sweep indexing pass over the resolved layout models (`data/search.lua`). *(Status: Active & Stable - Merged in PR 1004)*
 - **Phase 5 (Item Button Drawing):** Presentation-only, "dumb" button frame drawing (`frames/item.lua`). *(Status: Active & Stable - Merged in PR 1005)*
-- **Phase 6 (Item Button Placement):** Unifies Category View, One Bag View, and Blizzard Bag View under a single string-based, clean-sweep polymorphic category placement engine (`views/gridview_new.lua`). *(Status: Active & Stable - Merged in PR 1008)*
+- **Phase 6 (Item Button Placement):** Unifies Category View, One Bag View, and Blizzard Bag View under a single string-based, clean-sweep polymorphic category placement engine (`views/gridview.lua`). *(Status: Active & Stable - Merged in PR 1008)*
 - **Phase 7 (Section Layout):** Wraps sorted cells into local category section grids. *(Status: Active & Stable - Merged in PR 1009)*
-- **Phase 8 (Page Placement & UI Restoration):** Packs sections into equal-height columns, resolves window bounds, and un-gates visual redraw messages (`views/gridview_new.lua`). *(Status: Active & Stable - Merged in PR 1010)*
+- **Phase 8 (Page Placement & UI Restoration):** Packs sections into equal-height columns, resolves window bounds, and un-gates visual redraw messages (`views/gridview.lua`). *(Status: Active & Stable - Merged in PR 1010)*
 
 ---
 
