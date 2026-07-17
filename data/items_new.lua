@@ -92,6 +92,31 @@ local binding = addon:GetModule("Binding")
 
 local items = addon:NewModule("Items")
 
+---@param name string
+---@param func fun(data: ItemData): boolean
+function items:RegisterUpgradeProvider(name, func)
+  self.upgradeProviders = self.upgradeProviders or {}
+  self.upgradeProviders[name] = func
+end
+
+---@param data ItemData
+---@return boolean
+function items:ResolveUpgrade(data)
+  if not data or data.isItemEmpty then
+    return false
+  end
+  local provider = database:GetUpgradeIconProvider()
+  if provider == "None" then
+    return false
+  end
+  self.upgradeProviders = self.upgradeProviders or {}
+  local func = self.upgradeProviders[provider]
+  if func then
+    return func(data) or false
+  end
+  return false
+end
+
 -- BOOT STUBS & LEGACY PROTOTYPES
 function items:OnInitialize()
   self.slotInfo = {}
@@ -112,6 +137,31 @@ function items:OnInitialize()
   }
   self.equipmentCache = {}
   self.previousItemGUID = {}
+
+  self.upgradeProviders = {}
+  self:RegisterUpgradeProvider("BetterBags", function(data)
+    if not data.inventorySlots or not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
+      return false
+    end
+
+    for _, slot in pairs(data.inventorySlots) do
+      local equippedItem = self:GetItemDataFromInventorySlot(slot)
+      -- If the item is an offhand and the mainhand is a 2H weapon, don't show upgrade.
+      if slot == INVSLOT_OFFHAND then
+        local mainhand = self:GetItemDataFromInventorySlot(INVSLOT_MAINHAND)
+        if mainhand and (mainhand.itemInfo.itemEquipLoc == "INVTYPE_2HWEAPON" or mainhand.itemInfo.itemEquipLoc == "INVTYPE_RANGED") then
+          return false
+        end
+      end
+
+      if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
+        return true
+      elseif equippedItem and equippedItem.isItemEmpty and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
+        return true
+      end
+    end
+    return false
+  end)
 end
 
 function items:OnEnable()
@@ -489,6 +539,7 @@ function items:ProcessRefresh(ctx, kind)
       slotInfo.totalItems = slotInfo.totalItems + 1
     end
     currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
+    currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
   end
 
   slotInfo:SortEmptySlots()

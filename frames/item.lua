@@ -208,60 +208,11 @@ end
 function itemFrame.itemProto:UpdateUpgrade(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
-	if data.isItemEmpty then
+	if data.isItemEmpty or self.staticData then
 		decoration.UpgradeIcon:SetShown(false)
 		return
 	end
-	if self.staticData then
-		return
-	end
-	if data.isUpgrade ~= nil then
-		decoration.UpgradeIcon:SetShown(data.isUpgrade)
-		return
-	end
-
-	if not data.inventorySlots or not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
-		decoration.UpgradeIcon:SetShown(false)
-		return
-	end
-
-	if database:GetUpgradeIconProvider() == "None" then
-		decoration.UpgradeIcon:SetShown(false)
-		return
-	end
-
-	for _, slot in pairs(data.inventorySlots) do
-		local equippedItem = items:GetItemDataFromInventorySlot(slot)
-		-- If the item is an offhand and the mainhand is a 2H weapon
-		-- don't show the upgrade icon.
-		if slot == INVSLOT_OFFHAND then
-			local mainhand = items:GetItemDataFromInventorySlot(INVSLOT_MAINHAND)
-			if
-				mainhand
-				and (
-					mainhand.itemInfo.itemEquipLoc == "INVTYPE_2HWEAPON"
-					or mainhand.itemInfo.itemEquipLoc == "INVTYPE_RANGED"
-				)
-			then
-				decoration.UpgradeIcon:SetShown(false)
-				break
-			end
-		end
-		if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
-			decoration.UpgradeIcon:SetShown(true)
-			break
-		elseif
-			equippedItem
-			and equippedItem.isItemEmpty
-			and slot >= INVSLOT_FIRST_EQUIPPED
-			and slot <= INVSLOT_LAST_EQUIPPED
-		then
-			decoration.UpgradeIcon:SetShown(true)
-			break
-		else
-			decoration.UpgradeIcon:SetShown(false)
-		end
-	end
+	decoration.UpgradeIcon:SetShown(data.isUpgrade or false)
 end
 
 ---@return ItemData?

@@ -258,17 +258,6 @@ function gridProto:DislocateAllCellsWithID(id)
   targetCell.frame:ClearAllPoints()
 end
 
--- Sort will sort the cells in this grid using the given function.
----@param fn fun(a: `T`, b: `T`):boolean
-function gridProto:Sort(fn)
-  -- Guard against invalid sort functions from external addons modifying saved variables.
-  -- Use a no-op comparison function as a safe default to prevent crashes.
-  if type(fn) ~= "function" then
-    fn = function() return false end
-  end
-  table.sort(self.cells, fn)
-end
-
 ---@return number, number
 function gridProto:stageSimple()
   return 1,1

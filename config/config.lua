@@ -138,7 +138,18 @@ function config:CreateConfig()
   f:AddDropdown({
     title = 'Upgrade Icon Provider',
     description = 'Select the icon provider for item upgrades.',
-    items = {'None', 'BetterBags'},
+    itemsFunction = function()
+      local list = {'None', 'BetterBags'}
+      local itemsModule = addon:GetModule('Items')
+      if itemsModule and itemsModule.upgradeProviders then
+        for provider in pairs(itemsModule.upgradeProviders) do
+          if provider ~= 'BetterBags' then
+            table.insert(list, provider)
+          end
+        end
+      end
+      return list
+    end,
     getValue = function(_, value)
       return value == db:GetUpgradeIconProvider()
     end,
