@@ -162,8 +162,8 @@ LoadBetterBagsModule("views/views.lua")
 local views = addon:GetModule("Views")
 
 -- Load the new view implementations
-LoadBetterBagsModule("views/gridview_new.lua")
-LoadBetterBagsModule("views/bagview_new.lua")
+LoadBetterBagsModule("views/gridview.lua")
+LoadBetterBagsModule("views/bagview.lua")
 
 local context = addon:GetModule("Context")
 

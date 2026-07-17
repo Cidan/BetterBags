@@ -101,6 +101,16 @@ function search:Wipe()
   end
 end
 
+-- IndexItems replaces the previous indexes and indexes a completely fresh collection of flat items
+---@param currentItems table<string, ItemData>
+function search:IndexItems(currentItems)
+  self:Wipe()
+  if not currentItems then return end
+  for _, item in pairs(currentItems) do
+    self:Add(item)
+  end
+end
+
 ---@private
 ---@param index SearchIndex
 ---@param value boolean
@@ -179,7 +189,7 @@ end
 
 ---@param item ItemData
 function search:Add(item)
-  if item.isItemEmpty then return end
+  if item == nil or item.isItemEmpty then return end
   search:addStringToIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:addStringToIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
@@ -220,21 +230,27 @@ function search:Add(item)
   search:addNumberToIndex(self.indicies.bagid, item.bagid, item.slotkey)
   search:addNumberToIndex(self.indicies.slotid, item.slotid, item.slotkey)
   search:addNumberToIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
-  for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
-    local bonusNum = tonumber(bonusID)
-    if bonusNum then search:addNumberToIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
+  if item.itemLinkInfo and item.itemLinkInfo.bonusIDs then
+    for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
+      local bonusNum = tonumber(bonusID)
+      if bonusNum then search:addNumberToIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
+    end
   end
 
   search:addBoolToIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:addBoolToIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  search:addBoolToIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
-  search:addBoolToIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
-  search:addBoolToIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
+  if item.bindingInfo then
+    search:addBoolToIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
+  end
+  if item.questInfo then
+    search:addBoolToIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
+    search:addBoolToIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
+  end
 end
 
 ---@param item ItemData
 function search:Remove(item)
-  if item.isItemEmpty then return end
+  if item == nil or item.isItemEmpty then return end
   search:removeStringFromIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
   search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
   search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
@@ -275,16 +291,22 @@ function search:Remove(item)
   search:removeNumberFromIndex(self.indicies.bagid, item.bagid, item.slotkey)
   search:removeNumberFromIndex(self.indicies.slotid, item.slotid, item.slotkey)
   search:removeNumberFromIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
-  for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
-    local bonusNum = tonumber(bonusID)
-    if bonusNum then search:removeNumberFromIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
+  if item.itemLinkInfo and item.itemLinkInfo.bonusIDs then
+    for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
+      local bonusNum = tonumber(bonusID)
+      if bonusNum then search:removeNumberFromIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
+    end
   end
 
   search:removeBoolFromIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
   search:removeBoolFromIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  search:removeBoolFromIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
-  search:removeBoolFromIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
-  search:removeBoolFromIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
+  if item.bindingInfo then
+    search:removeBoolFromIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
+  end
+  if item.questInfo then
+    search:removeBoolFromIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
+    search:removeBoolFromIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
+  end
 end
 
 function search:StringToBoolean(value)
@@ -345,8 +367,10 @@ function search:isNotInIndex(name, value)
 
   local b = self:StringToBoolean(string.lower(value))
   if b ~= nil then
-    for k in pairs(index.bools[b]) do
-      results[k] = false
+    if index.bools[b] then
+      for k in pairs(index.bools[b]) do
+        results[k] = false
+      end
     end
     return results
   end

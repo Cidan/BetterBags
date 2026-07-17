@@ -78,7 +78,7 @@ By separating the **Ideal state** (what items actually exist in the player's inv
 - **Output:** Execution callback indicating the C-level item cache is primed.
 - **Implementation Status:** COMPLETE. This module remains active as our pipeline's anchor.
 
-### Phase 2: Data Farming (`data/items_new.lua`)
+### Phase 2: Data Farming (`data/items.lua`)
 - **Responsibility:** Performs a fast, breadth-first sweep of all active slots (`bagID` and `slotID`) for the requested context (Backpack, Bank, or Warbank). It retrieves basic item fields and tags metadata (bound status, item levels, quality).
 - **Rules:** No stacking, no indexing, no categorizing. It simply builds an accurate snapshot of the player's physical items.
 - **Input:** Active `bagList` (from Constants) and the primed `ItemLoader` cache.
@@ -93,7 +93,7 @@ By separating the **Ideal state** (what items actually exist in the player's inv
   ---@field itemInfo ItemInfo
   ```
 
-### Phase 3: Virtual Stacks (`data/stacks_new.lua`)
+### Phase 3: Virtual Stacks (`data/stacks.lua`)
 - **Responsibility:** Resolves all stacking rules (virtual item stacking, merging/unmerging at vendors, merging unstackables, partial stack splits) from a **clean slate**.
 - **Rules:** The stacking state is cleared (`wipe`) at the beginning of this pass. Stacks are computed by iterating over the flat `ItemData` snapshot.
 - **Input:** Flat physical `ItemData` snapshot.
@@ -107,19 +107,19 @@ By separating the **Ideal state** (what items actually exist in the player's inv
      ---@field slotkeys table<string, boolean> -- Children slot keys hidden behind root
      ```
 
-### Phase 4: Search Indexing (`data/search_new.lua`)
+### Phase 4: Search Indexing (`data/search.lua`)
 - **Responsibility:** Rebuilds search engine indices (name, category, levels, binding) to support category search filters and live text queries.
 - **Rules:** Indexing is triggered as a separate, breadth-first step using the flat model resolved in Phase 3. 
 - **Input:** Resolved layout model (`visibleSlots` and `stacks`).
 - **Output:** Completed search and query indexes.
 
-### Phase 5: Item Button Drawing (`frames/item_new.lua`)
+### Phase 5: Item Button Drawing (`frames/item.lua`)
 - **Responsibility:** Manages the visual state of individual item buttons (icons, border textures, text count, level text, upgrade arrows, item flashes).
 - **Rules:** The button acts as a "dumb" visual representation. It is updated by passing a slot key. It reads its own visual properties directly from the cached `ItemData` and has no knowledge of layout columns, virtual stacking logic, or tabs.
 - **Input:** Slot key and resolved metadata.
 - **Output:** Updated visual button widgets.
 
-### Phase 6: Item Button Placement (`views/gridview_new.lua`)
+### Phase 6: Item Button Placement (`views/gridview.lua`)
 - **Responsibility:** Sorts items and assigns individual item buttons to their respective category section containers.
 - **Rules:** Maps item categories (including query-based dynamic search categories and *Recent Items*). Hides child buttons of stacks.
 - **Input:** Resolved layout model, search results, and category mapping.
@@ -131,7 +131,7 @@ By separating the **Ideal state** (what items actually exist in the player's inv
 - **Input:** Set of item buttons assigned to the section.
 - **Output:** Rendered local grid section with precise width and height bounds.
 
-### Phase 8: Page Placement (`frames/grid_new.lua` / `views/gridview_new.lua`)
+### Phase 8: Page Placement (`frames/grid.lua` / `views/gridview.lua`)
 - **Responsibility:** Arranges the completed category sections within the main bag window frame.
 - **Rules:** Runs the final packing algorithm, aligning sections alphabetically/prioritized into columns, updating the window's total height, and adjusting scrollbars.
 - **Input:** Set of rendered grid sections.
@@ -153,8 +153,8 @@ Rather than keeping the legacy modules running alongside the new ones, we will e
 ```
 +-----------------------------------------------------------------------------+
 |                                  PHASE 2                                    |
-| - Action: Disable legacy items.lua in TOC. Add data/items_new.lua.          |
-| - Test File: spec/items_new_spec.lua                                        |
+| - Action: Enable promoted data/items.lua in TOC.                           |
+| - Test File: spec/items_spec.lua                                            |
 | - Validation: Verify in unit tests that raw slot sweeps harvest clean        |
 |   metadata. Add in-game slash command to print physical item maps.           |
 +-----------------------------------------------------------------------------+
@@ -162,8 +162,8 @@ Rather than keeping the legacy modules running alongside the new ones, we will e
                                       v
 +-----------------------------------------------------------------------------+
 |                                  PHASE 3                                    |
-| - Action: Disable legacy stacks.lua in TOC. Add data/stacks_new.lua.        |
-| - Test File: spec/stacks_new_spec.lua                                       |
+| - Action: Enable promoted data/stacks.lua in TOC.                          |
+| - Test File: spec/stacks_spec.lua                                           |
 | - Validation: Assert clean-sweep stack resolution works. In-game command    |
 |   prints stack trees of real items (revealing any promo roots/children).    |
 +-----------------------------------------------------------------------------+
@@ -171,8 +171,8 @@ Rather than keeping the legacy modules running alongside the new ones, we will e
                                       v
 +-----------------------------------------------------------------------------+
 |                                  PHASE 4                                    |
-| - Action: Disable legacy search.lua in TOC. Add data/search_new.lua.        |
-| - Test File: spec/search_new_spec.lua                                       |
+| - Action: Enable promoted data/search.lua in TOC.                          |
+| - Test File: spec/search_spec.lua                                           |
 | - Validation: Verify indexing logic matches flat models. Slash command     |
 |   executes test live queries (e.g. "/bb search hearthstone") and matches.    |
 +-----------------------------------------------------------------------------+
@@ -180,8 +180,8 @@ Rather than keeping the legacy modules running alongside the new ones, we will e
                                       v
 +-----------------------------------------------------------------------------+
 |                               PHASES 5 - 8                                  |
-| - Action: Disable legacy view modules in TOC. Add new rendering files.       |
-| - Test File: spec/views/gridview_new_spec.lua                               |
+| - Action: Enable promoted views in TOC.                                     |
+| - Test File: spec/views/gridview_spec.lua                                   |
 | - Validation: Step-by-step category framing, layout, and page alignment.   |
 |   Once Phase 8 is active, the UI windows render completely.                 |
 +-----------------------------------------------------------------------------+
@@ -189,26 +189,23 @@ Rather than keeping the legacy modules running alongside the new ones, we will e
 
 ---
 
-## Expected Code Modifications
+## Expected Code Modifications (Completed)
 
-| Legacy Module File | Action | New Module File |
+All legacy files have been retired, and the new architecture has been promoted to canonical names:
+
+| Retired File | Action | Promoted Canonical File |
 | :--- | :--- | :--- |
-| `data/items.lua` | Disable in TOC -> Delete | `data/items_new.lua` |
-| `data/stacks.lua` | Disable in TOC -> Delete | `data/stacks_new.lua` |
-| `data/search.lua` | Disable in TOC -> Delete | `data/search_new.lua` |
-| `views/gridview.lua` | Disable in TOC -> Delete | `views/gridview_new.lua` |
-| `views/bagview.lua` | Disable in TOC -> Delete | `views/bagview_new.lua` |
-| `frames/item.lua` | Reuse / Extend | No change (kept as dumb frame) |
-| `frames/section.lua` | Disable in TOC -> Delete | `frames/section_new.lua` |
-| `frames/grid.lua` | Reuse / Extend | No change |
+| `data/items.lua` (Legacy) | Deleted | `data/items.lua` (Promoted) |
+| `data/stacks.lua` (Legacy) | Deleted | `data/stacks.lua` (Promoted) |
+| `data/search.lua` (Legacy) | Deleted | `data/search.lua` (Promoted) |
+| `views/gridview.lua` (Legacy) | Deleted | `views/gridview.lua` (Promoted) |
+| `views/bagview.lua` (Legacy) | Deleted | `views/bagview.lua` (Promoted) |
+| `frames/item.lua` | Reused / Extended | `frames/item.lua` (Kept as dumb frame) |
+| `frames/grid.lua` | Reused / Extended | `frames/grid.lua` |
 
 ---
 
 ## Next Steps
 
-1. **Review and approval:** Confirm this Clean-Break integration plan.
-2. **Deactivate Legacy:** Comment out legacy files in all four client `.toc` files.
-3. **Launch Phase 2:**
-   - Define `data/items_new.lua`.
-   - Implement pure, breadth-first fetching of raw physical items.
-   - Write `spec/items_new_spec.lua` to enforce TDD coverage.
+1. **Promotion Completed:** The `_new.lua` and `_new_spec.lua` files have been renamed to their canonical names.
+2. **All Tests Verified:** All test suites compile and run under Lua 5.1 seamlessly.

@@ -152,12 +152,12 @@ LoadBetterBagsModule("util/trees/intervaltree.lua")
 ResetModuleStub("QueryParser", "util/query.lua")
 LoadBetterBagsModule("util/query.lua")
 
-ResetModuleStub("Search", "data/search_new.lua")
-LoadBetterBagsModule("data/search_new.lua")
+ResetModuleStub("Search", "data/search.lua")
+LoadBetterBagsModule("data/search.lua")
 local search = addon:GetModule("Search")
 
-ResetModuleStub("Stacks", "data/stacks_new.lua")
-LoadBetterBagsModule("data/stacks_new.lua")
+ResetModuleStub("Stacks", "data/stacks.lua")
+LoadBetterBagsModule("data/stacks.lua")
 
 ResetModuleStub("Binding", "data/binding.lua")
 LoadBetterBagsModule("data/binding.lua")
@@ -166,8 +166,8 @@ ResetModuleStub("TooltipScanner", "data/tooltip.lua")
 LoadBetterBagsModule("data/tooltip.lua")
 local tooltipScanner = addon:GetModule("TooltipScanner")
 
-ResetModuleStub("Items", "data/items_new.lua")
-LoadBetterBagsModule("data/items_new.lua")
+ResetModuleStub("Items", "data/items.lua")
+LoadBetterBagsModule("data/items.lua")
 LoadBetterBagsModule("data/slots.lua")
 local items = addon:GetModule("Items")
 

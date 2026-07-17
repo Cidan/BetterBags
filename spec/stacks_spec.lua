@@ -11,6 +11,7 @@ items.GetItemDataFromSlotKey = function(_, slotkey)
   return itemDataStore[slotkey]
 end
 
+ResetModuleStub("Stacks", "data/stacks.lua")
 LoadBetterBagsModule("data/stacks.lua")
 local stacksMod = addon:GetModule("Stacks")
 
@@ -22,7 +23,7 @@ local function MockItemData(opts)
   return data
 end
 
-describe("Stacks", function()
+describe("Stacks (New Clean-Sweep)", function()
 
   local stack
 
@@ -116,6 +117,39 @@ describe("Stacks", function()
       stack:AddToStack(item2)
       stack:RemoveFromStack(item1)
       assert.is_true(stack:IsRootItem("h1", "s2"))
+    end)
+
+    it("promotes the highest count child to root when root is removed from a 3-item stack", function()
+      local item1 = MockItemData({slotkey = "s1", itemHash = "h1", count = 10})
+      local item2 = MockItemData({slotkey = "s2", itemHash = "h1", count = 5})
+      local item3 = MockItemData({slotkey = "s3", itemHash = "h1", count = 8})
+      stack:AddToStack(item1)
+      stack:AddToStack(item2)
+      stack:AddToStack(item3)
+
+      stack:RemoveFromStack(item1)
+      assert.is_true(stack:IsRootItem("h1", "s3"))
+      assert.is_true(stack:HasItem("h1", "s2"))
+      assert.is_false(stack:HasItem("h1", "s1"))
+      assert.are.equal(2, stack:GetTotalCount("h1"))
+    end)
+
+    it("does not crash and handles nil item data when promoting a child", function()
+      local item1 = MockItemData({slotkey = "s1", itemHash = "h1", count = 10})
+      local item2 = MockItemData({slotkey = "s2", itemHash = "h1", count = 5})
+      local item3 = MockItemData({slotkey = "s3", itemHash = "h1", count = 8})
+      stack:AddToStack(item1)
+      stack:AddToStack(item2)
+      stack:AddToStack(item3)
+
+      -- Simulate item data for item3 disappearing (GetItemDataFromSlotKey returns nil)
+      itemDataStore["s3"] = nil
+
+      -- This should not crash, even though s3 is nil
+      stack:RemoveFromStack(item1)
+      -- It should promote s2 as it is the only non-nil child
+      assert.is_true(stack:IsRootItem("h1", "s2"))
+      assert.are.equal(2, stack:GetTotalCount("h1"))
     end)
 
     it("removes the entire stack when the last item is removed", function()
