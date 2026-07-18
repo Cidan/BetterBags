@@ -565,12 +565,12 @@ describe("Items (New Data Farming Engine)", function()
       items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
 
       local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
-      assert.is_not_nil(slotInfo.sortedCategories)
+      assert.is_not_nil(slotInfo.layouts.bagView.sortedCategories)
 
       -- If physical ordering is preserved, the order should be: Bag 1, Bag 2, Bag 10
       -- If alphabetical sort was applied, Bag 10 would sort before Bag 2
       local order = {}
-      for _, cat in ipairs(slotInfo.sortedCategories) do
+      for _, cat in ipairs(slotInfo.layouts.bagView.sortedCategories) do
         table.insert(order, cat.name)
       end
 
@@ -854,6 +854,107 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_Container.GetContainerNumFreeSlots = originalGetContainerNumFreeSlots
       groups.GetAllGroups = originalGetAllGroups
       groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
+      const.BACKPACK_BAGS = originalBackpackBags
+    end)
+  end)
+
+  describe("Decoupled Data Sweep and Dual Layouts", function()
+    it("should generate both categoryView and bagView layouts during a single data sweep", function()
+      local DB = addon:GetModule("Database")
+      local originalGetBagView = DB.GetBagView
+      DB.GetBagView = function() return const.BAG_VIEW.SECTION_GRID end
+
+      local originalGetCategoryFilter = DB.GetCategoryFilter
+      DB.GetCategoryFilter = function(self, kind, filter)
+        return filter == "Type"
+      end
+
+      -- Mock bags and their names
+      local savedGetBagName = _G.C_Container.GetBagName
+      _G.C_Container.GetBagName = function(bagid)
+        if bagid == 1 then return "Bag One" end
+        return nil
+      end
+
+      local savedGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+      _G.C_Container.GetContainerNumSlots = function(bagid)
+        if bagid == 1 then return 2 end
+        return 0
+      end
+
+      local savedGetContainerItemID = _G.C_Container.GetContainerItemID
+      _G.C_Container.GetContainerItemID = function(bagid, slotid)
+        if bagid == 1 then return 2000 + slotid end
+        return nil
+      end
+
+      local savedGetContainerItemLink = _G.C_Container.GetContainerItemLink
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+        if bagid == 1 then return "|cff0070dd|Hitem:"..(2000+slotid).."|h[Item "..slotid.."]|h|r" end
+        return nil
+      end
+
+      local savedGetItemInfo = _G.C_Item.GetItemInfo
+      _G.C_Item.GetItemInfo = function(itemID)
+        local id = tonumber(itemID) or 2001
+        local class = id == 2001 and "Armor" or "Weapon"
+        return "Item " .. id, "|cff0070dd|Hitem:"..id.."|h[Item "..id.."]|h|r", 1, 100, 1, class, class, 1, "INVTYPE_WEAPON", 134400, 100, 2, 0, 1, 0, 0, false
+      end
+
+      -- Temporarily set active bags
+      local originalBackpackBags = const.BACKPACK_BAGS
+      const.BACKPACK_BAGS = { [1] = 1 }
+
+      local ctx = addon:GetModule("Context"):New("TestDualLayouts")
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+
+      -- Check layouts populated on slotInfo
+      assert.is_not_nil(slotInfo.layouts)
+      assert.is_not_nil(slotInfo.layouts.categoryView)
+      assert.is_not_nil(slotInfo.layouts.bagView)
+
+      -- Verify categoryView layout structure
+      local categoryView = slotInfo.layouts.categoryView
+      assert.is_not_nil(categoryView.tabs)
+      assert.is_not_nil(categoryView.sortedItems)
+      assert.is_not_nil(categoryView.sortedCategories)
+
+      local armorItem = nil
+      for _, item in ipairs(categoryView.sortedItems) do
+        if item.slotkey == "1_1" then
+          armorItem = item
+        end
+      end
+      assert.is_not_nil(armorItem)
+      assert.are.equal("Armor", armorItem.itemInfo.category)
+
+      -- Verify bagView layout structure
+      local bagView = slotInfo.layouts.bagView
+      assert.is_not_nil(bagView.tabs)
+      assert.is_not_nil(bagView.sortedItems)
+      assert.is_not_nil(bagView.sortedCategories)
+
+      local bagViewItem = nil
+      for _, item in ipairs(bagView.sortedItems) do
+        if item.slotkey == "1_1" then
+          bagViewItem = item
+        end
+      end
+      assert.is_not_nil(bagViewItem)
+      assert.are.equal(items:GetBagName(1), bagViewItem.itemInfo.category)
+      assert.are.equal("Armor", armorItem.itemInfo.category) -- original remains unchanged
+
+      -- Clean up mocks
+      DB.GetBagView = originalGetBagView
+      DB.GetCategoryFilter = originalGetCategoryFilter
+      _G.C_Container.GetBagName = savedGetBagName
+      _G.C_Container.GetContainerNumSlots = savedGetContainerNumSlots
+      _G.C_Container.GetContainerItemID = savedGetContainerItemID
+      _G.C_Container.GetContainerItemLink = savedGetContainerItemLink
+      _G.C_Item.GetItemInfo = savedGetItemInfo
       const.BACKPACK_BAGS = originalBackpackBags
     end)
   end)
