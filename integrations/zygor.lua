@@ -3,72 +3,47 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
-
 ---@class Items: AceModule
 local items = addon:GetModule('Items')
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
 ---@class Zygor: AceModule
 local zygor = addon:NewModule('Zygor')
-
----@param item Item
-local function onItemUpdate(item)
-  if not item.button.UpgradeIcon then return end
-  local data = item:GetItemData()
-  if not data then return end
-  if data.isItemEmpty or not data.bagid or not data.slotid then
-    item.button.UpgradeIcon:SetShown(false)
-    return
-  end
-  local isUpgrade, _, _, _, comment = ZGV.ItemScore.Upgrades:IsUpgrade(data.itemInfo.itemLink)
-  if comment == "not scored" or comment == "no link" then
-    -- For unscored trinkets, fall back to ilvl-based comparison.
-    -- A trinket is an upgrade if its ilvl exceeds at least one equipped
-    -- trinket slot, or if a slot is empty.
-    -- This does not imply full stat/effect evaluation.
-    if data.itemInfo.itemEquipLoc == "INVTYPE_TRINKET" and data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then
-      local isIlvlUpgrade = false
-      for _, slot in pairs({INVSLOT_TRINKET1, INVSLOT_TRINKET2}) do
-        local equippedItem = items:GetItemDataFromInventorySlot(slot)
-        if equippedItem and not equippedItem.isItemEmpty then
-          if data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
-            isIlvlUpgrade = true
-            break
-          end
-        else
-          isIlvlUpgrade = true
-          break
-        end
-      end
-      item.button.UpgradeIcon:SetShown(isIlvlUpgrade)
-    end
-    return
-  end
-  item.button.UpgradeIcon:SetShown(isUpgrade or false)
-end
-
----@param bag Bag
-local function onBagRendered(_, bag, _)
-  if InCombatLockdown() then
-    addon.Bags.Backpack.drawAfterCombat = true
-    return
-  end
-  if database:GetUpgradeIconProvider() ~= 'Zygor' then return end
-  if not ZGV.ItemScore.ActiveRuleSet then return end
-  items:PreLoadAllEquipmentSlots(function()
-    for _, item in pairs(bag.currentView:GetItemsByBagAndSlot()) do
-      onItemUpdate(item)
-    end
-  end)
-end
 
 function zygor:OnEnable()
   if not ZGV or not ZGV.ItemScore or not ZGV.ItemScore.Upgrades then
     return
   end
-  events:RegisterMessage('bag/Rendered', onBagRendered)
+
+  items:RegisterUpgradeProvider("Zygor", function(data)
+    if not data or data.isItemEmpty or not data.itemInfo or not data.itemInfo.itemLink then
+      return false
+    end
+    if not ZGV.ItemScore.ActiveRuleSet then
+      return false
+    end
+    local isUpgrade, _, _, _, comment = ZGV.ItemScore.Upgrades:IsUpgrade(data.itemInfo.itemLink)
+    if comment == "not scored" or comment == "no link" then
+      -- Zygor does not score trinkets; fall back to an ilvl-based comparison.
+      -- A trinket is an upgrade if its ilvl exceeds at least one equipped
+      -- trinket, or if a trinket slot is empty. This does not imply full
+      -- stat/effect evaluation.
+      local ilvl = data.itemInfo.currentItemLevel
+      if data.itemInfo.itemEquipLoc == "INVTYPE_TRINKET" and ilvl and ilvl > 0 then
+        for _, slot in pairs({INVSLOT_TRINKET1, INVSLOT_TRINKET2}) do
+          local equippedItem = items:GetItemDataFromInventorySlot(slot)
+          if equippedItem and not equippedItem.isItemEmpty then
+            if ilvl > equippedItem.itemInfo.currentItemLevel then
+              return true
+            end
+          else
+            return true
+          end
+        end
+      end
+      return false
+    end
+    return isUpgrade or false
+  end)
+
+  print("BetterBags: Zygor ItemScore integration enabled.")
 end
