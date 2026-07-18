@@ -125,6 +125,7 @@ local gw2Theme = {
 
       newPanelButton(decoration, "Interface/AddOns/GW2_UI/Textures/icons/bagmicrobutton-up", "Show Bags", function(ctx)
         local bag = frame.Owner
+        ctx:Set("tab_switch", true)
         if bag.slots:IsShown() then
           -- Persist bank-slots visibility to DB so re-opening the bank restores the correct state.
           if bag.kind == const.BAG_KIND.BANK then
@@ -132,7 +133,7 @@ local gw2Theme = {
           end
           database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
           bag.slots:Hide()
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          bag:Draw(ctx, bag.lastSlotInfo)
         else
           if bag.kind == const.BAG_KIND.BANK then
             database:SetShowBankTabs(true)
@@ -141,7 +142,7 @@ local gw2Theme = {
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
           bag.slots:Draw(ctx)
           bag.slots:Show()
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          bag:Draw(ctx, bag.lastSlotInfo)
         end
       end)
 

@@ -207,16 +207,17 @@ function contextMenu:CreateContextMenu(bag)
     tooltipText = L:G("Click to toggle the display of the bag slots."),
     func = function()
       local ctx = context:New('ToggleBagSlots')
+      ctx:Set("tab_switch", true)
       if bag.slots:IsShown() then
         database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
         bag.slots:Hide()
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        bag:Draw(ctx, bag.lastSlotInfo)
       else
         database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
         database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
         bag.slots:Draw(ctx)
         bag.slots:Show()
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        bag:Draw(ctx, bag.lastSlotInfo)
       end
     end
   })
