@@ -401,4 +401,236 @@ describe("Debug Dump Harness with test.lua", function()
     assert.is_not_nil(emptySlot)
     assert.is_true(emptySlot.isItemEmpty)
   end)
+
+  it("should generate correctly partitioned bagView and categoryView layouts for both Backpack and Bank using mapped/mocked dump items", function()
+    -- Set active profile to Default (where the dump resides)
+    DB.data:SetProfile("Default")
+
+    -- Retrieve the dumped items dictionary
+    local dumpItems = _G.BetterBagsDB.profiles.Default.debugBackpackDump
+    assert.is_not_nil(dumpItems)
+
+    -- Save original API references
+    local origGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+    local origGetContainerItemID = _G.C_Container.GetContainerItemID
+    local origGetContainerItemLink = _G.C_Container.GetContainerItemLink
+    local origGetContainerItemInfo = _G.C_Container.GetContainerItemInfo
+    local origGetContainerItemQuestInfo = _G.C_Container.GetContainerItemQuestInfo
+    local origGetItemInfo = _G.C_Item.GetItemInfo
+    local origGetDetailedItemLevelInfo = _G.C_Item.GetDetailedItemLevelInfo
+    local origGetItemGUID = _G.C_Item.GetItemGUID
+    local origGetBagName = _G.C_Container.GetBagName
+
+    -- For Bank simulation, we map bagid to bank bagids:
+    -- 0 -> Characterbanktab (100)
+    -- 1 -> CharacterBankTab_1 (101)
+    -- 2 -> CharacterBankTab_2 (102)
+    -- 3 -> AccountBankTab_1 (200)
+    -- 4 -> AccountBankTab_2 (201)
+    -- 5 -> AccountBankTab_3 (202)
+    local function mapBagId(bagid, simulateBank)
+      if not simulateBank then return bagid end
+      if bagid == 0 then return 100
+      elseif bagid == 1 then return 101
+      elseif bagid == 2 then return 102
+      elseif bagid == 3 then return 200
+      elseif bagid == 4 then return 201
+      elseif bagid == 5 then return 202
+      end
+      return bagid
+    end
+
+    local simBank = false
+
+    _G.C_Container.GetBagName = function(bagid)
+      if bagid == 0 then return "Backpack"
+      elseif bagid == 1 then return "Bag 1"
+      elseif bagid == 2 then return "Bag 2"
+      elseif bagid == 3 then return "Bag 3"
+      elseif bagid == 4 then return "Bag 4"
+      elseif bagid == 5 then return "Bag 5"
+      elseif bagid == 100 then return "Character Bank Tab 1"
+      elseif bagid == 101 then return "Character Bank Tab 2"
+      elseif bagid == 102 then return "Character Bank Tab 3"
+      elseif bagid == 200 then return "Account Bank Tab 1"
+      elseif bagid == 201 then return "Account Bank Tab 2"
+      elseif bagid == 202 then return "Account Bank Tab 3"
+      end
+      return "Unknown Bag"
+    end
+
+    _G.C_Container.GetContainerNumSlots = function(bagid)
+      local maxSlot = 0
+      for _, item in pairs(dumpItems) do
+        local mappedId = mapBagId(item.bagid, simBank)
+        if mappedId == bagid then
+          if item.slotid > maxSlot then
+            maxSlot = item.slotid
+          end
+        end
+      end
+      return maxSlot > 0 and maxSlot or 0
+    end
+
+    _G.C_Container.GetContainerItemID = function(bagid, slotid)
+      for _, item in pairs(dumpItems) do
+        local mappedId = mapBagId(item.bagid, simBank)
+        if mappedId == bagid and item.slotid == slotid then
+          if not item.isItemEmpty then
+            return item.containerInfo.itemID
+          end
+        end
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+      for _, item in pairs(dumpItems) do
+        local mappedId = mapBagId(item.bagid, simBank)
+        if mappedId == bagid and item.slotid == slotid then
+          if not item.isItemEmpty then
+            return item.containerInfo.hyperlink
+          end
+        end
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemInfo = function(bagid, slotid)
+      for _, item in pairs(dumpItems) do
+        local mappedId = mapBagId(item.bagid, simBank)
+        if mappedId == bagid and item.slotid == slotid then
+          if not item.isItemEmpty then
+            -- Make sure containerInfo bagid matches mappedId
+            local info = {}
+            for k, v in pairs(item.containerInfo) do
+              info[k] = v
+            end
+            info.bagID = mappedId
+            return info
+          end
+        end
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemQuestInfo = function(bagid, slotid)
+      for _, item in pairs(dumpItems) do
+        local mappedId = mapBagId(item.bagid, simBank)
+        if mappedId == bagid and item.slotid == slotid then
+          if not item.isItemEmpty then
+            return item.questInfo
+          end
+        end
+      end
+      return nil
+    end
+
+    _G.C_Item.GetItemInfo = function(itemID)
+      for _, item in pairs(dumpItems) do
+        if item.containerInfo and item.containerInfo.itemID == itemID then
+          local info = item.itemInfo
+          return info.itemName, info.itemLink, info.itemQuality, info.itemLevel, info.itemMinLevel, info.itemType, info.itemSubType, info.itemStackCount, info.itemEquipLoc, info.itemIcon, info.sellPrice, info.classID, info.subclassID, info.bindType, info.expacID, info.setID, info.isCraftingReagent
+        end
+      end
+      return nil
+    end
+
+    _G.C_Item.GetDetailedItemLevelInfo = function(itemID)
+      for _, item in pairs(dumpItems) do
+        if item.containerInfo and item.containerInfo.itemID == itemID then
+          local info = item.itemInfo
+          return info.effectiveIlvl or info.itemLevel, info.isPreview or false, info.baseIlvl or info.itemLevel
+        end
+      end
+      return nil
+    end
+
+    _G.C_Item.GetItemGUID = function(_)
+      return "MockGUID"
+    end
+
+    -- 1. Test BACKPACK layout generation
+    simBank = false
+    local ctx = context:New("TestBackpackLayouts")
+    items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
+
+    local bpSlotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+    assert.is_not_nil(bpSlotInfo)
+    assert.is_not_nil(bpSlotInfo.layouts)
+    assert.is_not_nil(bpSlotInfo.layouts.categoryView)
+    assert.is_not_nil(bpSlotInfo.layouts.bagView)
+
+    -- Check categoryView has categories and sorted items
+    local bpCatView = bpSlotInfo.layouts.categoryView
+    assert.is_not_nil(bpCatView.sortedCategories)
+    assert.is_not_nil(bpCatView.sortedItems)
+    assert.is_true(#bpCatView.sortedItems > 0)
+
+    -- Verify category names (e.g. standard category name like "Midnight - Potions" or "Miscellaneous")
+    local foundPotionsCategory = false
+    for _, cat in ipairs(bpCatView.sortedCategories) do
+      if cat.name == "Midnight - Potions" or cat.name == "Miscellaneous" then
+        foundPotionsCategory = true
+      end
+    end
+    assert.is_true(foundPotionsCategory)
+
+    -- Check bagView has physical bags and sorted items
+    local bpBagView = bpSlotInfo.layouts.bagView
+    assert.is_not_nil(bpBagView.sortedCategories)
+    assert.is_not_nil(bpBagView.sortedItems)
+    assert.is_true(#bpBagView.sortedItems > 0)
+
+    -- In bagView, category name is the physical bag name!
+    local foundPhysicalBagCategory = false
+    for _, cat in ipairs(bpBagView.sortedCategories) do
+      if cat.name:find("Backpack") or cat.name:find("Bag 1") or cat.name:find("Bag 2") then
+        foundPhysicalBagCategory = true
+      end
+    end
+    assert.is_true(foundPhysicalBagCategory)
+
+    -- 2. Test BANK layout generation
+    simBank = true
+    ctx = context:New("TestBankLayouts")
+    items:ProcessRefresh(ctx, const.BAG_KIND.BANK)
+
+    local bankSlotInfo = items.slotInfo[const.BAG_KIND.BANK]
+    assert.is_not_nil(bankSlotInfo)
+    assert.is_not_nil(bankSlotInfo.layouts)
+    assert.is_not_nil(bankSlotInfo.layouts.categoryView)
+    assert.is_not_nil(bankSlotInfo.layouts.bagView)
+
+    -- Check categoryView has categories and sorted items
+    local bankCatView = bankSlotInfo.layouts.categoryView
+    assert.is_not_nil(bankCatView.sortedCategories)
+    assert.is_not_nil(bankCatView.sortedItems)
+    assert.is_true(#bankCatView.sortedItems > 0)
+
+    -- Check bagView has physical bags and sorted items
+    local bankBagView = bankSlotInfo.layouts.bagView
+    assert.is_not_nil(bankBagView.sortedCategories)
+    assert.is_not_nil(bankBagView.sortedItems)
+    assert.is_true(#bankBagView.sortedItems > 0)
+
+    local foundBankPhysicalBagCategory = false
+    for _, cat in ipairs(bankBagView.sortedCategories) do
+      if cat.name:find("Bank") or cat.name:find("Account") then
+        foundBankPhysicalBagCategory = true
+      end
+    end
+    assert.is_true(foundBankPhysicalBagCategory)
+
+    -- Clean up mocks
+    _G.C_Container.GetContainerNumSlots = origGetContainerNumSlots
+    _G.C_Container.GetContainerItemID = origGetContainerItemID
+    _G.C_Container.GetContainerItemLink = origGetContainerItemLink
+    _G.C_Container.GetContainerItemInfo = origGetContainerItemInfo
+    _G.C_Container.GetContainerItemQuestInfo = origGetContainerItemQuestInfo
+    _G.C_Item.GetItemInfo = origGetItemInfo
+    _G.C_Item.GetDetailedItemLevelInfo = origGetDetailedItemLevelInfo
+    _G.C_Item.GetItemGUID = origGetItemGUID
+    _G.C_Container.GetBagName = origGetBagName
+  end)
 end)
