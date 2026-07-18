@@ -261,13 +261,14 @@ function contextMenu:CreateContextMenu(bag)
 					return
 				end
 				local ctx = context:New("ToggleBagSlots")
+				ctx:Set("tab_switch", true)
 				if bag.slots and bag.slots:IsShown() then
 					if isBank then
 						database:SetShowBankTabs(false)
 					end
 					database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
 					bag.slots:Hide()
-					events:SendMessage(ctx, 'bags/FullRefreshAll')
+					bag:Draw(ctx, bag.lastSlotInfo)
 				elseif bag.slots then
 					if isBank then
 						database:SetShowBankTabs(true)
@@ -276,7 +277,7 @@ function contextMenu:CreateContextMenu(bag)
 						database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
 					bag.slots:Draw(ctx)
 					bag.slots:Show()
-					events:SendMessage(ctx, 'bags/FullRefreshAll')
+					bag:Draw(ctx, bag.lastSlotInfo)
 				end
 			end,
 		})

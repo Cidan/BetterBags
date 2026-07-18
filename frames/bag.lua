@@ -436,14 +436,21 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
+	self.lastSlotInfo = slotInfo
 	if not self:IsShown() then
-		self.lastSlotInfo = slotInfo
 		self.drawPendingOnShow = true
 		if callback then
 			callback()
 		end
 		return
 	end
+
+	local layoutKey = database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and "bagView" or "categoryView"
+	local activeSlotInfo = slotInfo.layouts and slotInfo.layouts[layoutKey] or slotInfo
+	if slotInfo.layouts and slotInfo.layouts[layoutKey] then
+		setmetatable(activeSlotInfo, { __index = slotInfo })
+	end
+
 	local tabID = self:GetCurrentTabID()
 	local view = self:GetViewForTab(ctx, tabID)
 
@@ -512,16 +519,16 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 			local layout = tonumber(layoutStr)
 			local tTabID = tonumber(tabIDStr)
 			if layout == currentLayout and tTabID ~= tabID then
-				tView:Render(ctx, self, slotInfo, function() end)
+				tView:Render(ctx, self, activeSlotInfo, function() end)
 				tView:GetContent():Hide()
 			end
 		end
 	end
 
-	local headerW, headerH, footerW, footerH = self:DrawGlobalSections(ctx, slotInfo)
+	local headerW, headerH, footerW, footerH = self:DrawGlobalSections(ctx, activeSlotInfo)
 
 	debug:StartProfile("Bag Render %d", self.kind)
-	view:Render(ctx, self, slotInfo, function()
+	view:Render(ctx, self, activeSlotInfo, function()
 		debug:EndProfile("Bag Render %d", self.kind)
 		view:GetContent():Show()
 		self.currentView = view
@@ -561,7 +568,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 			self.slots:Show()
 		end
 		events:SendMessage(ctx, "bag/RedrawIcons", self)
-		events:SendMessage(ctx, "bag/Rendered", self, slotInfo)
+		events:SendMessage(ctx, "bag/Rendered", self, activeSlotInfo)
 		callback()
 	end)
 end

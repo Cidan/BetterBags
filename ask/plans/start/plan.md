@@ -1,52 +1,48 @@
-# Implementation Plan: Retire Legacy Files and Promote `_new.lua` Files
+# Implementation Plan: Decoupling Data Sweep from Bag View State
 
 ## Overview
-This plan outlines the steps to remove legacy rendering/data pipeline scripts and promote the `_new.lua` architecture to be the canonical files in the BetterBags addon.
+The goal is to modify the data sweep pipeline (`data/items.lua`) so it no longer mutates `itemInfo.category` based on the UI state (`database.GetBagView()`). Instead, it should collect all data and generate two distinct pre-computed layouts inside `slotInfo.layouts`: one for the category view and one for the bag view.
 
-## 1. Delete Legacy Files
-Remove the old unused files from the repository:
-- `data/items.lua`
-- `data/search.lua`
-- `data/stacks.lua`
+## 1. Modify `data/items.lua`
+- Remove all instances of `database.GetBagView` polling during `items:ProcessRefresh(ctx, kind)`. The data layer should not care what view the UI is currently displaying.
+- During item data population (or in `AttachBasicItemInfo`), populate `currentItem.itemInfo.physicalBagName = self:GetBagName(currentItem.bagid)` for all items.
+- Structure `slotInfo` to contain two pre-computed layout models:
+  ```lua
+  slotInfo.layouts = {
+    categoryView = {},
+    bagView = {}
+  }
+  ```
+- **Category View (`layouts.categoryView`)**:
+  - Group items by `itemInfo.category`.
+  - Sort items using standard user preferences (quality, ilvl, name, etc.).
+  - Partition items into tabs (Bank Tab 1, Bank Tab 2, etc.) as normal.
+- **Bag View (`layouts.bagView`)**:
+  - Group items strictly by `itemInfo.physicalBagName`.
+  - Sort items strictly by physical location (`bagid` then `slotid`), bypassing standard sorting rules.
+  - Apply `{ hideHeader = true, sortMode = "physical" }` metadata to `sectionLayouts` so the view knows to hide headers.
+  - Include empty slot dummy items correctly attributed to their physical bags.
 
-## 2. Rename `_new.lua` Files
-Promote the new architecture files by renaming them to their canonical names:
-- `data/items_new.lua` -> `data/items.lua`
-- `data/stacks_new.lua` -> `data/stacks.lua`
-- `data/search_new.lua` -> `data/search.lua`
-- `views/gridview_new.lua` -> `views/gridview.lua`
-- `views/bagview_new.lua` -> `views/bagview.lua`
+## 2. Update Bag UI Layer (`frames/bag.lua` and related context menus)
+- **`bagProto:Draw(ctx, slotInfo, callback)`**:
+  - Determine the active layout using `database:GetBagView`:
+    ```lua
+    local layoutKey = database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS and "bagView" or "categoryView"
+    local activeSlotInfo = slotInfo.layouts and slotInfo.layouts[layoutKey] or slotInfo
+    ```
+  - Pass `activeSlotInfo` to `DrawGlobalSections` and `view:Render`.
+- **Context Menus (`frames/contextmenu.lua` and `themes/*.lua`)**:
+  - Currently, clicking "Show Bags" or "Show Categories" might trigger a full database refresh.
+  - Refactor this to perform an instant visual swap. Set `ctx:Set("tab_switch", true)`, invoke `database:SetBagView`, and call `bag:Draw(ctx, bag.lastSlotInfo)` without sending `bags/FullRefreshAll`.
 
-## 3. Rename Corresponding Test Files
-Promote the spec tests corresponding to the renamed files:
-- `spec/items_new_spec.lua` -> `spec/items_spec.lua`
-- `spec/search_new_spec.lua` -> `spec/search_spec.lua`
-- `spec/stacks_new_spec.lua` -> `spec/stacks_spec.lua`
-- `spec/views/gridview_new_spec.lua` -> `spec/views/gridview_spec.lua`
-*(Note: If legacy `_spec.lua` files exist, they should be deleted/overwritten during the move).*
+## 3. Testing
+- **`spec/items_spec.lua`**:
+  - Remove tests that assert `itemInfo.category` is mutated when `database:GetBagView` returns `SECTION_ALL_BAGS`.
+  - Add tests validating that both `slotInfo.layouts.categoryView` and `slotInfo.layouts.bagView` are generated and structured correctly, independent of UI state.
+- **`spec/debug_dump_harness_spec.lua`**:
+  - Use the integration testing harness (with item dumps) to test full pipeline execution.
+  - Validate that `items:ProcessRefresh` produces correctly partitioned `bagView` and `categoryView` layouts for real-world user dataset dumps in both the Backpack and Bank.
 
-## 4. Update WoW TOC Files
-Update all project `.toc` files to load the new canonical `.lua` names instead of `_new.lua`:
-- `BetterBags.toc`
-- `BetterBags_Vanilla.toc`
-- `BetterBags_TBC.toc`
-- `BetterBags_Mists.toc`
-
-## 5. Update Spec & Dependency References
-Perform a global replace across the `spec/` folder to ensure all module loading refers to the correct canonical paths:
-- Replace `data/items_new.lua` -> `data/items.lua`
-- Replace `data/stacks_new.lua` -> `data/stacks.lua`
-- Replace `data/search_new.lua` -> `data/search.lua`
-- Replace `views/gridview_new.lua` -> `views/gridview.lua`
-- Replace `views/bagview_new.lua` -> `views/bagview.lua`
-
-## 6. Update Documentation and Rules
-Update project rules, handoff documentation, and architectural markdown to refer to the finalized filenames:
-- `.claude/rules/data-loader.md`
-- `.claude/rules/item-drawing.md`
-- `docs/render.md`
-- `docs/handoff.md`
-
-## Risks and Edge Cases
-- Ensure any leftover references to the legacy filenames in `Luacheck` or `Busted` configurations are properly tested.
-- Some legacy test files might share the target name (e.g. `items_spec.legacy`); these should be safely removed to prevent confusion.
+## Risks & Edge Cases
+- **Compatibility**: The dual-layout structure could affect other views or listeners expecting `slotInfo.tabs` at the root. We must ensure `activeSlotInfo` seamlessly provides all the necessary fields (`tabs`, `sortedItems`, `sectionLayouts`, etc.).
+- **Global Context Variables**: `DrawGlobalSections` uses `emptySlotsSorted` and `freeSlotKeysByBag`. Make sure these global-scope data structures are correctly mapped into the chosen layout or properly accessed from the root `slotInfo`.
