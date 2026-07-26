@@ -287,12 +287,8 @@ end
 local function ItemBelongsToTab(kind, item, tabID, viewBagView)
   if not item then return false end
   if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
-    if kind == const.BAG_KIND.BANK and addon.isRetail then
-      if tabID == const.BANK_TAB.BANK then
-        return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[item.bagid] == nil
-      else
-        return item.bagid == tabID
-      end
+    if kind == const.BAG_KIND.BANK then
+      return item.bagid == tabID
     end
     return true
   end
@@ -303,7 +299,11 @@ local function ItemBelongsToTab(kind, item, tabID, viewBagView)
   local groupsMod = addon:GetModule("Groups", true)
   if kind == const.BAG_KIND.BANK then
     if database.GetShowBankTabs and database:GetShowBankTabs() then
-      return item.bagid == tabID
+      if tabID == const.BANK_TAB.BANK then
+        return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[item.bagid] == nil
+      else
+        return item.bagid == tabID
+      end
     end
     if groupsMod then
       local activeGroup = groupsMod:GetGroup(const.BAG_KIND.BANK, tabID)
@@ -327,6 +327,10 @@ local function IncludeBagInFreeSpace(kind, bagid, tabID)
     return const.BACKPACK_BAGS[bagid] ~= nil
   end
   if database.GetShowBankTabs and database:GetShowBankTabs() then
+    local viewBagView = database.GetBagView and database:GetBagView(kind) or const.BAG_VIEW.SECTION_GRID
+    if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
+      return bagid == tabID
+    end
     if addon.isRetail then
       if tabID == const.BANK_TAB.BANK then
         return const.ACCOUNT_BANK_BAGS == nil or const.ACCOUNT_BANK_BAGS[bagid] == nil
@@ -364,7 +368,12 @@ local function GetPossibleTabIDs(kind)
     end
   elseif kind == const.BAG_KIND.BANK then
     if database.GetShowBankTabs and database:GetShowBankTabs() then
-      tabs[const.BANK_TAB.BANK] = true -- which is -1
+      tabs[const.BANK_TAB.BANK] = true
+      if const.BANK_BAGS then
+        for _, bag in pairs(const.BANK_BAGS) do
+          tabs[bag] = true
+        end
+      end
       if addon.isRetail and const.ACCOUNT_BANK_BAGS then
         for _, bag in pairs(const.ACCOUNT_BANK_BAGS) do
           tabs[bag] = true
@@ -650,7 +659,7 @@ function items:ProcessRefresh(ctx, kind)
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
       for slotid, data in pairs(emptyBagData) do
-        if C_Container.GetBagName(bagid) ~= nil then
+        if C_Container.GetBagName(bagid) ~= nil or (addon.isRetail and const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid]) then
           local category = self:GetBagName(bagid)
           local dummy = {
             isFreeSlot = true,
