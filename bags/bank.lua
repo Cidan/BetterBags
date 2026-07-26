@@ -252,7 +252,6 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	end
 
 	self.bag.currentItemCount = -1
-	ctx:Set("tab_switch", true)
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
@@ -565,7 +564,6 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	self.bag:SetTitle(group.name)
 	self.bag.currentItemCount = -1
 
-	ctx:Set("tab_switch", true)
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
