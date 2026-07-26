@@ -325,7 +325,6 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     -- Assertions
     assert.is_false(refreshMessageSent, "Should NOT trigger bags/RefreshBackpack")
     assert.equal(-1, mockBag.currentItemCount, "Should reset currentItemCount to -1")
-    assert.is_true(ctx:GetBool("tab_switch"), "Context tab_switch should be true")
     assert.equal(ctx, drawCalledWithCtx, "Should call Draw with the correct context object")
     assert.equal(mockSlotInfo[0], drawCalledWithSlotInfo, "Should call Draw with the correct backpack slotInfo")
   end)

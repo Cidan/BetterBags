@@ -36,4 +36,4 @@ Historically, each individual Tab View created its own `WowScrollBox` and scroll
     ```
   - The scroll child's size is explicitly updated: `scrollChild:SetSize(totalW, totalH)`.
   - `UpdateBagBounds(totalW, totalH)` is called to resize the bag frame and dynamically show or hide the global scrollbar based on screen clamping limits.
-- **Tab-Swap Sizing:** Toggling active tab visibility (`tab_switch = true`) synchronously re-evaluates the pre-rendered grid's height, updates container/scroll child dimensions, and calls `UpdateBagBounds` instantly with sub-millisecond local latency.
+- **Tab-Swap Sizing:** Toggling active tab visibility (switching groups or tabs) runs through the same pure stateless drawing flow synchronously, re-evaluating the active grid's height, updating container/scroll child dimensions, and calling `UpdateBagBounds` instantly to achieve flawless sizing with zero state-holding overhead.

@@ -367,7 +367,6 @@ function backpack.proto:SwitchToGroup(ctx, groupID)
 	debug:Log("groups", "Switched to group: %s (ID: %d)", group.name, groupID)
 
 	self.bag.currentItemCount = -1
-	ctx:Set("tab_switch", true)
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK]
 	self.bag:Draw(ctx, slotInfo, function() end)
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)

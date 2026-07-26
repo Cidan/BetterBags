@@ -452,61 +452,13 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		return
 	end
 
-	if ctx:GetBool("tab_switch") and not view.isNew then
-		if self.currentView and self.currentView ~= view then
-			self.currentView:GetContent():Hide()
-		end
-		view:GetContent():Show()
-		self.currentView = view
-
-		local totalW = 0
-		local totalH = 0
-		if self.tabContainer then
-			local headerW, headerH = 0, 0
-			if self.globalSections and self.globalSections[L:G("Recent Items")] then
-				headerW, headerH = self.globalSections[L:G("Recent Items")].frame:GetSize()
-			end
-			local footerW, footerH = 0, 0
-			if self.globalSections and self.globalSections[L:G("Free Space")] then
-				footerW, footerH = self.globalSections[L:G("Free Space")].frame:GetSize()
-			end
-
-			local tabW, tabH = view.content.contentWidth or 0, view.content.contentHeight or 0
-			self.tabContainer:SetHeight(math.max(1, tabH))
-			self.tabContainer:SetWidth(math.max(1, tabW))
-
-			totalW = math.max(headerW, tabW, footerW)
-			totalH = headerH + tabH + footerH
-			if self.scrollChild then
-				self.scrollChild:SetSize(math.max(1, totalW), math.max(1, totalH))
-			end
-		end
-
-		self:UpdateBagBounds(totalW, totalH)
-
-		if self.scrollBox and self.scrollBox.FullUpdate then
-			self.scrollBox:FullUpdate(true)
-		end
-
-		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-		local text = searchBox:GetText()
-		if text ~= "" and text ~= nil then
-			self:Search(ctx, search:Search(text))
-		end
-		self:OnResize()
-		if callback then
-			callback()
-		end
-		return
-	end
-
 	if self.currentView and self.currentView ~= view then
 		self.currentView:GetContent():Hide()
 	end
 
 	-- Render other background persistent views first to keep them in a consistent data state
 	local currentLayout = database:GetBagView(self.kind)
-	if not ctx:GetBool("tab_switch") and self.tabViews then
+	if self.tabViews then
 		for viewKey, tView in pairs(self.tabViews) do
 			local layoutStr, tabIDStr = string.split("_", viewKey)
 			local layout = tonumber(layoutStr)

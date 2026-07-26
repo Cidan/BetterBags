@@ -8,7 +8,8 @@ exclude_files = {
 	"annotations.lua",
 	"**/examples",
 	"**/.claude",
-	"lua51-rocks"
+	"lua51-rocks",
+	"test.lua"
 }
 
 ignore = {
