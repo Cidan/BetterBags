@@ -1,52 +1,28 @@
-# Implementation Plan: Retire Legacy Files and Promote `_new.lua` Files
+# Implementation Plan: Fix Bank "Show Bags" and Warbank Empty Slots
 
-## Overview
-This plan outlines the steps to remove legacy rendering/data pipeline scripts and promote the `_new.lua` architecture to be the canonical files in the BetterBags addon.
+## Issue Summary
+1. Character bank tabs are empty because the backend aggregates all character bank bags into a single tab (`-1`) while the UI requests them by their individual physical bag IDs (`5`, `6`, etc.).
+2. Warbank tabs appear as categories rather than grids because dummy empty slots are not generated, due to a legacy API check (`C_Container.GetBagName` returning `nil` for Warbank bags).
 
-## 1. Delete Legacy Files
-Remove the old unused files from the repository:
-- `data/items.lua`
-- `data/search.lua`
-- `data/stacks.lua`
+## Approach
 
-## 2. Rename `_new.lua` Files
-Promote the new architecture files by renaming them to their canonical names:
-- `data/items_new.lua` -> `data/items.lua`
-- `data/stacks_new.lua` -> `data/stacks.lua`
-- `data/search_new.lua` -> `data/search.lua`
-- `views/gridview_new.lua` -> `views/gridview.lua`
-- `views/bagview_new.lua` -> `views/bagview.lua`
+### 1. Write Failing Tests First
+- In `spec/items_spec.lua` or `spec/data/items_spec.lua` (using the high-fidelity debug dump test harness as per the `test-harness.md` rules), add tests to verify the behavior of `ProcessRefresh` for the `BANK` when `database:GetShowBankTabs()` is true and `database:GetBagView()` is `SECTION_ALL_BAGS`.
+- Assert that `slotInfo.tabs` contains distinct entries for `-1` and individual character bank bags like `5`.
+- Assert that Warbank tabs (e.g., `13`) contain dummy `isFreeSlot = true` items to properly pad the grid.
+- Observe these tests fail.
 
-## 3. Rename Corresponding Test Files
-Promote the spec tests corresponding to the renamed files:
-- `spec/items_new_spec.lua` -> `spec/items_spec.lua`
-- `spec/search_new_spec.lua` -> `spec/search_spec.lua`
-- `spec/stacks_new_spec.lua` -> `spec/stacks_spec.lua`
-- `spec/views/gridview_new_spec.lua` -> `spec/views/gridview_spec.lua`
-*(Note: If legacy `_spec.lua` files exist, they should be deleted/overwritten during the move).*
+### 2. Fix Bank Tab Aggregation in `data/items.lua`
+- **`GetPossibleTabIDs(kind)`**: When `GetShowBankTabs()` is enabled, modify the logic so that it doesn't just add `const.BANK_TAB.BANK`. It should add `-1` (main bank) and iterate through `const.BANK_BAGS` adding each bag ID as a valid tab.
+- **`ItemBelongsToTab(kind, item, tabID, viewBagView)`**: Update the `SECTION_ALL_BAGS` and `GetShowBankTabs` conditions to strictly match `item.bagid == tabID` for all bank bags, eliminating the broad fallback to `-1` for all character bags.
+- **`IncludeBagInFreeSpace(kind, bagid, tabID)`**: Adjust the logic to strictly match `bagid == tabID` for bank bags instead of grouping all non-Warbank bags under `-1`.
 
-## 4. Update WoW TOC Files
-Update all project `.toc` files to load the new canonical `.lua` names instead of `_new.lua`:
-- `BetterBags.toc`
-- `BetterBags_Vanilla.toc`
-- `BetterBags_TBC.toc`
-- `BetterBags_Mists.toc`
+### 3. Fix Warbank Empty Slots in `data/items.lua`
+- Around line 653, modify the check: `if C_Container.GetBagName(bagid) ~= nil then`.
+- Change it to: `if C_Container.GetBagName(bagid) ~= nil or (addon.isRetail and const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid]) then`.
+- This ensures Warbank bags generate dummy empty slots, padding out the physical layout correctly.
 
-## 5. Update Spec & Dependency References
-Perform a global replace across the `spec/` folder to ensure all module loading refers to the correct canonical paths:
-- Replace `data/items_new.lua` -> `data/items.lua`
-- Replace `data/stacks_new.lua` -> `data/stacks.lua`
-- Replace `data/search_new.lua` -> `data/search.lua`
-- Replace `views/gridview_new.lua` -> `views/gridview.lua`
-- Replace `views/bagview_new.lua` -> `views/bagview.lua`
-
-## 6. Update Documentation and Rules
-Update project rules, handoff documentation, and architectural markdown to refer to the finalized filenames:
-- `.claude/rules/data-loader.md`
-- `.claude/rules/item-drawing.md`
-- `docs/render.md`
-- `docs/handoff.md`
-
-## Risks and Edge Cases
-- Ensure any leftover references to the legacy filenames in `Luacheck` or `Busted` configurations are properly tested.
-- Some legacy test files might share the target name (e.g. `items_spec.legacy`); these should be safely removed to prevent confusion.
+## Risks & Edge Cases
+- Ensure Classic/Era are not broken by the `const.ACCOUNT_BANK_BAGS` references. We must safely gate these with `addon.isRetail` or `const.ACCOUNT_BANK_BAGS ~= nil`.
+- The main bank tab (`-1`) must still function and render properly on its own.
+- Free space counts for the unified view (when "Show Bags" is off) must continue to correctly aggregate all bags. The changes strictly target the `GetShowBankTabs` or `SECTION_ALL_BAGS` conditions.

@@ -401,4 +401,189 @@ describe("Debug Dump Harness with test.lua", function()
     assert.is_not_nil(emptySlot)
     assert.is_true(emptySlot.isItemEmpty)
   end)
+
+  it("should generate distinct tabs for character bank bags when GetShowBankTabs is true and view is SECTION_ALL_BAGS, and should generate dummy empty slots for Warbank bags", function()
+    -- Enable Show Bank Tabs and SECTION_ALL_BAGS view
+    local old_isRetail = addon.isRetail
+    addon.isRetail = true
+    local old_GetShowBankTabs = DB.GetShowBankTabs
+    DB.GetShowBankTabs = function() return true end
+    local old_GetBagView = DB.GetBagView
+    DB.GetBagView = function(self, kind)
+      if kind == const.BAG_KIND.BANK then
+        return const.BAG_VIEW.SECTION_ALL_BAGS
+      end
+      return const.BAG_VIEW.SECTION_GRID
+    end
+
+    -- Overwrite constants for tests
+    local old_BANK_BAGS = const.BANK_BAGS
+    local old_ACCOUNT_BANK_BAGS = const.ACCOUNT_BANK_BAGS
+    const.BANK_BAGS = { [100] = 100, [5] = 5 }
+    const.ACCOUNT_BANK_BAGS = { [13] = 13 }
+
+    -- Create simulated bank items dump
+    local dumpBankItems = {
+      ["100_1"] = {
+        bagid = 100,
+        slotid = 1,
+        isItemEmpty = false,
+        containerInfo = { itemID = 1001, hyperlink = "|Hitem:1001:1001::::::::|h[Bank Item 1]|h", stackCount = 1 },
+        itemInfo = { itemName = "Bank Item 1", itemLink = "|Hitem:1001:1001::::::::|h[Bank Item 1]|h", itemQuality = 2, itemLevel = 100, itemMinLevel = 1, itemType = "Weapon", itemSubType = "One-Handed Swords", itemStackCount = 1, itemIcon = 135328, sellPrice = 100, classID = 2, subclassID = 7 }
+      },
+      ["5_1"] = {
+        bagid = 5,
+        slotid = 1,
+        isItemEmpty = false,
+        containerInfo = { itemID = 1002, hyperlink = "|Hitem:1002:1002::::::::|h[Bank Tab Item 2]|h", stackCount = 1 },
+        itemInfo = { itemName = "Bank Tab Item 2", itemLink = "|Hitem:1002:1002::::::::|h[Bank Tab Item 2]|h", itemQuality = 3, itemLevel = 200, itemMinLevel = 1, itemType = "Armor", itemSubType = "Cloth", itemStackCount = 1, itemIcon = 135329, sellPrice = 200, classID = 4, subclassID = 1 }
+      },
+      ["13_1"] = {
+        bagid = 13,
+        slotid = 1,
+        isItemEmpty = false,
+        containerInfo = { itemID = 1003, hyperlink = "|Hitem:1003:1003::::::::|h[Warbank Item 3]|h", stackCount = 1 },
+        itemInfo = { itemName = "Warbank Item 3", itemLink = "|Hitem:1003:1003::::::::|h[Warbank Item 3]|h", itemQuality = 4, itemLevel = 300, itemMinLevel = 1, itemType = "Gem", itemSubType = "Red", itemStackCount = 1, itemIcon = 135330, sellPrice = 300, classID = 3, subclassID = 0 }
+      }
+    }
+
+    -- Save original API references
+    local origGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+    local origGetContainerItemID = _G.C_Container.GetContainerItemID
+    local origGetContainerItemLink = _G.C_Container.GetContainerItemLink
+    local origGetContainerItemInfo = _G.C_Container.GetContainerItemInfo
+    local origGetContainerItemQuestInfo = _G.C_Container.GetContainerItemQuestInfo
+    local origGetItemInfo = _G.C_Item.GetItemInfo
+    local origGetDetailedItemLevelInfo = _G.C_Item.GetDetailedItemLevelInfo
+    local origGetItemGUID = _G.C_Item.GetItemGUID
+    local origGetBagName = _G.C_Container.GetBagName
+
+    -- Mock low-level APIs
+    _G.C_Container.GetContainerNumSlots = function(bagid)
+      -- Let's say each bag has 2 slots
+      return 2
+    end
+
+    _G.C_Container.GetContainerItemID = function(bagid, slotid)
+      local slotkey = bagid .. "_" .. slotid
+      local item = dumpBankItems[slotkey]
+      if item and not item.isItemEmpty then
+        return item.containerInfo.itemID
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+      local slotkey = bagid .. "_" .. slotid
+      local item = dumpBankItems[slotkey]
+      if item and not item.isItemEmpty then
+        return item.containerInfo.hyperlink
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemInfo = function(bagid, slotid)
+      local slotkey = bagid .. "_" .. slotid
+      local item = dumpBankItems[slotkey]
+      if item and not item.isItemEmpty then
+        return item.containerInfo
+      end
+      return nil
+    end
+
+    _G.C_Container.GetContainerItemQuestInfo = function(bagid, slotid)
+      return nil
+    end
+
+    _G.C_Item.GetItemInfo = function(itemID)
+      for _, item in pairs(dumpBankItems) do
+        if item.containerInfo and item.containerInfo.itemID == itemID then
+          local info = item.itemInfo
+          return info.itemName, info.itemLink, info.itemQuality, info.itemLevel, info.itemMinLevel, info.itemType, info.itemSubType, info.itemStackCount, info.itemEquipLoc, info.itemIcon, info.sellPrice, info.classID, info.subclassID, info.bindType, info.expacID, info.setID, info.isCraftingReagent
+        end
+      end
+      return nil
+    end
+
+    _G.C_Item.GetDetailedItemLevelInfo = function(itemID)
+      for _, item in pairs(dumpBankItems) do
+        if item.containerInfo and item.containerInfo.itemID == itemID then
+          local info = item.itemInfo
+          return info.itemLevel, false, info.itemLevel
+        end
+      end
+      return nil
+    end
+
+    _G.C_Item.GetItemGUID = function(_)
+      return "MockGUID"
+    end
+
+    _G.C_Container.GetBagName = function(bagid)
+      if bagid == 100 then return "Bank" end
+      if bagid == 5 then return "Bank Bag 1" end
+      -- Warbank returns nil for GetBagName natively
+      if bagid == 13 then return nil end
+      return nil
+    end
+
+    -- Run the bank refresh pass
+    local ctx = context:New("TestBankEndToEndRefresh")
+    items:ProcessRefresh(ctx, const.BAG_KIND.BANK)
+
+    -- Restore low-level APIs
+    _G.C_Container.GetContainerNumSlots = origGetContainerNumSlots
+    _G.C_Container.GetContainerItemID = origGetContainerItemID
+    _G.C_Container.GetContainerItemLink = origGetContainerItemLink
+    _G.C_Container.GetContainerItemInfo = origGetContainerItemInfo
+    _G.C_Container.GetContainerItemQuestInfo = origGetContainerItemQuestInfo
+    _G.C_Item.GetItemInfo = origGetItemInfo
+    _G.C_Item.GetDetailedItemLevelInfo = origGetDetailedItemLevelInfo
+    _G.C_Item.GetItemGUID = origGetItemGUID
+    _G.C_Container.GetBagName = origGetBagName
+
+    -- Restore constants
+    const.BANK_BAGS = old_BANK_BAGS
+    const.ACCOUNT_BANK_BAGS = old_ACCOUNT_BANK_BAGS
+    addon.isRetail = old_isRetail
+    DB.GetShowBankTabs = old_GetShowBankTabs
+    DB.GetBagView = old_GetBagView
+
+    -- Assert results of the end-to-end bank refresh pass
+    local slotInfo = items.slotInfo[const.BAG_KIND.BANK]
+    assert.is_not_nil(slotInfo)
+
+    -- Tab 100, 5, and 13 should all be created
+    assert.is_not_nil(slotInfo.tabs[100], "Tab 100 (main bank) should exist")
+    assert.is_not_nil(slotInfo.tabs[5], "Tab 5 (character bank bag 1) should exist")
+    assert.is_not_nil(slotInfo.tabs[13], "Tab 13 (warbank bag 1) should exist")
+
+    -- Items must belong to their respective tabs and include dummy free slots (size is 2)
+    assert.are.equal(2, #slotInfo.tabs[100].items, "Tab 100 should contain 2 items")
+    local tab100Real, tab100Free = nil, nil
+    for _, item in ipairs(slotInfo.tabs[100].items) do
+      if item.isFreeSlot then tab100Free = item else tab100Real = item end
+    end
+    assert.is_not_nil(tab100Real, "Tab 100 should contain real item")
+    assert.is_not_nil(tab100Free, "Tab 100 should contain dummy empty slot")
+    assert.are.equal("Bank Item 1", tab100Real.itemInfo.itemName)
+
+    assert.are.equal(2, #slotInfo.tabs[5].items, "Tab 5 should contain 2 items")
+    local tab5Real, tab5Free = nil, nil
+    for _, item in ipairs(slotInfo.tabs[5].items) do
+      if item.isFreeSlot then tab5Free = item else tab5Real = item end
+    end
+    assert.is_not_nil(tab5Real, "Tab 5 should contain real item")
+    assert.is_not_nil(tab5Free, "Tab 5 should contain dummy empty slot")
+    assert.are.equal("Bank Tab Item 2", tab5Real.itemInfo.itemName)
+
+    assert.are.equal(2, #slotInfo.tabs[13].items, "Tab 13 should contain 2 items")
+    local tab13Real, tab13Free = nil, nil
+    for _, item in ipairs(slotInfo.tabs[13].items) do
+      if item.isFreeSlot then tab13Free = item else tab13Real = item end
+    end
+    assert.is_not_nil(tab13Real, "Tab 13 should contain real item")
+    assert.is_not_nil(tab13Free, "Tab 13 should contain dummy empty slot")
+    assert.are.equal("Warbank Item 3", tab13Real.itemInfo.itemName)
+  end)
 end)
