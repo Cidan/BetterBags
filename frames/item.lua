@@ -444,7 +444,11 @@ end
 function itemFrame.itemProto:ResetSize(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
 	self:SetSize(ctx, 37, 37)
-	decoration.NormalTexture:SetSize(64, 64)
+	if decoration.NormalTexture then
+		decoration.NormalTexture:SetSize(64, 64)
+	elseif decoration.GetNormalTexture and decoration:GetNormalTexture() then
+		decoration:GetNormalTexture():SetSize(64, 64)
+	end
 end
 
 ---@param ctx Context
@@ -456,10 +460,14 @@ function itemFrame.itemProto:SetSize(ctx, width, height)
 	self.button:SetSize(width, height)
 	decoration:SetSize(width, height)
 	decoration.IconBorder:SetSize(width, height)
-	decoration.NormalTexture:SetSize(64 / width, 64 / height)
-	decoration.IconQuestTexture:SetSize(width, height)
-	decoration.IconTexture:SetSize(width, height)
-	decoration.IconOverlay:SetSize(width, height)
+	if decoration.NormalTexture then
+		decoration.NormalTexture:SetSize(64 / width, 64 / height)
+	elseif decoration.GetNormalTexture and decoration:GetNormalTexture() then
+		decoration:GetNormalTexture():SetSize(64 / width, 64 / height)
+	end
+	if decoration.IconQuestTexture then decoration.IconQuestTexture:SetSize(width, height) end
+	if decoration.IconTexture then decoration.IconTexture:SetSize(width, height) end
+	if decoration.IconOverlay then decoration.IconOverlay:SetSize(width, height) end
 end
 
 -- SetFreeSlots will set the item button to a free slot.
