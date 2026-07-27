@@ -160,6 +160,7 @@ function searchBox.searchProto:UpdateSearch(ctx)
 end
 
 function searchBox:GetText()
+  if not self.searchFrame then return "" end
   return self.searchFrame.textBox:GetText()
 end
 
