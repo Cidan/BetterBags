@@ -363,8 +363,10 @@ end
 ---@param ctx Context
 function itemFrame.itemProto:FlashItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
-	decoration.NewItemTexture:SetAtlas("bags-glow-white")
-	decoration.NewItemTexture:Show()
+	if decoration.NewItemTexture then
+		decoration.NewItemTexture:SetAtlas("bags-glow-white")
+		decoration.NewItemTexture:Show()
+	end
 	if not decoration.flashAnim:IsPlaying() and not decoration.newitemglowAnim:IsPlaying() then
 		decoration.flashAnim:Play()
 		decoration.newitemglowAnim:Play()
@@ -374,8 +376,12 @@ end
 ---@param ctx Context
 function itemFrame.itemProto:ClearFlashItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
-	decoration.BattlepayItemTexture:Hide()
-	decoration.NewItemTexture:Hide()
+	if decoration.BattlepayItemTexture then
+		decoration.BattlepayItemTexture:Hide()
+	end
+	if decoration.NewItemTexture then
+		decoration.NewItemTexture:Hide()
+	end
 	if decoration.flashAnim:IsPlaying() or decoration.newitemglowAnim:IsPlaying() then
 		decoration.flashAnim:Stop()
 		decoration.newitemglowAnim:Stop()
@@ -386,19 +392,21 @@ end
 ---@param data ItemData
 function itemFrame.itemProto:UpdateNewItem(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
-	if not decoration.BattlepayItemTexture and not self.NewItemTexture then
+	assert(data, "data must be provided")
+	if not decoration.NewItemTexture then
 		return
 	end
-	assert(data, "data must be provided")
 	if data.isItemEmpty then
-		decoration.BattlepayItemTexture:Hide()
+		if decoration.BattlepayItemTexture then
+			decoration.BattlepayItemTexture:Hide()
+		end
 		decoration.NewItemTexture:Hide()
 		return
 	end
 	local quality = data.itemInfo.itemQuality
 
 	if data.itemInfo.isNewItem then
-		if data.itemInfo.isBattlePayItem then
+		if data.itemInfo.isBattlePayItem and decoration.BattlepayItemTexture then
 			decoration.NewItemTexture:Hide()
 			decoration.BattlepayItemTexture:Show()
 		else
@@ -407,7 +415,9 @@ function itemFrame.itemProto:UpdateNewItem(ctx, data)
 			else
 				decoration.NewItemTexture:SetAtlas("bags-glow-white")
 			end
-			decoration.BattlepayItemTexture:Hide()
+			if decoration.BattlepayItemTexture then
+				decoration.BattlepayItemTexture:Hide()
+			end
 			decoration.NewItemTexture:Show()
 		end
 		if not decoration.flashAnim:IsPlaying() and not decoration.newitemglowAnim:IsPlaying() then
@@ -415,7 +425,9 @@ function itemFrame.itemProto:UpdateNewItem(ctx, data)
 			decoration.newitemglowAnim:Play()
 		end
 	else
-		decoration.BattlepayItemTexture:Hide()
+		if decoration.BattlepayItemTexture then
+			decoration.BattlepayItemTexture:Hide()
+		end
 		decoration.NewItemTexture:Hide()
 		if decoration.flashAnim:IsPlaying() or decoration.newitemglowAnim:IsPlaying() then
 			decoration.flashAnim:Stop()

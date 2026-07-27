@@ -656,7 +656,7 @@ function bagFrame:Create(ctx, kind)
 	b.currentItemCount = 0
 	b.drawOnClose = false
 	b.drawAfterCombat = false
-	b.bankTab = Enum.BagIndex.Characterbanktab
+	b.bankTab = addon.isRetail and Enum.BagIndex.Characterbanktab or (const.BANK_TAB and const.BANK_TAB.BANK or 1)
 	b.sections = {}
 	b.toRelease = {}
 	b.toReleaseSections = {}

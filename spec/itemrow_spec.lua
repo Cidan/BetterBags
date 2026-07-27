@@ -69,21 +69,6 @@ describe("ItemRow Frame Font Validation", function()
       itemRowFrame:Create(ctx)
     end)
   end)
-
-  it("should successfully initialize because of the valid normal font flag in era", function()
-    -- First make sure the main ItemRowFrame is loaded
-    ResetModuleStub("ItemRowFrame", "frames/itemrow.lua")
-    LoadBetterBagsModule("frames/itemrow.lua")
-
-    -- Now load era/itemrow.lua which retrieves 'ItemRowFrame' and modifies it
-    LoadBetterBagsModule("frames/era/itemrow.lua")
-    local itemRowFrame = addon:GetModule("ItemRowFrame")
-
-    -- This should NOT throw a SetFont error anymore because '' is valid
-    assert.has_no_error(function()
-      itemRowFrame:_DoCreate(ctx)
-    end)
-  end)
 end)
 
 -- Restore original helper

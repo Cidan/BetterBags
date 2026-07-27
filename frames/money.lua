@@ -110,13 +110,28 @@ function money:CreateButton(kind, parent)
   else
     b:SetPoint("RIGHT", parent, "LEFT", -4, 0)
   end
-  b:SetNormalAtlas("coin-" .. kind)
+  if addon.isRetail then
+    b:SetNormalAtlas("coin-" .. kind)
+  else
+    b:SetNormalTexture("Interface\\MONEYFRAME\\UI-MoneyIcons")
+    if kind == "copper" then
+      b:GetNormalTexture():SetTexCoord(0.5, 0.75, 0, 1)
+    elseif kind == "silver" then
+      b:GetNormalTexture():SetTexCoord(0.25, 0.5, 0, 1)
+    else
+      b:GetNormalTexture():SetTexCoord(0, 0.25, 0, 1)
+    end
+  end
   b:GetNormalTexture():ClearAllPoints()
   b:GetNormalTexture():SetPoint("RIGHT", 0, 0)
   b:GetNormalTexture():SetSize(13, 13)
   local fs = b:CreateFontString(nil, "OVERLAY")
   b:SetFontString(fs)
-  b:SetNormalFontObject("Number12Font")
+  if addon.isRetail then
+    b:SetNormalFontObject("Number12Font")
+  else
+    b:SetNormalFontObject("NumberFontNormalRight")
+  end
   fs:SetPoint("RIGHT", -13, 0)
   b:Show()
   return b
