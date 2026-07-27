@@ -503,7 +503,12 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 		SetItemButtonCount(decoration, count)
 	end
 	decoration.GetItemContextMatchResult = nil
-	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	if addon.isRetail then
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	else
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]]) else SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]]) end
+		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
+	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
 	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
@@ -527,7 +532,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	decoration.IconBorder:SetBlendMode("BLEND")
 	decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
 	self.isFreeSlot = true
-	if decoration.ItemSlotBackground then decoration.ItemSlotBackground:Show() end
+	if addon.isRetail and decoration.ItemSlotBackground then decoration.ItemSlotBackground:Show() end
 	self.frame:SetAlpha(1)
 	events:SendMessage(ctx, "item/Updated", self, decoration)
 	self.frame:Show()
@@ -575,7 +580,12 @@ function itemFrame.itemProto:ClearItem(ctx)
 	if decoration.SetHasItem then decoration:SetHasItem(false) end
 	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	decoration.GetItemContextMatchResult = nil
-	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	if addon.isRetail then
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	else
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]]) else SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]]) end
+		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
+	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
 	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
@@ -662,8 +672,8 @@ function itemFrame:_DoCreate(_, bagID)
 	-- Install special handlers for themed interaction textures.
 	-- Use plain HookScript (not addon.HookScript) to avoid creating contexts during
 	-- mouse events, which can cause taint when followed by protected clicks (e.g. UseContainerItem).
-	button.PushedTexture:SetTexture("")
-	button.NormalTexture:SetTexture("")
+	if button.PushedTexture then button.PushedTexture:SetTexture("") elseif button.GetPushedTexture and button:GetPushedTexture() then button:GetPushedTexture():SetTexture("") end
+	if button.NormalTexture then button.NormalTexture:SetTexture("") elseif button.GetNormalTexture and button:GetNormalTexture() then button:GetNormalTexture():SetTexture("") end
 
 	-- Cache a lazy reference to get the decoration button. The decoration is retrieved
 	-- via themes module, but we avoid touching addon tables during the actual mouse events.
