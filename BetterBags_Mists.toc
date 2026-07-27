@@ -93,6 +93,7 @@ frames\groupdialog.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua
+frames\contextmenu.lua
 frames\grid.lua
 frames\item.lua
 frames\itemrow.lua
