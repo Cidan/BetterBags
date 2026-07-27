@@ -83,7 +83,14 @@ function BagButtonFrame.bagButtonProto:SetBag(ctx, bag)
     self.frame.ItemSlotBackground:Hide()
     self.empty = false
   else
-    --icon = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+    if not addon.isRetail then
+      local _, texture = GetInventorySlotInfo("Bag"..bag)
+      if texture then
+        self.frame.ItemSlotBackground:SetTexture(texture)
+      else
+        self.frame.ItemSlotBackground:SetTexture("Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag")
+      end
+    end
     self.frame.ItemSlotBackground:Show()
     self.empty = true
   end
@@ -113,7 +120,8 @@ function BagButtonFrame.bagButtonProto:OnEnter()
     GameTooltip:SetOwner(self.frame, "ANCHOR_LEFT")
     GameTooltip:SetText(BANK_BAG_PURCHASE, 1, 1, 1)
     local cost = GetBankSlotCost(self.bag)
-    local costInfo = strjoin("", COSTS_LABEL, " ", C_CurrencyInfo.GetCoinTextureString(cost))
+    local coinStr = C_CurrencyInfo and C_CurrencyInfo.GetCoinTextureString and C_CurrencyInfo.GetCoinTextureString(cost) or GetCoinTextureString(cost)
+    local costInfo = strjoin("", COSTS_LABEL, " ", coinStr)
     GameTooltip:AddLine(costInfo, 1, 1, 1, true)
     GameTooltip:Show()
     CursorUpdate(self.frame)
@@ -189,7 +197,12 @@ function BagButtonFrame:_DoCreate()
   local name = format("BetterBagsBagButton%d", buttonCount)
   buttonCount = buttonCount + 1
 
-  local f = CreateFrame("ItemButton", name)
+  local f
+  if addon.isRetail then
+    f = CreateFrame("ItemButton", name)
+  else
+    f = CreateFrame("Button", name, nil, "ItemButtonTemplate")
+  end
   f:SetSize(37, 37)
   f:RegisterForDrag("LeftButton")
   f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -199,7 +212,12 @@ function BagButtonFrame:_DoCreate()
   f:SetScript("OnDragStart", function() b:OnDragStart() end)
   f:SetScript("OnReceiveDrag", function() b:OnReceiveDrag() end)
   b.frame = f
-  f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
+  if addon.isRetail then
+    f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND", "ItemSlotBackgroundCombinedBagsTemplate", -6);
+  else
+    f.ItemSlotBackground = f:CreateTexture(nil, "BACKGROUND")
+    f.ItemSlotBackground:SetTexture("Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag")
+  end
   f.ItemSlotBackground:SetAllPoints(f);
   f.ItemSlotBackground:Hide()
   return b

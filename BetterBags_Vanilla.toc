@@ -1,4 +1,4 @@
-## Interface: 11508
+## Interface: 11509
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
@@ -93,18 +93,13 @@ frames\groupdialog.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua
-frames\era\money.lua
-frames\era\contextmenu.lua
+frames\contextmenu.lua
 frames\grid.lua
 frames\item.lua
-frames\era\item.lua
 frames\itemrow.lua
-frames\era\itemrow.lua
 frames\section.lua
 frames\bagbutton.lua
-frames\era\bagbutton.lua
 frames\bagslots.lua
-frames\era\bagslots.lua
 frames\currency.lua
 frames\list.lua
 frames\themeconfig.lua
@@ -123,7 +118,6 @@ bags\bank.lua
 bags\era\bank.lua
 
 frames\bag.lua
-frames\era\bag.lua
 
 themes\default.lua
 themes\simpledark.lua

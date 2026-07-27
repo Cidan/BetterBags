@@ -126,7 +126,11 @@ function itemFrame.itemProto:UpdateCooldown(ctx, data)
 		return
 	end
 	local decoration = themes:GetItemButton(ctx, self)
-	decoration:UpdateCooldown(data.itemInfo.itemIcon)
+	if decoration.UpdateCooldown then
+		decoration:UpdateCooldown(data.itemInfo.itemIcon)
+	elseif data.bagid ~= nil then
+		ContainerFrame_UpdateCooldown(data.bagid, decoration)
+	end
 end
 
 ---@param ctx Context
@@ -309,14 +313,14 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	self.stackid = data.itemInfo.itemID
 	decoration.minDisplayCount = 1
 	self:DrawItemLevel(data)
-	decoration.ItemSlotBackground:Hide()
-	ClearItemButtonOverlay(decoration)
-	decoration:SetHasItem(data.itemInfo.itemIcon)
-	self.button:SetHasItem(data.itemInfo.itemIcon)
+	if decoration.ItemSlotBackground then decoration.ItemSlotBackground:Hide() end
+	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
+	if decoration.SetHasItem then decoration:SetHasItem(data.itemInfo.itemIcon) end
+	if self.button.SetHasItem then self.button:SetHasItem(data.itemInfo.itemIcon) end
 
 	--override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
-	decoration:SetItemButtonTexture(data.itemInfo.itemIcon)
+	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(data.itemInfo.itemIcon) else SetItemButtonTexture(decoration, data.itemInfo.itemIcon) end
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
 	if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > const.ITEM_QUALITY.Common then
 		decoration.IconBorder:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
@@ -329,22 +333,24 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	self:UpdateCount(ctx, data)
 	--self:SetLock(data.itemInfo.isLocked)
-	if self.button.UpdateExtended then
-		self.button:UpdateExtended()
+	if addon.isRetail then
+		if self.button.UpdateExtended then
+			self.button:UpdateExtended()
+		end
+		if decoration.UpdateExtended then
+			decoration:UpdateExtended()
+		end
 	end
-	if decoration.UpdateExtended then
-		decoration:UpdateExtended()
-	end
-	decoration:UpdateQuestItem(isQuestItem, questID, isActive)
+	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(isQuestItem, questID, isActive) end
 	if not self.staticData then
 		self:UpdateNewItem(ctx, data)
 	end
-	decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue)
-	decoration:UpdateItemContextMatching()
-	decoration:UpdateCooldown(ctx, data)
-	decoration:SetReadable(readable)
-	decoration:CheckUpdateTooltip(tooltipOwner)
-	decoration:SetMatchesSearch(not isFiltered)
+	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue) end
+	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
+	if decoration.UpdateCooldown then decoration:UpdateCooldown(ctx, data) end
+	if decoration.SetReadable then decoration:SetReadable(readable) end
+	if decoration.CheckUpdateTooltip then decoration:CheckUpdateTooltip(tooltipOwner) end
+	if decoration.SetMatchesSearch then decoration:SetMatchesSearch(not isFiltered) end
 	self:Unlock(ctx)
 
 	self.freeSlotName = ""
@@ -363,8 +369,10 @@ end
 ---@param ctx Context
 function itemFrame.itemProto:FlashItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
-	decoration.NewItemTexture:SetAtlas("bags-glow-white")
-	decoration.NewItemTexture:Show()
+	if decoration.NewItemTexture then
+		decoration.NewItemTexture:SetAtlas("bags-glow-white")
+		decoration.NewItemTexture:Show()
+	end
 	if not decoration.flashAnim:IsPlaying() and not decoration.newitemglowAnim:IsPlaying() then
 		decoration.flashAnim:Play()
 		decoration.newitemglowAnim:Play()
@@ -374,8 +382,12 @@ end
 ---@param ctx Context
 function itemFrame.itemProto:ClearFlashItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
-	decoration.BattlepayItemTexture:Hide()
-	decoration.NewItemTexture:Hide()
+	if decoration.BattlepayItemTexture then
+		decoration.BattlepayItemTexture:Hide()
+	end
+	if decoration.NewItemTexture then
+		decoration.NewItemTexture:Hide()
+	end
 	if decoration.flashAnim:IsPlaying() or decoration.newitemglowAnim:IsPlaying() then
 		decoration.flashAnim:Stop()
 		decoration.newitemglowAnim:Stop()
@@ -386,19 +398,21 @@ end
 ---@param data ItemData
 function itemFrame.itemProto:UpdateNewItem(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
-	if not decoration.BattlepayItemTexture and not self.NewItemTexture then
+	assert(data, "data must be provided")
+	if not decoration.NewItemTexture then
 		return
 	end
-	assert(data, "data must be provided")
 	if data.isItemEmpty then
-		decoration.BattlepayItemTexture:Hide()
+		if decoration.BattlepayItemTexture then
+			decoration.BattlepayItemTexture:Hide()
+		end
 		decoration.NewItemTexture:Hide()
 		return
 	end
 	local quality = data.itemInfo.itemQuality
 
 	if data.itemInfo.isNewItem then
-		if data.itemInfo.isBattlePayItem then
+		if data.itemInfo.isBattlePayItem and decoration.BattlepayItemTexture then
 			decoration.NewItemTexture:Hide()
 			decoration.BattlepayItemTexture:Show()
 		else
@@ -407,7 +421,9 @@ function itemFrame.itemProto:UpdateNewItem(ctx, data)
 			else
 				decoration.NewItemTexture:SetAtlas("bags-glow-white")
 			end
-			decoration.BattlepayItemTexture:Hide()
+			if decoration.BattlepayItemTexture then
+				decoration.BattlepayItemTexture:Hide()
+			end
 			decoration.NewItemTexture:Show()
 		end
 		if not decoration.flashAnim:IsPlaying() and not decoration.newitemglowAnim:IsPlaying() then
@@ -415,7 +431,9 @@ function itemFrame.itemProto:UpdateNewItem(ctx, data)
 			decoration.newitemglowAnim:Play()
 		end
 	else
-		decoration.BattlepayItemTexture:Hide()
+		if decoration.BattlepayItemTexture then
+			decoration.BattlepayItemTexture:Hide()
+		end
 		decoration.NewItemTexture:Hide()
 		if decoration.flashAnim:IsPlaying() or decoration.newitemglowAnim:IsPlaying() then
 			decoration.flashAnim:Stop()
@@ -428,7 +446,11 @@ end
 function itemFrame.itemProto:ResetSize(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
 	self:SetSize(ctx, 37, 37)
-	decoration.NormalTexture:SetSize(64, 64)
+	if decoration.NormalTexture then
+		decoration.NormalTexture:SetSize(64, 64)
+	elseif decoration.GetNormalTexture and decoration:GetNormalTexture() then
+		decoration:GetNormalTexture():SetSize(64, 64)
+	end
 end
 
 ---@param ctx Context
@@ -440,10 +462,14 @@ function itemFrame.itemProto:SetSize(ctx, width, height)
 	self.button:SetSize(width, height)
 	decoration:SetSize(width, height)
 	decoration.IconBorder:SetSize(width, height)
-	decoration.NormalTexture:SetSize(64 / width, 64 / height)
-	decoration.IconQuestTexture:SetSize(width, height)
-	decoration.IconTexture:SetSize(width, height)
-	decoration.IconOverlay:SetSize(width, height)
+	if decoration.NormalTexture then
+		decoration.NormalTexture:SetSize(64 / width, 64 / height)
+	elseif decoration.GetNormalTexture and decoration:GetNormalTexture() then
+		decoration:GetNormalTexture():SetSize(64 / width, 64 / height)
+	end
+	if decoration.IconQuestTexture then decoration.IconQuestTexture:SetSize(width, height) end
+	if decoration.IconTexture then decoration.IconTexture:SetSize(width, height) end
+	if decoration.IconOverlay then decoration.IconOverlay:SetSize(width, height) end
 end
 
 -- SetFreeSlots will set the item button to a free slot.
@@ -472,28 +498,35 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	decoration.minDisplayCount = -1
 	self.freeSlotCount = count
 
-	ClearItemButtonOverlay(decoration)
-	decoration:SetHasItem(false)
-	self.button:SetHasItem(false)
+	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
+	if decoration.SetHasItem then decoration:SetHasItem(false) end
+	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	if not nocount then
 		SetItemButtonCount(decoration, count)
 	end
 	decoration.GetItemContextMatchResult = nil
-	decoration:SetItemButtonTexture(0)
-	decoration:UpdateQuestItem(false, nil, nil)
-	decoration:UpdateNewItem(false)
-	decoration:UpdateJunkItem(false, false)
-	decoration:UpdateItemContextMatching()
+	if addon.isRetail then
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	else
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]]) else SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]]) end
+		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
+	end
+	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
+	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
+	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
 	SetItemButtonDesaturated(decoration, false)
-	decoration:UpdateCooldown(false)
+	if decoration.UpdateCooldown then decoration:UpdateCooldown(false) end
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
 	decoration.UpgradeIcon:SetShown(false)
-	if self.button.UpdateExtended then
-		self.button:UpdateExtended()
-	end
-	if decoration.UpdateExtended then
-		decoration:UpdateExtended()
+	if addon.isRetail then
+		if self.button.UpdateExtended then
+			self.button:UpdateExtended()
+		end
+		if decoration.UpdateExtended then
+			decoration:UpdateExtended()
+		end
 	end
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
@@ -503,7 +536,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	decoration.IconBorder:SetBlendMode("BLEND")
 	decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
 	self.isFreeSlot = true
-	decoration.ItemSlotBackground:Show()
+	if addon.isRetail and decoration.ItemSlotBackground then decoration.ItemSlotBackground:Show() end
 	self.frame:SetAlpha(1)
 	events:SendMessage(ctx, "item/Updated", self, decoration)
 	self.frame:Show()
@@ -548,21 +581,26 @@ function itemFrame.itemProto:ClearItem(ctx)
 	self.frame:SetParent(nil)
 	self.frame:SetAlpha(1)
 	self.frame:Hide()
-	decoration:SetHasItem(false)
-	self.button:SetHasItem(false)
+	if decoration.SetHasItem then decoration:SetHasItem(false) end
+	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	decoration.GetItemContextMatchResult = nil
-	decoration:SetItemButtonTexture(0)
-	decoration:UpdateQuestItem(false, nil, nil)
-	decoration:UpdateNewItem(false)
-	decoration:UpdateJunkItem(false, false)
-	decoration:UpdateItemContextMatching()
+	if addon.isRetail then
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	else
+		if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture([[Interface\PaperDoll\UI-Backpack-EmptySlot]]) else SetItemButtonTexture(decoration, [[Interface\PaperDoll\UI-Backpack-EmptySlot]]) end
+		if decoration.ExtendedSlot then decoration.ExtendedSlot:Hide() end
+	end
+	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
+	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
+	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
 	SetItemButtonQuality(decoration, false)
 	decoration.minDisplayCount = 1
 	SetItemButtonCount(decoration, 0)
 	SetItemButtonDesaturated(decoration, false)
-	ClearItemButtonOverlay(decoration)
-	decoration:UpdateCooldown(false)
-	decoration.ItemSlotBackground:Hide()
+	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
+	if decoration.UpdateCooldown then decoration:UpdateCooldown(false) end
+	if decoration.ItemSlotBackground then decoration.ItemSlotBackground:Hide() end
 	self.button:Enable()
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
@@ -638,8 +676,8 @@ function itemFrame:_DoCreate(_, bagID)
 	-- Install special handlers for themed interaction textures.
 	-- Use plain HookScript (not addon.HookScript) to avoid creating contexts during
 	-- mouse events, which can cause taint when followed by protected clicks (e.g. UseContainerItem).
-	button.PushedTexture:SetTexture("")
-	button.NormalTexture:SetTexture("")
+	if button.PushedTexture then button.PushedTexture:SetTexture("") elseif button.GetPushedTexture and button:GetPushedTexture() then button:GetPushedTexture():SetTexture("") end
+	if button.NormalTexture then button.NormalTexture:SetTexture("") elseif button.GetNormalTexture and button:GetNormalTexture() then button:GetNormalTexture():SetTexture("") end
 
 	-- Cache a lazy reference to get the decoration button. The decoration is retrieved
 	-- via themes module, but we avoid touching addon tables during the actual mouse events.

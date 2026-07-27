@@ -68,7 +68,7 @@ function item.itemRowProto:SetItemFromData(ctx, data, static)
     return
   end
 
-  self.rowButton:SetHasItem(data.itemInfo.itemIcon)
+  if self.rowButton.SetHasItem then self.rowButton:SetHasItem(data.itemInfo.itemIcon) end
 
   local quality = data.itemInfo.itemQuality
   if quality == nil then

@@ -34,6 +34,49 @@ end
 ---@field private iconIndex CurrencyItem[]
 local CurrencyIconGrid = {}
 
+local function getCurrencyInfo(ref)
+  if C_CurrencyInfo and C_CurrencyInfo.GetCurrencyListInfo then
+    return C_CurrencyInfo.GetCurrencyListInfo(ref)
+  elseif GetCurrencyListInfo then
+    local name, isHeader, isExpanded,
+    isUnused, isWatched, count, icon,
+    maximum, hasWeeklyLimit,
+    currentWeeklyAmount, unknown, itemID = GetCurrencyListInfo(ref)
+    return {
+      name = name,
+      isHeader = isHeader,
+      isHeaderExpanded = isExpanded,
+      isTypeUnused = isUnused,
+      isShowInBackpack = isWatched,
+      quantity = count,
+      iconFileID = icon,
+      maxQuantity = maximum,
+      canEarnPerWeek = hasWeeklyLimit,
+      quantityEarnedThisWeek = currentWeeklyAmount,
+      unknown = unknown,
+      itemID = itemID
+    }
+  end
+  return nil
+end
+
+local function expandCurrencyList(ref)
+  if C_CurrencyInfo and C_CurrencyInfo.ExpandCurrencyList then
+    C_CurrencyInfo.ExpandCurrencyList(ref, true)
+  elseif ExpandCurrencyList then
+    ExpandCurrencyList(ref, true)
+  end
+end
+
+local function getCurrencyListSize()
+  if C_CurrencyInfo and C_CurrencyInfo.GetCurrencyListSize then
+    return C_CurrencyInfo.GetCurrencyListSize()
+  elseif GetCurrencyListSize then
+    return GetCurrencyListSize()
+  end
+  return 0
+end
+
 function CurrencyIconGrid:Update()
   for _, cell in pairs(self.iconGrid.cells) do
     ---@cast cell CurrencyItem
@@ -44,9 +87,9 @@ function CurrencyIconGrid:Update()
   local showCount = 0
   repeat
     local ref = index
-    local info = C_CurrencyInfo.GetCurrencyListInfo(ref)
+    local info = getCurrencyInfo(ref)
     if info and info.isHeader then
-      C_CurrencyInfo.ExpandCurrencyList(ref, true)
+      expandCurrencyList(ref)
     end
     if info and info.isShowInBackpack and showCount < 7 then
       local icon = self.iconIndex[index]
@@ -74,7 +117,7 @@ function CurrencyIconGrid:Update()
       showCount = showCount + 1
     end
     index = index + 1
-  until index > C_CurrencyInfo.GetCurrencyListSize()
+  until index > getCurrencyListSize()
   local w, h = self.iconGrid:Draw({
     cells = self.iconGrid.cells,
     maxWidthPerRow = 1024,

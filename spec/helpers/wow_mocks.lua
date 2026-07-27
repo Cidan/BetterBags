@@ -145,10 +145,17 @@ local function CreateMockWidget(widgetType, name, parent)
     return fs
   end
   function widget:SetNormalTexture(texture)
-    self.NormalTexture = texture
+    if type(texture) == "string" then
+      local normal = self:GetNormalTexture()
+      if normal and type(normal) == "table" and normal.SetTexture then
+        normal:SetTexture(texture)
+      end
+    else
+      self.NormalTexture = texture
+    end
   end
   function widget:GetNormalTexture()
-    if not self.NormalTexture and widgetType ~= "Texture" then
+    if (not self.NormalTexture or type(self.NormalTexture) == "string") and widgetType ~= "Texture" then
       self.NormalTexture = CreateMockWidget("Texture", nil, self)
     end
     return self.NormalTexture

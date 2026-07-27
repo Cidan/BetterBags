@@ -89,6 +89,8 @@ globals = {
 	"GetBankSlotCost",
 	"GetCurrencyListInfo",
 	"GetCurrencyListSize",
+	"GetCoinTextureString",
+	"ExpandCurrencyList",
 	"GetCursorPosition",
 	"GetDetailedItemLevelInfo",
 	"GetFramerate",

@@ -3,6 +3,7 @@
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 -- Context is needed by Pool's create/reset functions
 LoadBetterBagsModule("core/context.lua")
+ResetModuleStub("Pool", "core/pool.lua")
 LoadBetterBagsModule("core/pool.lua")
 local context = addon:GetModule("Context")
 local pool = addon:GetModule("Pool")
