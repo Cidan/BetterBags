@@ -310,7 +310,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	decoration.minDisplayCount = 1
 	self:DrawItemLevel(data)
 	decoration.ItemSlotBackground:Hide()
-	ClearItemButtonOverlay(decoration)
+	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
 	decoration:SetHasItem(data.itemInfo.itemIcon)
 	self.button:SetHasItem(data.itemInfo.itemIcon)
 
@@ -484,7 +484,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	decoration.minDisplayCount = -1
 	self.freeSlotCount = count
 
-	ClearItemButtonOverlay(decoration)
+	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
 	decoration:SetHasItem(false)
 	self.button:SetHasItem(false)
 	if not nocount then
@@ -572,7 +572,7 @@ function itemFrame.itemProto:ClearItem(ctx)
 	decoration.minDisplayCount = 1
 	SetItemButtonCount(decoration, 0)
 	SetItemButtonDesaturated(decoration, false)
-	ClearItemButtonOverlay(decoration)
+	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
 	decoration:UpdateCooldown(false)
 	decoration.ItemSlotBackground:Hide()
 	self.button:Enable()
