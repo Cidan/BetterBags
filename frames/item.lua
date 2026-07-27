@@ -316,7 +316,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 
 	--override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
-	decoration:SetItemButtonTexture(data.itemInfo.itemIcon)
+	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(data.itemInfo.itemIcon) else SetItemButtonTexture(decoration, data.itemInfo.itemIcon) end
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
 	if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > const.ITEM_QUALITY.Common then
 		decoration.IconBorder:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
@@ -335,16 +335,16 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	if decoration.UpdateExtended then
 		decoration:UpdateExtended()
 	end
-	decoration:UpdateQuestItem(isQuestItem, questID, isActive)
+	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(isQuestItem, questID, isActive) end
 	if not self.staticData then
 		self:UpdateNewItem(ctx, data)
 	end
-	decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue)
-	decoration:UpdateItemContextMatching()
-	decoration:UpdateCooldown(ctx, data)
-	decoration:SetReadable(readable)
-	decoration:CheckUpdateTooltip(tooltipOwner)
-	decoration:SetMatchesSearch(not isFiltered)
+	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue) end
+	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
+	if decoration.UpdateCooldown then decoration:UpdateCooldown(ctx, data) end
+	if decoration.SetReadable then decoration:SetReadable(readable) end
+	if decoration.CheckUpdateTooltip then decoration:CheckUpdateTooltip(tooltipOwner) end
+	if decoration.SetMatchesSearch then decoration:SetMatchesSearch(not isFiltered) end
 	self:Unlock(ctx)
 
 	self.freeSlotName = ""
@@ -491,13 +491,13 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 		SetItemButtonCount(decoration, count)
 	end
 	decoration.GetItemContextMatchResult = nil
-	decoration:SetItemButtonTexture(0)
-	decoration:UpdateQuestItem(false, nil, nil)
-	decoration:UpdateNewItem(false)
-	decoration:UpdateJunkItem(false, false)
-	decoration:UpdateItemContextMatching()
+	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
+	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
+	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
 	SetItemButtonDesaturated(decoration, false)
-	decoration:UpdateCooldown(false)
+	if decoration.UpdateCooldown then decoration:UpdateCooldown(false) end
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
 	decoration.UpgradeIcon:SetShown(false)
@@ -563,17 +563,17 @@ function itemFrame.itemProto:ClearItem(ctx)
 	if decoration.SetHasItem then decoration:SetHasItem(false) end
 	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	decoration.GetItemContextMatchResult = nil
-	decoration:SetItemButtonTexture(0)
-	decoration:UpdateQuestItem(false, nil, nil)
-	decoration:UpdateNewItem(false)
-	decoration:UpdateJunkItem(false, false)
-	decoration:UpdateItemContextMatching()
+	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(0) else SetItemButtonTexture(decoration, 0) end
+	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(false, nil, nil) end
+	if decoration.UpdateNewItem then decoration:UpdateNewItem(false) end
+	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(false, false) end
+	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
 	SetItemButtonQuality(decoration, false)
 	decoration.minDisplayCount = 1
 	SetItemButtonCount(decoration, 0)
 	SetItemButtonDesaturated(decoration, false)
 	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
-	decoration:UpdateCooldown(false)
+	if decoration.UpdateCooldown then decoration:UpdateCooldown(false) end
 	decoration.ItemSlotBackground:Hide()
 	self.button:Enable()
 	self.ilvlText:SetText("")
