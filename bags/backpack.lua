@@ -93,7 +93,7 @@ function backpack.proto:OnHide(ctx)
 		-- Set up callback to handle post-hide logic
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			self.bag.searchFrame:Hide()
+			if self.bag.searchFrame then self.bag.searchFrame:Hide() end
 			if self.bag.drawOnClose then
 				debug:Log("draw", "Drawing bag on close")
 				self.bag.drawOnClose = false
@@ -104,7 +104,7 @@ function backpack.proto:OnHide(ctx)
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
-		self.bag.searchFrame:Hide()
+		if self.bag.searchFrame then self.bag.searchFrame:Hide() end
 		if self.bag.drawOnClose then
 			debug:Log("draw", "Drawing bag on close")
 			self.bag.drawOnClose = false
