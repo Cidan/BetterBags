@@ -126,7 +126,11 @@ function itemFrame.itemProto:UpdateCooldown(ctx, data)
 		return
 	end
 	local decoration = themes:GetItemButton(ctx, self)
-	decoration:UpdateCooldown(data.itemInfo.itemIcon)
+	if decoration.UpdateCooldown then
+		decoration:UpdateCooldown(data.itemInfo.itemIcon)
+	elseif data.bagid ~= nil then
+		ContainerFrame_UpdateCooldown(data.bagid, decoration)
+	end
 end
 
 ---@param ctx Context
