@@ -415,6 +415,14 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
   if not button.IconQuestTexture then
     button.IconQuestTexture = _G[buttonName.."Decoration"..theme.."IconQuestTexture"]
   end
+  if button.GetNormalTexture and button:GetNormalTexture() then
+    button:GetNormalTexture():SetTexture("")
+    button:GetNormalTexture():Hide()
+  end
+  if button.GetPushedTexture and button:GetPushedTexture() then
+    button:GetPushedTexture():SetTexture("")
+    button:GetPushedTexture():Hide()
+  end
   button:Show()
   return button
 end
