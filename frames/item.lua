@@ -311,8 +311,8 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	self:DrawItemLevel(data)
 	decoration.ItemSlotBackground:Hide()
 	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
-	decoration:SetHasItem(data.itemInfo.itemIcon)
-	self.button:SetHasItem(data.itemInfo.itemIcon)
+	if decoration.SetHasItem then decoration:SetHasItem(data.itemInfo.itemIcon) end
+	if self.button.SetHasItem then self.button:SetHasItem(data.itemInfo.itemIcon) end
 
 	--override default to avoid https://github.com/Stanzilla/WoWUIBugs/issues/640
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
@@ -485,8 +485,8 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.freeSlotCount = count
 
 	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
-	decoration:SetHasItem(false)
-	self.button:SetHasItem(false)
+	if decoration.SetHasItem then decoration:SetHasItem(false) end
+	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	if not nocount then
 		SetItemButtonCount(decoration, count)
 	end
@@ -560,8 +560,8 @@ function itemFrame.itemProto:ClearItem(ctx)
 	self.frame:SetParent(nil)
 	self.frame:SetAlpha(1)
 	self.frame:Hide()
-	decoration:SetHasItem(false)
-	self.button:SetHasItem(false)
+	if decoration.SetHasItem then decoration:SetHasItem(false) end
+	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	decoration.GetItemContextMatchResult = nil
 	decoration:SetItemButtonTexture(0)
 	decoration:UpdateQuestItem(false, nil, nil)
