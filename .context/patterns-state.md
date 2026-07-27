@@ -125,6 +125,23 @@ if childData and childData.itemInfo.currentItemCount ~= ... then
 
 **Key files**: `frames/item.lua:323-333`, `views/gridview.lua:75-91`, `views/gridview.lua:99-120`, `views/gridview.lua:175-210`
 
+## AceDB Merges Defaults Before Migrate Runs
+**Problem**: A migration checks whether a profile key already has the new shape, concludes the profile is converted, and marks itself complete without touching the data.
+
+**Root cause**: `LibStub('AceDB-3.0'):New()` is followed immediately by `DB:Migrate()`, and AceDB's `initSection` calls `copyDefaults(tbl, defaults)` on the first access of `db.profile` — which is `Migrate`'s first statement. `copyDefaults` creates every table-valued key declared in `DATABASE_DEFAULTS` that the saved profile lacks. Any key the defaults know about is therefore present, in its *new* shape, before migration code can inspect it.
+
+**Concrete case**: `BAG_KIND.BACKPACK` is `0`; flat pre-scoping profiles keyed `profile.groups` by group ID starting at `1`, so key `0` never existed on disk. The kind-scoping migration tested `profile.groups[BACKPACK]` for namespace shape, AceDB had just created it from defaults, and the check passed for every legacy profile — leaving groups and `categoryToGroup` stranded at the top level while the completion flag was set.
+
+**Solution**: Never use a defaulted key as evidence about saved data. Discriminate shapes by fields only one shape can own (`isFlatGroup` tests for `name`/`id`/`order` on the value itself), and make conversions unconditional and idempotent instead of flag-gated, so a pass that got it wrong can be corrected later:
+```lua
+-- core/database.lua
+migrateFlatGroupData() -- every load; a no-op once there is nothing flat left
+```
+
+**Related**: `removeDefaults` runs on logout and strips values equal to their default, so absence from a `SavedVariables` file is equally uninformative.
+
+**Key files**: `core/database.lua` (`migrateFlatGroupData`, `DB:Migrate`), `libs/AceDB-3.0/AceDB-3.0.lua` (`copyDefaults`, `removeDefaults`, `initSection`), `.claude/rules/profile-migrations.md`
+
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds

@@ -602,6 +602,9 @@ const.FORM_LAYOUT = {
 ---@field id number Unique auto-incremented ID
 ---@field name string Display name for the tab
 ---@field order number Sort order for tab positioning
+---@field kind? BagKind The bag the group belongs to
+---@field bankType? BankType Bank tab type, set on the default bank groups
+---@field isDefault? boolean Built-in group that cannot be deleted
 
 ---@class databaseOptions
 const.DATABASE_DEFAULTS = {
