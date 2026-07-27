@@ -1,4 +1,4 @@
-## Interface: 20505
+## Interface: 20506
 
 ## Title: BetterBags
 ## Notes: Better Bags for everyone!
