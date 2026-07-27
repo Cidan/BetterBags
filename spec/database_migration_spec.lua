@@ -197,4 +197,13 @@ describe("Database Migration", function()
       assert.are.equal(original, DB.data.profile.size[const.BAG_VIEW.SECTION_ALL_BAGS][const.BAG_KIND.BACKPACK].itemsPerRow)
     end)
   end)
+
+  describe("retail bank view persistence", function()
+    it("preserves SECTION_ALL_BAGS view state across migration in retail", function()
+      addon.isRetail = true
+      DB.data.profile.views[const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_ALL_BAGS
+      DB:Migrate()
+      assert.are.equal(const.BAG_VIEW.SECTION_ALL_BAGS, DB.data.profile.views[const.BAG_KIND.BANK])
+    end)
+  end)
 end)
