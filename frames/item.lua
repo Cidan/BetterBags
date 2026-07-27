@@ -333,11 +333,13 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	self:UpdateCount(ctx, data)
 	--self:SetLock(data.itemInfo.isLocked)
-	if self.button.UpdateExtended then
-		self.button:UpdateExtended()
-	end
-	if decoration.UpdateExtended then
-		decoration:UpdateExtended()
+	if addon.isRetail then
+		if self.button.UpdateExtended then
+			self.button:UpdateExtended()
+		end
+		if decoration.UpdateExtended then
+			decoration:UpdateExtended()
+		end
 	end
 	if decoration.UpdateQuestItem then decoration:UpdateQuestItem(isQuestItem, questID, isActive) end
 	if not self.staticData then
@@ -518,11 +520,13 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
 	decoration.UpgradeIcon:SetShown(false)
-	if self.button.UpdateExtended then
-		self.button:UpdateExtended()
-	end
-	if decoration.UpdateExtended then
-		decoration:UpdateExtended()
+	if addon.isRetail then
+		if self.button.UpdateExtended then
+			self.button:UpdateExtended()
+		end
+		if decoration.UpdateExtended then
+			decoration:UpdateExtended()
+		end
 	end
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
