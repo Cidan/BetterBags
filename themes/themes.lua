@@ -423,6 +423,8 @@ function themes.CreateBlankItemButtonDecoration(parent, theme, buttonName)
     button:GetPushedTexture():SetTexture("")
     button:GetPushedTexture():Hide()
   end
+  if button.BattlepayItemTexture then button.BattlepayItemTexture:Hide() end
+  if button.NewItemTexture then button.NewItemTexture:Hide() end
   button:Show()
   return button
 end
