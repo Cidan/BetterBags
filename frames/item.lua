@@ -309,7 +309,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	self.stackid = data.itemInfo.itemID
 	decoration.minDisplayCount = 1
 	self:DrawItemLevel(data)
-	decoration.ItemSlotBackground:Hide()
+	if decoration.ItemSlotBackground then decoration.ItemSlotBackground:Hide() end
 	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
 	if decoration.SetHasItem then decoration:SetHasItem(data.itemInfo.itemIcon) end
 	if self.button.SetHasItem then self.button:SetHasItem(data.itemInfo.itemIcon) end
@@ -515,7 +515,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	decoration.IconBorder:SetBlendMode("BLEND")
 	decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
 	self.isFreeSlot = true
-	decoration.ItemSlotBackground:Show()
+	if decoration.ItemSlotBackground then decoration.ItemSlotBackground:Show() end
 	self.frame:SetAlpha(1)
 	events:SendMessage(ctx, "item/Updated", self, decoration)
 	self.frame:Show()
@@ -574,7 +574,7 @@ function itemFrame.itemProto:ClearItem(ctx)
 	SetItemButtonDesaturated(decoration, false)
 	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
 	if decoration.UpdateCooldown then decoration:UpdateCooldown(false) end
-	decoration.ItemSlotBackground:Hide()
+	if decoration.ItemSlotBackground then decoration.ItemSlotBackground:Hide() end
 	self.button:Enable()
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
