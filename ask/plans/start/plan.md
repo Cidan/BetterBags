@@ -1,54 +1,52 @@
-# Implementation Plan: Move Frame Creation to ADDON_LOADED (OnInitialize)
+# ProcessRefresh Functional Pipeline Refactor Plan
 
-## Objective
-The goal is to shift heavy UI frame creation from the `PLAYER_LOGIN` event (`addon:OnEnable()`) to the `ADDON_LOADED` event (`addon:OnInitialize()`). This will decouple the data fetch from frame creation and fix script timeouts experienced in Hardcore versions of World of Warcraft during the initial player login.
-
-## Files to Modify
-- `core/init.lua`
+## Context and Goal
+The `ProcessRefresh` function in `data/items.lua` is a monolithic 500-line function that directly mutates `slotInfo` state. The goal is to refactor this into a pure, unidirectional functional pipeline that passes data linearly between distinct phase functions, rather than relying on an ever-mutating global state bag. This allows for easier testing, zero-cost state drops, and more readable architecture.
 
 ## Approach
+We will rip the `items:ProcessRefresh(ctx, kind)` function into 5-6 distinct, purely scoped helper functions. 
 
-1. **Modify `addon:OnInitialize()`** (in `core/init.lua`):
-   Append the heavy UI frame creation code to the end of the newly implemented deterministic boot loop, immediately after the module `Init()` calls (e.g., right after `consoleport:Init()`).
-   Specifically, move the following:
-   - `applyCompat()`
-   - `self:HideBlizzardBags()`
-   - The instantiation logic for Backpack and Bank:
-     ```lua
-     local rootctx = context:New('addon_initialize')
-     addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-     if database:GetEnableBankBag() then
-       addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-     end
-     ```
-   - `themes:Enable()`
-   - Setting the Backpack title: `addon.Bags.Backpack:SetTitle(L:G("Backpack"))`
-   - Inserting frames into `UISpecialFrames`:
-     ```lua
-     table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-     if addon.Bags.Bank then
-       table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-     end
-     ```
+### 1. Functional Phase Breakdown
+`items:ProcessRefresh` will be rewritten to look conceptually like:
+```lua
+function items:ProcessRefresh(ctx, kind)
+  local bagList = self:Phase1_DetermineBags(ctx, kind)
+  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
+  local previousItems = self:GetPreviousItems(kind)
+  
+  -- Compute and clear glows for items moved between slots
+  self:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
+  
+  local stackData, visibleItemsBySlotKey = self:Phase4_ApplyVirtualStacks(kind, itemData)
+  local enrichedData, sectionLayouts = self:Phase5_EnrichCategories(kind, itemData)
+  local sortedItems = self:Phase6_Sort(kind, visibleItemsBySlotKey)
+  local tabData = self:Phase7_PartitionIntoTabs(ctx, kind, sortedItems)
+  
+  self:Phase8_CommitAndDispatch(ctx, kind, itemData, visibleItemsBySlotKey, tabData, sectionLayouts, equipmentData)
+end
+```
+*(Function names and boundaries may be adjusted slightly during implementation for optimal garbage collection and Lua performance).*
 
-2. **Modify `addon:OnEnable()`** (in `core/init.lua`):
-   Remove the code lines identified above from `addon:OnEnable()`.
-   Ensure `addon:OnEnable()` correctly retains:
-   - The sequential `module:Enable()` calls.
-   - Core secure hooks (`ToggleAllBags`, `CloseSpecialWindows`).
-   - The event registrations (`BANKFRAME_CLOSED`, `PLAYER_INTERACTION_MANAGER_FRAME_SHOW`, etc.).
-   - The `items/RefreshBackpack/Done` and `items/RefreshBank/Done` message event hooks.
-   - Disabling CVar tutorials for Retail.
+### 2. Purging Dead Delta State
+The legacy architecture computed `addedItems`, `removedItems`, `updatedItems`, and a `deferDelete` flag on `slotInfo` on every sweep. With the clean-sweep architecture, these are essentially dead code except for one use-case: preventing "new item glows" from flashing when a player simply moves an existing item to a different slot.
+- **Action:** We will delete all delta assignments to `slotInfo`.
+- **Replacement:** A highly specific `Phase3_ClearMovedItemGlows(ctx, previousItems, currentItems)` function will perform a quick GUID intersection to clear glows on moved items, then discard the tracking tables.
 
-## Edge Cases and Risks
-- **Data Query Triggers:** We must make sure none of the frame creations inside `BagFrame:Create(...)` inadvertently trigger a data fetch via `C_Container` or `search:IndexItems`. We have verified that `BagFrame:Create` acts structurally, so this risk is mitigated.
-- **`themes:Enable()` Order:** This method applies global textures and styles to existing frame objects. It must be called strictly *after* the `BagFrame:Create` calls, and must only be called once to prevent UI leaks or duplications.
-- **Module Init Completion:** The creation routines depend on modules like `events`, `database`, `themes`, etc., having run their `Init()` functions. We already secured this topological sort in the previous PR step.
-- **Context Name:** The context instantiated for `BagFrame:Create` is currently named `'addon_enable'`. Since we are creating this context in `OnInitialize()`, we should rename it to `'addon_initialize'` for clarity.
+### 3. State Commitment
+The pipeline will avoid mutating `slotInfo` until the very last step (`Phase8_CommitAndDispatch`), at which point the final structurally pure datasets are written to the UI state and the `RefreshBackpack/Done` event is broadcast.
 
-## Implementation Steps for Executor
-1. Read `core/init.lua`.
-2. Delete the frame creation code from `addon:OnEnable()`.
-3. Insert the frame creation code at the bottom of the initialization sequence inside `addon:OnInitialize()`, keeping the existing tutorial disabling and override binding logic at the very end of `OnInitialize()`.
-4. Use `luacheck` to verify the codebase's syntax and scope requirements.
-5. Create a git commit directly adding onto the existing PR work.
+### 4. Test Harness Updates
+The `spec/` folder heavily mocks or relies on the exact step-by-step mutations inside `ProcessRefresh`. Because we are shifting boundaries, tests will need to be refactored:
+- Existing tests that call `ProcessRefresh` and assert on `slotInfo.addedItems` or `updatedItems` will be cleaned up.
+- New unit tests will be created or adjusted to validate the isolated phase functions directly (e.g., passing raw `itemData` into `Phase5_EnrichCategories` and verifying the output).
+
+## Risks and Edge Cases
+- **Garbage Collection (Stutters):** If we pass completely new cloned datasets out of every phase, we will overwhelm the Lua GC. We must ensure we pass the *same* underlying `itemData` nodes linearly through the pipeline, while the phase functions orchestrate the linking and mapping (like `visibleItemsBySlotKey`), maintaining the functional paradigm without the functional GC tax.
+- **Test Breakage:** This will break many system-level assertions in the test harness that expect mid-pipeline state. Extensive test-fixing is required.
+
+## Execution
+- **Step 1:** Add the new Phase helper functions into `data/items.lua`.
+- **Step 2:** Refactor `items:ProcessRefresh` to act purely as the orchestrator.
+- **Step 3:** Purge `slotInfo` delta properties (`addedItems`, `removedItems`, `updatedItems`, `deferDelete`).
+- **Step 4:** Run tests and fix all broken assertions in `spec/` caused by the removed properties or altered boundaries.
+- **Step 5:** Commit changes.

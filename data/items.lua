@@ -395,7 +395,7 @@ end
 --- CENTRALIZED PIPELINE REFRESH ORCHESTRATOR (PHASES 1-5)
 ---@param ctx Context
 ---@param kind BagKind
-function items:ProcessRefresh(ctx, kind)
+function items:Phase1_DetermineBags(ctx, kind)
   local bagList = {}
   if kind == const.BAG_KIND.BACKPACK then
     bagList = const.BACKPACK_BAGS
@@ -454,8 +454,390 @@ function items:ProcessRefresh(ctx, kind)
       end
     end
   end
+  return bagList
+end
 
-  local itemData, equipmentData = self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
+function items:Phase2_Harvest(kind, bagList)
+  return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
+end
+
+function items:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
+  local added = {}
+  local removed = {}
+
+  for slotkey, newItem in pairs(itemData) do
+    local oldItem = previousItems[slotkey]
+    if not newItem.isItemEmpty then
+      if not oldItem or oldItem.isItemEmpty then
+        added[slotkey] = newItem
+      end
+    end
+  end
+
+  for slotkey, oldItem in pairs(previousItems) do
+    local newItem = itemData[slotkey]
+    if not oldItem.isItemEmpty then
+      if not newItem or newItem.isItemEmpty then
+        removed[slotkey] = oldItem
+      end
+    end
+  end
+
+  for _, addedItem in pairs(added) do
+    for _, removedItem in pairs(removed) do
+      if addedItem.itemInfo and removedItem.itemInfo and addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
+        self:ClearNewItem(ctx, addedItem.slotkey)
+      end
+    end
+  end
+end
+
+function items:Phase4_ApplyVirtualStacks(kind, itemData, slotInfo)
+  slotInfo.stacks:Clear()
+  for _, item in pairs(itemData) do
+    if not item.isItemEmpty then
+      slotInfo.stacks:AddToStack(item)
+    end
+  end
+
+  local function ShouldMergeItem(bagKind, item, stackInfo)
+    if not stackInfo then return false end
+    local opts = database:GetStackingOptions(bagKind)
+    if not opts.mergeStacks then return false end
+    if opts.unmergeAtShop and addon.atInteracting then return false end
+    if opts.dontMergePartial and item.itemInfo.itemStackCount ~= item.itemInfo.currentItemCount then return false end
+    if not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1 then return false end
+    return true
+  end
+
+  local visibleItemsBySlotKey = {}
+  for slotkey, item in pairs(itemData) do
+    if not item.isItemEmpty then
+      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      local isRoot = true
+
+      if ShouldMergeItem(kind, item, stackInfo) then
+        if item.slotkey == stackInfo.rootItem then
+          -- Root item. Compute total count.
+          local totalCount = item.itemInfo.currentItemCount
+          for childSlotkey in pairs(stackInfo.slotkeys) do
+            local childItem = itemData[childSlotkey]
+            if childItem and not childItem.isItemEmpty then
+              if ShouldMergeItem(kind, childItem, stackInfo) then
+                totalCount = totalCount + childItem.itemInfo.currentItemCount
+              end
+            end
+          end
+          item.stackedCount = totalCount
+        else
+          isRoot = false
+        end
+      else
+        item.stackedCount = nil
+      end
+
+      if isRoot then
+        visibleItemsBySlotKey[slotkey] = item
+      end
+    end
+  end
+
+  return visibleItemsBySlotKey
+end
+
+function items:Phase5_EnrichCategories(kind, itemData, slotInfo)
+  if search and search.IndexItems then
+    search:IndexItems(itemData)
+  end
+
+  self:RefreshSearchCache(kind)
+
+  for _, currentItem in pairs(itemData) do
+    if not currentItem.isItemEmpty then
+      local searchCategory = self:GetSearchCategory(kind, currentItem.slotkey)
+      if searchCategory then
+        local oldCategory = currentItem.itemInfo.category
+        if oldCategory ~= L:G("Recent Items") then
+          currentItem.itemInfo.category = searchCategory
+          if search.UpdateCategoryIndex then
+            search:UpdateCategoryIndex(currentItem, oldCategory)
+          end
+        end
+      end
+    end
+  end
+
+  local sectionLayouts = {}
+  if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    local shouldHideHeader = (kind == const.BAG_KIND.BANK)
+    for _, currentItem in pairs(itemData) do
+      if not currentItem.isItemEmpty then
+        local category = self:GetBagName(currentItem.bagid)
+        currentItem.itemInfo.category = category
+        sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
+      end
+    end
+    for bagid, _ in pairs(slotInfo.emptySlotByBagAndSlot) do
+      local category = self:GetBagName(bagid)
+      sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
+    end
+  end
+
+  return sectionLayouts
+end
+
+function items:Phase6_Sort(kind, visibleItemsBySlotKey, slotInfo)
+  local sortedItems = {}
+  for _, item in pairs(visibleItemsBySlotKey) do
+    table.insert(sortedItems, item)
+  end
+
+  if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+    for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
+      for slotid, data in pairs(emptyBagData) do
+        if C_Container.GetBagName(bagid) ~= nil or (addon.isRetail and const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid]) then
+          local category = self:GetBagName(bagid)
+          local dummy = {
+            isFreeSlot = true,
+            bagid = bagid,
+            slotid = slotid,
+            slotkey = data.slotkey or (bagid .. "_" .. slotid),
+            itemInfo = {
+              category = category,
+              itemName = "",
+              itemQuality = -1,
+              currentItemCount = 0,
+              itemGUID = "",
+              currentItemLevel = 0,
+              expacID = 0
+            }
+          }
+          table.insert(sortedItems, dummy)
+        end
+      end
+    end
+  end
+
+  local sortModule = addon:GetModule("Sort", true)
+  if sortModule then
+    local sortFunc
+    if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
+      sortFunc = sortModule.SortItemDataBySlot
+    elseif sortModule.GetItemDataSortFunction then
+      sortFunc = sortModule:GetItemDataSortFunction(kind, database:GetBagView(kind))
+    end
+
+    if sortFunc then
+      table.sort(sortedItems, sortFunc)
+    end
+  end
+
+  return sortedItems
+end
+
+function items:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, slotInfo)
+  local tabs = {}
+  local viewBagView = database.GetBagView and database:GetBagView(kind) or const.BAG_VIEW.SECTION_GRID
+  local possibleTabs = GetPossibleTabIDs(kind)
+
+  -- Get active tab ID
+  local activeTabID = 1
+  if kind == const.BAG_KIND.BACKPACK then
+    if database.GetGroupsEnabled and database:GetGroupsEnabled(kind) then
+      activeTabID = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
+    end
+  elseif kind == const.BAG_KIND.BANK then
+    if database.GetShowBankTabs and database:GetShowBankTabs() then
+      activeTabID = const.BANK_TAB.BANK
+    elseif database.GetGroupsEnabled and database:GetGroupsEnabled(kind) then
+      activeTabID = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
+    end
+  end
+
+  possibleTabs[activeTabID] = true
+  possibleTabs[1] = true -- fallback
+
+  local showAll = database:GetShowAllFreeSpace(kind)
+
+  for tabID in pairs(possibleTabs) do
+    tabs[tabID] = {
+      items = {},
+      categories = {},
+      emptySlotsSorted = {},
+      emptySlotsByBag = {},
+      emptySlots = {},
+      totalItems = 0,
+      freeSpace = {
+        showAll = showAll,
+        buttons = {},
+      },
+    }
+
+    -- Filter emptySlotsSorted and emptySlotsByBag for this tab
+    for _, item in ipairs(slotInfo.emptySlotsSorted or {}) do
+      if IncludeBagInFreeSpace(kind, item.bagid, tabID) then
+        table.insert(tabs[tabID].emptySlotsSorted, item)
+      end
+    end
+
+    if slotInfo.emptySlotsByBag then
+      for bagid, info in pairs(slotInfo.emptySlotsByBag) do
+        if IncludeBagInFreeSpace(kind, bagid, tabID) then
+          tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
+          tabs[tabID].emptySlots[info.name] = (tabs[tabID].emptySlots[info.name] or 0) + info.count
+        end
+      end
+    end
+
+    -- Populate tabData.freeSpace.buttons
+    if showAll then
+      for _, item in ipairs(tabs[tabID].emptySlotsSorted) do
+        table.insert(tabs[tabID].freeSpace.buttons, {
+          slotkey = item.slotkey,
+          bagid = item.bagid,
+          slotid = item.slotid,
+          count = 1,
+          isIndividual = true,
+          key = item.slotkey,
+          itemInfo = item.itemInfo,
+        })
+      end
+    else
+      local aggregatedCounts = {}
+      local firstSlotKeyForSubclass = {}
+      for bagid, info in pairs(tabs[tabID].emptySlotsByBag) do
+        aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
+        if not firstSlotKeyForSubclass[info.name] and slotInfo.freeSlotKeysByBag and slotInfo.freeSlotKeysByBag[bagid] then
+          firstSlotKeyForSubclass[info.name] = slotInfo.freeSlotKeysByBag[bagid]
+        end
+      end
+
+      local sortedSubclasses = {}
+      for name in pairs(aggregatedCounts) do
+        table.insert(sortedSubclasses, name)
+      end
+      table.sort(sortedSubclasses)
+
+      for _, name in ipairs(sortedSubclasses) do
+        local freeSlotCount = aggregatedCounts[name]
+        local slotKey = firstSlotKeyForSubclass[name]
+        if freeSlotCount > 0 and slotKey ~= nil then
+          local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
+          if freeSlotBag and freeSlotID then
+            local originalItem = self:GetItemDataFromSlotKey(slotKey)
+            table.insert(tabs[tabID].freeSpace.buttons, {
+              slotkey = slotKey,
+              bagid = tonumber(freeSlotBag),
+              slotid = tonumber(freeSlotID),
+              count = freeSlotCount,
+              isIndividual = false,
+              key = name,
+              itemInfo = originalItem and originalItem.itemInfo or {
+                emptySlotName = name,
+                itemQuality = const.ITEM_QUALITY.Common,
+              },
+            })
+          end
+        end
+      end
+    end
+  end
+
+  -- Filter and assign items to their respective tabs
+  for _, item in ipairs(sortedItems) do
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+    local isShown = true
+    if viewBagView ~= const.BAG_VIEW.SECTION_ALL_BAGS and categories.IsCategoryShown then
+      isShown = categories:IsCategoryShown(category) ~= false
+    end
+    if isShown then
+      for tabID, tabData in pairs(tabs) do
+        if ItemBelongsToTab(kind, item, tabID, viewBagView) then
+          table.insert(tabData.items, item)
+          if not item.isFreeSlot then
+            tabData.totalItems = tabData.totalItems + 1
+          end
+        end
+      end
+    end
+  end
+
+  local sortModule = addon:GetModule("Sort", true)
+
+  -- Sort categories for each tab
+  for _, tabData in pairs(tabs) do
+    local categoryTally = {}
+    local categoryOrder = {}
+    for _, item in ipairs(tabData.items) do
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      if not categoryTally[category] then
+        categoryTally[category] = {
+          name = category,
+          count = 0,
+          isFreeSpace = (category == L:G("Free Space")),
+          isRecent = (category == L:G("Recent Items")),
+          fillWidth = false,
+          shown = (not categories.IsCategoryShown) or (categories:IsCategoryShown(category) ~= false),
+        }
+        table.insert(categoryOrder, categoryTally[category])
+      end
+      categoryTally[category].count = categoryTally[category].count + 1
+    end
+
+    local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
+    if not isAllBags and sortModule and sortModule.GetCategoryDataSortFunction then
+      local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
+      if sortFunc then
+        table.sort(categoryOrder, sortFunc)
+      end
+    end
+    tabData.categories = categoryOrder
+  end
+
+  return tabs
+end
+
+function items:Phase8_CommitAndDispatch(ctx, kind, slotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
+  slotInfo.visibleItemsBySlotKey = visibleItemsBySlotKey
+  slotInfo.sectionLayouts = sectionLayouts
+  slotInfo.sortedItems = sortedItems
+  slotInfo.tabs = tabData
+
+  -- Synthesize Category Data
+  local categoryTally = {}
+  local categoryOrder = {}
+  for _, item in ipairs(slotInfo.sortedItems) do
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+    if not categoryTally[category] then
+      categoryTally[category] = {
+        name = category,
+        count = 0,
+        isFreeSpace = (category == L:G("Free Space")),
+        isRecent = (category == L:G("Recent Items")),
+        fillWidth = false
+      }
+      table.insert(categoryOrder, categoryTally[category])
+    end
+    categoryTally[category].count = categoryTally[category].count + 1
+  end
+
+  local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
+  local sortModule = addon:GetModule("Sort", true)
+  if not isAllBags and sortModule and sortModule.GetCategoryDataSortFunction then
+    local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
+    if sortFunc then
+      table.sort(categoryOrder, sortFunc)
+    end
+  end
+  slotInfo.sortedCategories = categoryOrder
+
+  local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
+  events:SendMessage(ctx, ev, slotInfo)
+end
+
+function items:ProcessRefresh(ctx, kind)
+  local bagList = self:Phase1_DetermineBags(ctx, kind)
+  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
 
   local slotInfo = self.slotInfo[kind]
   if not slotInfo then
@@ -464,34 +846,7 @@ function items:ProcessRefresh(ctx, kind)
   end
 
   local previousItems = slotInfo.itemsBySlotKey or {}
-  local added = {}
-  local removed = {}
-  local updated = {}
-
-  for slotkey, newItem in pairs(itemData) do
-    local oldItem = previousItems[slotkey]
-    if newItem.isItemEmpty then
-      if oldItem and not oldItem.isItemEmpty then
-        removed[slotkey] = oldItem
-      end
-    else
-      if not oldItem or oldItem.isItemEmpty then
-        added[slotkey] = newItem
-      else
-        if oldItem.itemHash ~= newItem.itemHash or
-           oldItem.itemInfo.currentItemCount ~= newItem.itemInfo.currentItemCount or
-           oldItem.itemInfo.isNewItem ~= newItem.itemInfo.isNewItem then
-          updated[slotkey] = newItem
-        end
-      end
-    end
-  end
-
-  for slotkey, oldItem in pairs(previousItems) do
-    if not itemData[slotkey] and not oldItem.isItemEmpty then
-      removed[slotkey] = oldItem
-    end
-  end
+  self:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
 
   if self._firstLoad[kind] == true then
     self._firstLoad[kind] = false
@@ -499,10 +854,6 @@ function items:ProcessRefresh(ctx, kind)
   end
 
   slotInfo:Update(ctx, itemData)
-  slotInfo.addedItems = added
-  slotInfo.removedItems = removed
-  slotInfo.updatedItems = updated
-
   if kind == const.BAG_KIND.BACKPACK then
     self.equipmentCache = equipmentData
   end
@@ -553,336 +904,12 @@ function items:ProcessRefresh(ctx, kind)
 
   slotInfo:SortEmptySlots()
 
-  for _, addedItem in pairs(slotInfo.addedItems) do
-    for _, removedItem in pairs(slotInfo.removedItems) do
-      if addedItem.itemInfo and removedItem.itemInfo and addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
-        self:ClearNewItem(ctx, addedItem.slotkey)
-      end
-    end
-  end
+  local visibleItemsBySlotKey = self:Phase4_ApplyVirtualStacks(kind, itemData, slotInfo)
+  local sectionLayouts = self:Phase5_EnrichCategories(kind, itemData, slotInfo)
+  local sortedItems = self:Phase6_Sort(kind, visibleItemsBySlotKey, slotInfo)
+  local tabData = self:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, slotInfo)
 
-  if slotInfo.totalItems < slotInfo.previousTotalItems then
-    slotInfo.deferDelete = true
-  end
-
-  slotInfo.stacks:Clear()
-  for _, item in pairs(itemData) do
-    if not item.isItemEmpty then
-      slotInfo.stacks:AddToStack(item)
-    end
-  end
-
-  local function ShouldMergeItem(bagKind, item, stackInfo)
-    if not stackInfo then return false end
-    local opts = database:GetStackingOptions(bagKind)
-    if not opts.mergeStacks then return false end
-    if opts.unmergeAtShop and addon.atInteracting then return false end
-    if opts.dontMergePartial and item.itemInfo.itemStackCount ~= item.itemInfo.currentItemCount then return false end
-    if not opts.mergeUnstackable and item.itemInfo.itemStackCount == 1 then return false end
-    return true
-  end
-
-  slotInfo.visibleItemsBySlotKey = {}
-  for slotkey, item in pairs(itemData) do
-    if not item.isItemEmpty then
-      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
-      local isRoot = true
-
-      if ShouldMergeItem(kind, item, stackInfo) then
-        if item.slotkey == stackInfo.rootItem then
-          -- Root item. Compute total count.
-          local totalCount = item.itemInfo.currentItemCount
-          for childSlotkey in pairs(stackInfo.slotkeys) do
-            local childItem = itemData[childSlotkey]
-            if childItem and not childItem.isItemEmpty then
-              if ShouldMergeItem(kind, childItem, stackInfo) then
-                totalCount = totalCount + childItem.itemInfo.currentItemCount
-              end
-            end
-          end
-          item.stackedCount = totalCount
-        else
-          isRoot = false
-        end
-      else
-        item.stackedCount = nil
-      end
-
-      if isRoot then
-        slotInfo.visibleItemsBySlotKey[slotkey] = item
-      end
-    end
-  end
-
-  if search and search.IndexItems then
-    search:IndexItems(itemData)
-  end
-
-  self:RefreshSearchCache(kind)
-
-  for _, currentItem in pairs(itemData) do
-    if not currentItem.isItemEmpty then
-      local searchCategory = self:GetSearchCategory(kind, currentItem.slotkey)
-      if searchCategory then
-        local oldCategory = currentItem.itemInfo.category
-        if oldCategory ~= L:G("Recent Items") then
-          currentItem.itemInfo.category = searchCategory
-          if search.UpdateCategoryIndex then
-            search:UpdateCategoryIndex(currentItem, oldCategory)
-          end
-        end
-      end
-    end
-  end
-
-  slotInfo.sectionLayouts = {}
-  if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    local shouldHideHeader = (kind == const.BAG_KIND.BANK)
-    for _, currentItem in pairs(itemData) do
-      if not currentItem.isItemEmpty then
-        local category = self:GetBagName(currentItem.bagid)
-        currentItem.itemInfo.category = category
-        slotInfo.sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
-      end
-    end
-    for bagid, _ in pairs(slotInfo.emptySlotByBagAndSlot) do
-      local category = self:GetBagName(bagid)
-      slotInfo.sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
-    end
-  end
-
-  slotInfo.sortedItems = {}
-  for _, item in pairs(slotInfo.visibleItemsBySlotKey) do
-    table.insert(slotInfo.sortedItems, item)
-  end
-
-  if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-    for bagid, emptyBagData in pairs(slotInfo.emptySlotByBagAndSlot) do
-      for slotid, data in pairs(emptyBagData) do
-        if C_Container.GetBagName(bagid) ~= nil or (addon.isRetail and const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid]) then
-          local category = self:GetBagName(bagid)
-          local dummy = {
-            isFreeSlot = true,
-            bagid = bagid,
-            slotid = slotid,
-            slotkey = data.slotkey or (bagid .. "_" .. slotid),
-            itemInfo = {
-              category = category,
-              itemName = "",
-              itemQuality = -1,
-              currentItemCount = 0,
-              itemGUID = "",
-              currentItemLevel = 0,
-              expacID = 0
-            }
-          }
-          table.insert(slotInfo.sortedItems, dummy)
-        end
-      end
-    end
-  end
-
-  local sortModule = addon:GetModule("Sort", true)
-  if sortModule then
-    local sortFunc
-    if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
-      sortFunc = sortModule.SortItemDataBySlot
-    elseif sortModule.GetItemDataSortFunction then
-      sortFunc = sortModule:GetItemDataSortFunction(kind, database:GetBagView(kind))
-    end
-
-    if sortFunc then
-      table.sort(slotInfo.sortedItems, sortFunc)
-    end
-  end
-
-  -- Partition slotInfo.tabs (Phase 4.5)
-  slotInfo.tabs = {}
-  local viewBagView = database.GetBagView and database:GetBagView(kind) or const.BAG_VIEW.SECTION_GRID
-  local possibleTabs = GetPossibleTabIDs(kind)
-
-  -- Get active tab ID
-  local activeTabID = 1
-  if kind == const.BAG_KIND.BACKPACK then
-    if database.GetGroupsEnabled and database:GetGroupsEnabled(kind) then
-      activeTabID = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
-    end
-  elseif kind == const.BAG_KIND.BANK then
-    if database.GetShowBankTabs and database:GetShowBankTabs() then
-      activeTabID = const.BANK_TAB.BANK
-    elseif database.GetGroupsEnabled and database:GetGroupsEnabled(kind) then
-      activeTabID = database.GetActiveGroup and database:GetActiveGroup(kind) or 1
-    end
-  end
-
-  possibleTabs[activeTabID] = true
-  possibleTabs[1] = true -- fallback
-
-  local showAll = database:GetShowAllFreeSpace(kind)
-
-  for tabID in pairs(possibleTabs) do
-    slotInfo.tabs[tabID] = {
-      items = {},
-      categories = {},
-      emptySlotsSorted = {},
-      emptySlotsByBag = {},
-      emptySlots = {},
-      totalItems = 0,
-      freeSpace = {
-        showAll = showAll,
-        buttons = {},
-      },
-    }
-
-    -- Filter emptySlotsSorted and emptySlotsByBag for this tab
-    for _, item in ipairs(slotInfo.emptySlotsSorted or {}) do
-      if IncludeBagInFreeSpace(kind, item.bagid, tabID) then
-        table.insert(slotInfo.tabs[tabID].emptySlotsSorted, item)
-      end
-    end
-
-    if slotInfo.emptySlotsByBag then
-      for bagid, info in pairs(slotInfo.emptySlotsByBag) do
-        if IncludeBagInFreeSpace(kind, bagid, tabID) then
-          slotInfo.tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
-          slotInfo.tabs[tabID].emptySlots[info.name] = (slotInfo.tabs[tabID].emptySlots[info.name] or 0) + info.count
-        end
-      end
-    end
-
-    -- Populate tabData.freeSpace.buttons
-    if showAll then
-      for _, item in ipairs(slotInfo.tabs[tabID].emptySlotsSorted) do
-        table.insert(slotInfo.tabs[tabID].freeSpace.buttons, {
-          slotkey = item.slotkey,
-          bagid = item.bagid,
-          slotid = item.slotid,
-          count = 1,
-          isIndividual = true,
-          key = item.slotkey,
-          itemInfo = item.itemInfo,
-        })
-      end
-    else
-      local aggregatedCounts = {}
-      local firstSlotKeyForSubclass = {}
-      for bagid, info in pairs(slotInfo.tabs[tabID].emptySlotsByBag) do
-        aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
-        if not firstSlotKeyForSubclass[info.name] and slotInfo.freeSlotKeysByBag and slotInfo.freeSlotKeysByBag[bagid] then
-          firstSlotKeyForSubclass[info.name] = slotInfo.freeSlotKeysByBag[bagid]
-        end
-      end
-
-      local sortedSubclasses = {}
-      for name in pairs(aggregatedCounts) do
-        table.insert(sortedSubclasses, name)
-      end
-      table.sort(sortedSubclasses)
-
-      for _, name in ipairs(sortedSubclasses) do
-        local freeSlotCount = aggregatedCounts[name]
-        local slotKey = firstSlotKeyForSubclass[name]
-        if freeSlotCount > 0 and slotKey ~= nil then
-          local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
-          if freeSlotBag and freeSlotID then
-            local originalItem = self:GetItemDataFromSlotKey(slotKey)
-            table.insert(slotInfo.tabs[tabID].freeSpace.buttons, {
-              slotkey = slotKey,
-              bagid = tonumber(freeSlotBag),
-              slotid = tonumber(freeSlotID),
-              count = freeSlotCount,
-              isIndividual = false,
-              key = name,
-              itemInfo = originalItem and originalItem.itemInfo or {
-                emptySlotName = name,
-                itemQuality = const.ITEM_QUALITY.Common,
-              },
-            })
-          end
-        end
-      end
-    end
-  end
-
-  -- Filter and assign items to their respective tabs
-  for _, item in ipairs(slotInfo.sortedItems) do
-    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-    local isShown = true
-    if viewBagView ~= const.BAG_VIEW.SECTION_ALL_BAGS and categories.IsCategoryShown then
-      isShown = categories:IsCategoryShown(category) ~= false
-    end
-    if isShown then
-      for tabID, tabData in pairs(slotInfo.tabs) do
-        if ItemBelongsToTab(kind, item, tabID, viewBagView) then
-          table.insert(tabData.items, item)
-          if not item.isFreeSlot then
-            tabData.totalItems = tabData.totalItems + 1
-          end
-        end
-      end
-    end
-  end
-
-  -- Sort categories for each tab
-  for _, tabData in pairs(slotInfo.tabs) do
-    local categoryTally = {}
-    local categoryOrder = {}
-    for _, item in ipairs(tabData.items) do
-      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-      if not categoryTally[category] then
-        categoryTally[category] = {
-          name = category,
-          count = 0,
-          isFreeSpace = (category == L:G("Free Space")),
-          isRecent = (category == L:G("Recent Items")),
-          fillWidth = false,
-          shown = (not categories.IsCategoryShown) or (categories:IsCategoryShown(category) ~= false),
-        }
-        table.insert(categoryOrder, categoryTally[category])
-      end
-      categoryTally[category].count = categoryTally[category].count + 1
-    end
-
-    local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
-    if not isAllBags and sortModule and sortModule.GetCategoryDataSortFunction then
-      local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
-      if sortFunc then
-        table.sort(categoryOrder, sortFunc)
-      end
-    end
-    tabData.categories = categoryOrder
-  end
-
-  -- Synthesize Category Data (Phase 4.5)
-  slotInfo.sortedCategories = {}
-  local categoryTally = {}
-  local categoryOrder = {}
-  for _, item in ipairs(slotInfo.sortedItems) do
-    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
-    if not categoryTally[category] then
-      categoryTally[category] = {
-        name = category,
-        count = 0,
-        isFreeSpace = (category == L:G("Free Space")),
-        isRecent = (category == L:G("Recent Items")),
-        fillWidth = false
-      }
-      table.insert(categoryOrder, categoryTally[category])
-    end
-    categoryTally[category].count = categoryTally[category].count + 1
-  end
-
-  local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
-  if not isAllBags and sortModule and sortModule.GetCategoryDataSortFunction then
-    local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
-    if sortFunc then
-      table.sort(categoryOrder, sortFunc)
-    end
-  end
-  slotInfo.sortedCategories = categoryOrder
-
-  local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
-  events:SendMessage(ctx, ev, slotInfo)
+  self:Phase8_CommitAndDispatch(ctx, kind, slotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
 end
 
 function items:RefreshBackpack(ctx)

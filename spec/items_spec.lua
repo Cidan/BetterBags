@@ -884,4 +884,57 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_Item.GetItemInfo = savedGetItemInfo
     end)
   end)
+
+  describe("ProcessRefresh Functional Phase Isolation", function()
+    it("Phase1_DetermineBags returns the expected bag list", function()
+      local ctx = addon:GetModule("Context"):New("TestPhase1")
+      local backpackBags = items:Phase1_DetermineBags(ctx, const.BAG_KIND.BACKPACK)
+      assert.are.equal(const.BACKPACK_BAGS, backpackBags)
+    end)
+
+    it("Phase3_ClearMovedItemGlows clears new item status for moved items", function()
+      local ctx = addon:GetModule("Context"):New("TestPhase3")
+      local clearedSlotKey = nil
+      local originalClearNewItem = items.ClearNewItem
+      items.ClearNewItem = function(self, ectx, slotkey)
+        clearedSlotKey = slotkey
+      end
+
+      local previous = {
+        ["0_1"] = {
+          isItemEmpty = false,
+          slotkey = "0_1",
+          itemInfo = { itemGUID = "GUID_123" }
+        }
+      }
+      local current = {
+        ["0_2"] = {
+          isItemEmpty = false,
+          slotkey = "0_2",
+          itemInfo = { itemGUID = "GUID_123" }
+        }
+      }
+
+      items:Phase3_ClearMovedItemGlows(ctx, previous, current)
+      assert.are.equal("0_2", clearedSlotKey)
+
+      items.ClearNewItem = originalClearNewItem
+    end)
+
+    it("Phase4_ApplyVirtualStacks calculates stack data correctly", function()
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      local itemData = {
+        ["0_1"] = {
+          isItemEmpty = false,
+          slotkey = "0_1",
+          itemHash = "hash123",
+          itemInfo = { currentItemCount = 5, itemStackCount = 20 }
+        }
+      }
+
+      local visibleMap = items:Phase4_ApplyVirtualStacks(const.BAG_KIND.BACKPACK, itemData, slotInfo)
+      assert.is_not_nil(visibleMap["0_1"])
+    end)
+  end)
 end)
