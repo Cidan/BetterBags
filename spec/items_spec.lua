@@ -414,15 +414,14 @@ describe("Items (New Data Farming Engine)", function()
 
       local ctx = addon:GetModule("Context"):New("TestFreeSlots")
       items:WipeSlotInfo(const.BAG_KIND.BANK)
-      items:UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
+      local _, emptySlotsByBag = items:UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
 
-      local slotInfo = items.slotInfo[const.BAG_KIND.BANK]
-      assert.is_not_nil(slotInfo.emptySlotsByBag)
-      assert.are.equal(5, slotInfo.emptySlotsByBag[6].count)
-      assert.are.equal("Bag", slotInfo.emptySlotsByBag[6].name)
-      assert.are.equal(3, slotInfo.emptySlotsByBag[7].count)
-      assert.are.equal(10, slotInfo.emptySlotsByBag[13].count)
-      assert.are.equal(12, slotInfo.emptySlotsByBag[14].count)
+      assert.is_not_nil(emptySlotsByBag)
+      assert.are.equal(5, emptySlotsByBag[6].count)
+      assert.are.equal("Bag", emptySlotsByBag[6].name)
+      assert.are.equal(3, emptySlotsByBag[7].count)
+      assert.are.equal(10, emptySlotsByBag[13].count)
+      assert.are.equal(12, emptySlotsByBag[14].count)
 
       -- Restore mocks
       _G.C_Container.GetContainerNumFreeSlots = originalGetContainerNumFreeSlots
