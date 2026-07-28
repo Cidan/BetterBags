@@ -71,3 +71,11 @@ To permanently prevent ObjectPool contamination, cell leakage, and fatal `Cannot
 - **Rule:** Every rendering pass for a view is functionally isolated and begins with a complete, synchronous wipe of its own frames, returning all of its pooled elements back to the global stacks before any rendering/population occurs.
 - **Mechanism:** The very first line of each view's `Render` method (e.g. `GridView` or `BagView`) executes `view:Wipe(ctx)`.
 - **State Transition (`isNew` flag):** Inside `Wipe(view, ctx)`, explicitly set `view.isNew = true` to flag the view as completely empty. At the beginning of the `Render` method (right after wiping), set `view.isNew = false` to indicate the view is populated and complete. This guarantees 100% clean-slate rendering on every single frame update.
+
+### 10. Unidirectional, Purely Functional Pipeline and Isolated Transactional Commits
+To enforce strict functional isolation and eliminate side-effects, reentrancy bugs, and half-calculated visual glitches during database updates:
+- **Rule:** The entire rendering and data-refresh pipeline (`ProcessRefresh`) is structured as a purely unidirectional, functional pipeline of discrete phase functions. It must avoid mutating any global/committed state (like `self.slotInfo[kind]`) until the final phase (`Phase8_CommitAndDispatch`).
+- **Transient State Isolation:** A lightweight, isolated `tempSlotInfo` object (instantiated via `self:NewSlotInfo()`) acts as the transient state container throughout the pipeline.
+  - Stacking options and temporary frames operate exclusively on this transient state (e.g. `tempSlotInfo.stacks` is an isolated stack engine instance).
+  - JIT queries and helper checks during the refresh are routed dynamically to the active transient state using `self._tempSlotInfo[kind]`.
+- **Commit Phase:** At the end of the pipeline, `Phase8_CommitAndDispatch` copies all calculated tables, totals, and layout metadata transactionally from the transient `tempSlotInfo` to the real, stateful `self.slotInfo[kind]`, ensuring atomic updates and zero half-finished visual states.

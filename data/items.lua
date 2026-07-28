@@ -209,7 +209,8 @@ end
 -- UpdateFreeSlots updates the current free slot count for a given bag kind.
 ---@param ctx Context
 ---@param kind BagKind
-function items:UpdateFreeSlots(ctx, kind)
+---@param slotInfo? SlotInfo
+function items:UpdateFreeSlots(ctx, kind, slotInfo)
   local baglist
   local tab = ctx:Get("bagid")
   if kind == const.BAG_KIND.BANK then
@@ -237,8 +238,9 @@ function items:UpdateFreeSlots(ctx, kind)
     baglist = const.BACKPACK_BAGS
   end
 
-  self.slotInfo[kind].emptySlots = {}
-  self.slotInfo[kind].emptySlotsByBag = {}
+  slotInfo = slotInfo or self.slotInfo[kind]
+  slotInfo.emptySlots = {}
+  slotInfo.emptySlotsByBag = {}
 
   for bagid in pairs(baglist) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid) or 0
@@ -255,9 +257,9 @@ function items:UpdateFreeSlots(ctx, kind)
       freeSlots = freeSlots - 4
     end
     if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
-      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] or 0
-      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] + freeSlots
-      self.slotInfo[kind].emptySlotsByBag[bagid] = { name = name, count = freeSlots }
+      slotInfo.emptySlots[name] = slotInfo.emptySlots[name] or 0
+      slotInfo.emptySlots[name] = slotInfo.emptySlots[name] + freeSlots
+      slotInfo.emptySlotsByBag[bagid] = { name = name, count = freeSlots }
     end
   end
 end
@@ -459,6 +461,52 @@ end
 
 function items:Phase2_Harvest(kind, bagList)
   return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
+end
+
+function items:Phase2b_EnrichData(ctx, kind, itemData, tempSlotInfo)
+  for _, currentItem in pairs(itemData) do
+    local bagid = currentItem.bagid
+    local slotid = currentItem.slotid
+    local name
+    local invid = C_Container.ContainerIDToInventoryID(bagid)
+    local baglink = GetInventoryItemLink("player", invid)
+
+    if Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
+      name = L:G("Keyring")
+    elseif baglink ~= nil and invid ~= nil then
+      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
+      name = C_Item.GetItemSubClassInfo(class, subclass)
+    else
+      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
+    end
+
+    if currentItem.isItemEmpty then
+      currentItem.itemInfo = currentItem.itemInfo or {}
+      currentItem.itemInfo.emptySlotName = name
+      local quality
+      if baglink ~= nil and invid ~= nil then
+        local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink))
+        if class == Enum.ItemClass.Quiver then
+          quality = const.BAG_SUBTYPE_TO_QUALITY[99]
+        else
+          quality = const.BAG_SUBTYPE_TO_QUALITY[subclass]
+        end
+      else
+        quality = const.BAG_SUBTYPE_TO_QUALITY[0]
+      end
+      currentItem.itemInfo.itemQuality = quality or const.ITEM_QUALITY.Common
+    end
+
+    tempSlotInfo:StoreIfEmptySlot(name, currentItem)
+
+    if not currentItem.isItemEmpty then
+      tempSlotInfo.totalItems = tempSlotInfo.totalItems + 1
+    end
+    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
+    currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
+  end
+
+  tempSlotInfo:SortEmptySlots()
 end
 
 function items:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
@@ -797,16 +845,41 @@ function items:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, slotInfo)
   return tabs
 end
 
-function items:Phase8_CommitAndDispatch(ctx, kind, slotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
-  slotInfo.visibleItemsBySlotKey = visibleItemsBySlotKey
-  slotInfo.sectionLayouts = sectionLayouts
-  slotInfo.sortedItems = sortedItems
-  slotInfo.tabs = tabData
+function items:Phase8_CommitAndDispatch(ctx, kind, tempSlotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
+  local realSlotInfo = self.slotInfo[kind]
+  if not realSlotInfo then
+    self:WipeSlotInfo(kind)
+    realSlotInfo = self.slotInfo[kind]
+  end
+
+  -- Copy everything from tempSlotInfo to realSlotInfo
+  realSlotInfo.emptySlots = tempSlotInfo.emptySlots
+  realSlotInfo.freeSlotKeys = tempSlotInfo.freeSlotKeys
+  realSlotInfo.freeSlotKeysByBag = tempSlotInfo.freeSlotKeysByBag
+  realSlotInfo.emptySlotsByBag = tempSlotInfo.emptySlotsByBag
+  realSlotInfo.totalItems = tempSlotInfo.totalItems
+  realSlotInfo.previousTotalItems = tempSlotInfo.previousTotalItems
+  realSlotInfo.emptySlotByBagAndSlot = tempSlotInfo.emptySlotByBagAndSlot
+  realSlotInfo.deferDelete = tempSlotInfo.deferDelete
+  realSlotInfo.dirtyItems = tempSlotInfo.dirtyItems
+  realSlotInfo.itemsBySlotKey = tempSlotInfo.itemsBySlotKey
+  realSlotInfo.previousItemsBySlotKey = tempSlotInfo.previousItemsBySlotKey
+  realSlotInfo.addedItems = tempSlotInfo.addedItems
+  realSlotInfo.removedItems = tempSlotInfo.removedItems
+  realSlotInfo.updatedItems = tempSlotInfo.updatedItems
+  realSlotInfo.emptySlotsSorted = tempSlotInfo.emptySlotsSorted
+  realSlotInfo.stacks = tempSlotInfo.stacks
+
+  -- Set final computed fields on realSlotInfo
+  realSlotInfo.visibleItemsBySlotKey = visibleItemsBySlotKey
+  realSlotInfo.sectionLayouts = sectionLayouts
+  realSlotInfo.sortedItems = sortedItems
+  realSlotInfo.tabs = tabData
 
   -- Synthesize Category Data
   local categoryTally = {}
   local categoryOrder = {}
-  for _, item in ipairs(slotInfo.sortedItems) do
+  for _, item in ipairs(realSlotInfo.sortedItems) do
     local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
     if not categoryTally[category] then
       categoryTally[category] = {
@@ -829,87 +902,51 @@ function items:Phase8_CommitAndDispatch(ctx, kind, slotInfo, visibleItemsBySlotK
       table.sort(categoryOrder, sortFunc)
     end
   end
-  slotInfo.sortedCategories = categoryOrder
+  realSlotInfo.sortedCategories = categoryOrder
 
   local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
-  events:SendMessage(ctx, ev, slotInfo)
+  events:SendMessage(ctx, ev, realSlotInfo)
 end
 
 function items:ProcessRefresh(ctx, kind)
   local bagList = self:Phase1_DetermineBags(ctx, kind)
   local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
 
-  local slotInfo = self.slotInfo[kind]
-  if not slotInfo then
-    self:WipeSlotInfo(kind)
-    slotInfo = self.slotInfo[kind]
-  end
-
-  local previousItems = slotInfo.itemsBySlotKey or {}
-  self:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
-
   if self._firstLoad[kind] == true then
     self._firstLoad[kind] = false
     ctx:Set("wipe", true)
   end
 
-  slotInfo:Update(ctx, itemData)
+  local tempSlotInfo = self:NewSlotInfo()
+  local realSlotInfo = self.slotInfo[kind]
+  tempSlotInfo.previousItemsBySlotKey = realSlotInfo and realSlotInfo.itemsBySlotKey or {}
+  tempSlotInfo.itemsBySlotKey = itemData
+  tempSlotInfo.previousTotalItems = realSlotInfo and realSlotInfo.totalItems or 0
+
+  -- Register tempSlotInfo for in-progress pipeline queries
+  self._tempSlotInfo = self._tempSlotInfo or {}
+  self._tempSlotInfo[kind] = tempSlotInfo
+
+  local previousItems = tempSlotInfo.previousItemsBySlotKey
+  self:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
+
   if kind == const.BAG_KIND.BACKPACK then
     self.equipmentCache = equipmentData
   end
 
-  self:UpdateFreeSlots(ctx, kind)
+  self:UpdateFreeSlots(ctx, kind, tempSlotInfo)
 
-  for _, currentItem in pairs(itemData) do
-    local bagid = currentItem.bagid
-    local slotid = currentItem.slotid
-    local name
-    local invid = C_Container.ContainerIDToInventoryID(bagid)
-    local baglink = GetInventoryItemLink("player", invid)
+  self:Phase2b_EnrichData(ctx, kind, itemData, tempSlotInfo)
 
-    if Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
-      name = L:G("Keyring")
-    elseif baglink ~= nil and invid ~= nil then
-      local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]
-      name = C_Item.GetItemSubClassInfo(class, subclass)
-    else
-      name = C_Item.GetItemSubClassInfo(Enum.ItemClass.Container, 0)
-    end
+  local visibleItemsBySlotKey = self:Phase4_ApplyVirtualStacks(kind, itemData, tempSlotInfo)
+  local sectionLayouts = self:Phase5_EnrichCategories(kind, itemData, tempSlotInfo)
+  local sortedItems = self:Phase6_Sort(kind, visibleItemsBySlotKey, tempSlotInfo)
+  local tabData = self:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, tempSlotInfo)
 
-    if currentItem.isItemEmpty then
-      currentItem.itemInfo = currentItem.itemInfo or {}
-      currentItem.itemInfo.emptySlotName = name
-      local quality
-      if baglink ~= nil and invid ~= nil then
-        local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink))
-        if class == Enum.ItemClass.Quiver then
-          quality = const.BAG_SUBTYPE_TO_QUALITY[99]
-        else
-          quality = const.BAG_SUBTYPE_TO_QUALITY[subclass]
-        end
-      else
-        quality = const.BAG_SUBTYPE_TO_QUALITY[0]
-      end
-      currentItem.itemInfo.itemQuality = quality or const.ITEM_QUALITY.Common
-    end
+  self:Phase8_CommitAndDispatch(ctx, kind, tempSlotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
 
-    slotInfo:StoreIfEmptySlot(name, currentItem)
-
-    if not currentItem.isItemEmpty then
-      slotInfo.totalItems = slotInfo.totalItems + 1
-    end
-    currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
-    currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
-  end
-
-  slotInfo:SortEmptySlots()
-
-  local visibleItemsBySlotKey = self:Phase4_ApplyVirtualStacks(kind, itemData, slotInfo)
-  local sectionLayouts = self:Phase5_EnrichCategories(kind, itemData, slotInfo)
-  local sortedItems = self:Phase6_Sort(kind, visibleItemsBySlotKey, slotInfo)
-  local tabData = self:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, slotInfo)
-
-  self:Phase8_CommitAndDispatch(ctx, kind, slotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
+  -- Clear in-progress pipeline registration
+  self._tempSlotInfo[kind] = nil
 end
 
 function items:RefreshBackpack(ctx)
@@ -1072,7 +1109,8 @@ end
 function items:GetItemDataFromSlotKey(slotkey)
   local kind = self:GetBagKindFromSlotKey(slotkey)
   if not kind then return nil end
-  return self.slotInfo[kind] and self.slotInfo[kind].itemsBySlotKey[slotkey]
+  local slotInfo = (self._tempSlotInfo and self._tempSlotInfo[kind]) or self.slotInfo[kind]
+  return slotInfo and slotInfo.itemsBySlotKey[slotkey]
 end
 
 function items:GetItemDataFromInventorySlot(slot)
