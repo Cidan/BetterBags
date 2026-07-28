@@ -63,6 +63,12 @@ ADDON_LOADED (core/init.lua: OnInitialize)
   consoleport:Init()
 ```
 
+### 4. Shifting Heavy UI Frame Creation to ADDON_LOADED
+To completely avoid script timeout errors (up to 200ms) during the enter-world sequences (`PLAYER_LOGIN`) on World of Warcraft (especially in Hardcore environments), the heavy structural UI creation is shifted entirely to the `ADDON_LOADED` phase inside `addon:OnInitialize()`.
+- **Phase Split:** Building physical bag and bank containers (`BagFrame:Create`), applying structural and theme textures (`themes:Enable`), setting up backpack titles, and registering frames to `UISpecialFrames` are performed under `addon:OnInitialize()`. This phase is immune to the engine's standard script execution timers.
+- **Data Decoupling:** Absolutely no data-api queries, `C_Container` scans, search engine indexing, or items harvesting are permitted during this phase. The UI frames must remain empty structural shells.
+- **OnEnable Login-Only Sweep:** The first data harvest/sweep and actual UI rendering (`RequestUpdate`) are triggered synchronously inside `OnEnable()`, ensuring that heavy visual rendering only happens when the game data is fully ready.
+
 ## API Contracts and Maintenance
 
 - **Adding a New Module:** When creating a new module, do **not** use `OnInitialize()`. Use `Init()`, and explicitly register/call it inside `addon:OnInitialize()` in `core/init.lua` in its correct dependency position.

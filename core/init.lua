@@ -131,6 +131,35 @@ local function CheckKeyBindings()
   end
 end
 
+local function applyCompat()
+  C_Timer.After(5, function()
+    if C_AddOns.IsAddOnLoaded("BetterBagsElvUISkin") then
+      question:Alert("Disable ElvUI Plugin", "The ElvUI BetterBags plugin you have installed is not compatible with BetterBags. It has been disabled -- please reload your UI to apply the changes.")
+      C_AddOns.DisableAddOn("BetterBagsElvUISkin")
+    end
+  end)
+
+  -- PatchWerk breaks every WoW addon by patching functions globally, even addons
+  -- it is not configured to patch. Detect it early and force the user to disable it.
+  C_Timer.After(2, function()
+    if C_AddOns.IsAddOnLoaded("PatchWerk") then
+      StaticPopupDialogs["BETTERBAGS_PATCHWERK_CONFLICT"] = {
+        text = "BetterBags has detected that the addon |cFFFF4400PatchWerk|r is loaded.\n\nPatchWerk breaks every WoW addon, even addons it is not configured to patch. You must disable PatchWerk entirely for BetterBags and other addons to work correctly.\n\nClick 'Disable & Reload' to disable PatchWerk and reload your UI.",
+        button1 = "Disable & Reload",
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = false,
+        preferredIndex = 3,
+        OnAccept = function()
+          C_AddOns.DisableAddOn("PatchWerk")
+          ReloadUI()
+        end,
+      }
+      StaticPopup_Show("BETTERBAGS_PATCHWERK_CONFLICT")
+    end
+  end)
+end
+
 -- OnInitialize is called when the addon is loaded.
 function addon:OnInitialize()
   -- 1. Core and Utilities
@@ -162,6 +191,28 @@ function addon:OnInitialize()
 
   -- 5. Integrations
   consoleport:Init()
+
+  applyCompat()
+  self:HideBlizzardBags()
+  local rootctx = context:New('addon_initialize')
+  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+
+  -- Only create the bank bag if the setting is enabled
+  if database:GetEnableBankBag() then
+    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+  end
+
+  -- Apply themes globally -- do not instantiate new windows after this call.
+  themes:Enable()
+
+  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
+
+  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
+
+  -- Only add bank to UISpecialFrames if it was created
+  if addon.Bags.Bank then
+    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+  end
 
   -- Disable the bag tutorial screens, as Better Bags does not match
   -- the base UI/UX these screens refer to.
@@ -274,38 +325,8 @@ function addon:UpdateButtonHighlight()
   end
 end
 
-local function applyCompat()
-  C_Timer.After(5, function()
-    if C_AddOns.IsAddOnLoaded("BetterBagsElvUISkin") then
-      question:Alert("Disable ElvUI Plugin", "The ElvUI BetterBags plugin you have installed is not compatible with BetterBags. It has been disabled -- please reload your UI to apply the changes.")
-      C_AddOns.DisableAddOn("BetterBagsElvUISkin")
-    end
-  end)
-
-  -- PatchWerk breaks every WoW addon by patching functions globally, even addons
-  -- it is not configured to patch. Detect it early and force the user to disable it.
-  C_Timer.After(2, function()
-    if C_AddOns.IsAddOnLoaded("PatchWerk") then
-      StaticPopupDialogs["BETTERBAGS_PATCHWERK_CONFLICT"] = {
-        text = "BetterBags has detected that the addon |cFFFF4400PatchWerk|r is loaded.\n\nPatchWerk breaks every WoW addon, even addons it is not configured to patch. You must disable PatchWerk entirely for BetterBags and other addons to work correctly.\n\nClick 'Disable & Reload' to disable PatchWerk and reload your UI.",
-        button1 = "Disable & Reload",
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = false,
-        preferredIndex = 3,
-        OnAccept = function()
-          C_AddOns.DisableAddOn("PatchWerk")
-          ReloadUI()
-        end,
-      }
-      StaticPopup_Show("BETTERBAGS_PATCHWERK_CONFLICT")
-    end
-  end)
-end
-
 -- OnEnable is called when the addon is enabled.
 function addon:OnEnable()
-  applyCompat()
   debug:Enable()
   masque:Enable()
   itemFrame:Enable()
@@ -325,27 +346,6 @@ function addon:OnEnable()
   searchCategoryConfig:Enable()
   async:Enable()
   form:Enable()
-
-  self:HideBlizzardBags()
-  local rootctx = context:New('addon_enable')
-  addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-
-  -- Only create the bank bag if the setting is enabled
-  if database:GetEnableBankBag() then
-    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-  end
-
-  -- Apply themes globally -- do not instantiate new windows after this call.
-  themes:Enable()
-
-  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
-
-  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-
-  -- Only add bank to UISpecialFrames if it was created
-  if addon.Bags.Bank then
-    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-  end
 
   consoleport:Enable()
   quickfind:Enable()
