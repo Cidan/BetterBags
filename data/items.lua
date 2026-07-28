@@ -32,7 +32,7 @@ local L = addon:GetModule("Localization")
 local binding = addon:GetModule("Binding")
 
 ---@class Async: AceModule
---local async = addon:GetModule("Async")
+local async = addon:GetModule("Async")
 
 ---@class Debug: AceModule
 --local debug = addon:GetModule("Debug")
@@ -940,28 +940,32 @@ function items:Phase3_ExtractPreviousState(kind)
 end
 
 function items:ProcessRefresh(ctx, kind)
-  local bagList = self:Phase1_DetermineBags(ctx, kind)
-  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
+  async:Do(ctx, function(ectx)
+    local bagList = self:Phase1_DetermineBags(ectx, kind)
+    local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
 
-  if self._firstLoad[kind] == true then
-    self._firstLoad[kind] = false
-    ctx:Set("wipe", true)
-  end
+    if self._firstLoad[kind] == true then
+      self._firstLoad[kind] = false
+      ectx:Set("wipe", true)
+    end
 
-  local previousItems, previousTotalItems = self:Phase3_ExtractPreviousState(kind)
+    local previousItems, previousTotalItems = self:Phase3_ExtractPreviousState(kind)
 
-  self:Phase4_ClearMovedItemGlows(ctx, previousItems, itemData)
+    self:Phase4_ClearMovedItemGlows(ectx, previousItems, itemData)
 
-  local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ctx, kind)
+    local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
 
-  local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ctx, kind, itemData)
+    local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData)
 
-  local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
-  local sectionLayouts = self:Phase8_EnrichCategories(kind, itemData, emptySlotByBagAndSlot)
-  local sortedItems = self:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
-  local tabData = self:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
+    local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
+    local sectionLayouts = self:Phase8_EnrichCategories(kind, itemData, emptySlotByBagAndSlot)
+    local sortedItems = self:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
+    local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
 
-  self:Phase11_CommitAndDispatch(ctx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
+    async:Yield()
+
+    self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
+  end)
 end
 
 function items:RefreshBackpack(ctx)

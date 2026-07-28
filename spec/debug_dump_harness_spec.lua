@@ -166,6 +166,11 @@ ResetModuleStub("TooltipScanner", "data/tooltip.lua")
 LoadBetterBagsModule("data/tooltip.lua")
 local tooltipScanner = addon:GetModule("TooltipScanner")
 
+ResetModuleStub("Async", "core/async.lua")
+LoadBetterBagsModule("core/async.lua")
+local async = addon:GetModule("Async")
+async.Yield = function() end
+
 ResetModuleStub("Items", "data/items.lua")
 LoadBetterBagsModule("data/items.lua")
 LoadBetterBagsModule("data/slots.lua")

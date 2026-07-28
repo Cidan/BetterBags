@@ -1,41 +1,32 @@
-# Functional Pipeline Refactor Plan
+# Implementation Plan: Async Chaining for ProcessRefresh
 
-## Objective
-Convert `items:ProcessRefresh` into a truly pure functional pipeline by removing the `_tempSlotInfo` hack and passing explicit data structures between phases. This eliminates side effects and makes the data refresh process entirely stateless until the final commit phase.
+## Files to Modify
+1. `data/items.lua`
+2. `spec/items_spec.lua`
+3. `spec/orchestrator_spec.lua`
+4. `spec/debug_dump_harness_spec.lua`
 
 ## Approach
-1. **Remove `tempSlotInfo` from the Pipeline**
-   - Delete `local tempSlotInfo = self:NewSlotInfo()` and the registration `self._tempSlotInfo[kind] = tempSlotInfo`.
-   - Update `items:GetItemDataFromSlotKey` to only read from `self.slotInfo[kind]` (removing the fallback to `_tempSlotInfo`).
 
-2. **Pass Explicit Data Instead of Using Getters**
-   - Identify helper functions called during the refresh pipeline that currently rely on `self:GetItemDataFromSlotKey` to fetch newly harvested items (e.g., `RefreshSearchCache`).
-   - Update these helpers to accept the explicit `itemData` map being passed down the pipeline:
-     - `items:RefreshSearchCache(kind, itemData)`
-     - Phase 5 `EnrichCategories` will pass `itemData` to `RefreshSearchCache`.
+### 1. `data/items.lua`
+- At the top of the file, uncomment or add `local async = addon:GetModule("Async")` (around line 34).
+- Locate the `items:ProcessRefresh(ctx, kind)` method (around line 942).
+- Wrap the entire body of `ProcessRefresh` inside an `async:Do(ctx, function(ectx) ... end)` block.
+- Place `async:Yield()` after `Phase10_PartitionIntoTabs` and right before `Phase11_CommitAndDispatch`.
+- This ensures that Phases 1-10 are executed in Frame 1, the coroutine yields, and Phase 11 (the UI commit and dispatch draw call) is executed in Frame 2.
 
-3. **Refactor Phase Signatures**
-   - `Phase2b_EnrichData(ctx, kind, itemData)`: Instead of mutating `tempSlotInfo`, instantiate a local temporary struct (or separate tables) for empty slots and item counts, and return them.
-     - Returns: `emptySlotData` (a struct containing emptySlotsSorted, emptySlotsByBag, emptySlots, emptySlotByBagAndSlot, totalItems)
-   - `Phase4_ApplyVirtualStacks(kind, itemData)`: Takes `itemData`, returns `visibleItemsBySlotKey` and `stackData`.
-   - `Phase5_EnrichCategories(kind, itemData, emptySlotData)`: Takes `itemData` and `emptySlotData`, returns `sectionLayouts`.
-   - `Phase6_Sort(kind, visibleItemsBySlotKey, emptySlotData)`: Returns `sortedItems`.
-   - `Phase7_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotData)`: Returns `tabData`.
-
-4. **Phase8_CommitAndDispatch (The Pure State Update)**
-   - `Phase8_CommitAndDispatch(ctx, kind, itemData, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData, emptySlotData, stackData, ...)`
-   - Takes all these isolated return values and atomically populates the real `self.slotInfo[kind]`, creating it fresh or wiping the old data, then dispatches the done event.
-
-5. **Update Tests**
-   - Update `spec/items_spec.lua` and any other tests mocking or expecting `tempSlotInfo` or the old phase signatures. The tests will need to reflect the new purely functional phase inputs and outputs.
+### 2. Test Files (`spec/items_spec.lua`, `spec/orchestrator_spec.lua`, `spec/debug_dump_harness_spec.lua`)
+- Because `ProcessRefresh` will now be asynchronous, tests that call it and immediately assert on `slotInfo` will fail as the coroutine will suspend before Phase 11 executes.
+- In each of these spec files, immediately after `core/async.lua` is loaded or near the top of the file, we will stub out the `Yield` function of the Async module.
+- Add the following snippet to ensure `ProcessRefresh` executes entirely synchronously during these unit tests:
+  ```lua
+  local async = addon:GetModule("Async", true)
+  if async then
+    async.Yield = function() end
+  end
+  ```
+- This elegant test-only mock prevents `async:Do` from yielding to `C_Timer.After` in tests, preserving the atomic, synchronous behavior needed for the test assertions without altering the source code logic with testing flags.
 
 ## Risks & Edge Cases
-- **Stale State Reads**: Since `GetItemDataFromSlotKey` will no longer read `_tempSlotInfo`, any internal function inadvertently calling it during the refresh pipeline might read the stale state from the previous frame. We must exhaustively ensure that all phase helpers use the passed `itemData` map.
-- **Test Harness Breakage**: Our test suite heavily relies on the exact mutations of `ProcessRefresh`. We will need to update the mocks to handle the new return types for each phase.
-
-## Summary of Changes
-- **Files to Modify**: 
-  - `data/items.lua`
-  - `spec/items_spec.lua`
-  - `spec/search_spec.lua` (if it tests `RefreshSearchCache`)
-- **Action**: Cleanly restructure `ProcessRefresh` and its sub-phases to use pure input/output maps, culminating in a single atomic update in Phase 8.
+- **Test Integrity:** If we forget to mock `async.Yield` in any other file that calls `ProcessRefresh`, that test will hang or fail its assertions. We must grep to ensure we catch all instances (which are currently `items_spec.lua`, `orchestrator_spec.lua`, and `debug_dump_harness_spec.lua`).
+- **Coroutine Context:** The parameters `ctx` and `kind` inside `ProcessRefresh` will be available as upvalues to the coroutine closure. However, we must ensure we use the scoped `ectx` inside `async:Do` for phases when we pass context down (e.g. `self:Phase1_DetermineBags(ectx, kind)`).

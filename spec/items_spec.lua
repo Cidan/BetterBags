@@ -29,6 +29,8 @@ LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
 LoadBetterBagsModule("data/search.lua")
 LoadBetterBagsModule("core/async.lua")
+local async = addon:GetModule("Async")
+async.Yield = function() end
 LoadBetterBagsModule("data/stacks.lua")
 ResetModuleStub("Binding", "data/binding.lua")
 LoadBetterBagsModule("data/binding.lua")
@@ -414,7 +416,7 @@ describe("Items (New Data Farming Engine)", function()
 
       local ctx = addon:GetModule("Context"):New("TestFreeSlots")
       items:WipeSlotInfo(const.BAG_KIND.BANK)
-      local _, emptySlotsByBag = items:UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
+      local _, emptySlotsByBag = items:Phase5_UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
 
       assert.is_not_nil(emptySlotsByBag)
       assert.are.equal(5, emptySlotsByBag[6].count)
@@ -891,7 +893,7 @@ describe("Items (New Data Farming Engine)", function()
       assert.are.equal(const.BACKPACK_BAGS, backpackBags)
     end)
 
-    it("Phase3_ClearMovedItemGlows clears new item status for moved items", function()
+    it("Phase4_ClearMovedItemGlows clears new item status for moved items", function()
       local ctx = addon:GetModule("Context"):New("TestPhase3")
       local clearedSlotKey = nil
       local originalClearNewItem = items.ClearNewItem
@@ -914,13 +916,13 @@ describe("Items (New Data Farming Engine)", function()
         }
       }
 
-      items:Phase3_ClearMovedItemGlows(ctx, previous, current)
+      items:Phase4_ClearMovedItemGlows(ctx, previous, current)
       assert.are.equal("0_2", clearedSlotKey)
 
       items.ClearNewItem = originalClearNewItem
     end)
 
-    it("Phase4_ApplyVirtualStacks calculates stack data correctly", function()
+    it("Phase7_ApplyVirtualStacks calculates stack data correctly", function()
       local stacks = addon:GetModule("Stacks")
       local originalCreate = stacks.Create
       stacks.Create = function()
@@ -946,7 +948,7 @@ describe("Items (New Data Farming Engine)", function()
         }
       }
 
-      local visibleMap, stackData = items:Phase4_ApplyVirtualStacks(const.BAG_KIND.BACKPACK, itemData)
+      local visibleMap, stackData = items:Phase7_ApplyVirtualStacks(const.BAG_KIND.BACKPACK, itemData)
       assert.is_not_nil(visibleMap["0_1"])
       assert.is_not_nil(stackData)
       local stackInfo = stackData:GetStackInfo("hash123")

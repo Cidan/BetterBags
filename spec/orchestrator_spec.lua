@@ -70,6 +70,8 @@ LoadBetterBagsModule("util/trees/trees.lua")
 LoadBetterBagsModule("util/trees/intervaltree.lua")
 LoadBetterBagsModule("data/search.lua")
 LoadBetterBagsModule("core/async.lua")
+local async = addon:GetModule("Async")
+async.Yield = function() end
 ResetModuleStub("Stacks", "data/stacks.lua")
 LoadBetterBagsModule("data/stacks.lua")
 ResetModuleStub("Binding", "data/binding.lua")
