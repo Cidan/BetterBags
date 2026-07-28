@@ -57,7 +57,7 @@ LoadBetterBagsModule("util/serialization.lua")
 
 addon:GetModule("Context")
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 StubBetterBagsModule("Debug")
 local debug = addon:GetModule("Debug")
@@ -190,7 +190,7 @@ local DB = addon:GetModule("Database")
 DB.Migrate = function() end
 
 -- Initialize the database with our controlled defaults
-DB:OnInitialize()
+DB:Init()
 
 describe("Database", function()
 

@@ -6,7 +6,7 @@ LoadBetterBagsModule("core/events.lua")
 LoadBetterBagsModule("core/pool.lua")
 
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 -- Stub modules before loading views and items
 local L = StubBetterBagsModule("Localization")
@@ -149,7 +149,7 @@ LoadBetterBagsModule("util/trees/intervaltree.lua")
 ResetModuleStub("Search", "data/search.lua")
 LoadBetterBagsModule("data/search.lua")
 local search = addon:GetModule("Search")
-search:OnInitialize()
+search:Init()
 LoadBetterBagsModule("core/async.lua")
 ResetModuleStub("Stacks", "data/stacks.lua")
 LoadBetterBagsModule("data/stacks.lua")

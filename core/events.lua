@@ -27,7 +27,7 @@ local context = addon:GetModule('Context')
 ---@field _bucketCallbacks table<string, fun(...)[]>
 local events = addon:NewModule('Events')
 
-function events:OnInitialize()
+function events:Init()
   self._eventHandler = {}
   self._messageMap = {}
   self._eventMap = {}

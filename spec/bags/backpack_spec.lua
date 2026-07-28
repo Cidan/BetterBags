@@ -132,7 +132,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
 
     StubBetterBagsModule("Events")
     local events = addon:GetModule("Events")
-    events.OnInitialize = events.OnInitialize or function() end
+    events.Init = events.Init or function() end
     events.SendMessage = events.SendMessage or function() end
     events.BucketEvent = events.BucketEvent or function() end
     events.RegisterMessage = events.RegisterMessage or function() end
@@ -206,7 +206,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     -- Setup database defaults
     local DB = addon:GetModule("Database")
     DB.Migrate = function() end
-    DB:OnInitialize()
+    DB:Init()
     DB.data:ResetProfile(false, true)
   end)
 

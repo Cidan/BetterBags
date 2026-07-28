@@ -16,7 +16,7 @@ local events = addon:GetModule('Events')
 ---@field AfterCombatCallbacks fun(ctx: Context)[]
 local async = addon:NewModule('Async')
 
-function async:OnInitialize()
+function async:Init()
   self.AfterCombatCallbacks = {}
 end
 

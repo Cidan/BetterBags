@@ -118,7 +118,7 @@ function items:ResolveUpgrade(data)
 end
 
 -- BOOT STUBS & LEGACY PROTOTYPES
-function items:OnInitialize()
+function items:Init()
   self.slotInfo = {}
   self.searchCache = {
     [const.BAG_KIND.BACKPACK] = {},

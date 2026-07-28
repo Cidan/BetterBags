@@ -10,7 +10,7 @@ LoadBetterBagsModule("core/events.lua")
 
 local context = addon:GetModule("Context")
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end

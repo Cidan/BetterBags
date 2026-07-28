@@ -19,7 +19,7 @@ local DB = addon:NewModule('Database')
 ---@field blue number
 ---@field alpha number
 
-function DB:OnInitialize()
+function DB:Init()
   -- Create the settings database.
   DB.data = LibStub('AceDB-3.0'):New(addonName .. 'DB', const.DATABASE_DEFAULTS --[[@as AceDB.Schema]], true) --[[@as databaseOptions]]
   DB:Migrate()

@@ -340,7 +340,7 @@ end
 --- Section Frame
 -------
 
-function sectionFrame:OnInitialize()
+function sectionFrame:Init()
   self._pool = pool:Create(self._DoCreate, self._DoReset)
   events:RegisterEvent('MODIFIER_STATE_CHANGED', function()
     if self.currentTooltip then

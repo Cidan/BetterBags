@@ -21,7 +21,7 @@ describe("TooltipScanner", function()
 
   before_each(function()
     oldCTooltipInfo = _G.C_TooltipInfo
-    tooltipScanner:OnInitialize()
+    tooltipScanner:Init()
   end)
 
   after_each(function()
@@ -216,8 +216,8 @@ describe("TooltipScanner", function()
     before_each(function()
       originalIsRetail = addon.isRetail
       addon.isRetail = false
-      -- Re-run OnInitialize so it creates the scanTooltip frame for Classic.
-      tooltipScanner:OnInitialize()
+      -- Re-run Init so it creates the scanTooltip frame for Classic.
+      tooltipScanner:Init()
       originalScanTooltip = tooltipScanner.scanTooltip
     end)
 
@@ -331,7 +331,7 @@ describe("TooltipScanner", function()
     before_each(function()
       originalIsRetail = addon.isRetail
       addon.isRetail = false
-      tooltipScanner:OnInitialize()
+      tooltipScanner:Init()
       originalScanTooltip = tooltipScanner.scanTooltip
     end)
 
@@ -354,9 +354,9 @@ describe("TooltipScanner", function()
     end)
   end)
 
-  -- ─── OnInitialize ───────────────────────────────────────────────────────────
+  -- ─── Init ───────────────────────────────────────────────────────────────────
 
-  describe("OnInitialize", function()
+  describe("Init", function()
 
     it("creates a scanTooltip frame for non-retail clients", function()
       local originalIsRetail = addon.isRetail
@@ -372,7 +372,7 @@ describe("TooltipScanner", function()
         table.insert(frames, f)
         return f
       end
-      tooltipScanner:OnInitialize()
+      tooltipScanner:Init()
       addon.isRetail = originalIsRetail
       _G.WorldFrame = oldWorldFrame
       _G.CreateFrame = oldCreateFrame
@@ -383,14 +383,14 @@ describe("TooltipScanner", function()
     it("uses nil scanTooltip on retail clients (C_TooltipInfo path)", function()
       local originalIsRetail = addon.isRetail
       addon.isRetail = true
-      tooltipScanner:OnInitialize()
+      tooltipScanner:Init()
       addon.isRetail = originalIsRetail
       assert.is_nil(tooltipScanner.scanTooltip)
     end)
 
     it("resets the cache", function()
       tooltipScanner.cache["x"] = "old"
-      tooltipScanner:OnInitialize()
+      tooltipScanner:Init()
       assert.are.equal(0, tooltipScanner:GetCacheSize())
     end)
   end)

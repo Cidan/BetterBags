@@ -54,7 +54,7 @@ local MockSearchItem = MockData.ItemData
 describe("Search", function()
 
   before_each(function()
-    search:OnInitialize()
+    search:Init()
   end)
 
   -- ─── Index Basics ───────────────────────────────────────────────────────────

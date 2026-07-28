@@ -11,7 +11,7 @@ local events = addon:GetModule('Events')
 ---@field private enabled boolean
 local consoleport = addon:NewModule('ConsolePort')
 
-function consoleport:OnInitialize()
+function consoleport:Init()
   self.enabled = ConsolePort and true or false
 end
 

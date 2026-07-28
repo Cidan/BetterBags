@@ -15,7 +15,7 @@ const.BANK_ONLY_BAGS_LIST = { 5, 6, 7, 8, 9, 10, 11 }
 const.BANK_ONLY_BAGS = { [5] = true, [6] = true, [7] = true, [8] = true, [9] = true, [10] = true, [11] = true }
 
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
@@ -82,7 +82,7 @@ describe("UI Unification Classic/Era Fallbacks", function()
 
       ResetModuleStub("BagButton", "frames/bagbutton.lua")
       LoadBetterBagsModule("frames/bagbutton.lua")
-      addon:GetModule("BagButton"):OnInitialize()
+      addon:GetModule("BagButton"):Init()
     end)
 
     teardown(function()

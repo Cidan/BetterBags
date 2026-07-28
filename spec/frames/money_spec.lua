@@ -5,7 +5,7 @@ LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 -- Stub any missing dependencies
 local debug = StubBetterBagsModule("Debug")

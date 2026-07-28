@@ -1,28 +1,54 @@
-# Implementation Plan: Fix Bank "Show Bags" and Warbank Empty Slots
+# Implementation Plan: Move Frame Creation to ADDON_LOADED (OnInitialize)
 
-## Issue Summary
-1. Character bank tabs are empty because the backend aggregates all character bank bags into a single tab (`-1`) while the UI requests them by their individual physical bag IDs (`5`, `6`, etc.).
-2. Warbank tabs appear as categories rather than grids because dummy empty slots are not generated, due to a legacy API check (`C_Container.GetBagName` returning `nil` for Warbank bags).
+## Objective
+The goal is to shift heavy UI frame creation from the `PLAYER_LOGIN` event (`addon:OnEnable()`) to the `ADDON_LOADED` event (`addon:OnInitialize()`). This will decouple the data fetch from frame creation and fix script timeouts experienced in Hardcore versions of World of Warcraft during the initial player login.
+
+## Files to Modify
+- `core/init.lua`
 
 ## Approach
 
-### 1. Write Failing Tests First
-- In `spec/items_spec.lua` or `spec/data/items_spec.lua` (using the high-fidelity debug dump test harness as per the `test-harness.md` rules), add tests to verify the behavior of `ProcessRefresh` for the `BANK` when `database:GetShowBankTabs()` is true and `database:GetBagView()` is `SECTION_ALL_BAGS`.
-- Assert that `slotInfo.tabs` contains distinct entries for `-1` and individual character bank bags like `5`.
-- Assert that Warbank tabs (e.g., `13`) contain dummy `isFreeSlot = true` items to properly pad the grid.
-- Observe these tests fail.
+1. **Modify `addon:OnInitialize()`** (in `core/init.lua`):
+   Append the heavy UI frame creation code to the end of the newly implemented deterministic boot loop, immediately after the module `Init()` calls (e.g., right after `consoleport:Init()`).
+   Specifically, move the following:
+   - `applyCompat()`
+   - `self:HideBlizzardBags()`
+   - The instantiation logic for Backpack and Bank:
+     ```lua
+     local rootctx = context:New('addon_initialize')
+     addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
+     if database:GetEnableBankBag() then
+       addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+     end
+     ```
+   - `themes:Enable()`
+   - Setting the Backpack title: `addon.Bags.Backpack:SetTitle(L:G("Backpack"))`
+   - Inserting frames into `UISpecialFrames`:
+     ```lua
+     table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
+     if addon.Bags.Bank then
+       table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+     end
+     ```
 
-### 2. Fix Bank Tab Aggregation in `data/items.lua`
-- **`GetPossibleTabIDs(kind)`**: When `GetShowBankTabs()` is enabled, modify the logic so that it doesn't just add `const.BANK_TAB.BANK`. It should add `-1` (main bank) and iterate through `const.BANK_BAGS` adding each bag ID as a valid tab.
-- **`ItemBelongsToTab(kind, item, tabID, viewBagView)`**: Update the `SECTION_ALL_BAGS` and `GetShowBankTabs` conditions to strictly match `item.bagid == tabID` for all bank bags, eliminating the broad fallback to `-1` for all character bags.
-- **`IncludeBagInFreeSpace(kind, bagid, tabID)`**: Adjust the logic to strictly match `bagid == tabID` for bank bags instead of grouping all non-Warbank bags under `-1`.
+2. **Modify `addon:OnEnable()`** (in `core/init.lua`):
+   Remove the code lines identified above from `addon:OnEnable()`.
+   Ensure `addon:OnEnable()` correctly retains:
+   - The sequential `module:Enable()` calls.
+   - Core secure hooks (`ToggleAllBags`, `CloseSpecialWindows`).
+   - The event registrations (`BANKFRAME_CLOSED`, `PLAYER_INTERACTION_MANAGER_FRAME_SHOW`, etc.).
+   - The `items/RefreshBackpack/Done` and `items/RefreshBank/Done` message event hooks.
+   - Disabling CVar tutorials for Retail.
 
-### 3. Fix Warbank Empty Slots in `data/items.lua`
-- Around line 653, modify the check: `if C_Container.GetBagName(bagid) ~= nil then`.
-- Change it to: `if C_Container.GetBagName(bagid) ~= nil or (addon.isRetail and const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid]) then`.
-- This ensures Warbank bags generate dummy empty slots, padding out the physical layout correctly.
+## Edge Cases and Risks
+- **Data Query Triggers:** We must make sure none of the frame creations inside `BagFrame:Create(...)` inadvertently trigger a data fetch via `C_Container` or `search:IndexItems`. We have verified that `BagFrame:Create` acts structurally, so this risk is mitigated.
+- **`themes:Enable()` Order:** This method applies global textures and styles to existing frame objects. It must be called strictly *after* the `BagFrame:Create` calls, and must only be called once to prevent UI leaks or duplications.
+- **Module Init Completion:** The creation routines depend on modules like `events`, `database`, `themes`, etc., having run their `Init()` functions. We already secured this topological sort in the previous PR step.
+- **Context Name:** The context instantiated for `BagFrame:Create` is currently named `'addon_enable'`. Since we are creating this context in `OnInitialize()`, we should rename it to `'addon_initialize'` for clarity.
 
-## Risks & Edge Cases
-- Ensure Classic/Era are not broken by the `const.ACCOUNT_BANK_BAGS` references. We must safely gate these with `addon.isRetail` or `const.ACCOUNT_BANK_BAGS ~= nil`.
-- The main bank tab (`-1`) must still function and render properly on its own.
-- Free space counts for the unified view (when "Show Bags" is off) must continue to correctly aggregate all bags. The changes strictly target the `GetShowBankTabs` or `SECTION_ALL_BAGS` conditions.
+## Implementation Steps for Executor
+1. Read `core/init.lua`.
+2. Delete the frame creation code from `addon:OnEnable()`.
+3. Insert the frame creation code at the bottom of the initialization sequence inside `addon:OnInitialize()`, keeping the existing tutorial disabling and override binding logic at the very end of `OnInitialize()`.
+4. Use `luacheck` to verify the codebase's syntax and scope requirements.
+5. Create a git commit directly adding onto the existing PR work.

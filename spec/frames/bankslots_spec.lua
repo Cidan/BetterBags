@@ -6,7 +6,7 @@ LoadBetterBagsModule("core/events.lua")
 LoadBetterBagsModule("core/pool.lua")
 
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 addon.ForceHideBlizzardBags = function() end
 
@@ -148,14 +148,14 @@ LoadBetterBagsModule("frames/bankslots.lua")
 LoadBetterBagsModule("frames/money.lua")
 LoadBetterBagsModule("bags/bank.lua")
 
-addon:GetModule("BagButton"):OnInitialize()
+addon:GetModule("BagButton"):Init()
 
 describe("Bank Bag/Slot Window Pane Tests", function()
   before_each(function()
     _G.BankFrame = nil
     _G.BankPanel = nil
     _G.AccountBankPanel = nil
-    events:OnInitialize()
+    events:Init()
   end)
 
   describe("1. Classic/Era Event Typo (PLAYERBANKSLOTS_CHANGED)", function()

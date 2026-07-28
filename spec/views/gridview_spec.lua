@@ -6,7 +6,7 @@ LoadBetterBagsModule("core/events.lua")
 LoadBetterBagsModule("core/pool.lua")
 
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 -- Stub modules before loading views
 local L = StubBetterBagsModule("Localization")

@@ -13,7 +13,7 @@ describe("Events", function()
 
   before_each(function()
     -- Re-initialize to get a clean state each test
-    events:OnInitialize()
+    events:Init()
   end)
 
   -- ─── RegisterMessage + SendMessage ──────────────────────────────────────────

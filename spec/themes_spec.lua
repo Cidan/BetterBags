@@ -45,7 +45,7 @@ describe("Themes", function()
     db.GetInBagSearch = function() return false end
 
     themes.themes = {}
-    themes:OnInitialize()
+    themes:Init()
   end)
 
   teardown(function()

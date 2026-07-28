@@ -14,8 +14,8 @@ describe("Bucket", function()
     _G.C_Timer.After = function(delay, callback)
       table.insert(timerCallbacks, {delay = delay, callback = callback})
     end
-    -- Simulate OnInitialize (Ace modules call this on enable)
-    bucket.bucketsFunctions = {}
+    -- Simulate Init (our manual initialization)
+    bucket:Init()
   end)
 
   after_each(function()

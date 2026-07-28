@@ -25,7 +25,7 @@ local debug = addon:GetModule('Debug')
 ---@field private isSorting boolean
 local refresh = addon:NewModule('Refresh')
 
-function refresh:OnInitialize()
+function refresh:Init()
   self.isSorting = false
 end
 

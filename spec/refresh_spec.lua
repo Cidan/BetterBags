@@ -6,7 +6,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
@@ -35,7 +35,7 @@ local refresh = addon:GetModule("Refresh")
 
 describe("Refresh Module", function()
   before_each(function()
-    refresh:OnInitialize()
+    refresh:Init()
     registeredCallback = nil
     addon.atBank = false
     addon.Bags = {}

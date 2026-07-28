@@ -7,7 +7,7 @@ LoadBetterBagsModule("core/events.lua")
 
 local context = addon:GetModule("Context")
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 LoadBetterBagsModule("core/async.lua")
 local async = addon:GetModule("Async")
@@ -22,7 +22,7 @@ describe("Async", function()
     _G.C_Timer.After = function(_, callback)
       table.insert(timerCallbacks, callback)
     end
-    async:OnInitialize()
+    async:Init()
   end)
 
   after_each(function()

@@ -7,7 +7,7 @@ local loader = addon:NewModule('ItemLoader')
 local const = addon:GetModule('Constants')
 local events = addon:GetModule('Events')
 
-function loader:OnInitialize()
+function loader:Init()
   self.itemMixinsBySlotKey = {}
   self.itemMixinsByBag = {}
   self.bagUpdateCallbacks = {}
