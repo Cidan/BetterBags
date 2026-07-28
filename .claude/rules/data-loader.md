@@ -72,10 +72,10 @@ To permanently prevent ObjectPool contamination, cell leakage, and fatal `Cannot
 - **Mechanism:** The very first line of each view's `Render` method (e.g. `GridView` or `BagView`) executes `view:Wipe(ctx)`.
 - **State Transition (`isNew` flag):** Inside `Wipe(view, ctx)`, explicitly set `view.isNew = true` to flag the view as completely empty. At the beginning of the `Render` method (right after wiping), set `view.isNew = false` to indicate the view is populated and complete. This guarantees 100% clean-slate rendering on every single frame update.
 
-### 10. Unidirectional, Purely Functional Pipeline and Isolated Transactional Commits
+### 10. Unidirectional, Purely Functional Pipeline and Stateless Execution
 To enforce strict functional isolation and eliminate side-effects, reentrancy bugs, and half-calculated visual glitches during database updates:
-- **Rule:** The entire rendering and data-refresh pipeline (`ProcessRefresh`) is structured as a purely unidirectional, functional pipeline of discrete phase functions. It must avoid mutating any global/committed state (like `self.slotInfo[kind]`) until the final phase (`Phase8_CommitAndDispatch`).
-- **Transient State Isolation:** A lightweight, isolated `tempSlotInfo` object (instantiated via `self:NewSlotInfo()`) acts as the transient state container throughout the pipeline.
-  - Stacking options and temporary frames operate exclusively on this transient state (e.g. `tempSlotInfo.stacks` is an isolated stack engine instance).
-  - JIT queries and helper checks during the refresh are routed dynamically to the active transient state using `self._tempSlotInfo[kind]`.
-- **Commit Phase:** At the end of the pipeline, `Phase8_CommitAndDispatch` copies all calculated tables, totals, and layout metadata transactionally from the transient `tempSlotInfo` to the real, stateful `self.slotInfo[kind]`, ensuring atomic updates and zero half-finished visual states.
+- **Rule:** The entire rendering and data-refresh pipeline (`ProcessRefresh`) is structured as a purely unidirectional, functional pipeline of discrete phase functions. It avoids mutating any global or committed state (such as `self.slotInfo[kind]`) until the final phase (`Phase8_CommitAndDispatch`).
+- **Transient State Isolation:** We completely avoid global/module-level JIT queries or the `_tempSlotInfo` hack.
+  - An un-registered `emptySlotData` object (instantiated locally via `self:NewSlotInfo()`) acts as a transient container for empty slots, free keys, and item counts.
+  - Explicit maps and dictionaries (such as `itemData` and `visibleItemsBySlotKey`) are passed linearly as arguments between the phase functions (e.g. `items:RefreshSearchCache(kind, itemData)` and `stack:AddToStack(item, itemData)`). This ensures statelessness and permanently prevents stale-state reads during calculation.
+- **Commit Phase:** At the end of the pipeline, `Phase8_CommitAndDispatch` copies all calculated tables, totals, layout metadata, and the newly calculated `stackData` atomically and transactionally from the transient data structures to the real, stateful `self.slotInfo[kind]`, ensuring atomic updates and zero half-finished visual states.

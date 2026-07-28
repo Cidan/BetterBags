@@ -922,8 +922,22 @@ describe("Items (New Data Farming Engine)", function()
     end)
 
     it("Phase4_ApplyVirtualStacks calculates stack data correctly", function()
+      local stacks = addon:GetModule("Stacks")
+      local originalCreate = stacks.Create
+      stacks.Create = function()
+        local s = {
+          stacksByItemHash = {},
+          AddToStack = function(self, item)
+            self.stacksByItemHash[item.itemHash] = {count = 1, rootItem = item.slotkey, slotkeys = {}}
+          end,
+          GetStackInfo = function(self, hash)
+            return self.stacksByItemHash[hash]
+          end
+        }
+        return s
+      end
+
       items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
-      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
       local itemData = {
         ["0_1"] = {
           isItemEmpty = false,
@@ -933,8 +947,27 @@ describe("Items (New Data Farming Engine)", function()
         }
       }
 
-      local visibleMap = items:Phase4_ApplyVirtualStacks(const.BAG_KIND.BACKPACK, itemData, slotInfo)
+      local visibleMap, stackData = items:Phase4_ApplyVirtualStacks(const.BAG_KIND.BACKPACK, itemData)
       assert.is_not_nil(visibleMap["0_1"])
+      assert.is_not_nil(stackData)
+      local stackInfo = stackData:GetStackInfo("hash123")
+      assert.is_not_nil(stackInfo)
+      assert.are.equal("0_1", stackInfo.rootItem)
+
+      stacks.Create = originalCreate
+    end)
+
+    it("GetItemDataFromSlotKey does not read from _tempSlotInfo", function()
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      items._tempSlotInfo = {
+        [const.BAG_KIND.BACKPACK] = {
+          itemsBySlotKey = {
+            ["0_1"] = { slotkey = "0_1", isItemEmpty = false }
+          }
+        }
+      }
+      assert.is_nil(items:GetItemDataFromSlotKey("0_1"))
+      items._tempSlotInfo = nil
     end)
   end)
 end)

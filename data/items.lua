@@ -540,11 +540,12 @@ function items:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
   end
 end
 
-function items:Phase4_ApplyVirtualStacks(kind, itemData, slotInfo)
-  slotInfo.stacks:Clear()
+function items:Phase4_ApplyVirtualStacks(kind, itemData)
+  local stacks = addon:GetModule("Stacks")
+  local stackData = stacks:Create()
   for _, item in pairs(itemData) do
     if not item.isItemEmpty then
-      slotInfo.stacks:AddToStack(item)
+      stackData:AddToStack(item, itemData)
     end
   end
 
@@ -561,7 +562,7 @@ function items:Phase4_ApplyVirtualStacks(kind, itemData, slotInfo)
   local visibleItemsBySlotKey = {}
   for slotkey, item in pairs(itemData) do
     if not item.isItemEmpty then
-      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      local stackInfo = stackData:GetStackInfo(item.itemHash)
       local isRoot = true
 
       if ShouldMergeItem(kind, item, stackInfo) then
@@ -590,7 +591,7 @@ function items:Phase4_ApplyVirtualStacks(kind, itemData, slotInfo)
     end
   end
 
-  return visibleItemsBySlotKey
+  return visibleItemsBySlotKey, stackData
 end
 
 function items:Phase5_EnrichCategories(kind, itemData, slotInfo)
@@ -598,7 +599,7 @@ function items:Phase5_EnrichCategories(kind, itemData, slotInfo)
     search:IndexItems(itemData)
   end
 
-  self:RefreshSearchCache(kind)
+  self:RefreshSearchCache(kind, itemData)
 
   for _, currentItem in pairs(itemData) do
     if not currentItem.isItemEmpty then
@@ -772,7 +773,7 @@ function items:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, slotInfo)
         if freeSlotCount > 0 and slotKey ~= nil then
           local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
           if freeSlotBag and freeSlotID then
-            local originalItem = self:GetItemDataFromSlotKey(slotKey)
+            local originalItem = slotInfo.itemsBySlotKey[slotKey]
             table.insert(tabs[tabID].freeSpace.buttons, {
               slotkey = slotKey,
               bagid = tonumber(freeSlotBag),
@@ -845,7 +846,7 @@ function items:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, slotInfo)
   return tabs
 end
 
-function items:Phase8_CommitAndDispatch(ctx, kind, tempSlotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
+function items:Phase8_CommitAndDispatch(ctx, kind, tempSlotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData, stackData)
   local realSlotInfo = self.slotInfo[kind]
   if not realSlotInfo then
     self:WipeSlotInfo(kind)
@@ -868,7 +869,7 @@ function items:Phase8_CommitAndDispatch(ctx, kind, tempSlotInfo, visibleItemsByS
   realSlotInfo.removedItems = tempSlotInfo.removedItems
   realSlotInfo.updatedItems = tempSlotInfo.updatedItems
   realSlotInfo.emptySlotsSorted = tempSlotInfo.emptySlotsSorted
-  realSlotInfo.stacks = tempSlotInfo.stacks
+  realSlotInfo.stacks = stackData
 
   -- Set final computed fields on realSlotInfo
   realSlotInfo.visibleItemsBySlotKey = visibleItemsBySlotKey
@@ -917,36 +918,31 @@ function items:ProcessRefresh(ctx, kind)
     ctx:Set("wipe", true)
   end
 
-  local tempSlotInfo = self:NewSlotInfo()
   local realSlotInfo = self.slotInfo[kind]
-  tempSlotInfo.previousItemsBySlotKey = realSlotInfo and realSlotInfo.itemsBySlotKey or {}
-  tempSlotInfo.itemsBySlotKey = itemData
-  tempSlotInfo.previousTotalItems = realSlotInfo and realSlotInfo.totalItems or 0
+  local previousItems = realSlotInfo and realSlotInfo.itemsBySlotKey or {}
+  local previousTotalItems = realSlotInfo and realSlotInfo.totalItems or 0
 
-  -- Register tempSlotInfo for in-progress pipeline queries
-  self._tempSlotInfo = self._tempSlotInfo or {}
-  self._tempSlotInfo[kind] = tempSlotInfo
-
-  local previousItems = tempSlotInfo.previousItemsBySlotKey
   self:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
 
   if kind == const.BAG_KIND.BACKPACK then
     self.equipmentCache = equipmentData
   end
 
-  self:UpdateFreeSlots(ctx, kind, tempSlotInfo)
+  local emptySlotData = self:NewSlotInfo()
+  emptySlotData.previousItemsBySlotKey = previousItems
+  emptySlotData.itemsBySlotKey = itemData
+  emptySlotData.previousTotalItems = previousTotalItems
 
-  self:Phase2b_EnrichData(ctx, kind, itemData, tempSlotInfo)
+  self:UpdateFreeSlots(ctx, kind, emptySlotData)
 
-  local visibleItemsBySlotKey = self:Phase4_ApplyVirtualStacks(kind, itemData, tempSlotInfo)
-  local sectionLayouts = self:Phase5_EnrichCategories(kind, itemData, tempSlotInfo)
-  local sortedItems = self:Phase6_Sort(kind, visibleItemsBySlotKey, tempSlotInfo)
-  local tabData = self:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, tempSlotInfo)
+  self:Phase2b_EnrichData(ctx, kind, itemData, emptySlotData)
 
-  self:Phase8_CommitAndDispatch(ctx, kind, tempSlotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData)
+  local visibleItemsBySlotKey, stackData = self:Phase4_ApplyVirtualStacks(kind, itemData)
+  local sectionLayouts = self:Phase5_EnrichCategories(kind, itemData, emptySlotData)
+  local sortedItems = self:Phase6_Sort(kind, visibleItemsBySlotKey, emptySlotData)
+  local tabData = self:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotData)
 
-  -- Clear in-progress pipeline registration
-  self._tempSlotInfo[kind] = nil
+  self:Phase8_CommitAndDispatch(ctx, kind, emptySlotData, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData, stackData)
 end
 
 function items:RefreshBackpack(ctx)
@@ -967,7 +963,8 @@ function items:WipeSearchCache(kind)
   if self.categoryPriorityCache[kind] then wipe(self.categoryPriorityCache[kind]) end
 end
 
-function items:RefreshSearchCache(kind)
+function items:RefreshSearchCache(kind, itemData)
+  itemData = itemData or (self.slotInfo[kind] and self.slotInfo[kind].itemsBySlotKey) or {}
   self:WipeSearchCache(kind)
   if not categories or not categories.GetSortedSearchCategories then return end
   local ctx = context:New('RefreshSearchCache')
@@ -986,9 +983,9 @@ function items:RefreshSearchCache(kind)
 
           -- Apply groupBy logic to generate dynamic category name
           if groupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
-            local itemData = self:GetItemDataFromSlotKey(slotkey)
-            if itemData and not itemData.isItemEmpty then
-              local suffix = self:GetGroupBySuffix(itemData, groupBy)
+            local currentItem = itemData[slotkey]
+            if currentItem and not currentItem.isItemEmpty then
+              local suffix = self:GetGroupBySuffix(currentItem, groupBy)
               if suffix and suffix ~= "" then
                 categoryName = categoryFilter.name .. " - " .. suffix
 
@@ -1109,7 +1106,7 @@ end
 function items:GetItemDataFromSlotKey(slotkey)
   local kind = self:GetBagKindFromSlotKey(slotkey)
   if not kind then return nil end
-  local slotInfo = (self._tempSlotInfo and self._tempSlotInfo[kind]) or self.slotInfo[kind]
+  local slotInfo = self.slotInfo[kind]
   return slotInfo and slotInfo.itemsBySlotKey[slotkey]
 end
 
