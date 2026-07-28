@@ -12,7 +12,7 @@ local bucket = addon:NewModule('Bucket')
 ---@field func fun()
 ---@field delay number
 
-function bucket:OnInitialize()
+function bucket:Init()
   self.bucketsFunctions = {}
 end
 

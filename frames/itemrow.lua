@@ -156,7 +156,7 @@ end
 
 local buttonCount = 0
 
-function item:OnInitialize()
+function item:Init()
   self._pool = pool:Create(self._DoCreate, self._DoReset)
 end
 

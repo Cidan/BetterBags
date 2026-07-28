@@ -33,7 +33,7 @@ describe("EquipmentSets", function()
       return { isBank = false, isBags = true, slot = 1, bag = 0 }
     end
 
-    equipmentSets:OnInitialize()
+    equipmentSets:Init()
   end)
 
   -- ─── Update (version gating) ──────────────────────────────────────────────────

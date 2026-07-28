@@ -18,7 +18,7 @@ local debug = addon:GetModule('Debug')
 ---@class (exact) Groups: AceModule
 local groups = addon:NewModule('Groups')
 
-function groups:OnInitialize()
+function groups:Init()
 end
 
 function groups:OnEnable()

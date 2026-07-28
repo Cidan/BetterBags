@@ -133,6 +133,36 @@ end
 
 -- OnInitialize is called when the addon is loaded.
 function addon:OnInitialize()
+  -- 1. Core and Utilities
+  events:Init()
+  debug:Init()
+  async:Init()
+  addon:GetModule('Bucket'):Init()
+
+  -- 2. Database (DB must be initialized before other data/UI modules read config)
+  database:Init()
+
+  -- 3. Data Models and Scanners
+  addon:GetModule('TooltipScanner'):Init()
+  itemLoader:Init()
+  categories:Init()
+  addon:GetModule('Groups'):Init()
+  addon:GetModule('EquipmentSets'):Init()
+  search:Init()
+  items:Init()
+  refresh:Init()
+
+  -- 4. Themes and Presentation Frames
+  themes:Init()
+  itemFrame:Init()
+  sectionFrame:Init()
+  contextMenu:Init()
+  addon:GetModule('BagButton'):Init()
+  addon:GetModule('ItemRowFrame'):Init()
+
+  -- 5. Integrations
+  consoleport:Init()
+
   -- Disable the bag tutorial screens, as Better Bags does not match
   -- the base UI/UX these screens refer to.
   if addon.isRetail then

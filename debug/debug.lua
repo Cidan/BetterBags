@@ -13,7 +13,7 @@ local context = addon:GetModule('Context')
 ---@field tooltip GameTooltip
 local debug = addon:NewModule('Debug')
 
-function debug:OnInitialize()
+function debug:Init()
   self.profiles = {}
   self.enabled = false
   self.tooltip = CreateFrame('GameTooltip', 'BetterBagsTooltip', UIParent, 'GameTooltipTemplate') --[[@as GameTooltip]]

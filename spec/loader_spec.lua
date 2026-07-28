@@ -21,7 +21,7 @@ describe("ItemLoader", function()
   before_each(function()
     -- Reset stub/event registry
     local events = addon:GetModule("Events")
-    events:OnInitialize()
+    events:Init()
   end)
 
   it("should initialize with static structures", function()
@@ -30,7 +30,7 @@ describe("ItemLoader", function()
     local loader = addon:GetModule("ItemLoader")
     assert.is_not_nil(loader)
 
-    loader:OnInitialize()
+    loader:Init()
     assert.is_not_nil(loader.itemMixinsBySlotKey)
     assert.is_not_nil(loader.itemMixinsByBag)
     assert.is_not_nil(loader.bagUpdateCallbacks)
@@ -38,7 +38,7 @@ describe("ItemLoader", function()
 
   it("should populate the static itemMixins cache on enable", function()
     local loader = addon:GetModule("ItemLoader")
-    loader:OnInitialize()
+    loader:Init()
     loader:OnEnable()
 
     -- Check that mixins were created for the mock bags (0, 1, 5, 10)
@@ -56,7 +56,7 @@ describe("ItemLoader", function()
 
   it("should support registering callbacks for bag updates", function()
     local loader = addon:GetModule("ItemLoader")
-    loader:OnInitialize()
+    loader:Init()
     loader:OnEnable()
 
     local called = false

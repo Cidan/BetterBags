@@ -175,7 +175,7 @@ function BagButtonFrame.bagButtonProto:OnReceiveDrag()
   PutItemInBag(self.invID)
 end
 
-function BagButtonFrame:OnInitialize()
+function BagButtonFrame:Init()
   self._pool = pool:Create(self._DoCreate, self._DoReset)
 end
 

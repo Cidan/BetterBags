@@ -9,7 +9,7 @@ local tooltipScanner = addon:NewModule('TooltipScanner')
 ---@class (exact) Debug: AceModule
 local debug = addon:GetModule('Debug')
 
-function tooltipScanner:OnInitialize()
+function tooltipScanner:Init()
   -- Cache to store extracted tooltip text, keyed by item GUID
   -- This prevents repeated expensive tooltip extractions
   ---@type table<string, string>

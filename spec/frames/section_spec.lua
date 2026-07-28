@@ -6,7 +6,7 @@ LoadBetterBagsModule("core/events.lua")
 LoadBetterBagsModule("core/pool.lua")
 
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 -- Stub file-scope modules required by frames/section.lua
 local categories = StubBetterBagsModule("Categories")
@@ -101,7 +101,7 @@ local sectionFrame = addon:GetModule("SectionFrame")
 
 describe("Section Frame", function()
   before_each(function()
-    sectionFrame:OnInitialize()
+    sectionFrame:Init()
   end)
 
   after_each(function()

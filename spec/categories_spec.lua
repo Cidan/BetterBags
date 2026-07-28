@@ -8,7 +8,7 @@ LoadBetterBagsModule("core/events.lua")
 
 local context = addon:GetModule("Context")
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
@@ -102,7 +102,7 @@ describe("Categories", function()
     for k in pairs(dbEphemeralCategories) do dbEphemeralCategories[k] = nil end
     for k in pairs(dbCategoryOptions) do dbCategoryOptions[k] = nil end
     -- Re-initialize module
-    categories:OnInitialize()
+    categories:Init()
   end)
 
   -- ─── CreateCategory ─────────────────────────────────────────────────────────

@@ -44,7 +44,7 @@ local context = addon:GetModule('Context')
 ---@field private ephemeralCategoryByItemID table<number, CustomCategoryFilter>
 local categories = addon:NewModule('Categories')
 
-function categories:OnInitialize()
+function categories:Init()
   self.categoryFunctions = {}
   self.itemsWithNoCategory = {}
   self.ephemeralCategories = {}

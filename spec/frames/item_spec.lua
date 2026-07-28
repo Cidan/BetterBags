@@ -6,7 +6,7 @@ LoadBetterBagsModule("core/events.lua")
 LoadBetterBagsModule("core/pool.lua")
 
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 local ctx = addon:GetModule("Context")
 
@@ -94,10 +94,10 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     _G.SetItemButtonCount = _G.SetItemButtonCount or function() end
     _G.SetItemButtonDesaturated = _G.SetItemButtonDesaturated or function() end
     _G.GameTooltip.GetOwner = _G.GameTooltip.GetOwner or function() return nil end
-    itemFrame:OnInitialize()
+    itemFrame:Init()
   end)
 
-  it("should create buttonsBySlotkey table on OnInitialize", function()
+  it("should create buttonsBySlotkey table on Init", function()
     assert.is_table(itemFrame.buttonsBySlotkey)
   end)
 

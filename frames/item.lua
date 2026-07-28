@@ -615,7 +615,7 @@ function itemFrame.itemProto:ClearItem(ctx)
 	decoration.UpgradeIcon:SetShown(false)
 end
 
-function itemFrame:OnInitialize()
+function itemFrame:Init()
 	self.buttonsBySlotkey = {}
 	self.activeItems = setmetatable({}, { __mode = "k" })
 end

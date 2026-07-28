@@ -57,7 +57,7 @@ local themes = addon:NewModule('Themes')
 -- Initialize this bare as we will be adding themes from bare files.
 themes.themes = {}
 
-function themes:OnInitialize()
+function themes:Init()
   self.windows = {
     [const.WINDOW_KIND.PORTRAIT] = {},
     [const.WINDOW_KIND.SIMPLE] = {},

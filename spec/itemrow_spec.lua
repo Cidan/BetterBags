@@ -62,7 +62,7 @@ describe("ItemRow Frame Font Validation", function()
     ResetModuleStub("ItemRowFrame", "frames/itemrow.lua")
     LoadBetterBagsModule("frames/itemrow.lua")
     local itemRowFrame = addon:GetModule("ItemRowFrame")
-    itemRowFrame:OnInitialize()
+    itemRowFrame:Init()
 
     -- This should NOT throw a SetFont error anymore because '' is valid
     assert.has_no_error(function()

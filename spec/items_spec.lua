@@ -6,7 +6,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 -- Stubs for modules items.lua depends on
 local debug = StubBetterBagsModule("Debug")
@@ -118,7 +118,7 @@ local items = addon:GetModule("Items")
 
 describe("Items (New Data Farming Engine)", function()
   before_each(function()
-    items:OnInitialize()
+    items:Init()
   end)
 
   describe("Initialization & Stubs", function()
@@ -253,7 +253,7 @@ describe("Items (New Data Farming Engine)", function()
       _G.C_Container.GetContainerItemInfo = function(bagid, slotid) return nil end
 
       local search = addon:GetModule("Search")
-      search:OnInitialize()
+      search:Init()
     end)
 
     after_each(function()

@@ -38,7 +38,7 @@ function search:CreateIndex(name)
   }
 end
 
-function search:OnInitialize()
+function search:Init()
   self.indicies = {}
   -- String indexes
   self:CreateIndex('name')

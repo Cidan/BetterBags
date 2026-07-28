@@ -6,7 +6,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 local events = addon:GetModule("Events")
-events:OnInitialize()
+events:Init()
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
@@ -109,11 +109,11 @@ describe("Phase 1-5 Orchestrator (ProcessRefresh)", function()
     _G.C_Container.GetContainerItemInfo = function(bagid, slotid) return nil end
     _G.C_Item.GetItemInfo = function() return nil end
 
-    items:OnInitialize()
+    items:Init()
     items:OnEnable()
 
     local search = addon:GetModule("Search")
-    search:OnInitialize()
+    search:Init()
   end)
 
   after_each(function()

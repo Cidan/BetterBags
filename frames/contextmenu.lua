@@ -41,7 +41,7 @@ local LibDD = LibStub:GetLibrary("LibUIDropDownMenu-4.0")
 ---@field keepShownOnClick? boolean
 ---@field tooltipOnButton? boolean
 
-function contextMenu:OnInitialize()
+function contextMenu:Init()
 	self.sabt = {}
 	--self:CreateContext()
 end
