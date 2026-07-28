@@ -209,7 +209,8 @@ end
 -- UpdateFreeSlots updates the current free slot count for a given bag kind.
 ---@param ctx Context
 ---@param kind BagKind
-function items:UpdateFreeSlots(ctx, kind)
+---@param slotInfo? SlotInfo
+function items:UpdateFreeSlots(ctx, kind, slotInfo)
   local baglist
   local tab = ctx:Get("bagid")
   if kind == const.BAG_KIND.BANK then
@@ -237,8 +238,9 @@ function items:UpdateFreeSlots(ctx, kind)
     baglist = const.BACKPACK_BAGS
   end
 
-  self.slotInfo[kind].emptySlots = {}
-  self.slotInfo[kind].emptySlotsByBag = {}
+  slotInfo = slotInfo or self.slotInfo[kind]
+  slotInfo.emptySlots = {}
+  slotInfo.emptySlotsByBag = {}
 
   for bagid in pairs(baglist) do
     local freeSlots = C_Container.GetContainerNumFreeSlots(bagid) or 0
@@ -255,9 +257,9 @@ function items:UpdateFreeSlots(ctx, kind)
       freeSlots = freeSlots - 4
     end
     if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
-      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] or 0
-      self.slotInfo[kind].emptySlots[name] = self.slotInfo[kind].emptySlots[name] + freeSlots
-      self.slotInfo[kind].emptySlotsByBag[bagid] = { name = name, count = freeSlots }
+      slotInfo.emptySlots[name] = slotInfo.emptySlots[name] or 0
+      slotInfo.emptySlots[name] = slotInfo.emptySlots[name] + freeSlots
+      slotInfo.emptySlotsByBag[bagid] = { name = name, count = freeSlots }
     end
   end
 end
@@ -395,7 +397,7 @@ end
 --- CENTRALIZED PIPELINE REFRESH ORCHESTRATOR (PHASES 1-5)
 ---@param ctx Context
 ---@param kind BagKind
-function items:ProcessRefresh(ctx, kind)
+function items:Phase1_DetermineBags(ctx, kind)
   local bagList = {}
   if kind == const.BAG_KIND.BACKPACK then
     bagList = const.BACKPACK_BAGS
@@ -454,61 +456,14 @@ function items:ProcessRefresh(ctx, kind)
       end
     end
   end
+  return bagList
+end
 
-  local itemData, equipmentData = self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
+function items:Phase2_Harvest(kind, bagList)
+  return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
+end
 
-  local slotInfo = self.slotInfo[kind]
-  if not slotInfo then
-    self:WipeSlotInfo(kind)
-    slotInfo = self.slotInfo[kind]
-  end
-
-  local previousItems = slotInfo.itemsBySlotKey or {}
-  local added = {}
-  local removed = {}
-  local updated = {}
-
-  for slotkey, newItem in pairs(itemData) do
-    local oldItem = previousItems[slotkey]
-    if newItem.isItemEmpty then
-      if oldItem and not oldItem.isItemEmpty then
-        removed[slotkey] = oldItem
-      end
-    else
-      if not oldItem or oldItem.isItemEmpty then
-        added[slotkey] = newItem
-      else
-        if oldItem.itemHash ~= newItem.itemHash or
-           oldItem.itemInfo.currentItemCount ~= newItem.itemInfo.currentItemCount or
-           oldItem.itemInfo.isNewItem ~= newItem.itemInfo.isNewItem then
-          updated[slotkey] = newItem
-        end
-      end
-    end
-  end
-
-  for slotkey, oldItem in pairs(previousItems) do
-    if not itemData[slotkey] and not oldItem.isItemEmpty then
-      removed[slotkey] = oldItem
-    end
-  end
-
-  if self._firstLoad[kind] == true then
-    self._firstLoad[kind] = false
-    ctx:Set("wipe", true)
-  end
-
-  slotInfo:Update(ctx, itemData)
-  slotInfo.addedItems = added
-  slotInfo.removedItems = removed
-  slotInfo.updatedItems = updated
-
-  if kind == const.BAG_KIND.BACKPACK then
-    self.equipmentCache = equipmentData
-  end
-
-  self:UpdateFreeSlots(ctx, kind)
-
+function items:Phase2b_EnrichData(ctx, kind, itemData, tempSlotInfo)
   for _, currentItem in pairs(itemData) do
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
@@ -542,33 +497,55 @@ function items:ProcessRefresh(ctx, kind)
       currentItem.itemInfo.itemQuality = quality or const.ITEM_QUALITY.Common
     end
 
-    slotInfo:StoreIfEmptySlot(name, currentItem)
+    tempSlotInfo:StoreIfEmptySlot(name, currentItem)
 
     if not currentItem.isItemEmpty then
-      slotInfo.totalItems = slotInfo.totalItems + 1
+      tempSlotInfo.totalItems = tempSlotInfo.totalItems + 1
     end
     currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
     currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
   end
 
-  slotInfo:SortEmptySlots()
+  tempSlotInfo:SortEmptySlots()
+end
 
-  for _, addedItem in pairs(slotInfo.addedItems) do
-    for _, removedItem in pairs(slotInfo.removedItems) do
+function items:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
+  local added = {}
+  local removed = {}
+
+  for slotkey, newItem in pairs(itemData) do
+    local oldItem = previousItems[slotkey]
+    if not newItem.isItemEmpty then
+      if not oldItem or oldItem.isItemEmpty then
+        added[slotkey] = newItem
+      end
+    end
+  end
+
+  for slotkey, oldItem in pairs(previousItems) do
+    local newItem = itemData[slotkey]
+    if not oldItem.isItemEmpty then
+      if not newItem or newItem.isItemEmpty then
+        removed[slotkey] = oldItem
+      end
+    end
+  end
+
+  for _, addedItem in pairs(added) do
+    for _, removedItem in pairs(removed) do
       if addedItem.itemInfo and removedItem.itemInfo and addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
         self:ClearNewItem(ctx, addedItem.slotkey)
       end
     end
   end
+end
 
-  if slotInfo.totalItems < slotInfo.previousTotalItems then
-    slotInfo.deferDelete = true
-  end
-
-  slotInfo.stacks:Clear()
+function items:Phase4_ApplyVirtualStacks(kind, itemData)
+  local stacks = addon:GetModule("Stacks")
+  local stackData = stacks:Create()
   for _, item in pairs(itemData) do
     if not item.isItemEmpty then
-      slotInfo.stacks:AddToStack(item)
+      stackData:AddToStack(item, itemData)
     end
   end
 
@@ -582,10 +559,10 @@ function items:ProcessRefresh(ctx, kind)
     return true
   end
 
-  slotInfo.visibleItemsBySlotKey = {}
+  local visibleItemsBySlotKey = {}
   for slotkey, item in pairs(itemData) do
     if not item.isItemEmpty then
-      local stackInfo = slotInfo.stacks:GetStackInfo(item.itemHash)
+      local stackInfo = stackData:GetStackInfo(item.itemHash)
       local isRoot = true
 
       if ShouldMergeItem(kind, item, stackInfo) then
@@ -609,16 +586,20 @@ function items:ProcessRefresh(ctx, kind)
       end
 
       if isRoot then
-        slotInfo.visibleItemsBySlotKey[slotkey] = item
+        visibleItemsBySlotKey[slotkey] = item
       end
     end
   end
 
+  return visibleItemsBySlotKey, stackData
+end
+
+function items:Phase5_EnrichCategories(kind, itemData, slotInfo)
   if search and search.IndexItems then
     search:IndexItems(itemData)
   end
 
-  self:RefreshSearchCache(kind)
+  self:RefreshSearchCache(kind, itemData)
 
   for _, currentItem in pairs(itemData) do
     if not currentItem.isItemEmpty then
@@ -635,25 +616,29 @@ function items:ProcessRefresh(ctx, kind)
     end
   end
 
-  slotInfo.sectionLayouts = {}
+  local sectionLayouts = {}
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
     local shouldHideHeader = (kind == const.BAG_KIND.BANK)
     for _, currentItem in pairs(itemData) do
       if not currentItem.isItemEmpty then
         local category = self:GetBagName(currentItem.bagid)
         currentItem.itemInfo.category = category
-        slotInfo.sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
+        sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
       end
     end
     for bagid, _ in pairs(slotInfo.emptySlotByBagAndSlot) do
       local category = self:GetBagName(bagid)
-      slotInfo.sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
+      sectionLayouts[category] = { hideHeader = shouldHideHeader, sortMode = "physical" }
     end
   end
 
-  slotInfo.sortedItems = {}
-  for _, item in pairs(slotInfo.visibleItemsBySlotKey) do
-    table.insert(slotInfo.sortedItems, item)
+  return sectionLayouts
+end
+
+function items:Phase6_Sort(kind, visibleItemsBySlotKey, slotInfo)
+  local sortedItems = {}
+  for _, item in pairs(visibleItemsBySlotKey) do
+    table.insert(sortedItems, item)
   end
 
   if database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS then
@@ -676,7 +661,7 @@ function items:ProcessRefresh(ctx, kind)
               expacID = 0
             }
           }
-          table.insert(slotInfo.sortedItems, dummy)
+          table.insert(sortedItems, dummy)
         end
       end
     end
@@ -692,12 +677,15 @@ function items:ProcessRefresh(ctx, kind)
     end
 
     if sortFunc then
-      table.sort(slotInfo.sortedItems, sortFunc)
+      table.sort(sortedItems, sortFunc)
     end
   end
 
-  -- Partition slotInfo.tabs (Phase 4.5)
-  slotInfo.tabs = {}
+  return sortedItems
+end
+
+function items:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, slotInfo)
+  local tabs = {}
   local viewBagView = database.GetBagView and database:GetBagView(kind) or const.BAG_VIEW.SECTION_GRID
   local possibleTabs = GetPossibleTabIDs(kind)
 
@@ -721,7 +709,7 @@ function items:ProcessRefresh(ctx, kind)
   local showAll = database:GetShowAllFreeSpace(kind)
 
   for tabID in pairs(possibleTabs) do
-    slotInfo.tabs[tabID] = {
+    tabs[tabID] = {
       items = {},
       categories = {},
       emptySlotsSorted = {},
@@ -737,23 +725,23 @@ function items:ProcessRefresh(ctx, kind)
     -- Filter emptySlotsSorted and emptySlotsByBag for this tab
     for _, item in ipairs(slotInfo.emptySlotsSorted or {}) do
       if IncludeBagInFreeSpace(kind, item.bagid, tabID) then
-        table.insert(slotInfo.tabs[tabID].emptySlotsSorted, item)
+        table.insert(tabs[tabID].emptySlotsSorted, item)
       end
     end
 
     if slotInfo.emptySlotsByBag then
       for bagid, info in pairs(slotInfo.emptySlotsByBag) do
         if IncludeBagInFreeSpace(kind, bagid, tabID) then
-          slotInfo.tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
-          slotInfo.tabs[tabID].emptySlots[info.name] = (slotInfo.tabs[tabID].emptySlots[info.name] or 0) + info.count
+          tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
+          tabs[tabID].emptySlots[info.name] = (tabs[tabID].emptySlots[info.name] or 0) + info.count
         end
       end
     end
 
     -- Populate tabData.freeSpace.buttons
     if showAll then
-      for _, item in ipairs(slotInfo.tabs[tabID].emptySlotsSorted) do
-        table.insert(slotInfo.tabs[tabID].freeSpace.buttons, {
+      for _, item in ipairs(tabs[tabID].emptySlotsSorted) do
+        table.insert(tabs[tabID].freeSpace.buttons, {
           slotkey = item.slotkey,
           bagid = item.bagid,
           slotid = item.slotid,
@@ -766,7 +754,7 @@ function items:ProcessRefresh(ctx, kind)
     else
       local aggregatedCounts = {}
       local firstSlotKeyForSubclass = {}
-      for bagid, info in pairs(slotInfo.tabs[tabID].emptySlotsByBag) do
+      for bagid, info in pairs(tabs[tabID].emptySlotsByBag) do
         aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
         if not firstSlotKeyForSubclass[info.name] and slotInfo.freeSlotKeysByBag and slotInfo.freeSlotKeysByBag[bagid] then
           firstSlotKeyForSubclass[info.name] = slotInfo.freeSlotKeysByBag[bagid]
@@ -785,8 +773,8 @@ function items:ProcessRefresh(ctx, kind)
         if freeSlotCount > 0 and slotKey ~= nil then
           local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
           if freeSlotBag and freeSlotID then
-            local originalItem = self:GetItemDataFromSlotKey(slotKey)
-            table.insert(slotInfo.tabs[tabID].freeSpace.buttons, {
+            local originalItem = slotInfo.itemsBySlotKey[slotKey]
+            table.insert(tabs[tabID].freeSpace.buttons, {
               slotkey = slotKey,
               bagid = tonumber(freeSlotBag),
               slotid = tonumber(freeSlotID),
@@ -805,14 +793,14 @@ function items:ProcessRefresh(ctx, kind)
   end
 
   -- Filter and assign items to their respective tabs
-  for _, item in ipairs(slotInfo.sortedItems) do
+  for _, item in ipairs(sortedItems) do
     local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
     local isShown = true
     if viewBagView ~= const.BAG_VIEW.SECTION_ALL_BAGS and categories.IsCategoryShown then
       isShown = categories:IsCategoryShown(category) ~= false
     end
     if isShown then
-      for tabID, tabData in pairs(slotInfo.tabs) do
+      for tabID, tabData in pairs(tabs) do
         if ItemBelongsToTab(kind, item, tabID, viewBagView) then
           table.insert(tabData.items, item)
           if not item.isFreeSlot then
@@ -823,8 +811,10 @@ function items:ProcessRefresh(ctx, kind)
     end
   end
 
+  local sortModule = addon:GetModule("Sort", true)
+
   -- Sort categories for each tab
-  for _, tabData in pairs(slotInfo.tabs) do
+  for _, tabData in pairs(tabs) do
     local categoryTally = {}
     local categoryOrder = {}
     for _, item in ipairs(tabData.items) do
@@ -853,11 +843,44 @@ function items:ProcessRefresh(ctx, kind)
     tabData.categories = categoryOrder
   end
 
-  -- Synthesize Category Data (Phase 4.5)
-  slotInfo.sortedCategories = {}
+  return tabs
+end
+
+function items:Phase8_CommitAndDispatch(ctx, kind, tempSlotInfo, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData, stackData)
+  local realSlotInfo = self.slotInfo[kind]
+  if not realSlotInfo then
+    self:WipeSlotInfo(kind)
+    realSlotInfo = self.slotInfo[kind]
+  end
+
+  -- Copy everything from tempSlotInfo to realSlotInfo
+  realSlotInfo.emptySlots = tempSlotInfo.emptySlots
+  realSlotInfo.freeSlotKeys = tempSlotInfo.freeSlotKeys
+  realSlotInfo.freeSlotKeysByBag = tempSlotInfo.freeSlotKeysByBag
+  realSlotInfo.emptySlotsByBag = tempSlotInfo.emptySlotsByBag
+  realSlotInfo.totalItems = tempSlotInfo.totalItems
+  realSlotInfo.previousTotalItems = tempSlotInfo.previousTotalItems
+  realSlotInfo.emptySlotByBagAndSlot = tempSlotInfo.emptySlotByBagAndSlot
+  realSlotInfo.deferDelete = tempSlotInfo.deferDelete
+  realSlotInfo.dirtyItems = tempSlotInfo.dirtyItems
+  realSlotInfo.itemsBySlotKey = tempSlotInfo.itemsBySlotKey
+  realSlotInfo.previousItemsBySlotKey = tempSlotInfo.previousItemsBySlotKey
+  realSlotInfo.addedItems = tempSlotInfo.addedItems
+  realSlotInfo.removedItems = tempSlotInfo.removedItems
+  realSlotInfo.updatedItems = tempSlotInfo.updatedItems
+  realSlotInfo.emptySlotsSorted = tempSlotInfo.emptySlotsSorted
+  realSlotInfo.stacks = stackData
+
+  -- Set final computed fields on realSlotInfo
+  realSlotInfo.visibleItemsBySlotKey = visibleItemsBySlotKey
+  realSlotInfo.sectionLayouts = sectionLayouts
+  realSlotInfo.sortedItems = sortedItems
+  realSlotInfo.tabs = tabData
+
+  -- Synthesize Category Data
   local categoryTally = {}
   local categoryOrder = {}
-  for _, item in ipairs(slotInfo.sortedItems) do
+  for _, item in ipairs(realSlotInfo.sortedItems) do
     local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
     if not categoryTally[category] then
       categoryTally[category] = {
@@ -873,16 +896,53 @@ function items:ProcessRefresh(ctx, kind)
   end
 
   local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
+  local sortModule = addon:GetModule("Sort", true)
   if not isAllBags and sortModule and sortModule.GetCategoryDataSortFunction then
     local sortFunc = sortModule:GetCategoryDataSortFunction(kind, database:GetBagView(kind))
     if sortFunc then
       table.sort(categoryOrder, sortFunc)
     end
   end
-  slotInfo.sortedCategories = categoryOrder
+  realSlotInfo.sortedCategories = categoryOrder
 
   local ev = kind == const.BAG_KIND.BANK and "items/RefreshBank/Done" or "items/RefreshBackpack/Done"
-  events:SendMessage(ctx, ev, slotInfo)
+  events:SendMessage(ctx, ev, realSlotInfo)
+end
+
+function items:ProcessRefresh(ctx, kind)
+  local bagList = self:Phase1_DetermineBags(ctx, kind)
+  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
+
+  if self._firstLoad[kind] == true then
+    self._firstLoad[kind] = false
+    ctx:Set("wipe", true)
+  end
+
+  local realSlotInfo = self.slotInfo[kind]
+  local previousItems = realSlotInfo and realSlotInfo.itemsBySlotKey or {}
+  local previousTotalItems = realSlotInfo and realSlotInfo.totalItems or 0
+
+  self:Phase3_ClearMovedItemGlows(ctx, previousItems, itemData)
+
+  if kind == const.BAG_KIND.BACKPACK then
+    self.equipmentCache = equipmentData
+  end
+
+  local emptySlotData = self:NewSlotInfo()
+  emptySlotData.previousItemsBySlotKey = previousItems
+  emptySlotData.itemsBySlotKey = itemData
+  emptySlotData.previousTotalItems = previousTotalItems
+
+  self:UpdateFreeSlots(ctx, kind, emptySlotData)
+
+  self:Phase2b_EnrichData(ctx, kind, itemData, emptySlotData)
+
+  local visibleItemsBySlotKey, stackData = self:Phase4_ApplyVirtualStacks(kind, itemData)
+  local sectionLayouts = self:Phase5_EnrichCategories(kind, itemData, emptySlotData)
+  local sortedItems = self:Phase6_Sort(kind, visibleItemsBySlotKey, emptySlotData)
+  local tabData = self:Phase7_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotData)
+
+  self:Phase8_CommitAndDispatch(ctx, kind, emptySlotData, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData, stackData)
 end
 
 function items:RefreshBackpack(ctx)
@@ -903,7 +963,8 @@ function items:WipeSearchCache(kind)
   if self.categoryPriorityCache[kind] then wipe(self.categoryPriorityCache[kind]) end
 end
 
-function items:RefreshSearchCache(kind)
+function items:RefreshSearchCache(kind, itemData)
+  itemData = itemData or (self.slotInfo[kind] and self.slotInfo[kind].itemsBySlotKey) or {}
   self:WipeSearchCache(kind)
   if not categories or not categories.GetSortedSearchCategories then return end
   local ctx = context:New('RefreshSearchCache')
@@ -922,9 +983,9 @@ function items:RefreshSearchCache(kind)
 
           -- Apply groupBy logic to generate dynamic category name
           if groupBy ~= const.SEARCH_CATEGORY_GROUP_BY.NONE then
-            local itemData = self:GetItemDataFromSlotKey(slotkey)
-            if itemData and not itemData.isItemEmpty then
-              local suffix = self:GetGroupBySuffix(itemData, groupBy)
+            local currentItem = itemData[slotkey]
+            if currentItem and not currentItem.isItemEmpty then
+              local suffix = self:GetGroupBySuffix(currentItem, groupBy)
               if suffix and suffix ~= "" then
                 categoryName = categoryFilter.name .. " - " .. suffix
 
@@ -1045,7 +1106,8 @@ end
 function items:GetItemDataFromSlotKey(slotkey)
   local kind = self:GetBagKindFromSlotKey(slotkey)
   if not kind then return nil end
-  return self.slotInfo[kind] and self.slotInfo[kind].itemsBySlotKey[slotkey]
+  local slotInfo = self.slotInfo[kind]
+  return slotInfo and slotInfo.itemsBySlotKey[slotkey]
 end
 
 function items:GetItemDataFromInventorySlot(slot)

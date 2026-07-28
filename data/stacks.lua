@@ -23,7 +23,8 @@ function stacks:Create()
 end
 
 ---@param item ItemData
-function stack:AddToStack(item)
+---@param itemData? table<string, ItemData>
+function stack:AddToStack(item, itemData)
   if item.isItemEmpty then
     return
   end
@@ -38,7 +39,7 @@ function stack:AddToStack(item)
 
   ---@class Items: AceModule
   local items = addon:GetModule('Items')
-  local rootItemData = items:GetItemDataFromSlotKey(stackinfo.rootItem)
+  local rootItemData = itemData and itemData[stackinfo.rootItem] or items:GetItemDataFromSlotKey(stackinfo.rootItem)
 
   stackinfo.slotkeys[item.slotkey] = true
   stackinfo.count = stackinfo.count + 1

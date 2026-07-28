@@ -1,54 +1,41 @@
-# Implementation Plan: Move Frame Creation to ADDON_LOADED (OnInitialize)
+# Functional Pipeline Refactor Plan
 
 ## Objective
-The goal is to shift heavy UI frame creation from the `PLAYER_LOGIN` event (`addon:OnEnable()`) to the `ADDON_LOADED` event (`addon:OnInitialize()`). This will decouple the data fetch from frame creation and fix script timeouts experienced in Hardcore versions of World of Warcraft during the initial player login.
-
-## Files to Modify
-- `core/init.lua`
+Convert `items:ProcessRefresh` into a truly pure functional pipeline by removing the `_tempSlotInfo` hack and passing explicit data structures between phases. This eliminates side effects and makes the data refresh process entirely stateless until the final commit phase.
 
 ## Approach
+1. **Remove `tempSlotInfo` from the Pipeline**
+   - Delete `local tempSlotInfo = self:NewSlotInfo()` and the registration `self._tempSlotInfo[kind] = tempSlotInfo`.
+   - Update `items:GetItemDataFromSlotKey` to only read from `self.slotInfo[kind]` (removing the fallback to `_tempSlotInfo`).
 
-1. **Modify `addon:OnInitialize()`** (in `core/init.lua`):
-   Append the heavy UI frame creation code to the end of the newly implemented deterministic boot loop, immediately after the module `Init()` calls (e.g., right after `consoleport:Init()`).
-   Specifically, move the following:
-   - `applyCompat()`
-   - `self:HideBlizzardBags()`
-   - The instantiation logic for Backpack and Bank:
-     ```lua
-     local rootctx = context:New('addon_initialize')
-     addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
-     if database:GetEnableBankBag() then
-       addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-     end
-     ```
-   - `themes:Enable()`
-   - Setting the Backpack title: `addon.Bags.Backpack:SetTitle(L:G("Backpack"))`
-   - Inserting frames into `UISpecialFrames`:
-     ```lua
-     table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-     if addon.Bags.Bank then
-       table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-     end
-     ```
+2. **Pass Explicit Data Instead of Using Getters**
+   - Identify helper functions called during the refresh pipeline that currently rely on `self:GetItemDataFromSlotKey` to fetch newly harvested items (e.g., `RefreshSearchCache`).
+   - Update these helpers to accept the explicit `itemData` map being passed down the pipeline:
+     - `items:RefreshSearchCache(kind, itemData)`
+     - Phase 5 `EnrichCategories` will pass `itemData` to `RefreshSearchCache`.
 
-2. **Modify `addon:OnEnable()`** (in `core/init.lua`):
-   Remove the code lines identified above from `addon:OnEnable()`.
-   Ensure `addon:OnEnable()` correctly retains:
-   - The sequential `module:Enable()` calls.
-   - Core secure hooks (`ToggleAllBags`, `CloseSpecialWindows`).
-   - The event registrations (`BANKFRAME_CLOSED`, `PLAYER_INTERACTION_MANAGER_FRAME_SHOW`, etc.).
-   - The `items/RefreshBackpack/Done` and `items/RefreshBank/Done` message event hooks.
-   - Disabling CVar tutorials for Retail.
+3. **Refactor Phase Signatures**
+   - `Phase2b_EnrichData(ctx, kind, itemData)`: Instead of mutating `tempSlotInfo`, instantiate a local temporary struct (or separate tables) for empty slots and item counts, and return them.
+     - Returns: `emptySlotData` (a struct containing emptySlotsSorted, emptySlotsByBag, emptySlots, emptySlotByBagAndSlot, totalItems)
+   - `Phase4_ApplyVirtualStacks(kind, itemData)`: Takes `itemData`, returns `visibleItemsBySlotKey` and `stackData`.
+   - `Phase5_EnrichCategories(kind, itemData, emptySlotData)`: Takes `itemData` and `emptySlotData`, returns `sectionLayouts`.
+   - `Phase6_Sort(kind, visibleItemsBySlotKey, emptySlotData)`: Returns `sortedItems`.
+   - `Phase7_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotData)`: Returns `tabData`.
 
-## Edge Cases and Risks
-- **Data Query Triggers:** We must make sure none of the frame creations inside `BagFrame:Create(...)` inadvertently trigger a data fetch via `C_Container` or `search:IndexItems`. We have verified that `BagFrame:Create` acts structurally, so this risk is mitigated.
-- **`themes:Enable()` Order:** This method applies global textures and styles to existing frame objects. It must be called strictly *after* the `BagFrame:Create` calls, and must only be called once to prevent UI leaks or duplications.
-- **Module Init Completion:** The creation routines depend on modules like `events`, `database`, `themes`, etc., having run their `Init()` functions. We already secured this topological sort in the previous PR step.
-- **Context Name:** The context instantiated for `BagFrame:Create` is currently named `'addon_enable'`. Since we are creating this context in `OnInitialize()`, we should rename it to `'addon_initialize'` for clarity.
+4. **Phase8_CommitAndDispatch (The Pure State Update)**
+   - `Phase8_CommitAndDispatch(ctx, kind, itemData, visibleItemsBySlotKey, sectionLayouts, sortedItems, tabData, emptySlotData, stackData, ...)`
+   - Takes all these isolated return values and atomically populates the real `self.slotInfo[kind]`, creating it fresh or wiping the old data, then dispatches the done event.
 
-## Implementation Steps for Executor
-1. Read `core/init.lua`.
-2. Delete the frame creation code from `addon:OnEnable()`.
-3. Insert the frame creation code at the bottom of the initialization sequence inside `addon:OnInitialize()`, keeping the existing tutorial disabling and override binding logic at the very end of `OnInitialize()`.
-4. Use `luacheck` to verify the codebase's syntax and scope requirements.
-5. Create a git commit directly adding onto the existing PR work.
+5. **Update Tests**
+   - Update `spec/items_spec.lua` and any other tests mocking or expecting `tempSlotInfo` or the old phase signatures. The tests will need to reflect the new purely functional phase inputs and outputs.
+
+## Risks & Edge Cases
+- **Stale State Reads**: Since `GetItemDataFromSlotKey` will no longer read `_tempSlotInfo`, any internal function inadvertently calling it during the refresh pipeline might read the stale state from the previous frame. We must exhaustively ensure that all phase helpers use the passed `itemData` map.
+- **Test Harness Breakage**: Our test suite heavily relies on the exact mutations of `ProcessRefresh`. We will need to update the mocks to handle the new return types for each phase.
+
+## Summary of Changes
+- **Files to Modify**: 
+  - `data/items.lua`
+  - `spec/items_spec.lua`
+  - `spec/search_spec.lua` (if it tests `RefreshSearchCache`)
+- **Action**: Cleanly restructure `ProcessRefresh` and its sub-phases to use pure input/output maps, culminating in a single atomic update in Phase 8.
