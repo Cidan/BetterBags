@@ -252,8 +252,8 @@ end
 ---@param bData ItemData
 ---@return boolean
 function sort.SortItemDataByQualityThenAlpha(aData, bData)
-  if aData.isFreeSlot then return false end
-  if bData.isFreeSlot then return true end
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
   if invalidData(aData, bData) then return false end
   if aData.itemInfo.itemQuality ~= bData.itemInfo.itemQuality then
     return aData.itemInfo.itemQuality > bData.itemInfo.itemQuality
@@ -269,8 +269,8 @@ end
 ---@param bData ItemData
 ---@return boolean
 function sort.SortItemDataByAlphaThenQuality(aData, bData)
-  if aData.isFreeSlot then return false end
-  if bData.isFreeSlot then return true end
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
   if invalidData(aData, bData) then return false end
   if aData.itemInfo.itemName ~= bData.itemInfo.itemName then
     return aData.itemInfo.itemName < bData.itemInfo.itemName
@@ -286,8 +286,8 @@ end
 ---@param bData ItemData
 ---@return boolean
 function sort.SortItemDataByItemLevel(aData, bData)
-  if aData.isFreeSlot then return false end
-  if bData.isFreeSlot then return true end
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
   if invalidData(aData, bData) then return false end
   if aData.itemInfo.currentItemLevel ~= bData.itemInfo.currentItemLevel then
     return aData.itemInfo.currentItemLevel > bData.itemInfo.currentItemLevel
@@ -303,8 +303,8 @@ end
 ---@param bData ItemData
 ---@return boolean
 function sort.SortItemDataByExpansion(aData, bData)
-  if aData.isFreeSlot then return false end
-  if bData.isFreeSlot then return true end
+  if aData.isFreeSlot or aData.isItemGap then return false end
+  if bData.isFreeSlot or bData.isItemGap then return true end
   if invalidData(aData, bData) then return false end
 
   local aExpacID = aData.itemInfo.expacID or 0
