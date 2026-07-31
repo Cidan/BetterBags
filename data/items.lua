@@ -117,6 +117,49 @@ function items:ResolveUpgrade(data)
   return false
 end
 
+---@param data ItemData
+---@return integer
+function items:ResolveItemContextMatchResult(data)
+  local match = _G.ItemButtonUtil and _G.ItemButtonUtil.ItemContextMatchResult and _G.ItemButtonUtil.ItemContextMatchResult.Match or 1
+  local mismatch = _G.ItemButtonUtil and _G.ItemButtonUtil.ItemContextMatchResult and _G.ItemButtonUtil.ItemContextMatchResult.Mismatch or 2
+  local doesNotApply = _G.ItemButtonUtil and _G.ItemButtonUtil.ItemContextMatchResult and _G.ItemButtonUtil.ItemContextMatchResult.DoesNotApply or 0
+
+  if not data or data.isItemEmpty or not data.bagid or not data.slotid then
+    return doesNotApply
+  end
+  if not _G.ItemLocation or not _G.ItemButtonUtil or not _G.ItemButtonUtil.GetItemContextMatchResultForItem then
+    return match
+  end
+  local itemLocation = _G.ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
+  if itemLocation and type(itemLocation) == "table" and itemLocation.HasAnyLocation and itemLocation:HasAnyLocation() and itemLocation.IsBagAndSlot and itemLocation:IsBagAndSlot() and itemLocation.IsValid and itemLocation:IsValid() then
+    local result = _G.ItemButtonUtil.GetItemContextMatchResultForItem(itemLocation)
+    if not const.BACKPACK_BAGS[data.bagid] then
+      return match
+    end
+    if result == match then
+      return match
+    end
+
+    local accountBankStart = addon.isRetail and Enum and Enum.BagIndex and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
+    if
+      addon.atBank
+      and addon.Bags
+      and addon.Bags.Bank
+      and addon.Bags.Bank.bankTab
+      and accountBankStart
+      and addon.Bags.Bank.bankTab >= accountBankStart
+    then
+      if C_Bank and C_Bank.IsItemAllowedInBankType and not C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, itemLocation) then
+        return mismatch
+      else
+        return match
+      end
+    end
+    return result or match
+  end
+  return doesNotApply
+end
+
 -- BOOT STUBS & LEGACY PROTOTYPES
 function items:Init()
   self.slotInfo = {}
@@ -471,6 +514,13 @@ function items:Phase6_EnrichData(ctx, kind, itemData)
   local emptySlotsSorted = {}
   local totalItems = 0
 
+  local searchBox = addon:GetModule("SearchBox", true)
+  local searchQuery = searchBox and searchBox.GetText and searchBox:GetText()
+  local searchResults = nil
+  if searchQuery and searchQuery ~= "" and search and search.Search then
+    searchResults = search:Search(searchQuery)
+  end
+
   for _, currentItem in pairs(itemData) do
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
@@ -516,6 +566,12 @@ function items:Phase6_EnrichData(ctx, kind, itemData)
 
     currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
     currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
+    currentItem.itemContextMatchResult = self:ResolveItemContextMatchResult(currentItem)
+    if searchResults then
+      currentItem.isSearchResult = searchResults[currentItem.slotkey] or false
+    else
+      currentItem.isSearchResult = nil
+    end
   end
 
   table.sort(emptySlotsSorted, function(a, b)

@@ -89,6 +89,7 @@ local itemFrame = addon:GetModule("ItemFrame")
 
 describe("ItemFrame Static Buttons and Parent Removal Tests", function()
   before_each(function()
+    addon.isRetail = true
     _G.ClearItemButtonOverlay = _G.ClearItemButtonOverlay or function() end
     _G.SetItemButtonQuality = _G.SetItemButtonQuality or function() end
     _G.SetItemButtonCount = _G.SetItemButtonCount or function() end
@@ -121,6 +122,53 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     assert.is_table(item)
     assert.equal(item, itemFrame.buttonsBySlotkey["Container"])
     assert.equal(item.slotkey, "Container")
+  end)
+
+  describe("Virtual Item Button Pool Architecture", function()
+    it("should pre-allocate virtual item buttons during OnEnable", function()
+      itemFrame:Init()
+      assert.equal(0, #itemFrame.virtualPool)
+      itemFrame:OnEnable()
+      assert.is_true(#itemFrame.virtualPool >= 20)
+    end)
+
+    it("should acquire virtual button from pool without calling Create during GetButton", function()
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      local poolCountBefore = #itemFrame.virtualPool
+      local createCalled = false
+      local origDoCreate = itemFrame._DoCreate
+      itemFrame._DoCreate = function(...)
+        createCalled = true
+        return origDoCreate(...)
+      end
+
+      local btnCtx = ctx:New("test_virtual_pool")
+      local item = itemFrame:GetButton(btnCtx, "Reagent Bag")
+
+      assert.is_false(createCalled, "_DoCreate should NOT be called during GetButton for virtual slotkeys when pool has pre-allocated buttons")
+      assert.equal("Reagent Bag", item.slotkey)
+      assert.is_true(item.isVirtual)
+      assert.equal(#itemFrame.virtualPool, poolCountBefore - 1)
+
+      itemFrame._DoCreate = origDoCreate
+    end)
+
+    it("should release virtual button back to pool on Wipe or Release", function()
+      itemFrame:Init()
+      itemFrame:OnEnable()
+
+      local btnCtx = ctx:New("test_virtual_release")
+      local item = itemFrame:GetButton(btnCtx, "Container")
+      assert.equal("Container", item.slotkey)
+      assert.equal(item, itemFrame.buttonsBySlotkey["Container"])
+
+      local poolCountBeforeWipe = #itemFrame.virtualPool
+      item:Wipe(btnCtx)
+
+      assert.is_nil(itemFrame.buttonsBySlotkey["Container"])
+      assert.equal(#itemFrame.virtualPool, poolCountBeforeWipe + 1)
+    end)
   end)
 
   it("should use a permanent parent frame for the bag as i.frame", function()
@@ -290,6 +338,25 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       end
     end)
 
+    it("SetItemFromData should pass pre-computed isSearchResult to SetMatchesSearch", function()
+      local itemData = {
+        slotkey = "0_6",
+        bagid = 0,
+        slotid = 6,
+        isItemEmpty = false,
+        isSearchResult = false,
+        questInfo = { isQuestItem = false },
+        containerInfo = { isReadable = false, isFiltered = false, hasNoValue = false },
+        itemInfo = { isBound = false, itemID = 12345, itemIcon = 136235, itemQuality = 2, itemLink = "item:12345" },
+      }
+      local searchMatched = nil
+      item._decoration.SetMatchesSearch = function(_, matched)
+        searchMatched = matched
+      end
+      item:SetItemFromData(btnCtx, itemData)
+      assert.is_false(searchMatched)
+    end)
+
     it("UpdateCount should render pre-computed stackedCount when present", function()
       local itemData = {
         slotkey = "0_6",
@@ -406,6 +473,22 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       item:SetFreeSlots(btnCtx, itemData, 1, false)
       assert.equal("Quiver", item.freeSlotName)
       assert.equal(4, setQualityVal)
+    end)
+
+    it("GetItemContextMatchResult should return pre-computed itemContextMatchResult from ItemData", function()
+      local contextMatchCtx = ctx:New("test_context_match")
+      local contextMatchItem = itemFrame:GetButton(contextMatchCtx, "0_7")
+      local itemData = {
+        slotkey = "0_7",
+        bagid = 0,
+        slotid = 7,
+        isItemEmpty = false,
+        itemContextMatchResult = 42,
+      }
+      contextMatchItem.currentData = itemData
+
+      local result = itemFrame.GetItemContextMatchResult(contextMatchItem)
+      assert.equal(42, result)
     end)
 
     it("UpdateUpgrade should assert that data is provided", function()

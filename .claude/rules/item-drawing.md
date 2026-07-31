@@ -58,3 +58,20 @@ In Classic clients, free/empty slots must be handled explicitly to prevent defau
   if button.NewItemTexture then button.NewItemTexture:Hide() end
   ```
 - Additionally, explicitly call `decoration.ExtendedSlot:Hide()` during `SetFreeSlots()` to suppress the default quickslot background glow.
+
+### 7. Zero Dynamic Frame Allocations (Virtual Item Button Pool)
+Virtual slot keys (like `"Container"`, `"Reagent Bag"`, or aggregated free space buttons) must never trigger `CreateFrame` dynamically on the fly during layout drawing.
+- **Pre-allocation:** All virtual item buttons are pre-allocated during `itemFrame:OnEnable()` into `itemFrame.virtualPool`.
+- **Acquisition & Release:** `itemFrame:GetButton(ctx, slotkey)` acquires a virtual button from `virtualPool` via `itemFrame:AcquireVirtualItem(ctx, slotkey)`. When views wipe or release item frames (`item:Wipe(ctx)`), virtual buttons are unmapped from `buttonsBySlotkey` and returned to `virtualPool`.
+
+### 8. Upstream Pre-Computation of ItemContextMatchResult
+Evaluating whether an item is valid for active interactions (e.g. bank, merchant, scrapping, or account bank tabs) is pre-computed during data enrichment (`Phase6_EnrichData`) and stored as `data.itemContextMatchResult`.
+- **Pure Drawing:** `itemFrame.GetItemContextMatchResult(item)` reads `data.itemContextMatchResult` directly. It performs zero on-the-fly `ItemLocation:CreateFromBagAndSlot` object instantiations, zero `C_Bank.IsItemAllowedInBankType` calls, and zero global addon state queries during draw.
+
+### 9. Upstream Pre-Computation of Search Filtering
+Active search query evaluation is performed upstream during the data sweep phase (`Phase6_EnrichData`) and attached to item nodes as `data.isSearchResult`.
+- **No Draw-Phase Search Execution:** Late-stage search evaluations at the end of frame drawing (e.g., querying `searchBox:GetText()` inside `bag.lua` during `Draw`) are completely removed. Item buttons update their search alpha synchronously from `data.isSearchResult`.
+
+### 10. Zero Database Mutation in Views
+The view rendering layer (`views/views.lua`) is strictly read-only and presentation-driven.
+- **Rule:** Methods like `GetOrCreateSection` must never mutate database state or call `categories:CreateCategory`. All dynamic category creation and search-group resolution must occur upstream in the data sweep phase before `slotInfo` is dispatched to views.

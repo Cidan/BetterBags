@@ -46,12 +46,6 @@ local Window = LibStub("LibWindow-1.1")
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule("ItemFrame")
 
----@class SearchBox: AceModule
-local searchBox = addon:GetModule("SearchBox")
-
----@class Search: AceModule
-local search = addon:GetModule("Search")
-
 ---@class Themes: AceModule
 local themes = addon:GetModule("Themes")
 
@@ -499,10 +493,6 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		end
 
 		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-		local text = searchBox:GetText()
-		if text ~= "" and text ~= nil then
-			self:Search(ctx, search:Search(text))
-		end
 		self:OnResize()
 		if
 			database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS
