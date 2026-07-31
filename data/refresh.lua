@@ -62,6 +62,7 @@ end
 ---@field backpack? boolean Update backpack items
 ---@field bank? boolean Update bank items
 ---@field sort? boolean Sort backpack items
+---@field bags? table<number, boolean> Table of specific bagIDs that changed
 
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
@@ -70,7 +71,12 @@ function refresh:RequestUpdate(request)
       self.pendingRequest = {}
     end
     for k, v in pairs(request) do
-      if v then
+      if k == 'bags' then
+        self.pendingRequest.bags = self.pendingRequest.bags or {}
+        for bagID in pairs(v) do
+          self.pendingRequest.bags[bagID] = true
+        end
+      elseif v then
         self.pendingRequest[k] = true
       end
     end
@@ -78,6 +84,10 @@ function refresh:RequestUpdate(request)
   end
 
   local ctx = context:New('BagUpdate')
+
+  if request.bags then
+    ctx:Set('targetedBags', request.bags)
+  end
 
   if request.wipe then
     items:ClearItemCache(ctx)
@@ -126,7 +136,8 @@ function refresh:OnEnable()
     if backpackChanged or bankChanged then
       self:RequestUpdate({
         backpack = backpackChanged,
-        bank = bankChanged
+        bank = bankChanged,
+        bags = updatedBags
       })
     end
   end)
@@ -185,7 +196,7 @@ function refresh:OnEnable()
 
   if not addon.isRetail then
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
-      self:RequestUpdate({ wipe = true, bank = true })
+      self:RequestUpdate({ bank = true, bags = { [-1] = true } })
     end)
   end
 

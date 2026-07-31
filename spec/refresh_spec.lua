@@ -170,7 +170,7 @@ describe("Refresh Module", function()
     local eventMap = events._eventMap
     assert.is_not_nil(eventMap["PLAYERBANKSLOTS_CHANGED"])
     eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, bank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { bank = true, bags = { [-1] = true } })
     addon.isRetail = true -- reset
   end)
 
