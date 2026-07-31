@@ -535,11 +535,14 @@ describe("Sort", function()
       assert.are.equal(sort.SortItemDataByQualityThenAlpha, fn)
     end)
 
-    it("SortItemData functions always sort free slots to the end", function()
+    it("SortItemData functions always sort free slots and gaps to the end", function()
       local item = MockItemData({name = "Sword", quality = 4, guid = "a"})
       local freeSlot = { isFreeSlot = true, bagid = 0, slotid = 1 }
+      local gapSlot = { isItemGap = true, bagid = 0, slotid = 2 }
       assert.is_false(sort.SortItemDataByQualityThenAlpha(freeSlot, item))
       assert.is_true(sort.SortItemDataByQualityThenAlpha(item, freeSlot))
+      assert.is_false(sort.SortItemDataByQualityThenAlpha(gapSlot, item))
+      assert.is_true(sort.SortItemDataByQualityThenAlpha(item, gapSlot))
     end)
   end)
 

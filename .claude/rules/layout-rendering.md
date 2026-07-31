@@ -37,3 +37,12 @@ Historically, each individual Tab View created its own `WowScrollBox` and scroll
   - The scroll child's size is explicitly updated: `scrollChild:SetSize(totalW, totalH)`.
   - `UpdateBagBounds(totalW, totalH)` is called to resize the bag frame and dynamically show or hide the global scrollbar based on screen clamping limits.
 - **Tab-Swap Sizing:** Toggling active tab visibility (switching groups or tabs) runs through the same pure stateless drawing flow synchronously, re-evaluating the active grid's height, updating container/scroll child dimensions, and calling `UpdateBagBounds` instantly to achieve flawless sizing with zero state-holding overhead.
+
+### 4. Absolute Position Grid and Mathematical Gap Handling
+To support visual gaps and spacers without polluting the UI with thousands of invisible frame regions or heavy unused `ItemButton` objects, the Grid layout engine uses a mathematically calculated absolute-position layout system.
+- **Rule:** The `Grid` module does not chain cells relative to previous cell frames. Instead, `layoutSingleColumn` computes the precise `(currentX, currentY)` coordinates for each cell relative to its parent container frame (`self.inner`) using pure mathematical offsets.
+- **Gap Objects:** A gap or spacer is represented as a lightweight, stateless cell table with `isGap = true` (e.g. `{ isGap = true, width = 37, height = 37 }`), bypassing frame creation completely.
+- **Data Layer Contract:** The data layer specifies spacer locations in `tabData.items` by setting `isItemGap = true`. Such items are omitted from item count metrics (`tabData.totalItems`).
+- **View Layer Contract:** In both `GridView` and `BagView` rendering pipelines, if an item is a gap (`item.isItemGap == true`), we do not request or draw an `ItemButton`. Instead, we add a mathematical gap cell to the corresponding section via `section:AddCell(slotkey, { isGap = true, width = 37, height = 37 })`.
+- **Linter & Test Verification:** All calculations must remain free of warnings under `luacheck` and fully covered by layout-specific and edge-case unit tests.
+

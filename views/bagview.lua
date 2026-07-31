@@ -74,7 +74,13 @@ local function BagView(view, ctx, bag, slotInfo, callback)
 
   for _, item in ipairs(tabData.items) do
     local slotkey = item.slotkey
-    if item.isFreeSlot then
+    if item.isItemGap then
+      local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+      local section = view:GetOrCreateSection(ctx, category)
+      local gapCell = { isGap = true, width = 37, height = 37 }
+      section:AddCell(slotkey, gapCell)
+      view:SetSlotSection(slotkey, section)
+    elseif item.isFreeSlot then
       local itemButton = view:GetOrCreateItemButton(ctx, slotkey)
       itemButton:SetFreeSlots(ctx, item, -1)
       local category = item.itemInfo and item.itemInfo.category or L:G("Everything")

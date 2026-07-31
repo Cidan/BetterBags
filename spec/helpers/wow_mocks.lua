@@ -116,6 +116,14 @@ local function CreateMockWidget(widgetType, name, parent)
       y = y
     })
   end
+  function widget:GetPoint(index)
+    index = index or 1
+    local p = self._points[index]
+    if p then
+      return p.point, p.relativeTo, p.relativePoint, p.x or 0, p.y or 0
+    end
+    return nil
+  end
   function widget:EnableMouse(enable)
     self._mouseEnabled = enable
   end

@@ -822,7 +822,7 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
       for tabID, tabData in pairs(tabs) do
         if ItemBelongsToTab(kind, item, tabID, viewBagView) then
           table.insert(tabData.items, item)
-          if not item.isFreeSlot then
+          if not item.isFreeSlot and not item.isItemGap then
             tabData.totalItems = tabData.totalItems + 1
           end
         end

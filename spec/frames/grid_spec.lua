@@ -61,3 +61,100 @@ describe("Grid scrollbar and mousewheel tests", function()
     end)
   end)
 end)
+
+describe("Grid gap layout tests", function()
+  it("should layout cells with gaps correctly using absolute coordinates", function()
+    local parent = CreateFrame("Frame")
+    local g = grid:Create(parent, false)
+    g.spacing = 4
+
+    -- Let's define some cells.
+    -- Cell 1: real frame
+    local f1 = CreateFrame("Frame")
+    f1:SetSize(37, 37)
+    local cell1 = { frame = f1 }
+
+    -- Cell 2: gap
+    local cell2 = { isGap = true, width = 37, height = 37 }
+
+    -- Cell 3: real frame
+    local f3 = CreateFrame("Frame")
+    f3:SetSize(37, 37)
+    local cell3 = { frame = f3 }
+
+    g:AddCell("cell1", cell1)
+    g:AddCell("cell2", cell2)
+    g:AddCell("cell3", cell3)
+
+    -- Render in a grid that can fit all 3 in one row.
+    -- Width per row before wrapping = 205 (can fit all 3: 37 + 4 + 37 + 4 + 37 = 119)
+    g:Draw({
+      cells = g.cells,
+      maxWidthPerRow = 205
+    })
+
+    -- Since cell1 is first, its TOPLEFT is at (0, 0)
+    local point1, _, _, x1, y1 = f1:GetPoint(1)
+    assert.is_equal("TOPLEFT", point1)
+    assert.is_equal(0, x1)
+    assert.is_equal(0, y1)
+
+    -- Since cell2 is a gap of size 37, and spacing is 4, cell3 should start at 37 + 4 (cell1) + 37 (gap) + 4 = 82
+    local point3, _, _, x3, y3 = f3:GetPoint(1)
+    assert.is_equal("TOPLEFT", point3)
+    assert.is_equal(82, x3)
+    assert.is_equal(0, y3)
+  end)
+
+  it("should handle a row starting with a gap correctly", function()
+    local parent = CreateFrame("Frame")
+    local g = grid:Create(parent, false)
+    g.spacing = 4
+
+    -- Cell 1: gap
+    local cell1 = { isGap = true, width = 37, height = 37 }
+
+    -- Cell 2: real frame
+    local f2 = CreateFrame("Frame")
+    f2:SetSize(37, 37)
+    local cell2 = { frame = f2 }
+
+    g:AddCell("cell1", cell1)
+    g:AddCell("cell2", cell2)
+
+    g:Draw({
+      cells = g.cells,
+      maxWidthPerRow = 205
+    })
+
+    -- Since cell1 is a gap, cell2 should start at 37 + 4 = 41
+    local point2, _, _, x2, y2 = f2:GetPoint(1)
+    assert.is_equal("TOPLEFT", point2)
+    assert.is_equal(41, x2)
+    assert.is_equal(0, y2)
+  end)
+
+  it("should handle a row consisting entirely of gaps correctly", function()
+    local parent = CreateFrame("Frame")
+    local g = grid:Create(parent, false)
+    g.spacing = 4
+
+    -- Cell 1: gap
+    local cell1 = { isGap = true, width = 37, height = 37 }
+
+    -- Cell 2: gap
+    local cell2 = { isGap = true, width = 37, height = 37 }
+
+    g:AddCell("cell1", cell1)
+    g:AddCell("cell2", cell2)
+
+    local _, height = g:Draw({
+      cells = g.cells,
+      maxWidthPerRow = 205
+    })
+
+    -- Height should be exactly 37, and width should be calculated properly
+    assert.is_equal(37, height)
+  end)
+end)
+
