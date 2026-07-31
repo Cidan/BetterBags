@@ -970,5 +970,76 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_nil(items:GetItemDataFromSlotKey("0_1"))
       items._tempSlotInfo = nil
     end)
+
+    it("Phase6_EnrichData pre-computes itemContextMatchResult on itemData", function()
+      _G.ItemLocation = {
+        CreateFromBagAndSlot = function(bagid, slotid)
+          return {
+            HasAnyLocation = function() return true end,
+            IsBagAndSlot = function() return true end,
+            IsValid = function() return true end,
+          }
+        end
+      }
+      _G.ItemButtonUtil = {
+        ItemContextMatchResult = { Match = 1, Mismatch = 2, DoesNotApply = 0 },
+        GetItemContextMatchResultForItem = function() return 1 end,
+      }
+
+      local itemData = {
+        ["0_1"] = {
+          slotkey = "0_1",
+          bagid = 0,
+          slotid = 1,
+          isItemEmpty = false,
+          itemInfo = {},
+        }
+      }
+
+      local ctx = addon:GetModule("Context"):New("test_enrich_context")
+      items:Phase6_EnrichData(ctx, const.BAG_KIND.BACKPACK, itemData)
+
+      assert.is_not_nil(itemData["0_1"].itemContextMatchResult)
+      assert.equal(1, itemData["0_1"].itemContextMatchResult)
+    end)
+
+    it("should pre-compute isSearchResult during Phase6_EnrichData when a search query is set", function()
+      local search = addon:GetModule("Search")
+      local origSearch = search.Search
+      search.Search = function(_, text)
+        if text == "potion" then
+          return { ["0_1"] = true, ["0_2"] = false }
+        end
+        return {}
+      end
+
+      local searchBox = StubBetterBagsModule("SearchBox")
+      searchBox.GetText = function() return "potion" end
+
+      local itemData = {
+        ["0_1"] = {
+          slotkey = "0_1",
+          bagid = 0,
+          slotid = 1,
+          isItemEmpty = false,
+          itemInfo = {},
+        },
+        ["0_2"] = {
+          slotkey = "0_2",
+          bagid = 0,
+          slotid = 2,
+          isItemEmpty = false,
+          itemInfo = {},
+        },
+      }
+
+      local ctx = addon:GetModule("Context"):New("test_search_enrich")
+      items:Phase6_EnrichData(ctx, const.BAG_KIND.BACKPACK, itemData)
+
+      assert.is_true(itemData["0_1"].isSearchResult)
+      assert.is_false(itemData["0_2"].isSearchResult)
+
+      search.Search = origSearch
+    end)
   end)
 end)

@@ -125,13 +125,6 @@ function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
       self.content:AddCell(category, section)
     end
     self.sections[category] = section
-    if self.bagview == const.BAG_VIEW.SECTION_GRID then
-      categories:CreateCategory(ctx, {
-        name = category,
-        itemList = {},
-        dynamic = true,
-      })
-    end
   else
     -- Section already exists - update the color in case it changed
     section:SetTitle(category, color)

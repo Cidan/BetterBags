@@ -231,48 +231,17 @@ function itemFrame.itemProto:SetStaticItemFromData(ctx, data)
 	self:SetItemFromData(ctx, data)
 end
 
----@param item ItemButton
+---@param item ItemButton|Item
 ---@return integer
 function itemFrame.GetItemContextMatchResult(item)
-	local itemLocation = ItemLocation:CreateFromBagAndSlot(item.bagID, item:GetID())
-	if itemLocation and itemLocation:HasAnyLocation() and itemLocation:IsBagAndSlot() and itemLocation:IsValid() then
-		local result = ItemButtonUtil.GetItemContextMatchResultForItem(itemLocation) --[[@as integer]]
-		if not const.BACKPACK_BAGS[item.bagID] then
-			return ItemButtonUtil.ItemContextMatchResult.Match
-		end
-		if result == ItemButtonUtil.ItemContextMatchResult.Match then
-			return ItemButtonUtil.ItemContextMatchResult.Match
-		end
-
-		-- Debug logging to identify nil values
-		if addon.isRetail and addon.atBank then
-			debug:Log(
-				"ItemContext",
-				"Bank.bankTab: %s, ACCOUNT_BANK_1 value: %s",
-				tostring(addon.Bags.Bank and addon.Bags.Bank.bankTab),
-				tostring(const.BANK_TAB.ACCOUNT_BANK_1)
-			)
-			debug:Log("ItemContext", "AccountBankTab_1 enum value: %s", tostring(Enum.BagIndex.AccountBankTab_1))
-		end
-
-		-- Fix for retail WoW: use Enum.BagIndex.AccountBankTab_1 directly
-		local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
-		if
-			addon.atBank
-			and addon.Bags.Bank
-			and addon.Bags.Bank.bankTab
-			and accountBankStart
-			and addon.Bags.Bank.bankTab >= accountBankStart
-		then
-			if not C_Bank.IsItemAllowedInBankType(Enum.BankType.Account, itemLocation) then
-				return ItemButtonUtil.ItemContextMatchResult.Mismatch
-			else
-				return ItemButtonUtil.ItemContextMatchResult.Match
-			end
-		end
-		return result or ItemButtonUtil.ItemContextMatchResult.Match
+	local data = item and (item._itemData or (item.GetItemData and item:GetItemData()) or item.currentData)
+	if data and data.itemContextMatchResult then
+		return data.itemContextMatchResult
 	end
-	return ItemButtonUtil.ItemContextMatchResult.DoesNotApply
+	if _G.ItemButtonUtil and _G.ItemButtonUtil.ItemContextMatchResult then
+		return _G.ItemButtonUtil.ItemContextMatchResult.Match
+	end
+	return 0
 end
 
 ---@param ctx Context
@@ -282,6 +251,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	self.currentData = data
 	self.slotkey = data.slotkey
 	local decoration = themes:GetItemButton(ctx, self)
+	decoration._itemData = data
 	local tooltipOwner = GameTooltip:GetOwner()
 	local bagid, slotid = data.bagid, data.slotid
 	if bagid and slotid then
@@ -350,7 +320,13 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	if decoration.UpdateCooldown then decoration:UpdateCooldown(ctx, data) end
 	if decoration.SetReadable then decoration:SetReadable(readable) end
 	if decoration.CheckUpdateTooltip then decoration:CheckUpdateTooltip(tooltipOwner) end
-	if decoration.SetMatchesSearch then decoration:SetMatchesSearch(not isFiltered) end
+	if decoration.SetMatchesSearch then
+		if data.isSearchResult ~= nil then
+			decoration:SetMatchesSearch(data.isSearchResult)
+		else
+			decoration:SetMatchesSearch(not isFiltered)
+		end
+	end
 	self:Unlock(ctx)
 
 	self.freeSlotName = ""
@@ -559,6 +535,9 @@ function itemFrame.itemProto:Wipe(ctx)
 	self.frame:SetParent(nil)
 	self.frame:ClearAllPoints()
 	self:ClearItem(ctx)
+	if self.isVirtual then
+		itemFrame:ReleaseVirtualButton(self)
+	end
 end
 
 -- Unlink will remove and hide this item button
@@ -617,18 +596,29 @@ end
 
 function itemFrame:Init()
 	self.buttonsBySlotkey = {}
+	self.virtualPool = {}
 	self.activeItems = setmetatable({}, { __mode = "k" })
 end
 
 function itemFrame:OnEnable()
 	self.emptyItemTooltip = CreateFrame("GameTooltip", "BetterBagsEmptySlotTooltip", UIParent, "GameTooltipTemplate") --[[@as GameTooltip]]
-	self.emptyItemTooltip:SetScale(GameTooltip:GetScale())
+	if self.emptyItemTooltip.GetScale then
+		self.emptyItemTooltip:SetScale(self.emptyItemTooltip:GetScale())
+	end
 
 	events:RegisterMessage("itemLevel/MaxChanged", function()
 		self:RefreshItemLevelColors()
 	end)
 
 	local ctx = context:New("itemFrame_OnEnable")
+	-- Pre-allocate virtual item buttons for non-physical/virtual slots.
+	for _ = 1, 50 do
+		local vItem = self:_DoCreate(ctx, -3)
+		vItem.isVirtual = true
+		vItem.frame:Hide()
+		tinsert(self.virtualPool, vItem)
+	end
+
 	-- Pre-populate all possible physical buttons to avoid allocations in combat.
 	for bagID in pairs(const.BACKPACK_BAGS) do
 		for slotID = 1, 40 do
@@ -786,11 +776,37 @@ function itemFrame:GetButton(ctx, slotkey)
 		return item
 	else
 		-- This is a virtual slotkey (like "Container", "Reagent Bag", etc.)
-		-- We can create a dynamic button on demand.
-		local item = self:Create(ctx, -3)
-		item.slotkey = slotkey
-		self.buttonsBySlotkey[slotkey] = item
-		return item
+		-- Acquire from pre-allocated virtual item pool.
+		return self:AcquireVirtualItem(ctx, slotkey)
+	end
+end
+
+---@param ctx Context
+---@param slotkey string
+---@return Item
+function itemFrame:AcquireVirtualItem(ctx, slotkey)
+	local item
+	if self.virtualPool and #self.virtualPool > 0 then
+		item = tremove(self.virtualPool)
+	else
+		debug:Log("ItemFrame", "Virtual item pool empty, creating dynamic button for %s", tostring(slotkey))
+		item = self:Create(ctx, -3)
+	end
+	item.isVirtual = true
+	item.slotkey = slotkey
+	self.buttonsBySlotkey[slotkey] = item
+	return item
+end
+
+---@param item Item
+function itemFrame:ReleaseVirtualButton(item)
+	if not item or not item.isVirtual then return end
+	if item.slotkey then
+		self.buttonsBySlotkey[item.slotkey] = nil
+		item.slotkey = nil
+	end
+	if self.virtualPool then
+		tinsert(self.virtualPool, item)
 	end
 end
 
