@@ -500,6 +500,18 @@ function items:Phase1_DetermineBags(ctx, kind)
       end
     end
   end
+
+  local targetedBags = ctx:Get("targetedBags")
+  if targetedBags and not ctx:Get("wipe") then
+    local filteredBagList = {}
+    for bagID in pairs(bagList) do
+      if targetedBags[bagID] then
+        filteredBagList[bagID] = bagList[bagID]
+      end
+    end
+    return filteredBagList
+  end
+
   return bagList
 end
 
@@ -1006,6 +1018,23 @@ function items:ProcessRefresh(ctx, kind)
     end
 
     local previousItems, previousTotalItems = self:Phase3_ExtractPreviousState(kind)
+
+    local targetedBags = ectx:Get("targetedBags")
+    local isWipe = ectx:Get("wipe") == true
+
+    if targetedBags and not isWipe then
+      local harvestedData = itemData
+      itemData = {}
+      for slotkey, item in pairs(previousItems) do
+        local bagid = item.bagid or tonumber((strsplit("_", slotkey)))
+        if not targetedBags[bagid] then
+          itemData[slotkey] = item
+        end
+      end
+      for slotkey, item in pairs(harvestedData) do
+        itemData[slotkey] = item
+      end
+    end
 
     self:Phase4_ClearMovedItemGlows(ectx, previousItems, itemData)
 
