@@ -206,4 +206,172 @@ describe("Database Migration", function()
       assert.are.equal(const.BAG_VIEW.SECTION_ALL_BAGS, DB.data.profile.views[const.BAG_KIND.BANK])
     end)
   end)
+
+  describe("kind-scoped group migration", function()
+    local BACKPACK = 0
+    local BANK = 1
+
+    -- The namespace AceDB copies in from the current defaults before Migrate
+    -- runs. Its presence must not be read as "this profile is already scoped".
+    local function injectedBackpackNamespace()
+      return { [1] = { id = 1, name = "Backpack", order = 1, kind = BACKPACK, isDefault = true } }
+    end
+
+    local function scopedBankNamespace()
+      return {
+        [1] = { id = 1, name = "Bank", order = 1, kind = BANK,
+                bankType = _G.Enum.BankType.Character, isDefault = true },
+        [2] = { id = 2, name = "Warbank", order = 2, kind = BANK,
+                bankType = _G.Enum.BankType.Account, isDefault = true },
+      }
+    end
+
+    it("re-homes flat groups even though the backpack namespace already exists", function()
+      DB.data.profile.groups = {
+        [BACKPACK] = injectedBackpackNamespace(),
+        [BANK] = {},
+        [2] = { id = 2, name = "Legacy Group", order = 2 },
+      }
+      DB.data.profile.groupCounter = 2
+      DB.data.profile.categoryToGroup = { [BACKPACK] = {}, [BANK] = {}, ["CatA"] = 2, ["CatB"] = 2 }
+
+      DB:Migrate()
+
+      local moved = DB.data.profile.groups[BACKPACK][2]
+      assert.is_table(moved)
+      assert.are.equal("Legacy Group", moved.name)
+      assert.are.equal(BACKPACK, moved.kind)
+      assert.are.equal(2, moved.id)
+      assert.is_nil(DB.data.profile.groups[2])
+
+      assert.are.equal(2, DB.data.profile.categoryToGroup[BACKPACK]["CatA"])
+      assert.are.equal(2, DB.data.profile.categoryToGroup[BACKPACK]["CatB"])
+      assert.is_nil(DB.data.profile.categoryToGroup["CatA"])
+      assert.is_nil(DB.data.profile.categoryToGroup["CatB"])
+
+      assert.are.equal(2, DB.data.profile.groupCounter[BACKPACK])
+    end)
+
+    it("repairs profiles the old migration flagged without converting", function()
+      -- Exactly what a live profile looks like after the broken conversion: the
+      -- markers are set, the bank namespace was filled in afterwards, and the
+      -- user's group plus its category assignments were left at the top level.
+      DB.data.profile.__groupsScopedByKind = true
+      DB.data.profile.__bankDefaultTabsFixed = true
+      DB.data.profile.groups = {
+        [BACKPACK] = injectedBackpackNamespace(),
+        [BANK] = scopedBankNamespace(),
+        [2] = { id = 2, name = "Legacy Group", order = 2 },
+      }
+      DB.data.profile.groupCounter = { [BACKPACK] = 2, [BANK] = 2 }
+      DB.data.profile.categoryToGroup = { [BACKPACK] = {}, [BANK] = {}, ["CatA"] = 2 }
+
+      DB:Migrate()
+
+      assert.are.equal("Legacy Group", DB.data.profile.groups[BACKPACK][2].name)
+      assert.is_nil(DB.data.profile.groups[2])
+      assert.are.equal(2, DB.data.profile.categoryToGroup[BACKPACK]["CatA"])
+      assert.is_nil(DB.data.profile.categoryToGroup["CatA"])
+
+      -- The bank namespace is untouched, so no duplicate default tabs appear.
+      assert.are.equal("Bank", DB.data.profile.groups[BANK][1].name)
+      assert.are.equal("Warbank", DB.data.profile.groups[BANK][2].name)
+      assert.is_nil(DB.data.profile.groups[BANK][3])
+
+      -- The obsolete markers are cleared out of the profile.
+      assert.is_nil(DB.data.profile.__groupsScopedByKind)
+      assert.is_nil(DB.data.profile.__bankDefaultTabsFixed)
+    end)
+
+    it("keeps a scoped category assignment over the orphaned flat one", function()
+      DB.data.profile.groups = {
+        [BACKPACK] = {
+          [1] = { id = 1, name = "Backpack", order = 1, kind = BACKPACK, isDefault = true },
+          [5] = { id = 5, name = "Newer Group", order = 5, kind = BACKPACK },
+        },
+        [BANK] = scopedBankNamespace(),
+        [2] = { id = 2, name = "Legacy Group", order = 2 },
+      }
+      DB.data.profile.groupCounter = { [BACKPACK] = 5, [BANK] = 2 }
+      -- CatA was re-assigned to group 5 after the flat entry was orphaned.
+      DB.data.profile.categoryToGroup = {
+        [BACKPACK] = { ["CatA"] = 5 },
+        [BANK] = {},
+        ["CatA"] = 2,
+        ["CatB"] = 2,
+      }
+
+      DB:Migrate()
+
+      assert.are.equal(5, DB.data.profile.categoryToGroup[BACKPACK]["CatA"])
+      assert.are.equal(2, DB.data.profile.categoryToGroup[BACKPACK]["CatB"])
+      assert.is_nil(DB.data.profile.categoryToGroup["CatA"])
+    end)
+
+    it("moves a flat group sitting on the bank kind key to the backpack", function()
+      DB.data.profile.groups = {
+        [BACKPACK] = injectedBackpackNamespace(),
+        -- Legacy group ID 1 collides with BAG_KIND.BANK.
+        [1] = { id = 1, name = "Backpack", order = 1 },
+      }
+      DB.data.profile.groupCounter = 1
+      DB.data.profile.categoryToGroup = { ["CatA"] = 1 }
+
+      DB:Migrate()
+
+      assert.are.equal("Backpack", DB.data.profile.groups[BACKPACK][1].name)
+      assert.is_true(DB.data.profile.groups[BACKPACK][1].isDefault)
+      assert.are.equal(BACKPACK, DB.data.profile.groups[BACKPACK][1].kind)
+      assert.are.equal(1, DB.data.profile.categoryToGroup[BACKPACK]["CatA"])
+
+      -- The bank namespace was rebuilt and refilled with its default tabs.
+      assert.are.equal("Bank", DB.data.profile.groups[BANK][1].name)
+      assert.are.equal("Warbank", DB.data.profile.groups[BANK][2].name)
+    end)
+
+    it("leaves already scoped data alone and is safe to run repeatedly", function()
+      DB.data.profile.groups = {
+        [BACKPACK] = {
+          [1] = { id = 1, name = "Backpack", order = 1, kind = BACKPACK, isDefault = true },
+          [3] = { id = 3, name = "User Group", order = 3, kind = BACKPACK },
+        },
+        [BANK] = scopedBankNamespace(),
+      }
+      DB.data.profile.groupCounter = { [BACKPACK] = 3, [BANK] = 2 }
+      DB.data.profile.categoryToGroup = { [BACKPACK] = { ["CatA"] = 3 }, [BANK] = {} }
+
+      DB:Migrate()
+      DB:Migrate()
+
+      local backpackGroups = DB.data.profile.groups[BACKPACK]
+      local count = 0
+      for _ in pairs(backpackGroups) do count = count + 1 end
+      assert.are.equal(2, count)
+      assert.are.equal("User Group", backpackGroups[3].name)
+      assert.are.equal(3, DB.data.profile.categoryToGroup[BACKPACK]["CatA"])
+      assert.are.equal(3, DB.data.profile.groupCounter[BACKPACK])
+    end)
+
+    it("allocates a fresh ID when a flat group's slot is already taken", function()
+      DB.data.profile.groups = {
+        [BACKPACK] = {
+          [1] = { id = 1, name = "Backpack", order = 1, kind = BACKPACK, isDefault = true },
+          [2] = { id = 2, name = "Existing Group", order = 2, kind = BACKPACK },
+        },
+        [BANK] = scopedBankNamespace(),
+        [2] = { id = 2, name = "Legacy Group", order = 2 },
+      }
+      DB.data.profile.groupCounter = { [BACKPACK] = 2, [BANK] = 2 }
+      DB.data.profile.categoryToGroup = { [BACKPACK] = {}, [BANK] = {}, ["CatA"] = 2 }
+
+      DB:Migrate()
+
+      assert.are.equal("Existing Group", DB.data.profile.groups[BACKPACK][2].name)
+      assert.are.equal("Legacy Group", DB.data.profile.groups[BACKPACK][3].name)
+      assert.are.equal(3, DB.data.profile.groups[BACKPACK][3].id)
+      -- The assignment follows the group to its new ID.
+      assert.are.equal(3, DB.data.profile.categoryToGroup[BACKPACK]["CatA"])
+      assert.are.equal(3, DB.data.profile.groupCounter[BACKPACK])
+    end)
+  end)
 end)

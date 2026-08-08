@@ -990,6 +990,147 @@ function DB:ImportSettings(dataString)
   return true, "Category configuration imported successfully"
 end
 
+-- Reports whether a value stored under a numeric key of profile.groups is a
+-- group object rather than a bag kind namespace. A namespace maps group IDs to
+-- groups and so never carries a group's own fields.
+---@param value any
+---@return boolean
+local function isFlatGroup(value)
+  return type(value) == "table" and
+    (value.name ~= nil or value.id ~= nil or value.order ~= nil)
+end
+
+-- Moves pre-scoping group data into the kind-scoped layout.
+--
+-- Old profiles kept profile.groups as a flat map of group ID to group, and
+-- profile.categoryToGroup as a flat map of category name to group ID. Both are
+-- now keyed by bag kind first.
+--
+-- This runs on every load instead of behind the __groupsScopedByKind flag,
+-- because the conversion that flag guards used to detect "already converted" by
+-- checking whether profile.groups[BACKPACK] was a namespace. AceDB copies the
+-- kind-scoped defaults into the profile before Migrate runs, and BACKPACK is 0,
+-- a key no flat profile ever used, so that key was always present as a
+-- namespace and the check always passed. Those profiles were flagged as
+-- converted while their groups and category assignments stayed at the top
+-- level, where nothing reads them. The pass below is idempotent, so it both
+-- performs the original conversion and repairs the profiles it skipped.
+local function migrateFlatGroupData()
+  local profile = DB.data.profile
+  if type(profile.groups) ~= "table" then
+    profile.groups = {}
+  end
+
+  local backpack = const.BAG_KIND.BACKPACK
+  local bank = const.BAG_KIND.BANK
+  local kinds = { backpack, bank }
+
+  -- Collect flat entries before rewriting anything, because a legacy group can
+  -- sit on a key that is also a bag kind.
+  ---@type table<number, Group>
+  local flatGroups = {}
+  for key, value in pairs(profile.groups) do
+    if type(key) == "number" and isFlatGroup(value) then
+      flatGroups[key] = value
+    end
+  end
+
+  -- Both namespaces have to exist, and have to be namespaces.
+  for _, kind in pairs(kinds) do
+    if type(profile.groups[kind]) ~= "table" or isFlatGroup(profile.groups[kind]) then
+      profile.groups[kind] = {}
+    end
+  end
+
+  -- old ID -> new location, so the category assignments below can follow the
+  -- groups they point at.
+  ---@type table<number, {kind: BagKind, id: number}>
+  local movedTo = {}
+
+  for oldID, group in pairs(flatGroups) do
+    if oldID ~= backpack and oldID ~= bank then
+      profile.groups[oldID] = nil
+    end
+
+    local kind = group.kind or backpack
+
+    -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3.
+    if oldID ~= 1 and group.isDefault then
+      kind = backpack
+      group.isDefault = nil
+      group.bankType = nil
+    end
+
+    -- ID 1 was always the default backpack group.
+    if oldID == 1 then
+      kind = backpack
+      group.isDefault = true
+    end
+    group.kind = kind
+
+    -- Keep the original ID, which is what the category assignments reference,
+    -- unless the slot is taken. ID 1 is the exception: what sits there is the
+    -- default group AceDB created from the new defaults, which this supersedes.
+    local newID = oldID
+    local occupant = profile.groups[kind][newID]
+    if occupant and occupant ~= group and oldID ~= 1 then
+      local counter = type(profile.groupCounter) == "table" and profile.groupCounter[kind] or 0
+      newID = counter + 1
+      while profile.groups[kind][newID] do
+        newID = newID + 1
+      end
+    end
+
+    group.id = newID
+    profile.groups[kind][newID] = group
+    movedTo[oldID] = { kind = kind, id = newID }
+  end
+
+  -- Keep the counters ahead of every ID in use so a new group cannot take the
+  -- ID of one that was just re-homed.
+  if type(profile.groupCounter) == "table" then
+    for _, kind in pairs(kinds) do
+      local highest = profile.groupCounter[kind] or 0
+      for id in pairs(profile.groups[kind]) do
+        if type(id) == "number" and id > highest then
+          highest = id
+        end
+      end
+      profile.groupCounter[kind] = highest
+    end
+  end
+
+  if type(profile.categoryToGroup) ~= "table" then
+    profile.categoryToGroup = {}
+  end
+
+  for _, kind in pairs(kinds) do
+    if type(profile.categoryToGroup[kind]) ~= "table" then
+      profile.categoryToGroup[kind] = {}
+    end
+  end
+
+  for categoryName, groupID in pairs(profile.categoryToGroup) do
+    if type(categoryName) == "string" and type(groupID) == "number" then
+      local moved = movedTo[groupID]
+      local kind, id
+      if moved then
+        kind, id = moved.kind, moved.id
+      elseif profile.groups[backpack][groupID] then
+        -- Assignments made before kind scoping only ever applied to the backpack.
+        kind, id = backpack, groupID
+      end
+
+      -- A scoped assignment for the same category can only have been made after
+      -- the flat one was orphaned, so it is the newer of the two and wins.
+      if kind and profile.categoryToGroup[kind][categoryName] == nil then
+        profile.categoryToGroup[kind][categoryName] = id
+      end
+      profile.categoryToGroup[categoryName] = nil
+    end
+  end
+end
+
 function DB:Migrate()
 
   --[[
@@ -1094,93 +1235,25 @@ function DB:Migrate()
   end
 
 
-  -- Migrate to kind-scoped groups, groupCounter, and categoryToGroup
-  if not DB.data.profile.__groupsScopedByKind then
-    local oldGroups = DB.data.profile.groups
-    local oldCategoryToGroup = DB.data.profile.categoryToGroup
-    local oldGroupCounter = DB.data.profile.groupCounter
-
-    -- Check if it's already scoped (e.g. fresh install with new defaults)
-    -- We must ensure oldGroups[1] isn't just the old Backpack group.
-    -- A scoped namespace will NOT have a 'name' field, whereas a group object will.
-    local isAlreadyScoped = false
-    if oldGroups and type(oldGroups) == "table" then
-      local maybeBackpackNamespace = oldGroups[const.BAG_KIND.BACKPACK]
-      local maybeBankNamespace = oldGroups[const.BAG_KIND.BANK]
-
-      -- If it's a namespace, it shouldn't have an 'id' or 'name' directly on it
-      if (maybeBackpackNamespace and type(maybeBackpackNamespace) == "table" and maybeBackpackNamespace.name == nil) or
-         (maybeBankNamespace and type(maybeBankNamespace) == "table" and maybeBankNamespace.name == nil) then
-        isAlreadyScoped = true
-      end
-    end
-
-    if not isAlreadyScoped then
-      DB.data.profile.groups = {
-        [const.BAG_KIND.BACKPACK] = {},
-        [const.BAG_KIND.BANK] = {}
-      }
-      DB.data.profile.categoryToGroup = {
-        [const.BAG_KIND.BACKPACK] = {},
-        [const.BAG_KIND.BANK] = {}
-      }
-
-      if type(oldGroupCounter) == "number" then
-        DB.data.profile.groupCounter = {
-          [const.BAG_KIND.BACKPACK] = oldGroupCounter,
-          [const.BAG_KIND.BANK] = 0
-        }
-      end
-
-      if oldGroups then
-        -- First, move all groups to their respective kind
-        for id, group in pairs(oldGroups) do
-          if type(group) == "table" then
-            local kind = group.kind or const.BAG_KIND.BACKPACK
-
-            -- Fix bug where AceDB merged default Bank/Warbank fields into existing user groups with IDs 2 or 3.
-            if id ~= 1 and group.isDefault then
-              kind = const.BAG_KIND.BACKPACK
-              group.kind = const.BAG_KIND.BACKPACK
-              group.isDefault = nil
-              group.bankType = nil
-            end
-
-            if id == 1 then
-              group.isDefault = true
-              kind = const.BAG_KIND.BACKPACK
-              group.kind = const.BAG_KIND.BACKPACK
-            end
-
-            DB.data.profile.groups[kind][id] = group
-          end
-        end
-      end
-
-      if oldCategoryToGroup then
-        for categoryName, groupID in pairs(oldCategoryToGroup) do
-          if type(groupID) == "number" then
-            -- We only know the old categoryToGroup mapped to backpacks
-            local group = DB.data.profile.groups[const.BAG_KIND.BACKPACK] and DB.data.profile.groups[const.BAG_KIND.BACKPACK][groupID]
-            if group then
-              DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK][categoryName] = groupID
-            end
-          end
-        end
-      end
-    end
-
-    DB.data.profile.__groupsScopedByKind = true
-    DB.data.profile.__bankDefaultTabsFixed = true
-  end
-
-  -- Catch-all for users who may have slipped past the migration or had AceDB merge incorrectly
+  -- Migrate to kind-scoped groups, groupCounter, and categoryToGroup.
+  -- The counter is widened first so re-homing can allocate IDs from it.
   if type(DB.data.profile.groupCounter) == "number" then
     DB.data.profile.groupCounter = {
       [const.BAG_KIND.BACKPACK] = DB.data.profile.groupCounter,
       [const.BAG_KIND.BANK] = 0
     }
   end
+
+  migrateFlatGroupData()
+
+  --[[
+    Deletion of the group scoping markers. migrateFlatGroupData runs on every
+    load, so nothing gates on __groupsScopedByKind any more, and
+    __bankDefaultTabsFixed was never read at all.
+    Do not remove before Q3'27.
+  ]]--
+  DB.data.profile.__groupsScopedByKind = nil
+  DB.data.profile.__bankDefaultTabsFixed = nil
 
   -- Ensure defaults exist
   local charBankType = Enum.BankType and Enum.BankType.Character or 1
