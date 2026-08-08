@@ -1,44 +1,25 @@
-# Implementation Plan: Pure Functional Draw Phase
+# Implementation Plan: Remove Combat Gating for Item Updates
 
-## Goal
-Ensure the UI draw phase (`Draw()` / `Render()`) has absolutely no side effects, adhering to a purely functional presentation model. All state mutations, memory allocations, and global API queries must be shifted upstream to the data sweep phase.
+## Overview
+Because BetterBags pre-allocates physical item buttons and statically binds them to bag and slot IDs at startup, it's safe to update textures, count text, and re-anchor these frames in combat without triggering secure frame taint ("Action blocked"). However, bag sorting still relies on protected APIs that must not execute during combat.
 
-## Approach & Changes
+## File Changes
 
-### 1. Remove On-the-Fly Database Mutation (Categories)
-**File:** `views/views.lua`
-- **Action:** Remove the `categories:CreateCategory` call inside `GetOrCreateSection`.
-- **Reason:** The presentation layer must not mutate the database.
-- **Dependency:** The data sweep phase must ensure any dynamic categories (like those for virtual groups or missing categories) are created before passing `slotInfo` to the view layer.
+### 1. `data/refresh.lua`
+- **Remove** the `InCombatLockdown()` early-return check and queuing logic at the beginning of `refresh:RequestUpdate()` (lines 69-84). This allows redraw requests to proceed instantly even during combat.
+- **Update** the `request.sort` handling in `refresh:RequestUpdate()` (around line 113) to only proceed if we are NOT in combat: `if request.sort and not InCombatLockdown() then`. This keeps the secure sorting APIs restricted.
+- **Remove** the `PLAYER_REGEN_ENABLED` event registration in `refresh:OnEnable()` (lines 161-167) since we are no longer queuing or flushing `self.pendingRequest`.
 
-### 2. Replace Dynamic Frame Allocation with an Object Pool
-**File:** `frames/item.lua`
-- **Action:** Remove the dynamic `self:Create` (which calls `CreateFrame`) inside the `GetButton` fallback for virtual slotkeys (e.g., `"Container"`).
-- **Action:** Implement a virtual item button pool.
-  - Pre-allocate a reasonable number of generic virtual buttons (e.g., 20-50) during `Init()` or `OnEnable()`.
-  - Introduce `AcquireVirtualItem()` to pull from this pool.
-  - Update `GetButton()` to use `AcquireVirtualItem()` for non-physical slotkeys.
-  - Ensure the `Wipe()` method correctly releases these virtual buttons back to the pool.
+### 2. `spec/refresh_spec.lua`
+- **Remove** the test `"should handle combat gating and queue requests"` which tests the now-deleted queueing behavior.
+- **Add** a new test `"should process item updates synchronously during combat"` to assert that `RefreshBackpack` / `RefreshBank` execute immediately even if `InCombatLockdown()` returns true.
+- **Add/Update** a test to ensure that when `request.sort` is true but `InCombatLockdown()` returns true, sorting APIs (`C_Container.SortBags` or `SortBags`) are **not** invoked.
 
-### 3. Pre-Compute External API Queries and Context Matches
-**Files:** `data/items.lua`, `frames/item.lua`
-- **Action:** Shift the logic for `GetItemContextMatchResult` out of `frames/item.lua` and into the data sweep phase (`data/items.lua`).
-- **Action:** The data phase must determine `ItemContextMatchResult` (e.g., by evaluating `addon.atBank`, active bank tabs, and calling `C_Bank.IsItemAllowedInBankType`) and assign it as a property on the `ItemData` node (e.g., `data.itemContextMatchResult`).
-- **Action:** Update `frames/item.lua` to strictly read this property from `data` instead of querying global state or external WoW APIs on the fly.
+### 3. `.claude/rules/data-loader.md`
+- **Update** "3. Unified Update Flow (Stateless, Zero-Debounce Execution)" section. 
+- Modify the bullet point for **Combat Gating**. Explain that redraws and item updates are un-gated and happen completely synchronously during combat due to the pre-allocation and static `bagID`/`slotID` bindings of the `ItemButton` frames.
+- Note that bag sorting remains the only restricted action that is bypassed or gated during combat to avoid lock/swap taint.
 
-### 4. Relocate Search Evaluation Upstream
-**Files:** `data/items.lua`, `frames/bag.lua`
-- **Action:** Remove the late-stage search execution at the end of the `Draw` callback in `frames/bag.lua` (which queries `searchBox:GetText()` and calls `search:Search(text)`).
-- **Action:** Evaluate search matches upstream in the data phase (`data/items.lua`). Set a flag (e.g., `data.isSearchResult`) on the `ItemData` node during the sweep.
-- **Action:** The presentation layer should simply use this flag to dim/highlight items synchronously as they are drawn.
-
-### 5. Testing (Happy & Sad Paths)
-**Files:** `spec/frames/item_spec.lua`, `spec/views/views_spec.lua`, `spec/data/items_spec.lua` (or relevant test files)
-- **Action:** Write tests verifying that `itemFrame:GetButton` for a virtual slot retrieves from the pre-allocated pool and does not invoke `CreateFrame`.
-- **Action:** Write tests validating that the data sweep phase correctly attaches `isSearchResult` and `itemContextMatchResult`.
-- **Action:** Write tests ensuring `views.lua` successfully renders without mutating the global `categories` state.
-
-## Risks & Edge Cases
-- **Pool Exhaustion:** If the virtual item pool runs out of pre-allocated frames during a massive free-space grouping, it may crash or fail to render. A sufficiently large initial allocation (e.g., 50) may be needed.
-- **State Stale-ness:** Moving `ItemContextMatchResult` upstream means if the bank context changes rapidly without a `BAG_UPDATE`, the item highlight could technically lag by one frame. Ensure events that toggle bank context trigger a clean data refresh.
-- **Search Latency:** Moving search evaluation into the data phase could add latency to typing in the search box. Typing in the search box must correctly trigger a fast data refresh loop rather than just a UI redraw.
+## Edge Cases and Risks
+- Ensure `self.pendingRequest` is completely stripped from the module initialization and usage.
+- Ensure that sorting simply drops the request if in combat (or optionally defers it, but the plan is to simply guard `C_Container.SortBags`). Ignoring it is safest as users can manually sort again after combat.

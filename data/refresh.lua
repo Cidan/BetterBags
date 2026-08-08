@@ -66,23 +66,6 @@ end
 
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
-  if InCombatLockdown() then
-    if not self.pendingRequest then
-      self.pendingRequest = {}
-    end
-    for k, v in pairs(request) do
-      if k == 'bags' then
-        self.pendingRequest.bags = self.pendingRequest.bags or {}
-        for bagID in pairs(v) do
-          self.pendingRequest.bags[bagID] = true
-        end
-      elseif v then
-        self.pendingRequest[k] = true
-      end
-    end
-    return
-  end
-
   local ctx = context:New('BagUpdate')
 
   if request.bags then
@@ -110,7 +93,7 @@ function refresh:RequestUpdate(request)
     items:RefreshBackpack(ctx)
   end
 
-  if request.sort then
+  if request.sort and not InCombatLockdown() then
     if addon.isRetail and C_Container and C_Container.SortBags then
       C_Container.SortBags()
     elseif _G.SortBags then
@@ -156,14 +139,6 @@ function refresh:OnEnable()
   end)
   events:RegisterMessage('bags/SortBackpack', function()
     self:RequestUpdate({ sort = true })
-  end)
-
-  events:RegisterEvent('PLAYER_REGEN_ENABLED', function()
-    if self.pendingRequest then
-      local req = self.pendingRequest
-      self.pendingRequest = nil
-      self:RequestUpdate(req)
-    end
   end)
 
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function()
