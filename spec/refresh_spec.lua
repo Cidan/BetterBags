@@ -14,6 +14,9 @@ const.BANK_BAGS = { [6] = 6, [7] = 7 }
 const.BACKPACK_BAGS = { [0] = 0, [1] = 1 }
 const.BANK_TAB = { BANK = 1, REAGENT = 2, ACCOUNT_BANK_1 = 3 }
 
+local db = StubBetterBagsModule("Database")
+db.GetShowBankTabs = function() return false end
+
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
@@ -113,8 +116,7 @@ describe("Refresh Module", function()
     assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
   end)
 
-  it("should handle combat gating and queue requests", function()
-    -- Set to combat
+  it("should process item updates synchronously during combat", function()
     _G.InCombatLockdown = function() return true end
     addon.atBank = true
     addon.Bags = { Bank = { bankTab = 1 } }
@@ -122,27 +124,36 @@ describe("Refresh Module", function()
     spy.on(items, "RefreshBank")
 
     refresh:RequestUpdate({ backpack = true })
-    assert.spy(items.RefreshBackpack).was_not.called()
-    assert.is_not_nil(refresh.pendingRequest)
-    assert.is_true(refresh.pendingRequest.backpack)
+    assert.spy(items.RefreshBackpack).was.called(1)
+    assert.is_nil(refresh.pendingRequest)
 
     refresh:RequestUpdate({ bank = true })
-    assert.spy(items.RefreshBank).was_not.called()
-    assert.is_true(refresh.pendingRequest.bank)
+    assert.spy(items.RefreshBank).was.called(1)
 
-    refresh:OnEnable() -- registers PLAYER_REGEN_ENABLED
-
-    -- Exit combat
     _G.InCombatLockdown = function() return false end
+  end)
 
-    local eventMap = events._eventMap
-    assert.is_not_nil(eventMap["PLAYER_REGEN_ENABLED"])
+  it("should not invoke sorting APIs when in combat lockdown", function()
+    _G.C_Container = _G.C_Container or {}
+    _G.C_Container.SortBags = function() end
+    _G.SortBags = function() end
 
-    eventMap["PLAYER_REGEN_ENABLED"].fn("PLAYER_REGEN_ENABLED")
+    spy.on(_G.C_Container, "SortBags")
+    spy.on(_G, "SortBags")
+    spy.on(items, "RefreshBackpack")
+
+    _G.InCombatLockdown = function() return true end
+    addon.isRetail = true
+
+    refresh:RequestUpdate({ backpack = true, sort = true })
 
     assert.spy(items.RefreshBackpack).was.called(1)
-    assert.spy(items.RefreshBank).was.called(1)
-    assert.is_nil(refresh.pendingRequest)
+    assert.spy(_G.C_Container.SortBags).was_not.called()
+    assert.spy(_G.SortBags).was_not.called()
+
+    _G.InCombatLockdown = function() return false end
+    refresh:RequestUpdate({ sort = true })
+    assert.spy(_G.C_Container.SortBags).was.called(1)
   end)
 
   it("should trigger a full update on BAG_CONTAINER_UPDATE", function()
