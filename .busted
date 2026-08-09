@@ -1,5 +1,0 @@
-return {
-  default = {
-    helper = "spec/setup.lua",
-  }
-}
