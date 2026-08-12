@@ -150,7 +150,15 @@ function bagFrame.bagProto:Sort(ctx)
 		return
 	end
 	PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-	events:SendMessage(ctx, "bags/SortBackpack")
+	if self.kind == const.BAG_KIND.BANK then
+		if addon.isRetail and self.bankTab and Enum and Enum.BagIndex and Enum.BagIndex.AccountBankTab_1 and self.bankTab >= Enum.BagIndex.AccountBankTab_1 then
+			events:SendMessage(ctx, "bags/SortWarbank")
+		else
+			events:SendMessage(ctx, "bags/SortBank")
+		end
+	else
+		events:SendMessage(ctx, "bags/SortBackpack")
+	end
 end
 
 -- Wipe will wipe the contents of the bag and release all cells.

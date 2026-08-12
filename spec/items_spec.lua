@@ -1042,4 +1042,127 @@ describe("Items (New Data Farming Engine)", function()
       search.Search = origSearch
     end)
   end)
+
+  describe("Scoped Recent Items Tracking", function()
+    before_each(function()
+      items:Init()
+    end)
+
+    it("initializes _newItemTimers scoped by BAG_KIND", function()
+      assert.is_table(items._newItemTimers)
+      assert.is_table(items._newItemTimers[const.BAG_KIND.BACKPACK])
+      assert.is_table(items._newItemTimers[const.BAG_KIND.BANK])
+    end)
+
+    it("correctly tracks new items separately per BAG_KIND", function()
+      local ctx = addon:GetModule("Context"):New("TestScopedNewItems")
+      local backpackData = {
+        kind = const.BAG_KIND.BACKPACK,
+        bagid = 0,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BACKPACK_1" }
+      }
+      local bankData = {
+        kind = const.BAG_KIND.BANK,
+        bagid = 6,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BANK_1" }
+      }
+
+      items:MarkItemAsNew(ctx, backpackData)
+      items:MarkItemAsNew(ctx, bankData)
+
+      assert.is_true(items:IsNewItem(backpackData))
+      assert.is_true(items:IsNewItem(bankData))
+
+      local fakeBackpackWithBankGUID = {
+        kind = const.BAG_KIND.BACKPACK,
+        bagid = 0,
+        slotid = 2,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BANK_1" }
+      }
+      assert.is_false(items:IsNewItem(fakeBackpackWithBankGUID))
+    end)
+
+    it("ClearNewItems(BACKPACK) only clears backpack recent items", function()
+      local ctx = addon:GetModule("Context"):New("TestClearBackpackNewItems")
+      local backpackData = {
+        kind = const.BAG_KIND.BACKPACK,
+        bagid = 0,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BP" }
+      }
+      local bankData = {
+        kind = const.BAG_KIND.BANK,
+        bagid = 6,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BANK" }
+      }
+
+      items:MarkItemAsNew(ctx, backpackData)
+      items:MarkItemAsNew(ctx, bankData)
+
+      items:ClearNewItems(const.BAG_KIND.BACKPACK)
+
+      assert.is_false(items:IsNewItem(backpackData))
+      assert.is_true(items:IsNewItem(bankData))
+    end)
+
+    it("ClearNewItems(BANK) only clears bank recent items", function()
+      local ctx = addon:GetModule("Context"):New("TestClearBankNewItems")
+      local backpackData = {
+        kind = const.BAG_KIND.BACKPACK,
+        bagid = 0,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BP" }
+      }
+      local bankData = {
+        kind = const.BAG_KIND.BANK,
+        bagid = 6,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BANK" }
+      }
+
+      items:MarkItemAsNew(ctx, backpackData)
+      items:MarkItemAsNew(ctx, bankData)
+
+      items:ClearNewItems(const.BAG_KIND.BANK)
+
+      assert.is_true(items:IsNewItem(backpackData))
+      assert.is_false(items:IsNewItem(bankData))
+    end)
+
+    it("ClearNewItems() with no arguments clears both backpack and bank recent items", function()
+      local ctx = addon:GetModule("Context"):New("TestClearAllNewItems")
+      local backpackData = {
+        kind = const.BAG_KIND.BACKPACK,
+        bagid = 0,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BP" }
+      }
+      local bankData = {
+        kind = const.BAG_KIND.BANK,
+        bagid = 6,
+        slotid = 1,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = "GUID_BANK" }
+      }
+
+      items:MarkItemAsNew(ctx, backpackData)
+      items:MarkItemAsNew(ctx, bankData)
+
+      items:ClearNewItems()
+
+      assert.is_false(items:IsNewItem(backpackData))
+      assert.is_false(items:IsNewItem(bankData))
+    end)
+  end)
 end)

@@ -224,7 +224,7 @@ function contextMenu:CreateContextMenu(bag)
 				if addon.isRetail and C_Bank and C_Bank.AutoDepositItemsIntoBank then
 					C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
 				end
-				C_Container.SortBankBags()
+				events:SendMessage(context:New("SortBank"), "bags/SortBank")
 			end,
 		})
 		if addon.isRetail and C_Container.SortAccountBankBags then
@@ -235,7 +235,7 @@ function contextMenu:CreateContextMenu(bag)
 				tooltipText = L:G("Click to clean up your Warbanks and resort items into correct tabs."),
 				func = function()
 					PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-					C_Container.SortAccountBankBags()
+					events:SendMessage(context:New("SortWarbank"), "bags/SortWarbank")
 				end,
 			})
 		end

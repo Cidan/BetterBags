@@ -62,6 +62,8 @@ end
 ---@field backpack? boolean Update backpack items
 ---@field bank? boolean Update bank items
 ---@field sort? boolean Sort backpack items
+---@field sortBank? boolean Sort character bank items
+---@field sortWarbank? boolean Sort account/warbank items
 ---@field bags? table<number, boolean> Table of specific bagIDs that changed
 
 ---@param request RefreshRequest
@@ -79,6 +81,16 @@ function refresh:RequestUpdate(request)
     request.bank = true
   end
 
+  if request.sort then
+    items:ClearNewItems(const.BAG_KIND.BACKPACK)
+    request.backpack = true
+  end
+
+  if request.sortBank or request.sortWarbank then
+    items:ClearNewItems(const.BAG_KIND.BANK)
+    request.bank = true
+  end
+
   if request.bank and addon.atBank and addon.Bags.Bank then
     local accountBankStart = addon.isRetail and Enum.BagIndex.AccountBankTab_1 or const.BANK_TAB.ACCOUNT_BANK_1
     if addon.atWarbank and addon.Bags.Bank.bankTab and accountBankStart and addon.Bags.Bank.bankTab < accountBankStart then
@@ -93,11 +105,27 @@ function refresh:RequestUpdate(request)
     items:RefreshBackpack(ctx)
   end
 
-  if request.sort and not InCombatLockdown() then
-    if addon.isRetail and C_Container and C_Container.SortBags then
-      C_Container.SortBags()
-    elseif _G.SortBags then
-      _G.SortBags()
+  if not InCombatLockdown() then
+    if request.sort then
+      if addon.isRetail and C_Container and C_Container.SortBags then
+        C_Container.SortBags()
+      elseif _G.SortBags then
+        _G.SortBags()
+      end
+    end
+
+    if request.sortBank then
+      if addon.isRetail and C_Container and C_Container.SortBankBags then
+        C_Container.SortBankBags()
+      elseif _G.SortBankBags then
+        _G.SortBankBags()
+      end
+    end
+
+    if request.sortWarbank then
+      if addon.isRetail and C_Container and C_Container.SortAccountBankBags then
+        C_Container.SortAccountBankBags()
+      end
     end
   end
 end
@@ -139,6 +167,12 @@ function refresh:OnEnable()
   end)
   events:RegisterMessage('bags/SortBackpack', function()
     self:RequestUpdate({ sort = true })
+  end)
+  events:RegisterMessage('bags/SortBank', function()
+    self:RequestUpdate({ sortBank = true })
+  end)
+  events:RegisterMessage('bags/SortWarbank', function()
+    self:RequestUpdate({ sortWarbank = true })
   end)
 
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function()

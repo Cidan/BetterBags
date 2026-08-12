@@ -24,6 +24,7 @@ local items = StubBetterBagsModule("Items")
 items.ClearItemCache = function() end
 items.RefreshBackpack = function() end
 items.RefreshBank = function() end
+items.ClearNewItems = function() end
 
 -- Mock ItemLoader
 local loader = StubBetterBagsModule("ItemLoader")
@@ -209,5 +210,70 @@ describe("Refresh Module", function()
     refresh:RequestUpdate({ sort = true })
     assert.spy(_G.SortBags).was.called(1)
     addon.isRetail = true -- reset
+  end)
+
+  describe("Sort Handling and Recent Items Clearing", function()
+    it("should clear backpack recent items, force backpack refresh, and sort on request.sort", function()
+      items.ClearNewItems = function() end
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+
+      spy.on(items, "ClearNewItems")
+      spy.on(items, "RefreshBackpack")
+      spy.on(_G.C_Container, "SortBags")
+
+      refresh:RequestUpdate({ sort = true })
+
+      assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BACKPACK)
+      assert.spy(items.RefreshBackpack).was.called(1)
+      assert.spy(_G.C_Container.SortBags).was.called(1)
+    end)
+
+    it("should clear bank recent items, force bank refresh, and sort on request.sortBank", function()
+      addon.atBank = true
+      addon.Bags = { Bank = { bankTab = 1 } }
+      items.ClearNewItems = function() end
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBankBags = function() end
+
+      spy.on(items, "ClearNewItems")
+      spy.on(items, "RefreshBank")
+      spy.on(_G.C_Container, "SortBankBags")
+
+      refresh:RequestUpdate({ sortBank = true })
+
+      assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BANK)
+      assert.spy(items.RefreshBank).was.called(1)
+      assert.spy(_G.C_Container.SortBankBags).was.called(1)
+    end)
+
+    it("should clear bank recent items, force bank refresh, and sort warbank on request.sortWarbank", function()
+      addon.atBank = true
+      addon.Bags = { Bank = { bankTab = 1 } }
+      items.ClearNewItems = function() end
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortAccountBankBags = function() end
+
+      spy.on(items, "ClearNewItems")
+      spy.on(items, "RefreshBank")
+      spy.on(_G.C_Container, "SortAccountBankBags")
+
+      refresh:RequestUpdate({ sortWarbank = true })
+
+      assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BANK)
+      assert.spy(items.RefreshBank).was.called(1)
+      assert.spy(_G.C_Container.SortAccountBankBags).was.called(1)
+    end)
+
+    it("should route bags/SortBank and bags/SortWarbank messages", function()
+      refresh:OnEnable()
+      spy.on(refresh, "RequestUpdate")
+
+      events:SendMessage("bags/SortBank")
+      assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sortBank = true })
+
+      events:SendMessage("bags/SortWarbank")
+      assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sortWarbank = true })
+    end)
   end)
 end)
