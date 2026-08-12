@@ -171,7 +171,10 @@ function items:Init()
     [const.BAG_KIND.BACKPACK] = {},
     [const.BAG_KIND.BANK] = {},
   }
-  self._newItemTimers = {}
+  self._newItemTimers = {
+    [const.BAG_KIND.BACKPACK] = {},
+    [const.BAG_KIND.BANK] = {},
+  }
   self._preSort = false
   self._doingRefresh = false
   self._firstLoad = {
@@ -1159,6 +1162,16 @@ function items:GetItemData(ctx, itemList, callback)
   end)
 end
 
+local function resolveKind(self, data)
+  if data and data.kind then
+    return data.kind
+  end
+  if data and data.bagid then
+    return self:GetBagKindFromBagID(data.bagid)
+  end
+  return const.BAG_KIND.BACKPACK
+end
+
 function items:IsNewItem(data)
   if not data or data.isItemEmpty then return false end
   if _G.C_NewItems and _G.C_NewItems.IsNewItem then
@@ -1167,10 +1180,14 @@ function items:IsNewItem(data)
     end
   end
   local guid = data.itemInfo and data.itemInfo.itemGUID
-  if guid and self._newItemTimers[guid] then
-    local diff = time() - self._newItemTimers[guid]
-    local limit = database:GetNewItemTime() or 30
-    return diff < limit
+  if guid then
+    local kind = resolveKind(self, data)
+    local timerTable = self._newItemTimers and self._newItemTimers[kind]
+    if timerTable and timerTable[guid] then
+      local diff = time() - timerTable[guid]
+      local limit = database:GetNewItemTime() or 30
+      return diff < limit
+    end
   end
   return false
 end
@@ -1187,22 +1204,71 @@ function items:ClearNewItem(ctx, slotkey)
     _G.C_NewItems.RemoveNewItem(data.bagid, data.slotid)
   end
   data.itemInfo.isNewItem = false
-  self._newItemTimers[data.itemInfo.itemGUID] = nil
+  local kind = resolveKind(self, data)
+  if self._newItemTimers and self._newItemTimers[kind] and data.itemInfo and data.itemInfo.itemGUID then
+    self._newItemTimers[kind][data.itemInfo.itemGUID] = nil
+  end
   data.itemInfo.category = self:GetCategory(ctx, data)
 end
 
-function items:ClearNewItems()
-  if _G.C_NewItems and _G.C_NewItems.ClearAll then
-    _G.C_NewItems.ClearAll()
+function items:ClearNewItems(kind)
+  if kind == const.BAG_KIND.BACKPACK then
+    if self._newItemTimers and self._newItemTimers[const.BAG_KIND.BACKPACK] then
+      wipe(self._newItemTimers[const.BAG_KIND.BACKPACK])
+    end
+    if _G.C_NewItems and _G.C_NewItems.RemoveNewItem then
+      for bagID in pairs(const.BACKPACK_BAGS) do
+        local numSlots = _G.C_Container and _G.C_Container.GetContainerNumSlots and _G.C_Container.GetContainerNumSlots(bagID) or 0
+        for slotID = 1, numSlots do
+          if _G.C_NewItems.IsNewItem and _G.C_NewItems.IsNewItem(bagID, slotID) then
+            _G.C_NewItems.RemoveNewItem(bagID, slotID)
+          end
+        end
+      end
+    end
+  elseif kind == const.BAG_KIND.BANK then
+    if self._newItemTimers and self._newItemTimers[const.BAG_KIND.BANK] then
+      wipe(self._newItemTimers[const.BAG_KIND.BANK])
+    end
+    if _G.C_NewItems and _G.C_NewItems.RemoveNewItem then
+      local function clearBags(bags)
+        if not bags then return end
+        for bagID in pairs(bags) do
+          local numSlots = _G.C_Container and _G.C_Container.GetContainerNumSlots and _G.C_Container.GetContainerNumSlots(bagID) or 0
+          for slotID = 1, numSlots do
+            if _G.C_NewItems.IsNewItem and _G.C_NewItems.IsNewItem(bagID, slotID) then
+              _G.C_NewItems.RemoveNewItem(bagID, slotID)
+            end
+          end
+        end
+      end
+      clearBags(const.BANK_BAGS)
+      clearBags(const.ACCOUNT_BANK_BAGS)
+    end
+  else
+    if _G.C_NewItems and _G.C_NewItems.ClearAll then
+      _G.C_NewItems.ClearAll()
+    end
+    if self._newItemTimers then
+      if self._newItemTimers[const.BAG_KIND.BACKPACK] then
+        wipe(self._newItemTimers[const.BAG_KIND.BACKPACK])
+      end
+      if self._newItemTimers[const.BAG_KIND.BANK] then
+        wipe(self._newItemTimers[const.BAG_KIND.BANK])
+      end
+    end
   end
-  wipe(self._newItemTimers)
 end
 
 function items:MarkItemAsNew(ctx, data)
-  if data and data.itemInfo and data.itemInfo.itemGUID and self._newItemTimers[data.itemInfo.itemGUID] == nil then
-    self._newItemTimers[data.itemInfo.itemGUID] = time()
-    data.itemInfo.isNewItem = true
-    data.itemInfo.category = self:GetCategory(ctx, data)
+  if data and data.itemInfo and data.itemInfo.itemGUID then
+    local kind = resolveKind(self, data)
+    local timerTable = self._newItemTimers and self._newItemTimers[kind]
+    if timerTable and timerTable[data.itemInfo.itemGUID] == nil then
+      timerTable[data.itemInfo.itemGUID] = time()
+      data.itemInfo.isNewItem = true
+      data.itemInfo.category = self:GetCategory(ctx, data)
+    end
   end
 end
 
@@ -1609,8 +1675,8 @@ function items:AttachItemInfo(data, kind)
     end
   end
 
-  if data.itemInfo.isNewItem and self._newItemTimers[data.itemInfo.itemGUID] == nil then
-    self._newItemTimers[data.itemInfo.itemGUID] = time()
+  if data.itemInfo.isNewItem and self._newItemTimers and self._newItemTimers[kind] and self._newItemTimers[kind][data.itemInfo.itemGUID] == nil then
+    self._newItemTimers[kind][data.itemInfo.itemGUID] = time()
   end
 
   data.itemLinkInfo = self:ParseItemLink(itemLink)
