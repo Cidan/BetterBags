@@ -458,6 +458,17 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		self.currentView:GetContent():Hide()
 	end
 
+	-- Every physical slot has exactly one static item button, shared by the global
+	-- Recent Items / Free Space sections and by every tab view. Release all of them
+	-- before any renderer acquires buttons; a wipe that ran later in this pass would
+	-- hide a button another renderer had already claimed.
+	self:WipeGlobalSections(ctx)
+	if self.tabViews then
+		for _, tView in pairs(self.tabViews) do
+			tView:Wipe(ctx)
+		end
+	end
+
 	-- Render other background persistent views first to keep them in a consistent data state
 	local currentLayout = database:GetBagView(self.kind)
 	if self.tabViews then

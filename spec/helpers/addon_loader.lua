@@ -28,17 +28,20 @@ end
 
 --- Create a stub module on the BetterBags addon. Useful for satisfying GetModule()
 --- dependencies without loading the real module file.
---- Returns the existing module if it was already created.
+--- Returns the existing module if it was already created, plus a flag telling the
+--- caller whether a brand new stub was registered (so it can ResetModuleStub it during
+--- teardown without clobbering a real module registered by another spec).
 ---@param name string Module name (e.g. "Database", "Constants")
 ---@return table module The stub module table
+---@return boolean created True when this call registered a new stub module
 _G.StubBetterBagsModule = function(name)
   local ok, mod = pcall(function() return addon:GetModule(name) end)
-  if ok and mod then return mod end
+  if ok and mod then return mod, false end
   local stub = addon:NewModule(name)
   if name == "Database" then
     stub.GetUpgradeIconProvider = stub.GetUpgradeIconProvider or function() return "None" end
   end
-  return stub
+  return stub, true
 end
 
 --- Clear a previously-stubbed module so the real module file can be loaded safely.

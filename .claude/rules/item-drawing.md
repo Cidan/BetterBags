@@ -37,7 +37,9 @@ While Blizzard backported the `ContainerFrameItemButtonTemplate` XML to Classic/
       SetItemButtonTexture(decoration, tex)
   end
   ```
-- **UpdateCooldown:** Classic uses `ContainerFrame_UpdateCooldown(bagid, button)` instead of the mixin `UpdateCooldown` method.
+- **UpdateCooldown:** Classic uses `ContainerFrame_UpdateCooldown(bagid, button)` instead of the mixin `UpdateCooldown` method. `SetItemFromData` must always go through `itemProto:UpdateCooldown(ctx, data)` (which picks the right one) rather than calling `decoration:UpdateCooldown` behind an existence guard — the guard silently skipped cooldowns on Classic at draw time, so they only appeared after the next `BAG_UPDATE_COOLDOWN`.
+- **Quality Borders:** Blizzard's Classic `SetItemButtonQuality` (`Blizzard_ItemButton/Classic/ItemButtonTemplate.lua`, classic_era and classic branches) has its quality-color block commented out and unconditionally ends with `button.IconBorder:Hide()`. Retail's version colors and shows the border. After calling `SetItemButtonQuality`, non-retail clients must call `itemProto:DrawClassicQualityBorder(decoration, quality)`, which applies `const.ITEM_QUALITY_COLOR[quality]` and shows `IconBorder` (used by both `SetItemFromData` and `SetFreeSlots`, the latter with the bag's quality). `spec/frames/item_classic_spec.lua` carries a source-faithful mock of the Classic function; fix the code, not the mock.
+- **Bag Kind:** `item.kind` drives item-level options, extra-glowy borders and Masque groups. It is derived from the bag ID via `const.BANK_BAGS` **and** `const.ACCOUNT_BANK_BAGS`; checking only `BANK_BAGS` classified every Warbank button as backpack.
 - **UpdateExtended:** Calling `UpdateExtended()` on Classic clients causes the engine to flag the button as an extended slot (e.g. Reagent bag), which incorrectly applies a blue `ExtendedOverlay` tint to the item. This must be guarded strictly behind `if addon.isRetail then ... end`.
 
 ### 6. The "Blue Glow" Empty Slot Taint (Classic UI Quirk)
@@ -69,7 +71,7 @@ Evaluating whether an item is valid for active interactions (e.g. bank, merchant
 - **Pure Drawing:** `itemFrame.GetItemContextMatchResult(item)` reads `data.itemContextMatchResult` directly. It performs zero on-the-fly `ItemLocation:CreateFromBagAndSlot` object instantiations, zero `C_Bank.IsItemAllowedInBankType` calls, and zero global addon state queries during draw.
 
 ### 9. Upstream Pre-Computation of Search Filtering
-Active search query evaluation is performed upstream during the data sweep phase (`Phase6_EnrichData`) and attached to item nodes as `data.isSearchResult`.
+Active search query evaluation is performed upstream during the data sweep phase (`Phase8_EnrichCategories`, right after `search:IndexItems` rebuilt the index for this sweep) and attached to item nodes as `data.isSearchResult`. It must not run in `Phase6_EnrichData`, which executes before re-indexing and would evaluate the query against the previous sweep's index.
 - **No Draw-Phase Search Execution:** Late-stage search evaluations at the end of frame drawing (e.g., querying `searchBox:GetText()` inside `bag.lua` during `Draw`) are completely removed. Item buttons update their search alpha synchronously from `data.isSearchResult`.
 
 ### 10. Zero Database Mutation in Views

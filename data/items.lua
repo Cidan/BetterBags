@@ -529,13 +529,6 @@ function items:Phase6_EnrichData(ctx, kind, itemData)
   local emptySlotsSorted = {}
   local totalItems = 0
 
-  local searchBox = addon:GetModule("SearchBox", true)
-  local searchQuery = searchBox and searchBox.GetText and searchBox:GetText()
-  local searchResults = nil
-  if searchQuery and searchQuery ~= "" and search and search.Search then
-    searchResults = search:Search(searchQuery)
-  end
-
   for _, currentItem in pairs(itemData) do
     local bagid = currentItem.bagid
     local slotid = currentItem.slotid
@@ -582,11 +575,6 @@ function items:Phase6_EnrichData(ctx, kind, itemData)
     currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
     currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
     currentItem.itemContextMatchResult = self:ResolveItemContextMatchResult(currentItem)
-    if searchResults then
-      currentItem.isSearchResult = searchResults[currentItem.slotkey] or false
-    else
-      currentItem.isSearchResult = nil
-    end
   end
 
   table.sort(emptySlotsSorted, function(a, b)
@@ -624,7 +612,7 @@ function items:Phase4_ClearMovedItemGlows(ctx, previousItems, itemData)
   for _, addedItem in pairs(added) do
     for _, removedItem in pairs(removed) do
       if addedItem.itemInfo and removedItem.itemInfo and addedItem.itemInfo.itemGUID == removedItem.itemInfo.itemGUID then
-        self:ClearNewItem(ctx, addedItem.slotkey)
+        self:ClearNewItemFromData(ctx, addedItem)
       end
     end
   end
@@ -684,25 +672,40 @@ function items:Phase7_ApplyVirtualStacks(kind, itemData)
   return visibleItemsBySlotKey, stackData
 end
 
-function items:Phase8_EnrichCategories(kind, itemData, emptySlotByBagAndSlot)
+function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlot)
   if search and search.IndexItems then
     search:IndexItems(itemData)
   end
 
   self:RefreshSearchCache(kind, itemData)
 
+  -- Phase 6 resolved categories against the previous sweep's search cache. Resolve
+  -- again now that the cache reflects this sweep, so search categories compete with
+  -- custom categories, gear sets and recent items by the priority rules in GetCategory.
   for _, currentItem in pairs(itemData) do
     if not currentItem.isItemEmpty then
-      local searchCategory = self:GetSearchCategory(kind, currentItem.slotkey)
-      if searchCategory then
-        local oldCategory = currentItem.itemInfo.category
-        if oldCategory ~= L:G("Recent Items") then
-          currentItem.itemInfo.category = searchCategory
-          if search.UpdateCategoryIndex then
-            search:UpdateCategoryIndex(currentItem, oldCategory)
-          end
+      local oldCategory = currentItem.itemInfo.category
+      local newCategory = self:GetCategory(ctx, currentItem)
+      if newCategory ~= oldCategory then
+        currentItem.itemInfo.category = newCategory
+        if search.UpdateCategoryIndex then
+          search:UpdateCategoryIndex(currentItem, oldCategory)
         end
       end
+    end
+  end
+
+  local searchBox = addon:GetModule("SearchBox", true)
+  local searchQuery = searchBox and searchBox.GetText and searchBox:GetText()
+  local searchResults = nil
+  if searchQuery and searchQuery ~= "" and search and search.Search then
+    searchResults = search:Search(searchQuery)
+  end
+  for _, currentItem in pairs(itemData) do
+    if searchResults then
+      currentItem.isSearchResult = searchResults[currentItem.slotkey] or false
+    else
+      currentItem.isSearchResult = nil
     end
   end
 
@@ -1015,6 +1018,11 @@ function items:ProcessRefresh(ctx, kind)
     local bagList = self:Phase1_DetermineBags(ectx, kind)
     local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
 
+    -- The harvest captured this frame's client state. Everything below runs on the
+    -- next frame against the state committed by then, so refreshes started in the
+    -- same frame merge in order instead of overwriting each other's bags.
+    async:Yield()
+
     if self._firstLoad[kind] == true then
       self._firstLoad[kind] = false
       ectx:Set("wipe", true)
@@ -1046,11 +1054,9 @@ function items:ProcessRefresh(ctx, kind)
     local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData)
 
     local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
-    local sectionLayouts = self:Phase8_EnrichCategories(kind, itemData, emptySlotByBagAndSlot)
+    local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
     local sortedItems = self:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
     local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
-
-    async:Yield()
 
     self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
   end)
@@ -1196,7 +1202,12 @@ function items:ClearNewItem(ctx, slotkey)
   if not slotkey then
     return
   end
-  local data = self:GetItemDataFromSlotKey(slotkey)
+  self:ClearNewItemFromData(ctx, self:GetItemDataFromSlotKey(slotkey))
+end
+
+---@param ctx Context
+---@param data ItemData?
+function items:ClearNewItemFromData(ctx, data)
   if not data or data.isItemEmpty then
     return
   end

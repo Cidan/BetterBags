@@ -893,12 +893,12 @@ describe("Items (New Data Farming Engine)", function()
       assert.are.equal(const.BACKPACK_BAGS, backpackBags)
     end)
 
-    it("Phase4_ClearMovedItemGlows clears new item status for moved items", function()
+    it("Phase4_ClearMovedItemGlows clears new item status on the moved item's harvested data", function()
       local ctx = addon:GetModule("Context"):New("TestPhase3")
-      local clearedSlotKey = nil
-      local originalClearNewItem = items.ClearNewItem
-      items.ClearNewItem = function(self, ectx, slotkey)
-        clearedSlotKey = slotkey
+      local clearedData = nil
+      local originalClearNewItemFromData = items.ClearNewItemFromData
+      items.ClearNewItemFromData = function(self, ectx, data)
+        clearedData = data
       end
 
       local previous = {
@@ -917,9 +917,11 @@ describe("Items (New Data Farming Engine)", function()
       }
 
       items:Phase4_ClearMovedItemGlows(ctx, previous, current)
-      assert.are.equal("0_2", clearedSlotKey)
+      -- The harvested data for the new slot is cleared directly; the committed
+      -- SlotInfo still holds the previous occupant of that slot (or nothing at all).
+      assert.are.equal(current["0_2"], clearedData)
 
-      items.ClearNewItem = originalClearNewItem
+      items.ClearNewItemFromData = originalClearNewItemFromData
     end)
 
     it("Phase7_ApplyVirtualStacks calculates stack data correctly", function()
@@ -1003,7 +1005,7 @@ describe("Items (New Data Farming Engine)", function()
       assert.equal(1, itemData["0_1"].itemContextMatchResult)
     end)
 
-    it("should pre-compute isSearchResult during Phase6_EnrichData when a search query is set", function()
+    it("should pre-compute isSearchResult during Phase8_EnrichCategories once the fresh index exists", function()
       local search = addon:GetModule("Search")
       local origSearch = search.Search
       search.Search = function(_, text)
@@ -1017,29 +1019,34 @@ describe("Items (New Data Farming Engine)", function()
       searchBox.GetText = function() return "potion" end
 
       local itemData = {
-        ["0_1"] = {
-          slotkey = "0_1",
-          bagid = 0,
-          slotid = 1,
-          isItemEmpty = false,
-          itemInfo = {},
-        },
-        ["0_2"] = {
-          slotkey = "0_2",
-          bagid = 0,
-          slotid = 2,
-          isItemEmpty = false,
-          itemInfo = {},
-        },
+        ["0_1"] = MockData.ItemData({ slotkey = "0_1", bagid = 0, slotid = 1 }),
+        ["0_2"] = MockData.ItemData({ slotkey = "0_2", bagid = 0, slotid = 2 }),
       }
 
       local ctx = addon:GetModule("Context"):New("test_search_enrich")
-      items:Phase6_EnrichData(ctx, const.BAG_KIND.BACKPACK, itemData)
+      items:Phase8_EnrichCategories(ctx, const.BAG_KIND.BACKPACK, itemData, {})
 
       assert.is_true(itemData["0_1"].isSearchResult)
       assert.is_false(itemData["0_2"].isSearchResult)
 
       search.Search = origSearch
+    end)
+
+    it("should leave isSearchResult unset in Phase6_EnrichData so buttons never draw against a stale index", function()
+      local searchBox = StubBetterBagsModule("SearchBox")
+      local origGetText = searchBox.GetText
+      searchBox.GetText = function() return "potion" end
+
+      local itemData = {
+        ["0_1"] = MockData.ItemData({ slotkey = "0_1", bagid = 0, slotid = 1 }),
+      }
+
+      local ctx = addon:GetModule("Context"):New("test_search_phase6")
+      items:Phase6_EnrichData(ctx, const.BAG_KIND.BACKPACK, itemData)
+
+      assert.is_nil(itemData["0_1"].isSearchResult)
+
+      searchBox.GetText = origGetText
     end)
   end)
 
