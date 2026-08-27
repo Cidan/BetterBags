@@ -846,7 +846,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     groups.CategoryBelongsToGroup = old_CategoryBelongsToGroup
   end)
 
-  it("should not centrally call Wipe on all views in bag:Draw() but instead wipe when rendering", function()
+  it("should wipe every view centrally before rendering and again inside each Render", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
     local frame = CreateFrame("Frame")
@@ -887,9 +887,9 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     bag:Draw(ctx, mockSlotInfo, function() end)
 
-    -- Under the new pure functional design, each rendered view (active view1 and background view2)
-    -- will call Wipe synchronously during their Render call.
-    assert.equals(2, #wipe_called)
+    -- Draw releases every shared item button owner up front (one central Wipe per view),
+    -- and each Render then performs its own idempotent Wipe before populating.
+    assert.equals(4, #wipe_called)
   end)
 
   it("should set view.isNew to true on Wipe() for both GridView and BagView", function()

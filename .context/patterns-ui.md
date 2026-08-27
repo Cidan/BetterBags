@@ -114,6 +114,26 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 **Problem**: If multiple item buttons share the same parent frame, layout engines that position the parent frame (e.g. setting `item.frame:SetPoint(...)`) will stack all elements on top of each other and hide/wipe them together.
 **Solution**: Create a dedicated, unique unsecure parent frame per physical item button, configure it with the correct ID/attributes, and implement fallback methods (like `IsCombinedBagContainer()`) natively on that parent frame to safely bypass Blizzard's native checks without secure attribute taint.
 
+## Shared Static Frames: Release Every Owner Before Any Renderer Acquires
+
+**Problem**: Physical item buttons are static per slot key (`itemFrame.buttonsBySlotkey`) and are shared by several renderers in one draw pass (global Recent Items / Free Space sections plus every tab view). Renderer A acquired button `0_1` (e.g. as the Free Space representative), then renderer B's `Wipe` released the *same* button because B had drawn an item in `0_1` on the previous pass. `item:Release` hides and unparents the frame, so the button A just drew silently vanished ("free space slots disappear when something is put in the bank").
+
+**Why**: Each renderer only knows about its own previous cells. A wipe interleaved with another renderer's acquisition can never tell whether the button it releases has already been re-claimed.
+
+**Solution**: Make the draw pass two-phase. `bagProto:Draw` first releases *every* owner (`WipeGlobalSections` plus `view:Wipe` for every tab view, regardless of layout), and only then renders background views, global sections and the active view. `Render` may still self-wipe, but at that point it owns nothing so the wipe releases no shared button. `spec/frames/bag_draw_ownership_spec.lua` asserts that the last `item:Release` precedes the first `itemFrame:GetButton` in a pass.
+
+**Diagnostic**: A section that is populated (`section:HasItem(button)` is true) but whose button frame is hidden / has no parent → some later wipe in the same pass released it.
+
+**Related Files**: `frames/bag.lua` (`Draw`), `views/gridview.lua`, `views/bagview.lua`, `frames/item.lua` (`Wipe`/`ClearItem`).
+
+## Classic Item Buttons: Blizzard's SetItemButtonQuality Always Hides The Border
+
+**Problem**: Rarity borders were missing on Classic/Era/MoP while retail was fine, even though both call the global `SetItemButtonQuality`.
+
+**Why**: In `Blizzard_ItemButton/Classic/ItemButtonTemplate.lua` (classic_era and classic branches) the quality-color block is commented out and the function ends with `button.IconBorder:Hide()`. The retail implementation (`Blizzard_ItemButton/Mainline/ItemButtonTemplate.lua`) colors and shows the border via `ColorManager`.
+
+**Solution**: After `SetItemButtonQuality`, non-retail clients call `itemProto:DrawClassicQualityBorder(decoration, quality)` which applies `const.ITEM_QUALITY_COLOR[quality]` and shows `IconBorder` (both for items and for free slots, which use the bag's quality). Never "fix" this by editing the mock: `spec/frames/item_classic_spec.lua` carries a source-faithful Classic mock of `SetItemButtonQuality`.
+
 ## Unified Global ScrollBox Architecture (Zero-Reparenting Secure Frame Design)
 
 **Problem**: WoW secure item buttons and empty slot buttons are bound to unique physical slot keys and cannot be reparented or dynamically moved between views during active combat without causing fatal "Action blocked" taint errors. Storing scrollboxes inside individual tab views requires secure buttons to be reparented on tab switches.

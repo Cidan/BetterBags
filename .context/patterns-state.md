@@ -125,6 +125,18 @@ if childData and childData.itemInfo.currentItemCount ~= ... then
 
 **Key files**: `frames/item.lua:323-333`, `views/gridview.lua:75-91`, `views/gridview.lua:99-120`, `views/gridview.lua:175-210`
 
+## Coroutine Pipelines: Capture Client State, Then Yield, Then Read Committed State
+**Problem**: `items:ProcessRefresh` runs inside `async:Do` and yields once (the resume comes back through `C_Timer.After(0)` on the next frame). With the yield placed right before the commit, two refreshes started in the same frame both read the *same* committed `previousItems` before either committed. A wipe refresh followed in the same frame by a `BAG_UPDATE_DELAYED` targeted sweep ended with the targeted sweep committing last — merged against the wiped (empty) previous state — so every bag it did not target vanished until the next update.
+
+**Rule**: The only frame boundary in the pipeline sits immediately after `Phase2_Harvest`. The harvest must read the client in the frame the event fired, but everything that reads committed addon state (`Phase3_ExtractPreviousState`, the targeted merge, categories, sorting, partition, commit) runs after the yield, so refreshes resume in queue order and each one merges against whatever the previous one just committed. Never move `async:Yield()` below the merge again.
+
+**Test**: `spec/refresh_pipeline_spec.lua` ("does not lose untouched bags when a wipe refresh and a targeted refresh start in the same frame") uses a real `coroutine.yield` and a queued `C_Timer.After` mock to replay the two-frame sequence.
+
+## Data Phases Must Operate On The Data They Were Handed, Not On Committed State
+**Problem**: `Phase4_ClearMovedItemGlows` detected a moved item (same GUID added in one slot and removed from another) but then called `items:ClearNewItem(ctx, slotkey)`, which looks the slot key up in the *committed* `SlotInfo` — i.e. the previous occupant of the destination slot, or nothing at all. The moved item's GUID timer was never cleared and it stayed in "Recent Items".
+
+**Rule**: Phase functions receive the transient `itemData` / `previousItems` tables as arguments; anything they mutate must be reached through those arguments (`items:ClearNewItemFromData(ctx, addedItem)`), never through `GetItemDataFromSlotKey`, which only reflects the last commit.
+
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds

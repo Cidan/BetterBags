@@ -83,6 +83,15 @@ local children = {
 	"HighlightTexture",
 }
 
+---@param bagid number?
+---@return BagKind
+local function bagKindFromBagID(bagid)
+	if bagid and (const.BANK_BAGS[bagid] or (const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bagid])) then
+		return const.BAG_KIND.BANK
+	end
+	return const.BAG_KIND.BACKPACK
+end
+
 ---@param ctx Context
 ---@param found? boolean
 function itemFrame.itemProto:UpdateSearch(ctx, found)
@@ -253,16 +262,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	local decoration = themes:GetItemButton(ctx, self)
 	decoration._itemData = data
 	local tooltipOwner = GameTooltip:GetOwner()
-	local bagid, slotid = data.bagid, data.slotid
-	if bagid and slotid then
-		if const.BANK_BAGS[bagid] then
-			self.kind = const.BAG_KIND.BANK
-		else
-			self.kind = const.BAG_KIND.BACKPACK
-		end
-	else
-		self.kind = const.BAG_KIND.BACKPACK
-	end
+	self.kind = bagKindFromBagID(data.bagid)
 
 	-- TODO(lobato): Figure out what to do with empty items.
 	if data.isItemEmpty then
@@ -301,6 +301,9 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 		decoration.IconBorder:SetBlendMode("BLEND")
 		decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
 	end
+	if not addon.isRetail then
+		self:DrawClassicQualityBorder(decoration, data.itemInfo.itemQuality)
+	end
 	self:UpdateCount(ctx, data)
 	--self:SetLock(data.itemInfo.isLocked)
 	if addon.isRetail then
@@ -317,7 +320,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	if decoration.UpdateJunkItem then decoration:UpdateJunkItem(data.itemInfo.itemQuality, noValue) end
 	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
-	if decoration.UpdateCooldown then decoration:UpdateCooldown(ctx, data) end
+	self:UpdateCooldown(ctx, data)
 	if decoration.SetReadable then decoration:SetReadable(readable) end
 	if decoration.CheckUpdateTooltip then decoration:CheckUpdateTooltip(tooltipOwner) end
 	if decoration.SetMatchesSearch then
@@ -448,6 +451,21 @@ function itemFrame.itemProto:SetSize(ctx, width, height)
 	if decoration.IconOverlay then decoration.IconOverlay:SetSize(width, height) end
 end
 
+-- Blizzard's Classic SetItemButtonQuality (Blizzard_ItemButton/Classic/ItemButtonTemplate.lua)
+-- has its quality-color block commented out and always ends with IconBorder:Hide(), so
+-- non-retail clients have to draw the rarity border themselves.
+---@param decoration ItemButton
+---@param quality number?
+function itemFrame.itemProto:DrawClassicQualityBorder(decoration, quality)
+	local qualityColor = quality and const.ITEM_QUALITY_COLOR[quality]
+	if qualityColor then
+		decoration.IconBorder:SetVertexColor(unpack(qualityColor))
+		decoration.IconBorder:Show()
+	else
+		decoration.IconBorder:Hide()
+	end
+end
+
 -- SetFreeSlots will set the item button to a free slot.
 ---@param ctx Context
 ---@param data ItemData
@@ -458,11 +476,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	assert(data, "data must be provided")
 	local bagid, slotid = data.bagid, data.slotid
 	self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
-	if const.BANK_BAGS[bagid] then
-		self.kind = const.BAG_KIND.BANK
-	else
-		self.kind = const.BAG_KIND.BACKPACK
-	end
+	self.kind = bagKindFromBagID(bagid)
 
 	if count == 0 then
 		self.button:Disable()
@@ -506,11 +520,14 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
-		local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
-		SetItemButtonQuality(decoration, quality, nil, false, false)
+	local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
+	SetItemButtonQuality(decoration, quality, nil, false, false)
 	decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
 	decoration.IconBorder:SetBlendMode("BLEND")
 	decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
+	if not addon.isRetail then
+		self:DrawClassicQualityBorder(decoration, quality)
+	end
 	self.isFreeSlot = true
 	if addon.isRetail and decoration.ItemSlotBackground then decoration.ItemSlotBackground:Show() end
 	self.frame:SetAlpha(1)
