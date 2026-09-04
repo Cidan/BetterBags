@@ -377,6 +377,28 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.is_nil(slotInfo.itemsBySlotKey["0_3"].isSearchResult)
   end)
 
+  it("keeps both bags searchable in the shared global index after a full refresh (bank indexed first, backpack last)", function()
+    -- A full refresh (data/refresh.lua RequestUpdate) always processes the bank first
+    -- and the backpack second. The search index is a single global structure shared by
+    -- both bags, so indexing only the last-processed kind evicts the other bag from the
+    -- index. That is exactly what broke the live bank search: the backpack overwrote the
+    -- bank's entries, so typing anything in the bank filtered out every bank item.
+    mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } } -- Alpha Sword (backpack)
+    mockContainer[6] = { { itemID = 202, guid = "guid-202", count = 1 } } -- Beta Shield (bank)
+
+    local bankCtx = context:New("refresh-bank")
+    items:RefreshBank(bankCtx)
+    refreshBackpack()
+
+    -- These are the exact calls frames/search.lua makes when the user types into the
+    -- backpack or bank search box against the shared global index.
+    local backpackResults = search:Search("alpha")
+    assert.is_true(backpackResults["0_1"], "backpack item must match the live search box")
+
+    local bankResults = search:Search("beta")
+    assert.is_true(bankResults["6_1"], "bank item must remain searchable after the backpack is indexed last")
+  end)
+
   it("does not lose untouched bags when a wipe refresh and a targeted refresh start in the same frame", function()
     mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
     mockContainer[1] = { { itemID = 201, guid = "guid-201", count = 1 } }
