@@ -333,6 +333,25 @@ function items:GetBagName(bagid)
   end
 end
 
+-- CloneAsGap produces a frameless gap placeholder from a previous layout entry,
+-- preserving the fields (bagid, itemInfo.category, itemHash) that downstream tab
+-- partitioning and category tallying rely on, so the hole stays in the same
+-- section/tab the departed item occupied.
+---@param entry ItemData
+---@return ItemData
+local function CloneAsGap(entry)
+  local gap = {}
+  for k, v in pairs(entry) do
+    gap[k] = v
+  end
+  gap.isItemGap = true
+  gap.isFreeSlot = nil
+  if not entry.isItemGap then
+    gap.slotkey = "gap:" .. tostring(entry.slotkey)
+  end
+  return gap
+end
+
 local function ItemBelongsToTab(kind, item, tabID, viewBagView)
   if not item then return false end
   if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
@@ -747,6 +766,152 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
   return sectionLayouts
 end
 
+-- IsBagOpen reports whether the bag window for `kind` is currently visible.
+-- Gaps only accrue while the user is looking at the bag; a sweep that runs while
+-- the bag is hidden (the on-close redraw, or consuming items with bags closed)
+-- rebuilds a fresh, gapless layout instead.
+---@param kind BagKind
+---@return boolean
+function items:IsBagOpen(kind)
+  local bag = addon.Bags and (kind == const.BAG_KIND.BANK and addon.Bags.Bank or addon.Bags.Backpack)
+  if not bag or not bag.frame or not bag.frame.IsShown then
+    return false
+  end
+  return bag.frame:IsShown() and true or false
+end
+
+-- MarkDrawOnClose flags the bag so that closing it triggers a refresh which,
+-- because the frame is then hidden, rebuilds a gapless layout.
+---@param kind BagKind
+function items:MarkDrawOnClose(kind)
+  local bag = addon.Bags and (kind == const.BAG_KIND.BANK and addon.Bags.Bank or addon.Bags.Backpack)
+  if bag then
+    bag.drawOnClose = true
+  end
+end
+
+-- BuildOrderedItems computes the ordered item list for a sweep, holding a
+-- persistent empty gap wherever a displayed icon has left the bag, by diffing the
+-- previously committed layout (previousSortedItems) against this sweep's displayed
+-- items (visibleItemsBySlotKey). Falls back to a fresh attribute sort (Phase9_Sort)
+-- for the physical bag view, when the feature is off, on an explicit reset, when the
+-- bag is closed, or when there is no previous layout to diff against.
+---@param ctx Context
+---@param kind BagKind
+---@param visibleItemsBySlotKey table<string, ItemData>
+---@param emptySlotByBagAndSlot table
+---@param previousSortedItems ItemData[]
+---@return ItemData[]
+function items:BuildOrderedItems(ctx, kind, visibleItemsBySlotKey, emptySlotByBagAndSlot, previousSortedItems)
+  local view = database.GetBagView and database:GetBagView(kind) or const.BAG_VIEW.SECTION_GRID
+  if view == const.BAG_VIEW.SECTION_ALL_BAGS then
+    return self:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
+  end
+
+  local enabled = database.GetPreserveItemGaps and database:GetPreserveItemGaps(kind) or false
+  local reset = ctx and ctx:Get("resetLayout") == true
+  local havePrevious = previousSortedItems ~= nil and next(previousSortedItems) ~= nil
+
+  if (not enabled) or reset or (not self:IsBagOpen(kind)) or (not havePrevious) then
+    return self:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
+  end
+
+  -- Bucket previous real entries and current displayed items by stack identity.
+  local prevByHash = {}
+  for _, entry in ipairs(previousSortedItems) do
+    if not entry.isItemGap and not entry.isFreeSlot and entry.itemHash then
+      prevByHash[entry.itemHash] = prevByHash[entry.itemHash] or {}
+      table.insert(prevByHash[entry.itemHash], entry)
+    end
+  end
+
+  local curByHash = {}
+  for slotkey, item in pairs(visibleItemsBySlotKey) do
+    if item.itemHash then
+      curByHash[item.itemHash] = curByHash[item.itemHash] or {}
+      curByHash[item.itemHash][slotkey] = item
+    end
+  end
+
+  local action = {}   -- prevEntry table -> { keep = ItemData } or { gap = true }
+  local usedCur = {}  -- current slotkey -> true
+
+  for h, prevs in pairs(prevByHash) do
+    local cur = curByHash[h] or {}
+    -- Pass 1: same slotkey survives in place.
+    for _, p in ipairs(prevs) do
+      if cur[p.slotkey] and not usedCur[p.slotkey] then
+        action[p] = { keep = cur[p.slotkey] }
+        usedCur[p.slotkey] = true
+      end
+    end
+    -- Pass 2: remaining current items of this hash fill remaining prev slots
+    -- (a move or virtual-stack re-root keeps its position; no gap).
+    local remaining = {}
+    for slotkey in pairs(cur) do
+      if not usedCur[slotkey] then
+        table.insert(remaining, slotkey)
+      end
+    end
+    table.sort(remaining)
+    local ri = 1
+    for _, p in ipairs(prevs) do
+      if not action[p] then
+        if ri <= #remaining then
+          local sk = remaining[ri]
+          action[p] = { keep = cur[sk] }
+          usedCur[sk] = true
+          ri = ri + 1
+        else
+          action[p] = { gap = true }
+        end
+      end
+    end
+  end
+
+  -- Emit in the previous layout's order, holding gaps in place.
+  local result = {}
+  local emittedGap = false
+  for _, entry in ipairs(previousSortedItems) do
+    if entry.isItemGap then
+      table.insert(result, CloneAsGap(entry))
+      emittedGap = true
+    elseif not entry.isFreeSlot then
+      local a = action[entry]
+      if a and a.keep then
+        table.insert(result, a.keep)
+      else
+        table.insert(result, CloneAsGap(entry))
+        emittedGap = true
+      end
+    end
+  end
+
+  -- Append genuinely new displayed items in fresh sort order.
+  local newItems = {}
+  for slotkey, item in pairs(visibleItemsBySlotKey) do
+    if not usedCur[slotkey] then
+      table.insert(newItems, item)
+    end
+  end
+  local sortModule = addon:GetModule("Sort", true)
+  if sortModule and sortModule.GetItemDataSortFunction then
+    local sortFunc = sortModule:GetItemDataSortFunction(kind, view)
+    if sortFunc then
+      table.sort(newItems, sortFunc)
+    end
+  end
+  for _, item in ipairs(newItems) do
+    table.insert(result, item)
+  end
+
+  if emittedGap then
+    self:MarkDrawOnClose(kind)
+  end
+
+  return result
+end
+
 function items:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
   local sortedItems = {}
   for _, item in pairs(visibleItemsBySlotKey) do
@@ -1029,7 +1194,8 @@ function items:Phase3_ExtractPreviousState(kind)
   local realSlotInfo = self.slotInfo[kind]
   local previousItems = realSlotInfo and realSlotInfo.itemsBySlotKey or {}
   local previousTotalItems = realSlotInfo and realSlotInfo.totalItems or 0
-  return previousItems, previousTotalItems
+  local previousSortedItems = realSlotInfo and realSlotInfo.sortedItems or {}
+  return previousItems, previousTotalItems, previousSortedItems
 end
 
 function items:ProcessRefresh(ctx, kind)
@@ -1047,7 +1213,7 @@ function items:ProcessRefresh(ctx, kind)
       ectx:Set("wipe", true)
     end
 
-    local previousItems, previousTotalItems = self:Phase3_ExtractPreviousState(kind)
+    local previousItems, previousTotalItems, previousSortedItems = self:Phase3_ExtractPreviousState(kind)
 
     local targetedBags = ectx:Get("targetedBags")
     local isWipe = ectx:Get("wipe") == true
@@ -1074,7 +1240,7 @@ function items:ProcessRefresh(ctx, kind)
 
     local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
     local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
-    local sortedItems = self:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
+    local sortedItems = self:BuildOrderedItems(ectx, kind, visibleItemsBySlotKey, emptySlotByBagAndSlot, previousSortedItems)
     local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
 
     self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)

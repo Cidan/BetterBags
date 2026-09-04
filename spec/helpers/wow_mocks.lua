@@ -526,6 +526,21 @@ _G.strchar = string.char
 _G.strrep = string.rep
 _G.strjoin = function(sep, ...) return table.concat({...}, sep) end
 
+-- strlenutf8: WoW global returning the number of UTF-8 characters (code points)
+-- in a string. Not part of stock Lua 5.1, so provide a faithful mock that counts
+-- lead bytes (any byte that is not a 0x80-0xBF continuation byte).
+_G.strlenutf8 = function(s)
+  if type(s) ~= "string" then return 0 end
+  local count = 0
+  for i = 1, #s do
+    local b = string.byte(s, i)
+    if b < 0x80 or b > 0xBF then
+      count = count + 1
+    end
+  end
+  return count
+end
+
 _G.strsplit = function(sep, str, max)
   if str == nil then return end
   local t = {}

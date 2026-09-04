@@ -182,6 +182,21 @@ describe("Section Frame", function()
       s:RemoveCell("cell1")
       assert.are.equal(s:GetCellCount(), 0)
     end)
+
+    it("skips frameless gap cells when releasing all cells", function()
+      local ctx = context:New("TestReleaseGap")
+      local s = sectionFrame:Create(ctx)
+      local released = false
+      local realCell = { Release = function() released = true end }
+      -- Gap cells are plain math tables with no Release method.
+      local gapCell = { isGap = true, width = 37, height = 37 }
+      s:AddCell("real1", realCell)
+      s:AddCell("gap:0_5", gapCell)
+      assert.has_no.errors(function()
+        s:ReleaseAllCells(ctx)
+      end)
+      assert.is_true(released)
+    end)
   end)
 
   describe("Draw and Sizing", function()
