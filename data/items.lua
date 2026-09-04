@@ -674,7 +674,26 @@ end
 
 function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlot)
   if search and search.IndexItems then
-    search:IndexItems(itemData)
+    -- The search index is a single, global structure shared by the backpack and the
+    -- bank, and IndexItems is a clean sweep (search:Wipe then re-add). Indexing only
+    -- this kind's items would therefore evict the other bag from the index. A full
+    -- refresh processes the bank first and the backpack second (data/refresh.lua), so
+    -- the backpack would overwrite the bank's entries and the live bank search box
+    -- (frames/search.lua -> search:Search) would match nothing, filtering out every
+    -- bank item. Rebuild from the complete cross-kind model instead: this kind's fresh
+    -- items unioned with the other kind's last-committed items.
+    local otherKind = (kind == const.BAG_KIND.BANK) and const.BAG_KIND.BACKPACK or const.BAG_KIND.BANK
+    local combinedItems = {}
+    local otherSlotInfo = self.slotInfo and self.slotInfo[otherKind]
+    if otherSlotInfo and otherSlotInfo.itemsBySlotKey then
+      for slotkey, item in pairs(otherSlotInfo.itemsBySlotKey) do
+        combinedItems[slotkey] = item
+      end
+    end
+    for slotkey, item in pairs(itemData) do
+      combinedItems[slotkey] = item
+    end
+    search:IndexItems(combinedItems)
   end
 
   self:RefreshSearchCache(kind, itemData)
