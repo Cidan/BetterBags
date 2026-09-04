@@ -590,4 +590,111 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
     end)
   end)
+
+  describe("Persistent item gaps", function()
+    -- Builds a view whose GetOrCreateSection returns recording sections (one per
+    -- category) that capture AddCell calls, and swaps ItemFrame:GetButton for a
+    -- recorder, so we can assert how the view routes an isItemGap entry.
+    local function renderWithGaps(newView)
+      local parent = CreateFrame("Frame")
+      local view = newView(parent, const.BAG_KIND.BACKPACK)
+      local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+
+      local addedCells = {}
+      local sections = {}
+      view.sections = {}
+      view.GetOrCreateSection = function(self, _, category)
+        if not sections[category] then
+          local sec = setmetatable({
+            SetMaxCellWidth = function() end,
+            RemoveHeader = function() end,
+            Draw = function() return 50, 50 end,
+            IsCollapsed = function() return false end,
+            GetAllCells = function() return {} end,
+            AddCell = function(_, id, cell)
+              table.insert(addedCells, { id = id, cell = cell })
+            end,
+          }, {})
+          sec.frame = CreateFrame("Frame")
+          sections[category] = sec
+          self.sections[category] = sec
+          if not self.content.cells then self.content.cells = {} end
+          table.insert(self.content.cells, sec)
+        end
+        return sections[category]
+      end
+
+      local requestedButtons = {}
+      local originalGetButton = itemFrame.GetButton
+      itemFrame.GetButton = function(s, _, slotkey)
+        table.insert(requestedButtons, slotkey)
+        return s.Create()
+      end
+      finally(function() itemFrame.GetButton = originalGetButton end)
+
+      local tabID = view.tabID or 1
+      view.tabID = tabID
+      local normal = {
+        slotkey = "0_0",
+        isItemEmpty = false,
+        itemInfo = { category = "Cat", currentItemCount = 1, itemQuality = 1 },
+        questInfo = { isQuestItem = false },
+      }
+      local gap = { isItemGap = true, slotkey = "gap:0_1", itemInfo = { category = "Cat" } }
+      local slotInfo = {
+        tabs = { [tabID] = { items = { normal, gap }, categories = { { name = "Cat" } } } },
+        totalItems = 1,
+        sectionLayouts = {},
+      }
+
+      local rendered = false
+      view:Render(context:New("gap"), bag, slotInfo, function() rendered = true end)
+
+      return rendered, addedCells, requestedButtons
+    end
+
+    local function findCell(addedCells, id)
+      for _, e in ipairs(addedCells) do
+        if e.id == id then return e.cell end
+      end
+      return nil
+    end
+
+    local function requested(list, slotkey)
+      for _, sk in ipairs(list) do
+        if sk == slotkey then return true end
+      end
+      return false
+    end
+
+    it("routes a gap to a frameless cell and requests no button (grid view)", function()
+      local rendered, addedCells, requestedButtons = renderWithGaps(function(p, k)
+        return views:NewGrid(p, k)
+      end)
+      assert.is_true(rendered)
+
+      local gapCell = findCell(addedCells, "gap:0_1")
+      assert.is_not_nil(gapCell)
+      assert.is_true(gapCell.isGap == true)
+      assert.are.equal(37, gapCell.width)
+      assert.are.equal(37, gapCell.height)
+
+      assert.is_true(requested(requestedButtons, "0_0"))
+      assert.is_false(requested(requestedButtons, "gap:0_1"))
+    end)
+
+    it("routes a gap to a frameless cell and requests no button (bag view)", function()
+      local rendered, addedCells, requestedButtons = renderWithGaps(function(p, k)
+        return views:NewBagView(p, k)
+      end)
+      assert.is_true(rendered)
+
+      local gapCell = findCell(addedCells, "gap:0_1")
+      assert.is_not_nil(gapCell)
+      assert.is_true(gapCell.isGap == true)
+
+      assert.is_true(requested(requestedButtons, "0_0"))
+      assert.is_false(requested(requestedButtons, "gap:0_1"))
+    end)
+  end)
 end)

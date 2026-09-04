@@ -645,6 +645,21 @@ function DB:SetShowAllFreeSpace(kind, value)
   DB.data.profile.showAllFreeSpace[kind] = value
 end
 
+---@param kind BagKind
+---@return boolean
+function DB:GetPreserveItemGaps(kind)
+  local t = DB.data.profile.preserveItemGaps
+  if not t then return false end
+  return t[kind]
+end
+
+---@param kind BagKind
+---@param value boolean
+function DB:SetPreserveItemGaps(kind, value)
+  DB.data.profile.preserveItemGaps = DB.data.profile.preserveItemGaps or {}
+  DB.data.profile.preserveItemGaps[kind] = value
+end
+
 -------
 --- Groups Feature
 -------

@@ -176,7 +176,11 @@ end
 ---@param ctx Context
 function sectionProto:ReleaseAllCells(ctx)
   for _, cell in pairs(self.content.cells) do
-    cell:Release(ctx)
+    -- Gap cells are plain math tables ({ isGap = true, ... }) with no frame and
+    -- no Release method; they must be skipped or the wipe path errors.
+    if not cell.isGap then
+      cell:Release(ctx)
+    end
   end
 end
 

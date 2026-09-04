@@ -99,6 +99,7 @@ const.DATABASE_DEFAULTS = {
     theme = 'Default',
     showFullSectionNames = { [0] = false, [1] = false },
     showAllFreeSpace = { [0] = false, [1] = false },
+    preserveItemGaps = { [0] = true, [1] = true },
     extraGlowyButtons = { [0] = false, [1] = false },
     newItems = {
       [0] = { markRecentItems = true, showNewItemFlash = false },
@@ -447,6 +448,15 @@ describe("Database", function()
     it("GetShowAllFreeSpace / SetShowAllFreeSpace", function()
       DB:SetShowAllFreeSpace(const.BAG_KIND.BACKPACK, true)
       assert.is_true(DB:GetShowAllFreeSpace(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("GetPreserveItemGaps / SetPreserveItemGaps", function()
+      -- Default is on for both kinds.
+      assert.is_true(DB:GetPreserveItemGaps(const.BAG_KIND.BACKPACK))
+      assert.is_true(DB:GetPreserveItemGaps(const.BAG_KIND.BANK))
+      DB:SetPreserveItemGaps(const.BAG_KIND.BACKPACK, false)
+      assert.is_false(DB:GetPreserveItemGaps(const.BAG_KIND.BACKPACK))
+      assert.is_true(DB:GetPreserveItemGaps(const.BAG_KIND.BANK))
     end)
   end)
 

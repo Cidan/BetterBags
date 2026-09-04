@@ -502,6 +502,18 @@ function config:CreateConfig()
     })
 
     f:AddCheckbox({
+      title = 'Preserve Empty Slots as Gaps',
+      description = 'When an item is used, sold, moved, or removed, keep an empty gap in its place until you close the ' .. string.lower(bagType.name) .. ' or sort it. New items appear elsewhere and never fill the gap.',
+      getValue = function(_)
+        return db:GetPreserveItemGaps(bagType.kind)
+      end,
+      setValue = function(ctx, value)
+        db:SetPreserveItemGaps(bagType.kind, value)
+        events:SendMessage(ctx, 'bags/FullRefreshAll')
+      end
+    })
+
+    f:AddCheckbox({
       title = 'Extra Glowy Item Buttons',
       description = 'Item buttons will have an enhanced glow effect using the item quality color.',
       getValue = function(_)

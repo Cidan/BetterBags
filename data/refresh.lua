@@ -65,6 +65,7 @@ end
 ---@field sortBank? boolean Sort character bank items
 ---@field sortWarbank? boolean Sort account/warbank items
 ---@field bags? table<number, boolean> Table of specific bagIDs that changed
+---@field resetLayout? boolean Ignore the previous gap layout and rebuild a fresh, gapless sort
 
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
@@ -72,6 +73,13 @@ function refresh:RequestUpdate(request)
 
   if request.bags then
     ctx:Set('targetedBags', request.bags)
+  end
+
+  -- resetLayout collapses any persistent item gaps: the sweep rebuilds a fresh,
+  -- gapless sort instead of diffing against the previous layout. Set before the
+  -- bank ctx:Copy() below so both kinds inherit it.
+  if request.resetLayout then
+    ctx:Set('resetLayout', true)
   end
 
   if request.wipe then
@@ -82,11 +90,13 @@ function refresh:RequestUpdate(request)
   end
 
   if request.sort then
+    ctx:Set('resetLayout', true)
     items:ClearNewItems(const.BAG_KIND.BACKPACK)
     request.backpack = true
   end
 
   if request.sortBank or request.sortWarbank then
+    ctx:Set('resetLayout', true)
     items:ClearNewItems(const.BAG_KIND.BANK)
     request.bank = true
   end
@@ -196,7 +206,9 @@ function refresh:OnEnable()
         addon.Bags.Bank.blizzardBankTab = firstButton.bagIndex
       end
     end
-    self:RequestUpdate({ bank = true })
+    -- Opening the bank starts from a clean, gapless layout; any gaps held from a
+    -- previous session are collapsed here.
+    self:RequestUpdate({ bank = true, resetLayout = true })
   end)
 
   events:RegisterEvent('BANKFRAME_CLOSED', function()

@@ -431,4 +431,179 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.equal(201, slotInfo.itemsBySlotKey["1_1"].itemInfo.itemID)
     assert.equal(2, slotInfo.totalItems)
   end)
+
+  describe("persistent item gaps", function()
+    local function gapCount(sortedItems)
+      local n = 0
+      for _, e in ipairs(sortedItems or {}) do
+        if e.isItemGap then n = n + 1 end
+      end
+      return n
+    end
+
+    local function enableGaps()
+      override(database, "GetPreserveItemGaps", function() return true end)
+      override(items, "IsBagOpen", function() return true end)
+      override(addon:GetModule("Sort"), "GetItemDataSortFunction", function()
+        return function(a, b)
+          if a.isItemGap or a.isFreeSlot then return false end
+          if b.isItemGap or b.isFreeSlot then return true end
+          return tostring(a.slotkey) < tostring(b.slotkey)
+        end
+      end)
+    end
+
+    local function refreshBackpackReset()
+      local ctx = context:New("refresh")
+      ctx:Set("resetLayout", true)
+      items:RefreshBackpack(ctx)
+      return items.slotInfo[const.BAG_KIND.BACKPACK]
+    end
+
+    local function refreshBank()
+      local ctx = context:New("refresh")
+      items:RefreshBank(ctx)
+      return items.slotInfo[const.BAG_KIND.BANK]
+    end
+
+    it("holds a gap in place when an item is consumed while the bag is open", function()
+      enableGaps()
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 201, guid = "g201", count = 1 },
+        { itemID = 202, guid = "g202", count = 1 },
+      }
+      local baseline = refreshBackpack()
+      assert.equal(3, baseline.totalItems)
+      assert.equal(0, gapCount(baseline.sortedItems))
+
+      -- Consume the middle item (slot 2 -> "0_2").
+      mockContainer[0][2] = {}
+      local after = refreshBackpack()
+
+      assert.equal(2, after.totalItems)
+      assert.equal(1, gapCount(after.sortedItems))
+      assert.equal("0_1", after.sortedItems[1].slotkey)
+      assert.is_true(after.sortedItems[2].isItemGap == true)
+      assert.equal("gap:0_2", after.sortedItems[2].slotkey)
+      assert.equal("0_3", after.sortedItems[3].slotkey)
+    end)
+
+    it("appends a newly looted item after the held gap", function()
+      enableGaps()
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 201, guid = "g201", count = 1 },
+        { itemID = 202, guid = "g202", count = 1 },
+      }
+      refreshBackpack()
+      mockContainer[0][2] = {}
+      refreshBackpack()
+      -- Loot a new item into slot 4.
+      mockContainer[0][4] = { itemID = 303, guid = "g303", count = 1 }
+      local after = refreshBackpack()
+
+      assert.equal(3, after.totalItems)
+      assert.equal(1, gapCount(after.sortedItems))
+      assert.equal(4, #after.sortedItems)
+      assert.equal("0_1", after.sortedItems[1].slotkey)
+      assert.is_true(after.sortedItems[2].isItemGap == true)
+      assert.equal("0_3", after.sortedItems[3].slotkey)
+      assert.equal("0_4", after.sortedItems[4].slotkey)
+    end)
+
+    it("collapses gaps on a reset (sort) refresh", function()
+      enableGaps()
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 201, guid = "g201", count = 1 },
+      }
+      refreshBackpack()
+      mockContainer[0][1] = {}
+      local gapped = refreshBackpack()
+      assert.equal(1, gapCount(gapped.sortedItems))
+
+      local collapsed = refreshBackpackReset()
+      assert.equal(0, gapCount(collapsed.sortedItems))
+      assert.equal(1, collapsed.totalItems)
+    end)
+
+    it("produces no gaps when the bag is closed", function()
+      enableGaps()
+      override(items, "IsBagOpen", function() return false end)
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 201, guid = "g201", count = 1 },
+      }
+      refreshBackpack()
+      mockContainer[0][1] = {}
+      local after = refreshBackpack()
+      assert.equal(0, gapCount(after.sortedItems))
+    end)
+
+    it("does not gap on a partial stack consume (virtual stacks)", function()
+      enableGaps()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+      -- Two slots of the same item merge into a single displayed stack.
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101a", count = 10 },
+        { itemID = 101, guid = "g101b", count = 10 },
+      }
+      local baseline = refreshBackpack()
+      assert.equal(1, #baseline.sortedItems) -- one displayed icon
+      assert.equal(0, gapCount(baseline.sortedItems))
+
+      -- Consume one slot entirely; the merged icon remains -> no gap.
+      mockContainer[0][1] = {}
+      local after = refreshBackpack()
+      assert.equal(0, gapCount(after.sortedItems))
+      assert.equal(1, #after.sortedItems)
+    end)
+
+    it("gaps when an entire displayed stack is consumed (virtual stacks)", function()
+      enableGaps()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101a", count = 10 },
+        { itemID = 101, guid = "g101b", count = 10 },
+      }
+      refreshBackpack()
+      -- Consume both slots -> the whole displayed stack disappears -> one gap.
+      mockContainer[0][1] = {}
+      mockContainer[0][2] = {}
+      local after = refreshBackpack()
+      assert.equal(1, gapCount(after.sortedItems))
+      assert.equal(0, after.totalItems)
+    end)
+
+    it("scopes gaps per bag kind (bank gap does not touch the backpack)", function()
+      enableGaps()
+      override(addon, "atBank", true)
+      mockContainer[0] = {
+        { itemID = 101, guid = "gbp1", count = 1 },
+      }
+      mockContainer[6] = {
+        { itemID = 201, guid = "gbank1", count = 1 },
+        { itemID = 202, guid = "gbank2", count = 1 },
+      }
+      local bp = refreshBackpack()
+      local bank = refreshBank()
+      assert.equal(0, gapCount(bp.sortedItems))
+      assert.equal(0, gapCount(bank.sortedItems))
+
+      -- Consume a bank item; refresh only the bank.
+      mockContainer[6][1] = {}
+      local bankAfter = refreshBank()
+      assert.equal(1, gapCount(bankAfter.sortedItems))
+
+      -- The backpack's committed layout is a different kind and is untouched.
+      assert.equal(0, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems))
+    end)
+  end)
 end)
