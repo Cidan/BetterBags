@@ -75,6 +75,33 @@ describe("Money Frame", function()
     end)
   end)
 
+  describe("Login timing", function()
+    it("refreshes stale money once the player finishes entering the world", function()
+      -- On a fresh login the money frame is built during ADDON_LOADED (see
+      -- core/init.lua -> BagFrame:Create -> SetupMoneyFrame -> money:Create),
+      -- at which point GetMoney() still returns 0 because player data has not
+      -- loaded yet.
+      _G._playerMoney = 0
+      local m = money:Create(false)
+      -- Reproduces the reported bug: the frame shows 0/0/0 like the screenshot.
+      assert.are.equal(m.goldButton:GetText(), "0")
+      assert.are.equal(m.silverButton:GetText(), "0")
+      assert.are.equal(m.copperButton:GetText(), "0")
+
+      -- Player data becomes available and the world finishes loading. PLAYER_MONEY
+      -- does NOT fire on login (the amount did not change), so the money frame must
+      -- refresh itself on PLAYER_ENTERING_WORLD or it will display a stale 0 forever.
+      _G._playerMoney = 1234567 -- 123 gold, 45 silver, 67 copper
+      local handler = events._eventMap["PLAYER_ENTERING_WORLD"]
+      assert.is_not_nil(handler) -- money frame must listen for login completion
+      handler.fn()
+
+      assert.are.equal(m.goldButton:GetText(), "123")
+      assert.are.equal(m.silverButton:GetText(), "45")
+      assert.are.equal(m.copperButton:GetText(), "67")
+    end)
+  end)
+
   describe("Mouse Interactions and Popups", function()
     it("shows PICKUP_MONEY popup on left-clicking standard frame", function()
       local m = money:Create(false)

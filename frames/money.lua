@@ -94,6 +94,14 @@ function money:Create(warbank)
   events:RegisterEvent("PLAYER_MONEY", function()
     m:Update()
   end)
+  -- The frame is built during ADDON_LOADED (core/init.lua -> BagFrame:Create),
+  -- when GetMoney() still returns 0 because player data has not loaded yet.
+  -- PLAYER_MONEY does not fire on login (the amount did not change), so without
+  -- this the frame would display a stale 0 until money next changes. Refresh once
+  -- the world finishes loading (login and /reload) so the real amount is shown.
+  events:RegisterEvent("PLAYER_ENTERING_WORLD", function()
+    m:Update()
+  end)
   return m
 end
 
