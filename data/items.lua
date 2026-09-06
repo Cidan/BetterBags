@@ -637,6 +637,41 @@ function items:Phase4_ClearMovedItemGlows(ctx, previousItems, itemData)
   end
 end
 
+-- MarkAddedItemsRecent implements the "All Items Recent" option
+-- (database:GetMarkRecentItems). It marks every genuinely-acquired item as recent
+-- independent of the client's C_NewItems flag, which is required because WoW does not flag
+-- items auto-looted from an opened container (e.g. a loot bag) as new. An item is treated as
+-- acquired when its GUID is not present anywhere in the previously committed state; this
+-- covers a brand-new slot, a slot whose contents changed in place (the container's own slot
+-- being filled by its contents), and excludes a pure move (the same GUID reappearing in a
+-- different slot), which Phase4_ClearMovedItemGlows handles instead.
+---@param ctx Context
+---@param kind BagKind
+---@param previousItems table<string, ItemData>
+---@param itemData table<string, ItemData>
+function items:MarkAddedItemsRecent(ctx, kind, previousItems, itemData)
+  if ctx:Get("wipe") == true then return end
+  if not addon.isRetail then return end
+  -- Bank items are only being viewed, not actively acquired, so they are never marked recent.
+  if kind ~= const.BAG_KIND.BACKPACK then return end
+  if not (database.GetMarkRecentItems and database:GetMarkRecentItems(kind)) then return end
+
+  local previousGUIDs = {}
+  for _, oldItem in pairs(previousItems) do
+    if not oldItem.isItemEmpty and oldItem.itemInfo and oldItem.itemInfo.itemGUID then
+      previousGUIDs[oldItem.itemInfo.itemGUID] = true
+    end
+  end
+
+  for _, newItem in pairs(itemData) do
+    if not newItem.isItemEmpty and newItem.itemInfo and newItem.itemInfo.itemGUID then
+      if not previousGUIDs[newItem.itemInfo.itemGUID] then
+        self:MarkItemAsNew(ctx, newItem)
+      end
+    end
+  end
+end
+
 function items:Phase7_ApplyVirtualStacks(kind, itemData)
   local stacks = addon:GetModule("Stacks")
   local stackData = stacks:Create()
@@ -1233,6 +1268,7 @@ function items:ProcessRefresh(ctx, kind)
     end
 
     self:Phase4_ClearMovedItemGlows(ectx, previousItems, itemData)
+    self:MarkAddedItemsRecent(ectx, kind, previousItems, itemData)
 
     local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
 

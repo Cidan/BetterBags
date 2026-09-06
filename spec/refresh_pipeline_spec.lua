@@ -432,6 +432,66 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.equal(2, slotInfo.totalItems)
   end)
 
+  describe("All Items Recent (container auto-loot, same-frame remove + add)", function()
+    -- The "All Items Recent" option (database:GetMarkRecentItems) marks every BetterBags-detected
+    -- ADDED item as recent, independent of the client's C_NewItems flag. This matters because WoW
+    -- does NOT flag items that pop out of an opened container (e.g. a loot bag) as new via
+    -- C_NewItems -- so C_NewItems.IsNewItem stays false for them (newSlots left empty below).
+    -- Opening the container removes it from its slot and auto-loots its contents in the SAME
+    -- BAG_UPDATE sweep; those added items must still land in "Recent Items".
+
+    local function enableAllItemsRecent()
+      override(database, "GetMarkRecentItems", function(_, kind) return kind == const.BAG_KIND.BACKPACK end)
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(items, "IsBagOpen", function() return true end)
+    end
+
+    it("marks items auto-looted from an opened container as Recent Items in the sweep the container is removed", function()
+      enableAllItemsRecent()
+
+      -- Baseline: a loot-bag container sits in slot 0_1, with two empty slots after it.
+      mockContainer[0] = {
+        { itemID = 303, guid = "guid-bag", count = 1 }, -- the container item
+        {},
+        {},
+      }
+      local baseline = refreshBackpack()
+      assert.equal(303, baseline.itemsBySlotKey["0_1"].itemInfo.itemID)
+
+      -- Open it: the container is consumed (removed) and its three items are auto-looted into
+      -- slot 0_1 (its own freed slot -> hash change) plus the two freed slots 0_2 and 0_3, all in
+      -- the SAME targeted sweep. The client does not flag any of them as new (newSlots stays empty).
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 201, guid = "guid-201", count = 1 },
+        { itemID = 202, guid = "guid-202", count = 1 },
+      }
+      local after = refreshBackpack({ bags = { [0] = true } })
+
+      assert.equal("Recent Items", after.itemsBySlotKey["0_1"].itemInfo.category,
+        "item that replaced the container in its own slot must be Recent")
+      assert.equal("Recent Items", after.itemsBySlotKey["0_2"].itemInfo.category,
+        "item auto-looted into a freed slot must be Recent")
+      assert.equal("Recent Items", after.itemsBySlotKey["0_3"].itemInfo.category,
+        "item auto-looted into a freed slot must be Recent")
+    end)
+
+    it("does not mark a purely moved item as Recent via All Items Recent", function()
+      enableAllItemsRecent()
+
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 }, {} }
+      refreshBackpack()
+
+      -- Drag the item from slot 1 to slot 2: same GUID, no C_NewItems flag. A move is not an
+      -- acquisition, so it must not be (re-)marked recent.
+      mockContainer[0] = { {}, { itemID = 101, guid = "guid-101", count = 1 } }
+      local after = refreshBackpack({ bags = { [0] = true } })
+
+      assert.are_not.equal("Recent Items", after.itemsBySlotKey["0_2"].itemInfo.category,
+        "a pure move must not be marked recent by All Items Recent")
+    end)
+  end)
+
   describe("persistent item gaps", function()
     local function gapCount(sortedItems)
       local n = 0
