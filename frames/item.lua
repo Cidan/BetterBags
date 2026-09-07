@@ -127,6 +127,22 @@ function itemFrame.itemProto:OnLeave()
 	itemFrame.emptyItemTooltip:Hide()
 end
 
+-- Classic/TBC only. The clickable button is a ContainerFrameItemButtonTemplate, whose
+-- native OnEnter shows the tooltip via GameTooltip:SetBagItem(GetParent():GetID(), GetID()).
+-- For the main bank container (bag id -1) that becomes SetBagItem(-1, slot) -- a path
+-- Blizzard's own bank UI never uses and which renders a degenerate "vendor price only"
+-- tooltip when the item's data is cold/evicted. Blizzard's bank buttons instead go through
+-- BankFrameItemButton_OnEnter, which uses GameTooltip:SetInventoryItem("player",
+-- BankButtonIDToInvSlotID(slot)). Route main-bank hovers there and everything else through
+-- the standard container path.
+function itemFrame.itemProto:UpdateTooltip()
+	if self.button:GetParent():GetID() == -1 then
+		BankFrameItemButton_OnEnter(self.button)
+	else
+		ContainerFrameItemButton_OnEnter(self.button)
+	end
+end
+
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:UpdateCooldown(ctx, data)
@@ -685,6 +701,18 @@ function itemFrame:_DoCreate(_, bagID)
 	-- mouse events, which can cause taint when followed by protected clicks (e.g. UseContainerItem).
 	if button.PushedTexture then button.PushedTexture:SetTexture("") elseif button.GetPushedTexture and button:GetPushedTexture() then button:GetPushedTexture():SetTexture("") end
 	if button.NormalTexture then button.NormalTexture:SetTexture("") elseif button.GetNormalTexture and button:GetNormalTexture() then button:GetNormalTexture():SetTexture("") end
+
+	-- On Classic/TBC, replace the template's native tooltip handler so the main bank
+	-- container (bag id -1) uses BankFrameItemButton_OnEnter (SetInventoryItem) instead of
+	-- the SetBagItem(-1, slot) path (see itemProto:UpdateTooltip). This is set before the
+	-- OnEnter/OnLeave HookScripts below so those (highlight, i:OnEnter) layer on top of it,
+	-- and UpdateTooltip is overridden so GameTooltip's 0.2s re-poll uses the same dispatcher.
+	-- Retail's ItemButtonMixin:OnEnter resolves bank slots correctly, so it is left untouched.
+	if not addon.isRetail then
+		button.GetInventorySlot = ButtonInventorySlot
+		button.UpdateTooltip = function() i:UpdateTooltip() end
+		button:SetScript("OnEnter", function() i:UpdateTooltip() end)
+	end
 
 	-- Cache a lazy reference to get the decoration button. The decoration is retrieved
 	-- via themes module, but we avoid touching addon tables during the actual mouse events.

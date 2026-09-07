@@ -366,3 +366,117 @@ describe("ItemFrame bag kind classification", function()
     assert.equal(const.BAG_KIND.BACKPACK, backpackItem.kind)
   end)
 end)
+
+-- On Classic/TBC, BetterBags renders every bank slot -- including the 28 main-bank
+-- container slots (bag id -1) -- with ContainerFrameItemButtonTemplate buttons. The
+-- template's native OnEnter runs GameTooltip:SetBagItem(GetParent():GetID(), GetID()),
+-- i.e. SetBagItem(-1, slot) for the main bank. Blizzard's own TBC bank never uses that
+-- path; BankFrameItemButton_OnEnter (Blizzard_UIPanels_Game/TBC/BankFrame.lua:39-68) uses
+-- GameTooltip:SetInventoryItem("player", BankButtonIDToInvSlotID(slot)) instead. Feeding a
+-- main-bank slot through SetBagItem(-1, ...) on a cold item cache produces the "vendor
+-- price only" degenerate tooltip. So on non-retail clients the button must dispatch its
+-- tooltip to BankFrameItemButton_OnEnter for the main bank container and to
+-- ContainerFrameItemButton_OnEnter for every ordinary bag. ButtonInventorySlot
+-- (TBC/BankFrame.lua:5-7) must be installed on the button so BankFrameItemButton_OnEnter
+-- can translate the slot id via GetInventorySlot().
+describe("ItemFrame bank tooltip dispatch on Classic", function()
+  local itemFrame
+  local savedGlobals = {}
+  local bankCalls, containerCalls
+
+  before_each(function()
+    stubModules()
+    savedGlobals.SetItemButtonQuality = _G.SetItemButtonQuality
+    savedGlobals.SetItemButtonTexture = _G.SetItemButtonTexture
+    savedGlobals.SetItemButtonCount = _G.SetItemButtonCount
+    savedGlobals.SetItemButtonDesaturated = _G.SetItemButtonDesaturated
+    savedGlobals.ContainerFrame_UpdateCooldown = _G.ContainerFrame_UpdateCooldown
+    savedGlobals.GetOwner = _G.GameTooltip.GetOwner
+    savedGlobals.NEW_ITEM_ATLAS_BY_QUALITY = _G.NEW_ITEM_ATLAS_BY_QUALITY
+    savedGlobals.isRetail = addon.isRetail
+    savedGlobals.BankFrameItemButton_OnEnter = _G.BankFrameItemButton_OnEnter
+    savedGlobals.ContainerFrameItemButton_OnEnter = _G.ContainerFrameItemButton_OnEnter
+    savedGlobals.ButtonInventorySlot = _G.ButtonInventorySlot
+    savedGlobals.BankButtonIDToInvSlotID = _G.BankButtonIDToInvSlotID
+
+    _G.SetItemButtonQuality = ClassicSetItemButtonQuality
+    _G.SetItemButtonTexture = ClassicSetItemButtonTexture
+    _G.SetItemButtonCount = function() end
+    _G.SetItemButtonDesaturated = function() end
+    _G.ContainerFrame_UpdateCooldown = function() end
+    _G.GameTooltip.GetOwner = function() return nil end
+    _G.NEW_ITEM_ATLAS_BY_QUALITY = { [1] = "bags-glow-white", [2] = "bags-glow-green" }
+    addon.isRetail = false
+
+    bankCalls, containerCalls = {}, {}
+    _G.BankFrameItemButton_OnEnter = function(btn) table.insert(bankCalls, btn) end
+    _G.ContainerFrameItemButton_OnEnter = function(btn) table.insert(containerCalls, btn) end
+    _G.BankButtonIDToInvSlotID = function(id) return 50 + id end
+    _G.ButtonInventorySlot = function(self) return _G.BankButtonIDToInvSlotID(self:GetID(), self.isBag) end
+
+    ResetModuleStub("ItemFrame", "frames/item.lua")
+    LoadBetterBagsModule("frames/item.lua")
+    itemFrame = addon:GetModule("ItemFrame")
+    itemFrame:Init()
+  end)
+
+  after_each(function()
+    ResetModuleStub("ItemFrame", "frames/item.lua")
+    restoreOverrides()
+    _G.SetItemButtonQuality = savedGlobals.SetItemButtonQuality
+    _G.SetItemButtonTexture = savedGlobals.SetItemButtonTexture
+    _G.SetItemButtonCount = savedGlobals.SetItemButtonCount
+    _G.SetItemButtonDesaturated = savedGlobals.SetItemButtonDesaturated
+    _G.ContainerFrame_UpdateCooldown = savedGlobals.ContainerFrame_UpdateCooldown
+    _G.GameTooltip.GetOwner = savedGlobals.GetOwner
+    _G.NEW_ITEM_ATLAS_BY_QUALITY = savedGlobals.NEW_ITEM_ATLAS_BY_QUALITY
+    addon.isRetail = savedGlobals.isRetail
+    _G.BankFrameItemButton_OnEnter = savedGlobals.BankFrameItemButton_OnEnter
+    _G.ContainerFrameItemButton_OnEnter = savedGlobals.ContainerFrameItemButton_OnEnter
+    _G.ButtonInventorySlot = savedGlobals.ButtonInventorySlot
+    _G.BankButtonIDToInvSlotID = savedGlobals.BankButtonIDToInvSlotID
+    resetCreatedStubs()
+  end)
+
+  it("routes main bank (-1) hovers to BankFrameItemButton_OnEnter", function()
+    local ctx = context:New("bank_tt")
+    local item = itemFrame:GetButton(ctx, "-1_5")
+
+    item.button:GetScript("OnEnter")()
+
+    assert.equal(1, #bankCalls, "main bank hover must call BankFrameItemButton_OnEnter")
+    assert.equal(item.button, bankCalls[1])
+    assert.equal(0, #containerCalls, "main bank hover must not use the SetBagItem container path")
+  end)
+
+  it("routes ordinary bag hovers to ContainerFrameItemButton_OnEnter", function()
+    local ctx = context:New("bag_tt")
+    local item = itemFrame:GetButton(ctx, "0_1")
+
+    item.button:GetScript("OnEnter")()
+
+    assert.equal(1, #containerCalls, "bag hover must call ContainerFrameItemButton_OnEnter")
+    assert.equal(item.button, containerCalls[1])
+    assert.equal(0, #bankCalls, "bag hover must not use the bank inventory-slot path")
+  end)
+
+  it("re-polls the correct handler via UpdateTooltip for the 0.2s tooltip refresh", function()
+    local ctx = context:New("bank_poll")
+    local item = itemFrame:GetButton(ctx, "-1_7")
+
+    -- GameTooltip's OnUpdate calls owner:UpdateTooltip() every TOOLTIP_UPDATE_TIME.
+    item.button:UpdateTooltip()
+
+    assert.equal(1, #bankCalls, "UpdateTooltip must re-dispatch to the bank handler for -1")
+    assert.equal(0, #containerCalls)
+  end)
+
+  it("installs ButtonInventorySlot so bank slots translate to inventory slots", function()
+    local ctx = context:New("bank_inv")
+    local item = itemFrame:GetButton(ctx, "-1_5")
+
+    assert.equal(_G.ButtonInventorySlot, item.button.GetInventorySlot)
+    -- slot id 5 -> BankButtonIDToInvSlotID(5) -> 55 in this mock
+    assert.equal(55, item.button:GetInventorySlot())
+  end)
+end)
