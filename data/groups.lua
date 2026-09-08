@@ -133,20 +133,23 @@ end
 ---@param kind BagKind
 ---@param categoryName string
 ---@param groupID number
-function groups:AssignCategoryToGroup(ctx, kind, categoryName, groupID)
+---@param bankType? number
+function groups:AssignCategoryToGroup(ctx, kind, categoryName, groupID, bankType)
+  local group = database:GetGroup(kind, groupID)
+  bankType = bankType or (group and group.bankType)
+
   -- If assigning to a default group, just remove the explicit assignment
   if self:IsDefaultGroup(kind, groupID) then
-    self:RemoveCategoryFromGroup(ctx, kind, categoryName)
+    self:RemoveCategoryFromGroup(ctx, kind, categoryName, bankType)
     return
   end
 
-  local group = database:GetGroup(kind, groupID)
   if not group then
     debug:Log("groups", "Cannot assign to non-existent group: %d", groupID)
     return
   end
 
-  database:SetCategoryGroup(kind, categoryName, groupID)
+  database:SetCategoryGroup(kind, categoryName, groupID, bankType)
   debug:Log("groups", "Assigned category '%s' to group '%s' (ID: %d)", categoryName, group.name, groupID)
   events:SendMessage(ctx, 'groups/CategoryAssigned', categoryName, groupID, kind)
 end
@@ -155,9 +158,10 @@ end
 ---@param ctx Context
 ---@param kind BagKind
 ---@param categoryName string
-function groups:RemoveCategoryFromGroup(ctx, kind, categoryName)
-  local previousGroup = database:GetCategoryGroup(kind, categoryName)
-  database:RemoveCategoryFromGroup(kind, categoryName)
+---@param bankType? number
+function groups:RemoveCategoryFromGroup(ctx, kind, categoryName, bankType)
+  local previousGroup = database:GetCategoryGroup(kind, categoryName, bankType)
+  database:RemoveCategoryFromGroup(kind, categoryName, bankType)
   if previousGroup then
     debug:Log("groups", "Removed category '%s' from group (ID: %d)", categoryName, previousGroup)
     events:SendMessage(ctx, 'groups/CategoryRemoved', categoryName, previousGroup, kind)
@@ -168,9 +172,10 @@ end
 -- Returns nil if the category has no explicit assignment (belongs to Backpack).
 ---@param kind BagKind
 ---@param categoryName string
+---@param bankType? number
 ---@return number? The group ID, or nil if unassigned (belongs to default)
-function groups:GetGroupForCategory(kind, categoryName)
-  return database:GetCategoryGroup(kind, categoryName)
+function groups:GetGroupForCategory(kind, categoryName, bankType)
+  return database:GetCategoryGroup(kind, categoryName, bankType)
 end
 
 -- GetCategoriesInGroup returns all categories explicitly assigned to a group.
@@ -186,9 +191,14 @@ end
 ---@param kind BagKind
 ---@param categoryName string
 ---@param groupID number
+---@param bankType? number
 ---@return boolean
-function groups:CategoryBelongsToGroup(kind, categoryName, groupID)
-  local assignedGroup = database:GetCategoryGroup(kind, categoryName)
+function groups:CategoryBelongsToGroup(kind, categoryName, groupID, bankType)
+  if addon.isRetail and kind == const.BAG_KIND.BANK and bankType == nil then
+    local group = database:GetGroup(kind, groupID)
+    bankType = group and group.bankType
+  end
+  local assignedGroup = database:GetCategoryGroup(kind, categoryName, bankType)
   if self:IsDefaultGroup(kind, groupID) then
     -- Default groups include all categories not explicitly assigned to another group of the same kind
     if assignedGroup == nil then return true end
@@ -235,10 +245,22 @@ end
 ---@param categoryName string
 function groups:OnCategoryDeleted(_, categoryName)
   for _, kind in pairs(const.BAG_KIND) do
-    local groupID = database:GetCategoryGroup(kind, categoryName)
-    if groupID then
-      database:RemoveCategoryFromGroup(kind, categoryName)
-      debug:Log("groups", "Cleaned up deleted category '%s' from group ID: %d in bag kind: %s", categoryName, groupID, kind)
+    if addon.isRetail and kind == const.BAG_KIND.BANK then
+      local charBankType = Enum.BankType and Enum.BankType.Character or 0
+      local accountBankType = Enum.BankType and Enum.BankType.Account or 2
+      for _, bankType in ipairs({ charBankType, accountBankType }) do
+        local groupID = database:GetCategoryGroup(kind, categoryName, bankType)
+        if groupID then
+          database:RemoveCategoryFromGroup(kind, categoryName, bankType)
+          debug:Log("groups", "Cleaned up deleted category '%s' from group ID: %d in bankType: %d", categoryName, groupID, bankType)
+        end
+      end
+    else
+      local groupID = database:GetCategoryGroup(kind, categoryName)
+      if groupID then
+        database:RemoveCategoryFromGroup(kind, categoryName)
+        debug:Log("groups", "Cleaned up deleted category '%s' from group ID: %d in bag kind: %s", categoryName, groupID, kind)
+      end
     end
   end
 end

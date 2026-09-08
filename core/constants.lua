@@ -830,10 +830,13 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = 1,
       [const.BAG_KIND.BANK] = 0,
     },
-    ---@type table<BagKind, table<string, number>>
+    ---@type table<BagKind, table<string, number>|table<number, table<string, number>>>
     categoryToGroup = {
       [const.BAG_KIND.BACKPACK] = {},
-      [const.BAG_KIND.BANK] = {},
+      [const.BAG_KIND.BANK] = addon.isRetail and {
+        [Enum.BankType and Enum.BankType.Character or 0] = {},
+        [Enum.BankType and Enum.BankType.Account or 2] = {},
+      } or {},
     },
     ---@type table<BagKind, number>
     activeGroup = {
@@ -847,6 +850,8 @@ const.DATABASE_DEFAULTS = {
     },
     -- Profile system migration flag
     __profileSystemMigrated = false,
+    -- Bank categories scoped by bankType migration flag
+    __bankCategoriesScopedByBankType = false,
     -- Saved backpack dump for testing and debugging
     debugBackpackDump = {},
   },
