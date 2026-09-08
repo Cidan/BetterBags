@@ -137,6 +137,17 @@ if childData and childData.itemInfo.currentItemCount ~= ... then
 
 **Rule**: Phase functions receive the transient `itemData` / `previousItems` tables as arguments; anything they mutate must be reached through those arguments (`items:ClearNewItemFromData(ctx, addedItem)`), never through `GetItemDataFromSlotKey`, which only reflects the last commit.
 
+## Dual-Bank Tab Routing (Retail Character Bank vs Warbank)
+**Problem**: In Retail, Character Bank (`bankType = Character`) and Account Bank (`bankType = Account`) share `const.BAG_KIND.BANK`. If `categoryToGroup[BANK]` is stored as a flat dictionary, assigning a category to a Warbank tab overwrites the Character Bank assignment. `ItemBelongsToTab` strictly filters items by `itemIsAccountBank == tabIsAccountBank`, so Character Bank items of that category cannot show in the Warbank tab, cannot show in any Character Bank tab (since `assignedGroup` points to the Warbank tab), and are rejected by default Tab 1 (which only accepts unassigned categories). The items completely vanish from all bank tabs.
+
+**Solution**:
+1. Partition `categoryToGroup[const.BAG_KIND.BANK]` by `bankType` on Retail (`[Enum.BankType.Character]` and `[Enum.BankType.Account]`).
+2. Pass `bankType` during category assignment, removal, and lookup.
+3. In `ItemBelongsToTab`, derive `itemBankType` from `itemIsAccountBank` and pass it to `CategoryBelongsToGroup`.
+4. If a category is not assigned in that item's `bankType`, it safely falls back to the default tab of that bank type (Tab 1 for Character Bank, Tab 2 for Warbank).
+5. Non-retail clients (`not addon.isRetail`) maintain the single flat dictionary without bankType scoping because Warbank and `Enum.BankType` do not exist.
+
+
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds

@@ -706,9 +706,30 @@ function DB:DeleteGroup(kind, groupID)
   if group.isDefault then return end
 
   -- Remove category associations for this group
-  for categoryName, gID in pairs(DB.data.profile.categoryToGroup[kind]) do
-    if gID == groupID then
-      DB.data.profile.categoryToGroup[kind][categoryName] = nil
+  if addon.isRetail and kind == const.BAG_KIND.BANK then
+    local bankType = group.bankType
+    if bankType ~= nil and type(DB.data.profile.categoryToGroup[kind][bankType]) == "table" then
+      for categoryName, gID in pairs(DB.data.profile.categoryToGroup[kind][bankType]) do
+        if gID == groupID then
+          DB.data.profile.categoryToGroup[kind][bankType][categoryName] = nil
+        end
+      end
+    else
+      for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
+        if type(tbl) == "table" then
+          for categoryName, gID in pairs(tbl) do
+            if gID == groupID then
+              tbl[categoryName] = nil
+            end
+          end
+        end
+      end
+    end
+  else
+    for categoryName, gID in pairs(DB.data.profile.categoryToGroup[kind]) do
+      if gID == groupID then
+        DB.data.profile.categoryToGroup[kind][categoryName] = nil
+      end
     end
   end
 
@@ -773,9 +794,19 @@ function DB:RenameCategory(oldName, newName)
 
   -- 3. Update group mapping
   for _, kind in pairs(const.BAG_KIND) do
-    if DB.data.profile.categoryToGroup[kind] and DB.data.profile.categoryToGroup[kind][oldName] then
-      DB.data.profile.categoryToGroup[kind][newName] = DB.data.profile.categoryToGroup[kind][oldName]
-      DB.data.profile.categoryToGroup[kind][oldName] = nil
+    if DB.data.profile.categoryToGroup[kind] then
+      if DB.data.profile.categoryToGroup[kind][oldName] then
+        DB.data.profile.categoryToGroup[kind][newName] = DB.data.profile.categoryToGroup[kind][oldName]
+        DB.data.profile.categoryToGroup[kind][oldName] = nil
+      end
+      if addon.isRetail and kind == const.BAG_KIND.BANK then
+        for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
+          if type(tbl) == "table" and tbl[oldName] then
+            tbl[newName] = tbl[oldName]
+            tbl[oldName] = nil
+          end
+        end
+      end
     end
   end
 
@@ -852,21 +883,71 @@ end
 
 ---@param kind BagKind
 ---@param categoryName string
+---@param bankType? number
 ---@return number? The group ID, or nil if not assigned (belongs to Backpack/Bank default)
-function DB:GetCategoryGroup(kind, categoryName)
-  return DB.data.profile.categoryToGroup[kind][categoryName]
+function DB:GetCategoryGroup(kind, categoryName, bankType)
+  local categoryMap = DB.data.profile.categoryToGroup[kind]
+  if not categoryMap then return nil end
+
+  if addon.isRetail and kind == const.BAG_KIND.BANK then
+    if bankType ~= nil then
+      local bankTypeTable = categoryMap[bankType]
+      if bankTypeTable then
+        return bankTypeTable[categoryName]
+      end
+    else
+      local charBankType = Enum.BankType and Enum.BankType.Character or 0
+      local accountBankType = Enum.BankType and Enum.BankType.Account or 2
+      local charTable = categoryMap[charBankType]
+      if charTable and charTable[categoryName] then return charTable[categoryName] end
+      local accountTable = categoryMap[accountBankType]
+      if accountTable and accountTable[categoryName] then return accountTable[categoryName] end
+    end
+    -- Fallback for flat unmigrated entries if any
+    return categoryMap[categoryName]
+  end
+
+  return categoryMap[categoryName]
 end
 
 ---@param kind BagKind
 ---@param categoryName string
 ---@param groupID number
-function DB:SetCategoryGroup(kind, categoryName, groupID)
+---@param bankType? number
+function DB:SetCategoryGroup(kind, categoryName, groupID, bankType)
+  if addon.isRetail and kind == const.BAG_KIND.BANK then
+    if bankType == nil then
+      local group = DB:GetGroup(kind, groupID)
+      bankType = group and group.bankType or ((Enum.BankType and Enum.BankType.Character) or 0)
+    end
+    if not DB.data.profile.categoryToGroup[kind][bankType] then
+      DB.data.profile.categoryToGroup[kind][bankType] = {}
+    end
+    DB.data.profile.categoryToGroup[kind][bankType][categoryName] = groupID
+    return
+  end
   DB.data.profile.categoryToGroup[kind][categoryName] = groupID
 end
 
 ---@param kind BagKind
 ---@param categoryName string
-function DB:RemoveCategoryFromGroup(kind, categoryName)
+---@param bankType? number
+function DB:RemoveCategoryFromGroup(kind, categoryName, bankType)
+  if addon.isRetail and kind == const.BAG_KIND.BANK then
+    if bankType ~= nil then
+      if DB.data.profile.categoryToGroup[kind][bankType] then
+        DB.data.profile.categoryToGroup[kind][bankType][categoryName] = nil
+      end
+    else
+      for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
+        if type(tbl) == "table" then
+          tbl[categoryName] = nil
+        end
+      end
+      DB.data.profile.categoryToGroup[kind][categoryName] = nil
+    end
+    return
+  end
   DB.data.profile.categoryToGroup[kind][categoryName] = nil
 end
 
@@ -875,6 +956,28 @@ end
 ---@return table<string, boolean> Category names in this group
 function DB:GetGroupCategories(kind, groupID)
   local categories = {}
+  if addon.isRetail and kind == const.BAG_KIND.BANK then
+    local group = DB:GetGroup(kind, groupID)
+    local bankType = group and group.bankType
+    if bankType ~= nil and type(DB.data.profile.categoryToGroup[kind][bankType]) == "table" then
+      for categoryName, gID in pairs(DB.data.profile.categoryToGroup[kind][bankType]) do
+        if gID == groupID then
+          categories[categoryName] = true
+        end
+      end
+      return categories
+    end
+    for _, tbl in pairs(DB.data.profile.categoryToGroup[kind]) do
+      if type(tbl) == "table" then
+        for categoryName, gID in pairs(tbl) do
+          if gID == groupID then
+            categories[categoryName] = true
+          end
+        end
+      end
+    end
+    return categories
+  end
   for categoryName, gID in pairs(DB.data.profile.categoryToGroup[kind]) do
     if gID == groupID then
       categories[categoryName] = true
@@ -1262,6 +1365,49 @@ function DB:Migrate()
 
   if DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] == nil then
     DB.data.profile.groupsEnabled[const.BAG_KIND.BANK] = true
+  end
+
+  -- Migrate Retail Bank categories to be scoped by bankType
+  if addon.isRetail and not DB.data.profile.__bankCategoriesScopedByBankType then
+    local bankGroups = DB.data.profile.groups[const.BAG_KIND.BANK] or {}
+    local oldBankCategoryToGroup = DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]
+
+    local flatEntries = {}
+    if oldBankCategoryToGroup then
+      for k, v in pairs(oldBankCategoryToGroup) do
+        if type(k) == "string" and type(v) == "number" then
+          flatEntries[k] = v
+        end
+      end
+    end
+
+    local newBankCategoryToGroup = {
+      [charBankType] = (type(oldBankCategoryToGroup) == "table" and type(oldBankCategoryToGroup[charBankType]) == "table") and oldBankCategoryToGroup[charBankType] or {},
+      [accountBankType] = (type(oldBankCategoryToGroup) == "table" and type(oldBankCategoryToGroup[accountBankType]) == "table") and oldBankCategoryToGroup[accountBankType] or {},
+    }
+
+    for catName, gID in pairs(flatEntries) do
+      local grp = bankGroups[gID]
+      local bType = grp and grp.bankType or charBankType
+      if not newBankCategoryToGroup[bType] then
+        newBankCategoryToGroup[bType] = {}
+      end
+      newBankCategoryToGroup[bType][catName] = gID
+    end
+
+    DB.data.profile.categoryToGroup[const.BAG_KIND.BANK] = newBankCategoryToGroup
+    DB.data.profile.__bankCategoriesScopedByBankType = true
+  end
+
+  -- Ensure retail bank category tables exist
+  if addon.isRetail and DB.data.profile.categoryToGroup and DB.data.profile.categoryToGroup[const.BAG_KIND.BANK] then
+    local bankTable = DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]
+    if not bankTable[charBankType] then
+      bankTable[charBankType] = {}
+    end
+    if not bankTable[accountBankType] then
+      bankTable[accountBankType] = {}
+    end
   end
 
   -- ============================================================

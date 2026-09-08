@@ -450,12 +450,14 @@ function sectionFrame:PerformDrop()
   if not kind then return end
 
   local dropCtx = context:New("CategoryDropOnTab")
+  local group = groups:GetGroup(kind, tabID)
+  local bankType = group and group.bankType
   if groups:IsDefaultGroup(kind, tabID) then
     -- Dropping on default tabs removes group assignment
-    groups:RemoveCategoryFromGroup(dropCtx, kind, category)
+    groups:RemoveCategoryFromGroup(dropCtx, kind, category, bankType)
   else
     -- Dropping on other group assigns to that group
-    groups:AssignCategoryToGroup(dropCtx, kind, category, tabID)
+    groups:AssignCategoryToGroup(dropCtx, kind, category, tabID, bankType)
   end
 
   local eventsModule = addon:GetModule("Events")

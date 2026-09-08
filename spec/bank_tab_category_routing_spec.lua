@@ -295,15 +295,24 @@ describe("Bank tab category routing bug reproduction", function()
     -- Character bank TWW ore assigned to Character bank group (10) shows up in Character bank tab:
     assert.are.same({ 10 }, charTWWOreTabs, "Character bank TWW ore should be in Bank Crafting tab (10)")
 
-    -- BUT THE BUG:
+    -- With bankType-scoped routing:
     -- Character bank items whose category was assigned to a Warbank group (4 or 6)
-    -- are COMPLETELY ABSENT from all tabs in the bank!
-    assert.are.equal(0, #charHelmTabs, "BUG CONFIRMED: Character bank helm is in 0 tabs!")
-    assert.are.equal(0, #charMidnightOreTabs, "BUG CONFIRMED: Character bank Midnight ore is in 0 tabs!")
+    -- are safely preserved in the default Character Bank tab (1):
+    assert.are.same({ 1 }, charHelmTabs, "Character bank helm should fall back to default Bank tab (1)")
+    assert.are.same({ 1 }, charMidnightOreTabs, "Character bank Midnight ore should fall back to default Bank tab (1)")
 
     -- And conversely, Warbank items whose category was assigned to a Character bank group (10)
-    -- are COMPLETELY ABSENT from all tabs in the bank!
-    assert.are.equal(0, #warTWWOreTabs, "BUG CONFIRMED: Warbank TWW ore is in 0 tabs!")
+    -- are safely preserved in the default Warbank tab (2):
+    assert.are.same({ 2 }, warTWWOreTabs, "Warbank TWW ore should fall back to default Warbank tab (2)")
+
+    -- Now verify that assigning "Head" to Character Bank tab 9 works independently of Warbank tab 4:
+    groups:AssignCategoryToGroup(ctx, BANK, "Head", 9)
+    tabs = items:Phase10_PartitionIntoTabs(ctx, BANK, sortedItems, {}, {}, {}, itemData)
+    charHelmTabs = findTabsForItem("6_1")
+    warHelmTabs = findTabsForItem("13_1")
+
+    assert.are.same({ 9 }, charHelmTabs, "Character bank helm should now be in Character Bank Armor tab (9)")
+    assert.are.same({ 4 }, warHelmTabs, "Warbank helm should remain in Warbank Armor tab (4)")
   end)
 
   it("reproduces the bug using the user's actual SavedVariables file from ~/Downloads/BetterBags.lua", function()
@@ -411,15 +420,15 @@ describe("Bank tab category routing bug reproduction", function()
     assert.are.same({ 4 }, warHelmTabs)
     assert.are.same({ 6 }, warMidnightOreTabs)
 
-    -- PROVE THE USER'S EXACT REPORT:
-    -- 1. Character bank armor piece is in ZERO tabs:
-    assert.are.equal(0, #charHelmTabs, "User's Character Bank Helm is in 0 tabs!")
+    -- Under the migrated configuration:
+    -- 1. Character bank armor piece safely falls back to default Bank tab 1 instead of vanishing:
+    assert.are.same({ 1 }, charHelmTabs, "User's Character Bank Helm is safely visible in Bank default tab (1)!")
 
-    -- 2. Character bank Midnight reagent is in ZERO tabs:
-    assert.are.equal(0, #charMidnightOreTabs, "User's Character Bank Midnight Ore is in 0 tabs!")
+    -- 2. Character bank Midnight reagent safely falls back to default Bank tab 1 instead of vanishing:
+    assert.are.same({ 1 }, charMidnightOreTabs, "User's Character Bank Midnight Ore is safely visible in Bank default tab (1)!")
 
-    -- 3. Warbank TWW reagent (which user assigned to Character Bank CRAFTING tab 10) is in ZERO tabs:
-    assert.are.equal(0, #warTWWOreTabs, "User's Warbank TWW Ore is in 0 tabs!")
+    -- 3. Warbank TWW reagent (which user assigned to Character Bank CRAFTING tab 10) safely falls back to Warbank default tab 2:
+    assert.are.same({ 2 }, warTWWOreTabs, "User's Warbank TWW Ore is safely visible in Warbank default tab (2)!")
   end)
 
   it("fails the expected invariant: all physical bank items must belong to at least one bank tab", function()
@@ -575,8 +584,8 @@ describe("Bank tab category routing bug reproduction", function()
     -- Warbank helm is in tab 4 (Warbank Armor):
     assert.is_true(inAnyTab("13_1"), "Warbank helm is present in a bank tab")
 
-    -- BUT Character bank items are completely dropped from all tabs in slotInfo.tabs:
-    assert.is_false(inAnyTab("6_1"), "BUG: Character bank helm is missing from all tabs in slotInfo.tabs!")
-    assert.is_false(inAnyTab("6_2"), "BUG: Character bank Midnight ore is missing from all tabs in slotInfo.tabs!")
+    -- Character bank items are safely preserved in bank tabs (default tab 1):
+    assert.is_true(inAnyTab("6_1"), "Character bank helm is visible in bank tabs!")
+    assert.is_true(inAnyTab("6_2"), "Character bank Midnight ore is visible in bank tabs!")
   end)
 end)
