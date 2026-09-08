@@ -64,4 +64,7 @@ _G.ResetModuleStub = function(name, filePath)
   if name == "Items" then
     loadedModules["data/slots.lua"] = nil
   end
+  if name == "Trees" then
+    loadedModules["util/trees/intervaltree.lua"] = nil
+  end
 end
