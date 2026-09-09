@@ -1173,3 +1173,83 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 end)
+
+-- ─── Item stat hashing (Catalyst) ─────────────────────────────────────────────
+-- The 12.1 Catalyst retains a source item's secondary stats, so two pieces can
+-- share the same itemID, item level and bonus IDs yet differ only in their stat
+-- allocation. That difference is invisible to the item link's hashed fields but
+-- is reported by C_Item.GetItemStats, so the hash must fold in a stat digest or
+-- the two pieces collide and get virtually stacked into one slot.
+describe("GenerateItemHash (Catalyst item stats)", function()
+  local savedGetItemStats
+  before_each(function()
+    _G.C_Item = _G.C_Item or {}
+    savedGetItemStats = _G.C_Item.GetItemStats
+  end)
+  after_each(function()
+    _G.C_Item.GetItemStats = savedGetItemStats
+  end)
+
+  -- Both fists share itemID, item level and bonus IDs; only the itemLink (used to
+  -- look up live stats) and the reported stats differ.
+  local function makeData(link)
+    return {
+      kind = const.BAG_KIND.BACKPACK,
+      itemLinkInfo = {
+        itemID = 271520,
+        bonusIDs = { "6652", "13440", "13691", "13697", "12846" },
+        relic1BonusIDs = {}, relic2BonusIDs = {}, relic3BonusIDs = {},
+      },
+      bindingInfo = { binding = const.BINDING_SCOPE.SOULBOUND },
+      itemInfo = { currentItemLevel = 321, itemLink = link },
+      transmogInfo = {},
+    }
+  end
+
+  it("GenerateItemStatHash returns a deterministic, sorted digest", function()
+    _G.C_Item.GetItemStats = function()
+      return { ITEM_MOD_HASTE_RATING_SHORT = 50, ITEM_MOD_CRIT_RATING_SHORT = 93 }
+    end
+    assert.are.equal(
+      "ITEM_MOD_CRIT_RATING_SHORT=93,ITEM_MOD_HASTE_RATING_SHORT=50",
+      items:GenerateItemStatHash("anylink")
+    )
+  end)
+
+  it("GenerateItemStatHash returns empty string when stats are unavailable", function()
+    _G.C_Item.GetItemStats = function() return nil end
+    assert.are.equal("", items:GenerateItemStatHash("anylink"))
+    _G.C_Item.GetItemStats = function() return {} end
+    assert.are.equal("", items:GenerateItemStatHash("anylink"))
+  end)
+
+  it("produces different hashes for two catalyst items that differ only in secondary stats", function()
+    _G.C_Item.GetItemStats = function(link)
+      if link == "linkHaste" then
+        return {
+          ITEM_MOD_CRIT_RATING_SHORT = 93, ITEM_MOD_HASTE_RATING_SHORT = 50,
+          ITEM_MOD_STAMINA_SHORT = 2527, RESISTANCE0_NAME = 101, ITEM_MOD_AGILITY_SHORT = 125,
+        }
+      elseif link == "linkVers" then
+        return {
+          ITEM_MOD_CRIT_RATING_SHORT = 84, ITEM_MOD_VERSATILITY = 59,
+          ITEM_MOD_STAMINA_SHORT = 2527, RESISTANCE0_NAME = 101, ITEM_MOD_AGILITY_SHORT = 125,
+        }
+      end
+      return nil
+    end
+
+    local hashHaste = items:GenerateItemHash(makeData("linkHaste"))
+    local hashVers = items:GenerateItemHash(makeData("linkVers"))
+    assert.are_not.equal(hashHaste, hashVers)
+  end)
+
+  it("produces identical hashes for two items with identical stats (still stackable)", function()
+    -- The item link itself is not hashed, only the parsed link fields plus the
+    -- stat digest; two items with identical stats must remain mergeable.
+    _G.C_Item.GetItemStats = function()
+      return { ITEM_MOD_CRIT_RATING_SHORT = 93, ITEM_MOD_HASTE_RATING_SHORT = 50 }
+    end
+    assert.are.equal(items:GenerateItemHash(makeData("linkA")), items:GenerateItemHash(makeData("linkB")))
+  end)
+end)

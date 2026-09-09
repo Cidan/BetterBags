@@ -686,7 +686,12 @@ function items:Phase7_ApplyVirtualStacks(kind, itemData)
     end
   end
 
+  -- Show Bags (SECTION_ALL_BAGS) mirrors the physical container layout: every bag slot
+  -- must render on its own, so virtual stacking is disabled entirely for that view.
+  local isAllBags = database.GetBagView and database:GetBagView(kind) == const.BAG_VIEW.SECTION_ALL_BAGS
+
   local function ShouldMergeItem(bagKind, item, stackInfo)
+    if isAllBags then return false end
     if not stackInfo then return false end
     local opts = database:GetStackingOptions(bagKind)
     if not opts.mergeStacks then return false end
@@ -2222,6 +2227,34 @@ function items:ParseItemLink(link)
   }
 end
 
+-- The 12.1 Catalyst retains a source item's secondary stats, so two pieces can share
+-- the same itemID, item level and bonus IDs (the stat difference lives in an item-link
+-- modifier we do not hash) yet display different stats. C_Item.GetItemStats reports the
+-- resolved per-item stats, so a sorted digest of it is folded into the item hash to keep
+-- such pieces from collapsing into a single virtual stack. The digest is intentionally
+-- key/value only (locale-independent constant names) and sorted for determinism.
+---@param itemLink? string
+---@return string
+function items:GenerateItemStatHash(itemLink)
+  if not itemLink or itemLink == "" then return "" end
+  -- C_Item.GetItemStats on Retail (10.2.5+); the global GetItemStats on Classic/Era.
+  local getItemStats = (C_Item and C_Item.GetItemStats) or _G.GetItemStats
+  if not getItemStats then return "" end
+  local stats = getItemStats(itemLink)
+  if not stats then return "" end
+  local keys = {}
+  for k in pairs(stats) do
+    keys[#keys + 1] = k
+  end
+  if #keys == 0 then return "" end
+  table.sort(keys)
+  local parts = {}
+  for i = 1, #keys do
+    parts[i] = keys[i] .. "=" .. tostring(stats[keys[i]])
+  end
+  return table.concat(parts, ",")
+end
+
 function items:GenerateItemHash(data)
   local stackOpts = database:GetStackingOptions(data.kind)
   local itemLinkInfo = data.itemLinkInfo or {}
@@ -2243,6 +2276,7 @@ function items:GenerateItemHash(data)
   local extraEnchantID = itemLinkInfo.extraEnchantID or ""
   local bindingVal = bindingInfo.binding or 0
   local currentItemLevel = itemInfo.currentItemLevel or 0
+  local statHash = self:GenerateItemStatHash(itemInfo.itemLink)
 
   local appearanceID = 0
   if stackOpts.dontMergeTransmog
@@ -2252,7 +2286,7 @@ function items:GenerateItemHash(data)
   end
 
   local hash = format(
-    "%d%s%s%s%s%s%s%s%s%s%s%s%d%d%d",
+    "%d%s%s%s%s%s%s%s%s%s%s%s%d%d%d%s",
     itemID,
     enchantID,
     gemID1,
@@ -2267,7 +2301,8 @@ function items:GenerateItemHash(data)
     extraEnchantID,
     bindingVal,
     currentItemLevel,
-    appearanceID
+    appearanceID,
+    statHash
   )
   return hash
 end
