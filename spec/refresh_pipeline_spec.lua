@@ -50,7 +50,7 @@ local itemNames = {
 }
 
 local const, database, categories, searchText
-local mockContainer, newSlots, removedNewItems
+local mockContainer, newSlots, removedNewItems, mockStats
 
 local function stubModules()
   local debug = stubModule("Debug")
@@ -147,6 +147,7 @@ local function stubClientAPIs()
     { _G.C_Container, "ContainerIDToInventoryID" },
     { _G.C_Item, "GetItemInfo" },
     { _G.C_Item, "GetItemGUID" },
+    { _G.C_Item, "GetItemStats" },
     { _G.C_Item, "GetItemSubClassInfo" },
     { _G.C_NewItems, "IsNewItem" },
     { _G.C_NewItems, "RemoveNewItem" },
@@ -166,6 +167,7 @@ local function stubClientAPIs()
   _G.C_Container.GetContainerItemLink = function(bagid, slotid)
     local slot = mockContainer[bagid] and mockContainer[bagid][slotid]
     if not slot or not slot.itemID then return nil end
+    if slot.link then return slot.link end
     local name = itemNames[slot.itemID] or ("TestItem " .. slot.itemID)
     return "|cffffffff|Hitem:" .. slot.itemID .. "|h[" .. name .. "]|h|r"
   end
@@ -198,6 +200,7 @@ local function stubClientAPIs()
     local slot = bagid and mockContainer[bagid] and mockContainer[bagid][slotid]
     return slot and slot.guid or ""
   end
+  _G.C_Item.GetItemStats = function(link) return mockStats[link] end
   _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
   _G.C_NewItems.IsNewItem = function(bagid, slotid)
     return newSlots[bagid .. "_" .. slotid] or false
@@ -256,6 +259,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     mockContainer = {}
     newSlots = {}
     removedNewItems = {}
+    mockStats = {}
     searchText = ""
 
     stubModules()
@@ -318,6 +322,83 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK]["guid-101"], "moved item's recent timer must be cleared")
     assert.is_false(moved.itemInfo.isNewItem)
     assert.are_not.equal("Recent Items", moved.itemInfo.category)
+  end)
+
+  -- Two 12.1 Catalyst pieces: identical itemID, item level and bonus IDs, differing
+  -- only in the secondary stats reported by GetItemStats. Without a stat component in
+  -- the item hash they collide and one is hidden behind a virtual stack.
+  -- Modern (|cnIQ4:) colour-prefixed links that ParseItemLink handles cleanly. Both
+  -- carry identical bonus IDs (6652,13440); they differ only in the value of modifier
+  -- type 64 (251124 vs 193758) — the field the real Catalyst uses and the one the item
+  -- hash does not hash. GetItemStats is mocked per exact link string below.
+  local FIST_HASTE = "|cnIQ4:|Hitem:271520:0:0:0:0:0:0:0:0:0:0:0:2:6652:13440:1:64:251124:0:0:0:::|h[Monkey King's Fighting Fists]|h|r"
+  local FIST_VERS  = "|cnIQ4:|Hitem:271520:0:0:0:0:0:0:0:0:0:0:0:2:6652:13440:1:64:193758:0:0:0:::|h[Monkey King's Fighting Fists]|h|r"
+
+  it("does not virtually stack two catalyst items that differ only in secondary stats", function()
+    override(database, "GetStackingOptions", function()
+      return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+        dontMergePartial = false, dontMergeTransmog = false }
+    end)
+    mockContainer[0] = {
+      { itemID = 271520, guid = "guid-fist-1", count = 1, link = FIST_HASTE },
+      { itemID = 271520, guid = "guid-fist-2", count = 1, link = FIST_VERS },
+    }
+    mockStats[FIST_HASTE] = {
+      ITEM_MOD_CRIT_RATING_SHORT = 93, ITEM_MOD_HASTE_RATING_SHORT = 50,
+      ITEM_MOD_STAMINA_SHORT = 2527, RESISTANCE0_NAME = 101, ITEM_MOD_AGILITY_SHORT = 125,
+    }
+    mockStats[FIST_VERS] = {
+      ITEM_MOD_CRIT_RATING_SHORT = 84, ITEM_MOD_VERSATILITY = 59,
+      ITEM_MOD_STAMINA_SHORT = 2527, RESISTANCE0_NAME = 101, ITEM_MOD_AGILITY_SHORT = 125,
+    }
+
+    local slotInfo = refreshBackpack()
+
+    -- Both physical slots survive as their own visible (root) items rather than
+    -- one being merged away.
+    assert.is_not_nil(slotInfo.visibleItemsBySlotKey["0_1"], "first fist must remain visible")
+    assert.is_not_nil(slotInfo.visibleItemsBySlotKey["0_2"], "second fist must remain visible")
+    assert.are_not.equal(
+      slotInfo.itemsBySlotKey["0_1"].itemHash,
+      slotInfo.itemsBySlotKey["0_2"].itemHash,
+      "differing secondary stats must yield different item hashes"
+    )
+  end)
+
+  describe("Show Bags (SECTION_ALL_BAGS) view", function()
+    local function twoIdenticalItems()
+      return {
+        ["0_1"] = { slotkey = "0_1", isItemEmpty = false, itemHash = "H",
+          itemInfo = { currentItemCount = 1, itemStackCount = 1 } },
+        ["0_2"] = { slotkey = "0_2", isItemEmpty = false, itemHash = "H",
+          itemInfo = { currentItemCount = 1, itemStackCount = 1 } },
+      }
+    end
+
+    it("never virtually stacks items, so every physical slot stays visible", function()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+      override(database, "GetBagView", function() return const.BAG_VIEW.SECTION_ALL_BAGS end)
+
+      local visible = items:Phase7_ApplyVirtualStacks(const.BAG_KIND.BACKPACK, twoIdenticalItems())
+      assert.is_not_nil(visible["0_1"], "Show Bags must render every physical slot")
+      assert.is_not_nil(visible["0_2"], "Show Bags must render every physical slot")
+    end)
+
+    it("still merges identical items in the grid view", function()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+      override(database, "GetBagView", function() return const.BAG_VIEW.SECTION_GRID end)
+
+      local visible = items:Phase7_ApplyVirtualStacks(const.BAG_KIND.BACKPACK, twoIdenticalItems())
+      local count = 0
+      for _ in pairs(visible) do count = count + 1 end
+      assert.are.equal(1, count, "grid view merges identical items into a single visible root")
+    end)
   end)
 
   it("resolves search categories against custom categories by priority after re-indexing", function()
