@@ -241,6 +241,11 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	-- Store the selected Blizzard tab so items.lua can filter to it
 	self.bag.blizzardBankTab = bagIndex
 
+	-- Mirror the selected tab onto bankTab so the backpack context-match
+	-- resolver (items:ResolveItemContextMatchResult) sees the active bank tab
+	-- when deciding whether an item is greyed out for the current bank type.
+	self.bag.bankTab = bagIndex
+
 	-- Update BankPanel bank type so right-click item deposits go to the
 	-- correct bank (character vs account/warbank).
 	if addon.isRetail and BankPanel and BankPanel.SetBankType then
@@ -255,6 +260,15 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+
+	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
+	-- during its own data sweep, resolved against the active bank type. Switching
+	-- bank tabs changes that context (e.g. Warbank -> Character bank), so the
+	-- backpack must be re-swept and redrawn or its grey-out stays stale until the
+	-- next backpack refresh (previously only a manual sort cleared it).
+	if addon.atBank then
+		events:SendMessage(ctx, 'bags/RefreshBackpack')
+	end
 end
 
 ---@param ctx Context
@@ -567,6 +581,15 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+
+	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
+	-- during its own data sweep, resolved against the active bank type. Switching
+	-- group tabs changes that context (e.g. Warbank -> Character bank), so the
+	-- backpack must be re-swept and redrawn or its grey-out stays stale until the
+	-- next backpack refresh (previously only a manual sort cleared it).
+	if addon.atBank then
+		events:SendMessage(ctx, 'bags/RefreshBackpack')
+	end
 end
 
 function bank.proto:SwitchToBankAndWipe(ctx)
