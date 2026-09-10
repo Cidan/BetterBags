@@ -480,39 +480,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.is_true(bankResults["6_1"], "bank item must remain searchable after the backpack is indexed last")
   end)
 
-  it("does not lose untouched bags when a wipe refresh and a targeted refresh start in the same frame", function()
-    mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
-    mockContainer[1] = { { itemID = 201, guid = "guid-201", count = 1 } }
-    refreshBackpack()
-    assert.is_not_nil(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["1_1"])
-
-    -- Use the real frame boundary: async:Yield suspends the coroutine and it resumes
-    -- through C_Timer.After on the next frame.
-    async.Yield = function() coroutine.yield() end
-    local queued = {}
-    saveGlobal(_G.C_Timer, "After")
-    _G.C_Timer.After = function(_, fn) table.insert(queued, fn) end
-
-    -- Frame N: a full wipe refresh (bags/FullRefreshAll) ...
-    refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
-    -- ... followed in the same frame by a BAG_UPDATE_DELAYED sweep targeting bag 0 only.
-    refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
-    assert.equal(2, #queued, "both refreshes must be suspended at a frame boundary")
-
-    -- Frame N+1: both coroutines resume in the order they were queued.
-    local i = 1
-    while queued[i] do
-      queued[i]()
-      i = i + 1
-    end
-
-    local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
-    assert.is_not_nil(slotInfo.itemsBySlotKey["0_1"])
-    assert.is_not_nil(slotInfo.itemsBySlotKey["1_1"], "bag 1 must survive a same-frame wipe + targeted refresh")
-    assert.equal(201, slotInfo.itemsBySlotKey["1_1"].itemInfo.itemID)
-    assert.equal(2, slotInfo.totalItems)
-  end)
-
   describe("All Items Recent (container auto-loot, same-frame remove + add)", function()
     -- The "All Items Recent" option (database:GetMarkRecentItems) marks every BetterBags-detected
     -- ADDED item as recent, independent of the client's C_NewItems flag. This matters because WoW
@@ -745,6 +712,154 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
       -- The backpack's committed layout is a different kind and is untouched.
       assert.equal(0, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems))
+    end)
+  end)
+
+  describe("refresh scheduler (serialized queue)", function()
+    -- data/refresh.lua serializes every refresh request through a single frame-stepped
+    -- queue: RequestUpdate only enqueues, and a pump runs exactly one unit at a time,
+    -- with a deliberate idle frame between units, so no two data sweeps are ever in
+    -- flight and no request-time side effect (ClearItemCache/ClearNewItems/Sort) can
+    -- mutate state a parked sweep still depends on. installClock() swaps in the real
+    -- coroutine yield and a captured, hand-cranked frame clock so the cadence is
+    -- deterministic; advance() runs exactly the tick(s) pending for one frame.
+    local function installClock()
+      async.Yield = function() coroutine.yield() end
+      local frames = {}
+      saveGlobal(_G.C_Timer, "After")
+      _G.C_Timer.After = function(_, fn) table.insert(frames, fn) end
+      return function()
+        local pending = frames
+        frames = {}
+        for _, fn in ipairs(pending) do fn() end
+        return #pending
+      end
+    end
+
+    it("processes queued refreshes one at a time with an idle frame between units", function()
+      local advance = installClock()
+      local origRun = items.RunRefresh
+      local starts, ends = {}, {}
+      override(items, "RunRefresh", function(self, ectx, kind)
+        table.insert(starts, kind)
+        origRun(self, ectx, kind)
+        table.insert(ends, kind)
+      end)
+
+      mockContainer[0] = { { itemID = 101, guid = "g1", count = 1 } }
+
+      -- Frame 1 (synchronous, scheduler idle): U1 harvests and parks at its yield.
+      refresh:RequestUpdate({ backpack = true })
+      assert.same({ const.BAG_KIND.BACKPACK }, starts)
+      assert.same({}, ends, "the first unit is parked at its yield, not yet committed")
+
+      -- A second request only enqueues; it must NOT start while U1 is in flight.
+      refresh:RequestUpdate({ backpack = true })
+      assert.equal(1, #starts, "the second unit must not start while the first is in flight")
+
+      advance() -- U1 resumes -> commits -> unit done
+      assert.same({ const.BAG_KIND.BACKPACK }, ends)
+      assert.equal(1, #starts, "no new unit starts on the commit frame")
+
+      advance() -- idle hand-off frame: nothing runs
+      assert.equal(1, #starts, "an idle frame must separate the two units")
+      assert.equal(1, #ends)
+
+      advance() -- U2 starts, parks
+      assert.equal(2, #starts)
+      assert.equal(1, #ends)
+
+      advance() -- U2 commits
+      assert.equal(2, #ends)
+    end)
+
+    it("defers a queued unit's side effects until it runs (no sync mutation of an in-flight sweep)", function()
+      local advance = installClock()
+      local clears = 0
+      local origClear = items.ClearItemCache
+      override(items, "ClearItemCache", function(self, ctx)
+        clears = clears + 1
+        return origClear(self, ctx)
+      end)
+
+      mockContainer[0] = { { itemID = 101, guid = "g1", count = 1 } }
+
+      refresh:RequestUpdate({ backpack = true })                    -- U1 parked
+      refresh:RequestUpdate({ wipe = true, backpack = true, bank = true }) -- U2 enqueued
+      assert.equal(0, clears, "a wipe must not clear the cache while a prior sweep is parked")
+
+      for _ = 1, 12 do advance() end
+      assert.equal(1, clears, "the wipe clears the cache exactly once, when its own unit runs")
+    end)
+
+    it("runs the first queued unit's harvest synchronously when the scheduler is idle", function()
+      installClock()
+      local origRun = items.RunRefresh
+      local started = false
+      override(items, "RunRefresh", function(self, ectx, kind)
+        started = true
+        origRun(self, ectx, kind)
+      end)
+
+      mockContainer[0] = { { itemID = 101, guid = "g1", count = 1 } }
+      refresh:RequestUpdate({ backpack = true })
+      assert.is_true(started, "an idle scheduler executes the first step within the enqueue call")
+    end)
+
+    it("does not flood Recent Items when a bank-open burst enqueues a switch refresh and a full wipe", function()
+      -- The reported bug: bags opened, closed, then bank opened dumped the whole backpack
+      -- into Recent Items. Opening the bank enqueues a non-wipe backpack refresh (bank tab
+      -- switch) and, in the same frame, a bags/FullRefreshAll wipe. Under the old direct
+      -- model the wipe's ClearItemCache ran synchronously and emptied the parked switch
+      -- refresh's previousItems, so MarkAddedItemsRecent marked every item acquired. The
+      -- serialized queue runs the switch refresh to completion before the wipe touches the
+      -- cache, so nothing is falsely marked recent.
+      override(database, "GetMarkRecentItems", function(_, kind) return kind == const.BAG_KIND.BACKPACK end)
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(items, "IsBagOpen", function() return true end)
+
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 201, guid = "guid-201", count = 1 },
+        { itemID = 202, guid = "guid-202", count = 1 },
+      }
+      -- Baseline (bags already open) committed synchronously before the clock is installed.
+      refreshBackpack({ wipe = true })
+      assert.are_not.equal("Recent Items",
+        items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["0_1"].itemInfo.category)
+
+      local advance = installClock()
+      refresh:RequestUpdate({ backpack = true })                            -- bank tab switch
+      refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })  -- interaction FullRefreshAll
+      for _ = 1, 16 do advance() end
+
+      local after = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.are_not.equal("Recent Items", after.itemsBySlotKey["0_1"].itemInfo.category,
+        "pre-existing backpack items must not be flooded into Recent Items on bank open")
+      assert.are_not.equal("Recent Items", after.itemsBySlotKey["0_2"].itemInfo.category)
+      assert.are_not.equal("Recent Items", after.itemsBySlotKey["0_3"].itemInfo.category)
+      assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK]["guid-101"],
+        "the burst must not seed recent-item timers for pre-existing items")
+    end)
+
+    it("preserves untouched bags when a wipe and a targeted refresh are enqueued in the same frame", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      mockContainer[1] = { { itemID = 201, guid = "guid-201", count = 1 } }
+      refreshBackpack() -- baseline, committed synchronously (before the clock)
+      assert.is_not_nil(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["1_1"])
+
+      local advance = installClock()
+      -- Serialized: the wipe unit commits both bags in full, THEN the targeted bag-0 sweep
+      -- merges against that committed state, so bag 1 survives.
+      refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+      refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+      for _ = 1, 16 do advance() end
+
+      local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.is_not_nil(slotInfo.itemsBySlotKey["0_1"])
+      assert.is_not_nil(slotInfo.itemsBySlotKey["1_1"], "bag 1 must survive a same-frame wipe + targeted refresh")
+      assert.equal(201, slotInfo.itemsBySlotKey["1_1"].itemInfo.itemID)
+      assert.equal(2, slotInfo.totalItems)
     end)
   end)
 end)

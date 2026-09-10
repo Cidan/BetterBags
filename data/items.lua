@@ -1243,53 +1243,64 @@ function items:Phase3_ExtractPreviousState(kind)
   return previousItems, previousTotalItems, previousSortedItems
 end
 
-function items:ProcessRefresh(ctx, kind)
-  async:Do(ctx, function(ectx)
-    local bagList = self:Phase1_DetermineBags(ectx, kind)
-    local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
+-- RunRefresh executes the full data sweep for one bag kind inline in the CURRENT
+-- coroutine (it calls async:Yield() once, after the harvest). It must be driven from
+-- within a coroutine -- either ProcessRefresh's async:Do wrapper (direct/test callers)
+-- or the Refresh scheduler's serialized unit coroutine (production). Keeping the core
+-- driveable is what lets the scheduler run bank-then-backpack sequentially in a single
+-- coroutine, so no two sweeps are ever in flight at once.
+---@param ectx Context
+---@param kind BagKind
+function items:RunRefresh(ectx, kind)
+  local bagList = self:Phase1_DetermineBags(ectx, kind)
+  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
 
-    -- The harvest captured this frame's client state. Everything below runs on the
-    -- next frame against the state committed by then, so refreshes started in the
-    -- same frame merge in order instead of overwriting each other's bags.
-    async:Yield()
+  -- The harvest captured this frame's client state. Everything below runs on the
+  -- next frame against the state committed by then.
+  async:Yield()
 
-    if self._firstLoad[kind] == true then
-      self._firstLoad[kind] = false
-      ectx:Set("wipe", true)
-    end
+  if self._firstLoad[kind] == true then
+    self._firstLoad[kind] = false
+    ectx:Set("wipe", true)
+  end
 
-    local previousItems, previousTotalItems, previousSortedItems = self:Phase3_ExtractPreviousState(kind)
+  local previousItems, previousTotalItems, previousSortedItems = self:Phase3_ExtractPreviousState(kind)
 
-    local targetedBags = ectx:Get("targetedBags")
-    local isWipe = ectx:Get("wipe") == true
+  local targetedBags = ectx:Get("targetedBags")
+  local isWipe = ectx:Get("wipe") == true
 
-    if targetedBags and not isWipe then
-      local harvestedData = itemData
-      itemData = {}
-      for slotkey, item in pairs(previousItems) do
-        local bagid = item.bagid or tonumber((strsplit("_", slotkey)))
-        if not targetedBags[bagid] then
-          itemData[slotkey] = item
-        end
-      end
-      for slotkey, item in pairs(harvestedData) do
+  if targetedBags and not isWipe then
+    local harvestedData = itemData
+    itemData = {}
+    for slotkey, item in pairs(previousItems) do
+      local bagid = item.bagid or tonumber((strsplit("_", slotkey)))
+      if not targetedBags[bagid] then
         itemData[slotkey] = item
       end
     end
+    for slotkey, item in pairs(harvestedData) do
+      itemData[slotkey] = item
+    end
+  end
 
-    self:Phase4_ClearMovedItemGlows(ectx, previousItems, itemData)
-    self:MarkAddedItemsRecent(ectx, kind, previousItems, itemData)
+  self:Phase4_ClearMovedItemGlows(ectx, previousItems, itemData)
+  self:MarkAddedItemsRecent(ectx, kind, previousItems, itemData)
 
-    local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
+  local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
 
-    local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData)
+  local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData)
 
-    local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
-    local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
-    local sortedItems = self:BuildOrderedItems(ectx, kind, visibleItemsBySlotKey, emptySlotByBagAndSlot, previousSortedItems)
-    local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
+  local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
+  local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
+  local sortedItems = self:BuildOrderedItems(ectx, kind, visibleItemsBySlotKey, emptySlotByBagAndSlot, previousSortedItems)
+  local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
 
-    self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
+  self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
+end
+
+function items:ProcessRefresh(ctx, kind)
+  async:Do(ctx, function(ectx)
+    self:RunRefresh(ectx, kind)
   end)
 end
 
