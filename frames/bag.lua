@@ -363,13 +363,27 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 	local currentView = database:GetBagView(self.kind)
 	local sizeInfo = database:GetBagSizeInfo(self.kind, currentView)
 
-	-- 1. Scan and draw Recent Items inside self.headerContainer
+	-- 1. Scan and draw Recent Items inside self.headerContainer.
+	-- The Recent Items section must honor the ordered, gap-carrying layout the data
+	-- pipeline computed (slotInfo.sortedItems from BuildOrderedItems): it holds the
+	-- items in their stable, sorted positions and carries persistent empty gaps for
+	-- consumed/removed items. Iterating the unordered visible-item map (a hash) via
+	-- pairs() instead rendered Recent Items in an arbitrary order that re-shuffled on
+	-- every sweep and dropped every gap.
 	local recentItems = {}
 	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
-		local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
-		for _, item in pairs(itemsGetter(slotInfo)) do
-			if not item.isItemEmpty and item.itemInfo and item.itemInfo.category == L:G("Recent Items") then
-				table.insert(recentItems, item)
+		if slotInfo.sortedItems then
+			for _, item in ipairs(slotInfo.sortedItems) do
+				if item.itemInfo and item.itemInfo.category == L:G("Recent Items") then
+					table.insert(recentItems, item)
+				end
+			end
+		else
+			local itemsGetter = slotInfo.GetVisibleItems or slotInfo.GetCurrentItems
+			for _, item in pairs(itemsGetter(slotInfo)) do
+				if not item.isItemEmpty and item.itemInfo and item.itemInfo.category == L:G("Recent Items") then
+					table.insert(recentItems, item)
+				end
 			end
 		end
 	end
@@ -387,9 +401,13 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		recentSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
 
 		for _, item in ipairs(recentItems) do
-			local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
-			itemButton:SetItemFromData(ctx, item)
-			recentSection:AddCell(item.slotkey, itemButton)
+			if item.isItemGap then
+				recentSection:AddCell(item.slotkey, { isGap = true, width = 37, height = 37 })
+			else
+				local itemButton = self:GetOrCreateGlobalItemButton(ctx, item.slotkey)
+				itemButton:SetItemFromData(ctx, item)
+				recentSection:AddCell(item.slotkey, itemButton)
+			end
 		end
 		headerW, headerH = recentSection:Draw(self.kind, currentView, false)
 	end
