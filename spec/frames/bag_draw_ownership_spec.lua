@@ -351,6 +351,57 @@ local function slotInfoWith(allItems, freeButtons)
   }
 end
 
+-- Builds the slotInfo shape for a bag whose ordered layout (sortedItems) is the
+-- single source of truth for item order and persistent gaps, exactly as
+-- Phase11_CommitAndDispatch commits it. The Recent Items global section must be
+-- rendered from this ordered, gap-carrying list -- not from an arbitrary pairs()
+-- scan of the visible item map. Gap entries (isItemGap) are excluded from the
+-- visible map, mirroring production where gaps live only in sortedItems.
+local function slotInfoOrdered(sortedItems, freeButtons)
+  local visible = {}
+  local tabItems = {}
+  local categories = {}
+  local seen = {}
+  for _, item in ipairs(sortedItems) do
+    if not item.isItemGap then
+      visible[item.slotkey] = item
+    end
+    if item.itemInfo.category ~= "Recent Items" and not item.isItemGap then
+      table.insert(tabItems, item)
+      if not seen[item.itemInfo.category] then
+        seen[item.itemInfo.category] = true
+        table.insert(categories, { name = item.itemInfo.category })
+      end
+    end
+  end
+  return {
+    totalItems = #sortedItems,
+    sectionLayouts = {},
+    sortedItems = sortedItems,
+    GetVisibleItems = function() return visible end,
+    GetCurrentItems = function() return visible end,
+    tabs = {
+      [1] = {
+        items = tabItems,
+        categories = categories,
+        totalItems = #tabItems,
+        freeSpace = { showAll = false, buttons = freeButtons or {} },
+      },
+    },
+  }
+end
+
+-- A persistent empty gap left behind by a consumed/removed Recent Items entry, as
+-- CloneAsGap produces it: isItemGap, a "gap:"-prefixed slotkey, and the departed
+-- item's category preserved so the hole routes to the same section.
+local function recentGap(originalSlotkey)
+  return {
+    isItemGap = true,
+    slotkey = "gap:" .. originalSlotkey,
+    itemInfo = { category = "Recent Items", itemQuality = 1 },
+  }
+end
+
 describe("Bag Draw: shared item button ownership across global sections and views", function()
   local itemFrame
   local savedGlobals = {}
@@ -472,5 +523,55 @@ describe("Bag Draw: shared item button ownership across global sections and view
     assert.is_not_nil(lastRelease, "expected the previous draw's buttons to be released")
     assert.is_true(lastRelease < firstAcquire,
       "every button release must precede the first button acquisition, got: " .. table.concat(log, ", "))
+  end)
+
+  -- Regression: the Recent Items global section was built by iterating
+  -- GetVisibleItems() (a hash map) via pairs(), so it rendered in arbitrary Lua
+  -- hash-iteration order and could never show the persistent gaps that
+  -- BuildOrderedItems computes into slotInfo.sortedItems. Users saw Recent Items in
+  -- a "random" order that re-shuffled on every loot/consume, and consuming an item
+  -- collapsed its slot instead of leaving a gap. The section must instead be built
+  -- from the ordered, gap-carrying slotInfo.sortedItems.
+  local function recentOrder(section)
+    local order = {}
+    for _, cell in ipairs(section.content.cells) do
+      if cell.isGap then
+        table.insert(order, "gap")
+      else
+        table.insert(order, cell.slotkey)
+      end
+    end
+    return order
+  end
+
+  it("renders Recent Items in slotInfo.sortedItems order, not hash-iteration order", function()
+    local bag = newBag()
+    -- A deterministic layout order the pairs() scan is not guaranteed to reproduce.
+    local sorted = {
+      itemAt(0, 5, "Recent Items"),
+      itemAt(0, 2, "Recent Items"),
+      itemAt(0, 8, "Recent Items"),
+      itemAt(0, 1, "Recent Items"),
+    }
+    bag:Draw(context:New("draw1"), slotInfoOrdered(sorted), function() end)
+
+    local section = bag.globalSections["Recent Items"]
+    assert.is_not_nil(section)
+    assert.same({ "0_5", "0_2", "0_8", "0_1" }, recentOrder(section))
+  end)
+
+  it("preserves a consumed Recent Items slot as an in-place gap in the header section", function()
+    local bag = newBag()
+    -- 0_2 was consumed; BuildOrderedItems holds its position as a gap between 0_1 and 0_3.
+    local sorted = {
+      itemAt(0, 1, "Recent Items"),
+      recentGap("0_2"),
+      itemAt(0, 3, "Recent Items"),
+    }
+    bag:Draw(context:New("draw1"), slotInfoOrdered(sorted), function() end)
+
+    local section = bag.globalSections["Recent Items"]
+    assert.is_not_nil(section)
+    assert.same({ "0_1", "gap", "0_3" }, recentOrder(section))
   end)
 end)
