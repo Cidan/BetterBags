@@ -27,6 +27,15 @@ local refresh = addon:NewModule('Refresh')
 
 function refresh:Init()
   self.isSorting = false
+  -- Serialized refresh queue. RequestUpdate only enqueues; the pump (_Step) runs exactly
+  -- ONE unit at a time in a single coroutine, with a deliberate idle hand-off frame
+  -- between units. Because no two sweeps are ever in flight, no request-time side effect
+  -- (ClearItemCache / ClearNewItems / Sort) can mutate state a parked sweep still depends
+  -- on, and a unit's commit+draw can never share a frame with the next unit's harvest.
+  self._queue = {}
+  self._active = nil
+  self._idlePending = false
+  self._running = false
 end
 
 ---@param ctx Context
@@ -56,7 +65,6 @@ function refresh:AfterSort(ctx)
   --end
 end
 
--- RequestUpdate processes an update request instantly and synchronously
 ---@class RefreshRequest
 ---@field wipe? boolean Clear cache before refresh
 ---@field backpack? boolean Update backpack items
@@ -67,8 +75,85 @@ end
 ---@field bags? table<number, boolean> Table of specific bagIDs that changed
 ---@field resetLayout? boolean Ignore the previous gap layout and rebuild a fresh, gapless sort
 
+-- RequestUpdate enqueues an update request onto the serialized refresh queue. It performs
+-- NO side effects itself: the request's mutations (cache wipe, recent-item clearing,
+-- Blizzard sort calls) and data sweeps all run inside the request's own unit when the
+-- pump reaches it, so a request queued while another is in flight can never corrupt the
+-- in-flight sweep. If the scheduler is idle, the first step runs synchronously in this
+-- call (harvesting this frame's client state); every subsequent step is handed off to the
+-- next frame via _Arm.
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
+  table.insert(self._queue, request)
+  if not self._running then
+    self._running = true
+    self:_Step()
+  end
+end
+
+-- _Arm schedules the next pump step for the next frame. This is the ONLY clock in the
+-- refresh path: a single chain, never one-per-refresh, so step ordering is deterministic.
+function refresh:_Arm()
+  C_Timer.After(0, function()
+    self:_Step()
+  end)
+end
+
+-- _Resume advances the active unit's coroutine by one step. When the unit finishes it
+-- flags an idle hand-off frame; a failed unit is dropped (reported, not swallowed) so a
+-- single bad sweep cannot wedge the whole queue.
+function refresh:_Resume()
+  local co = self._active
+  local ok, err = coroutine.resume(co)
+  if not ok then
+    self._active = nil
+    self._idlePending = true
+    if geterrorhandler then
+      geterrorhandler()(err)
+    end
+    return
+  end
+  if coroutine.status(co) == 'dead' then
+    self._active = nil
+    self._idlePending = true
+  end
+end
+
+-- _Step is one frame of the pump: advance the active unit, else burn the idle hand-off
+-- frame, else start the next queued unit. When the queue drains it stops the clock.
+function refresh:_Step()
+  if self._active then
+    self:_Resume()
+    self:_Arm()
+    return
+  end
+
+  if self._idlePending then
+    self._idlePending = false
+    self:_Arm()
+    return
+  end
+
+  local request = table.remove(self._queue, 1)
+  if not request then
+    self._running = false
+    return
+  end
+
+  self._active = coroutine.create(function()
+    self:_RunUnit(request)
+  end)
+  self:_Resume()
+  self:_Arm()
+end
+
+-- _RunUnit executes a single request end-to-end inside the pump's coroutine: request-time
+-- mutations first, then the bank sweep, then the backpack sweep (each an inline
+-- items:RunRefresh that yields once), then the protected Blizzard sort calls. Because this
+-- is the only sweep in flight, ClearItemCache/ClearNewItems run with nothing parked to
+-- corrupt.
+---@param request RefreshRequest
+function refresh:_RunUnit(request)
   local ctx = context:New('BagUpdate')
 
   if request.bags then
@@ -107,12 +192,11 @@ function refresh:RequestUpdate(request)
       addon.Bags.Bank.bankTab = accountBankStart
     end
 
-    local refreshCtx = ctx:Copy()
-    items:RefreshBank(refreshCtx)
+    items:RunRefresh(ctx:Copy(), const.BAG_KIND.BANK)
   end
 
   if request.backpack then
-    items:RefreshBackpack(ctx)
+    items:RunRefresh(ctx, const.BAG_KIND.BACKPACK)
   end
 
   if not InCombatLockdown() then

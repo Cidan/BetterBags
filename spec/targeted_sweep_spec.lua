@@ -134,10 +134,13 @@ describe("Targeted Data Sweep System", function()
 
   describe("Refresh Module Targeted Requests", function()
     it("should pass targeted bags into context on RequestUpdate", function()
+      -- The scheduler drives sweeps through items:RunRefresh(ctx, kind), so capture there.
       local capturedCtx
-      local origRefreshBackpack = items.RefreshBackpack
-      items.RefreshBackpack = function(self, ctx)
-        capturedCtx = ctx
+      local origRunRefresh = items.RunRefresh
+      items.RunRefresh = function(_, ctx, kind)
+        if kind == const.BAG_KIND.BACKPACK then
+          capturedCtx = ctx
+        end
       end
 
       refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
@@ -147,7 +150,7 @@ describe("Targeted Data Sweep System", function()
       assert.is_not_nil(targetedBags)
       assert.is_true(targetedBags[0])
 
-      items.RefreshBackpack = origRefreshBackpack
+      items.RunRefresh = origRunRefresh
     end)
 
     it("should pass updatedBags from ItemLoader callback to RequestUpdate", function()

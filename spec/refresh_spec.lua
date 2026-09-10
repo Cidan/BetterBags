@@ -20,10 +20,15 @@ db.GetShowBankTabs = function() return false end
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
+local match = require("luassert.match")
+
 local items = StubBetterBagsModule("Items")
 items.ClearItemCache = function() end
 items.RefreshBackpack = function() end
 items.RefreshBank = function() end
+-- The serialized refresh scheduler (data/refresh.lua) drives sweeps through the inline
+-- items:RunRefresh core, not the async ProcessRefresh wrappers, so tests assert against it.
+items.RunRefresh = function() end
 items.ClearNewItems = function() end
 
 -- Mock ItemLoader
@@ -38,11 +43,20 @@ LoadBetterBagsModule("data/refresh.lua")
 local refresh = addon:GetModule("Refresh")
 
 describe("Refresh Module", function()
+  local savedAfter
   before_each(function()
     refresh:Init()
     registeredCallback = nil
     addon.atBank = false
     addon.Bags = {}
+    -- Drive the scheduler's frame clock synchronously so a RequestUpdate drains its unit
+    -- within the call, preserving these tests' "processed synchronously" expectations.
+    savedAfter = _G.C_Timer.After
+    _G.C_Timer.After = function(_, fn) fn() end
+  end)
+
+  after_each(function()
+    _G.C_Timer.After = savedAfter
   end)
 
   it("should initialize with default states", function()
@@ -54,39 +68,36 @@ describe("Refresh Module", function()
   end)
 
   it("should process RequestUpdate instantly and synchronously for backpack", function()
-    spy.on(items, "RefreshBackpack")
-    spy.on(items, "RefreshBank")
+    spy.on(items, "RunRefresh")
 
     refresh:RequestUpdate({ backpack = true })
 
-    assert.spy(items.RefreshBackpack).was.called(1)
-    assert.spy(items.RefreshBank).was_not.called()
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+    assert.spy(items.RunRefresh).was_not.called_with(items, match._, const.BAG_KIND.BANK)
   end)
 
   it("should process RequestUpdate instantly and synchronously for bank if at bank", function()
     addon.atBank = true
     addon.Bags = { Bank = { bankTab = 1 } }
-    spy.on(items, "RefreshBackpack")
-    spy.on(items, "RefreshBank")
+    spy.on(items, "RunRefresh")
 
     refresh:RequestUpdate({ bank = true })
 
-    assert.spy(items.RefreshBank).was.called(1)
-    assert.spy(items.RefreshBackpack).was_not.called()
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
+    assert.spy(items.RunRefresh).was_not.called_with(items, match._, const.BAG_KIND.BACKPACK)
   end)
 
   it("should process RequestUpdate instantly and synchronously for wipe", function()
     addon.atBank = true
     addon.Bags = { Bank = { bankTab = 1 } }
     spy.on(items, "ClearItemCache")
-    spy.on(items, "RefreshBackpack")
-    spy.on(items, "RefreshBank")
+    spy.on(items, "RunRefresh")
 
     refresh:RequestUpdate({ wipe = true })
 
     assert.spy(items.ClearItemCache).was.called(1)
-    assert.spy(items.RefreshBackpack).was.called(1)
-    assert.spy(items.RefreshBank).was.called(1)
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
   end)
 
   it("should register callback with ItemLoader on OnEnable", function()
@@ -121,15 +132,13 @@ describe("Refresh Module", function()
     _G.InCombatLockdown = function() return true end
     addon.atBank = true
     addon.Bags = { Bank = { bankTab = 1 } }
-    spy.on(items, "RefreshBackpack")
-    spy.on(items, "RefreshBank")
+    spy.on(items, "RunRefresh")
 
     refresh:RequestUpdate({ backpack = true })
-    assert.spy(items.RefreshBackpack).was.called(1)
-    assert.is_nil(refresh.pendingRequest)
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
 
     refresh:RequestUpdate({ bank = true })
-    assert.spy(items.RefreshBank).was.called(1)
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
 
     _G.InCombatLockdown = function() return false end
   end)
@@ -141,14 +150,14 @@ describe("Refresh Module", function()
 
     spy.on(_G.C_Container, "SortBags")
     spy.on(_G, "SortBags")
-    spy.on(items, "RefreshBackpack")
+    spy.on(items, "RunRefresh")
 
     _G.InCombatLockdown = function() return true end
     addon.isRetail = true
 
     refresh:RequestUpdate({ backpack = true, sort = true })
 
-    assert.spy(items.RefreshBackpack).was.called(1)
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
     assert.spy(_G.C_Container.SortBags).was_not.called()
     assert.spy(_G.SortBags).was_not.called()
 
@@ -219,13 +228,13 @@ describe("Refresh Module", function()
       _G.C_Container.SortBags = function() end
 
       spy.on(items, "ClearNewItems")
-      spy.on(items, "RefreshBackpack")
+      spy.on(items, "RunRefresh")
       spy.on(_G.C_Container, "SortBags")
 
       refresh:RequestUpdate({ sort = true })
 
       assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BACKPACK)
-      assert.spy(items.RefreshBackpack).was.called(1)
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
       assert.spy(_G.C_Container.SortBags).was.called(1)
     end)
 
@@ -237,13 +246,13 @@ describe("Refresh Module", function()
       _G.C_Container.SortBankBags = function() end
 
       spy.on(items, "ClearNewItems")
-      spy.on(items, "RefreshBank")
+      spy.on(items, "RunRefresh")
       spy.on(_G.C_Container, "SortBankBags")
 
       refresh:RequestUpdate({ sortBank = true })
 
       assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BANK)
-      assert.spy(items.RefreshBank).was.called(1)
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
       assert.spy(_G.C_Container.SortBankBags).was.called(1)
     end)
 
@@ -255,13 +264,13 @@ describe("Refresh Module", function()
       _G.C_Container.SortAccountBankBags = function() end
 
       spy.on(items, "ClearNewItems")
-      spy.on(items, "RefreshBank")
+      spy.on(items, "RunRefresh")
       spy.on(_G.C_Container, "SortAccountBankBags")
 
       refresh:RequestUpdate({ sortWarbank = true })
 
       assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BANK)
-      assert.spy(items.RefreshBank).was.called(1)
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
       assert.spy(_G.C_Container.SortAccountBankBags).was.called(1)
     end)
 
