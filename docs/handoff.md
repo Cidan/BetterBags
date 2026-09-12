@@ -52,8 +52,10 @@ To verify the stability of the entire pipeline and keep the suite warning-free:
    ```bash
    luacheck data/refresh.lua
    ```
-2. **Busted Suite (Lua 5.1 Target):** Execute the unit tests against the local interpreter:
+2. **Busted Suite (Lua 5.1 Target):** Execute the unit tests with a Lua 5.1 `busted`
+   (see `spec/README.md` § "Local setup (Lua 5.1 toolchain)" for installing one via your
+   system luarocks — the suite aborts on any non-5.1 interpreter):
    ```bash
-   ./lua51-rocks/bin/busted
+   busted
    ```
 3. **In-game Slash Commands:** You can run `/bb debugitems` in-game at any time to verify that the Phase 2 physical data map is successfully being harvested and updated.

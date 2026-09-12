@@ -4,6 +4,50 @@ Unit tests for BetterBags, powered by [busted](https://olivinelabs.com/busted/) 
 
 > **The suite is Lua 5.1 only.** `spec/setup.lua` aborts before any test code runs if `_VERSION` is not `"Lua 5.1"`. If you see a "BetterBags test suite requires Lua 5.1" error, the `lua` / `busted` on your `PATH` is the wrong interpreter — install Lua 5.1 (or a 5.1-compatible LuaJIT 2.x) and `luarocks install busted` against it, then rerun. See `CLAUDE.md` § "Lua Version" for the full policy.
 
+## Local setup (Lua 5.1 toolchain)
+
+Install the test tools with **your system-installed LuaRocks** against a **Lua 5.1**
+interpreter. This is exactly what CI does (`.github/workflows/test.yml` pins Lua 5.1 via
+`leafo/gh-actions-lua@v10`, then `luarocks install busted luacov`). **Never commit a rocks
+tree into the repo** — `busted`/`luacheck`/`luacov` are per-developer tools, not addon
+dependencies, and `install-deps.sh` deliberately does not install them.
+
+- **`busted` must run under Lua 5.1** — the suite's `_VERSION` guard rejects anything else.
+- **`luacheck` is interpreter-agnostic** — it lints against `std = "lua51"` (set in
+  `.luacheckrc`) regardless of which Lua runs it, so a 5.4 `luacheck` on your `PATH` is fine.
+
+### If your system Lua *is* 5.1
+
+```bash
+luarocks install busted luacheck luacov   # rocks land in your normal 5.1 tree
+busted
+```
+
+### If your system Lua is a different version (e.g. 5.4)
+
+Point LuaRocks at a separate Lua 5.1 interpreter and install into a user-local 5.1 tree.
+A 5.1-compatible **LuaJIT 2.1** works (`_VERSION` is `"Lua 5.1"`); real `lua5.1` works too.
+
+```bash
+# Example: LuaJIT from Homebrew/Linuxbrew. Replace the prefix with your own
+# (`brew --prefix luajit`, or the prefix of any Lua 5.1 install).
+LUA51_PREFIX="$(brew --prefix luajit)"
+
+luarocks --lua-version=5.1 --lua-dir="$LUA51_PREFIX" --local install busted
+luarocks --lua-version=5.1 --lua-dir="$LUA51_PREFIX" --local install luacheck
+luarocks --lua-version=5.1 --lua-dir="$LUA51_PREFIX" --local install luacov
+```
+
+This installs into `~/.luarocks` (the 5.1 rocks tree coexists with your 5.4 one). The 5.1
+`busted` launcher is `~/.luarocks/bin/busted`. Run it directly, or put `~/.luarocks/bin`
+ahead of your other rocks bin dir on `PATH` so plain `busted` resolves to the 5.1 build:
+
+```bash
+~/.luarocks/bin/busted            # explicit
+# or, after `export PATH="$HOME/.luarocks/bin:$PATH"`:
+busted
+```
+
 ## Running Tests
 
 ```bash
