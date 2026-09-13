@@ -197,29 +197,13 @@ function addon:OnInitialize()
   local rootctx = context:New('addon_initialize')
   addon.Bags.Backpack = BagFrame:Create(rootctx, const.BAG_KIND.BACKPACK)
 
-  -- Only create the bank bag if the setting is enabled
-  if database:GetEnableBankBag() then
-    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
-  end
-
-  -- Apply themes globally -- do not instantiate new windows after this call.
-  themes:Enable()
-
-  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
-
-  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
-
-  -- Only add bank to UISpecialFrames if it was created
-  if addon.Bags.Bank then
-    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
-  end
-
-  -- Disable the bag tutorial screens, as Better Bags does not match
-  -- the base UI/UX these screens refer to.
-  if addon.isRetail then
-		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
-		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
-	end
+  -- Establish the bag-button bindings and the highlight-button list before any
+  -- of the fallible frame/theme/bank creation below. AceAddon runs
+  -- OnInitialize inside a safecall (xpcall): if a later step throws, the addon
+  -- still proceeds to OnEnable and hooks ToggleAllBags, so UpdateButtonHighlight
+  -- would iterate a nil addon._buttons on every bag toggle (issue #1076). Keep
+  -- this immediately after the Backpack frame exists (UpdateButtonHighlight
+  -- reads addon.Bags.Backpack) and before everything that can fail.
   addon._bindingFrame = addon._bindingFrame or CreateFrame("Frame")
   addon._bindingFrame:RegisterEvent("PLAYER_LOGIN")
   addon._bindingFrame:RegisterEvent("UPDATE_BINDINGS")
@@ -243,6 +227,30 @@ function addon:OnInitialize()
       addon:ToggleAllBags(ctx)
     end)
   end
+
+  -- Only create the bank bag if the setting is enabled
+  if database:GetEnableBankBag() then
+    addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
+  end
+
+  -- Apply themes globally -- do not instantiate new windows after this call.
+  themes:Enable()
+
+  addon.Bags.Backpack:SetTitle(L:G("Backpack"))
+
+  table.insert(UISpecialFrames, addon.Bags.Backpack:GetName())
+
+  -- Only add bank to UISpecialFrames if it was created
+  if addon.Bags.Bank then
+    table.insert(UISpecialFrames, addon.Bags.Bank:GetName())
+  end
+
+  -- Disable the bag tutorial screens, as Better Bags does not match
+  -- the base UI/UX these screens refer to.
+  if addon.isRetail then
+		C_CVar.SetCVar("professionToolSlotsExampleShown", 1)
+		C_CVar.SetCVar("professionAccessorySlotsExampleShown", 1)
+	end
 end
 
 

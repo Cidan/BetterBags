@@ -149,4 +149,70 @@ describe("Core Init and Enable flow", function()
     addon:OnEnable()
     assert.spy(bagFrame.Create).was_not.called()
   end)
+
+  -- Regression: issue #1076. AceAddon runs OnInitialize inside a safecall
+  -- (xpcall), so if any frame/theme creation throws partway through, the addon
+  -- still proceeds to OnEnable and hooks ToggleAllBags. The button/highlight
+  -- setup must therefore be established BEFORE any fallible frame/theme/bank
+  -- creation, or every subsequent bag toggle crashes in UpdateButtonHighlight
+  -- with "bad argument #1 to 'pairs' (table expected, got nil)".
+  it("populates addon._buttons even if a later OnInitialize step throws", function()
+    local bagFrame = addon:GetModule("BagFrame")
+    addon._buttons = nil
+
+    -- Simulate a client-specific failure after the Backpack frame is created:
+    -- the Bank frame creation throws (e.g. a theme/bank API not ready yet).
+    bagFrame.Create = spy.new(function(_, _, kind)
+      local const = addon:GetModule("Constants")
+      if kind == const.BAG_KIND.BANK then
+        error("simulated bank creation failure")
+      end
+      return {
+        GetName = function() return "MockBag_" .. tostring(kind) end,
+        SetTitle = function() end,
+        IsShown = function() return false end,
+      }
+    end)
+
+    -- Mimic AceAddon's safecall: a throw is swallowed, execution continues.
+    local ok = pcall(function() addon:OnInitialize() end)
+    assert.is_false(ok)
+
+    assert.is_table(addon._buttons)
+    assert.is_true(#addon._buttons > 0)
+  end)
+
+  it("UpdateButtonHighlight does not error after a partial OnInitialize", function()
+    local bagFrame = addon:GetModule("BagFrame")
+    addon._buttons = nil
+
+    -- Give the bag-slot button globals the highlight texture the real frames
+    -- have, so the only possible failure is pairs(nil) on addon._buttons.
+    local function withHighlight(button)
+      button.SlotHighlightTexture = { SetShown = function() end }
+      return button
+    end
+    withHighlight(_G.MainMenuBarBackpackButton)
+    withHighlight(_G.CharacterBag0Slot)
+    withHighlight(_G.CharacterBag1Slot)
+    withHighlight(_G.CharacterBag2Slot)
+    withHighlight(_G.CharacterBag3Slot)
+    withHighlight(_G.KeyRingButton)
+
+    bagFrame.Create = spy.new(function(_, _, kind)
+      local const = addon:GetModule("Constants")
+      if kind == const.BAG_KIND.BANK then
+        error("simulated bank creation failure")
+      end
+      return {
+        GetName = function() return "MockBag_" .. tostring(kind) end,
+        SetTitle = function() end,
+        IsShown = function() return false end,
+      }
+    end)
+
+    pcall(function() addon:OnInitialize() end)
+
+    assert.has_no.errors(function() addon:UpdateButtonHighlight() end)
+  end)
 end)
