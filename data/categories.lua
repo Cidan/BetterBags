@@ -589,16 +589,44 @@ function categories:GetCustomCategory(ctx, kind, data)
 end
 
 ---@param id number The ItemID of the item to remove from a custom category.
-function categories:RemoveItemFromCategory(id)
+---@param category? string When provided, remove the item only from this specific
+--- category (whether it is the item's ephemeral assignment or the user's saved,
+--- persisted assignment). When omitted, remove only the item's ephemeral
+--- assignment and leave any saved (persisted) assignment untouched.
+---
+--- An unscoped call must never silently destroy a category the user themselves
+--- filed the item into: plugins routinely add items to their own ephemeral
+--- category and later remove them, and the old unscoped behaviour also deleted
+--- the user's hand-filed persisted assignment with no signal to the caller
+--- (issue #1079). Pass `category` explicitly to remove a persisted assignment.
+function categories:RemoveItemFromCategory(id, category)
   self.itemsWithNoCategory[id] = nil
+
+  if category ~= nil then
+    -- Scoped removal: only touch the named category, wherever it lives.
+    local ephemeral = self.ephemeralCategories[category]
+    if ephemeral and ephemeral.itemList then
+      ephemeral.itemList[id] = nil
+    end
+    local filter = self.ephemeralCategoryByItemID[id]
+    if filter and filter.name == category then
+      self.ephemeralCategoryByItemID[id] = nil
+    end
+    local persistedCategory = database:GetItemCategoryByItemID(id)
+    if persistedCategory.name == category then
+      database:DeleteItemFromCategory(id, category)
+    end
+    return
+  end
+
+  -- Unscoped removal: only the ephemeral assignment. The user's saved
+  -- (persisted) assignment is intentionally preserved (issue #1079).
   local filter = self.ephemeralCategoryByItemID[id]
   if filter then
-    filter.itemList[id] = nil
+    if filter.itemList then
+      filter.itemList[id] = nil
+    end
     self.ephemeralCategoryByItemID[id] = nil
-  end
-  local persistedCategory = database:GetItemCategoryByItemID(id)
-  if persistedCategory.name then
-    database:DeleteItemFromCategory(id, persistedCategory.name)
   end
 end
 
