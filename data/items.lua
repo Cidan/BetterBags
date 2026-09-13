@@ -1921,6 +1921,7 @@ function items:AttachItemInfo(data, kind)
     category = "",
     currentItemLevel = C_Item.GetCurrentItemLevel and C_Item.GetCurrentItemLevel(itemLocation) or effectiveIlvl or 0,
     equipmentSets = equipmentSets:GetItemSets(bagid, slotid),
+    tooltipText = tooltipText or "",
   }
   -- Track max item level for dynamic coloring
   if data.itemInfo.currentItemLevel and data.itemInfo.currentItemLevel > 0 then

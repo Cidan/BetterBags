@@ -984,4 +984,49 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("Gear: Aff", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
     end)
   end)
+
+  -- Tooltip-body free-text search. The harvest scans each item's tooltip via
+  -- tooltipScanner:GetTooltipText and must store it on itemInfo.tooltipText so
+  -- search:Add indexes it into the 'tooltip' index (one of the default free-text
+  -- indices). Commit ce09592 (#1037) dropped the assignment from the itemInfo
+  -- constructor, so the tooltip index stayed empty and free-text queries that
+  -- only match an item's tooltip body found nothing (issue #1078).
+  describe("tooltip-body search indexing", function()
+    it("indexes an item's tooltip text so free-text search matches it", function()
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      -- "zephyrium" appears only in the tooltip body, not in the name/type/subtype.
+      override(tooltipScanner, "GetTooltipText", function(_, bagid, slotid)
+        if bagid == 0 and slotid == 1 then
+          return "Use: channel zephyrium essence"
+        end
+        return ""
+      end)
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+      }
+
+      local slotInfo = refreshBackpack()
+
+      -- The scanned text must be carried on the item so the search engine can index it.
+      assert.equal("Use: channel zephyrium essence",
+        slotInfo.itemsBySlotKey["0_1"].itemInfo.tooltipText)
+
+      -- A free-text query for a word that lives only in the tooltip body must match.
+      local results = search:Search("zephyrium")
+      assert.is_true(results["0_1"] == true,
+        "free-text search should match text found only in the tooltip body")
+    end)
+
+    it("leaves the tooltip index empty for items with no tooltip text", function()
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      override(tooltipScanner, "GetTooltipText", function() return "" end)
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+      }
+
+      local slotInfo = refreshBackpack()
+      assert.equal("", slotInfo.itemsBySlotKey["0_1"].itemInfo.tooltipText)
+      assert.is_nil(search:Search("zephyrium")["0_1"])
+    end)
+  end)
 end)

@@ -371,6 +371,7 @@ function EquipmentManager_UnpackLocation(location) end
 ---@field isBound boolean
 ---@field isLocked boolean
 ---@field isNewItem boolean
+---@field isBattlePayItem boolean
 ---@field currentItemCount number
 ---@field category string
 ---@field currentItemLevel number
