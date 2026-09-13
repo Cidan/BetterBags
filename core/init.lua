@@ -221,11 +221,21 @@ function addon:OnInitialize()
     table.insert(addon._buttons, CharacterReagentBag0Slot)
   end
 
+  -- Hook OnClick on the Blizzard bag-bar buttons so clicking them toggles
+  -- BetterBags. Use the native frame HookScript (a post-hook): the AceHook
+  -- dot-call form -- addon.HookScript(button, ...) -- passes the frame as
+  -- `self` and the script name as the object, so AceHook throws and, because
+  -- this loop runs mid-OnInitialize, aborts the rest of init (bank, themes,
+  -- SetTitle, UISpecialFrames). Skip the main backpack button: HideBlizzardBags
+  -- replaces its OnClick outright with a ToggleAllBags override, so hooking it
+  -- here too would toggle twice (open then close) on a single click.
   for _, button in pairs(addon._buttons) do
-    addon.HookScript(button, "OnClick",
-    function(ctx)
-      addon:ToggleAllBags(ctx)
-    end)
+    if button ~= MainMenuBarBackpackButton then
+      button:HookScript("OnClick", function()
+        local ctx = context:New('BagButton_OnClick')
+        addon:ToggleAllBags(ctx)
+      end)
+    end
   end
 
   -- Only create the bank bag if the setting is enabled
