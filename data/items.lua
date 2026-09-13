@@ -1252,6 +1252,14 @@ end
 ---@param ectx Context
 ---@param kind BagKind
 function items:RunRefresh(ectx, kind)
+  -- Rebuild the equipment-set location map before harvesting. The map is keyed by
+  -- physical (bag, slot), and the harvest reads it per slot via
+  -- equipmentSets:GetItemSets. Rebuilding it here (same frame as the harvest)
+  -- keeps gear-set labels correct as items are looted, moved, equipped, or the
+  -- active set changes; without it the map only reflects login state, so looted
+  -- items inherit stale set labels and moved set items lose theirs.
+  equipmentSets:Update()
+
   local bagList = self:Phase1_DetermineBags(ectx, kind)
   local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
 
