@@ -469,4 +469,78 @@ describe("Categories", function()
       assert.is_nil(categories.itemsWithNoCategory[itemID])
     end)
   end)
+
+  -- ─── RemoveItemFromCategory ──────────────────────────────────────────────────
+  -- Issue #1079: an unscoped RemoveItemFromCategory(id) must not destroy the
+  -- user's saved (persisted) category assignment as a side effect. A category
+  -- name may be passed to scope the removal.
+  describe("RemoveItemFromCategory", function()
+    local ctx
+    before_each(function()
+      ctx = context:New("Test")
+    end)
+
+    it("unscoped removal leaves the user's persisted assignment intact", function()
+      local itemID = 12345
+      -- User hand-files the item into their own saved category.
+      categories:AddPermanentItemToCategory(ctx, itemID, "UserCat")
+      -- A plugin also files it into its own ephemeral category.
+      categories:AddItemToCategory(ctx, itemID, "PluginCat")
+
+      categories:RemoveItemFromCategory(itemID)
+
+      -- Ephemeral (plugin) assignment is gone...
+      assert.is_nil(categories.ephemeralCategoryByItemID[itemID])
+      -- ...but the user's saved assignment survives.
+      assert.are.equal("UserCat", database:GetItemCategoryByItemID(itemID).name)
+    end)
+
+    it("scoped removal of the ephemeral category leaves the persisted one intact", function()
+      local itemID = 23456
+      categories:AddPermanentItemToCategory(ctx, itemID, "UserCat")
+      categories:AddItemToCategory(ctx, itemID, "PluginCat")
+
+      categories:RemoveItemFromCategory(itemID, "PluginCat")
+
+      assert.is_nil(categories.ephemeralCategoryByItemID[itemID])
+      assert.are.equal("UserCat", database:GetItemCategoryByItemID(itemID).name)
+    end)
+
+    it("scoped removal of the persisted category deletes only that assignment", function()
+      local itemID = 34567
+      categories:AddPermanentItemToCategory(ctx, itemID, "UserCat")
+      categories:AddItemToCategory(ctx, itemID, "PluginCat")
+
+      categories:RemoveItemFromCategory(itemID, "UserCat")
+
+      -- The persisted assignment is gone...
+      assert.are.equal(nil, database:GetItemCategoryByItemID(itemID).name)
+      -- ...but the plugin's ephemeral assignment is untouched.
+      assert.is_not_nil(categories.ephemeralCategoryByItemID[itemID])
+      assert.are.equal("PluginCat", categories.ephemeralCategoryByItemID[itemID].name)
+    end)
+
+    it("scoped removal of a non-matching category touches nothing", function()
+      local itemID = 45678
+      categories:AddPermanentItemToCategory(ctx, itemID, "UserCat")
+      categories:AddItemToCategory(ctx, itemID, "PluginCat")
+
+      categories:RemoveItemFromCategory(itemID, "SomeOtherCategory")
+
+      assert.are.equal("UserCat", database:GetItemCategoryByItemID(itemID).name)
+      assert.is_not_nil(categories.ephemeralCategoryByItemID[itemID])
+      assert.are.equal("PluginCat", categories.ephemeralCategoryByItemID[itemID].name)
+    end)
+
+    it("unscoped removal still clears the itemsWithNoCategory marker", function()
+      local itemID = 56789
+      local mockItem = { itemInfo = { itemID = itemID } }
+      -- Populate the no-category cache.
+      categories:GetCustomCategory(ctx, const.BAG_KIND.BACKPACK, mockItem)
+      assert.is_true(categories.itemsWithNoCategory[itemID])
+
+      categories:RemoveItemFromCategory(itemID)
+      assert.is_nil(categories.itemsWithNoCategory[itemID])
+    end)
+  end)
 end)
