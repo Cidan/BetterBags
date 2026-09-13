@@ -291,7 +291,11 @@ function themes:resetCloseButton(button)
 end
 
 function themes:SetTitle(frame, title)
-  local theme = self.themes[db:GetTheme()]
+  -- Use GetCurrentTheme so an unregistered or unavailable saved theme falls back
+  -- to Default instead of indexing a nil theme. SetTitle can run during
+  -- OnInitialize (ADDON_LOADED), before themes:OnEnable resolves the fallback
+  -- and before a third-party theme's addon has loaded (issue #1076).
+  local theme = self:GetCurrentTheme()
   theme.SetTitle(frame, title)
   self.titles[frame:GetName()] = title
 end

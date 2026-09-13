@@ -63,8 +63,47 @@ This is enforced in three places, redundantly, on purpose:
 Practical consequences:
 
 - Do not use any 5.2+ language feature or standard library function. If you are tempted to reach for one, stop and find the 5.1 equivalent. Luacheck will catch it; the test guard will catch it; CI will catch it.
-- The `lua` / `busted` binaries on `$PATH` must be 5.1 (or a 5.1-compatible LuaJIT 2.x, whose `_VERSION` is `"Lua 5.1"`). If `lua -v` reports anything other than `Lua 5.1.x`, fix that before running the suite — do not "just try it" on the wrong runtime and trust a green result. `install-deps.sh` does not install a Lua interpreter; you must provide 5.1 yourself.
+- Run the suite with the pre-installed Lua 5.1.5 toolchain at `~/.local/lua51/bin/busted` (see "Running Tests (Canonical Path)" below). Do **not** run the plain `busted` on `$PATH` — it is a 5.4 build and the `spec/setup.lua` guard will reject it. Never reinstall the framework; it is already installed. `install-deps.sh` does not install a Lua interpreter — it does not need to, the 5.1 toolchain is already present.
 - When debugging a test failure, never conclude "this works on 5.4" as a workaround. 5.4 is irrelevant. Fix the 5.1 behavior.
+
+## Running Tests (Canonical Path — DO NOT reinstall)
+
+A real **Lua 5.1.5** toolchain is **already installed** on this machine and is the one and
+only way you should run the suite. It is self-contained under `~/.local/lua51/` and ships its
+own `lua`, `luarocks`, and `busted` (2.3.0) built against Lua 5.1. **Do not `luarocks install
+busted` again, do not build a new rocks tree, do not create a LuaJIT tree.** It is done. Just
+use it:
+
+```bash
+# From the repo root (/home/antonio/git/BetterBags):
+~/.local/lua51/bin/busted                          # run the whole suite
+~/.local/lua51/bin/busted spec/items_spec.lua      # run one spec file
+~/.local/lua51/bin/busted --filter "gear set"      # run tests matching a pattern
+~/.local/lua51/bin/busted -l                        # list tests without running
+```
+
+`~/.local/lua51/bin/lua -e 'print(_VERSION)'` prints `Lua 5.1` — this is genuine Lua 5.1.5
+(matches CI's `leafo/gh-actions-lua@v10` runtime exactly), so it satisfies the
+`spec/setup.lua` `_VERSION` guard and validates real 5.1 behavior, not LuaJIT's approximation.
+
+**Why not plain `busted`?** The `busted` first on `$PATH` (`~/.local/bin/busted`) is a **Lua
+5.4** build. Running it aborts immediately with the "BetterBags test suite requires Lua 5.1"
+error from `spec/setup.lua`. That is the guard working correctly, **not** a signal to install
+anything — reach for `~/.local/lua51/bin/busted` instead. (If you prefer a short command,
+prepend the dir once per shell: `export PATH="$HOME/.local/lua51/bin:$PATH"`, after which
+plain `busted` resolves to the 5.1 build. Never commit this to any repo file.)
+
+**Luacheck** is interpreter-agnostic — it lints against `std = "lua51"` from `.luacheckrc`
+regardless of the Lua that runs it — so the plain `luacheck .` on `$PATH` is correct as-is and
+needs no special interpreter.
+
+**If (and only if) the toolchain is ever actually missing** (`~/.local/lua51/bin/busted` does
+not exist), recreate it into that same tree with the machine's already-installed LuaRocks —
+never into the repo:
+
+```bash
+~/.local/lua51/bin/luarocks install busted luacov
+```
 
 ## Deps Requirements
 

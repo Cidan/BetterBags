@@ -96,6 +96,7 @@ local function stubModules()
 
   local equipmentSets = stubModule("EquipmentSets")
   override(equipmentSets, "GetItemSets", function() return nil end)
+  override(equipmentSets, "Update", function() end)
 
   local tooltipScanner = stubModule("TooltipScanner")
   override(tooltipScanner, "GetTooltipText", function() return "" end)
@@ -860,6 +861,127 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.is_not_nil(slotInfo.itemsBySlotKey["1_1"], "bag 1 must survive a same-frame wipe + targeted refresh")
       assert.equal(201, slotInfo.itemsBySlotKey["1_1"].itemInfo.itemID)
       assert.equal(2, slotInfo.totalItems)
+    end)
+  end)
+
+  -- Gear set (WoW C_EquipmentSet) labeling. The equipment-set location map is
+  -- keyed by physical (bag, slot) and is only correct if it is rebuilt on every
+  -- data sweep. Commit ce09592 dropped the per-sweep equipmentSets:Update() call
+  -- that the pre-refactor pipeline made at the top of RefreshBags, so the map
+  -- went stale after login: newly looted items in slots a set item had vacated
+  -- inherited the set label, and set items that moved lost theirs (issue: gear
+  -- items mislabeled / disappearing after looting).
+  describe("gear set labeling (C_EquipmentSet)", function()
+    -- A stateful EquipmentSets stub: GetItemSets reads a live (bag,slot)->names
+    -- map, and Update() rebuilds that live map from a "pending" source of truth
+    -- (the current C_EquipmentSet item locations). The sweep must call Update()
+    -- for the live map to reflect the pending source.
+    local liveSets, pendingSets, eq
+
+    local function syncFromPending()
+      liveSets = {}
+      for bag, slots in pairs(pendingSets) do
+        liveSets[bag] = {}
+        for slot, names in pairs(slots) do
+          liveSets[bag][slot] = names
+        end
+      end
+    end
+
+    before_each(function()
+      liveSets = {}
+      pendingSets = {}
+      eq = addon:GetModule("EquipmentSets")
+      override(eq, "GetItemSets", function(_, bag, slot)
+        return liveSets[bag] and liveSets[bag][slot]
+      end)
+      override(eq, "Update", function()
+        syncFromPending()
+      end)
+      -- Only the GearSet category filter is on for these tests.
+      override(database, "GetCategoryFilter", function(_, _, filter)
+        return filter == "GearSet"
+      end)
+    end)
+
+    it("rebuilds the set map each sweep so a set item is labeled", function()
+      pendingSets[0] = { [1] = { "Demo" } }
+      mockContainer[0] = {
+        { itemID = 101, guid = "gear-demo", count = 1 },
+      }
+
+      local slotInfo = refreshBackpack()
+
+      local item = slotInfo.itemsBySlotKey["0_1"]
+      assert.is_not_nil(item)
+      assert.are.same({ "Demo" }, item.itemInfo.equipmentSets)
+      assert.equal("Gear: Demo", item.itemInfo.category)
+    end)
+
+    it("does not label a newly looted item that took over a vacated set slot", function()
+      -- Simulate login: the set map was built once while a Demo gear piece sat in
+      -- slot 0_1.
+      pendingSets[0] = { [1] = { "Demo" } }
+      eq:Update()
+      assert.are.same({ "Demo" }, eq:GetItemSets(0, 1))
+
+      -- The Demo piece is equipped (leaves the bags) and a brand-new looted item
+      -- lands in the now-free slot 0_1. The set no longer occupies any bag slot.
+      pendingSets[0] = {}
+      mockContainer[0] = {
+        { itemID = 303, guid = "loot-new", count = 1 },
+      }
+
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+
+      local item = slotInfo.itemsBySlotKey["0_1"]
+      assert.is_not_nil(item)
+      assert.equal(303, item.itemInfo.itemID)
+      assert.is_nil(item.itemInfo.equipmentSets)
+      assert.are_not.equal("Gear: Demo", item.itemInfo.category)
+    end)
+
+    it("follows a set item that moved to a new slot instead of dropping its label", function()
+      -- Login-time map: Demo piece in slot 0_1.
+      pendingSets[0] = { [1] = { "Demo" } }
+      eq:Update()
+
+      -- The piece is dragged to slot 0_2; the C_EquipmentSet locations now point
+      -- at 0_2. Without a per-sweep Update() the stale map still points at 0_1, so
+      -- the moved piece loses its "Gear: Demo" label (the "gear sets disappeared"
+      -- symptom).
+      pendingSets[0] = { [2] = { "Demo" } }
+      mockContainer[0] = {
+        {},
+        { itemID = 101, guid = "gear-demo", count = 1 },
+      }
+
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+
+      local moved = slotInfo.itemsBySlotKey["0_2"]
+      assert.is_not_nil(moved)
+      assert.are.same({ "Demo" }, moved.itemInfo.equipmentSets)
+      assert.equal("Gear: Demo", moved.itemInfo.category)
+    end)
+
+    it("relabels set items when the set is renamed (e.g. after a spec switch)", function()
+      -- Two gear pieces, initially in the "Demo" set.
+      pendingSets[0] = { [1] = { "Demo" }, [2] = { "Demo" } }
+      mockContainer[0] = {
+        { itemID = 101, guid = "gear-a", count = 1 },
+        { itemID = 202, guid = "gear-b", count = 1 },
+      }
+      local slotInfo = refreshBackpack()
+      assert.equal("Gear: Demo", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      assert.equal("Gear: Demo", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
+
+      -- The set the pieces belong to now resolves to a different name. A stale map
+      -- would keep labeling them "Gear: Demo"; a fresh sweep must pick up "Aff".
+      pendingSets[0] = { [1] = { "Aff" }, [2] = { "Aff" } }
+      slotInfo = refreshBackpack({ wipe = true })
+
+      assert.equal("Gear: Aff", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+      assert.equal("Gear: Aff", slotInfo.itemsBySlotKey["0_2"].itemInfo.category)
     end)
   end)
 end)

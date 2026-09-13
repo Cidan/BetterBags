@@ -544,4 +544,70 @@ describe("Themes", function()
       assert.are.equal(16, lastPoint.y)
     end)
   end)
+
+  -- Regression: issue #1076. themes:SetTitle is called during OnInitialize
+  -- (ADDON_LOADED), before themes:OnEnable has run its fallback. If the saved
+  -- theme key is not registered/available yet (e.g. a third-party theme whose
+  -- addon has not loaded), SetTitle must fall back to the Default theme like
+  -- its sibling accessors (GetCurrentTheme, GetFlatHeaderHeight, GetItemButton)
+  -- instead of indexing a nil theme and aborting OnInitialize.
+  describe("SetTitle fallback", function()
+    before_each(function()
+      themes:RegisterTheme("Default", {
+        Name = "Default",
+        Available = true,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function() end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() end,
+        ToggleSearch = function() end,
+      })
+    end)
+
+    it("does not error when the active theme is not registered", function()
+      activeTheme = "SomeThirdPartyThemeNotLoadedYet"
+      local frame = CreateFrame("Frame", "TestSetTitleFallbackFrame")
+      assert.has_no.errors(function()
+        themes:SetTitle(frame, "Backpack")
+      end)
+      assert.are.equal("Backpack", themes.titles[frame:GetName()])
+    end)
+
+    it("uses the Default theme's SetTitle when the active theme is unavailable", function()
+      local defaultCalled = false
+      themes:RegisterTheme("Default", {
+        Name = "Default",
+        Available = true,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function() end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() defaultCalled = true end,
+        ToggleSearch = function() end,
+      })
+      themes:RegisterTheme("Broken", {
+        Name = "Broken",
+        Available = false,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function() end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() error("unavailable theme SetTitle must not run") end,
+        ToggleSearch = function() end,
+      })
+      activeTheme = "Broken"
+      local frame = CreateFrame("Frame", "TestSetTitleUnavailableFrame")
+      assert.has_no.errors(function()
+        themes:SetTitle(frame, "Bank")
+      end)
+      assert.is_true(defaultCalled)
+    end)
+  end)
 end)

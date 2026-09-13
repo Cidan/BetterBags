@@ -20,6 +20,8 @@ function L:G(key) return key end
 
 local equipmentSets = StubBetterBagsModule("EquipmentSets")
 equipmentSets.GetItemSets = function() return nil end
+-- RunRefresh rebuilds the equipment-set location map each sweep.
+equipmentSets.Update = equipmentSets.Update or function() end
 
 local tooltipScanner = StubBetterBagsModule("TooltipScanner")
 tooltipScanner.GetTooltipText = function() return "" end
