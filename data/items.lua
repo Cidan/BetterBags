@@ -2305,8 +2305,20 @@ function items:GenerateItemHash(data)
     appearanceID = transmogInfo.transmogInfoMixin.appearanceID
   end
 
+  -- Scope the hash by bank type so the Character Bank and the Warbank never virtually
+  -- stack together. On retail the bank data sweep loads both bank types into one unified
+  -- cache (they only partition into tabs downstream, after stacking), so two identical
+  -- items -- one in each bank type -- would otherwise collide on this hash and one would
+  -- be hidden behind the other's virtual stack, making items appear to merge across bank
+  -- types. Items within the same bank type (all Character Bank bags, or all Warbank tabs)
+  -- keep the same scope and still stack. Backpack and non-retail clients are unaffected.
+  local bankScope = ""
+  if const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[data.bagid] then
+    bankScope = "W"
+  end
+
   local hash = format(
-    "%d%s%s%s%s%s%s%s%s%s%s%s%d%d%d%s",
+    "%d%s%s%s%s%s%s%s%s%s%s%s%d%d%d%s%s",
     itemID,
     enchantID,
     gemID1,
@@ -2322,7 +2334,8 @@ function items:GenerateItemHash(data)
     bindingVal,
     currentItemLevel,
     appearanceID,
-    statHash
+    statHash,
+    bankScope
   )
   return hash
 end
