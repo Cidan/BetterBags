@@ -402,6 +402,57 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  describe("bank/warbank virtual stacking isolation", function()
+    local function refreshBank()
+      local ctx = context:New("refresh")
+      items:RefreshBank(ctx)
+      return items.slotInfo[const.BAG_KIND.BANK]
+    end
+
+    -- The retail bank data sweep loads the Character Bank (BANK_BAGS) and the Warbank
+    -- (ACCOUNT_BANK_BAGS) into one unified cache, then partitions into tabs downstream.
+    -- Virtual stacking runs before that partition, so two identical items -- one in each
+    -- bank type -- must NOT merge into a single visible root, or one physical pile is
+    -- hidden and the item appears to jump between bank types / tabs.
+    it("does not merge an identical item across the Character Bank and the Warbank", function()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+      -- Same itemID (and thus same generated link/stats) in a Character Bank bag (6) and
+      -- an Account Bank / Warbank bag (13).
+      mockContainer[6] = { { itemID = 101, guid = "guid-char", count = 5 } }
+      mockContainer[13] = { { itemID = 101, guid = "guid-warbank", count = 5 } }
+
+      local slotInfo = refreshBank()
+
+      assert.is_not_nil(slotInfo.visibleItemsBySlotKey["6_1"], "character-bank copy must stay visible")
+      assert.is_not_nil(slotInfo.visibleItemsBySlotKey["13_1"], "warbank copy must stay visible")
+      assert.are_not.equal(
+        slotInfo.itemsBySlotKey["6_1"].itemHash,
+        slotInfo.itemsBySlotKey["13_1"].itemHash,
+        "character-bank and warbank copies must hash differently so they never stack"
+      )
+    end)
+
+    it("still merges two identical items within the same Character Bank", function()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+      mockContainer[6] = { { itemID = 101, guid = "guid-a", count = 5 } }
+      mockContainer[7] = { { itemID = 101, guid = "guid-b", count = 5 } }
+
+      local slotInfo = refreshBank()
+
+      local visibleInBankBags = 0
+      for slotkey in pairs(slotInfo.visibleItemsBySlotKey) do
+        if slotkey == "6_1" or slotkey == "7_1" then visibleInBankBags = visibleInBankBags + 1 end
+      end
+      assert.are.equal(1, visibleInBankBags, "identical items in the same bank type still merge")
+    end)
+  end)
+
   it("resolves search categories against custom categories by priority after re-indexing", function()
     override(categories, "GetCustomCategory", function(_, _, _, data)
       if data.itemInfo.itemID == 101 then

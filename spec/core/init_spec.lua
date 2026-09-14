@@ -80,6 +80,7 @@ describe("Core Init and Enable flow", function()
     local bagFrame = addon:GetModule("BagFrame")
     bagFrame.Create = spy.new(function(_, ctx, kind)
       return {
+        frame = CreateFrame("Frame"),
         GetName = function() return "MockBag_" .. tostring(kind) end,
         SetTitle = function() end,
       }
@@ -168,6 +169,7 @@ describe("Core Init and Enable flow", function()
         error("simulated bank creation failure")
       end
       return {
+        frame = CreateFrame("Frame"),
         GetName = function() return "MockBag_" .. tostring(kind) end,
         SetTitle = function() end,
         IsShown = function() return false end,
@@ -205,6 +207,7 @@ describe("Core Init and Enable flow", function()
         error("simulated bank creation failure")
       end
       return {
+        frame = CreateFrame("Frame"),
         GetName = function() return "MockBag_" .. tostring(kind) end,
         SetTitle = function() end,
         IsShown = function() return false end,

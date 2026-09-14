@@ -238,6 +238,19 @@ function addon:OnInitialize()
     end
   end
 
+  -- Keep the Blizzard bag-bar highlight in sync with the backpack window on EVERY
+  -- show/hide path, not just addon:ToggleAllBags. The "X" close button
+  -- (frame.Owner:Hide) and ESC (UISpecialFrames hides the frame widget directly) both
+  -- bypass addon.OnUpdate, the only caller of UpdateButtonHighlight, so without these
+  -- hooks the bag-bar buttons stay lit after closing the bag by those paths. Hooking
+  -- our own insecure frame's OnShow/OnHide is taint-free and idempotent with OnUpdate.
+  addon.Bags.Backpack.frame:HookScript("OnShow", function()
+    addon:UpdateButtonHighlight()
+  end)
+  addon.Bags.Backpack.frame:HookScript("OnHide", function()
+    addon:UpdateButtonHighlight()
+  end)
+
   -- Only create the bank bag if the setting is enabled
   if database:GetEnableBankBag() then
     addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)

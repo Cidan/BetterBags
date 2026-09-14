@@ -86,10 +86,13 @@ describe("Bag-bar backpack button click", function()
 
     local bagFrame = addon:GetModule("BagFrame")
     bagFrame.Create = function(_, _, kind)
+      local frame = CreateFrame("Frame")
+      frame:SetShown(false)
       return {
+        frame = frame,
         GetName = function() return "MockBag_" .. tostring(kind) end,
         SetTitle = function() end,
-        IsShown = function() return false end,
+        IsShown = function() return frame:IsShown() end,
       }
     end
 
@@ -109,7 +112,10 @@ describe("Bag-bar backpack button click", function()
       b.IsProtected = function() return false, false end
       b.RegisterForClicks = function() end
       b.RegisterForDrag = function() end
-      b.SlotHighlightTexture = { SetShown = function() end }
+      b.SlotHighlightTexture = {
+        shown = false,
+        SetShown = function(self, value) self.shown = value end,
+      }
       return b
     end
     _G.MainMenuBarBackpackButton = makeBagButton()
@@ -176,5 +182,30 @@ describe("Bag-bar backpack button click", function()
     onclick(_G.CharacterBag0Slot, "LeftButton")
 
     assert.are.equal(1, count)
+  end)
+
+  -- The "X" close button and ESC both hide the backpack frame directly, bypassing
+  -- addon:ToggleAllBags/addon.OnUpdate (the only callers of UpdateButtonHighlight).
+  -- The frame's own OnShow/OnHide must drive the bag-bar highlight so it never sticks
+  -- lit after the bag is closed by any path.
+  it("clears the bag-bar highlight when the backpack frame hides (X / ESC path)", function()
+    pcall(function() addon:OnInitialize() end)
+
+    local frame = addon.Bags.Backpack.frame
+
+    -- Simulate the bag opening: frame shown, OnShow fires -> highlight lit.
+    frame:SetShown(true)
+    local onShow = frame:GetScript("OnShow")
+    assert.is_function(onShow)
+    onShow(frame)
+    assert.is_true(_G.MainMenuBarBackpackButton.SlotHighlightTexture.shown)
+
+    -- Simulate the X button / ESC hiding the frame directly.
+    frame:SetShown(false)
+    local onHide = frame:GetScript("OnHide")
+    assert.is_function(onHide)
+    onHide(frame)
+    assert.is_false(_G.MainMenuBarBackpackButton.SlotHighlightTexture.shown)
+    assert.is_false(_G.CharacterBag0Slot.SlotHighlightTexture.shown)
   end)
 end)
