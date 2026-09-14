@@ -519,19 +519,23 @@ function sectionFrame:OnTitleRightClick(section)
   local list = {}
 
   for _, cell in pairs(section:GetAllCells()) do
-    local data = cell:GetItemData()
-    if not data.isItemEmpty then
-      table.insert(list, data)
+    -- Gap cells are plain math tables ({ isGap = true, ... }) with no frame and
+    -- no GetItemData method; they persist in a section after items leave it
+    -- (e.g. mailing away Recent Items) and must be skipped or this errors.
+    if not cell.isGap then
+      local data = cell:GetItemData()
+      if not data.isItemEmpty then
+        table.insert(list, data)
 
-      -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
-      local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
-      if stack ~= nil then
-        for subSlotKey in pairs(stack.slotkeys) do
-          local subData = items:GetItemDataFromSlotKey(subSlotKey)
-          table.insert(list, subData)
+        -- checking stacks if Merge stacks is enabled and Unmerge at Shop disabled
+        local stack = items:GetAllSlotInfo()[addon:GetBagFromBagID(data.bagid).kind].stacks:GetStackInfo(data.itemHash)
+        if stack ~= nil then
+          for subSlotKey in pairs(stack.slotkeys) do
+            local subData = items:GetItemDataFromSlotKey(subSlotKey)
+            table.insert(list, subData)
+          end
         end
       end
-
     end
   end
 

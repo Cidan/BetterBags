@@ -15,7 +15,7 @@ categories.GetGroupForCategory = function() return nil end
 local const = StubBetterBagsModule("Constants")
 const.BAG_VIEW = { SECTION_GRID = 1 }
 const.BAG_KIND = { BACKPACK = 1, BANK = 2 }
-const.MOVEMENT_FLOW = { UNDEFINED = 0, NPCSHOP = 1 }
+const.MOVEMENT_FLOW = { UNDEFINED = 0, NPCSHOP = 1, SENDMAIL = 2 }
 
 local sort = StubBetterBagsModule("Sort")
 sort.GetItemSortBySlot = function() end
@@ -30,7 +30,7 @@ local themes = StubBetterBagsModule("Themes")
 themes.UpdateSectionFont = function() end
 themes.RegisterSectionFont = function() end
 
-StubBetterBagsModule("Items")
+local items = StubBetterBagsModule("Items")
 local movementFlow = StubBetterBagsModule("MovementFlow")
 movementFlow.GetMovementFlow = function() return 0 end
 
@@ -196,6 +196,43 @@ describe("Section Frame", function()
         s:ReleaseAllCells(ctx)
       end)
       assert.is_true(released)
+    end)
+
+    it("skips frameless gap cells when right-clicking the title to move items", function()
+      -- Reproduces the bug where mailing items from Recent Items leaves
+      -- persistent gap cells; the next right-click iterated them and called
+      -- cell:GetItemData() on a frameless gap table (section.lua:522 crash).
+      movementFlow.GetMovementFlow = function() return const.MOVEMENT_FLOW.SENDMAIL end
+
+      local used = {}
+      local realBagID = 0
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.UseContainerItem = function(bagid, slotid)
+        table.insert(used, { bagid = bagid, slotid = slotid })
+      end
+      addon.GetBagFromBagID = function() return { kind = const.BAG_KIND.BACKPACK } end
+      items.GetAllSlotInfo = function()
+        return { [const.BAG_KIND.BACKPACK] = { stacks = { GetStackInfo = function() return nil end } } }
+      end
+
+      local ctx = context:New("TestRightClickGap")
+      local s = sectionFrame:Create(ctx)
+      local realCell = {
+        Release = function() end,
+        GetItemData = function()
+          return { isItemEmpty = false, bagid = realBagID, slotid = 3, itemHash = "hash" }
+        end,
+      }
+      -- A frameless gap cell has no GetItemData method.
+      local gapCell = { isGap = true, width = 37, height = 37 }
+      s:AddCell("0_3", realCell)
+      s:AddCell("gap:0_5", gapCell)
+
+      assert.has_no.errors(function()
+        sectionFrame:OnTitleRightClick(s)
+      end)
+      -- The real item is still moved; the gap is simply skipped.
+      assert.are.equal(1, #used)
     end)
   end)
 
