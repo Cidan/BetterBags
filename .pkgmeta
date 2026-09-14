@@ -26,11 +26,21 @@ ignore:
   - tools
   - go.mod
   - go.sum
-  - cache 
+  - cache
   - .claude
-  - .roo
+  - .roomodes
   - .libraries
   - spec
   - .github
   - .busted
   - .omc
+  - .context
+  - .vscode
+  - docs
+  - test.lua
+  - .luacheckrc
+  - .luacov
+  - .luarc.json
+  - CLAUDE.md
+  - GEMINI.md
+  - AGENTS.md
