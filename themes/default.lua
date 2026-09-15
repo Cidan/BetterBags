@@ -71,6 +71,15 @@ local defaultTheme = {
       decoration.CloseButton:SetScript("OnClick", function()
         frame:Hide()
       end)
+      -- Raise the close button above the owner frame's mouse layer and the
+      -- template's TitleContainer (frameLevel 510). The owner form frame is
+      -- mouse-enabled for drag-move above the decoration (decoration = owner
+      -- level - 1), so without this the close button is occluded and only its
+      -- corner sliver is clickable, reading as an offset hit area on Classic.
+      -- Mirrors the Portrait (bag) window, whose close button works correctly.
+      decoration.CloseButton:SetFrameLevel(1001)
+      decoration.TitleContainer:SetFrameLevel(1001)
+      decoration.NineSlice:SetFrameLevel(1000)
       decoration.TitleContainer.TitleText:SetFontObject(fonts.UnitFrame12Yellow)
       if themes.titles[frame:GetName()] then
         decoration:SetTitle(themes.titles[frame:GetName()])
