@@ -35,6 +35,12 @@ local context = addon:GetModule("Context")
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
+-- Alpha multiplier for the quality glow when "Extra Glowy Item Buttons" is off.
+-- The glow is always the additive UI-ActionButton-Border texture; this dims it
+-- to a subtle level so item quality is still visible (Classic's default bags
+-- draw no quality border at all) while "Extra Glowy" is the full-intensity look.
+local SUBTLE_QUALITY_GLOW_ALPHA = 0.55
+
 ---@class ItemStack
 ---@field button Item
 ---@field data? ItemData
@@ -308,18 +314,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	decoration.GetItemContextMatchResult = itemFrame.GetItemContextMatchResult
 	if decoration.SetItemButtonTexture then decoration:SetItemButtonTexture(data.itemInfo.itemIcon) else SetItemButtonTexture(decoration, data.itemInfo.itemIcon) end
 	SetItemButtonQuality(decoration, data.itemInfo.itemQuality, data.itemInfo.itemLink, false, bound)
-	if database:GetExtraGlowyButtons(self.kind) and data.itemInfo.itemQuality > const.ITEM_QUALITY.Common then
-		decoration.IconBorder:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
-		decoration.IconBorder:SetBlendMode("ADD")
-		decoration.IconBorder:SetTexCoord(14 / 64, 49 / 64, 15 / 64, 50 / 64)
-	else
-		decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
-		decoration.IconBorder:SetBlendMode("BLEND")
-		decoration.IconBorder:SetTexCoord(0, 1, 0, 1)
-	end
-	if not addon.isRetail then
-		self:DrawClassicQualityBorder(decoration, data.itemInfo.itemQuality)
-	end
+	self:DrawQualityGlow(decoration, data.itemInfo.itemQuality)
 	self:UpdateCount(ctx, data)
 	--self:SetLock(data.itemInfo.isLocked)
 	if addon.isRetail then
@@ -472,8 +467,41 @@ end
 -- non-retail clients have to draw the rarity border themselves.
 ---@param decoration ItemButton
 ---@param quality number?
+-- DrawQualityGlow draws the item quality indicator on the decoration's IconBorder.
+-- Uncommon+ items get an additive quality glow (UI-ActionButton-Border); "Extra
+-- Glowy" is the full-intensity version, otherwise the glow is dimmed to a subtle
+-- level so quality is still visible without the option (Classic's default bags
+-- draw no quality border at all). Poor/Common items get no border, matching
+-- Blizzard's own SetItemButtonQuality (which returns no color for Poor/Common) and
+-- avoiding a stray border on plain items. Retail and Classic share this path.
+---@param decoration Frame
+---@param quality number
+function itemFrame.itemProto:DrawQualityGlow(decoration, quality)
+	local border = decoration.IconBorder
+	if not border then return end
+	if quality and quality > const.ITEM_QUALITY.Common then
+		local qualityColor = const.ITEM_QUALITY_COLOR[quality] or const.ITEM_QUALITY_COLOR[const.ITEM_QUALITY.Common]
+		border:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
+		border:SetBlendMode("ADD")
+		border:SetTexCoord(14 / 64, 49 / 64, 15 / 64, 50 / 64)
+		local alpha = database:GetExtraGlowyButtons(self.kind) and 1 or SUBTLE_QUALITY_GLOW_ALPHA
+		border:SetVertexColor(qualityColor[1], qualityColor[2], qualityColor[3], (qualityColor[4] or 1) * alpha)
+		border:Show()
+	else
+		border:Hide()
+	end
+end
+
+-- DrawClassicQualityBorder draws a thin colored quality border for free slots on
+-- Classic (special bags with a non-common bag quality). Only Uncommon+ gets a
+-- border, matching Blizzard's SetItemButtonQuality (no color for Poor/Common):
+-- drawing a white border on a plain empty slot double-borders the empty-slot
+-- texture and reads as a stray/offset frame.
+---@param decoration Frame
+---@param quality number
 function itemFrame.itemProto:DrawClassicQualityBorder(decoration, quality)
-	local qualityColor = quality and const.ITEM_QUALITY_COLOR[quality]
+	if not decoration.IconBorder then return end
+	local qualityColor = quality and quality > const.ITEM_QUALITY.Common and const.ITEM_QUALITY_COLOR[quality]
 	if qualityColor then
 		decoration.IconBorder:SetVertexColor(unpack(qualityColor))
 		decoration.IconBorder:Show()
