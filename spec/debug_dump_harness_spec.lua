@@ -218,6 +218,25 @@ describe("Debug Dump Harness with test.lua", function()
     assert.is_not_nil(currentProfile)
   end)
 
+  it("PruneOrphanedSectionSort keeps real pinned categories and only drops true orphans", function()
+    DB.data:SetProfile("Default")
+    local sort = DB.data.profile.customSectionSort[0]
+    -- The real dump pins "Midnight", which is a genuine customCategoryFilters entry.
+    assert.is_not_nil(sort, "dump should carry a backpack customSectionSort table")
+    assert.is_not_nil(DB.data.profile.customCategoryFilters["Midnight"],
+      "'Midnight' must be a real category in the dump")
+    assert.are.equal(1, sort["Midnight"])
+
+    -- Inject a pin with no backing category (an orphan) alongside the valid one.
+    sort["TotallyGoneCategory"] = 99
+
+    DB:PruneOrphanedSectionSort()
+
+    -- Valid pin preserved, orphan removed — no regression to real pinned data.
+    assert.are.equal(1, DB.data.profile.customSectionSort[0]["Midnight"])
+    assert.is_nil(DB.data.profile.customSectionSort[0]["TotallyGoneCategory"])
+  end)
+
   it("should run the full items:ProcessRefresh pipeline using the dumped items", function()
     -- Set active profile to Default (where the dump resides)
     DB.data:SetProfile("Default")
