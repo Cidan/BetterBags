@@ -21,7 +21,10 @@ function pawn:Register()
   if self._registered then
     return true
   end
-  if not PawnIsContainerItemAnUpgrade and not PawnGetItemData then
+  -- PawnGetItemData is a stable, long-lived Pawn global; its presence means the
+  -- Pawn addon has loaded and defined its API. (We deliberately do not check
+  -- PawnIsContainerItemAnUpgrade, which no longer exists in current Pawn.)
+  if not PawnGetItemData then
     return false
   end
 

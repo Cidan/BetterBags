@@ -229,6 +229,12 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetWordWrap(wrap)
     self._wordWrap = wrap
   end
+  function widget:SetNonSpaceWrap(wrap)
+    self._nonSpaceWrap = wrap
+  end
+  function widget:GetLineHeight()
+    return self._lineHeight or 12
+  end
   function widget:SetShadowColor(r, g, b, a)
     self._shadowColor = {r = r, g = g, b = b, a = a or 1}
   end
@@ -342,6 +348,30 @@ local function CreateMockWidget(widgetType, name, parent)
       self._container = CreateMockWidget("Frame", nil, self)
     end
     return self._container
+  end
+
+  -- Modern DropdownButton menu APIs. The generator passed to SetupMenu is run on
+  -- every GenerateMenu()/Update() call (mirroring the live client, which re-runs
+  -- the generator each time the menu is opened). Each run builds a fresh menu
+  -- root and records the created entries on self._lastMenuItems so tests can
+  -- assert what the menu currently shows.
+  function widget:SetupMenu(generator)
+    self._menuGenerator = generator
+    self:GenerateMenu()
+  end
+  function widget:GenerateMenu()
+    if not self._menuGenerator then return end
+    local items = {}
+    local root = {
+      SetScrollMode = function() end,
+      CreateButton = function(_, text) table.insert(items, text); return {} end,
+      CreateCheckbox = function(_, text) table.insert(items, text); return {} end,
+    }
+    self._menuGenerator(self, root)
+    self._lastMenuItems = items
+  end
+  function widget:Update()
+    self:GenerateMenu()
   end
 
   if widgetType ~= "Texture" then
