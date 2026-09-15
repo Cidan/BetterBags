@@ -631,6 +631,14 @@ end
 ---@param value string
 function DB:SetUpgradeIconProvider(value)
   DB.data.profile.upgradeIconProvider = value
+  -- Record that the user made an explicit choice, so external-provider
+  -- precedence (see items:GetActiveUpgradeProvider) stops overriding it.
+  DB.data.profile.upgradeIconProviderUserSet = true
+end
+
+---@return boolean
+function DB:GetUpgradeIconProviderUserSet()
+  return DB.data.profile.upgradeIconProviderUserSet or false
 end
 
 ---@param kind BagKind

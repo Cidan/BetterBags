@@ -91,6 +91,8 @@ const.INVENTORY_TYPE_TO_INVENTORY_SLOTS = {
 _G.Enum = _G.Enum or {}
 _G.Enum.ItemClass = _G.Enum.ItemClass or { Tradegoods = 7, Container = 1 }
 
+database.GetUpgradeIconProvider = database.GetUpgradeIconProvider or function() return "None" end
+database.GetUpgradeIconProviderUserSet = function() return true end
 database.GetNewItemTime = function() return 30 end
 database.GetStackingOptions = function()
   return { dontMergeTransmog = false }
@@ -1270,8 +1272,14 @@ describe("Upgrade Icon Providers", function()
   local savedPawnUnbudgeted, savedPawnIsUpgrade, savedPawnGetItemData
   local savedSimpleItemLevel
 
+  local savedUserSet, savedGetProvider
+
   before_each(function()
     items:Init()
+    -- Reset the integration modules' one-shot registration guard so each test
+    -- exercises a clean OnEnable.
+    pawn._registered = nil
+    simpleItemLevel._registered = nil
 
     savedMainhand = _G.INVSLOT_MAINHAND
     savedOffhand = _G.INVSLOT_OFFHAND
@@ -1280,10 +1288,15 @@ describe("Upgrade Icon Providers", function()
     savedPawnIsUpgrade = _G.PawnIsContainerItemAnUpgrade
     savedPawnGetItemData = _G.PawnGetItemData
     savedSimpleItemLevel = _G.SimpleItemLevel
+    savedUserSet = database.GetUpgradeIconProviderUserSet
+    savedGetProvider = database.GetUpgradeIconProvider
 
     _G.INVSLOT_MAINHAND = 16
     _G.INVSLOT_OFFHAND = 17
     _G.C_Item.IsEquippableItem = function() return true end
+    -- Default: the user made an explicit provider choice, so precedence does
+    -- not kick in. Precedence tests override this to false.
+    database.GetUpgradeIconProviderUserSet = function() return true end
   end)
 
   after_each(function()
@@ -1294,7 +1307,17 @@ describe("Upgrade Icon Providers", function()
     _G.PawnIsContainerItemAnUpgrade = savedPawnIsUpgrade
     _G.PawnGetItemData = savedPawnGetItemData
     _G.SimpleItemLevel = savedSimpleItemLevel
+    database.GetUpgradeIconProviderUserSet = savedUserSet
+    database.GetUpgradeIconProvider = savedGetProvider
   end)
+
+  -- Register the Pawn provider with a controllable verdict.
+  local function enablePawn(verdict)
+    _G.PawnGetItemData = function() return {} end
+    _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return verdict end
+    pawn._registered = nil
+    pawn:OnEnable()
+  end
 
   -- Build a minimal equippable item that the providers can consume.
   ---@param opts table
@@ -1410,16 +1433,92 @@ describe("Upgrade Icon Providers", function()
       assert.is_false(called)
     end)
 
-    -- Reproduces the reported "Pawn is not in the dropdown" symptom: if the Pawn
-    -- addon has not populated its globals by the time BetterBags enables its
-    -- modules (load-order race), OnEnable's guard early-returns and the provider
-    -- is never registered, so config's dynamic dropdown never lists "Pawn".
-    it("FAILS TO REGISTER when Pawn globals are absent at OnEnable time (load-order bug)", function()
+    -- Robustness against the reported "Pawn is not in the dropdown" symptom: if
+    -- the Pawn addon has not populated its globals by the time BetterBags enables
+    -- its modules (load-order race), OnEnable must not give up permanently. It
+    -- registers an ADDON_LOADED retry so the provider appears once Pawn loads.
+    it("registers late via ADDON_LOADED when Pawn loads after BetterBags enables", function()
       _G.PawnGetItemData = nil
       _G.PawnIsContainerItemAnUpgrade = nil
       _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = nil
       pawn:OnEnable()
+      -- Not registered yet: Pawn's globals do not exist.
       assert.is_nil(items.upgradeProviders["Pawn"])
+
+      -- Pawn finishes loading; its globals appear and ADDON_LOADED fires. The
+      -- retry registers the provider and requests one refresh so drawn arrows
+      -- re-resolve against Pawn.
+      _G.PawnGetItemData = function() return {} end
+      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return true end
+      local refreshed = 0
+      events:RegisterMessage('bags/FullRefreshAll', function() refreshed = refreshed + 1 end)
+      local handler = events._eventMap["ADDON_LOADED"]
+      assert.is_not_nil(handler)
+      handler.fn("ADDON_LOADED", "Pawn")
+
+      assert.is_function(items.upgradeProviders["Pawn"])
+      assert.are.equal(1, refreshed)
+
+      -- A subsequent ADDON_LOADED must not re-register or re-refresh.
+      handler.fn("ADDON_LOADED", "SomethingElse")
+      assert.are.equal(1, refreshed)
+    end)
+  end)
+
+  describe("provider precedence (restores automatic Pawn/SimpleItemLevel)", function()
+    -- The user never explicitly picked a provider (legacy default), so an
+    -- available external provider should win automatically — restoring the
+    -- pre-#1036 behavior where Pawn drew arrows without any dropdown selection.
+    before_each(function()
+      database.GetUpgradeIconProviderUserSet = function() return false end
+    end)
+
+    it("prefers a registered Pawn provider over the saved 'None' value", function()
+      database.GetUpgradeIconProvider = function() return "None" end
+      enablePawn(true)
+      assert.are.equal("Pawn", items:GetActiveUpgradeProvider())
+      assert.is_true(items:ResolveUpgrade(equippableItem({ currentItemLevel = 1 })))
+    end)
+
+    it("prefers a registered Pawn provider over the saved 'BetterBags' value", function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+      enablePawn(false)
+      assert.are.equal("Pawn", items:GetActiveUpgradeProvider())
+      -- Pawn says not-an-upgrade, so no arrow even though BetterBags (naive)
+      -- would have arrowed this higher-ilvl item.
+      items.equipmentCache = { [5] = equippedItem(90) }
+      assert.is_false(items:ResolveUpgrade(equippableItem({ inventorySlots = { 5 }, currentItemLevel = 200 })))
+    end)
+
+    it("prefers Pawn over SimpleItemLevel when both are registered", function()
+      database.GetUpgradeIconProvider = function() return "None" end
+      enablePawn(true)
+      _G.SimpleItemLevel = { API = { ItemIsUpgrade = function() return true end } }
+      simpleItemLevel._registered = nil
+      simpleItemLevel:OnEnable()
+      assert.are.equal("Pawn", items:GetActiveUpgradeProvider())
+    end)
+
+    it("uses SimpleItemLevel when it is the only external provider", function()
+      database.GetUpgradeIconProvider = function() return "None" end
+      _G.SimpleItemLevel = { API = { ItemIsUpgrade = function() return true end } }
+      simpleItemLevel._registered = nil
+      simpleItemLevel:OnEnable()
+      assert.are.equal("SimpleItemLevel", items:GetActiveUpgradeProvider())
+    end)
+
+    it("falls back to the saved value when no external provider is registered", function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+      assert.are.equal("BetterBags", items:GetActiveUpgradeProvider())
+    end)
+
+    it("honors an explicit user choice over external-provider precedence", function()
+      database.GetUpgradeIconProviderUserSet = function() return true end
+      database.GetUpgradeIconProvider = function() return "None" end
+      enablePawn(true)
+      -- The user explicitly chose 'None'; Pawn must NOT override it.
+      assert.are.equal("None", items:GetActiveUpgradeProvider())
+      assert.is_false(items:ResolveUpgrade(equippableItem({ currentItemLevel = 1 })))
     end)
   end)
 

@@ -99,13 +99,36 @@ function items:RegisterUpgradeProvider(name, func)
   self.upgradeProviders[name] = func
 end
 
+-- GetActiveUpgradeProvider resolves which registered provider actually drives
+-- upgrade arrows. When the user has explicitly chosen a provider we honor that
+-- choice exactly. Otherwise (the legacy default, where the setting was never
+-- touched) an available external provider takes precedence over the built-in
+-- 'None'/'BetterBags' values, restoring the pre-#1036 behavior where Pawn (or
+-- SimpleItemLevel) drew arrows automatically without any dropdown selection.
+-- Pawn wins over SimpleItemLevel when both are present.
+---@return string
+function items:GetActiveUpgradeProvider()
+  local selected = database:GetUpgradeIconProvider()
+  if database:GetUpgradeIconProviderUserSet() then
+    return selected
+  end
+  self.upgradeProviders = self.upgradeProviders or {}
+  if self.upgradeProviders["Pawn"] then
+    return "Pawn"
+  end
+  if self.upgradeProviders["SimpleItemLevel"] then
+    return "SimpleItemLevel"
+  end
+  return selected
+end
+
 ---@param data ItemData
 ---@return boolean
 function items:ResolveUpgrade(data)
   if not data or data.isItemEmpty then
     return false
   end
-  local provider = database:GetUpgradeIconProvider()
+  local provider = self:GetActiveUpgradeProvider()
   if provider == "None" then
     return false
   end

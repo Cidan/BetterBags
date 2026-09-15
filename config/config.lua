@@ -151,11 +151,17 @@ function config:CreateConfig()
       return list
     end,
     getValue = function(_, value)
-      return value == db:GetUpgradeIconProvider()
+      -- Reflect the provider actually in effect (which may be an external
+      -- provider taking precedence when the user has not made an explicit
+      -- choice), so the highlighted option matches the arrows being drawn.
+      return value == addon:GetModule('Items'):GetActiveUpgradeProvider()
     end,
     setValue = function(ctx, value)
       db:SetUpgradeIconProvider(value)
-      events:SendMessage(ctx, 'bag/RedrawIcons')
+      -- A full refresh re-runs the data sweep so Phase6 re-resolves each item's
+      -- data.isUpgrade with the newly selected provider. bag/RedrawIcons only
+      -- re-reads the already-committed (stale) isUpgrade and would not update.
+      events:SendMessage(ctx, 'bags/FullRefreshAll')
     end,
   })
 

@@ -473,6 +473,14 @@ describe("Database", function()
       DB:SetUpgradeIconProvider("Pawn")
       assert.are.equal("Pawn", DB:GetUpgradeIconProvider())
     end)
+
+    it("tracks whether the user explicitly set a provider", function()
+      -- Defaults to false so external-provider precedence can kick in for
+      -- legacy users who never touched the setting.
+      assert.is_false(DB:GetUpgradeIconProviderUserSet())
+      DB:SetUpgradeIconProvider("Pawn")
+      assert.is_true(DB:GetUpgradeIconProviderUserSet())
+    end)
   end)
 
   -- ─── Stacking ──────────────────────────────────────────────────────────────────

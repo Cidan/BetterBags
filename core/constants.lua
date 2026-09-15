@@ -618,6 +618,10 @@ const.DATABASE_DEFAULTS = {
     showKeybindWarning = true,
     enterToMakeCategory = true,
     upgradeIconProvider = 'None',
+    -- False until the user explicitly picks a provider in the config dropdown.
+    -- While false, an available external provider (Pawn/SimpleItemLevel) takes
+    -- precedence so upgrade arrows keep working automatically for existing users.
+    upgradeIconProviderUserSet = false,
     theme = 'Default',
     showFullSectionNames = {
       [const.BAG_KIND.BACKPACK] = false,
