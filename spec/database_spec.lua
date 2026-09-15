@@ -709,6 +709,66 @@ describe("Database", function()
       assert.is_nil(DB.data.profile.customCategoryIndex[2])
     end)
 
+    it("DeleteItemCategory scrubs pinned sort, options, collapse, and group for all kinds", function()
+      -- Reproduces the orphaned-category bug: deleting a category must remove
+      -- every reference to it, otherwise a leftover customSectionSort ("Pinned")
+      -- entry resurfaces it forever as an undeletable "dynamic" category.
+      DB.data.profile.customCategoryFilters["Orphan"] = {
+        name = "Orphan", itemList = { [50] = true }, enabled = { [0] = true, [1] = true }
+      }
+      DB.data.profile.customCategoryIndex[50] = "Orphan"
+      DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Orphan"] = 3
+      DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Orphan"] = 4
+      DB.data.profile.categoryOptions["Orphan"] = { shown = false }
+      DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Orphan"] = true
+      DB.data.profile.collapsedSections[const.BAG_KIND.BANK]["Orphan"] = true
+      DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"] = 5
+      DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Orphan"] = 7
+
+      DB:DeleteItemCategory("Orphan")
+
+      assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"])
+      assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Orphan"])
+      assert.is_nil(DB.data.profile.categoryOptions["Orphan"])
+      assert.is_nil(DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Orphan"])
+      assert.is_nil(DB.data.profile.collapsedSections[const.BAG_KIND.BANK]["Orphan"])
+      assert.is_nil(DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Orphan"])
+      assert.is_nil(DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Orphan"])
+    end)
+
+    it("DeleteItemCategory scrubs grouped sub-categories from side tables", function()
+      DB.data.profile.customCategoryFilters["Parent"] = {
+        name = "Parent", itemList = {}, enabled = { [0] = true, [1] = true }
+      }
+      DB.data.profile.ephemeralCategoryFilters["Parent - Consumable"] = { name = "Parent - Consumable" }
+      DB.data.profile.categoryOptions["Parent - Consumable"] = { shown = true }
+      DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Parent - Consumable"] = 2
+      DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Parent - Consumable"] = true
+
+      DB:DeleteItemCategory("Parent")
+
+      assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Parent - Consumable"])
+      assert.is_nil(DB.data.profile.categoryOptions["Parent - Consumable"])
+      assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Parent - Consumable"])
+      assert.is_nil(DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Parent - Consumable"])
+    end)
+
+    it("PruneOrphanedSectionSort drops pins with no backing category, keeps valid ones", function()
+      DB.data.profile.customCategoryFilters["Real"] = { name = "Real", itemList = {} }
+      DB.data.profile.ephemeralCategoryFilters["Dyn"] = { name = "Dyn", dynamic = true }
+      DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK] = {
+        ["Real"] = 1, ["Dyn"] = 2, ["Orphan"] = 3,
+      }
+      DB.data.profile.customSectionSort[const.BAG_KIND.BANK] = { ["GhostBank"] = 1 }
+
+      DB:PruneOrphanedSectionSort()
+
+      assert.are.equal(1, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Real"])
+      assert.are.equal(2, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Dyn"])
+      assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"])
+      assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["GhostBank"])
+    end)
+
     it("WipeItemCategory clears items from persistent category", function()
       DB.data.profile.customCategoryFilters["WipeMe"] = {
         name = "WipeMe", itemList = { [5] = true, [10] = true }, enabled = { [0] = true, [1] = true }
