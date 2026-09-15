@@ -91,6 +91,8 @@ const.INVENTORY_TYPE_TO_INVENTORY_SLOTS = {
 _G.Enum = _G.Enum or {}
 _G.Enum.ItemClass = _G.Enum.ItemClass or { Tradegoods = 7, Container = 1 }
 
+database.GetUpgradeIconProvider = database.GetUpgradeIconProvider or function() return "None" end
+database.GetUpgradeIconProviderUserSet = function() return true end
 database.GetNewItemTime = function() return 30 end
 database.GetStackingOptions = function()
   return { dontMergeTransmog = false }
@@ -1253,5 +1255,389 @@ describe("GenerateItemHash (Catalyst item stats)", function()
       return { ITEM_MOD_CRIT_RATING_SHORT = 93, ITEM_MOD_HASTE_RATING_SHORT = 50 }
     end
     assert.are.equal(items:GenerateItemHash(makeData("linkA")), items:GenerateItemHash(makeData("linkB")))
+  end)
+end)
+
+-- Load the Pawn and SimpleItemLevel integration modules so their OnEnable
+-- provider registration can be exercised directly.
+LoadBetterBagsModule("integrations/pawn.lua")
+LoadBetterBagsModule("integrations/simpleitemlevel.lua")
+local pawn = addon:GetModule("Pawn")
+local simpleItemLevel = addon:GetModule("SimpleItemLevel")
+
+describe("Upgrade Icon Providers", function()
+  -- INVSLOT globals the built-in BetterBags provider references. wow_mocks only
+  -- defines FIRST/LAST_EQUIPPED, not MAINHAND/OFFHAND.
+  local savedMainhand, savedOffhand, savedIsEquippable
+  local savedPawnUnbudgeted, savedPawnIsUpgrade, savedPawnGetItemData
+  local savedSimpleItemLevel
+
+  local savedUserSet, savedGetProvider
+
+  before_each(function()
+    items:Init()
+    -- Reset the integration modules' one-shot registration guard so each test
+    -- exercises a clean OnEnable.
+    pawn._registered = nil
+    simpleItemLevel._registered = nil
+
+    savedMainhand = _G.INVSLOT_MAINHAND
+    savedOffhand = _G.INVSLOT_OFFHAND
+    savedIsEquippable = _G.C_Item.IsEquippableItem
+    savedPawnUnbudgeted = _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted
+    savedPawnIsUpgrade = _G.PawnIsContainerItemAnUpgrade
+    savedPawnGetItemData = _G.PawnGetItemData
+    savedSimpleItemLevel = _G.SimpleItemLevel
+    savedUserSet = database.GetUpgradeIconProviderUserSet
+    savedGetProvider = database.GetUpgradeIconProvider
+
+    _G.INVSLOT_MAINHAND = 16
+    _G.INVSLOT_OFFHAND = 17
+    _G.C_Item.IsEquippableItem = function() return true end
+    -- Default: the user made an explicit provider choice, so precedence does
+    -- not kick in. Precedence tests override this to false.
+    database.GetUpgradeIconProviderUserSet = function() return true end
+  end)
+
+  after_each(function()
+    _G.INVSLOT_MAINHAND = savedMainhand
+    _G.INVSLOT_OFFHAND = savedOffhand
+    _G.C_Item.IsEquippableItem = savedIsEquippable
+    _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = savedPawnUnbudgeted
+    _G.PawnIsContainerItemAnUpgrade = savedPawnIsUpgrade
+    _G.PawnGetItemData = savedPawnGetItemData
+    _G.SimpleItemLevel = savedSimpleItemLevel
+    database.GetUpgradeIconProviderUserSet = savedUserSet
+    database.GetUpgradeIconProvider = savedGetProvider
+  end)
+
+  -- Register the Pawn provider with a controllable verdict.
+  local function enablePawn(verdict)
+    _G.PawnGetItemData = function() return {} end
+    _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return verdict end
+    pawn._registered = nil
+    pawn:OnEnable()
+  end
+
+  -- Build a minimal equippable item that the providers can consume.
+  ---@param opts table
+  local function equippableItem(opts)
+    return {
+      isItemEmpty = false,
+      inventorySlots = opts.inventorySlots or { 5 },
+      itemInfo = {
+        itemLink = opts.itemLink or "|cff0070dd|Hitem:1000|h[Test]|h|r",
+        currentItemLevel = opts.currentItemLevel or 100,
+        itemEquipLoc = opts.itemEquipLoc or "INVTYPE_CHEST",
+      },
+    }
+  end
+
+  -- An equipped item as stored in items.equipmentCache (keyed by inventory slot).
+  local function equippedItem(ilvl, equipLoc)
+    return {
+      isItemEmpty = false,
+      itemInfo = { currentItemLevel = ilvl, itemEquipLoc = equipLoc or "INVTYPE_CHEST" },
+    }
+  end
+
+  describe("BetterBags (built-in) provider", function()
+    before_each(function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+    end)
+
+    it("is registered by items:Init()", function()
+      assert.is_function(items.upgradeProviders["BetterBags"])
+    end)
+
+    it("returns false for non-equippable items", function()
+      _G.C_Item.IsEquippableItem = function() return false end
+      items.equipmentCache = { [5] = equippedItem(90) }
+      local data = equippableItem({ inventorySlots = { 5 }, currentItemLevel = 200 })
+      assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    it("returns true when the bag item out-levels the equipped item in its slot", function()
+      items.equipmentCache = { [5] = equippedItem(90) }
+      local data = equippableItem({ inventorySlots = { 5 }, currentItemLevel = 100 })
+      assert.is_true(items:ResolveUpgrade(data))
+    end)
+
+    it("returns false when the bag item ilvl equals the equipped item", function()
+      items.equipmentCache = { [5] = equippedItem(100) }
+      local data = equippableItem({ inventorySlots = { 5 }, currentItemLevel = 100 })
+      assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    it("returns false when the bag item ilvl is below the equipped item", function()
+      items.equipmentCache = { [5] = equippedItem(120) }
+      local data = equippableItem({ inventorySlots = { 5 }, currentItemLevel = 100 })
+      assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    it("does not arrow an offhand when a 2H weapon is equipped in the mainhand", function()
+      items.equipmentCache = {
+        [16] = equippedItem(90, "INVTYPE_2HWEAPON"),
+        [17] = equippedItem(90, "INVTYPE_WEAPONOFFHAND"),
+      }
+      local data = equippableItem({
+        inventorySlots = { 17 }, currentItemLevel = 200, itemEquipLoc = "INVTYPE_WEAPONOFFHAND",
+      })
+      assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    -- When the usability APIs are unavailable (e.g. Classic, where the tooltip
+    -- flags are not exposed), the built-in provider falls back to a pure
+    -- item-level comparison and will arrow a higher-ilvl piece regardless of
+    -- armor type. This documents that graceful-degradation path.
+    it("falls back to naive ilvl comparison when usability APIs are unavailable", function()
+      assert.is_nil(_G.IsItemPreferredArmorType)
+      assert.is_nil(_G.C_PlayerInfo and _G.C_PlayerInfo.CanUseItem)
+      items.equipmentCache = { [5] = equippedItem(100, "INVTYPE_CHEST") }
+      local clothChest = equippableItem({ inventorySlots = { 5 }, currentItemLevel = 110 })
+      assert.is_true(items:ResolveUpgrade(clothChest))
+    end)
+  end)
+
+  describe("BetterBags provider — usability gating (retail APIs)", function()
+    local savedCanUse, savedPreferred, savedArmorSub, savedClassArmor, savedClassWeapon
+
+    before_each(function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+      savedCanUse = _G.C_PlayerInfo
+      savedPreferred = _G.IsItemPreferredArmorType
+      savedArmorSub = _G.Enum.ItemArmorSubclass
+      savedClassArmor = _G.Enum.ItemClass.Armor
+      savedClassWeapon = _G.Enum.ItemClass.Weapon
+
+      _G.C_PlayerInfo = { CanUseItem = function() return true end }
+      _G.IsItemPreferredArmorType = function() return true end
+      _G.Enum.ItemClass.Armor = 4
+      _G.Enum.ItemClass.Weapon = 2
+      _G.Enum.ItemArmorSubclass = {
+        Generic = 0, Cloth = 1, Leather = 2, Mail = 3, Plate = 4, Cosmetic = 5, Shield = 6,
+      }
+    end)
+
+    after_each(function()
+      _G.C_PlayerInfo = savedCanUse
+      _G.IsItemPreferredArmorType = savedPreferred
+      _G.Enum.ItemArmorSubclass = savedArmorSub
+      _G.Enum.ItemClass.Armor = savedClassArmor
+      _G.Enum.ItemClass.Weapon = savedClassWeapon
+    end)
+
+    -- A wearable-armor bag item: plate wearer's slot with a higher-ilvl piece.
+    local function armorItem(subclassID, equipLoc)
+      items.equipmentCache = { [5] = equippedItem(100, equipLoc or "INVTYPE_CHEST") }
+      return {
+        isItemEmpty = false,
+        bagid = 0, slotid = 3,
+        inventorySlots = { 5 },
+        itemInfo = {
+          itemID = 55555,
+          itemLink = "|cff0070dd|Hitem:55555|h[Chest]|h|r",
+          currentItemLevel = 200,
+          itemEquipLoc = equipLoc or "INVTYPE_CHEST",
+          classID = 4,
+          subclassID = subclassID,
+        },
+      }
+    end
+
+    it("arrows a higher-ilvl item the character can use and prefers", function()
+      assert.is_true(items:ResolveUpgrade(armorItem(4))) -- Plate, preferred
+    end)
+
+    it("does NOT arrow an item the character cannot use (proficiency)", function()
+      _G.C_PlayerInfo.CanUseItem = function() return false end
+      assert.is_false(items:ResolveUpgrade(armorItem(4)))
+    end)
+
+    it("does NOT arrow wearable armor of a non-preferred type (cloth on a plate wearer)", function()
+      _G.IsItemPreferredArmorType = function() return false end
+      assert.is_false(items:ResolveUpgrade(armorItem(1))) -- Cloth, not preferred
+    end)
+
+    it("still arrows a cloak even though cloaks are subclass Cloth", function()
+      -- Cloaks are armor subclass Cloth but wearable by every class, so the
+      -- preferred-armor gate must never suppress them.
+      _G.IsItemPreferredArmorType = function() return false end
+      assert.is_true(items:ResolveUpgrade(armorItem(1, "INVTYPE_CLOAK")))
+    end)
+
+    it("does not apply the preferred-armor gate to shields", function()
+      -- Shield is subclass 6, not one of the four wearable armor types.
+      _G.IsItemPreferredArmorType = function() return false end
+      assert.is_true(items:ResolveUpgrade(armorItem(6, "INVTYPE_SHIELD")))
+    end)
+
+    it("does not apply the preferred-armor gate to non-armor (weapons)", function()
+      _G.IsItemPreferredArmorType = function() return false end
+      local weapon = armorItem(7, "INVTYPE_WEAPONMAINHAND")
+      weapon.itemInfo.classID = 2 -- Weapon
+      assert.is_true(items:ResolveUpgrade(weapon))
+    end)
+  end)
+
+  describe("Pawn provider", function()
+    it("registers a 'Pawn' provider when Pawn is loaded at OnEnable time", function()
+      _G.PawnGetItemData = function() return {} end
+      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return true end
+      pawn:OnEnable()
+      assert.is_function(items.upgradeProviders["Pawn"])
+    end)
+
+    it("delegates to Pawn's verdict when selected as the provider", function()
+      _G.PawnGetItemData = function() return {} end
+      local pawnVerdict = true
+      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return pawnVerdict end
+      pawn:OnEnable()
+      database.GetUpgradeIconProvider = function() return "Pawn" end
+
+      local data = equippableItem({ currentItemLevel = 1 })
+      assert.is_true(items:ResolveUpgrade(data))
+
+      pawnVerdict = false
+      assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    it("returns false for empty items without calling Pawn", function()
+      _G.PawnGetItemData = function() return {} end
+      local called = false
+      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() called = true; return true end
+      pawn:OnEnable()
+      database.GetUpgradeIconProvider = function() return "Pawn" end
+
+      -- ResolveUpgrade short-circuits empty items before hitting the provider.
+      assert.is_false(items:ResolveUpgrade({ isItemEmpty = true }))
+      assert.is_false(called)
+    end)
+
+    -- Robustness against the reported "Pawn is not in the dropdown" symptom: if
+    -- the Pawn addon has not populated its globals by the time BetterBags enables
+    -- its modules (load-order race), OnEnable must not give up permanently. It
+    -- registers an ADDON_LOADED retry so the provider appears once Pawn loads.
+    it("registers late via ADDON_LOADED when Pawn loads after BetterBags enables", function()
+      _G.PawnGetItemData = nil
+      _G.PawnIsContainerItemAnUpgrade = nil
+      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = nil
+      pawn:OnEnable()
+      -- Not registered yet: Pawn's globals do not exist.
+      assert.is_nil(items.upgradeProviders["Pawn"])
+
+      -- Pawn finishes loading; its globals appear and ADDON_LOADED fires. The
+      -- retry registers the provider and requests one refresh so drawn arrows
+      -- re-resolve against Pawn.
+      _G.PawnGetItemData = function() return {} end
+      _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return true end
+      local refreshed = 0
+      events:RegisterMessage('bags/FullRefreshAll', function() refreshed = refreshed + 1 end)
+      local handler = events._eventMap["ADDON_LOADED"]
+      assert.is_not_nil(handler)
+      handler.fn("ADDON_LOADED", "Pawn")
+
+      assert.is_function(items.upgradeProviders["Pawn"])
+      assert.are.equal(1, refreshed)
+
+      -- A subsequent ADDON_LOADED must not re-register or re-refresh.
+      handler.fn("ADDON_LOADED", "SomethingElse")
+      assert.are.equal(1, refreshed)
+    end)
+  end)
+
+  describe("provider precedence (restores automatic Pawn/SimpleItemLevel)", function()
+    -- The user never explicitly picked a provider (legacy default), so an
+    -- available external provider should win automatically — restoring the
+    -- pre-#1036 behavior where Pawn drew arrows without any dropdown selection.
+    before_each(function()
+      database.GetUpgradeIconProviderUserSet = function() return false end
+    end)
+
+    it("prefers a registered Pawn provider over the saved 'None' value", function()
+      database.GetUpgradeIconProvider = function() return "None" end
+      enablePawn(true)
+      assert.are.equal("Pawn", items:GetActiveUpgradeProvider())
+      assert.is_true(items:ResolveUpgrade(equippableItem({ currentItemLevel = 1 })))
+    end)
+
+    it("prefers a registered Pawn provider over the saved 'BetterBags' value", function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+      enablePawn(false)
+      assert.are.equal("Pawn", items:GetActiveUpgradeProvider())
+      -- Pawn says not-an-upgrade, so no arrow even though BetterBags (naive)
+      -- would have arrowed this higher-ilvl item.
+      items.equipmentCache = { [5] = equippedItem(90) }
+      assert.is_false(items:ResolveUpgrade(equippableItem({ inventorySlots = { 5 }, currentItemLevel = 200 })))
+    end)
+
+    it("prefers Pawn over SimpleItemLevel when both are registered", function()
+      database.GetUpgradeIconProvider = function() return "None" end
+      enablePawn(true)
+      _G.SimpleItemLevel = { API = { ItemIsUpgrade = function() return true end } }
+      simpleItemLevel._registered = nil
+      simpleItemLevel:OnEnable()
+      assert.are.equal("Pawn", items:GetActiveUpgradeProvider())
+    end)
+
+    it("uses SimpleItemLevel when it is the only external provider", function()
+      database.GetUpgradeIconProvider = function() return "None" end
+      _G.SimpleItemLevel = { API = { ItemIsUpgrade = function() return true end } }
+      simpleItemLevel._registered = nil
+      simpleItemLevel:OnEnable()
+      assert.are.equal("SimpleItemLevel", items:GetActiveUpgradeProvider())
+    end)
+
+    it("falls back to the saved value when no external provider is registered", function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+      assert.are.equal("BetterBags", items:GetActiveUpgradeProvider())
+    end)
+
+    it("honors an explicit user choice over external-provider precedence", function()
+      database.GetUpgradeIconProviderUserSet = function() return true end
+      database.GetUpgradeIconProvider = function() return "None" end
+      enablePawn(true)
+      -- The user explicitly chose 'None'; Pawn must NOT override it.
+      assert.are.equal("None", items:GetActiveUpgradeProvider())
+      assert.is_false(items:ResolveUpgrade(equippableItem({ currentItemLevel = 1 })))
+    end)
+  end)
+
+  describe("SimpleItemLevel provider", function()
+    it("registers a 'SimpleItemLevel' provider when the addon is loaded", function()
+      _G.SimpleItemLevel = { API = { ItemIsUpgrade = function() return true end } }
+      simpleItemLevel:OnEnable()
+      assert.is_function(items.upgradeProviders["SimpleItemLevel"])
+    end)
+
+    it("does not register when the SimpleItemLevel addon is absent", function()
+      _G.SimpleItemLevel = nil
+      simpleItemLevel:OnEnable()
+      assert.is_nil(items.upgradeProviders["SimpleItemLevel"])
+    end)
+  end)
+
+  describe("ResolveUpgrade selection", function()
+    it("returns false when the provider is 'None'", function()
+      database.GetUpgradeIconProvider = function() return "None" end
+      items.equipmentCache = { [5] = equippedItem(1) }
+      local data = equippableItem({ currentItemLevel = 999 })
+      assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    it("returns false when the selected provider is not registered (no fallback)", function()
+      -- e.g. a saved 'Pawn' value while the Pawn provider failed to register.
+      database.GetUpgradeIconProvider = function() return "Pawn" end
+      items.upgradeProviders["Pawn"] = nil
+      items.equipmentCache = { [5] = equippedItem(1) }
+      local data = equippableItem({ currentItemLevel = 999 })
+      assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    it("returns false for empty item data", function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+      assert.is_false(items:ResolveUpgrade({ isItemEmpty = true }))
+      assert.is_false(items:ResolveUpgrade(nil))
+    end)
   end)
 end)

@@ -49,7 +49,7 @@ themes.GetItemButton = function(_, buttonCtx, item)
       SetID = function(_, id) item._decoration.id = id end,
       SetMatchesSearch = function() end,
       ItemSlotBackground = { Hide = function() end, Show = function() end },
-      IconBorder = { SetTexture = function() end, SetBlendMode = function() end, SetTexCoord = function() end, SetSize = function() end },
+      IconBorder = { SetTexture = function() end, SetBlendMode = function() end, SetTexCoord = function() end, SetSize = function() end, SetVertexColor = function() end, Show = function() end, Hide = function() end },
       NormalTexture = { SetSize = function() end },
       IconQuestTexture = { SetSize = function() end },
       IconTexture = { SetSize = function() end },

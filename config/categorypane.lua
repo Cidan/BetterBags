@@ -1275,8 +1275,29 @@ function categoryPaneProto:ShowDynamicCategoryDetail(categoryName)
 
     local infoLabel = self.dynamicDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     infoLabel:SetPoint("TOPLEFT", 10, -50)
-    infoLabel:SetText("This is a dynamic category.\nIt cannot be edited or deleted.")
+    infoLabel:SetText("This is a dynamic category. It is generated automatically\nand cannot be edited.\n\nIf this category is a leftover you can no longer see or use,\nremove it below to clear it from the list.")
     infoLabel:SetTextColor(0.7, 0.7, 0.7)
+
+    -- Escape hatch for orphaned categories: a name that has no backing filter
+    -- (deleted, or an ephemeral category dropped on reload) falls through to
+    -- this panel and was previously unremovable. Remove scrubs every lingering
+    -- reference via categories:DeleteCategory (which now cleans customSectionSort
+    -- et al.), so the ghost cannot resurface.
+    local removeButton = CreateFrame("Button", nil, self.dynamicDetail, "UIPanelButtonTemplate")
+    removeButton:SetPoint("TOPLEFT", 10, -140)
+    removeButton:SetSize(150, 25)
+    removeButton:SetText("Remove Category")
+    removeButton:SetScript("OnClick", function()
+      if not self.selectedCategory then return end
+      question:YesNo("Remove Category", format("Remove the leftover category %s from the list?", self.selectedCategory), function()
+        local ctx = context:New('CategoryPane_RemoveOrphanCategory')
+        categories:DeleteCategory(ctx, self.selectedCategory)
+        self.selectedCategory = nil
+        self:UpdateDetailPanel()
+        self:RefreshList()
+      end, function() end)
+    end)
+    self.dynamicDetail.removeButton = removeButton
   end
 
   self.dynamicDetail:Show()

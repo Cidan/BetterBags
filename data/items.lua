@@ -99,13 +99,72 @@ function items:RegisterUpgradeProvider(name, func)
   self.upgradeProviders[name] = func
 end
 
+-- GetActiveUpgradeProvider resolves which registered provider actually drives
+-- upgrade arrows. When the user has explicitly chosen a provider we honor that
+-- choice exactly. Otherwise (the legacy default, where the setting was never
+-- touched) an available external provider takes precedence over the built-in
+-- 'None'/'BetterBags' values, restoring the pre-#1036 behavior where Pawn (or
+-- SimpleItemLevel) drew arrows automatically without any dropdown selection.
+-- Pawn wins over SimpleItemLevel when both are present.
+---@return string
+function items:GetActiveUpgradeProvider()
+  local selected = database:GetUpgradeIconProvider()
+  if database:GetUpgradeIconProviderUserSet() then
+    return selected
+  end
+  self.upgradeProviders = self.upgradeProviders or {}
+  if self.upgradeProviders["Pawn"] then
+    return "Pawn"
+  end
+  if self.upgradeProviders["SimpleItemLevel"] then
+    return "SimpleItemLevel"
+  end
+  return selected
+end
+
+-- IsNonPreferredArmorType returns true when the item is one of the four
+-- wearable armor types (Cloth/Leather/Mail/Plate) but not the armor type the
+-- current character prefers, per Blizzard's IsItemPreferredArmorType (the same
+-- check that drives the "not your best armor type" bind warning). Shields,
+-- cloaks (armor subclass Cloth but universally wearable), cosmetic and generic
+-- armor, and all non-armor items are never gated. Returns false when the API
+-- is unavailable (non-retail), so those clients keep the naive comparison.
+---@param data ItemData
+---@return boolean
+function items:IsNonPreferredArmorType(data)
+  if not _G.IsItemPreferredArmorType or not _G.ItemLocation then
+    return false
+  end
+  local info = data and data.itemInfo
+  if not info or not Enum or not Enum.ItemClass or not Enum.ItemArmorSubclass then
+    return false
+  end
+  if info.classID ~= Enum.ItemClass.Armor then
+    return false
+  end
+  local sub = info.subclassID
+  local armor = Enum.ItemArmorSubclass
+  if sub ~= armor.Cloth and sub ~= armor.Leather and sub ~= armor.Mail and sub ~= armor.Plate then
+    return false
+  end
+  -- Cloaks are armor subclass Cloth but wearable by every class; never gate.
+  if info.itemEquipLoc == "INVTYPE_CLOAK" then
+    return false
+  end
+  local loc = _G.ItemLocation:CreateFromBagAndSlot(data.bagid, data.slotid)
+  if not (loc and loc.IsValid and loc:IsValid()) then
+    return false
+  end
+  return not _G.IsItemPreferredArmorType(loc)
+end
+
 ---@param data ItemData
 ---@return boolean
 function items:ResolveUpgrade(data)
   if not data or data.isItemEmpty then
     return false
   end
-  local provider = database:GetUpgradeIconProvider()
+  local provider = self:GetActiveUpgradeProvider()
   if provider == "None" then
     return false
   end
@@ -187,6 +246,23 @@ function items:Init()
   self.upgradeProviders = {}
   self:RegisterUpgradeProvider("BetterBags", function(data)
     if not data.inventorySlots or not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
+      return false
+    end
+
+    -- Suppress arrows for items this character cannot use at all (class /
+    -- proficiency), e.g. a staff for a warrior. C_PlayerInfo.CanUseItem is
+    -- available on retail (10.0.5+) and Classic; when absent the provider
+    -- degrades to the naive item-level comparison below.
+    if _G.C_PlayerInfo and _G.C_PlayerInfo.CanUseItem and data.itemInfo.itemID then
+      if not _G.C_PlayerInfo.CanUseItem(data.itemInfo.itemID) then
+        return false
+      end
+    end
+
+    -- Suppress arrows for wearable armor that is not the character's preferred
+    -- armor type (e.g. cloth on a plate wearer), mirroring Blizzard's own
+    -- "not your best armor type" bind-on-equip warning.
+    if self:IsNonPreferredArmorType(data) then
       return false
     end
 

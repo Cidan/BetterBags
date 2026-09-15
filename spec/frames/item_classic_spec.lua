@@ -214,33 +214,67 @@ describe("ItemFrame on Classic clients", function()
     resetCreatedStubs()
   end)
 
-  it("shows a colored rarity border for items even though Classic SetItemButtonQuality hides it", function()
+  it("draws an additive quality glow for uncommon+ items (subtle when Extra Glowy is off)", function()
     local ctx = context:New("classic_border")
     local item = itemFrame:GetButton(ctx, "0_1")
     local decoration = item._decoration
 
     item:SetItemFromData(ctx, itemData(0, 1, const.ITEM_QUALITY.Rare))
 
-    assert.is_true(decoration.IconBorder:IsShown(), "rare item must have a visible quality border on Classic")
-    assert.same({ r = 0, g = 0.44, b = 0.87, a = 1 }, decoration.IconBorder._vertexColor)
-    assert.equal([[Interface\Common\WhiteIconFrame]], decoration.IconBorder._texturePath)
+    assert.is_true(decoration.IconBorder:IsShown(), "rare item must have a visible quality glow on Classic")
+    assert.equal([[Interface\Buttons\UI-ActionButton-Border]], decoration.IconBorder._texturePath)
+    assert.equal("ADD", decoration.IconBorder._blendMode)
+    local vc = decoration.IconBorder._vertexColor
+    assert.equal(0, vc.r)
+    assert.equal(0.44, vc.g)
+    assert.equal(0.87, vc.b)
+    -- Extra Glowy is off (stub returns false), so the glow is subtle (alpha < 1).
+    assert.is_true(vc.a > 0 and vc.a < 1, "non-extra-glowy quality glow must be subtle (alpha < 1)")
   end)
 
-  it("colors the border per quality on Classic", function()
+  it("uses a full-intensity glow when Extra Glowy is enabled", function()
+    local database = addon:GetModule("Database")
+    override(database, "GetExtraGlowyButtons", function() return true end)
+
+    local ctx = context:New("classic_border_glowy")
+    local item = itemFrame:GetButton(ctx, "0_5")
+    local decoration = item._decoration
+
+    item:SetItemFromData(ctx, itemData(0, 5, const.ITEM_QUALITY.Rare))
+    assert.is_true(decoration.IconBorder:IsShown())
+    assert.equal([[Interface\Buttons\UI-ActionButton-Border]], decoration.IconBorder._texturePath)
+    assert.equal("ADD", decoration.IconBorder._blendMode)
+    assert.equal(1, decoration.IconBorder._vertexColor.a)
+  end)
+
+  it("colors the glow per quality on Classic", function()
     local ctx = context:New("classic_border_epic")
     local item = itemFrame:GetButton(ctx, "0_2")
     local decoration = item._decoration
 
     item:SetItemFromData(ctx, itemData(0, 2, const.ITEM_QUALITY.Epic))
     assert.is_true(decoration.IconBorder:IsShown())
-    assert.same({ r = 0.64, g = 0.21, b = 0.93, a = 1 }, decoration.IconBorder._vertexColor)
+    assert.equal(0.64, decoration.IconBorder._vertexColor.r)
+    assert.equal(0.21, decoration.IconBorder._vertexColor.g)
+    assert.equal(0.93, decoration.IconBorder._vertexColor.b)
 
     item:SetItemFromData(ctx, itemData(0, 2, const.ITEM_QUALITY.Uncommon))
     assert.is_true(decoration.IconBorder:IsShown())
-    assert.same({ r = 0.12, g = 1, b = 0, a = 1 }, decoration.IconBorder._vertexColor)
+    assert.equal(0.12, decoration.IconBorder._vertexColor.r)
+    assert.equal(1, decoration.IconBorder._vertexColor.g)
+    assert.equal(0, decoration.IconBorder._vertexColor.b)
   end)
 
-  it("shows a bag-quality border for free slots on Classic", function()
+  it("draws no quality border for common items (matches Blizzard)", function()
+    local ctx = context:New("classic_border_common")
+    local item = itemFrame:GetButton(ctx, "0_6")
+    local decoration = item._decoration
+
+    item:SetItemFromData(ctx, itemData(0, 6, const.ITEM_QUALITY.Common))
+    assert.is_false(decoration.IconBorder:IsShown(), "common items must not draw a quality border")
+  end)
+
+  it("shows a bag-quality border for special (uncommon+) free slots on Classic", function()
     local ctx = context:New("classic_free_slot")
     local item = itemFrame:GetButton(ctx, "0_3")
     local decoration = item._decoration
@@ -253,8 +287,25 @@ describe("ItemFrame on Classic clients", function()
     }, 4)
 
     assert.is_true(item.isFreeSlot)
-    assert.is_true(decoration.IconBorder:IsShown(), "free slot must show the bag quality border on Classic")
+    assert.is_true(decoration.IconBorder:IsShown(), "special-bag free slot must show the bag quality border on Classic")
     assert.same({ r = 0.12, g = 1, b = 0, a = 1 }, decoration.IconBorder._vertexColor)
+  end)
+
+  it("does NOT border a plain (common) free slot — avoids the double border on the empty-slot texture", function()
+    local ctx = context:New("classic_free_slot_common")
+    local item = itemFrame:GetButton(ctx, "0_7")
+    local decoration = item._decoration
+
+    item:SetFreeSlots(ctx, {
+      slotkey = "0_7",
+      bagid = 0,
+      slotid = 7,
+      itemInfo = { emptySlotName = "Bag", itemQuality = const.ITEM_QUALITY.Common },
+    }, 4)
+
+    assert.is_true(item.isFreeSlot)
+    assert.is_false(decoration.IconBorder:IsShown(),
+      "a common/normal free slot must not draw a quality border over the empty-slot texture")
   end)
 
   it("hides the border again when the button is cleared", function()
