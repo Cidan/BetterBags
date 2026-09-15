@@ -88,8 +88,9 @@ describe("Tab icon anchoring", function()
     assert.is_not_nil(decoration.tabIcon._point)
     assert.equal("CENTER", decoration.tabIcon._point.point)
     assert.equal(0, decoration.tabIcon._point.x)
-    -- Must track the tab's content region, not the frame center.
-    assert.equal(10, decoration.tabIcon._point.y)
+    -- Tracks the tab's content region (label baseline 10, dropped a few px so an
+    -- icon's center reads centered rather than sitting on the text baseline).
+    assert.equal(6, decoration.tabIcon._point.y)
   end)
 
   it("keeps the retail anchor when the template has no deselectedTextY", function()
