@@ -23,6 +23,12 @@ Rationale: right-click used to *both* auto-deposit and sort the bank in one acti
 made a plain "sort" also shuffle items into the Warbank unexpectedly. Deposit and sort are
 now split — plain right-click sorts, shift+right-click deposits.
 
+The hover tooltip (`bagButton` `OnEnter`, same file) must mirror the click map. The retail
+bank tooltip lists **Right Click → Sort Bank** and **Shift Right Click → Deposit Warbank
+Items** (it previously advertised right-click as "Deposit Warbank Items"/"Deposit Reagent
+Items", which no longer matches the handler). Keep these two in sync whenever the click
+branches change.
+
 ## 2. Sorting the backpack also sorts the open bank
 
 The `bags/SortBackpack` message handler (`data/refresh.lua`, `refresh:OnEnable`) builds
