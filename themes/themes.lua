@@ -538,11 +538,13 @@ function themes.SetupBagButton(bag, decoration)
       end
     elseif e == "RightButton" then
       if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
-        if bag.bankTab <= Enum.BagIndex.CharacterBankTab_6 then
-          C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Character)
+        if IsShiftKeyDown() then
+          -- Shift + right-click deposits eligible items into the Warbank.
+          C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
+        elseif bag.bankTab <= Enum.BagIndex.CharacterBankTab_6 then
+          -- Right-click sorts the active bank type only (no auto-deposit).
           events:SendMessage(ctx, "bags/SortBank")
         else
-          C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
           events:SendMessage(ctx, "bags/SortWarbank")
         end
       else
