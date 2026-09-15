@@ -197,9 +197,29 @@ describe("Refresh Module", function()
 
   it("should register bags/SortBackpack message and trigger sorting", function()
     refresh:OnEnable()
+    addon.atBank = false
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/SortBackpack")
     assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true })
+  end)
+
+  it("should also sort the bank and warbank when sorting the backpack with the bank open (retail)", function()
+    refresh:OnEnable()
+    addon.atBank = true
+    addon.isRetail = true
+    spy.on(refresh, "RequestUpdate")
+    events:SendMessage("bags/SortBackpack")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true, sortWarbank = true })
+  end)
+
+  it("should also sort the bank (not warbank) when sorting the backpack with the bank open (classic)", function()
+    refresh:OnEnable()
+    addon.atBank = true
+    addon.isRetail = false
+    spy.on(refresh, "RequestUpdate")
+    events:SendMessage("bags/SortBackpack")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true })
+    addon.isRetail = true -- reset
   end)
 
   it("should invoke C_Container.SortBags on Retail or SortBags on Classic when sorting", function()

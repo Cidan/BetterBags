@@ -260,7 +260,18 @@ function refresh:OnEnable()
     self:RequestUpdate({ bank = true })
   end)
   events:RegisterMessage('bags/SortBackpack', function()
-    self:RequestUpdate({ sort = true })
+    -- Sorting the backpack while the bank is open also sorts the open bank, so a
+    -- single right-click cleans up everything on screen (restores the classic
+    -- "sort inventory also sorts the bank" behavior). Both bank sorts ride the
+    -- same serialized refresh unit as the backpack sort.
+    local request = { sort = true }
+    if addon.atBank then
+      request.sortBank = true
+      if addon.isRetail then
+        request.sortWarbank = true
+      end
+    end
+    self:RequestUpdate(request)
   end)
   events:RegisterMessage('bags/SortBank', function()
     self:RequestUpdate({ sortBank = true })
