@@ -400,9 +400,15 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		if not decoration.tabIcon then
 			local icon = decoration:CreateTexture(nil, "OVERLAY")
 			icon:SetSize(16, 16)
-			icon:SetPoint("CENTER", decoration, "CENTER", 0, 1)
 			decoration.tabIcon = icon
 		end
+		-- Anchor the icon to the tab's content region, not the raw frame center.
+		-- The Classic tab template places its label ~10px above center
+		-- (deselectedTextY); anchoring to the frame center left the icon low and
+		-- bleeding out the bottom on Classic. Retail templates have no
+		-- deselectedTextY, so the original +1 offset is preserved there.
+		decoration.tabIcon:ClearAllPoints()
+		decoration.tabIcon:SetPoint("CENTER", decoration, "CENTER", 0, decoration.deselectedTextY or 1)
 		decoration.tabIcon:SetAtlas(tab.icon)
 		decoration.tabIcon:Show()
 
