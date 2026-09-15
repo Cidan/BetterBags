@@ -1386,16 +1386,97 @@ describe("Upgrade Icon Providers", function()
       assert.is_false(items:ResolveUpgrade(data))
     end)
 
-    -- The user's core complaint: the built-in provider is a pure item-level
-    -- comparison. It knowingly arrows a higher-ilvl piece even when it is an
-    -- armor type the class can't use or has the wrong stats, because it never
-    -- consults spec/stat weights. This documents that intentional limitation
-    -- and is exactly why Pawn is the desired provider.
-    it("naively arrows a higher-ilvl item regardless of armor type / stats", function()
-      -- Plate wearer's equipped chest; bag item is a higher-ilvl CLOTH chest.
+    -- When the usability APIs are unavailable (e.g. Classic, where the tooltip
+    -- flags are not exposed), the built-in provider falls back to a pure
+    -- item-level comparison and will arrow a higher-ilvl piece regardless of
+    -- armor type. This documents that graceful-degradation path.
+    it("falls back to naive ilvl comparison when usability APIs are unavailable", function()
+      assert.is_nil(_G.IsItemPreferredArmorType)
+      assert.is_nil(_G.C_PlayerInfo and _G.C_PlayerInfo.CanUseItem)
       items.equipmentCache = { [5] = equippedItem(100, "INVTYPE_CHEST") }
       local clothChest = equippableItem({ inventorySlots = { 5 }, currentItemLevel = 110 })
       assert.is_true(items:ResolveUpgrade(clothChest))
+    end)
+  end)
+
+  describe("BetterBags provider — usability gating (retail APIs)", function()
+    local savedCanUse, savedPreferred, savedArmorSub, savedClassArmor, savedClassWeapon
+
+    before_each(function()
+      database.GetUpgradeIconProvider = function() return "BetterBags" end
+      savedCanUse = _G.C_PlayerInfo
+      savedPreferred = _G.IsItemPreferredArmorType
+      savedArmorSub = _G.Enum.ItemArmorSubclass
+      savedClassArmor = _G.Enum.ItemClass.Armor
+      savedClassWeapon = _G.Enum.ItemClass.Weapon
+
+      _G.C_PlayerInfo = { CanUseItem = function() return true end }
+      _G.IsItemPreferredArmorType = function() return true end
+      _G.Enum.ItemClass.Armor = 4
+      _G.Enum.ItemClass.Weapon = 2
+      _G.Enum.ItemArmorSubclass = {
+        Generic = 0, Cloth = 1, Leather = 2, Mail = 3, Plate = 4, Cosmetic = 5, Shield = 6,
+      }
+    end)
+
+    after_each(function()
+      _G.C_PlayerInfo = savedCanUse
+      _G.IsItemPreferredArmorType = savedPreferred
+      _G.Enum.ItemArmorSubclass = savedArmorSub
+      _G.Enum.ItemClass.Armor = savedClassArmor
+      _G.Enum.ItemClass.Weapon = savedClassWeapon
+    end)
+
+    -- A wearable-armor bag item: plate wearer's slot with a higher-ilvl piece.
+    local function armorItem(subclassID, equipLoc)
+      items.equipmentCache = { [5] = equippedItem(100, equipLoc or "INVTYPE_CHEST") }
+      return {
+        isItemEmpty = false,
+        bagid = 0, slotid = 3,
+        inventorySlots = { 5 },
+        itemInfo = {
+          itemID = 55555,
+          itemLink = "|cff0070dd|Hitem:55555|h[Chest]|h|r",
+          currentItemLevel = 200,
+          itemEquipLoc = equipLoc or "INVTYPE_CHEST",
+          classID = 4,
+          subclassID = subclassID,
+        },
+      }
+    end
+
+    it("arrows a higher-ilvl item the character can use and prefers", function()
+      assert.is_true(items:ResolveUpgrade(armorItem(4))) -- Plate, preferred
+    end)
+
+    it("does NOT arrow an item the character cannot use (proficiency)", function()
+      _G.C_PlayerInfo.CanUseItem = function() return false end
+      assert.is_false(items:ResolveUpgrade(armorItem(4)))
+    end)
+
+    it("does NOT arrow wearable armor of a non-preferred type (cloth on a plate wearer)", function()
+      _G.IsItemPreferredArmorType = function() return false end
+      assert.is_false(items:ResolveUpgrade(armorItem(1))) -- Cloth, not preferred
+    end)
+
+    it("still arrows a cloak even though cloaks are subclass Cloth", function()
+      -- Cloaks are armor subclass Cloth but wearable by every class, so the
+      -- preferred-armor gate must never suppress them.
+      _G.IsItemPreferredArmorType = function() return false end
+      assert.is_true(items:ResolveUpgrade(armorItem(1, "INVTYPE_CLOAK")))
+    end)
+
+    it("does not apply the preferred-armor gate to shields", function()
+      -- Shield is subclass 6, not one of the four wearable armor types.
+      _G.IsItemPreferredArmorType = function() return false end
+      assert.is_true(items:ResolveUpgrade(armorItem(6, "INVTYPE_SHIELD")))
+    end)
+
+    it("does not apply the preferred-armor gate to non-armor (weapons)", function()
+      _G.IsItemPreferredArmorType = function() return false end
+      local weapon = armorItem(7, "INVTYPE_WEAPONMAINHAND")
+      weapon.itemInfo.classID = 2 -- Weapon
+      assert.is_true(items:ResolveUpgrade(weapon))
     end)
   end)
 
