@@ -32,6 +32,10 @@ local themes = addon:GetModule('Themes')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+-- Symmetric padding (in pixels) between the flat panel edge and the bag grid on
+-- Classic/Era, where the panel is a plain backdrop with no title-bar header.
+local CLASSIC_PADDING = 8
+
 ---@class bagSlots
 ---@field frame Frame
 ---@field content Grid
@@ -51,17 +55,29 @@ function BagSlots.bagSlotProto:Draw(ctx)
     cells = self.content.cells,
     maxWidthPerRow = 1024,
   })
-  self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
 
-  local headerHeight = themes:GetFlatHeaderHeight(self.frame)
-  local topInset = headerHeight > 0 and headerHeight or 12
-  local leftInset = addon.isRetail and (const.OFFSETS.BAG_LEFT_INSET + 4) or const.OFFSETS.BAG_LEFT_INSET
+  local container = self.content:GetContainer()
+  container:ClearAllPoints()
 
-  self.content:GetContainer():ClearAllPoints()
-  self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", leftInset, -topInset)
-  self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
-
-  self.frame:SetHeight(h + topInset + 12)
+  if addon.isRetail then
+    -- Retail uses the themed flat window, which reserves a visual header band at
+    -- the top of the panel; leave room for it and 12px at the bottom.
+    self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
+    local headerHeight = themes:GetFlatHeaderHeight(self.frame)
+    local topInset = headerHeight > 0 and headerHeight or 12
+    local leftInset = const.OFFSETS.BAG_LEFT_INSET + 4
+    container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", leftInset, -topInset)
+    container:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
+    self.frame:SetHeight(h + topInset + 12)
+  else
+    -- Classic/Era render a plain flat backdrop panel with no title-bar header, so
+    -- wrap the bag grid with equal padding on all sides to keep the bags centered
+    -- both horizontally and vertically.
+    self.frame:SetWidth(w + CLASSIC_PADDING * 2)
+    self.frame:SetHeight(h + CLASSIC_PADDING * 2)
+    container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", CLASSIC_PADDING, -CLASSIC_PADDING)
+    container:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -CLASSIC_PADDING, CLASSIC_PADDING)
+  end
 end
 
 function BagSlots.bagSlotProto:SetShown(shown)
@@ -135,10 +151,29 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
   b.bagFrame = bagFrame
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
   ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", name .. "BagSlots", UIParent)
+  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BackdropTemplate")
   b.frame = f
 
-  themes:RegisterFlatWindow(f, "")
+  if addon.isRetail then
+    themes:RegisterFlatWindow(f, "")
+  else
+    -- On Classic/Era the Default theme's DefaultPanelFlatTemplate draws a title-bar
+    -- band (a 28px _UI-Frame-TitleTile top edge on its NineSlice) that cannot be
+    -- hidden, so the panel would show an empty title bar. Bypass the themed flat
+    -- window and render a self-contained flat panel instead: a background plus a
+    -- thin border, no title bar and no close button. BackdropTemplate + SetBackdrop
+    -- behaves identically on retail, MoP, TBC, and Vanilla.
+    f:SetBackdrop({
+      bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+      edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+      tile = true,
+      tileSize = 16,
+      edgeSize = 16,
+      insets = { left = 4, right = 4, top = 4, bottom = 4 },
+    })
+    f:SetBackdropColor(0, 0, 0, 0.9)
+    f:SetBackdropBorderColor(1, 1, 1, 1)
+  end
 
   b.content = grid:Create(b.frame)
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
