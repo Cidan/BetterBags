@@ -145,7 +145,12 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     StubBetterBagsModule("BagSlots")
     local slots = addon:GetModule("BagSlots")
     slots.CreatePanel = slots.CreatePanel or function()
-      return { frame = CreateFrame("Frame") }
+      local panel = { frame = CreateFrame("Frame") }
+      function panel:IsShown() return self.frame:IsShown() end
+      function panel:Show() self.frame:Show() end
+      function panel:Hide() self.frame:Hide() end
+      function panel:Draw() end
+      return panel
     end
 
     StubBetterBagsModule("SearchBox")
@@ -239,6 +244,8 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     local mockBag = {
       frame = parentFrame,
       tabsResizedAfterLoad = false,
+      sideAnchor = CreateFrame("Frame"),
+      windowGrouping = { AddWindow = function() end },
     }
     local behavior = backpack:Create(mockBag)
 
@@ -248,6 +255,11 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     assert.has_no.errors(function()
       behavior:OnCreate({})
     end)
+
+    -- The era override must create the bag slots panel and search frame so that
+    -- the context menu's "Show Bags" entry (gated on bag.slots) appears on Classic.
+    assert.is_not_nil(mockBag.slots, "era backpack OnCreate must create the bag slots panel")
+    assert.is_not_nil(mockBag.searchFrame, "era backpack OnCreate must create the search frame")
   end)
 
   it("should successfully run classic backpack OnCreate without crashes", function()
@@ -269,6 +281,8 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     local mockBag = {
       frame = parentFrame,
       tabsResizedAfterLoad = false,
+      sideAnchor = CreateFrame("Frame"),
+      windowGrouping = { AddWindow = function() end },
     }
     local behavior = backpack:Create(mockBag)
 
@@ -278,6 +292,11 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     assert.has_no.errors(function()
       behavior:OnCreate({})
     end)
+
+    -- The classic override must create the bag slots panel and search frame so that
+    -- the context menu's "Show Bags" entry (gated on bag.slots) appears on Classic.
+    assert.is_not_nil(mockBag.slots, "classic backpack OnCreate must create the bag slots panel")
+    assert.is_not_nil(mockBag.searchFrame, "classic backpack OnCreate must create the search frame")
   end)
 
   it("should use instant pre-rendered tab swap on SwitchToGroup", function()
