@@ -22,6 +22,13 @@ addon.isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 addon.isMists = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
 addon.isAnniversary = WOW_PROJECT_ID == 5
 
+-- WoW: Forever (codename Camelot) is a mainline retail fork, so the checks above
+-- report it as retail (addon.isRetail == true) and no build/project number can
+-- tell it apart from live retail. addon.isForever is instead set by core/forever.lua,
+-- which is listed only in BetterBags_Camelot.toc and loads before this file. Normalize
+-- it to a boolean here so every downstream consumer can treat it as a plain flag.
+addon.isForever = addon.isForever == true
+
 -- Get the interface/TOC version for patch-specific feature gating
 -- Format: 110207 for patch 11.0.207, 120000 for 12.0.0 (Midnight), etc.
 local _, _, _, tocVersion = GetBuildInfo()

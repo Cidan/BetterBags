@@ -138,4 +138,22 @@ describe("Constants Module Offsets", function()
     assert.is_not_nil(const.OFFSETS)
     assert.are.equal(14, const.OFFSETS.SCROLLBAR_WIDTH)
   end)
+
+  describe("addon.isForever normalization", function()
+    local savedIsForever
+    before_each(function() savedIsForever = addon.isForever end)
+    after_each(function() addon.isForever = savedIsForever end)
+
+    it("normalizes an unset flag to false (retail/classic are never Forever)", function()
+      addon.isForever = nil
+      loadfile("core/constants.lua")("BetterBags")
+      assert.is_false(addon.isForever)
+    end)
+
+    it("preserves the flag set by core/forever.lua (Camelot stays Forever)", function()
+      addon.isForever = true
+      loadfile("core/constants.lua")("BetterBags")
+      assert.is_true(addon.isForever)
+    end)
+  end)
 end)
