@@ -50,14 +50,41 @@ of truth, so this is also forward-compatible if Blizzard adds tabs to either cli
   these tables. A naive static add of tabs 7–9 would also throw `table index is nil` on live
   retail, where those enum members do not exist.
 
+`ACCOUNT_BANK_BAGS_LIST` is the ordered account-tab counterpart of `BANK_ONLY_BAGS_LIST`,
+built in the same loop, consumed by the bank tab slots panel (§3).
+
 Coverage: `spec/core/constants_spec.lua` ("dynamic bank tab sizing": 6+5 retail shape, 9+9
-Camelot expansion, and `BANK_ONLY_BAGS_LIST` ordering by tab index).
+Camelot expansion across every derived table incl. `ACCOUNT_BANK_BAGS_LIST`, and
+`BANK_ONLY_BAGS_LIST` ordering by tab index).
 
-## 3. Still pending (not yet done)
+## 3. Bank UI is retail code — it carries over; only tab counts needed fixing
 
-- Count-driven UI/search follow-ons: `frames/bankslots.lua` (purchase panel is a fixed 11
-  slots + `maxCellWidth = 11`) and `integrations/quickfind.lua` (hard upper bounds
-  `<= CharacterBankTab_6` / `<= AccountBankTab_5`).
+Camelot runs BetterBags' **retail** bank UI unchanged (`BankPanel`,
+`C_Bank.FetchPurchasedBankTabData`, `BankPanelPurchaseButtonScriptTemplate` + `overrideBankType`,
+`BankPanel:SetBankType`, `.TabSettingsMenu` all exist and behave as on retail — audited from
+the `origin/forever` source). `BankPanel.Header` and `BankPanel.AutoDepositFrame` do **not**
+exist on Camelot, but `bags/bank.lua` already nil-guards both and uses `SetAlpha(0)` + `Show()`
+(not `Hide()`), which is correct there too — no change needed. The bank window renders its own
+container-scan view, so Camelot's paged "player bags in bank" model (`ShouldUsePlayerBagsInBank`)
+does not affect us. Our tab-slots panel is the analogue of Camelot's physical bank-bag slots in
+bag mode, and of retail's virtual tabs in non-bag mode — same panel both ways.
+
+The only real gap was **tab count**, fixed by deriving from the §2 constant tables (not an
+`addon.isForever` branch — the enum already encodes the count, so this is forward-compatible and
+identical on retail):
+
+- `frames/bankslots.lua` `CreatePanel` builds `allTabSlots` from `const.BANK_ONLY_BAGS_LIST`
+  (character) + `const.ACCOUNT_BANK_BAGS_LIST` (account), and sets
+  `content.maxCellWidth = #allTabSlots` (was a fixed 11-entry literal + `maxCellWidth = 11`).
+  Renders 11 slots on retail, 18 on Camelot. Coverage: `spec/frames/bankslots_spec.lua`
+  ("Dynamic tab count derived from Constants").
+- `integrations/quickfind.lua` classifies a bank tab id via membership in `const.BANK_ONLY_BAGS`
+  / `const.ACCOUNT_BANK_BAGS` instead of the old hard bounds `<= CharacterBankTab_6` /
+  `<= AccountBankTab_5` (which dropped Camelot tabs 7-9 / 6-9 into the visual-only fallback).
+  Coverage: `spec/quickfind_spec.lua`.
+
+## 4. Still pending (not yet done)
+
 - The three new `C_Bank` functions on Camelot (`ShouldUsePlayerBagsInBank`,
   `FetchMaxNumBankTabs`, `BankBagTypeAndIDToInvSlot`) are net-new integration points; none
   are required for the container-scan model above.

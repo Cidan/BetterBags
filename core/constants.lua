@@ -183,9 +183,13 @@ end
 if addon.isRetail then
   -- ACCOUNT_BANK_BAGS is the account (warband) bank tabs, sized off the enum so
   -- Camelot's extra tabs are included automatically (see enumerateBagIndices).
+  -- ACCOUNT_BANK_BAGS_LIST is the same tabs in tab-index order, the account-bank
+  -- counterpart to BANK_ONLY_BAGS_LIST (consumed by the bank tab slots panel).
   const.ACCOUNT_BANK_BAGS = {}
+  const.ACCOUNT_BANK_BAGS_LIST = {}
   for _, id in ipairs(enumerateBagIndices("AccountBankTab_")) do
     const.ACCOUNT_BANK_BAGS[id] = id
+    const.ACCOUNT_BANK_BAGS_LIST[#const.ACCOUNT_BANK_BAGS_LIST + 1] = id
   end
 end
 

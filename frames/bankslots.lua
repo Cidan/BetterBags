@@ -420,8 +420,6 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   -- this panel has no title, so we match the 12 px bottom gap.
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -12)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
-  -- Allow all 11 slots on one row
-  b.content.maxCellWidth = 11
   b.content:HideScrollBar()
   -- Bank tab slots grid is not scrollable; disable mouse wheel so scroll
   -- events pass through to the outer scrollable bag container.
@@ -432,22 +430,21 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.selectedBagIndex = nil
   b.tabsWereShown = false
 
-  -- All possible bank tab slots in order:
-  --   6 character bank tabs (CharacterBankTab_1 through _6)
-  --   5 account/warbank tabs (AccountBankTab_1 through _5)
-  local allTabSlots = {
-    {bagIndex = Enum.BagIndex.CharacterBankTab_1, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_2, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_3, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_4, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_5, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_6, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.AccountBankTab_1, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_2, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_3, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_4, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_5, bankType = Enum.BankType.Account},
-  }
+  -- All possible bank tab slots in order: every character bank tab followed by
+  -- every account/warbank tab. Derived from the Constants tables (built by probing
+  -- Enum.BagIndex) rather than a fixed list, so the panel renders the right number
+  -- of slots on any client: 6 + 5 on live retail, 9 + 9 on WoW: Forever (Camelot),
+  -- and any future count without code changes. See core/constants.lua and
+  -- .claude/rules/camelot-forever.md.
+  local allTabSlots = {}
+  for _, bagIndex in ipairs(const.BANK_ONLY_BAGS_LIST) do
+    allTabSlots[#allTabSlots + 1] = {bagIndex = bagIndex, bankType = Enum.BankType.Character}
+  end
+  for _, bagIndex in ipairs(const.ACCOUNT_BANK_BAGS_LIST) do
+    allTabSlots[#allTabSlots + 1] = {bagIndex = bagIndex, bankType = Enum.BankType.Account}
+  end
+  -- Keep every slot on a single row.
+  b.content.maxCellWidth = #allTabSlots
 
   for i, slotInfo in ipairs(allTabSlots) do
     ---@type BankSlotButton

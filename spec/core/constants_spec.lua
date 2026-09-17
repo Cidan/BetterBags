@@ -173,6 +173,7 @@ describe("Constants Module Offsets", function()
       -- BANK_BAGS also carries the main Characterbanktab container (6 tabs + 1).
       assert.are.equal(7, countKeys(const.BANK_BAGS))
       assert.are.equal(5, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(5, #const.ACCOUNT_BANK_BAGS_LIST)
       -- Tabs beyond the retail cap must not be present.
       assert.is_nil(const.BANK_ONLY_BAGS[Enum.BagIndex.CharacterBankTab_6 + 1])
     end)
@@ -200,11 +201,13 @@ describe("Constants Module Offsets", function()
       assert.are.equal(9, countKeys(const.BANK_ONLY_BAGS))
       assert.are.equal(10, countKeys(const.BANK_BAGS))
       assert.are.equal(9, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(9, #const.ACCOUNT_BANK_BAGS_LIST)
 
       -- The new tabs resolve to their enum values in every derived table.
       assert.are.equal(Enum.BagIndex.CharacterBankTab_9, const.BANK_ONLY_BAGS[Enum.BagIndex.CharacterBankTab_9])
       assert.are.equal(Enum.BagIndex.CharacterBankTab_9, const.BANK_BAGS[Enum.BagIndex.CharacterBankTab_9])
       assert.are.equal(Enum.BagIndex.AccountBankTab_9, const.ACCOUNT_BANK_BAGS[Enum.BagIndex.AccountBankTab_9])
+      assert.are.equal(Enum.BagIndex.AccountBankTab_9, const.ACCOUNT_BANK_BAGS_LIST[9])
 
       -- BANK_TAB covers every character and account tab plus the aliases.
       assert.are.equal(Enum.BagIndex.CharacterBankTab_9, const.BANK_TAB[Enum.BagIndex.CharacterBankTab_9])

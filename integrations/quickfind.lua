@@ -147,13 +147,14 @@ function quickfind:ShowInBag(id)
         if bag.behavior.SwitchToBank then
           bag.behavior:SwitchToBank(ctx)
         end
-      elseif tabID >= Enum.BagIndex.CharacterBankTab_1 and tabID <= Enum.BagIndex.CharacterBankTab_6 then
-        -- Character bank tabs (6-11)
+      elseif const.BANK_ONLY_BAGS and const.BANK_ONLY_BAGS[tabID] then
+        -- Character bank tab (membership-tested against the Constants table so
+        -- all tabs are recognized regardless of count: 6 on retail, 9 on Camelot).
         if bag.behavior.SwitchToCharacterBankTab then
           bag.behavior:SwitchToCharacterBankTab(ctx, tabID)
         end
-      elseif tabID >= Enum.BagIndex.AccountBankTab_1 and tabID <= Enum.BagIndex.AccountBankTab_5 then
-        -- Account bank tabs (13-17)
+      elseif const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[tabID] then
+        -- Account/warbank tab (membership-tested; 5 on retail, 9 on Camelot).
         if bag.behavior.SwitchToAccountBank then
           bag.behavior:SwitchToAccountBank(ctx, tabID)
         end
