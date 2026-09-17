@@ -832,6 +832,20 @@ function bagFrame:Create(ctx, kind)
 	b.anchor = anchor:New(kind, b.frame, name)
 	-- Load the bag position from settings.
 	Window.RestorePosition(b.frame)
+
+	-- TEMPORARY (WoW: Forever): the portrait window decoration renders too high on
+	-- Forever, so the bank window's top edge bleeds up into the backpack window.
+	-- Until the decoration itself is fixed, nudge the bank window down on screen so
+	-- it can be viewed and screenshotted cleanly. Retail and Classic are untouched.
+	-- The frame is clamped to screen (below), so this can't push it off-screen.
+	if addon.isForever and kind == const.BAG_KIND.BANK then
+		local point, relativeTo, relativePoint, x, y = b.frame:GetPoint()
+		if point then
+			b.frame:ClearAllPoints()
+			b.frame:SetPoint(point, relativeTo, relativePoint, x or 0, (y or 0) - 250)
+		end
+	end
+
 	b.previousSize = b.frame:GetBottom()
 
 	b.frame:SetScript("OnSizeChanged", function()
