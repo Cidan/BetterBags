@@ -37,6 +37,14 @@ local registeredCallback = nil
 loader.TellMeWhenABagIsUpdated = function(_, cb)
   registeredCallback = cb
 end
+-- Mirror the real loader: LoadAllBagsAndUpdate primes the cache and then fans the login
+-- sweep out through the registered bag-update callback, exactly as a BAG_UPDATE would for
+-- every managed bag (backpack 0/1, bank 6/7 per the const stubs above).
+loader.LoadAllBagsAndUpdate = function()
+  if registeredCallback then
+    registeredCallback({ [0] = true, [1] = true, [6] = true, [7] = true })
+  end
+end
 
 ResetModuleStub("Refresh", "data/refresh.lua")
 LoadBetterBagsModule("data/refresh.lua")
@@ -115,10 +123,28 @@ describe("Refresh Module", function()
     assert.is_false(calledArgs[2].bank)
   end)
 
-  it("should trigger a full update on OnEnable (Startup Refresh Gap)", function()
+  it("routes the initial login sweep through the ItemLoader cache-priming path", function()
+    spy.on(loader, "LoadAllBagsAndUpdate")
+    refresh:OnEnable()
+    -- The login sweep must prime the item cache via the loader (the same
+    -- ContinuableContainer path BAG_UPDATE uses) instead of harvesting a possibly-cold
+    -- cache directly, which would mislabel items into "Everything" until a /reload.
+    assert.spy(loader.LoadAllBagsAndUpdate).was.called(1)
+  end)
+
+  it("should trigger a full update on OnEnable once the item cache is primed", function()
     spy.on(refresh, "RequestUpdate")
     refresh:OnEnable()
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+    -- LoadAllBagsAndUpdate primes the cache and, via the registered loader callback, fans
+    -- the login sweep out to RequestUpdate for the changed kinds (backpack + bank).
+    local found = false
+    for _, c in ipairs(refresh.RequestUpdate.calls) do
+      local req = c.vals[2]
+      if req and req.backpack and req.bank and req.bags then
+        found = true
+      end
+    end
+    assert.is_true(found)
   end)
 
   it("should register bags/FullRefreshAll message and trigger full update", function()

@@ -316,5 +316,11 @@ function refresh:OnEnable()
     end)
   end
 
-  self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+  -- Route the initial login sweep through the ItemLoader's ContinuableContainer, exactly
+  -- like a BAG_UPDATE, so the first harvest only runs once the item cache is primed.
+  -- Harvesting a cold cache here reads nil type/subtype from C_Item.GetItemInfo and dumps
+  -- items into "Everything" until a /reload. The loader's callback (registered above) fans
+  -- this out to RequestUpdate, and RunRefresh forces a wipe on each kind's first sweep, so
+  -- no explicit wipe is needed here.
+  itemLoader:LoadAllBagsAndUpdate()
 end

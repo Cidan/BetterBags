@@ -54,6 +54,28 @@ describe("ItemLoader", function()
     assert.are.equal(2, mixin2._slotID)
   end)
 
+  it("should prime and update every managed bag via LoadAllBagsAndUpdate (login path)", function()
+    local loader = addon:GetModule("ItemLoader")
+    loader:Init()
+    loader:OnEnable()
+
+    local seen = nil
+    loader:TellMeWhenABagIsUpdated(function(updatedBags)
+      seen = updatedBags
+    end)
+
+    -- LoadAllBagsAndUpdate must drive the exact same path a BAG_UPDATE takes (mark bags
+    -- dirty, then run ProcessPendingBagUpdates through the ContinuableContainer), but for
+    -- every managed bag at once and without needing a BAG_UPDATE event to have fired.
+    loader:LoadAllBagsAndUpdate()
+
+    assert.is_not_nil(seen)
+    assert.is_true(seen[0])
+    assert.is_true(seen[1])
+    assert.is_true(seen[5])
+    assert.is_true(seen[10])
+  end)
+
   it("should support registering callbacks for bag updates", function()
     local loader = addon:GetModule("ItemLoader")
     loader:Init()
