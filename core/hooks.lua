@@ -31,7 +31,10 @@ local interactionEvents = {
   [Enum.PlayerInteractionType.ItemUpgrade] = true,
 }
 
-if addon.isRetail then
+-- The Account (warband) banker only exists on clients with a warbank. WoW:
+-- Forever (Camelot) has none, so don't register its interaction (Enum.
+-- PlayerInteractionType.AccountBanker may not even exist there).
+if addon.hasWarbank then
   interactionEvents[Enum.PlayerInteractionType.AccountBanker] = true
 end
 

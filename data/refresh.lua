@@ -267,7 +267,7 @@ function refresh:OnEnable()
     local request = { sort = true }
     if addon.atBank then
       request.sortBank = true
-      if addon.isRetail then
+      if addon.hasWarbank then
         request.sortWarbank = true
       end
     end

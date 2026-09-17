@@ -1420,7 +1420,13 @@ function DB:Migrate()
     end
   end
 
-  if not hasWarbank and addon.isRetail then
+  -- Only seed the default Warbank group on clients that actually have a warbank.
+  -- WoW: Forever (Camelot) is retail-shaped but has no account bank, so it must
+  -- not get a Warbank group (which would otherwise create an empty account tab
+  -- section and drive the whole data-side warbank surface). `hasWarbank` here is
+  -- the local "profile already has a warbank group" flag; addon.hasWarbank is the
+  -- client capability.
+  if not hasWarbank and addon.hasWarbank then
     local newID = DB.data.profile.groupCounter[const.BAG_KIND.BANK] + 1
     DB.data.profile.groupCounter[const.BAG_KIND.BANK] = newID
     DB.data.profile.groups[const.BAG_KIND.BANK][newID] = {

@@ -83,7 +83,44 @@ identical on retail):
   `<= AccountBankTab_5` (which dropped Camelot tabs 7-9 / 6-9 into the visual-only fallback).
   Coverage: `spec/quickfind_spec.lua`.
 
-## 4. Still pending (not yet done)
+## 4. No warbank on Forever — `addon.hasWarbank`
+
+Camelot has **no Account bank (Warbank / Warband bank)** at all, even though its
+`Enum.BagIndex` still declares `AccountBankTab_1..9`. This is a genuine behavioral divergence
+the enum cannot express, so it is gated on a dedicated predicate rather than the enum:
+
+- **`addon.hasWarbank = addon.isRetail and not addon.isForever`** (`core/constants.lua`, set
+  next to the other flavor flags). True on live retail, false on Camelot and on classic.
+- **Central lever:** the account bag tables are built **only when `addon.hasWarbank`**. On
+  Camelot they are left **present-but-empty** (`const.ACCOUNT_BANK_BAGS = {}`,
+  `ACCOUNT_BANK_BAGS_LIST = {}`) — this must be explicit, because the enum probe would
+  otherwise populate 9 phantom account tabs. Every **table-driven** warbank site then goes
+  inert automatically with no per-site branch: the data sweep/partition/free-slot/cache-clear
+  in `data/items.lua`, the bank tab slots panel (`frames/bankslots.lua` renders character tabs
+  only), `integrations/quickfind.lua`, `data/loader.lua`, `data/refresh.lua` bank-change
+  detection, the virtual-stack `"W"` hash discriminator, and `frames/item.lua` kind classing.
+- **Explicit `addon.hasWarbank` gates** for the warbank surfaces that reference
+  `Enum.BankType.Account` / warbank UI directly (not through those tables):
+  - `core/database.lua` `Migrate` — does **not** seed the default **Warbank** group (this is
+    what kills the whole data-driven account-tab section / `tabIsAccountBank` routing).
+  - `frames/groupdialog.lua` — the group-creation dialog omits the "Warbank" bank-type option.
+  - `bags/bank.lua` — `money:Create(addon.hasWarbank)` (character-only bank wallet).
+  - `frames/contextmenu.lua` — omits the "Clean Up Warbank" menu entry.
+  - `themes/themes.lua` — bag-menu button drops the "Deposit Warbank Items" tooltip line and
+    the shift-right deposit / SortWarbank branch; on Forever right-click always sorts the
+    character bank (see bag-menu-button.md).
+  - `data/refresh.lua` — a backpack sort with the bank open no longer sets `sortWarbank`.
+  - `core/hooks.lua` — does not register the `AccountBanker` interaction.
+- **Do NOT** gate these on `addon.isRetail` alone (that is still true on Camelot) or on
+  `addon.isForever` inline — use `addon.hasWarbank`, so classic (also warbank-less) stays
+  correct and the intent reads clearly.
+
+Coverage: `spec/core/constants_spec.lua` ("warbank availability": empty tables + `hasWarbank`
+false on Forever, populated + true on retail), `spec/database_migration_spec.lua` ("default
+Warbank group gating"), `spec/refresh_spec.lua` ("sort the bank but NOT the warbank on a client
+without one").
+
+## 5. Still pending (not yet done)
 
 - The three new `C_Bank` functions on Camelot (`ShouldUsePlayerBagsInBank`,
   `FetchMaxNumBankTabs`, `BankBagTypeAndIDToInvSlot`) are net-new integration points; none

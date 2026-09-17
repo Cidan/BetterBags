@@ -247,4 +247,50 @@ describe("Constants Module Offsets", function()
       assert.is_true(addon.isForever)
     end)
   end)
+
+  describe("warbank availability (no warbank on Forever)", function()
+    local savedIsForever, savedHasWarbank
+
+    local function countKeys(t)
+      local n = 0
+      for _ in pairs(t) do n = n + 1 end
+      return n
+    end
+
+    before_each(function()
+      savedIsForever = addon.isForever
+      savedHasWarbank = addon.hasWarbank
+      addon.modules["Constants"] = nil
+      local aceAddon = LibStub("AceAddon-3.0")
+      if aceAddon.addons["BetterBags_Constants"] then
+        aceAddon.addons["BetterBags_Constants"] = nil
+      end
+    end)
+
+    after_each(function()
+      addon.isForever = savedIsForever
+      addon.hasWarbank = savedHasWarbank
+    end)
+
+    it("populates account bank tables and sets hasWarbank on live retail", function()
+      addon.isForever = nil
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.is_true(addon.hasWarbank)
+      assert.are.equal(5, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(5, #const.ACCOUNT_BANK_BAGS_LIST)
+    end)
+
+    it("leaves account bank tables empty and clears hasWarbank on Forever", function()
+      addon.isForever = true
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.is_false(addon.hasWarbank)
+      -- Account tables exist but are empty, so every table-driven warbank site is inert.
+      assert.are.equal(0, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(0, #const.ACCOUNT_BANK_BAGS_LIST)
+      -- Character bank tabs are unaffected.
+      assert.are.equal(6, #const.BANK_ONLY_BAGS_LIST)
+    end)
+  end)
 end)

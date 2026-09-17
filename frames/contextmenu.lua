@@ -227,7 +227,7 @@ function contextMenu:CreateContextMenu(bag)
 				events:SendMessage(context:New("SortBank"), "bags/SortBank")
 			end,
 		})
-		if addon.isRetail and C_Container.SortAccountBankBags then
+		if addon.hasWarbank and C_Container.SortAccountBankBags then
 			table.insert(menuList, {
 				text = L:G("Clean Up Warbank"),
 				notCheckable = true,

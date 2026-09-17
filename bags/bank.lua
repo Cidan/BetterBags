@@ -328,7 +328,9 @@ end
 ---@param bottomBar Frame
 ---@return Money
 function bank.proto:SetupMoneyFrame(bottomBar)
-	local moneyFrame = money:Create(true) -- Warbank-enabled
+	-- Warbank-enabled only on clients that have a warbank. WoW: Forever (Camelot)
+	-- has no account bank, so its bank money frame is character-only.
+	local moneyFrame = money:Create(addon.hasWarbank)
 	moneyFrame.frame:SetPoint("BOTTOMRIGHT", bottomBar, "BOTTOMRIGHT", -4, 0)
 	moneyFrame.frame:SetParent(self.bag.frame)
 	return moneyFrame

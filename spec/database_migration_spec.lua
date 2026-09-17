@@ -206,4 +206,41 @@ describe("Database Migration", function()
       assert.are.equal(const.BAG_VIEW.SECTION_ALL_BAGS, DB.data.profile.views[const.BAG_KIND.BANK])
     end)
   end)
+
+  describe("default Warbank group gating (no warbank on Forever)", function()
+    local savedHasWarbank
+
+    before_each(function()
+      savedHasWarbank = addon.hasWarbank
+      -- Reset the bank groups so Migrate() re-seeds the defaults from scratch.
+      DB.data.profile.groups[const.BAG_KIND.BANK] = {}
+      DB.data.profile.groupCounter[const.BAG_KIND.BANK] = 0
+      DB.data.profile.activeGroup[const.BAG_KIND.BANK] = nil
+    end)
+
+    after_each(function()
+      addon.hasWarbank = savedHasWarbank
+    end)
+
+    local function defaultGroupOfType(bankType)
+      for _, g in pairs(DB.data.profile.groups[const.BAG_KIND.BANK]) do
+        if g.isDefault and g.bankType == bankType then return true end
+      end
+      return false
+    end
+
+    it("creates a default Warbank group when the client has a warbank", function()
+      addon.hasWarbank = true
+      DB:Migrate()
+      assert.is_true(defaultGroupOfType(Enum.BankType.Account))
+      assert.is_true(defaultGroupOfType(Enum.BankType.Character))
+    end)
+
+    it("creates only the Character bank group when the client has no warbank (Forever)", function()
+      addon.hasWarbank = false
+      DB:Migrate()
+      assert.is_false(defaultGroupOfType(Enum.BankType.Account))
+      assert.is_true(defaultGroupOfType(Enum.BankType.Character))
+    end)
+  end)
 end)

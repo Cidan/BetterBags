@@ -29,6 +29,14 @@ addon.isAnniversary = WOW_PROJECT_ID == 5
 -- it to a boolean here so every downstream consumer can treat it as a plain flag.
 addon.isForever = addon.isForever == true
 
+-- Whether the client has an Account bank (Warbank / Warband bank). It exists on
+-- live retail but NOT on WoW: Forever (Camelot), which is a retail fork that
+-- ships no warbank even though its Enum.BagIndex still declares AccountBankTab_N
+-- members. Every warbank-specific path gates on this predicate; the account bag
+-- tables below are also built only when it is true, so table-driven warbank sites
+-- (data sweep, tab slots panel, quickfind) go inert on Forever with no per-site branch.
+addon.hasWarbank = addon.isRetail and not addon.isForever
+
 -- Get the interface/TOC version for patch-specific feature gating
 -- Format: 110207 for patch 11.0.207, 120000 for 12.0.0 (Midnight), etc.
 local _, _, _, tocVersion = GetBuildInfo()
@@ -180,7 +188,7 @@ else
   }
 end
 
-if addon.isRetail then
+if addon.hasWarbank then
   -- ACCOUNT_BANK_BAGS is the account (warband) bank tabs, sized off the enum so
   -- Camelot's extra tabs are included automatically (see enumerateBagIndices).
   -- ACCOUNT_BANK_BAGS_LIST is the same tabs in tab-index order, the account-bank
@@ -191,6 +199,14 @@ if addon.isRetail then
     const.ACCOUNT_BANK_BAGS[id] = id
     const.ACCOUNT_BANK_BAGS_LIST[#const.ACCOUNT_BANK_BAGS_LIST + 1] = id
   end
+elseif addon.isRetail then
+  -- Retail-shaped client with no warbank (WoW: Forever / Camelot). Keep the tables
+  -- present but empty so every table-driven warbank site iterates/tests nothing and
+  -- goes inert, without needing an addon.isForever branch of its own. Enum.BagIndex
+  -- still declares AccountBankTab_N here, so this must be explicit — the enum probe
+  -- above would otherwise populate 9 phantom account tabs.
+  const.ACCOUNT_BANK_BAGS = {}
+  const.ACCOUNT_BANK_BAGS_LIST = {}
 end
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
