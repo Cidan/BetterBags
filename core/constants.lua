@@ -44,23 +44,35 @@ const.BAG_KIND = {
   BANK = 1,
 }
 
+-- enumerateBagIndices walks contiguous Enum.BagIndex members named
+-- "<prefix>1", "<prefix>2", ... and returns their values in order, stopping at
+-- the first missing index. Live retail exposes CharacterBankTab_1..6 and
+-- AccountBankTab_1..5; WoW: Forever (codename Camelot) exposes _1..9 for both.
+-- Probing the enum keeps every derived bank table correctly sized on any client
+-- without hard-coding the tab count, so the retail bank paths adapt to Camelot's
+-- 9+9 tabs automatically (and to any future tab additions on either client).
+local function enumerateBagIndices(prefix)
+  local ids = {}
+  local n = 1
+  while Enum.BagIndex[prefix .. n] ~= nil do
+    ids[#ids + 1] = Enum.BagIndex[prefix .. n]
+    n = n + 1
+  end
+  return ids
+end
+
 if addon.isRetail then
   -- BankTab is an enum for the different bank tabs.
   ---@enum BankTab
   const.BANK_TAB = {
     [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
-    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
-    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
-    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
-    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
-    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
-    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
-    [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
-    [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
-    [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
-    [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
-    [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
   }
+  for _, id in ipairs(enumerateBagIndices("CharacterBankTab_")) do
+    const.BANK_TAB[id] = id
+  end
+  for _, id in ipairs(enumerateBagIndices("AccountBankTab_")) do
+    const.BANK_TAB[id] = id
+  end
   -- Named aliases used as context markers by UpdateFreeSlots to distinguish
   -- character bank from account bank (warbank) mode. The retail BANK_TAB table
   -- uses integer enum keys only, so these named keys are required for the
@@ -123,31 +135,18 @@ const.BINDING_MAP = {
 }
 
 if addon.isRetail then
+  -- BANK_BAGS carries the main Characterbanktab container plus every character
+  -- bank tab; BANK_ONLY_BAGS / _LIST are the tabs alone (see enumerateBagIndices).
   const.BANK_BAGS = {
     [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
-    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
-    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
-    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
-    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
-    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
-    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
   }
-  const.BANK_ONLY_BAGS = {
-    [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
-    [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
-    [Enum.BagIndex.CharacterBankTab_3] = Enum.BagIndex.CharacterBankTab_3,
-    [Enum.BagIndex.CharacterBankTab_4] = Enum.BagIndex.CharacterBankTab_4,
-    [Enum.BagIndex.CharacterBankTab_5] = Enum.BagIndex.CharacterBankTab_5,
-    [Enum.BagIndex.CharacterBankTab_6] = Enum.BagIndex.CharacterBankTab_6,
-  }
-  const.BANK_ONLY_BAGS_LIST = {
-    Enum.BagIndex.CharacterBankTab_1,
-    Enum.BagIndex.CharacterBankTab_2,
-    Enum.BagIndex.CharacterBankTab_3,
-    Enum.BagIndex.CharacterBankTab_4,
-    Enum.BagIndex.CharacterBankTab_5,
-    Enum.BagIndex.CharacterBankTab_6,
-  }
+  const.BANK_ONLY_BAGS = {}
+  const.BANK_ONLY_BAGS_LIST = {}
+  for _, id in ipairs(enumerateBagIndices("CharacterBankTab_")) do
+    const.BANK_BAGS[id] = id
+    const.BANK_ONLY_BAGS[id] = id
+    const.BANK_ONLY_BAGS_LIST[#const.BANK_ONLY_BAGS_LIST + 1] = id
+  end
 else
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
@@ -182,13 +181,12 @@ else
 end
 
 if addon.isRetail then
-  const.ACCOUNT_BANK_BAGS = {
-    [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
-    [Enum.BagIndex.AccountBankTab_2] = Enum.BagIndex.AccountBankTab_2,
-    [Enum.BagIndex.AccountBankTab_3] = Enum.BagIndex.AccountBankTab_3,
-    [Enum.BagIndex.AccountBankTab_4] = Enum.BagIndex.AccountBankTab_4,
-    [Enum.BagIndex.AccountBankTab_5] = Enum.BagIndex.AccountBankTab_5,
-  }
+  -- ACCOUNT_BANK_BAGS is the account (warband) bank tabs, sized off the enum so
+  -- Camelot's extra tabs are included automatically (see enumerateBagIndices).
+  const.ACCOUNT_BANK_BAGS = {}
+  for _, id in ipairs(enumerateBagIndices("AccountBankTab_")) do
+    const.ACCOUNT_BANK_BAGS[id] = id
+  end
 end
 
 -- BACKPACK_BAGS contains all the bags that are part of the backpack, including
