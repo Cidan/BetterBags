@@ -352,6 +352,20 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	end
 	decoration:SetFrameLevel(math.max(0, self.button:GetFrameLevel() - 1))
 	self:UpdateUpgrade(ctx, data)
+
+	-- Classic quality glow fix: the interaction button's own NormalTexture
+	-- (Interface\Buttons\UI-Quickslot2, a 64x64 beveled frame) is re-shown by
+	-- Blizzard's drag/update logic and, because the decoration sits one frame
+	-- level BELOW self.button, that frame drew OVER the decoration's quality glow
+	-- and hid it. A plain Hide() loses to the re-show, so clear the texture value
+	-- itself -- nothing renders even when it is re-shown, and the additive glow
+	-- from DrawQualityGlow (above) becomes visible, matching retail behavior
+	-- (same halo, same "Extra Glowy" intensity control). Retail has no such
+	-- re-show, so leave it untouched.
+	if not addon.isRetail and self.button.GetNormalTexture and self.button:GetNormalTexture() then
+		self.button:GetNormalTexture():SetTexture(nil)
+	end
+
 	self.frame:Show()
 	self.button:Show()
 end
