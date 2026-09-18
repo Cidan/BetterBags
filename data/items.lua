@@ -1897,6 +1897,22 @@ function items:AttachItemInfo(data, kind)
   setID = setID or 0
   isCraftingReagent = not not isCraftingReagent
 
+  -- The categorization-relevant fields (type, subtype, equip location, class, subclass)
+  -- are sourced from C_Item.GetItemInfoInstant, which never issues a server query and
+  -- always returns for a valid item -- unlike C_Item.GetItemInfo above, which returns nil
+  -- for these while the item cache is cold. On login with very full bags that cold read
+  -- coerced itemType/itemSubType to "" and dumped every affected item into "Everything"
+  -- until a /reload warmed the cache (issue #1090). Instant info keeps categorization
+  -- correct regardless of cache warmth; GetItemInfo still supplies name/level/price/bind/
+  -- expac, which have no instant equivalent and heal on the next warm sweep.
+  local _, instType, instSubType, instEquipLoc, _, instClassID, instSubclassID =
+    C_Item.GetItemInfoInstant(itemID)
+  itemType = instType or itemType
+  itemSubType = instSubType or itemSubType
+  itemEquipLoc = instEquipLoc or itemEquipLoc
+  classID = instClassID or classID
+  subclassID = instSubclassID or subclassID
+
   bindType = self:GetBindTypeFromLink(itemLink) or bindType --link overrides itemID if set
   local itemQuality = C_Item.GetItemQuality(itemLocation) --[[@as ItemQuality]]
   itemQuality = itemQuality or const.ITEM_QUALITY.Common
