@@ -231,6 +231,87 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- Regression for issue #1090: on login with very full bags the item cache is cold,
+  -- so C_Item.GetItemInfo(itemID) returns nil type/subtype and every affected item was
+  -- dumped into "Everything". The categorization-relevant fields (itemType, itemSubType,
+  -- itemEquipLoc, classID, subclassID) are ALL available from C_Item.GetItemInfoInstant,
+  -- which never queries the server and always returns for a valid item, so categorization
+  -- must be sourced from it and stay correct even when GetItemInfo is cold.
+  describe("Cold item cache categorization (login, issue #1090)", function()
+    local savedGetItemInfo
+    local savedGetItemInfoInstant
+    local savedGetContainerNumSlots
+    local savedGetContainerItemID
+    local savedGetContainerItemLink
+    local savedGetContainerItemInfo
+    local savedGetCategoryFilter
+
+    before_each(function()
+      savedGetItemInfo = _G.C_Item.GetItemInfo
+      savedGetItemInfoInstant = _G.C_Item.GetItemInfoInstant
+      savedGetContainerNumSlots = _G.C_Container.GetContainerNumSlots
+      savedGetContainerItemID = _G.C_Container.GetContainerItemID
+      savedGetContainerItemLink = _G.C_Container.GetContainerItemLink
+      savedGetContainerItemInfo = _G.C_Container.GetContainerItemInfo
+      savedGetCategoryFilter = database.GetCategoryFilter
+
+      -- A single valid item in bag 0 slot 1.
+      _G.C_Container.GetContainerNumSlots = function(bagid) return bagid == 0 and 1 or 0 end
+      _G.C_Container.GetContainerItemID = function(bagid, slotid)
+        if bagid == 0 and slotid == 1 then return 12345 end
+        return nil
+      end
+      _G.C_Container.GetContainerItemLink = function(bagid, slotid)
+        if bagid == 0 and slotid == 1 then return "|cff0070dd|Hitem:12345|h[Cold Sword]|h|r" end
+        return nil
+      end
+      _G.C_Container.GetContainerItemInfo = function() return nil end
+
+      -- COLD CACHE: GetItemInfo returns nothing (exactly what an uncached item returns
+      -- during the login sweep).
+      _G.C_Item.GetItemInfo = function() return nil end
+
+      -- GetItemInfoInstant is cold-proof and returns the instant fields:
+      -- itemID, itemType, itemSubType, itemEquipLoc, icon, classID, subClassID.
+      _G.C_Item.GetItemInfoInstant = function()
+        return 12345, "Weapon", "One-Handed Swords", "INVTYPE_WEAPON", 134400, 2, 7
+      end
+
+      -- Only the Type filter is on, so a warm categorization yields exactly "Weapon".
+      database.GetCategoryFilter = function(_, _, filter)
+        return filter == "Type"
+      end
+    end)
+
+    after_each(function()
+      _G.C_Item.GetItemInfo = savedGetItemInfo
+      _G.C_Item.GetItemInfoInstant = savedGetItemInfoInstant
+      _G.C_Container.GetContainerNumSlots = savedGetContainerNumSlots
+      _G.C_Container.GetContainerItemID = savedGetContainerItemID
+      _G.C_Container.GetContainerItemLink = savedGetContainerItemLink
+      _G.C_Container.GetContainerItemInfo = savedGetContainerItemInfo
+      database.GetCategoryFilter = savedGetCategoryFilter
+    end)
+
+    it("categorizes a cold-cache item by its instant type, not into Everything", function()
+      local ctx = { Get = function() return nil end, Set = function() end }
+      local itemsMap = items:Harvest(const.BAG_KIND.BACKPACK, { [0] = 0 })
+      local data = itemsMap["0_1"]
+
+      assert.is_not_nil(data)
+      assert.is_false(data.isItemEmpty)
+      -- The instant type/subtype must have been captured despite the cold GetItemInfo.
+      assert.are.equal("Weapon", data.itemInfo.itemType)
+      assert.are.equal("One-Handed Swords", data.itemInfo.itemSubType)
+      assert.are.equal("INVTYPE_WEAPON", data.itemInfo.itemEquipLoc)
+      assert.are.equal(2, data.itemInfo.classID)
+      assert.are.equal(7, data.itemInfo.subclassID)
+
+      -- The bug: this resolved to "Everything". It must be the real type.
+      assert.are.equal("Weapon", items:GetCategory(ctx, data))
+    end)
+  end)
+
   describe("Category Enrichment & Search Cache", function()
     local savedContainerIDToInventoryID
     local savedGetItemSubClassInfo
