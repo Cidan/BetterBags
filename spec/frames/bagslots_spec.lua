@@ -99,23 +99,18 @@ describe("BagSlots panel layout", function()
     assert.are.equal(PAD, c.points["BOTTOMRIGHT"].y)
   end)
 
-  it("aligns the first bag button with the item column on Camelot (headerless tooltip panel)", function()
+  it("centers the bags with symmetric padding on Camelot (headerless tooltip-bordered panel)", function()
     addon.isRetail = true
     addon.isForever = true
     local panel = newPanel(120, 40)
     panel:Draw(ctx:New("test"))
 
-    -- Camelot is headerless (no phantom themed header, so symmetric vertical padding),
-    -- but the left inset matches the main window's item column (BAG_LEFT_INSET + 4) so
-    -- the first bag button lines up with the first item column -- NOT the fully
-    -- symmetric CLASSIC_PADDING left inset, which would sit ~2px too far left.
-    local leftInset = const.OFFSETS.BAG_LEFT_INSET + 4
-    assert.are.equal(120 + leftInset + PAD, panel.frame.width)
+    -- Camelot uses the headerless decoration, so it takes the same symmetric-padding
+    -- path as Classic (no phantom themed header), not the retail header-reserving path.
+    assert.are.equal(120 + PAD * 2, panel.frame.width)
     assert.are.equal(40 + PAD * 2, panel.frame.height)
     local c = panel._container
-    assert.are.equal(leftInset, c.points["TOPLEFT"].x)
     assert.are.equal(-PAD, c.points["TOPLEFT"].y)
-    assert.are.equal(-PAD, c.points["BOTTOMRIGHT"].x)
     assert.are.equal(PAD, c.points["BOTTOMRIGHT"].y)
   end)
 
