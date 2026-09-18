@@ -191,7 +191,12 @@ function BankSlots.bankSlotsPanelProto:Show(callback)
   -- Reanchor the bank slots panel to the bottom of the bank window, occupying
   -- the space where the group tabs normally sit.
   self.frame:ClearAllPoints()
-  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
+  -- TEMPORARY (WoW: Forever): the slots-panel window decoration renders too high
+  -- and bleeds up into the bank window above it. Drop the panel further below the
+  -- bag frame on Forever so it can be viewed and screenshotted cleanly, until the
+  -- decoration itself is fixed. Retail and Classic keep the tight -2 gap.
+  local topGap = addon.isForever and -102 or -2
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, topGap)
   -- Completely hide the group tabs and remember whether they were visible so
   -- they can be restored correctly when the bank slots panel is closed.
   local bankBag = addon.Bags and addon.Bags.Bank

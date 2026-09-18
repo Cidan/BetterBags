@@ -570,23 +570,6 @@ function bagFrame.bagProto:OnResize()
 		self.frame:ClearAllPoints()
 		self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, self.previousSize) --, left, self.previousSize * self.frame:GetScale())
 	end
-
-	-- TEMPORARY (WoW: Forever): the portrait window decoration renders too high, so
-	-- the window's top edge bleeds up into whatever sits above it. Nudge both the
-	-- backpack and the bank window down on screen so they can be viewed and
-	-- screenshotted cleanly, until the decoration itself is fixed. Done here (after
-	-- Draw) rather than at creation because the frame is only reliably positioned by
-	-- now; a one-shot flag keeps the offset from compounding across OnResize calls.
-	-- Retail and Classic are untouched; the frame is clamped to screen below.
-	if addon.isForever and not self._foreverNudged then
-		local point, relativeTo, relativePoint, x, y = self.frame:GetPoint()
-		if point then
-			self._foreverNudged = true
-			self.frame:ClearAllPoints()
-			self.frame:SetPoint(point, relativeTo, relativePoint, x or 0, (y or 0) - 350)
-		end
-	end
-
 	self:KeepBagInBounds()
 	self.previousSize = self.frame:GetBottom()
 end

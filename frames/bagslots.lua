@@ -92,7 +92,12 @@ end
 function BagSlots.bagSlotProto:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
   self.frame:ClearAllPoints()
-  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
+  -- TEMPORARY (WoW: Forever): the slots-panel window decoration renders too high
+  -- and bleeds up into the bag window above it. Drop the panel further below the
+  -- bag frame on Forever so it can be viewed and screenshotted cleanly, until the
+  -- decoration itself is fixed. Retail and Classic keep the tight -2 gap.
+  local topGap = addon.isForever and -102 or -2
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, topGap)
 
   local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
   if parentBag and parentBag.tabs then
