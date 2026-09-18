@@ -69,10 +69,22 @@ function BagSlots.bagSlotProto:Draw(ctx)
     container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", leftInset, -topInset)
     container:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
     self.frame:SetHeight(h + topInset + 12)
+  elseif addon.isForever then
+    -- Camelot: headerless tooltip decoration. Align the first bag button with the
+    -- main bag window's first item column by using the SAME left inset the window's
+    -- items use (BAG_LEFT_INSET + 4) -- the panel shares the bag frame's left edge,
+    -- so an equal inset lines the two up. The tooltip border art differs from the
+    -- themed window, so symmetric padding (which centers in the panel) would sit the
+    -- bags ~2px left of the item column. Keep symmetric vertical padding (no header).
+    local leftInset = const.OFFSETS.BAG_LEFT_INSET + 4
+    self.frame:SetWidth(w + leftInset + CLASSIC_PADDING)
+    self.frame:SetHeight(h + CLASSIC_PADDING * 2)
+    container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", leftInset, -CLASSIC_PADDING)
+    container:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -CLASSIC_PADDING, CLASSIC_PADDING)
   else
-    -- Classic/Era (and Camelot) render a plain headerless backdrop panel with no
-    -- title-bar header, so wrap the bag grid with equal padding on all sides to
-    -- keep the bags centered both horizontally and vertically.
+    -- Classic/Era render a plain headerless backdrop panel with no title-bar header,
+    -- so wrap the bag grid with equal padding on all sides to keep the bags centered
+    -- both horizontally and vertically.
     self.frame:SetWidth(w + CLASSIC_PADDING * 2)
     self.frame:SetHeight(h + CLASSIC_PADDING * 2)
     container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", CLASSIC_PADDING, -CLASSIC_PADDING)
