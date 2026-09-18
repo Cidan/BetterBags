@@ -439,4 +439,43 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       assert.is_true(tabsShown, "group tabs should have been shown on close because groups are enabled")
     end)
   end)
+
+  describe("9. Camelot headerless decoration", function()
+    local savedIsForever, savedRegister
+    before_each(function()
+      savedIsForever = addon.isForever
+      savedRegister = themes.RegisterFlatWindow
+    end)
+    after_each(function()
+      addon.isForever = savedIsForever
+      themes.RegisterFlatWindow = savedRegister
+    end)
+
+    it("does not use the themed flat window on Camelot (uses a headerless decoration)", function()
+      addon.isRetail = true
+      addon.isForever = true
+      local registered = false
+      themes.RegisterFlatWindow = function() registered = true end
+
+      local bagFrame = CreateFrame("Frame")
+      local bankSlots = addon:GetModule("BankSlots")
+      local panel = bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+
+      assert.is_not_nil(panel)
+      assert.is_false(registered, "Camelot must not register the broken themed flat window")
+    end)
+
+    it("still uses the themed flat window on ordinary retail", function()
+      addon.isRetail = true
+      addon.isForever = false
+      local registered = false
+      themes.RegisterFlatWindow = function() registered = true end
+
+      local bagFrame = CreateFrame("Frame")
+      local bankSlots = addon:GetModule("BankSlots")
+      bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+
+      assert.is_true(registered)
+    end)
+  end)
 end)

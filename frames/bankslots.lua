@@ -153,8 +153,15 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
   })
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
 
-  local headerHeight = themes:GetFlatHeaderHeight(self.frame)
-  local topInset = headerHeight > 0 and headerHeight or 12
+  -- Camelot uses a headerless tooltip-bordered decoration, so reserve no header
+  -- band (symmetric 12px padding); other retail themes reserve their flat header.
+  local topInset
+  if addon.isForever then
+    topInset = 12
+  else
+    local headerHeight = themes:GetFlatHeaderHeight(self.frame)
+    topInset = headerHeight > 0 and headerHeight or 12
+  end
 
   self.content:GetContainer():ClearAllPoints()
   self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -topInset)
@@ -191,12 +198,7 @@ function BankSlots.bankSlotsPanelProto:Show(callback)
   -- Reanchor the bank slots panel to the bottom of the bank window, occupying
   -- the space where the group tabs normally sit.
   self.frame:ClearAllPoints()
-  -- TEMPORARY (WoW: Forever): the slots-panel window decoration renders too high
-  -- and bleeds up into the bank window above it. Drop the panel further below the
-  -- bag frame on Forever so it can be viewed and screenshotted cleanly, until the
-  -- decoration itself is fixed. Retail and Classic keep the tight -2 gap.
-  local topGap = addon.isForever and -102 or -2
-  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, topGap)
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
   -- Completely hide the group tabs and remember whether they were visible so
   -- they can be restored correctly when the bank slots panel is closed.
   local bankBag = addon.Bags and addon.Bags.Bank
@@ -415,9 +417,20 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.frame = f
   b.bagFrame = bagFrame
 
-  -- Register with an empty title so no title text is rendered in the window
-  -- decoration across any theme. The panel has no title bar text by design.
-  themes:RegisterFlatWindow(f, "")
+  if addon.isForever then
+    -- Camelot (WoW: Forever): DefaultPanelFlatTemplate renders a broken title-bar
+    -- band and oversized metal header on this client, so decorate with a headerless,
+    -- dark, tooltip-bordered frame instead of the themed flat window. See
+    -- camelot-forever.md and the matching bagslots.lua branch.
+    local deco = CreateFrame("Frame", f:GetName().."Camelot", f, "TooltipBorderedFrameTemplate")
+    deco:SetAllPoints()
+    deco:SetBackdropColor(0, 0, 0, 0.9)
+    deco:SetBackdropBorderColor(1, 1, 1, 1)
+  else
+    -- Register with an empty title so no title text is rendered in the window
+    -- decoration across any theme. The panel has no title bar text by design.
+    themes:RegisterFlatWindow(f, "")
+  end
 
   b.content = grid:Create(b.frame)
   -- Use the same inset on top and bottom so the slot icons are vertically

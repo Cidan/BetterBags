@@ -78,9 +78,9 @@ local function newPanel(contentW, contentH)
 end
 
 describe("BagSlots panel layout", function()
-  local savedIsRetail
-  before_each(function() savedIsRetail = addon.isRetail end)
-  after_each(function() addon.isRetail = savedIsRetail end)
+  local savedIsRetail, savedIsForever
+  before_each(function() savedIsRetail = addon.isRetail; savedIsForever = addon.isForever end)
+  after_each(function() addon.isRetail = savedIsRetail; addon.isForever = savedIsForever end)
 
   it("centers the bags with symmetric padding on Classic/Era (flat panel, no title bar)", function()
     addon.isRetail = false
@@ -99,8 +99,24 @@ describe("BagSlots panel layout", function()
     assert.are.equal(PAD, c.points["BOTTOMRIGHT"].y)
   end)
 
+  it("centers the bags with symmetric padding on Camelot (headerless tooltip-bordered panel)", function()
+    addon.isRetail = true
+    addon.isForever = true
+    local panel = newPanel(120, 40)
+    panel:Draw(ctx:New("test"))
+
+    -- Camelot uses the headerless decoration, so it takes the same symmetric-padding
+    -- path as Classic (no phantom themed header), not the retail header-reserving path.
+    assert.are.equal(120 + PAD * 2, panel.frame.width)
+    assert.are.equal(40 + PAD * 2, panel.frame.height)
+    local c = panel._container
+    assert.are.equal(-PAD, c.points["TOPLEFT"].y)
+    assert.are.equal(PAD, c.points["BOTTOMRIGHT"].y)
+  end)
+
   it("keeps the retail themed-header layout unchanged", function()
     addon.isRetail = true
+    addon.isForever = false
     local panel = newPanel(120, 40)
     panel:Draw(ctx:New("test"))
 

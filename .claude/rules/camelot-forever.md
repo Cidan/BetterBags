@@ -120,7 +120,38 @@ false on Forever, populated + true on retail), `spec/database_migration_spec.lua
 Warbank group gating"), `spec/refresh_spec.lua` ("sort the bank but NOT the warbank on a client
 without one").
 
-## 5. Still pending (not yet done)
+## 5. Flat slots panels use a headerless tooltip decoration on Camelot
+
+The Default theme decorates flat windows (`themes:RegisterFlatWindow`) with
+`DefaultPanelFlatTemplate`. On Camelot that template renders **broken**: its `Bg` starts
+20px below the top (a reserved title strip), and its `ButtonFrameTemplateNoPortrait`
+NineSlice overhangs the top with tall metal header art that Camelot re-drew even taller
+(`Blizzard_SharedXML/Camelot/NineSliceLayoutOverrides.lua`) — Blizzard shipped a Camelot-only
+`NineSliceUtil.UpdateCornerCropping` just to survive it on short frames. On the short
+bag/bank **slots panels** this showed as an empty dark title-bar band + wrong border.
+
+Fix: on `addon.isForever`, both slots panels decorate with a **headerless
+`TooltipBorderedFrameTemplate`** child frame (dark, thin-bordered, carries its own
+background; cross-version-safe, verified on all five TOCs) instead of registering the themed
+flat window, and take the **symmetric-padding** layout path (no reserved header — never feed
+`GetFlatHeaderHeight`, which still returns Default's 30, into this path). This mirrors the
+Classic manual-backdrop fix in `classic-bag-slots-panel.md`; Camelot just uses the Blizzard
+tooltip template rather than a raw `SetBackdrop`.
+
+- `frames/bagslots.lua` — `CreatePanel` adds an `addon.isForever` branch (tooltip decoration)
+  ahead of the retail/Classic branches; `Draw` centering condition is `addon.isRetail and not
+  addon.isForever` so Camelot falls to the symmetric-padding branch.
+- `frames/bankslots.lua` — `CreatePanel` decorates with the tooltip template on Camelot else
+  registers the flat window; `Draw` uses a 12px symmetric `topInset` on Camelot.
+- Only the **slots panels** are converted. Other flat windows (`frames/searchcategory.lua`
+  config pane) still use the themed decoration; convert them the same way if they show the
+  band on Camelot.
+
+Coverage: `spec/frames/bagslots_spec.lua` ("centers the bags with symmetric padding on
+Camelot") and `spec/frames/bankslots_spec.lua` ("Camelot headerless decoration": bypasses the
+themed flat window on Camelot, still uses it on ordinary retail).
+
+## 6. Still pending (not yet done)
 
 - The three new `C_Bank` functions on Camelot (`ShouldUsePlayerBagsInBank`,
   `FetchMaxNumBankTabs`, `BankBagTypeAndIDToInvSlot`) are net-new integration points; none
