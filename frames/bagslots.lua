@@ -59,7 +59,7 @@ function BagSlots.bagSlotProto:Draw(ctx)
   local container = self.content:GetContainer()
   container:ClearAllPoints()
 
-  if addon.isRetail then
+  if addon.isRetail and not addon.isForever then
     -- Retail uses the themed flat window, which reserves a visual header band at
     -- the top of the panel; leave room for it and 12px at the bottom.
     self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
@@ -70,9 +70,9 @@ function BagSlots.bagSlotProto:Draw(ctx)
     container:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
     self.frame:SetHeight(h + topInset + 12)
   else
-    -- Classic/Era render a plain flat backdrop panel with no title-bar header, so
-    -- wrap the bag grid with equal padding on all sides to keep the bags centered
-    -- both horizontally and vertically.
+    -- Classic/Era (and Camelot) render a plain headerless backdrop panel with no
+    -- title-bar header, so wrap the bag grid with equal padding on all sides to
+    -- keep the bags centered both horizontally and vertically.
     self.frame:SetWidth(w + CLASSIC_PADDING * 2)
     self.frame:SetHeight(h + CLASSIC_PADDING * 2)
     container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", CLASSIC_PADDING, -CLASSIC_PADDING)
@@ -92,7 +92,10 @@ end
 function BagSlots.bagSlotProto:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
   self.frame:ClearAllPoints()
-  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", 0, -2)
+  -- Camelot's tooltip-bordered decoration has thicker border art than the main bag
+  -- window, so nudge the whole panel ~4px right to line it up cleanly with the window.
+  local leftNudge = addon.isForever and 4 or 0
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", leftNudge, -2)
 
   local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
   if parentBag and parentBag.tabs then
@@ -154,7 +157,18 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
   local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BackdropTemplate")
   b.frame = f
 
-  if addon.isRetail then
+  if addon.isForever then
+    -- Camelot (WoW: Forever): the Default theme's DefaultPanelFlatTemplate renders a
+    -- broken title-bar band and oversized metal header art on this client (its
+    -- ButtonFrameTemplateNoPortrait NineSlice overhangs the top; Blizzard even ships
+    -- a Camelot-only corner-crop workaround). Decorate with a headerless, dark,
+    -- tooltip-bordered frame instead of the themed flat window. Cross-version-safe
+    -- template, but only needed here. See camelot-forever.md.
+    local deco = CreateFrame("Frame", f:GetName().."Camelot", f, "TooltipBorderedFrameTemplate")
+    deco:SetAllPoints()
+    deco:SetBackdropColor(0, 0, 0, 0.9)
+    deco:SetBackdropBorderColor(1, 1, 1, 1)
+  elseif addon.isRetail then
     themes:RegisterFlatWindow(f, "")
   else
     -- On Classic/Era the Default theme's DefaultPanelFlatTemplate draws a title-bar

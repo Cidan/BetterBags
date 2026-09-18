@@ -8,6 +8,10 @@ LoadBetterBagsModule("core/events.lua")
 local events = addon:GetModule("Events")
 events:Init()
 
+-- Default the flavor flags to retail-with-warbank; individual tests override.
+addon.isRetail = true
+addon.hasWarbank = true
+
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 const.BANK_BAGS = { [6] = 6, [7] = 7 }
@@ -233,19 +237,33 @@ describe("Refresh Module", function()
     refresh:OnEnable()
     addon.atBank = true
     addon.isRetail = true
+    addon.hasWarbank = true
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/SortBackpack")
     assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true, sortWarbank = true })
+  end)
+
+  it("should sort the bank but NOT the warbank on a client without one (Forever)", function()
+    refresh:OnEnable()
+    addon.atBank = true
+    addon.isRetail = true
+    addon.hasWarbank = false
+    spy.on(refresh, "RequestUpdate")
+    events:SendMessage("bags/SortBackpack")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true })
+    addon.hasWarbank = true -- reset
   end)
 
   it("should also sort the bank (not warbank) when sorting the backpack with the bank open (classic)", function()
     refresh:OnEnable()
     addon.atBank = true
     addon.isRetail = false
+    addon.hasWarbank = false
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/SortBackpack")
     assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true })
     addon.isRetail = true -- reset
+    addon.hasWarbank = true -- reset
   end)
 
   it("should invoke C_Container.SortBags on Retail or SortBags on Classic when sorting", function()

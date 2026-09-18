@@ -11,11 +11,16 @@ The button registers `LeftButtonUp`/`RightButtonUp` and branches on the click ar
 - **Left-click** — shift = `BetterBags_ToggleSearch()`; cursor holds an item = create a
   category for it; otherwise open the context menu (`contextMenu:Show(bag.menuList)`).
 - **Right-click, backpack** — `bag:Sort(ctx)` → `bags/SortBackpack`.
-- **Right-click, bank (retail)** — **sort only** the active bank type: `bags/SortBank` when
-  the active tab is a Character-bank tab (`bag.bankTab <= Enum.BagIndex.CharacterBankTab_6`),
-  else `bags/SortWarbank`. No auto-deposit happens on a plain right-click.
-- **Shift + right-click, bank (retail)** — **deposit** eligible items into the Warbank
-  (`C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)`). No sort.
+- **Right-click, bank (retail *with* warbank — `addon.hasWarbank`)** — **sort only** the
+  active bank type: `bags/SortWarbank` when the active tab is a Warbank tab
+  (`const.ACCOUNT_BANK_BAGS[bag.bankTab]`), else `bags/SortBank`. No auto-deposit happens on a
+  plain right-click. (The membership test replaced the old `bag.bankTab <= CharacterBankTab_6`
+  bound, which misrouted character tabs 7-9 on 9-tab clients.)
+- **Shift + right-click, bank (retail with warbank)** — **deposit** eligible items into the
+  Warbank (`C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)`). No sort.
+- **Right-click, bank (retail *without* warbank — WoW: Forever, `addon.isRetail` and not
+  `addon.hasWarbank`)** — always `bags/SortBank`; there is no Warbank, so no shift-deposit and
+  no `bags/SortWarbank` branch. See camelot-forever.md §4.
 - **Right-click, bank (non-retail)** — falls through to `bag:Sort(ctx)` (bank `Sort` is a
   no-op via `ShouldHandleSort()==false`; classic bank sorting is handled elsewhere).
 
@@ -24,16 +29,16 @@ made a plain "sort" also shuffle items into the Warbank unexpectedly. Deposit an
 now split — plain right-click sorts, shift+right-click deposits.
 
 The hover tooltip (`bagButton` `OnEnter`, same file) must mirror the click map. The retail
-bank tooltip lists **Right Click → Sort Bank** and **Shift Right Click → Deposit Warbank
-Items** (it previously advertised right-click as "Deposit Warbank Items"/"Deposit Reagent
-Items", which no longer matches the handler). Keep these two in sync whenever the click
-branches change.
+bank tooltip lists **Right Click → Sort Bank** and, **only when `addon.hasWarbank`**, **Shift
+Right Click → Deposit Warbank Items** (on Forever the deposit line is omitted). Keep these in
+sync whenever the click branches change.
 
 ## 2. Sorting the backpack also sorts the open bank
 
 The `bags/SortBackpack` message handler (`data/refresh.lua`, `refresh:OnEnable`) builds
 `{ sort = true }` and, **when `addon.atBank` is true**, additionally sets `sortBank = true`
-(and `sortWarbank = true` on `addon.isRetail`). So a single right-click on the backpack
+(and `sortWarbank = true` on `addon.hasWarbank`, i.e. retail with a warbank — never on
+Forever). So a single right-click on the backpack
 button cleans up everything visible when the bank is open, restoring the classic "sort
 inventory also sorts the bank" behavior.
 

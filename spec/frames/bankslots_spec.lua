@@ -28,8 +28,13 @@ database.GetGroupsEnabled = function() return true end
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 1, BANK = 2 }
 const.BACKPACK_ONLY_BAGS_LIST = { 1, 2, 3, 4 }
-const.BANK_ONLY_BAGS_LIST = { 5, 6, 7, 8 }
-const.BANK_ONLY_BAGS = { [5]=5, [6]=6, [7]=7, [8]=8 }
+-- Character bank tabs (CharacterBankTab_1..6) and account bank tabs
+-- (AccountBankTab_1..5) in tab-index order, matching the stubbed Enum.BagIndex
+-- below. The bank tab slots panel builds its buttons from these lists.
+const.BANK_ONLY_BAGS_LIST = { 10, 11, 12, 13, 14, 15 }
+const.BANK_ONLY_BAGS = { [10]=10, [11]=11, [12]=12, [13]=13, [14]=14, [15]=15 }
+const.ACCOUNT_BANK_BAGS_LIST = { 16, 17, 18, 19, 20 }
+const.ACCOUNT_BANK_BAGS = { [16]=16, [17]=17, [18]=18, [19]=19, [20]=20 }
 const.BAG_VIEW = { SECTION_GRID = 1, SECTION_ALL_BAGS = 2 }
 const.OFFSETS = {
   BAG_LEFT_INSET = 10,
@@ -351,6 +356,62 @@ describe("Bank Bag/Slot Window Pane Tests", function()
     end)
   end)
 
+  describe("8. Dynamic tab count derived from Constants (Camelot 9+9)", function()
+    local savedCharList, savedAcctList
+
+    before_each(function()
+      savedCharList = const.BANK_ONLY_BAGS_LIST
+      savedAcctList = const.ACCOUNT_BANK_BAGS_LIST
+    end)
+
+    after_each(function()
+      const.BANK_ONLY_BAGS_LIST = savedCharList
+      const.ACCOUNT_BANK_BAGS_LIST = savedAcctList
+    end)
+
+    it("builds one slot button per character + account tab (retail 6+5)", function()
+      addon.isRetail = true
+      local bagFrame = CreateFrame("Frame")
+      local bankSlots = addon:GetModule("BankSlots")
+      local panel = bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+
+      assert.are.equal(11, #panel.buttons)
+      assert.are.equal(11, panel.content.maxCellWidth)
+      -- First six are Character tabs, remaining five are Account tabs.
+      for i = 1, 6 do
+        assert.are.equal(Enum.BankType.Character, panel.buttons[i].bankType)
+      end
+      for i = 7, 11 do
+        assert.are.equal(Enum.BankType.Account, panel.buttons[i].bankType)
+      end
+      -- Button bag indices match the constant lists in order.
+      assert.are.equal(const.BANK_ONLY_BAGS_LIST[1], panel.buttons[1].bagIndex)
+      assert.are.equal(const.ACCOUNT_BANK_BAGS_LIST[1], panel.buttons[7].bagIndex)
+    end)
+
+    it("expands to 18 slot buttons when the client exposes 9+9 tabs", function()
+      addon.isRetail = true
+      -- Simulate Camelot: 9 character tabs + 9 account tabs.
+      const.BANK_ONLY_BAGS_LIST = { 10, 11, 12, 13, 14, 15, 21, 22, 23 }
+      const.ACCOUNT_BANK_BAGS_LIST = { 16, 17, 18, 19, 20, 24, 25, 26, 27 }
+
+      local bagFrame = CreateFrame("Frame")
+      local bankSlots = addon:GetModule("BankSlots")
+      local panel = bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+
+      assert.are.equal(18, #panel.buttons)
+      assert.are.equal(18, panel.content.maxCellWidth)
+      for i = 1, 9 do
+        assert.are.equal(Enum.BankType.Character, panel.buttons[i].bankType)
+      end
+      for i = 10, 18 do
+        assert.are.equal(Enum.BankType.Account, panel.buttons[i].bankType)
+      end
+      assert.are.equal(23, panel.buttons[9].bagIndex)
+      assert.are.equal(27, panel.buttons[18].bagIndex)
+    end)
+  end)
+
   describe("7. Restore Group Tabs even if tabsWereShown was false (Bugfix)", function()
     it("should restore group tabs on close if groups are enabled, even if tabsWereShown is false", function()
       addon.isRetail = true
@@ -376,6 +437,45 @@ describe("Bank Bag/Slot Window Pane Tests", function()
 
       panel:OnClose(ctx:New("test"))
       assert.is_true(tabsShown, "group tabs should have been shown on close because groups are enabled")
+    end)
+  end)
+
+  describe("9. Camelot headerless decoration", function()
+    local savedIsForever, savedRegister
+    before_each(function()
+      savedIsForever = addon.isForever
+      savedRegister = themes.RegisterFlatWindow
+    end)
+    after_each(function()
+      addon.isForever = savedIsForever
+      themes.RegisterFlatWindow = savedRegister
+    end)
+
+    it("does not use the themed flat window on Camelot (uses a headerless decoration)", function()
+      addon.isRetail = true
+      addon.isForever = true
+      local registered = false
+      themes.RegisterFlatWindow = function() registered = true end
+
+      local bagFrame = CreateFrame("Frame")
+      local bankSlots = addon:GetModule("BankSlots")
+      local panel = bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+
+      assert.is_not_nil(panel)
+      assert.is_false(registered, "Camelot must not register the broken themed flat window")
+    end)
+
+    it("still uses the themed flat window on ordinary retail", function()
+      addon.isRetail = true
+      addon.isForever = false
+      local registered = false
+      themes.RegisterFlatWindow = function() registered = true end
+
+      local bagFrame = CreateFrame("Frame")
+      local bankSlots = addon:GetModule("BankSlots")
+      bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+
+      assert.is_true(registered)
     end)
   end)
 end)

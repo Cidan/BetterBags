@@ -138,4 +138,159 @@ describe("Constants Module Offsets", function()
     assert.is_not_nil(const.OFFSETS)
     assert.are.equal(14, const.OFFSETS.SCROLLBAR_WIDTH)
   end)
+
+  describe("dynamic bank tab sizing", function()
+    local addedKeys
+
+    local function countKeys(t)
+      local n = 0
+      for _ in pairs(t) do n = n + 1 end
+      return n
+    end
+
+    before_each(function()
+      addon.modules["Constants"] = nil
+      local aceAddon = LibStub("AceAddon-3.0")
+      if aceAddon.addons["BetterBags_Constants"] then
+        aceAddon.addons["BetterBags_Constants"] = nil
+      end
+      addedKeys = {}
+    end)
+
+    after_each(function()
+      -- Remove any bank tab enum members added by a test so the default 6+5
+      -- retail shape is restored for other specs.
+      for _, key in ipairs(addedKeys) do
+        _G.Enum.BagIndex[key] = nil
+      end
+    end)
+
+    it("yields the 6+5 retail shape from a live-retail enum", function()
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.are.equal(6, #const.BANK_ONLY_BAGS_LIST)
+      assert.are.equal(6, countKeys(const.BANK_ONLY_BAGS))
+      -- BANK_BAGS also carries the main Characterbanktab container (6 tabs + 1).
+      assert.are.equal(7, countKeys(const.BANK_BAGS))
+      assert.are.equal(5, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(5, #const.ACCOUNT_BANK_BAGS_LIST)
+      -- Tabs beyond the retail cap must not be present.
+      assert.is_nil(const.BANK_ONLY_BAGS[Enum.BagIndex.CharacterBankTab_6 + 1])
+    end)
+
+    it("expands to 9+9 when the enum exposes Camelot's extra tabs", function()
+      -- Simulate WoW: Forever (Camelot), which adds CharacterBankTab_7..9 and
+      -- AccountBankTab_6..9 to Enum.BagIndex.
+      local charBase = Enum.BagIndex.CharacterBankTab_6
+      for i = 7, 9 do
+        local key = "CharacterBankTab_" .. i
+        _G.Enum.BagIndex[key] = charBase + (i - 6)
+        table.insert(addedKeys, key)
+      end
+      local acctBase = Enum.BagIndex.AccountBankTab_5
+      for i = 6, 9 do
+        local key = "AccountBankTab_" .. i
+        _G.Enum.BagIndex[key] = acctBase + (i - 5)
+        table.insert(addedKeys, key)
+      end
+
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+
+      assert.are.equal(9, #const.BANK_ONLY_BAGS_LIST)
+      assert.are.equal(9, countKeys(const.BANK_ONLY_BAGS))
+      assert.are.equal(10, countKeys(const.BANK_BAGS))
+      assert.are.equal(9, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(9, #const.ACCOUNT_BANK_BAGS_LIST)
+
+      -- The new tabs resolve to their enum values in every derived table.
+      assert.are.equal(Enum.BagIndex.CharacterBankTab_9, const.BANK_ONLY_BAGS[Enum.BagIndex.CharacterBankTab_9])
+      assert.are.equal(Enum.BagIndex.CharacterBankTab_9, const.BANK_BAGS[Enum.BagIndex.CharacterBankTab_9])
+      assert.are.equal(Enum.BagIndex.AccountBankTab_9, const.ACCOUNT_BANK_BAGS[Enum.BagIndex.AccountBankTab_9])
+      assert.are.equal(Enum.BagIndex.AccountBankTab_9, const.ACCOUNT_BANK_BAGS_LIST[9])
+
+      -- BANK_TAB covers every character and account tab plus the aliases.
+      assert.are.equal(Enum.BagIndex.CharacterBankTab_9, const.BANK_TAB[Enum.BagIndex.CharacterBankTab_9])
+      assert.are.equal(Enum.BagIndex.AccountBankTab_9, const.BANK_TAB[Enum.BagIndex.AccountBankTab_9])
+      assert.are.equal(Enum.BagIndex.Characterbanktab, const.BANK_TAB.BANK)
+      assert.are.equal(Enum.BagIndex.AccountBankTab_1, const.BANK_TAB.ACCOUNT_BANK_1)
+    end)
+
+    it("preserves BANK_ONLY_BAGS_LIST ordering by tab index", function()
+      for i = 7, 9 do
+        local key = "CharacterBankTab_" .. i
+        _G.Enum.BagIndex[key] = Enum.BagIndex.CharacterBankTab_6 + (i - 6)
+        table.insert(addedKeys, key)
+      end
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      for i = 1, 9 do
+        assert.are.equal(Enum.BagIndex["CharacterBankTab_" .. i], const.BANK_ONLY_BAGS_LIST[i])
+      end
+    end)
+  end)
+
+  describe("addon.isForever normalization", function()
+    local savedIsForever
+    before_each(function() savedIsForever = addon.isForever end)
+    after_each(function() addon.isForever = savedIsForever end)
+
+    it("normalizes an unset flag to false (retail/classic are never Forever)", function()
+      addon.isForever = nil
+      loadfile("core/constants.lua")("BetterBags")
+      assert.is_false(addon.isForever)
+    end)
+
+    it("preserves the flag set by core/forever.lua (Camelot stays Forever)", function()
+      addon.isForever = true
+      loadfile("core/constants.lua")("BetterBags")
+      assert.is_true(addon.isForever)
+    end)
+  end)
+
+  describe("warbank availability (no warbank on Forever)", function()
+    local savedIsForever, savedHasWarbank
+
+    local function countKeys(t)
+      local n = 0
+      for _ in pairs(t) do n = n + 1 end
+      return n
+    end
+
+    before_each(function()
+      savedIsForever = addon.isForever
+      savedHasWarbank = addon.hasWarbank
+      addon.modules["Constants"] = nil
+      local aceAddon = LibStub("AceAddon-3.0")
+      if aceAddon.addons["BetterBags_Constants"] then
+        aceAddon.addons["BetterBags_Constants"] = nil
+      end
+    end)
+
+    after_each(function()
+      addon.isForever = savedIsForever
+      addon.hasWarbank = savedHasWarbank
+    end)
+
+    it("populates account bank tables and sets hasWarbank on live retail", function()
+      addon.isForever = nil
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.is_true(addon.hasWarbank)
+      assert.are.equal(5, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(5, #const.ACCOUNT_BANK_BAGS_LIST)
+    end)
+
+    it("leaves account bank tables empty and clears hasWarbank on Forever", function()
+      addon.isForever = true
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.is_false(addon.hasWarbank)
+      -- Account tables exist but are empty, so every table-driven warbank site is inert.
+      assert.are.equal(0, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(0, #const.ACCOUNT_BANK_BAGS_LIST)
+      -- Character bank tabs are unaffected.
+      assert.are.equal(6, #const.BANK_ONLY_BAGS_LIST)
+    end)
+  end)
 end)

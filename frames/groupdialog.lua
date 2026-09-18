@@ -82,7 +82,7 @@ function groupDialog:Initialize()
 		end
 		UIDropDownMenu_AddButton(info)
 
-		if addon.isRetail then
+		if addon.hasWarbank then
 			local info2 = UIDropDownMenu_CreateInfo()
 			info2.text = L:G("Warbank")
 			info2.func = function()

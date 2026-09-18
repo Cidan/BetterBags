@@ -153,8 +153,15 @@ function BankSlots.bankSlotsPanelProto:Draw(ctx)
   })
   self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
 
-  local headerHeight = themes:GetFlatHeaderHeight(self.frame)
-  local topInset = headerHeight > 0 and headerHeight or 12
+  -- Camelot uses a headerless tooltip-bordered decoration, so reserve no header
+  -- band (symmetric 12px padding); other retail themes reserve their flat header.
+  local topInset
+  if addon.isForever then
+    topInset = 12
+  else
+    local headerHeight = themes:GetFlatHeaderHeight(self.frame)
+    topInset = headerHeight > 0 and headerHeight or 12
+  end
 
   self.content:GetContainer():ClearAllPoints()
   self.content:GetContainer():SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -topInset)
@@ -410,9 +417,20 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.frame = f
   b.bagFrame = bagFrame
 
-  -- Register with an empty title so no title text is rendered in the window
-  -- decoration across any theme. The panel has no title bar text by design.
-  themes:RegisterFlatWindow(f, "")
+  if addon.isForever then
+    -- Camelot (WoW: Forever): DefaultPanelFlatTemplate renders a broken title-bar
+    -- band and oversized metal header on this client, so decorate with a headerless,
+    -- dark, tooltip-bordered frame instead of the themed flat window. See
+    -- camelot-forever.md and the matching bagslots.lua branch.
+    local deco = CreateFrame("Frame", f:GetName().."Camelot", f, "TooltipBorderedFrameTemplate")
+    deco:SetAllPoints()
+    deco:SetBackdropColor(0, 0, 0, 0.9)
+    deco:SetBackdropBorderColor(1, 1, 1, 1)
+  else
+    -- Register with an empty title so no title text is rendered in the window
+    -- decoration across any theme. The panel has no title bar text by design.
+    themes:RegisterFlatWindow(f, "")
+  end
 
   b.content = grid:Create(b.frame)
   -- Use the same inset on top and bottom so the slot icons are vertically
@@ -420,8 +438,6 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   -- this panel has no title, so we match the 12 px bottom gap.
   b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -12)
   b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
-  -- Allow all 11 slots on one row
-  b.content.maxCellWidth = 11
   b.content:HideScrollBar()
   -- Bank tab slots grid is not scrollable; disable mouse wheel so scroll
   -- events pass through to the outer scrollable bag container.
@@ -432,22 +448,21 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   b.selectedBagIndex = nil
   b.tabsWereShown = false
 
-  -- All possible bank tab slots in order:
-  --   6 character bank tabs (CharacterBankTab_1 through _6)
-  --   5 account/warbank tabs (AccountBankTab_1 through _5)
-  local allTabSlots = {
-    {bagIndex = Enum.BagIndex.CharacterBankTab_1, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_2, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_3, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_4, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_5, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.CharacterBankTab_6, bankType = Enum.BankType.Character},
-    {bagIndex = Enum.BagIndex.AccountBankTab_1, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_2, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_3, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_4, bankType = Enum.BankType.Account},
-    {bagIndex = Enum.BagIndex.AccountBankTab_5, bankType = Enum.BankType.Account},
-  }
+  -- All possible bank tab slots in order: every character bank tab followed by
+  -- every account/warbank tab. Derived from the Constants tables (built by probing
+  -- Enum.BagIndex) rather than a fixed list, so the panel renders the right number
+  -- of slots on any client: 6 + 5 on live retail, 9 + 9 on WoW: Forever (Camelot),
+  -- and any future count without code changes. See core/constants.lua and
+  -- .claude/rules/camelot-forever.md.
+  local allTabSlots = {}
+  for _, bagIndex in ipairs(const.BANK_ONLY_BAGS_LIST) do
+    allTabSlots[#allTabSlots + 1] = {bagIndex = bagIndex, bankType = Enum.BankType.Character}
+  end
+  for _, bagIndex in ipairs(const.ACCOUNT_BANK_BAGS_LIST) do
+    allTabSlots[#allTabSlots + 1] = {bagIndex = bagIndex, bankType = Enum.BankType.Account}
+  end
+  -- Keep every slot on a single row.
+  b.content.maxCellWidth = #allTabSlots
 
   for i, slotInfo in ipairs(allTabSlots) do
     ---@type BankSlotButton

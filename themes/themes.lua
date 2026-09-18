@@ -493,7 +493,9 @@ function themes.SetupBagButton(bag, decoration)
       GameTooltip:AddDoubleLine(L:G("Shift Left Click"), L:G("Search Bags"), 1, 0.81, 0, 1, 1, 1)
       if addon.isRetail then
         GameTooltip:AddDoubleLine(L:G("Right Click"), L:G("Sort Bank"), 1, 0.81, 0, 1, 1, 1)
-        GameTooltip:AddDoubleLine(L:G("Shift Right Click"), L:G("Deposit Warbank Items"), 1, 0.81, 0, 1, 1, 1)
+        if addon.hasWarbank then
+          GameTooltip:AddDoubleLine(L:G("Shift Right Click"), L:G("Deposit Warbank Items"), 1, 0.81, 0, 1, 1, 1)
+        end
       end
     end
 
@@ -535,14 +537,20 @@ function themes.SetupBagButton(bag, decoration)
       end
     elseif e == "RightButton" then
       if bag.kind == const.BAG_KIND.BANK and addon.isRetail then
-        if IsShiftKeyDown() then
-          -- Shift + right-click deposits eligible items into the Warbank.
-          C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
-        elseif bag.bankTab <= Enum.BagIndex.CharacterBankTab_6 then
-          -- Right-click sorts the active bank type only (no auto-deposit).
-          events:SendMessage(ctx, "bags/SortBank")
+        if addon.hasWarbank then
+          if IsShiftKeyDown() then
+            -- Shift + right-click deposits eligible items into the Warbank.
+            C_Bank.AutoDepositItemsIntoBank(Enum.BankType.Account)
+          elseif const.ACCOUNT_BANK_BAGS and const.ACCOUNT_BANK_BAGS[bag.bankTab] then
+            -- Active tab is a Warbank tab: sort the Warbank.
+            events:SendMessage(ctx, "bags/SortWarbank")
+          else
+            -- Right-click sorts the active (character) bank only (no auto-deposit).
+            events:SendMessage(ctx, "bags/SortBank")
+          end
         else
-          events:SendMessage(ctx, "bags/SortWarbank")
+          -- No warbank (WoW: Forever): right-click always sorts the character bank.
+          events:SendMessage(ctx, "bags/SortBank")
         end
       else
         bag:Sort(ctx)
