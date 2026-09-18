@@ -20,7 +20,9 @@ local S
 
 if ElvUI then
   E = unpack(ElvUI --[[@as ElvUI]]) --[[@as ElvUI]]
-  S = E:GetModule('Skins')
+  if E then
+    S = E:GetModule('Skins')
+  end
 end
 
 ---@class SearchBox: AceModule
