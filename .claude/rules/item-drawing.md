@@ -112,10 +112,9 @@ centered, semi-transparent glyph so the slot's restriction is visible at a glanc
   `const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`. The map is empty by default (every specialized bag shares
   the default glyph); it exists so distinct per-family icons are a one-line data addition later.
 - **Values are texture ATLAS names, not file paths** (drawn via `Texture:SetAtlas`). The default is
-  `"Mobile-Herbalism"` (a 128×128 atlas, sized down in the draw layer). **Cross-version caveat:**
-  `Mobile-*` atlases are retail-only, so on Classic the default may render blank — add a Classic-safe
-  atlas/override if that matters. (The earlier `Interface\PaperDoll\UI-PaperDoll-Slot-Bag` file path
-  was replaced by the atlas at the user's request.)
+  `"Mobile-Herbalism"` (a 128×128 atlas, sized down in the draw layer), confirmed present on both
+  retail and classic clients. (The earlier `Interface\PaperDoll\UI-PaperDoll-Slot-Bag` file path was
+  replaced by the atlas at the user's request.)
 - **Threading (data phase).** `Phase5_UpdateFreeSlots` captures the family into
   `emptySlotsByBag[bagid].family`. `Phase6_EnrichData` (now taking `emptySlotsByBag`) resolves and
   stores the ready atlas name on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one field

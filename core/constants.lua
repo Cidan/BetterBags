@@ -260,8 +260,8 @@ const.ITEM_BAG_FAMILY = {
 -- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the small glyph drawn, centered and semi-transparent,
 -- in the empty slots of any specialized (non-zero bag family) bag: reagent bags, quivers,
 -- soul/herb/enchanting bags, etc. Values in this system are texture ATLAS names (drawn via
--- Texture:SetAtlas), not file paths. NOTE: "Mobile-*" atlases are retail-only, so on Classic
--- this glyph may not render; add a Classic-safe atlas/override if that becomes a problem.
+-- Texture:SetAtlas), not file paths. Mobile-Herbalism is present on both retail and classic
+-- clients, so it is a safe cross-version default.
 const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "Mobile-Herbalism"
 
 -- On retail the dedicated Reagent Bag (bag id 5) is identified by id, not by a bag-family bit
