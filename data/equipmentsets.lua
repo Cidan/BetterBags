@@ -19,11 +19,15 @@ function equipmentSets:Update()
   if addon.isClassic then return end
   if addon.isAnniversary then return end
 
-  -- Use different implementation for Midnight vs War Within
-  if addon.isMidnight then
-    return self:UpdateMidnight()
-  else
+  -- Route by which EquipmentManager API the client actually provides, not by TOC
+  -- version. Midnight (12.0+) removed EquipmentManager_UnpackLocation in favor of
+  -- EquipmentManager_GetLocationData; WoW: Forever (a mainline retail fork) also ships
+  -- only GetLocationData but reports a sub-12.0 TOC, so a version gate (addon.isMidnight)
+  -- misrouted it to the UnpackLocation path and crashed with "attempt to call a nil value".
+  if EquipmentManager_UnpackLocation ~= nil then
     return self:UpdatePreMidnight()
+  else
+    return self:UpdateMidnight()
   end
 end
 

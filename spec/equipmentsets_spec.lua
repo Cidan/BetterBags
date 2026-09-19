@@ -36,7 +36,7 @@ describe("EquipmentSets", function()
     equipmentSets:Init()
   end)
 
-  -- ─── Update (version gating) ──────────────────────────────────────────────────
+  -- ─── Update (API feature detection) ───────────────────────────────────────────
 
   describe("Update", function()
 
@@ -52,13 +52,23 @@ describe("EquipmentSets", function()
       equipmentSets:Update()
     end)
 
-    it("calls UpdatePreMidnight when not midnight", function()
-      addon.isMidnight = false
+    it("uses the UnpackLocation path when that API exists", function()
+      _G.C_EquipmentSet.GetEquipmentSetIDs = function() return {1} end
+      _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) return "Set" .. id end
+      _G.C_EquipmentSet.GetItemLocations = function(id) return {"loc-" .. id} end
+      _G.EquipmentManager_UnpackLocation = function()
+        return 0, false, true, false, 1, 0
+      end
+      -- GetLocationData present too, but UnpackLocation must win where available.
+      _G.EquipmentManager_GetLocationData = function()
+        error("should not be called when UnpackLocation exists")
+      end
       equipmentSets:Update()
+      assert.are.same({"Set1"}, equipmentSets:GetItemSets(0, 1))
     end)
 
-    it("calls UpdateMidnight when on midnight", function()
-      addon.isMidnight = true
+    it("uses the GetLocationData path when UnpackLocation is absent (Midnight)", function()
+      _G.EquipmentManager_UnpackLocation = nil
       _G.C_EquipmentSet.GetEquipmentSetIDs = function() return {1} end
       _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) return "Set" .. id end
       _G.C_EquipmentSet.GetItemLocations = function(id) return {"loc-" .. id} end
@@ -66,9 +76,25 @@ describe("EquipmentSets", function()
         return { isBank = false, isBags = true, slot = 1, bag = 0 }
       end
       equipmentSets:Update()
-      local result = equipmentSets:GetItemSets(0, 1)
-      assert.is_not_nil(result)
-      assert.are.same({"Set1"}, result)
+      assert.are.same({"Set1"}, equipmentSets:GetItemSets(0, 1))
+    end)
+
+    -- Regression: WoW: Forever (Camelot) is a mainline retail fork that ships the
+    -- Midnight EquipmentManager (only GetLocationData; no UnpackLocation) but reports
+    -- a sub-12.0 TOC, so addon.isMidnight is false. The old version gate routed it to
+    -- the UnpackLocation path and crashed with "attempt to call a nil value".
+    it("does not crash on Forever (retail, non-midnight, no UnpackLocation)", function()
+      addon.isRetail = true
+      addon.isMidnight = false
+      _G.EquipmentManager_UnpackLocation = nil
+      _G.C_EquipmentSet.GetEquipmentSetIDs = function() return {1} end
+      _G.C_EquipmentSet.GetEquipmentSetInfo = function(id) return "Forever Set" .. id end
+      _G.C_EquipmentSet.GetItemLocations = function(id) return {"loc-" .. id} end
+      _G.EquipmentManager_GetLocationData = function()
+        return { isBank = false, isBags = true, slot = 4, bag = 2 }
+      end
+      assert.has_no.errors(function() equipmentSets:Update() end)
+      assert.are.same({"Forever Set1"}, equipmentSets:GetItemSets(2, 4))
     end)
   end)
 
