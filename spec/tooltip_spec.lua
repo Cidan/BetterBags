@@ -12,6 +12,33 @@ addon.isRetail = true
 -- Mock WorldFrame for Classic path
 _G.WorldFrame = {}
 
+-- data/tooltip.lua resolves Events + Context at file scope and, on retail, registers
+-- a TOOLTIP_DATA_UPDATE bucket during Init. Reuse the real modules if they already
+-- exist; only load them (which marks them loaded so later specs don't double-register)
+-- when absent. Then override the two Events methods we need to observe, restoring them
+-- on teardown so nothing leaks into specs that run after this file.
+local context = addon:GetModule("Context", true)
+if not context then
+  LoadBetterBagsModule("core/context.lua")
+  context = addon:GetModule("Context")
+end
+if not context.New then
+  context.New = function(_, name) return { _name = name, Event = name } end
+end
+
+local events = addon:GetModule("Events", true)
+if not events then
+  LoadBetterBagsModule("core/events.lua")
+  events = addon:GetModule("Events")
+end
+local origBucketEvent, origSendMessage = events.BucketEvent, events.SendMessage
+local capturedBucket
+local sentMessages = {}
+events.BucketEvent = function(_, event, cb)
+  if event == "TOOLTIP_DATA_UPDATE" then capturedBucket = cb end
+end
+events.SendMessage = function(_, _, msg) table.insert(sentMessages, msg) end
+
 ResetModuleStub("TooltipScanner", "data/tooltip.lua")
 LoadBetterBagsModule("data/tooltip.lua")
 local tooltipScanner = addon:GetModule("TooltipScanner")
@@ -26,6 +53,11 @@ describe("TooltipScanner", function()
 
   after_each(function()
     _G.C_TooltipInfo = oldCTooltipInfo
+  end)
+
+  teardown(function()
+    events.BucketEvent = origBucketEvent
+    events.SendMessage = origSendMessage
   end)
 
   -- ─── Cache ──────────────────────────────────────────────────────────────────
@@ -203,6 +235,98 @@ describe("TooltipScanner", function()
       }
       tooltipScanner:GetTooltipText(0, 1, "guid-empty")
       assert.is_nil(tooltipScanner.cache["guid-empty"])
+    end)
+  end)
+
+  -- ─── TOOLTIP_DATA_UPDATE resolution (retail sparse tooltips) ────────────────
+
+  describe("TOOLTIP_DATA_UPDATE resolution", function()
+    before_each(function()
+      for i = #sentMessages, 1, -1 do sentMessages[i] = nil end
+      addon.atBank = false
+      -- Cold scan: a sparse tooltip (name only, no "Use:" line) carrying instance 555.
+      _G.C_TooltipInfo = {
+        GetBagItem = function()
+          return { dataInstanceID = 555, lines = {{ leftText = "Minor Healing Potion" }} }
+        end,
+      }
+    end)
+
+    it("records a dataInstanceID -> GUID mapping when scanning a retail tooltip", function()
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      assert.are.equal("guid-potion", tooltipScanner.instanceToGUID[555])
+      assert.are.equal(555, tooltipScanner.guidToInstance["guid-potion"])
+    end)
+
+    it("invalidates the cached tooltip and re-harvests when its instance resolves", function()
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      assert.are.equal("Minor Healing Potion", tooltipScanner.cache["guid-potion"])
+      assert.is_function(capturedBucket)
+
+      -- Debounced TOOLTIP_DATA_UPDATE batch resolving instance 555.
+      capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 555 } } })
+
+      assert.is_nil(tooltipScanner.cache["guid-potion"], "stale cache entry must be dropped")
+      assert.is_nil(tooltipScanner.instanceToGUID[555])
+      assert.is_nil(tooltipScanner.guidToInstance["guid-potion"])
+      assert.are.same({ "bags/RefreshBackpack" }, sentMessages)
+    end)
+
+    it("re-scans warm on the next lookup after invalidation", function()
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 555 } } })
+      -- The spell line has now loaded; the next scan must pick up the full text.
+      _G.C_TooltipInfo.GetBagItem = function()
+        return { dataInstanceID = 555, lines = {
+          { leftText = "Minor Healing Potion" },
+          { leftText = "Use: Restores 70 to 90 health." },
+        } }
+      end
+      local text = tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      assert.is_truthy(text:find("health"))
+      assert.is_truthy(tooltipScanner.cache["guid-potion"]:find("health"))
+    end)
+
+    it("ignores updates for unknown or nil dataInstanceIDs (no invalidation, no refresh)", function()
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      capturedBucket(context:New("t"), {
+        { eventName = "TOOLTIP_DATA_UPDATE", args = { 999 } }, -- unknown instance
+        { eventName = "TOOLTIP_DATA_UPDATE", args = { } },     -- nil dataInstanceID
+      })
+      assert.are.equal("Minor Healing Potion", tooltipScanner.cache["guid-potion"])
+      assert.are.equal(0, #sentMessages)
+    end)
+
+    it("re-harvests the bank too, but only when at the bank", function()
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      addon.atBank = true
+      capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 555 } } })
+      assert.are.same({ "bags/RefreshBackpack", "bags/RefreshBank" }, sentMessages)
+    end)
+
+    it("keeps the instance maps 1:1 with the cache when re-scanned under a new instance", function()
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      assert.are.equal("guid-potion", tooltipScanner.instanceToGUID[555])
+      -- A later scan of the same GUID reports a different instance id; the old
+      -- reverse mapping must not linger.
+      tooltipScanner.cache["guid-potion"] = nil
+      _G.C_TooltipInfo.GetBagItem = function()
+        return { dataInstanceID = 777, lines = {{ leftText = "Minor Healing Potion" }} }
+      end
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      assert.is_nil(tooltipScanner.instanceToGUID[555], "old instance mapping must be dropped")
+      assert.are.equal("guid-potion", tooltipScanner.instanceToGUID[777])
+      assert.are.equal(777, tooltipScanner.guidToInstance["guid-potion"])
+    end)
+
+    it("does not register the bucket again on repeated Init (no handler leak)", function()
+      local count = 0
+      local saved = events.BucketEvent
+      events.BucketEvent = function(_, event) if event == "TOOLTIP_DATA_UPDATE" then count = count + 1 end end
+      tooltipScanner:Init()
+      tooltipScanner:Init()
+      events.BucketEvent = saved
+      assert.are.equal(0, count, "already hooked; further Inits must not re-register")
     end)
   end)
 
