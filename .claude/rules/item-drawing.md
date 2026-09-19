@@ -85,3 +85,41 @@ Active search query evaluation is performed upstream during the data sweep phase
 ### 10. Zero Database Mutation in Views
 The view rendering layer (`views/views.lua`) is strictly read-only and presentation-driven.
 - **Rule:** Methods like `GetOrCreateSection` must never mutate database state or call `categories:CreateCategory`. All dynamic category creation and search-group resolution must occur upstream in the data sweep phase before `slotInfo` is dispatched to views.
+
+### 11. Empty-Slot Family Glyph (Specialized Bags, All Clients)
+Empty slots that belong to a **specialized** bag — one with a non-zero *bag family* (reagent
+bags on retail; quivers, ammo pouches, soul/herb/enchanting/… bags on classic) — draw a small,
+centered, semi-transparent glyph so the slot's restriction is visible at a glance. Generic bags
+(family `0`) draw nothing.
+- **Detection is by bag family, not bag id.** `C_Container.GetContainerNumFreeSlots(bagID)`
+  returns `numFreeSlots, bagFamily` (verified in the API docs; `bagFamily` is `Nilable`). The
+  family bit values are the keys of `const.ITEM_BAG_FAMILY`. This is the single cross-version
+  discriminator — retail's dedicated Reagent Bag (bag id 5) and every classic profession bag are
+  all just non-zero families, so no per-client / `addon.isRetail` branch is needed.
+- **Resolution is data-phase, per the Pure Presentation Principle (§1) — the draw layer never
+  resolves it.** `items:GetEmptySlotFamilyIcon(family)` (`data/items.lua`) maps a family bit to a
+  texture: `nil` for family `0`/`nil` (no glyph), an explicit `const.EMPTY_SLOT_FAMILY_ICON[family]`
+  override if present, else the shared `const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`. The map is empty by
+  default (every specialized bag shares the default glyph); it exists so distinct per-family icons
+  are a one-line data addition later.
+- **The default glyph is `Interface\PaperDoll\UI-PaperDoll-Slot-Bag`** — a stock PaperDoll asset
+  present on every client (retail and classic; already used on the non-retail path in
+  `frames/bagbutton.lua`). Do **not** use the retail-only `bags-icon-*` atlases for the default;
+  they are absent on classic.
+- **Threading (data phase).** `Phase5_UpdateFreeSlots` captures the family into
+  `emptySlotsByBag[bagid].family`. `Phase6_EnrichData` (now taking `emptySlotsByBag`) resolves and
+  stores the ready texture string on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one
+  field reaches **all three** empty-slot render paths: the individual free-space buttons (reuse the
+  harvested `itemInfo`), the aggregated/combined free-space button (reuses the harvested `itemInfo`,
+  with a `familyForSubclass` fallback in `Phase10_PartitionIntoTabs` for the no-`originalItem`
+  case), and the in-place empty slots of the Show-Bags view.
+- **Draw (`frames/item.lua`).** `SetFreeSlots` reads `data.itemInfo.emptySlotFamilyIcon` and, when
+  set, shows a lazily-created `OVERLAY` texture on the **themed decoration** (`decoration.BetterBagsFamilyIcon`
+  via `getFamilyIconTexture`) — 20×20, centered, `0.8` alpha — else hides it. The overlay lives on
+  the **decoration** (the visual layer), not `self.button` (the interaction layer), and in the
+  `OVERLAY` layer so it sits above the empty-slot art. It is hidden in `SetItemFromData` (any real
+  item drawn into the slot) and `ClearItem`. No `items:`/database call happens at draw time.
+- **Coverage:** `spec/items_spec.lua` ("Empty slot family icons (specialized bags)": resolver
+  semantics, `Phase5` family capture, `Phase6` icon resolution incl. the generic-bag nil case) and
+  `spec/frames/item_spec.lua` ("Empty slot family icon overlay": shown on specialized slots, hidden
+  on generic slots and when the slot is redrawn as an item).

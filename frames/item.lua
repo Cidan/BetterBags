@@ -98,6 +98,29 @@ local function bagKindFromBagID(bagid)
 	return const.BAG_KIND.BACKPACK
 end
 
+-- Size of the small family-bag glyph drawn in the center of a specialized empty slot,
+-- well under the 37x37 slot so it reads as an icon and not a slot background.
+local FAMILY_ICON_SIZE = 20
+-- The glyph is drawn at reduced opacity so it hints at the bag type without dominating the slot.
+local FAMILY_ICON_ALPHA = 0.8
+
+-- getFamilyIconTexture lazily creates (and returns) the centered family-bag glyph on a themed
+-- item-button decoration. It lives in the OVERLAY layer so it sits above the empty-slot art,
+-- and is stored on the decoration itself so it survives across draws and theme swaps.
+---@param decoration ItemButton
+---@return Texture
+local function getFamilyIconTexture(decoration)
+	if not decoration.BetterBagsFamilyIcon then
+		local tex = decoration:CreateTexture(nil, "OVERLAY")
+		tex:SetSize(FAMILY_ICON_SIZE, FAMILY_ICON_SIZE)
+		tex:SetPoint("CENTER", decoration, "CENTER", 0, 0)
+		tex:SetAlpha(FAMILY_ICON_ALPHA)
+		tex:Hide()
+		decoration.BetterBagsFamilyIcon = tex
+	end
+	return decoration.BetterBagsFamilyIcon
+end
+
 ---@param ctx Context
 ---@param found? boolean
 function itemFrame.itemProto:UpdateSearch(ctx, found)
@@ -285,6 +308,9 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	decoration._itemData = data
 	local tooltipOwner = GameTooltip:GetOwner()
 	self.kind = bagKindFromBagID(data.bagid)
+
+	-- Any real (or empty) item drawn into the slot clears the specialized-bag glyph.
+	if decoration.BetterBagsFamilyIcon then decoration.BetterBagsFamilyIcon:Hide() end
 
 	-- TODO(lobato): Figure out what to do with empty items.
 	if data.isItemEmpty then
@@ -578,6 +604,18 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 
 	self.freeSlotName = data.itemInfo and data.itemInfo.emptySlotName or ""
+
+	-- Specialized bags (reagent, quiver, soul, herb, ...) carry a pre-resolved glyph, drawn
+	-- centered and semi-transparent. Generic bags leave it nil, so the overlay stays hidden.
+	local familyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon
+	local familyTexture = getFamilyIconTexture(decoration)
+	if familyIcon then
+		familyTexture:SetTexture(familyIcon)
+		familyTexture:Show()
+	else
+		familyTexture:Hide()
+	end
+
 	local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
 	SetItemButtonQuality(decoration, quality, nil, false, false)
 	decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
@@ -629,6 +667,7 @@ end
 function itemFrame.itemProto:ClearItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
 	events:SendMessage(ctx, "item/Clearing", self, decoration)
+	if decoration.BetterBagsFamilyIcon then decoration.BetterBagsFamilyIcon:Hide() end
 	self.currentData = nil
 	self.kind = nil
 	self.frame:ClearAllPoints()

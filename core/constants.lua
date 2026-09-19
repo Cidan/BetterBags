@@ -257,6 +257,18 @@ const.ITEM_BAG_FAMILY = {
   [1024] = L:G("Mining Bag"),
 }
 
+-- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the small glyph drawn, centered and semi-transparent,
+-- in the empty slots of any specialized (non-zero bag family) bag: reagent bags, quivers,
+-- soul/herb/enchanting bags, etc. The character-sheet bag-slot texture is a stock PaperDoll
+-- asset present on every client (retail and classic), so it is a safe cross-version default.
+const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+
+-- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value (see ITEM_BAG_FAMILY) to a distinct
+-- overlay icon. Families with no explicit entry fall back to EMPTY_SLOT_FAMILY_ICON_DEFAULT
+-- (resolved by items:GetEmptySlotFamilyIcon). Empty by default — every specialized bag shares
+-- the default glyph for now; add per-family textures here to differentiate them.
+const.EMPTY_SLOT_FAMILY_ICON = {}
+
 ---@enum WindowKind
 const.WINDOW_KIND = {
   UNDEFINED = 0,
