@@ -1185,7 +1185,6 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
         if freeSlotCount > 0 and slotKey ~= nil then
           local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
           if freeSlotBag and freeSlotID then
-            local originalItem = itemData[slotKey]
             table.insert(tabs[tabID].freeSpace.buttons, {
               slotkey = slotKey,
               bagid = tonumber(freeSlotBag),
@@ -1193,9 +1192,11 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
               count = freeSlotCount,
               isIndividual = false,
               key = name,
-              itemInfo = originalItem and originalItem.itemInfo or {
+              -- The aggregated "stack" button is a counter, not a real item slot, so it carries
+              -- no itemQuality (nil => no quality border). Reusing the harvested slot's itemInfo
+              -- would leak the bag's quality (e.g. the reagent bag's) and paint a colored border.
+              itemInfo = {
                 emptySlotName = name,
-                itemQuality = const.ITEM_QUALITY.Common,
                 emptySlotFamilyIcon = self:GetEmptySlotFamilyIcon(familyForSubclass[name]),
               },
             })

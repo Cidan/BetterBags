@@ -563,6 +563,32 @@ describe("Empty slot family icon overlay", function()
     assert.is_false(item._decoration.BetterBagsFamilyIcon._shown)
   end)
 
+  it("passes nil (not Common) to SetItemButtonQuality when a free slot has no itemQuality", function()
+    local captured, called
+    local orig = _G.SetItemButtonQuality
+    _G.SetItemButtonQuality = function(_, quality) called = true; captured = quality end
+
+    local btnCtx = ctx:New("famnoq")
+    local item = itemFrame:GetButton(btnCtx, "5_1")
+
+    -- Aggregated "stack" button: itemInfo carries no itemQuality -> nil reaches the API (no border).
+    item:SetFreeSlots(btnCtx, {
+      slotkey = "5_1", bagid = 5, slotid = 1,
+      itemInfo = { emptySlotName = "Reagent Bag", emptySlotFamilyIcon = "Mobile-Herbalism" },
+    }, 2)
+    assert.is_true(called)
+    assert.is_nil(captured)
+
+    -- A slot that does carry a quality still passes it through unchanged.
+    item:SetFreeSlots(btnCtx, {
+      slotkey = "5_1", bagid = 5, slotid = 1,
+      itemInfo = { itemQuality = const.ITEM_QUALITY.Uncommon },
+    }, -1)
+    assert.are.equal(const.ITEM_QUALITY.Uncommon, captured)
+
+    _G.SetItemButtonQuality = orig
+  end)
+
   it("shows the icon through the exact individual free-slot call (nocount) after a wipe", function()
     -- Individual ("unstacked") free slots are drawn as SetFreeSlots(ctx, btn, 1, true) after the
     -- button is released/wiped by WipeGlobalSections; the aggregated ("stacked") counter uses

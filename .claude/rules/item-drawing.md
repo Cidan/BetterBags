@@ -120,10 +120,21 @@ centered, semi-transparent glyph so the slot's restriction is visible at a glanc
   `emptySlotsByBag[bagid].family`. `Phase6_EnrichData` (now taking `emptySlotsByBag`) resolves and
   stores the ready atlas name on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one field
   reaches **all four** empty-slot render paths: the individual free-space buttons (reuse the
-  harvested `itemInfo`), the aggregated/combined free-space button (reuses the harvested `itemInfo`,
-  with a `familyForSubclass` fallback in `Phase10_PartitionIntoTabs` for the no-`originalItem`
-  case), and the in-place empty slots of the Show-Bags view — whose dummy `itemInfo` is built fresh
-  in `Phase9_Sort`, so it copies `emptySlotFamilyIcon` from the harvested empty item it iterates.
+  harvested `itemInfo`), the aggregated/combined free-space "stack" button (`Phase10_PartitionIntoTabs`
+  builds it a **fresh** `itemInfo` with `emptySlotName` + `emptySlotFamilyIcon` from
+  `familyForSubclass[name]`, and **no `itemQuality`** — see the border note below), and the in-place
+  empty slots of the Show-Bags view — whose dummy `itemInfo` is built fresh in `Phase9_Sort`, so it
+  copies `emptySlotFamilyIcon` from the harvested empty item it iterates.
+- **The aggregated "stack" button carries no quality (no border).** A specialized bag's harvested
+  empty-slot `itemInfo` carries the bag's `itemQuality` (from `const.BAG_SUBTYPE_TO_QUALITY`). Reusing
+  it for the aggregate counter leaked that quality and painted a colored `IconBorder` around the stack
+  button (the reported reagent-bag border), unlike the plain-bag stack. So `Phase10` builds the stack
+  button a fresh `itemInfo` **without `itemQuality`** (nil), and `SetFreeSlots` no longer coerces a
+  missing quality to `Common` (Blizzard's `ColorManager` returns a color for `Common`, so `Common`
+  *would* draw a border; **nil** is what clears it — `SetItemButtonQuality(nil)` and
+  `DrawClassicQualityBorder(nil)` both hide the border). Individual free-slot buttons and Show-Bags
+  empties still pass their harvested quality through unchanged. Coverage: `spec/frames/item_spec.lua`
+  ("passes nil (not Common) to SetItemButtonQuality when a free slot has no itemQuality").
 - **Draw (`frames/item.lua`).** `SetFreeSlots` reads `data.itemInfo.emptySlotFamilyIcon` and, when
   set, shows a lazily-created `OVERLAY` texture on the **themed decoration** (`decoration.BetterBagsFamilyIcon`
   via `getFamilyIconTexture`) via `SetAtlas` — 24×24, centered, `0.4` alpha (re-applying `SetSize`

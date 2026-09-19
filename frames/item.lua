@@ -618,7 +618,11 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 		familyTexture:Hide()
 	end
 
-	local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
+	-- No `or Common` fallback: a nil quality must stay nil so SetItemButtonQuality (and, on
+	-- classic, DrawClassicQualityBorder) draw no border. Coercing to Common would paint one,
+	-- since ColorManager returns a color for Common. The aggregated free-slot "stack" button
+	-- deliberately carries no quality so it renders borderless like a plain empty slot.
+	local quality = data.itemInfo and data.itemInfo.itemQuality
 	SetItemButtonQuality(decoration, quality, nil, false, false)
 	decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
 	decoration.IconBorder:SetBlendMode("BLEND")
