@@ -116,23 +116,35 @@ function events:CatchUntil(caughtEvent, finalEvent, callback)
   end)
 end
 
+-- BucketEvent debounces an event: it collects every fire within a 0.2s window
+-- and invokes the callback once after the window settles. The callback receives
+-- the coalesced payloads of every fire in the window as an EventArg[] (each entry
+-- `{ eventName = <event>, args = { <payload...> } }`), so consumers that need the
+-- per-fire arguments (e.g. the TOOLTIP_DATA_UPDATE dataInstanceIDs) can read them.
+-- Callbacks that only care that the event fired can ignore the second argument.
 ---@param event string
----@param callback fun(ctx: Context, ...)
+---@param callback fun(ctx: Context, events: EventArg[])
 function events:BucketEvent(event, callback)
  --TODO(lobato): Refine this so that timers only run when an event is in the queue.
   local bucketFunction = function()
+    local collected = self._eventArguments[event] or {}
     for _, cb in pairs(self._bucketCallbacks[event]) do
-      xpcall(function(...)
+      -- Wrap in a closure: xpcall in Lua 5.1 (WoW's runtime) does not forward
+      -- extra args to the protected function, so pass `collected` via upvalue.
+      xpcall(function()
         local ctx = context:New(event)
-        cb(ctx, ...)
+        cb(ctx, collected)
       end, geterrorhandler())
     end
     self._bucketTimers[event] = nil
     self._bucketCallbacks[event] = {}
+    self._eventArguments[event] = {}
   end
 
   self._bucketCallbacks[event] = {}
-  self:RegisterEvent(event, function()
+  self._eventArguments[event] = {}
+  self:RegisterEvent(event, function(_, eventName, ...)
+    tinsert(self._eventArguments[event], { eventName = eventName, args = {...} })
     if self._bucketTimers[event] then
       self._bucketTimers[event]:Cancel()
     end

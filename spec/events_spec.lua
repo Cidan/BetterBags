@@ -338,6 +338,21 @@ describe("Events", function()
       fireTimers()
       assert.is_not_nil(receivedCtx)
     end)
+
+    it("passes the collected per-fire event arguments to the callback", function()
+      local received
+      events:BucketEvent("test/BucketArgs", function(_, evts) received = evts end)
+      local fn = events._eventMap["test/BucketArgs"].fn
+      -- Simulate AceEvent firing the event twice in the debounce window with
+      -- distinct payloads (e.g. two different TOOLTIP_DATA_UPDATE dataInstanceIDs).
+      fn("test/BucketArgs", 111)
+      fn("test/BucketArgs", 222)
+      fireTimers()
+      assert.is_table(received)
+      assert.are.equal(2, #received)
+      assert.are.equal(111, received[1].args[1])
+      assert.are.equal(222, received[2].args[1])
+    end)
   end)
 
   -- ─── GroupBucketEvent ───────────────────────────────────────────────────────

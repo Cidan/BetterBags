@@ -164,6 +164,39 @@ function searchBox:GetText()
   return self.searchFrame.textBox:GetText()
 end
 
+-- GetSearchText returns the active search query for the given bag kind.
+--
+-- The live filter is driven by whichever box the user typed into. When in-bag
+-- search is enabled (the default), that is the per-kind in-bag box created by
+-- searchBox:CreateBox and stored on the themed decoration as `decoration.search`
+-- -- a distinct SearchFrame instance from the module-level overlay searchFrame.
+-- GetText() only ever sees the overlay box, so the data pipeline
+-- (data/items.lua Phase8_EnrichCategories) must call this kind-aware getter when
+-- it recomputes item.isSearchResult on every redraw. Reading only the overlay
+-- box reset the filter to "everything matches" whenever a redraw fired while the
+-- in-bag search was active (e.g. right-clicking an item to send it to the bank).
+---@param kind BagKind?
+---@return string
+function searchBox:GetSearchText(kind)
+  if kind ~= nil and database:GetInBagSearch() then
+    local themes = addon:GetModule('Themes', true)
+    local bags = addon.Bags
+    local bag = bags and ((kind == const.BAG_KIND.BANK) and bags.Bank or bags.Backpack)
+    if themes and bag and bag.frame then
+      local box = themes:GetInBagSearchBox(bag.frame)
+      if box and box.textBox then
+        local text = box.textBox:GetText()
+        if text and text ~= "" then
+          return text
+        end
+      end
+    end
+  end
+  -- No active in-bag query: fall back to the overlay box (which searches both
+  -- bags), and returns "" when it holds no text.
+  return self:GetText()
+end
+
 ---@param ctx Context
 ---@param parent Frame
 ---@return SearchFrame

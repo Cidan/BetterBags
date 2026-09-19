@@ -864,7 +864,11 @@ function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlo
   end
 
   local searchBox = addon:GetModule("SearchBox", true)
-  local searchQuery = searchBox and searchBox.GetText and searchBox:GetText()
+  -- Resolve the active query for THIS kind: with in-bag search on (default) the
+  -- live filter is driven by the per-kind in-bag box, not the overlay box that
+  -- GetText() reads. Reading the wrong box reset isSearchResult to nil on every
+  -- redraw, clearing the visible filter (e.g. right-clicking an item to bank it).
+  local searchQuery = searchBox and searchBox.GetSearchText and searchBox:GetSearchText(kind)
   local searchResults = nil
   if searchQuery and searchQuery ~= "" and search and search.Search then
     searchResults = search:Search(searchQuery)
