@@ -114,7 +114,7 @@ local function stubModules()
   override(sort, "SortItemDataBySlot", function() return false end)
 
   local searchBox = stubModule("SearchBox")
-  override(searchBox, "GetText", function() return searchText end)
+  override(searchBox, "GetSearchText", function() return searchText end)
 
   local loader = stubModule("ItemLoader")
   override(loader, "TellMeWhenABagIsUpdated", function() end)

@@ -1101,7 +1101,7 @@ describe("Items (New Data Farming Engine)", function()
       end
 
       local searchBox = StubBetterBagsModule("SearchBox")
-      searchBox.GetText = function() return "potion" end
+      searchBox.GetSearchText = function() return "potion" end
 
       local itemData = {
         ["0_1"] = MockData.ItemData({ slotkey = "0_1", bagid = 0, slotid = 1 }),
@@ -1117,10 +1117,44 @@ describe("Items (New Data Farming Engine)", function()
       search.Search = origSearch
     end)
 
+    it("resolves the query via the kind-aware GetSearchText, not the overlay-only GetText (in-bag search bug)", function()
+      local search = addon:GetModule("Search")
+      local origSearch = search.Search
+      search.Search = function(_, text)
+        if text == "ink" then
+          return { ["0_1"] = true, ["0_2"] = false }
+        end
+        return {}
+      end
+
+      local searchBox = StubBetterBagsModule("SearchBox")
+      -- The overlay box is empty (the user typed into the per-kind in-bag box).
+      -- Phase8 must consult GetSearchText(kind), which returns the in-bag query;
+      -- reading GetText() would reset the filter on this redraw.
+      searchBox.GetText = function() return "" end
+      searchBox.GetSearchText = function(_, kind)
+        assert.equal(const.BAG_KIND.BACKPACK, kind)
+        return "ink"
+      end
+
+      local itemData = {
+        ["0_1"] = MockData.ItemData({ slotkey = "0_1", bagid = 0, slotid = 1 }),
+        ["0_2"] = MockData.ItemData({ slotkey = "0_2", bagid = 0, slotid = 2 }),
+      }
+
+      local ctx = addon:GetModule("Context"):New("test_search_inbag")
+      items:Phase8_EnrichCategories(ctx, const.BAG_KIND.BACKPACK, itemData, {})
+
+      assert.is_true(itemData["0_1"].isSearchResult)
+      assert.is_false(itemData["0_2"].isSearchResult)
+
+      search.Search = origSearch
+    end)
+
     it("should leave isSearchResult unset in Phase6_EnrichData so buttons never draw against a stale index", function()
       local searchBox = StubBetterBagsModule("SearchBox")
-      local origGetText = searchBox.GetText
-      searchBox.GetText = function() return "potion" end
+      local origGetSearchText = searchBox.GetSearchText
+      searchBox.GetSearchText = function() return "potion" end
 
       local itemData = {
         ["0_1"] = MockData.ItemData({ slotkey = "0_1", bagid = 0, slotid = 1 }),
@@ -1131,7 +1165,7 @@ describe("Items (New Data Farming Engine)", function()
 
       assert.is_nil(itemData["0_1"].isSearchResult)
 
-      searchBox.GetText = origGetText
+      searchBox.GetSearchText = origGetSearchText
     end)
   end)
 

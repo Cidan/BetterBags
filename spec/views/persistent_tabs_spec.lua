@@ -232,6 +232,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     StubBetterBagsModule("Currency")
     local searchBox = StubBetterBagsModule("SearchBox")
     searchBox.GetText = function() return "" end
+    searchBox.GetSearchText = function() return "" end
 
     StubBetterBagsModule("ThemeConfig")
     StubBetterBagsModule("WindowGroup")
