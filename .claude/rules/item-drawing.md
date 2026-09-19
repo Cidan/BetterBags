@@ -132,14 +132,6 @@ centered, semi-transparent glyph so the slot's restriction is visible at a glanc
   layer), and in the `OVERLAY` layer so it sits above the empty-slot art. It is hidden in
   `SetItemFromData` (any real item drawn into the slot) and `ClearItem`. No `items:`/database call
   happens at draw time.
-- **The glyph replaces the quality border on these slots.** Empty free slots are normally tinted by
-  their bag's subclass quality (`const.BAG_SUBTYPE_TO_QUALITY`): a plain bag is subclass 0 → Poor →
-  no border, but a specialized bag maps to Uncommon+ → a colored `IconBorder`. Since the glyph now
-  conveys "specialized bag," `SetFreeSlots` forces `quality = Common` whenever `familyIcon` is set,
-  so `SetItemButtonQuality` draws no colored frame (Common hides `IconBorder` on both retail and,
-  via `DrawClassicQualityBorder`, classic). Generic bags are unaffected (they were already Poor/
-  Common). Coverage: `spec/frames/item_spec.lua` ("suppresses the colored quality border on a
-  specialized empty slot").
 - **Coverage:** `spec/items_spec.lua` ("Empty slot family icons (specialized bags)": resolver
   semantics, `Phase5` family capture, `Phase6` icon resolution incl. the generic-bag nil case) and
   `spec/frames/item_spec.lua` ("Empty slot family icon overlay": shown on specialized slots, hidden
