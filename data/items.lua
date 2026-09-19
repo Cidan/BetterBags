@@ -1065,7 +1065,8 @@ function items:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
               currentItemCount = 0,
               itemGUID = "",
               currentItemLevel = 0,
-              expacID = 0
+              expacID = 0,
+              emptySlotFamilyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon,
             }
           }
           table.insert(sortedItems, dummy)

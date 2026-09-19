@@ -106,28 +106,32 @@ centered, semi-transparent glyph so the slot's restriction is visible at a glanc
   substitution only fires when the API family is 0, so if a client ever reports a real family for
   the reagent bag, the numeric path wins unchanged.
 - **Resolution is data-phase, per the Pure Presentation Principle (§1) — the draw layer never
-  resolves it.** `items:GetEmptySlotFamilyIcon(family)` (`data/items.lua`) maps a family bit to a
-  texture: `nil` for family `0`/`nil` (no glyph), an explicit `const.EMPTY_SLOT_FAMILY_ICON[family]`
-  override if present, else the shared `const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`. The map is empty by
-  default (every specialized bag shares the default glyph); it exists so distinct per-family icons
-  are a one-line data addition later.
-- **The default glyph is `Interface\PaperDoll\UI-PaperDoll-Slot-Bag`** — a stock PaperDoll asset
-  present on every client (retail and classic; already used on the non-retail path in
-  `frames/bagbutton.lua`). Do **not** use the retail-only `bags-icon-*` atlases for the default;
-  they are absent on classic.
+  resolves it.** `items:GetEmptySlotFamilyIcon(family)` (`data/items.lua`) maps a family key to a
+  texture **atlas name**: `nil` for family `0`/`nil` (no glyph), an explicit
+  `const.EMPTY_SLOT_FAMILY_ICON[family]` override if present, else the shared
+  `const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`. The map is empty by default (every specialized bag shares
+  the default glyph); it exists so distinct per-family icons are a one-line data addition later.
+- **Values are texture ATLAS names, not file paths** (drawn via `Texture:SetAtlas`). The default is
+  `"Mobile-Herbalism"` (a 128×128 atlas, sized down in the draw layer). **Cross-version caveat:**
+  `Mobile-*` atlases are retail-only, so on Classic the default may render blank — add a Classic-safe
+  atlas/override if that matters. (The earlier `Interface\PaperDoll\UI-PaperDoll-Slot-Bag` file path
+  was replaced by the atlas at the user's request.)
 - **Threading (data phase).** `Phase5_UpdateFreeSlots` captures the family into
   `emptySlotsByBag[bagid].family`. `Phase6_EnrichData` (now taking `emptySlotsByBag`) resolves and
-  stores the ready texture string on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one
-  field reaches **all three** empty-slot render paths: the individual free-space buttons (reuse the
+  stores the ready atlas name on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one field
+  reaches **all four** empty-slot render paths: the individual free-space buttons (reuse the
   harvested `itemInfo`), the aggregated/combined free-space button (reuses the harvested `itemInfo`,
   with a `familyForSubclass` fallback in `Phase10_PartitionIntoTabs` for the no-`originalItem`
-  case), and the in-place empty slots of the Show-Bags view.
+  case), and the in-place empty slots of the Show-Bags view — whose dummy `itemInfo` is built fresh
+  in `Phase9_Sort`, so it copies `emptySlotFamilyIcon` from the harvested empty item it iterates.
 - **Draw (`frames/item.lua`).** `SetFreeSlots` reads `data.itemInfo.emptySlotFamilyIcon` and, when
   set, shows a lazily-created `OVERLAY` texture on the **themed decoration** (`decoration.BetterBagsFamilyIcon`
-  via `getFamilyIconTexture`) — 20×20, centered, `0.8` alpha — else hides it. The overlay lives on
-  the **decoration** (the visual layer), not `self.button` (the interaction layer), and in the
-  `OVERLAY` layer so it sits above the empty-slot art. It is hidden in `SetItemFromData` (any real
-  item drawn into the slot) and `ClearItem`. No `items:`/database call happens at draw time.
+  via `getFamilyIconTexture`) via `SetAtlas` — 24×24, centered, `0.4` alpha (re-applying `SetSize`
+  after `SetAtlas`, since `SetAtlas` can otherwise snap to the atlas's native 128×128) — else hides
+  it. The overlay lives on the **decoration** (the visual layer), not `self.button` (the interaction
+  layer), and in the `OVERLAY` layer so it sits above the empty-slot art. It is hidden in
+  `SetItemFromData` (any real item drawn into the slot) and `ClearItem`. No `items:`/database call
+  happens at draw time.
 - **Coverage:** `spec/items_spec.lua` ("Empty slot family icons (specialized bags)": resolver
   semantics, `Phase5` family capture, `Phase6` icon resolution incl. the generic-bag nil case) and
   `spec/frames/item_spec.lua` ("Empty slot family icon overlay": shown on specialized slots, hidden
