@@ -445,6 +445,16 @@ const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY6_DESC)] = const.ITEM_QUALIT
 const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY7_DESC)] = const.ITEM_QUALITY.Heirloom
 const.ITEM_QUALITY_TO_ENUM[string.lower(ITEM_QUALITY8_DESC)] = const.ITEM_QUALITY.WoWToken
 
+-- Quality glow intensity slider (0-100). At or below this threshold the item
+-- button draws a flat colored quality border (alpha scaled by intensity/threshold);
+-- above it, the additive "glowing halo" fades in. See frames/item.lua:DrawQualityGlow.
+const.GLOW_INTENSITY_HALO_THRESHOLD = 60
+-- The "on" and "off" states of the retired boolean "Extra Glowy" option map onto
+-- these intensities during migration (on -> full blinding halo, off -> flat border
+-- at the halo threshold). Do not remove: DB:Migrate references them.
+const.GLOW_INTENSITY_MAX = 100
+const.GLOW_INTENSITY_DEFAULT = const.GLOW_INTENSITY_HALO_THRESHOLD
+
 const.ITEM_QUALITY_COLOR = {
   [const.ITEM_QUALITY.Poor] = {0.62, 0.62, 0.62, 1},
   [const.ITEM_QUALITY.Common] = {1, 1, 1, 1},
@@ -680,9 +690,9 @@ const.DATABASE_DEFAULTS = {
       [const.BAG_KIND.BACKPACK] = true,
       [const.BAG_KIND.BANK] = true,
     },
-    extraGlowyButtons = {
-      [const.BAG_KIND.BACKPACK] = false,
-      [const.BAG_KIND.BANK] = false,
+    glowIntensity = {
+      [const.BAG_KIND.BACKPACK] = 60,
+      [const.BAG_KIND.BANK] = 60,
     },
     newItems = {
       [const.BAG_KIND.BACKPACK] = {

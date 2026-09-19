@@ -70,6 +70,9 @@ function L:G(key) return key end
 -- Set up Constants
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 0, BANK = 1, UNDEFINED = -1 }
+const.GLOW_INTENSITY_HALO_THRESHOLD = 60
+const.GLOW_INTENSITY_MAX = 100
+const.GLOW_INTENSITY_DEFAULT = 60
 const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.SECTION_SORT_TYPE = { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
@@ -89,7 +92,7 @@ const.DATABASE_DEFAULTS = {
     upgradeIconProvider = 'None', theme = 'Default',
     showFullSectionNames = { [0] = false, [1] = false },
     showAllFreeSpace = { [0] = false, [1] = false },
-    extraGlowyButtons = { [0] = false, [1] = false },
+    glowIntensity = { [0] = 60, [1] = 60 },
     newItems = {
       [0] = { markRecentItems = true, showNewItemFlash = false },
       [1] = { markRecentItems = true, showNewItemFlash = false },
@@ -204,6 +207,24 @@ describe("Database Migration", function()
       DB.data.profile.views[const.BAG_KIND.BANK] = const.BAG_VIEW.SECTION_ALL_BAGS
       DB:Migrate()
       assert.are.equal(const.BAG_VIEW.SECTION_ALL_BAGS, DB.data.profile.views[const.BAG_KIND.BANK])
+    end)
+  end)
+
+  describe("extra glowy boolean -> glow intensity migration", function()
+    it("maps the old per-kind boolean to an intensity (true->100, false->60) and drops the old field", function()
+      DB.data.profile.extraGlowyButtons = { [const.BAG_KIND.BACKPACK] = true, [const.BAG_KIND.BANK] = false }
+      DB:Migrate()
+      assert.equal(100, DB.data.profile.glowIntensity[const.BAG_KIND.BACKPACK])
+      assert.equal(60, DB.data.profile.glowIntensity[const.BAG_KIND.BANK])
+      assert.is_nil(DB.data.profile.extraGlowyButtons)
+    end)
+
+    it("leaves glowIntensity at its default when there is no legacy field", function()
+      DB.data.profile.extraGlowyButtons = nil
+      DB.data.profile.glowIntensity = { [const.BAG_KIND.BACKPACK] = 85, [const.BAG_KIND.BANK] = 60 }
+      DB:Migrate()
+      assert.equal(85, DB.data.profile.glowIntensity[const.BAG_KIND.BACKPACK])
+      assert.equal(60, DB.data.profile.glowIntensity[const.BAG_KIND.BANK])
     end)
   end)
 

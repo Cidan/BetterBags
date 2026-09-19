@@ -138,6 +138,9 @@ local function stubModules()
   override(const, "BANK_BAGS", { [6] = 6 })
   override(const, "ACCOUNT_BANK_BAGS", {})
   override(const, "BACKPACK_ONLY_REAGENT_BAGS", {})
+  override(const, "GLOW_INTENSITY_HALO_THRESHOLD", 60)
+  override(const, "GLOW_INTENSITY_MAX", 100)
+  override(const, "GLOW_INTENSITY_DEFAULT", 60)
   override(const, "OFFSETS", {
     BAG_LEFT_INSET = 6,
     BAG_TOP_INSET = -38,
@@ -159,7 +162,7 @@ local function stubModules()
   override(database, "GetShowFullSectionNames", function() return false end)
   override(database, "GetItemLevelOptions", function() return { enabled = false, color = false } end)
   override(database, "GetStackingOptions", function() return { mergeUnstackable = false } end)
-  override(database, "GetExtraGlowyButtons", function() return false end)
+  override(database, "GetGlowIntensity", function() return 60 end)
   override(database, "ToggleSectionCollapsed", function() end)
   override(database, "GetUpgradeIconProvider", function() return "None" end)
 

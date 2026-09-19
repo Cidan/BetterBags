@@ -35,11 +35,11 @@ local context = addon:GetModule("Context")
 ---@class Debug: AceModule
 local debug = addon:GetModule("Debug")
 
--- Alpha multiplier for the quality glow when "Extra Glowy Item Buttons" is off.
--- The glow is always the additive UI-ActionButton-Border texture; this dims it
--- to a subtle level so item quality is still visible (Classic's default bags
--- draw no quality border at all) while "Extra Glowy" is the full-intensity look.
-local SUBTLE_QUALITY_GLOW_ALPHA = 0.55
+-- Alpha floor for the additive quality halo the instant it turns on, just above
+-- the halo threshold. The halo ramps from this value at (threshold + 1) up to a
+-- blinding 1.0 at intensity 100, so it is already clearly visible the moment it
+-- kicks in rather than fading up from invisible. See DrawQualityGlow.
+local HALO_MIN_ALPHA = 0.4
 
 ---@class ItemStack
 ---@field button Item
@@ -508,29 +508,47 @@ end
 -- non-retail clients have to draw the rarity border themselves.
 ---@param decoration ItemButton
 ---@param quality number?
--- DrawQualityGlow draws the item quality indicator on the decoration's IconBorder.
--- Uncommon+ items get an additive quality glow (UI-ActionButton-Border); "Extra
--- Glowy" is the full-intensity version, otherwise the glow is dimmed to a subtle
--- level so quality is still visible without the option (Classic's default bags
--- draw no quality border at all). Poor/Common items get no border, matching
--- Blizzard's own SetItemButtonQuality (which returns no color for Poor/Common) and
--- avoiding a stray border on plain items. Retail and Classic share this path.
+-- DrawQualityGlow draws the item quality indicator on the decoration's IconBorder,
+-- scaled by the per-kind "Quality Glow" intensity slider (0-100). Poor/Common items
+-- never get a border (matching Blizzard's SetItemButtonQuality, which returns no
+-- color for them) and neither does intensity 0. The slider then has two phases,
+-- both colored by the item's quality:
+--   * intensity 1..threshold (60): a flat colored border (WhiteIconFrame, BLEND)
+--     whose alpha fades in as intensity/threshold, reaching a solid border at the
+--     threshold. No glow yet.
+--   * intensity threshold+1..100: the additive glowing halo (UI-ActionButton-Border,
+--     ADD) that alphas in from HALO_MIN_ALPHA to a blinding 1.0 at 100.
+-- Retail and Classic share this single path.
 ---@param decoration Frame
 ---@param quality number
 function itemFrame.itemProto:DrawQualityGlow(decoration, quality)
 	local border = decoration.IconBorder
 	if not border then return end
-	if quality and quality > const.ITEM_QUALITY.Common then
-		local qualityColor = const.ITEM_QUALITY_COLOR[quality] or const.ITEM_QUALITY_COLOR[const.ITEM_QUALITY.Common]
+	local intensity = database:GetGlowIntensity(self.kind)
+	if not (quality and quality > const.ITEM_QUALITY.Common) or not intensity or intensity <= 0 then
+		border:Hide()
+		return
+	end
+	local qualityColor = const.ITEM_QUALITY_COLOR[quality] or const.ITEM_QUALITY_COLOR[const.ITEM_QUALITY.Common]
+	local threshold = const.GLOW_INTENSITY_HALO_THRESHOLD
+	local baseAlpha = qualityColor[4] or 1
+	if intensity <= threshold then
+		-- Flat colored quality border, fading in with intensity. No halo.
+		border:SetTexture([[Interface\Common\WhiteIconFrame]])
+		border:SetBlendMode("BLEND")
+		border:SetTexCoord(0, 1, 0, 1)
+		local alpha = intensity / threshold
+		border:SetVertexColor(qualityColor[1], qualityColor[2], qualityColor[3], baseAlpha * alpha)
+	else
+		-- Additive glowing halo ramping from a clearly-visible floor to full.
 		border:SetTexture([[Interface\Buttons\UI-ActionButton-Border]])
 		border:SetBlendMode("ADD")
 		border:SetTexCoord(14 / 64, 49 / 64, 15 / 64, 50 / 64)
-		local alpha = database:GetExtraGlowyButtons(self.kind) and 1 or SUBTLE_QUALITY_GLOW_ALPHA
-		border:SetVertexColor(qualityColor[1], qualityColor[2], qualityColor[3], (qualityColor[4] or 1) * alpha)
-		border:Show()
-	else
-		border:Hide()
+		local t = (intensity - threshold) / (const.GLOW_INTENSITY_MAX - threshold)
+		local alpha = HALO_MIN_ALPHA + (1 - HALO_MIN_ALPHA) * t
+		border:SetVertexColor(qualityColor[1], qualityColor[2], qualityColor[3], baseAlpha * alpha)
 	end
+	border:Show()
 end
 
 -- DrawClassicQualityBorder draws a thin colored quality border for free slots on

@@ -519,14 +519,19 @@ function config:CreateConfig()
       end
     })
 
-    f:AddCheckbox({
-      title = 'Extra Glowy Item Buttons',
-      description = 'Item buttons will have an enhanced glow effect using the item quality color.',
+    f:AddSlider({
+      title = 'Quality Glow Intensity',
+      description = 'How strongly item buttons show their quality color, from 0 to 100. '
+        .. 'At 0 there is no border at all. Up to 60 it is a flat colored border that fades in. '
+        .. 'Above 60 the glowing halo alphas in, reaching a blinding maximum at 100.',
+      min = 0,
+      max = 100,
+      step = 1,
       getValue = function(_)
-        return db:GetExtraGlowyButtons(bagType.kind)
+        return db:GetGlowIntensity(bagType.kind)
       end,
       setValue = function(ctx, value)
-        db:SetExtraGlowyButtons(bagType.kind, value)
+        db:SetGlowIntensity(bagType.kind, value)
         events:SendMessage(ctx, 'bags/FullRefreshAll')
       end
     })
