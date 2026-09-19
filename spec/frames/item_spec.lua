@@ -563,6 +563,31 @@ describe("Empty slot family icon overlay", function()
     assert.is_false(item._decoration.BetterBagsFamilyIcon._shown)
   end)
 
+  it("suppresses the colored quality border on a specialized empty slot", function()
+    local captured
+    local orig = _G.SetItemButtonQuality
+    _G.SetItemButtonQuality = function(_, quality) captured = quality end
+
+    local btnCtx = ctx:New("famborder")
+    local item = itemFrame:GetButton(btnCtx, "0_12")
+
+    -- Specialized bag (glyph shown): quality border is forced to Common so no colored frame draws.
+    item:SetFreeSlots(btnCtx, {
+      slotkey = "0_12", bagid = 0, slotid = 12,
+      itemInfo = { itemQuality = const.ITEM_QUALITY.Uncommon, emptySlotFamilyIcon = "Mobile-Herbalism" },
+    }, -1)
+    assert.are.equal(const.ITEM_QUALITY.Common, captured)
+
+    -- Generic empty slot (no glyph) keeps whatever quality it was given.
+    item:SetFreeSlots(btnCtx, {
+      slotkey = "0_12", bagid = 0, slotid = 12,
+      itemInfo = { itemQuality = const.ITEM_QUALITY.Uncommon },
+    }, -1)
+    assert.are.equal(const.ITEM_QUALITY.Uncommon, captured)
+
+    _G.SetItemButtonQuality = orig
+  end)
+
   it("shows the icon through the exact individual free-slot call (nocount) after a wipe", function()
     -- Individual ("unstacked") free slots are drawn as SetFreeSlots(ctx, btn, 1, true) after the
     -- button is released/wiped by WipeGlobalSections; the aggregated ("stacked") counter uses

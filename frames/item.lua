@@ -619,6 +619,11 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 
 	local quality = data.itemInfo and data.itemInfo.itemQuality or const.ITEM_QUALITY.Common
+	if familyIcon then
+		-- The centered family glyph already marks this as a specialized bag, so suppress the
+		-- redundant colored quality border these bags would otherwise draw (Common hides it).
+		quality = const.ITEM_QUALITY.Common
+	end
 	SetItemButtonQuality(decoration, quality, nil, false, false)
 	decoration.IconBorder:SetTexture([[Interface\Common\WhiteIconFrame]])
 	decoration.IconBorder:SetBlendMode("BLEND")
