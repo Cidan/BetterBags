@@ -75,6 +75,21 @@ themes.GetItemButton = function(_, buttonCtx, item)
         end
         item._decoration._frameLevel = level
       end,
+      CreateTexture = function(_, _, layer)
+        return {
+          _shown = false,
+          _layer = layer,
+          SetTexture = function(t, path) t._texture = path end,
+          SetAtlas = function(t, atlas) t._atlas = atlas end,
+          SetSize = function(t, w, h) t._w, t._h = w, h end,
+          SetPoint = function() end,
+          SetAlpha = function(t, a) t._alpha = a end,
+          SetTexCoord = function() end,
+          Show = function(t) t._shown = true end,
+          Hide = function(t) t._shown = false end,
+          SetShown = function(t, s) t._shown = not not s end,
+        }
+      end,
     }
   end
   return item._decoration
@@ -502,5 +517,101 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
         item:UpdateCooldown(btnCtx, nil)
       end, "data must be provided")
     end)
+  end)
+end)
+
+describe("Empty slot family icon overlay", function()
+  before_each(function()
+    addon.isRetail = true
+    _G.ClearItemButtonOverlay = _G.ClearItemButtonOverlay or function() end
+    _G.SetItemButtonQuality = _G.SetItemButtonQuality or function() end
+    _G.SetItemButtonCount = _G.SetItemButtonCount or function() end
+    _G.SetItemButtonDesaturated = _G.SetItemButtonDesaturated or function() end
+    _G.GameTooltip.GetOwner = _G.GameTooltip.GetOwner or function() return nil end
+    itemFrame:Init()
+  end)
+
+  it("draws a centered, semi-transparent family icon atlas on a specialized empty slot", function()
+    local btnCtx = ctx:New("famicon")
+    local item = itemFrame:GetButton(btnCtx, "0_9")
+    item:SetFreeSlots(btnCtx, {
+      slotkey = "0_9", bagid = 0, slotid = 9,
+      itemInfo = { emptySlotName = "Herb Bag", emptySlotFamilyIcon = "Mobile-Herbalism" },
+    }, -1)
+    local overlay = item._decoration.BetterBagsFamilyIcon
+    assert.is_not_nil(overlay)
+    assert.is_true(overlay._shown)
+    assert.are.equal("Mobile-Herbalism", overlay._atlas)
+    assert.are.equal(0.4, overlay._alpha)
+  end)
+
+  it("hides the family icon on a generic (family 0) empty slot", function()
+    local btnCtx = ctx:New("famicon2")
+    local item = itemFrame:GetButton(btnCtx, "0_10")
+    item:SetFreeSlots(btnCtx, { slotkey = "0_10", bagid = 0, slotid = 10, itemInfo = { emptySlotFamilyIcon = "X" } }, -1)
+    assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
+    item:SetFreeSlots(btnCtx, { slotkey = "0_10", bagid = 0, slotid = 10, itemInfo = { emptySlotName = "Bag" } }, -1)
+    assert.is_false(item._decoration.BetterBagsFamilyIcon._shown)
+  end)
+
+  it("hides the family icon when the slot is (re)drawn as an item", function()
+    local btnCtx = ctx:New("famicon3")
+    local item = itemFrame:GetButton(btnCtx, "0_11")
+    item:SetFreeSlots(btnCtx, { slotkey = "0_11", bagid = 0, slotid = 11, itemInfo = { emptySlotFamilyIcon = "X" } }, -1)
+    assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
+    item:SetItemFromData(btnCtx, { slotkey = "0_11", bagid = 0, slotid = 11, isItemEmpty = true, itemInfo = {} })
+    assert.is_false(item._decoration.BetterBagsFamilyIcon._shown)
+  end)
+
+  it("passes nil (not Common) to SetItemButtonQuality when a free slot has no itemQuality", function()
+    local captured, called
+    local orig = _G.SetItemButtonQuality
+    _G.SetItemButtonQuality = function(_, quality) called = true; captured = quality end
+
+    local btnCtx = ctx:New("famnoq")
+    local item = itemFrame:GetButton(btnCtx, "5_1")
+
+    -- Aggregated "stack" button: itemInfo carries no itemQuality -> nil reaches the API (no border).
+    item:SetFreeSlots(btnCtx, {
+      slotkey = "5_1", bagid = 5, slotid = 1,
+      itemInfo = { emptySlotName = "Reagent Bag", emptySlotFamilyIcon = "Mobile-Herbalism" },
+    }, 2)
+    assert.is_true(called)
+    assert.is_nil(captured)
+
+    -- A slot that does carry a quality still passes it through unchanged.
+    item:SetFreeSlots(btnCtx, {
+      slotkey = "5_1", bagid = 5, slotid = 1,
+      itemInfo = { itemQuality = const.ITEM_QUALITY.Uncommon },
+    }, -1)
+    assert.are.equal(const.ITEM_QUALITY.Uncommon, captured)
+
+    _G.SetItemButtonQuality = orig
+  end)
+
+  it("shows the icon through the exact individual free-slot call (nocount) after a wipe", function()
+    -- Individual ("unstacked") free slots are drawn as SetFreeSlots(ctx, btn, 1, true) after the
+    -- button is released/wiped by WipeGlobalSections; the aggregated ("stacked") counter uses
+    -- SetFreeSlots(ctx, btn, count). Both must end up with the glyph shown.
+    local btnCtx = ctx:New("famicon4")
+    local item = itemFrame:GetButton(btnCtx, "5_1")
+    local btn = { slotkey = "5_1", bagid = 5, slotid = 1, itemInfo = { emptySlotName = "Reagent Bag", emptySlotFamilyIcon = "REAGENT" } }
+
+    -- Individual path (nocount = true), fresh button.
+    item:ClearItem(btnCtx)
+    item:SetFreeSlots(btnCtx, btn, 1, true)
+    assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
+    assert.are.equal("REAGENT", item._decoration.BetterBagsFamilyIcon._atlas)
+
+    -- Simulate a redraw: WipeGlobalSections -> Release (ClearItem) then re-draw individual.
+    item:ClearItem(btnCtx)
+    assert.is_false(item._decoration.BetterBagsFamilyIcon._shown)
+    item:SetFreeSlots(btnCtx, btn, 1, true)
+    assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
+
+    -- Aggregated path (count, no nocount) must also show it.
+    item:ClearItem(btnCtx)
+    item:SetFreeSlots(btnCtx, btn, 2)
+    assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
   end)
 end)

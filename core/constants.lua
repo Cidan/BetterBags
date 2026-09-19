@@ -257,6 +257,26 @@ const.ITEM_BAG_FAMILY = {
   [1024] = L:G("Mining Bag"),
 }
 
+-- EMPTY_SLOT_FAMILY_ICON_DEFAULT is the small glyph drawn, centered and semi-transparent,
+-- in the empty slots of any specialized (non-zero bag family) bag: reagent bags, quivers,
+-- soul/herb/enchanting bags, etc. Values in this system are texture ATLAS names (drawn via
+-- Texture:SetAtlas), not file paths. Mobile-Herbalism is present on both retail and classic
+-- clients, so it is a safe cross-version default.
+const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = "Mobile-Herbalism"
+
+-- On retail the dedicated Reagent Bag (bag id 5) is identified by id, not by a bag-family bit
+-- (C_Container.GetContainerNumFreeSlots reports family 0 for it), so it is keyed in
+-- EMPTY_SLOT_FAMILY_ICON by this symbolic key instead of a numeric family. Classic profession
+-- bags keep their real numeric family bits.
+const.REAGENT_BAG_FAMILY_KEY = "ReagentBag"
+
+-- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value (see ITEM_BAG_FAMILY), or the symbolic
+-- REAGENT_BAG_FAMILY_KEY, to a distinct overlay atlas name. Families with no explicit entry
+-- fall back to EMPTY_SLOT_FAMILY_ICON_DEFAULT (resolved by items:GetEmptySlotFamilyIcon).
+-- Empty by default — every specialized bag shares the default glyph for now; add per-family
+-- atlases here to differentiate them.
+const.EMPTY_SLOT_FAMILY_ICON = {}
+
 ---@enum WindowKind
 const.WINDOW_KIND = {
   UNDEFINED = 0,

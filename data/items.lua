@@ -364,7 +364,8 @@ function items:Phase5_UpdateFreeSlots(ctx, kind)
   local emptySlotsByBag = {}
 
   for bagid in pairs(baglist) do
-    local freeSlots = C_Container.GetContainerNumFreeSlots(bagid) or 0
+    local freeSlots, bagFamily = C_Container.GetContainerNumFreeSlots(bagid)
+    freeSlots = freeSlots or 0
     local name
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
@@ -378,9 +379,15 @@ function items:Phase5_UpdateFreeSlots(ctx, kind)
       freeSlots = freeSlots - 4
     end
     if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
+      -- The retail reagent bag reports family 0 (it is identified by bag id, not a family
+      -- bit), so key it by the symbolic reagent key; classic profession bags keep their bits.
+      local family = bagFamily or 0
+      if family == 0 and const.BACKPACK_ONLY_REAGENT_BAGS and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+        family = const.REAGENT_BAG_FAMILY_KEY
+      end
       emptySlots[name] = emptySlots[name] or 0
       emptySlots[name] = emptySlots[name] + freeSlots
-      emptySlotsByBag[bagid] = { name = name, count = freeSlots }
+      emptySlotsByBag[bagid] = { name = name, count = freeSlots, family = family }
     end
   end
 
@@ -622,7 +629,7 @@ function items:Phase2_Harvest(kind, bagList)
   return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
 end
 
-function items:Phase6_EnrichData(ctx, kind, itemData)
+function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
   local emptySlotByBagAndSlot = {}
   local freeSlotKeys = {}
   local freeSlotKeysByBag = {}
@@ -648,6 +655,8 @@ function items:Phase6_EnrichData(ctx, kind, itemData)
     if currentItem.isItemEmpty then
       currentItem.itemInfo = currentItem.itemInfo or {}
       currentItem.itemInfo.emptySlotName = name
+      local bagFamily = emptySlotsByBag and emptySlotsByBag[bagid] and emptySlotsByBag[bagid].family
+      currentItem.itemInfo.emptySlotFamilyIcon = self:GetEmptySlotFamilyIcon(bagFamily)
       local quality
       if baglink ~= nil and invid ~= nil then
         local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink))
@@ -1056,7 +1065,8 @@ function items:Phase9_Sort(kind, visibleItemsBySlotKey, emptySlotByBagAndSlot)
               currentItemCount = 0,
               itemGUID = "",
               currentItemLevel = 0,
-              expacID = 0
+              expacID = 0,
+              emptySlotFamilyIcon = data.itemInfo and data.itemInfo.emptySlotFamilyIcon,
             }
           }
           table.insert(sortedItems, dummy)
@@ -1130,7 +1140,7 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
     if emptySlotsByBag then
       for bagid, info in pairs(emptySlotsByBag) do
         if IncludeBagInFreeSpace(kind, bagid, tabID) then
-          tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count }
+          tabs[tabID].emptySlotsByBag[bagid] = { name = info.name, count = info.count, family = info.family }
           tabs[tabID].emptySlots[info.name] = (tabs[tabID].emptySlots[info.name] or 0) + info.count
         end
       end
@@ -1152,8 +1162,12 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
     else
       local aggregatedCounts = {}
       local firstSlotKeyForSubclass = {}
+      local familyForSubclass = {}
       for bagid, info in pairs(tabs[tabID].emptySlotsByBag) do
         aggregatedCounts[info.name] = (aggregatedCounts[info.name] or 0) + info.count
+        if familyForSubclass[info.name] == nil then
+          familyForSubclass[info.name] = info.family
+        end
         if not firstSlotKeyForSubclass[info.name] and freeSlotKeysByBag and freeSlotKeysByBag[bagid] then
           firstSlotKeyForSubclass[info.name] = freeSlotKeysByBag[bagid]
         end
@@ -1171,7 +1185,6 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
         if freeSlotCount > 0 and slotKey ~= nil then
           local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
           if freeSlotBag and freeSlotID then
-            local originalItem = itemData[slotKey]
             table.insert(tabs[tabID].freeSpace.buttons, {
               slotkey = slotKey,
               bagid = tonumber(freeSlotBag),
@@ -1179,9 +1192,12 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
               count = freeSlotCount,
               isIndividual = false,
               key = name,
-              itemInfo = originalItem and originalItem.itemInfo or {
+              -- The aggregated "stack" button is a counter, not a real item slot, so it carries
+              -- no itemQuality (nil => no quality border). Reusing the harvested slot's itemInfo
+              -- would leak the bag's quality (e.g. the reagent bag's) and paint a colored border.
+              itemInfo = {
                 emptySlotName = name,
-                itemQuality = const.ITEM_QUALITY.Common,
+                emptySlotFamilyIcon = self:GetEmptySlotFamilyIcon(familyForSubclass[name]),
               },
             })
           end
@@ -1372,7 +1388,7 @@ function items:RunRefresh(ectx, kind)
 
   local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
 
-  local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData)
+  local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData, emptySlotsByBag)
 
   local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
   local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
@@ -1745,6 +1761,20 @@ function items:GetBagTypeFromBagID(bagid)
   else
     return Enum.ItemClass.Container, 0
   end
+end
+
+-- GetEmptySlotFamilyIcon returns the small centered overlay icon for an empty slot that
+-- belongs to a specialized bag, keyed by the bag's family bit value (see
+-- const.ITEM_BAG_FAMILY). Generic bags (family 0 or nil) return nil, meaning no overlay.
+-- A specialized family with no per-family override falls back to the shared default glyph.
+---@param family number|nil
+---@return string|nil
+function items:GetEmptySlotFamilyIcon(family)
+  if not family or family == 0 then
+    return nil
+  end
+  local overrides = const.EMPTY_SLOT_FAMILY_ICON
+  return (overrides and overrides[family]) or const.EMPTY_SLOT_FAMILY_ICON_DEFAULT
 end
 
 -- HasReagentBag returns true if the player has a reagent bag slotted in their inventory.

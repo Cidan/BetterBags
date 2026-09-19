@@ -85,3 +85,64 @@ Active search query evaluation is performed upstream during the data sweep phase
 ### 10. Zero Database Mutation in Views
 The view rendering layer (`views/views.lua`) is strictly read-only and presentation-driven.
 - **Rule:** Methods like `GetOrCreateSection` must never mutate database state or call `categories:CreateCategory`. All dynamic category creation and search-group resolution must occur upstream in the data sweep phase before `slotInfo` is dispatched to views.
+
+### 11. Empty-Slot Family Glyph (Specialized Bags, All Clients)
+Empty slots that belong to a **specialized** bag — one with a non-zero *bag family* (reagent
+bags on retail; quivers, ammo pouches, soul/herb/enchanting/… bags on classic) — draw a small,
+centered, semi-transparent glyph so the slot's restriction is visible at a glance. Generic bags
+(family `0`) draw nothing.
+- **Detection is by bag family, not bag id.** `C_Container.GetContainerNumFreeSlots(bagID)`
+  returns `numFreeSlots, bagFamily` (verified in the API docs; `bagFamily` is `Nilable`). The
+  family bit values are the keys of `const.ITEM_BAG_FAMILY`. Classic profession bags (quiver,
+  soul/herb/enchanting/…) all report a non-zero family, so no per-client branch is needed for them.
+- **The retail Reagent Bag is the one exception — it is id-based, not family-based.** Blizzard's
+  own `ContainerFrame_IsReagentBag(id)` is literally `return id == 5`, and
+  `GetContainerNumFreeSlots(5)` reports family **0**. A family-only check therefore silently skips
+  it (the bug behind "no icon on retail"). `Phase5_UpdateFreeSlots` substitutes the symbolic
+  `const.REAGENT_BAG_FAMILY_KEY` (`"ReagentBag"`) as the family when `bagFamily == 0` and
+  `const.BACKPACK_ONLY_REAGENT_BAGS[bagid]` is set. The resolver and override map treat that string
+  key exactly like a numeric family (override `EMPTY_SLOT_FAMILY_ICON["ReagentBag"]` for a
+  reagent-specific glyph — e.g. the retail-only `bags-icon-reagents` atlas — else the default). The
+  substitution only fires when the API family is 0, so if a client ever reports a real family for
+  the reagent bag, the numeric path wins unchanged.
+- **Resolution is data-phase, per the Pure Presentation Principle (§1) — the draw layer never
+  resolves it.** `items:GetEmptySlotFamilyIcon(family)` (`data/items.lua`) maps a family key to a
+  texture **atlas name**: `nil` for family `0`/`nil` (no glyph), an explicit
+  `const.EMPTY_SLOT_FAMILY_ICON[family]` override if present, else the shared
+  `const.EMPTY_SLOT_FAMILY_ICON_DEFAULT`. The map is empty by default (every specialized bag shares
+  the default glyph); it exists so distinct per-family icons are a one-line data addition later.
+- **Values are texture ATLAS names, not file paths** (drawn via `Texture:SetAtlas`). The default is
+  `"Mobile-Herbalism"` (a 128×128 atlas, sized down in the draw layer), confirmed present on both
+  retail and classic clients. (The earlier `Interface\PaperDoll\UI-PaperDoll-Slot-Bag` file path was
+  replaced by the atlas at the user's request.)
+- **Threading (data phase).** `Phase5_UpdateFreeSlots` captures the family into
+  `emptySlotsByBag[bagid].family`. `Phase6_EnrichData` (now taking `emptySlotsByBag`) resolves and
+  stores the ready atlas name on each empty slot's `itemInfo.emptySlotFamilyIcon`. This one field
+  reaches **all four** empty-slot render paths: the individual free-space buttons (reuse the
+  harvested `itemInfo`), the aggregated/combined free-space "stack" button (`Phase10_PartitionIntoTabs`
+  builds it a **fresh** `itemInfo` with `emptySlotName` + `emptySlotFamilyIcon` from
+  `familyForSubclass[name]`, and **no `itemQuality`** — see the border note below), and the in-place
+  empty slots of the Show-Bags view — whose dummy `itemInfo` is built fresh in `Phase9_Sort`, so it
+  copies `emptySlotFamilyIcon` from the harvested empty item it iterates.
+- **The aggregated "stack" button carries no quality (no border).** A specialized bag's harvested
+  empty-slot `itemInfo` carries the bag's `itemQuality` (from `const.BAG_SUBTYPE_TO_QUALITY`). Reusing
+  it for the aggregate counter leaked that quality and painted a colored `IconBorder` around the stack
+  button (the reported reagent-bag border), unlike the plain-bag stack. So `Phase10` builds the stack
+  button a fresh `itemInfo` **without `itemQuality`** (nil), and `SetFreeSlots` no longer coerces a
+  missing quality to `Common` (Blizzard's `ColorManager` returns a color for `Common`, so `Common`
+  *would* draw a border; **nil** is what clears it — `SetItemButtonQuality(nil)` and
+  `DrawClassicQualityBorder(nil)` both hide the border). Individual free-slot buttons and Show-Bags
+  empties still pass their harvested quality through unchanged. Coverage: `spec/frames/item_spec.lua`
+  ("passes nil (not Common) to SetItemButtonQuality when a free slot has no itemQuality").
+- **Draw (`frames/item.lua`).** `SetFreeSlots` reads `data.itemInfo.emptySlotFamilyIcon` and, when
+  set, shows a lazily-created `OVERLAY` texture on the **themed decoration** (`decoration.BetterBagsFamilyIcon`
+  via `getFamilyIconTexture`) via `SetAtlas` — 24×24, centered, `0.4` alpha (re-applying `SetSize`
+  after `SetAtlas`, since `SetAtlas` can otherwise snap to the atlas's native 128×128) — else hides
+  it. The overlay lives on the **decoration** (the visual layer), not `self.button` (the interaction
+  layer), and in the `OVERLAY` layer so it sits above the empty-slot art. It is hidden in
+  `SetItemFromData` (any real item drawn into the slot) and `ClearItem`. No `items:`/database call
+  happens at draw time.
+- **Coverage:** `spec/items_spec.lua` ("Empty slot family icons (specialized bags)": resolver
+  semantics, `Phase5` family capture, `Phase6` icon resolution incl. the generic-bag nil case) and
+  `spec/frames/item_spec.lua` ("Empty slot family icon overlay": shown on specialized slots, hidden
+  on generic slots and when the slot is redrawn as an item).

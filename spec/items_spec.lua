@@ -1722,3 +1722,143 @@ describe("Upgrade Icon Providers", function()
     end)
   end)
 end)
+
+describe("Empty slot family icons (specialized bags)", function()
+  before_each(function()
+    addon.isRetail = true
+  end)
+
+  it("GetEmptySlotFamilyIcon returns nil for generic bags and a texture for specialized bags", function()
+    const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+    const.EMPTY_SLOT_FAMILY_ICON = {}
+
+    assert.is_nil(items:GetEmptySlotFamilyIcon(nil))
+    assert.is_nil(items:GetEmptySlotFamilyIcon(0))
+    -- Any non-zero family with no explicit override falls back to the shared default.
+    assert.are.equal([[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]], items:GetEmptySlotFamilyIcon(4))
+
+    -- A per-family override is honored (sets us up for distinct icons later).
+    const.EMPTY_SLOT_FAMILY_ICON[32] = [[Interface\Icons\INV_Misc_Herb_01]]
+    assert.are.equal([[Interface\Icons\INV_Misc_Herb_01]], items:GetEmptySlotFamilyIcon(32))
+  end)
+
+  it("Phase5_UpdateFreeSlots records the bag family per bag", function()
+    const.BANK_BAGS = { [6] = 6, [7] = 7 }
+    const.ACCOUNT_BANK_BAGS = {}
+    const.BANK_TAB = { BANK = -1, ACCOUNT_BANK_1 = -3 }
+
+    local origFree = _G.C_Container.GetContainerNumFreeSlots
+    _G.C_Container.GetContainerNumFreeSlots = function(bagid)
+      if bagid == 6 then return 5, 0 end    -- generic bag
+      if bagid == 7 then return 3, 32 end   -- herb bag (family bit 32)
+      return 0, 0
+    end
+    local origSub = _G.C_Item.GetItemSubClassInfo
+    _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
+    local origLink = _G.GetInventoryItemLink
+    _G.GetInventoryItemLink = function() return nil end
+
+    local c = addon:GetModule("Context"):New("TestFamilyPhase5")
+    items:WipeSlotInfo(const.BAG_KIND.BANK)
+    local _, emptySlotsByBag = items:Phase5_UpdateFreeSlots(c, const.BAG_KIND.BANK)
+
+    assert.are.equal(0, emptySlotsByBag[6].family)
+    assert.are.equal(32, emptySlotsByBag[7].family)
+
+    _G.C_Container.GetContainerNumFreeSlots = origFree
+    _G.C_Item.GetItemSubClassInfo = origSub
+    _G.GetInventoryItemLink = origLink
+  end)
+
+  it("Phase5_UpdateFreeSlots flags the retail reagent bag by id (family 0 from the API)", function()
+    -- On retail the reagent bag (id 5) is identified purely by its id; GetContainerNumFreeSlots
+    -- returns family 0 for it, so it must be flagged via BACKPACK_ONLY_REAGENT_BAGS instead.
+    addon.isRetail = true
+    const.BACKPACK_BAGS = { [0] = 0, [5] = 5 }
+    const.BACKPACK_ONLY_REAGENT_BAGS = { [5] = 5 }
+    const.REAGENT_BAG_FAMILY_KEY = "ReagentBag"
+
+    local origFree = _G.C_Container.GetContainerNumFreeSlots
+    _G.C_Container.GetContainerNumFreeSlots = function(bagid)
+      if bagid == 0 then return 4, 0 end    -- generic backpack bag
+      if bagid == 5 then return 6, 0 end    -- reagent bag: API reports family 0
+      return 0, 0
+    end
+    local origSub = _G.C_Item.GetItemSubClassInfo
+    _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
+    local origLink = _G.GetInventoryItemLink
+    _G.GetInventoryItemLink = function() return nil end
+
+    local c = addon:GetModule("Context"):New("TestReagentPhase5")
+    items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+    local _, emptySlotsByBag = items:Phase5_UpdateFreeSlots(c, const.BAG_KIND.BACKPACK)
+
+    assert.are.equal(0, emptySlotsByBag[0].family)
+    assert.are.equal("ReagentBag", emptySlotsByBag[5].family)
+    -- The reagent-bag key resolves to a (default) glyph.
+    const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+    const.EMPTY_SLOT_FAMILY_ICON = {}
+    assert.are.equal([[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]], items:GetEmptySlotFamilyIcon("ReagentBag"))
+
+    _G.C_Container.GetContainerNumFreeSlots = origFree
+    _G.C_Item.GetItemSubClassInfo = origSub
+    _G.GetInventoryItemLink = origLink
+  end)
+
+  it("Phase6_EnrichData resolves the family icon onto empty-slot itemInfo", function()
+    const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+    const.EMPTY_SLOT_FAMILY_ICON = {}
+    const.BACKPACK_BAGS = { [0] = 0 }
+
+    local origIID = _G.C_Container.ContainerIDToInventoryID
+    _G.C_Container.ContainerIDToInventoryID = function() return nil end
+    local origSub = _G.C_Item.GetItemSubClassInfo
+    _G.C_Item.GetItemSubClassInfo = function() return "Herb Bag" end
+    local origLink = _G.GetInventoryItemLink
+    _G.GetInventoryItemLink = function() return nil end
+
+    local itemData = {
+      ["0_1"] = { bagid = 0, slotid = 1, slotkey = "0_1", isItemEmpty = true, itemInfo = {} },
+      ["0_2"] = { bagid = 0, slotid = 2, slotkey = "0_2", isItemEmpty = true, itemInfo = {} },
+    }
+    -- Bag 0 is a specialized (herb, family 32) bag in this scenario.
+    local emptySlotsByBag = { [0] = { name = "Herb Bag", count = 2, family = 32 } }
+
+    local c = addon:GetModule("Context"):New("TestFamilyPhase6")
+    items:Phase6_EnrichData(c, const.BAG_KIND.BACKPACK, itemData, emptySlotsByBag)
+
+    assert.are.equal([[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]], itemData["0_1"].itemInfo.emptySlotFamilyIcon)
+    assert.are.equal([[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]], itemData["0_2"].itemInfo.emptySlotFamilyIcon)
+
+    _G.C_Container.ContainerIDToInventoryID = origIID
+    _G.C_Item.GetItemSubClassInfo = origSub
+    _G.GetInventoryItemLink = origLink
+  end)
+
+  it("Phase6_EnrichData leaves the family icon nil for a generic (family 0) bag", function()
+    const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+    const.EMPTY_SLOT_FAMILY_ICON = {}
+    const.BACKPACK_BAGS = { [0] = 0 }
+
+    local origIID = _G.C_Container.ContainerIDToInventoryID
+    _G.C_Container.ContainerIDToInventoryID = function() return nil end
+    local origSub = _G.C_Item.GetItemSubClassInfo
+    _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
+    local origLink = _G.GetInventoryItemLink
+    _G.GetInventoryItemLink = function() return nil end
+
+    local itemData = {
+      ["0_1"] = { bagid = 0, slotid = 1, slotkey = "0_1", isItemEmpty = true, itemInfo = {} },
+    }
+    local emptySlotsByBag = { [0] = { name = "Bag", count = 1, family = 0 } }
+
+    local c = addon:GetModule("Context"):New("TestFamilyPhase6Generic")
+    items:Phase6_EnrichData(c, const.BAG_KIND.BACKPACK, itemData, emptySlotsByBag)
+
+    assert.is_nil(itemData["0_1"].itemInfo.emptySlotFamilyIcon)
+
+    _G.C_Container.ContainerIDToInventoryID = origIID
+    _G.C_Item.GetItemSubClassInfo = origSub
+    _G.GetInventoryItemLink = origLink
+  end)
+end)
