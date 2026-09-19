@@ -800,6 +800,7 @@ function stackedLayout:AddSlider(opts)
 
   container.description = self:createDescription(container, opts.description, {0.75, 0.75, 0.75})
   container.description:SetPoint("TOPLEFT", container.title, "BOTTOMLEFT", 0, -5)
+  container.description:SetPoint("RIGHT", container, "RIGHT", -10, 0)
 
   if addon.isRetail then
     container.slider = CreateFrame("Slider", nil, container, "UISliderTemplate") --[[@as Slider]]

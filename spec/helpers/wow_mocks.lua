@@ -232,6 +232,33 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetNonSpaceWrap(wrap)
     self._nonSpaceWrap = wrap
   end
+  -- Slider widget API (UISliderTemplate / HorizontalSliderTemplate).
+  function widget:SetOrientation(orientation)
+    self._orientation = orientation
+  end
+  function widget:SetMinMaxValues(minValue, maxValue)
+    self._minValue = minValue
+    self._maxValue = maxValue
+  end
+  function widget:SetValueStep(step)
+    self._valueStep = step
+  end
+  function widget:SetObeyStepOnDrag(obey)
+    self._obeyStepOnDrag = obey
+  end
+  function widget:SetValue(value)
+    self._value = value
+  end
+  function widget:GetValue()
+    return self._value or 0
+  end
+  -- EditBox widget API (InputBoxTemplate).
+  function widget:SetNumeric(numeric)
+    self._numeric = numeric
+  end
+  function widget:SetAutoFocus(autoFocus)
+    self._autoFocus = autoFocus
+  end
   function widget:GetLineHeight()
     return self._lineHeight or 12
   end
