@@ -62,9 +62,12 @@ end
 
 local function expandCurrencyList(ref)
   if C_CurrencyInfo and C_CurrencyInfo.ExpandCurrencyList then
+    -- Modern namespace: expand flag is a boolean.
     C_CurrencyInfo.ExpandCurrencyList(ref, true)
   elseif ExpandCurrencyList then
-    ExpandCurrencyList(ref, true)
+    -- Legacy Classic global: expand flag is a number (0 = collapse, 1 = expand).
+    -- Passing a boolean raises "Usage: ExpandCurrencyList(index,expand)".
+    ExpandCurrencyList(ref, 1)
   end
 end
 
