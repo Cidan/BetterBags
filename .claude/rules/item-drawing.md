@@ -93,9 +93,18 @@ centered, semi-transparent glyph so the slot's restriction is visible at a glanc
 (family `0`) draw nothing.
 - **Detection is by bag family, not bag id.** `C_Container.GetContainerNumFreeSlots(bagID)`
   returns `numFreeSlots, bagFamily` (verified in the API docs; `bagFamily` is `Nilable`). The
-  family bit values are the keys of `const.ITEM_BAG_FAMILY`. This is the single cross-version
-  discriminator — retail's dedicated Reagent Bag (bag id 5) and every classic profession bag are
-  all just non-zero families, so no per-client / `addon.isRetail` branch is needed.
+  family bit values are the keys of `const.ITEM_BAG_FAMILY`. Classic profession bags (quiver,
+  soul/herb/enchanting/…) all report a non-zero family, so no per-client branch is needed for them.
+- **The retail Reagent Bag is the one exception — it is id-based, not family-based.** Blizzard's
+  own `ContainerFrame_IsReagentBag(id)` is literally `return id == 5`, and
+  `GetContainerNumFreeSlots(5)` reports family **0**. A family-only check therefore silently skips
+  it (the bug behind "no icon on retail"). `Phase5_UpdateFreeSlots` substitutes the symbolic
+  `const.REAGENT_BAG_FAMILY_KEY` (`"ReagentBag"`) as the family when `bagFamily == 0` and
+  `const.BACKPACK_ONLY_REAGENT_BAGS[bagid]` is set. The resolver and override map treat that string
+  key exactly like a numeric family (override `EMPTY_SLOT_FAMILY_ICON["ReagentBag"]` for a
+  reagent-specific glyph — e.g. the retail-only `bags-icon-reagents` atlas — else the default). The
+  substitution only fires when the API family is 0, so if a client ever reports a real family for
+  the reagent bag, the numeric path wins unchanged.
 - **Resolution is data-phase, per the Pure Presentation Principle (§1) — the draw layer never
   resolves it.** `items:GetEmptySlotFamilyIcon(family)` (`data/items.lua`) maps a family bit to a
   texture: `nil` for family `0`/`nil` (no glyph), an explicit `const.EMPTY_SLOT_FAMILY_ICON[family]`

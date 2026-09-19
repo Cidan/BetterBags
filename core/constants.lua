@@ -263,6 +263,12 @@ const.ITEM_BAG_FAMILY = {
 -- asset present on every client (retail and classic), so it is a safe cross-version default.
 const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 
+-- On retail the dedicated Reagent Bag (bag id 5) is identified by id, not by a bag-family bit
+-- (C_Container.GetContainerNumFreeSlots reports family 0 for it), so it is keyed in
+-- EMPTY_SLOT_FAMILY_ICON by this symbolic key instead of a numeric family. Classic profession
+-- bags keep their real numeric family bits.
+const.REAGENT_BAG_FAMILY_KEY = "ReagentBag"
+
 -- EMPTY_SLOT_FAMILY_ICON maps a bag-family bit value (see ITEM_BAG_FAMILY) to a distinct
 -- overlay icon. Families with no explicit entry fall back to EMPTY_SLOT_FAMILY_ICON_DEFAULT
 -- (resolved by items:GetEmptySlotFamilyIcon). Empty by default — every specialized bag shares

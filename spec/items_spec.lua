@@ -1770,6 +1770,41 @@ describe("Empty slot family icons (specialized bags)", function()
     _G.GetInventoryItemLink = origLink
   end)
 
+  it("Phase5_UpdateFreeSlots flags the retail reagent bag by id (family 0 from the API)", function()
+    -- On retail the reagent bag (id 5) is identified purely by its id; GetContainerNumFreeSlots
+    -- returns family 0 for it, so it must be flagged via BACKPACK_ONLY_REAGENT_BAGS instead.
+    addon.isRetail = true
+    const.BACKPACK_BAGS = { [0] = 0, [5] = 5 }
+    const.BACKPACK_ONLY_REAGENT_BAGS = { [5] = 5 }
+    const.REAGENT_BAG_FAMILY_KEY = "ReagentBag"
+
+    local origFree = _G.C_Container.GetContainerNumFreeSlots
+    _G.C_Container.GetContainerNumFreeSlots = function(bagid)
+      if bagid == 0 then return 4, 0 end    -- generic backpack bag
+      if bagid == 5 then return 6, 0 end    -- reagent bag: API reports family 0
+      return 0, 0
+    end
+    local origSub = _G.C_Item.GetItemSubClassInfo
+    _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
+    local origLink = _G.GetInventoryItemLink
+    _G.GetInventoryItemLink = function() return nil end
+
+    local c = addon:GetModule("Context"):New("TestReagentPhase5")
+    items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+    local _, emptySlotsByBag = items:Phase5_UpdateFreeSlots(c, const.BAG_KIND.BACKPACK)
+
+    assert.are.equal(0, emptySlotsByBag[0].family)
+    assert.are.equal("ReagentBag", emptySlotsByBag[5].family)
+    -- The reagent-bag key resolves to a (default) glyph.
+    const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+    const.EMPTY_SLOT_FAMILY_ICON = {}
+    assert.are.equal([[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]], items:GetEmptySlotFamilyIcon("ReagentBag"))
+
+    _G.C_Container.GetContainerNumFreeSlots = origFree
+    _G.C_Item.GetItemSubClassInfo = origSub
+    _G.GetInventoryItemLink = origLink
+  end)
+
   it("Phase6_EnrichData resolves the family icon onto empty-slot itemInfo", function()
     const.EMPTY_SLOT_FAMILY_ICON_DEFAULT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
     const.EMPTY_SLOT_FAMILY_ICON = {}

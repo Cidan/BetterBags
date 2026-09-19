@@ -379,9 +379,15 @@ function items:Phase5_UpdateFreeSlots(ctx, kind)
       freeSlots = freeSlots - 4
     end
     if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
+      -- The retail reagent bag reports family 0 (it is identified by bag id, not a family
+      -- bit), so key it by the symbolic reagent key; classic profession bags keep their bits.
+      local family = bagFamily or 0
+      if family == 0 and const.BACKPACK_ONLY_REAGENT_BAGS and const.BACKPACK_ONLY_REAGENT_BAGS[bagid] then
+        family = const.REAGENT_BAG_FAMILY_KEY
+      end
       emptySlots[name] = emptySlots[name] or 0
       emptySlots[name] = emptySlots[name] + freeSlots
-      emptySlotsByBag[bagid] = { name = name, count = freeSlots, family = bagFamily or 0 }
+      emptySlotsByBag[bagid] = { name = name, count = freeSlots, family = family }
     end
   end
 
