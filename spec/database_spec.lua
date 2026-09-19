@@ -72,6 +72,9 @@ function L:G(key) return key end
 -- Set up Constants module
 local const = StubBetterBagsModule("Constants")
 const.BAG_KIND = { BACKPACK = 0, BANK = 1, UNDEFINED = -1 }
+const.GLOW_INTENSITY_HALO_THRESHOLD = 60
+const.GLOW_INTENSITY_MAX = 100
+const.GLOW_INTENSITY_DEFAULT = 60
 const.BAG_VIEW = { UNDEFINED = 0, SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 const.SECTION_SORT_TYPE = { ALPHABETICALLY = 1, SIZE_DESCENDING = 2, SIZE_ASCENDING = 3 }
 const.ITEM_SORT_TYPE = { ALPHABETICALLY_THEN_QUALITY = 1, QUALITY_THEN_ALPHABETICALLY = 2, ITEM_LEVEL = 3, EXPANSION = 4 }
@@ -100,7 +103,7 @@ const.DATABASE_DEFAULTS = {
     showFullSectionNames = { [0] = false, [1] = false },
     showAllFreeSpace = { [0] = false, [1] = false },
     preserveItemGaps = { [0] = true, [1] = true },
-    extraGlowyButtons = { [0] = false, [1] = false },
+    glowIntensity = { [0] = 60, [1] = 60 },
     newItems = {
       [0] = { markRecentItems = true, showNewItemFlash = false },
       [1] = { markRecentItems = true, showNewItemFlash = false },
@@ -428,11 +431,20 @@ describe("Database", function()
 
   -- ─── Extra glowy buttons ───────────────────────────────────────────────────────
 
-  describe("extra glowy buttons", function()
+  describe("glow intensity", function()
 
-    it("GetExtraGlowyButtons / SetExtraGlowyButtons", function()
-      DB:SetExtraGlowyButtons(const.BAG_KIND.BACKPACK, true)
-      assert.is_true(DB:GetExtraGlowyButtons(const.BAG_KIND.BACKPACK))
+    it("GetGlowIntensity / SetGlowIntensity", function()
+      DB:SetGlowIntensity(const.BAG_KIND.BACKPACK, 85)
+      assert.equal(85, DB:GetGlowIntensity(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("clamps and rounds the stored intensity to an integer in [0, 100]", function()
+      DB:SetGlowIntensity(const.BAG_KIND.BACKPACK, 61.6)
+      assert.equal(62, DB:GetGlowIntensity(const.BAG_KIND.BACKPACK))
+      DB:SetGlowIntensity(const.BAG_KIND.BACKPACK, -20)
+      assert.equal(0, DB:GetGlowIntensity(const.BAG_KIND.BACKPACK))
+      DB:SetGlowIntensity(const.BAG_KIND.BACKPACK, 250)
+      assert.equal(100, DB:GetGlowIntensity(const.BAG_KIND.BACKPACK))
     end)
   end)
 

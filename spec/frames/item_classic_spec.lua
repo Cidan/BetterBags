@@ -117,11 +117,14 @@ local function stubModules()
   override(const, "BANK_BAGS", { [6] = 6 })
   override(const, "ACCOUNT_BANK_BAGS", { [13] = 13 })
   override(const, "BACKPACK_ONLY_REAGENT_BAGS", {})
+  override(const, "GLOW_INTENSITY_HALO_THRESHOLD", 60)
+  override(const, "GLOW_INTENSITY_MAX", 100)
+  override(const, "GLOW_INTENSITY_DEFAULT", 60)
 
   local database = stubModule("Database")
   override(database, "GetItemLevelOptions", function() return { enabled = false, color = false } end)
   override(database, "GetStackingOptions", function() return { mergeUnstackable = false } end)
-  override(database, "GetExtraGlowyButtons", function() return false end)
+  override(database, "GetGlowIntensity", function() return 100 end)
   override(database, "GetShowAllFreeSpace", function() return false end)
 
   local color = stubModule("Color")
@@ -214,27 +217,75 @@ describe("ItemFrame on Classic clients", function()
     resetCreatedStubs()
   end)
 
-  it("draws an additive quality glow for uncommon+ items (subtle when Extra Glowy is off)", function()
-    local ctx = context:New("classic_border")
+  it("draws no quality border at glow intensity 0", function()
+    local database = addon:GetModule("Database")
+    override(database, "GetGlowIntensity", function() return 0 end)
+
+    local ctx = context:New("classic_border_zero")
+    local item = itemFrame:GetButton(ctx, "0_1")
+    local decoration = item._decoration
+
+    item:SetItemFromData(ctx, itemData(0, 1, const.ITEM_QUALITY.Rare))
+    assert.is_false(decoration.IconBorder:IsShown(), "intensity 0 must draw no border at all")
+  end)
+
+  it("draws a solid colored border (no additive halo) at intensity 60", function()
+    local database = addon:GetModule("Database")
+    override(database, "GetGlowIntensity", function() return 60 end)
+
+    local ctx = context:New("classic_border_60")
     local item = itemFrame:GetButton(ctx, "0_1")
     local decoration = item._decoration
 
     item:SetItemFromData(ctx, itemData(0, 1, const.ITEM_QUALITY.Rare))
 
-    assert.is_true(decoration.IconBorder:IsShown(), "rare item must have a visible quality glow on Classic")
-    assert.equal([[Interface\Buttons\UI-ActionButton-Border]], decoration.IconBorder._texturePath)
-    assert.equal("ADD", decoration.IconBorder._blendMode)
+    assert.is_true(decoration.IconBorder:IsShown(), "rare item must show a solid quality border at 60")
+    assert.equal([[Interface\Common\WhiteIconFrame]], decoration.IconBorder._texturePath)
+    assert.equal("BLEND", decoration.IconBorder._blendMode)
     local vc = decoration.IconBorder._vertexColor
     assert.equal(0, vc.r)
     assert.equal(0.44, vc.g)
     assert.equal(0.87, vc.b)
-    -- Extra Glowy is off (stub returns false), so the glow is subtle (alpha < 1).
-    assert.is_true(vc.a > 0 and vc.a < 1, "non-extra-glowy quality glow must be subtle (alpha < 1)")
+    -- 60 is the threshold: the flat border is at full alpha, the halo has not begun.
+    assert.equal(1, vc.a)
   end)
 
-  it("uses a full-intensity glow when Extra Glowy is enabled", function()
+  it("fades the solid border alpha with intensity below 60", function()
     local database = addon:GetModule("Database")
-    override(database, "GetExtraGlowyButtons", function() return true end)
+    override(database, "GetGlowIntensity", function() return 30 end)
+
+    local ctx = context:New("classic_border_30")
+    local item = itemFrame:GetButton(ctx, "0_1")
+    local decoration = item._decoration
+
+    item:SetItemFromData(ctx, itemData(0, 1, const.ITEM_QUALITY.Rare))
+    assert.is_true(decoration.IconBorder:IsShown())
+    assert.equal([[Interface\Common\WhiteIconFrame]], decoration.IconBorder._texturePath)
+    assert.equal("BLEND", decoration.IconBorder._blendMode)
+    -- 30/60 -> half alpha.
+    assert.equal(0.5, decoration.IconBorder._vertexColor.a)
+  end)
+
+  it("switches to the additive halo above 60 (extra glowy at 61)", function()
+    local database = addon:GetModule("Database")
+    override(database, "GetGlowIntensity", function() return 61 end)
+
+    local ctx = context:New("classic_border_61")
+    local item = itemFrame:GetButton(ctx, "0_1")
+    local decoration = item._decoration
+
+    item:SetItemFromData(ctx, itemData(0, 1, const.ITEM_QUALITY.Rare))
+    assert.is_true(decoration.IconBorder:IsShown())
+    assert.equal([[Interface\Buttons\UI-ActionButton-Border]], decoration.IconBorder._texturePath)
+    assert.equal("ADD", decoration.IconBorder._blendMode)
+    -- Just above the threshold the halo is already clearly present, but not full.
+    local a = decoration.IconBorder._vertexColor.a
+    assert.is_true(a >= 0.4 and a < 1, "halo must be clearly present but below full just above 60")
+  end)
+
+  it("uses a full-intensity additive halo at 100", function()
+    local database = addon:GetModule("Database")
+    override(database, "GetGlowIntensity", function() return 100 end)
 
     local ctx = context:New("classic_border_glowy")
     local item = itemFrame:GetButton(ctx, "0_5")

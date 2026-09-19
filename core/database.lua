@@ -310,15 +310,21 @@ function DB:SetSectionSortType(kind, view, sort)
 end
 
 ---@param kind BagKind
----@return boolean
-function DB:GetExtraGlowyButtons(kind)
-  return DB.data.profile.extraGlowyButtons[kind]
+---@return number
+function DB:GetGlowIntensity(kind)
+  return DB.data.profile.glowIntensity[kind]
 end
 
 ---@param kind BagKind
----@param value boolean
-function DB:SetExtraGlowyButtons(kind, value)
-  DB.data.profile.extraGlowyButtons[kind] = value
+---@param value number
+function DB:SetGlowIntensity(kind, value)
+  value = math.floor((tonumber(value) or 0) + 0.5)
+  if value < 0 then
+    value = 0
+  elseif value > const.GLOW_INTENSITY_MAX then
+    value = const.GLOW_INTENSITY_MAX
+  end
+  DB.data.profile.glowIntensity[kind] = value
 end
 
 ---@param kind BagKind
@@ -1291,6 +1297,26 @@ function DB:Migrate()
     }
   end
 
+
+  -- ============================================================
+  -- "Extra Glowy" boolean -> glow intensity slider migration (Q3'27)
+  -- Do not remove before Q3'28
+  -- ============================================================
+  -- The retired per-kind boolean extraGlowyButtons is replaced by a 0-100
+  -- glowIntensity slider. Preserve the user's prior look: an enabled "Extra
+  -- Glowy" maps to the full blinding halo (100), a disabled one to the flat
+  -- colored border at the halo threshold (60). The old field is then dropped so
+  -- this runs exactly once.
+  if DB.data.profile.extraGlowyButtons ~= nil then
+    for _, kind in pairs(const.BAG_KIND) do
+      if DB.data.profile.glowIntensity[kind] ~= nil then
+        DB.data.profile.glowIntensity[kind] = DB.data.profile.extraGlowyButtons[kind]
+          and const.GLOW_INTENSITY_MAX
+          or const.GLOW_INTENSITY_DEFAULT
+      end
+    end
+    DB.data.profile.extraGlowyButtons = nil
+  end
 
   -- Migrate to kind-scoped groups, groupCounter, and categoryToGroup
   if not DB.data.profile.__groupsScopedByKind then

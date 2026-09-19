@@ -49,7 +49,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
         theme = 'Default',
         showFullSectionNames = { [0] = false, [1] = false },
         showAllFreeSpace = { [0] = false, [1] = false },
-        extraGlowyButtons = { [0] = false, [1] = false },
+        glowIntensity = { [0] = 60, [1] = 60 },
         newItems = {
           [0] = { markRecentItems = true, showNewItemFlash = false },
           [1] = { markRecentItems = true, showNewItemFlash = false },

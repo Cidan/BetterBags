@@ -18,7 +18,7 @@ local database = StubBetterBagsModule("Database")
 database.GetItemLevelOptions = function() return { color = true, enabled = true } end
 database.GetStackingOptions = function() return { mergeUnstackable = false } end
 database.GetShowAllFreeSpace = function() return false end
-database.GetExtraGlowyButtons = function() return false end
+database.GetGlowIntensity = function() return 60 end
 
 local color = StubBetterBagsModule("Color")
 color.GetItemLevelColor = function() return 1, 1, 1 end
@@ -28,6 +28,16 @@ const.BAG_KIND = { BACKPACK = 0, BANK = 1 }
 const.BACKPACK_BAGS = { [0] = true, [1] = true }
 const.BANK_BAGS = { [5] = true }
 const.ITEM_QUALITY = { Common = 1, Uncommon = 2 }
+const.ITEM_QUALITY_COLOR = {
+  [0] = { 0.62, 0.62, 0.62, 1 },
+  [1] = { 1, 1, 1, 1 },
+  [2] = { 0.12, 1, 0, 1 },
+  [3] = { 0, 0.44, 0.87, 1 },
+  [4] = { 0.64, 0.21, 0.93, 1 },
+}
+const.GLOW_INTENSITY_HALO_THRESHOLD = 60
+const.GLOW_INTENSITY_MAX = 100
+const.GLOW_INTENSITY_DEFAULT = 60
 const.BACKPACK_ONLY_REAGENT_BAGS = {}
 
 local items = StubBetterBagsModule("Items")
