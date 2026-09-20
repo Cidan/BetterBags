@@ -178,39 +178,7 @@ sets (it remains defined; it has no other consumer). Coverage: `spec/equipmentse
 ("Update" describe — UnpackLocation-present path, UnpackLocation-absent Midnight path, and the
 "does not crash on Forever (retail, non-midnight, no UnpackLocation)" regression).
 
-## 7. Bank re-indexing: Camelot fires the classic PLAYERBANKSLOTS_CHANGED
-
-Camelot's bank is a **classic-style numbered bank wearing the retail tab UI**. Its base/general
-character bank is `CharacterBankTab_1` = **bag id 6** (confirmed from `origin/forever`:
-`Blizzard_UIPanels_Game/Camelot/BankFrame.lua` — `GetBagIDFromBankTypeAndSlot(Character, bagSlot)
-= bagSlot + ITEM_INVENTORY_BANK_BAG_OFFSET`, offset `= NUM_TOTAL_EQUIPPED_BAG_SLOTS = 5`, so base
-slot 1 → 6; and `Blizzard_UIPanels_Game/Mainline/BankFrameTemplates.lua` scans each purchased tab
-via `C_Container.GetContainerNumSlots(bankTabData.ID)`). That id is already in `const.BANK_BAGS`
-(§2), so the container list is correct — the bug was that **nothing re-scanned it once its slots
-materialized**.
-
-Unlike live retail's virtual bank tabs (which refresh through `BAG_UPDATE` on the tab
-containers), Camelot signals bank slot changes with the **classic** `PLAYERBANKSLOTS_CHANGED`
-event — its bank item-bag mixin registers exactly `PLAYERBANKSLOTS_CHANGED`,
-`PLAYER_ACCOUNT_BANK_TAB_SLOTS_CHANGED`, `BAG_CONTAINER_UPDATE`. But `data/refresh.lua` gated its
-`PLAYERBANKSLOTS_CHANGED` handler behind `if not addon.isRetail`, and Camelot is
-`addon.isRetail == true`, so it was never registered. The `BANKFRAME_OPENED` sweep runs before the
-paged bank's container slots exist (`GetContainerNumSlots(6)` reads 0), the base bank harvests
-empty, and with no re-scan trigger it stays that way — an **empty bank showed no free-slot
-markers**. (The free-space pipeline itself is correct: given consistent inputs the markers render;
-this was purely a missing re-scan trigger.)
-
-Fix (`data/refresh.lua`, `refresh:OnEnable`): add an `elseif addon.isForever` branch that also
-registers `PLAYERBANKSLOTS_CHANGED`, requesting a **full** bank re-scan (`{ bank = true }`, no
-targeted bags — every tab re-indexes once its slots materialize). It must **not** reuse the
-non-retail handler's `bags = { [-1] = true }` targeting: Camelot's base bank is bag 6, not the
-classic -1. Live retail stays unregistered (its `isForever` is false), so it is untouched; the
-refresh pipeline is a stateless idempotent clean-sweep, so a redundant bank refresh just redraws
-identical content. Coverage: `spec/refresh_spec.lua` ("should trigger a full bank re-scan on
-PLAYERBANKSLOTS_CHANGED on Forever (Camelot)", "should NOT register PLAYERBANKSLOTS_CHANGED on live
-retail (no Forever)").
-
-## 8. Still pending (not yet done)
+## 7. Still pending (not yet done)
 
 - The three new `C_Bank` functions on Camelot (`ShouldUsePlayerBagsInBank`,
   `FetchMaxNumBankTabs`, `BankBagTypeAndIDToInvSlot`) are net-new integration points; none

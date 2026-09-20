@@ -225,30 +225,6 @@ describe("Refresh Module", function()
     addon.isRetail = true -- reset
   end)
 
-  it("should trigger a full bank re-scan on PLAYERBANKSLOTS_CHANGED on Forever (Camelot)", function()
-    -- Camelot is a retail fork whose numbered bank fires the classic PLAYERBANKSLOTS_CHANGED
-    -- when its bank container slots materialize/change. Its base bank is CharacterBankTab_1
-    -- (bag 6), not -1, so it must do a full bank re-scan (no targeted bags), unlike the
-    -- non-retail path which targets bag -1.
-    addon.isRetail = true
-    addon.isForever = true
-    refresh:OnEnable()
-    spy.on(refresh, "RequestUpdate")
-    local eventMap = events._eventMap
-    assert.is_not_nil(eventMap["PLAYERBANKSLOTS_CHANGED"])
-    eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { bank = true })
-    addon.isForever = false -- reset
-  end)
-
-  it("should NOT register PLAYERBANKSLOTS_CHANGED on live retail (no Forever)", function()
-    addon.isRetail = true
-    addon.isForever = false
-    events._eventMap["PLAYERBANKSLOTS_CHANGED"] = nil
-    refresh:OnEnable()
-    assert.is_nil(events._eventMap["PLAYERBANKSLOTS_CHANGED"])
-  end)
-
   it("should register bags/SortBackpack message and trigger sorting", function()
     refresh:OnEnable()
     addon.atBank = false

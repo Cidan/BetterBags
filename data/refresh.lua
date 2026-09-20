@@ -314,17 +314,6 @@ function refresh:OnEnable()
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
       self:RequestUpdate({ bank = true, bags = { [-1] = true } })
     end)
-  elseif addon.isForever then
-    -- WoW: Forever (Camelot) is a retail fork whose numbered bank fires the classic
-    -- PLAYERBANKSLOTS_CHANGED when its bank container slots materialize/change. Live
-    -- retail's virtual bank tabs do not use this event (they refresh via BAG_UPDATE),
-    -- so it stays gated to Forever. Without this, opening the bank scans before the
-    -- base bank tab's slots exist and nothing ever re-indexes it, so an empty bank
-    -- shows no free-slot markers. Camelot's base bank is CharacterBankTab_1 (bag 6),
-    -- not -1, so this does a full bank re-scan (no targeted bags) to re-index every tab.
-    events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
-      self:RequestUpdate({ bank = true })
-    end)
   end
 
   -- Route the initial login sweep through the ItemLoader's ContinuableContainer, exactly
