@@ -378,10 +378,7 @@ function items:Phase5_UpdateFreeSlots(ctx, kind)
     if addon.isClassic and Enum.BagIndex and (bagid == Enum.BagIndex.Bank or (Enum.BagIndex.Reagentbank and bagid == Enum.BagIndex.Reagentbank)) then
       freeSlots = freeSlots - 4
     end
-    -- Camelot (addon.isForever) has no keyring and reuses bag id -1 as the base bank, so the
-    -- keyring exclusion must not fire there or the base bank's free slots are dropped.
-    local isKeyring = not addon.isForever and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
-    if not isKeyring then
+    if not (Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring) then
       -- The retail reagent bag reports family 0 (it is identified by bag id, not a family
       -- bit), so key it by the symbolic reagent key; classic profession bags keep their bits.
       local family = bagFamily or 0
@@ -646,8 +643,7 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
     local invid = C_Container.ContainerIDToInventoryID(bagid)
     local baglink = GetInventoryItemLink("player", invid)
 
-    if not addon.isForever and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
-      -- Camelot has no keyring and reuses bag id -1 as the base bank; don't mislabel it.
+    if Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring then
       name = L:G("Keyring")
     elseif baglink ~= nil and invid ~= nil then
       local class, subclass = select(6, C_Item.GetItemInfoInstant(baglink)) --[[@as number]]

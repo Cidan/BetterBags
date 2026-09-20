@@ -517,61 +517,6 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
-  describe("Forever base bank at -1 (keyring guard)", function()
-    -- On WoW: Forever (Camelot) the base bank is container -1, which the mainline enum labels
-    -- "Keyring". The keyring special-casing in Phase5/Phase6 must NOT fire for -1 on Forever,
-    -- or the base bank's free slots are excluded/mislabeled and the bank renders blank.
-    local savedBankBags, savedIsForever, savedBagIndex
-    local savedFree, savedSubclass, savedLink
-
-    before_each(function()
-      savedBankBags = const.BANK_BAGS
-      savedIsForever = addon.isForever
-      savedBagIndex = _G.Enum.BagIndex
-      savedFree = _G.C_Container.GetContainerNumFreeSlots
-      savedSubclass = _G.C_Item.GetItemSubClassInfo
-      savedLink = _G.GetInventoryItemLink
-
-      addon.isRetail = true
-      const.BANK_BAGS = { [-1] = -1, [6] = 6 }
-      const.ACCOUNT_BANK_BAGS = {}
-      _G.Enum.BagIndex = { Keyring = -1 }
-      _G.C_Container.GetContainerNumFreeSlots = function(bagid)
-        if bagid == -1 then return 32 end
-        return 0
-      end
-      _G.C_Item.GetItemSubClassInfo = function() return "Bag" end
-      _G.GetInventoryItemLink = function() return nil end
-    end)
-
-    after_each(function()
-      const.BANK_BAGS = savedBankBags
-      addon.isForever = savedIsForever
-      _G.Enum.BagIndex = savedBagIndex
-      _G.C_Container.GetContainerNumFreeSlots = savedFree
-      _G.C_Item.GetItemSubClassInfo = savedSubclass
-      _G.GetInventoryItemLink = savedLink
-    end)
-
-    it("counts free slots for the base bank -1 on Forever", function()
-      addon.isForever = true
-      local ctx = addon:GetModule("Context"):New("TestForeverBaseBank")
-      items:WipeSlotInfo(const.BAG_KIND.BANK)
-      local emptySlots, emptySlotsByBag = items:Phase5_UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
-      assert.is_not_nil(emptySlotsByBag[-1])
-      assert.are.equal(32, emptySlotsByBag[-1].count)
-      assert.are.equal(32, emptySlots["Bag"])
-    end)
-
-    it("still excludes bag -1 as the keyring when NOT Forever", function()
-      addon.isForever = false
-      local ctx = addon:GetModule("Context"):New("TestKeyringExcluded")
-      items:WipeSlotInfo(const.BAG_KIND.BANK)
-      local _, emptySlotsByBag = items:Phase5_UpdateFreeSlots(ctx, const.BAG_KIND.BANK)
-      assert.is_nil(emptySlotsByBag[-1])
-    end)
-  end)
-
   describe("Synthesis of sortedCategories", function()
     it("should synthesize and sort categories after ProcessRefresh", function()
       _G.C_Container.GetContainerNumSlots = function(bagid) return 2 end

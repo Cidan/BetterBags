@@ -155,17 +155,6 @@ if addon.isRetail then
     const.BANK_ONLY_BAGS[id] = id
     const.BANK_ONLY_BAGS_LIST[#const.BANK_ONLY_BAGS_LIST + 1] = id
   end
-  if addon.isForever then
-    -- WoW: Forever (Camelot) keeps its always-present base/general character bank in
-    -- container -1 (verified live: C_Container.GetContainerNumSlots(-1) == 32 at the bank),
-    -- NOT in Characterbanktab (-2, which only holds bank-bag objects) and NOT in a purchased
-    -- CharacterBankTab_N (those are empty until bought). The mainline enum labels -1 "Keyring",
-    -- but Camelot has no keyring. Register it as a bank container so the base bank is
-    -- scanned/harvested/free-counted (without it the whole bank renders blank). Keep it OUT of
-    -- BANK_ONLY_BAGS -- that is the purchasable tabs alone, consumed by the tab slots panel.
-    -- The keyring special-casing in data/items.lua is disabled on Forever for the same reason.
-    const.BANK_BAGS[-1] = -1
-  end
 else
 -- BANK_BAGS contains all the bags that are part of the bank, including
 -- the main bank view.
