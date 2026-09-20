@@ -178,7 +178,58 @@ sets (it remains defined; it has no other consumer). Coverage: `spec/equipmentse
 ("Update" describe — UnpackLocation-present path, UnpackLocation-absent Midnight path, and the
 "does not crash on Forever (retail, non-midnight, no UnpackLocation)" regression).
 
-## 7. Still pending (not yet done)
+## 7. Base/general bank lives in container -1 (not -2, not a CharacterBankTab_N)
+
+Camelot's always-present base/general **character** bank is stored in container **-1**, and
+that is the id BetterBags must scan. Verified live on a 1.60.1 client with an empty bank and
+zero purchased tabs (`/run` dump): the only bank-range container reporting slots was
+`-1: slots=32, free=32`; `Characterbanktab` (-2) reported nothing, and every
+`CharacterBankTab_N` (6..14) was empty because `C_Bank.FetchNumPurchasedBankTabs(Character)`
+was 0 (purchased-tab data `[]`). So on a fresh/low-tab Camelot character the entire bank
+lives at -1.
+
+- `Characterbanktab` (-2) only holds **bank-bag objects** (addressed as
+  `(Characterbanktab, bagSlotID)` in `origin/forever:Blizzard_UIPanels_Game/Camelot/BankFrame.lua`),
+  not item storage — `GetContainerNumSlots(-2)` is 0.
+- The purchasable tabs `CharacterBankTab_1..9` (bag ids 6..14) *are* item storage once bought,
+  and are already in `const.BANK_BAGS` (§2) — but they are empty/absent until purchased.
+- The mainline enum Camelot inherits labels **-1 as `Keyring`**, but Camelot has no keyring;
+  -1 is the bank there.
+
+**The bug this caused:** `const.BANK_BAGS` (retail build) was `{ [-2]=-2, 6..14 }` — it never
+included -1 — so `Harvest`/`Phase5_UpdateFreeSlots`/`Phase6_EnrichData` never scanned the base
+bank. With no purchased tabs, nothing bank-side was scanned at all and the **entire bank window
+rendered blank** (no items, no free-slot markers).
+
+**Fix (two inline `addon.isForever` gates — no split constants file, no new constant):**
+1. `core/constants.lua`, retail `BANK_BAGS` build: after the `CharacterBankTab_` loop,
+   `if addon.isForever then const.BANK_BAGS[-1] = -1 end`. Added to `BANK_BAGS` only, **not**
+   `BANK_ONLY_BAGS` (that list is the purchasable tabs alone, consumed by the tab slots panel).
+   Because `BANK_BAGS` drives the whole scan/partition/free-count pipeline plus the loader's
+   managed-bag set (`data/loader.lua:ForEachManagedBag`) and the `BAG_UPDATE`→bank-refresh
+   fan-out (`data/refresh.lua`), this one addition makes the base bank scanned, harvested,
+   free-counted, routed to the character bank tab (`const.ACCOUNT_BANK_BAGS[-1]` is nil, so
+   `IncludeBagInFreeSpace`/`ItemBelongsToTab` treat it as character bank), and re-indexed on
+   change — with no other per-site edits.
+2. `data/items.lua`: the keyring special-casing keys off `Enum.BagIndex.Keyring`, which is -1 on
+   Camelot — i.e. the base bank. Gate both sites with `not addon.isForever` so -1 is never
+   excluded/mislabeled as the keyring: `Phase5_UpdateFreeSlots` (the `isKeyring` guard that
+   otherwise drops -1 from `emptySlots`) and `Phase6_EnrichData` (the `name = "Keyring"` branch).
+   `GetBagName` needs no change — -1 isn't in `BACKPACK_BAGS`, so it already falls to its
+   `id == -1 → "#1: Bank"` branch.
+
+Do **not** re-introduce a `bags = { [-1] = true }`-style *targeted* handler for this (that was the
+non-retail `PLAYERBANKSLOTS_CHANGED` path); the fix is purely making -1 a first-class member of
+`BANK_BAGS`. An earlier attempt that instead registered `PLAYERBANKSLOTS_CHANGED` on Forever did
+**not** fix it (the base bank container was never in the scan list to begin with) and was
+reverted.
+
+Coverage: `spec/core/constants_spec.lua` ("Forever base bank container (-1)": added to
+`BANK_BAGS` but not `BANK_ONLY_BAGS` on Forever, absent on live retail) and `spec/items_spec.lua`
+("Forever base bank at -1 (keyring guard)": `Phase5_UpdateFreeSlots` counts -1's free slots on
+Forever, still excludes -1 as the keyring when not Forever).
+
+## 8. Still pending (not yet done)
 
 - The three new `C_Bank` functions on Camelot (`ShouldUsePlayerBagsInBank`,
   `FetchMaxNumBankTabs`, `BankBagTypeAndIDToInvSlot`) are net-new integration points; none

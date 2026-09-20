@@ -230,6 +230,42 @@ describe("Constants Module Offsets", function()
     end)
   end)
 
+  describe("Forever base bank container (-1)", function()
+    local savedIsForever
+
+    before_each(function()
+      addon.modules["Constants"] = nil
+      local aceAddon = LibStub("AceAddon-3.0")
+      if aceAddon.addons["BetterBags_Constants"] then
+        aceAddon.addons["BetterBags_Constants"] = nil
+      end
+      savedIsForever = addon.isForever
+    end)
+
+    after_each(function()
+      addon.isForever = savedIsForever
+    end)
+
+    -- Camelot's always-present base/general character bank lives in container -1 (verified
+    -- live: GetContainerNumSlots(-1) == 32 at the bank), not Characterbanktab (-2) and not a
+    -- purchased CharacterBankTab_N. The mainline enum labels -1 "Keyring", but Camelot has no
+    -- keyring. BetterBags must scan -1 or the whole bank shows blank.
+    it("adds the base bank container -1 to BANK_BAGS on Forever, not to BANK_ONLY_BAGS", function()
+      addon.isForever = true
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.are.equal(-1, const.BANK_BAGS[-1])
+      assert.is_nil(const.BANK_ONLY_BAGS[-1])
+    end)
+
+    it("does not add -1 to BANK_BAGS on live retail (no Forever)", function()
+      addon.isForever = false
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.is_nil(const.BANK_BAGS[-1])
+    end)
+  end)
+
   describe("addon.isForever normalization", function()
     local savedIsForever
     before_each(function() savedIsForever = addon.isForever end)
