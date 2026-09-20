@@ -57,6 +57,38 @@ local isClosingBank = false
 ---@field bag Bag Reference to the parent bag
 bank.proto = {}
 
+-- SuppressBlizzardBankPanel neutralizes Blizzard's BankPanel so BetterBags can render its own
+-- bank window. The panel must stay Shown (invisibly) for GetActiveBankType to work, so we drop
+-- its alpha/input rather than hiding it, and hide its chrome children.
+--
+-- Camelot: BankPanel.MoneyDisplay (BankBagCostMoneyDisplayMixin -- the "cost of the next bank
+-- tab" money frame) registers PLAYER_MONEY at login and, because BetterBags reparents BankFrame
+-- under a permanently-hidden frame, its OnHide never fires to unregister it (OnShow/OnHide track
+-- effective visibility, and it is never IsVisible). Event registration is independent of shown
+-- state, so hiding it does NOT unregister it -- a gold change while away from the bank then runs
+-- Blizzard's OnShowOrHideBagCost with a nil bank type and crashes on FetchNumPurchasedBankTabs.
+-- We therefore UnregisterEvent it directly. Nothing re-registers it (its OnShow can never fire
+-- while it is not IsVisible). Nil-guarded, so live retail (no MoneyDisplay) is unaffected.
+function bank:SuppressBlizzardBankPanel()
+	if not BankPanel then return end
+	BankPanel:SetAlpha(0)
+	BankPanel:EnableMouse(false)
+	BankPanel:EnableKeyboard(false)
+	if BankPanel.MoneyFrame then
+		BankPanel.MoneyFrame:Hide()
+	end
+	if BankPanel.AutoDepositFrame then
+		BankPanel.AutoDepositFrame:Hide()
+	end
+	if BankPanel.Header then
+		BankPanel.Header:Hide()
+	end
+	if BankPanel.MoneyDisplay then
+		BankPanel.MoneyDisplay:UnregisterEvent("PLAYER_MONEY")
+	end
+	BankPanel:Show()
+end
+
 ---@param ctx Context
 function bank.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
@@ -99,21 +131,7 @@ function bank.proto:OnShow(ctx)
 
 			-- CRITICAL: BankPanel taint handling (see patterns.md)
 			-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
-			if BankPanel then
-				BankPanel:SetAlpha(0)
-				BankPanel:EnableMouse(false)
-				BankPanel:EnableKeyboard(false)
-				if BankPanel.MoneyFrame then
-					BankPanel.MoneyFrame:Hide()
-				end
-				if BankPanel.AutoDepositFrame then
-					BankPanel.AutoDepositFrame:Hide()
-				end
-				if BankPanel.Header then
-					BankPanel.Header:Hide()
-				end
-				BankPanel:Show()
-			end
+			bank:SuppressBlizzardBankPanel()
 
 			local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
 			self.bag.tabs:SetTabByID(ctx, activeGroup)
@@ -146,21 +164,7 @@ function bank.proto:OnShow(ctx)
 		-- Direct show path (existing logic)
 		-- CRITICAL: BankPanel taint handling (see patterns.md)
 		-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
-		if BankPanel then
-			BankPanel:SetAlpha(0)
-			BankPanel:EnableMouse(false)
-			BankPanel:EnableKeyboard(false)
-			if BankPanel.MoneyFrame then
-				BankPanel.MoneyFrame:Hide()
-			end
-			if BankPanel.AutoDepositFrame then
-				BankPanel.AutoDepositFrame:Hide()
-			end
-			if BankPanel.Header then
-				BankPanel.Header:Hide()
-			end
-			BankPanel:Show()
-		end
+		bank:SuppressBlizzardBankPanel()
 
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
 		self.bag.tabs:SetTabByID(ctx, activeGroup)

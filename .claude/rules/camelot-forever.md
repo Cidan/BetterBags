@@ -213,7 +213,64 @@ first-tab grant/load not being reflected at the `BANKFRAME_OPENED` scan (there i
 re-scan on `BANK_TABS_CHANGED`), **not** a missing base-bank container — diagnose that path
 rather than re-adding -1.
 
-## 8. Still pending (not yet done)
+## 8. PLAYER_MONEY crash while looting away from the bank (directly UnregisterEvent BankPanel.MoneyDisplay)
+
+Symptom: on Camelot, a gold change out in the world (looting coin) throws
+`Blizzard_UIPanels_Game/Camelot/BankFrame.lua:43: bad argument #1 to 'FetchNumPurchasedBankTabs'
+(bankType nil)`. It requires having visited the bank at least once in the session, and does not
+happen with the addon disabled.
+
+Root cause (a latent Blizzard bug that BetterBags's frame handling triggers), traced end to end:
+- `BankPanel.MoneyDisplay` (`BankBagCostMoneyDisplayMixin`, the "cost of the next bank tab" money
+  frame) registers `PLAYER_MONEY` in its `OnShow` / unregisters in `OnHide`
+  (`Camelot/BankFrame.lua`). Its `OnEvent` on `PLAYER_MONEY` calls `Refresh()`, which fires
+  `EventRegistry:TriggerEvent("BankPanelMixin.ShowOrHideBagCost")`. The handler
+  `BankFrameMixin:OnShowOrHideBagCost` calls `C_Bank.FetchNumPurchasedBankTabs(self:GetActiveBankType())`
+  with **no nil check**.
+- The two `GetActiveBankType`s are asymmetric (`Mainline/BankFrameTemplates.lua`):
+  `BankPanelMixin:GetActiveBankType()` returns `self.bankType` (raw), but
+  `BankFrameBaseMixin:GetActiveBankType()` returns `self.BankPanel:IsShown() and
+  self.BankPanel:GetActiveBankType() or nil` — **gated on `BankPanel:IsShown()`**. `MoneyDisplay:Refresh`'s
+  guard reads the raw (BankPanel) one; the crashing handler reads the IsShown-gated (BankFrame) one.
+- `IsShown()` is the frame's own flag; `IsVisible()` is effective (self **and** all parents shown)
+  — verified from `warcraft.wiki.gg` (`ScriptRegion:IsVisible`; their example: reparent a shown
+  frame under a hidden one ⇒ `IsShown()==true, IsVisible()==false`). `OnShow`/`OnHide` track
+  **effective visibility**, with one exception: `OnShow` for an XML frame "fires after OnLoad
+  **unless hidden at the time**" (its own hidden state, not the parent chain). And critically,
+  **event registration is independent of shown state** — a registered frame keeps receiving events
+  while hidden, and calling `Hide()` on a frame that is not `IsVisible` produces no
+  visible→hidden transition, so its `OnHide` does **not** fire.
+- So `MoneyDisplay` registers `PLAYER_MONEY` at **login** (own flag shown, no `hidden` attr),
+  regardless of the parent bank being hidden. BetterBags then reparents `BankFrame` under the
+  permanently-hidden `sneakyFrame` (`core/init.lua` `HideBlizzardBags`, gated on
+  `database:GetEnableBankBag()`). Because `MoneyDisplay` is never *effectively visible*, its
+  `OnHide` never fires, and it stays registered forever. **`Hide()` cannot fix this** — verified
+  live in the broken state: `MoneyDisplay:IsEventRegistered("PLAYER_MONEY")==true` while
+  `IsShown()==false`. (My earlier "close cascade unregisters it" and the two `Hide()`-based
+  attempts — at bank `OnShow` and at close — were all wrong for this reason; the `OnShow` one also
+  fought Blizzard re-`Show()`ing it mid-session.)
+- After any bank visit, `BankPanel.bankType` is left non-nil (`bags/bank.lua` `SwitchToBankAndWipe`
+  → `SetBankType(Character)`), and `addon.CloseBank` sets `BankPanel:IsShown()` false via
+  `BankPanel:Hide()` (`core/hooks.lua`). Looting then: `PLAYER_MONEY` → `MoneyDisplay:OnEvent` →
+  `Refresh` guard passes (raw bankType non-nil) → handler reads `BankPanel:IsShown()`(false) → nil →
+  crash. (No crash *before* a bank visit — `bankType` is nil, so `Refresh`'s guard bails.)
+
+Fix: **`UnregisterEvent("PLAYER_MONEY")` on `MoneyDisplay` directly** — not `Hide()`, which cannot
+unregister it. Done in two taint-safe places:
+- `bags/bank.lua` `bank:SuppressBlizzardBankPanel()` — the consolidated BankPanel-suppression
+  helper (previously duplicated inline in the fade + direct `bank.proto:OnShow` paths) that also
+  hides `MoneyFrame`/`AutoDepositFrame`/`Header`. So it's killed the moment BetterBags takes over
+  the bank.
+- `core/hooks.lua` `addon.CloseBank` — alongside the existing `BankPanel:Hide()`, in the
+  `BANKFRAME_CLOSED` event-handler context (sanctioned by patterns-taint.md).
+
+Nothing re-registers it (its `OnShow` can never fire while it is not `IsVisible` under the
+`sneakyFrame`). Must **not** be done at init — touching `BankPanel`/children during
+`HideBlizzardBags` taints `BankPanel` and breaks `UseContainerItem()` for all containers (see the
+`core/init.lua` warning). Nil-guarded, so live retail (no `MoneyDisplay`) is unaffected. Coverage:
+`spec/core/close_bank_spec.lua` and `spec/bags/bank_panel_suppress_spec.lua`.
+
+## 9. Still pending (not yet done)
 
 - The three new `C_Bank` functions on Camelot (`ShouldUsePlayerBagsInBank`,
   `FetchMaxNumBankTabs`, `BankBagTypeAndIDToInvSlot`) are net-new integration points; none

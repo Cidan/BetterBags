@@ -155,6 +155,20 @@ function addon.CloseBank(ctx, _, interactingFrame)
   -- This must happen AFTER the bank frame is hidden to prevent taint
   if BankPanel then
     BankPanel:Hide()
+    -- Camelot: BankPanel.MoneyDisplay (BankBagCostMoneyDisplayMixin -- the "cost of the next
+    -- bank tab" money frame) registers PLAYER_MONEY at login and stays registered, because
+    -- BetterBags reparents BankFrame under a permanently-hidden frame (HideBlizzardBags), so
+    -- MoneyDisplay is never effectively visible and its OnHide never fires. Event registration
+    -- is independent of shown state, so Hide() does NOT unregister it (verified live:
+    -- registered=true, shown=false). Left live, a gold change while away from the bank (e.g.
+    -- looting) runs Blizzard's OnShowOrHideBagCost with a nil BankFrame:GetActiveBankType()
+    -- (gated on BankPanel:IsShown(), which we just set false) and crashes on
+    -- C_Bank.FetchNumPurchasedBankTabs(nil). We therefore UnregisterEvent it directly, in this
+    -- taint-safe event context. Nil-guarded, so live retail (no MoneyDisplay) is unaffected.
+    -- See camelot-forever.md.
+    if BankPanel.MoneyDisplay then
+      BankPanel.MoneyDisplay:UnregisterEvent("PLAYER_MONEY")
+    end
   end
 
   events:SendMessage(ctx, 'bags/BankClosed')
