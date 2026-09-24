@@ -42,3 +42,41 @@ return reserves a phantom header the classic panel no longer has, which pushed t
 bags off-center (the reported bug). Coverage: `spec/frames/bagslots_spec.lua`
 ("centers the bags with symmetric padding on Classic/Era", "keeps the retail
 themed-header layout unchanged").
+
+## 3. Classic/Era bank "Show Bags" (the bank gets the same panel as the backpack)
+
+The context menu's "Show Bags" entry (`frames/contextmenu.lua`) is only added
+`if bag.slots`. The UI unification (#1044) removed `frames/classic/bag.lua` /
+`frames/era/bag.lua`, which created the bag-slots panel inline for **both** bags,
+and moved creation into each behavior's `OnCreate`. #1089 restored it for the
+backpack only, so the Classic/Era **bank** had no `bag.slots` and its menu entry
+was missing. There are three parts to the fix. Leave out any one and the bank menu
+entry is missing, broken, or shows an empty/partial view.
+
+- **Panel creation.** `bags/classic/bank.lua` and `bags/era/bank.lua` `OnCreate(ctx)`
+  call `bagSlots:CreatePanel(ctx, const.BAG_KIND.BANK, self.bag.frame)` (hidden,
+  parented to the bank frame), exactly like the backpack overrides. The panel shows
+  `const.BANK_ONLY_BAGS_LIST` (`BankBag_1..7`); `frames/bagbutton.lua` already
+  classifies these as bank bags on non-retail and handles buying bank bag slots.
+  `frames/bagslots.lua` loads before `bags/*` in every Classic TOC.
+- **Toggle semantics.** The retail bank's `bag.slots` is a different panel — the
+  bank-**tab** filter (`frames/bankslots.lua`, retail only) — whose state persists via
+  `database:SetShowBankTabs` and drives the one-tab-at-a-time data filter. That is a
+  retail-only concept. The menu's `usesBankTabs` is therefore
+  `addon.isRetail and bag.kind == BANK`. On Classic/Era the bank toggles **exactly
+  like the backpack**: checkmark = `bag.slots:IsShown()`, and it only switches the bag
+  view (`SECTION_ALL_BAGS` / previous view). It never writes `showBankTabs`. The GW2
+  theme's duplicate "Show Bags" panel button (`themes/gw2.lua`) uses the same retail
+  gate. Re-opening the bank restores the panel from the view:
+  `bagProto:Draw` shows `bag.slots` whenever the view is `SECTION_ALL_BAGS`.
+- **Data partition.** `ItemBelongsToTab` (`data/items.lua`) filters bank items to
+  `item.bagid == tabID` in `SECTION_ALL_BAGS`, because on retail tab ID == Blizzard
+  bank-tab bag ID. On Classic/Era the bank tab IDs are group IDs (or `-1` with a stale
+  `showBankTabs`), so that filter emptied the view or kept only the main bank. The filter
+  is retail-only. On Classic/Era every bank container (main bank `-1` plus
+  `BankBag_1..7`) renders as its own physical section, like the backpack.
+
+Coverage: `spec/bags/bank_spec.lua` ("Classic/Era Bank OnCreate Bag Slots Panel"),
+`spec/frames/contextmenu_spec.lua` (classic bank toggles like the backpack; retail
+bank still persists `showBankTabs`), and `spec/bank_tab_category_routing_spec.lua`
+("Bank Show Bags (SECTION_ALL_BAGS) partition by client flavor").

@@ -134,6 +134,14 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 
 **Solution**: After `SetItemButtonQuality`, non-retail clients call `itemProto:DrawClassicQualityBorder(decoration, quality)` which applies `const.ITEM_QUALITY_COLOR[quality]` and shows `IconBorder` (both for items and for free slots, which use the bag's quality). Never "fix" this by editing the mock: `spec/frames/item_classic_spec.lua` carries a source-faithful Classic mock of `SetItemButtonQuality`.
 
+## Behavior OnCreate Overrides Must Create Every Kind's Sub-Frames
+
+**Problem**: After the UI unification (#1044), UI that the legacy `frames/classic|era/bag.lua` built inline for *both* bags (search, bag-slots panel, currency, theme config) went missing on Classic, first on the backpack (#1089) and then on the bank ("Show Bags" absent from the bank menu).
+
+**Why**: The unified `frames/bag.lua` delegates sub-frame creation to `behavior:OnCreate`, and the Classic/Era overrides in `bags/classic/` and `bags/era/` replace the retail `OnCreate` entirely. Anything a retail `OnCreate` creates, or that the legacy frame created for that kind, must be re-created in each override. Menu entries such as "Show Bags" are gated on the sub-frame existing (`bag.slots`), so a missing frame silently removes the menu item. There is no error.
+
+**Solution**: When auditing a flavor, compare each `bags/<flavor>/*.lua` `OnCreate` against the pre-#1044 `frames/<flavor>/bag.lua` (`git show aa6eeeb^:frames/classic/bag.lua`) for **both** kinds. Also check that per-kind state the shared code assumes (e.g. retail-only `showBankTabs`, or the retail one-tab `SECTION_ALL_BAGS` bank filter) is gated on `addon.isRetail` rather than on `bag.kind` alone.
+
 ## Unified Global ScrollBox Architecture (Zero-Reparenting Secure Frame Design)
 
 **Problem**: WoW secure item buttons and empty slot buttons are bound to unique physical slot keys and cannot be reparented or dynamically moved between views during active combat without causing fatal "Action blocked" taint errors. Storing scrollboxes inside individual tab views requires secure buttons to be reparented on tab switches.

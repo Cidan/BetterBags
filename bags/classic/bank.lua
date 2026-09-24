@@ -22,9 +22,17 @@ local L = addon:GetModule("Localization")
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class BagSlots: AceModule
+local bagSlots = addon:GetModule("BagSlots")
+
 -------
 --- Classic Bank Behavior Overrides
 --- Classic (MoP Remix, Cata) doesn't have BankPanel, tabs, or warbank.
+--- The unified frames/bag.lua delegates bag-slots creation to the behavior's
+--- OnCreate (the legacy frames/classic/bag.lua created it inline for both bags
+--- and was removed in #1044), so this override must create the bank's panel —
+--- otherwise bag.slots is never set and the context menu's "Show Bags" entry
+--- (gated on bag.slots) disappears from the bank.
 -------
 
 function bank.proto:OnShow()
@@ -67,9 +75,17 @@ function bank.proto:OnHide()
 	end
 end
 
-function bank.proto:OnCreate()
+---@param ctx Context
+function bank.proto:OnCreate(ctx)
 	-- Classic bank doesn't have tabs or BankPanel settings
 	self.bag.bankTab = const.BANK_TAB.BANK
+
+	-- Bag slots panel (bank bags, including purchasable bank bag slots)
+	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BANK, self.bag.frame)
+	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
+	slots.frame:SetParent(self.bag.frame)
+	slots.frame:Hide()
+	self.bag.slots = slots
 end
 
 ---@param ctx Context

@@ -127,14 +127,15 @@ local gw2Theme = {
         local bag = frame.Owner
         if bag.slots:IsShown() then
           -- Persist bank-slots visibility to DB so re-opening the bank restores the correct state.
-          if bag.kind == const.BAG_KIND.BANK then
+          -- Retail only: the Classic/Era bank panel is the plain bag-slots panel, not the bank-tab filter.
+          if addon.isRetail and bag.kind == const.BAG_KIND.BANK then
             database:SetShowBankTabs(false)
           end
           database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
           bag.slots:Hide()
           events:SendMessage(ctx, 'bags/FullRefreshAll')
         else
-          if bag.kind == const.BAG_KIND.BANK then
+          if addon.isRetail and bag.kind == const.BAG_KIND.BANK then
             database:SetShowBankTabs(true)
           end
           database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))

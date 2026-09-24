@@ -589,3 +589,228 @@ describe("Bank tab category routing bug reproduction", function()
     assert.is_true(inAnyTab("6_2"), "Character bank Midnight ore is visible in bank tabs!")
   end)
 end)
+
+-- The retail bank "Show Bags" view is driven by the bank-tab slots panel, which selects
+-- exactly one Blizzard bank tab (tab ID == bag ID), so its partition keeps only that
+-- container. Classic/Era has no bank tabs: its bank "Show Bags" view must render every
+-- bank container (main bank -1 plus BankBag_1..7) as physical sections, like the backpack.
+describe("Bank Show Bags (SECTION_ALL_BAGS) partition by client flavor", function()
+  local BANK, BACKPACK
+  local saved
+
+  local function slotkeysInTab(tabs, tabID)
+    local keys = {}
+    local tab = tabs[tabID]
+    if not tab then return keys end
+    for _, item in ipairs(tab.items) do
+      keys[item.slotkey] = true
+    end
+    return keys
+  end
+
+  local function initModules()
+    _G.BetterBagsDB = nil
+    database:Init()
+    groups:Init()
+    categories:Init()
+    items:Init()
+  end
+
+  local function classicBankItems()
+    local mainBank = mockData.ItemData({
+      bagid = Enum.BagIndex.Bank, slotid = 1, slotkey = Enum.BagIndex.Bank .. "_1",
+      kind = BANK, name = "Main Bank Item", category = "#1: Bank",
+    })
+    local bankBag1 = mockData.ItemData({
+      bagid = Enum.BagIndex.BankBag_1, slotid = 1, slotkey = Enum.BagIndex.BankBag_1 .. "_1",
+      kind = BANK, name = "Bank Bag 1 Item", category = "#2: Bank Bag",
+    })
+    local bankBag3 = mockData.ItemData({
+      bagid = Enum.BagIndex.BankBag_3, slotid = 2, slotkey = Enum.BagIndex.BankBag_3 .. "_2",
+      kind = BANK, name = "Bank Bag 3 Item", category = "#4: Bank Bag",
+    })
+    local sortedItems = { mainBank, bankBag1, bankBag3 }
+    local itemData = {}
+    for _, item in ipairs(sortedItems) do
+      itemData[item.slotkey] = item
+    end
+    return sortedItems, itemData
+  end
+
+  before_each(function()
+    BANK = const.BAG_KIND.BANK
+    BACKPACK = const.BAG_KIND.BACKPACK
+    saved = {
+      betterBagsDB = _G.BetterBagsDB,
+      isRetail = addon.isRetail,
+      hasWarbank = addon.hasWarbank,
+      bankTab = const.BANK_TAB,
+      bankBags = const.BANK_BAGS,
+      accountBankBags = const.ACCOUNT_BANK_BAGS,
+    }
+  end)
+
+  after_each(function()
+    _G.BetterBagsDB = saved.betterBagsDB
+    addon.isRetail = saved.isRetail
+    addon.hasWarbank = saved.hasWarbank
+    const.BANK_TAB = saved.bankTab
+    const.BANK_BAGS = saved.bankBags
+    const.ACCOUNT_BANK_BAGS = saved.accountBankBags
+  end)
+
+  describe("on Classic/Era", function()
+    before_each(function()
+      addon.isRetail = false
+      addon.hasWarbank = false
+      -- Mirror the non-retail branches of core/constants.lua: the bank tab marker is the
+      -- main bank container, BANK_BAGS is the main bank plus BankBag_1..7, and there is no
+      -- account bank table at all.
+      const.BANK_TAB = {
+        BANK = Enum.BagIndex.Bank,
+        REAGENT = Enum.BagIndex.Reagentbank,
+      }
+      const.BANK_BAGS = {
+        [Enum.BagIndex.Bank] = Enum.BagIndex.Bank,
+        [Enum.BagIndex.BankBag_1] = Enum.BagIndex.BankBag_1,
+        [Enum.BagIndex.BankBag_2] = Enum.BagIndex.BankBag_2,
+        [Enum.BagIndex.BankBag_3] = Enum.BagIndex.BankBag_3,
+        [Enum.BagIndex.BankBag_4] = Enum.BagIndex.BankBag_4,
+        [Enum.BagIndex.BankBag_5] = Enum.BagIndex.BankBag_5,
+        [Enum.BagIndex.BankBag_6] = Enum.BagIndex.BankBag_6,
+        [Enum.BagIndex.BankBag_7] = Enum.BagIndex.BankBag_7,
+      }
+      const.ACCOUNT_BANK_BAGS = nil
+      initModules()
+    end)
+
+    it("renders every bank container in the active group tab when bank tabs are off", function()
+      database:SetBagView(BANK, const.BAG_VIEW.SECTION_ALL_BAGS)
+      database:SetShowBankTabs(false)
+      database.data.profile.groupsEnabled[BANK] = true
+      database.data.profile.groups[BANK] = {
+        [1] = { id = 1, name = "Bank", isDefault = true, kind = BANK, order = 1 },
+      }
+      database:SetActiveGroup(BANK, 1)
+
+      local sortedItems, itemData = classicBankItems()
+      local ctx = context:New("ClassicBankShowBagsGroups")
+      local tabs = items:Phase10_PartitionIntoTabs(ctx, BANK, sortedItems, {}, {}, {}, itemData)
+
+      assert.is_not_nil(tabs[1], "the active bank group tab (1) must exist")
+      local keys = slotkeysInTab(tabs, 1)
+      for _, item in ipairs(sortedItems) do
+        assert.is_true(keys[item.slotkey] == true,
+          "classic bank Show Bags tab 1 must contain the item in bag " .. item.bagid .. " (" .. item.slotkey .. ")")
+      end
+      assert.are.equal(#sortedItems, tabs[1].totalItems)
+    end)
+
+    it("renders every bank container in the bank tab when a stale showBankTabs flag is set", function()
+      database:SetBagView(BANK, const.BAG_VIEW.SECTION_ALL_BAGS)
+      database:SetShowBankTabs(true)
+
+      local sortedItems, itemData = classicBankItems()
+      local ctx = context:New("ClassicBankShowBagsBankTabs")
+      local tabs = items:Phase10_PartitionIntoTabs(ctx, BANK, sortedItems, {}, {}, {}, itemData)
+
+      local activeTab = const.BANK_TAB.BANK
+      assert.are.equal(Enum.BagIndex.Bank, activeTab)
+      assert.is_not_nil(tabs[activeTab], "the classic bank tab (-1) must exist")
+      local keys = slotkeysInTab(tabs, activeTab)
+      for _, item in ipairs(sortedItems) do
+        assert.is_true(keys[item.slotkey] == true,
+          "classic bank Show Bags tab -1 must contain the item in bag " .. item.bagid .. " (" .. item.slotkey .. ")")
+      end
+      assert.are.equal(#sortedItems, tabs[activeTab].totalItems)
+    end)
+
+    it("still renders every backpack container in the backpack's active tab", function()
+      database:SetBagView(BACKPACK, const.BAG_VIEW.SECTION_ALL_BAGS)
+      database.data.profile.groupsEnabled[BACKPACK] = true
+      database.data.profile.groups[BACKPACK] = {
+        [1] = { id = 1, name = "Backpack", isDefault = true, kind = BACKPACK, order = 1 },
+      }
+      database:SetActiveGroup(BACKPACK, 1)
+
+      local backpack = mockData.ItemData({
+        bagid = Enum.BagIndex.Backpack, slotid = 1, slotkey = Enum.BagIndex.Backpack .. "_1",
+        kind = BACKPACK, name = "Backpack Item", category = "#1: Backpack",
+      })
+      local bag1 = mockData.ItemData({
+        bagid = Enum.BagIndex.Bag_1, slotid = 1, slotkey = Enum.BagIndex.Bag_1 .. "_1",
+        kind = BACKPACK, name = "Bag 1 Item", category = "#2: Bag",
+      })
+      local bag3 = mockData.ItemData({
+        bagid = Enum.BagIndex.Bag_3, slotid = 4, slotkey = Enum.BagIndex.Bag_3 .. "_4",
+        kind = BACKPACK, name = "Bag 3 Item", category = "#4: Bag",
+      })
+      local sortedItems = { backpack, bag1, bag3 }
+      local itemData = {}
+      for _, item in ipairs(sortedItems) do
+        itemData[item.slotkey] = item
+      end
+
+      local ctx = context:New("ClassicBackpackShowBags")
+      local tabs = items:Phase10_PartitionIntoTabs(ctx, BACKPACK, sortedItems, {}, {}, {}, itemData)
+
+      local keys = slotkeysInTab(tabs, 1)
+      for _, item in ipairs(sortedItems) do
+        assert.is_true(keys[item.slotkey] == true,
+          "classic backpack Show Bags tab 1 must contain the item in bag " .. item.bagid .. " (" .. item.slotkey .. ")")
+      end
+      assert.are.equal(#sortedItems, tabs[1].totalItems)
+    end)
+  end)
+
+  describe("on Retail", function()
+    before_each(function()
+      addon.isRetail = true
+      addon.hasWarbank = true
+      const.BANK_BAGS = {
+        [Enum.BagIndex.Characterbanktab] = Enum.BagIndex.Characterbanktab,
+        [Enum.BagIndex.CharacterBankTab_1] = Enum.BagIndex.CharacterBankTab_1,
+        [Enum.BagIndex.CharacterBankTab_2] = Enum.BagIndex.CharacterBankTab_2,
+      }
+      const.ACCOUNT_BANK_BAGS = {
+        [Enum.BagIndex.AccountBankTab_1] = Enum.BagIndex.AccountBankTab_1,
+      }
+      initModules()
+    end)
+
+    it("keeps the single-container filter so each bank tab shows only its own bag", function()
+      database:SetBagView(BANK, const.BAG_VIEW.SECTION_ALL_BAGS)
+      database:SetShowBankTabs(true)
+
+      local charTab1 = mockData.ItemData({
+        bagid = Enum.BagIndex.CharacterBankTab_1, slotid = 1,
+        slotkey = Enum.BagIndex.CharacterBankTab_1 .. "_1",
+        kind = BANK, name = "Character Tab 1 Item", category = "#1: Bank",
+      })
+      local charTab2 = mockData.ItemData({
+        bagid = Enum.BagIndex.CharacterBankTab_2, slotid = 3,
+        slotkey = Enum.BagIndex.CharacterBankTab_2 .. "_3",
+        kind = BANK, name = "Character Tab 2 Item", category = "#2: Bank",
+      })
+      local accountTab1 = mockData.ItemData({
+        bagid = Enum.BagIndex.AccountBankTab_1, slotid = 2,
+        slotkey = Enum.BagIndex.AccountBankTab_1 .. "_2",
+        kind = BANK, name = "Warbank Tab 1 Item", category = "#1: Warbank",
+      })
+      local sortedItems = { charTab1, charTab2, accountTab1 }
+      local itemData = {}
+      for _, item in ipairs(sortedItems) do
+        itemData[item.slotkey] = item
+      end
+
+      local ctx = context:New("RetailBankShowBags")
+      local tabs = items:Phase10_PartitionIntoTabs(ctx, BANK, sortedItems, {}, {}, {}, itemData)
+
+      for _, item in ipairs(sortedItems) do
+        assert.is_not_nil(tabs[item.bagid], "retail bank tab " .. item.bagid .. " must exist")
+        assert.are.same({ [item.slotkey] = true }, slotkeysInTab(tabs, item.bagid),
+          "retail bank Show Bags tab " .. item.bagid .. " must contain only its own container's item")
+      end
+    end)
+  end)
+end)

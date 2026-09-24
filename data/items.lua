@@ -438,7 +438,9 @@ end
 local function ItemBelongsToTab(kind, item, tabID, viewBagView)
   if not item then return false end
   if viewBagView == const.BAG_VIEW.SECTION_ALL_BAGS then
-    if kind == const.BAG_KIND.BANK then
+    -- Retail's bank Show Bags view is one Blizzard bank tab at a time (tab ID == bag ID).
+    -- Classic/Era has no bank tabs, so every bank container renders, like the backpack.
+    if kind == const.BAG_KIND.BANK and addon.isRetail then
       return item.bagid == tabID
     end
     return true

@@ -116,11 +116,13 @@ Overrides bank behavior for Classic Era:
 - No BankPanel (doesn't exist in Era)
 - No tabs system
 - Simpler bank structure
+- `OnCreate` creates the bank bag-slots panel (`BagSlots:CreatePanel` with `BAG_KIND.BANK`) so the context menu's "Show Bags" entry appears; it toggles like the backpack's (no `showBankTabs`). See `.claude/rules/classic-bag-slots-panel.md` §3.
 
 ### classic/bank.lua (Version Override)
 
 Overrides bank behavior for Classic (Cata, MoP):
 - Similar to Era but with version-specific differences
+- Same bank bag-slots panel creation in `OnCreate` as Era
 
 ## How It Works
 
