@@ -361,7 +361,7 @@ Supported windows include bags, all bank tabs, the mailbox, the trade window, an
 ## Search
 BetterBags offers a comprehensive Search option that can be toggled with a keybinding (`BetterBags > Search Bags`).
 
-When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, and `binding`. When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator.  
+When searching for bare words (eg. "Signet"), the search will match any item that has the word in the entire text of the default indices, which includes `name`, `type`, `subtype`, `category`, `equipmentLocation`, `binding`, and `tooltip`. When searching in an index (eg. "name = Signet"), using the `=` operator will search in a prefix style, meaning the things you are searching for must start with what you type. To support full-text searching of each field, use the `%=` operator. The exception is `tooltip`: there, `=` and `!=` match the text anywhere in the tooltip, the same as `%=`.  
 If you would like to exclude items in gear sets from your searches, the easiest way to do so is add `and not category = "gear:"` to the end of your search. (eg. `slot = finger or slot = neck and not (category = 'gear:')` will highlight all rings and necklaces that are NOT part of a gear set)
 Search allows you to find items by the following indices (based on the item below):
 
@@ -381,6 +381,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `equipmentSet` (equipmentSet = "MW DPS") The equipment set(s) that a piece of gear is part of.
 - `guid` (guid = 'item-60-0-4000000CAEA5CBE3') The globally unique identifier of the item. This string is unique to the specific instance of an item.
 - `binding` (binding = soulbound) The text description of the binding type of the item. Possible values include nonbinding (items that do not bind), boe (bind on equip), bou (bind on use), quest (a soulbound quest item), soulbound (bound to a specific character), refundable (items that can be sold back to a vendor for a full refund), warbound (bound to a warband), bnet (bound to a battle.net account), or wue (warbound until equipped). **Note:** soulbound and warbound are only available on Retail because of API limitations on non-Retail versions.
+- `tooltip` (tooltip = health) The full text of the item's tooltip. Unlike the other string fields, `=` and `!=` match the value anywhere in the tooltip, not only at the start.
 
 ### Numbers
 - `level` or `ilvl` (ilvl = 528) The item level of the item. Non-gear items have item levels as well, but they are not shown to the user.

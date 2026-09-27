@@ -282,32 +282,110 @@ describe("Events", function()
       assert.is_true(called)
     end)
 
-    it("cancels the previous timer when a new event fires", function()
+    it("keeps a single pending timer while events keep firing", function()
       events:BucketEvent("test/BucketCancel", function() end)
-      local eventMap = events._eventMap
-      if eventMap["test/BucketCancel"] then
-        eventMap["test/BucketCancel"].fn("test/BucketCancel", "test/BucketCancel")
-        eventMap["test/BucketCancel"].fn("test/BucketCancel", "test/BucketCancel")
-        eventMap["test/BucketCancel"].fn("test/BucketCancel", "test/BucketCancel")
-      end
-      -- Each fire schedules a new timer; only the most recent one should
-      -- remain active (the others are cancelled).
-      local active = 0
-      for _, t in ipairs(timerCallbacks) do
-        if not t.cancelled then active = active + 1 end
-      end
-      assert.are.equal(1, active)
+      local fn = events._eventMap["test/BucketCancel"].fn
+      fn("test/BucketCancel", "test/BucketCancel")
+      fn("test/BucketCancel", "test/BucketCancel")
+      fn("test/BucketCancel", "test/BucketCancel")
+      -- Later fires join the pending window instead of cancelling and
+      -- re-creating the timer.
+      assert.are.equal(1, #timerCallbacks)
+      assert.is_false(timerCallbacks[1].cancelled)
     end)
 
-    it("clears the timer reference after firing", function()
+    it("clears the timer reference after firing but keeps the callback registered", function()
       events:BucketEvent("test/BucketClear", function() end)
-      local eventMap = events._eventMap
-      if eventMap["test/BucketClear"] then
-        eventMap["test/BucketClear"].fn("test/BucketClear", "test/BucketClear")
-      end
+      events._eventMap["test/BucketClear"].fn("test/BucketClear", "test/BucketClear")
       fireTimers()
       assert.is_nil(events._bucketTimers["test/BucketClear"])
-      assert.same({}, events._bucketCallbacks["test/BucketClear"])
+      assert.are.equal(1, #events._bucketCallbacks["test/BucketClear"])
+    end)
+
+    it("runs the callback for every window, not only the first", function()
+      local calls = 0
+      events:BucketEvent("test/BucketRepeat", function() calls = calls + 1 end)
+      local fn = events._eventMap["test/BucketRepeat"].fn
+      for _ = 1, 3 do
+        fn("test/BucketRepeat")
+        fn("test/BucketRepeat")
+        fireTimers()
+      end
+      assert.are.equal(3, calls)
+    end)
+
+    it("is not starved by a continuous stream of fires", function()
+      local batches = {}
+      events:BucketEvent("test/BucketStream", function(_, evts) table.insert(batches, #evts) end)
+      local fn = events._eventMap["test/BucketStream"].fn
+      -- Fires keep arriving inside every window; each window still flushes.
+      fn("test/BucketStream", 1)
+      fn("test/BucketStream", 2)
+      fireTimers()
+      fn("test/BucketStream", 3)
+      fn("test/BucketStream", 4)
+      fn("test/BucketStream", 5)
+      fireTimers()
+      assert.same({2, 3}, batches)
+    end)
+
+    it("drops fires rejected by the filter without scheduling or recording", function()
+      local received
+      events:BucketEvent("test/BucketFilter", function(_, evts) received = evts end, function(_, id)
+        return id == 7
+      end)
+      local fn = events._eventMap["test/BucketFilter"].fn
+      fn("test/BucketFilter", 1)
+      fn("test/BucketFilter", 2)
+      assert.are.equal(0, #timerCallbacks)
+      assert.are.equal(0, #events._eventArguments["test/BucketFilter"])
+      fn("test/BucketFilter", 7)
+      assert.are.equal(1, #timerCallbacks)
+      fireTimers()
+      assert.are.equal(1, #received)
+      assert.are.equal(7, received[1].args[1])
+    end)
+
+    it("builds no context or argument record for payload-less fires", function()
+      events:BucketEvent("test/BucketNoAlloc", function() end)
+      local fn = events._eventMap["test/BucketNoAlloc"].fn
+      local originalNew = context.New
+      local created = 0
+      context.New = function(...)
+        created = created + 1
+        return originalNew(...)
+      end
+      for _ = 1, 5 do fn("test/BucketNoAlloc") end
+      local createdDuringFires = created
+      local recorded = #events._eventArguments["test/BucketNoAlloc"]
+      fireTimers()
+      context.New = originalNew
+      assert.are.equal(0, createdDuringFires)
+      assert.are.equal(0, recorded)
+      assert.are.equal(1, created)
+    end)
+
+    it("registers the underlying event once when BucketEvent is called again", function()
+      events:BucketEvent("test/BucketOnce", function() end)
+      events:BucketEvent("test/BucketOnce", function() end)
+      assert.are.equal(1, #events._eventMap["test/BucketOnce"].cbs)
+    end)
+
+    it("opens a fresh window for fires raised during the flush", function()
+      local fn
+      local batches = {}
+      events:BucketEvent("test/BucketReentrant", function(_, evts)
+        table.insert(batches, evts[1].args[1])
+        if #batches == 1 then fn("test/BucketReentrant", "second") end
+      end)
+      fn = events._eventMap["test/BucketReentrant"].fn
+      fn("test/BucketReentrant", "first")
+      local firstWindow = timerCallbacks[1]
+      timerCallbacks = {}
+      firstWindow.callback()
+      assert.are.equal(1, #timerCallbacks)
+      fireTimers()
+      assert.same({"first", "second"}, batches)
     end)
 
     it("replaces the previous callback when called twice for the same event", function()
@@ -343,7 +421,7 @@ describe("Events", function()
       local received
       events:BucketEvent("test/BucketArgs", function(_, evts) received = evts end)
       local fn = events._eventMap["test/BucketArgs"].fn
-      -- Simulate AceEvent firing the event twice in the debounce window with
+      -- Simulate AceEvent firing the event twice in one window with
       -- distinct payloads (e.g. two different TOOLTIP_DATA_UPDATE dataInstanceIDs).
       fn("test/BucketArgs", 111)
       fn("test/BucketArgs", 222)

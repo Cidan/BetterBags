@@ -347,4 +347,44 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     assert.equal(ctx, drawCalledWithCtx, "Should call Draw with the correct context object")
     assert.equal(mockSlotInfo[0], drawCalledWithSlotInfo, "Should call Draw with the correct backpack slotInfo")
   end)
+
+  it("only refreshes cooldowns while shown, and refreshes them whenever the bag opens", function()
+    local loadBase = assert(loadfile("bags/backpack.lua"))
+    loadBase("BetterBags")
+    local backpack = addon:GetModule("BackpackBehavior")
+
+    local events = addon:GetModule("Events")
+    local savedBucketEvent, savedRegisterMessage = events.BucketEvent, events.RegisterMessage
+    local buckets = {}
+    events.BucketEvent = function(_, event, cb, filter)
+      buckets[event] = { cb = cb, filter = filter }
+    end
+    events.RegisterMessage = function() end
+
+    local frame = CreateFrame("Frame", "BetterBagsBackpackCooldownTest")
+    local refreshes = 0
+    local mockBag = {
+      frame = frame,
+      OnCooldown = function() refreshes = refreshes + 1 end,
+    }
+    function mockBag:IsShown() return self.frame:IsShown() end
+
+    backpack:Create(mockBag):RegisterEvents()
+    events.BucketEvent, events.RegisterMessage = savedBucketEvent, savedRegisterMessage
+
+    local bucket = buckets["BAG_UPDATE_COOLDOWN"]
+    assert.is_not_nil(bucket, "BAG_UPDATE_COOLDOWN must be bucketed")
+    assert.is_function(bucket.filter, "cooldown fires must be filtered on bag visibility")
+    frame:Hide()
+    assert.is_false(bucket.filter("BAG_UPDATE_COOLDOWN"), "fires while closed must be dropped")
+    frame:Show()
+    assert.is_true(bucket.filter("BAG_UPDATE_COOLDOWN"))
+
+    -- Cooldowns that started while the bag was closed must be correct the moment it
+    -- opens, whichever path shows the frame (toggle, fade-in, direct Show).
+    local onShow = frame:GetScript("OnShow")
+    assert.is_function(onShow, "the bag frame must refresh cooldowns in OnShow")
+    onShow(frame)
+    assert.are.equal(1, refreshes)
+  end)
 end)

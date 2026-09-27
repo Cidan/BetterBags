@@ -15,6 +15,11 @@ local events = addon:GetModule('Events')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+-- A tooltip whose data keeps resolving (e.g. dynamic text that updates) would otherwise
+-- re-scan and re-harvest forever; after this many resolution-driven re-scans an item's
+-- tooltip is left as cached.
+local MAX_RESOLVE_RESCANS = 3
+
 function tooltipScanner:Init()
   -- Cache to store extracted tooltip text, keyed by item GUID
   -- This prevents repeated expensive tooltip extractions
@@ -30,6 +35,9 @@ function tooltipScanner:Init()
   self.instanceToGUID = {}
   ---@type table<string, number>
   self.guidToInstance = {}
+  -- Resolution-driven re-scans per item GUID, capped at MAX_RESOLVE_RESCANS.
+  ---@type table<string, number>
+  self.resolveRescans = {}
 
   -- For Classic/Era: Create a hidden GameTooltip for scanning
   -- Retail uses C_TooltipInfo API and doesn't need this
@@ -42,13 +50,17 @@ function tooltipScanner:Init()
     debug:Log("TooltipScanner", "Using C_TooltipInfo API for Retail")
     -- Register the sparse-tooltip resolution listener exactly once (guarded so
     -- repeated Init calls -- e.g. in tests -- never leak duplicate handlers).
-    -- BucketEvent debounces the burst of updates that fires as data warms up and
-    -- hands us every resolved dataInstanceID at once. Retail only; the event does
-    -- exist on Classic but C_TooltipInfo (and thus dataInstanceID) does not.
+    -- TOOLTIP_DATA_UPDATE fires for every tooltip in the game (units, spells, action
+    -- buttons), so the filter drops anything that is not one of our scanned items
+    -- before BucketEvent records or schedules anything; matching ids are batched per
+    -- window. Retail only; the event does exist on Classic but C_TooltipInfo (and thus
+    -- dataInstanceID) does not.
     if not self._tooltipUpdateHooked then
       self._tooltipUpdateHooked = true
       events:BucketEvent('TOOLTIP_DATA_UPDATE', function(_, resolved)
         self:OnTooltipDataResolved(resolved)
+      end, function(_, dataInstanceID)
+        return dataInstanceID ~= nil and self.instanceToGUID[dataInstanceID] ~= nil
       end)
     end
   end
@@ -77,7 +89,8 @@ function tooltipScanner:GetTooltipText(bagid, slotid, itemGUID)
     self.cache[itemGUID] = text
     -- Record the retail sparse-tooltip instance so a later TOOLTIP_DATA_UPDATE can
     -- invalidate this exact entry if it was scanned while still partial.
-    if addon.isRetail and dataInstanceID ~= nil and itemGUID ~= nil and itemGUID ~= "" then
+    if addon.isRetail and dataInstanceID ~= nil and itemGUID ~= nil and itemGUID ~= ""
+      and (self.resolveRescans[itemGUID] or 0) < MAX_RESOLVE_RESCANS then
       self:RecordInstance(itemGUID, dataInstanceID)
     end
     debug:Log("TooltipScanner", "Cached tooltip for GUID %s: %s", itemGUID, string.sub(text, 1, 50) .. "...")
@@ -241,6 +254,7 @@ function tooltipScanner:OnTooltipDataResolved(resolved)
       local guid = self.instanceToGUID[dataInstanceID]
       if guid ~= nil then
         self:RemoveFromCache(guid)
+        self.resolveRescans[guid] = (self.resolveRescans[guid] or 0) + 1
         invalidated = true
       end
     end
