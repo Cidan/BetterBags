@@ -32,10 +32,13 @@ if not events then
   events = addon:GetModule("Events")
 end
 local origBucketEvent, origSendMessage = events.BucketEvent, events.SendMessage
-local capturedBucket
+local capturedBucket, capturedFilter
 local sentMessages = {}
-events.BucketEvent = function(_, event, cb)
-  if event == "TOOLTIP_DATA_UPDATE" then capturedBucket = cb end
+events.BucketEvent = function(_, event, cb, filter)
+  if event == "TOOLTIP_DATA_UPDATE" then
+    capturedBucket = cb
+    capturedFilter = filter
+  end
 end
 events.SendMessage = function(_, _, msg) table.insert(sentMessages, msg) end
 
@@ -327,6 +330,31 @@ describe("TooltipScanner", function()
       tooltipScanner:Init()
       events.BucketEvent = saved
       assert.are.equal(0, count, "already hooked; further Inits must not re-register")
+    end)
+
+    it("filters updates at the door: only our recorded dataInstanceIDs pass", function()
+      assert.is_function(capturedFilter)
+      tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+      assert.is_true(capturedFilter("TOOLTIP_DATA_UPDATE", 555))
+      assert.is_false(capturedFilter("TOOLTIP_DATA_UPDATE", 999))
+      assert.is_false(capturedFilter("TOOLTIP_DATA_UPDATE", nil))
+      assert.is_false(capturedFilter("TOOLTIP_DATA_UPDATE"))
+    end)
+
+    it("stops tracking an item after 3 resolution re-scans so it cannot loop refreshes", function()
+      local invalidations = 0
+      for _ = 1, 5 do
+        tooltipScanner:GetTooltipText(0, 1, "guid-potion")
+        local before = #sentMessages
+        if capturedFilter("TOOLTIP_DATA_UPDATE", 555) then
+          capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 555 } } })
+        end
+        if #sentMessages > before then invalidations = invalidations + 1 end
+      end
+      assert.are.equal(3, invalidations)
+      assert.is_nil(tooltipScanner.instanceToGUID[555])
+      assert.are.equal("Minor Healing Potion", tooltipScanner.cache["guid-potion"],
+        "the text is still cached and searchable; only resolution tracking stops")
     end)
   end)
 

@@ -577,4 +577,53 @@ describe("Bag Draw: shared item button ownership across global sections and view
     assert.is_not_nil(section)
     assert.same({ "0_1", "gap", "0_3" }, recentOrder(section))
   end)
+
+  describe("cooldown refresh (OnCooldown)", function()
+    local function spyCooldowns(slotkeys)
+      local calls = {}
+      for _, key in ipairs(slotkeys) do
+        local button = itemFrame.buttonsBySlotkey[key]
+        button._decoration.UpdateCooldown = function()
+          calls[key] = (calls[key] or 0) + 1
+        end
+      end
+      return calls
+    end
+
+    it("refreshes Recent Items buttons as well as tab view buttons", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw"), slotInfoWith(
+        { itemAt(0, 1, "Weapons"), itemAt(0, 2, "Recent Items") }, {}), function() end)
+      local calls = spyCooldowns({ "0_1", "0_2" })
+
+      bag:OnCooldown(context:New("cooldown"))
+
+      assert.are.equal(1, calls["0_1"])
+      assert.are.equal(1, calls["0_2"], "Recent Items buttons live outside the tab view and must refresh too")
+    end)
+
+    it("skips Free Space buttons, even when they previously held an item", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons") }, { freeSpaceButton(0, 2, 3) }), function() end)
+      -- Slot 0_1 empties and its button becomes the Free Space representative.
+      bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 2, "Weapons") }, { freeSpaceButton(0, 1, 3) }), function() end)
+      local calls = spyCooldowns({ "0_1", "0_2" })
+
+      bag:OnCooldown(context:New("cooldown"))
+
+      assert.is_nil(calls["0_1"])
+      assert.are.equal(1, calls["0_2"])
+    end)
+
+    it("does nothing while the bag is hidden", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+      local calls = spyCooldowns({ "0_1" })
+      bag.frame:Hide()
+
+      bag:OnCooldown(context:New("cooldown"))
+
+      assert.is_nil(calls["0_1"])
+    end)
+  end)
 end)

@@ -114,7 +114,7 @@ Provides a powerful full-text search engine with query parsing capabilities.
   - `>`, `<`, `>=`, `<=` (comparisons)
   - `%=` (contains/partial match)
 - **Logical Operators**: AND, OR, NOT
-- **N-gram Indexing**: Fast prefix searching
+- **N-gram Indexing**: Fast prefix searching (except the `tooltip` index, which stores full text only; `=`/`!=` on it are substring matches)
 - **Interval Trees**: Efficient number range queries
 
 #### Search Query Examples

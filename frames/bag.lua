@@ -589,15 +589,32 @@ function bagFrame.bagProto:SwitchToBankAndWipe(ctx)
 end
 
 ---@param ctx Context
-function bagFrame.bagProto:OnCooldown(ctx)
-	if not self.currentView then
+---@param item Item
+local function refreshCooldown(ctx, item)
+	-- A button reused as a free slot still carries the data of the item it last drew.
+	if item.isFreeSlot then
 		return
 	end
-	for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
-		local data = item:GetItemData()
-		if data then
-			item:UpdateCooldown(ctx, data)
+	local data = item:GetItemData()
+	if data then
+		item:UpdateCooldown(ctx, data)
+	end
+end
+
+-- OnCooldown refreshes the cooldown of every visible item button: the active tab
+-- view's buttons and the global Recent Items section's, which lives outside the view.
+---@param ctx Context
+function bagFrame.bagProto:OnCooldown(ctx)
+	if not self:IsShown() then
+		return
+	end
+	if self.currentView then
+		for _, item in pairs(self.currentView:GetItemsByBagAndSlot()) do
+			refreshCooldown(ctx, item)
 		end
+	end
+	for _, item in ipairs(self.itemFrames or {}) do
+		refreshCooldown(ctx, item)
 	end
 end
 

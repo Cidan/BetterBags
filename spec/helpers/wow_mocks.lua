@@ -480,6 +480,8 @@ _G.GetLocale = function() return "enUS" end
 _G.GetBuildInfo = function() return "10.0.0", "12345", "Jan 1 2024", 100000 end
 _G.GetRealmName = function() return "TestRealm" end
 _G.UnitName = function() return "TestChar", "TestRealm" end
+-- UnitDocumentation.lua: UnitNameUnmodified(unit) -> unitName, unitServer (read by AceDB-3.0 r1417+).
+_G.UnitNameUnmodified = function() return "TestChar", "TestRealm" end
 _G.UnitClass = function() return "Warrior", "WARRIOR" end
 _G.UnitFactionGroup = function() return "Alliance", "Alliance" end
 _G.UnitRace = function() return "Human", "Human" end

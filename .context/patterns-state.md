@@ -147,7 +147,13 @@ if childData and childData.itemInfo.currentItemCount ~= ... then
 4. If a category is not assigned in that item's `bankType`, it safely falls back to the default tab of that bank type (Tab 1 for Character Bank, Tab 2 for Warbank).
 5. Non-retail clients (`not addon.isRetail`) maintain the single flat dictionary without bankType scoping because Warbank and `Enum.BankType` do not exist.
 
+## High-Frequency Game Events: Filter at the Door, Batch in Windows
+Events like `TOOLTIP_DATA_UPDATE` (every tooltip in the game) and `BAG_UPDATE_COOLDOWN` (spell casts) can fire many times per second. Handle them with `events:BucketEvent(event, callback, filter)` and give it a filter that rejects every fire you don't care about (an id you didn't record, a hidden bag) before anything is allocated or scheduled. Never debounce a stream that can be continuous (it never flushes) and never build a Context or argument table per fire. Contract: `.claude/rules/event-buckets.md`.
+
+## Keep Clean-Sweep Work Linear in Item Count
+Every sweep re-runs Phase 8's search index rebuild over both bags, even for a one-slot change, so any per-item cost that grows with string length or item count is paid constantly. The tooltip prefix n-grams (quadratic in tooltip length) were the dominant cost of every sweep until the tooltip index became full-text only (`.claude/rules/search-indexing.md` §2a).
 
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds
+3. **Profile the pipeline against a real dump**: for performance reports, copy the setup block of `spec/debug_dump_harness_spec.lua` into a scratch spec outside the repo, wrap the `items:Phase*` and `search:*` functions with `os.clock()` timers, and run `items:ProcessRefresh` over the `test.lua` backpack dump (fill empty slots and inject realistic `tooltipText` to approximate a full bag). This is how the tooltip n-gram cost was found. A "no events fired on that frame" hitch report points at the timer-resumed second half of a refresh (`data/refresh.lua` `_Arm`), i.e. Phase 3 onward.

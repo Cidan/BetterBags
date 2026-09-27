@@ -21,6 +21,7 @@ local trees = addon:GetModule('Trees')
 ---@field numbers IntervalTree
 ---@field bools table<boolean, table<string, boolean>>
 ---@field fullText table<string, table<string, boolean>>
+---@field fullTextOnly? boolean Stores no prefix ngrams; `=` / `!=` match substrings of the full text.
 
 ---@class Search: AceModule
 ---@field private indicies table<string, SearchIndex>
@@ -28,13 +29,16 @@ local trees = addon:GetModule('Trees')
 ---@field private defaultIndicies string[]
 local search = addon:NewModule('Search')
 
-function search:CreateIndex(name)
+---@param name string
+---@param fullTextOnly? boolean
+function search:CreateIndex(name, fullTextOnly)
   self.indicies[name] = {
     property = name,
     ngrams = {},
     numbers = trees.NewIntervalTree(),
     bools = {},
-    fullText = {}
+    fullText = {},
+    fullTextOnly = fullTextOnly,
   }
 end
 
@@ -51,7 +55,9 @@ function search:Init()
   self:CreateIndex('bagName')
   self:CreateIndex('guid')
   self:CreateIndex('binding')
-  self:CreateIndex('tooltip')
+  -- Tooltip text runs to hundreds of characters; indexing every prefix of it is
+  -- quadratic per item and dominated the cost of each sweep.
+  self:CreateIndex('tooltip', true)
 
   -- Number indexes
   self:CreateIndex('level')
@@ -151,12 +157,14 @@ end
 ---@param slotkey string
 function search:addStringToIndex(index, value, slotkey)
   if value == nil or value == "" then return end
-  local prefix = ""
   value = string.lower(value)
-  for i = 1, #value do
-    prefix = prefix .. value:sub(i, i)
-    index.ngrams[prefix] = index.ngrams[prefix] or {}
-    index.ngrams[prefix][slotkey] = true
+  if not index.fullTextOnly then
+    local prefix = ""
+    for i = 1, #value do
+      prefix = prefix .. value:sub(i, i)
+      index.ngrams[prefix] = index.ngrams[prefix] or {}
+      index.ngrams[prefix][slotkey] = true
+    end
   end
   index.fullText[value] = index.fullText[value] or {}
   index.fullText[value][slotkey] = true
@@ -168,12 +176,14 @@ end
 ---@param slotkey string
 function search:removeStringFromIndex(index, value, slotkey)
   if value == nil or value == "" then return end
-  local prefix = ""
   value = string.lower(value)
-  for i = 1, #value do
-    prefix = prefix .. value:sub(i, i)
-    index.ngrams[prefix] = index.ngrams[prefix] or {}
-    index.ngrams[prefix][slotkey] = nil
+  if not index.fullTextOnly then
+    local prefix = ""
+    for i = 1, #value do
+      prefix = prefix .. value:sub(i, i)
+      index.ngrams[prefix] = index.ngrams[prefix] or {}
+      index.ngrams[prefix][slotkey] = nil
+    end
   end
   index.fullText[value] = index.fullText[value] or {}
   index.fullText[value][slotkey] = nil
@@ -330,6 +340,9 @@ end
 function search:isInIndex(name, value)
   local index = self:GetIndex(name)
   if not index then return {} end
+  if index.fullTextOnly then
+    return self:isFullTextMatch(name, tostring(value))
+  end
   if type(tonumber(value)) == 'number' then
     local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
     return node and node.data or {}
@@ -353,6 +366,12 @@ function search:isNotInIndex(name, value)
   local results = {
     ["___NEGATED___"] = true
   }
+  if index.fullTextOnly then
+    for k in pairs(self:isFullTextMatch(name, tostring(value))) do
+      results[k] = false
+    end
+    return results
+  end
   if type(tonumber(value)) == 'number' then
     local node = index.numbers:ExactMatch(tonumber(value)--[[@as number]])
     if node then

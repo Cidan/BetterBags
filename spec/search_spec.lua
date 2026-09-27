@@ -434,4 +434,71 @@ describe("Search", function()
       assert.is_true(search:isFullTextMatch("name", "healing")["s1"] or false)
     end)
   end)
+
+  -- ─── Tooltip index: full text only, substring semantics ────────────────────
+  -- Tooltip text is hundreds of characters long; storing every prefix of it is
+  -- quadratic per item and was the dominant cost of every sweep. The tooltip index
+  -- keeps only the full text, and `tooltip =` / `tooltip !=` match substrings.
+
+  describe("Tooltip index (full text only)", function()
+
+    local function potion()
+      return MockSearchItem({
+        slotkey = "potion", name = "Healing Potion",
+        tooltipText = "Healing Potion Use: Restores 70 to 90 health. Sell Price: 1",
+      })
+    end
+
+    local function sword()
+      return MockSearchItem({
+        slotkey = "sword", name = "Thunderfury",
+        tooltipText = "Thunderfury, Blessed Blade of the Windseeker Chance on hit",
+      })
+    end
+
+    it("stores no prefix ngrams for tooltip text", function()
+      search:IndexItems({potion = potion(), sword = sword()})
+      local index = search:GetIndex("tooltip")
+      assert.is_nil(next(index.ngrams))
+      assert.is_true(index.fullText["healing potion use: restores 70 to 90 health. sell price: 1"]["potion"])
+    end)
+
+    it("still stores prefix ngrams for short string fields", function()
+      search:IndexItems({potion = potion()})
+      assert.is_true(search:isInIndex("name", "heal")["potion"] or false)
+    end)
+
+    it("matches `tooltip = x` as a substring anywhere in the tooltip", function()
+      search:IndexItems({potion = potion(), sword = sword()})
+      local results = search:Search("tooltip = health")
+      assert.is_true(results["potion"] or false)
+      assert.is_nil(results["sword"])
+    end)
+
+    it("treats a numeric `tooltip = x` value as text, not a number lookup", function()
+      search:IndexItems({potion = potion(), sword = sword()})
+      local results = search:isInIndex("tooltip", 70)
+      assert.is_true(results["potion"] or false)
+      assert.is_nil(results["sword"])
+    end)
+
+    it("excludes items whose tooltip contains x for `tooltip != x`", function()
+      search:IndexItems({potion = potion(), sword = sword()})
+      local results = search:isNotInIndex("tooltip", "health")
+      assert.is_true(results["___NEGATED___"] or false)
+      assert.are.equal(false, results["potion"])
+      assert.is_nil(results["sword"])
+
+      local combined = search:Search("name %= u AND tooltip != health")
+      assert.is_true(combined["sword"] or false)
+      assert.is_nil(combined["potion"])
+    end)
+
+    it("keeps plain searches matching words inside the tooltip", function()
+      search:IndexItems({potion = potion(), sword = sword()})
+      local results = search:Search("health")
+      assert.is_true(results["potion"] or false)
+      assert.is_nil(results["sword"])
+    end)
+  end)
 end)

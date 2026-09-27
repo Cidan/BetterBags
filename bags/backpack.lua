@@ -183,7 +183,15 @@ function backpack.proto:RegisterEvents()
 	local bag = self.bag
 	local behavior = self
 
+	-- Cooldowns are only refreshed while the bag is visible: fires while it is closed are
+	-- dropped before they schedule anything. Showing the frame refreshes them, so a
+	-- cooldown that started while the bag was closed is right the moment it opens.
 	events:BucketEvent("BAG_UPDATE_COOLDOWN", function(ectx)
+		bag:OnCooldown(ectx)
+	end, function()
+		return bag:IsShown()
+	end)
+	addon.HookScript(bag.frame, "OnShow", function(ectx)
 		bag:OnCooldown(ectx)
 	end)
 

@@ -45,36 +45,57 @@ resolves — this is how Blizzard's own `GameTooltip` rebuilds itself
   too, but `C_TooltipInfo`/`dataInstanceID` do **not** (retail-only API, verified via the
   wiki "Game Types" badge), so Classic keeps its unchanged `GameTooltip:SetBagItem`
   FontString scan and is not wired to this path.
-- **`OnTooltipDataResolved(resolved)`** iterates the debounced batch; for each resolved
+- **Filtered at the door.** `TOOLTIP_DATA_UPDATE` fires for **every** tooltip in the game
+  (units, spells, action buttons, `#showtooltip` macros), not just our bag items; the
+  payload is a nilable `dataInstanceID` (`TooltipInfoDocumentation.lua`). The listener
+  passes `BucketEvent` a filter, `dataInstanceID ~= nil and self.instanceToGUID[dataInstanceID]
+  ~= nil`, so every other fire costs one table lookup and records, allocates, and schedules
+  nothing. This mirrors Blizzard's own `GameTooltipDataMixin:OnEvent`, which only checks the
+  id and sets a flag. Before the filter, each fire built a Context and an argument record
+  and cancelled/re-created a timer, and during continuous fires the pending argument list
+  grew without bound (see event-buckets.md).
+- **`OnTooltipDataResolved(resolved)`** iterates the batch; for each resolved
   `dataInstanceID` that maps to one of our cached GUIDs it `RemoveFromCache`s the stale
   entry (so the next harvest re-scans it warm) and, if anything was invalidated, sends
   `bags/RefreshBackpack` (always) and `bags/RefreshBank` (**only when `addon.atBank`**, so
   we never clobber the last-seen bank contents while away). Unknown/`nil` instance ids are
-  ignored — no spurious refresh.
+  still ignored here too (the map can change between a fire and its flush).
+- **Bounded re-scans.** Each resolution-driven invalidation increments
+  `resolveRescans[guid]`; once a GUID reaches `MAX_RESOLVE_RESCANS` (3, `data/tooltip.lua`),
+  `GetTooltipText` stops recording its instance id, so its tooltip is no longer tracked and
+  can never trigger another refresh. Without the cap, a tooltip whose data keeps resolving
+  (dynamic text) would loop re-scan → new instance → resolve → refresh. Three allows for the
+  item and spell data channels resolving separately. The cached text stays searchable.
 
 Because `RemoveFromCache` only drops the invalidated GUID, the triggered re-harvest
 re-scans just that item; every other item hits the warm cache. The re-index is the normal
 `Phase8` clean sweep.
 
-## 3. `BucketEvent` now coalesces per-fire args (reusable primitive)
+**History:** until the `BucketEvent` fix (event-buckets.md), this listener's callback was
+discarded after its first flush, so the re-scan only ever worked for the first burst after
+login. It is now live for the whole session, which is why the filter and the cap above are
+required.
 
-`TOOLTIP_DATA_UPDATE` fires in bursts as data warms; the debounce **and** the collection of
+## 3. `BucketEvent` coalesces per-fire args (reusable primitive)
+
+`TOOLTIP_DATA_UPDATE` fires in bursts as data warms; the batching **and** the collection of
 each fire's `dataInstanceID` belong in the Events module, not a hand-rolled timer in the
-scanner. `events:BucketEvent(event, callback)` (`core/events.lua`) was expanded: it still
-debounces to 0.2s, but now accumulates every fire's payload in the window and passes the
+scanner. `events:BucketEvent(event, callback, filter)` (`core/events.lua`) passes the
 callback an `EventArg[]` as its **second** argument (each entry `{ eventName, args = {…} }`;
-`args[1]` is the first payload — e.g. the `dataInstanceID`). Its prior contract is
-preserved: `ctx` is still the first arg, callbacks that ignore the second arg (e.g.
-`bags/backpack.lua`'s `BAG_UPDATE_COOLDOWN`) are unaffected, and the reset-callbacks-per-
-registration behavior is unchanged. Coverage: `spec/events_spec.lua` ("passes the collected
-per-fire event arguments to the callback").
+`args[1]` is the first payload — e.g. the `dataInstanceID`). `ctx` is still the first arg,
+and callbacks that ignore the second arg are unaffected. The full contract (0.2s windows
+that are never starved, persistent callbacks, the filter, no per-fire allocation) is in
+event-buckets.md. Coverage: `spec/events_spec.lua` ("passes the collected per-fire event
+arguments to the callback").
 
 ## 4. Coverage
 
 `spec/tooltip_spec.lua` ("TOOLTIP_DATA_UPDATE resolution"): records the instance map,
 invalidates + re-harvests on resolution, re-scans warm on next lookup, ignores
 unknown/`nil` ids, gates the bank refresh on `addon.atBank`, keeps the maps 1:1 with the
-cache across re-scan, and asserts the bucket registers exactly once across repeated `Init`
-(no handler leak). The spec reuses the real `Events`/`Context` modules when present (only
+cache across re-scan, asserts the bucket registers exactly once across repeated `Init`
+(no handler leak), that the filter only admits recorded instance ids ("filters updates at
+the door"), and that an item stops being tracked after three resolution re-scans ("stops
+tracking an item after 3 resolution re-scans"). The spec reuses the real `Events`/`Context` modules when present (only
 loading them when absent, to avoid double-`NewModule` collisions) and restores the two
 overridden `Events` methods on teardown.
