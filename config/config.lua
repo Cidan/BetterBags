@@ -362,6 +362,15 @@ function config:CreateConfig()
       end
     })
 
+    -- Bag config extensions: let plugins add settings inline in each bag section,
+    -- right after the category filters. Registered via config:RegisterBagConfig.
+    -- Wrapped in pcall so a misbehaving plugin cannot break the config window.
+    if self.bagConfigExtensions then
+      for _, fn in ipairs(self.bagConfigExtensions) do
+        pcall(fn, f, bagType)
+      end
+    end
+
     f:AddInlineSubSection({
       title = 'Item Stacking',
       description = 'Settings for item stacking in the ' .. string.lower(bagType.name) .. '.',
@@ -1132,6 +1141,20 @@ function config:RegisterSettings()
     local ctx = context:New('on_click')
     events:SendMessage(ctx, 'config/DebugMode', db:GetDebugMode())
   end)
+end
+
+-- RegisterBagConfig registers a callback invoked once per bag section (Backpack /
+-- Bank) while the config window is built, letting a plugin add its own settings
+-- inline in those sections (right after the category filters). Callbacks receive
+-- (form, bagType), where bagType is { name = string, kind = BagKind } and form is
+-- the config FormFrame -- call f:AddCheckbox / f:AddDropdown / etc. on it, the same
+-- widgets BetterBags uses. Mirrors AddPluginConfig (the global "Plugins" tab) but
+-- targets the per-bag sections. Register before the config window is first built
+-- (e.g. at PLAYER_LOGIN).
+---@param fn fun(form: table, bagType: table)
+function config:RegisterBagConfig(fn)
+  self.bagConfigExtensions = self.bagConfigExtensions or {}
+  table.insert(self.bagConfigExtensions, fn)
 end
 
 function config:OnEnable()
