@@ -477,5 +477,273 @@ describe("Bank Bag/Slot Window Pane Tests", function()
 
       assert.is_true(registered)
     end)
+
+    -- The slot grid is a clipping WowScrollBox child of the panel. A filled backdrop on a
+    -- sibling child frame shares the grid's frame level and can render over the buttons
+    -- (the darkened "buttons under the window" look). The panel frame must own the
+    -- backdrop so it always sits a level below the grid.
+    it("draws the Camelot backdrop on the panel frame itself, not on a sibling of the grid", function()
+      addon.isRetail = true
+      addon.isForever = true
+
+      local calls = {}
+      local origCreateFrame = _G.CreateFrame
+      _G.CreateFrame = function(frameType, name, parent, template)
+        local f = origCreateFrame(frameType, name, parent, template)
+        table.insert(calls, { frame = f, parent = parent, template = template })
+        return f
+      end
+      local bagFrame = origCreateFrame("Frame")
+      local ok, panel = pcall(function()
+        return addon:GetModule("BankSlots"):CreatePanel(ctx:New("test"), bagFrame)
+      end)
+      _G.CreateFrame = origCreateFrame
+      assert.is_true(ok, tostring(panel))
+
+      local panelTemplate
+      for _, c in ipairs(calls) do
+        if c.frame == panel.frame then panelTemplate = c.template end
+        assert.is_false(c.parent == panel.frame and c.template == "TooltipBorderedFrameTemplate",
+          "the backdrop must not be a sibling frame of the slot grid")
+      end
+      assert.are.equal("TooltipBorderedFrameTemplate", panelTemplate)
+      assert.are.same({ r = 0, g = 0, b = 0, a = 0.9 }, panel.frame._backdropColor)
+    end)
+  end)
+
+  -- WoW: Forever (Camelot/BankFrame.lua): every character bank tab after the first is a
+  -- bag socket addressed as (Enum.BagIndex.Characterbanktab, socketIndex). The tab only
+  -- has slots once a bag is placed in its socket; C_Container.PickupContainerItem on
+  -- the socket picks the bag up, places the cursor bag, or swaps them.
+  describe("10. Forever bank tabs are bag sockets", function()
+    local EMPTY_BAG_SLOT = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+    local saved = {}
+
+    local function newPanel()
+      local panel = addon:GetModule("BankSlots"):CreatePanel(ctx:New("test"), CreateFrame("Frame"))
+      panel:Draw(ctx:New("test"))
+      return panel
+    end
+
+    local function tooltipHasLine(text)
+      for _, line in ipairs(GameTooltip.lines) do
+        if line.text == text then return true end
+      end
+      return false
+    end
+
+    before_each(function()
+      saved.isRetail = addon.isRetail
+      saved.isForever = addon.isForever
+      saved.charList = const.BANK_ONLY_BAGS_LIST
+      saved.charBags = const.BANK_ONLY_BAGS
+      saved.acctList = const.ACCOUNT_BANK_BAGS_LIST
+      saved.acctBags = const.ACCOUNT_BANK_BAGS
+      saved.characterbanktab = Enum.BagIndex.Characterbanktab
+      saved.characterBankTab1 = Enum.BagIndex.CharacterBankTab_1
+      saved.fetch = C_Bank.FetchPurchasedBankTabData
+      saved.inCombat = _G.InCombatLockdown
+      saved.itemsAtLocation = _G._itemsAtLocation
+
+      addon.isRetail = true
+      addon.isForever = true
+      -- Forever enum values (BagIndexConstantsDocumentation.lua): 9 character tabs at
+      -- bag ids 6..14, sockets at Characterbanktab (-2), no warbank.
+      const.BANK_ONLY_BAGS_LIST = { 6, 7, 8, 9, 10, 11, 12, 13, 14 }
+      const.BANK_ONLY_BAGS = {}
+      for _, id in ipairs(const.BANK_ONLY_BAGS_LIST) do const.BANK_ONLY_BAGS[id] = id end
+      const.ACCOUNT_BANK_BAGS_LIST = {}
+      const.ACCOUNT_BANK_BAGS = {}
+      Enum.BagIndex.Characterbanktab = -2
+      Enum.BagIndex.CharacterBankTab_1 = 6
+      C_Bank.FetchPurchasedBankTabData = function(bankType)
+        if bankType == Enum.BankType.Character then
+          return {
+            { ID = 6, name = "Base", icon = 100 },
+            { ID = 7, name = "Herbs", icon = 101 },
+            { ID = 8, name = "Spare", icon = 102 },
+          }
+        end
+        return {}
+      end
+      -- Tab 7's socket (slot 2) holds a bag; tab 8's socket (slot 3) is empty.
+      _G._itemsAtLocation = { ["-2:2"] = { icon = 555 } }
+      C_Container._pickups = {}
+      _G._cursorType = nil
+      _G._isShiftKeyDown = false
+      GameTooltip._bagItem = nil
+      GameTooltip._text = ""
+    end)
+
+    after_each(function()
+      addon.isRetail = saved.isRetail
+      addon.isForever = saved.isForever
+      const.BANK_ONLY_BAGS_LIST = saved.charList
+      const.BANK_ONLY_BAGS = saved.charBags
+      const.ACCOUNT_BANK_BAGS_LIST = saved.acctList
+      const.ACCOUNT_BANK_BAGS = saved.acctBags
+      Enum.BagIndex.Characterbanktab = saved.characterbanktab
+      Enum.BagIndex.CharacterBankTab_1 = saved.characterBankTab1
+      C_Bank.FetchPurchasedBankTabData = saved.fetch
+      _G.InCombatLockdown = saved.inCombat
+      _G._itemsAtLocation = saved.itemsAtLocation
+      _G._cursorType = nil
+      _G._isShiftKeyDown = false
+    end)
+
+    it("maps every character tab after the first to its bag socket", function()
+      local panel = newPanel()
+      assert.is_nil(panel.buttons[1]:GetBagSocketIndex(), "the first tab is the bagless base bank")
+      assert.are.equal(2, panel.buttons[2]:GetBagSocketIndex())
+      assert.are.equal(3, panel.buttons[3]:GetBagSocketIndex())
+      assert.are.equal(9, panel.buttons[9]:GetBagSocketIndex())
+    end)
+
+    it("has no bag sockets on live retail", function()
+      addon.isForever = false
+      local panel = newPanel()
+      assert.is_nil(panel.buttons[2]:GetBagSocketIndex())
+      assert.is_nil(panel.buttons[2].viewButton._registeredDrags)
+      local onReceiveDrag = panel.buttons[2].viewButton:GetScript("OnReceiveDrag")
+      if onReceiveDrag then onReceiveDrag(panel.buttons[2].viewButton) end
+      assert.are.equal(0, #C_Container._pickups)
+    end)
+
+    it("places a dropped bag into the tab's socket", function()
+      local panel = newPanel()
+      local button = panel.buttons[3].viewButton
+      button:GetScript("OnReceiveDrag")(button)
+      assert.are.same({ { bag = -2, slot = 3 } }, C_Container._pickups)
+    end)
+
+    it("picks the socketed bag up when the tab is dragged", function()
+      local panel = newPanel()
+      local button = panel.buttons[2].viewButton
+      assert.are.same({ "LeftButton" }, button._registeredDrags)
+      button:GetScript("OnDragStart")(button)
+      assert.are.same({ { bag = -2, slot = 2 } }, C_Container._pickups)
+    end)
+
+    -- Records the tab a click selected (nil when the click selected nothing).
+    local function recordSelection(panel)
+      local selection = {}
+      panel.SelectTab = function(_, _, bagIndex) selection.bagIndex = bagIndex end
+      return selection
+    end
+
+    it("places the cursor item on left-click instead of selecting the tab", function()
+      local panel = newPanel()
+      local selection = recordSelection(panel)
+      _G._cursorType = "item"
+      local button = panel.buttons[2].viewButton
+      button:GetScript("OnClick")(button, "LeftButton")
+      assert.are.same({ { bag = -2, slot = 2 } }, C_Container._pickups)
+      assert.is_nil(selection.bagIndex)
+    end)
+
+    it("picks the bag up on shift-left-click", function()
+      local panel = newPanel()
+      local selection = recordSelection(panel)
+      _G._isShiftKeyDown = true
+      local button = panel.buttons[2].viewButton
+      button:GetScript("OnClick")(button, "LeftButton")
+      assert.are.same({ { bag = -2, slot = 2 } }, C_Container._pickups)
+      assert.is_nil(selection.bagIndex)
+    end)
+
+    it("still selects the tab on a plain left-click", function()
+      local panel = newPanel()
+      local selection = recordSelection(panel)
+      local button = panel.buttons[2].viewButton
+      button:GetScript("OnClick")(button, "LeftButton")
+      assert.are.equal(0, #C_Container._pickups)
+      assert.are.equal(7, selection.bagIndex)
+    end)
+
+    it("never moves bags through the bagless base tab", function()
+      local panel = newPanel()
+      local selection = recordSelection(panel)
+      local button = panel.buttons[1].viewButton
+      button:GetScript("OnReceiveDrag")(button)
+      _G._cursorType = "item"
+      button:GetScript("OnClick")(button, "LeftButton")
+      assert.are.equal(0, #C_Container._pickups)
+      assert.are.equal(6, selection.bagIndex)
+    end)
+
+    it("refuses to change bags in combat", function()
+      local panel = newPanel()
+      _G.InCombatLockdown = function() return true end
+      local button = panel.buttons[2].viewButton
+      button:GetScript("OnReceiveDrag")(button)
+      button:GetScript("OnDragStart")(button)
+      assert.are.equal(0, #C_Container._pickups)
+    end)
+
+    it("badges each socket tab with its bag, or an empty bag slot", function()
+      local panel = newPanel()
+      local withBag, emptySocket, base = panel.buttons[2], panel.buttons[3], panel.buttons[1]
+
+      assert.is_true(withBag.bagBadge:IsShown())
+      assert.are.equal(555, withBag.bagBadge._texturePath)
+      assert.is_false(withBag.iconTexture:IsDesaturated())
+
+      assert.is_true(emptySocket.bagBadge:IsShown())
+      assert.are.equal(EMPTY_BAG_SLOT, emptySocket.bagBadge._texturePath)
+      assert.is_true(emptySocket.iconTexture:IsDesaturated())
+
+      assert.is_false(base.bagBadge:IsShown())
+      assert.is_false(base.iconTexture:IsDesaturated())
+    end)
+
+    it("leads the tooltip with the socketed bag, then the tab and its free slots", function()
+      local panel = newPanel()
+      local button = panel.buttons[2].viewButton
+      button:GetScript("OnEnter")(button)
+      assert.are.same({ bag = -2, slot = 2 }, GameTooltip._bagItem)
+      assert.is_true(tooltipHasLine("Herbs"))
+      assert.is_true(tooltipHasLine("4 of 16 slots free"))
+      assert.is_true(tooltipHasLine("Drag to remove this bag"))
+      assert.is_true(tooltipHasLine("Drop a bag here to swap it"))
+    end)
+
+    it("explains an empty socket in the tooltip", function()
+      local panel = newPanel()
+      local button = panel.buttons[3].viewButton
+      button:GetScript("OnEnter")(button)
+      assert.are.equal("Spare", GameTooltip._text)
+      assert.is_true(tooltipHasLine("No bag in this slot"))
+      assert.is_true(tooltipHasLine("Drop a bag here to use this tab"))
+      assert.is_false(tooltipHasLine("4 of 16 slots free"))
+    end)
+
+    it("shows the base tab's free slots without bag hints", function()
+      local panel = newPanel()
+      local button = panel.buttons[1].viewButton
+      button:GetScript("OnEnter")(button)
+      assert.is_nil(GameTooltip._bagItem)
+      assert.are.equal("Base", GameTooltip._text)
+      assert.is_true(tooltipHasLine("4 of 16 slots free"))
+      assert.is_false(tooltipHasLine("Drag to remove this bag"))
+      assert.is_false(tooltipHasLine("Drop a bag here to use this tab"))
+    end)
+
+    it("redraws when a bank bag socket changes, only on Forever", function()
+      local registered = {}
+      local oldRegisterEvent = events.RegisterEvent
+      events.RegisterEvent = function(_, event) registered[event] = true end
+      newPanel()
+      events.RegisterEvent = oldRegisterEvent
+      assert.is_true(registered["PLAYERBANKSLOTS_CHANGED"])
+      assert.is_true(registered["BAG_CONTAINER_UPDATE"])
+
+      addon.isForever = false
+      registered = {}
+      events.RegisterEvent = function(_, event) registered[event] = true end
+      newPanel()
+      events.RegisterEvent = oldRegisterEvent
+      assert.is_nil(registered["PLAYERBANKSLOTS_CHANGED"])
+      assert.is_nil(registered["BAG_CONTAINER_UPDATE"])
+    end)
   end)
 end)

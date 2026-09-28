@@ -314,6 +314,12 @@ function refresh:OnEnable()
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
       self:RequestUpdate({ bank = true, bags = { [-1] = true } })
     end)
+  elseif addon.isForever then
+    -- A bag placed in or removed from a bank tab's bag socket resizes that tab's
+    -- container, so sweep every bank bag. Bag -1 is the keyring on Forever.
+    events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function()
+      self:RequestUpdate({ bank = true })
+    end)
   end
 
   -- Route the initial login sweep through the ItemLoader's ContinuableContainer, exactly

@@ -153,21 +153,20 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
   setmetatable(b, {__index = BagSlots.bagSlotProto})
   b.bagFrame = bagFrame
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
+  -- Camelot (WoW: Forever): the Default theme's DefaultPanelFlatTemplate renders a
+  -- broken title-bar band and oversized metal header art on this client (its
+  -- ButtonFrameTemplateNoPortrait NineSlice overhangs the top; Blizzard even ships
+  -- a Camelot-only corner-crop workaround), so the panel is a headerless, dark,
+  -- tooltip-bordered frame instead of a themed flat window. The template goes on the
+  -- panel frame itself: on a sibling child frame the filled backdrop shares the bag
+  -- grid's frame level and draws over the bag buttons. See camelot-forever.md.
   ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, "BackdropTemplate")
+  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, addon.isForever and "TooltipBorderedFrameTemplate" or "BackdropTemplate")
   b.frame = f
 
   if addon.isForever then
-    -- Camelot (WoW: Forever): the Default theme's DefaultPanelFlatTemplate renders a
-    -- broken title-bar band and oversized metal header art on this client (its
-    -- ButtonFrameTemplateNoPortrait NineSlice overhangs the top; Blizzard even ships
-    -- a Camelot-only corner-crop workaround). Decorate with a headerless, dark,
-    -- tooltip-bordered frame instead of the themed flat window. Cross-version-safe
-    -- template, but only needed here. See camelot-forever.md.
-    local deco = CreateFrame("Frame", f:GetName().."Camelot", f, "TooltipBorderedFrameTemplate")
-    deco:SetAllPoints()
-    deco:SetBackdropColor(0, 0, 0, 0.9)
-    deco:SetBackdropBorderColor(1, 1, 1, 1)
+    f:SetBackdropColor(0, 0, 0, 0.9)
+    f:SetBackdropBorderColor(1, 1, 1, 1)
   elseif addon.isRetail then
     themes:RegisterFlatWindow(f, "")
   else

@@ -130,26 +130,42 @@ NineSlice overhangs the top with tall metal header art that Camelot re-drew even
 `NineSliceUtil.UpdateCornerCropping` just to survive it on short frames. On the short
 bag/bank **slots panels** this showed as an empty dark title-bar band + wrong border.
 
-Fix: on `addon.isForever`, both slots panels decorate with a **headerless
-`TooltipBorderedFrameTemplate`** child frame (dark, thin-bordered, carries its own
-background; cross-version-safe, verified on all five TOCs) instead of registering the themed
-flat window, and take the **symmetric-padding** layout path (no reserved header — never feed
-`GetFlatHeaderHeight`, which still returns Default's 30, into this path). This mirrors the
-Classic manual-backdrop fix in `classic-bag-slots-panel.md`; Camelot just uses the Blizzard
-tooltip template rather than a raw `SetBackdrop`.
+Fix: on `addon.isForever`, both slots panels are a **headerless
+`TooltipBorderedFrameTemplate`** (dark, thin-bordered, carries its own background;
+cross-version-safe, verified on all five TOCs) instead of a themed flat window, and take the
+**symmetric-padding** layout path (no reserved header — never feed `GetFlatHeaderHeight`,
+which still returns Default's 30, into this path). This mirrors the Classic manual-backdrop
+fix in `classic-bag-slots-panel.md`; Camelot just uses the Blizzard tooltip template rather
+than a raw `SetBackdrop`.
 
-- `frames/bagslots.lua` — `CreatePanel` adds an `addon.isForever` branch (tooltip decoration)
-  ahead of the retail/Classic branches; `Draw` centering condition is `addon.isRetail and not
-  addon.isForever` so Camelot falls to the symmetric-padding branch.
-- `frames/bankslots.lua` — `CreatePanel` decorates with the tooltip template on Camelot else
-  registers the flat window; `Draw` uses a 12px symmetric `topInset` on Camelot.
+**The template must be on the panel frame itself, never on a child "decoration" frame.** The
+first version created the tooltip template as a sibling child of the panel
+(`CreateFrame(..., f, "TooltipBorderedFrameTemplate")`). That sibling shares the frame level
+of the slot grid, which is also a child of the panel: a clipping `WowScrollBox`
+(`clipChildren="true"`, `ScrollBox.xml`) whose buttons render as a group at the scroll box's
+level. With the two at the same level the 90%-black filled centre could draw over the grid,
+so every slot button looked sunk under a dark film ("the buttons are a layer under the
+window"). A frame's own regions always sit below its child frames, so with the template on
+the panel frame the backdrop is strictly a level below the grid. Classic never hit this
+because its `SetBackdrop` is on the panel frame; retail never hit it because the themed
+decoration's only same-level art is a border (its filled `Bg` is a `frameLevel="0"` frame in
+`DefaultPanelFlatTemplate`).
+
+- `frames/bagslots.lua` — `CreatePanel` creates the panel frame with
+  `TooltipBorderedFrameTemplate` on Camelot (`BackdropTemplate` elsewhere) and colors it in an
+  `addon.isForever` branch ahead of the retail/Classic branches; `Draw` centering condition is
+  `addon.isRetail and not addon.isForever` so Camelot falls to the symmetric-padding branch.
+- `frames/bankslots.lua` — `CreatePanel` creates the panel frame with the tooltip template on
+  Camelot else registers the flat window; `Draw` uses a 12px symmetric `topInset` on Camelot.
 - Only the **slots panels** are converted. Other flat windows (`frames/searchcategory.lua`
   config pane) still use the themed decoration; convert them the same way if they show the
   band on Camelot.
 
 Coverage: `spec/frames/bagslots_spec.lua` ("centers the bags with symmetric padding on
-Camelot") and `spec/frames/bankslots_spec.lua` ("Camelot headerless decoration": bypasses the
-themed flat window on Camelot, still uses it on ordinary retail).
+Camelot", "BagSlots panel decoration": backdrop on the panel frame, no sibling backdrop, Classic
+keeps `BackdropTemplate`) and `spec/frames/bankslots_spec.lua` ("Camelot headerless
+decoration": bypasses the themed flat window on Camelot, still uses it on ordinary retail,
+backdrop on the panel frame rather than a sibling of the grid).
 
 ## 6. Equipment-set scan routes by API existence, not TOC version
 
@@ -270,10 +286,57 @@ Nothing re-registers it (its `OnShow` can never fire while it is not `IsVisible`
 `core/init.lua` warning). Nil-guarded, so live retail (no `MoneyDisplay`) is unaffected. Coverage:
 `spec/core/close_bank_spec.lua` and `spec/bags/bank_panel_suppress_spec.lua`.
 
-## 9. Still pending (not yet done)
+## 9. Bank tabs are bag sockets — the "Show Bags" tab button is where the bag goes
 
-- The three new `C_Bank` functions on Camelot (`ShouldUsePlayerBagsInBank`,
-  `FetchMaxNumBankTabs`, `BankBagTypeAndIDToInvSlot`) are net-new integration points; none
-  are required for the container-scan model above.
-- Optional net-new feature: a physical bank-bag-slot bar (analogous to `frames/bagslots.lua`)
-  for viewing/buying/dragging the actual bags Camelot slots into the bank.
+On Camelot a purchased character bank tab is not a ready container: it is a **bag socket**,
+and the tab only has slots once a bag is placed in it. Source of truth is Blizzard's own
+socket button, `BankItemButtonBagMixin` (`Blizzard_UIPanels_Game/Camelot/BankFrame.lua`):
+
+- Sockets are addressed as `(Enum.BagIndex.Characterbanktab = -2, socketIndex)`; socket `N`
+  backs tab bag id `CharacterBankTab_1 + N - 1` (`GetExactBankTabSlot`). Blizzard's bag
+  buttons start at socket **2**: tab 1 is the free, fixed-size (48 slots), bagless base bank.
+- One call does everything: `C_Container.PickupContainerItem(Characterbanktab, N)` picks the
+  bag up, places the cursor bag, or swaps them (bound to click, `OnDragStart`, and
+  `OnReceiveDrag`).
+- Tooltip: `GameTooltip:SetBagItem(-2, N)` gives the bag's name, size and type. It returns
+  false (and hides the tooltip) for an empty socket (`TooltipDataHandler.lua`).
+- Refresh events: `PLAYERBANKSLOTS_CHANGED` and `BAG_CONTAINER_UPDATE`.
+
+Rather than add a second row of bag buttons, BetterBags makes the existing tab button in the
+bank "Show Bags" strip (`frames/bankslots.lua`) the socket too, because on Camelot each
+socket is exactly one tab:
+
+- `bankSlotButtonProto:GetBagSocketIndex()` — the socket behind a tab, or nil (not Forever,
+  an account tab, or the base tab). `PickupBag()` refuses in combat with the same
+  "Cannot change bags in combat." message the backpack bag buttons use, then calls
+  `PickupContainerItem`.
+- Clicks: dropping a bag on the tab, or left-clicking while holding an item, places it
+  (swapping out any bag already there); dragging the tab or shift-left-click
+  (`IsModifiedClick("PICKUPITEM")`) picks the bag up; a plain left-click still selects the
+  tab and right-click still opens its settings (name, icon). Drag is only registered on
+  Forever, so live retail tabs are unchanged.
+- Face: the tab's custom icon stays; a 16px corner badge (`btn.bagBadge`) shows the socketed
+  bag's icon (`C_Item.GetItemIcon` on the socket `ItemLocation`), or the empty-bag-slot art
+  with the tab icon desaturated when the socket is empty.
+- Tooltip: the bag's own tooltip leads, followed by the tab name, "N of M slots free" and the
+  drag/drop hints. An empty socket reads "No bag in this slot / Drop a bag here to use this
+  tab". The base tab shows its free slots and no bag hints.
+- The panel redraws on `PLAYERBANKSLOTS_CHANGED` and `BAG_CONTAINER_UPDATE` (Forever only),
+  and `data/refresh.lua` sweeps every bank bag on `PLAYERBANKSLOTS_CHANGED` on Forever
+  (`{ bank = true }`). It must **not** reuse the Classic handler's `bags = { [-1] = true }`:
+  bag -1 is the keyring on Forever (§7).
+- Gated on `addon.isForever`: the socket model belongs to the Camelot client (Blizzard creates
+  its bag buttons unconditionally there), and no live-retail API expresses it.
+
+Coverage: `spec/frames/bankslots_spec.lua` ("Forever bank tabs are bag sockets": socket
+mapping, live-retail no-op, drop/drag/click/shift-click, base tab, combat refusal, badge,
+tooltips, redraw events) and `spec/refresh_spec.lua` ("sweep every bank bag on
+PLAYERBANKSLOTS_CHANGED on Forever", "not listen … on live retail").
+
+## 10. Still pending (not yet done)
+
+- `C_Bank.ShouldUsePlayerBagsInBank`, `FetchMaxNumBankTabs` and `BankBagTypeAndIDToInvSlot`
+  (Camelot-only) are still unused; the socket feature (§9) works from the
+  `Characterbanktab` container addressing and needs none of them.
+- Hovering a socket tab does not yet highlight that bag's items in the bank grid (Blizzard's
+  `ToggleButtonGlowForItemsOfBankBag`).
