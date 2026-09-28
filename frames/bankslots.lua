@@ -40,6 +40,8 @@ local database = addon:GetModule('Database')
 
 local buttonCount = 0
 
+local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
+
 -- BankSlotButton represents a single bank tab slot button in the panel.
 -- Each slot has two sub-buttons inside a container frame:
 --   viewButton    – a plain Button, shown when the slot is purchased (select tab / open config)
@@ -56,7 +58,39 @@ local buttonCount = 0
 ---@field iconTexture Texture The icon texture (shown when purchased, child of viewButton)
 ---@field selectedHighlight Texture The highlight shown when selected (child of viewButton)
 ---@field plusText Texture The green '+' atlas icon shown for unpurchased slots (child of purchaseButton)
+---@field bagBadge Texture Corner badge showing the bag in this tab's socket (WoW: Forever only)
 local bankSlotButtonProto = {}
+
+-- GetBagSocketIndex returns the Enum.BagIndex.Characterbanktab slot of the bag socket
+-- behind this tab, or nil when the tab has none. On WoW: Forever every character bank
+-- tab after the first is a bag socket: it only has slots once a bag is placed in it. The
+-- first tab is the fixed, bagless base bank (Camelot/BankFrame.lua starts its bag
+-- buttons at socket 2).
+---@return number?
+function bankSlotButtonProto:GetBagSocketIndex()
+  if not addon.isForever or self.bankType ~= Enum.BankType.Character then
+    return nil
+  end
+  local socketIndex = self.bagIndex - Enum.BagIndex.CharacterBankTab_1 + 1
+  if socketIndex < 2 then
+    return nil
+  end
+  return socketIndex
+end
+
+-- PickupBag picks up the bag in this tab's socket, places the cursor bag into it, or
+-- swaps the two, exactly like Blizzard's own bank bag button.
+function bankSlotButtonProto:PickupBag()
+  local socketIndex = self:GetBagSocketIndex()
+  if not socketIndex then
+    return
+  end
+  if InCombatLockdown() then
+    print("BetterBags: "..L:G("Cannot change bags in combat."))
+    return
+  end
+  C_Container.PickupContainerItem(Enum.BagIndex.Characterbanktab, socketIndex)
+end
 
 -- Update refreshes the button's visual state based on current tab data.
 ---@param charTabData table<number, BankTabData>
@@ -85,6 +119,18 @@ function bankSlotButtonProto:Update(charTabData, accountTabData)
     self.plusText:Show()
     self.viewButton:Hide()
     self.purchaseButton:Show()
+  end
+
+  local socketIndex = self.purchased and self:GetBagSocketIndex()
+  if socketIndex then
+    local location = ItemLocation:CreateFromBagAndSlot(Enum.BagIndex.Characterbanktab, socketIndex)
+    local hasBag = C_Item.DoesItemExist(location)
+    self.bagBadge:SetTexture(hasBag and C_Item.GetItemIcon(location) or EMPTY_BAG_SLOT_TEXTURE)
+    self.bagBadge:Show()
+    self.iconTexture:SetDesaturated(not hasBag)
+  else
+    self.bagBadge:Hide()
+    self.iconTexture:SetDesaturated(false)
   end
 
   -- Update selected highlight (only relevant when the slot is purchased)
@@ -412,20 +458,19 @@ function BankSlots:CreatePanel(ctx, bagFrame)
   local b = {}
   setmetatable(b, {__index = BankSlots.bankSlotsPanelProto})
 
+  -- Camelot (WoW: Forever): DefaultPanelFlatTemplate renders a broken title-bar band
+  -- and oversized metal header on this client, so the panel is a headerless, dark,
+  -- tooltip-bordered frame instead of a themed flat window. The template goes on the
+  -- panel frame itself: on a sibling child frame the filled backdrop shares the slot
+  -- grid's frame level and draws over the buttons. See camelot-forever.md.
   ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", "BetterBagsBankSlots", bagFrame)
+  local f = CreateFrame("Frame", "BetterBagsBankSlots", bagFrame, addon.isForever and "TooltipBorderedFrameTemplate" or nil)
   b.frame = f
   b.bagFrame = bagFrame
 
   if addon.isForever then
-    -- Camelot (WoW: Forever): DefaultPanelFlatTemplate renders a broken title-bar
-    -- band and oversized metal header on this client, so decorate with a headerless,
-    -- dark, tooltip-bordered frame instead of the themed flat window. See
-    -- camelot-forever.md and the matching bagslots.lua branch.
-    local deco = CreateFrame("Frame", f:GetName().."Camelot", f, "TooltipBorderedFrameTemplate")
-    deco:SetAllPoints()
-    deco:SetBackdropColor(0, 0, 0, 0.9)
-    deco:SetBackdropBorderColor(1, 1, 1, 1)
+    f:SetBackdropColor(0, 0, 0, 0.9)
+    f:SetBackdropBorderColor(1, 1, 1, 1)
   else
     -- Register with an empty title so no title text is rendered in the window
     -- decoration across any theme. The panel has no title bar text by design.
@@ -517,6 +562,14 @@ function BankSlots:CreatePanel(ctx, bagFrame)
     selectedHL:Hide()
     btn.selectedHighlight = selectedHL
 
+    -- Corner badge on the view button showing the bag in this tab's socket (WoW:
+    -- Forever); Update() fills and shows it.
+    local bagBadge = viewButton:CreateTexture(nil, "OVERLAY", nil, 1)
+    bagBadge:SetSize(16, 16)
+    bagBadge:SetPoint("BOTTOMRIGHT", viewButton, "BOTTOMRIGHT", -1, 1)
+    bagBadge:Hide()
+    btn.bagBadge = bagBadge
+
     -- Plus atlas icon on the purchase button (shown when unpurchased).
     -- Use explicit SetPoint + SetSize BEFORE SetAtlas so the rendered size is
     -- controlled by us, not by the atlas metadata (SetAtlas ignores SetAllPoints).
@@ -538,12 +591,22 @@ function BankSlots:CreatePanel(ctx, bagFrame)
       if mouseButton == "RightButton" then
         -- Right-click: open Blizzard tab configuration
         capturedPanel:OpenTabConfig(capturedBtn.bagIndex)
+      elseif capturedBtn:GetBagSocketIndex() and (GetCursorInfo() == "item" or IsModifiedClick("PICKUPITEM")) then
+        -- Left-click holding an item places it in the tab's bag socket; shift-left-click
+        -- picks the socketed bag up.
+        capturedBtn:PickupBag()
       else
         -- Left-click: select this tab and filter bank to its items
         local ectx = context:New('BankSlotSelect')
         capturedPanel:SelectTab(ectx, capturedBtn.bagIndex)
       end
     end)
+
+    if addon.isForever then
+      viewButton:RegisterForDrag("LeftButton")
+      viewButton:SetScript("OnDragStart", function() capturedBtn:PickupBag() end)
+      viewButton:SetScript("OnReceiveDrag", function() capturedBtn:PickupBag() end)
+    end
 
     -- Shared tooltip builder used by both sub-buttons.
     local function showSlotTooltip(anchorFrame)
@@ -561,13 +624,34 @@ function BankSlots:CreatePanel(ctx, bagFrame)
         end
       end
       if tabData then
-        GameTooltip:SetText(tabData.name, 1, 1, 1, 1, true)
+        local socketIndex = capturedBtn:GetBagSocketIndex()
+        local hasBag = socketIndex ~= nil and GameTooltip:SetBagItem(Enum.BagIndex.Characterbanktab, socketIndex)
+        if hasBag then
+          -- The socketed bag's own tooltip (name, size and type) leads; the tab follows.
+          GameTooltip:AddLine(" ")
+          GameTooltip:AddLine(tabData.name, 1, 1, 1, true)
+        else
+          GameTooltip:SetText(tabData.name, 1, 1, 1, 1, true)
+        end
         if capturedSlotInfo.bankType == Enum.BankType.Character then
           GameTooltip:AddLine(L:G("Bank"), 0.6, 0.8, 1.0, true)
         else
           GameTooltip:AddLine(L:G("Warbank"), 1.0, 0.85, 0.1, true)
         end
+        if socketIndex and not hasBag then
+          GameTooltip:AddLine(L:G("No bag in this slot"), 1.0, 0.3, 0.3, true)
+        elseif addon.isForever and capturedSlotInfo.bankType == Enum.BankType.Character then
+          local numSlots = C_Container.GetContainerNumSlots(capturedSlotInfo.bagIndex)
+          local numFree = C_Container.GetContainerNumFreeSlots(capturedSlotInfo.bagIndex)
+          GameTooltip:AddLine(format(L:G("%d of %d slots free"), numFree, numSlots), 1, 1, 1, true)
+        end
         GameTooltip:AddLine(L:G("Left-click to view this tab"), 0.8, 0.8, 0.8, true)
+        if hasBag then
+          GameTooltip:AddLine(L:G("Drag to remove this bag"), 0.8, 0.8, 0.8, true)
+          GameTooltip:AddLine(L:G("Drop a bag here to swap it"), 0.8, 0.8, 0.8, true)
+        elseif socketIndex then
+          GameTooltip:AddLine(L:G("Drop a bag here to use this tab"), 0.8, 0.8, 0.8, true)
+        end
         GameTooltip:AddLine(L:G("Right-click to configure this tab"), 0.8, 0.8, 0.8, true)
       elseif capturedSlotInfo.bankType == Enum.BankType.Character then
         GameTooltip:SetText(L:G("Unpurchased Bank Tab"), 1, 1, 1, 1, true)
@@ -620,6 +704,21 @@ function BankSlots:CreatePanel(ctx, bagFrame)
       b:Draw(ectx)
     end
   end)
+
+  if addon.isForever then
+    -- Redraw when a bag is placed in or removed from a tab's bag socket; these are
+    -- the events Blizzard's own bank bag buttons refresh on (Camelot/BankFrame.lua).
+    events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(ectx)
+      if b:IsShown() then
+        b:Draw(ectx)
+      end
+    end)
+    events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ectx)
+      if b:IsShown() then
+        b:Draw(ectx)
+      end
+    end)
+  end
 
   b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 8)
   b.frame:Hide()

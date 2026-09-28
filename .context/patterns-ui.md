@@ -142,6 +142,14 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 
 **Solution**: When auditing a flavor, compare each `bags/<flavor>/*.lua` `OnCreate` against the pre-#1044 `frames/<flavor>/bag.lua` (`git show aa6eeeb^:frames/classic/bag.lua`) for **both** kinds. Also check that per-kind state the shared code assumes (e.g. retail-only `showBankTabs`, or the retail one-tab `SECTION_ALL_BAGS` bank filter) is gated on `addon.isRetail` rather than on `bag.kind` alone.
 
+## Filled Backdrops Belong on the Panel Frame, Not a Sibling of the Content
+
+**Problem**: On WoW: Forever the "Show Bags" slot buttons looked sunk under a dark film. The panel's `TooltipBorderedFrameTemplate` backdrop (90% black centre) had been created as a child "decoration" frame of the panel, a sibling of the slot grid.
+
+**Why**: A child frame gets its parent's level + 1, so the decoration and the grid shared a frame level. The grid is a `WowScrollBox` with `clipChildren="true"`, whose descendants render as a group at the scroll box's level, so the buttons' own higher levels don't lift them above a same-level sibling. Which of two same-level siblings draws on top is not something to rely on. Since 7.0.3 `SetParent` does not re-level a frame either (warcraft.wiki.gg "Frame Strata").
+
+**Solution**: Put a filled backdrop where it is guaranteed to be below the content: on the panel frame itself (inherit the template in its `CreateFrame`, or `SetBackdrop` on a `BackdropTemplate` frame), or on a frame pinned to a lower level (Blizzard's `DefaultPanelFlatTemplate` puts its `Bg` frame at `frameLevel="0"`). A sibling decoration frame is only safe when everything it draws at that level is border art. See camelot-forever.md §5.
+
 ## Unified Global ScrollBox Architecture (Zero-Reparenting Secure Frame Design)
 
 **Problem**: WoW secure item buttons and empty slot buttons are bound to unique physical slot keys and cannot be reparented or dynamically moved between views during active combat without causing fatal "Action blocked" taint errors. Storing scrollboxes inside individual tab views requires secure buttons to be reparented on tab switches.

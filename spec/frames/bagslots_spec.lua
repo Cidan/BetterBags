@@ -130,3 +130,78 @@ describe("BagSlots panel layout", function()
     assert.are.equal(12, c.points["BOTTOMRIGHT"].y)
   end)
 end)
+
+describe("BagSlots panel decoration", function()
+  local savedIsRetail, savedIsForever, savedCreateFrame, savedGridCreate, savedButtonCreate
+  local bagButton = addon:GetModule("BagButton")
+  local grid = addon:GetModule("Grid")
+
+  before_each(function()
+    savedIsRetail = addon.isRetail
+    savedIsForever = addon.isForever
+    savedCreateFrame = _G.CreateFrame
+    savedGridCreate = grid.Create
+    savedButtonCreate = bagButton.Create
+    grid.Create = function()
+      local container = savedCreateFrame("Frame")
+      return {
+        GetContainer = function() return container end,
+        HideScrollBar = function() end,
+        EnableMouseWheelScroll = function() end,
+        Show = function() end,
+        AddCell = function() end,
+        cells = {},
+      }
+    end
+    bagButton.Create = function() return { SetBag = function() end } end
+  end)
+
+  after_each(function()
+    addon.isRetail = savedIsRetail
+    addon.isForever = savedIsForever
+    _G.CreateFrame = savedCreateFrame
+    grid.Create = savedGridCreate
+    bagButton.Create = savedButtonCreate
+  end)
+
+  -- The bag grid is a clipping WowScrollBox child of the panel. A filled backdrop on a
+  -- sibling child frame shares the grid's frame level and can render over the bag
+  -- buttons, so on Camelot the panel frame itself must own the backdrop.
+  it("draws the Camelot backdrop on the panel frame itself, not on a sibling of the grid", function()
+    addon.isRetail = true
+    addon.isForever = true
+    local calls = {}
+    _G.CreateFrame = function(frameType, name, parent, template)
+      local f = savedCreateFrame(frameType, name, parent, template)
+      table.insert(calls, { frame = f, parent = parent, template = template })
+      return f
+    end
+
+    local panel = addon:GetModule("BagSlots"):CreatePanel(ctx:New("test"), const.BAG_KIND.BACKPACK, savedCreateFrame("Frame"))
+
+    local panelTemplate
+    for _, c in ipairs(calls) do
+      if c.frame == panel.frame then panelTemplate = c.template end
+      assert.is_false(c.parent == panel.frame and c.template == "TooltipBorderedFrameTemplate",
+        "the backdrop must not be a sibling frame of the bag grid")
+    end
+    assert.are.equal("TooltipBorderedFrameTemplate", panelTemplate)
+    assert.are.same({ r = 0, g = 0, b = 0, a = 0.9 }, panel.frame._backdropColor)
+  end)
+
+  it("keeps the BackdropTemplate panel on Classic/Era", function()
+    addon.isRetail = false
+    addon.isForever = false
+    local panelTemplate
+    _G.CreateFrame = function(frameType, name, parent, template)
+      local f = savedCreateFrame(frameType, name, parent, template)
+      if name == "BackpackBagSlots" then panelTemplate = template end
+      return f
+    end
+
+    local panel = addon:GetModule("BagSlots"):CreatePanel(ctx:New("test"), const.BAG_KIND.BACKPACK, savedCreateFrame("Frame"))
+
+    assert.are.equal("BackdropTemplate", panelTemplate)
+    assert.is_not_nil(panel.frame._backdrop)
+  end)
+end)

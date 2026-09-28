@@ -225,6 +225,32 @@ describe("Refresh Module", function()
     addon.isRetail = true -- reset
   end)
 
+  -- On WoW: Forever, placing a bag in (or removing it from) a bank tab's bag socket fires
+  -- PLAYERBANKSLOTS_CHANGED and resizes that tab's container, so every bank bag is swept.
+  -- Bag -1 is the keyring there, never the bank, so the Classic targeted request is wrong.
+  it("should sweep every bank bag on PLAYERBANKSLOTS_CHANGED on Forever", function()
+    events:Init()
+    addon.isRetail = true
+    addon.isForever = true
+    refresh:OnEnable()
+    spy.on(refresh, "RequestUpdate")
+    local eventMap = events._eventMap
+    assert.is_not_nil(eventMap["PLAYERBANKSLOTS_CHANGED"])
+    eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
+    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { bank = true })
+    assert.spy(refresh.RequestUpdate).was_not.called_with(refresh, { bank = true, bags = { [-1] = true } })
+    addon.isForever = nil -- reset
+  end)
+
+  it("should not listen for PLAYERBANKSLOTS_CHANGED on live retail", function()
+    events:Init()
+    addon.isRetail = true
+    addon.isForever = false
+    refresh:OnEnable()
+    assert.is_nil(events._eventMap["PLAYERBANKSLOTS_CHANGED"])
+    addon.isForever = nil -- reset
+  end)
+
   it("should register bags/SortBackpack message and trigger sorting", function()
     refresh:OnEnable()
     addon.atBank = false

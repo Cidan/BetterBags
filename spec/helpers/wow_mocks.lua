@@ -203,6 +203,13 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetColorTexture(r, g, b, a)
     self._colorTexture = {r = r, g = g, b = b, a = a or 1}
   end
+  -- TextureBase:SetDesaturated(desaturated?) / IsDesaturated() -> boolean.
+  function widget:SetDesaturated(desaturated)
+    self._desaturated = desaturated == true
+  end
+  function widget:IsDesaturated()
+    return self._desaturated == true
+  end
   function widget:SetNormalAtlas(atlas)
     self._normalAtlas = atlas
   end
@@ -686,6 +693,19 @@ end
 function _G.GameTooltip:AddDoubleLine(left, right, lr, lg, lb, rr, rg, rb)
   table.insert(self.doubleLines, {left = left, right = right, lr = lr, lg = lg, lb = lb, rr = rr, rg = rg, rb = rb})
 end
+-- GameTooltip:SetBagItem(bag, slot) is a TooltipDataHandler accessor (GetBagItem): it
+-- returns true and shows the tooltip when the slot holds an item, otherwise it hides the
+-- tooltip and returns false (Blizzard_SharedXMLGame/Tooltip/TooltipDataHandler.lua).
+function _G.GameTooltip:SetBagItem(bag, slot)
+  self._bagItem = { bag = bag, slot = slot }
+  if _G.C_Item.DoesItemExist(_G.ItemLocation:CreateFromBagAndSlot(bag, slot)) then
+    self.lines = {}
+    self:Show()
+    return true
+  end
+  self:Hide()
+  return false
+end
 
 -- Cursor APIs
 _G._cursorHasItem = false
@@ -703,6 +723,11 @@ _G.IsShiftKeyDown = function() return _G._isShiftKeyDown or false end
 _G.IsControlKeyDown = function() return _G._isControlKeyDown or false end
 _G.IsAltKeyDown = function() return _G._isAltKeyDown or false end
 _G.GetCursorInfo = function() return _G._cursorType, _G._cursorItemID, _G._cursorItemLink end
+-- IsModifiedClick(action?) -> isHeld. PICKUPITEM defaults to SHIFT (Bindings_*.xml).
+_G.IsModifiedClick = function(action)
+  if action == "PICKUPITEM" then return _G.IsShiftKeyDown() end
+  return false
+end
 _G.ClearCursor = function()
   _G._cursorHasItem = false
   _G._cursorType = nil
@@ -765,6 +790,12 @@ end
 _G.C_Container.GetContainerItemInfo = _G.C_Container.GetContainerItemInfo or function(bagid, slotid)
   return { iconFileID = 12345, stackCount = 1, isLocked = false, quality = 1, isReadable = false, hasLoot = false, hyperlink = "[Mock Link]", isFiltered = false, hasNoValue = false, itemID = 123 }
 end
+-- C_Container.PickupContainerItem(containerIndex, slotIndex): picks up, places, or swaps
+-- the cursor item with the item at that container slot. Calls are recorded for specs.
+_G.C_Container._pickups = {}
+_G.C_Container.PickupContainerItem = function(containerIndex, slotIndex)
+  table.insert(_G.C_Container._pickups, { bag = containerIndex, slot = slotIndex })
+end
 _G.C_Container.UseContainerItem = function(bagid, slotid, target, bankType, isReagent)
   table.insert(_G.C_Container._usedItems, {
     bagid = bagid,
@@ -805,6 +836,24 @@ _G.ItemLocation.CreateFromEquipmentSlot = function(_, slotID)
   function loc:IsBagAndSlot() return false end
   function loc:IsValid() return true end
   return loc
+end
+
+-- Location-based C_Item APIs (ItemDocumentation.lua). Specs describe what sits at a
+-- bag/slot via _G._itemsAtLocation["bag:slot"] = { icon = fileID, quality = n }.
+_G._itemsAtLocation = {}
+local function itemAtLocation(itemLocation)
+  local bag, slot = itemLocation:GetBagAndSlot()
+  if bag == nil then return nil end
+  return _G._itemsAtLocation[bag .. ":" .. slot]
+end
+-- C_Item.DoesItemExist(emptiableItemLocation) -> itemExists
+_G.C_Item.DoesItemExist = function(itemLocation)
+  return itemAtLocation(itemLocation) ~= nil
+end
+-- C_Item.GetItemIcon(itemLocation) -> icon (fileID, nilable)
+_G.C_Item.GetItemIcon = function(itemLocation)
+  local item = itemAtLocation(itemLocation)
+  return item and item.icon or nil
 end
 
 -- Item Setup
