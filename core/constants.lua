@@ -14,20 +14,26 @@ local const = addon:NewModule('Constants')
 ---@field shown boolean
 ---@field staticPoint? string
 
+-- WoW: Forever (codename Camelot) is a mainline retail fork and runs the retail code
+-- paths. Builds before 1.60.1 (70170) report WOW_PROJECT_MAINLINE. From 70170 on,
+-- Blizzard_ProjectConstants/Camelot/ProjectConstants.lua sets WOW_PROJECT_ID to
+-- WOW_PROJECT_CAMELOT (18), a global that only exists on the camelot game type.
+local isCamelotProject = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
+
 -- Constants for detecting WoW version.
-addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
+addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE or isCamelotProject
 addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 addon.isBCC = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addon.isCata = WOW_PROJECT_ID == WOW_PROJECT_CATACLYSM_CLASSIC
 addon.isMists = WOW_PROJECT_ID == WOW_PROJECT_MISTS_CLASSIC
 addon.isAnniversary = WOW_PROJECT_ID == 5
 
--- WoW: Forever (codename Camelot) is a mainline retail fork, so the checks above
--- report it as retail (addon.isRetail == true) and no build/project number can
--- tell it apart from live retail. addon.isForever is instead set by core/forever.lua,
--- which is listed only in BetterBags_Camelot.toc and loads before this file. Normalize
--- it to a boolean here so every downstream consumer can treat it as a plain flag.
-addon.isForever = addon.isForever == true
+-- addon.isForever is set by core/forever.lua, which is listed only in
+-- BetterBags_Camelot.toc and loads before this file; that is the only signal on
+-- pre-70170 builds, where the project ID is indistinguishable from live retail. The
+-- Camelot project ID is also honored. Normalize to a boolean here so every downstream
+-- consumer can treat it as a plain flag.
+addon.isForever = addon.isForever == true or isCamelotProject
 
 -- Whether the client has an Account bank (Warbank / Warband bank). It exists on
 -- live retail but NOT on WoW: Forever (Camelot), which is a retail fork that

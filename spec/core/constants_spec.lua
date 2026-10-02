@@ -293,4 +293,142 @@ describe("Constants Module Offsets", function()
       assert.are.equal(6, #const.BANK_ONLY_BAGS_LIST)
     end)
   end)
+
+  describe("client flavor detection (WOW_PROJECT_ID)", function()
+    local PROJECT_GLOBALS = {
+      "WOW_PROJECT_ID", "WOW_PROJECT_MAINLINE", "WOW_PROJECT_CLASSIC",
+      "WOW_PROJECT_BURNING_CRUSADE_CLASSIC", "WOW_PROJECT_CATACLYSM_CLASSIC",
+      "WOW_PROJECT_MISTS_CLASSIC", "WOW_PROJECT_CAMELOT",
+    }
+    local ADDON_FLAGS = {
+      "isRetail", "isClassic", "isBCC", "isCata", "isMists", "isAnniversary",
+      "isForever", "hasWarbank", "isMidnight", "tocVersion",
+    }
+    local savedGlobals, savedFlags, savedBagIndex
+
+    local function countKeys(t)
+      local n = 0
+      for _ in pairs(t) do n = n + 1 end
+      return n
+    end
+
+    -- Enum.BagIndex exactly as WoW: Forever 1.60.1 (70170) declares it
+    -- (Blizzard_APIDocumentationGenerated/BagIndexConstantsDocumentation.lua on the
+    -- forever branch): retail-shaped, with no Bank / BankBag_N / Reagentbank members,
+    -- -1 is the Keyring, and 9 character + 9 account bank tabs.
+    local function camelotBagIndex()
+      local t = {
+        Accountbanktab = -3, Characterbanktab = -2, Keyring = -1,
+        Backpack = 0, Bag_1 = 1, Bag_2 = 2, Bag_3 = 3, Bag_4 = 4, ReagentBag = 5,
+      }
+      for i = 1, 9 do
+        t["CharacterBankTab_" .. i] = 5 + i
+        t["AccountBankTab_" .. i] = 14 + i
+      end
+      return t
+    end
+
+    -- Blizzard_ProjectConstants/ProjectConstants.lua defines only MAINLINE and
+    -- CLASSIC on retail-engine clients. Camelot/ProjectConstants.lua
+    -- ([AllowLoadGameType camelot], new in 1.60.1 (70170)) adds
+    -- WOW_PROJECT_CAMELOT = 18 and sets WOW_PROJECT_ID to it.
+    local function setProject(projectID, camelotConstant)
+      for _, name in ipairs(PROJECT_GLOBALS) do _G[name] = nil end
+      _G.WOW_PROJECT_MAINLINE = 1
+      _G.WOW_PROJECT_CLASSIC = 2
+      _G.WOW_PROJECT_CAMELOT = camelotConstant
+      _G.WOW_PROJECT_ID = projectID
+    end
+
+    before_each(function()
+      savedGlobals, savedFlags = {}, {}
+      for _, name in ipairs(PROJECT_GLOBALS) do savedGlobals[name] = _G[name] end
+      for _, name in ipairs(ADDON_FLAGS) do savedFlags[name] = addon[name] end
+      savedBagIndex = _G.Enum.BagIndex
+    end)
+
+    after_each(function()
+      for _, name in ipairs(PROJECT_GLOBALS) do _G[name] = savedGlobals[name] end
+      for _, name in ipairs(ADDON_FLAGS) do addon[name] = savedFlags[name] end
+      _G.Enum.BagIndex = savedBagIndex
+    end)
+
+    it("treats the Camelot project (1.60.1 70170+) as a retail-engine client and loads", function()
+      setProject(18, 18)
+      _G.Enum.BagIndex = camelotBagIndex()
+      addon.isForever = true -- set by core/forever.lua via BetterBags_Camelot.toc
+
+      assert.has_no.errors(function()
+        loadfile("core/constants.lua")("BetterBags")
+      end)
+      local const = addon:GetModule("Constants")
+
+      assert.is_true(addon.isRetail)
+      assert.is_false(addon.isClassic)
+      assert.is_false(addon.isBCC)
+      assert.is_false(addon.isCata)
+      assert.is_false(addon.isMists)
+      assert.is_false(addon.isAnniversary)
+      assert.is_true(addon.isForever)
+      assert.is_false(addon.hasWarbank)
+
+      -- Retail-shaped bank tables: Characterbanktab + 9 character tabs, no warbank,
+      -- and never the keyring (-1).
+      assert.are.equal(10, countKeys(const.BANK_BAGS))
+      assert.are.equal(9, #const.BANK_ONLY_BAGS_LIST)
+      assert.is_nil(const.BANK_BAGS[Enum.BagIndex.Keyring])
+      assert.are.equal(0, countKeys(const.ACCOUNT_BANK_BAGS))
+      assert.are.equal(Enum.BagIndex.Characterbanktab, const.BANK_TAB.BANK)
+    end)
+
+    it("detects Forever from the Camelot project ID even without the TOC flag", function()
+      setProject(18, 18)
+      _G.Enum.BagIndex = camelotBagIndex()
+      addon.isForever = nil
+
+      loadfile("core/constants.lua")("BetterBags")
+
+      assert.is_true(addon.isRetail)
+      assert.is_true(addon.isForever)
+      assert.is_false(addon.hasWarbank)
+    end)
+
+    it("still treats pre-70170 Forever builds (mainline project + TOC flag) as Forever retail", function()
+      setProject(1, nil)
+      _G.Enum.BagIndex = camelotBagIndex()
+      addon.isForever = true
+
+      loadfile("core/constants.lua")("BetterBags")
+
+      assert.is_true(addon.isRetail)
+      assert.is_true(addon.isForever)
+      assert.is_false(addon.hasWarbank)
+    end)
+
+    it("leaves live retail detection unchanged (WOW_PROJECT_CAMELOT undefined)", function()
+      setProject(1, nil)
+      addon.isForever = nil
+
+      loadfile("core/constants.lua")("BetterBags")
+
+      assert.is_true(addon.isRetail)
+      assert.is_false(addon.isClassic)
+      assert.is_false(addon.isForever)
+      assert.is_true(addon.hasWarbank)
+    end)
+
+    it("leaves Classic Era detection unchanged", function()
+      setProject(2, nil)
+      addon.isForever = nil
+
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+
+      assert.is_false(addon.isRetail)
+      assert.is_true(addon.isClassic)
+      assert.is_false(addon.isForever)
+      assert.is_false(addon.hasWarbank)
+      assert.are.equal(Enum.BagIndex.Bank, const.BANK_BAGS[Enum.BagIndex.Bank])
+    end)
+  end)
 end)
