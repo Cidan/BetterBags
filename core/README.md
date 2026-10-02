@@ -202,12 +202,15 @@ The core module handles differences between WoW versions:
 - Burning Crusade Classic
 - Cataclysm Classic
 - Mists of Pandaria Classic
+- WoW: Forever (codename Camelot, a mainline fork that runs the retail paths)
 
 Version detection is done via:
 ```lua
-addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
+local isCamelotProject = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT
+addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE or isCamelotProject
 addon.isClassic = WOW_PROJECT_ID == WOW_PROJECT_CLASSIC
 -- etc.
+addon.isForever = addon.isForever == true or isCamelotProject -- TOC flag from core/forever.lua
 ```
 
 ## Performance Considerations

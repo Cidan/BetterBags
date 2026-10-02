@@ -2,31 +2,61 @@
 
 WoW: Forever (internal codename **Camelot**, build `1.60.1.69893`, install flavor
 `wow_classic_beta`, TOC Interface `16001`) is a **mainline retail fork**: the engine and
-UI are retail, so at runtime `WOW_PROJECT_ID == WOW_PROJECT_MAINLINE` and
-`addon.isRetail == true`, exactly like live retail. Camelot therefore runs BetterBags'
+UI are retail, so `addon.isRetail == true`, exactly like live retail (see §1 for how the
+project ID changed in build 70170). Camelot therefore runs BetterBags'
 **retail** code paths. Its bank is still the numbered-container model (BetterBags renders
 its own window by scanning container bags via `C_Container`; it never uses Blizzard's paged
 `BankPanel`), it just exposes **9 character + 9 account bank tabs** instead of retail's
 **6 + 5**, and the `Enum.BagIndex.AccountBankTab_N` values are shifted up accordingly.
 
-## 1. Detection is load-time only — `addon.isForever`
+## 1. Detection — `addon.isRetail` and `addon.isForever`
 
-There is **no** build, version, or project number that distinguishes Camelot from live
-retail at runtime (it is a mainline fork). The only reliable signal is **which TOC loaded**:
+Two runtime eras exist, and detection must work on both:
 
+- **Before build 1.60.1 (70170):** `WOW_PROJECT_ID == WOW_PROJECT_MAINLINE`. No build,
+  version, or project number distinguishes Camelot from live retail, so the only signal is
+  **which TOC loaded**.
+- **From 70170 on:** Blizzard added `Blizzard_ProjectConstants/Camelot/ProjectConstants.lua`
+  (`[AllowLoadGameType camelot]` in `Blizzard_ProjectConstants.toc`), which sets
+  `WOW_PROJECT_CAMELOT = 18` and `WOW_PROJECT_ID = WOW_PROJECT_CAMELOT`.
+  `WOW_PROJECT_CAMELOT` is only defined on the camelot game type (Blizzard's own
+  `GlueParent.lua` relies on that: `WOW_PROJECT_CAMELOT or WOW_PROJECT_MAINLINE`).
+
+How `core/constants.lua` handles both:
+
+- A local `isCamelotProject = WOW_PROJECT_CAMELOT ~= nil and WOW_PROJECT_ID == WOW_PROJECT_CAMELOT`.
+  The `~= nil` guard is load-bearing: when both globals are nil, a bare
+  `WOW_PROJECT_ID == WOW_PROJECT_CAMELOT` is `nil == nil`, i.e. true. That is exactly the
+  spec environment (it defines no `WOW_PROJECT_*` globals), where it would flag every spec
+  that loads `core/constants.lua` as Forever and turn off the warbank.
+- `addon.isRetail = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE or isCamelotProject`. **Never**
+  compare against `WOW_PROJECT_MAINLINE` alone again. That is what broke 70170: `isRetail`
+  went false, the Classic branch built `const.BANK_BAGS` with `[Enum.BagIndex.Bank]` as a key,
+  and Camelot's retail-shaped `Enum.BagIndex` has no `Bank` member (`Characterbanktab = -2`,
+  `Keyring = -1`), so the addon died at load with `core/constants.lua: table index is nil`.
+  Every other flavor gate in the addon reads `addon.isRetail`, so this one line is the
+  whole fix.
 - `core/forever.lua` sets `addon.isForever = true`. It is listed **only** in
   `BetterBags_Camelot.toc`, so it runs solely on the Camelot client. It must load **after**
-  `core/boot.lua` (which creates the addon) and **before** `core/constants.lua`.
-- `core/constants.lua` normalizes `addon.isForever = addon.isForever == true` next to the
-  other `addon.is*` flavor flags, so every consumer sees a plain boolean (`false` on
-  retail/classic, `true` on Camelot).
-- **Never** try to detect Camelot with a version/`GetBuildInfo`/`WOW_PROJECT_ID` check — it
-  is indistinguishable from live retail by any such API. Confirmed with the Forever devs.
+  `core/boot.lua` (which creates the addon) and **before** `core/constants.lua`. It is still
+  required: it is the only signal on pre-70170 builds.
+- `core/constants.lua` normalizes `addon.isForever = addon.isForever == true or isCamelotProject`
+  next to the other `addon.is*` flavor flags, so every consumer sees a plain boolean (`false`
+  on retail/classic, `true` on Camelot) from either signal.
+- **Never** detect Camelot with `GetBuildInfo`/TOC version checks. The 16001 interface number
+  is not a reliable discriminator.
 - **Never** add `core/forever.lua` to `BetterBags.toc` (the base TOC) or any non-Camelot
   TOC — doing so would flag every retail/classic user as Forever.
+- Vendored libraries carry their own project checks. `libs/LibUIDropDownMenu` (an external,
+  not our code) detects Forever as `projectID == WOW_PROJECT_MAINLINE` with a 1.x interface,
+  so on 70170+ it falls into none of its flavor modes. That needs an upstream fix, not a
+  local patch to `libs/` (which is gitignored and pulled by the packager).
 
 Coverage: `spec/core/forever_spec.lua` (flag set; present in Camelot TOC, absent from base
-TOC; loads before constants.lua) and `spec/core/constants_spec.lua` (boolean normalization).
+TOC; loads before constants.lua) and `spec/core/constants_spec.lua` (boolean normalization,
+and "client flavor detection (WOW_PROJECT_ID)": the 70170 Camelot project with Camelot's real
+`Enum.BagIndex` loads and is retail + Forever, the project ID alone sets Forever, pre-70170
+mainline + TOC flag still works, live retail and Classic Era are unchanged).
 
 ## 2. Bank tab tables are sized off the enum, not hard-coded
 
