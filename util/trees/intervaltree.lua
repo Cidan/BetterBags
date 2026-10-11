@@ -17,6 +17,7 @@ local trees = addon:GetModule('Trees')
 ---@class (exact) IntervalTree
 ---@field private root IntervalTreeNode
 trees.IntervalTree = {}
+addon:GetModule('Perf'):RegisterPrototype(trees.IntervalTree, 'IntervalTree')
 
 -- Insert adds a new value to the tree. If the value already exists,
 -- the data table for the value will be appended to with the data

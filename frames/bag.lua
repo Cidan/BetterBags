@@ -31,9 +31,6 @@ local resize = addon:GetModule("Resize")
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
 
----@class Debug: AceModule
-local debug = addon:GetModule("Debug")
-
 ---@class Question: AceModule
 local question = addon:GetModule("Question")
 
@@ -100,6 +97,7 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field blizzardBankTab number? When set, the bank is filtered to show only items from this specific Blizzard bag index (set by the bank slots panel).
 ---@field behavior BackpackBehaviorProto|BankBehaviorProto The bag-type-specific behavior
 bagFrame.bagProto = {}
+addon:GetModule('Perf'):RegisterPrototype(bagFrame.bagProto, 'Bag')
 
 ---@param ctx Context
 function bagFrame.bagProto:Show(ctx)
@@ -161,13 +159,21 @@ function bagFrame.bagProto:Sort(ctx)
 	end
 end
 
--- Wipe will wipe the contents of the bag and release all cells.
+-- Wipe tears the bag's drawing down: every view and global section and every item button
+-- the last passes drew (including a pass that failed before its sweep) is released.
 ---@param ctx Context
 function bagFrame.bagProto:Wipe(ctx)
 	self:WipeGlobalSections(ctx)
-	if self.currentView then
-		self.currentView:Wipe(ctx)
+	for _, tView in pairs(self.tabViews or {}) do
+		tView:Wipe(ctx)
 	end
+	for _, drawn in ipairs({ self.drawnButtons or {}, self.claims or {} }) do
+		for item in pairs(drawn) do
+			item:Release(ctx)
+		end
+	end
+	self.drawnButtons = {}
+	self.claims = nil
 end
 
 ---@param ctx Context
@@ -259,11 +265,56 @@ function bagFrame.bagProto:GetOrCreateGlobalItemButton(ctx, slotkey)
 	self.itemFrames = self.itemFrames or {}
 	local item = itemFrame:GetButton(ctx, slotkey)
 	tinsert(self.itemFrames, item)
+	if self.claims then
+		self.claims[item] = true
+	end
 	return item
 end
 
+-- BeginGlobalSections starts the global sections' part of a draw pass. Last pass's
+-- Recent Items and Free Space sections are set aside for reuse; nothing is released.
+function bagFrame.bagProto:BeginGlobalSections()
+	if self.staleGlobalSections then return end
+	self.staleGlobalSections = self.globalSections or {}
+	self.globalSections = {}
+	if self.itemFrames then
+		wipe(self.itemFrames)
+	end
+end
+
+-- GetOrCreateGlobalSection returns the named global section for this pass, reusing last
+-- pass's section of the same name.
+---@param ctx Context
+---@param name string
+---@return Section
+function bagFrame.bagProto:GetOrCreateGlobalSection(ctx, name)
+	local section = self.staleGlobalSections and self.staleGlobalSections[name]
+	if section then
+		self.staleGlobalSections[name] = nil
+		section:PrepareForReuse()
+	else
+		section = addon:GetModule("SectionFrame"):Create(ctx)
+	end
+	self.globalSections[name] = section
+	return section
+end
+
+-- FinishGlobalSections releases the global sections this pass did not draw again. Their
+-- item buttons are left to the draw pass sweep.
+---@param ctx Context
+function bagFrame.bagProto:FinishGlobalSections(ctx)
+	local stale = self.staleGlobalSections
+	self.staleGlobalSections = nil
+	for _, section in pairs(stale or {}) do
+		section:Release(ctx)
+	end
+end
+
+-- WipeGlobalSections tears the global sections down outside a draw pass: every section
+-- and every item button they drew is released.
 ---@param ctx Context
 function bagFrame.bagProto:WipeGlobalSections(ctx)
+	self:FinishGlobalSections(ctx)
 	if self.itemFrames then
 		for _, item in pairs(self.itemFrames) do
 			item:Release(ctx)
@@ -354,7 +405,7 @@ end
 ---@param slotInfo SlotInfo
 ---@return number headerW, number headerH, number footerW, number footerH
 function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
-	self:WipeGlobalSections(ctx)
+	self:BeginGlobalSections()
 
 	if not self.headerContainer then
 		return 0, 0, 0, 0
@@ -390,13 +441,11 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 
 	local headerW, headerH = 0, 0
 	if #recentItems > 0 then
-		local sectionFrame = addon:GetModule("SectionFrame")
-		local recentSection = sectionFrame:Create(ctx)
+		local recentSection = self:GetOrCreateGlobalSection(ctx, L:G("Recent Items"))
 		recentSection.frame:SetParent(self.headerContainer)
 		recentSection.frame:ClearAllPoints()
 		recentSection.frame:SetPoint("TOPLEFT", self.headerContainer, "TOPLEFT", 0, 0)
 		recentSection:SetTitle(L:G("Recent Items"))
-		self.globalSections[L:G("Recent Items")] = recentSection
 
 		recentSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
 
@@ -419,13 +468,11 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		local tabID = self:GetCurrentTabID()
 		local tabData = slotInfo.tabs and slotInfo.tabs[tabID] or slotInfo
 
-		local sectionFrame = addon:GetModule("SectionFrame")
-		local freeSlotsSection = sectionFrame:Create(ctx)
+		local freeSlotsSection = self:GetOrCreateGlobalSection(ctx, L:G("Free Space"))
 		freeSlotsSection.frame:SetParent(self.footerContainer)
 		freeSlotsSection.frame:ClearAllPoints()
 		freeSlotsSection.frame:SetPoint("TOPLEFT", self.footerContainer, "TOPLEFT", 0, 0)
 		freeSlotsSection:SetTitle(L:G("Free Space"))
-		self.globalSections[L:G("Free Space")] = freeSlotsSection
 
 		local freeSpaceData = tabData.freeSpace or { showAll = true, buttons = {} }
 		if freeSpaceData.showAll then
@@ -448,7 +495,28 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 	end
 	self.footerContainer:SetHeight(math.max(1, footerH))
 
+	self:FinishGlobalSections(ctx)
 	return headerW, headerH, footerW, footerH
+end
+
+-- FinishDrawPass ends a draw pass once every renderer has run: views release the
+-- sections they did not draw again (every section of a view that was not rendered), and
+-- the item buttons the previous pass drew that no renderer claimed this pass are
+-- released.
+---@param ctx Context
+---@param claims table<Item, boolean>
+function bagFrame.bagProto:FinishDrawPass(ctx, claims)
+	for _, tView in pairs(self.tabViews or {}) do
+		tView:FinishRender(ctx)
+	end
+	self:FinishGlobalSections(ctx)
+	for item in pairs(self.drawnButtons or {}) do
+		if not claims[item] then
+			item:Release(ctx)
+		end
+	end
+	self.drawnButtons = claims
+	self.claims = nil
 end
 
 -- Draw will draw the correct bag view based on the bag view configuration.
@@ -477,35 +545,34 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 	end
 
 	-- Every physical slot has exactly one static item button, shared by the global
-	-- Recent Items / Free Space sections and by every tab view. Release all of them
-	-- before any renderer acquires buttons; a wipe that ran later in this pass would
-	-- hide a button another renderer had already claimed.
-	self:WipeGlobalSections(ctx)
-	if self.tabViews then
-		for _, tView in pairs(self.tabViews) do
-			tView:Wipe(ctx)
+	-- Recent Items / Free Space sections and by every tab view. A draw pass claims, then
+	-- sweeps: nothing is released up front, every renderer claims the buttons it draws and
+	-- reuses last pass's section for each category it draws again, and once every
+	-- renderer has run, the buttons the previous pass drew that nobody claimed are
+	-- released (FinishDrawPass). A button drawn in consecutive passes is therefore never
+	-- hidden or unparented, which would run the item button template's OnHide/OnShow
+	-- handlers on every redraw. Only the active tab is rendered; a tab is rendered when it
+	-- is switched to.
+	if self.claims then
+		-- The previous pass failed before its sweep: what it claimed is on screen.
+		self.drawnButtons = self.drawnButtons or {}
+		for item in pairs(self.claims) do
+			self.drawnButtons[item] = true
 		end
 	end
-
-	-- Render other background persistent views first to keep them in a consistent data state
-	local currentLayout = database:GetBagView(self.kind)
-	if self.tabViews then
-		for viewKey, tView in pairs(self.tabViews) do
-			local layoutStr, tabIDStr = string.split("_", viewKey)
-			local layout = tonumber(layoutStr)
-			local tTabID = tonumber(tabIDStr)
-			if layout == currentLayout and tTabID ~= tabID then
-				tView:Render(ctx, self, slotInfo, function() end)
-				tView:GetContent():Hide()
-			end
-		end
+	local claims = {}
+	self.claims = claims
+	self:FinishGlobalSections(ctx)
+	self:BeginGlobalSections()
+	for _, tView in pairs(self.tabViews or {}) do
+		tView:FinishRender(ctx)
+		tView:BeginRender(ctx, claims)
 	end
 
 	local headerW, headerH, footerW, footerH = self:DrawGlobalSections(ctx, slotInfo)
 
-	debug:StartProfile("Bag Render %d", self.kind)
 	view:Render(ctx, self, slotInfo, function()
-		debug:EndProfile("Bag Render %d", self.kind)
+		self:FinishDrawPass(ctx, claims)
 		view:GetContent():Show()
 		self.currentView = view
 
@@ -597,7 +664,7 @@ local function refreshCooldown(ctx, item)
 	end
 	local data = item:GetItemData()
 	if data then
-		item:UpdateCooldown(ctx, data)
+		item:UpdateCooldown(ctx, data, true)
 	end
 end
 

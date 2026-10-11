@@ -610,4 +610,114 @@ describe("Themes", function()
       assert.is_true(defaultCalled)
     end)
   end)
+
+  -- GetItemButton is called about ten times per item button on every redraw. Only the
+  -- first lookup after a theme is applied may show the decoration and announce it with
+  -- item/NewButton (Masque re-adds and re-skins a button on every announcement).
+  describe("GetItemButton decoration cache", function()
+    local announced
+    local savedSendMessage
+    local buttonCount = 0
+
+    local function newItem()
+      buttonCount = buttonCount + 1
+      local holder = CreateFrame("Frame")
+      local button = CreateFrame("Button", "TestDecorationCacheButton" .. buttonCount, holder)
+      return { button = button, frame = holder }
+    end
+
+    local function theme(name, itemButton)
+      return {
+        Name = name,
+        Available = true,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function() end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() end,
+        ToggleSearch = function() end,
+        ItemButton = itemButton,
+      }
+    end
+
+    local function countShows(decoration)
+      local shows = 0
+      local show = decoration.Show
+      decoration.Show = function(self)
+        shows = shows + 1
+        return show(self)
+      end
+      return function() return shows end
+    end
+
+    before_each(function()
+      announced = {}
+      savedSendMessage = events.SendMessage
+      events.SendMessage = function(_, _, event, item)
+        if event == "item/NewButton" then
+          table.insert(announced, item)
+        end
+      end
+      themes:RegisterTheme("Default", theme("Default"))
+    end)
+
+    after_each(function()
+      events.SendMessage = savedSendMessage
+    end)
+
+    it("returns the cached decoration without showing or announcing it again", function()
+      local item = newItem()
+      local decoration = themes:GetItemButton(nil, item)
+      local shows = countShows(decoration)
+      assert.are.equal(1, #announced)
+
+      for _ = 1, 10 do
+        assert.are.equal(decoration, themes:GetItemButton(nil, item))
+      end
+      assert.are.equal(1, #announced)
+      assert.are.equal(0, shows())
+    end)
+
+    it("shows and announces the decoration again after a theme is applied", function()
+      local item = newItem()
+      local decoration = themes:GetItemButton(nil, item)
+      local shows = countShows(decoration)
+
+      themes:ApplyTheme(nil, "Default")
+      assert.are.equal(decoration, themes:GetItemButton(nil, item))
+      assert.are.equal(1, shows())
+      assert.are.equal(2, #announced)
+
+      themes:GetItemButton(nil, item)
+      assert.are.equal(1, shows())
+      assert.are.equal(2, #announced)
+    end)
+
+    -- A theme with its own ItemButton (ElvUI) keeps its own decorations and re-applies
+    -- per-lookup fixups (ElvUI re-pins its backdrop's frame level), so it is asked on
+    -- every lookup; only the default decoration path is cached.
+    it("asks a theme with its own ItemButton on every lookup, and falls back to the cache for Default", function()
+      local custom = CreateFrame("Frame")
+      local asked = 0
+      themes:RegisterTheme("Custom", theme("Custom", function()
+        asked = asked + 1
+        return custom
+      end))
+      local item = newItem()
+      local default = themes:GetItemButton(nil, item)
+
+      activeTheme = "Custom"
+      assert.are.equal(custom, themes:GetItemButton(nil, item))
+      assert.are.equal(custom, themes:GetItemButton(nil, item))
+      assert.are.equal(2, asked)
+
+      -- Nothing hid the default decoration (only ApplyTheme does), so it is still cached.
+      activeTheme = "Default"
+      local shows = countShows(default)
+      assert.are.equal(default, themes:GetItemButton(nil, item))
+      assert.are.equal(0, shows())
+    end)
+  end)
 end)

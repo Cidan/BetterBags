@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
+---@class Perf: AceModule
+local perf = addon:GetModule('Perf')
+
 ---@class Task
 ---@field fn fun()
 ---@field cb fun()
@@ -211,7 +214,11 @@ function async:AfterCombat(ctx, cb)
   end
 end
 
--- Yield is a small wrapper around coroutine.yield.
+-- Yield is a small wrapper around coroutine.yield. Yield through here rather than calling
+-- coroutine.yield directly: it tells the profiler the coroutine is paused, so the time
+-- until it resumes is not charged to whatever it had open.
 function async:Yield()
+  perf:BeforeYield()
   coroutine.yield()
+  perf:AfterResume()
 end

@@ -14,8 +14,6 @@ L.G = function(self, key) return key end
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
-debug.StartProfile = function() end
-debug.EndProfile = function() end
 debug.WalkAndFixAnchorGraph = function() end
 
 local database = StubBetterBagsModule("Database")
@@ -160,7 +158,12 @@ ResetModuleStub("Slots", "data/slots.lua")
 LoadBetterBagsModule("data/slots.lua")
 
 local items = addon:GetModule("Items")
+items:Init()
 items._firstLoad = {
+  [const.BAG_KIND.BACKPACK] = false,
+  [const.BAG_KIND.BANK] = false,
+}
+items._sortSweepPending = {
   [const.BAG_KIND.BACKPACK] = false,
   [const.BAG_KIND.BANK] = false,
 }
@@ -412,7 +415,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(view2.emptyGroupFrame:IsShown())
   end)
 
-  it("should render all instantiated views matching the current layout in bag:Draw()", function()
+  it("renders only the active tab's view in bag:Draw(); other tabs render when switched to", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
     local frame = CreateFrame("Frame")
@@ -452,9 +455,12 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     bag:Draw(ctx, mockSlotInfo, function() end)
 
-    -- Assert both views were rendered
+    -- Views now rebuild from scratch on every render, so a hidden tab has nothing to
+    -- keep up to date; switching tabs draws it (backpack/bank SwitchToGroup, bank
+    -- SwitchToBlizzardTab all call bag:Draw).
     assert.is_true(render1_called)
-    assert.is_true(render2_called)
+    assert.is_false(render2_called)
+    assert.is_false(view2.rendering, "the hidden tab's pass is finished, releasing its sections")
   end)
 
   it("should skip rendering in Draw() when the bag is not shown, and draw when shown", function()
@@ -847,7 +853,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     groups.CategoryBelongsToGroup = old_CategoryBelongsToGroup
   end)
 
-  it("should wipe every view centrally before rendering and again inside each Render", function()
+  it("does not wipe any view during bag:Draw(); every view begins and finishes a render pass", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
     local frame = CreateFrame("Frame")
@@ -886,11 +892,25 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       totalItems = 0
     }
 
+    local begun = {}
+    for id, view in pairs({ [1] = view1, [2] = view2 }) do
+      local beginRender = view.BeginRender
+      view.BeginRender = function(self, ...)
+        begun[id] = true
+        return beginRender(self, ...)
+      end
+    end
+
     bag:Draw(ctx, mockSlotInfo, function() end)
 
-    -- Draw releases every shared item button owner up front (one central Wipe per view),
-    -- and each Render then performs its own idempotent Wipe before populating.
-    assert.equals(4, #wipe_called)
+    -- Draw claims, then sweeps (frames/bag.lua): nothing is wiped up front, so buttons
+    -- drawn again are never hidden. Wipe is only the teardown path (bag:Wipe,
+    -- DeleteTabView).
+    assert.equals(0, #wipe_called)
+    assert.is_true(begun[1])
+    assert.is_true(begun[2])
+    assert.is_false(view1.rendering)
+    assert.is_false(view2.rendering)
   end)
 
   it("should set view.isNew to true on Wipe() for both GridView and BagView", function()

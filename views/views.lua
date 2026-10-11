@@ -34,7 +34,11 @@ local views = addon:NewModule('Views')
 ---@field dirtySections table<string, boolean>
 ---@field WipeHandler fun(view: View, ctx: Context)
 ---@field isNew boolean
+---@field rendering boolean True between BeginRender and FinishRender.
+---@field claims table<Item, boolean>|nil The current pass's claimed buttons (see frames/bag.lua Draw).
+---@field staleSections table<string, Section>|nil Last pass's sections not drawn again yet.
 views.viewProto = {}
+addon:GetModule('Perf'):RegisterPrototype(views.viewProto, 'View')
 
 function views:OnEnable()
 end
@@ -65,9 +69,53 @@ function views.viewProto:AddSlot(newSlotKey)
   error('AddSlot method not implemented')
 end
 
+-- BeginRender starts a render pass without releasing or hiding anything. Last pass's
+-- sections are set aside so GetOrCreateSection can draw the same category into the same
+-- section, and every button the pass draws is recorded in claims; the bag releases the
+-- buttons no renderer claimed once every renderer has run. A second call before
+-- FinishRender is a no-op.
+---@param ctx Context
+---@param claims table<Item, boolean>|nil
+function views.viewProto:BeginRender(ctx, claims)
+  local _ = ctx
+  if self.rendering then return end
+  self.rendering = true
+  self.claims = claims
+  self.staleSections = self.sections
+  self.sections = {}
+  self.content:Wipe()
+  self.itemCount = 0
+  wipe(self.itemsByBagAndSlot)
+  self:ClearDeferredItems()
+  self:ClearDirtySections()
+  wipe(self.slotToSection)
+  self.sortRequired = true
+  self.isNew = true
+end
+
+-- FinishRender ends the pass and releases the sections it did not draw again. Their item
+-- buttons are left alone: a button may already be drawn somewhere else in this pass.
+---@param ctx Context
+function views.viewProto:FinishRender(ctx)
+  if not self.rendering then return end
+  self.rendering = false
+  self.claims = nil
+  local stale = self.staleSections
+  self.staleSections = nil
+  for _, section in pairs(stale or {}) do
+    section:Release(ctx)
+  end
+end
+
+-- Wipe tears the view down: every section and every item button it drew is released,
+-- including the sections a failed render pass set aside.
 ---@param ctx Context
 function views.viewProto:Wipe(ctx)
   assert(self.WipeHandler, 'WipeHandler not set')
+  for _, section in pairs(self.staleSections or {}) do
+    section:ReleaseAllCells(ctx)
+  end
+  self:FinishRender(ctx)
   self.WipeHandler(self, ctx)
   self:ClearDeferredItems()
   self:ClearDirtySections()
@@ -96,11 +144,13 @@ function views.viewProto:GetOrCreateItemButton(ctx, slotkey, createFunc)
     if createFunc then
       item = self:GetItemFrame(ctx, createFunc)
     else
+      -- Static per-slot buttons belong to ItemFrame, not to the view.
       item = itemFrame:GetButton(ctx, slotkey)
-      self.itemFrames = self.itemFrames or {}
-      tinsert(self.itemFrames, item)
     end
     self.itemsByBagAndSlot[slotkey] = item
+  end
+  if self.claims then
+    self.claims[item] = true
   end
   return item
 end
@@ -118,8 +168,14 @@ function views.viewProto:GetOrCreateSection(ctx, category, onlyCreate)
   local color = filter and filter.color or nil
 
   if section == nil then
-    section = sectionFrame:Create(ctx)
-    section.frame:SetParent(self.content:GetScrollView())
+    section = self.staleSections and self.staleSections[category]
+    if section then
+      self.staleSections[category] = nil
+      section:PrepareForReuse()
+    else
+      section = sectionFrame:Create(ctx)
+      section.frame:SetParent(self.content:GetScrollView())
+    end
     section:SetTitle(category, color)
     if not onlyCreate then
       self.content:AddCell(category, section)

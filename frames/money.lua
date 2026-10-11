@@ -18,6 +18,7 @@ local events = addon:GetModule('Events')
 ---@field goldButton Button
 ---@field warbank? boolean
 money.moneyProto = {}
+addon:GetModule('Perf'):RegisterPrototype(money.moneyProto, 'Money')
 
 function money.moneyProto:Update()
   local currentMoney

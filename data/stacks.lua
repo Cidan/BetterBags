@@ -14,6 +14,7 @@ local stacks = addon:NewModule('Stacks')
 ---@class Stack
 ---@field stacksByItemHash table<string, StackInfo>
 local stack = {}
+addon:GetModule('Perf'):RegisterPrototype(stack, 'Stack')
 
 ---@return Stack
 function stacks:Create()

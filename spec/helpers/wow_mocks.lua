@@ -4,6 +4,32 @@
 -- Core game functions
 _G.GetTime = function() return os.clock() end
 
+-- FrameScriptDocumentation.lua: debugprofilestop() -> elapsedMilliseconds (number).
+_G.debugprofilestop = function() return os.clock() * 1000 end
+
+-- PerformanceDocumentation.lua: UpdateAddOnMemoryUsage() refreshes the numbers that
+-- GetAddOnMemoryUsage(name) -> result (kilobytes) returns.
+_G.UpdateAddOnMemoryUsage = function() end
+_G.GetAddOnMemoryUsage = function() return 0 end
+
+-- AddOnProfilerConstantsDocumentation.lua. C_AddOnProfiler itself is left undefined so
+-- code has to cope with clients that lack it; specs install it when they need it.
+_G.Enum = _G.Enum or {}
+_G.Enum.AddOnProfilerMetric = {
+  SessionAverageTime = 0,
+  RecentAverageTime = 1,
+  EncounterAverageTime = 2,
+  LastTime = 3,
+  PeakTime = 4,
+  CountTimeOver1Ms = 5,
+  CountTimeOver5Ms = 6,
+  CountTimeOver10Ms = 7,
+  CountTimeOver50Ms = 8,
+  CountTimeOver100Ms = 9,
+  CountTimeOver500Ms = 10,
+  CountTimeOver1000Ms = 11,
+}
+
 -- Stateful Widget factory helper
 local function CreateMockWidget(widgetType, name, parent)
   local widget = {}
@@ -48,6 +74,15 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:IsShown()
     return self._shown
+  end
+  -- ScriptRegion:IsVisible() -> true only when this region and every parent are shown.
+  function widget:IsVisible()
+    if not self._shown then return false end
+    local owner = self._parent
+    if owner and owner.IsVisible then
+      return owner:IsVisible()
+    end
+    return true
   end
   function widget:SetShown(shown)
     self._shown = shown
@@ -136,6 +171,29 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:RegisterForDrag(...)
     self._registeredDrags = {...}
   end
+  -- Button: Enable() / Disable() / IsEnabled() -> boolean, LockHighlight() / UnlockHighlight().
+  function widget:Enable()
+    self._enabled = true
+  end
+  function widget:Disable()
+    self._enabled = false
+  end
+  function widget:IsEnabled()
+    return self._enabled ~= false
+  end
+  function widget:LockHighlight()
+    self._highlightLocked = true
+  end
+  function widget:UnlockHighlight()
+    self._highlightLocked = false
+  end
+  -- CheckButton: SetChecked(checked) / GetChecked() -> boolean.
+  function widget:SetChecked(checked)
+    self._checked = checked == true
+  end
+  function widget:GetChecked()
+    return self._checked == true
+  end
 
   -- Textures and FontStrings
   function widget:CreateTexture(textureName, drawLayer, inherits)
@@ -185,6 +243,10 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:SetBlendMode(mode)
     self._blendMode = mode
+  end
+  -- TextureBase:GetBlendMode() -> blendMode (non-nilable; textures default to "BLEND").
+  function widget:GetBlendMode()
+    return self._blendMode or "BLEND"
   end
   function widget:SetDrawLayer(layer, sublevel)
     self._drawLayer = layer
@@ -429,8 +491,6 @@ local function CreateMockWidget(widgetType, name, parent)
         self:SetID(slot)
         self:GetParent():IsCombinedBagContainer()
       end
-      widget.Enable = function() end
-      widget.Disable = function() end
       widget.GetSlotAndBagID = function(self)
         return self:GetID(), self:GetBagID()
       end
@@ -558,8 +618,9 @@ _G.C_NewItems = _G.C_NewItems or {
   ClearAll = function() end,
 }
 
--- Time function
+-- Time functions (WoW exposes os.time and os.date as the globals time and date)
 _G.time = _G.time or os.time
+_G.date = _G.date or os.date
 
 -- string.split (WoW alias for strsplit, available as string method)
 string.split = string.split or function(sep, str)
@@ -780,6 +841,17 @@ _G.C_Container.GetContainerItemLink = function(bagid, slotid)
     return string.format("|cffff8000|Hitem:%d:0:0:0:0:0:0:0|h[Mock Item %d]|h|r", itemID, itemID)
   end
   return nil
+end
+-- C_Container.GetContainerItemCooldown(containerIndex, slotIndex) -> startTime, duration, enable
+-- (ContainerDocumentation.lua: three non-nilable numbers). Specs set a slot's cooldown via
+-- _G._containerCooldowns["bag_slot"] = { start, duration, enable }; otherwise none.
+_G._containerCooldowns = {}
+_G.C_Container.GetContainerItemCooldown = function(containerIndex, slotIndex)
+  local cd = _G._containerCooldowns[tostring(containerIndex) .. "_" .. tostring(slotIndex)]
+  if cd then
+    return cd[1], cd[2], cd[3]
+  end
+  return 0, 0, 1
 end
 _G.C_Container.GetContainerNumFreeSlots = function(bagid)
   return 4, nil

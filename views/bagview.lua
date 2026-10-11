@@ -56,7 +56,7 @@ end
 ---@param slotInfo SlotInfo
 ---@param callback fun()
 local function BagView(view, ctx, bag, slotInfo, callback)
-  view:Wipe(ctx)
+  view:BeginRender(ctx)
   view.isNew = false
 
   local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
@@ -196,6 +196,7 @@ local function BagView(view, ctx, bag, slotInfo, callback)
   end
 
   view.itemCount = slotInfo.totalItems
+  view:FinishRender(ctx)
   callback()
 end
 

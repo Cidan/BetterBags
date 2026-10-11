@@ -554,6 +554,16 @@ Import and Export strings only contain category information. Set your own style 
 	</tr>
 </table>
 
+## Reporting Performance Problems
+If BetterBags makes your game stutter, you can record exactly what it was doing and send that along with your report.
+
+1. Type `/bbdb` to open the debug window and switch to the **Performance** tab.
+2. Press **Start Capture**, do whatever causes the stutter (open your bags, loot, use the abilities that lag), then press **Stop Capture**. To record the load-in itself, tick **Capture next reload** and type `/reload` instead.
+3. The capture is saved as a session in the list on the left. Select it to see a flame graph of where the time went, the slowest frames, and a summary.
+4. Log out or `/reload` so the game writes the session to `WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua`, and attach that file to your report.
+
+Profiling is always off unless you start it, and it is never left running across a reload. Saved sessions can be deleted from the same tab.
+
 ## Plugin System
 BetterBags has a robust plugin system that allows developers to write custom categories.
 

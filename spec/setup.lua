@@ -33,5 +33,9 @@ dofile("libs/AceConfig-3.0/AceConfig-3.0.lua")
 -- Step 3: Create the BetterBags addon and provide module loading helpers
 dofile("spec/helpers/addon_loader.lua")
 
+-- The profiler engine loads right after core/boot.lua in every TOC, and files across the
+-- addon register their prototypes with it at load time, so every spec needs it present.
+LoadBetterBagsModule("debug/perf/engine.lua")
+
 -- Step 4: Load shared mock data factories
 dofile("spec/helpers/mock_data.lua")

@@ -68,8 +68,10 @@ resolves — this is how Blizzard's own `GameTooltip` rebuilds itself
   item and spell data channels resolving separately. The cached text stays searchable.
 
 Because `RemoveFromCache` only drops the invalidated GUID, the triggered re-harvest
-re-scans just that item; every other item hits the warm cache. The re-index is the normal
-`Phase8` clean sweep.
+re-scans just that item; every other item hits the warm cache. The item's slot is usually
+unchanged, so the harvest keeps its committed item, and the kept item's `tooltipText` is
+refreshed from `GetTooltipText` precisely so this re-scan lands (data-loader.md §16). Its new
+text then makes `search:SyncKind` re-index that one item (search-indexing.md §1).
 
 **History:** until the `BucketEvent` fix (event-buckets.md), this listener's callback was
 discarded after its first flush, so the re-scan only ever worked for the first burst after

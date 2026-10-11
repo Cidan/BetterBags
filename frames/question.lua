@@ -16,6 +16,7 @@ local question = addon:NewModule('Question')
 ---@field ok Button|UIPanelButtonTemplate
 ---@field input EditBox|InputBoxTemplate
 local questionProto = {}
+addon:GetModule('Perf'):RegisterPrototype(questionProto, 'QuestionFrame')
 
 function question:OnEnable()
   self._pool = CreateObjectPool(self._OnCreate, self._OnReset)

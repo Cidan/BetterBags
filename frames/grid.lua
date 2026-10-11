@@ -37,6 +37,7 @@ local debug = addon:GetModule('Debug')
 ---@field package scrollBox WowScrollBox
 ---@field private sortVertical boolean
 local gridProto = {}
+addon:GetModule('Perf'):RegisterPrototype(gridProto, 'GridFrame')
 
 ---@class (exact) RenderOptions
 ---@field cells Cell[] The cells to render in this grid.
@@ -426,7 +427,9 @@ function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
     end
 
     if not cell.isGap then
-      cell.frame:SetParent(self.inner)
+      if cell.frame:GetParent() ~= self.inner then
+        cell.frame:SetParent(self.inner)
+      end
       cell.frame:ClearAllPoints()
       cell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", currentX, currentY)
       cell.frame:Show()

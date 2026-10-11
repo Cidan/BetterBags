@@ -43,6 +43,7 @@ local CLASSIC_PADDING = 8
 ---@field fadeInGroup AnimationGroup
 ---@field fadeOutGroup AnimationGroup
 BagSlots.bagSlotProto = {}
+addon:GetModule('Perf'):RegisterPrototype(BagSlots.bagSlotProto, 'BagSlotsPanel')
 
 ---@param ctx Context
 function BagSlots.bagSlotProto:Draw(ctx)

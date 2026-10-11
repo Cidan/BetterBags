@@ -29,6 +29,7 @@ local themeConfig = addon:NewModule('ThemeConfig')
 ---@field package fadeIn AnimationGroup
 ---@field package fadeOut AnimationGroup
 local themeConfigFrame = {}
+addon:GetModule('Perf'):RegisterPrototype(themeConfigFrame, 'ThemeConfigFrame')
 
 ---@param f BetterBagsPlainTextListButton
 ---@param data table

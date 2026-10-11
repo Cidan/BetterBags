@@ -33,6 +33,7 @@ local themePane = addon:NewModule('ThemePane')
 ---@field selectedTheme string|nil
 ---@field selectedButton ThemePaneListButton|nil
 local themePaneProto = {}
+addon:GetModule('Perf'):RegisterPrototype(themePaneProto, 'ThemePaneFrame')
 
 ---@param button ThemePaneListButton
 ---@param elementData table

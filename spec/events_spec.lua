@@ -564,4 +564,80 @@ describe("Events", function()
       end)
     end)
   end)
+
+  -- ─── Profiler dispatch labels ───────────────────────────────────────────────
+
+  describe("profiler dispatch labels", function()
+    LoadBetterBagsModule("debug/perf/format.lua")
+    local perf = addon:GetModule("Perf")
+    local perfFormat = addon:GetModule("PerfFormat")
+
+    local now
+    local timerCallbacks
+    local originalNewTimer
+
+    before_each(function()
+      now = 0
+      perf:Init()
+      perf:SetClock(function() return now end)
+      timerCallbacks = {}
+      originalNewTimer = _G.C_Timer.NewTimer
+      _G.C_Timer.NewTimer = function(_, callback)
+        table.insert(timerCallbacks, callback)
+        return { Cancel = function() end }
+      end
+      perf:Start({ modules = {}, prototypes = {}, includeRoot = false, calibrate = false })
+    end)
+
+    after_each(function()
+      if perf:IsActive() then perf:Stop() end
+      _G.C_Timer.NewTimer = originalNewTimer
+    end)
+
+    local function stopAndFind(path)
+      return perfFormat:Find(perfFormat:Decode(perf:Stop()), path)
+    end
+
+    it("roots WoW event dispatch under the event's name", function()
+      events:RegisterEvent("TEST_PERF_EVENT", function() now = now + 3 end)
+      local fn = events._eventMap["TEST_PERF_EVENT"].fn
+      fn("TEST_PERF_EVENT")
+      fn("TEST_PERF_EVENT")
+      local node = stopAndFind({ "[event] TEST_PERF_EVENT" })
+      assert.are.equal(2, node.calls)
+      assert.are.equal(6, node.self)
+    end)
+
+    it("counts every fire of a bucketed event, including filtered ones", function()
+      events:BucketEvent("TEST_PERF_BUCKET", function() now = now + 4 end, function(_, id)
+        return id == 1
+      end)
+      local fn = events._eventMap["TEST_PERF_BUCKET"].fn
+      fn("TEST_PERF_BUCKET", 1)
+      fn("TEST_PERF_BUCKET", 2)
+      fn("TEST_PERF_BUCKET", 3)
+      timerCallbacks[1]()
+      local tree = perfFormat:Decode(perf:Stop())
+      assert.are.equal(3, perfFormat:Find(tree, { "[event] TEST_PERF_BUCKET" }).calls)
+      local flush = perfFormat:Find(tree, { "[bucket] TEST_PERF_BUCKET" })
+      assert.are.equal(1, flush.calls)
+      assert.are.equal(4, flush.self)
+    end)
+
+    it("roots message dispatch under the message name", function()
+      events:RegisterMessage("test/PerfMessage", function() now = now + 2 end)
+      events:SendMessage(context:New("TestPerf"), "test/PerfMessage")
+      local node = stopAndFind({ "[msg] test/PerfMessage" })
+      assert.are.equal(1, node.calls)
+      assert.are.equal(2, node.self)
+    end)
+
+    it("labels a group bucket flush", function()
+      events:GroupBucketEvent({ "TEST_PERF_GROUP" }, {}, function() now = now + 5 end)
+      events._eventMap["TEST_PERF_GROUP"].fn("TEST_PERF_GROUP")
+      timerCallbacks[#timerCallbacks]()
+      local node = stopAndFind({ "[bucket] TEST_PERF_GROUP" })
+      assert.are.equal(5, node.self)
+    end)
+  end)
 end)

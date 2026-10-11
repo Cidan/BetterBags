@@ -114,15 +114,15 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 **Problem**: If multiple item buttons share the same parent frame, layout engines that position the parent frame (e.g. setting `item.frame:SetPoint(...)`) will stack all elements on top of each other and hide/wipe them together.
 **Solution**: Create a dedicated, unique unsecure parent frame per physical item button, configure it with the correct ID/attributes, and implement fallback methods (like `IsCombinedBagContainer()`) natively on that parent frame to safely bypass Blizzard's native checks without secure attribute taint.
 
-## Shared Static Frames: Release Every Owner Before Any Renderer Acquires
+## Shared Static Frames: Claim, Then Sweep
 
 **Problem**: Physical item buttons are static per slot key (`itemFrame.buttonsBySlotkey`) and are shared by several renderers in one draw pass (global Recent Items / Free Space sections plus every tab view). Renderer A acquired button `0_1` (e.g. as the Free Space representative), then renderer B's `Wipe` released the *same* button because B had drawn an item in `0_1` on the previous pass. `item:Release` hides and unparents the frame, so the button A just drew silently vanished ("free space slots disappear when something is put in the bank").
 
 **Why**: Each renderer only knows about its own previous cells. A wipe interleaved with another renderer's acquisition can never tell whether the button it releases has already been re-claimed.
 
-**Solution**: Make the draw pass two-phase. `bagProto:Draw` first releases *every* owner (`WipeGlobalSections` plus `view:Wipe` for every tab view, regardless of layout), and only then renders background views, global sections and the active view. `Render` may still self-wipe, but at that point it owns nothing so the wipe releases no shared button. `spec/frames/bag_draw_ownership_spec.lua` asserts that the last `item:Release` precedes the first `itemFrame:GetButton` in a pass.
+**Solution**: Never release a shared button while renderers are still drawing. `bagProto:Draw` releases nothing up front: every renderer records the buttons it draws in the pass's claim table, and after every renderer has run, `FinishDrawPass` releases only the buttons the previous pass drew that nobody claimed. (An earlier fix released every owner before any renderer ran; it was correct but hid, reset and re-showed every displayed button on every redraw, running Blizzard's OnHide/OnShow handlers each time.) Contract: `.claude/rules/layout-rendering.md` §1.
 
-**Diagnostic**: A section that is populated (`section:HasItem(button)` is true) but whose button frame is hidden / has no parent → some later wipe in the same pass released it.
+**Diagnostic**: A section that is populated (`section:HasItem(button)` is true) but whose button frame is hidden / has no parent → something released it mid-pass; only `FinishDrawPass` and the teardown paths (`bag:Wipe`, `DeleteTabView`) may release buttons.
 
 **Related Files**: `frames/bag.lua` (`Draw`), `views/gridview.lua`, `views/bagview.lua`, `frames/item.lua` (`Wipe`/`ClearItem`).
 

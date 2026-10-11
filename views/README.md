@@ -336,12 +336,9 @@ debug:Enable()
 debug:Log("View", "Debug message")
 ```
 
-Monitor performance:
-```lua
-debug:StartProfile('View Render')
--- View operations
-debug:EndProfile('View Render')
-```
+Monitor performance: every `View`, `GridFrame`, `Section`, and `Item` method is measured
+automatically by the profiler. Capture from the Performance tab of `/bbdb` and look for
+`View.Render` in the flame graph (`.claude/rules/perf-profiler.md`).
 
 ## Future Enhancements
 

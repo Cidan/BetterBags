@@ -24,6 +24,9 @@ local list = addon:GetModule('List')
 ---@class ItemBrowser: AceModule
 local itemBrowser = addon:GetModule('ItemBrowser')
 
+---@class PerfPane: AceModule
+local perfPane = addon:GetModule('PerfPane')
+
 ---@class DebugWindow: AceModule
 ---@field frame Frame
 ---@field rows number
@@ -107,10 +110,11 @@ function debugWindow:Create(ctx)
     return false
   end)
 
-  -- Add default "Debug Log", "Items", and "Dump" tabs
+  -- Add default "Debug Log", "Items", "Dump", and "Performance" tabs
   self.tabFrame:AddTab(ctx, "Debug Log")
   self.tabFrame:AddTab(ctx, "Items")
   self.tabFrame:AddTab(ctx, "Dump")
+  self.tabFrame:AddTab(ctx, "Performance")
   self.tabFrame:SetTabByIndex(ctx, 1)
 
   -- Create content frames for each tab
@@ -118,6 +122,7 @@ function debugWindow:Create(ctx)
   self.contentFrames[1] = self:CreateDebugLogFrame()
   self.contentFrames[2] = self:CreateItemsFrame()
   self.contentFrames[3] = self:CreateDumpFrame()
+  self.contentFrames[4] = self:CreatePerformanceFrame()
 
   -- Use existing CloseButton from template if available, otherwise create one
   local closeButton = self.frame.CloseButton or CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
@@ -269,13 +274,23 @@ function debugWindow:CreateDumpFrame()
   return f
 end
 
+---CreatePerformanceFrame creates the profiler's Performance tab.
+---@return PerfPaneFrame
+function debugWindow:CreatePerformanceFrame()
+  local pane = perfPane:Create(self.frame)
+  pane.frame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 5, -25)
+  pane.frame:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -5, 5)
+  pane:Hide()
+  return pane
+end
+
 ---SwitchTab switches to the specified tab.
 ---@param tabId number
 function debugWindow:SwitchTab(tabId)
   for id, frame in pairs(self.contentFrames) do
     if id == tabId then
       frame:Show()
-      if id == 2 or id == 3 then
+      if id == 2 or id == 3 or id == 4 then
         frame:Update()
       end
     else

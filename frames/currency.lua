@@ -23,6 +23,7 @@ local events = addon:GetModule('Events')
 ---@field count FontString
 ---@field index number
 local CurrencyItem = {}
+addon:GetModule('Perf'):RegisterPrototype(CurrencyItem, 'CurrencyItem')
 
 function CurrencyItem:Release()
   self.frame:ClearAllPoints()
@@ -33,6 +34,7 @@ end
 ---@field iconGrid Grid
 ---@field private iconIndex CurrencyItem[]
 local CurrencyIconGrid = {}
+addon:GetModule('Perf'):RegisterPrototype(CurrencyIconGrid, 'CurrencyIconGrid')
 
 local function getCurrencyInfo(ref)
   if C_CurrencyInfo and C_CurrencyInfo.GetCurrencyListInfo then

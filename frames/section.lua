@@ -75,6 +75,7 @@ sectionFrame.dragTargetTab = nil  -- Track the tab we're hovering over while dra
 ---@field shouldShrinkWhenCollapsed boolean Whether to actually shrink the frame when collapsed
 ---@field private originalTextColor? table The original RGBA color of the section title text
 local sectionProto = {}
+addon:GetModule('Perf'):RegisterPrototype(sectionProto, 'Section')
 
 ---@param kind BagKind
 ---@param view BagView
@@ -199,6 +200,22 @@ function sectionProto:Wipe()
   -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
   -- Note: We don't restore the color here because SetTitle always explicitly sets it,
   -- ensuring pooled sections don't bleed custom colors to other categories.
+  self.originalTextColor = nil
+end
+
+-- PrepareForReuse readies a section kept from the previous render pass to be drawn
+-- again: the per-pass state the pool reset clears, without hiding or unparenting it.
+function sectionProto:PrepareForReuse()
+  self:EnableHeader()
+  self.content:SortHorizontal()
+  self.content:Wipe()
+  self.view = const.BAG_VIEW.SECTION_GRID
+  self.fillWidth = false
+  self.frame:SetAlpha(1)
+  self.collapsed = false
+  self.shouldShrinkWhenCollapsed = true
+  self.removeHeader = false
+  self.title:Show()
   self.originalTextColor = nil
 end
 

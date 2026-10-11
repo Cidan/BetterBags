@@ -62,6 +62,7 @@ local categoryPane = addon:NewModule('CategoryPane')
 ---@field selectedCategory string|nil
 ---@field selectedButton CategoryPaneListButton|nil
 local categoryPaneProto = {}
+addon:GetModule('Perf'):RegisterPrototype(categoryPaneProto, 'CategoryPaneFrame')
 
 -- Mapping from enum value to display text
 local groupByEnumToDisplayText = {

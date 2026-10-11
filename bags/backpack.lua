@@ -61,6 +61,7 @@ local contextMenu = addon:GetModule("ContextMenu")
 ---@class BackpackBehaviorProto
 ---@field bag Bag Reference to the parent bag
 backpack.proto = {}
+addon:GetModule('Perf'):RegisterPrototype(backpack.proto, 'Backpack')
 
 function backpack.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_BACKPACK_OPEN)

@@ -20,6 +20,7 @@ local list = addon:GetModule('List')
 ---@class ItemBrowserFrame
 ---@field list ListFrame
 local itemBrowserFrame = {}
+addon:GetModule('Perf'):RegisterPrototype(itemBrowserFrame, 'ItemBrowserFrame')
 
 function itemBrowserFrame:Show()
   self.list:Show()

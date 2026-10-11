@@ -210,6 +210,55 @@ describe("Async", function()
       coroutine.resume(co)
       assert.are.equal("suspended", coroutine.status(co))
     end)
+
+    it("pauses the profiler around the yield so time between frames is not counted", function()
+      LoadBetterBagsModule("debug/perf/format.lua")
+      local perf = addon:GetModule("Perf")
+      local perfFormat = addon:GetModule("PerfFormat")
+      local now = 0
+      perf:Init()
+      perf:SetClock(function() return now end)
+      perf:Start({ modules = {}, prototypes = {}, includeRoot = false, calibrate = false })
+      local co = coroutine.create(function()
+        local token = perf:Enter("[span] sweep")
+        now = now + 2
+        async:Yield()
+        now = now + 3
+        perf:Exit(token)
+      end)
+      coroutine.resume(co)
+      now = now + 1000
+      coroutine.resume(co)
+      local session = perf:Stop()
+      local tree = perfFormat:Decode(session)
+      assert.are.equal(5, perfFormat:Find(tree, { "[span] sweep" }).self)
+      assert.are.equal(5, session.stats.instrumentedMs)
+    end)
+
+    it("still excludes the frame gap when Async itself is being measured", function()
+      LoadBetterBagsModule("debug/perf/format.lua")
+      local perf = addon:GetModule("Perf")
+      local perfFormat = addon:GetModule("PerfFormat")
+      local now = 0
+      perf:Init()
+      perf:SetClock(function() return now end)
+      perf:Start({ modules = { "Async" }, prototypes = {}, includeRoot = false, calibrate = false })
+      local co = coroutine.create(function()
+        local token = perf:Enter("[span] sweep")
+        now = now + 2
+        async:Yield()
+        now = now + 3
+        perf:Exit(token)
+      end)
+      coroutine.resume(co)
+      now = now + 1000
+      coroutine.resume(co)
+      local session = perf:Stop()
+      local tree = perfFormat:Decode(session)
+      assert.are.equal(5, session.stats.instrumentedMs)
+      assert.is_not_nil(perfFormat:Find(tree, { "[span] sweep", "Async.Yield" }))
+      assert.are.equal(0, session.stats.aborted)
+    end)
   end)
 
   -- ─── DoWithDelay ────────────────────────────────────────────────────────────

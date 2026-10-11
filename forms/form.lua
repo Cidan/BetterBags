@@ -27,6 +27,7 @@ local form = addon:NewModule('Form')
 ---@field ScrollBar MinimalScrollBar This is the scrollbar that controls the scroll box.
 ---@field inner Frame This is the inner frame that contains the form elements.
 local formFrame = {}
+addon:GetModule('Perf'):RegisterPrototype(formFrame, 'FormFrame')
 
 ---@class FormCreateOptions
 ---@field title string

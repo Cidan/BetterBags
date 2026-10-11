@@ -412,6 +412,25 @@ describe("Database", function()
       DB:UpdateMaxItemLevel(50)
       assert.are.equal(100, DB:GetMaxItemLevel())
     end)
+
+    -- The maximum is learned while items are read, and a sweep keeps the items of unchanged
+    -- slots without reading them again, so a reset must ask for a full re-read.
+    it("ResetMaxItemLevel requests a full refresh so the maximum is learned again", function()
+      DB:UpdateMaxItemLevel(100)
+      local sent = {}
+      local send = events.SendMessage
+      events.SendMessage = function(_, _, event)
+        table.insert(sent, event)
+      end
+      DB:ResetMaxItemLevel()
+      events.SendMessage = send
+      assert.are.equal(1, DB:GetMaxItemLevel())
+      local full = false
+      for _, event in ipairs(sent) do
+        if event == "bags/FullRefreshAll" then full = true end
+      end
+      assert.is_true(full)
+    end)
   end)
 
   -- ─── Sort types ────────────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@field package canReorder boolean
 ---@field dragBehavior ScrollBoxDragBehavior
 local listFrame = {}
+addon:GetModule('Perf'):RegisterPrototype(listFrame, 'ListFrame')
 
 -- SetupDataSource readies the list frame to accept items.
 -- You must call this method before you can add items to the list.

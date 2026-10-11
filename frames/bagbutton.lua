@@ -29,6 +29,7 @@ local buttonCount = 0
 ---@field kind BagKind
 ---@field canBuy boolean
 BagButtonFrame.bagButtonProto = {}
+addon:GetModule('Perf'):RegisterPrototype(BagButtonFrame.bagButtonProto, 'BagButtonFrame')
 
 ---@param ctx Context
 function BagButtonFrame.bagButtonProto:Draw(ctx)
