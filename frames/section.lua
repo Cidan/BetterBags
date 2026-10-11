@@ -203,6 +203,22 @@ function sectionProto:Wipe()
   self.originalTextColor = nil
 end
 
+-- PrepareForReuse readies a section kept from the previous render pass to be drawn
+-- again: the per-pass state the pool reset clears, without hiding or unparenting it.
+function sectionProto:PrepareForReuse()
+  self:EnableHeader()
+  self.content:SortHorizontal()
+  self.content:Wipe()
+  self.view = const.BAG_VIEW.SECTION_GRID
+  self.fillWidth = false
+  self.frame:SetAlpha(1)
+  self.collapsed = false
+  self.shouldShrinkWhenCollapsed = true
+  self.removeHeader = false
+  self.title:Show()
+  self.originalTextColor = nil
+end
+
 function sectionProto:WipeOnlyContents()
   self.content:Wipe()
 end

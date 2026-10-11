@@ -44,11 +44,11 @@ To support instant, synchronous tab switching with zero visual flickers or loadi
 - **Bank-Type Scoped Category Routing:** On Retail, `categoryToGroup[const.BAG_KIND.BANK]` is partitioned by `bankType` (`Enum.BankType.Character` vs `Enum.BankType.Account`). Assigning a category to a Warbank tab does not overwrite or evict the category in the Character Bank, and vice versa. During `ItemBelongsToTab`, if an item's category is unassigned for that item's `bankType`, it safely falls back to the default tab of that bank type (`Tab 1` for Character Bank, `Tab 2` for Warbank). No physical item is ever dropped into zero tabs.
 - **Non-Retail Isolation:** Non-retail clients (`not addon.isRetail`) have no Warbank and no `Enum.BankType`. They maintain the single flat `categoryToGroup[BANK]` namespace without bankType scoping.
 - **Bypass for Blizzard Bag View:** If the active view mode is Blizzard's physical container view (`SECTION_ALL_BAGS`), the partition filtering and section group-hiding filters are completely bypassed. This ensures that when a user switches to Blizzard Bag View, all physical bag containers and their items render completely and synchronously, regardless of the active custom tab/group.
-- **Instant Swapping:** Since the cache is always complete, tab switching (`SwitchToGroup` or `SwitchToBlizzardTab`) does not wipe caches or trigger server-refresh messages. Instead, the UI simply hides the old view, fetches the new view, and calls `Draw()` synchronously and instantly.
+- **Instant Swapping:** Since the cache is always complete, tab switching (`SwitchToGroup` or `SwitchToBlizzardTab`) does not wipe caches or trigger server-refresh messages. Instead, the UI simply hides the old view, fetches the new view, and calls `Draw()` synchronously and instantly. Only the active tab's view is rendered by a draw; the others are drawn when switched to (layout-rendering.md §1).
 
 ### 6. Idempotent Functional Rendering (No Changeset Gating)
 To enforce strict functional isolation and eliminate UI state leakage or out-of-order rendering bugs, changeset-gating and background rendering optimizations have been completely removed.
-- **Rule:** Every rendering pass for any view (whether active or background) must be 100% functional, idempotent, and built completely from scratch using the provided `slotInfo` dataset state.
+- **Rule:** Every rendering pass for a view must be 100% functional, idempotent, and built completely from scratch using the provided `slotInfo` dataset state: the cell lists, section membership and order, and the data applied to every drawn button are recomputed each pass. What is kept between passes is only the frames themselves (a section reused for the same category, a button drawn again), never data (layout-rendering.md §1).
 - **Benefits:** Eliminating incremental delta updates guarantees that the view state remains mathematically consistent with the underlying data model, preventing the visual accumulation of ghost or out-of-sync frames.
 
 ### 7. Phase 8: Page Placement (Clean-Sweep Layout and Column-Packing)
@@ -74,11 +74,11 @@ To eliminate JIT (just-in-time) database and search engine queries during UI lay
 - **Synchronous, State-Driven Toggle:** The "Show Bags" buttons synchronously mutate the database view state and trigger immediate refresh events (`FullRefreshAll`). All asynchronous OnFinished animation hooks that previously modified state or initiated refreshes have been completely removed.
 - **Obsolete Views:** Obsolete `ONE_BAG` (value 1) and `LIST` (value 3) views have been completely removed from constants and database defaults. Existing users' databases are automatically migrated to `SECTION_GRID` (Category View) via `DB:Migrate()`.
 
-### 9. Isolated Wipe-On-Render to Prevent Pool Contamination and Anchor Crashes
-To permanently prevent ObjectPool contamination, cell leakage, and fatal `Cannot anchor to itself` crashes during layout recalculations:
-- **Rule:** Every rendering pass for a view is functionally isolated and begins with a complete, synchronous wipe of its own frames, returning all of its pooled elements back to the global stacks before any rendering/population occurs.
-- **Mechanism:** The very first line of each view's `Render` method (e.g. `GridView` or `BagView`) executes `view:Wipe(ctx)`.
-- **State Transition (`isNew` flag):** Inside `Wipe(view, ctx)`, explicitly set `view.isNew = true` to flag the view as completely empty. At the beginning of the `Render` method (right after wiping), set `view.isNew = false` to indicate the view is populated and complete. This guarantees 100% clean-slate rendering on every single frame update.
+### 9. Render Passes: Clean Model, Retained Frames
+To prevent ObjectPool contamination, cell leakage, and `Cannot anchor to itself` crashes while not hiding and re-showing every frame on every redraw:
+- **Rule:** Every render pass starts from an empty model and releases, at its end, every frame it did not draw again. Frames are never shared between owners mid-pass: a section belongs to one view (or the bag's global sections) and is reused only for the same category; a button is released only after every renderer of the pass has run and only if no renderer claimed it.
+- **Mechanism:** each view's `Render` (`GridView`, `BagView`) begins with `view:BeginRender(ctx)` (a no-op when `bagProto:Draw` already began the pass with its claim table) and ends with `view:FinishRender(ctx)`. `view:Wipe(ctx)` remains the full teardown (bag close / tab deletion) and finishes any open pass first. Layout anchors every cell to its grid's inner frame by absolute offset, so retained frames cannot form anchor cycles.
+- **State Transition (`isNew` flag):** `BeginRender` (and `Wipe`) set `view.isNew = true`; `Render` sets `view.isNew = false` right after beginning.
 
 ### 10. Unidirectional, Purely Functional Pipeline and Stateless Execution
 To enforce strict functional isolation and eliminate side-effects, reentrancy bugs, and half-calculated visual glitches during database updates:

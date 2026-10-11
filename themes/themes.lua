@@ -67,6 +67,9 @@ function themes:Init()
   self.titles = {}
   self.itemButtons = {}
   self.tabs = {}
+  -- Bumped whenever a theme is applied, which hides every decoration; item buttons
+  -- re-resolve (and so re-show) their decoration on the next lookup.
+  self.decorationGeneration = 0
 end
 
 function themes:OnEnable()
@@ -111,6 +114,7 @@ function themes:ApplyTheme(ctx, key)
 
   local theme = self.themes[key]
   db:SetTheme(key)
+  self.decorationGeneration = (self.decorationGeneration or 0) + 1
 
   -- Hide all tab decorations.
   --for _, tab in pairs(self.tabs) do
@@ -332,19 +336,29 @@ end
 ---@return ItemButton
 function themes:GetItemButton(ctx, item)
   local theme = self:GetCurrentTheme()
+  -- A theme with its own ItemButton (ElvUI) keeps its own decorations and re-applies
+  -- fixups on every lookup, so it is always asked.
   if theme.ItemButton then
     return theme.ItemButton(item)
+  end
+  -- Item buttons look their decoration up about ten times per redraw. Only the first
+  -- lookup after a theme is applied resolves it, which shows it and announces it with
+  -- item/NewButton; the rest return the cached decoration untouched.
+  if item._decoration and item._decorationTheme == theme and item._decorationGeneration == self.decorationGeneration then
+    return item._decoration
   end
   local buttonName = item.button:GetName()
   local button = self.itemButtons[buttonName]
   if button then
     button:Show()
-    events:SendMessage(ctx, 'item/NewButton', item, button)
-    return button
+  else
+    button = themes.CreateBlankItemButtonDecoration(item.frame, "default", buttonName)
+    self.itemButtons[buttonName] = button
   end
-  button = themes.CreateBlankItemButtonDecoration(item.frame, "default", buttonName)
   events:SendMessage(ctx, 'item/NewButton', item, button)
-  self.itemButtons[buttonName] = button
+  item._decoration = button
+  item._decorationTheme = theme
+  item._decorationGeneration = self.decorationGeneration
   return button
 end
 

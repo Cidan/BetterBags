@@ -244,6 +244,10 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetBlendMode(mode)
     self._blendMode = mode
   end
+  -- TextureBase:GetBlendMode() -> blendMode (non-nilable; textures default to "BLEND").
+  function widget:GetBlendMode()
+    return self._blendMode or "BLEND"
+  end
   function widget:SetDrawLayer(layer, sublevel)
     self._drawLayer = layer
     self._sublevel = sublevel
@@ -487,8 +491,6 @@ local function CreateMockWidget(widgetType, name, parent)
         self:SetID(slot)
         self:GetParent():IsCombinedBagContainer()
       end
-      widget.Enable = function() end
-      widget.Disable = function() end
       widget.GetSlotAndBagID = function(self)
         return self:GetID(), self:GetBagID()
       end

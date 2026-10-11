@@ -304,6 +304,12 @@ end
 ---@param data ItemData
 function itemFrame.itemProto:SetItemFromData(ctx, data)
 	assert(data, "data must be provided")
+	local mode = data.isItemEmpty and "empty" or "item"
+	if self.drawnAs ~= mode then
+		self:ResetVisuals(ctx)
+	end
+	self.drawnAs = mode
+	self.released = false
 	self.currentData = data
 	self.slotkey = data.slotkey
 	local decoration = themes:GetItemButton(ctx, self)
@@ -578,6 +584,11 @@ end
 function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
+	if self.drawnAs ~= "free" then
+		self:ResetVisuals(ctx)
+	end
+	self.drawnAs = "free"
+	self.released = false
 	local bagid, slotid = data.bagid, data.slotid
 	self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
 	self.kind = bagKindFromBagID(bagid)
@@ -589,6 +600,12 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	end
 
 	self.stackCount = 1
+	if nocount then
+		-- Clear a count left by the previous draw while the minimum is 1, so 0 stays
+		-- hidden (with the -1 minimum below, a count of 0 would show "0").
+		decoration.minDisplayCount = 1
+		SetItemButtonCount(decoration, 0)
+	end
 	decoration.minDisplayCount = -1
 	self.freeSlotCount = count
 
@@ -667,12 +684,19 @@ function itemFrame.itemProto:Release(ctx)
 	self:Wipe(ctx)
 end
 
+-- Wipe takes the button off screen and resets it. A button not drawn since its last
+-- release is left alone: a full teardown (bag:Wipe, DeleteTabView) followed by a draw
+-- pass sweep must not release it twice, or a virtual button would enter its pool twice.
 ---@param ctx Context
 function itemFrame.itemProto:Wipe(ctx)
+	if self.released then
+		return
+	end
 	self.frame:Hide()
 	self.frame:SetParent(nil)
 	self.frame:ClearAllPoints()
 	self:ClearItem(ctx)
+	self.released = true
 	if self.isVirtual then
 		itemFrame:ReleaseVirtualButton(self)
 	end
@@ -692,13 +716,29 @@ end
 function itemFrame.itemProto:ClearItem(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
 	events:SendMessage(ctx, "item/Clearing", self, decoration)
+	self.frame:ClearAllPoints()
+	self.frame:SetParent(nil)
+	self.frame:Hide()
+	self:ResetVisuals(ctx)
+	-- Size and static data are set by the caller before drawing (item rows size the
+	-- button and use SetStaticItemFromData), so only a release clears them.
+	self:ResetSize(ctx)
+	self.stacks = {}
+	self.staticData = nil
+end
+
+-- ResetVisuals returns the button to a blank slot without taking it off screen. Draws
+-- call it only when the button changes what it shows (item, free slot, empty slot):
+-- SetItemFromData and SetFreeSlots each set every visual of their own kind, so a
+-- button redrawn as the same kind needs no reset.
+---@param ctx Context
+function itemFrame.itemProto:ResetVisuals(ctx)
+	local decoration = themes:GetItemButton(ctx, self)
 	if decoration.BetterBagsFamilyIcon then decoration.BetterBagsFamilyIcon:Hide() end
 	self.currentData = nil
 	self.kind = nil
-	self.frame:ClearAllPoints()
-	self.frame:SetParent(nil)
+	self.drawnAs = nil
 	self.frame:SetAlpha(1)
-	self.frame:Hide()
 	if decoration.SetHasItem then decoration:SetHasItem(false) end
 	if self.button.SetHasItem then self.button:SetHasItem(false) end
 	decoration.GetItemContextMatchResult = nil
@@ -722,14 +762,11 @@ function itemFrame.itemProto:ClearItem(ctx)
 	self.button:Enable()
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
-	self:ResetSize(ctx)
-	self.stacks = {}
 	self.stackCount = 1
 	self.stackid = nil
 	self.isFreeSlot = false
 	self.freeSlotName = ""
 	self.freeSlotCount = 0
-	self.staticData = nil
 	decoration.UpgradeIcon:SetShown(false)
 end
 
@@ -944,6 +981,7 @@ function itemFrame:AcquireVirtualItem(ctx, slotkey)
 		item = self:Create(ctx, -3)
 	end
 	item.isVirtual = true
+	item.released = false
 	item.slotkey = slotkey
 	self.buttonsBySlotkey[slotkey] = item
 	return item

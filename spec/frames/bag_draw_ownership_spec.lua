@@ -1,9 +1,10 @@
 -- bag_draw_ownership_spec.lua -- Every physical slot maps to exactly one static item
 -- button (itemFrame.buttonsBySlotkey) that is shared by the bag's global sections
--- (Recent Items / Free Space) and by every tab view. A single bagProto:Draw pass must
--- release every previous owner of a button BEFORE any renderer acquires it. If a
--- renderer that runs later in the pass wipes a button that an earlier renderer just
--- claimed, the button is hidden and unparented and simply vanishes from the UI.
+-- (Recent Items / Free Space) and by every tab view. A bagProto:Draw pass claims, then
+-- sweeps: renderers record the buttons they draw, and only buttons the previous pass
+-- drew that nobody claimed are released, after every renderer has run. If a button
+-- another renderer just claimed were released mid-pass, it would be hidden and
+-- unparented and simply vanish from the UI (.claude/rules/layout-rendering.md §1).
 --
 -- These specs run the real ItemFrame, SectionFrame, Views and BagFrame modules so
 -- that button identity and section cell release behave exactly as in the client.
@@ -486,44 +487,359 @@ describe("Bag Draw: shared item button ownership across global sections and view
     assert.is_true(bag.globalSections["Recent Items"]:HasItem(button1))
   end)
 
-  it("releases every previous button owner before any renderer acquires a button", function()
-    local bag = newBag()
-    bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons") }, { freeSpaceButton(0, 2, 3) }), function() end)
+  -- Claim, then sweep. A draw pass releases nothing up front: every renderer claims the
+  -- buttons and sections it draws, and only what the previous pass drew and nobody
+  -- claimed is released, after every renderer has run. A button drawn in consecutive
+  -- passes is never hidden or unparented in between, so Blizzard's OnHide/OnShow
+  -- handlers on the item button template do not run on every redraw.
+  describe("claim, then sweep", function()
+    local log
 
-    local view = bag.tabViews[const.BAG_VIEW.SECTION_GRID .. "_1"]
-    assert.is_not_nil(view)
-
-    -- Record every button release and acquisition during the second draw.
-    local log = {}
-    local originalRelease = itemFrame.itemProto.Release
-    itemFrame.itemProto.Release = function(self, ctx)
-      table.insert(log, "release:" .. tostring(self.slotkey))
-      return originalRelease(self, ctx)
-    end
-    local originalGetButton = itemFrame.GetButton
-    itemFrame.GetButton = function(self, ctx, slotkey)
-      table.insert(log, "acquire:" .. slotkey)
-      return originalGetButton(self, ctx, slotkey)
-    end
-
-    bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 2, "Weapons") }, { freeSpaceButton(0, 1, 3) }), function() end)
-    itemFrame.itemProto.Release = originalRelease
-    itemFrame.GetButton = originalGetButton
-
-    local firstAcquire
-    local lastRelease
-    for i, entry in ipairs(log) do
-      if not firstAcquire and entry:match("^acquire:") then
-        firstAcquire = i
+    local function watch(button)
+      local frame = button.frame
+      local hide, setParent = frame.Hide, frame.SetParent
+      frame.Hide = function(self)
+        table.insert(log, "hide:" .. tostring(button.slotkey))
+        return hide(self)
       end
-      if entry:match("^release:") then
-        lastRelease = i
+      frame.SetParent = function(self, parent)
+        if parent == nil then
+          table.insert(log, "unparent:" .. tostring(button.slotkey))
+        end
+        return setParent(self, parent)
       end
     end
-    assert.is_not_nil(firstAcquire, "expected at least one button acquisition")
-    assert.is_not_nil(lastRelease, "expected the previous draw's buttons to be released")
-    assert.is_true(lastRelease < firstAcquire,
-      "every button release must precede the first button acquisition, got: " .. table.concat(log, ", "))
+
+    local function watchPass()
+      local originalRelease = itemFrame.itemProto.Release
+      local originalGetButton = itemFrame.GetButton
+      override(itemFrame.itemProto, "Release", function(self, ctx)
+        table.insert(log, "release:" .. tostring(self.slotkey))
+        return originalRelease(self, ctx)
+      end)
+      override(itemFrame, "GetButton", function(self, ctx, slotkey)
+        table.insert(log, "acquire:" .. slotkey)
+        return originalGetButton(self, ctx, slotkey)
+      end)
+    end
+
+    local function entries(prefix)
+      local out = {}
+      for _, entry in ipairs(log) do
+        if entry:sub(1, #prefix) == prefix then table.insert(out, entry) end
+      end
+      return out
+    end
+
+    before_each(function()
+      log = {}
+    end)
+
+    it("never releases, hides or unparents a button that is drawn again", function()
+      local bag = newBag()
+      local info = function()
+        return slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Recent Items") }, { freeSpaceButton(0, 3, 3) })
+      end
+      bag:Draw(context:New("draw1"), info(), function() end)
+      for _, key in ipairs({ "0_1", "0_2", "0_3" }) do watch(itemFrame.buttonsBySlotkey[key]) end
+      watchPass()
+
+      bag:Draw(context:New("draw2"), info(), function() end)
+
+      assert.are.same({}, entries("release:"))
+      assert.are.same({}, entries("hide:"))
+      assert.are.same({}, entries("unparent:"))
+      for _, key in ipairs({ "0_1", "0_2", "0_3" }) do
+        assert.is_true(itemFrame.buttonsBySlotkey[key].frame:IsShown(), key)
+      end
+    end)
+
+    it("releases a button no longer drawn, after every renderer has run", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Weapons") }, {}), function() end)
+      local gone = itemFrame.buttonsBySlotkey["0_2"]
+      watchPass()
+
+      bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons") }, { freeSpaceButton(0, 3, 1) }), function() end)
+
+      assert.are.same({ "release:0_2" }, entries("release:"))
+      local lastAcquire, release
+      for i, entry in ipairs(log) do
+        if entry:match("^acquire:") then lastAcquire = i end
+        if entry == "release:0_2" then release = i end
+      end
+      assert.is_true(release > lastAcquire, "unclaimed buttons are released only after every renderer: " .. table.concat(log, ", "))
+      assert.is_false(gone.frame:IsShown())
+      assert.is_nil(gone.frame:GetParent())
+    end)
+
+    it("moves a button between Recent Items and a tab section without releasing it", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Recent Items") }, {}), function() end)
+      local button = itemFrame.buttonsBySlotkey["0_1"]
+      watchPass()
+
+      bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+      assert.are.same({}, entries("release:"))
+      local view = bag.tabViews[const.BAG_VIEW.SECTION_GRID .. "_1"]
+      assert.is_true(view.sections["Weapons"]:HasItem(button))
+      assert.is_true(button.frame:IsShown())
+      assert.is_nil(bag.globalSections["Recent Items"])
+
+      bag:Draw(context:New("draw3"), slotInfoWith({ itemAt(0, 1, "Recent Items") }, {}), function() end)
+      assert.are.same({}, entries("release:"))
+      assert.is_true(bag.globalSections["Recent Items"]:HasItem(button))
+      assert.is_true(button.frame:IsShown())
+    end)
+
+    it("keeps the section of a category drawn again and releases the section of a category that is gone", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Armor") }, {}), function() end)
+      local view = bag.tabViews[const.BAG_VIEW.SECTION_GRID .. "_1"]
+      local weapons, armor = view.sections["Weapons"], view.sections["Armor"]
+      local weaponsHidden = false
+      local hide = weapons.frame.Hide
+      weapons.frame.Hide = function(self)
+        weaponsHidden = true
+        return hide(self)
+      end
+
+      bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+
+      assert.are.equal(weapons, view.sections["Weapons"])
+      assert.is_false(weaponsHidden)
+      assert.is_nil(view.sections["Armor"])
+      assert.is_false(armor.frame:IsShown())
+    end)
+
+    it("draws only the active tab and releases the hidden tab's sections and buttons", function()
+      local active = 1
+      local database = addon:GetModule("Database")
+      override(database, "GetGroupsEnabled", function() return true end)
+      override(database, "GetActiveGroup", function() return active end)
+      local function info()
+        local weapons, armor = itemAt(0, 1, "Weapons"), itemAt(0, 2, "Armor")
+        return {
+          totalItems = 2,
+          sectionLayouts = {},
+          GetVisibleItems = function() return { ["0_1"] = weapons, ["0_2"] = armor } end,
+          tabs = {
+            [1] = { items = { weapons }, categories = { { name = "Weapons" } }, totalItems = 1, freeSpace = { buttons = {} } },
+            [2] = { items = { armor }, categories = { { name = "Armor" } }, totalItems = 1, freeSpace = { buttons = {} } },
+          },
+        }
+      end
+      local bag = newBag()
+      bag:Draw(context:New("tab1"), info(), function() end)
+      local tab1 = bag.tabViews[const.BAG_VIEW.SECTION_GRID .. "_1"]
+      local weaponsButton = itemFrame.buttonsBySlotkey["0_1"]
+      assert.is_nil(itemFrame.buttonsBySlotkey["0_2"], "the hidden tab is not rendered")
+
+      active = 2
+      bag:Draw(context:New("tab2"), info(), function() end)
+      local tab2 = bag.tabViews[const.BAG_VIEW.SECTION_GRID .. "_2"]
+      assert.is_not_nil(tab2.sections["Armor"])
+      assert.is_nil(next(tab1.sections), "the now hidden tab's sections are released")
+      assert.is_false(weaponsButton.frame:IsShown(), "the now hidden tab's buttons are released")
+
+      active = 1
+      bag:Draw(context:New("tab1again"), info(), function() end)
+      assert.is_not_nil(tab1.sections["Weapons"])
+      assert.is_true(weaponsButton.frame:IsShown())
+      assert.is_nil(next(tab2.sections))
+    end)
+
+    it("does not keep last pass's cells in a reused section", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Weapons") }, {}), function() end)
+      local gone = itemFrame.buttonsBySlotkey["0_2"]
+      bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+      local weapons = bag.tabViews[const.BAG_VIEW.SECTION_GRID .. "_1"].sections["Weapons"]
+      assert.are.equal(1, #weapons.content.cells)
+      assert.is_false(weapons:HasItem(gone))
+    end)
+
+    describe("after a draw that failed partway", function()
+      local failOn
+
+      before_each(function()
+        failOn = nil
+        local original = itemFrame.itemProto.SetItemFromData
+        override(itemFrame.itemProto, "SetItemFromData", function(self, c, data)
+          if data.slotkey == failOn then
+            error("simulated draw failure")
+          end
+          return original(self, c, data)
+        end)
+      end)
+
+      it("a wipe releases every button, including those left in sections the failed pass did not reach", function()
+        local bag = newBag()
+        bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Armor") }, {}), function() end)
+        local weaponsButton = itemFrame.buttonsBySlotkey["0_1"]
+        local armorButton = itemFrame.buttonsBySlotkey["0_2"]
+
+        -- Armor is gone this pass; the pass fails before its sweep, leaving the Armor
+        -- section (still holding 0_2) set aside.
+        failOn = "0_1"
+        assert.has_error(function()
+          bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+        end)
+        failOn = nil
+
+        bag:Wipe(context:New("wipe"))
+        for _, button in ipairs({ weaponsButton, armorButton }) do
+          assert.is_false(button.frame:IsShown(), button.slotkey)
+          assert.is_nil(button.frame:GetParent(), button.slotkey)
+        end
+      end)
+
+      it("a wipe releases a button the previous pass drew outside any view", function()
+        local bag = newBag()
+        bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Recent Items") }, {}), function() end)
+        local recent = itemFrame.buttonsBySlotkey["0_2"]
+
+        -- No recent items this pass, so the Recent Items section is released (without its
+        -- button), and the pass then fails in the tab view before its sweep.
+        failOn = "0_1"
+        assert.has_error(function()
+          bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+        end)
+        failOn = nil
+
+        bag:Wipe(context:New("wipe"))
+        assert.is_false(recent.frame:IsShown())
+        assert.is_nil(recent.frame:GetParent())
+      end)
+
+      it("a wipe tears down a tab whose first render failed", function()
+        local active = 1
+        local database = addon:GetModule("Database")
+        override(database, "GetGroupsEnabled", function() return true end)
+        override(database, "GetActiveGroup", function() return active end)
+        local function info()
+          local weapons, armor = itemAt(0, 1, "Weapons"), itemAt(0, 2, "Armor")
+          return {
+            totalItems = 2,
+            sectionLayouts = {},
+            GetVisibleItems = function() return { ["0_1"] = weapons, ["0_2"] = armor } end,
+            tabs = {
+              [1] = { items = { weapons }, categories = { { name = "Weapons" } }, totalItems = 1, freeSpace = { buttons = {} } },
+              [2] = { items = { armor }, categories = { { name = "Armor" } }, totalItems = 1, freeSpace = { buttons = {} } },
+            },
+          }
+        end
+        local bag = newBag()
+        bag:Draw(context:New("tab1"), info(), function() end)
+
+        active = 2
+        failOn = "0_2"
+        assert.has_error(function()
+          bag:Draw(context:New("tab2"), info(), function() end)
+        end)
+        failOn = nil
+        local tab2 = bag.tabViews[const.BAG_VIEW.SECTION_GRID .. "_2"]
+        assert.is_not_nil(next(tab2.sections))
+
+        bag:Wipe(context:New("wipe"))
+        assert.is_nil(next(tab2.sections))
+        assert.is_false(tab2.rendering)
+      end)
+
+      it("a wipe releases a button claimed by a pass that failed while drawing it", function()
+        local bag = newBag()
+        bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+
+        failOn = "0_2"
+        assert.has_error(function()
+          bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Weapons") }, {}), function() end)
+        end)
+        failOn = nil
+        local claimedOnly = itemFrame.buttonsBySlotkey["0_2"]
+
+        bag:Wipe(context:New("wipe"))
+        assert.is_true(claimedOnly.released)
+        assert.is_false(claimedOnly.frame:IsShown())
+      end)
+
+      it("the next pass releases a button only the failed pass drew", function()
+        local bag = newBag()
+        bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+
+        failOn = "0_3"
+        assert.has_error(function()
+          bag:Draw(context:New("draw2"), slotInfoWith(
+            { itemAt(0, 1, "Weapons"), itemAt(0, 2, "Armor"), itemAt(0, 3, "Weapons") }, {}), function() end)
+        end)
+        failOn = nil
+        local drawnByFailedPass = itemFrame.buttonsBySlotkey["0_2"]
+        assert.is_true(drawnByFailedPass.frame:IsShown())
+
+        bag:Draw(context:New("draw3"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+        assert.is_false(drawnByFailedPass.frame:IsShown())
+        assert.is_true(itemFrame.buttonsBySlotkey["0_1"].frame:IsShown())
+      end)
+    end)
+
+    it("re-enables a button drawn as an item after it was a zero-count free slot", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), slotInfoWith({}, { freeSpaceButton(0, 1, 0) }), function() end)
+      local button = itemFrame.buttonsBySlotkey["0_1"]
+      assert.is_false(button.button:IsEnabled())
+
+      bag:Draw(context:New("draw2"), slotInfoWith({ itemAt(0, 1, "Weapons") }, {}), function() end)
+      assert.is_true(button.button:IsEnabled())
+      assert.is_false(button.isFreeSlot or false)
+    end)
+
+    describe("free slots drawn without a count", function()
+      local counts
+
+      local function showAllInfo(allItems, freeButtons)
+        local info = slotInfoWith(allItems, freeButtons)
+        info.tabs[1].freeSpace.showAll = true
+        return info
+      end
+
+      local function lastCount(button)
+        local entry = counts[button._decoration]
+        return entry and entry.count, entry and entry.minDisplayCount
+      end
+
+      before_each(function()
+        counts = {}
+        _G.SetItemButtonCount = function(decoration, count)
+          counts[decoration] = { count = count, minDisplayCount = decoration.minDisplayCount }
+        end
+      end)
+
+      it("clears the count an item left on the button", function()
+        local bag = newBag()
+        bag:Draw(context:New("draw1"), slotInfoWith({ MockData.ItemData({
+          bagid = 0, slotid = 1, slotkey = "0_1", category = "Weapons", quality = 2, itemID = 1001,
+          name = "Stack", stackedCount = 20,
+        }) }, {}), function() end)
+        local button = itemFrame.buttonsBySlotkey["0_1"]
+        assert.are.equal(20, (lastCount(button)))
+
+        bag:Draw(context:New("draw2"), showAllInfo({}, { freeSpaceButton(0, 1, 1) }), function() end)
+        local count, minDisplayCount = lastCount(button)
+        assert.are.equal(0, count)
+        assert.are.equal(1, minDisplayCount, "0 must not exceed the minimum, so the count stays hidden")
+      end)
+
+      it("clears the count a counted free slot left on the button", function()
+        local bag = newBag()
+        bag:Draw(context:New("draw1"), slotInfoWith({}, { freeSpaceButton(0, 1, 5) }), function() end)
+        local button = itemFrame.buttonsBySlotkey["0_1"]
+        assert.are.equal(5, (lastCount(button)))
+
+        bag:Draw(context:New("draw2"), showAllInfo({}, { freeSpaceButton(0, 1, 1) }), function() end)
+        local count, minDisplayCount = lastCount(button)
+        assert.are.equal(0, count)
+        assert.are.equal(1, minDisplayCount)
+      end)
+    end)
   end)
 
   -- Regression: the Recent Items global section was built by iterating

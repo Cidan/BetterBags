@@ -194,6 +194,53 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       assert.is_nil(itemFrame.buttonsBySlotkey["Container"])
       assert.equal(#itemFrame.virtualPool, poolCountBeforeWipe + 1)
     end)
+
+    -- A full teardown (bag:Wipe, DeleteTabView) can release a button the next draw's
+    -- sweep then also finds unclaimed; a virtual button must still enter its pool once.
+    it("returns a virtual button to the pool only once, however often it is released", function()
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      local btnCtx = ctx:New("test_virtual_double_release")
+      local item = itemFrame:GetButton(btnCtx, "Container")
+      local before = #itemFrame.virtualPool
+      item:Release(btnCtx)
+      item:Release(btnCtx)
+      item:Wipe(btnCtx)
+      assert.equal(before + 1, #itemFrame.virtualPool)
+    end)
+
+    it("releases a virtual button again after it is acquired from the pool again", function()
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      local btnCtx = ctx:New("test_virtual_reacquire")
+      local item = itemFrame:GetButton(btnCtx, "Container")
+      item:Release(btnCtx)
+      local again = itemFrame:GetButton(btnCtx, "Reagent Bag")
+      assert.equal(item, again, "the pool hands back the button just released")
+      local before = #itemFrame.virtualPool
+      again:Release(btnCtx)
+      assert.equal(before + 1, #itemFrame.virtualPool)
+      assert.is_nil(itemFrame.buttonsBySlotkey["Reagent Bag"])
+    end)
+  end)
+
+  it("releases a physical button again only after it has been drawn again", function()
+    local btnCtx = ctx:New("test_release_rearm")
+    local item = itemFrame:GetButton(btnCtx, "0_12")
+    local hides = 0
+    local hide = item.frame.Hide
+    item.frame.Hide = function(self)
+      hides = hides + 1
+      return hide(self)
+    end
+    item:Release(btnCtx)
+    local afterFirst = hides
+    item:Release(btnCtx)
+    assert.equal(afterFirst, hides, "a second release of an undrawn button does nothing")
+
+    item:SetFreeSlots(btnCtx, { bagid = 0, slotid = 12, slotkey = "0_12", itemInfo = { emptySlotName = "Bag" } }, 1)
+    item:Release(btnCtx)
+    assert.is_true(hides > afterFirst)
   end)
 
   it("should use a permanent parent frame for the bag as i.frame", function()
@@ -380,6 +427,74 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       end
       item:SetItemFromData(btnCtx, itemData)
       assert.is_false(searchMatched)
+    end)
+
+    -- A button drawn in consecutive passes is no longer released in between, so the
+    -- reset a release used to do runs only when the button changes what it shows (item,
+    -- free slot, empty slot). Same-kind redraws set every visual themselves.
+    describe("redrawing without a release", function()
+      local function fullItem(count)
+        return {
+          slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = false, stackedCount = count,
+          questInfo = { isQuestItem = false },
+          containerInfo = { isReadable = false, isFiltered = false, hasNoValue = false },
+          itemInfo = { isBound = false, itemID = 12345, itemIcon = 136235, itemQuality = 2,
+            itemLink = "item:12345", currentItemCount = count, classID = 0 },
+        }
+      end
+
+      local function countResets()
+        local resets = 0
+        local original = itemFrame.itemProto.ResetVisuals
+        itemFrame.itemProto.ResetVisuals = function(self, c)
+          resets = resets + 1
+          return original(self, c)
+        end
+        return function()
+          itemFrame.itemProto.ResetVisuals = original
+          return resets
+        end
+      end
+
+      it("does not reset a button that shows an item again", function()
+        item:SetItemFromData(btnCtx, fullItem(3))
+        local done = countResets()
+        item:SetItemFromData(btnCtx, fullItem(9))
+        assert.equal(0, done())
+        assert.equal(9, _G.SetItemButtonCountVal)
+      end)
+
+      it("resets the button like a release when its slot is drawn empty", function()
+        item:SetItemFromData(btnCtx, fullItem(7))
+        local done = countResets()
+        item:SetItemFromData(btnCtx, { slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = true,
+          itemInfo = {} })
+        assert.equal(1, done())
+        assert.equal(0, _G.SetItemButtonCountVal)
+      end)
+
+      it("keeps the size and static data an item row set before its first draw", function()
+        local row = itemFrame:Create(btnCtx)
+        row:SetSize(btnCtx, 20, 20)
+        local data = fullItem(1)
+        row:SetStaticItemFromData(btnCtx, data)
+        assert.equal(data, row.staticData)
+        assert.equal(20, row.frame:GetWidth())
+        assert.equal(data, row:GetItemData())
+      end)
+
+      it("resets the button when a free slot shows an item, and when an item becomes a free slot", function()
+        item:SetFreeSlots(btnCtx, { bagid = 0, slotid = 6, slotkey = "0_6", itemInfo = { emptySlotName = "Bag" } }, 0)
+        local done = countResets()
+        item:SetItemFromData(btnCtx, fullItem(2))
+        assert.equal(1, done())
+        assert.is_true(item.button:IsEnabled())
+
+        done = countResets()
+        item:SetFreeSlots(btnCtx, { bagid = 0, slotid = 6, slotkey = "0_6", itemInfo = { emptySlotName = "Bag" } }, 4)
+        assert.equal(1, done())
+        assert.is_nil(item.currentData)
+      end)
     end)
 
     it("UpdateCount should render pre-computed stackedCount when present", function()

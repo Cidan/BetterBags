@@ -427,7 +427,9 @@ function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
     end
 
     if not cell.isGap then
-      cell.frame:SetParent(self.inner)
+      if cell.frame:GetParent() ~= self.inner then
+        cell.frame:SetParent(self.inner)
+      end
       cell.frame:ClearAllPoints()
       cell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", currentX, currentY)
       cell.frame:Show()

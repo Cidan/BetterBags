@@ -66,8 +66,7 @@ backpack overrides do not replace `RegisterEvents`):
   opened just before closing can flush after it), then refreshes the active tab view's
   buttons **and** the global section buttons in `self.itemFrames` (Recent Items lives
   outside the tab view, and freshly looted consumables sit there). Buttons with
-  `isFreeSlot` are skipped: `SetFreeSlots` does not reset `currentData`, so a button reused
-  as a free slot still carries the data of the item it last drew.
+  `isFreeSlot` are skipped: a free slot has no item cooldown to show.
 
 ## 4. Coverage
 

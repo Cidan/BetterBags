@@ -62,22 +62,33 @@ function masque:OnEnable()
   self.groups["Bank"] = Masque:Group('BetterBags', 'Bank')
   self.groups["Bank"]:RegisterCallback(self.OnSkinChange, self)
 
-  events:RegisterMessage('item/NewButton', function(_, item, decoration)
-    ---@cast item Item
+  -- The group each item decoration was last added to. Item buttons are redrawn without
+  -- being released (and so removed) in between, and Masque's AddButton does nothing for a
+  -- button already in the group, so a redrawn button is re-skinned instead: the draw
+  -- re-applied BetterBags' quality border (texture coordinates and blend) over the skin.
+  self.added = setmetatable({}, { __mode = 'k' })
+
+  ---@param item Item
+  ---@param decoration ItemButton
+  local function skin(item, decoration)
     if not item.kind then return end
     if themes:GetCurrentTheme().DisableMasque then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    group:AddButton(decoration)
+    if self.added[decoration] == group then
+      group:ReSkin(decoration)
+    else
+      group:AddButton(decoration)
+      self.added[decoration] = group
+    end
     self:ReapplyBlend(decoration)
+  end
+
+  events:RegisterMessage('item/NewButton', function(_, item, decoration)
+    skin(item, decoration)
   end)
 
   events:RegisterMessage('item/Updated', function(_, item, decoration)
-    ---@cast item Item
-    if not item.kind then return end
-    if themes:GetCurrentTheme().DisableMasque then return end
-    local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    group:AddButton(decoration)
-    self:ReapplyBlend(decoration)
+    skin(item, decoration)
   end)
 
   events:RegisterMessage('item/Clearing', function(_, item, decoration)
@@ -86,6 +97,7 @@ function masque:OnEnable()
     if themes:GetCurrentTheme().DisableMasque then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:RemoveButton(decoration)
+    self.added[decoration] = nil
   end)
 
   events:RegisterMessage('bagbutton/Updated', function(_, bag)

@@ -63,6 +63,26 @@ describe("Grid scrollbar and mousewheel tests", function()
 end)
 
 describe("Grid gap layout tests", function()
+  it("does not reparent a cell that is already in this grid", function()
+    local parent = CreateFrame("Frame")
+    local g = grid:Create(parent, false)
+    local f = CreateFrame("Frame")
+    f:SetSize(37, 37)
+    g:AddCell("a", { frame = f })
+    g:Draw({ cells = g.cells, maxWidthPerRow = 205 })
+    assert.is_equal(g.inner, f:GetParent())
+
+    local reparented = 0
+    local setParent = f.SetParent
+    f.SetParent = function(self, p)
+      reparented = reparented + 1
+      return setParent(self, p)
+    end
+    g:Draw({ cells = g.cells, maxWidthPerRow = 205 })
+    assert.is_equal(0, reparented)
+    assert.is_equal(g.inner, f:GetParent())
+  end)
+
   it("should layout cells with gaps correctly using absolute coordinates", function()
     local parent = CreateFrame("Frame")
     local g = grid:Create(parent, false)
