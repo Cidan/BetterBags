@@ -71,6 +71,7 @@ local HALO_MIN_ALPHA = 0.4
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
+---@field drawState table|nil The inputs of the last full draw (see itemDrawUnchanged).
 itemFrame.itemProto = {}
 addon:GetModule('Perf'):RegisterPrototype(itemFrame.itemProto, 'Item')
 
@@ -123,6 +124,135 @@ local function getFamilyIconTexture(decoration)
 	return decoration.BetterBagsFamilyIcon
 end
 
+-- searchMatch is the search state a full draw applies: the live search result when a
+-- search is active, else the client's own filter.
+---@param data ItemData
+---@return boolean
+local function searchMatch(data)
+	if data.isSearchResult ~= nil then
+		return data.isSearchResult
+	end
+	return not (data.containerInfo and data.containerInfo.isFiltered)
+end
+
+-- Each button records in item.drawState the inputs of its last full draw. A redraw whose
+-- inputs all match skips the setters: the decoration still shows what they would set. The
+-- inputs are the item's itemHash (item ID, enchant, gems, bonus IDs, binding, item level
+-- and stats), every other ItemData field the setters read, the data phase's draw generation
+-- (a new one after every wipe sweep, which is how settings changes reach the buttons), and
+-- the decoration and theme generation the button was drawn with. ResetVisuals (a release or
+-- a change between item, free slot and empty slot) and Lock clear the record; UpdateSearch
+-- keeps its search match current.
+---@param item Item
+---@param decoration ItemButton
+---@param data ItemData
+---@return boolean
+local function itemDrawUnchanged(item, decoration, data)
+	local s = item.drawState
+	if not s or not s.valid or item.staticData then
+		return false
+	end
+	local info, quest, container = data.itemInfo, data.questInfo, data.containerInfo
+	return s.decoration == decoration
+		and s.decorationGeneration == themes.decorationGeneration
+		and s.drawGeneration == data.drawGeneration
+		and s.bagid == data.bagid
+		and s.itemHash == data.itemHash
+		and s.itemLink == info.itemLink
+		and s.itemIcon == info.itemIcon
+		and s.itemQuality == info.itemQuality
+		and s.isBound == info.isBound
+		and s.currentItemLevel == info.currentItemLevel
+		and s.classID == info.classID
+		and s.stackedCount == data.stackedCount
+		and s.currentItemCount == info.currentItemCount
+		and s.isNewItem == info.isNewItem
+		and s.isBattlePayItem == info.isBattlePayItem
+		and s.isQuestItem == quest.isQuestItem
+		and s.questID == quest.questID
+		and s.isActive == quest.isActive
+		and s.readable == (container and container.isReadable)
+		and s.noValue == (container and container.hasNoValue)
+		and s.matches == searchMatch(data)
+		and s.isUpgrade == data.isUpgrade
+		and s.itemContextMatchResult == data.itemContextMatchResult
+end
+
+---@param item Item
+---@param decoration ItemButton
+---@param data ItemData
+local function recordItemDraw(item, decoration, data)
+	local s = item.drawState or {}
+	item.drawState = s
+	local info, quest, container = data.itemInfo, data.questInfo, data.containerInfo
+	s.decoration = decoration
+	s.decorationGeneration = themes.decorationGeneration
+	s.drawGeneration = data.drawGeneration
+	s.bagid = data.bagid
+	s.itemHash = data.itemHash
+	s.itemLink = info.itemLink
+	s.itemIcon = info.itemIcon
+	s.itemQuality = info.itemQuality
+	s.isBound = info.isBound
+	s.currentItemLevel = info.currentItemLevel
+	s.classID = info.classID
+	s.stackedCount = data.stackedCount
+	s.currentItemCount = info.currentItemCount
+	s.isNewItem = info.isNewItem
+	s.isBattlePayItem = info.isBattlePayItem
+	s.isQuestItem = quest.isQuestItem
+	s.questID = quest.questID
+	s.isActive = quest.isActive
+	s.readable = container and container.isReadable
+	s.noValue = container and container.hasNoValue
+	s.matches = searchMatch(data)
+	s.isUpgrade = data.isUpgrade
+	s.itemContextMatchResult = data.itemContextMatchResult
+	s.valid = true
+end
+
+---@param item Item
+---@param decoration ItemButton
+---@param data ItemData
+---@param count number
+---@param nocount? boolean
+---@return boolean
+local function freeDrawUnchanged(item, decoration, data, count, nocount)
+	local s = item.drawState
+	if not s or not s.valid then
+		return false
+	end
+	local info = data.itemInfo
+	return s.decoration == decoration
+		and s.decorationGeneration == themes.decorationGeneration
+		and s.bagid == data.bagid
+		and s.count == count
+		and s.nocount == (nocount and true or false)
+		and s.emptySlotName == (info and info.emptySlotName)
+		and s.emptySlotFamilyIcon == (info and info.emptySlotFamilyIcon)
+		and s.itemQuality == (info and info.itemQuality)
+end
+
+---@param item Item
+---@param decoration ItemButton
+---@param data ItemData
+---@param count number
+---@param nocount? boolean
+local function recordFreeDraw(item, decoration, data, count, nocount)
+	local s = item.drawState or {}
+	item.drawState = s
+	local info = data.itemInfo
+	s.decoration = decoration
+	s.decorationGeneration = themes.decorationGeneration
+	s.bagid = data.bagid
+	s.count = count
+	s.nocount = nocount and true or false
+	s.emptySlotName = info and info.emptySlotName
+	s.emptySlotFamilyIcon = info and info.emptySlotFamilyIcon
+	s.itemQuality = info and info.itemQuality
+	s.valid = true
+end
+
 ---@param ctx Context
 ---@param found? boolean
 function itemFrame.itemProto:UpdateSearch(ctx, found)
@@ -131,6 +261,9 @@ function itemFrame.itemProto:UpdateSearch(ctx, found)
 	end
 	local decoration = themes:GetItemButton(ctx, self)
 	decoration:SetMatchesSearch(found and true or false)
+	if self.drawState then
+		self.drawState.matches = found and true or false
+	end
 end
 
 function itemFrame.itemProto:OnEnter()
@@ -193,6 +326,9 @@ end
 function itemFrame.itemProto:Lock(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
 	SetItemButtonDesaturated(decoration, true)
+	if self.drawState then
+		self.drawState.valid = false
+	end
 end
 
 ---@param ctx Context
@@ -314,8 +450,19 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	self.slotkey = data.slotkey
 	local decoration = themes:GetItemButton(ctx, self)
 	decoration._itemData = data
-	local tooltipOwner = GameTooltip:GetOwner()
 	self.kind = bagKindFromBagID(data.bagid)
+
+	if mode == "item" and itemDrawUnchanged(self, decoration, data) then
+		-- The new-item glow loops; a full draw replays the one-shot flash whenever the glow
+		-- has stopped, so a new item still goes through UpdateNewItem.
+		if data.itemInfo.isNewItem then
+			self:UpdateNewItem(ctx, data)
+		end
+		self:FinishItemDraw(ctx, decoration)
+		return
+	end
+
+	local tooltipOwner = GameTooltip:GetOwner()
 
 	-- Any real (or empty) item drawn into the slot clears the specialized-bag glyph.
 	if decoration.BetterBagsFamilyIcon then decoration.BetterBagsFamilyIcon:Hide() end
@@ -384,8 +531,21 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	if self.slotkey ~= nil then
 		events:SendMessage(ctx, "item/Updated", self, decoration)
 	end
-	decoration:SetFrameLevel(math.max(0, self.button:GetFrameLevel() - 1))
 	self:UpdateUpgrade(ctx, data)
+	recordItemDraw(self, decoration, data)
+	self:FinishItemDraw(ctx, decoration)
+end
+
+-- FinishItemDraw is the part of an item draw that runs even when the drawn inputs are
+-- unchanged: it keeps the decoration below the interaction button and the button shown.
+---@param ctx Context
+---@param decoration ItemButton
+function itemFrame.itemProto:FinishItemDraw(ctx, decoration)
+	decoration:SetFrameLevel(math.max(0, self.button:GetFrameLevel() - 1))
+	-- A theme with its own ItemButton re-applies its fixups on every lookup (ElvUI pins its
+	-- backdrop's frame level below the decoration's), so look it up again after setting the
+	-- level. For the default themes this is a cache hit.
+	themes:GetItemButton(ctx, self)
 
 	-- Classic quality glow fix: the interaction button's own NormalTexture
 	-- (Interface\Buttons\UI-Quickslot2, a 64x64 beveled frame) is re-shown by
@@ -393,7 +553,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	-- level BELOW self.button, that frame drew OVER the decoration's quality glow
 	-- and hid it. A plain Hide() loses to the re-show, so clear the texture value
 	-- itself -- nothing renders even when it is re-shown, and the additive glow
-	-- from DrawQualityGlow (above) becomes visible, matching retail behavior
+	-- from DrawQualityGlow becomes visible, matching retail behavior
 	-- (same halo, same "Extra Glowy" intensity control). Retail has no such
 	-- re-show, so leave it untouched.
 	if not addon.isRetail and self.button.GetNormalTexture and self.button:GetNormalTexture() then
@@ -593,6 +753,12 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
 	self.kind = bagKindFromBagID(bagid)
 
+	if freeDrawUnchanged(self, decoration, data, count, nocount) then
+		self.frame:Show()
+		self.button:Show()
+		return
+	end
+
 	if count == 0 then
 		self.button:Disable()
 	else
@@ -669,6 +835,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.isFreeSlot = true
 	if addon.isRetail and decoration.ItemSlotBackground then decoration.ItemSlotBackground:Show() end
 	self.frame:SetAlpha(1)
+	recordFreeDraw(self, decoration, data, count, nocount)
 	events:SendMessage(ctx, "item/Updated", self, decoration)
 	self.frame:Show()
 	self.button:Show()
@@ -734,6 +901,9 @@ end
 ---@param ctx Context
 function itemFrame.itemProto:ResetVisuals(ctx)
 	local decoration = themes:GetItemButton(ctx, self)
+	if self.drawState then
+		self.drawState.valid = false
+	end
 	if decoration.BetterBagsFamilyIcon then decoration.BetterBagsFamilyIcon:Hide() end
 	self.currentData = nil
 	self.kind = nil

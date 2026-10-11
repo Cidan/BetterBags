@@ -176,7 +176,7 @@ local function stubClientAPIs()
   _G.C_Container.GetContainerItemInfo = function(bagid, slotid)
     local slot = mockContainer[bagid] and mockContainer[bagid][slotid]
     if not slot or not slot.itemID then return nil end
-    return {
+    local info = {
       iconFileID = 134400,
       stackCount = slot.count or 1,
       isLocked = false,
@@ -188,7 +188,11 @@ local function stubClientAPIs()
       hasNoValue = false,
       itemID = slot.itemID,
       isBound = false,
+      itemName = itemNames[slot.itemID] or ("TestItem " .. slot.itemID),
     }
+    -- slot.info overrides individual ContainerItemInfo fields.
+    for k, v in pairs(slot.info or {}) do info[k] = v end
+    return info
   end
   _G.C_Container.ContainerIDToInventoryID = function() return nil end
   _G.C_Item.GetItemInfo = function(itemID)
@@ -324,6 +328,315 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK]["guid-101"], "moved item's recent timer must be cleared")
     assert.is_false(moved.itemInfo.isNewItem)
     assert.are_not.equal("Recent Items", moved.itemInfo.category)
+  end)
+
+  -- A sweep re-reads only the slots whose contents changed: a slot whose client container
+  -- info and item GUID match the committed item keeps that item (refreshing the fields that
+  -- change without the slot changing), so a targeted sweep of a 36-slot bag after one potion
+  -- re-reads one slot, not 36.
+  describe("per-slot harvest cache", function()
+    local harvested
+
+    local function harvestedKeys()
+      local keys = {}
+      for _, key in ipairs(harvested) do keys[#keys + 1] = key end
+      table.sort(keys)
+      return keys
+    end
+
+    before_each(function()
+      harvested = {}
+      local attach = items.AttachItemInfo
+      override(items, "AttachItemInfo", function(self, data, kind, ...)
+        table.insert(harvested, data.bagid .. "_" .. data.slotid)
+        return attach(self, data, kind, ...)
+      end)
+    end)
+
+    it("keeps unchanged slots and re-reads the changed one on a targeted sweep", function()
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 102, guid = "guid-102", count = 5 },
+      }
+      local kept = refreshBackpack({ wipe = true }).itemsBySlotKey["0_1"]
+      harvested = {}
+
+      mockContainer[0][2].count = 4
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_2" }, harvestedKeys())
+      assert.equal(kept, slotInfo.itemsBySlotKey["0_1"])
+      assert.equal(4, slotInfo.itemsBySlotKey["0_2"].itemInfo.currentItemCount)
+    end)
+
+    it("reads a changed slot's container info once", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      refreshBackpack({ wipe = true })
+      local reads = 0
+      local read = _G.C_Container.GetContainerItemInfo
+      override(_G.C_Container, "GetContainerItemInfo", function(bagid, slotid)
+        reads = reads + 1
+        return read(bagid, slotid)
+      end)
+      mockContainer[0][1].count = 2
+      refreshBackpack({ bags = { [0] = true } })
+      assert.equal(1, reads)
+    end)
+
+    it("re-reads a slot whose item changed identity even though its container info matches", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-a", count = 20 } }
+      refreshBackpack({ wipe = true })
+      harvested = {}
+      mockContainer[0][1].guid = "guid-b"
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_1" }, harvestedKeys())
+      assert.equal("guid-b", slotInfo.itemsBySlotKey["0_1"].itemInfo.itemGUID)
+    end)
+
+    it("re-reads every slot on a wipe sweep", function()
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 102, guid = "guid-102", count = 1 },
+      }
+      refreshBackpack({ wipe = true })
+      harvested = {}
+      refreshBackpack({ wipe = true })
+      assert.are.same({ "0_1", "0_2" }, harvestedKeys())
+    end)
+
+    it("re-reads a slot first read while the client had no item info for it", function()
+      local cold = true
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(itemID)
+        if cold then return nil end
+        return getItemInfo(itemID)
+      end)
+      itemNames[909] = "Warm Name"
+      mockContainer[0] = { { itemID = 909, guid = "guid-909", count = 1 } }
+      refreshBackpack({ wipe = true })
+      cold = false
+      harvested = {}
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_1" }, harvestedKeys())
+      assert.equal("Warm Name", slotInfo.itemsBySlotKey["0_1"].itemInfo.itemName)
+
+      harvested = {}
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({}, harvestedKeys(), "once read warm, the slot is kept")
+      itemNames[909] = nil
+    end)
+
+    -- A fresh read takes the new-item flag (the glow) from the client alone; the Recent
+    -- Items timer decides the category. A kept slot must agree, or an item the player
+    -- hovered (which drops the client flag) keeps glowing until its timer runs out.
+    it("computes a kept slot's new-item flag exactly as a fresh read does", function()
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 102, guid = "guid-102", count = 1 },
+      }
+      newSlots["0_1"] = true
+      local first = refreshBackpack({ wipe = true })
+      assert.is_true(first.itemsBySlotKey["0_1"].itemInfo.isNewItem)
+      assert.is_not_nil(items._newItemTimers[const.BAG_KIND.BACKPACK]["guid-101"])
+
+      newSlots["0_1"] = nil
+      harvested = {}
+      mockContainer[0][2].count = 2
+      local kept = refreshBackpack({ bags = { [0] = true } }).itemsBySlotKey["0_1"]
+      assert.are.same({ "0_2" }, harvestedKeys())
+
+      local fresh = { bagid = 0, slotid = 1 }
+      items:AttachItemInfo(fresh, const.BAG_KIND.BACKPACK)
+      assert.is_false(fresh.itemInfo.isNewItem)
+      assert.is_false(kept.itemInfo.isNewItem)
+    end)
+
+    -- Each ContainerItemInfo field the check compares; any change re-reads the slot. An
+    -- enchant or an upgrade changes the link but keeps the GUID.
+    local SWORD = "|cnIQ1:|Hitem:101:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Alpha Sword]|h|r"
+    local fieldChanges = {
+      { "link", function(slot) slot.link = "|cnIQ1:|Hitem:101:6:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Alpha Sword]|h|r" end },
+      { "item ID", function(slot) slot.info = { itemID = 999 } end },
+      { "name", function(slot) slot.info = { itemName = "Renamed" } end },
+      { "icon", function(slot) slot.info = { iconFileID = 1 } end },
+      { "quality", function(slot) slot.info = { quality = 4 } end },
+      { "lock", function(slot) slot.info = { isLocked = true } end },
+      { "bound state", function(slot) slot.info = { isBound = true } end },
+      { "readable", function(slot) slot.info = { isReadable = true } end },
+      { "loot", function(slot) slot.info = { hasLoot = true } end },
+      { "filter", function(slot) slot.info = { isFiltered = true } end },
+      { "no-value", function(slot) slot.info = { hasNoValue = true } end },
+    }
+    for _, change in ipairs(fieldChanges) do
+      it("re-reads a slot whose " .. change[1] .. " changed", function()
+        mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1, link = SWORD } }
+        refreshBackpack({ wipe = true })
+        harvested = {}
+        change[2](mockContainer[0][1])
+        refreshBackpack({ bags = { [0] = true } })
+        assert.are.same({ "0_1" }, harvestedKeys())
+      end)
+    end
+
+    it("does not change the committed items it keeps until the sweep commits", function()
+      override(database, "GetStackingOptions", function()
+        return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+          dontMergePartial = false, dontMergeTransmog = false }
+      end)
+      local shield = "|cnIQ1:|Hitem:102:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Beta Shield]|h|r"
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-a", count = 5, link = SWORD },
+        { itemID = 101, guid = "guid-b", count = 3, link = SWORD },
+        { itemID = 102, guid = "guid-c", count = 1, link = shield },
+      }
+      local root = refreshBackpack({ wipe = true }).itemsBySlotKey["0_1"]
+      assert.equal(8, root.stackedCount)
+      -- Between the harvest and the commit (one frame apart) the bag may draw from the
+      -- committed state; it must still show the stack total.
+      local stackedDuringSweep
+      local harvest = items.Phase2_Harvest
+      override(items, "Phase2_Harvest", function(self, ...)
+        local a, b = harvest(self, ...)
+        stackedDuringSweep = root.stackedCount
+        return a, b
+      end)
+      mockContainer[0][3].count = 2
+      refreshBackpack({ bags = { [0] = true } })
+      assert.equal(8, stackedDuringSweep)
+    end)
+
+    it("refreshes a kept slot's new-item flag, gear sets, quest state and tooltip text", function()
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 102, guid = "guid-102", count = 1 },
+      }
+      refreshBackpack({ wipe = true })
+
+      newSlots["0_1"] = true
+      local equipmentSets = addon:GetModule("EquipmentSets")
+      override(equipmentSets, "GetItemSets", function(_, bagid, slotid)
+        if bagid == 0 and slotid == 1 then return { "Tank" } end
+        return nil
+      end)
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      override(tooltipScanner, "GetTooltipText", function(_, bagid, slotid)
+        if bagid == 0 and slotid == 1 then return "Use: Restores health." end
+        return ""
+      end)
+      local questInfo = _G.C_Container.GetContainerItemQuestInfo
+      override(_G.C_Container, "GetContainerItemQuestInfo", function(bagid, slotid)
+        if bagid == 0 and slotid == 1 then return { isQuestItem = true, questID = 9, isActive = true } end
+        return questInfo(bagid, slotid)
+      end)
+      harvested = {}
+      mockContainer[0][2].count = 2
+      local item = refreshBackpack({ bags = { [0] = true } }).itemsBySlotKey["0_1"]
+
+      assert.are.same({ "0_2" }, harvestedKeys())
+      assert.is_true(item.itemInfo.isNewItem)
+      assert.are.same({ "Tank" }, item.itemInfo.equipmentSets)
+      assert.equal("Use: Restores health.", item.itemInfo.tooltipText)
+      assert.is_true(item.questInfo.isActive)
+    end)
+
+    describe("virtual stacks", function()
+      before_each(function()
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+            dontMergePartial = false, dontMergeTransmog = false }
+        end)
+      end)
+
+      it("totals a stack from current counts when its piles were kept", function()
+        -- Full retail links: the short mock link parses to item ID 0, so two different items
+        -- without one would share a hash.
+        local swordLink = "|cnIQ1:|Hitem:101:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Alpha Sword]|h|r"
+        local shieldLink = "|cnIQ1:|Hitem:102:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Beta Shield]|h|r"
+        mockContainer[0] = {
+          { itemID = 101, guid = "guid-a", count = 5, link = swordLink },
+          { itemID = 101, guid = "guid-b", count = 3, link = swordLink },
+          { itemID = 102, guid = "guid-c", count = 1, link = shieldLink },
+        }
+        local first = refreshBackpack({ wipe = true })
+        assert.are_not.equal(first.itemsBySlotKey["0_1"].itemHash, first.itemsBySlotKey["0_3"].itemHash)
+        harvested = {}
+        mockContainer[0][3].count = 2
+        local slotInfo = refreshBackpack({ bags = { [0] = true } })
+        assert.are.same({ "0_3" }, harvestedKeys())
+        assert.equal(8, slotInfo.visibleItemsBySlotKey["0_1"].stackedCount)
+        assert.is_nil(slotInfo.visibleItemsBySlotKey["0_2"])
+      end)
+
+      it("re-roots a stack onto a kept pile when the root pile shrinks", function()
+        mockContainer[0] = {
+          { itemID = 101, guid = "guid-a", count = 5 },
+          { itemID = 101, guid = "guid-b", count = 3 },
+        }
+        refreshBackpack({ wipe = true })
+        harvested = {}
+        mockContainer[0][1].count = 2
+        local slotInfo = refreshBackpack({ bags = { [0] = true } })
+        assert.are.same({ "0_1" }, harvestedKeys())
+        assert.is_nil(slotInfo.visibleItemsBySlotKey["0_1"])
+        assert.equal(5, slotInfo.visibleItemsBySlotKey["0_2"].stackedCount)
+      end)
+
+      it("unmerges kept piles when the stacking rule stops applying", function()
+        mockContainer[0] = {
+          { itemID = 101, guid = "guid-a", count = 5 },
+          { itemID = 101, guid = "guid-b", count = 3 },
+        }
+        refreshBackpack({ wipe = true })
+        addon.atInteracting = true
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = true,
+            dontMergePartial = false, dontMergeTransmog = false }
+        end)
+        local slotInfo = refreshBackpack()
+        addon.atInteracting = nil
+        assert.is_nil(slotInfo.visibleItemsBySlotKey["0_1"].stackedCount)
+        assert.is_nil(slotInfo.visibleItemsBySlotKey["0_2"].stackedCount)
+        assert.equal(5, slotInfo.visibleItemsBySlotKey["0_1"].itemInfo.currentItemCount)
+      end)
+    end)
+  end)
+
+  -- Item buttons skip a redraw whose inputs are unchanged (frames/item.lua). Settings that
+  -- change how a button looks without changing its data (glow intensity, item level
+  -- display, theme) all send bags/FullRefreshAll, a wipe sweep; the draw generation every
+  -- item carries changes on exactly those sweeps, so their buttons redraw in full.
+  describe("draw generation", function()
+    it("stamps every item, including those a targeted sweep carried over", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      mockContainer[1] = { { itemID = 102, guid = "guid-102", count = 1 } }
+      local slotInfo = refreshBackpack({ wipe = true })
+      local generation = slotInfo.itemsBySlotKey["0_1"].drawGeneration
+      assert.is_not_nil(generation)
+      assert.equal(generation, slotInfo.itemsBySlotKey["1_1"].drawGeneration)
+
+      mockContainer[0][1].count = 2
+      slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.equal(generation, slotInfo.itemsBySlotKey["0_1"].drawGeneration, "a targeted sweep keeps the generation")
+      assert.equal(generation, slotInfo.itemsBySlotKey["1_1"].drawGeneration)
+    end)
+
+    it("changes on a wipe sweep only", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      local first = refreshBackpack({ wipe = true }).itemsBySlotKey["0_1"].drawGeneration
+      local plain = refreshBackpack().itemsBySlotKey["0_1"].drawGeneration
+      assert.equal(first, plain)
+      local wiped = refreshBackpack({ wipe = true }).itemsBySlotKey["0_1"].drawGeneration
+      assert.are_not.equal(first, wiped)
+    end)
+
+    it("is counted per bag kind, so a bank wipe does not redraw the backpack", function()
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      local before = refreshBackpack({ wipe = true }).itemsBySlotKey["0_1"].drawGeneration
+      local ctx = context:New("bank-wipe")
+      ctx:Set("wipe", true)
+      items:RefreshBank(ctx)
+      local after = refreshBackpack().itemsBySlotKey["0_1"].drawGeneration
+      assert.equal(before, after)
+    end)
   end)
 
   -- Two 12.1 Catalyst pieces: identical itemID, item level and bonus IDs, differing
@@ -531,6 +844,111 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
     local bankResults = search:Search("beta")
     assert.is_true(bankResults["6_1"], "bank item must remain searchable after the backpack is indexed last")
+  end)
+
+  -- The index is updated incrementally (search:SyncKind). It must always equal a clean
+  -- rebuild over both bags' committed items (docs/roadmap.md, "Incremental search indexing").
+  describe("incremental search index", function()
+    local function sets(t)
+      local out = {}
+      for value, slots in pairs(t) do
+        local keys = {}
+        for k in pairs(slots) do keys[#keys + 1] = k end
+        table.sort(keys)
+        out[tostring(value)] = table.concat(keys, ",")
+      end
+      return out
+    end
+    local function numbers(node, out)
+      if node then
+        numbers(node.left, out)
+        local keys = {}
+        for k in pairs(node.data) do keys[#keys + 1] = k end
+        table.sort(keys)
+        out[tostring(node.value)] = table.concat(keys, ",")
+        numbers(node.right, out)
+      end
+      return out
+    end
+    local function indexState()
+      local out = {}
+      for name, index in pairs(search.indicies) do
+        out[name] = { sets(index.ngrams), sets(index.fullText), sets(index.bools), numbers(index.numbers.root, {}) }
+      end
+      return out
+    end
+    local function cleanState()
+      local saved = { search.indicies, search.indexLookup, search.indexed }
+      search:Init()
+      local all = {}
+      for _, kind in ipairs({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }) do
+        for slotkey, it in pairs(items.slotInfo[kind].itemsBySlotKey or {}) do all[slotkey] = it end
+      end
+      search:IndexItems(all)
+      local state = indexState()
+      search.indicies, search.indexLookup, search.indexed = saved[1], saved[2], saved[3]
+      return state
+    end
+    local function refreshBank(wipe)
+      local ctx = context:New("refresh-bank")
+      if wipe then ctx:Set("wipe", true) end
+      items:RefreshBank(ctx)
+    end
+
+    it("re-indexes only the slot that changed on a targeted sweep", function()
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 202, guid = "guid-202", count = 5 },
+      }
+      mockContainer[6] = { { itemID = 303, guid = "guid-303", count = 1 } }
+      refreshBank()
+      refreshBackpack({ wipe = true })
+
+      local added = {}
+      local add = search.Add
+      override(search, "Add", function(self, it)
+        table.insert(added, it.slotkey)
+        return add(self, it)
+      end)
+      mockContainer[0][2].count = 4
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_2" }, added)
+      assert.is_true(search:isInIndex("count", 4)["0_2"])
+      assert.is_nil(search:isInIndex("count", 5)["0_2"])
+    end)
+
+    it("equals a clean rebuild over both bags after targeted, plain and wipe sweeps", function()
+      mockContainer[0] = {
+        { itemID = 101, guid = "guid-101", count = 1 },
+        { itemID = 202, guid = "guid-202", count = 5 },
+        {},
+      }
+      mockContainer[1] = { { itemID = 303, guid = "guid-303", count = 2 } }
+      mockContainer[6] = { { itemID = 201, guid = "guid-201", count = 1 }, {} }
+      refreshBank(true)
+      refreshBackpack({ wipe = true })
+      assert.are.same(cleanState(), indexState(), "after wipe sweeps")
+
+      -- Use one potion, loot an item, move one, sell one.
+      mockContainer[0][2].count = 4
+      mockContainer[0][3] = { itemID = 303, guid = "guid-new", count = 1 }
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same(cleanState(), indexState(), "after a targeted sweep")
+
+      mockContainer[1][1], mockContainer[0][1] = mockContainer[0][1], {}
+      refreshBackpack()
+      assert.are.same(cleanState(), indexState(), "after a move")
+
+      mockContainer[6][2] = { itemID = 202, guid = "guid-bank2", count = 3 }
+      refreshBank()
+      assert.are.same(cleanState(), indexState(), "after a bank sweep")
+
+      mockContainer[1] = { {} }
+      refreshBackpack({ bags = { [1] = true } })
+      assert.are.same(cleanState(), indexState(), "after a sale")
+      assert.is_nil(search.indexed["1_1"])
+      assert.is_not_nil(search.indexed["6_2"], "the bank stays indexed")
+    end)
   end)
 
   describe("All Items Recent (container auto-loot, same-frame remove + add)", function()

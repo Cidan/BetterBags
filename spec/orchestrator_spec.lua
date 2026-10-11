@@ -143,8 +143,13 @@ describe("Phase 1-5 Orchestrator (ProcessRefresh)", function()
     local ctx = addon:GetModule("Context"):New("TestRefresh")
     local search = addon:GetModule("Search")
 
-    -- Spy on search indexing and stacking
-    spy.on(search, "IndexItems")
+    -- Record search indexing
+    local synced = {}
+    local syncKind = search.SyncKind
+    search.SyncKind = function(self, kind, kindItems, rebuild)
+      table.insert(synced, { kind = kind, items = kindItems, rebuild = rebuild })
+      return syncKind(self, kind, kindItems, rebuild)
+    end
 
     -- Call ProcessRefresh for backpack
     items:ProcessRefresh(ctx, const.BAG_KIND.BACKPACK)
@@ -164,8 +169,15 @@ describe("Phase 1-5 Orchestrator (ProcessRefresh)", function()
     assert.is_not_nil(stackInfo)
     assert.are.equal("0_1", stackInfo.rootItem)
 
-    -- Assert Phase 4 Search Indexing: search:IndexItems was called with slotInfo.itemsBySlotKey
-    assert.spy(search.IndexItems).was.called(1)
+    -- Assert Phase 4 Search Indexing: the backpack's items are synced into the shared index
+    -- (re-added in full, as the first sweep is a wipe), then the bank's committed items.
+    search.SyncKind = syncKind
+    assert.are.equal(2, #synced)
+    assert.are.equal(const.BAG_KIND.BACKPACK, synced[1].kind)
+    assert.are.equal(slotInfo.itemsBySlotKey, synced[1].items)
+    assert.is_true(synced[1].rebuild)
+    assert.are.equal(const.BAG_KIND.BANK, synced[2].kind)
+    assert.is_true(search:isInIndex("id", 54321)["0_1"])
   end)
 
   it("should dispatch completion messages on done", function()

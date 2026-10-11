@@ -502,3 +502,350 @@ describe("Search", function()
     end)
   end)
 end)
+
+-- The index is kept up to date incrementally: each sweep re-indexes only the items whose
+-- indexed values changed, removing an item with the values it was indexed with. The result
+-- must always equal a clean rebuild (search:IndexItems) over the same items
+-- (docs/roadmap.md, "Incremental search indexing").
+describe("Search incremental indexing (SyncKind)", function()
+  local BACKPACK, BANK = 0, 1
+
+  local function item(opts)
+    return MockSearchItem(opts)
+  end
+
+  local function sortedKeys(set)
+    local keys = {}
+    for k in pairs(set) do keys[#keys + 1] = tostring(k) end
+    table.sort(keys)
+    return table.concat(keys, ",")
+  end
+
+  local function normalizeSets(sets)
+    local out = {}
+    for value, slots in pairs(sets) do
+      out[tostring(value)] = sortedKeys(slots)
+    end
+    return out
+  end
+
+  -- checkTree asserts every node's min/max covers exactly its subtree (range queries prune
+  -- on them) and collects value -> slotkeys.
+  local function checkTree(node, out)
+    if not node then return nil, nil end
+    local lo, hi = node.value, node.value
+    local lmin, lmax = checkTree(node.left, out)
+    local rmin, rmax = checkTree(node.right, out)
+    if lmin and lmin < lo then lo = lmin end
+    if rmin and rmin < lo then lo = rmin end
+    if lmax and lmax > hi then hi = lmax end
+    if rmax and rmax > hi then hi = rmax end
+    assert.are.equal(lo, node.min, "interval tree min")
+    assert.are.equal(hi, node.max, "interval tree max")
+    assert.is_not_nil(next(node.data), "interval tree node with no slots")
+    out[tostring(node.value)] = sortedKeys(node.data)
+    return lo, hi
+  end
+
+  local function indexState()
+    local out = {}
+    for name, index in pairs(search.indicies) do
+      local numbers = {}
+      checkTree(index.numbers.root, numbers)
+      out[name] = {
+        ngrams = normalizeSets(index.ngrams),
+        fullText = normalizeSets(index.fullText),
+        bools = normalizeSets(index.bools),
+        numbers = numbers,
+      }
+    end
+    return out
+  end
+
+  -- cleanState is the index a clean rebuild over the given items produces. The live
+  -- (incremental) index is set aside and restored, so drift can accumulate across steps.
+  local function cleanState(itemsByKind)
+    local saved = { search.indicies, search.indexLookup, search.indexed }
+    search:Init()
+    local all = {}
+    for _, kindItems in pairs(itemsByKind) do
+      for slotkey, it in pairs(kindItems) do all[slotkey] = it end
+    end
+    search:IndexItems(all)
+    local state = indexState()
+    search.indicies, search.indexLookup, search.indexed = saved[1], saved[2], saved[3]
+    return state
+  end
+
+  before_each(function()
+    search:Init()
+  end)
+
+  it("indexes new items and leaves unchanged ones alone", function()
+    local bag = {
+      a = item({ slotkey = "a", name = "Sword", kind = BACKPACK }),
+      b = item({ slotkey = "b", name = "Shield", kind = BACKPACK }),
+    }
+    search:SyncKind(BACKPACK, bag)
+    local added = {}
+    local add = search.Add
+    search.Add = function(self, it)
+      table.insert(added, it.slotkey)
+      return add(self, it)
+    end
+    bag.c = item({ slotkey = "c", name = "Potion", kind = BACKPACK })
+    search:SyncKind(BACKPACK, bag)
+    search.Add = add
+    assert.are.same({ "c" }, added)
+    assert.is_true(search:isInIndex("name", "potion")["c"])
+    assert.is_true(search:isInIndex("name", "sword")["a"])
+  end)
+
+  it("re-indexes an item changed in place, removing the values it was indexed with", function()
+    local sword = item({ slotkey = "a", name = "Sword", category = "Weapons", count = 1, kind = BACKPACK })
+    local bag = { a = sword }
+    search:SyncKind(BACKPACK, bag)
+    sword.itemInfo.category = "Junk"
+    sword.itemInfo.currentItemCount = 4
+    search:SyncKind(BACKPACK, bag)
+    assert.is_nil(search:isInIndex("category", "weapons")["a"])
+    assert.is_true(search:isInIndex("category", "junk")["a"])
+    assert.is_nil(search:isInIndex("count", 1)["a"])
+    assert.is_true(search:isInIndex("count", 4)["a"])
+  end)
+
+  it("removes an item that left the bag or whose slot is now empty", function()
+    local bag = {
+      a = item({ slotkey = "a", name = "Sword", kind = BACKPACK }),
+      b = item({ slotkey = "b", name = "Shield", kind = BACKPACK }),
+    }
+    search:SyncKind(BACKPACK, bag)
+    bag.a = nil
+    bag.b = item({ slotkey = "b", isItemEmpty = true, kind = BACKPACK })
+    search:SyncKind(BACKPACK, bag)
+    assert.is_nil(next(search.indexed))
+    assert.are.same(cleanState({}), indexState())
+  end)
+
+  it("never touches the other bag's items", function()
+    search:SyncKind(BANK, { z = item({ slotkey = "z", name = "Banked", kind = BANK }) })
+    search:SyncKind(BACKPACK, { a = item({ slotkey = "a", name = "Sword", kind = BACKPACK }) })
+    search:SyncKind(BACKPACK, {})
+    assert.is_true(search:isInIndex("name", "banked")["z"])
+    assert.is_nil(search:isInIndex("name", "sword")["a"])
+  end)
+
+  it("re-adds every item of the bag on a rebuild", function()
+    local bag = { a = item({ slotkey = "a", name = "Sword", kind = BACKPACK }) }
+    search:SyncKind(BACKPACK, bag)
+    local added = 0
+    local add = search.Add
+    search.Add = function(self, it)
+      added = added + 1
+      return add(self, it)
+    end
+    search:SyncKind(BACKPACK, bag, true)
+    search.Add = add
+    assert.are.equal(1, added)
+    assert.are.same(cleanState({ bag }), indexState())
+  end)
+
+  it("keeps a category updated after indexing, so the next sync does not re-index it", function()
+    local sword = item({ slotkey = "a", name = "Sword", category = "Weapons", kind = BACKPACK })
+    local bag = { a = sword }
+    search:SyncKind(BACKPACK, bag)
+    sword.itemInfo.category = "Search Hits"
+    search:UpdateCategoryIndex(sword, "Weapons")
+    local added = 0
+    local add = search.Add
+    search.Add = function(self, it)
+      added = added + 1
+      return add(self, it)
+    end
+    search:SyncKind(BACKPACK, bag)
+    search.Add = add
+    assert.are.equal(0, added)
+    assert.are.same(cleanState({ bag }), indexState())
+  end)
+
+  it("deletes a value's entry when its last slot is removed", function()
+    local it = item({ slotkey = "a", name = "Sword", tooltipText = "Use: Restores health.", kind = BACKPACK })
+    search:Add(it)
+    search:Remove(it)
+    for name, index in pairs(search.indicies) do
+      assert.is_nil(next(index.ngrams), name .. " ngrams")
+      assert.is_nil(next(index.fullText), name .. " fullText")
+      assert.is_nil(next(index.bools), name .. " bools")
+      assert.is_nil(index.numbers.root, name .. " numbers")
+    end
+  end)
+
+  it("replaces, rather than adds to, an item added twice under the same slot", function()
+    search:Add(item({ slotkey = "a", name = "Sword", kind = BACKPACK }))
+    search:Add(item({ slotkey = "a", name = "Shield", kind = BACKPACK }))
+    assert.is_nil(search:isInIndex("name", "sword")["a"])
+    assert.is_true(search:isInIndex("name", "shield")["a"])
+  end)
+
+  -- Every value an item puts in the index, changed in place on the same ItemData object
+  -- (as targeted sweeps and the harvest cache do), must re-index the item.
+  describe("re-indexes an item when one indexed value changes in place", function()
+    local changes = {
+      { "name", function(it) it.itemInfo.itemName = "Shield" end },
+      { "type", function(it) it.itemInfo.itemType = "Weapon" end },
+      { "subtype", function(it) it.itemInfo.itemSubType = "Swords" end },
+      { "category", function(it) it.itemInfo.category = "Junk" end },
+      { "GUID", function(it) it.itemInfo.itemGUID = "guid-other" end },
+      { "expansion", function(it) it.itemInfo.expacID = 9 end },
+      { "equipment location", function(it) it.itemInfo.itemEquipLoc = "INVTYPE_HEAD" end },
+      { "binding", function(it) it.bindingInfo.binding = 2 end },
+      { "tooltip", function(it) it.itemInfo.tooltipText = "Use: Restores mana." end },
+      { "item level", function(it) it.itemInfo.currentItemLevel = 500 end },
+      { "quality", function(it) it.itemInfo.itemQuality = 4 end },
+      { "item ID", function(it) it.itemInfo.itemID = 4242 end },
+      { "count", function(it) it.itemInfo.currentItemCount = 9 end },
+      { "class", function(it) it.itemInfo.classID = 2 end },
+      { "subclass", function(it) it.itemInfo.subclassID = 7 end },
+      { "bind type", function(it) it.itemInfo.bindType = 2 end },
+      { "reagent flag", function(it) it.itemInfo.isCraftingReagent = true end },
+      { "bound flag", function(it) it.itemInfo.isBound = true end },
+      { "binding's bound flag", function(it) it.bindingInfo.bound = true end },
+      { "quest item flag", function(it) it.questInfo.isQuestItem = true end },
+      { "active quest flag", function(it) it.questInfo.isActive = true end },
+      { "equipment sets", function(it) it.itemInfo.equipmentSets = { "Tank" } end },
+      { "bonus IDs", function(it) it.itemLinkInfo.bonusIDs = { "6652" } end },
+    }
+    for _, change in ipairs(changes) do
+      it(change[1], function()
+        local savedHead = _G.INVTYPE_HEAD
+        _G.INVTYPE_HEAD = "Head"
+        local sword = item({ slotkey = "a", name = "Sword", kind = BACKPACK, tooltipText = "Use: Restores health." })
+        local bag = { a = sword }
+        search:SyncKind(BACKPACK, bag)
+        change[2](sword)
+        search:SyncKind(BACKPACK, bag)
+        local expected = cleanState({ bag })
+        local actual = indexState()
+        _G.INVTYPE_HEAD = savedHead
+        assert.are.same(expected, actual)
+      end)
+    end
+  end)
+
+  -- Acceptance gate (docs/roadmap.md): randomized adds, removes, moves, in-place changes,
+  -- category updates after indexing and rebuilds across both bags, compared after every
+  -- step with a clean rebuild over the same items.
+  describe("matches a clean rebuild", function()
+    local seed
+    local function random(n)
+      seed = (seed * 16807) % 2147483647
+      return seed % n + 1
+    end
+    local function pick(list)
+      return list[random(#list)]
+    end
+
+    local NAMES = { "Sword", "Swordfish", "Shield", "Potion", "Potion of Speed", "Tank Plate" }
+    local CATEGORIES = { "Weapons", "Armor", "Consumables", "Recent Items", "Junk" }
+    local TOOLTIPS = { "", "Use: Restores health.", "Equip: +5 Stamina", "Use: Restores mana." }
+    local SETS = { "Tank", "Tanky", "Heal" }
+    local EQUIP = { "INVTYPE_NON_EQUIP_IGNORE", "INVTYPE_HEAD", "INVTYPE_CHEST", "" }
+    local guid = 0
+
+    local function randomItem(kind, slot)
+      guid = guid + 1
+      local sets
+      if random(3) == 1 then
+        sets = {}
+        for _ = 1, random(2) do sets[#sets + 1] = pick(SETS) end
+      end
+      local bonus = {}
+      for _ = 1, random(3) - 1 do bonus[#bonus + 1] = tostring(pick({ 6652, 13440, 13578 })) end
+      return item({
+        slotkey = slot, bagid = kind * 10 + 1, slotid = tonumber(slot:match("_(%d+)$")), kind = kind,
+        name = pick(NAMES), category = pick(CATEGORIES), count = random(20), itemLevel = random(5) * 100,
+        quality = random(5) - 1, itemID = 1000 + random(6), expacID = pick({ 0, 1, 9, 5 }),
+        equipLoc = pick(EQUIP), tooltipText = pick(TOOLTIPS), equipmentSets = sets, bonusIDs = bonus,
+        isBound = random(2) == 1, isReagent = random(2) == 1, bound = random(2) == 1,
+        bindingScope = random(3) - 1, isQuest = random(2) == 1, isActiveQuest = random(2) == 1,
+        guid = "guid-" .. guid,
+      })
+    end
+
+    local function mutate(it)
+      local info = it.itemInfo
+      local which = random(18)
+      if which == 1 then info.category = pick(CATEGORIES)
+      elseif which == 2 then info.currentItemCount = random(20)
+      elseif which == 3 then info.tooltipText = pick(TOOLTIPS)
+      elseif which == 4 then info.equipmentSets = random(2) == 1 and { pick(SETS), pick(SETS) } or nil
+      elseif which == 5 then it.itemLinkInfo.bonusIDs = { tostring(pick({ 6652, 13440 })) }
+      elseif which == 6 then it.questInfo.isActive = not it.questInfo.isActive
+      elseif which == 7 then info.itemName = pick(NAMES)
+      elseif which == 8 then it.bindingInfo.bound = not it.bindingInfo.bound
+      elseif which == 9 then info.currentItemLevel = random(5) * 100
+      elseif which == 10 then info.itemQuality = random(5) - 1
+      elseif which == 11 then info.itemID = 1000 + random(6)
+      elseif which == 12 then info.classID = random(4)
+      elseif which == 13 then info.subclassID = random(4)
+      elseif which == 14 then info.bindType = random(4) - 1
+      elseif which == 15 then info.isBound = not info.isBound
+      elseif which == 16 then info.isCraftingReagent = not info.isCraftingReagent
+      elseif which == 17 then it.questInfo.isQuestItem = not it.questInfo.isQuestItem
+      else it.bindingInfo.binding = random(3) - 1 end
+    end
+
+    local function step(bags, kind)
+      local bag = bags[kind]
+      local slots = {}
+      for i = 1, 8 do slots[i] = kind .. "_" .. i end
+      local op = random(6)
+      local slot = pick(slots)
+      if op == 1 then
+        bag[slot] = randomItem(kind, slot)
+      elseif op == 2 then
+        bag[slot] = nil
+      elseif op == 3 and bag[slot] and not bag[slot].isItemEmpty then
+        mutate(bag[slot])
+      elseif op == 4 then
+        bag[slot] = item({ slotkey = slot, isItemEmpty = true, kind = kind })
+      elseif op == 5 and bag[slot] and not bag[slot].isItemEmpty then
+        -- A move: the same item (GUID) shows up in another slot as a new object.
+        local dest = pick(slots)
+        if dest ~= slot then
+          local moved = randomItem(kind, dest)
+          moved.itemInfo.itemGUID = bag[slot].itemInfo.itemGUID
+          moved.itemInfo.itemName = bag[slot].itemInfo.itemName
+          bag[dest] = moved
+          bag[slot] = nil
+        end
+      end
+
+      local otherKind = kind == BACKPACK and BANK or BACKPACK
+      search:SyncKind(kind, bag, random(10) == 1)
+      search:SyncKind(otherKind, bags[otherKind])
+
+      -- Phase8 re-resolves categories after indexing and updates the category index.
+      for _, it in pairs(bag) do
+        if not it.isItemEmpty and random(5) == 1 then
+          local old = it.itemInfo.category
+          it.itemInfo.category = pick(CATEGORIES)
+          if it.itemInfo.category ~= old then
+            search:UpdateCategoryIndex(it, old)
+          end
+        end
+      end
+    end
+
+    for _, startSeed in ipairs({ 1, 42, 1999, 31337, 271828 }) do
+      it("over 150 random steps (seed " .. startSeed .. ")", function()
+        seed = startSeed
+        local bags = { [BACKPACK] = {}, [BANK] = {} }
+        for n = 1, 150 do
+          step(bags, random(2) == 1 and BACKPACK or BANK)
+          assert.are.same(cleanState(bags), indexState(), "step " .. n)
+        end
+      end)
+    end
+  end)
+end)

@@ -257,6 +257,9 @@ function DB:ResetMaxItemLevel()
   local context = addon:GetModule('Context')
   local ctx = context:New('ResetMaxItemLevel')
   events:SendMessage(ctx, 'itemLevel/MaxChanged', 1)
+  -- The maximum is learned while items are read, and sweeps keep the items of unchanged
+  -- slots without reading them again; re-read everything so it is learned again.
+  events:SendMessage(ctx, 'bags/FullRefreshAll')
 end
 
 function DB:GetItemLevelColors()

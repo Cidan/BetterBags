@@ -153,8 +153,16 @@ Events like `TOOLTIP_DATA_UPDATE` (every tooltip in the game) and `BAG_UPDATE_CO
 ## Don't Sweep Before a Server-Side Change; Mark It Pending and Guarantee a Later Sweep
 A sort (and anything else whose effect arrives later as `BAG_UPDATE`s) should not sweep in its own unit: that sweep redraws the old contents and is thrown away a moment later. Instead mark the kind pending in Items (`items:MarkSortSweepPending`), let the next committed sweep of that kind carry the extra work (full re-read, layout reset) and clear the mark only after `Phase11` commits, and arm a fallback timer that requests the sweep if nothing else did (a sort that moves nothing fires no event at all). Set the mark and the fallback before any call that can fail, and have the fallback's unit re-check the mark when it runs so a queued event refresh is never repeated. Contract: `.claude/rules/refresh-scheduler.md` §6.
 
-## Keep Clean-Sweep Work Linear in Item Count
-Every sweep re-runs Phase 8's search index rebuild over both bags, even for a one-slot change, so any per-item cost that grows with string length or item count is paid constantly. The tooltip prefix n-grams (quadratic in tooltip length) were the dominant cost of every sweep until the tooltip index became full-text only (`.claude/rules/search-indexing.md` §2a).
+## Keep Per-Sweep Work Linear in Item Count
+Any per-item cost that grows with string length or item count is paid for every item the sweep touches. The tooltip prefix n-grams (quadratic in tooltip length) were the dominant cost of every sweep until the tooltip index became full-text only (`.claude/rules/search-indexing.md` §2a).
+
+## Incremental Work Without Drift: Record What Was Applied, Diff Against It
+A sweep that changed one slot should cost one slot, but every past attempt at incremental updates (v0.4.x search `Add`/`Remove`, changeset-gated views) drifted, because it removed or compared using the item's *current* values, and ItemData objects are reused and mutated in place across sweeps. The pattern that holds:
+- **Record a snapshot of exactly what was applied**, separate from the data object: the search index stores per-slot snapshots (`fillSnapshot`), item buttons store their last full draw's inputs (`drawState`), the harvest compares against the raw container values the item was read from (`rawItemName`...).
+- **Diff a fresh snapshot against the record** to decide whether to redo the work, and **undo with the recorded values**, never the current ones.
+- **Keep one definition of the snapshot** that both the apply and the compare use, so a new field cannot be applied without being compared.
+- **Fall back to a full rebuild on wipes**, which are also how settings changes propagate (draw generation).
+- **Gate it with an equivalence test** against the clean rebuild over randomized sequences (`spec/search_spec.lua` "matches a clean rebuild"), plus a mutation check that each guard is load-bearing.
 
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point

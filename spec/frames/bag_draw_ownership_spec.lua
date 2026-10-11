@@ -781,6 +781,33 @@ describe("Bag Draw: shared item button ownership across global sections and view
       end)
     end)
 
+    it("fully redraws only the button whose item changed (using a potion)", function()
+      local function potion(count)
+        return MockData.ItemData({ bagid = 0, slotid = 1, slotkey = "0_1", category = "Consumables",
+          quality = 1, itemID = 1001, name = "Potion", count = count })
+      end
+      local function info(count)
+        return slotInfoWith({ potion(count), itemAt(0, 2, "Weapons"), itemAt(0, 3, "Recent Items") },
+          { freeSpaceButton(0, 4, 3) })
+      end
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), info(5), function() end)
+
+      local full = {}
+      for _, key in ipairs({ "0_1", "0_2", "0_3", "0_4" }) do
+        local decoration = itemFrame.buttonsBySlotkey[key]._decoration
+        decoration.SetReadable = function() full[key] = (full[key] or 0) + 1 end
+        decoration.UpdateQuestItem = function() full[key] = (full[key] or 0) + 1 end
+      end
+
+      bag:Draw(context:New("draw2"), info(4), function() end)
+      assert.are.same({ ["0_1"] = 2 }, full, "the potion's item draw calls both setters; nothing else redraws")
+      for _, key in ipairs({ "0_1", "0_2", "0_3", "0_4" }) do
+        assert.is_true(itemFrame.buttonsBySlotkey[key].frame:IsShown(), key)
+      end
+      assert.are.equal(4, itemFrame.buttonsBySlotkey["0_1"].currentData.itemInfo.currentItemCount)
+    end)
+
     it("re-enables a button drawn as an item after it was a zero-count free slot", function()
       local bag = newBag()
       bag:Draw(context:New("draw1"), slotInfoWith({}, { freeSpaceButton(0, 1, 0) }), function() end)

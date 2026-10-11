@@ -66,7 +66,7 @@ themes.GetItemButton = function(_, buttonCtx, item)
       IconOverlay = { SetSize = function() end },
       UpgradeIcon = { SetShown = function() end },
       BattlepayItemTexture = { Hide = function() end },
-      NewItemTexture = { Hide = function() end },
+      NewItemTexture = { Hide = function() end, Show = function() end, SetAtlas = function() end },
       flashAnim = { IsPlaying = function() return false end, Play = function() end, Stop = function() end },
       newitemglowAnim = { IsPlaying = function() return false end, Play = function() end, Stop = function() end },
       SetHasItem = function() end,
@@ -471,6 +471,242 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           itemInfo = {} })
         assert.equal(1, done())
         assert.equal(0, _G.SetItemButtonCountVal)
+      end)
+
+      -- A redraw whose drawn inputs are identical to the last draw skips every setter:
+      -- the signature is the item's itemHash plus its link and each field SetItemFromData
+      -- reads, plus the data phase's draw generation (bumped by every wipe sweep, which is
+      -- how settings changes reach the buttons) and the theme's decoration generation.
+      describe("skipping a redraw whose inputs are unchanged", function()
+        local fullDraws
+
+        local function data(changes)
+          local d = fullItem(4)
+          d.itemHash = "hash-12345"
+          d.drawGeneration = 1
+          d.isUpgrade = false
+          d.itemContextMatchResult = 1
+          d.questInfo.isActive = false
+          d.itemInfo.isNewItem = false
+          d.itemInfo.isBattlePayItem = false
+          d.itemInfo.currentItemLevel = 100
+          for _, change in ipairs(changes or {}) do change(d) end
+          return d
+        end
+
+        before_each(function()
+          fullDraws = 0
+          themes.decorationGeneration = 0
+          item:SetItemFromData(btnCtx, data())
+          -- Only a full item draw calls SetReadable (ResetVisuals does not).
+          item._decoration.SetReadable = function() fullDraws = fullDraws + 1 end
+        end)
+
+        after_each(function()
+          themes.decorationGeneration = nil
+        end)
+
+        it("skips the setters but still points the button at the new data", function()
+          local again = data()
+          item:SetItemFromData(btnCtx, again)
+          assert.equal(0, fullDraws)
+          assert.equal(again, item.currentData)
+          assert.equal(again, item._decoration._itemData)
+          assert.is_false(item.released)
+        end)
+
+        local changes = {
+          { "stacked count", function(d) d.stackedCount = 5 end },
+          { "count without a stack", function(d) d.stackedCount = nil; d.itemInfo.currentItemCount = 9 end },
+          { "new item", function(d) d.itemInfo.isNewItem = true end },
+          { "battle pay", function(d) d.itemInfo.isBattlePayItem = true end },
+          { "quest item", function(d) d.questInfo.isQuestItem = true end },
+          { "quest id", function(d) d.questInfo.questID = 77 end },
+          { "active quest", function(d) d.questInfo.isActive = true end },
+          { "readable", function(d) d.containerInfo.isReadable = true end },
+          { "filtered", function(d) d.containerInfo.isFiltered = true end },
+          { "no value", function(d) d.containerInfo.hasNoValue = true end },
+          { "bound", function(d) d.itemInfo.isBound = true end },
+          { "search match", function(d) d.isSearchResult = false end },
+          { "upgrade", function(d) d.isUpgrade = true end },
+          { "context match", function(d) d.itemContextMatchResult = 2 end },
+          { "item hash", function(d) d.itemHash = "hash-other" end },
+          { "item link", function(d) d.itemInfo.itemLink = "item:12345:0:0:0:0:0:0:0:0:0:0:0:1:9999" end },
+          { "icon", function(d) d.itemInfo.itemIcon = 1 end },
+          { "quality", function(d) d.itemInfo.itemQuality = 4 end },
+          { "item level", function(d) d.itemInfo.currentItemLevel = 200 end },
+          { "item class", function(d) d.itemInfo.classID = 4 end },
+          { "draw generation", function(d) d.drawGeneration = 2 end },
+        }
+        for _, change in ipairs(changes) do
+          it("redraws when the " .. change[1] .. " changes", function()
+            item:SetItemFromData(btnCtx, data({ change[2] }))
+            assert.equal(1, fullDraws)
+          end)
+        end
+
+        it("redraws after a theme is applied", function()
+          themes.decorationGeneration = 1
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+        end)
+
+        it("redraws after the live search dimmed the button, not after it applied the same match", function()
+          item:UpdateSearch(btnCtx, true)
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(0, fullDraws)
+          item:UpdateSearch(btnCtx, false)
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+        end)
+
+        it("redraws after the button was locked", function()
+          item:Lock(btnCtx)
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+        end)
+
+        it("replays the new-item animation on a skipped redraw", function()
+          local isNew = function(d) d.itemInfo.isNewItem = true end
+          item:SetItemFromData(btnCtx, data({ isNew }))
+          fullDraws = 0
+          local updates = 0
+          item.UpdateNewItem = function() updates = updates + 1 end
+          item:SetItemFromData(btnCtx, data({ isNew }))
+          item.UpdateNewItem = nil
+          assert.equal(0, fullDraws)
+          assert.equal(1, updates)
+        end)
+
+        it("never skips an item row's static draw", function()
+          item:SetStaticItemFromData(btnCtx, data())
+          item:SetStaticItemFromData(btnCtx, data())
+          item.staticData = nil
+          assert.equal(2, fullDraws)
+        end)
+
+        -- ElvUI re-pins its backdrop's frame level whenever its decoration is looked up, so
+        -- a draw must end with a lookup made after the decoration's level is set.
+        it("looks the decoration up again after setting its frame level, on full and skipped draws", function()
+          for _, variant in ipairs({ { function(d) d.itemInfo.currentItemCount = 7 end }, {} }) do
+            local log = {}
+            local lookup = themes.GetItemButton
+            themes.GetItemButton = function(...)
+              table.insert(log, "lookup")
+              return lookup(...)
+            end
+            local setLevel = item._decoration.SetFrameLevel
+            item._decoration.SetFrameLevel = function(...)
+              table.insert(log, "level")
+              return setLevel(...)
+            end
+            item:SetItemFromData(btnCtx, data(variant))
+            themes.GetItemButton = lookup
+            item._decoration.SetFrameLevel = setLevel
+            local lastLevel, lastLookup
+            for i, entry in ipairs(log) do
+              if entry == "level" then lastLevel = i else lastLookup = i end
+            end
+            assert.is_not_nil(lastLevel)
+            assert.is_true(lastLookup > lastLevel, table.concat(log, ","))
+          end
+        end)
+
+        it("redraws when the decoration is a different object", function()
+          local old = item._decoration
+          item._decoration = nil
+          themes.GetItemButton(nil, btnCtx, item)
+          item._decoration.SetReadable = function() fullDraws = fullDraws + 1 end
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+          item._decoration = old
+        end)
+
+        it("redraws a button that was released since its last draw", function()
+          item:Release(btnCtx)
+          fullDraws = 0
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+        end)
+
+        it("still clears the classic slot texture on a skipped redraw", function()
+          addon.isRetail = false
+          local cleared = 0
+          local normal = item.button:GetNormalTexture()
+          local setTexture = normal.SetTexture
+          normal.SetTexture = function(self, path)
+            if path == nil then cleared = cleared + 1 end
+            return setTexture(self, path)
+          end
+          item:SetItemFromData(btnCtx, data())
+          addon.isRetail = true
+          normal.SetTexture = setTexture
+          assert.equal(0, fullDraws)
+          assert.equal(1, cleared)
+        end)
+      end)
+
+      describe("skipping a free-slot redraw whose inputs are unchanged", function()
+        local fullDraws
+
+        local function slot(changes)
+          local d = { bagid = 0, slotid = 6, slotkey = "0_6",
+            itemInfo = { emptySlotName = "Bag", emptySlotFamilyIcon = nil, itemQuality = nil } }
+          for _, change in ipairs(changes or {}) do change(d) end
+          return d
+        end
+
+        before_each(function()
+          fullDraws = 0
+          themes.decorationGeneration = 0
+          item:SetFreeSlots(btnCtx, slot(), 3)
+          item._decoration.UpdateQuestItem = function() fullDraws = fullDraws + 1 end
+        end)
+
+        after_each(function()
+          themes.decorationGeneration = nil
+        end)
+
+        it("skips the setters when nothing changed, and still shows the button", function()
+          item.frame:Hide()
+          item:SetFreeSlots(btnCtx, slot(), 3)
+          assert.equal(0, fullDraws)
+          assert.is_true(item.isFreeSlot)
+          assert.is_true(item.frame:IsShown())
+        end)
+
+        it("redraws after a theme is applied, on a new decoration, or for another bag", function()
+          themes.decorationGeneration = 1
+          item:SetFreeSlots(btnCtx, slot(), 3)
+          assert.equal(1, fullDraws)
+
+          local old = item._decoration
+          item._decoration = nil
+          themes.GetItemButton(nil, btnCtx, item)
+          item._decoration.UpdateQuestItem = function() fullDraws = fullDraws + 1 end
+          item:SetFreeSlots(btnCtx, slot(), 3)
+          assert.equal(2, fullDraws)
+
+          item:SetFreeSlots(btnCtx, slot({ function(d) d.bagid = 1 end }), 3)
+          assert.equal(3, fullDraws)
+          item._decoration = old
+        end)
+
+        it("redraws when the count, the count display, the name, the family icon or the quality changes", function()
+          item:SetFreeSlots(btnCtx, slot(), 4)
+          item:SetFreeSlots(btnCtx, slot(), 4, true)
+          item:SetFreeSlots(btnCtx, slot({ function(d) d.itemInfo.emptySlotName = "Reagent Bag" end }), 4, true)
+          item:SetFreeSlots(btnCtx, slot({
+            function(d) d.itemInfo.emptySlotName = "Reagent Bag" end,
+            function(d) d.itemInfo.emptySlotFamilyIcon = "Mobile-Herbalism" end,
+          }), 4, true)
+          item:SetFreeSlots(btnCtx, slot({
+            function(d) d.itemInfo.emptySlotName = "Reagent Bag" end,
+            function(d) d.itemInfo.emptySlotFamilyIcon = "Mobile-Herbalism" end,
+            function(d) d.itemInfo.itemQuality = 2 end,
+          }), 4, true)
+          assert.equal(5, fullDraws)
+        end)
       end)
 
       it("keeps the size and static data an item row set before its first draw", function()

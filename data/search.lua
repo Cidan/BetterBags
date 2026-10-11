@@ -27,7 +27,114 @@ local trees = addon:GetModule('Trees')
 ---@field private indicies table<string, SearchIndex>
 ---@field private indexLookup table<string, SearchIndex>
 ---@field private defaultIndicies string[]
+---@field private indexed table<string, table> slotkey -> the values that slot is indexed with (see fillSnapshot).
 local search = addon:NewModule('Search')
+
+-- An item's indexed values. fillSnapshot is the single definition of what an item puts in
+-- the index: Add indexes a snapshot and Remove removes the slot's stored snapshot, so an
+-- item is always removed with exactly the values it was indexed with, however its ItemData
+-- changed since. SyncKind compares a fresh snapshot with the stored one to find the items
+-- whose indexed values changed.
+local SNAPSHOT_FIELDS = {
+  'kind', 'name', 'type', 'subtype', 'category', 'guid', 'expansion', 'equipmentlocation',
+  'binding', 'tooltip', 'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid',
+  'slotid', 'bindtype', 'reagent', 'isbound', 'bound', 'quest', 'activequest',
+}
+
+---@param into table[]|nil
+---@param list string[]|nil
+---@return table
+local function copyList(into, list)
+  into = into or {}
+  local n = 0
+  for _, v in ipairs(list or {}) do
+    n = n + 1
+    into[n] = v
+  end
+  for i = n + 1, #into do
+    into[i] = nil
+  end
+  return into
+end
+
+---@param s table The snapshot to fill (reused across items).
+---@param item ItemData
+---@return table
+local function fillSnapshot(s, item)
+  local info = item.itemInfo
+  s.kind = item.kind
+  s.name = info.itemName
+  s.type = info.itemType
+  s.subtype = info.itemSubType
+  s.category = info.category
+  s.guid = info.itemGUID
+  s.sets = copyList(s.sets, info.equipmentSets)
+  s.expansion = info.expacID ~= nil and const.BRIEF_EXPANSION_MAP[info.expacID] or nil
+  local equipLoc = info.itemEquipLoc
+  if equipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and _G[equipLoc] ~= nil and _G[equipLoc] ~= "" then
+    s.equipmentlocation = _G[equipLoc]
+  else
+    s.equipmentlocation = nil
+  end
+  local bindingInfo = item.bindingInfo
+  if bindingInfo and bindingInfo.binding ~= nil and const.BINDING_MAP[bindingInfo.binding] ~= "" then
+    s.binding = const.BINDING_MAP[bindingInfo.binding]
+  else
+    s.binding = nil
+  end
+  if info.tooltipText and info.tooltipText ~= "" then
+    s.tooltip = info.tooltipText
+  else
+    s.tooltip = nil
+  end
+  s.level = info.currentItemLevel
+  s.rarity = info.itemQuality
+  s.id = info.itemID
+  s.stackcount = info.currentItemCount
+  s.class = info.classID
+  s.subclass = info.subclassID
+  s.bagid = item.bagid
+  s.slotid = item.slotid
+  s.bindtype = info.bindType
+  s.bonusIDs = copyList(s.bonusIDs, item.itemLinkInfo and item.itemLinkInfo.bonusIDs)
+  s.reagent = info.isCraftingReagent
+  s.isbound = info.isBound
+  s.bound = bindingInfo and bindingInfo.bound
+  s.quest = item.questInfo and item.questInfo.isQuestItem
+  s.activequest = item.questInfo and item.questInfo.isActive
+  return s
+end
+
+---@param a table
+---@param b table
+---@return boolean
+local function sameList(a, b)
+  if #a ~= #b then return false end
+  for i = 1, #a do
+    if a[i] ~= b[i] then return false end
+  end
+  return true
+end
+
+---@param a table
+---@param b table
+---@return boolean
+local function sameSnapshot(a, b)
+  for _, field in ipairs(SNAPSHOT_FIELDS) do
+    if a[field] ~= b[field] then return false end
+  end
+  return sameList(a.sets, b.sets) and sameList(a.bonusIDs, b.bonusIDs)
+end
+
+-- Number and boolean snapshot fields share their name with the index they go into.
+local NUMBER_FIELDS = {
+  'level', 'rarity', 'id', 'stackcount', 'class', 'subclass', 'bagid', 'slotid', 'bindtype',
+}
+local BOOL_FIELDS = { 'reagent', 'isbound', 'bound', 'quest', 'activequest' }
+
+-- scratch is reused to snapshot each item SyncKind compares, so an unchanged item costs no
+-- allocation.
+local scratch = {}
 
 ---@param name string
 ---@param fullTextOnly? boolean
@@ -44,6 +151,7 @@ end
 
 function search:Init()
   self.indicies = {}
+  self.indexed = {}
   -- String indexes
   self:CreateIndex('name')
   self:CreateIndex('type')
@@ -105,6 +213,7 @@ function search:Wipe()
     index.bools = {}
     index.numbers = trees.NewIntervalTree()
   end
+  self.indexed = {}
 end
 
 -- IndexItems replaces the previous indexes and indexes a completely fresh collection of flat items
@@ -114,6 +223,36 @@ function search:IndexItems(currentItems)
   if not currentItems then return end
   for _, item in pairs(currentItems) do
     self:Add(item)
+  end
+end
+
+-- SyncKind makes the index hold exactly the given items of one bag kind, leaving the other
+-- kind's entries alone. Only the items whose indexed values changed since they were indexed
+-- are re-indexed; a slot that is gone or now empty is removed with the values it was indexed
+-- with. With rebuild set, every item of the kind is removed and re-added. The result is the
+-- index search:IndexItems would build over the same items (spec/search_spec.lua checks this
+-- over randomized sequences).
+---@param kind BagKind
+---@param items table<string, ItemData>|nil
+---@param rebuild? boolean
+function search:SyncKind(kind, items, rebuild)
+  for slotkey, snap in pairs(self.indexed) do
+    if snap.kind == kind then
+      local item = items and items[slotkey]
+      if rebuild or not item or item.isItemEmpty then
+        self:removeSnapshot(slotkey, snap)
+      end
+    end
+  end
+  for slotkey, item in pairs(items or {}) do
+    if not item.isItemEmpty then
+      local snap = self.indexed[slotkey]
+      if not snap then
+        self:Add(item)
+      elseif not sameSnapshot(fillSnapshot(scratch, item), snap) then
+        self:Add(item)
+      end
+    end
   end
 end
 
@@ -131,8 +270,11 @@ end
 ---@param value boolean
 ---@param slotkey string
 function search:removeBoolFromIndex(index, value, slotkey)
-  index.bools[value] = index.bools[value] or {}
-  index.bools[value][slotkey] = nil
+  local set = index.bools[value]
+  if set then
+    set[slotkey] = nil
+    if next(set) == nil then index.bools[value] = nil end
+  end
 end
 
 ---@private
@@ -181,141 +323,124 @@ function search:removeStringFromIndex(index, value, slotkey)
     local prefix = ""
     for i = 1, #value do
       prefix = prefix .. value:sub(i, i)
-      index.ngrams[prefix] = index.ngrams[prefix] or {}
-      index.ngrams[prefix][slotkey] = nil
+      local set = index.ngrams[prefix]
+      if set then
+        set[slotkey] = nil
+        if next(set) == nil then index.ngrams[prefix] = nil end
+      end
     end
   end
-  index.fullText[value] = index.fullText[value] or {}
-  index.fullText[value][slotkey] = nil
+  -- A value with no slots left is deleted, so the index stays equal to a clean rebuild and
+  -- full-text searches (which walk every value) do not slow down as items come and go.
+  local set = index.fullText[value]
+  if set then
+    set[slotkey] = nil
+    if next(set) == nil then index.fullText[value] = nil end
+  end
 end
 
+-- UpdateCategoryIndex moves an indexed item to its new category. The category it is
+-- removed from is the one it was indexed with, when it was indexed.
 ---@param item ItemData
 ---@param oldCategory string
 function search:UpdateCategoryIndex(item, oldCategory)
   if item == nil or item.isItemEmpty or item.itemInfo.category == nil then return end
+  local snap = self.indexed[item.slotkey]
+  if snap then
+    oldCategory = snap.category
+    snap.category = item.itemInfo.category
+  end
   search:removeStringFromIndex(self.indicies.category, oldCategory, item.slotkey)
   search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
 end
 
----@param item ItemData
-function search:Add(item)
-  if item == nil or item.isItemEmpty then return end
-  search:addStringToIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
-  search:addStringToIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
-  search:addStringToIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
-  search:addStringToIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
-  search:addStringToIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
-  --search:addStringToIndex(self.indicies.bagName, item.bagName, item.slotkey)
-
-  if item.itemInfo.equipmentSets ~= nil then
-    for _, set in ipairs(item.itemInfo.equipmentSets) do
-      search:addStringToIndex(self.indicies.equipmentset, set, item.slotkey)
+---@private
+---@param slotkey string
+---@param s table
+function search:indexSnapshot(slotkey, s)
+  local idx = self.indicies
+  self:addStringToIndex(idx.name, s.name, slotkey)
+  self:addStringToIndex(idx.type, s.type, slotkey)
+  self:addStringToIndex(idx.subtype, s.subtype, slotkey)
+  self:addStringToIndex(idx.category, s.category, slotkey)
+  self:addStringToIndex(idx.guid, s.guid, slotkey)
+  for _, set in ipairs(s.sets) do
+    self:addStringToIndex(idx.equipmentset, set, slotkey)
+  end
+  self:addStringToIndex(idx.expansion, s.expansion, slotkey)
+  self:addStringToIndex(idx.equipmentlocation, s.equipmentlocation, slotkey)
+  self:addStringToIndex(idx.binding, s.binding, slotkey)
+  self:addStringToIndex(idx.tooltip, s.tooltip, slotkey)
+  for _, field in ipairs(NUMBER_FIELDS) do
+    if s[field] ~= nil then
+      self:addNumberToIndex(idx[field], s[field], slotkey)
     end
   end
-
-  if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
-    search:addStringToIndex(self.indicies.expansion, const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID], item.slotkey)
+  for _, bonusID in ipairs(s.bonusIDs) do
+    local bonusNum = tonumber(bonusID)
+    if bonusNum then self:addNumberToIndex(idx.bonusid, bonusNum, slotkey) end
   end
-
-  if item.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
-  _G[item.itemInfo.itemEquipLoc] ~= nil and
-  _G[item.itemInfo.itemEquipLoc] ~= "" then
-    search:addStringToIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
-  end
-
-  if item.bindingInfo and item.bindingInfo.binding ~= nil and const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
-    search:addStringToIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
-  end
-
-  if item.itemInfo.tooltipText and item.itemInfo.tooltipText ~= "" then
-    search:addStringToIndex(self.indicies.tooltip, item.itemInfo.tooltipText, item.slotkey)
-  end
-
-  search:addNumberToIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
-  search:addNumberToIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
-  search:addNumberToIndex(self.indicies.id, item.itemInfo.itemID, item.slotkey)
-  search:addNumberToIndex(self.indicies.stackcount, item.itemInfo.currentItemCount, item.slotkey)
-  search:addNumberToIndex(self.indicies.class, item.itemInfo.classID, item.slotkey)
-  search:addNumberToIndex(self.indicies.subclass, item.itemInfo.subclassID, item.slotkey)
-  search:addNumberToIndex(self.indicies.bagid, item.bagid, item.slotkey)
-  search:addNumberToIndex(self.indicies.slotid, item.slotid, item.slotkey)
-  search:addNumberToIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
-  if item.itemLinkInfo and item.itemLinkInfo.bonusIDs then
-    for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
-      local bonusNum = tonumber(bonusID)
-      if bonusNum then search:addNumberToIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
+  for _, field in ipairs(BOOL_FIELDS) do
+    if s[field] ~= nil then
+      self:addBoolToIndex(idx[field], s[field], slotkey)
     end
-  end
-
-  search:addBoolToIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
-  search:addBoolToIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  if item.bindingInfo then
-    search:addBoolToIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
-  end
-  if item.questInfo then
-    search:addBoolToIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
-    search:addBoolToIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
   end
 end
 
+---@private
+---@param slotkey string
+---@param s table
+function search:removeSnapshot(slotkey, s)
+  local idx = self.indicies
+  self:removeStringFromIndex(idx.name, s.name, slotkey)
+  self:removeStringFromIndex(idx.type, s.type, slotkey)
+  self:removeStringFromIndex(idx.subtype, s.subtype, slotkey)
+  self:removeStringFromIndex(idx.category, s.category, slotkey)
+  self:removeStringFromIndex(idx.guid, s.guid, slotkey)
+  for _, set in ipairs(s.sets) do
+    self:removeStringFromIndex(idx.equipmentset, set, slotkey)
+  end
+  self:removeStringFromIndex(idx.expansion, s.expansion, slotkey)
+  self:removeStringFromIndex(idx.equipmentlocation, s.equipmentlocation, slotkey)
+  self:removeStringFromIndex(idx.binding, s.binding, slotkey)
+  self:removeStringFromIndex(idx.tooltip, s.tooltip, slotkey)
+  for _, field in ipairs(NUMBER_FIELDS) do
+    if s[field] ~= nil then
+      self:removeNumberFromIndex(idx[field], s[field], slotkey)
+    end
+  end
+  for _, bonusID in ipairs(s.bonusIDs) do
+    local bonusNum = tonumber(bonusID)
+    if bonusNum then self:removeNumberFromIndex(idx.bonusid, bonusNum, slotkey) end
+  end
+  for _, field in ipairs(BOOL_FIELDS) do
+    if s[field] ~= nil then
+      self:removeBoolFromIndex(idx[field], s[field], slotkey)
+    end
+  end
+  self.indexed[slotkey] = nil
+end
+
+-- Add indexes an item, replacing whatever its slot was indexed with.
+---@param item ItemData
+function search:Add(item)
+  if item == nil or item.isItemEmpty then return end
+  local old = self.indexed[item.slotkey]
+  if old then
+    self:removeSnapshot(item.slotkey, old)
+  end
+  local snap = fillSnapshot({}, item)
+  self:indexSnapshot(item.slotkey, snap)
+  self.indexed[item.slotkey] = snap
+end
+
+-- Remove removes an item's slot from the index, with the values it was indexed with.
 ---@param item ItemData
 function search:Remove(item)
-  if item == nil or item.isItemEmpty then return end
-  search:removeStringFromIndex(self.indicies.name, item.itemInfo.itemName, item.slotkey)
-  search:removeStringFromIndex(self.indicies.type, item.itemInfo.itemType, item.slotkey)
-  search:removeStringFromIndex(self.indicies.subtype, item.itemInfo.itemSubType, item.slotkey)
-  search:removeStringFromIndex(self.indicies.category, item.itemInfo.category, item.slotkey)
-  search:removeStringFromIndex(self.indicies.guid, item.itemInfo.itemGUID, item.slotkey)
-  --search:removeStringFromIndex(self.indicies.bagName, item.bagName, item.slotkey)
-
-  if item.itemInfo.equipmentSets ~= nil then
-    for _, set in ipairs(item.itemInfo.equipmentSets) do
-      search:removeStringFromIndex(self.indicies.equipmentset, set, item.slotkey)
-    end
-  end
-
-  if item.itemInfo.expacID ~= nil and const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID] ~= nil then
-    search:removeStringFromIndex(self.indicies.expansion, const.BRIEF_EXPANSION_MAP[item.itemInfo.expacID], item.slotkey)
-  end
-
-  if item.itemInfo.itemEquipLoc ~= "INVTYPE_NON_EQUIP_IGNORE" and
-  _G[item.itemInfo.itemEquipLoc] ~= nil and
-  _G[item.itemInfo.itemEquipLoc] ~= "" then
-    search:removeStringFromIndex(self.indicies.equipmentlocation, _G[item.itemInfo.itemEquipLoc], item.slotkey)
-  end
-
-  if item.bindingInfo and item.bindingInfo.binding ~= nil and const.BINDING_MAP[item.bindingInfo.binding] ~= "" then
-    search:removeStringFromIndex(self.indicies.binding, const.BINDING_MAP[item.bindingInfo.binding], item.slotkey)
-  end
-
-  if item.itemInfo.tooltipText and item.itemInfo.tooltipText ~= "" then
-    search:removeStringFromIndex(self.indicies.tooltip, item.itemInfo.tooltipText, item.slotkey)
-  end
-
-  search:removeNumberFromIndex(self.indicies.level, item.itemInfo.currentItemLevel, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.rarity, item.itemInfo.itemQuality, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.id, item.itemInfo.itemID, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.stackcount, item.itemInfo.currentItemCount, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.class, item.itemInfo.classID, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.subclass, item.itemInfo.subclassID, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.bagid, item.bagid, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.slotid, item.slotid, item.slotkey)
-  search:removeNumberFromIndex(self.indicies.bindtype, item.itemInfo.bindType, item.slotkey)
-  if item.itemLinkInfo and item.itemLinkInfo.bonusIDs then
-    for _, bonusID in ipairs(item.itemLinkInfo.bonusIDs) do
-      local bonusNum = tonumber(bonusID)
-      if bonusNum then search:removeNumberFromIndex(self.indicies.bonusid, bonusNum, item.slotkey) end
-    end
-  end
-
-  search:removeBoolFromIndex(self.indicies.reagent, item.itemInfo.isCraftingReagent, item.slotkey)
-  search:removeBoolFromIndex(self.indicies.isbound, item.itemInfo.isBound, item.slotkey)
-  if item.bindingInfo then
-    search:removeBoolFromIndex(self.indicies.bound, item.bindingInfo.bound, item.slotkey)
-  end
-  if item.questInfo then
-    search:removeBoolFromIndex(self.indicies.quest, item.questInfo.isQuestItem, item.slotkey)
-    search:removeBoolFromIndex(self.indicies.activequest, item.questInfo.isActive, item.slotkey)
+  if item == nil then return end
+  local snap = self.indexed[item.slotkey]
+  if snap then
+    self:removeSnapshot(item.slotkey, snap)
   end
 end
 

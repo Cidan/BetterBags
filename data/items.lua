@@ -86,6 +86,11 @@ local async = addon:GetModule("Async")
 ---@field stackedCount number
 ---@field itemLinkInfo ItemLinkInfo
 ---@field itemHash string
+---@field drawGeneration number The kind's draw generation when this sweep ran (see items:Init).
+---@field harvestIncomplete boolean True when the client had no item info at harvest; never reused.
+---@field rawItemName string|nil The client's ContainerItemInfo.itemName, before fallbacks (see ReuseHarvestedSlot).
+---@field rawIconFileID number|nil The client's ContainerItemInfo.iconFileID, before fallbacks.
+---@field rawQuality number|nil The client's ContainerItemInfo.quality, before fallbacks.
 ---@field bagName string
 ---@field forceClear boolean
 ---@field nextStack string
@@ -246,6 +251,14 @@ function items:Init()
   self._sortSweepPending = {
     [const.BAG_KIND.BACKPACK] = false,
     [const.BAG_KIND.BANK] = false,
+  }
+  -- Stamped on every item each sweep (Phase6_EnrichData) and bumped by every wipe sweep.
+  -- Item buttons skip a redraw whose inputs are unchanged; settings that change how a
+  -- button looks without changing its data all reach the buttons through a wipe
+  -- (bags/FullRefreshAll), so a new generation makes every button of the kind redraw.
+  self._drawGeneration = {
+    [const.BAG_KIND.BACKPACK] = 0,
+    [const.BAG_KIND.BANK] = 0,
   }
   self.equipmentCache = {}
   self.previousItemGUID = {}
@@ -634,8 +647,11 @@ function items:Phase1_DetermineBags(ctx, kind)
   return bagList
 end
 
-function items:Phase2_Harvest(kind, bagList)
-  return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK)
+---@param kind BagKind
+---@param bagList table<number, number>
+---@param previousItems? table<string, ItemData> The committed items, whose unchanged slots are kept.
+function items:Phase2_Harvest(kind, bagList, previousItems)
+  return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK, previousItems)
 end
 
 function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
@@ -693,6 +709,7 @@ function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
     currentItem.itemInfo.category = self:GetCategory(ctx, currentItem)
     currentItem.isUpgrade = self:ResolveUpgrade(currentItem)
     currentItem.itemContextMatchResult = self:ResolveItemContextMatchResult(currentItem)
+    currentItem.drawGeneration = self._drawGeneration[kind]
   end
 
   table.sort(emptySlotsSorted, function(a, b)
@@ -831,27 +848,16 @@ function items:Phase7_ApplyVirtualStacks(kind, itemData)
 end
 
 function items:Phase8_EnrichCategories(ctx, kind, itemData, emptySlotByBagAndSlot)
-  if search and search.IndexItems then
-    -- The search index is a single, global structure shared by the backpack and the
-    -- bank, and IndexItems is a clean sweep (search:Wipe then re-add). Indexing only
-    -- this kind's items would therefore evict the other bag from the index. A full
-    -- refresh processes the bank first and the backpack second (data/refresh.lua), so
-    -- the backpack would overwrite the bank's entries and the live bank search box
-    -- (frames/search.lua -> search:Search) would match nothing, filtering out every
-    -- bank item. Rebuild from the complete cross-kind model instead: this kind's fresh
-    -- items unioned with the other kind's last-committed items.
+  if search and search.SyncKind then
+    -- The search index is a single, global structure shared by the backpack and the bank
+    -- (the live bank search box queries it too). Bring this kind's entries in line with
+    -- this sweep's items -- re-indexing only the items whose indexed values changed, or
+    -- every item on a wipe -- and the other kind's with its last-committed items, so the
+    -- index always equals a clean rebuild over both bags.
     local otherKind = (kind == const.BAG_KIND.BANK) and const.BAG_KIND.BACKPACK or const.BAG_KIND.BANK
-    local combinedItems = {}
     local otherSlotInfo = self.slotInfo and self.slotInfo[otherKind]
-    if otherSlotInfo and otherSlotInfo.itemsBySlotKey then
-      for slotkey, item in pairs(otherSlotInfo.itemsBySlotKey) do
-        combinedItems[slotkey] = item
-      end
-    end
-    for slotkey, item in pairs(itemData) do
-      combinedItems[slotkey] = item
-    end
-    search:IndexItems(combinedItems)
+    search:SyncKind(kind, itemData, ctx:Get("wipe") == true)
+    search:SyncKind(otherKind, otherSlotInfo and otherSlotInfo.itemsBySlotKey or {})
   end
 
   self:RefreshSearchCache(kind, itemData)
@@ -1376,7 +1382,13 @@ function items:RunRefresh(ectx, kind)
   equipmentSets:Update()
 
   local bagList = self:Phase1_DetermineBags(ectx, kind)
-  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList)
+  -- A wipe re-reads every slot; any other sweep keeps the committed item of each slot
+  -- whose contents have not changed (ReuseHarvestedSlot).
+  local committedItems
+  if ectx:Get("wipe") ~= true and self.slotInfo and self.slotInfo[kind] then
+    committedItems = self.slotInfo[kind].itemsBySlotKey
+  end
+  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList, committedItems)
 
   -- The harvest captured this frame's client state. Everything below runs on the
   -- next frame against the state committed by then.
@@ -1391,6 +1403,9 @@ function items:RunRefresh(ectx, kind)
 
   local targetedBags = ectx:Get("targetedBags")
   local isWipe = ectx:Get("wipe") == true
+  if isWipe then
+    self._drawGeneration[kind] = self._drawGeneration[kind] + 1
+  end
 
   if targetedBags and not isWipe then
     local harvestedData = itemData
@@ -1701,9 +1716,10 @@ end
 ---@param kind BagKind
 ---@param bagList table<number, number> Bags to sweep (e.g., const.BACKPACK_BAGS)
 ---@param includeEquipment boolean Whether to include equipped items
+---@param previousItems? table<string, ItemData> Committed items; a slot whose contents are unchanged keeps its item.
 ---@return table<string, ItemData> itemData A flat table of physical item datas indexed by slotKey
 ---@return table<number, ItemData> equipmentData A flat table of equipped item datas indexed by inventory slot ID
-function items:Harvest(kind, bagList, includeEquipment)
+function items:Harvest(kind, bagList, includeEquipment, previousItems)
   local itemData = {}
   local equipmentData = {}
 
@@ -1712,11 +1728,18 @@ function items:Harvest(kind, bagList, includeEquipment)
     local size = C_Container.GetContainerNumSlots(bagid)
     if size and size > 0 then
       for slotid = 1, size do
-        local data = {}
-        ---@cast data +ItemData
-        data.bagid, data.slotid = bagid, slotid
-        self:AttachItemInfo(data, kind)
-        itemData[self:GetSlotKey(data)] = data
+        local slotkey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
+        local data, containerInfo
+        if previousItems then
+          data, containerInfo = self:ReuseHarvestedSlot(kind, previousItems[slotkey], bagid, slotid)
+        end
+        if not data then
+          data = {}
+          ---@cast data +ItemData
+          data.bagid, data.slotid = bagid, slotid
+          self:AttachItemInfo(data, kind, containerInfo)
+        end
+        itemData[slotkey] = data
       end
     end
   end
@@ -1754,6 +1777,100 @@ SlashCmdList["BETTERBAGS_DEBUGITEMS"] = function(msg)
   else
     print("BetterBags Debug Commands: use '/bb debugitems' to dump harvested physical items.")
   end
+end
+
+-- clientNewItemFlag is an item's new-item flag (the glow): the client's own flag alone. The
+-- Recent Items timer (IsNewItem with a GUID) decides the category, not the glow, so an item
+-- the player hovered (which drops the client flag) stops glowing but stays in Recent Items.
+---@param bagid number
+---@param slotid number
+---@return boolean
+local function clientNewItemFlag(bagid, slotid)
+  return _G.C_NewItems ~= nil and _G.C_NewItems.IsNewItem ~= nil
+    and _G.C_NewItems.IsNewItem(bagid, slotid) and true or false
+end
+
+-- seedNewItemTimer starts the Recent Items timer of a new item the first time a sweep sees
+-- it, so it stays recent after the client drops its own new-item flag.
+---@param self Items
+---@param kind BagKind
+---@param data ItemData
+local function seedNewItemTimer(self, kind, data)
+  if data.itemInfo.isNewItem and self._newItemTimers and self._newItemTimers[kind] and self._newItemTimers[kind][data.itemInfo.itemGUID] == nil then
+    self._newItemTimers[kind][data.itemInfo.itemGUID] = time()
+  end
+end
+
+-- ReuseHarvestedSlot returns a slot's committed item when the slot still holds the same
+-- item in the same state, so a sweep only re-reads the slots that changed. The item is the
+-- same when the client's container info (item, link, count, name, icon, quality, lock,
+-- bound, readable, loot, filtered, no-value) and the item's GUID all match what the item
+-- was read from. The fields that change without the slot changing are refreshed on the kept
+-- item: the new-item flag, gear sets, quest state and tooltip text. Everything the later
+-- phases derive (category, virtual stack, search match, upgrade, context match) is
+-- recomputed by them every sweep. Nothing else on the kept item is written here: it is the
+-- committed item until this sweep commits a frame later, and the bag may draw from it in
+-- between (a virtual stack root must still show its total).
+--
+-- A slot is read again when it was empty, when it was read while the client had no item
+-- info for it (cold cache at login, which AttachItemInfo heals on a later read), or when
+-- the check fails. In the last case the container info it read is returned so the harvest
+-- does not read it twice.
+--
+-- Like an item in a bag the sweep did not visit, a kept item does not refresh state the
+-- client changes without changing the slot: a refundable purchase's binding expiring, or
+-- an appearance being collected. A wipe sweep re-reads everything.
+---@param kind BagKind
+---@param previous ItemData|nil
+---@param bagid number
+---@param slotid number
+---@return ItemData|nil kept
+---@return ContainerItemInfo|nil containerInfo
+function items:ReuseHarvestedSlot(kind, previous, bagid, slotid)
+  if not previous or previous.isItemEmpty or previous.harvestIncomplete or previous.kind ~= kind then
+    return nil, nil
+  end
+  local info = C_Container.GetContainerItemInfo(bagid, slotid)
+  if not info then
+    return nil, nil
+  end
+  local old = previous.containerInfo
+  if info.itemID ~= old.itemID
+    or info.hyperlink ~= old.hyperlink
+    or info.stackCount ~= old.stackCount
+    or info.itemName ~= previous.rawItemName
+    or info.iconFileID ~= previous.rawIconFileID
+    or info.quality ~= previous.rawQuality
+    or info.isLocked ~= old.isLocked
+    or info.isBound ~= old.isBound
+    or info.isReadable ~= old.isReadable
+    or info.hasLoot ~= old.hasLoot
+    or info.isFiltered ~= old.isFiltered
+    or info.hasNoValue ~= old.hasNoValue then
+    return nil, info
+  end
+  local itemLoader = addon:GetModule("ItemLoader", true)
+  local itemMixin = itemLoader and itemLoader:GetItemMixinFromSlotKey(previous.slotkey) or Item:CreateFromBagAndSlot(bagid, slotid) --[[@as ItemMixin]]
+  local itemGUID = C_Item.GetItemGUID(itemMixin:GetItemLocation()) or ""
+  local itemInfo = previous.itemInfo
+  if itemGUID ~= itemInfo.itemGUID then
+    return nil, info
+  end
+
+  previous.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+  if not previous.questInfo then
+    previous.questInfo = {
+      isQuestItem = false,
+      isActive = false,
+    }
+  end
+  ---@class TooltipScanner: AceModule
+  local tooltipScanner = addon:GetModule('TooltipScanner')
+  itemInfo.tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID) or ""
+  itemInfo.equipmentSets = equipmentSets:GetItemSets(bagid, slotid)
+  itemInfo.isNewItem = clientNewItemFlag(bagid, slotid)
+  seedNewItemTimer(self, kind, previous)
+  return previous, info
 end
 
 -- REUSED DETAILED METADATA UTILITIES FROM LEGACY IMPLEMENTATION
@@ -1931,8 +2048,9 @@ end
 
 ---@param data ItemData
 ---@param kind BagKind
+---@param containerInfo? ContainerItemInfo The slot's container info, when the caller already read it.
 ---@return ItemData
-function items:AttachItemInfo(data, kind)
+function items:AttachItemInfo(data, kind, containerInfo)
   local bagid, slotid = data.bagid, data.slotid
   local slotkey = self:GetSlotKeyFromBagAndSlot(bagid, slotid)
   local itemLoader = addon:GetModule("ItemLoader", true)
@@ -1952,6 +2070,7 @@ function items:AttachItemInfo(data, kind)
   data.isItemEmpty = false
   local itemName, _, _, itemLevel, itemMinLevel, itemType, itemSubType, itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType, expacID, setID, isCraftingReagent =
     C_Item.GetItemInfo(itemID)
+  local harvestIncomplete = itemName == nil
 
   itemName = itemName or ""
   itemLevel = itemLevel or 0
@@ -1995,8 +2114,9 @@ function items:AttachItemInfo(data, kind)
   baseIlvl = baseIlvl or itemLevel or 0
 
   local invType = itemMixin:GetInventoryType()
-  data.containerInfo = C_Container.GetContainerItemInfo(bagid, slotid)
+  data.containerInfo = containerInfo or C_Container.GetContainerItemInfo(bagid, slotid)
   if not data.containerInfo then
+    harvestIncomplete = true
     data.containerInfo = {
       iconFileID = itemTexture or 134400,
       stackCount = 1,
@@ -2011,6 +2131,9 @@ function items:AttachItemInfo(data, kind)
       isBound = false,
     }
   end
+  data.rawItemName = data.containerInfo.itemName
+  data.rawIconFileID = data.containerInfo.iconFileID
+  data.rawQuality = data.containerInfo.quality
   data.containerInfo.itemName = data.containerInfo.itemName or itemName or ""
   data.containerInfo.iconFileID = data.containerInfo.iconFileID or itemTexture or 134400
   data.containerInfo.quality = data.containerInfo.quality or itemQuality
@@ -2079,7 +2202,7 @@ function items:AttachItemInfo(data, kind)
     itemIcon = data.containerInfo.iconFileID or itemTexture or 134400,
     isBound = data.containerInfo.isBound or false,
     isLocked = data.containerInfo.isLocked or false,
-    isNewItem = self:IsNewItem(data),
+    isNewItem = clientNewItemFlag(bagid, slotid),
     isBattlePayItem = (_G.C_Container and _G.C_Container.IsBattlePayItem and _G.C_Container.IsBattlePayItem(bagid, slotid)) and true or false,
     currentItemCount = data.containerInfo.stackCount or 1,
     category = "",
@@ -2101,15 +2224,14 @@ function items:AttachItemInfo(data, kind)
     end
   end
 
-  if data.itemInfo.isNewItem and self._newItemTimers and self._newItemTimers[kind] and self._newItemTimers[kind][data.itemInfo.itemGUID] == nil then
-    self._newItemTimers[kind][data.itemInfo.itemGUID] = time()
-  end
+  seedNewItemTimer(self, kind, data)
 
   data.itemLinkInfo = self:ParseItemLink(itemLink)
   data.itemHash = self:GenerateItemHash(data)
   data.forceClear = false
   data.stacks = 0
   data.stackedCount = data.itemInfo.currentItemCount
+  data.harvestIncomplete = harvestIncomplete
   return data
 end
 
