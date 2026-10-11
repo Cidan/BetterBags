@@ -803,10 +803,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       provider = name
       items:RegisterUpgradeProvider(name, function(data)
         table.insert(asked, data.slotkey)
-        local v = verdicts[data.itemInfo.itemID]
-        if v == "unknown" then return nil end
-        if v == "transient" then return false, false end
-        return v or false
+        return verdicts[data.itemInfo.itemID] or false
       end, { cacheable = cacheable })
     end
 
@@ -867,7 +864,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
 
     it("never returns one provider's verdict for another, even at the same generation", function()
-      items._upgradeGenerations["Other"] = items._upgradeGenerations["Test"]
       items:RegisterUpgradeProvider("Other", function(data)
         table.insert(asked, data.slotkey)
         return false
@@ -876,21 +872,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local slotInfo = refreshBackpack()
       assert.are.same({ "0_1", "0_2" }, askedKeys())
       assert.is_false(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
-    end)
-
-    -- A provider can answer but mark the answer as not to be kept (Pawn answering false
-    -- because it had no data for the gear it compares with). It is shown and asked again on
-    -- every sweep, with no extra retry refresh.
-    it("shows but never keeps an answer its provider marked as not to be kept", function()
-      verdicts[102] = "transient"
-      mockContainer[0][2].count = 3
-      timers = {}
-      local slotInfo = refreshBackpack({ bags = { [0] = true } })
-      assert.are.same({ "0_2" }, askedKeys())
-      assert.is_false(slotInfo.itemsBySlotKey["0_2"].isUpgrade)
-      assert.equal(0, #timers, "no retry")
-      refreshBackpack()
-      assert.are.same({ "0_2" }, askedKeys(), "asked again")
     end)
 
     it("asks again after a wipe sweep", function()
@@ -982,11 +963,9 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     -- often, so they invalidate only the built-in provider's verdicts and request no refresh:
     -- the next refresh recomputes them.
     for _, name in ipairs({ "UPDATE_FACTION", "SPELLS_CHANGED" }) do
-      it("drops built-in verdicts, and only those, after " .. name, function()
+      it("drops kept verdicts without requesting a refresh after " .. name, function()
         fire(name)
         assert.equal(0, #timers, "no refresh is requested")
-        refreshBackpack()
-        assert.are.same({}, askedKeys(), "another provider's verdicts are kept")
 
         local builtin = items.upgradeProviders["BetterBags"]
         local builtinAsked = 0
@@ -1004,172 +983,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.equal(2, builtinAsked, "asked again")
       end)
     end
-
-    describe("a verdict the provider is not sure about yet", function()
-      before_each(function()
-        verdicts[102] = "unknown"
-        mockContainer[0][2].count = 3
-        refreshBackpack({ bags = { [0] = true } })
-        askedKeys()
-      end)
-
-      it("is not kept: the item is asked again on the next sweep", function()
-        refreshBackpack()
-        assert.are.same({ "0_2" }, askedKeys())
-      end)
-
-      it("schedules one retry refresh of the bag a quarter second later", function()
-        assert.equal(1, #timers)
-        assert.equal(0.25, timers[1].delay)
-        sent = {}
-        runTimers()
-        assert.are.same({ "bags/RefreshBackpack" }, sent)
-      end)
-
-      it("shows no arrow until it is known, never the previous gear's verdict", function()
-        verdicts[102] = true
-        mockContainer[0][2].count = 2
-        local slotInfo = refreshBackpack({ bags = { [0] = true } })
-        assert.is_true(slotInfo.itemsBySlotKey["0_2"].isUpgrade)
-        verdicts[102] = "unknown"
-        fire("SKILL_LINES_CHANGED")
-        slotInfo = refreshBackpack()
-        assert.is_false(slotInfo.itemsBySlotKey["0_2"].isUpgrade)
-      end)
-
-      it("stops retrying after the provider stalls, and still never keeps the item", function()
-        local rounds = 0
-        while #timers > 0 and rounds < 50 do
-          rounds = rounds + 1
-          runTimers()
-          refreshBackpack()
-        end
-        assert.equal(0, #timers, "retries stop")
-        assert.is_true(rounds >= 8, "after several rounds without progress, not at once")
-        assert.is_true(rounds < 50, "and not never")
-        askedKeys()
-        refreshBackpack()
-        assert.are.same({ "0_2" }, askedKeys(), "still not kept: asked again on every sweep")
-        assert.equal(0, #timers, "a given-up bag is not retried by later sweeps")
-      end)
-
-      it("keeps retrying while each round answers more items (Pawn's time budget)", function()
-        -- Ten unknown items; the provider answers one more per round, as a time-budgeted
-        -- provider does. Retries must continue until every item is answered.
-        mockContainer[1] = {}
-        for i = 1, 10 do
-          mockContainer[1][i] = { itemID = 200 + i, guid = "b" .. i, count = 1 }
-          verdicts[200 + i] = "unknown"
-        end
-        verdicts[102] = false
-        refreshBackpack()
-        local round = 0
-        while #timers > 0 and round < 30 do
-          round = round + 1
-          verdicts[200 + round] = true
-          runTimers()
-          refreshBackpack()
-        end
-        local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
-        for i = 1, 10 do
-          assert.is_true(slotInfo.itemsBySlotKey["1_" .. i].isUpgrade, "item " .. i)
-        end
-        assert.equal(0, #timers)
-      end)
-
-      it("retries again for new unanswered items after an earlier batch was given up", function()
-        local rounds = 0
-        while #timers > 0 and rounds < 50 do
-          rounds = rounds + 1
-          runTimers()
-          refreshBackpack()
-        end
-        assert.equal(0, #timers, "given up on 0_2")
-        mockContainer[1] = { { itemID = 401, guid = "new1", count = 1 } }
-        verdicts[401] = "unknown"
-        refreshBackpack()
-        assert.equal(1, #timers, "new unanswered items are retried")
-        verdicts[401] = true
-        runTimers()
-        local slotInfo = refreshBackpack()
-        assert.is_true(slotInfo.itemsBySlotKey["1_1"].isUpgrade)
-      end)
-
-      -- An invalidation is not new work for an item that stays unanswered: restarting its
-      -- retries on every invalidation (Pawn invalidates on every item pickup; reputation and
-      -- spell events arrive constantly) would re-sweep the bag forever for an item that is
-      -- never answered.
-      it("does not restart retries for the same unanswered items after an invalidation", function()
-        local rounds = 0
-        while #timers > 0 and rounds < 50 do
-          rounds = rounds + 1
-          runTimers()
-          refreshBackpack()
-        end
-        assert.equal(0, #timers)
-        for _ = 1, 20 do
-          fire("SKILL_LINES_CHANGED")
-          fire("UPDATE_FACTION")
-          runTimers()
-          refreshBackpack()
-          assert.equal(0, #timers)
-        end
-      end)
-
-      it("schedules one retry when two sweeps run within one retry window", function()
-        runTimers()
-        refreshBackpack()
-        refreshBackpack()
-        assert.equal(1, #timers)
-      end)
-
-      it("starts counting stalls afresh after a round with nothing unanswered", function()
-        for _ = 1, 5 do
-          runTimers()
-          refreshBackpack()
-        end
-        verdicts[102] = false
-        runTimers()
-        refreshBackpack()
-        assert.equal(0, #timers, "nothing unanswered")
-        verdicts[102] = "unknown"
-        mockContainer[0][2].count = 9
-        refreshBackpack({ bags = { [0] = true } })
-        local rounds = 0
-        while #timers > 0 and rounds < 50 do
-          rounds = rounds + 1
-          runTimers()
-          refreshBackpack()
-        end
-        assert.is_true(rounds >= 8, "a full set of retries, not the 3 left over")
-      end)
-
-      it("counts an answered item as progress even when another one became unanswered", function()
-        -- 0_2 is unanswered. Each round answers the previous unknown and a new one appears.
-        mockContainer[1] = {}
-        for round = 1, 12 do
-          mockContainer[1][round] = { itemID = 500 + round, guid = "r" .. round, count = 1 }
-          verdicts[500 + round] = "unknown"
-          if round > 1 then verdicts[500 + round - 1] = true end
-          verdicts[102] = round == 1 and "unknown" or false
-          runTimers()
-          refreshBackpack()
-          assert.equal(1, #timers, "round " .. round)
-        end
-      end)
-
-      it("retries a bank item with a bank refresh, only while the bank is open", function()
-        timers = {}
-        items:ScheduleUpgradeRetry(const.BAG_KIND.BANK)
-        sent = {}
-        runTimers()
-        assert.are.same({}, sent)
-        addon.atBank = true
-        items:ScheduleUpgradeRetry(const.BAG_KIND.BANK)
-        runTimers()
-        assert.are.same({ "bags/RefreshBank" }, sent)
-      end)
-    end)
 
     it("does not lose a bank refresh requested after a backpack-only one was scheduled", function()
       fire("PLAYER_LEVEL_UP", 70)
@@ -1246,11 +1059,11 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end)
       refreshBackpack({ wipe = true })
       runTimers()
-      local generation = items._upgradeGenerations["Test"]
+      local generation = items._upgradeGeneration
       cold = false
       sent = {}
       refreshBackpack()
-      assert.is_true(items._upgradeGenerations["Test"] > generation, "a new generation")
+      assert.is_true(items._upgradeGeneration > generation, "a new generation")
       runTimers()
       local bank = false
       for _, event in ipairs(sent) do
@@ -1285,7 +1098,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       links[1] = links[1]:gsub("501:0", "501:6")
       fire("PLAYER_EQUIPMENT_CHANGED", 5, true)
       runTimers()
-      local generation = items._upgradeGenerations["BetterBags"]
+      local generation = items._upgradeGeneration
       local getEquipmentInfo = items.GetEquipmentInfo
       override(items, "GetEquipmentInfo", function(self, mixin)
         if mixin:GetItemLocation():GetEquipmentSlot() == 5 then error("simulated read failure") end
@@ -1295,7 +1108,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       items.GetEquipmentInfo = getEquipmentInfo
 
       refreshBackpack()
-      assert.is_true(items._upgradeGenerations["BetterBags"] > generation, "the head change is still seen")
+      assert.is_true(items._upgradeGeneration > generation, "the head change is still seen")
     end)
 
     -- The equip location comes from GetItemInfoInstant (all seven values, never a server
@@ -1328,23 +1141,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("INVTYPE_2HWEAPON", items:GetItemDataFromInventorySlot(16).itemInfo.itemEquipLoc)
     end)
 
-    it("does not leave a stale unanswered count after a sweep failed while resolving upgrades", function()
-      verdicts[102] = "unknown"
-      local resolve = items.ResolveUpgrade
-      override(items, "ResolveUpgrade", function(self, data)
-        local v = resolve(self, data)
-        if data.slotkey == "0_2" then error("simulated failure") end
-        return v
-      end)
-      mockContainer[0][2].count = 7
-      assert.has_error(function() refreshBackpack({ bags = { [0] = true } }) end)
-      items.ResolveUpgrade = resolve
-      verdicts[102] = false
-      timers = {}
-      refreshBackpack()
-      assert.equal(0, #timers, "nothing is unanswered, so nothing is retried")
-    end)
-
     it("keeps no verdict while equipped gear reads cold, and asks again once it reads warm", function()
       local cold = true
       local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
@@ -1372,7 +1168,6 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       runTimers()
       refreshBackpack()
       assert.are.same({ "0_1", "0_2" }, askedKeys(), "not kept while the gear is cold")
-      assert.equal(1, #timers, "retried")
 
       cold = false
       runTimers()

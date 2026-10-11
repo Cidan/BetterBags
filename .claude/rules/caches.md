@@ -38,47 +38,38 @@ gear sets, quest state, tooltip text. Known staleness, the same as an unvisited 
 purchase's binding expiring, an appearance being collected (until the slot changes or a wipe).
 
 ### 2. Upgrade verdicts (`items:ResolveUpgrade`, data-loader.md §15)
-Kept value: `data.upgradeVerdict`, only for providers registered `{ cacheable = true }`: the
-built-in `BetterBags` provider, and `Pawn` when Pawn has `PawnRegisterThirdPartyBag` and runs on
-Mainline (`VgerCore.IsMainline`; elsewhere Pawn re-checks its own item data on every call, which a
-kept verdict would bypass) with every Pawn function its readiness check calls present. A provider can return a second value `false` to mark one answer as not
-to be kept; it is shown and asked again on the next sweep. Reused only
-while `data.upgradeProvider` is the active provider and `data.upgradeGeneration` equals that
-provider's generation (`items._upgradeGenerations[provider]`). `InvalidateUpgrades(provider,
-refresh)` bumps one provider's generation (or every provider's) and, with `refresh`, refreshes the
-backpack and the open bank on the next frame (`RequestUpgradeRefresh` coalesces a frame's requests
-into one refresh per kind and never drops a kind requested later in the frame).
+Kept value: `data.upgradeVerdict`, only for providers registered `{ cacheable = true }`, which is
+only the built-in `BetterBags` provider. Pawn and SimpleItemLevel are asked on every sweep, as
+before. Reused only while `data.upgradeProvider` is the active provider and
+`data.upgradeGeneration` equals `items._upgradeGeneration`. `InvalidateUpgrades(refresh)` bumps the
+generation and, with `refresh`, refreshes the backpack and the open bank on the next frame
+(`RequestUpgradeRefresh` coalesces a frame's requests into one refresh per kind and never drops a
+kind requested later in the frame).
 | Input | Invalidation |
 |---|---|
 | The bag item | A changed slot is a new ItemData (cache 1), which has no verdict |
 | Which provider is active | Provider name in the key; the dropdown also sends `bags/FullRefreshAll` |
-| Equipped gear (built-in compares item level and equip location; Pawn checks handedness and its best items) | `PLAYER_EQUIPMENT_CHANGED`; the gear harvest invalidates every provider and refreshes when a slot's link, item level or equip location changed, or when the gear stopped reading cold (cache 3) |
+| Equipped gear (item level and equip location in the item's slots) | `PLAYER_EQUIPMENT_CHANGED`; the gear harvest invalidates and refreshes when a slot's link, item level or equip location changed, or when the gear stopped reading cold (cache 3) |
 | The gear a verdict compares with | `HarvestEquipment` publishes `equipmentCache` as soon as it reads the gear, before anything else in the sweep, so a sweep that fails later cannot leave the bank judged against old gear under a new generation |
-| Equipped gear read cold | No verdict is kept while any equipped slot reads cold (`_equipmentIncomplete`); the backpack is retried until it reads warm, which invalidates and refreshes |
-| Player level and effective level (Pawn's minimum-level check, usability, scaling) | `PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED` (level sync and other effective-level changes), `PLAYER_AVG_ITEM_LEVEL_UPDATE`; each also re-reads all gear |
+| Equipped gear read cold | No verdict is kept while any equipped slot reads cold (`_equipmentIncomplete`); once it reads warm the harvest invalidates and refreshes |
+| Player level and effective level (usability, scaling) | `PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED` (level sync and other effective-level changes), `PLAYER_AVG_ITEM_LEVEL_UPDATE`; each also re-reads all gear |
 | Proficiencies and skills (`C_PlayerInfo.CanUseItem`) | `SKILL_LINES_CHANGED`, `LEARNED_SPELL_IN_SKILL_LINE` |
-| Reputation and spells (`C_PlayerInfo.CanUseItem`; the events Blizzard's usability refresh in `Blizzard_Wardrobe.lua` listens for) | `UPDATE_FACTION`, `SPELLS_CHANGED`: they fire often, so they drop only the built-in provider's verdicts and request no refresh; the next refresh recomputes them, as before caching |
+| Reputation and spells (`C_PlayerInfo.CanUseItem`; the events Blizzard's usability refresh in `Blizzard_Wardrobe.lua` listens for) | `UPDATE_FACTION`, `SPELLS_CHANGED`: they fire often, so they invalidate without a refresh; the next refresh recomputes the verdicts, as before caching |
 | Specialization | `PLAYER_SPECIALIZATION_CHANGED` for `"player"` |
-| Pawn's own state (scales and values, visibility, options, best items and item levels, artifacts, plugin scales, initialization) | Pawn's `RefreshAll` (`PawnRegisterThirdPartyBag`), **plus** a hook on each Pawn function that changes that state (`PAWN_STATE_FUNCTIONS` in `integrations/pawn.lua`, from Pawn 2.13.16: Pawn does not call `RefreshAll` after adding, deleting or duplicating a scale, plugin scales, or the item-level part of losing an item), **plus** Pawn's window `OnHide` for options its window sets directly. Each drops Pawn's verdicts whether or not Pawn is active, and refreshes while it is |
-| Pawn answering without the data it needs | Pawn answers a definite `false`, not "not sure", when it has no data for the item or for an equipped item it compares with ("we can't evaluate upgrades yet", `Pawn.lua`), and sends no signal when the data arrives. The Pawn provider checks Pawn's data for the item (unless it can never have stats; a relic's answer is never kept while Pawn shows relic upgrades, since Pawn's relic check answers false while relic data loads), for the equipped items in the item's slots, and for weapons for both weapon slots and the equipped weapon link whose handedness Pawn reads (the main hand's, or the off hand's when the main hand is empty); if any is missing the answer is not kept. Checking both weapon slots is more than Pawn needs (its second comparison slot exists only for rings, trinkets and one-hand weapons) and only ever keeps fewer answers |
-| A link Pawn can never arrow (caged battle pet, keystone: not an `item:` link) | Pawn answers nil for it forever (`GetItemInfo` has no item); the Pawn provider answers a definite `false` without asking Pawn |
-| Settings | Every wipe invalidates every provider |
+| Settings | Every wipe invalidates |
 | Cold item | Verdicts of `harvestIncomplete` items are not kept |
-| Provider not sure yet (`nil`: item data still loading) | Not kept, and the item shows **no** arrow, exactly as before caching. After the sweep, `FinishUpgradeResolution` refreshes the bag 0.25 s later while items are unanswered. A round makes progress when an item unanswered last round was answered or is gone, or when an item is unanswered that was not last round (new loot, a moved item, a re-asked item that stopped answering); a round with nothing unanswered clears the count. After 8 rounds in a row without progress the bag is given up until progress. An invalidation is deliberately not progress: invalidations are frequent (Pawn sends one on every item pickup; reputation and spell events arrive constantly), so restarting retries on them would re-sweep a bag forever for an item that is never answered. Given-up items are still never kept: every later sweep asks again, as before caching |
-Pawn is asked with `PawnShouldItemLinkHaveUpgradeArrowUnbudgeted`, the check that always answers,
-not its public time-budgeted `PawnShouldItemLinkHaveUpgradeArrow`. The budgeted check answers nil
-once Pawn's quarter-second budget is spent, which would force either missing arrows (a flicker
-after every Pawn `RefreshAll`, which Pawn sends on every item pickup, new loot slot and gear change)
-or arrows from before the inputs changed while waiting, and its shared budget starved one bag's
-retries with the other's. With verdicts kept, Pawn is only asked when an input changed, so the
-always-answering check costs at most what every refresh cost before caching.
 Optional events are registered only when `C_EventUtils.IsEventValid` says the client has them
 (Blizzard's own pattern); every event above exists on retail, WoW: Forever and every Classic
 branch. `RegisterCacheEvents` runs once, from `items:OnEnable`.
 
-Pawn skips its own inventory check in combat (`PawnOnInventoryChanged`); our
-`PLAYER_EQUIPMENT_CHANGED` still re-asks Pawn, and when Pawn later updates its state it calls
-`RefreshAll`, which invalidates again. That is the same answer an uncached ask would get.
+**Pawn is not cached, deliberately.** An attempt to cache Pawn's verdicts (registering as a Pawn
+third-party bag for `RefreshAll`, hooking every Pawn function that changes its state, and checking
+Pawn had the data each answer needed) made sorting visibly hitch: a sort moves every item, so
+every verdict was re-asked anyway, the readiness checks roughly doubled the cost of each ask, and
+Pawn's own invalidations during the sort (it signals on every item pickup) added a second full
+sweep. It was reverted. Pawn is called through `PawnShouldItemLinkHaveUpgradeArrowUnbudgeted`,
+uncached, as before; the public time-budgeted check answers nil once its budget is spent, which
+is why the internal one is used.
 
 ### 3. Equipped gear (`items:HarvestEquipment`)
 Kept value: each equipment slot's ItemData (`items._equipped[slot]`), read on backpack sweeps.
@@ -129,11 +120,10 @@ tooltip instance (bounded re-scans). Kept harvest slots re-fetch it, so a re-sca
 
 ## Coverage
 `spec/refresh_pipeline_spec.lua` ("per-slot harvest cache", "equipped gear cache", "upgrade
-verdict cache" — one test per invalidating event, provider scoping, retries with and without
-progress, coalescing, cold gear, a failed sweep, same-sweep gear — "draw generation", "incremental
+verdict cache" — one test per invalidating event, provider scoping, coalescing, cold gear and its
+warming, failed sweeps and failed gear reads, same-sweep gear — "draw generation", "incremental
 search index", "looks up a bag's name once per sweep", "looks a bag's name up again on the next
-sweep"), `spec/items_spec.lua` ("third-party bag contract": one test per hooked Pawn function, the
-window hook, `RefreshAll` while inactive), `spec/frames/item_spec.lua`
+sweep"), `spec/frames/item_spec.lua`
 ("cooldown refresh", "skipping a redraw whose inputs are unchanged"),
 `spec/frames/bag_draw_ownership_spec.lua` ("cooldown refresh (OnCooldown)"),
 `spec/search_spec.lua` ("Search incremental indexing (SyncKind)").

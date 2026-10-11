@@ -97,13 +97,11 @@ local async = addon:GetModule("Async")
 
 local items = addon:NewModule("Items")
 
--- A provider returns true or false, or nil when it cannot answer yet (the item is asked
--- again shortly). A second return of false marks an answer as not to be kept. A cacheable
--- provider's verdicts are kept on each item until one of their inputs changes (see
--- ResolveUpgrade); register a provider as cacheable only when every input of its verdict is
--- covered by an invalidation in RegisterCacheEvents or by a signal from the provider itself.
+-- A cacheable provider's verdicts are kept on each item until one of their inputs changes
+-- (see ResolveUpgrade); register a provider as cacheable only when every input of its
+-- verdict is covered by an invalidation in RegisterCacheEvents.
 ---@param name string
----@param func fun(data: ItemData): boolean|nil, boolean?
+---@param func fun(data: ItemData): boolean
 ---@param options? {cacheable: boolean}
 function items:RegisterUpgradeProvider(name, func, options)
   self.upgradeProviders = self.upgradeProviders or {}
@@ -171,22 +169,13 @@ function items:IsNonPreferredArmorType(data)
   return not _G.IsItemPreferredArmorType(loc)
 end
 
--- Retries for items whose upgrade provider could not answer yet (their data still loading):
--- a bag is refreshed again after UPGRADE_RETRY_DELAY seconds, and given up after
--- MAX_STALLED_UPGRADE_RETRIES rounds in a row without progress (FinishUpgradeResolution).
-local UPGRADE_RETRY_DELAY = 0.25
-local MAX_STALLED_UPGRADE_RETRIES = 8
-
 -- ResolveUpgrade returns whether an item shows the upgrade arrow. A cacheable provider's
--- verdict is kept on the item (upgradeVerdict) with the provider and that provider's
--- upgrade generation, and reused while both still match. The item itself never changes
--- under a kept verdict: a slot whose contents change is read into a new ItemData
--- (ReuseHarvestedSlot). Everything else a verdict depends on starts a new generation for
--- the providers that read it (InvalidateUpgrades; see .claude/rules/caches.md §2). Nothing
--- is kept for an item read while the client had no item info for it, or while any equipped
--- item reads cold. When the provider cannot answer yet (nil), nothing is kept and the item
--- shows no arrow: never a verdict from before its inputs changed. The sweep then retries
--- the bag (FinishUpgradeResolution).
+-- verdict is kept on the item (upgradeVerdict) with the provider and the upgrade generation,
+-- and reused while both still match. The item itself never changes under a kept verdict: a
+-- slot whose contents change is read into a new ItemData (ReuseHarvestedSlot). Everything
+-- else a verdict depends on starts a new generation (InvalidateUpgrades; see
+-- .claude/rules/caches.md §2). Nothing is kept for an item read while the client had no item
+-- info for it, or while any equipped item reads cold.
 ---@param data ItemData
 ---@return boolean
 function items:ResolveUpgrade(data)
@@ -203,121 +192,29 @@ function items:ResolveUpgrade(data)
     return false
   end
   local options = self.upgradeProviderOptions and self.upgradeProviderOptions[provider]
-  local generation = self._upgradeGenerations[provider] or 0
   local cacheable = options ~= nil and options.cacheable == true
     and not data.harvestIncomplete and not self._equipmentIncomplete
-  if cacheable and data.upgradeProvider == provider and data.upgradeGeneration == generation then
+  if cacheable and data.upgradeProvider == provider and data.upgradeGeneration == self._upgradeGeneration then
     return data.upgradeVerdict
   end
-  local verdict, keep = func(data)
-  if verdict == nil then
-    data.upgradeGeneration = nil
-    local kind = data.kind or const.BAG_KIND.BACKPACK
-    self._upgradePending[kind] = self._upgradePending[kind] or {}
-    self._upgradePending[kind][data.slotkey or data] = true
-    return false
-  end
-  verdict = verdict and true or false
-  if cacheable and keep ~= false then
+  local verdict = func(data) and true or false
+  if cacheable then
     data.upgradeVerdict = verdict
     data.upgradeProvider = provider
-    data.upgradeGeneration = generation
+    data.upgradeGeneration = self._upgradeGeneration
   else
     data.upgradeGeneration = nil
   end
   return verdict
 end
 
--- FinishUpgradeResolution runs after a sweep resolved its items' upgrades. While items are
--- unanswered (or, for the backpack, while equipped gear reads cold), the bag is refreshed
--- again shortly. A round makes progress when an item unanswered last round was answered
--- (or is gone), or when an item is unanswered that was not last round (new loot, a moved
--- item, or a re-asked item that stopped answering). After MAX_STALLED_UPGRADE_RETRIES
--- rounds in a row without progress the bag is given up until progress. An invalidation is
--- not progress: it does not change whether an unanswered item can be answered, and
--- invalidations are frequent (Pawn sends one on every item pickup), so restarting retries
--- on them would re-sweep a bag forever for an item that is never answered. Given-up items
--- are still never kept: every later sweep asks again.
----@param kind BagKind
-function items:FinishUpgradeResolution(kind)
-  local pending = self._upgradePending[kind] or {}
-  self._upgradePending[kind] = {}
-  if kind == const.BAG_KIND.BACKPACK and self._equipmentIncomplete then
-    for slot in pairs(self._equipmentIncompleteSlots) do
-      pending["equipment:" .. slot] = true
-    end
-  end
-  if next(pending) == nil then
-    self._upgradeLastPending[kind] = nil
-    self._upgradeStalls[kind] = 0
-    return
-  end
-  local last = self._upgradeLastPending[kind]
-  local progress = last == nil
-  if not progress then
-    for key in pairs(last) do
-      if not pending[key] then
-        progress = true
-        break
-      end
-    end
-  end
-  if not progress then
-    for key in pairs(pending) do
-      if not last[key] then
-        progress = true
-        break
-      end
-    end
-  end
-  if progress then
-    self._upgradeStalls[kind] = 0
-  else
-    self._upgradeStalls[kind] = (self._upgradeStalls[kind] or 0) + 1
-  end
-  self._upgradeLastPending[kind] = pending
-  if self._upgradeStalls[kind] < MAX_STALLED_UPGRADE_RETRIES then
-    self:ScheduleUpgradeRetry(kind)
-  end
-end
-
--- ScheduleUpgradeRetry refreshes a bag a moment later so its unanswered items are asked
--- again. One retry per bag kind is pending at a time; a bank retry only runs while the bank
--- is open.
----@param kind BagKind
-function items:ScheduleUpgradeRetry(kind)
-  kind = kind or const.BAG_KIND.BACKPACK
-  if self._upgradeRetryPending[kind] then
-    return
-  end
-  self._upgradeRetryPending[kind] = true
-  C_Timer.After(UPGRADE_RETRY_DELAY, function()
-    self._upgradeRetryPending[kind] = false
-    local ctx = context:New('UpgradeRetry')
-    if kind == const.BAG_KIND.BANK then
-      if addon.atBank then
-        events:SendMessage(ctx, 'bags/RefreshBank')
-      end
-    else
-      events:SendMessage(ctx, 'bags/RefreshBackpack')
-    end
-  end)
-end
-
--- InvalidateUpgrades starts a new upgrade generation for one provider (or every provider),
--- so their kept verdicts are computed again. With refresh, the backpack and (while open)
--- the bank are refreshed on the next frame so arrows update right away; without it, the
--- next refresh recomputes them (used for frequent events).
----@param provider? string Only this provider's verdicts; nil for every provider.
+-- InvalidateUpgrades starts a new upgrade generation, so kept verdicts are computed again.
+-- With refresh, the backpack and (while open) the bank are refreshed on the next frame so
+-- arrows update right away; without it, the next refresh recomputes them (used for frequent
+-- events).
 ---@param refresh boolean
-function items:InvalidateUpgrades(provider, refresh)
-  if provider then
-    self._upgradeGenerations[provider] = (self._upgradeGenerations[provider] or 0) + 1
-  else
-    for name in pairs(self.upgradeProviders or {}) do
-      self._upgradeGenerations[name] = (self._upgradeGenerations[name] or 0) + 1
-    end
-  end
+function items:InvalidateUpgrades(refresh)
+  self._upgradeGeneration = self._upgradeGeneration + 1
   if refresh then
     self:RequestUpgradeRefresh(true, addon.atBank == true)
   end
@@ -364,12 +261,11 @@ end
 --     effective-level changes), PLAYER_AVG_ITEM_LEVEL_UPDATE (also re-read all gear);
 --   * proficiencies and skills: SKILL_LINES_CHANGED, LEARNED_SPELL_IN_SKILL_LINE;
 --   * specialization: PLAYER_SPECIALIZATION_CHANGED for the player.
--- Each invalidates every provider's verdicts and refreshes the bags. The built-in
--- provider's usability check (C_PlayerInfo.CanUseItem) also changes with reputation and
--- spells, the events Blizzard's own usability refresh listens for (Blizzard_Wardrobe.lua):
--- UPDATE_FACTION and SPELLS_CHANGED fire often, so they invalidate only the built-in
--- provider's verdicts and request no refresh (the next refresh recomputes them).
--- Pawn's own state is covered by integrations/pawn.lua.
+-- Each invalidates every kept verdict and refreshes the bags. The built-in provider's
+-- usability check (C_PlayerInfo.CanUseItem) also changes with reputation and spells, the
+-- events Blizzard's own usability refresh listens for (Blizzard_Wardrobe.lua):
+-- UPDATE_FACTION and SPELLS_CHANGED fire often, so they invalidate without a refresh (the
+-- next refresh recomputes the verdicts).
 function items:RegisterCacheEvents()
   local function register(name, callback)
     if isEventValid(name) then
@@ -382,27 +278,27 @@ function items:RegisterCacheEvents()
     else
       self._equipmentDirtyAll = true
     end
-    self:InvalidateUpgrades(nil, true)
+    self:InvalidateUpgrades(true)
   end)
   for _, name in ipairs({ 'PLAYER_LEVEL_UP', 'PLAYER_LEVEL_CHANGED', 'PLAYER_AVG_ITEM_LEVEL_UPDATE' }) do
     register(name, function()
       self._equipmentDirtyAll = true
-      self:InvalidateUpgrades(nil, true)
+      self:InvalidateUpgrades(true)
     end)
   end
   for _, name in ipairs({ 'SKILL_LINES_CHANGED', 'LEARNED_SPELL_IN_SKILL_LINE' }) do
     register(name, function()
-      self:InvalidateUpgrades(nil, true)
+      self:InvalidateUpgrades(true)
     end)
   end
   register('PLAYER_SPECIALIZATION_CHANGED', function(_, _, unit)
     if unit == nil or unit == "player" then
-      self:InvalidateUpgrades(nil, true)
+      self:InvalidateUpgrades(true)
     end
   end)
   for _, name in ipairs({ 'UPDATE_FACTION', 'SPELLS_CHANGED' }) do
     register(name, function()
-      self:InvalidateUpgrades("BetterBags", false)
+      self:InvalidateUpgrades(false)
     end)
   end
 end
@@ -489,14 +385,9 @@ function items:Init()
   self.equipmentCache = {}
   self.previousItemGUID = {}
   -- Upgrade verdict cache (ResolveUpgrade) and equipped gear cache (HarvestEquipment).
-  self._upgradeGenerations = {}
-  self._upgradePending = {}
-  self._upgradeLastPending = {}
-  self._upgradeStalls = {}
-  self._upgradeRetryPending = {}
+  self._upgradeGeneration = 0
   self._upgradeRefreshPending = { backpack = false, bank = false }
   self._equipmentIncomplete = false
-  self._equipmentIncompleteSlots = {}
   self._equipped = {}
   self._equipmentDirty = {}
   self._equipmentDirtyAll = false
@@ -1658,7 +1549,7 @@ function items:RunRefresh(ectx, kind)
   local isWipe = ectx:Get("wipe") == true
   if isWipe then
     self._drawGeneration[kind] = self._drawGeneration[kind] + 1
-    self:InvalidateUpgrades(nil, false)
+    self:InvalidateUpgrades(false)
   end
 
   if targetedBags and not isWipe then
@@ -1680,9 +1571,7 @@ function items:RunRefresh(ectx, kind)
 
   local emptySlots, emptySlotsByBag = self:Phase5_UpdateFreeSlots(ectx, kind)
 
-  self._upgradePending[kind] = {}
   local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData, emptySlotsByBag)
-  self:FinishUpgradeResolution(kind)
 
   local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
   local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
@@ -2072,7 +1961,7 @@ function items:HarvestEquipment(rereadAll)
   end
   -- Nothing is recorded until every slot was read: if a read fails, the next sweep reads
   -- the changed slots again and still sees the change.
-  local incompleteSlots = {}
+  local incomplete = false
   for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
     local entry = read[slot]
     self._equipped[slot] = entry
@@ -2081,18 +1970,16 @@ function items:HarvestEquipment(rereadAll)
       equipmentData[entry.data.inventorySlots[1]] = entry.data
     end
     if entry and entry.incomplete then
-      incompleteSlots[slot] = true
+      incomplete = true
     end
   end
-  local incomplete = next(incompleteSlots) ~= nil
   if self._equipmentIncomplete and not incomplete then
     changed = true
   end
   self._equipmentIncomplete = incomplete
-  self._equipmentIncompleteSlots = incompleteSlots
   self.equipmentCache = equipmentData
   if changed then
-    self:InvalidateUpgrades(nil, true)
+    self:InvalidateUpgrades(true)
   end
   return equipmentData
 end
