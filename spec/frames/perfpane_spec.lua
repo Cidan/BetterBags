@@ -30,6 +30,7 @@ LoadBetterBagsModule("frames/flamegraph.lua")
 LoadFreshBetterBagsModule("PerfPane", "frames/perfpane.lua")
 
 local perf = addon:GetModule("Perf")
+local perfFormat = addon:GetModule("PerfFormat")
 local perfSessions = addon:GetModule("PerfSessions")
 local perfPane = addon:GetModule("PerfPane")
 
@@ -310,6 +311,31 @@ describe("PerfPane", function()
       assert.is_truthy(rows[1].text:find("9.00 ms", 1, true))
       pane:SelectFrame(1)
       assert.are.equal(5.5, pane.frameFlame.tree.root.total)
+    end)
+
+    it("lists a frame once, with the Blizzard reading that arrived a frame late", function()
+      -- Saved before readings were paired: worst[1] is an empty frame listed only because
+      -- Blizzard reported worst[2]'s work one frame later.
+      local s = makeSession(9, {
+        options = { spikeThresholdMs = 16 },
+        worst = {
+          { frame = 3, atUs = 60000, us = 30, blizzardUs = 40960, nodes = {} },
+          { frame = 2, atUs = 40000, us = 39430, blizzardUs = 11990, nodes = { "5,39430,1,0" } },
+        },
+        timeline = { ours = "0,12450,39430,30,0", blizzard = "20,680,11990,40960,60" },
+      })
+      table.insert(perfSessions.db.sessions, s)
+      pane:Update()
+      pane:SelectSession(9)
+
+      local rows = itemsOf(pane.frameList)
+      assert.are.equal(1, #rows)
+      assert.is_truthy(rows[1].text:find("^#1 "))
+      assert.is_truthy(rows[1].text:find("39.4 ms", 1, true))
+      assert.is_truthy(rows[1].text:find("Blizzard 41.0 ms", 1, true))
+      assert.are.equal(2, pane.selectedFrame)
+      assert.is_true(rows[1].selected)
+      assert.is_not_nil(perfFormat:Find(pane.frameFlame.tree, { "Bag.Draw" }))
     end)
 
     it("draws the per-frame timeline", function()

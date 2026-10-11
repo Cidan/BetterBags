@@ -68,6 +68,9 @@ local frameSeq, frameTotal, frameCalls, frameNested, dirty, dirtyN
 local frames, activeFrames, worstFrameMs
 local histogram, blizzardHistogram
 local worst, worstCap, spikeThreshold
+-- The frame closed at the previous OnUpdate, held until the next Blizzard reading has been
+-- credited (see considerFrame).
+local pHas, pFrame, pAt, pMs, pBlizzard, pEntries
 local timelineOurs, timelineBlizzard, timelineCalls, timelineNested, timelineCap
 local frameMetric, maxDurationMs, onAutoStop, autoStopSent
 local wrapped, overheadParent, overheadChild
@@ -333,6 +336,7 @@ local function resetState()
     blizzardHistogram[i] = 0
   end
   worst = {}
+  pHas, pFrame, pAt, pMs, pBlizzard, pEntries = false, nil, nil, nil, nil, nil
   timelineOurs, timelineBlizzard, timelineCalls, timelineNested = {}, {}, {}, {}
   autoStopSent = false
   last = clock()
@@ -494,14 +498,14 @@ local function finalize(now)
   local worstOut = {}
   for _, snap in ipairs(worst) do
     local entries = {}
-    for _, e in ipairs(snap.entries) do
-      entries[#entries + 1] = { ids[e[1]], e }
+    local flat = snap.entries
+    for i = 1, #flat, 4 do
+      entries[#entries + 1] = { ids[flat[i]], flat[i + 1], flat[i + 2], flat[i + 3] }
     end
     table.sort(entries, function(a, b) return a[1] < b[1] end)
     local packed = {}
-    for i, entry in ipairs(entries) do
-      local e = entry[2]
-      packed[i] = string.format('%d,%d,%d,%d', entry[1], us(e[2]), e[3], bytes(e[4]))
+    for i, e in ipairs(entries) do
+      packed[i] = string.format('%d,%d,%d,%d', e[1], us(e[2]), e[3], bytes(e[4]))
     end
     worstOut[#worstOut + 1] = {
       frame = snap.frame,
@@ -521,7 +525,7 @@ local function finalize(now)
   end
 
   return {
-    formatVersion = 1,
+    formatVersion = 2,
     options = {
       modules = captureOptions.modules,
       exclude = captureOptions.exclude,
@@ -570,18 +574,18 @@ local function finalize(now)
   }
 end
 
-local function considerWorst(ms, blizzardMs, now)
+local NO_ENTRIES = {}
+
+-- considerWorst ranks a closed frame by the larger of our time and the Blizzard reading
+-- credited to it, and keeps it if it is among the worst. entries is the frame's flat
+-- node,self,calls,alloc snapshot.
+local function considerWorst(frame, atMs, ms, blizzardMs, entries)
   if worstCap <= 0 then return end
   local rank = ms
   if blizzardMs and blizzardMs > rank then rank = blizzardMs end
   if rank < spikeThreshold then return end
   if #worst >= worstCap and rank <= worst[#worst].rank then return end
-  local entries = {}
-  for i = 1, dirtyN do
-    local node = dirty[i]
-    entries[i] = { node, node.fself, node.fcalls, node.falloc }
-  end
-  local snap = { frame = frameSeq, atMs = now - startTime, ms = ms, blizzardMs = blizzardMs, rank = rank, entries = entries }
+  local snap = { frame = frame, atMs = atMs, ms = ms, blizzardMs = blizzardMs, rank = rank, entries = entries or NO_ENTRIES }
   local pos = #worst + 1
   for i = 1, #worst do
     if rank > worst[i].rank then
@@ -592,6 +596,52 @@ local function considerWorst(ms, blizzardMs, now)
   table.insert(worst, pos, snap)
   if #worst > worstCap then
     worst[#worst] = nil
+  end
+end
+
+-- considerFrame closes the worst-frame bookkeeping for one frame. Blizzard's reading taken
+-- now covers the game tick that just finished, which overlaps this frame and the previous
+-- one: work run before our OnUpdate in a tick (events, timers) only shows up in the next
+-- frame's reading. The reading is credited to whichever of the two frames' measured time
+-- it is closer to, so the previous frame can only be judged now.
+---@param ms number
+---@param blizzardMs number|nil
+---@param now number
+local function considerFrame(ms, blizzardMs, now)
+  if worstCap <= 0 then return end
+  local entries
+  if dirtyN > 0 and (frameMetric or ms >= spikeThreshold) then
+    entries = {}
+    local k = 0
+    for i = 1, dirtyN do
+      local node = dirty[i]
+      entries[k + 1] = node
+      entries[k + 2] = node.fself
+      entries[k + 3] = node.fcalls
+      entries[k + 4] = node.falloc
+      k = k + 4
+    end
+  end
+  local credited = frameMetric and 0 or nil
+  if blizzardMs then
+    if pHas and math.abs(pMs - blizzardMs) < math.abs(ms - blizzardMs) then
+      pBlizzard = (pBlizzard or 0) + blizzardMs
+    else
+      credited = credited + blizzardMs
+    end
+  end
+  if pHas then
+    considerWorst(pFrame, pAt, pMs, pBlizzard, pEntries)
+  end
+  pHas, pFrame, pAt, pMs, pBlizzard, pEntries = true, frameSeq, now - startTime, ms, credited, entries
+end
+
+-- flushPending judges the last closed frame when the capture stops; no later reading
+-- will be credited to it.
+local function flushPending()
+  if pHas then
+    considerWorst(pFrame, pAt, pMs, pBlizzard, pEntries)
+    pHas, pEntries = false, nil
   end
 end
 
@@ -748,6 +798,7 @@ function perf:Stop()
   if captureOptions.pauseGC then
     collectgarbage("restart")
   end
+  flushPending()
   local session = finalize(now)
   root, overflow, cursor, threads, dirty, worst = nil, nil, nil, nil, nil, nil
   return session
@@ -799,7 +850,7 @@ function perf:_OnFrame()
       timelineBlizzard[#timelineBlizzard + 1] = blizzardMs or 0
     end
   end
-  considerWorst(ms, blizzardMs, now)
+  considerFrame(ms, blizzardMs, now)
 
   frameSeq = frameSeq + 1
   frameTotal = 0

@@ -119,10 +119,32 @@ closes one frame of measurements: the BetterBags time measured in it goes into a
 (<1, 1-5, 5-16, 16-33, 33-50, 50-100, 100+ ms) and the per-frame timeline. If
 `frameMetric` is given (PerfSessions passes Blizzard's
 `C_AddOnProfiler.GetAddOnMetric(addonName, Enum.AddOnProfilerMetric.LastTime)`) it is
-sampled too. A frame where either number reaches the spike threshold keeps its own call
-tree; the N worst are saved. Comparing the two series shows how much of BetterBags' cost
-the wrappers see; the rest ran in code that is not wrapped (closures, frame scripts,
-Blizzard template code running on our frames).
+sampled too. Comparing the two series shows how much of BetterBags' cost the wrappers see;
+the rest ran in code that is not wrapped (closures, frame scripts, Blizzard template code
+running on our frames).
+
+**Pairing Blizzard's reading with our frames.** `LastTime` is "total time in the most
+recent tick", so the reading taken in our `OnUpdate` covers the game tick that just
+finished. That tick overlaps our current frame and the one before it: work that runs before
+our `OnUpdate` in a tick (events, timers, and so the whole refresh pipeline) only appears in
+the **next** frame's reading. Verified on WoW: Forever captures: a refresh's harvest, redraw
+and a debug-log flush each matched Blizzard's reading one frame later (12.45/11.99,
+39.43/40.96, 1.60/1.63 ms), while opening the bag from a keybinding matched in the same frame
+(25.05/24.71). `considerFrame` (`debug/perf/engine.lua`) therefore holds each closed frame
+for one more frame, credits each reading to whichever of the two frames' measured time it
+is closer to (a frame's figure is the sum of the readings credited to it), and only then
+judges it: a frame is a worst frame when our time or its credited reading reaches the
+spike threshold, ranked by the larger. The last frame is judged at Stop. The timeline and
+histogram keep Blizzard's raw readings by sample time. A credited reading of 0 next to a
+large measured time means Blizzard did not charge that work to BetterBags (seen for
+refreshes started from a click or from our sort fallback timer; cause unknown).
+
+Before format version 2 the engine ranked frames on the same-frame reading, so a frame in
+which BetterBags did nothing was listed as a worst frame for the previous frame's work.
+`PerfFormat:WorstFrames(session)` (used by the Performance tab and the offline tool, whose
+`--frame n` numbers match the tab) re-pairs those older sessions from their per-frame
+timeline with the same rule and drops frames that no longer qualify; entries the timeline
+does not cover are shown as captured. `DecodeFrame` returns the credited reading.
 
 ### Overhead and allocations
 
@@ -184,14 +206,14 @@ Whether a capture is running is never saved: every load starts with profiling of
 clears the flag and starts a capture with reason `reload`. A capture still running on
 `PLAYER_LOGOUT` is stopped and saved.
 
-### Session format (version 1)
+### Session format (version 2)
 
 Times are integer microseconds, memory integer bytes. Nodes are packed strings so the file
 stays small and loads fast.
 
 ```lua
 session = {
-  id, formatVersion = 1,
+  id, formatVersion = 2,
   meta = { reason, startedAt, stoppedAt, character, realm, gameVersion, gameBuild, tocVersion,
            flavor, addonVersion, preset, blizzardStart, blizzardStop, memoryStartKB,
            memoryStopKB, luaMemoryStartKB, luaMemoryStopKB, backpackItems, bankItems },
@@ -205,16 +227,19 @@ session = {
   aborted = { "nameId,count", ... },  -- calls an error cut short, per function
   histogram = { bounds = {1,5,16,33,50,100}, counts = {7 numbers}, blizzard = {7}|nil },
   worst = { { frame, atUs, us, blizzardUs|nil, nodes = { "nodeId,selfUs,calls,allocBytes", ... } }, ... },
+           -- blizzardUs: the readings credited to this frame (version 1: the same-frame reading)
   timeline = { ours = "us,us,...", blizzard = "us,..."|nil,
                calls = "n,n,...", nested = "n,n,..." },  -- per-frame measured calls, and those with a measured caller
 }
 ```
 
 A worst frame lists only the nodes that ran in it; `PerfFormat:DecodeFrame` fills in their
-ancestors with zero cost. Any change to this format bumps `formatVersion` and updates
-`format.lua`, the tool, and their specs together. The overhead fields (`overheadParentMs`,
-`overheadChildMs`, `timeline.calls`, `timeline.nested`) are optional additions read only
-when present, so version 1 still decodes sessions saved without them.
+ancestors with zero cost, and always returns a root (a frame listed only for Blizzard's
+reading may have no measured nodes). Any change to this format bumps `formatVersion` and
+updates `format.lua`, the tool, and their specs together. Version 2 changed only the meaning
+of `worst[].blizzardUs` (see "Pairing Blizzard's reading"); version 1 sessions are re-paired
+when decoded. The overhead fields (`overheadParentMs`, `overheadChildMs`, `timeline.calls`,
+`timeline.nested`) are optional additions read only when present.
 
 ## 5. Settings and presets
 

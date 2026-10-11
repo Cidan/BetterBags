@@ -187,6 +187,67 @@ describe("PerfFormat", function()
     end)
   end)
 
+  describe("worst frames", function()
+    -- Mirrors a real capture saved before Blizzard's readings were paired: a harvest
+    -- (frame 1) and a redraw (frame 2), each reported by Blizzard one frame later. The
+    -- engine ranked frame 3 as the worst frame on Blizzard's late reading alone.
+    local function laggedV1Session()
+      return {
+        formatVersion = 1,
+        options = { spikeThresholdMs = 16 },
+        names = { "[all]", "Bag.Draw" },
+        nodes = { "0,1,0,0,0,0", "1,2,39430,1,39430,0" },
+        worst = {
+          { frame = 3, atUs = 60000, us = 30, blizzardUs = 40960, nodes = {} },
+          { frame = 2, atUs = 40000, us = 39430, blizzardUs = 11990, nodes = { "2,39430,1,0" } },
+        },
+        timeline = { ours = "0,12450,39430,30,0", blizzard = "20,680,11990,40960,60" },
+      }
+    end
+
+    it("re-pairs an older session's Blizzard readings and drops frames listed only for a late reading", function()
+      local session = laggedV1Session()
+      local list = perfFormat:WorstFrames(session)
+      assert.are.equal(1, #list)
+      assert.are.equal(2, list[1].index)
+      assert.are.equal(2, list[1].frame)
+      assert.are.equal(39.43, list[1].ms)
+      assert.are.equal(40.96, list[1].blizzardMs)
+      assert.are.equal(40.96, perfFormat:DecodeFrame(session, 2).blizzardMs)
+    end)
+
+    it("keeps an older session's readings when its timeline does not cover the frame", function()
+      local session = laggedV1Session()
+      session.timeline = { ours = "0", blizzard = "0" }
+      local list = perfFormat:WorstFrames(session)
+      assert.are.equal(2, #list)
+      assert.are.equal(40.96, list[1].blizzardMs)
+      assert.are.equal(11.99, perfFormat:DecodeFrame(session, 2).blizzardMs)
+    end)
+
+    it("uses a paired session's stored readings and order as they are", function()
+      local session = laggedV1Session()
+      session.formatVersion = 2
+      session.worst = { session.worst[2] }
+      session.worst[1].blizzardUs = 40960
+      local list = perfFormat:WorstFrames(session)
+      assert.are.equal(1, #list)
+      assert.are.equal(1, list[1].index)
+      assert.are.equal(40.96, list[1].blizzardMs)
+    end)
+
+    it("keeps an older session's frames as captured when it has no Blizzard readings", function()
+      local session = laggedV1Session()
+      session.timeline = { ours = "0,12450,39430,30,0" }
+      session.worst = { session.worst[2] }
+      session.worst[1].blizzardUs = nil
+      local list = perfFormat:WorstFrames(session)
+      assert.are.equal(1, #list)
+      assert.are.equal(39.43, list[1].ms)
+      assert.is_nil(list[1].blizzardMs)
+    end)
+  end)
+
   describe("overhead adjustment", function()
     -- A (4 ms self, 2 calls) calls B (2 ms self, 4 calls); C (0.5 ms self, 4 calls) is a
     -- sibling of A. Each wrapped call costs 0.125 ms on its caller and 0.25 ms on itself.

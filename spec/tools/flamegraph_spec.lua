@@ -213,6 +213,38 @@ BetterBagsPerfDB = {
     end)
   end)
 
+  it("numbers worst frames the way the Performance tab lists them", function()
+    local lagged = dir .. "/Lagged.lua"
+    local f = assert(io.open(lagged, "w"))
+    f:write([[
+BetterBagsPerfDB = {
+  ["sessions"] = {
+    {
+      ["id"] = 5,
+      ["formatVersion"] = 1,
+      ["meta"] = {},
+      ["stats"] = {},
+      ["options"] = { ["spikeThresholdMs"] = 16 },
+      ["names"] = { "[all]", "Bag.Draw" },
+      ["nodes"] = { "0,1,0,0,0,0", "1,2,39430,1,39430,0" },
+      ["functions"] = { "2,1,39430,39430" },
+      ["worst"] = {
+        { ["frame"] = 3, ["atUs"] = 60000, ["us"] = 30, ["blizzardUs"] = 40960, ["nodes"] = {} },
+        { ["frame"] = 2, ["atUs"] = 40000, ["us"] = 39430, ["blizzardUs"] = 11990, ["nodes"] = { "2,39430,1,0" } },
+      },
+      ["timeline"] = { ["ours"] = "0,12450,39430,30,0", ["blizzard"] = "20,680,11990,40960,60" },
+    },
+  },
+}
+]])
+    f:close()
+    assert.are.equal(0, tool.Main({ lagged, "--out", dir, "--frame", "1", "--raw" }, function() end))
+    assert.are.equal("Bag.Draw 39430\n", readFile(dir .. "/betterbags-5-frame1-raw.folded"))
+    local printed = {}
+    assert.are.equal(1, tool.Main({ lagged, "--out", dir, "--frame", "2" }, function(line) table.insert(printed, line) end))
+    assert.is_truthy(printed[1]:find("kept 1", 1, true))
+  end)
+
   it("fails with a message for a missing session, frame, or file", function()
     local printed = {}
     local out = function(line) table.insert(printed, line) end

@@ -175,15 +175,95 @@ function perfFormat:DecodeFunctions(session, tree)
   return out
 end
 
+-- Sessions before format version 2 stored, on each worst frame, Blizzard's reading taken
+-- in that same frame. That reading usually describes the previous frame's work (see
+-- considerFrame in engine.lua), so those sessions are re-paired from their per-frame
+-- timeline with the rule the engine now applies while capturing.
+local pairingCache = setmetatable({}, { __mode = 'k' })
+
+---@param session table
+---@return (fun(frame: number): number|nil)|nil
+local function oldSessionPairing(session)
+  if (session.formatVersion or 1) >= 2 then return nil end
+  local cached = pairingCache[session]
+  if cached ~= nil then return cached or nil end
+  local timeline = session.timeline
+  if not timeline or not timeline.ours or not timeline.blizzard then
+    pairingCache[session] = false
+    return nil
+  end
+  local ours = splitNumbers(timeline.ours)
+  local blizzard = splitNumbers(timeline.blizzard)
+  -- The reading taken at the end of frame f is blizzard[f + 1]; ours[f + 1] is frame f.
+  local function creditedTo(f)
+    local reading = blizzard[f + 1]
+    local previous = ours[f]
+    if previous and math.abs(previous - reading) < math.abs((ours[f + 1] or 0) - reading) then
+      return f - 1
+    end
+    return f
+  end
+  local pairing = function(frame)
+    if not ours[frame + 1] or not blizzard[frame + 1] then return nil end
+    local sum = 0
+    if creditedTo(frame) == frame then sum = sum + blizzard[frame + 1] end
+    if blizzard[frame + 2] and creditedTo(frame + 1) == frame then sum = sum + blizzard[frame + 2] end
+    return sum / 1000
+  end
+  pairingCache[session] = pairing
+  return pairing
+end
+
+-- blizzardFor returns Blizzard's reading for a worst frame and whether it was re-paired.
+---@param session table
+---@param entry table
+---@return number|nil blizzardMs
+---@return boolean repaired
+local function blizzardFor(session, entry)
+  local pairing = oldSessionPairing(session)
+  local paired = pairing and pairing(entry.frame)
+  if paired then return paired, true end
+  return entry.blizzardUs and entry.blizzardUs / 1000 or nil, false
+end
+
+---@class PerfWorstFrame
+---@field index number Position in session.worst, for DecodeFrame.
+---@field frame number
+---@field ms number
+---@field blizzardMs number|nil Blizzard's reading credited to this frame.
+---@field atMs number
+
+-- WorstFrames lists the worst frames to show, worst first. Frames of an older session
+-- that only qualified on a Blizzard reading belonging to another frame are left out.
+---@param session table
+---@return PerfWorstFrame[]
+function perfFormat:WorstFrames(session)
+  local threshold = (session.options and session.options.spikeThresholdMs) or 16
+  local out = {}
+  for i, entry in ipairs(session.worst or {}) do
+    local ms = entry.us / 1000
+    local blizzardMs, repaired = blizzardFor(session, entry)
+    local rank = math.max(ms, blizzardMs or 0)
+    if not repaired or rank >= threshold then
+      out[#out + 1] = { index = i, frame = entry.frame, ms = ms, blizzardMs = blizzardMs, atMs = entry.atUs / 1000, rank = rank }
+    end
+  end
+  table.sort(out, function(a, b)
+    if a.rank ~= b.rank then return a.rank > b.rank end
+    return a.index < b.index
+  end)
+  return out
+end
+
 ---@class PerfFrame
 ---@field frame number
 ---@field ms number BetterBags time measured by the profiler in this frame.
----@field blizzardMs number|nil Blizzard's addon profiler reading for this frame.
+---@field blizzardMs number|nil Blizzard's addon profiler reading credited to this frame.
 ---@field atMs number Milliseconds from the start of the capture.
 ---@field tree PerfTree
 
 ---@param session table
----@param index number
+---@param index number Position in session.worst.
 ---@return PerfFrame
 function perfFormat:DecodeFrame(session, index)
   local entry = session.worst[index]
@@ -218,6 +298,10 @@ function perfFormat:DecodeFrame(session, index)
     local parent = nodes[parents[id]]
     if parent then link(node, parent) end
   end
+  if not nodes[1] then
+    nodes[1] = newNode(1, names[1])
+  end
+  if maxId < 1 then maxId = 1 end
   for _, node in pairs(nodes) do
     table.sort(node.children, function(a, b) return a.id < b.id end)
   end
@@ -225,7 +309,7 @@ function perfFormat:DecodeFrame(session, index)
   return {
     frame = entry.frame,
     ms = entry.us / 1000,
-    blizzardMs = entry.blizzardUs and entry.blizzardUs / 1000 or nil,
+    blizzardMs = (blizzardFor(session, entry)),
     atMs = entry.atUs / 1000,
     tree = { root = nodes[1], nodes = nodes, hasAlloc = hasAlloc },
   }

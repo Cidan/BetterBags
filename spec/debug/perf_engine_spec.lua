@@ -533,6 +533,121 @@ describe("Perf engine", function()
       assert.are.same({ 80 }, perfFormat:DecodeTimeline(session).blizzard)
     end)
 
+    -- Blizzard's reading taken at the end of a frame covers the game tick that just
+    -- finished, which overlaps that frame and the one before it. Work run before our
+    -- OnUpdate in a tick (events, timers) shows up in the next frame's reading.
+    describe("pairing Blizzard's reading with our frames", function()
+      local readings
+      local function metric()
+        return table.remove(readings, 1) or 0
+      end
+      before_each(function()
+        readings = {}
+      end)
+
+      it("credits a reading that trails by a frame to the frame that did the work", function()
+        readings = { 0, 0.7, 31, 0.1 }
+        function A:TCost(ms) advance(ms) end
+        perf:Start(options({ frameMetric = metric, spikeThresholdMs = 16 }))
+        perf:_OnFrame()
+        A:TCost(30)
+        perf:_OnFrame()
+        perf:_OnFrame()
+        perf:_OnFrame()
+        local session = perf:Stop()
+
+        assert.are.equal(2, session.formatVersion)
+        assert.are.equal(1, #session.worst, "no separate empty frame for the late reading")
+        local frame = perfFormat:DecodeFrame(session, 1)
+        assert.are.equal(1, frame.frame)
+        assert.are.equal(30, frame.ms)
+        assert.are.equal(31, frame.blizzardMs)
+        assert.are.equal(30, perfFormat:Find(frame.tree, { "PerfSpecA.TCost" }).self)
+      end)
+
+      it("keeps a reading taken in the same frame as the work", function()
+        readings = { 24.7, 0.2 }
+        function A:TCost(ms) advance(ms) end
+        perf:Start(options({ frameMetric = metric, spikeThresholdMs = 16 }))
+        A:TCost(25)
+        perf:_OnFrame()
+        perf:_OnFrame()
+        local session = perf:Stop()
+
+        assert.are.equal(1, #session.worst)
+        local frame = perfFormat:DecodeFrame(session, 1)
+        assert.are.equal(0, frame.frame)
+        assert.are.equal(24.7, frame.blizzardMs)
+      end)
+
+      it("pairs each of two back-to-back busy frames with its own late reading", function()
+        -- Harvest then redraw, each reported by Blizzard one frame later.
+        readings = { 0, 0.7, 12, 41, 0.1 }
+        function A:TCost(ms) advance(ms) end
+        perf:Start(options({ frameMetric = metric, spikeThresholdMs = 10 }))
+        perf:_OnFrame()
+        A:TCost(12.5)
+        perf:_OnFrame()
+        A:TCost(39.5)
+        perf:_OnFrame()
+        perf:_OnFrame()
+        perf:_OnFrame()
+        local session = perf:Stop()
+
+        assert.are.equal(2, #session.worst)
+        local redraw = perfFormat:DecodeFrame(session, 1)
+        local harvest = perfFormat:DecodeFrame(session, 2)
+        assert.are.equal(39.5, redraw.ms)
+        assert.are.equal(41, redraw.blizzardMs)
+        assert.are.equal(12.5, harvest.ms)
+        assert.are.equal(12, harvest.blizzardMs)
+      end)
+
+      it("still lists a spike that only Blizzard measured", function()
+        readings = { 0, 40, 0 }
+        perf:Start(options({ frameMetric = metric, spikeThresholdMs = 16 }))
+        perf:_OnFrame()
+        perf:_OnFrame()
+        perf:_OnFrame()
+        local session = perf:Stop()
+
+        assert.are.equal(1, #session.worst)
+        local frame = perfFormat:DecodeFrame(session, 1)
+        assert.are.equal(0, frame.ms)
+        assert.are.equal(40, frame.blizzardMs)
+        assert.are.equal(0, frame.tree.root.total, "a frame with nothing measured still decodes to a tree")
+      end)
+
+      it("ranks frames by the larger of our time and the reading credited to them", function()
+        readings = { 0, 50, 0, 0 }
+        function A:TCost(ms) advance(ms) end
+        perf:Start(options({ frameMetric = metric, spikeThresholdMs = 16 }))
+        A:TCost(45)
+        perf:_OnFrame()
+        perf:_OnFrame()
+        A:TCost(30)
+        perf:_OnFrame()
+        perf:_OnFrame()
+        local session = perf:Stop()
+
+        assert.are.equal(2, #session.worst)
+        assert.are.equal(45, perfFormat:DecodeFrame(session, 1).ms)
+        assert.are.equal(50, perfFormat:DecodeFrame(session, 1).blizzardMs)
+        assert.are.equal(30, perfFormat:DecodeFrame(session, 2).ms)
+      end)
+
+      it("credits the last frame's reading when the capture stops", function()
+        readings = { 20 }
+        function A:TCost(ms) advance(ms) end
+        perf:Start(options({ frameMetric = metric, spikeThresholdMs = 16 }))
+        A:TCost(18)
+        perf:_OnFrame()
+        local session = perf:Stop()
+        assert.are.equal(1, #session.worst)
+        assert.are.equal(20, perfFormat:DecodeFrame(session, 1).blizzardMs)
+      end)
+    end)
+
     it("drives the frame boundary from its own OnUpdate while capturing", function()
       perf:Start(options())
       local onUpdate = perf.frame:GetScript("OnUpdate")

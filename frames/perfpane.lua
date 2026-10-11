@@ -637,8 +637,9 @@ function paneProto:SelectSession(id)
   self:FillFunctions()
   self.selectedFrame = nil
   self:FillFrames()
-  if session.worst and #session.worst > 0 then
-    self:SelectFrame(1)
+  local first = perfFormat:WorstFrames(session)[1]
+  if first then
+    self:SelectFrame(first.index)
   else
     self.frameFlame:SetTree(nil)
   end
@@ -661,23 +662,24 @@ end
 
 function paneProto:FillFrames()
   local items = {}
-  for i, entry in ipairs(self.session and self.session.worst or {}) do
-    local ms = entry.us / 1000
+  for n, entry in ipairs(self.session and perfFormat:WorstFrames(self.session) or {}) do
+    local ms = entry.ms
     if self:TimeMetric() == 'adjusted' then
-      local root = self:FrameTree(i).tree.root
+      local root = self:FrameTree(entry.index).tree.root
       ms = ms - (root.total - root.adjTotal)
     end
-    local text = string.format('#%d  %s', i, perfFormat:Ms(ms))
-    if entry.blizzardUs then
-      text = text .. string.format('  (Blizzard %s)', perfFormat:Ms(entry.blizzardUs / 1000))
+    local text = string.format('#%d  %s', n, perfFormat:Ms(ms))
+    if entry.blizzardMs then
+      text = text .. string.format('  (Blizzard %s)', perfFormat:Ms(entry.blizzardMs))
     end
-    text = text .. string.format('  at %s', perfFormat:Ms(entry.atUs / 1000))
-    items[i] = {
-      index = i,
-      selected = i == self.selectedFrame,
+    text = text .. string.format('  at %s', perfFormat:Ms(entry.atMs))
+    local index = entry.index
+    items[n] = {
+      index = index,
+      selected = index == self.selectedFrame,
       text = text,
       onClick = function()
-        self:SelectFrame(i)
+        self:SelectFrame(index)
       end,
     }
   end
@@ -765,7 +767,7 @@ function paneProto:DrawTimeline()
     self.timelineThreshold:SetPoint('BOTTOMLEFT', self.timeline, 'BOTTOMLEFT', 0, threshold / scale * height)
     self.timelineThreshold:SetPoint('BOTTOMRIGHT', self.timeline, 'BOTTOMRIGHT', 0, threshold / scale * height)
     self.timelineThreshold:Show()
-    self.timelineCaption:SetText(string.format('%s, tallest %s; red line = spike threshold %s; grey = Blizzard addon profiler',
+    self.timelineCaption:SetText(string.format('%s, tallest %s; red line = spike threshold %s; grey = Blizzard addon profiler, which can trail ours by a frame',
       plural(frames, 'frame'), perfFormat:Ms(scale), perfFormat:Ms(threshold)))
   else
     self.timelineThreshold:Hide()

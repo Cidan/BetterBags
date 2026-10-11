@@ -63,24 +63,25 @@ function M.ListSessions(db)
     lines[#lines + 1] = string.format('#%d  %s  %s - %s  %s  measured %s  %d frames  %d worst frames%s',
       s.id or 0, meta.startedAt and os.date('%Y-%m-%d %H:%M:%S', meta.startedAt) or '?',
       meta.character or '?', meta.realm or '?', perfFormat:Ms(stats.durationMs or 0),
-      perfFormat:Ms(stats.instrumentedMs or 0), stats.frames or 0, #(s.worst or {}),
+      perfFormat:Ms(stats.instrumentedMs or 0), stats.frames or 0, #perfFormat:WorstFrames(s),
       meta.reason == 'reload' and '  (reload)' or '')
   end
   return lines
 end
 
--- Tree decodes a whole session, or one of its worst frames when frameIndex is given, and
+-- Tree decodes a whole session, or one of its worst frames when worstIndex (a position in
+-- session.worst) is given, and
 -- removes the calibrated profiler overhead unless raw is set or the session has no
 -- calibration. The second return is the time metric to render: "adjusted" or "time".
 ---@param session table
----@param frameIndex number|nil
+---@param worstIndex number|nil
 ---@param raw boolean|nil
 ---@return PerfTree
 ---@return "time"|"adjusted"
-function M.Tree(session, frameIndex, raw)
+function M.Tree(session, worstIndex, raw)
   local tree
-  if frameIndex then
-    tree = perfFormat:DecodeFrame(session, frameIndex).tree
+  if worstIndex then
+    tree = perfFormat:DecodeFrame(session, worstIndex).tree
   else
     tree = perfFormat:Decode(session)
   end
@@ -376,10 +377,11 @@ function M.Html(tree, metric, title, summaryLines)
 end
 
 ---@param session table
----@param frameIndex number|nil
+---@param frameIndex number|nil The worst frame's number as listed.
+---@param worstIndex number|nil Its position in session.worst.
 ---@param adjusted boolean
 ---@return string[]
-local function summaryLines(session, frameIndex, adjusted)
+local function summaryLines(session, frameIndex, worstIndex, adjusted)
   local meta, stats = session.meta or {}, session.stats or {}
   local lines = {
     string.format('Session #%d, %s - %s, captured %s (%s).', session.id or 0, meta.character or '?',
@@ -388,7 +390,7 @@ local function summaryLines(session, frameIndex, adjusted)
       perfFormat:Ms(stats.durationMs or 0), perfFormat:Ms(stats.instrumentedMs or 0), stats.frames or 0, stats.calls or 0),
   }
   if frameIndex then
-    local frame = perfFormat:DecodeFrame(session, frameIndex)
+    local frame = perfFormat:DecodeFrame(session, worstIndex)
     local line = string.format('Worst frame #%d: %s at %s into the capture', frameIndex, perfFormat:Ms(frame.ms), perfFormat:Ms(frame.atMs))
     if frame.blizzardMs then
       line = line .. string.format(' (Blizzard addon profiler: %s)', perfFormat:Ms(frame.blizzardMs))
@@ -462,12 +464,14 @@ function M.Main(args, out)
     return 1
   end
   local frameIndex = opts.frame and tonumber(opts.frame) or nil
-  if opts.frame and (not frameIndex or not (session.worst or {})[frameIndex]) then
-    out(string.format('Session #%d has no worst frame %s (it kept %d).', session.id, tostring(opts.frame), #(session.worst or {})))
+  local shown = perfFormat:WorstFrames(session)
+  if opts.frame and (not frameIndex or not shown[frameIndex]) then
+    out(string.format('Session #%d has no worst frame %s (it kept %d).', session.id, tostring(opts.frame), #shown))
     return 1
   end
+  local worstIndex = frameIndex and shown[frameIndex].index or nil
 
-  local tree, timeMetric = M.Tree(session, frameIndex, opts.raw)
+  local tree, timeMetric = M.Tree(session, worstIndex, opts.raw)
   local metric = opts.metric == 'alloc' and 'alloc' or timeMetric
   local base = string.format('%s/betterbags-%d%s%s%s', opts.out, session.id,
     frameIndex and ('-frame' .. frameIndex) or '', opts.metric == 'alloc' and '-alloc' or '',
@@ -476,7 +480,7 @@ function M.Main(args, out)
   local outputs = {
     { base .. '.folded', M.Folded(tree, metric) },
     { base .. '.speedscope.json', M.Speedscope(tree, metric, title) },
-    { base .. '.html', M.Html(tree, metric, title, summaryLines(session, frameIndex, timeMetric == 'adjusted')) },
+    { base .. '.html', M.Html(tree, metric, title, summaryLines(session, frameIndex, worstIndex, timeMetric == 'adjusted')) },
   }
   for _, output in ipairs(outputs) do
     local ok, writeErr = writeFile(output[1], output[2])
