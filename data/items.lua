@@ -1276,6 +1276,25 @@ function items:BuildOrderedItems(ctx, kind, visibleItemsBySlotKey, emptySlotByBa
     end
   end
 
+  -- Pass 3: an item whose hash changed without leaving its slot (same item GUID) keeps
+  -- its position: a cold read at login warming up, an enchant or an item level change
+  -- rehashes an item that never left. It runs after the hash passes, so it only pairs
+  -- what they left over. The slot must match: a move between the Character Bank and the
+  -- Warbank changes the hash on purpose and stays a remove + add.
+  local keptRehashed = false
+  for _, p in ipairs(previousSortedItems) do
+    if not p.isItemGap and not p.isFreeSlot and not (action[p] and action[p].keep) then
+      local cur = visibleItemsBySlotKey[p.slotkey]
+      local guid = p.itemInfo and p.itemInfo.itemGUID
+      if cur and not usedCur[p.slotkey] and guid and guid ~= ""
+        and cur.itemInfo and cur.itemInfo.itemGUID == guid then
+        action[p] = { keep = cur }
+        usedCur[p.slotkey] = true
+        keptRehashed = true
+      end
+    end
+  end
+
   -- Emit in the previous layout's order, holding gaps in place.
   local result = {}
   local emittedGap = false
@@ -1312,7 +1331,9 @@ function items:BuildOrderedItems(ctx, kind, visibleItemsBySlotKey, emptySlotByBa
     table.insert(result, item)
   end
 
-  if emittedGap then
+  -- A kept rehashed item holds its old position, which can be out of sort order (its
+  -- category or sort keys may have changed), so closing the bag re-sorts it too.
+  if emittedGap or keptRehashed then
     self:MarkDrawOnClose(kind)
   end
 

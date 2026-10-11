@@ -46,3 +46,10 @@ The virtual stack is keyed **only** by `item.itemHash` (`stacksByItemHash`), and
 Two optimizations reuse work across sweeps; neither changes how stacks are computed.
 - **Kept harvest items** (data-loader.md §16): a slot whose contents are unchanged keeps its committed ItemData, including its `itemHash`. Stacking is still a clean sweep: `Phase7_ApplyVirtualStacks` builds a new stack table each sweep and re-totals every stack from every pile's current `currentItemCount`, so a kept pile is counted correctly, a stack re-roots when another pile overtakes the kept root, and kept piles unmerge when a stacking rule stops applying (e.g. "Unmerge on Interactions"). Coverage: `spec/refresh_pipeline_spec.lua` ("per-slot harvest cache" → "virtual stacks").
 - **Item button redraws** (item-drawing.md §7b) compare the item's `itemHash` and its `stackedCount` (the stack total a root shows), among other inputs, to decide whether a button can skip its redraw. `itemHash` is not changed for this; it stays the stack key only.
+
+### 8. Persistent Gaps Follow a Stack by Hash, Then by Same-Slot GUID
+The persistent-gap diff (data-loader.md §13) pairs the previous layout with the current visible items (stack roots and unmerged piles) by `itemHash` first, which is how a re-root keeps the stack's position. It then pairs an entry whose own slot still shows the same item GUID, i.e. an item whose hash changed in place (a cold read warming at login, an enchant, an item level change).
+- A stack whose piles all rehash with the same root keeps its position: the root keeps its slot and GUID.
+- Still a gap: a pile whose new hash joins a different, already-placed stack (its visible entry is now hidden inside that stack), and a stack that rehashes and re-roots to another pile in the same sweep.
+- The pairing never crosses slots, so a Character Bank to Warbank move (§6) stays a remove + add.
+- Stacking is unaffected: `Phase7_ApplyVirtualStacks` runs before the diff and keys only on the hash.
