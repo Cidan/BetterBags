@@ -1441,18 +1441,20 @@ describe("Upgrade Icon Providers", function()
       isItemEmpty = false,
       inventorySlots = opts.inventorySlots or { 5 },
       itemInfo = {
+        itemID = opts.itemID,
         itemLink = opts.itemLink or "|cff0070dd|Hitem:1000|h[Test]|h|r",
         currentItemLevel = opts.currentItemLevel or 100,
+        itemMinLevel = opts.itemMinLevel,
         itemEquipLoc = opts.itemEquipLoc or "INVTYPE_CHEST",
       },
     }
   end
 
   -- An equipped item as stored in items.equipmentCache (keyed by inventory slot).
-  local function equippedItem(ilvl, equipLoc)
+  local function equippedItem(ilvl, equipLoc, itemID)
     return {
       isItemEmpty = false,
-      itemInfo = { currentItemLevel = ilvl, itemEquipLoc = equipLoc or "INVTYPE_CHEST" },
+      itemInfo = { currentItemLevel = ilvl, itemEquipLoc = equipLoc or "INVTYPE_CHEST", itemID = itemID },
     }
   end
 
@@ -1499,6 +1501,234 @@ describe("Upgrade Icon Providers", function()
         inventorySlots = { 17 }, currentItemLevel = 200, itemEquipLoc = "INVTYPE_WEAPONOFFHAND",
       })
       assert.is_false(items:ResolveUpgrade(data))
+    end)
+
+    -- An empty equipped slot is filled by any item for it. Before the gear has been read
+    -- (equipmentCache is nil) every slot would look empty, so nothing is an upgrade.
+    describe("empty equipped slots", function()
+      it("arrows an item for an empty slot", function()
+        items.equipmentCache = {}
+        assert.is_true(items:ResolveUpgrade(equippableItem({ inventorySlots = { 5 }, currentItemLevel = 10 })))
+      end)
+
+      it("arrows nothing before the equipped gear has been read", function()
+        items.equipmentCache = nil
+        assert.is_false(items:ResolveUpgrade(equippableItem({ inventorySlots = { 5 }, currentItemLevel = 10 })))
+      end)
+
+      it("arrows a ring when one of the two ring slots is empty", function()
+        items.equipmentCache = { [11] = equippedItem(300, "INVTYPE_FINGER", 700) }
+        local ring = equippableItem({ inventorySlots = { 11, 12 }, currentItemLevel = 100,
+          itemEquipLoc = "INVTYPE_FINGER", itemID = 701 })
+        assert.is_true(items:ResolveUpgrade(ring))
+      end)
+
+      it("does not count the empty slot for a copy of the ring or trinket already worn", function()
+        items.equipmentCache = { [11] = equippedItem(237, "INVTYPE_FINGER", 700) }
+        local ring = equippableItem({ inventorySlots = { 11, 12 }, currentItemLevel = 237,
+          itemEquipLoc = "INVTYPE_FINGER", itemID = 700 })
+        assert.is_false(items:ResolveUpgrade(ring))
+
+        items.equipmentCache = { [14] = equippedItem(237, "INVTYPE_TRINKET", 800) }
+        local trinket = equippableItem({ inventorySlots = { 13, 14 }, currentItemLevel = 237,
+          itemEquipLoc = "INVTYPE_TRINKET", itemID = 800 })
+        assert.is_false(items:ResolveUpgrade(trinket))
+      end)
+
+      it("never arrows a shirt or a tabard", function()
+        items.equipmentCache = {}
+        assert.is_false(items:ResolveUpgrade(equippableItem({ inventorySlots = { 4 }, itemEquipLoc = "INVTYPE_BODY" })))
+        assert.is_false(items:ResolveUpgrade(equippableItem({ inventorySlots = { 19 }, itemEquipLoc = "INVTYPE_TABARD" })))
+      end)
+    end)
+
+    -- Handedness, as Pawn rules it: a two-hander (or a ranged weapon) in the main hand rules
+    -- out one-handers, off-hand weapons, shields and held items; a one-hander in the main hand
+    -- rules out two-handers. A one-hander is compared with the off hand only for a character
+    -- that can dual wield.
+    describe("handedness", function()
+      local savedDualWield
+      before_each(function()
+        savedDualWield = _G.CanDualWield
+      end)
+      after_each(function()
+        _G.CanDualWield = savedDualWield
+      end)
+
+      it("does not arrow a one-hander while a two-hander is equipped", function()
+        items.equipmentCache = { [16] = equippedItem(200, "INVTYPE_2HWEAPON") }
+        local oneHander = equippableItem({ inventorySlots = { 16, 17 }, currentItemLevel = 224,
+          itemEquipLoc = "INVTYPE_WEAPON" })
+        assert.is_false(items:ResolveUpgrade(oneHander))
+        local mainHand = equippableItem({ inventorySlots = { 16 }, currentItemLevel = 224,
+          itemEquipLoc = "INVTYPE_WEAPONMAINHAND" })
+        assert.is_false(items:ResolveUpgrade(mainHand))
+      end)
+
+      it("does not arrow a shield or held item while a ranged weapon is in the main hand", function()
+        items.equipmentCache = { [16] = equippedItem(200, "INVTYPE_RANGED") }
+        local shield = equippableItem({ inventorySlots = { 17 }, currentItemLevel = 220, itemEquipLoc = "INVTYPE_SHIELD" })
+        assert.is_false(items:ResolveUpgrade(shield))
+        local held = equippableItem({ inventorySlots = { 17 }, currentItemLevel = 220, itemEquipLoc = "INVTYPE_HOLDABLE" })
+        assert.is_false(items:ResolveUpgrade(held))
+      end)
+
+      it("does not arrow a two-hander while a one-hander is equipped", function()
+        items.equipmentCache = {
+          [16] = equippedItem(200, "INVTYPE_WEAPON"),
+          [17] = equippedItem(200, "INVTYPE_SHIELD"),
+        }
+        local twoHander = equippableItem({ inventorySlots = { 16 }, currentItemLevel = 300,
+          itemEquipLoc = "INVTYPE_2HWEAPON" })
+        assert.is_false(items:ResolveUpgrade(twoHander))
+      end)
+
+      -- On Classic a bow goes in the ranged slot, not the main hand, so a one-hander in the
+      -- main hand says nothing about it.
+      it("does not rule out a ranged weapon because a one-hander is equipped", function()
+        items.equipmentCache = { [16] = equippedItem(10, "INVTYPE_WEAPON") }
+        local bow = equippableItem({ inventorySlots = { 16 }, currentItemLevel = 20, itemEquipLoc = "INVTYPE_RANGED" })
+        assert.is_true(items:ResolveUpgrade(bow))
+      end)
+
+      it("still compares a two-hander with an equipped two-hander", function()
+        items.equipmentCache = { [16] = equippedItem(200, "INVTYPE_2HWEAPON") }
+        local twoHander = equippableItem({ inventorySlots = { 16 }, currentItemLevel = 300,
+          itemEquipLoc = "INVTYPE_2HWEAPON" })
+        assert.is_true(items:ResolveUpgrade(twoHander))
+      end)
+
+      it("compares a one-hander with the off hand only when the character can dual wield", function()
+        items.equipmentCache = {
+          [16] = equippedItem(300, "INVTYPE_WEAPON"),
+          [17] = equippedItem(100, "INVTYPE_WEAPON"),
+        }
+        local oneHander = equippableItem({ inventorySlots = { 16, 17 }, currentItemLevel = 224,
+          itemEquipLoc = "INVTYPE_WEAPON" })
+        _G.CanDualWield = function() return false end
+        assert.is_false(items:ResolveUpgrade(oneHander))
+        -- Learning Dual Wield fires LEARNED_SPELL_IN_SKILL_LINE, which invalidates kept verdicts.
+        _G.CanDualWield = function() return true end
+        items:InvalidateUpgrades(false)
+        assert.is_true(items:ResolveUpgrade(oneHander))
+      end)
+
+      it("does not fill an empty off hand with a one-hander for a character that cannot dual wield", function()
+        _G.CanDualWield = function() return false end
+        items.equipmentCache = { [16] = equippedItem(300, "INVTYPE_WEAPON") }
+        local oneHander = equippableItem({ inventorySlots = { 16, 17 }, currentItemLevel = 224,
+          itemEquipLoc = "INVTYPE_WEAPON" })
+        assert.is_false(items:ResolveUpgrade(oneHander))
+      end)
+    end)
+
+    it("does not arrow an item above the character's level", function()
+      local savedLevel = _G.UnitLevel
+      _G.UnitLevel = function() return 80 end
+      items.equipmentCache = { [17] = equippedItem(200, "INVTYPE_SHIELD") }
+      -- Voidbreaker's Wall (a real retail drop): item level 220, requires level 90.
+      local wall = equippableItem({ inventorySlots = { 17 }, currentItemLevel = 220,
+        itemEquipLoc = "INVTYPE_SHIELD", itemMinLevel = 90 })
+      assert.is_false(items:ResolveUpgrade(wall))
+      -- Levelling up fires PLAYER_LEVEL_UP, which invalidates kept verdicts.
+      _G.UnitLevel = function() return 90 end
+      items:InvalidateUpgrades(false)
+      assert.is_true(items:ResolveUpgrade(wall))
+      _G.UnitLevel = savedLevel
+    end)
+
+    -- An item that carries primary stats, none of them the current spec's, is not an
+    -- upgrade (an Intellect cloak for a Strength warrior). Stat keys are GetItemStats' global
+    -- strings; a multi-primary item lists each primary (a real retail shield reports both
+    -- ITEM_MOD_STRENGTH_SHORT and ITEM_MOD_INTELLECT_SHORT), and the "Agility or Intellect"
+    -- style keys are read too. Items with no primary stat (rings, many trinkets) are not
+    -- gated, nor is anything when the client reports no primary stat for the spec.
+    describe("spec primary stat", function()
+      local savedSpecInfo, savedGetItemStats, primaryStat, stats
+      before_each(function()
+        savedSpecInfo = _G.C_SpecializationInfo
+        savedGetItemStats = _G.C_Item.GetItemStats
+        primaryStat = _G.LE_UNIT_STAT_STRENGTH
+        stats = {}
+        _G.C_SpecializationInfo = {
+          GetSpecialization = function() return 3 end,
+          GetSpecializationInfo = function(index)
+            assert.are.equal(3, index)
+            return 70, "Retribution", "", 135873, "DAMAGER", primaryStat
+          end,
+        }
+        _G.C_Item.GetItemStats = function(link) return stats[link] end
+        items.equipmentCache = { [15] = equippedItem(200, "INVTYPE_CLOAK"), [17] = equippedItem(200, "INVTYPE_SHIELD"),
+          [11] = equippedItem(200, "INVTYPE_FINGER", 1), [12] = equippedItem(200, "INVTYPE_FINGER", 2) }
+      end)
+      after_each(function()
+        _G.C_SpecializationInfo = savedSpecInfo
+        _G.C_Item.GetItemStats = savedGetItemStats
+      end)
+
+      local function cloak(link, itemStats)
+        stats[link] = itemStats
+        return equippableItem({ inventorySlots = { 15 }, currentItemLevel = 230, itemEquipLoc = "INVTYPE_CLOAK", itemLink = link })
+      end
+
+      it("does not arrow an item whose primary stat is not the spec's", function()
+        local item = cloak("int-cloak", { ITEM_MOD_INTELLECT_SHORT = 500, ITEM_MOD_STAMINA_SHORT = 900 })
+        assert.is_false(items:ResolveUpgrade(item))
+      end)
+
+      it("arrows an item with the spec's primary stat", function()
+        -- Voidfused Wing Cloak (real): Haste, Stamina, Strength, Versatility.
+        local item = cloak("str-cloak", { ITEM_MOD_HASTE_RATING_SHORT = 1, ITEM_MOD_STAMINA_SHORT = 1,
+          ITEM_MOD_STRENGTH_SHORT = 1, ITEM_MOD_VERSATILITY = 1 })
+        assert.is_true(items:ResolveUpgrade(item))
+      end)
+
+      it("arrows a multi-primary item that includes the spec's primary stat", function()
+        -- Voidbreaker's Wall (real): reports both Strength and Intellect.
+        stats["wall"] = { ITEM_MOD_CRIT_RATING_SHORT = 1, ITEM_MOD_INTELLECT_SHORT = 1, ITEM_MOD_STAMINA_SHORT = 1,
+          ITEM_MOD_STRENGTH_SHORT = 1, ITEM_MOD_VERSATILITY = 1 }
+        local wall = equippableItem({ inventorySlots = { 17 }, currentItemLevel = 220, itemEquipLoc = "INVTYPE_SHIELD", itemLink = "wall" })
+        assert.is_true(items:ResolveUpgrade(wall))
+        -- A spec change fires PLAYER_SPECIALIZATION_CHANGED, which invalidates kept verdicts.
+        primaryStat = _G.LE_UNIT_STAT_AGILITY
+        items:InvalidateUpgrades(false)
+        assert.is_false(items:ResolveUpgrade(wall))
+      end)
+
+      it("reads combined primary-stat keys", function()
+        local item = cloak("agi-or-int", { ITEM_MOD_AGILITY_OR_INTELLECT_SHORT = 500 })
+        assert.is_false(items:ResolveUpgrade(item))
+        primaryStat = _G.LE_UNIT_STAT_INTELLECT
+        items:InvalidateUpgrades(false)
+        assert.is_true(items:ResolveUpgrade(item))
+        local any = cloak("any", { ITEM_MOD_AGILITY_OR_STRENGTH_OR_INTELLECT_SHORT = 500 })
+        primaryStat = _G.LE_UNIT_STAT_STRENGTH
+        items:InvalidateUpgrades(false)
+        assert.is_true(items:ResolveUpgrade(any))
+      end)
+
+      it("does not gate an item with no primary stat", function()
+        -- Preyseeker's Signet (real): Haste, Mastery, Stamina.
+        stats["ring"] = { ITEM_MOD_HASTE_RATING_SHORT = 1, ITEM_MOD_MASTERY_RATING_SHORT = 1, ITEM_MOD_STAMINA_SHORT = 1 }
+        local ring = equippableItem({ inventorySlots = { 11, 12 }, currentItemLevel = 237,
+          itemEquipLoc = "INVTYPE_FINGER", itemLink = "ring", itemID = 3 })
+        assert.is_true(items:ResolveUpgrade(ring))
+      end)
+
+      it("does not gate anything when the client reports no primary stat for the spec", function()
+        local item = cloak("int-cloak", { ITEM_MOD_INTELLECT_SHORT = 500 })
+        primaryStat = nil
+        assert.is_true(items:ResolveUpgrade(item))
+        primaryStat = 0
+        items:InvalidateUpgrades(false)
+        assert.is_true(items:ResolveUpgrade(item))
+        _G.C_SpecializationInfo.GetSpecialization = function() return nil end
+        items:InvalidateUpgrades(false)
+        assert.is_true(items:ResolveUpgrade(item))
+        _G.C_SpecializationInfo = nil
+        items:InvalidateUpgrades(false)
+        assert.is_true(items:ResolveUpgrade(item))
+      end)
     end)
 
     -- When the usability APIs are unavailable (e.g. Classic, where the tooltip

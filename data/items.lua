@@ -169,13 +169,86 @@ function items:IsNonPreferredArmorType(data)
   return not _G.IsItemPreferredArmorType(loc)
 end
 
+-- Main-hand items that leave no off hand (a ranged weapon only sits in the main hand on
+-- clients without a ranged slot), and items that need a one-handed main hand or go in the
+-- off hand. A character holding one kind is not shown upgrades of the other (Pawn's rule): a
+-- one-hander's item level says nothing about replacing a two-hander, and a two-hander's
+-- ignores the off hand that would be lost.
+local NO_OFF_HAND_EQUIP_LOCS = { INVTYPE_2HWEAPON = true, INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true }
+local ONE_HAND_EQUIP_LOCS = {
+  INVTYPE_WEAPON = true, INVTYPE_WEAPONMAINHAND = true, INVTYPE_WEAPONOFFHAND = true,
+  INVTYPE_SHIELD = true, INVTYPE_HOLDABLE = true,
+}
+-- Shirts and tabards are cosmetic, never upgrades.
+local COSMETIC_EQUIP_LOCS = { INVTYPE_BODY = true, INVTYPE_TABARD = true }
+-- Rings and trinkets fill two slots and are nearly always unique-equipped, so a copy of one
+-- already worn cannot fill the other slot.
+local PAIRED_UNIQUE_EQUIP_LOCS = { INVTYPE_FINGER = true, INVTYPE_TRINKET = true }
+-- Primary stats as GetItemStats names them, and the LE_UNIT_STAT_* constant for each.
+local PRIMARY_STAT_CONSTANTS = {
+  STRENGTH = "LE_UNIT_STAT_STRENGTH",
+  AGILITY = "LE_UNIT_STAT_AGILITY",
+  INTELLECT = "LE_UNIT_STAT_INTELLECT",
+}
+
+-- specPrimaryStat returns the current spec's primary stat (an LE_UNIT_STAT_* value), read
+-- the way Blizzard's paper doll does (PaperDollFrame.lua), or nil when the client reports
+-- none (no spec, or a client without spec primary stats).
+---@return number|nil
+local function specPrimaryStat()
+  local specInfo = _G.C_SpecializationInfo
+  if not specInfo or not specInfo.GetSpecialization or not specInfo.GetSpecializationInfo then
+    return nil
+  end
+  local spec = specInfo.GetSpecialization()
+  if not spec then
+    return nil
+  end
+  local primaryStat = select(6, specInfo.GetSpecializationInfo(spec, false, false, nil, UnitSex("player")))
+  if primaryStat == nil or primaryStat == 0 then
+    return nil
+  end
+  return primaryStat
+end
+
+-- itemSuitsPrimaryStat reports whether an item carries the given primary stat, or no
+-- primary stat at all. GetItemStats keys are global strings: ITEM_MOD_STRENGTH_SHORT and
+-- friends, with a multi-primary item listing each of its primaries (or, as the global
+-- strings allow, a combined key such as ITEM_MOD_AGILITY_OR_INTELLECT_SHORT).
+---@param itemLink string
+---@param primaryStat number
+---@return boolean
+local function itemSuitsPrimaryStat(itemLink, primaryStat)
+  local getItemStats = (C_Item and C_Item.GetItemStats) or _G.GetItemStats
+  local stats = getItemStats and itemLink and getItemStats(itemLink)
+  if not stats then
+    return true
+  end
+  local hasPrimary = false
+  for key in pairs(stats) do
+    local body = key:match("^ITEM_MOD_(.+)_SHORT$")
+    if body then
+      for name in (body .. "_OR_"):gmatch("(.-)_OR_") do
+        local constant = PRIMARY_STAT_CONSTANTS[name]
+        if constant then
+          hasPrimary = true
+          if _G[constant] == primaryStat then
+            return true
+          end
+        end
+      end
+    end
+  end
+  return not hasPrimary
+end
+
 -- ResolveUpgrade returns whether an item shows the upgrade arrow. A cacheable provider's
 -- verdict is kept on the item (upgradeVerdict) with the provider and the upgrade generation,
 -- and reused while both still match. The item itself never changes under a kept verdict: a
 -- slot whose contents change is read into a new ItemData (ReuseHarvestedSlot). Everything
 -- else a verdict depends on starts a new generation (InvalidateUpgrades; see
 -- .claude/rules/caches.md §2). Nothing is kept for an item read while the client had no item
--- info for it, or while any equipped item reads cold.
+-- info for it, before the equipped gear has been read, or while any equipped item reads cold.
 ---@param data ItemData
 ---@return boolean
 function items:ResolveUpgrade(data)
@@ -192,7 +265,7 @@ function items:ResolveUpgrade(data)
     return false
   end
   local options = self.upgradeProviderOptions and self.upgradeProviderOptions[provider]
-  local cacheable = options ~= nil and options.cacheable == true
+  local cacheable = options ~= nil and options.cacheable == true and self.equipmentCache ~= nil
     and not data.harvestIncomplete and not self._equipmentIncomplete
   if cacheable and data.upgradeProvider == provider and data.upgradeGeneration == self._upgradeGeneration then
     return data.upgradeVerdict
@@ -382,7 +455,9 @@ function items:Init()
     [const.BAG_KIND.BACKPACK] = 0,
     [const.BAG_KIND.BANK] = 0,
   }
-  self.equipmentCache = {}
+  -- Equipped gear by inventory slot, set by every backpack sweep (HarvestEquipment); nil
+  -- until the first one, so an unread slot is never taken for an empty one.
+  self.equipmentCache = nil
   self.previousItemGUID = {}
   -- Upgrade verdict cache (ResolveUpgrade) and equipped gear cache (HarvestEquipment).
   self._upgradeGeneration = 0
@@ -396,7 +471,12 @@ function items:Init()
   self.upgradeProviders = {}
   self.upgradeProviderOptions = {}
   self:RegisterUpgradeProvider("BetterBags", function(data)
-    if not data.inventorySlots or not C_Item.IsEquippableItem(data.itemInfo.itemLink) then
+    local info = data.itemInfo
+    if not data.inventorySlots or COSMETIC_EQUIP_LOCS[info.itemEquipLoc] or not C_Item.IsEquippableItem(info.itemLink) then
+      return false
+    end
+    -- Before the first backpack sweep has read the equipped gear, every slot would look empty.
+    if not self.equipmentCache then
       return false
     end
 
@@ -404,10 +484,15 @@ function items:Init()
     -- proficiency), e.g. a staff for a warrior. C_PlayerInfo.CanUseItem is
     -- available on retail (10.0.5+) and Classic; when absent the provider
     -- degrades to the naive item-level comparison below.
-    if _G.C_PlayerInfo and _G.C_PlayerInfo.CanUseItem and data.itemInfo.itemID then
-      if not _G.C_PlayerInfo.CanUseItem(data.itemInfo.itemID) then
+    if _G.C_PlayerInfo and _G.C_PlayerInfo.CanUseItem and info.itemID then
+      if not _G.C_PlayerInfo.CanUseItem(info.itemID) then
         return false
       end
+    end
+
+    -- Gear the character is not high enough level to wear yet.
+    if (info.itemMinLevel or 0) > UnitLevel("player") then
+      return false
     end
 
     -- Suppress arrows for wearable armor that is not the character's preferred
@@ -417,20 +502,46 @@ function items:Init()
       return false
     end
 
-    for _, slot in pairs(data.inventorySlots) do
-      local equippedItem = self:GetItemDataFromInventorySlot(slot)
-      -- If the item is an offhand and the mainhand is a 2H weapon, don't show upgrade.
-      if slot == INVSLOT_OFFHAND then
-        local mainhand = self:GetItemDataFromInventorySlot(INVSLOT_MAINHAND)
-        if mainhand and (mainhand.itemInfo.itemEquipLoc == "INVTYPE_2HWEAPON" or mainhand.itemInfo.itemEquipLoc == "INVTYPE_RANGED") then
-          return false
-        end
-      end
+    -- Gear with primary stats, none of them the current spec's (an Intellect cloak for a
+    -- Strength spec). Rings, necks and many trinkets carry no primary stat and pass.
+    local primaryStat = specPrimaryStat()
+    if primaryStat and not itemSuitsPrimaryStat(info.itemLink, primaryStat) then
+      return false
+    end
 
-      if equippedItem and data.itemInfo.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
-        return true
-      elseif equippedItem and equippedItem.isItemEmpty and slot >= INVSLOT_FIRST_EQUIPPED and slot <= INVSLOT_LAST_EQUIPPED then
-        return true
+    local mainhand = self:GetItemDataFromInventorySlot(INVSLOT_MAINHAND)
+    local mainhandEquipLoc = mainhand and mainhand.itemInfo.itemEquipLoc
+    if ONE_HAND_EQUIP_LOCS[info.itemEquipLoc] and NO_OFF_HAND_EQUIP_LOCS[mainhandEquipLoc] then
+      return false
+    end
+    -- Only melee two-handers: on Classic a ranged weapon goes in its own slot.
+    if info.itemEquipLoc == "INVTYPE_2HWEAPON" and ONE_HAND_EQUIP_LOCS[mainhandEquipLoc] then
+      return false
+    end
+    -- A one-hander goes in the off hand only for a character that can dual wield.
+    local offhandAllowed = info.itemEquipLoc ~= "INVTYPE_WEAPON" or not _G.CanDualWield or _G.CanDualWield()
+
+    for _, slot in pairs(data.inventorySlots) do
+      if slot ~= INVSLOT_OFFHAND or offhandAllowed then
+        local equippedItem = self:GetItemDataFromInventorySlot(slot)
+        if equippedItem == nil then
+          -- An empty slot: anything that fits is an upgrade, unless a copy of this ring or
+          -- trinket is already worn in its other slot.
+          local wornElsewhere = false
+          if PAIRED_UNIQUE_EQUIP_LOCS[info.itemEquipLoc] and info.itemID then
+            for _, other in pairs(data.inventorySlots) do
+              local worn = self:GetItemDataFromInventorySlot(other)
+              if worn and worn.itemInfo.itemID == info.itemID then
+                wornElsewhere = true
+              end
+            end
+          end
+          if not wornElsewhere then
+            return true
+          end
+        elseif info.currentItemLevel > equippedItem.itemInfo.currentItemLevel then
+          return true
+        end
       end
     end
     return false
@@ -1840,7 +1951,7 @@ function items:GetItemDataFromSlotKey(slotkey)
 end
 
 function items:GetItemDataFromInventorySlot(slot)
-  return self.equipmentCache[slot]
+  return self.equipmentCache and self.equipmentCache[slot]
 end
 
 function items:GetStackData(item)

@@ -49,13 +49,15 @@ kind requested later in the frame).
 |---|---|
 | The bag item | A changed slot is a new ItemData (cache 1), which has no verdict |
 | Which provider is active | Provider name in the key; the dropdown also sends `bags/FullRefreshAll` |
-| Equipped gear (item level and equip location in the item's slots) | `PLAYER_EQUIPMENT_CHANGED`; the gear harvest invalidates and refreshes when a slot's link, item level or equip location changed, or when the gear stopped reading cold (cache 3) |
+| Equipped gear (item level and equip location in the item's slots; whether a slot is empty; the main hand's handedness; the item worn in a ring or trinket's other slot) | `PLAYER_EQUIPMENT_CHANGED`; the gear harvest invalidates and refreshes when a slot's link, item level or equip location changed, or when the gear stopped reading cold (cache 3) |
+| Equipped gear not read yet | `equipmentCache` is nil until the first backpack sweep; no verdict is kept until then (a naked character's first read detects no change that would invalidate one) |
 | The gear a verdict compares with | `HarvestEquipment` publishes `equipmentCache` as soon as it reads the gear, before anything else in the sweep, so a sweep that fails later cannot leave the bank judged against old gear under a new generation |
 | Equipped gear read cold | No verdict is kept while any equipped slot reads cold (`_equipmentIncomplete`); once it reads warm the harvest invalidates and refreshes |
-| Player level and effective level (usability, scaling) | `PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED` (level sync and other effective-level changes), `PLAYER_AVG_ITEM_LEVEL_UPDATE`; each also re-reads all gear |
-| Proficiencies and skills (`C_PlayerInfo.CanUseItem`) | `SKILL_LINES_CHANGED`, `LEARNED_SPELL_IN_SKILL_LINE` |
+| Player level and effective level (the item's level requirement, usability, scaling) | `PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED` (level sync and other effective-level changes), `PLAYER_AVG_ITEM_LEVEL_UPDATE`; each also re-reads all gear |
+| Proficiencies, skills and dual wield (`C_PlayerInfo.CanUseItem`, `CanDualWield`) | `SKILL_LINES_CHANGED`, `LEARNED_SPELL_IN_SKILL_LINE` (learning Dual Wield) |
 | Reputation and spells (`C_PlayerInfo.CanUseItem`; the events Blizzard's usability refresh in `Blizzard_Wardrobe.lua` listens for) | `UPDATE_FACTION`, `SPELLS_CHANGED`: they fire often, so they invalidate without a refresh; the next refresh recomputes the verdicts, as before caching |
-| Specialization | `PLAYER_SPECIALIZATION_CHANGED` for `"player"` |
+| Specialization (the spec's primary stat; dual wield) | `PLAYER_SPECIALIZATION_CHANGED` for `"player"` |
+| The item's stats (primary stats) | Part of the item: a changed slot is a new ItemData; scaling items change with level (above) |
 | Settings | Every wipe invalidates |
 | Cold item | Verdicts of `harvestIncomplete` items are not kept |
 Optional events are registered only when `C_EventUtils.IsEventValid` says the client has them
