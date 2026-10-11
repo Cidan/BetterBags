@@ -57,6 +57,8 @@ themes.GetItemButton = function(_, buttonCtx, item)
     item._decoration = {
       SetSize = function() end,
       SetID = function(_, id) item._decoration.id = id end,
+      GetID = function() return item._decoration.id end,
+      GetBagID = function() return item._decoration.bagID end,
       SetMatchesSearch = function() end,
       ItemSlotBackground = { Hide = function() end, Show = function() end },
       IconBorder = { SetTexture = function() end, SetBlendMode = function() end, SetTexCoord = function() end, SetSize = function() end, SetVertexColor = function() end, Show = function() end, Hide = function() end },
@@ -432,6 +434,128 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     -- A button drawn in consecutive passes is no longer released in between, so the
     -- reset a release used to do runs only when the button changes what it shows (item,
     -- free slot, empty slot). Same-kind redraws set every visual themselves.
+    -- BAG_UPDATE_COOLDOWN refreshes (bag:OnCooldown) ask the client for each button's
+    -- cooldown and skip Blizzard's update (spiral, icon tint, has-item) when it matches
+    -- what that button last applied. Full draws always apply.
+    describe("cooldown refresh", function()
+      local applied
+      local function potion()
+        return {
+          slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = false,
+          questInfo = { isQuestItem = false },
+          containerInfo = { isReadable = false, isFiltered = false, hasNoValue = false },
+          itemInfo = { isBound = false, itemID = 5512, itemIcon = 135230, itemQuality = 1,
+            itemLink = "item:5512", currentItemCount = 3, classID = 0, currentItemLevel = 1 },
+        }
+      end
+
+      before_each(function()
+        applied = 0
+        _G._containerCooldowns = {}
+        themes.decorationGeneration = 0
+        item:SetItemFromData(btnCtx, potion())
+        item._decoration.UpdateCooldown = function() applied = applied + 1 end
+      end)
+
+      after_each(function()
+        _G._containerCooldowns = {}
+        themes.decorationGeneration = nil
+      end)
+
+      it("skips a refresh when the cooldown is unchanged since it was applied", function()
+        item:UpdateCooldown(btnCtx, potion(), true)
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(0, applied)
+      end)
+
+      it("applies when the client reports a different cooldown", function()
+        _G._containerCooldowns["0_6"] = { 100, 60, 1 }
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(1, applied)
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(1, applied)
+        _G._containerCooldowns["0_6"] = { 100, 60, 0 }
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(2, applied)
+        _G._containerCooldowns["0_6"] = { 100, 90, 0 }
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(3, applied)
+        _G._containerCooldowns["0_6"] = { 200, 90, 0 }
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(4, applied)
+        _G._containerCooldowns["0_6"] = nil
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(5, applied)
+      end)
+
+      it("applies when the icon, the theme or the decoration changed", function()
+        local other = potion()
+        other.itemInfo.itemIcon = 1
+        item:UpdateCooldown(btnCtx, other, true)
+        assert.equal(1, applied)
+
+        themes.decorationGeneration = 1
+        item:UpdateCooldown(btnCtx, other, true)
+        assert.equal(2, applied)
+
+        local old = item._decoration
+        item._decoration = nil
+        themes.GetItemButton(nil, btnCtx, item)
+        item._decoration.id, item._decoration.bagID = old.id, old.bagID
+        item._decoration.UpdateCooldown = function() applied = applied + 1 end
+        item:UpdateCooldown(btnCtx, other, true)
+        assert.equal(3, applied)
+        item._decoration = old
+      end)
+
+      it("always applies on a full draw or a call that does not ask to skip", function()
+        item:UpdateCooldown(btnCtx, potion())
+        assert.equal(1, applied)
+        local changed = potion()
+        changed.itemInfo.currentItemCount = 2
+        item:SetItemFromData(btnCtx, changed)
+        assert.equal(2, applied)
+      end)
+
+      it("applies again after the button was released", function()
+        item:Release(btnCtx)
+        item:SetItemFromData(btnCtx, potion())
+        applied = 0
+        item.cooldownState.valid = false
+        item:UpdateCooldown(btnCtx, potion(), true)
+        assert.equal(1, applied)
+
+        item:Release(btnCtx)
+        assert.is_false(item.cooldownState.valid)
+      end)
+
+      it("applies again after the button showed a free slot", function()
+        item:SetFreeSlots(btnCtx, { bagid = 0, slotid = 6, slotkey = "0_6", itemInfo = { emptySlotName = "Bag" } }, 1)
+        assert.is_false(item.cooldownState.valid)
+      end)
+
+      it("never skips an item row", function()
+        item.staticData = potion()
+        item:UpdateCooldown(btnCtx, potion(), true)
+        item:UpdateCooldown(btnCtx, potion(), true)
+        item.staticData = nil
+        assert.equal(2, applied)
+      end)
+
+      it("skips the same way on Classic, which updates through ContainerFrame_UpdateCooldown", function()
+        local saved = _G.ContainerFrame_UpdateCooldown
+        local classicApplied = 0
+        _G.ContainerFrame_UpdateCooldown = function() classicApplied = classicApplied + 1 end
+        item._decoration.UpdateCooldown = nil
+        item:UpdateCooldown(btnCtx, potion())
+        item:UpdateCooldown(btnCtx, potion(), true)
+        _G._containerCooldowns["0_6"] = { 100, 60, 1 }
+        item:UpdateCooldown(btnCtx, potion(), true)
+        _G.ContainerFrame_UpdateCooldown = saved
+        assert.equal(2, classicApplied)
+      end)
+    end)
+
     describe("redrawing without a release", function()
       local function fullItem(count)
         return {

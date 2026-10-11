@@ -154,6 +154,7 @@ local function stubClientAPIs()
     { _G.C_NewItems, "IsNewItem" },
     { _G.C_NewItems, "RemoveNewItem" },
     { _G, "GetInventoryItemLink" },
+    { _G.Item, "CreateFromEquipmentSlot" },
   }
   for _, k in ipairs(keys) do
     saveGlobal(k[1], k[2])
@@ -216,6 +217,14 @@ local function stubClientAPIs()
     table.insert(removedNewItems, bagid .. "_" .. slotid)
   end
   _G.GetInventoryItemLink = function() return nil end
+  -- Nothing is equipped unless a test equips something, consistent with GetInventoryItemLink.
+  _G.Item.CreateFromEquipmentSlot = function(_, slot)
+    local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+    local mixin = {}
+    function mixin:GetItemLocation() return loc end
+    function mixin:IsItemEmpty() return true end
+    return mixin
+  end
 end
 
 local function loadRealModules()
@@ -390,6 +399,27 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local slotInfo = refreshBackpack({ bags = { [0] = true } })
       assert.are.same({ "0_1" }, harvestedKeys())
       assert.equal("guid-b", slotInfo.itemsBySlotKey["0_1"].itemInfo.itemGUID)
+    end)
+
+    -- Scaling (level, timewalking-style events) can change an item's current item level
+    -- without changing its link, its container info or its GUID.
+    it("re-reads a slot whose current item level changed", function()
+      local level = 100
+      local currentLevel = _G.C_Item.GetCurrentItemLevel
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        local bagid, slotid = location:GetBagAndSlot()
+        if bagid == 0 and slotid == 1 then return level end
+        return currentLevel(location)
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "guid-101", count = 1 } }
+      refreshBackpack({ wipe = true })
+      harvested = {}
+      refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({}, harvestedKeys())
+      level = 60
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_1" }, harvestedKeys())
+      assert.equal(60, slotInfo.itemsBySlotKey["0_1"].itemInfo.currentItemLevel)
     end)
 
     it("re-reads every slot on a wipe sweep", function()
@@ -597,6 +627,881 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.is_nil(slotInfo.visibleItemsBySlotKey["0_2"].stackedCount)
         assert.equal(5, slotInfo.visibleItemsBySlotKey["0_1"].itemInfo.currentItemCount)
       end)
+    end)
+  end)
+
+  it("looks a bag's name up again on the next sweep (bags can be swapped)", function()
+    mockContainer[0] = { {} }
+    local name = "Bag"
+    override(_G.C_Item, "GetItemSubClassInfo", function() return name end)
+    refreshBackpack({ wipe = true })
+    name = "Herb Bag"
+    local slotInfo = refreshBackpack()
+    assert.equal("Herb Bag", slotInfo.itemsBySlotKey["0_1"].itemInfo.emptySlotName)
+  end)
+
+  -- Phase 6 names each empty slot after its bag. The name is the same for every slot of a
+  -- bag and only empty slots use it, so it is looked up once per bag per sweep.
+  it("looks up a bag's name once per sweep, not once per slot", function()
+    mockContainer[0] = { { itemID = 101, guid = "g1", count = 1 }, {}, {}, {} }
+    mockContainer[1] = { {}, {}, { itemID = 102, guid = "g2", count = 1 } }
+    local lookups = {}
+    local inPhase6 = false
+    local phase6 = items.Phase6_EnrichData
+    override(items, "Phase6_EnrichData", function(self, ...)
+      inPhase6 = true
+      local a1, a2, a3, a4, a5 = phase6(self, ...)
+      inPhase6 = false
+      return a1, a2, a3, a4, a5
+    end)
+    local toInventory = _G.C_Container.ContainerIDToInventoryID
+    override(_G.C_Container, "ContainerIDToInventoryID", function(bagid)
+      if inPhase6 then lookups[bagid] = (lookups[bagid] or 0) + 1 end
+      return toInventory(bagid)
+    end)
+    local slotInfo = refreshBackpack({ wipe = true })
+    assert.are.same({ [0] = 1, [1] = 1 }, lookups)
+    assert.equal("Bag", slotInfo.itemsBySlotKey["0_2"].itemInfo.emptySlotName)
+    assert.equal("Bag", slotInfo.itemsBySlotKey["1_1"].itemInfo.emptySlotName)
+  end)
+
+  -- Equipped gear is read on backpack sweeps. A slot is read again only when its link or
+  -- current item level changed, when PLAYER_EQUIPMENT_CHANGED named it, on a wipe, or when
+  -- its last read was cold; otherwise the previous read is kept.
+  describe("equipped gear cache", function()
+    local equipped, reads, registered
+
+    local function equip(slot, id, ilvl)
+      equipped[slot] = { id = id, ilvl = ilvl,
+        link = "|cnIQ4:|Hitem:" .. id .. ":0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear " .. id .. "]|h|r" }
+    end
+
+    local function readSlots()
+      local slots = {}
+      for _, slot in ipairs(reads) do slots[#slots + 1] = slot end
+      table.sort(slots)
+      reads = {}
+      return slots
+    end
+
+    before_each(function()
+      equipped, reads, registered = {}, {}, {}
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        local e = equipped[slot]
+        return e and e.link or nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return equipped[slot] == nil end
+        function mixin:GetItemLink() return equipped[slot] and equipped[slot].link end
+        function mixin:GetItemID() return equipped[slot] and equipped[slot].id end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      local currentLevel = _G.C_Item.GetCurrentItemLevel
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        local slot = location.GetEquipmentSlot and location:GetEquipmentSlot()
+        if slot then return equipped[slot] and equipped[slot].ilvl end
+        return currentLevel(location)
+      end)
+      local getEquipmentInfo = items.GetEquipmentInfo
+      override(items, "GetEquipmentInfo", function(self, mixin)
+        table.insert(reads, mixin:GetItemLocation():GetEquipmentSlot())
+        return getEquipmentInfo(self, mixin)
+      end)
+      override(events, "RegisterEvent", function(_, name, cb) registered[name] = cb end)
+      override(_G.C_Timer, "After", function() end)
+      items:RegisterCacheEvents()
+      mockContainer[0] = { { itemID = 101, guid = "g1", count = 1 } }
+      equip(1, 501, 100)
+      equip(5, 505, 100)
+      refreshBackpack({ wipe = true })
+      reads = {}
+    end)
+
+    it("keeps every slot whose link and item level are unchanged", function()
+      refreshBackpack()
+      assert.are.same({}, readSlots())
+      assert.equal(100, items:GetItemDataFromInventorySlot(5).itemInfo.currentItemLevel)
+    end)
+
+    it("re-reads a slot whose item changed", function()
+      equip(5, 605, 200)
+      refreshBackpack()
+      assert.are.same({ 5 }, readSlots())
+      assert.equal(200, items:GetItemDataFromInventorySlot(5).itemInfo.currentItemLevel)
+    end)
+
+    it("re-reads a slot whose item level changed without its link changing", function()
+      equipped[5].ilvl = 150
+      refreshBackpack()
+      assert.are.same({ 5 }, readSlots())
+      assert.equal(150, items:GetItemDataFromInventorySlot(5).itemInfo.currentItemLevel)
+    end)
+
+    it("re-reads a slot PLAYER_EQUIPMENT_CHANGED named, even with the same link", function()
+      registered["PLAYER_EQUIPMENT_CHANGED"](context:New("evt"), "PLAYER_EQUIPMENT_CHANGED", 1, true)
+      refreshBackpack()
+      assert.are.same({ 1 }, readSlots())
+    end)
+
+    it("drops a slot that was emptied", function()
+      equipped[5] = nil
+      refreshBackpack()
+      assert.is_nil(items:GetItemDataFromInventorySlot(5))
+      assert.is_not_nil(items:GetItemDataFromInventorySlot(1))
+    end)
+
+    it("re-reads every equipped slot on a wipe", function()
+      refreshBackpack({ wipe = true })
+      assert.are.same({ 1, 5 }, readSlots())
+    end)
+
+    it("re-reads a slot whose last read was cold until it reads warm", function()
+      local cold = true
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(id)
+        if cold and tostring(id):find("item:705", 1, true) then return nil end
+        return getItemInfo(id)
+      end)
+      equip(5, 705, 300)
+      refreshBackpack()
+      assert.are.same({ 5 }, readSlots())
+      refreshBackpack()
+      assert.are.same({ 5 }, readSlots(), "a cold read is not kept")
+      cold = false
+      refreshBackpack()
+      assert.are.same({ 5 }, readSlots())
+      refreshBackpack()
+      assert.are.same({}, readSlots(), "once read warm, the slot is kept")
+    end)
+
+    it("does not read gear on bank sweeps", function()
+      local ctx = context:New("bank")
+      items:RefreshBank(ctx)
+      assert.are.same({}, readSlots())
+    end)
+  end)
+
+  -- Upgrade verdicts of the cacheable providers (Pawn, the built-in BetterBags) are kept on
+  -- each item and reused while the provider and the upgrade generation are unchanged. Every
+  -- input of a verdict must invalidate it: these tests pin each one.
+  describe("upgrade verdict cache", function()
+    local asked, verdicts, registered, timers, sent, provider
+
+    local function askedKeys()
+      local keys = {}
+      for _, key in ipairs(asked) do keys[#keys + 1] = key end
+      table.sort(keys)
+      asked = {}
+      return keys
+    end
+
+    local function useProvider(name, cacheable)
+      provider = name
+      items:RegisterUpgradeProvider(name, function(data)
+        table.insert(asked, data.slotkey)
+        local v = verdicts[data.itemInfo.itemID]
+        if v == "unknown" then return nil end
+        if v == "transient" then return false, false end
+        return v or false
+      end, { cacheable = cacheable })
+    end
+
+    local function fire(name, ...)
+      registered[name](context:New("evt"), name, ...)
+    end
+
+    local function runTimers()
+      local pending = timers
+      timers = {}
+      for _, t in ipairs(pending) do t.fn() end
+    end
+
+    before_each(function()
+      asked, verdicts, registered, timers, sent = {}, {}, {}, {}, {}
+      override(database, "GetUpgradeIconProvider", function() return provider end)
+      override(database, "GetUpgradeIconProviderUserSet", function() return true end)
+      override(events, "RegisterEvent", function(_, name, cb) registered[name] = cb end)
+      override(_G.C_Timer, "After", function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end)
+      local send = events.SendMessage
+      override(events, "SendMessage", function(self, ctx, event, ...)
+        table.insert(sent, event)
+        return send(self, ctx, event, ...)
+      end)
+      items:RegisterCacheEvents()
+      useProvider("Test", true)
+      mockContainer[0] = {
+        { itemID = 101, guid = "g1", count = 1 },
+        { itemID = 102, guid = "g2", count = 5 },
+        {},
+      }
+      verdicts[101] = true
+      refreshBackpack({ wipe = true })
+      assert.are.same({ "0_1", "0_2" }, askedKeys())
+      sent = {}
+    end)
+
+    it("asks again only for the slot that changed", function()
+      mockContainer[0][2].count = 4
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_2" }, askedKeys())
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+      refreshBackpack()
+      assert.are.same({}, askedKeys())
+    end)
+
+    it("asks every sweep for a provider that is not cacheable", function()
+      useProvider("Uncached", false)
+      refreshBackpack()
+      refreshBackpack()
+      assert.are.same({ "0_1", "0_1", "0_2", "0_2" }, askedKeys())
+    end)
+
+    it("asks again when the active provider changes, even without a wipe", function()
+      useProvider("Other", true)
+      refreshBackpack()
+      assert.are.same({ "0_1", "0_2" }, askedKeys())
+    end)
+
+    it("never returns one provider's verdict for another, even at the same generation", function()
+      items._upgradeGenerations["Other"] = items._upgradeGenerations["Test"]
+      items:RegisterUpgradeProvider("Other", function(data)
+        table.insert(asked, data.slotkey)
+        return false
+      end, { cacheable = true })
+      provider = "Other"
+      local slotInfo = refreshBackpack()
+      assert.are.same({ "0_1", "0_2" }, askedKeys())
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].isUpgrade)
+    end)
+
+    -- A provider can answer but mark the answer as not to be kept (Pawn answering false
+    -- because it had no data for the gear it compares with). It is shown and asked again on
+    -- every sweep, with no extra retry refresh.
+    it("shows but never keeps an answer its provider marked as not to be kept", function()
+      verdicts[102] = "transient"
+      mockContainer[0][2].count = 3
+      timers = {}
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are.same({ "0_2" }, askedKeys())
+      assert.is_false(slotInfo.itemsBySlotKey["0_2"].isUpgrade)
+      assert.equal(0, #timers, "no retry")
+      refreshBackpack()
+      assert.are.same({ "0_2" }, askedKeys(), "asked again")
+    end)
+
+    it("asks again after a wipe sweep", function()
+      refreshBackpack({ wipe = true })
+      assert.are.same({ "0_1", "0_2" }, askedKeys())
+    end)
+
+    local invalidating = {
+      { "PLAYER_EQUIPMENT_CHANGED", { 5, true } },
+      { "PLAYER_LEVEL_UP", { 70 } },
+      { "PLAYER_LEVEL_CHANGED", { 70, 60 } },
+      { "PLAYER_AVG_ITEM_LEVEL_UPDATE", {} },
+      { "SKILL_LINES_CHANGED", {} },
+      { "LEARNED_SPELL_IN_SKILL_LINE", { 12345, 1, false } },
+      { "PLAYER_SPECIALIZATION_CHANGED", { "player" } },
+    }
+    for _, case in ipairs(invalidating) do
+      it("asks again after " .. case[1] .. ", and requests a backpack refresh", function()
+        fire(case[1], unpack(case[2]))
+        runTimers()
+        local refreshed = false
+        for _, event in ipairs(sent) do
+          if event == "bags/RefreshBackpack" then refreshed = true end
+          assert.are_not.equal("bags/RefreshBank", event, "the bank is closed")
+        end
+        assert.is_true(refreshed)
+        refreshBackpack()
+        assert.are.same({ "0_1", "0_2" }, askedKeys())
+      end)
+    end
+
+    it("ignores another unit's specialization change", function()
+      fire("PLAYER_SPECIALIZATION_CHANGED", "party1")
+      runTimers()
+      refreshBackpack()
+      assert.are.same({}, askedKeys())
+    end)
+
+    it("refreshes the bank too when it is open", function()
+      addon.atBank = true
+      fire("PLAYER_LEVEL_UP", 70)
+      runTimers()
+      local bank = false
+      for _, event in ipairs(sent) do
+        if event == "bags/RefreshBank" then bank = true end
+      end
+      assert.is_true(bank)
+    end)
+
+    it("coalesces invalidations in one frame into one refresh request", function()
+      fire("PLAYER_EQUIPMENT_CHANGED", 1, true)
+      fire("PLAYER_EQUIPMENT_CHANGED", 5, true)
+      fire("SKILL_LINES_CHANGED")
+      assert.equal(1, #timers)
+      runTimers()
+      local count = 0
+      for _, event in ipairs(sent) do
+        if event == "bags/RefreshBackpack" then count = count + 1 end
+      end
+      assert.equal(1, count)
+    end)
+
+    it("asks again when the harvest finds that equipped gear changed, with no event", function()
+      local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+      local current = link
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return current end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return current end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      refreshBackpack()
+      askedKeys()
+      current = link:gsub("505:0", "505:6")
+      refreshBackpack()
+      assert.are.same({ "0_1", "0_2" }, askedKeys())
+    end)
+
+    -- Built-in usability (C_PlayerInfo.CanUseItem) also changes with reputation and spells
+    -- (Blizzard's own usability refresh, Blizzard_Wardrobe.lua, listens for these). They fire
+    -- often, so they invalidate only the built-in provider's verdicts and request no refresh:
+    -- the next refresh recomputes them.
+    for _, name in ipairs({ "UPDATE_FACTION", "SPELLS_CHANGED" }) do
+      it("drops built-in verdicts, and only those, after " .. name, function()
+        fire(name)
+        assert.equal(0, #timers, "no refresh is requested")
+        refreshBackpack()
+        assert.are.same({}, askedKeys(), "another provider's verdicts are kept")
+
+        local builtin = items.upgradeProviders["BetterBags"]
+        local builtinAsked = 0
+        items.upgradeProviders["BetterBags"] = function(data)
+          builtinAsked = builtinAsked + 1
+          return builtin(data)
+        end
+        provider = "BetterBags"
+        refreshBackpack()
+        builtinAsked = 0
+        refreshBackpack()
+        assert.equal(0, builtinAsked, "kept")
+        fire(name)
+        refreshBackpack()
+        assert.equal(2, builtinAsked, "asked again")
+      end)
+    end
+
+    describe("a verdict the provider is not sure about yet", function()
+      before_each(function()
+        verdicts[102] = "unknown"
+        mockContainer[0][2].count = 3
+        refreshBackpack({ bags = { [0] = true } })
+        askedKeys()
+      end)
+
+      it("is not kept: the item is asked again on the next sweep", function()
+        refreshBackpack()
+        assert.are.same({ "0_2" }, askedKeys())
+      end)
+
+      it("schedules one retry refresh of the bag a quarter second later", function()
+        assert.equal(1, #timers)
+        assert.equal(0.25, timers[1].delay)
+        sent = {}
+        runTimers()
+        assert.are.same({ "bags/RefreshBackpack" }, sent)
+      end)
+
+      it("shows no arrow until it is known, never the previous gear's verdict", function()
+        verdicts[102] = true
+        mockContainer[0][2].count = 2
+        local slotInfo = refreshBackpack({ bags = { [0] = true } })
+        assert.is_true(slotInfo.itemsBySlotKey["0_2"].isUpgrade)
+        verdicts[102] = "unknown"
+        fire("SKILL_LINES_CHANGED")
+        slotInfo = refreshBackpack()
+        assert.is_false(slotInfo.itemsBySlotKey["0_2"].isUpgrade)
+      end)
+
+      it("stops retrying after the provider stalls, and still never keeps the item", function()
+        local rounds = 0
+        while #timers > 0 and rounds < 50 do
+          rounds = rounds + 1
+          runTimers()
+          refreshBackpack()
+        end
+        assert.equal(0, #timers, "retries stop")
+        assert.is_true(rounds >= 8, "after several rounds without progress, not at once")
+        assert.is_true(rounds < 50, "and not never")
+        askedKeys()
+        refreshBackpack()
+        assert.are.same({ "0_2" }, askedKeys(), "still not kept: asked again on every sweep")
+        assert.equal(0, #timers, "a given-up bag is not retried by later sweeps")
+      end)
+
+      it("keeps retrying while each round answers more items (Pawn's time budget)", function()
+        -- Ten unknown items; the provider answers one more per round, as a time-budgeted
+        -- provider does. Retries must continue until every item is answered.
+        mockContainer[1] = {}
+        for i = 1, 10 do
+          mockContainer[1][i] = { itemID = 200 + i, guid = "b" .. i, count = 1 }
+          verdicts[200 + i] = "unknown"
+        end
+        verdicts[102] = false
+        refreshBackpack()
+        local round = 0
+        while #timers > 0 and round < 30 do
+          round = round + 1
+          verdicts[200 + round] = true
+          runTimers()
+          refreshBackpack()
+        end
+        local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+        for i = 1, 10 do
+          assert.is_true(slotInfo.itemsBySlotKey["1_" .. i].isUpgrade, "item " .. i)
+        end
+        assert.equal(0, #timers)
+      end)
+
+      it("retries again for new unanswered items after an earlier batch was given up", function()
+        local rounds = 0
+        while #timers > 0 and rounds < 50 do
+          rounds = rounds + 1
+          runTimers()
+          refreshBackpack()
+        end
+        assert.equal(0, #timers, "given up on 0_2")
+        mockContainer[1] = { { itemID = 401, guid = "new1", count = 1 } }
+        verdicts[401] = "unknown"
+        refreshBackpack()
+        assert.equal(1, #timers, "new unanswered items are retried")
+        verdicts[401] = true
+        runTimers()
+        local slotInfo = refreshBackpack()
+        assert.is_true(slotInfo.itemsBySlotKey["1_1"].isUpgrade)
+      end)
+
+      -- An invalidation is not new work for an item that stays unanswered: restarting its
+      -- retries on every invalidation (Pawn invalidates on every item pickup; reputation and
+      -- spell events arrive constantly) would re-sweep the bag forever for an item that is
+      -- never answered.
+      it("does not restart retries for the same unanswered items after an invalidation", function()
+        local rounds = 0
+        while #timers > 0 and rounds < 50 do
+          rounds = rounds + 1
+          runTimers()
+          refreshBackpack()
+        end
+        assert.equal(0, #timers)
+        for _ = 1, 20 do
+          fire("SKILL_LINES_CHANGED")
+          fire("UPDATE_FACTION")
+          runTimers()
+          refreshBackpack()
+          assert.equal(0, #timers)
+        end
+      end)
+
+      it("schedules one retry when two sweeps run within one retry window", function()
+        runTimers()
+        refreshBackpack()
+        refreshBackpack()
+        assert.equal(1, #timers)
+      end)
+
+      it("starts counting stalls afresh after a round with nothing unanswered", function()
+        for _ = 1, 5 do
+          runTimers()
+          refreshBackpack()
+        end
+        verdicts[102] = false
+        runTimers()
+        refreshBackpack()
+        assert.equal(0, #timers, "nothing unanswered")
+        verdicts[102] = "unknown"
+        mockContainer[0][2].count = 9
+        refreshBackpack({ bags = { [0] = true } })
+        local rounds = 0
+        while #timers > 0 and rounds < 50 do
+          rounds = rounds + 1
+          runTimers()
+          refreshBackpack()
+        end
+        assert.is_true(rounds >= 8, "a full set of retries, not the 3 left over")
+      end)
+
+      it("counts an answered item as progress even when another one became unanswered", function()
+        -- 0_2 is unanswered. Each round answers the previous unknown and a new one appears.
+        mockContainer[1] = {}
+        for round = 1, 12 do
+          mockContainer[1][round] = { itemID = 500 + round, guid = "r" .. round, count = 1 }
+          verdicts[500 + round] = "unknown"
+          if round > 1 then verdicts[500 + round - 1] = true end
+          verdicts[102] = round == 1 and "unknown" or false
+          runTimers()
+          refreshBackpack()
+          assert.equal(1, #timers, "round " .. round)
+        end
+      end)
+
+      it("retries a bank item with a bank refresh, only while the bank is open", function()
+        timers = {}
+        items:ScheduleUpgradeRetry(const.BAG_KIND.BANK)
+        sent = {}
+        runTimers()
+        assert.are.same({}, sent)
+        addon.atBank = true
+        items:ScheduleUpgradeRetry(const.BAG_KIND.BANK)
+        runTimers()
+        assert.are.same({ "bags/RefreshBank" }, sent)
+      end)
+    end)
+
+    it("does not lose a bank refresh requested after a backpack-only one was scheduled", function()
+      fire("PLAYER_LEVEL_UP", 70)
+      assert.equal(1, #timers)
+      addon.atBank = true
+      items:RequestUpgradeRefresh(false, true)
+      assert.equal(1, #timers)
+      sent = {}
+      runTimers()
+      table.sort(sent)
+      assert.are.same({ "bags/RefreshBackpack", "bags/RefreshBank" }, sent)
+    end)
+
+    it("does not lose a backpack refresh requested after a bank-only one was scheduled", function()
+      addon.atBank = true
+      items:RequestUpgradeRefresh(false, true)
+      items:RequestUpgradeRefresh(true, false)
+      assert.equal(1, #timers)
+      sent = {}
+      runTimers()
+      table.sort(sent)
+      assert.are.same({ "bags/RefreshBackpack", "bags/RefreshBank" }, sent)
+    end)
+
+    it("registers its cache events when the module is enabled", function()
+      registered = {}
+      items:OnEnable()
+      for _, name in ipairs({ "PLAYER_EQUIPMENT_CHANGED", "PLAYER_LEVEL_UP", "PLAYER_LEVEL_CHANGED",
+        "PLAYER_AVG_ITEM_LEVEL_UPDATE", "SKILL_LINES_CHANGED", "LEARNED_SPELL_IN_SKILL_LINE",
+        "PLAYER_SPECIALIZATION_CHANGED", "UPDATE_FACTION", "SPELLS_CHANGED" }) do
+        assert.is_function(registered[name], name)
+      end
+    end)
+
+    -- Equipped gear that was read while the client had no item info for it: verdicts that
+    -- compare with it are not kept, the bag is retried, and once the gear reads warm every
+    -- verdict is asked again.
+    it("drops every kept verdict and refreshes the open bank when equipped gear stops reading cold", function()
+      addon.atBank = true
+      local cold = true
+      local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return link end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return link end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(id)
+        if cold and tostring(id):find("item:505", 1, true) then return nil end
+        return getItemInfo(id)
+      end)
+      -- As in the client: the item level and the instant info do not depend on the item
+      -- cache, so the cold and warm reads differ only in being cold.
+      local currentLevel = _G.C_Item.GetCurrentItemLevel
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        if location.GetEquipmentSlot and location:GetEquipmentSlot() == 5 then return 100 end
+        return currentLevel(location)
+      end)
+      local instant = _G.C_Item.GetItemInfoInstant
+      override(_G.C_Item, "GetItemInfoInstant", function(item)
+        if tostring(item):find("item:505", 1, true) then
+          return 505, "Armor", "Plate", "INVTYPE_CHEST", 134400, 4, 4
+        end
+        return instant(item)
+      end)
+      refreshBackpack({ wipe = true })
+      runTimers()
+      local generation = items._upgradeGenerations["Test"]
+      cold = false
+      sent = {}
+      refreshBackpack()
+      assert.is_true(items._upgradeGenerations["Test"] > generation, "a new generation")
+      runTimers()
+      local bank = false
+      for _, event in ipairs(sent) do
+        if event == "bags/RefreshBank" then bank = true end
+      end
+      assert.is_true(bank, "the open bank is refreshed")
+    end)
+
+    -- A sweep that fails partway through reading the gear must not lose the change it read
+    -- before failing: nothing is recorded until every slot was read.
+    it("does not lose a gear change when reading a later slot fails", function()
+      provider = "BetterBags"
+      local links = {
+        [1] = "|cnIQ4:|Hitem:501:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Head]|h|r",
+        [5] = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Chest]|h|r",
+      }
+      override(_G, "GetInventoryItemLink", function(_, slot) return links[slot] end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return links[slot] == nil end
+        function mixin:GetItemLink() return links[slot] end
+        function mixin:GetItemID() return 500 + slot end
+        function mixin:GetInventoryType() return slot end
+        return mixin
+      end)
+      refreshBackpack({ wipe = true })
+      runTimers()
+
+      -- The head changes; the chest is unchanged but due for a re-read, which fails.
+      links[1] = links[1]:gsub("501:0", "501:6")
+      fire("PLAYER_EQUIPMENT_CHANGED", 5, true)
+      runTimers()
+      local generation = items._upgradeGenerations["BetterBags"]
+      local getEquipmentInfo = items.GetEquipmentInfo
+      override(items, "GetEquipmentInfo", function(self, mixin)
+        if mixin:GetItemLocation():GetEquipmentSlot() == 5 then error("simulated read failure") end
+        return getEquipmentInfo(self, mixin)
+      end)
+      assert.has_error(function() refreshBackpack() end)
+      items.GetEquipmentInfo = getEquipmentInfo
+
+      refreshBackpack()
+      assert.is_true(items._upgradeGenerations["BetterBags"] > generation, "the head change is still seen")
+    end)
+
+    -- The equip location comes from GetItemInfoInstant (all seven values, never a server
+    -- query), so a cold GetItemInfo does not blank it.
+    it("reads an equipped item's equip location from GetItemInfoInstant", function()
+      local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 16 then return link end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 16 end
+        function mixin:GetItemLink() return link end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 17 end
+        return mixin
+      end)
+      local instant = _G.C_Item.GetItemInfoInstant
+      override(_G.C_Item, "GetItemInfoInstant", function(item)
+        if tostring(item):find("item:505", 1, true) then
+          return 505, "Weapon", "Two-Handed Swords", "INVTYPE_2HWEAPON", 135000, 2, 8
+        end
+        return instant(item)
+      end)
+      override(_G.C_Item, "GetItemInfo", function() return nil end)
+      refreshBackpack({ wipe = true })
+      assert.equal("INVTYPE_2HWEAPON", items:GetItemDataFromInventorySlot(16).itemInfo.itemEquipLoc)
+    end)
+
+    it("does not leave a stale unanswered count after a sweep failed while resolving upgrades", function()
+      verdicts[102] = "unknown"
+      local resolve = items.ResolveUpgrade
+      override(items, "ResolveUpgrade", function(self, data)
+        local v = resolve(self, data)
+        if data.slotkey == "0_2" then error("simulated failure") end
+        return v
+      end)
+      mockContainer[0][2].count = 7
+      assert.has_error(function() refreshBackpack({ bags = { [0] = true } }) end)
+      items.ResolveUpgrade = resolve
+      verdicts[102] = false
+      timers = {}
+      refreshBackpack()
+      assert.equal(0, #timers, "nothing is unanswered, so nothing is retried")
+    end)
+
+    it("keeps no verdict while equipped gear reads cold, and asks again once it reads warm", function()
+      local cold = true
+      local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return link end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return link end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(id)
+        if cold and tostring(id):find("item:505", 1, true) then return nil end
+        return getItemInfo(id)
+      end)
+      refreshBackpack({ wipe = true })
+      askedKeys()
+      runTimers()
+      refreshBackpack()
+      assert.are.same({ "0_1", "0_2" }, askedKeys(), "not kept while the gear is cold")
+      assert.equal(1, #timers, "retried")
+
+      cold = false
+      runTimers()
+      sent = {}
+      refreshBackpack()
+      askedKeys()
+      runTimers()
+      local refreshed = false
+      for _, event in ipairs(sent) do
+        if event == "bags/RefreshBackpack" then refreshed = true end
+      end
+      assert.is_true(refreshed, "warming gear refreshes the bags")
+      refreshBackpack()
+      assert.are.same({}, askedKeys(), "kept once the gear is warm")
+    end)
+
+    it("asks again when an equipped item's level changes without its link changing", function()
+      local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+      local level = 100
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return link end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return link end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      local currentLevel = _G.C_Item.GetCurrentItemLevel
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        if location.GetEquipmentSlot and location:GetEquipmentSlot() == 5 then return level end
+        return currentLevel(location)
+      end)
+      refreshBackpack()
+      askedKeys()
+      level = 40
+      refreshBackpack()
+      assert.are.same({ "0_1", "0_2" }, askedKeys())
+    end)
+
+    -- A backpack sweep that fails after its harvest must not leave the bank judged against
+    -- the gear before the change: the gear read is published with the harvest.
+    it("judges the bank against the newly read gear even when the backpack sweep failed", function()
+      provider = "BetterBags"
+      override(const, "INVENTORY_TYPE_TO_INVENTORY_SLOTS", { [1] = { 5 } })
+      local gear = { link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r", ilvl = 100 }
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return gear.link end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return gear.link end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        if location.GetEquipmentSlot and location:GetEquipmentSlot() == 5 then return gear.ilvl end
+        return 200
+      end)
+      mockContainer[6] = { { itemID = 301, guid = "bank1", count = 1 } }
+      refreshBackpack({ wipe = true })
+      local bankCtx = context:New("bank")
+      items:RefreshBank(bankCtx)
+      assert.is_true(items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey["6_1"].isUpgrade)
+
+      gear.link = gear.link:gsub("505:0", "505:6")
+      gear.ilvl = 300
+      local phase6 = items.Phase6_EnrichData
+      override(items, "Phase6_EnrichData", function() error("simulated sweep failure") end)
+      assert.has_error(function() refreshBackpack() end)
+      items.Phase6_EnrichData = phase6
+
+      items:RefreshBank(context:New("bank2"))
+      assert.is_false(items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey["6_1"].isUpgrade)
+    end)
+
+    it("does not keep a verdict for an item read while the client had no item info", function()
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(id)
+        if tostring(id) == "103" then return nil end
+        return getItemInfo(id)
+      end)
+      mockContainer[0][3] = { itemID = 103, guid = "g3", count = 1 }
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.is_nil(slotInfo.itemsBySlotKey["0_3"].upgradeGeneration)
+    end)
+
+    -- The built-in provider compares a bag item with the gear equipped in its slot. It must
+    -- compare with the gear read in the same sweep, or a verdict computed against the
+    -- previous gear would be kept.
+    it("judges the built-in provider against the gear read in the same sweep", function()
+      provider = "BetterBags"
+      override(const, "INVENTORY_TYPE_TO_INVENTORY_SLOTS", { [1] = { 5 } })
+      local gear = { link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r", ilvl = 100 }
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return gear.link end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return gear.link end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      override(_G.C_Item, "GetCurrentItemLevel", function(location)
+        if location.GetEquipmentSlot and location:GetEquipmentSlot() == 5 then return gear.ilvl end
+        return 200
+      end)
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].isUpgrade, "200 beats the equipped 100")
+
+      gear.link = gear.link:gsub("505:0", "505:6")
+      gear.ilvl = 300
+      slotInfo = refreshBackpack()
+      assert.is_false(slotInfo.itemsBySlotKey["0_1"].isUpgrade, "the same sweep sees the new 300")
     end)
   end)
 

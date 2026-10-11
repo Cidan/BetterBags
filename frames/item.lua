@@ -72,6 +72,7 @@ local HALO_MIN_ALPHA = 0.4
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
 ---@field drawState table|nil The inputs of the last full draw (see itemDrawUnchanged).
+---@field cooldownState table|nil The cooldown last applied (see UpdateCooldown).
 itemFrame.itemProto = {}
 addon:GetModule('Perf'):RegisterPrototype(itemFrame.itemProto, 'Item')
 
@@ -307,19 +308,58 @@ function itemFrame.itemProto:UpdateTooltip()
 	end
 end
 
+-- UpdateCooldown applies the client's cooldown for the item to the button: the cooldown
+-- spiral, the dimmed icon while a used item's cooldown has not started, and (retail) the
+-- has-item state. Blizzard's update reads the cooldown with GetContainerItemCooldown and
+-- applies all three; the button records what it applied (cooldownState). With
+-- onlyIfChanged (the BAG_UPDATE_COOLDOWN refresh, bag:OnCooldown) it reads the cooldown
+-- with the same bag and slot Blizzard's update would, and skips the update when the
+-- cooldown, the icon, the decoration and the theme generation all match the record. A
+-- full draw always applies. ResetVisuals and SetFreeSlots, which clear the cooldown,
+-- invalidate the record. Item rows never skip.
 ---@param ctx Context
 ---@param data ItemData
-function itemFrame.itemProto:UpdateCooldown(ctx, data)
+---@param onlyIfChanged? boolean
+function itemFrame.itemProto:UpdateCooldown(ctx, data, onlyIfChanged)
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
 		return
 	end
 	local decoration = themes:GetItemButton(ctx, self)
-	if decoration.UpdateCooldown then
-		decoration:UpdateCooldown(data.itemInfo.itemIcon)
-	elseif data.bagid ~= nil then
+	local retail = decoration.UpdateCooldown ~= nil
+	if not retail and data.bagid == nil then
+		return
+	end
+	local readCooldown = C_Container and C_Container.GetContainerItemCooldown
+	local bag, slot, start, duration, enable
+	if readCooldown then
+		if retail then
+			bag, slot = decoration:GetBagID(), decoration:GetID()
+		else
+			bag, slot = data.bagid, decoration:GetID()
+		end
+		start, duration, enable = readCooldown(bag, slot)
+	end
+	local icon = data.itemInfo.itemIcon
+	local s = self.cooldownState
+	if onlyIfChanged and readCooldown and not self.staticData and s and s.valid
+		and s.decoration == decoration and s.decorationGeneration == themes.decorationGeneration
+		and s.bag == bag and s.slot == slot and s.icon == icon
+		and s.start == start and s.duration == duration and s.enable == enable then
+		return
+	end
+	if retail then
+		decoration:UpdateCooldown(icon)
+	else
 		ContainerFrame_UpdateCooldown(data.bagid, decoration)
 	end
+	s = s or {}
+	self.cooldownState = s
+	s.decoration = decoration
+	s.decorationGeneration = themes.decorationGeneration
+	s.bag, s.slot, s.icon = bag, slot, icon
+	s.start, s.duration, s.enable = start, duration, enable
+	s.valid = readCooldown ~= nil
 end
 
 ---@param ctx Context
@@ -794,6 +834,9 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	if decoration.UpdateItemContextMatching then decoration:UpdateItemContextMatching() end
 	SetItemButtonDesaturated(decoration, false)
 	if decoration.UpdateCooldown then decoration:UpdateCooldown(false) end
+	if self.cooldownState then
+		self.cooldownState.valid = false
+	end
 	self.ilvlText:SetText("")
 	self.ilvlText:Hide()
 	decoration.UpgradeIcon:SetShown(false)
@@ -928,6 +971,9 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	SetItemButtonDesaturated(decoration, false)
 	if ClearItemButtonOverlay then ClearItemButtonOverlay(decoration) end
 	if decoration.UpdateCooldown then decoration:UpdateCooldown(false) end
+	if self.cooldownState then
+		self.cooldownState.valid = false
+	end
 	if decoration.ItemSlotBackground then decoration.ItemSlotBackground:Hide() end
 	self.button:Enable()
 	self.ilvlText:SetText("")

@@ -67,6 +67,11 @@ backpack overrides do not replace `RegisterEvents`):
   buttons **and** the global section buttons in `self.itemFrames` (Recent Items lives
   outside the tab view, and freshly looted consumables sit there). Buttons with
   `isFreeSlot` are skipped: a free slot has no item cooldown to show.
+- Each button's refresh (`item:UpdateCooldown(ctx, data, true)`) reads the client's cooldown
+  for the slot and skips Blizzard's cooldown update when it matches what the button last
+  applied (caches.md §5). `BAG_UPDATE_COOLDOWN` fires on many spell casts, so in combat this
+  refresh can run several times a second over every button; before, each one ran Blizzard's
+  full update (spiral, icon tint, has-item) on every button.
 
 ## 4. Coverage
 

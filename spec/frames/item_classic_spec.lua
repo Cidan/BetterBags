@@ -408,12 +408,14 @@ describe("ItemFrame bag kind classification", function()
     _G.NEW_ITEM_ATLAS_BY_QUALITY = { [1] = "bags-glow-white", [2] = "bags-glow-green" }
     addon.isRetail = true
 
-    -- Retail's ContainerFrameItemButtonTemplate carries the ItemButtonMixin cooldown method.
+    -- Retail's ContainerFrameItemButtonTemplate carries ContainerFrameItemButtonMixin's
+    -- UpdateCooldown and GetBagID (GetButton sets the bag on the decoration).
     local themes = addon:GetModule("Themes")
     override(themes, "GetItemButton", function(_, _, item)
       if not item._decoration then
         item._decoration = newClassicDecoration(item)
         item._decoration.UpdateCooldown = function() end
+        item._decoration.GetBagID = function(self) return self.bagID end
       end
       return item._decoration
     end)

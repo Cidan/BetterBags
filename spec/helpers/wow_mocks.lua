@@ -842,6 +842,17 @@ _G.C_Container.GetContainerItemLink = function(bagid, slotid)
   end
   return nil
 end
+-- C_Container.GetContainerItemCooldown(containerIndex, slotIndex) -> startTime, duration, enable
+-- (ContainerDocumentation.lua: three non-nilable numbers). Specs set a slot's cooldown via
+-- _G._containerCooldowns["bag_slot"] = { start, duration, enable }; otherwise none.
+_G._containerCooldowns = {}
+_G.C_Container.GetContainerItemCooldown = function(containerIndex, slotIndex)
+  local cd = _G._containerCooldowns[tostring(containerIndex) .. "_" .. tostring(slotIndex)]
+  if cd then
+    return cd[1], cd[2], cd[3]
+  end
+  return 0, 0, 1
+end
 _G.C_Container.GetContainerNumFreeSlots = function(bagid)
   return 4, nil
 end

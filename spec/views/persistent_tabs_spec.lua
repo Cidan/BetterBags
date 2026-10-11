@@ -158,6 +158,7 @@ ResetModuleStub("Slots", "data/slots.lua")
 LoadBetterBagsModule("data/slots.lua")
 
 local items = addon:GetModule("Items")
+items:Init()
 items._firstLoad = {
   [const.BAG_KIND.BACKPACK] = false,
   [const.BAG_KIND.BANK] = false,

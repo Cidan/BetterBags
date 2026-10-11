@@ -1373,6 +1373,19 @@ describe("GenerateItemHash (Catalyst item stats)", function()
   end)
 end)
 
+-- Pawn functions that change what its upgrade verdict reads (scales, options, best items,
+-- initialization), from the installed Pawn 2.13.16 source. integrations/pawn.lua hooks each.
+local PAWN_STATE_FUNCTIONS = {
+  "PawnInitialize", "PawnResetTooltips", "PawnClearCache", "PawnClearCacheValuesOnly",
+  "PawnInvalidateBestItems", "PawnInvalidateBestItemsForScale", "PawnAddDefaultScale",
+  "PawnDeleteScale", "PawnRenameScale", "PawnDuplicateScale", "PawnSetAutoSelectScales",
+  "PawnSetScaleVisible", "PawnSetUpgradeTracking", "PawnSetShowUpgradesForWeapons",
+  "PawnSetStatValue", "PawnImportScale", "PawnAddPluginScale", "PawnAddPluginScaleFromTemplate",
+  "PawnAddPluginScaleProvider", "PawnSetAllScaleProviderScalesVisible", "PawnClearBestItemLevelData",
+  "PawnOnItemLost", "PawnOnArtifactUpdated", "PawnAddItemToLevelTracker", "PawnResetScalesCore",
+  "PawnAddEmptyScale", "PawnCorrectScaleErrors",
+}
+
 -- Load the Pawn and SimpleItemLevel integration modules so their OnEnable
 -- provider registration can be exercised directly.
 LoadBetterBagsModule("integrations/pawn.lua")
@@ -1385,6 +1398,7 @@ describe("Upgrade Icon Providers", function()
   -- defines FIRST/LAST_EQUIPPED, not MAINHAND/OFFHAND.
   local savedMainhand, savedOffhand, savedIsEquippable
   local savedPawnUnbudgeted, savedPawnIsUpgrade, savedPawnGetItemData
+  local savedPawnBudgeted, savedPawnRegisterBag
   local savedSimpleItemLevel
 
   local savedUserSet, savedGetProvider
@@ -1402,6 +1416,10 @@ describe("Upgrade Icon Providers", function()
     savedPawnUnbudgeted = _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted
     savedPawnIsUpgrade = _G.PawnIsContainerItemAnUpgrade
     savedPawnGetItemData = _G.PawnGetItemData
+    savedPawnBudgeted = _G.PawnShouldItemLinkHaveUpgradeArrow
+    savedPawnRegisterBag = _G.PawnRegisterThirdPartyBag
+    _G.PawnShouldItemLinkHaveUpgradeArrow = nil
+    _G.PawnRegisterThirdPartyBag = nil
     savedSimpleItemLevel = _G.SimpleItemLevel
     savedUserSet = database.GetUpgradeIconProviderUserSet
     savedGetProvider = database.GetUpgradeIconProvider
@@ -1421,6 +1439,8 @@ describe("Upgrade Icon Providers", function()
     _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = savedPawnUnbudgeted
     _G.PawnIsContainerItemAnUpgrade = savedPawnIsUpgrade
     _G.PawnGetItemData = savedPawnGetItemData
+    _G.PawnShouldItemLinkHaveUpgradeArrow = savedPawnBudgeted
+    _G.PawnRegisterThirdPartyBag = savedPawnRegisterBag
     _G.SimpleItemLevel = savedSimpleItemLevel
     database.GetUpgradeIconProviderUserSet = savedUserSet
     database.GetUpgradeIconProvider = savedGetProvider
@@ -1658,6 +1678,324 @@ describe("Upgrade Icon Providers", function()
       -- A subsequent ADDON_LOADED must not re-register or re-refresh.
       handler.fn("ADDON_LOADED", "SomethingElse")
       assert.are.equal(1, refreshed)
+    end)
+
+    -- Pawn's documented integration for bag addons (PawnBags.lua): ask the public, time-
+    -- budgeted PawnShouldItemLinkHaveUpgradeArrow, treat nil as "not sure yet", and register
+    -- with PawnRegisterThirdPartyBag to be told (RefreshAll) whenever arrows must be
+    -- recomputed. Verdicts are only kept when that signal exists.
+    describe("third-party bag contract", function()
+      local registrations, pawnCalls, savedAfter, timers, hooks, savedHook, savedUIFrame
+      local savedVgerCore, savedCanHaveStats, savedForSlot, savedInvLink, equippedData, itemData
+      local savedCanBeRelic
+
+      local function enableFullPawn(verdict)
+        _G.PawnGetItemData = function(link) return itemData[link] end
+        _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function()
+          pawnCalls = pawnCalls + 1
+          return verdict()
+        end
+        _G.PawnShouldItemLinkHaveUpgradeArrow = function() error("the time-budgeted check must not be used") end
+        _G.PawnRegisterThirdPartyBag = function(name, overrides)
+          table.insert(registrations, { name = name, overrides = overrides })
+        end
+        pawn._registered = nil
+        pawn:OnEnable()
+        database.GetUpgradeIconProvider = function() return "Pawn" end
+      end
+
+      before_each(function()
+        registrations, pawnCalls, timers, hooks = {}, 0, {}, {}
+        -- Pawn has data for the test item and for whatever is equipped, unless a test says otherwise.
+        itemData = { ["|cff0070dd|Hitem:1000|h[Test]|h|r"] = {} }
+        equippedData = {}
+        savedVgerCore = _G.VgerCore
+        _G.VgerCore = { IsMainline = true }
+        savedCanHaveStats = _G.PawnCanItemHaveStats
+        _G.PawnCanItemHaveStats = function() return true end
+        savedCanBeRelic = _G.PawnCanItemBeArtifactUpgrade
+        _G.PawnCanItemBeArtifactUpgrade = function() return false end
+        savedForSlot = _G.PawnGetItemDataForInventorySlot
+        _G.PawnGetItemDataForInventorySlot = function(slot)
+          local e = equippedData[slot]
+          if e == nil then return nil, false end
+          if e == "nodata" then return nil, true end
+          return e, true
+        end
+        savedInvLink = _G.GetInventoryItemLink
+        _G.GetInventoryItemLink = function(_, slot)
+          local e = equippedData[slot]
+          if e == nil then return nil end
+          return "|Hitem:" .. (900 + slot) .. "|h"
+        end
+        savedAfter = _G.C_Timer.After
+        _G.C_Timer.After = function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end
+        savedHook = _G.hooksecurefunc
+        _G.hooksecurefunc = function(name, fn) hooks[name] = fn end
+        savedUIFrame = _G.PawnUIFrame
+        _G.PawnUIFrame = CreateFrame("Frame")
+        for _, name in ipairs(PAWN_STATE_FUNCTIONS) do
+          _G[name] = function() end
+        end
+      end)
+
+      after_each(function()
+        _G.VgerCore = savedVgerCore
+        _G.PawnCanItemHaveStats = savedCanHaveStats
+        _G.PawnCanItemBeArtifactUpgrade = savedCanBeRelic
+        _G.PawnGetItemDataForInventorySlot = savedForSlot
+        _G.GetInventoryItemLink = savedInvLink
+        _G.C_Timer.After = savedAfter
+        _G.hooksecurefunc = savedHook
+        _G.PawnUIFrame = savedUIFrame
+        for _, name in ipairs(PAWN_STATE_FUNCTIONS) do
+          _G[name] = nil
+        end
+      end)
+
+      -- The time-budgeted check answers nil whenever Pawn's budget is spent, which would
+      -- leave arrows missing or out of date while waiting. With verdicts kept, Pawn is only
+      -- asked when an input changed, so the always-answering check costs no more than every
+      -- refresh did before.
+      it("asks Pawn's check that always answers, not the time-budgeted one", function()
+        enableFullPawn(function() return true end)
+        assert.is_true(items:ResolveUpgrade(equippableItem({})))
+        assert.are.equal(1, pawnCalls)
+      end)
+
+      -- Pawn answers false when it has no data for the item or for the gear it compares
+      -- with ("we can't evaluate upgrades yet", Pawn.lua), and sends no signal when the data
+      -- arrives. Such an answer is shown but not kept.
+      it("does not keep an answer given while Pawn had no data for the item", function()
+        enableFullPawn(function() return false end)
+        itemData = {}
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+      end)
+
+      it("keeps an answer for an item that can never have stats", function()
+        enableFullPawn(function() return false end)
+        itemData = {}
+        _G.PawnCanItemHaveStats = function() return false end
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(1, pawnCalls)
+      end)
+
+      it("does not keep an answer given while Pawn had no data for gear in the item's slot", function()
+        enableFullPawn(function() return false end)
+        equippedData[5] = "nodata"
+        local data = equippableItem({ inventorySlots = { 5 } })
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+
+        equippedData[5] = {}
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(3, pawnCalls, "kept once Pawn has the data")
+      end)
+
+      it("ignores gear Pawn lacks in a slot the item does not compare with", function()
+        enableFullPawn(function() return false end)
+        equippedData[1] = "nodata"
+        local data = equippableItem({ inventorySlots = { 5 } })
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(1, pawnCalls)
+      end)
+
+      it("checks the weapon slots for a weapon, whose handedness Pawn compares", function()
+        enableFullPawn(function() return false end)
+        equippedData[16] = "nodata"
+        local data = equippableItem({ inventorySlots = { 17 }, itemEquipLoc = "INVTYPE_SHIELD" })
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+      end)
+
+      -- For a weapon Pawn reads the equipped weapon's handedness from the main hand, or the
+      -- off hand when the main hand is empty; both weapon slots are checked for weapons.
+      it("checks both weapon slots for a two-hander", function()
+        enableFullPawn(function() return false end)
+        equippedData[16] = {}
+        equippedData[17] = "nodata"
+        itemData["|Hitem:916|h"] = {}
+        local data = equippableItem({ inventorySlots = { 16 }, itemEquipLoc = "INVTYPE_2HWEAPON" })
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+      end)
+
+      it("checks the off hand's weapon link when the main hand is empty", function()
+        enableFullPawn(function() return false end)
+        equippedData[17] = {}
+        local data = equippableItem({ inventorySlots = { 16 }, itemEquipLoc = "INVTYPE_WEAPON" })
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls, "Pawn has no data for the off-hand link")
+
+        itemData["|Hitem:917|h"] = {}
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(3, pawnCalls)
+      end)
+
+      -- Pawn answers nil forever for links it can never arrow (caged battle pets, keystones:
+      -- GetItemInfo has no item for them); they get a definite false.
+      it("answers a definite, kept false for a link that is not an item link", function()
+        enableFullPawn(function() return nil end)
+        local data = equippableItem({ itemLink = "|cff0070dd|Hbattlepet:1234:25:3:1500:300:300:0|h[Pet]|h|r" })
+        data.kind = 0
+        assert.is_false(items:ResolveUpgrade(data))
+        assert.is_false(items:ResolveUpgrade(data))
+        assert.are.equal(0, pawnCalls)
+        assert.is_not_nil(data.upgradeGeneration)
+      end)
+
+      -- Pawn's relic branch answers false while relic data is still loading.
+      it("does not keep a relic answer while Pawn shows relic upgrades", function()
+        enableFullPawn(function() return false end)
+        _G.PawnCanItemHaveStats = function() return false end
+        local savedRelic, savedCommon = _G.PawnCanItemBeArtifactUpgrade, _G.PawnCommon
+        _G.PawnCanItemBeArtifactUpgrade = function() return true end
+        _G.PawnCommon = { ShowRelicUpgrades = true }
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+        _G.PawnCommon = { ShowRelicUpgrades = false }
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(3, pawnCalls, "kept when relic upgrades are off")
+        _G.PawnCanItemBeArtifactUpgrade, _G.PawnCommon = savedRelic, savedCommon
+      end)
+
+      it("does not keep verdicts when a Pawn function the readiness check needs is missing", function()
+        _G.PawnGetItemDataForInventorySlot = nil
+        enableFullPawn(function() return true end)
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+      end)
+
+      it("checks Pawn's data for the equipped weapon link itself", function()
+        enableFullPawn(function() return false end)
+        equippedData[16] = {}
+        local data = equippableItem({ inventorySlots = { 16 }, itemEquipLoc = "INVTYPE_WEAPON" })
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls, "Pawn has no data for the main-hand link")
+
+        itemData["|Hitem:916|h"] = {}
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(3, pawnCalls)
+      end)
+
+      -- Outside Mainline Pawn re-checks its own item data on every call (Pawn.lua), so its
+      -- answers are not kept there.
+      it("does not keep verdicts where Pawn re-validates its own data (not Mainline)", function()
+        _G.VgerCore = { IsMainline = false }
+        enableFullPawn(function() return true end)
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+      end)
+
+      it("registers BetterBags with Pawn once, and keeps verdicts while Pawn signals nothing", function()
+        enableFullPawn(function() return true end)
+        pawn:OnEnable()
+        assert.are.equal(1, #registrations)
+        assert.are.equal("BetterBags", registrations[1].name)
+        assert.is_function(registrations[1].overrides.RefreshAll)
+
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(1, pawnCalls)
+      end)
+
+      it("asks again for every item after Pawn's RefreshAll, and refreshes the bags", function()
+        local verdict = true
+        enableFullPawn(function() return verdict end)
+        local data = equippableItem({})
+        assert.is_true(items:ResolveUpgrade(data))
+        verdict = false
+        registrations[1].overrides.RefreshAll()
+        assert.is_false(items:ResolveUpgrade(data))
+        assert.are.equal(2, pawnCalls)
+        assert.are.equal(1, #timers)
+      end)
+
+      it("drops Pawn's verdicts on RefreshAll while another provider is active, without refreshing", function()
+        enableFullPawn(function() return true end)
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        database.GetUpgradeIconProvider = function() return "BetterBags" end
+        registrations[1].overrides.RefreshAll()
+        assert.are.equal(0, #timers)
+        database.GetUpgradeIconProvider = function() return "Pawn" end
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls, "the Pawn verdict kept before RefreshAll is not reused")
+      end)
+
+      it("does not keep a verdict Pawn is not sure about (data still loading), and shows no arrow", function()
+        local verdict = nil
+        enableFullPawn(function() return verdict end)
+        local data = equippableItem({})
+        data.kind = 0
+        data.isUpgrade = true
+        assert.is_false(items:ResolveUpgrade(data))
+        assert.is_nil(data.upgradeGeneration)
+        verdict = true
+        assert.is_true(items:ResolveUpgrade(data))
+        assert.are.equal(2, pawnCalls)
+      end)
+
+      -- Pawn changes scales and options in places that do not call PawnResetBags. Every
+      -- Pawn function that changes what its verdict reads is hooked, and closing Pawn's
+      -- window is a catch-all for options changed there.
+      for _, name in ipairs(PAWN_STATE_FUNCTIONS) do
+        it("asks again after Pawn's " .. name, function()
+          enableFullPawn(function() return true end)
+          local data = equippableItem({})
+          items:ResolveUpgrade(data)
+          assert.is_function(hooks[name], name .. " is hooked")
+          hooks[name]()
+          items:ResolveUpgrade(data)
+          assert.are.equal(2, pawnCalls)
+          assert.is_true(#timers >= 1, "and refreshes the bags")
+        end)
+      end
+
+      it("asks again after Pawn's window closes", function()
+        enableFullPawn(function() return true end)
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        _G.PawnUIFrame:GetScript("OnHide")(_G.PawnUIFrame)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+      end)
+
+      it("does not keep verdicts when Pawn has no third-party registration", function()
+        enableFullPawn(function() return true end)
+        _G.PawnRegisterThirdPartyBag = nil
+        _G.VgerCore = { IsMainline = true }
+        pawn._registered = nil
+        items:Init()
+        pawn:OnEnable()
+        database.GetUpgradeIconProvider = function() return "Pawn" end
+        local data = equippableItem({})
+        items:ResolveUpgrade(data)
+        items:ResolveUpgrade(data)
+        assert.are.equal(2, pawnCalls)
+      end)
     end)
   end)
 

@@ -98,17 +98,19 @@ Shows item upgrade indicators using Pawn's upgrade detection.
 
 **Key Components:**
 ```lua
--- Uses Pawn's upgrade detection
-PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(itemLink, true)
+PawnShouldItemLinkHaveUpgradeArrowUnbudgeted(itemLink, true) -- true / false / nil ("not sure yet")
+PawnRegisterThirdPartyBag("BetterBags", { RefreshAll = ... }) -- Pawn's bag-addon contract (PawnBags.lua)
 ```
 
-**Event Handlers:**
-- `bag/Rendered` - Update all items after bag render
-
 **Behavior:**
-- Shows upgrade arrows on items that are upgrades according to Pawn
-- Preloads all equipment slots for accurate comparison
-- Defers updates during combat to avoid taint
+- Registered as an upgrade provider (`items:RegisterUpgradeProvider`), cacheable when Pawn has
+  `PawnRegisterThirdPartyBag` and runs on Mainline: each item's verdict is kept until Pawn calls
+  `RefreshAll`, a hooked Pawn function changes its scales/options/best items, Pawn's window
+  closes, or another input changes (`.claude/rules/caches.md` §2)
+- An answer Pawn gave without data for the item or the gear it compares with is shown but not kept
+- A `nil` answer (item data loading) shows no arrow and is retried shortly while retries make
+  progress
+- Registering as a third-party bag turns off Pawn's own default-bag hooks
 
 ### SimpleItemLevel (`simpleitemlevel.lua`)
 

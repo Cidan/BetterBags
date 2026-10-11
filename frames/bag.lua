@@ -664,7 +664,7 @@ local function refreshCooldown(ctx, item)
 	end
 	local data = item:GetItemData()
 	if data then
-		item:UpdateCooldown(ctx, data)
+		item:UpdateCooldown(ctx, data, true)
 	end
 end
 
