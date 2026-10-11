@@ -20,6 +20,7 @@ local anchor = addon:NewModule('Anchor')
 ---@field anchorPoint string
 ---@field kind BagKind
 local anchorFrame = {}
+addon:GetModule('Perf'):RegisterPrototype(anchorFrame, 'AnchorFrame')
 
 ---@param frame Frame
 ---@return string

@@ -55,13 +55,15 @@ describe("Bag-bar backpack button click", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Themes", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions"
     }
     for _, name in ipairs(modules) do
       local stub = StubBetterBagsModule(name)
       stub.Init = stub.Init or function() end
       stub.Enable = stub.Enable or function() end
     end
+    local perfSessions = addon:GetModule("PerfSessions")
+    perfSessions.StartIfArmed = perfSessions.StartIfArmed or function() return false end
 
     local L = addon:GetModule("Localization")
     L.G = L.G or function(_, val) return val end

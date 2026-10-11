@@ -37,6 +37,7 @@ local debug = addon:GetModule('Debug')
 ---@field package scrollBox WowScrollBox
 ---@field private sortVertical boolean
 local gridProto = {}
+addon:GetModule('Perf'):RegisterPrototype(gridProto, 'GridFrame')
 
 ---@class (exact) RenderOptions
 ---@field cells Cell[] The cells to render in this grid.

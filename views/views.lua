@@ -35,6 +35,7 @@ local views = addon:NewModule('Views')
 ---@field WipeHandler fun(view: View, ctx: Context)
 ---@field isNew boolean
 views.viewProto = {}
+addon:GetModule('Perf'):RegisterPrototype(views.viewProto, 'View')
 
 function views:OnEnable()
 end

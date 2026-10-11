@@ -610,4 +610,87 @@ describe("Debug Dump Harness with test.lua", function()
     assert.is_not_nil(tab13Free, "Tab 13 should contain dummy empty slot")
     assert.are.equal("Warbank Item 3", tab13Real.itemInfo.itemName)
   end)
+
+  it("profiles the real refresh pipeline without changing its results, and exports the session", function()
+    LoadBetterBagsModule("debug/perf/format.lua")
+    local perf = addon:GetModule("Perf")
+    local perfFormat = addon:GetModule("PerfFormat")
+    DB.data:SetProfile("Default")
+    local dumpItems = _G.BetterBagsDB.profiles.Default.debugBackpackDump
+    local originalHarvest = items.Harvest
+    items.Harvest = function()
+      return dumpItems, {}
+    end
+    -- The sweep is under test, not message delivery: handlers that earlier spec files left
+    -- registered on AceEvent would otherwise run (and may throw) on the commit message.
+    local originalSendMessage = events.SendMessage
+    events.SendMessage = function() end
+
+    local function categoriesBySlot()
+      local out = {}
+      for slotkey, item in pairs(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+        out[slotkey] = item.itemInfo.category or false
+      end
+      return out
+    end
+
+    items:ProcessRefresh(context:New("Unprofiled"), const.BAG_KIND.BACKPACK)
+    local expected = categoriesBySlot()
+
+    local runRefresh = items.RunRefresh
+    perf:Init()
+    perf:SetClock(nil)
+    assert.is_true(perf:Start({
+      modules = { "Items", "Search", "Categories", "Stacks", "Database", "EquipmentSets", "TooltipScanner",
+        "QueryParser", "Binding", "Async", "Localization" },
+      prototypes = { "SlotInfo", "Stack", "IntervalTree" },
+      includeRoot = false,
+      calibrate = true,
+    }))
+    items:ProcessRefresh(context:New("Profiled"), const.BAG_KIND.BACKPACK)
+    perf:_OnFrame()
+    local session = perf:Stop()
+    items.Harvest = originalHarvest
+    events.SendMessage = originalSendMessage
+
+    assert.are.equal(runRefresh, items.RunRefresh)
+    assert.are.same(expected, categoriesBySlot())
+
+    local tree = perfFormat:Decode(session)
+    local sweep = perfFormat:Find(tree, { "Items.ProcessRefresh", "Async.Do", "Async.DoWithDelay", "Items.RunRefresh" })
+    assert.is_not_nil(sweep, "the sweep runs inside async:Do's coroutine")
+    for _, phase in ipairs({ "Items.Phase1_DetermineBags", "Items.Phase2_Harvest", "Items.Phase6_EnrichData",
+      "Items.Phase8_EnrichCategories", "Items.Phase10_PartitionIntoTabs", "Items.Phase11_CommitAndDispatch" }) do
+      assert.is_not_nil(sweep.childByName[phase], phase)
+    end
+    assert.is_true(session.stats.calls > 100)
+    assert.is_true(session.stats.wrappedFunctions > 100)
+    assert.are.equal(0, session.stats.aborted)
+
+    -- Round-trip the session through a SavedVariables file and the offline exporter.
+    local function serialize(value, indent)
+      if type(value) == "string" then return string.format("%q", value) end
+      if type(value) ~= "table" then return tostring(value) end
+      local parts = {}
+      for k, v in pairs(value) do
+        local key = type(k) == "number" and ("[" .. k .. "]") or ("[" .. string.format("%q", k) .. "]")
+        parts[#parts + 1] = indent .. "  " .. key .. " = " .. serialize(v, indent .. "  ")
+      end
+      return "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
+    end
+    session.id = 1
+    session.meta = { character = "Harness", realm = "Local", startedAt = 1700000000, reason = "manual" }
+    local dir = os.tmpname()
+    os.remove(dir)
+    os.execute("mkdir -p '" .. dir .. "'")
+    local svPath = dir .. "/BetterBags.lua"
+    local svFile = assert(io.open(svPath, "w"))
+    svFile:write("BetterBagsPerfDB = " .. serialize({ version = 1, sessions = { session } }, "") .. "\n")
+    svFile:close()
+    local tool = assert(loadfile("tools/flamegraph/flamegraph.lua"))("flamegraph-module")
+    assert.are.equal(0, tool.Main({ svPath, "--out", dir }, function() end))
+    local folded = assert(io.open(dir .. "/betterbags-1.folded", "r")):read("*a")
+    assert.is_truthy(folded:find("Items.ProcessRefresh;Async.Do;Async.DoWithDelay;Items.RunRefresh;Items.Phase2_Harvest", 1, true))
+    os.execute("rm -rf '" .. dir .. "'")
+  end)
 end)

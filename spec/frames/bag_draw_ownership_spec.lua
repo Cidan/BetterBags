@@ -115,8 +115,6 @@ local function stubModules()
 
   local debug = stubModule("Debug")
   override(debug, "Log", function() end)
-  override(debug, "StartProfile", function() end)
-  override(debug, "EndProfile", function() end)
   override(debug, "WalkAndFixAnchorGraph", function() end)
   override(debug, "ShowItemTooltip", function() end)
   override(debug, "HideItemTooltip", function() end)

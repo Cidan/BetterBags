@@ -70,8 +70,6 @@ sort.GetSectionSortFunction = function() return function() return true end end
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
-debug.StartProfile = function() end
-debug.EndProfile = function() end
 debug.WalkAndFixAnchorGraph = function() end
 
 local categories = StubBetterBagsModule("Categories")

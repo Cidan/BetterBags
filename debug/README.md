@@ -55,31 +55,33 @@ debug.colors = {
 }
 ```
 
-### Performance Profiling (`profile.lua`)
+### Performance Profiler (`perf/`)
 
-Measures execution time of code sections for performance optimization.
+An instrumenting profiler that is off by default and costs nothing while off. A capture
+wraps every module method and registered prototype method, records a call tree with exact
+self time, per-frame cost, and the worst frames, and saves the session to the
+`BetterBagsPerfDB` SavedVariable. Use it from the **Performance** tab of `/bbdb`; export
+saved sessions offline with `tools/flamegraph`.
 
-#### Features
-- **Named Profiles**: Track multiple concurrent profiles
-- **Millisecond Precision**: Uses `debugprofilestop()` for accuracy
-- **Nested Support**: Profile within profiles
-- **Automatic Cleanup**: Profiles are removed after completion
+- `perf/engine.lua` (`Perf`): wrapping, call tree, coroutine handling, frame clock.
+- `perf/format.lua` (`PerfFormat`): decoding, folded stacks, flame layout. Also loads outside the game.
+- `perf/sessions.lua` (`PerfSessions`): storage, settings, start/stop, capture next reload.
 
-#### Usage
+No timing calls are needed in ordinary code. For a `local function` the wrappers cannot
+reach, or a span inside a method:
+
 ```lua
--- Start a profile
-debug:StartProfile("DataLoad")
+local perf = addon:GetModule('Perf')
+local helper = perf:Wrap('Items.ItemBelongsToTab', function(...) ... end)
 
--- ... code to profile ...
-
--- End and log the profile
-debug:EndProfile("DataLoad")
--- Output: "DataLoad took 123.45 ms"
-
--- With formatting
-debug:StartProfile("Item_%d", itemID)
-debug:EndProfile("Item_%d", itemID)
+local token = perf:Enter('[span] partition')  -- nil when no capture is running
+-- ...
+perf:Exit(token)
 ```
+
+New prototype tables must be registered right after they are created:
+`addon:GetModule('Perf'):RegisterPrototype(fooProto, 'FooFrame')`. Full contract:
+`.claude/rules/perf-profiler.md`.
 
 ### Frame Debugging (`frames.lua`)
 
@@ -205,12 +207,9 @@ debug:LogContext("Refresh", ctx)
 ```
 
 ### Performance Analysis
-```lua
-debug:StartProfile("BagRefresh")
--- Refresh bag contents
-items:RefreshBackpack(ctx)
-debug:EndProfile("BagRefresh")
-```
+Open `/bbdb`, switch to the **Performance** tab, press **Start Capture**, reproduce the slow
+action, and press **Stop Capture**. The session opens in the flame graph; the Frames view
+lists the worst frames and their call trees.
 
 ### Frame Debugging
 ```lua
@@ -257,15 +256,15 @@ debug:LogContext("Operation", ctx)
 
 1. **Conditional Debugging**: Always check `debug.enabled` before expensive operations
 2. **Category Usage**: Use consistent category names for filtering
-3. **Profile Cleanup**: Always call EndProfile for started profiles
-4. **Safe Inspection**: Use `nocopy` parameter for large tables if needed
+3. **Profiler Spans**: Always pass the token from `perf:Enter` to `perf:Exit`, even when it is nil
+4. **Safe Inspection: Use `nocopy` parameter for large tables if needed
 5. **Border Colors**: Use consistent colors for similar frame types
 
 ## Performance Considerations
 
 - Debug operations are skipped when disabled
 - Table copying in Inspect can be expensive
-- Profile names should be unique or use formatting
+- The profiler wraps nothing while no capture is running
 - Border drawing adds minimal overhead
 - Tooltip generation is on-demand only
 
@@ -273,7 +272,7 @@ debug:LogContext("Operation", ctx)
 
 ### Common Issues
 
-1. **Missing Profiles**: Ensure StartProfile and EndProfile match
+1. **A function is missing from the flame graph**: it is a `local function` (wrap it with `perf:Wrap`) or a prototype that was never registered with `RegisterPrototype`
 2. **DevTools Not Working**: Check if DevTools addon is loaded
 3. **Borders Not Visible**: Check frame strata and visibility
 4. **Tooltip Errors**: Verify item data structure is valid
@@ -302,7 +301,7 @@ Data types are color-coded in debug output:
 
 ## Technical Notes
 
-- Uses `debugprofilestop()` for sub-millisecond timing
+- The profiler times with `debugprofilestop()` and never calls `debugprofilestart()`, which resets a timer every addon shares
 - Tooltip alternates colors every other line for readability
 - Frame walking prevents infinite recursion with visited tracking
 - Table inspection handles metatables safely

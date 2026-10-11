@@ -9,6 +9,7 @@ local windowGroup = addon:NewModule('WindowGroup')
 ---@class WindowGrouping
 ---@field windows any[]
 local windowGrouping = {}
+addon:GetModule('Perf'):RegisterPrototype(windowGrouping, 'WindowGrouping')
 
 ---@param name string
 ---@param frame any

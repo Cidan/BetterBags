@@ -17,6 +17,7 @@ local overlay = addon:NewModule('Overlay')
 ---@field fadeIn AnimationGroup
 ---@field fadeOut AnimationGroup
 local overlayFrame = {}
+addon:GetModule('Perf'):RegisterPrototype(overlayFrame, 'OverlayFrame')
 
 ---@param ctx Context
 ---@param event? string

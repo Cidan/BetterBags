@@ -60,6 +60,7 @@ local EMPTY_BAG_SLOT_TEXTURE = [[Interface\PaperDoll\UI-PaperDoll-Slot-Bag]]
 ---@field plusText Texture The green '+' atlas icon shown for unpurchased slots (child of purchaseButton)
 ---@field bagBadge Texture Corner badge showing the bag in this tab's socket (WoW: Forever only)
 local bankSlotButtonProto = {}
+addon:GetModule('Perf'):RegisterPrototype(bankSlotButtonProto, 'BankSlotButton')
 
 -- GetBagSocketIndex returns the Enum.BagIndex.Characterbanktab slot of the bag socket
 -- behind this tab, or nil when the tab has none. On WoW: Forever every character bank
@@ -162,6 +163,7 @@ end
 ---@field bagFrame Frame The parent bag frame this panel is attached to
 ---@field tabsWereShown boolean Whether group tabs were visible before panel opened
 BankSlots.bankSlotsPanelProto = {}
+addon:GetModule('Perf'):RegisterPrototype(BankSlots.bankSlotsPanelProto, 'BankSlotsPanel')
 
 -- Draw refreshes all button visuals from the current C_Bank tab data.
 ---@param ctx Context

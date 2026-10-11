@@ -9,6 +9,7 @@ local header = addon:NewModule('Header')
 ---@class (exact) HeaderFrame
 ---@field frame Frame
 header.headerProto = {}
+addon:GetModule('Perf'):RegisterPrototype(header.headerProto, 'Header')
 
 function header.headerProto:Add()
 

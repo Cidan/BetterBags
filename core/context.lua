@@ -145,13 +145,19 @@ function context:Copy()
   return newContext
 end
 
+---@class Perf: AceModule
+local perf = addon:GetModule('Perf')
+
 ---@param obj any
 ---@param script string
 ---@param func fun(ctx: Context, ...)
 function addon.HookScript(obj, script, func)
+  local label = '[script] ' .. script
   obj:HookScript(script, function(...)
+    local token = perf.active and perf:Enter(label)
     local ctx = context:New(script)
     func(ctx, unpack({...}))
+    if token then perf:Exit(token) end
   end)
 end
 
@@ -159,8 +165,11 @@ end
 ---@param script string
 ---@param func fun(ctx: Context, ...)
 function addon.SetScript(obj, script, func)
+  local label = '[script] ' .. script
   obj:SetScript(script, function(...)
+    local token = perf.active and perf:Enter(label)
     local ctx = context:New(script)
     func(ctx, unpack({...}))
+    if token then perf:Exit(token) end
   end)
 end

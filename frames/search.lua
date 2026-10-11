@@ -42,6 +42,7 @@ local searchBox = addon:NewModule('SearchBox')
 ---@field helpTextFadeIn AnimationGroup
 ---@field helpTextFadeOut AnimationGroup
 searchBox.searchProto = {}
+addon:GetModule('Perf'):RegisterPrototype(searchBox.searchProto, 'SearchBoxFrame')
 
 -- BetterBags_ToggleSearch toggles the search view. This function is used in the
 -- search key bind.

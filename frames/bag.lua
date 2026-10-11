@@ -31,9 +31,6 @@ local resize = addon:GetModule("Resize")
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
 
----@class Debug: AceModule
-local debug = addon:GetModule("Debug")
-
 ---@class Question: AceModule
 local question = addon:GetModule("Question")
 
@@ -100,6 +97,7 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field blizzardBankTab number? When set, the bank is filtered to show only items from this specific Blizzard bag index (set by the bank slots panel).
 ---@field behavior BackpackBehaviorProto|BankBehaviorProto The bag-type-specific behavior
 bagFrame.bagProto = {}
+addon:GetModule('Perf'):RegisterPrototype(bagFrame.bagProto, 'Bag')
 
 ---@param ctx Context
 function bagFrame.bagProto:Show(ctx)
@@ -503,9 +501,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 
 	local headerW, headerH, footerW, footerH = self:DrawGlobalSections(ctx, slotInfo)
 
-	debug:StartProfile("Bag Render %d", self.kind)
 	view:Render(ctx, self, slotInfo, function()
-		debug:EndProfile("Bag Render %d", self.kind)
 		view:GetContent():Show()
 		self.currentView = view
 

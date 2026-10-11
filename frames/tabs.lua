@@ -69,6 +69,7 @@ tabs.dropPlaceholder = nil          ---@type Frame? Visual placeholder showing w
 ---@field width number
 ---@field tabCount number
 local tabFrame = {}
+addon:GetModule('Perf'):RegisterPrototype(tabFrame, 'TabFrame')
 
 ---@param ctx Context
 ---@param name string

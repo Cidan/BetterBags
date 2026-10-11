@@ -23,17 +23,25 @@ The deterministic loading order is rigorously divided into 5 distinct phases:
 
 ```
 ADDON_LOADED (core/init.lua: OnInitialize)
-  ├── 1. Core & Utilities (events, debug, async, bucket)
+  ├── 1. Core & Utilities (events, perf + perfSessions + StartIfArmed, debug, async, bucket)
   ├── 2. Database (DB - loaded before downstream queries)
   ├── 3. Data Models & Scanners (tooltipScanner, itemLoader, categories, groups, equipmentSets, search, items, refresh)
   ├── 4. Themes & Presentation Frames (themes, itemFrame, sectionFrame, contextMenu, bagButton, itemRowFrame)
   └── 5. Integrations (consoleport)
 ```
 
+The profiler (`perf`, `perfSessions`) initializes immediately after `events` (its logout
+save registers an event) and before everything else, so a capture armed with "Capture next
+reload" installs its wrappers before any other `Init` runs and the whole startup is part of
+the session. See `.claude/rules/perf-profiler.md`.
+
 #### Exact Loading Code Block:
 ```lua
   -- 1. Core and Utilities
   events:Init()
+  perf:Init()
+  perfSessions:Init()
+  perfSessions:StartIfArmed()
   debug:Init()
   async:Init()
   addon:GetModule('Bucket'):Init()

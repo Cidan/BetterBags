@@ -56,6 +56,7 @@ local isClosingBank = false
 ---@class BankBehaviorProto
 ---@field bag Bag Reference to the parent bag
 bank.proto = {}
+addon:GetModule('Perf'):RegisterPrototype(bank.proto, 'Bank')
 
 -- SuppressBlizzardBankPanel neutralizes Blizzard's BankPanel so BetterBags can render its own
 -- bank window. The panel must stay Shown (invisibly) for GetActiveBankType to work, so we drop

@@ -36,6 +36,7 @@ local currencyPane = addon:NewModule('CurrencyPane')
 ---@field selectedIndex number|nil
 ---@field selectedButton CurrencyPaneListButton|nil
 local currencyPaneProto = {}
+addon:GetModule('Perf'):RegisterPrototype(currencyPaneProto, 'CurrencyPaneFrame')
 
 ---@param button CurrencyPaneListButton
 ---@param elementData table

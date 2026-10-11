@@ -5,7 +5,7 @@
 ## Notes: Better Bags for everyone!
 ## Author: Cidan
 ## Version: @project-version@
-## SavedVariables: BetterBagsDB
+## SavedVariables: BetterBagsDB, BetterBagsPerfDB
 ## X-Date: @project-date-iso@
 ## X-License: MIT
 ## X-Curse-Project-ID: 942432
@@ -32,6 +32,10 @@ templates\debug.xml
 
 core\boot.lua
 
+# The profiler loads first so every later file can register its prototypes.
+debug\perf\engine.lua
+debug\perf\format.lua
+
 animations\fade.lua
 
 core\context.lua
@@ -39,11 +43,11 @@ core\pool.lua
 
 debug\debug.lua
 debug\frames.lua
-debug\profile.lua
 debug\items.lua
 debug\analytics.lua
 
 core\events.lua
+debug\perf\sessions.lua
 core\localization.lua
 core\translations.lua
 core\overrides.lua
@@ -106,6 +110,8 @@ frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
 frames\itembrowser.lua
+frames\flamegraph.lua
+frames\perfpane.lua
 frames\debug.lua
 
 views\views.lua

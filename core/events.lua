@@ -6,6 +6,9 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Perf: AceModule
+local perf = addon:GetModule('Perf')
+
 ---@alias eventData any[][]
 
 ---@class Callback
@@ -45,11 +48,14 @@ end
 ---@param callback fun(ctx: Context, ...)
 function events:RegisterMessage(event, callback)
   if self._messageMap[event] == nil then
+    local label = '[msg] ' .. event
     self._messageMap[event] = {
       fn = function(...)
+        local token = perf.active and perf:Enter(label)
         for _, cb in pairs(self._messageMap[event].cbs) do
           cb.cb(select(2, ...))
         end
+        if token then perf:Exit(token) end
       end,
       cbs = {},
     }
@@ -71,8 +77,10 @@ end
 ---@param entry Callback
 function events:addEventCallback(event, entry)
   if self._eventMap[event] == nil then
+    local label = '[event] ' .. event
     self._eventMap[event] = {
       fn = function(...)
+        local token = perf.active and perf:Enter(label)
         for _, cb in pairs(self._eventMap[event].cbs) do
           if cb.raw then
             cb.cb(...)
@@ -81,6 +89,7 @@ function events:addEventCallback(event, entry)
             cb.cb(ctx, ...)
           end
         end
+        if token then perf:Exit(token) end
       end,
       cbs = {},
     }
@@ -150,7 +159,9 @@ function events:BucketEvent(event, callback, filter)
   self._eventArguments[event] = {}
   if not firstRegistration then return end
 
+  local label = '[bucket] ' .. event
   local flush = function()
+    local token = perf.active and perf:Enter(label)
     local collected = self._eventArguments[event]
     self._eventArguments[event] = {}
     self._bucketTimers[event] = nil
@@ -161,6 +172,7 @@ function events:BucketEvent(event, callback, filter)
         cb(context:New(event), collected)
       end, geterrorhandler())
     end
+    if token then perf:Exit(token) end
   end
 
   self:addEventCallback(event, { raw = true, cb = function(eventName, ...)
@@ -185,7 +197,12 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   local joinedEvents = table.concat(groupEvents, '')
   joinedEvents = joinedEvents .. table.concat(groupMessages, '')
 
+  local names = {}
+  for _, name in ipairs(groupEvents) do names[#names + 1] = name end
+  for _, name in ipairs(groupMessages) do names[#names + 1] = name end
+  local label = '[bucket] ' .. table.concat(names, ', ')
   local bucketFunction = function()
+    local token = perf.active and perf:Enter(label)
     for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
       -- Note: use a wrapper function because xpcall in Lua 5.1 (the WoW
       -- runtime) does NOT pass extra args to f, unlike Lua 5.4. Calling
@@ -195,6 +212,7 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
       end, geterrorhandler())
     end
     self._eventArguments[joinedEvents] = {}
+    if token then perf:Exit(token) end
   end
 
   self._bucketCallbacks[joinedEvents] = {}

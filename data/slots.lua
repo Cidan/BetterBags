@@ -32,6 +32,7 @@ local stacks = addon:GetModule('Stacks')
 ---@field emptySlotsByBag table<number, { name: string, count: number }> The free slot count per bag ID.
 ---@field stacks Stack A stack object to manage item stacks.
 local SlotInfo = {}
+addon:GetModule('Perf'):RegisterPrototype(SlotInfo, 'SlotInfo')
 
 function items:NewSlotInfo()
   return setmetatable({

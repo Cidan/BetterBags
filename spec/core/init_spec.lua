@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Themes", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions"
     }
 
     for _, name in ipairs(modules) do
@@ -54,6 +54,8 @@ describe("Core Init and Enable flow", function()
       stub.Init = stub.Init or spy.new(function() end)
       stub.Enable = stub.Enable or spy.new(function() end)
     end
+    local perfSessions = addon:GetModule("PerfSessions")
+    perfSessions.StartIfArmed = perfSessions.StartIfArmed or spy.new(function() return false end)
 
     -- Provide specific mock implementations needed by init
     local L = addon:GetModule("Localization")
@@ -133,6 +135,34 @@ describe("Core Init and Enable flow", function()
     for k, v in pairs(oldAddons) do
       aceAddon.addons[k] = v
     end
+  end)
+
+  it("starts the profiler right after Events, so a capture armed for this reload sees every other module initialize", function()
+    local order = {}
+    local perf = addon:GetModule("Perf")
+    local perfSessions = addon:GetModule("PerfSessions")
+    local eventsMod = addon:GetModule("Events")
+    local db = addon:GetModule("Database")
+    local saved = {
+      { perf, "Init", perf.Init },
+      { perfSessions, "Init", perfSessions.Init },
+      { perfSessions, "StartIfArmed", perfSessions.StartIfArmed },
+      { eventsMod, "Init", eventsMod.Init },
+      { db, "Init", db.Init },
+    }
+    eventsMod.Init = function() table.insert(order, "Events") end
+    perf.Init = function() table.insert(order, "Perf") end
+    perfSessions.Init = function() table.insert(order, "PerfSessions") end
+    perfSessions.StartIfArmed = function() table.insert(order, "StartIfArmed") end
+    db.Init = function() table.insert(order, "Database") end
+
+    local ok, err = pcall(function() addon:OnInitialize() end)
+
+    for _, s in ipairs(saved) do
+      s[1][s[2]] = s[3]
+    end
+    assert.is_true(ok, err)
+    assert.are.same({ "Events", "Perf", "PerfSessions", "StartIfArmed", "Database" }, order)
   end)
 
   it("should create UI frames during OnInitialize and NOT during OnEnable", function()

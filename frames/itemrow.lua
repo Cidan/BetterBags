@@ -27,6 +27,7 @@ local item = addon:NewModule('ItemRowFrame')
 ---@field text FontString
 ---@field slotkey string
 item.itemRowProto = {}
+addon:GetModule('Perf'):RegisterPrototype(item.itemRowProto, 'ItemRow')
 
 function item.itemRowProto:Unlock()
 end

@@ -15,6 +15,7 @@ local slider = addon:NewModule('Slider')
 ---@field OnValueChanged function
 ---@field OnMouseUp function
 local sliderProto = {}
+addon:GetModule('Perf'):RegisterPrototype(sliderProto, 'SliderFrame')
 
 ---@return Frame
 function sliderProto:GetFrame()

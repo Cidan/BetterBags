@@ -48,4 +48,95 @@
       </Layer>
     </Layers>
   </Button>
+  <Button name="BetterBagsPerfRow" virtual="true">
+    <Size>
+      <AbsDimension y="20"/>
+    </Size>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <Texture parentKey="Selected" hidden="true" setAllPoints="true">
+          <Color r="1" g="0.82" b="0" a="0.25"/>
+        </Texture>
+      </Layer>
+      <Layer level="OVERLAY">
+        <FontString inherits="GameFontHighlightSmall" parentKey="Text" justifyH="LEFT" wordwrap="false">
+          <Anchors>
+            <Anchor point="LEFT" x="4"/>
+            <Anchor point="RIGHT" x="-4"/>
+          </Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
+    <HighlightTexture setAllPoints="true" alphaMode="ADD">
+      <Color r="1" g="1" b="1" a="0.08"/>
+    </HighlightTexture>
+  </Button>
+  <Button name="BetterBagsPerfFunctionRow" virtual="true">
+    <Size>
+      <AbsDimension y="20"/>
+    </Size>
+    <Layers>
+      <Layer level="OVERLAY">
+        <FontString inherits="GameFontHighlightSmall" parentKey="Name" justifyH="LEFT" wordwrap="false">
+          <Size>
+            <AbsDimension x="180" y="20"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" x="4"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Calls" justifyH="RIGHT">
+          <Size>
+            <AbsDimension x="48" y="20"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Name" relativePoint="RIGHT"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Total" justifyH="RIGHT">
+          <Size>
+            <AbsDimension x="60" y="20"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Calls" relativePoint="RIGHT"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Self" justifyH="RIGHT">
+          <Size>
+            <AbsDimension x="60" y="20"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Total" relativePoint="RIGHT"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Avg" justifyH="RIGHT">
+          <Size>
+            <AbsDimension x="58" y="20"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Self" relativePoint="RIGHT"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Max" justifyH="RIGHT">
+          <Size>
+            <AbsDimension x="60" y="20"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Avg" relativePoint="RIGHT"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Alloc" justifyH="RIGHT">
+          <Size>
+            <AbsDimension x="56" y="20"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Max" relativePoint="RIGHT"/>
+          </Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
+    <HighlightTexture setAllPoints="true" alphaMode="ADD">
+      <Color r="1" g="1" b="1" a="0.08"/>
+    </HighlightTexture>
+  </Button>
 </Ui>

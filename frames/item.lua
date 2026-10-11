@@ -72,6 +72,7 @@ local HALO_MIN_ALPHA = 0.4
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
 itemFrame.itemProto = {}
+addon:GetModule('Perf'):RegisterPrototype(itemFrame.itemProto, 'Item')
 
 local buttonCount = 0
 local children = {

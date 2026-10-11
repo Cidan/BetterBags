@@ -20,6 +20,7 @@ local itemColorPane = addon:NewModule('ItemColorPane')
 ---@field breakpointsLabel FontString
 ---@field colorPickerLabels table<string, FontString>
 local itemColorPaneProto = {}
+addon:GetModule('Perf'):RegisterPrototype(itemColorPaneProto, 'ItemColorPaneFrame')
 
 function itemColorPaneProto:UpdateBreakpoints()
   local maxIlvl = database:GetMaxItemLevel()

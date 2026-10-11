@@ -11,6 +11,7 @@ local pool = addon:NewModule('Pool')
 ---@field private resetFn fun(ctx: Context, item: any)
 ---@field private items any[]
 local poolItem = {}
+addon:GetModule('Perf'):RegisterPrototype(poolItem, 'PoolItem')
 
 ---@param ctx Context
 ---@return any

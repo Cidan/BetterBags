@@ -274,4 +274,45 @@ describe("Context", function()
       end)
     end)
   end)
+
+  -- ─── Script helpers ─────────────────────────────────────────────────────────
+
+  describe("SetScript and HookScript profiler labels", function()
+    LoadBetterBagsModule("debug/perf/format.lua")
+    local perf = addon:GetModule("Perf")
+    local perfFormat = addon:GetModule("PerfFormat")
+    local now
+
+    before_each(function()
+      now = 0
+      perf:Init()
+      perf:SetClock(function() return now end)
+      perf:Start({ modules = {}, prototypes = {}, includeRoot = false, calibrate = false })
+    end)
+
+    after_each(function()
+      if perf:IsActive() then perf:Stop() end
+    end)
+
+    it("roots a SetScript handler under the script name and passes its arguments", function()
+      local frame = CreateFrame("Button")
+      local received
+      addon.SetScript(frame, "OnClick", function(c, _, button)
+        received = { c:Event(), button }
+        now = now + 4
+      end)
+      frame:GetScript("OnClick")(frame, "LeftButton")
+      local tree = perfFormat:Decode(perf:Stop())
+      assert.are.same({ "OnClick", "LeftButton" }, received)
+      assert.are.equal(4, perfFormat:Find(tree, { "[script] OnClick" }).self)
+    end)
+
+    it("roots a HookScript handler under the script name", function()
+      local frame = CreateFrame("Frame")
+      addon.HookScript(frame, "OnShow", function() now = now + 6 end)
+      frame:GetScript("OnShow")(frame)
+      local tree = perfFormat:Decode(perf:Stop())
+      assert.are.equal(6, perfFormat:Find(tree, { "[script] OnShow" }).self)
+    end)
+  end)
 end)

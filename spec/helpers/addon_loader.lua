@@ -68,3 +68,15 @@ _G.ResetModuleStub = function(name, filePath)
     loadedModules["util/trees/intervaltree.lua"] = nil
   end
 end
+
+--- Load a brand new copy of a real module, replacing whatever is registered under that
+--- name. Use it when a spec needs the real behavior of a shared module (Events, Context)
+--- that earlier spec files may have stubbed or patched without restoring.
+---@param name string Module name (e.g. "Events")
+---@param filePath string File that defines it (e.g. "core/events.lua")
+---@return table module
+_G.LoadFreshBetterBagsModule = function(name, filePath)
+  _G.ResetModuleStub(name, filePath)
+  _G.LoadBetterBagsModule(filePath)
+  return addon:GetModule(name)
+end

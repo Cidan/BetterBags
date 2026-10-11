@@ -42,6 +42,7 @@ local layouts = addon:GetModule('FormLayouts')
 ---@field activePane number|nil
 ---@field previousTab number|nil
 local stackedLayout = {}
+addon:GetModule('Perf'):RegisterPrototype(stackedLayout, 'StackedLayout')
 
 ---@param targetFrame Frame
 ---@param baseFrame Frame

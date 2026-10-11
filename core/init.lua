@@ -90,6 +90,12 @@ local debug = addon:GetModule('Debug')
 ---@class Form: AceModule
 local form = addon:GetModule('Form')
 
+---@class Perf: AceModule
+local perf = addon:GetModule('Perf')
+
+---@class PerfSessions: AceModule
+local perfSessions = addon:GetModule('PerfSessions')
+
 ---@class BagFrames
 ---@field Backpack Bag
 ---@field Bank Bag
@@ -164,6 +170,11 @@ end
 function addon:OnInitialize()
   -- 1. Core and Utilities
   events:Init()
+  -- The profiler comes up before everything else it can measure: a capture armed for this
+  -- reload installs its wrappers here, so every Init below is part of the session.
+  perf:Init()
+  perfSessions:Init()
+  perfSessions:StartIfArmed()
   debug:Init()
   async:Init()
   addon:GetModule('Bucket'):Init()

@@ -14,8 +14,6 @@ L.G = function(self, key) return key end
 
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
-debug.StartProfile = function() end
-debug.EndProfile = function() end
 debug.WalkAndFixAnchorGraph = function() end
 
 local database = StubBetterBagsModule("Database")

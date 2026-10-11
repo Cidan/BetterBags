@@ -75,6 +75,7 @@ sectionFrame.dragTargetTab = nil  -- Track the tab we're hovering over while dra
 ---@field shouldShrinkWhenCollapsed boolean Whether to actually shrink the frame when collapsed
 ---@field private originalTextColor? table The original RGBA color of the section title text
 local sectionProto = {}
+addon:GetModule('Perf'):RegisterPrototype(sectionProto, 'Section')
 
 ---@param kind BagKind
 ---@param view BagView
