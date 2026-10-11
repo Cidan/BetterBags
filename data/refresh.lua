@@ -22,11 +22,13 @@ local database = addon:GetModule('Database')
 local debug = addon:GetModule('Debug')
 
 ---@class (exact) Refresh: AceModule
----@field private isSorting boolean
 local refresh = addon:NewModule('Refresh')
 
+-- How long a sort waits for its item moves before refreshing anyway. WoW has no "sort
+-- finished" event, and a sort that moves nothing fires no BAG_UPDATE at all.
+refresh.SORT_FALLBACK_SECONDS = 0.5
+
 function refresh:Init()
-  self.isSorting = false
   -- Serialized refresh queue. RequestUpdate only enqueues; the pump (_Step) runs exactly
   -- ONE unit at a time in a single coroutine, with a deliberate idle hand-off frame
   -- between units. Because no two sweeps are ever in flight, no request-time side effect
@@ -47,24 +49,6 @@ function refresh:RedrawBackpack(ctx)
   end)
 end
 
-function refresh:AfterSort(ctx)
-  -- TODO(lobato): Detect if only new items were moved,
-  -- and only refresh the backpack if that's the case.
-  -- After moving an item, the client state does not update right
-  -- away, and there is a delay. This delay will prevent issues
-  -- with drawing.
-  C_Timer.After(0.5, function()
-    self.isSorting = false
-    events:SendMessage(ctx, 'bags/FullRefreshAll')
-  end)
-
-  --if ctx:GetBool('moved') then
-  --  events:SendMessage(ctx, 'bags/FullRefreshAll')
-  --else
-  --  events:SendMessage(ctx, 'bags/FullRefreshAll')
-  --end
-end
-
 ---@class RefreshRequest
 ---@field wipe? boolean Clear cache before refresh
 ---@field backpack? boolean Update backpack items
@@ -74,6 +58,7 @@ end
 ---@field sortWarbank? boolean Sort account/warbank items
 ---@field bags? table<number, boolean> Table of specific bagIDs that changed
 ---@field resetLayout? boolean Ignore the previous gap layout and rebuild a fresh, gapless sort
+---@field onlyIfSortPending? boolean Sweep each requested kind only if its sort has not been shown yet (the sort fallback)
 
 -- RequestUpdate enqueues an update request onto the serialized refresh queue. It performs
 -- NO side effects itself: the request's mutations (cache wipe, recent-item clearing,
@@ -91,8 +76,9 @@ function refresh:RequestUpdate(request)
   end
 end
 
--- _Arm schedules the next pump step for the next frame. This is the ONLY clock in the
--- refresh path: a single chain, never one-per-refresh, so step ordering is deterministic.
+-- _Arm schedules the next pump step for the next frame. This is the ONLY clock that steps
+-- the pump: a single chain, never one-per-refresh, so step ordering is deterministic. (The
+-- sort fallback timer only calls RequestUpdate.)
 function refresh:_Arm()
   C_Timer.After(0, function()
     self:_Step()
@@ -147,14 +133,60 @@ function refresh:_Step()
   self:_Arm()
 end
 
+local function backpackSorter()
+  if addon.isRetail and C_Container and C_Container.SortBags then
+    return C_Container.SortBags
+  end
+  return _G.SortBags
+end
+
+local function bankSorter()
+  if addon.isRetail and C_Container and C_Container.SortBankBags then
+    return C_Container.SortBankBags
+  end
+  return _G.SortBankBags
+end
+
+local function warbankSorter()
+  if addon.isRetail and C_Container and C_Container.SortAccountBankBags then
+    return C_Container.SortAccountBankBags
+  end
+  return nil
+end
+
+-- _ArmSortFallback guarantees that a sort is shown even if none of its item moves ever
+-- produce a refresh (the bags were already sorted, or the client refused the sort). When
+-- the timer fires it requests a sweep of each kind whose sort is still unshown; that unit
+-- checks again when it runs, so a moves refresh queued ahead of it is never repeated.
+---@param backpack boolean
+---@param bank boolean
+function refresh:_ArmSortFallback(backpack, bank)
+  C_Timer.After(self.SORT_FALLBACK_SECONDS, function()
+    local request = { onlyIfSortPending = true }
+    request.backpack = backpack and items:IsSortSweepPending(const.BAG_KIND.BACKPACK) or nil
+    request.bank = bank and items:IsSortSweepPending(const.BAG_KIND.BANK) or nil
+    if request.backpack or request.bank then
+      self:RequestUpdate(request)
+    end
+  end)
+end
+
 -- _RunUnit executes a single request end-to-end inside the pump's coroutine: request-time
--- mutations first, then the bank sweep, then the backpack sweep (each an inline
--- items:RunRefresh that yields once), then the protected Blizzard sort calls. Because this
--- is the only sweep in flight, ClearItemCache/ClearNewItems run with nothing parked to
--- corrupt.
+-- mutations and sort calls first, then the bank sweep, then the backpack sweep (each an
+-- inline items:RunRefresh that yields once). Because this is the only sweep in flight,
+-- ClearItemCache/ClearNewItems run with nothing parked to corrupt.
 ---@param request RefreshRequest
 function refresh:_RunUnit(request)
   local ctx = context:New('BagUpdate')
+
+  if request.onlyIfSortPending then
+    if request.backpack and not items:IsSortSweepPending(const.BAG_KIND.BACKPACK) then
+      request.backpack = nil
+    end
+    if request.bank and not items:IsSortSweepPending(const.BAG_KIND.BANK) then
+      request.bank = nil
+    end
+  end
 
   if request.bags then
     ctx:Set('targetedBags', request.bags)
@@ -174,16 +206,55 @@ function refresh:_RunUnit(request)
     request.bank = true
   end
 
+  -- Sorting. Every sorted kind is marked "sort sweep pending": the next committed sweep of
+  -- that kind re-reads all of its bags with a fresh layout and clears the mark. When the
+  -- client can sort now, the sort is issued here and this unit does not sweep that kind,
+  -- since the sweep would only redraw the pre-sort contents the moves replace a moment
+  -- later; the moves' BAG_UPDATE refresh shows the result, and the fallback timer covers a
+  -- sort that moves nothing. When it cannot sort (combat, no sort API), the kind is swept
+  -- here, now. The mark and the fallback are set before any call that could fail.
+  local sorters = {}
+  local deferBackpack, deferBank = false, false
+  local canSort = not InCombatLockdown()
+  local sortsBank = request.sortBank or request.sortWarbank
+
   if request.sort then
-    ctx:Set('resetLayout', true)
-    items:ClearNewItems(const.BAG_KIND.BACKPACK)
-    request.backpack = true
+    items:MarkSortSweepPending(const.BAG_KIND.BACKPACK)
+    local sorter = canSort and backpackSorter() or nil
+    if sorter then
+      table.insert(sorters, sorter)
+      deferBackpack = true
+    else
+      request.backpack = true
+    end
   end
 
-  if request.sortBank or request.sortWarbank then
-    ctx:Set('resetLayout', true)
+  if sortsBank then
+    items:MarkSortSweepPending(const.BAG_KIND.BANK)
+    local bank = request.sortBank and canSort and bankSorter() or nil
+    local warbank = request.sortWarbank and canSort and warbankSorter() or nil
+    if bank then table.insert(sorters, bank) end
+    if warbank then table.insert(sorters, warbank) end
+    if bank or warbank then
+      deferBank = true
+    else
+      request.bank = true
+    end
+  end
+
+  if deferBackpack or deferBank then
+    self:_ArmSortFallback(deferBackpack, deferBank)
+  end
+
+  if request.sort then
+    items:ClearNewItems(const.BAG_KIND.BACKPACK)
+  end
+  if sortsBank then
     items:ClearNewItems(const.BAG_KIND.BANK)
-    request.bank = true
+  end
+
+  for _, sorter in ipairs(sorters) do
+    sorter()
   end
 
   if request.bank and addon.atBank and addon.Bags.Bank then
@@ -197,30 +268,6 @@ function refresh:_RunUnit(request)
 
   if request.backpack then
     items:RunRefresh(ctx, const.BAG_KIND.BACKPACK)
-  end
-
-  if not InCombatLockdown() then
-    if request.sort then
-      if addon.isRetail and C_Container and C_Container.SortBags then
-        C_Container.SortBags()
-      elseif _G.SortBags then
-        _G.SortBags()
-      end
-    end
-
-    if request.sortBank then
-      if addon.isRetail and C_Container and C_Container.SortBankBags then
-        C_Container.SortBankBags()
-      elseif _G.SortBankBags then
-        _G.SortBankBags()
-      end
-    end
-
-    if request.sortWarbank then
-      if addon.isRetail and C_Container and C_Container.SortAccountBankBags then
-        C_Container.SortAccountBankBags()
-      end
-    end
   end
 end
 

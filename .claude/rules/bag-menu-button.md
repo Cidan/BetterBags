@@ -43,10 +43,12 @@ button cleans up everything visible when the bank is open, restoring the classic
 inventory also sorts the bank" behavior.
 
 - All three sort flags ride **one** serialized refresh unit (`refresh:_RunUnit`, see
-  refresh-scheduler.md): the unit clears recent items for both kinds, refreshes bank then
-  backpack, then issues the protected `C_Container.SortBags()` + `SortBankBags()` +
-  `SortAccountBankBags()` calls (still gated behind `not InCombatLockdown()`). No second
-  request is enqueued.
+  refresh-scheduler.md §6): the unit marks both kinds' sort sweeps pending, arms one
+  fallback timer covering both, clears recent items for both kinds, and issues the protected
+  `C_Container.SortBags()` + `SortBankBags()` + `SortAccountBankBags()` calls (gated behind
+  `not InCombatLockdown()`). It does not sweep either kind itself: the moves' `BAG_UPDATE`
+  refreshes (or the fallback, if nothing moved) show the result. In combat both kinds are
+  swept in the unit instead, as before.
 - When the bank is closed (`addon.atBank == false`), the request stays `{ sort = true }` —
   backpack only, byte-for-byte the prior behavior.
 

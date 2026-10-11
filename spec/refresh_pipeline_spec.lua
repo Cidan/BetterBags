@@ -90,6 +90,7 @@ local function stubModules()
   override(database, "GetShowAllFreeSpace", function() return false end)
   override(database, "GetBagView", function() return const.BAG_VIEW.SECTION_GRID end)
   override(database, "GetUpgradeIconProvider", function() return "None" end)
+  override(database, "GetUpgradeIconProviderUserSet", function() return false end)
   override(database, "GetGroupsEnabled", function() return false end)
   override(database, "GetActiveGroup", function() return 1 end)
   override(database, "GetShowBankTabs", function() return false end)
@@ -912,6 +913,203 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.is_not_nil(slotInfo.itemsBySlotKey["1_1"], "bag 1 must survive a same-frame wipe + targeted refresh")
       assert.equal(201, slotInfo.itemsBySlotKey["1_1"].itemInfo.itemID)
       assert.equal(2, slotInfo.totalItems)
+    end)
+  end)
+
+  -- Sorting. A sort the client can run is issued straight away and its own unit does not
+  -- sweep: the one sweep that shows the result is the next refresh of that kind (normally
+  -- the item moves' BAG_UPDATE), forced to re-read every bag and rebuild the layout, and a
+  -- fallback timer guarantees that sweep when nothing moves. The disaster to rule out is a
+  -- sort after which no sweep ever shows the cleared Recent Items / collapsed gaps.
+  describe("sorting (one sweep per sort)", function()
+    local frames, timers, sweeps, sortCalls
+
+    local function installClocks()
+      async.Yield = function() coroutine.yield() end
+      frames, timers = {}, {}
+      saveGlobal(_G.C_Timer, "After")
+      _G.C_Timer.After = function(delay, fn)
+        if delay == 0 then
+          table.insert(frames, fn)
+        else
+          table.insert(timers, fn)
+        end
+      end
+    end
+
+    local function drain()
+      for _ = 1, 50 do
+        local pending = frames
+        frames = {}
+        for _, fn in ipairs(pending) do fn() end
+        if #frames == 0 then return end
+      end
+      error("the refresh queue never drained")
+    end
+
+    local function fireFallbacks()
+      local pending = timers
+      timers = {}
+      for _, fn in ipairs(pending) do fn() end
+    end
+
+    local function gapCount(sortedItems)
+      local n = 0
+      for _, e in ipairs(sortedItems or {}) do
+        if e.isItemGap then n = n + 1 end
+      end
+      return n
+    end
+
+    before_each(function()
+      sweeps = { [const.BAG_KIND.BACKPACK] = 0, [const.BAG_KIND.BANK] = 0 }
+      sortCalls = { backpack = 0, bank = 0 }
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(database, "GetPreserveItemGaps", function() return true end)
+      override(items, "IsBagOpen", function() return true end)
+      override(addon:GetModule("Sort"), "GetItemDataSortFunction", function()
+        return function(a, b) return tostring(a.slotkey) < tostring(b.slotkey) end
+      end)
+      local origRun = items.RunRefresh
+      override(items, "RunRefresh", function(self, ectx, kind)
+        sweeps[kind] = sweeps[kind] + 1
+        return origRun(self, ectx, kind)
+      end)
+      saveGlobal(_G.C_Container, "SortBags")
+      saveGlobal(_G.C_Container, "SortBankBags")
+      _G.C_Container.SortBags = function() sortCalls.backpack = sortCalls.backpack + 1 end
+      _G.C_Container.SortBankBags = function() sortCalls.bank = sortCalls.bank + 1 end
+
+      -- Bag 0: three items; bag 1: one item flagged new by the client.
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 201, guid = "g201", count = 1 },
+        { itemID = 202, guid = "g202", count = 1 },
+      }
+      mockContainer[1] = { { itemID = 303, guid = "g303", count = 1 } }
+      newSlots["1_1"] = true
+      refreshBackpack()
+      -- Consume 0_2 with the bag open, leaving a held gap.
+      mockContainer[0][2] = {}
+      local before = refreshBackpack()
+      assert.equal(1, gapCount(before.sortedItems))
+      assert.equal("Recent Items", before.itemsBySlotKey["1_1"].itemInfo.category)
+      assert.is_true(before.itemsBySlotKey["1_1"].itemInfo.isNewItem)
+      sweeps[const.BAG_KIND.BACKPACK] = 0
+      sweeps[const.BAG_KIND.BANK] = 0
+    end)
+
+    local function assertSortShown()
+      local si = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.equal(0, gapCount(si.sortedItems), "the sort's sweep collapses held gaps")
+      assert.are_not.equal("Recent Items", si.itemsBySlotKey["1_1"].itemInfo.category)
+      assert.is_false(si.itemsBySlotKey["1_1"].itemInfo.isNewItem,
+        "every bag is re-read, so the new-item glow clears even on a bag the sort did not touch")
+      assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+    end
+
+    it("shows a sort that moves items with the one sweep from the moves' BAG_UPDATE", function()
+      installClocks()
+      refresh:RequestUpdate({ sort = true })
+      drain()
+      assert.equal(1, sortCalls.backpack)
+      assert.equal(0, sweeps[const.BAG_KIND.BACKPACK], "the sort unit itself must not sweep")
+
+      -- The server moves 0_3 into the free 0_2; the loader reports bag 0 only.
+      mockContainer[0][2] = mockContainer[0][3]
+      mockContainer[0][3] = {}
+      refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+      drain()
+
+      assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+      assertSortShown()
+      local si = items.slotInfo[const.BAG_KIND.BACKPACK]
+      assert.equal(202, si.itemsBySlotKey["0_2"].itemInfo.itemID)
+
+      fireFallbacks()
+      drain()
+      assert.equal(1, sweeps[const.BAG_KIND.BACKPACK], "the fallback does nothing once the sort was shown")
+    end)
+
+    it("shows a sort that moves nothing with the one sweep from the fallback", function()
+      installClocks()
+      refresh:RequestUpdate({ sort = true })
+      drain()
+      assert.equal(0, sweeps[const.BAG_KIND.BACKPACK])
+      assert.equal(1, #timers)
+
+      fireFallbacks()
+      drain()
+
+      assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+      assertSortShown()
+    end)
+
+    it("does not sweep twice when the fallback fires while the moves' refresh is still queued", function()
+      installClocks()
+      refresh:RequestUpdate({ sort = true })
+      mockContainer[0][2] = mockContainer[0][3]
+      mockContainer[0][3] = {}
+      refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+      fireFallbacks() -- the moves' unit has not run yet, so the sweep is still pending
+      drain()
+
+      assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+      assertSortShown()
+    end)
+
+    it("still shows the sort from the fallback when the moves' sweep fails", function()
+      installClocks()
+      local failures = 1
+      local origPartition = items.Phase10_PartitionIntoTabs
+      override(items, "Phase10_PartitionIntoTabs", function(...)
+        if failures > 0 then
+          failures = failures - 1
+          error("simulated sweep failure")
+        end
+        return origPartition(...)
+      end)
+
+      refresh:RequestUpdate({ sort = true })
+      refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+      drain()
+      assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+      assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BACKPACK), "a failed sweep must not count as shown")
+
+      fireFallbacks()
+      drain()
+      assert.equal(2, sweeps[const.BAG_KIND.BACKPACK])
+      assertSortShown()
+    end)
+
+    it("sweeps at once, as before, when it cannot sort in combat", function()
+      installClocks()
+      saveGlobal(_G, "InCombatLockdown")
+      _G.InCombatLockdown = function() return true end
+      refresh:RequestUpdate({ sort = true })
+      drain()
+
+      assert.equal(0, sortCalls.backpack)
+      assert.equal(1, sweeps[const.BAG_KIND.BACKPACK])
+      assert.equal(0, #timers)
+      assertSortShown()
+    end)
+
+    it("shows a bank sort that moves nothing with the one bank sweep from the fallback", function()
+      installClocks()
+      override(addon, "atBank", true)
+      override(addon, "Bags", { Bank = { bankTab = 6 } })
+      mockContainer[6] = { { itemID = 201, guid = "gb1", count = 1 } }
+      refresh:RequestUpdate({ sortBank = true })
+      drain()
+      assert.equal(1, sortCalls.bank)
+      assert.equal(0, sweeps[const.BAG_KIND.BANK])
+
+      fireFallbacks()
+      drain()
+      assert.equal(1, sweeps[const.BAG_KIND.BANK])
+      assert.equal(0, sweeps[const.BAG_KIND.BACKPACK])
+      assert.is_false(items:IsSortSweepPending(const.BAG_KIND.BANK))
     end)
   end)
 

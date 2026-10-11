@@ -162,6 +162,10 @@ items._firstLoad = {
   [const.BAG_KIND.BACKPACK] = false,
   [const.BAG_KIND.BANK] = false,
 }
+items._sortSweepPending = {
+  [const.BAG_KIND.BACKPACK] = false,
+  [const.BAG_KIND.BANK] = false,
+}
 -- We can set up items.slotInfo map to use our mock
 items.slotInfo = {
   [const.BAG_KIND.BACKPACK] = items:NewSlotInfo(),

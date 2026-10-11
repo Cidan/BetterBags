@@ -240,6 +240,13 @@ function items:Init()
     [const.BAG_KIND.BACKPACK] = true,
     [const.BAG_KIND.BANK] = true,
   }
+  -- A sort clears recent items and asks for a fresh layout, but the sweep that shows the
+  -- result comes later (the item moves' refresh, or Refresh's fallback when nothing moved).
+  -- The flag stays set until a sweep of that kind has committed.
+  self._sortSweepPending = {
+    [const.BAG_KIND.BACKPACK] = false,
+    [const.BAG_KIND.BANK] = false,
+  }
   self.equipmentCache = {}
   self.previousItemGUID = {}
 
@@ -1350,6 +1357,16 @@ end
 ---@param ectx Context
 ---@param kind BagKind
 function items:RunRefresh(ectx, kind)
+  -- The first sweep after a sort shows the sort. It re-reads every bag of the kind, even
+  -- when a BAG_UPDATE named only some: the sort may have moved items anywhere, and the
+  -- new-item flags it cleared live on every bag (an untouched bag would keep its stale
+  -- glow). It also rebuilds the layout from scratch, collapsing held gaps.
+  local sortSweep = self._sortSweepPending[kind] == true
+  if sortSweep then
+    ectx:Delete("targetedBags")
+    ectx:Set("resetLayout", true)
+  end
+
   -- Rebuild the equipment-set location map before harvesting. The map is keyed by
   -- physical (bag, slot), and the harvest reads it per slot via
   -- equipmentSets:GetItemSets. Rebuilding it here (same frame as the harvest)
@@ -1402,6 +1419,25 @@ function items:RunRefresh(ectx, kind)
   local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
 
   self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
+
+  -- Only a committed sweep counts as having shown the sort; one that failed above leaves
+  -- the flag set for the next sweep or the fallback.
+  if sortSweep then
+    self._sortSweepPending[kind] = false
+  end
+end
+
+-- MarkSortSweepPending records that a sort of this kind was requested and its result has
+-- not been shown yet. Refresh calls it before issuing the sort.
+---@param kind BagKind
+function items:MarkSortSweepPending(kind)
+  self._sortSweepPending[kind] = true
+end
+
+---@param kind BagKind
+---@return boolean
+function items:IsSortSweepPending(kind)
+  return self._sortSweepPending[kind] == true
 end
 
 function items:ProcessRefresh(ctx, kind)

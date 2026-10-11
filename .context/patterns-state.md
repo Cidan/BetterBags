@@ -150,6 +150,9 @@ if childData and childData.itemInfo.currentItemCount ~= ... then
 ## High-Frequency Game Events: Filter at the Door, Batch in Windows
 Events like `TOOLTIP_DATA_UPDATE` (every tooltip in the game) and `BAG_UPDATE_COOLDOWN` (spell casts) can fire many times per second. Handle them with `events:BucketEvent(event, callback, filter)` and give it a filter that rejects every fire you don't care about (an id you didn't record, a hidden bag) before anything is allocated or scheduled. Never debounce a stream that can be continuous (it never flushes) and never build a Context or argument table per fire. Contract: `.claude/rules/event-buckets.md`.
 
+## Don't Sweep Before a Server-Side Change; Mark It Pending and Guarantee a Later Sweep
+A sort (and anything else whose effect arrives later as `BAG_UPDATE`s) should not sweep in its own unit: that sweep redraws the old contents and is thrown away a moment later. Instead mark the kind pending in Items (`items:MarkSortSweepPending`), let the next committed sweep of that kind carry the extra work (full re-read, layout reset) and clear the mark only after `Phase11` commits, and arm a fallback timer that requests the sweep if nothing else did (a sort that moves nothing fires no event at all). Set the mark and the fallback before any call that can fail, and have the fallback's unit re-check the mark when it runs so a queued event refresh is never repeated. Contract: `.claude/rules/refresh-scheduler.md` §6.
+
 ## Keep Clean-Sweep Work Linear in Item Count
 Every sweep re-runs Phase 8's search index rebuild over both bags, even for a one-slot change, so any per-item cost that grows with string length or item count is paid constantly. The tooltip prefix n-grams (quadratic in tooltip length) were the dominant cost of every sweep until the tooltip index became full-text only (`.claude/rules/search-indexing.md` §2a).
 

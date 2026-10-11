@@ -34,6 +34,11 @@ items.RefreshBank = function() end
 -- items:RunRefresh core, not the async ProcessRefresh wrappers, so tests assert against it.
 items.RunRefresh = function() end
 items.ClearNewItems = function() end
+-- Mirror the real Items sort-sweep flag (data/items.lua): set by a sort, cleared by the
+-- next committed sweep of that kind.
+local sortSweepPending = {}
+items.MarkSortSweepPending = function(_, kind) sortSweepPending[kind] = true end
+items.IsSortSweepPending = function(_, kind) return sortSweepPending[kind] == true end
 
 -- Mock ItemLoader
 local loader = StubBetterBagsModule("ItemLoader")
@@ -56,15 +61,25 @@ local refresh = addon:GetModule("Refresh")
 
 describe("Refresh Module", function()
   local savedAfter
+  local delayed
   before_each(function()
     refresh:Init()
     registeredCallback = nil
     addon.atBank = false
     addon.Bags = {}
+    for k in pairs(sortSweepPending) do sortSweepPending[k] = nil end
     -- Drive the scheduler's frame clock synchronously so a RequestUpdate drains its unit
     -- within the call, preserving these tests' "processed synchronously" expectations.
+    -- Timers with a real delay (the sort fallback) are held for the test to fire.
+    delayed = {}
     savedAfter = _G.C_Timer.After
-    _G.C_Timer.After = function(_, fn) fn() end
+    _G.C_Timer.After = function(delay, fn)
+      if delay == 0 then
+        fn()
+      else
+        table.insert(delayed, { delay = delay, fn = fn })
+      end
+    end
   end)
 
   after_each(function()
@@ -72,7 +87,6 @@ describe("Refresh Module", function()
   end)
 
   it("should initialize with default states", function()
-    assert.is_false(refresh.isSorting)
     assert.is_nil(refresh.pendingBackpack)
     assert.is_nil(refresh.pendingBank)
     assert.is_nil(refresh.pendingWipe)
@@ -196,6 +210,36 @@ describe("Refresh Module", function()
     assert.spy(_G.C_Container.SortBags).was.called(1)
   end)
 
+  it("sweeps a sort request immediately, with no fallback, when it cannot sort in combat", function()
+    _G.C_Container = _G.C_Container or {}
+    _G.C_Container.SortBags = function() end
+    spy.on(_G.C_Container, "SortBags")
+    spy.on(items, "RunRefresh")
+    _G.InCombatLockdown = function() return true end
+
+    refresh:RequestUpdate({ sort = true })
+
+    _G.InCombatLockdown = function() return false end
+    assert.spy(_G.C_Container.SortBags).was_not.called()
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+    assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BACKPACK), "the sweep (stubbed here) is what clears it")
+    assert.are.equal(0, #delayed)
+  end)
+
+  it("sweeps a sort request immediately when the client has no sort function", function()
+    _G.C_Container = _G.C_Container or {}
+    local savedSortBags, savedGlobalSortBags = _G.C_Container.SortBags, _G.SortBags
+    _G.C_Container.SortBags = nil
+    _G.SortBags = nil
+    spy.on(items, "RunRefresh")
+
+    refresh:RequestUpdate({ sort = true })
+
+    _G.C_Container.SortBags, _G.SortBags = savedSortBags, savedGlobalSortBags
+    assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+    assert.are.equal(0, #delayed)
+  end)
+
   it("should trigger a full update on BAG_CONTAINER_UPDATE", function()
     refresh:OnEnable()
     spy.on(refresh, "RequestUpdate")
@@ -312,11 +356,13 @@ describe("Refresh Module", function()
   end)
 
   describe("Sort Handling and Recent Items Clearing", function()
-    it("should clear backpack recent items, force backpack refresh, and sort on request.sort", function()
-      items.ClearNewItems = function() end
+    -- A sort that the client can run is issued at once and does NOT sweep in its own unit:
+    -- the sweep that shows its result is the next refresh of that kind (the item moves'
+    -- BAG_UPDATE), and a fallback timer refreshes the kind if no such sweep has happened,
+    -- e.g. because the bags were already sorted and nothing moved.
+    it("issues the backpack sort at once, clears recent items, and defers the sweep", function()
       _G.C_Container = _G.C_Container or {}
       _G.C_Container.SortBags = function() end
-
       spy.on(items, "ClearNewItems")
       spy.on(items, "RunRefresh")
       spy.on(_G.C_Container, "SortBags")
@@ -324,17 +370,73 @@ describe("Refresh Module", function()
       refresh:RequestUpdate({ sort = true })
 
       assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BACKPACK)
-      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
       assert.spy(_G.C_Container.SortBags).was.called(1)
+      assert.spy(items.RunRefresh).was_not.called()
+      assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+      assert.are.equal(1, #delayed)
+      assert.are.equal(refresh.SORT_FALLBACK_SECONDS, delayed[1].delay)
     end)
 
-    it("should clear bank recent items, force bank refresh, and sort on request.sortBank", function()
+    it("refreshes from the fallback when the sort's sweep never happened", function()
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+      spy.on(items, "RunRefresh")
+
+      refresh:RequestUpdate({ sort = true })
+      assert.spy(items.RunRefresh).was_not.called()
+      delayed[1].fn()
+
+      assert.spy(items.RunRefresh).was.called(1)
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+    end)
+
+    it("does nothing from the fallback when the sort's sweep already happened", function()
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+      spy.on(items, "RunRefresh")
+      spy.on(refresh, "RequestUpdate")
+
+      refresh:RequestUpdate({ sort = true })
+      sortSweepPending[const.BAG_KIND.BACKPACK] = nil -- a BAG_UPDATE sweep committed
+      delayed[1].fn()
+
+      assert.spy(refresh.RequestUpdate).was.called(1)
+      assert.spy(items.RunRefresh).was_not.called()
+    end)
+
+    it("re-checks a fallback request when its unit runs, and skips a kind already swept", function()
+      spy.on(items, "RunRefresh")
+      refresh:RequestUpdate({ backpack = true, onlyIfSortPending = true })
+      assert.spy(items.RunRefresh).was_not.called()
+
+      sortSweepPending[const.BAG_KIND.BACKPACK] = true
+      refresh:RequestUpdate({ backpack = true, onlyIfSortPending = true })
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+    end)
+
+    it("marks the sweep pending and arms the fallback before calling the sort API", function()
+      _G.C_Container = _G.C_Container or {}
+      local seen = {}
+      _G.C_Container.SortBags = function()
+        seen.pending = items:IsSortSweepPending(const.BAG_KIND.BACKPACK)
+        seen.fallbacks = #delayed
+        error("sort failed")
+      end
+      local savedHandler = _G.geterrorhandler
+      _G.geterrorhandler = function() return function() end end
+
+      refresh:RequestUpdate({ sort = true })
+
+      _G.geterrorhandler = savedHandler
+      assert.is_true(seen.pending)
+      assert.are.equal(1, seen.fallbacks)
+    end)
+
+    it("issues the bank sort at once and defers the bank sweep", function()
       addon.atBank = true
       addon.Bags = { Bank = { bankTab = 1 } }
-      items.ClearNewItems = function() end
       _G.C_Container = _G.C_Container or {}
       _G.C_Container.SortBankBags = function() end
-
       spy.on(items, "ClearNewItems")
       spy.on(items, "RunRefresh")
       spy.on(_G.C_Container, "SortBankBags")
@@ -342,17 +444,18 @@ describe("Refresh Module", function()
       refresh:RequestUpdate({ sortBank = true })
 
       assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BANK)
-      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
       assert.spy(_G.C_Container.SortBankBags).was.called(1)
+      assert.spy(items.RunRefresh).was_not.called()
+      assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BANK))
+      delayed[1].fn()
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
     end)
 
-    it("should clear bank recent items, force bank refresh, and sort warbank on request.sortWarbank", function()
+    it("issues the warbank sort at once and defers the bank sweep", function()
       addon.atBank = true
       addon.Bags = { Bank = { bankTab = 1 } }
-      items.ClearNewItems = function() end
       _G.C_Container = _G.C_Container or {}
       _G.C_Container.SortAccountBankBags = function() end
-
       spy.on(items, "ClearNewItems")
       spy.on(items, "RunRefresh")
       spy.on(_G.C_Container, "SortAccountBankBags")
@@ -360,8 +463,48 @@ describe("Refresh Module", function()
       refresh:RequestUpdate({ sortWarbank = true })
 
       assert.spy(items.ClearNewItems).was.called_with(items, const.BAG_KIND.BANK)
-      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
       assert.spy(_G.C_Container.SortAccountBankBags).was.called(1)
+      assert.spy(items.RunRefresh).was_not.called()
+      assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BANK))
+    end)
+
+    it("sorts the backpack, bank and warbank together with one fallback covering both kinds", function()
+      addon.atBank = true
+      addon.Bags = { Bank = { bankTab = 1 } }
+      _G.C_Container = _G.C_Container or {}
+      _G.C_Container.SortBags = function() end
+      _G.C_Container.SortBankBags = function() end
+      _G.C_Container.SortAccountBankBags = function() end
+      spy.on(items, "RunRefresh")
+      spy.on(_G.C_Container, "SortBags")
+      spy.on(_G.C_Container, "SortBankBags")
+      spy.on(_G.C_Container, "SortAccountBankBags")
+
+      refresh:RequestUpdate({ sort = true, sortBank = true, sortWarbank = true })
+
+      assert.spy(_G.C_Container.SortBags).was.called(1)
+      assert.spy(_G.C_Container.SortBankBags).was.called(1)
+      assert.spy(_G.C_Container.SortAccountBankBags).was.called(1)
+      assert.spy(items.RunRefresh).was_not.called()
+      assert.are.equal(1, #delayed)
+      delayed[1].fn()
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BACKPACK)
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
+    end)
+
+    it("sweeps the bank at once when only an unavailable warbank sort was asked for", function()
+      addon.atBank = true
+      addon.Bags = { Bank = { bankTab = 1 } }
+      _G.C_Container = _G.C_Container or {}
+      local savedWarbank = _G.C_Container.SortAccountBankBags
+      _G.C_Container.SortAccountBankBags = nil
+      spy.on(items, "RunRefresh")
+
+      refresh:RequestUpdate({ sortWarbank = true })
+
+      _G.C_Container.SortAccountBankBags = savedWarbank
+      assert.spy(items.RunRefresh).was.called_with(items, match._, const.BAG_KIND.BANK)
+      assert.are.equal(0, #delayed)
     end)
 
     it("should route bags/SortBank and bags/SortWarbank messages", function()

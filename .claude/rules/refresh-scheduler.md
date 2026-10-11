@@ -42,17 +42,19 @@ harvest.
   frame if `_idlePending`; else (c) dequeues and starts the next unit; else (d) stops the
   clock (`self._running = false`) when the queue is empty. After (a), (b), and (c) it calls
   `_Arm()` to schedule the next step.
-- **`_Arm()` is the ONLY clock in the refresh path.** A single `C_Timer.After(0)` chain,
-  never one-per-refresh, so step ordering is fully deterministic.
+- **`_Arm()` is the ONLY clock that steps the pump.** A single `C_Timer.After(0)` chain,
+  never one-per-refresh, so step ordering is fully deterministic. The sort fallback timer
+  (§6) is the one other timer in the refresh path; it never steps the pump, it only calls
+  `RequestUpdate`.
 - **`_Resume()`** resumes the active coroutine; when it finishes it sets `_idlePending = true`
   (arming the hand-off frame). A unit that errors is dropped and reported via
   `geterrorhandler()` — one bad sweep must not wedge the queue.
 - **`_RunUnit(request)`** is the body that used to be `RequestUpdate`, now running inside the
-  pump's coroutine: request-time mutations first (`ClearItemCache` for `wipe`,
-  `ClearNewItems` for sorts, the bankTab adjust), then the bank sweep, then the backpack
-  sweep, then the protected `C_Container.Sort*` calls (still gated on
-  `not InCombatLockdown()`). Because this is the only sweep in flight, those mutations run
-  with nothing parked to corrupt.
+  pump's coroutine: request-time mutations and sort calls first (`ClearItemCache` for
+  `wipe`; for sorts, the sort-sweep mark, the fallback timer, `ClearNewItems`, and the
+  protected `C_Container.Sort*` calls, gated on `not InCombatLockdown()`; the bankTab
+  adjust), then the bank sweep, then the backpack sweep. Because this is the only sweep in
+  flight, those mutations run with nothing parked to corrupt.
 
 ### Frame cadence
 
@@ -81,8 +83,8 @@ handed to the next frame by `_Arm`.
   stability is the priority; do not add "collapse the queue" optimizations here without a
   separate, well-tested change.
 - **Whole request = one unit.** A request carrying both `bank` and `backpack` runs both
-  sweeps sequentially inside the same unit coroutine (bank first, then backpack), preserving
-  the original intra-request ordering of wipe → bank → backpack → sort.
+  sweeps sequentially inside the same unit coroutine (bank first, then backpack), in the
+  order wipe → sort calls → bank → backpack.
 
 ## 4. API Contracts
 
@@ -95,6 +97,10 @@ handed to the next frame by `_Arm`.
   production code, always go through `RequestUpdate` so serialization holds.
 - Scheduler state (`refresh._queue`, `_active`, `_idlePending`, `_running`) is initialized in
   `refresh:Init()` and reset there; tests re-init per case.
+- `RefreshRequest.onlyIfSortPending` — set only by the sort fallback (§6). The unit drops each
+  requested kind whose sort sweep is no longer pending (`items:IsSortSweepPending`) before
+  doing anything else. This is not coalescing: the request literally means "sweep this kind
+  if its sort has not been shown yet".
 
 ## 5. Testing Contract
 
@@ -112,3 +118,56 @@ handed to the next frame by `_Arm`.
   `C_Timer.After` (`function(_, fn) fn() end`) so a unit drains fully within the
   `RequestUpdate` call, and assert against `items:RunRefresh` (the entry the scheduler drives),
   not the `RefreshBackpack`/`RefreshBank` wrappers.
+- **Sort specs** (`spec/refresh_spec.lua` "Sort Handling and Recent Items Clearing" with a
+  clock that runs delay-0 frames at once and holds delayed timers for the test to fire;
+  `spec/refresh_pipeline_spec.lua` "sorting (one sweep per sort)" on the real pipeline and
+  queue) cover: a sort that moves items is shown by the moves' refresh alone; a sort that
+  moves nothing is shown by the fallback; the fallback racing a queued moves refresh sweeps
+  once; a failed sweep leaves the sort pending for the fallback; combat sweeps at once; the
+  bank path. Each safety mechanism (the run-time re-check, the forced full re-read, clearing
+  the mark only after commit, arming the fallback) was mutation-tested: removing any one
+  fails at least one of these specs.
+
+## 6. Sorting: One Sweep Per Sort
+
+A sort used to run a full sweep in its own unit and then call `C_Container.SortBags()`.
+That sweep only redrew the pre-sort contents (the moves happen server-side, afterwards), and
+the moves' `BAG_UPDATE` then triggered a second full sweep. A profiled sort on WoW: Forever
+spent about 31 ms of real time in the first, wasted sweep.
+
+Now, in `_RunUnit`, for each sorted kind (`sort` -> backpack; `sortBank`/`sortWarbank` ->
+bank):
+
+1. `items:MarkSortSweepPending(kind)`. The next committed sweep of that kind shows the sort:
+   `items:RunRefresh` re-reads **every** bag of the kind (it deletes `targetedBags`, because
+   the sort may have moved items anywhere and the new-item glow is a harvest-time field on
+   every bag, so a sweep of only the bags a `BAG_UPDATE` named would leave stale glows) and
+   rebuilds the layout (`resetLayout`). The mark is cleared only after `Phase11` commits, so
+   a sweep that fails leaves it set.
+2. If the client can sort now (out of combat and the sort API exists), the sort is issued in
+   this unit and the kind is **not** swept here. Otherwise (combat, no API) the kind is swept
+   in this unit, which consumes the mark, exactly as an unsorted refresh.
+3. When anything was issued, `_ArmSortFallback` schedules a `C_Timer.After(SORT_FALLBACK_SECONDS)`
+   (0.5 s). When it fires it requests `{ onlyIfSortPending = true }` for the kinds still
+   pending. This covers a sort that moves nothing (already sorted, or refused), which fires
+   no `BAG_UPDATE` at all; WoW has no "sort finished" event (`ContainerDocumentation.lua`,
+   and Blizzard's own sort button just calls `SortBags()`).
+4. The mark and the fallback are set **before** `ClearNewItems` and the sort calls, so an
+   error in either still leaves a refresh guaranteed.
+5. A request that also names the sorted kind explicitly (`backpack`, `bank`, or `wipe`) still
+   sweeps it in the unit, right after the sort call and before any item has moved. That
+   sweep consumes the mark, so the layout reset lands on the pre-move sweep and the moves'
+   refresh is an ordinary one. No caller sends such a combination (`bags/SortBackpack`,
+   `bags/SortBank`, `bags/SortWarbank` send only sort flags); it is kept because it can only
+   add a sweep, never remove one.
+
+Why no refresh can be missed: every real item change still produces its own `BAG_UPDATE`
+refresh, exactly as before; the change only removes the sort unit's own sweep, and the
+effects that sweep had (recent items cleared, layout reset, all bags re-read) are delivered
+by the first later sweep of that kind, which the fallback guarantees within 0.5 s. A bank
+sort whose bank closes first stays pending until the next bank sweep (bank open), the same
+gating the old in-unit bank sweep had.
+
+Trade-off: a sort that moves nothing now shows its cleared Recent Items 0.5 s after the
+click instead of at once. A sort whose moves arrive later than 0.5 s (high latency) gets the
+fallback sweep and then the moves' sweep, which is the old cost.
