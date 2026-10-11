@@ -164,6 +164,9 @@ A sweep that changed one slot should cost one slot, but every past attempt at in
 - **Fall back to a full rebuild on wipes**, which are also how settings changes propagate (draw generation).
 - **Gate it with an equivalence test** against the clean rebuild over randomized sequences (`spec/search_spec.lua` "matches a clean rebuild"), plus a mutation check that each guard is load-bearing.
 
+## A Content Hash Is Not an Identity
+`itemHash` answers "are these two items interchangeable" (stacking), not "is this the same item". Its inputs include values the client reports differently before and after it has an item's data (item level, bind type, stats), and values that change on a live item (enchants, upgrades, scaling). Any diff that matches by hash alone treats those as a departure plus an arrival: the persistent-gap diff left holes all over the bag at login this way (`.claude/rules/data-loader.md` §13). When a diff must follow the same item, pair by content first and then fall back to instance identity (the item GUID, same slot), keeping any boundary the hash encodes on purpose (the Warbank scope) out of the fallback.
+
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds

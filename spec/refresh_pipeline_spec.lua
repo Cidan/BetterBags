@@ -1900,6 +1900,106 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       -- The backpack's committed layout is a different kind and is untouched.
       assert.equal(0, gapCount(items.slotInfo[const.BAG_KIND.BACKPACK].sortedItems))
     end)
+
+    describe("items whose hash changes without leaving their slot", function()
+      -- A link with every field present, so the item ID parses into the item hash.
+      local function link(itemID)
+        local name = itemNames[itemID] or ("TestItem " .. itemID)
+        return "|cffffffff|Hitem:" .. itemID .. "::::::::80::::::::::|h[" .. name .. "]|h|r"
+      end
+
+      it("keeps items read cold at login in place when the item cache warms", function()
+        enableGaps()
+        override(database, "GetCategoryFilter", function(_, _, filter)
+          return filter == "Type" or filter == "Expansion"
+        end)
+        override(const, "EXPANSION_MAP", { [0] = "Classic", [11] = "Midnight" })
+        local function idOf(x) return tonumber(x) or tonumber(tostring(x):match("item:(%d+)")) end
+        local warm = { [101] = false, [201] = true, [202] = false }
+        _G.C_Item.GetItemInfo = function(x)
+          local id = idOf(x)
+          if not warm[id] then return nil end
+          return itemNames[id], nil, 1, 100, 1, "Consumable", "Potion", 20, "INVTYPE_NON_EQUIP_IGNORE",
+            134400, 10, 0, 1, 0, 11, 0, false
+        end
+        saveGlobal(_G.C_Item, "GetItemInfoInstant")
+        _G.C_Item.GetItemInfoInstant = function(x)
+          return idOf(x), "Consumable", "Potion", "INVTYPE_NON_EQUIP_IGNORE", 134400, 0, 1
+        end
+        saveGlobal(_G.C_Item, "GetCurrentItemLevel")
+        _G.C_Item.GetCurrentItemLevel = function(location)
+          local bagid, slotid = location:GetBagAndSlot()
+          local slot = mockContainer[bagid] and mockContainer[bagid][slotid]
+          return (slot and warm[slot.itemID]) and 100 or nil
+        end
+        mockContainer[0] = {
+          { itemID = 101, guid = "g101", count = 1, link = link(101) },
+          { itemID = 201, guid = "g201", count = 1, link = link(201) },
+          { itemID = 202, guid = "g202", count = 1, link = link(202) },
+        }
+        local cold = refreshBackpack({ wipe = true })
+        assert.equal("Consumable - Classic", cold.itemsBySlotKey["0_1"].itemInfo.category)
+        assert.equal("Consumable - Midnight", cold.itemsBySlotKey["0_2"].itemInfo.category)
+        assert.equal("Consumable - Classic", cold.itemsBySlotKey["0_3"].itemInfo.category)
+
+        warm[101], warm[202] = true, true
+        local after = refreshBackpack()
+
+        assert.equal(0, gapCount(after.sortedItems))
+        assert.equal(3, #after.sortedItems)
+        for _, entry in ipairs(after.sortedItems) do
+          assert.equal("Consumable - Midnight", entry.itemInfo.category)
+        end
+      end)
+
+      it("keeps a virtual stack in place when every pile's hash changes", function()
+        enableGaps()
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, mergeUnstackable = true, unmergeAtShop = false,
+            dontMergePartial = false, dontMergeTransmog = false }
+        end)
+        local level = nil
+        saveGlobal(_G.C_Item, "GetCurrentItemLevel")
+        _G.C_Item.GetCurrentItemLevel = function() return level end
+        mockContainer[0] = {
+          { itemID = 101, guid = "g101a", count = 20, link = link(101) },
+          { itemID = 101, guid = "g101b", count = 10, link = link(101) },
+          { itemID = 201, guid = "g201", count = 1, link = link(201) },
+        }
+        local before = refreshBackpack()
+        assert.equal(2, #before.sortedItems)
+
+        -- The current item level resolving changes the hash of every pile.
+        level = 100
+        local after = refreshBackpack()
+
+        assert.equal(0, gapCount(after.sortedItems))
+        assert.equal(2, #after.sortedItems)
+        for i, entry in ipairs(before.sortedItems) do
+          assert.equal(entry.slotkey, after.sortedItems[i].slotkey)
+        end
+        assert.equal(30, after.itemsBySlotKey["0_1"].stackedCount)
+      end)
+
+      it("still treats a move from the Character Bank to the Warbank as a remove + add", function()
+        enableGaps()
+        override(addon, "atBank", true)
+        mockContainer[6] = {
+          { itemID = 201, guid = "gbank1", count = 1, link = link(201) },
+          { itemID = 202, guid = "gbank2", count = 1, link = link(202) },
+        }
+        mockContainer[13] = { {} }
+        refreshBank()
+
+        mockContainer[6][1] = {}
+        mockContainer[13][1] = { itemID = 201, guid = "gbank1", count = 1, link = link(201) }
+        local after = refreshBank()
+
+        assert.equal(1, gapCount(after.sortedItems))
+        assert.equal("gap:6_1", after.sortedItems[1].slotkey)
+        assert.equal("13_1", after.sortedItems[#after.sortedItems].slotkey)
+      end)
+    end)
   end)
 
   describe("refresh scheduler (serialized queue)", function()
