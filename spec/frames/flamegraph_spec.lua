@@ -134,6 +134,37 @@ describe("FlameGraph", function()
     assert.are.equal(0, fg.depthOffset)
   end)
 
+  it("sizes bars by overhead-adjusted time and explains the adjustment in the tooltip", function()
+    local tree = sampleTree()
+    -- A: 2 ms self, 1 call; B: 6 ms self, 2 calls; C: 2 ms self, 5 calls.
+    perfFormat:Adjust(tree, { parentMs = 0.25, childMs = 0.5, approximate = false })
+    fg:SetTree(tree)
+    fg:SetMetric("adjusted")
+    local a = perfFormat:Find(tree, { "Items.A" })
+    assert.are.equal(a.adjTotal / tree.root.adjTotal, barFor(fg, "Items.A").rect.w)
+
+    fg:ShowTooltip({ node = a })
+    local text = {}
+    for _, l in ipairs(GameTooltip.doubleLines) do text[l.left] = l.right end
+    assert.are.equal(1, (text["Total"]:find(perfFormat:Ms(a.adjTotal), 1, true)))
+    assert.are.equal(perfFormat:Ms(a.adjSelf), text["Self"])
+    assert.are.equal("8.00 ms", text["Raw total (with profiler)"])
+    assert.is_not_nil(text["Profiler overhead"])
+  end)
+
+  it("warns when a node's time is mostly profiler overhead", function()
+    local tree = sampleTree()
+    perfFormat:Adjust(tree, { parentMs = 0.25, childMs = 0.5, approximate = false })
+    fg:SetTree(tree)
+    fg:SetMetric("adjusted")
+    fg:ShowTooltip({ node = perfFormat:Find(tree, { "[event] C" }) })
+    local warned = false
+    for _, l in ipairs(GameTooltip.lines) do
+      if l.text and l.text:find("rough estimate", 1, true) then warned = true end
+    end
+    assert.is_true(warned)
+  end)
+
   it("describes a node in the tooltip", function()
     local tree = sampleTree()
     fg:SetTree(tree)

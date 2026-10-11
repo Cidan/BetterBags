@@ -344,6 +344,86 @@ describe("PerfPane", function()
     end)
   end)
 
+  describe("profiler overhead", function()
+    -- Each measured call costs 0.5 ms on its caller and 0.5 ms on itself.
+    local function calibratedSession(id)
+      local s = makeSession(id)
+      s.stats.overheadPerCallMs = 1
+      s.stats.overheadParentMs = 0.5
+      s.stats.overheadChildMs = 0.5
+      s.timeline.calls = "0,2,2"
+      s.timeline.nested = "0,1,1"
+      return s
+    end
+
+    local function functionRow(name)
+      for _, row in ipairs(itemsOf(pane.functionList)) do
+        if row.name == name then return row end
+      end
+    end
+
+    local function renderRow(row)
+      local button = CreateFrame("Button")
+      for _, key in ipairs({ "Name", "Calls", "Total", "Self", "Avg", "Max", "Alloc" }) do
+        button[key] = button:CreateFontString()
+      end
+      pane.functionList.init(button, row)
+      return button
+    end
+
+    before_each(function()
+      table.insert(perfSessions.db.sessions, calibratedSession(1))
+      pane:Update()
+      pane:SelectSession(1)
+    end)
+
+    it("subtracts profiler overhead by default and can switch back to raw times", function()
+      assert.is_true(pane.adjustCheck:IsEnabled())
+      assert.is_true(pane.adjustCheck:GetChecked())
+      assert.are.equal("adjusted", pane.flame.metric)
+      assert.are.equal("adjusted", pane.frameFlame.metric)
+      assert.are.equal("5.50 ms", renderRow(functionRow("Items.Harvest")).Self:GetText())
+
+      pane.adjustCheck:SetChecked(false)
+      pane.adjustCheck:GetScript("OnClick")(pane.adjustCheck)
+      assert.are.equal("time", pane.flame.metric)
+      assert.are.equal("6.00 ms", renderRow(functionRow("Items.Harvest")).Self:GetText())
+    end)
+
+    it("shows the worst frames without the profiler's cost", function()
+      -- Raw 7.5 ms; its calls carried 1.5 ms of estimated overhead.
+      assert.is_truthy(itemsOf(pane.frameList)[1].text:find("6.00 ms", 1, true))
+    end)
+
+    it("greys out functions whose time is mostly profiler overhead", function()
+      -- Bag.Draw measured 0.5 ms over 2 calls, all of it within the estimated overhead.
+      local row = functionRow("Bag.Draw")
+      assert.is_true(row.overheadShare > 0.75)
+      local button = renderRow(row)
+      local r, g, b = button.Name:GetTextColor()
+      assert.is_true(r < 1 and g < 1 and b < 1)
+      local harvest = renderRow(functionRow("Items.Harvest"))
+      local hr, hg, hb = harvest.Name:GetTextColor()
+      assert.are.same({ 1, 1, 1 }, { hr, hg, hb })
+    end)
+
+    it("reports the calibration and the time without overhead in the summary", function()
+      local text = pane.summaryText:GetText()
+      assert.is_truthy(text:find("per call", 1, true))
+      assert.is_truthy(text:find("without profiler overhead", 1, true))
+    end)
+
+    it("offers no adjustment for a session captured without calibration", function()
+      local s = makeSession(2)
+      s.stats.overheadPerCallMs = 0
+      table.insert(perfSessions.db.sessions, s)
+      pane:Update()
+      pane:SelectSession(2)
+      assert.is_false(pane.adjustCheck:IsEnabled())
+      assert.are.equal("time", pane.flame.metric)
+    end)
+  end)
+
   describe("settings", function()
     local function entry(title)
       for _, e in ipairs(createdForm.entries) do

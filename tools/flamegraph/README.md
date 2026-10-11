@@ -28,11 +28,15 @@ lua tools/flamegraph/flamegraph.lua path/to/BetterBags.lua --metric alloc
 | `--session <id\|latest>` | Session to export. Default: the latest. |
 | `--frame <n>` | Export the session's n-th worst frame instead of the whole session. |
 | `--metric <time\|alloc>` | Size bars by time (default) or by allocated memory (needs a session captured with "Track memory allocations"). |
+| `--raw` | Keep the profiler's own overhead in the times. Without it, sessions captured with calibration (the default) have the measured per-call overhead removed. |
 | `--out <dir>` | Output directory. Default: the current directory. |
 
 ## Outputs
 
-Each run writes three files named `betterbags-<id>[-frame<n>][-alloc]`:
+Each run writes three files named `betterbags-<id>[-frame<n>][-alloc][-raw]`. Unless
+`--raw` is given, times have the profiler's per-call overhead (measured when the capture
+started) removed, the same adjustment the in-game "Subtract overhead" box applies; the HTML
+summary says which one you are looking at.
 
 - `.html`: a single self-contained page. Click a bar to zoom in, right-click to zoom out,
   type in the search box to highlight matches and see their share of the view.

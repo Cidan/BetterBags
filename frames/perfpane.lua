@@ -64,6 +64,10 @@ local BLIZZARD_METRICS = {
   { 'CountTimeOver500Ms', 'Frames over 500 ms', false },
 }
 
+-- Above this share of profiler overhead, an adjusted time is mostly an estimate.
+local ROUGH_ESTIMATE_SHARE = 0.75
+local ADJUSTED_FIELD = { incl = 'adjIncl', self = 'adjSelf', avg = 'adjAvg' }
+
 local TIMELINE_COLUMNS = 270
 local TIMELINE_HEIGHT = 70
 local STATUS_INTERVAL = 0.5
@@ -99,6 +103,10 @@ end
 ---@field flame FlameGraphFrame
 ---@field searchBox EditBox
 ---@field metricButton Button
+---@field adjustCheck CheckButton
+---@field adjust boolean Subtract profiler overhead when the session has a calibration.
+---@field overhead PerfOverhead|nil
+---@field showAlloc boolean
 ---@field functionList ListFrame
 ---@field functionHeaders table<string, Button>
 ---@field frameList ListFrame
@@ -131,6 +139,8 @@ function perfPane:Create(parent)
   pane.timelineBars = {}
   pane.timelineBlizzardBars = {}
   pane.sortKey = 'self'
+  pane.adjust = true
+  pane.showAlloc = false
   pane.sortDescending = true
   pane.newestSeen = 0
   pane.sinceStatus = 0
@@ -242,7 +252,7 @@ function paneProto:CreateViews()
   local previous
   for _, name in ipairs(VIEW_ORDER) do
     local button = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate') --[[@as Button]]
-    button:SetSize(100, 22)
+    button:SetSize(90, 22)
     if previous then
       button:SetPoint('LEFT', previous, 'RIGHT', 4, 0)
     else
@@ -260,6 +270,26 @@ function paneProto:CreateViews()
     view:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -8, 8)
     self.views[name] = view
   end
+
+  self.adjustCheck = CreateFrame('CheckButton', nil, f, 'UICheckButtonTemplate') --[[@as CheckButton]]
+  self.adjustCheck:SetSize(24, 24)
+  self.adjustCheck:SetPoint('LEFT', previous, 'RIGHT', 10, 0)
+  self.adjustCheck:SetScript('OnClick', function(button)
+    self.adjust = button:GetChecked()
+    self:ApplyMetric()
+  end)
+  self.adjustCheck:SetScript('OnEnter', function(button)
+    GameTooltip:SetOwner(button, 'ANCHOR_TOP')
+    GameTooltip:SetText('Subtract profiler overhead', 1, 1, 1)
+    GameTooltip:AddLine('Every measured call costs a little time inside the profiler itself. The cost per call is measured when the capture starts and removed from the numbers. Functions that are mostly overhead are greyed out: their adjusted time is a rough estimate.', nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  self.adjustCheck:SetScript('OnLeave', function()
+    GameTooltip:Hide()
+  end)
+  local adjustLabel = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  adjustLabel:SetPoint('LEFT', self.adjustCheck, 'RIGHT', 2, 0)
+  adjustLabel:SetText('Subtract overhead')
 
   self:CreateFlameView(self.views.flame)
   self:CreateFunctionsView(self.views.functions)
@@ -288,8 +318,8 @@ function paneProto:CreateFlameView(view)
   self.metricButton:SetSize(150, 20)
   self.metricButton:SetPoint('TOPRIGHT', view, 'TOPRIGHT', 0, 0)
   self.metricButton:SetScript('OnClick', function()
-    local metric = self.flame.metric == 'alloc' and 'time' or 'alloc'
-    self.flame:SetMetric(metric)
+    self.showAlloc = not self.showAlloc
+    self.flame:SetMetric(self:FlameMetric())
     self:UpdateMetricButton()
   end)
 
@@ -299,8 +329,47 @@ function paneProto:CreateFlameView(view)
   self:UpdateMetricButton()
 end
 
+-- TimeMetric is the time the views show: adjusted for profiler overhead when the session
+-- has a calibration and the box is ticked, raw otherwise.
+---@return "time"|"adjusted"
+function paneProto:TimeMetric()
+  if self.adjust and self.overhead then
+    return 'adjusted'
+  end
+  return 'time'
+end
+
+---@return "time"|"adjusted"|"alloc"
+function paneProto:FlameMetric()
+  if self.showAlloc then
+    return 'alloc'
+  end
+  return self:TimeMetric()
+end
+
+function paneProto:UpdateAdjustCheck()
+  if self.overhead then
+    self.adjustCheck:Enable()
+    self.adjustCheck:SetChecked(self.adjust)
+  else
+    self.adjustCheck:Disable()
+    self.adjustCheck:SetChecked(false)
+  end
+end
+
+-- ApplyMetric redraws every view after the overhead adjustment was switched on or off.
+function paneProto:ApplyMetric()
+  self.flame:SetMetric(self:FlameMetric())
+  self.frameFlame:SetMetric(self:TimeMetric())
+  self:UpdateMetricButton()
+  self:UpdateAdjustCheck()
+  self:FillFunctions()
+  self:FillFrames()
+  self:DrawTimeline()
+end
+
 function paneProto:UpdateMetricButton()
-  if self.flame.metric == 'alloc' then
+  if self.showAlloc then
     self.metricButton:SetText('Showing: Allocations')
   else
     self.metricButton:SetText('Showing: Time')
@@ -339,13 +408,18 @@ function paneProto:CreateFunctionsView(view)
   self.functionList.frame:SetPoint('BOTTOMRIGHT', view, 'BOTTOMRIGHT', 0, 0)
   self.functionList:SetupDataSource('BetterBagsPerfFunctionRow', function(button, fn)
     local hasAlloc = self.tree and self.tree.hasAlloc
+    local adjusted = self:TimeMetric() == 'adjusted' and fn.adjIncl ~= nil
     button.Name:SetText(fn.name)
     button.Calls:SetText(perfFormat:Count(fn.calls))
-    button.Total:SetText(perfFormat:Ms(fn.incl))
-    button.Self:SetText(perfFormat:Ms(fn.self))
-    button.Avg:SetText(perfFormat:Ms(fn.avg))
+    button.Total:SetText(perfFormat:Ms(adjusted and fn.adjIncl or fn.incl))
+    button.Self:SetText(perfFormat:Ms(adjusted and fn.adjSelf or fn.self))
+    button.Avg:SetText(perfFormat:Ms(adjusted and fn.adjAvg or fn.avg))
     button.Max:SetText(perfFormat:Ms(fn.max))
     button.Alloc:SetText(hasAlloc and perfFormat:KB(fn.alloc) or '-')
+    local shade = (adjusted and fn.overheadShare > ROUGH_ESTIMATE_SHARE) and 0.5 or 1
+    for _, key in ipairs({ 'Name', 'Calls', 'Total', 'Self', 'Avg', 'Max', 'Alloc' }) do
+      button[key]:SetTextColor(shade, shade, shade)
+    end
   end, function() end)
   self:UpdateFunctionHeaders()
 end
@@ -374,6 +448,9 @@ end
 
 function paneProto:FillFunctions()
   local key, descending = self.sortKey, self.sortDescending
+  if self:TimeMetric() == 'adjusted' and ADJUSTED_FIELD[key] then
+    key = ADJUSTED_FIELD[key]
+  end
   local sorted = {}
   for i, fn in ipairs(self.functions) do sorted[i] = fn end
   table.sort(sorted, function(a, b)
@@ -524,6 +601,7 @@ function paneProto:ClearSelection()
   self.selectedFrame = nil
   self.session = nil
   self.tree = nil
+  self.overhead = nil
   self.functions = {}
   self.flame:SetTree(nil)
   self.frameFlame:SetTree(nil)
@@ -531,6 +609,7 @@ function paneProto:ClearSelection()
   self.frameList:Wipe()
   self.summaryText:SetText('Select a saved session on the left, or start a capture.')
   self:UpdateMetricButton()
+  self:UpdateAdjustCheck()
   self:DrawTimeline()
 end
 
@@ -545,10 +624,16 @@ function paneProto:SelectSession(id)
   self.selectedId = id
   self.session = session
   self.tree = perfFormat:Decode(session)
+  self.overhead = perfFormat:Overhead(session)
+  if self.overhead then
+    perfFormat:Adjust(self.tree, self.overhead)
+  end
   self.functions = perfFormat:DecodeFunctions(session, self.tree)
-  self.flame.metric = 'time'
+  self.showAlloc = false
+  self.flame.metric = self:FlameMetric()
   self.flame:SetTree(self.tree)
   self:UpdateMetricButton()
+  self:UpdateAdjustCheck()
   self:FillFunctions()
   self.selectedFrame = nil
   self:FillFrames()
@@ -562,10 +647,27 @@ function paneProto:SelectSession(id)
   self:FillSessions()
 end
 
+-- FrameTree decodes one worst frame, adjusted for profiler overhead when the session has a
+-- calibration.
+---@param index number
+---@return PerfFrame
+function paneProto:FrameTree(index)
+  local frame = perfFormat:DecodeFrame(self.session, index)
+  if self.overhead then
+    perfFormat:Adjust(frame.tree, self.overhead)
+  end
+  return frame
+end
+
 function paneProto:FillFrames()
   local items = {}
   for i, entry in ipairs(self.session and self.session.worst or {}) do
-    local text = string.format('#%d  %s', i, perfFormat:Ms(entry.us / 1000))
+    local ms = entry.us / 1000
+    if self:TimeMetric() == 'adjusted' then
+      local root = self:FrameTree(i).tree.root
+      ms = ms - (root.total - root.adjTotal)
+    end
+    local text = string.format('#%d  %s', i, perfFormat:Ms(ms))
     if entry.blizzardUs then
       text = text .. string.format('  (Blizzard %s)', perfFormat:Ms(entry.blizzardUs / 1000))
     end
@@ -587,7 +689,8 @@ end
 function paneProto:SelectFrame(index)
   if not self.session or not self.session.worst[index] then return end
   self.selectedFrame = index
-  self.frameFlame:SetTree(perfFormat:DecodeFrame(self.session, index).tree)
+  self.frameFlame.metric = self:TimeMetric()
+  self.frameFlame:SetTree(self:FrameTree(index).tree)
   self:FillFrames()
 end
 
@@ -605,6 +708,9 @@ function paneProto:DrawTimeline()
   if self.session then
     local timeline = perfFormat:DecodeTimeline(self.session)
     ours, blizzard = timeline.ours, timeline.blizzard
+    if self:TimeMetric() == 'adjusted' then
+      ours = perfFormat:AdjustTimeline(timeline, self.overhead) or ours
+    end
   end
   local width, height = self.timeline:GetWidth(), self.timeline:GetHeight()
   local frames = #ours
@@ -694,6 +800,21 @@ function paneProto:BuildSummary(session)
     perfFormat:Count(stats.frames or 0), perfFormat:Count(stats.activeFrames or 0))
   add('Measured BetterBags time: %s (%.1f%% of the capture).', perfFormat:Ms(measured),
     duration > 0 and measured / duration * 100 or 0)
+  local overhead = perfFormat:Overhead(session)
+  if overhead then
+    local tree = session == self.session and self.tree or nil
+    if not tree then
+      tree = perfFormat:Decode(session)
+      perfFormat:Adjust(tree, overhead)
+    end
+    local removed = tree.root.total - tree.root.adjTotal
+    add('Profiler overhead per call%s: %.2f microseconds on the caller and %.2f on the function itself%s.',
+      overhead.approximate and ' (estimated; this session predates the split calibration)' or '',
+      overhead.parentMs * 1000, overhead.childMs * 1000,
+      overhead.approximate and '' or ', measured when the capture started')
+    add('About %s of the measured time was the profiler itself, so BetterBags ran for about %s without profiler overhead.',
+      perfFormat:Ms(removed), perfFormat:Ms(tree.root.adjTotal))
+  end
 
   local timeline = perfFormat:DecodeTimeline(session)
   if timeline.blizzard then
@@ -703,7 +824,7 @@ function paneProto:BuildSummary(session)
       theirs = theirs + (timeline.blizzard[i] or 0)
     end
     if theirs > 0 then
-      add('The wrappers saw %.1f%% of the time Blizzard\'s addon profiler charged to BetterBags (%s of %s). The rest ran in code that is not wrapped.',
+      add('The wrappers saw %.1f%% of the time Blizzard\'s addon profiler charged to BetterBags (%s of %s, both including the profiler\'s own cost). The rest ran in code that is not wrapped.',
         ours / theirs * 100, perfFormat:Ms(ours), perfFormat:Ms(theirs))
     end
   end
@@ -730,10 +851,6 @@ function paneProto:BuildSummary(session)
   add('Calls: %s.  Functions wrapped: %s.  Call-tree nodes: %s%s.', perfFormat:Count(stats.calls or 0),
     perfFormat:Count(stats.wrappedFunctions or 0), perfFormat:Count(stats.nodeCount or 0),
     (stats.droppedNodes or 0) > 0 and string.format(' (limit reached %s times)', perfFormat:Count(stats.droppedNodes)) or '')
-  if (stats.overheadPerCallMs or 0) > 0 then
-    add('Estimated profiler overhead: %s per call, about %s in total.', perfFormat:Ms(stats.overheadPerCallMs),
-      perfFormat:Ms(stats.overheadPerCallMs * (stats.calls or 0)))
-  end
   if (stats.aborted or 0) > 0 then
     local parts = {}
     for i, entry in ipairs(perfFormat:DecodeAborted(session)) do

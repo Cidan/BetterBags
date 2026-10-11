@@ -499,7 +499,26 @@ describe("Perf engine", function()
       local session = perf:Stop()
       local timeline = perfFormat:DecodeTimeline(session)
       assert.are.same({ 3, 0 }, timeline.ours)
+      assert.are.same({ 1, 0 }, timeline.calls)
+      assert.are.same({ 0, 0 }, timeline.nested)
       assert.is_nil(timeline.blizzard)
+    end)
+
+    -- A top-level call's caller-side profiler cost lands on the root, which is never
+    -- measured, so only calls made from inside a measured call carry it.
+    it("counts per frame the calls made from inside another measured call", function()
+      function A:TOuter()
+        B:TInner()
+        B:TInner()
+      end
+      function B:TInner() end
+      perf:Start(options())
+      A:TOuter()
+      B:TInner()
+      perf:_OnFrame()
+      local timeline = perfFormat:DecodeTimeline(perf:Stop())
+      assert.are.same({ 4 }, timeline.calls)
+      assert.are.same({ 2 }, timeline.nested)
     end)
 
     it("samples an external per-frame metric and flags spikes it reports", function()
@@ -585,14 +604,27 @@ describe("Perf engine", function()
   end)
 
   describe("calibration", function()
-    it("measures the per-call cost of a wrapped call", function()
+    -- With a clock that advances 0.001 ms every time it is read, a wrapped call reads it
+    -- once on entry (charging the caller) and once on return (charging itself), so each
+    -- side of the call costs exactly one tick.
+    it("measures what a wrapped call costs its caller and itself", function()
       perf:SetClock(function()
         now = now + 0.001
         return now
       end)
       perf:Start(options({ calibrate = true }))
       local session = perf:Stop()
-      assert.is_true(session.stats.overheadPerCallMs > 0)
+      assert.is_near(0.001, session.stats.overheadParentMs, 1e-9)
+      assert.is_near(0.001, session.stats.overheadChildMs, 1e-9)
+      assert.is_near(0.002, session.stats.overheadPerCallMs, 1e-9)
+    end)
+
+    it("records no overhead when calibration is off", function()
+      perf:Start(options({ calibrate = false }))
+      local session = perf:Stop()
+      assert.are.equal(0, session.stats.overheadPerCallMs)
+      assert.is_nil(session.stats.overheadParentMs)
+      assert.is_nil(session.stats.overheadChildMs)
     end)
   end)
 

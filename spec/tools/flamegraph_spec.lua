@@ -167,6 +167,52 @@ describe("flamegraph tool", function()
     assert.are.equal(2, #printed)
   end)
 
+  describe("profiler overhead", function()
+    -- A (4 ms self, 2 calls) calls B (2 ms self, 4 calls); each measured call cost
+    -- 0.125 ms on its caller and 0.25 ms on itself.
+    local CALIBRATED = [[
+BetterBagsPerfDB = {
+  ["sessions"] = {
+    {
+      ["id"] = 3,
+      ["meta"] = { ["character"] = "TestChar", ["realm"] = "TestRealm", ["startedAt"] = 1700000900 },
+      ["stats"] = { ["durationMs"] = 1000, ["instrumentedMs"] = 6, ["overheadParentMs"] = 0.125, ["overheadChildMs"] = 0.25, ["overheadPerCallMs"] = 0.375 },
+      ["names"] = { "[all]", "A", "B" },
+      ["nodes"] = { "0,1,0,0,0,0", "1,2,4000,2,3000,0", "2,3,2000,4,600,0" },
+      ["functions"] = { "2,2,6000,3000", "3,4,2000,600" },
+      ["worst"] = {},
+      ["timeline"] = { ["ours"] = "" },
+    },
+  },
+}
+]]
+    local calibratedPath
+
+    before_each(function()
+      calibratedPath = dir .. "/Calibrated.lua"
+      local f = assert(io.open(calibratedPath, "w"))
+      f:write(CALIBRATED)
+      f:close()
+    end)
+
+    it("subtracts the calibrated profiler overhead by default", function()
+      assert.are.equal(0, tool.Main({ calibratedPath, "--out", dir }, function() end))
+      assert.are.equal("A 3000\nA;B 1000\n", readFile(dir .. "/betterbags-3.folded"))
+      assert.is_truthy(readFile(dir .. "/betterbags-3.speedscope.json"):find('"weights":[3000,1000]', 1, true))
+      assert.is_truthy(readFile(dir .. "/betterbags-3.html"):find("without profiler overhead", 1, true))
+    end)
+
+    it("keeps the measured times with --raw", function()
+      assert.are.equal(0, tool.Main({ calibratedPath, "--out", dir, "--raw" }, function() end))
+      assert.are.equal("A 4000\nA;B 2000\n", readFile(dir .. "/betterbags-3-raw.folded"))
+    end)
+
+    it("leaves sessions without a calibration raw", function()
+      assert.are.equal(0, tool.Main({ svPath, "--out", dir, "--session", "2" }, function() end))
+      assert.is_truthy(readFile(dir .. "/betterbags-2.folded"):find("Bag.Draw 500", 1, true))
+    end)
+  end)
+
   it("fails with a message for a missing session, frame, or file", function()
     local printed = {}
     local out = function(line) table.insert(printed, line) end

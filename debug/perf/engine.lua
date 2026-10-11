@@ -41,7 +41,13 @@ local ALWAYS_EXCLUDED = {
 local HISTOGRAM_BOUNDS = { 1, 5, 16, 33, 50, 100 }
 local ROOT_NAME = '[all]'
 local OVERFLOW_NAME = '[node limit reached]'
-local CALIBRATION_CALLS = 1000
+-- Calibration rotates through many distinct wrapped functions taking a few arguments,
+-- because the cost of a wrapped call depends on how many different functions and nodes
+-- are in play (table and cache effects); a single hot function underestimates it. Checked
+-- against unprofiled runs of the real refresh pipeline; see .claude/rules/perf-profiler.md.
+local CALIBRATION_LABELS = 64
+local CALIBRATION_CALLS = 2048
+local CALIBRATION_RUNS = 5
 
 local coroutineRunning = coroutine.running
 local MAIN = {}
@@ -58,13 +64,13 @@ local serial = 0
 local fnCalls, fnIncl, fnMax, depth
 local totalCalls, abortedFrames, abortedNames
 local trackAlloc, lastKb, allocTotal, gcFreed
-local frameSeq, frameTotal, dirty, dirtyN
+local frameSeq, frameTotal, frameCalls, frameNested, dirty, dirtyN
 local frames, activeFrames, worstFrameMs
 local histogram, blizzardHistogram
 local worst, worstCap, spikeThreshold
-local timelineOurs, timelineBlizzard, timelineCap
+local timelineOurs, timelineBlizzard, timelineCalls, timelineNested, timelineCap
 local frameMetric, maxDurationMs, onAutoStop, autoStopSent
-local wrapped, overheadPerCall
+local wrapped, overheadParent, overheadChild
 local captureOptions
 
 local function newNode(name, parent)
@@ -227,6 +233,11 @@ end
 local function enter(label)
   local now = clock()
   local t = sync(now)
+  -- A call made from inside a measured call charges its caller-side overhead to that
+  -- caller; a top-level call charges it to the root, which is never counted.
+  if cursor ~= root then
+    frameNested = frameNested + 1
+  end
   local node = child(cursor, label)
   node.calls = node.calls + 1
   touch(node)
@@ -241,6 +252,7 @@ local function enter(label)
   t.pz[n] = t.pausedTotal
   cursor = node
   totalCalls = totalCalls + 1
+  frameCalls = frameCalls + 1
   fnCalls[label] = (fnCalls[label] or 0) + 1
   depth[label] = (depth[label] or 0) + 1
   return serial
@@ -313,7 +325,7 @@ local function resetState()
   fnCalls, fnIncl, fnMax, depth = {}, {}, {}, {}
   totalCalls, abortedFrames, abortedNames = 0, 0, {}
   allocTotal, gcFreed = 0, 0
-  frameSeq, frameTotal, dirty, dirtyN = 0, 0, {}, 0
+  frameSeq, frameTotal, frameCalls, frameNested, dirty, dirtyN = 0, 0, 0, 0, {}, 0
   frames, activeFrames, worstFrameMs = 0, 0, 0
   histogram, blizzardHistogram = {}, {}
   for i = 1, #HISTOGRAM_BOUNDS + 1 do
@@ -321,7 +333,7 @@ local function resetState()
     blizzardHistogram[i] = 0
   end
   worst = {}
-  timelineOurs, timelineBlizzard = {}, {}
+  timelineOurs, timelineBlizzard, timelineCalls, timelineNested = {}, {}, {}, {}
   autoStopSent = false
   last = clock()
   startTime = last
@@ -533,7 +545,9 @@ local function finalize(now)
       nodeCount = nodeCount,
       droppedNodes = droppedNodes,
       wrappedFunctions = #wrapped,
-      overheadPerCallMs = overheadPerCall,
+      overheadPerCallMs = (overheadParent or 0) + (overheadChild or 0),
+      overheadParentMs = overheadParent,
+      overheadChildMs = overheadChild,
       allocatedKB = bytes(allocTotal) / 1024,
       gcFreedKB = bytes(gcFreed) / 1024,
     },
@@ -549,6 +563,8 @@ local function finalize(now)
     worst = worstOut,
     timeline = {
       ours = packTimeline(timelineOurs),
+      calls = table.concat(timelineCalls, ','),
+      nested = table.concat(timelineNested, ','),
       blizzard = frameMetric and packTimeline(timelineBlizzard) or nil,
     },
   }
@@ -610,21 +626,64 @@ function perf:IsActive()
 end
 
 ---@return number overheadMs
+-- Calibrate measures what one wrapped call costs, split by where the cursor charges it:
+-- the part before the entry clock read and after the exit read lands on the caller, the
+-- rest on the called function. Each side is the time a wrapped loop spends on that node
+-- minus what the same loop costs unwrapped. The best of several runs is kept.
+---@return number parentMs
+---@return number childMs
 function perf:Calibrate()
-  local noop = function() end
-  local w = makeWrapper('[calibration]', noop)
-  resetState()
-  active = true
-  local t0 = clock()
-  for _ = 1, CALIBRATION_CALLS do noop() end
-  local bare = clock() - t0
-  t0 = clock()
-  for _ = 1, CALIBRATION_CALLS do w() end
-  local measured = clock() - t0
-  active = false
-  local overhead = (measured - bare) / CALIBRATION_CALLS
-  if overhead < 0 then overhead = 0 end
-  return overhead
+  local body = function(a) return a end
+  local fns = {}
+  for i = 1, CALIBRATION_LABELS do
+    fns[i] = makeWrapper('[calibration] ' .. i, body)
+  end
+  local x, y, z = 1, '', true
+  local bestParent, bestChild = math.huge, math.huge
+  for _ = 1, CALIBRATION_RUNS do
+    resetState()
+    active = true
+
+    local k = 1
+    local t0 = clock()
+    for _ = 1, CALIBRATION_CALLS do
+      k = k + 1
+      if k > CALIBRATION_LABELS then k = 1 end
+    end
+    local rotation = (clock() - t0) / CALIBRATION_CALLS
+
+    k = 1
+    t0 = clock()
+    for _ = 1, CALIBRATION_CALLS do
+      k = k + 1
+      if k > CALIBRATION_LABELS then k = 1 end
+      body(x, y, z)
+    end
+    local bare = (clock() - t0) / CALIBRATION_CALLS
+
+    local sid = enter('[calibration]')
+    k = 1
+    for _ = 1, CALIBRATION_CALLS do
+      k = k + 1
+      if k > CALIBRATION_LABELS then k = 1 end
+      fns[k](x, y, z)
+    end
+    finish(sid)
+    active = false
+
+    local caller = root.children['[calibration]']
+    local calleeSelf = 0
+    for _, c in pairs(caller.children) do
+      calleeSelf = calleeSelf + c.self
+    end
+    local callerCost = caller.self / CALIBRATION_CALLS - rotation
+    local calleeCost = calleeSelf / CALIBRATION_CALLS - (bare - rotation)
+    if callerCost < bestParent then bestParent = callerCost end
+    if calleeCost < bestChild then bestChild = calleeCost end
+  end
+  if bestParent < 0 then bestParent = 0 end
+  if bestChild < 0 then bestChild = 0 end
+  return bestParent, bestChild
 end
 
 ---@class PerfOptions
@@ -659,9 +718,9 @@ function perf:Start(options)
   maxDurationMs = (options.maxDurationSec or 0) * 1000
   trackAlloc = options.trackAllocations == true
 
-  overheadPerCall = 0
+  overheadParent, overheadChild = nil, nil
   if options.calibrate ~= false then
-    overheadPerCall = self:Calibrate()
+    overheadParent, overheadChild = self:Calibrate()
   end
 
   if options.pauseGC then
@@ -734,6 +793,8 @@ function perf:_OnFrame()
   end
   if #timelineOurs < timelineCap then
     timelineOurs[#timelineOurs + 1] = ms
+    timelineCalls[#timelineCalls + 1] = frameCalls
+    timelineNested[#timelineNested + 1] = frameNested
     if frameMetric then
       timelineBlizzard[#timelineBlizzard + 1] = blizzardMs or 0
     end
@@ -742,6 +803,8 @@ function perf:_OnFrame()
 
   frameSeq = frameSeq + 1
   frameTotal = 0
+  frameCalls = 0
+  frameNested = 0
   dirtyN = 0
 
   if maxDurationMs > 0 and not autoStopSent and now - startTime >= maxDurationMs then

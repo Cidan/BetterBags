@@ -187,6 +187,96 @@ describe("PerfFormat", function()
     end)
   end)
 
+  describe("overhead adjustment", function()
+    -- A (4 ms self, 2 calls) calls B (2 ms self, 4 calls); C (0.5 ms self, 4 calls) is a
+    -- sibling of A. Each wrapped call costs 0.125 ms on its caller and 0.25 ms on itself.
+    local function overheadSession()
+      return {
+        names = { "[all]", "A", "B", "C" },
+        nodes = {
+          "0,1,0,0,0,0",
+          "1,2,4000,2,3000,0",
+          "2,3,2000,4,600,0",
+          "1,4,500,4,200,0",
+        },
+        functions = { "2,2,6000,3000", "3,4,2000,600", "4,4,500,200" },
+        worst = {
+          { frame = 1, atUs = 0, us = 6500, nodes = { "2,4000,2,0", "3,2000,4,0" } },
+        },
+        timeline = { ours = "6000,500", calls = "6,4", nested = "4,0" },
+        stats = { overheadParentMs = 0.125, overheadChildMs = 0.25, overheadPerCallMs = 0.375 },
+      }
+    end
+
+    it("reads the calibrated split, or splits an older single figure evenly", function()
+      local split = perfFormat:Overhead(overheadSession())
+      assert.are.same({ parentMs = 0.125, childMs = 0.25, approximate = false }, split)
+      local old = overheadSession()
+      old.stats = { overheadPerCallMs = 0.375 }
+      assert.are.same({ parentMs = 0.1875, childMs = 0.1875, approximate = true }, perfFormat:Overhead(old))
+      old.stats = { overheadPerCallMs = 0 }
+      assert.is_nil(perfFormat:Overhead(old))
+    end)
+
+    it("removes each call's cost from its own node and from its caller", function()
+      local session = overheadSession()
+      local tree = perfFormat:Decode(session)
+      perfFormat:Adjust(tree, perfFormat:Overhead(session))
+      local a = perfFormat:Find(tree, { "A" })
+      local b = perfFormat:Find(tree, { "A", "B" })
+      local c = perfFormat:Find(tree, { "C" })
+      assert.are.equal(3, a.adjSelf)
+      assert.are.equal(1, b.adjSelf)
+      assert.are.equal(4, a.adjTotal)
+      assert.are.equal(4, tree.root.adjTotal)
+      assert.is_true(tree.adjusted)
+      -- Never below zero: C's measured time is less than its estimated overhead.
+      assert.are.equal(0, c.adjSelf)
+      assert.are.equal(1, c.overheadShare)
+      assert.are.equal(1 / 3, a.overheadShare)
+    end)
+
+    it("lays out and folds adjusted time", function()
+      local session = overheadSession()
+      local tree = perfFormat:Decode(session)
+      perfFormat:Adjust(tree, perfFormat:Overhead(session))
+      local rects = perfFormat:Layout(tree.root, { metric = "adjusted", minFraction = 0 })
+      local byName = {}
+      for _, r in ipairs(rects) do byName[r.node.name] = r end
+      assert.are.equal(1, byName["A"].w)
+      assert.are.equal(0.25, byName["B"].w)
+      assert.is_nil(byName["C"])
+      assert.are.same({ "A 3000", "A;B 1000" }, perfFormat:Folded(tree, "adjusted"))
+    end)
+
+    it("adjusts per-function totals and flags functions that are mostly overhead", function()
+      local session = overheadSession()
+      local tree = perfFormat:Decode(session)
+      perfFormat:Adjust(tree, perfFormat:Overhead(session))
+      local byName = {}
+      for _, fn in ipairs(perfFormat:DecodeFunctions(session, tree)) do byName[fn.name] = fn end
+      assert.are.equal(4, byName["A"].adjIncl)
+      assert.are.equal(3, byName["A"].adjSelf)
+      assert.are.equal(2, byName["A"].adjAvg)
+      assert.are.equal(1 / 3, byName["A"].overheadShare)
+      assert.are.equal(0, byName["C"].adjIncl)
+      assert.are.equal(1, byName["C"].overheadShare)
+    end)
+
+    it("adjusts a worst frame's tree and the per-frame timeline", function()
+      local session = overheadSession()
+      local overhead = perfFormat:Overhead(session)
+      local frame = perfFormat:DecodeFrame(session, 1)
+      perfFormat:Adjust(frame.tree, overhead)
+      assert.are.equal(4, frame.tree.root.adjTotal)
+      local timeline = perfFormat:DecodeTimeline(session)
+      assert.are.same({ 6, 4 }, timeline.calls)
+      assert.are.same({ 4, 0 }, timeline.nested)
+      -- Frame 1 is the worst frame above: the timeline agrees with its adjusted tree.
+      assert.are.same({ 4, 0 }, perfFormat:AdjustTimeline(timeline, overhead))
+    end)
+  end)
+
   describe("number formatting", function()
     it("formats milliseconds with precision that suits their size", function()
       assert.are.equal("0.004 ms", perfFormat:Ms(0.0042))

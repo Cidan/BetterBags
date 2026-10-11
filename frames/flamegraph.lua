@@ -14,6 +14,8 @@ local perfFormat = addon:GetModule('PerfFormat')
 local flameGraph = addon:NewModule('FlameGraph')
 
 local ROW_HEIGHT = 18
+-- Above this share of profiler overhead, an adjusted time is mostly an estimate.
+local ROUGH_ESTIMATE_SHARE = 0.75
 local LABEL_MIN_WIDTH = 36
 local MAX_BARS = 2000
 local DIM_ALPHA = 0.25
@@ -67,7 +69,7 @@ end
 ---@field rects PerfRect[]
 ---@field tree PerfTree|nil
 ---@field zoom PerfNode|nil
----@field metric "time"|"alloc"
+---@field metric "time"|"adjusted"|"alloc"
 ---@field search string|nil
 ---@field depthOffset number
 ---@field maxDepth number
@@ -152,7 +154,7 @@ function flameGraphProto:SetTree(tree)
   self:Refresh()
 end
 
----@param metric "time"|"alloc"
+---@param metric "time"|"adjusted"|"alloc"
 function flameGraphProto:SetMetric(metric)
   self.metric = metric
   self:Refresh()
@@ -214,7 +216,7 @@ end
 -- sits inside another match twice.
 ---@return number
 function flameGraphProto:SearchTotal()
-  local field = self.metric == 'alloc' and 'totalAlloc' or 'total'
+  local field = perfFormat.TOTAL_FIELD[self.metric]
   local sum = 0
   local function visit(node)
     if self:Matches(node) then
@@ -236,7 +238,7 @@ function flameGraphProto:UpdateBreadcrumb()
   end
   local path = perfFormat:PathOf(self.zoom)
   local text = #path > 0 and table.concat(path, ' > ') or 'All measured time'
-  local field = self.metric == 'alloc' and 'totalAlloc' or 'total'
+  local field = perfFormat.TOTAL_FIELD[self.metric]
   local format = self.metric == 'alloc' and perfFormat.KB or perfFormat.Ms
   text = text .. '  |cffaaaaaa' .. format(perfFormat, self.zoom[field]) .. '|r'
   if self.search then
@@ -355,19 +357,28 @@ end
 ---@param rect PerfRect
 function flameGraphProto:ShowTooltip(rect)
   local node = rect.node
-  local zoomTotal = self.zoom and self.zoom.total or 0
-  local share = zoomTotal > 0 and node.total / zoomTotal * 100 or 0
+  local adjusted = self.metric == 'adjusted'
+  local total = adjusted and node.adjTotal or node.total
+  local zoomTotal = self.zoom and (adjusted and self.zoom.adjTotal or self.zoom.total) or 0
+  local share = zoomTotal > 0 and total / zoomTotal * 100 or 0
   GameTooltip:SetOwner(self.canvas, 'ANCHOR_CURSOR')
   GameTooltip:SetText(node.name, 1, 1, 1)
-  GameTooltip:AddDoubleLine('Total', string.format('%s (%.1f%%)', perfFormat:Ms(node.total), share))
-  GameTooltip:AddDoubleLine('Self', perfFormat:Ms(node.self))
+  GameTooltip:AddDoubleLine('Total', string.format('%s (%.1f%%)', perfFormat:Ms(total), share))
+  GameTooltip:AddDoubleLine('Self', perfFormat:Ms(adjusted and node.adjSelf or node.self))
+  if adjusted then
+    GameTooltip:AddDoubleLine('Raw total (with profiler)', perfFormat:Ms(node.total))
+    GameTooltip:AddDoubleLine('Profiler overhead', string.format('%.0f%% of raw', node.overheadShare * 100))
+  end
   GameTooltip:AddDoubleLine('Calls', tostring(node.calls))
   if node.max > 0 then
-    GameTooltip:AddDoubleLine('Slowest call', perfFormat:Ms(node.max))
+    GameTooltip:AddDoubleLine(adjusted and 'Slowest call (raw)' or 'Slowest call', perfFormat:Ms(node.max))
   end
   if self.tree and self.tree.hasAlloc then
     GameTooltip:AddDoubleLine('Allocated', perfFormat:KB(node.totalAlloc))
     GameTooltip:AddDoubleLine('Allocated here', perfFormat:KB(node.alloc))
+  end
+  if adjusted and node.overheadShare > ROUGH_ESTIMATE_SHARE then
+    GameTooltip:AddLine('Mostly profiler overhead: the adjusted time is a rough estimate.', 1, 0.6, 0.2, true)
   end
   GameTooltip:AddLine('Left-click to zoom in, right-click to zoom out.', 0.6, 0.6, 0.6)
   GameTooltip:Show()

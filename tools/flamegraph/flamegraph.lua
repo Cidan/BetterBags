@@ -16,6 +16,7 @@ local USAGE = {
   '  --session <id|latest>  session to export (default: latest)',
   '  --frame <n>            export the n-th worst frame instead of the whole session',
   '  --metric <time|alloc>  size bars by time (default) or allocated memory',
+  '  --raw                  keep the profiler\'s own overhead in the times',
   '  --out <dir>            directory for the output files (default: .)',
 }
 
@@ -68,15 +69,27 @@ function M.ListSessions(db)
   return lines
 end
 
--- Tree decodes a whole session, or one of its worst frames when frameIndex is given.
+-- Tree decodes a whole session, or one of its worst frames when frameIndex is given, and
+-- removes the calibrated profiler overhead unless raw is set or the session has no
+-- calibration. The second return is the time metric to render: "adjusted" or "time".
 ---@param session table
 ---@param frameIndex number|nil
+---@param raw boolean|nil
 ---@return PerfTree
-function M.Tree(session, frameIndex)
+---@return "time"|"adjusted"
+function M.Tree(session, frameIndex, raw)
+  local tree
   if frameIndex then
-    return perfFormat:DecodeFrame(session, frameIndex).tree
+    tree = perfFormat:DecodeFrame(session, frameIndex).tree
+  else
+    tree = perfFormat:Decode(session)
   end
-  return perfFormat:Decode(session)
+  local overhead = perfFormat:Overhead(session)
+  if overhead and not raw then
+    perfFormat:Adjust(tree, overhead)
+    return tree, 'adjusted'
+  end
+  return tree, 'time'
 end
 
 ---@param tree PerfTree
@@ -147,6 +160,7 @@ local SPEEDSCOPE_KEYS = {
 
 local function value(node, metric)
   if metric == 'alloc' then return math.floor(node.alloc * 1024 + 0.5) end
+  if metric == 'adjusted' then return math.floor(node.adjSelf * 1000 + 0.5) end
   return math.floor(node.self * 1000 + 0.5)
 end
 
@@ -154,7 +168,7 @@ end
 -- becomes one sample whose stack runs from the top of the tree down to it, weighted by
 -- its self time (microseconds) or its allocations (bytes).
 ---@param tree PerfTree
----@param metric "time"|"alloc"
+---@param metric "time"|"adjusted"|"alloc"
 ---@param name string
 ---@return string
 function M.Speedscope(tree, metric, name)
@@ -209,8 +223,8 @@ local function escapeHtml(s)
 end
 
 local function htmlNode(node, metric)
-  local field = metric == 'alloc' and 'totalAlloc' or 'total'
-  local selfField = metric == 'alloc' and 'alloc' or 'self'
+  local field = perfFormat.TOTAL_FIELD[metric]
+  local selfField = perfFormat.SELF_FIELD[metric]
   local scale = metric == 'alloc' and 1024 or 1000
   local out = {
     n = node.name,
@@ -345,7 +359,7 @@ var DATA = %DATA%;
 -- Html renders a single self-contained page: the tree is embedded as JSON and drawn by an
 -- inline script (click to zoom, right-click to zoom out, search to highlight).
 ---@param tree PerfTree
----@param metric "time"|"alloc"
+---@param metric "time"|"adjusted"|"alloc"
 ---@param title string
 ---@param summaryLines string[]
 ---@return string
@@ -363,8 +377,9 @@ end
 
 ---@param session table
 ---@param frameIndex number|nil
+---@param adjusted boolean
 ---@return string[]
-local function summaryLines(session, frameIndex)
+local function summaryLines(session, frameIndex, adjusted)
   local meta, stats = session.meta or {}, session.stats or {}
   local lines = {
     string.format('Session #%d, %s - %s, captured %s (%s).', session.id or 0, meta.character or '?',
@@ -379,6 +394,13 @@ local function summaryLines(session, frameIndex)
       line = line .. string.format(' (Blizzard addon profiler: %s)', perfFormat:Ms(frame.blizzardMs))
     end
     lines[#lines + 1] = line .. '.'
+  end
+  local overhead = perfFormat:Overhead(session)
+  if adjusted and overhead then
+    lines[#lines + 1] = string.format('Times are shown without profiler overhead (%.2f microseconds on the caller and %.2f on the function removed per call%s). Use --raw for the measured times.',
+      overhead.parentMs * 1000, overhead.childMs * 1000, overhead.approximate and ', estimated for this older session' or '')
+  elseif overhead then
+    lines[#lines + 1] = 'Times include the profiler\'s own overhead (--raw).'
   end
   return lines
 end
@@ -402,6 +424,8 @@ function M.Main(args, out)
     local a = args[i]
     if a == '--list' then
       opts.list = true
+    elseif a == '--raw' then
+      opts.raw = true
     elseif a == '--session' or a == '--frame' or a == '--metric' or a == '--out' then
       opts[string.sub(a, 3)] = args[i + 1]
       i = i + 1
@@ -443,14 +467,16 @@ function M.Main(args, out)
     return 1
   end
 
-  local tree = M.Tree(session, frameIndex)
-  local base = string.format('%s/betterbags-%d%s%s', opts.out, session.id,
-    frameIndex and ('-frame' .. frameIndex) or '', opts.metric == 'alloc' and '-alloc' or '')
+  local tree, timeMetric = M.Tree(session, frameIndex, opts.raw)
+  local metric = opts.metric == 'alloc' and 'alloc' or timeMetric
+  local base = string.format('%s/betterbags-%d%s%s%s', opts.out, session.id,
+    frameIndex and ('-frame' .. frameIndex) or '', opts.metric == 'alloc' and '-alloc' or '',
+    opts.raw and '-raw' or '')
   local title = string.format('BetterBags session #%d%s', session.id, frameIndex and (', worst frame ' .. frameIndex) or '')
   local outputs = {
-    { base .. '.folded', M.Folded(tree, opts.metric) },
-    { base .. '.speedscope.json', M.Speedscope(tree, opts.metric, title) },
-    { base .. '.html', M.Html(tree, opts.metric, title, summaryLines(session, frameIndex)) },
+    { base .. '.folded', M.Folded(tree, metric) },
+    { base .. '.speedscope.json', M.Speedscope(tree, metric, title) },
+    { base .. '.html', M.Html(tree, metric, title, summaryLines(session, frameIndex, timeMetric == 'adjusted')) },
   }
   for _, output in ipairs(outputs) do
     local ok, writeErr = writeFile(output[1], output[2])

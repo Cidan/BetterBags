@@ -106,22 +106,51 @@ end
 ---@field max number
 ---@field avg number
 ---@field alloc number
+---@field adjIncl? number Inclusive time with profiler overhead removed (adjusted trees only).
+---@field adjSelf? number
+---@field adjAvg? number
+---@field overheadShare? number Fraction of the raw inclusive time that was profiler overhead.
 
+-- DecodeFunctions summarizes the session per function. On a tree that went through Adjust
+-- it also reports overhead-adjusted times, summed over each function's outermost nodes so
+-- recursion is counted once.
 ---@param session table
 ---@param tree PerfTree
 ---@return PerfFunctionStats[]
 function perfFormat:DecodeFunctions(session, tree)
-  local selfByName, allocByName = {}, {}
+  local selfByName, allocByName, adjSelfByName = {}, {}, {}
   for _, node in ipairs(tree.nodes) do
     selfByName[node.name] = (selfByName[node.name] or 0) + node.self
     allocByName[node.name] = (allocByName[node.name] or 0) + node.alloc
+    if tree.adjusted then
+      adjSelfByName[node.name] = (adjSelfByName[node.name] or 0) + node.adjSelf
+    end
+  end
+  local rawInclByName, adjInclByName = {}, {}
+  if tree.adjusted then
+    local onPath = {}
+    local function visit(node)
+      local outermost = not onPath[node.name]
+      if outermost then
+        rawInclByName[node.name] = (rawInclByName[node.name] or 0) + node.total
+        adjInclByName[node.name] = (adjInclByName[node.name] or 0) + node.adjTotal
+        onPath[node.name] = true
+      end
+      for _, c in ipairs(node.children) do
+        visit(c)
+      end
+      if outermost then
+        onPath[node.name] = nil
+      end
+    end
+    visit(tree.root)
   end
   local out = {}
   for _, packed in ipairs(session.functions or {}) do
     local f = splitNumbers(packed)
     local name = session.names[f[1]]
     local incl = f[3] / 1000
-    out[#out + 1] = {
+    local fn = {
       name = name,
       calls = f[2],
       incl = incl,
@@ -130,6 +159,14 @@ function perfFormat:DecodeFunctions(session, tree)
       avg = f[2] > 0 and incl / f[2] or 0,
       alloc = allocByName[name] or 0,
     }
+    if tree.adjusted then
+      local raw = rawInclByName[name] or 0
+      fn.adjIncl = adjInclByName[name] or 0
+      fn.adjSelf = adjSelfByName[name] or 0
+      fn.adjAvg = fn.calls > 0 and fn.adjIncl / fn.calls or 0
+      fn.overheadShare = raw > 0 and (raw - fn.adjIncl) / raw or 0
+    end
+    out[#out + 1] = fn
   end
   table.sort(out, function(a, b)
     if a.self ~= b.self then return a.self > b.self end
@@ -210,19 +247,92 @@ function perfFormat:DecodeAborted(session)
   return out
 end
 
+-- DecodeTimeline returns the per-frame series in milliseconds and, when the session
+-- recorded them, each frame's measured calls and how many of those were made from inside
+-- another measured call.
 ---@param session table
----@return {ours: number[], blizzard: number[]|nil}
+---@return {ours: number[], blizzard: number[]|nil, calls: number[]|nil, nested: number[]|nil}
 function perfFormat:DecodeTimeline(session)
-  local function decode(s)
+  local function decode(s, scale)
     if s == nil then return nil end
     local out = {}
     for _, v in ipairs(splitNumbers(s)) do
-      out[#out + 1] = v / 1000
+      out[#out + 1] = v / scale
     end
     return out
   end
   local timeline = session.timeline or {}
-  return { ours = decode(timeline.ours) or {}, blizzard = decode(timeline.blizzard) }
+  return {
+    ours = decode(timeline.ours, 1000) or {},
+    blizzard = decode(timeline.blizzard, 1000),
+    calls = decode(timeline.calls, 1),
+    nested = decode(timeline.nested, 1),
+  }
+end
+
+---@class PerfOverhead
+---@field parentMs number Profiler cost per measured call that lands on the caller.
+---@field childMs number Profiler cost per measured call that lands on the called function.
+---@field approximate boolean True for older sessions that only stored a single per-call cost.
+
+-- Overhead reads the per-call profiler cost measured when the capture started. Older
+-- sessions stored only the total per call; it is split evenly, which matches what the
+-- split calibration measures, and marked approximate.
+---@param session table
+---@return PerfOverhead|nil
+function perfFormat:Overhead(session)
+  local stats = session.stats or {}
+  if stats.overheadParentMs and stats.overheadChildMs then
+    return { parentMs = stats.overheadParentMs, childMs = stats.overheadChildMs, approximate = false }
+  end
+  if stats.overheadPerCallMs and stats.overheadPerCallMs > 0 then
+    local half = stats.overheadPerCallMs / 2
+    return { parentMs = half, childMs = half, approximate = true }
+  end
+  return nil
+end
+
+-- Adjust removes the estimated profiler cost from a decoded tree. Each measured call costs
+-- childMs on its own node and parentMs on its caller, so a node's own time loses
+-- calls x childMs plus its children's calls x parentMs, never going below zero. It sets
+-- adjSelf, adjTotal, and overheadShare (the fraction of the raw subtree total that was
+-- overhead) on every node.
+---@param tree PerfTree
+---@param overhead PerfOverhead
+function perfFormat:Adjust(tree, overhead)
+  local parentMs, childMs = overhead.parentMs, overhead.childMs
+  local function visit(node)
+    local childCalls, childTotal = 0, 0
+    for _, c in ipairs(node.children) do
+      childCalls = childCalls + c.calls
+      childTotal = childTotal + visit(c)
+    end
+    local adjSelf = node.self - node.calls * childMs - childCalls * parentMs
+    if adjSelf < 0 then adjSelf = 0 end
+    node.adjSelf = adjSelf
+    node.adjTotal = adjSelf + childTotal
+    node.overheadShare = node.total > 0 and (node.total - node.adjTotal) / node.total or 0
+    return node.adjTotal
+  end
+  visit(tree.root)
+  tree.adjusted = true
+end
+
+-- AdjustTimeline removes the estimated profiler cost from per-frame times, the same way
+-- Adjust does for a tree: childMs for every call, parentMs only for calls made from inside
+-- another measured call. Returns nil for sessions that did not record call counts.
+---@param timeline {ours: number[], calls: number[]|nil, nested: number[]|nil}
+---@param overhead PerfOverhead
+---@return number[]|nil
+function perfFormat:AdjustTimeline(timeline, overhead)
+  local calls, nested = timeline.calls, timeline.nested
+  if not calls or not nested then return nil end
+  local out = {}
+  for i, ms in ipairs(timeline.ours) do
+    local v = ms - (calls[i] or 0) * overhead.childMs - (nested[i] or 0) * overhead.parentMs
+    out[i] = v > 0 and v or 0
+  end
+  return out
 end
 
 ---@param tree PerfTree
@@ -250,9 +360,10 @@ end
 
 -- Folded renders the tree in the collapsed-stack format read by flamegraph.pl, inferno
 -- and speedscope: one "a;b;c value" line per node with a non-zero value. Time values are
--- microseconds, allocation values are bytes.
+-- microseconds ("adjusted" uses the overhead-adjusted self time), allocation values are
+-- bytes.
 ---@param tree PerfTree
----@param metric "time"|"alloc"
+---@param metric "time"|"adjusted"|"alloc"
 ---@return string[]
 function perfFormat:Folded(tree, metric)
   local lines = {}
@@ -262,6 +373,8 @@ function perfFormat:Folded(tree, metric)
       local value
       if metric == 'alloc' then
         value = math.floor(c.alloc * 1024 + 0.5)
+      elseif metric == 'adjusted' then
+        value = math.floor(c.adjSelf * 1000 + 0.5)
       else
         value = math.floor(c.self * 1000 + 0.5)
       end
@@ -275,6 +388,10 @@ function perfFormat:Folded(tree, metric)
   return lines
 end
 
+-- TOTAL_FIELD and SELF_FIELD name the node fields that hold each metric.
+perfFormat.TOTAL_FIELD = { time = 'total', adjusted = 'adjTotal', alloc = 'totalAlloc' }
+perfFormat.SELF_FIELD = { time = 'self', adjusted = 'adjSelf', alloc = 'alloc' }
+
 ---@class PerfRect
 ---@field node PerfNode
 ---@field depth number 0 for the layout root.
@@ -282,7 +399,7 @@ end
 ---@field w number Width as a fraction of the full width.
 
 ---@class PerfLayoutOptions
----@field metric "time"|"alloc"
+---@field metric "time"|"adjusted"|"alloc"
 ---@field minFraction number Nodes narrower than this fraction are skipped.
 ---@field maxDepth? number
 
@@ -292,7 +409,7 @@ end
 ---@param opts PerfLayoutOptions
 ---@return PerfRect[]
 function perfFormat:Layout(rootNode, opts)
-  local field = opts.metric == 'alloc' and 'totalAlloc' or 'total'
+  local field = perfFormat.TOTAL_FIELD[opts.metric] or 'total'
   local denom = rootNode[field]
   local rects = {}
   if not denom or denom <= 0 then return rects end

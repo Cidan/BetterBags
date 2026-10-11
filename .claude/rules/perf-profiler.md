@@ -126,9 +126,37 @@ Blizzard template code running on our frames).
 
 ### Overhead and allocations
 
-- `calibrate` times 1,000 empty wrapped calls at Start; `stats.overheadPerCallMs` lets the
-  summary estimate how much of the measured time is the profiler itself. Small functions
-  called very often look heavier than they are; skip them with the exclude list.
+- **Overhead model.** Every wrapped call spends time in the profiler, and the cursor charges
+  that time to two places: the part before the entry clock read and after the exit read
+  lands on the **caller** (`parentMs`), the rest on the **called function** (`childMs`).
+  `calibrate` (on by default) measures both at Start (`perf:Calibrate`): it rotates through
+  64 distinct wrapped functions taking 3 arguments, 2,048 calls per run, 5 runs, keeping the
+  lowest figure of each side. The rotation matters: the per-call cost depends on how many
+  distinct functions and call-tree nodes are in play (table and cache effects), and a single
+  hot function underestimated it. Stored as `stats.overheadParentMs` / `overheadChildMs`
+  (`overheadPerCallMs` is their sum).
+- **Adjustment** (`PerfFormat:Adjust`, display-time, raw numbers are never altered in the
+  saved session): a node's adjusted self time is `self - calls*childMs - childCalls*parentMs`
+  (its children's calls), clamped at 0; adjusted totals are summed from those. A top-level
+  call's caller-side cost lands on the root, which is never measured, so the root is not
+  charged. The per-frame timeline is adjusted the same way (`PerfFormat:AdjustTimeline`)
+  from each frame's `calls` and `nested` counts (calls made from inside another measured
+  call), so a worst frame's adjusted tree and its timeline bar agree exactly. Sessions
+  saved before the split calibration (only `overheadPerCallMs`) are split evenly and marked
+  approximate; sessions without calibration are not adjusted.
+- **Measured accuracy** (offline, `test.lua` dump, PUC Lua 5.1, 60 profiled vs 60 unprofiled
+  refresh sweeps, 9 runs): raw sweep time was about +300% of the real cost; adjusted it was
+  +2% to +14% (typically about +5%), always on the high side. Phases made of many tiny
+  calls are less accurate (`Phase6_EnrichData`: +4% to +31%). The old single-function,
+  no-argument calibration left +20% to +39%. Accuracy inside the game client is not
+  verifiable offline; the calibration itself runs in the client, so it measures that
+  client's cost.
+- **Limits.** The adjustment removes the profiler's average cost, not its side effects on
+  caches, so functions whose raw time is mostly overhead (more than 75%) are greyed out in
+  the Functions view and flagged in the flame graph tooltip as rough estimates. Blizzard's
+  addon profiler numbers include the profiler's cost and are compared raw. Allocations are
+  not adjusted. To measure a hot small function precisely, exclude its callees or wrap a
+  span around a loop instead.
 - `trackAllocations` charges growth of `collectgarbage("count")` to the running node. A
   garbage collection step during a call makes that call's number low (collections are
   totalled separately in `gcFreedKB`). `pauseGC` stops the collector for the capture
@@ -169,20 +197,24 @@ session = {
            memoryStopKB, luaMemoryStartKB, luaMemoryStopKB, backpackItems, bankItems },
   options = { the engine options used },
   stats = { durationMs, instrumentedMs, calls, frames, activeFrames, worstFrameMs, aborted,
-            nodeCount, droppedNodes, wrappedFunctions, overheadPerCallMs, allocatedKB, gcFreedKB },
+            nodeCount, droppedNodes, wrappedFunctions, overheadPerCallMs, overheadParentMs|nil,
+            overheadChildMs|nil, allocatedKB, gcFreedKB },
   names = { "[all]", "[event] BAG_UPDATE", ... },
   nodes = { "parentId,nameId,selfUs,calls,maxUs,allocBytes", ... },  -- node 1 is [all]; parents come first
   functions = { "nameId,calls,inclUs,maxUs", ... },
   aborted = { "nameId,count", ... },  -- calls an error cut short, per function
   histogram = { bounds = {1,5,16,33,50,100}, counts = {7 numbers}, blizzard = {7}|nil },
   worst = { { frame, atUs, us, blizzardUs|nil, nodes = { "nodeId,selfUs,calls,allocBytes", ... } }, ... },
-  timeline = { ours = "us,us,...", blizzard = "us,..."|nil },
+  timeline = { ours = "us,us,...", blizzard = "us,..."|nil,
+               calls = "n,n,...", nested = "n,n,..." },  -- per-frame measured calls, and those with a measured caller
 }
 ```
 
 A worst frame lists only the nodes that ran in it; `PerfFormat:DecodeFrame` fills in their
 ancestors with zero cost. Any change to this format bumps `formatVersion` and updates
-`format.lua`, the tool, and their specs together.
+`format.lua`, the tool, and their specs together. The overhead fields (`overheadParentMs`,
+`overheadChildMs`, `timeline.calls`, `timeline.nested`) are optional additions read only
+when present, so version 1 still decodes sessions saved without them.
 
 ## 5. Settings and presets
 
@@ -201,7 +233,7 @@ first open) and clamped by `PerfSessions.LIMITS`:
 | `timelineFrames` | 18000 | 0-216000 |
 | `trackAllocations` | false | |
 | `pauseGC` | false | |
-| `calibrate` | true | |
+| `calibrate` | true | measures per-call profiler overhead at Start (§3) |
 
 The pipeline preset lists module and prototype names; `spec/debug/perf_sessions_spec.lua`
 scans the source tree and fails if a preset names something that does not exist.
@@ -215,6 +247,13 @@ time or allocations), Functions (sortable by every column), Frames (the per-fram
 with Blizzard's numbers behind ours, the worst frames, and the selected frame's flame
 graph), and Summary. A session stopped from anywhere is selected automatically.
 
+**Subtract overhead** (checkbox next to the view buttons, on by default, disabled for
+sessions without a calibration) switches every time in the tab between adjusted and raw:
+flame graph bars and tooltips (which then also show the raw total and the overhead share),
+the Functions columns Total/Self/Avg (sorting follows; Max stays raw, it is a single call),
+the worst-frame list and frame flame graph, and the timeline. The Summary always gives the
+calibration and the time with and without overhead.
+
 The flame graph widget draws pooled textures on one canvas frame and hit-tests the cursor
 against the layout; it never creates a frame per bar. Left-click zooms in, right-click zooms
 out, the mouse wheel scrolls deep trees.
@@ -222,10 +261,11 @@ out, the mouse wheel scrolls deep trees.
 ## 7. Offline flame graphs
 
 ```
-lua tools/flamegraph/flamegraph.lua <WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua> [--list] [--session id|latest] [--frame n] [--metric time|alloc] [--out dir]
+lua tools/flamegraph/flamegraph.lua <WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua> [--list] [--session id|latest] [--frame n] [--metric time|alloc] [--raw] [--out dir]
 ```
 
-Writes `betterbags-<id>[-frame<n>][-alloc].folded` (collapsed stacks for `flamegraph.pl`,
+Times are overhead-adjusted by default when the session has a calibration; `--raw` keeps
+the measured times. Writes `betterbags-<id>[-frame<n>][-alloc][-raw].folded` (collapsed stacks for `flamegraph.pl`,
 `inferno`, speedscope), `.speedscope.json` (a speedscope "sampled" profile, stacks root
 first), and `.html` (a single self-contained page: click to zoom, right-click to zoom out,
 search). The SavedVariables file is run in an empty environment. See
