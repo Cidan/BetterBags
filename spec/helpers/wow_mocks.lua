@@ -1020,6 +1020,19 @@ _G.min = math.min
 _G.INVSLOT_FIRST_EQUIPPED = 1
 _G.INVSLOT_LAST_EQUIPPED = 19
 
+-- UnitStat indexes (client constants; values from Blizzard's LuaEnum, matching the
+-- SPELL_STAT<n>_NAME global strings: 1 Strength, 2 Agility, 3 Stamina, 4 Intellect).
+_G.LE_UNIT_STAT_STRENGTH = 1
+_G.LE_UNIT_STAT_AGILITY = 2
+_G.LE_UNIT_STAT_STAMINA = 3
+_G.LE_UNIT_STAT_INTELLECT = 4
+
+-- PlayerScriptDocumentation.lua: CanDualWield() -> result (bool, not nilable).
+_G.CanDualWield = function() return true end
+-- UnitDocumentation.lua: UnitLevel(name) -> result (number); UnitSex(unit) -> sex (number, nilable).
+_G.UnitLevel = function() return 80 end
+_G.UnitSex = function() return 2 end
+
 -- ItemButtonUtil Setup
 _G.ItemButtonUtil = {
   Event = { ItemContextChanged = 1 },

@@ -203,6 +203,8 @@ globals = {
 	"SOUNDKIT",
 	"UNIT_NAME_FONT",
 	"UnitName",
+	"UnitLevel",
+	"UnitSex",
 	"PawnGetItemData",
 	"PawnIsContainerItemAnUpgrade",
 	"PawnShouldItemLinkHaveUpgradeArrowUnbudgeted",

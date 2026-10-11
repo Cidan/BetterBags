@@ -178,6 +178,8 @@ If you would like more glow on the action buttons (more like what AdiBags had), 
 ### Item Level Upgrade Arrow
 Equipment in your bags that is an item level upgrade compared to the gear you are currently wearing will have a green upgrade arrow in the top corner of the item in your bags. This lets you easily see which pieces of gear in your bags might be an upgrade, such as when you're leveling and your item level is rapidly increasing.
 
+Gear for an empty equipment slot counts as an upgrade too. An item gets no arrow if your character can't use it, isn't high enough level for it, it isn't your armor type, or it has a primary stat (Strength, Agility, Intellect) that your current specialization doesn't use. While you hold a two-handed weapon, one-handers, shields and off-hands get no arrow, and while you hold a one-hander, two-handed melee weapons get none; a one-hander is compared with your off hand only if you can dual wield. For stat-weighted upgrades, choose Pawn as the upgrade provider.
+
 <div align="center" style="text-align:center">
 <a href="https://i.imgur.com/QGjlIYX.png" target="_blank"><img src="https://i.imgur.com/QGjlIYX.png" alt="Item Level Upgrade in Retail.">  </a>
 

@@ -1254,6 +1254,22 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.is_false(items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey["6_1"].isUpgrade)
     end)
 
+    -- Before the first backpack sweep the equipped gear is unknown (equipmentCache is nil):
+    -- a verdict computed then would compare with nothing, and a naked character's gear read
+    -- would detect no change to invalidate it, so nothing is kept until the gear is read.
+    it("does not keep a verdict computed before the equipped gear was read", function()
+      mockContainer[6] = { { itemID = 301, guid = "bank1", count = 1 } }
+      items.equipmentCache = nil
+      items:RefreshBank(context:New("bank1"))
+      items:RefreshBank(context:New("bank2"))
+      assert.are.same({ "6_1", "6_1" }, askedKeys(), "asked on every sweep while the gear is unknown")
+      refreshBackpack()
+      askedKeys()
+      items:RefreshBank(context:New("bank3"))
+      items:RefreshBank(context:New("bank4"))
+      assert.are.same({ "6_1" }, askedKeys(), "kept once the gear has been read")
+    end)
+
     it("does not keep a verdict for an item read while the client had no item info", function()
       local getItemInfo = _G.C_Item.GetItemInfo
       override(_G.C_Item, "GetItemInfo", function(id)
