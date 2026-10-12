@@ -15,6 +15,12 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 -- Coroutines keep their own stack. A coroutine that yields through async:Yield (which
 -- calls BeforeYield/AfterResume) is paused, and on resume its open frames are re-attached
 -- under whatever resumed it, so paused time never inflates a frame.
+--
+-- With tracing on, every measured call is also recorded in the order it started: its start,
+-- duration, node, flags, and (optionally) its arguments and return values. Each distinct
+-- value is described once and each distinct argument list stored once; a call only holds
+-- the id of its argument list. Time the profiler spends on its own bookkeeping (describing
+-- values, packing records) is taken off a virtual clock, so it is charged to nothing.
 ---@class Perf: AceModule
 ---@field active boolean
 ---@field frame Frame
@@ -34,6 +40,7 @@ local ALWAYS_EXCLUDED = {
   PerfSessions = true,
   PerfPane = true,
   FlameGraph = true,
+  TraceChart = true,
   DebugWindow = true,
   Context = true,
 }
@@ -49,16 +56,39 @@ local CALIBRATION_LABELS = 64
 local CALIBRATION_CALLS = 2048
 local CALIBRATION_RUNS = 5
 
+-- A call record is RECORD numbers: start (microseconds after the previous call in its
+-- chunk; 0 for the first), node id, argument set id, duration (-1 while running),
+-- return set id, flags. Records are kept as numbers until every call of a chunk has
+-- ended, then the chunk is packed into one string.
+local RECORD = 6
+local DEFAULT_CHUNK_SIZE = 4096
+local DEFAULT_MAX_CALLS = 1000000
+local CALL_ABORTED = 1
+local CALL_UNFINISHED = 2
+local CALL_PAUSED = 4
+perf.CALL_ABORTED = CALL_ABORTED
+perf.CALL_UNFINISHED = CALL_UNFINISHED
+perf.CALL_PAUSED = CALL_PAUSED
+
+-- Limits on how much of a value is described.
+local MAX_STRING = 64
+local MAX_FIELDS = 8
+local MAX_DEPTH = 2
+local CONTEXT_SKIP = { event = true, events = true }
+local BROKEN_TEXT = '<arguments could not be described>'
+
 local coroutineRunning = coroutine.running
 local MAIN = {}
 
 -- Capture state. Kept in upvalues rather than on the module table because the wrappers
 -- read and write them on every call.
 local active = false
+local capturing = false
 local clock
+local excluded = 0
 local root, overflow, cursor
 local last, startTime
-local nodeCount, maxNodes, droppedNodes
+local nodeCount, maxNodes, droppedNodes, nodeList
 local threads, chain, chainN, curKey
 local serial = 0
 local fnCalls, fnIncl, fnMax, depth
@@ -75,9 +105,34 @@ local timelineOurs, timelineBlizzard, timelineCalls, timelineNested, timelineCap
 local frameMetric, maxDurationMs, onAutoStop, autoStopSent
 local wrapped, overheadParent, overheadChild
 local captureOptions
+local frozen, frozenAt, stopReason
+
+-- Trace state.
+local tracing, traceArgs, traceMax, chunkSize
+local sidBase, traceCount
+local chunks, packed, chunkStart, chunkEnd, chunkPool
+local segments, frameEnds
+local values, valueIds, numIds, strIds, objIds, protoNames, instanceCounts
+local setRoots, sets, scratch, brokenSetId
+local canAccess, contextModule
+
+-- The virtual clock: the real clock minus the time the profiler excluded for itself.
+local function vclock()
+  return clock() - excluded
+end
+
+local function us(ms)
+  return math.floor(ms * 1000 + 0.5)
+end
+
+local function bytes(kb)
+  return math.floor(kb * 1024 + 0.5)
+end
 
 local function newNode(name, parent)
-  return {
+  nodeCount = nodeCount + 1
+  local node = {
+    id = nodeCount,
     name = name,
     parent = parent,
     children = {},
@@ -90,6 +145,8 @@ local function newNode(name, parent)
     fcalls = 0,
     falloc = 0,
   }
+  nodeList[nodeCount] = node
+  return node
 end
 
 local function child(parent, name)
@@ -101,13 +158,11 @@ local function child(parent, name)
     if not overflow then
       overflow = newNode(OVERFLOW_NAME, root)
       root.children[OVERFLOW_NAME] = overflow
-      nodeCount = nodeCount + 1
     end
     return overflow
   end
   node = newNode(name, parent)
   parent.children[name] = node
-  nodeCount = nodeCount + 1
   return node
 end
 
@@ -148,6 +203,383 @@ local function charge(now)
   end
 end
 
+---------------------------------------------------------------------------------------
+-- Call records
+---------------------------------------------------------------------------------------
+
+---@param index number
+---@return table chunk
+---@return number offset
+local function recordOf(index)
+  local ci = math.floor((index - 1) / chunkSize) + 1
+  return chunks[ci], ((index - 1) % chunkSize) * RECORD
+end
+
+-- packChunk turns a chunk whose calls have all ended into one string, and remembers where
+-- its first call starts and its last call ends, so a time window can skip whole chunks.
+local function packChunk(ci)
+  local x0 = clock()
+  local chunk = chunks[ci]
+  local data, n = chunk.data, chunk.n
+  local s, maxEnd = chunk.start, chunk.start
+  for i = 0, n - 1 do
+    local o = i * RECORD
+    s = s + data[o + 1]
+    local e = s + data[o + 4]
+    if e > maxEnd then maxEnd = e end
+  end
+  packed[ci] = table.concat(data, ',', 1, n * RECORD)
+  chunkStart[ci] = chunk.start
+  chunkEnd[ci] = maxEnd
+  chunks[ci] = nil
+  chunkPool[#chunkPool + 1] = data
+  excluded = excluded + (clock() - x0)
+end
+
+---@param sid number
+---@param node table
+---@param startUs number
+local function traceEnter(sid, node, startUs)
+  local index = sid - sidBase
+  local ci = math.floor((index - 1) / chunkSize) + 1
+  local chunk = chunks[ci]
+  if not chunk then
+    chunk = { data = table.remove(chunkPool) or {}, n = 0, open = 0, start = startUs, last = startUs }
+    chunks[ci] = chunk
+  end
+  local data = chunk.data
+  local o = chunk.n * RECORD
+  data[o + 1] = startUs - chunk.last
+  data[o + 2] = node.id
+  data[o + 3] = 0
+  data[o + 4] = -1
+  data[o + 5] = 0
+  data[o + 6] = 0
+  chunk.last = startUs
+  chunk.n = chunk.n + 1
+  chunk.open = chunk.open + 1
+  traceCount = index
+end
+
+-- traceClose ends a call record: it ran from startUs to endUs.
+---@param sid number
+---@param startUs number
+---@param endUs number
+---@param flags number
+---@param retId number
+local function traceClose(sid, startUs, endUs, flags, retId)
+  local index = sid - sidBase
+  local chunk, o = recordOf(index)
+  if not chunk then return end
+  local data = chunk.data
+  data[o + 4] = endUs - startUs
+  data[o + 5] = retId
+  data[o + 6] = flags
+  chunk.open = chunk.open - 1
+  if chunk.open == 0 and chunk.n == chunkSize then
+    packChunk(math.floor((index - 1) / chunkSize) + 1)
+  end
+end
+
+---@param sid number
+---@param setId number
+local function traceSetArgs(sid, setId)
+  local chunk, o = recordOf(sid - sidBase)
+  if chunk then
+    chunk.data[o + 3] = setId
+  end
+end
+
+-- tracePause gives every open call of a paused thread a provisional end where it paused.
+-- If the thread resumes, the call reopens and a segment records the pause.
+local function tracePause(t, now)
+  local pauseUs = us(now - startTime)
+  t.pauseUs = pauseUs
+  for i = 1, t.n do
+    local chunk, o = recordOf(t.sids[i] - sidBase)
+    if chunk then
+      chunk.data[o + 4] = pauseUs - t.us0[i]
+      chunk.data[o + 6] = CALL_PAUSED
+    end
+  end
+end
+
+local function traceResume(t, now)
+  local resumeUs = us(now - startTime)
+  for i = 1, t.n do
+    local index = t.sids[i] - sidBase
+    local chunk, o = recordOf(index)
+    if chunk then
+      chunk.data[o + 4] = -1
+      chunk.data[o + 6] = 0
+    end
+    local n = #segments
+    segments[n + 1] = index
+    segments[n + 2] = t.pauseUs
+    segments[n + 3] = resumeUs
+    segments[n + 4] = t.nodes[i].id
+  end
+end
+
+-- closeOpenCalls ends every call still open when the capture stops, and packs the chunks
+-- that held them. Calls on the running stack end at stop and are unfinished; calls of a
+-- paused coroutine keep the end where they paused; those of a coroutine that died are
+-- calls an error cut short.
+---@param now number
+local function closeOpenCalls(now)
+  local endUs = us(now - startTime)
+  local dead = {}
+  for key, t in pairs(threads) do
+    if type(key) == 'thread' and t.n > 0 and coroutine.status(key) == 'dead' then
+      for i = 1, t.n do
+        dead[t.sids[i]] = true
+      end
+    end
+  end
+  local open = {}
+  for ci in pairs(chunks) do
+    open[#open + 1] = ci
+  end
+  table.sort(open)
+  for _, ci in ipairs(open) do
+    local chunk = chunks[ci]
+    local data = chunk.data
+    local s = chunk.start
+    for i = 0, chunk.n - 1 do
+      local o = i * RECORD
+      s = s + data[o + 1]
+      local sid = (ci - 1) * chunkSize + i + 1 + sidBase
+      if data[o + 4] == -1 then
+        data[o + 4] = endUs - s
+        data[o + 6] = CALL_UNFINISHED
+      elseif data[o + 6] == CALL_PAUSED then
+        data[o + 6] = dead[sid] and CALL_ABORTED or (CALL_UNFINISHED + CALL_PAUSED)
+      end
+    end
+    chunk.open = 0
+    packChunk(ci)
+  end
+end
+
+---------------------------------------------------------------------------------------
+-- Describing arguments and return values
+---------------------------------------------------------------------------------------
+
+local function internText(text)
+  local id = valueIds[text]
+  if not id then
+    id = #values + 1
+    values[id] = text
+    valueIds[text] = id
+  end
+  return id
+end
+
+local NIL_ID, TRUE_ID, FALSE_ID = 1, 2, 3
+
+local describeTable
+
+local function quoteString(s)
+  local more = #s - MAX_STRING
+  if more > 0 then
+    return string.format('%q', string.sub(s, 1, MAX_STRING)) .. '...+' .. more
+  end
+  return (string.gsub(string.format('%q', s), '\\\n', '\\n'))
+end
+
+---@param v any
+---@return number
+local function valueId(v)
+  if v == nil then return NIL_ID end
+  local t = type(v)
+  if canAccess and not canAccess(v) then
+    return internText('<secret ' .. t .. '>')
+  end
+  if t == 'number' then
+    local id = numIds[v]
+    if id then return id end
+    if v ~= v then return internText('nan') end
+    id = internText(tostring(v))
+    numIds[v] = id
+    return id
+  elseif t == 'string' then
+    local id = strIds[v]
+    if id then return id end
+    id = internText(quoteString(v))
+    strIds[v] = id
+    return id
+  elseif t == 'boolean' then
+    return v and TRUE_ID or FALSE_ID
+  end
+  local id = objIds[v]
+  if id then return id end
+  if t == 'table' then
+    local text, keep = describeTable(v, 1)
+    id = internText(text)
+    if keep then objIds[v] = id end
+    return id
+  end
+  id = internText(t)
+  objIds[v] = id
+  return id
+end
+
+local function valueText(v, level)
+  if type(v) == 'table' and not (canAccess and not canAccess(v)) then
+    local id = objIds[v]
+    if id then return values[id] end
+    local text, keep = describeTable(v, level)
+    if keep then objIds[v] = internText(text) end
+    return text
+  end
+  return values[valueId(v)]
+end
+
+local function keyLess(a, b)
+  local ta, tb = type(a), type(b)
+  if ta ~= tb then return ta < tb end
+  if ta == 'number' or ta == 'string' then return a < b end
+  return false
+end
+
+local function keyText(k)
+  if type(k) == 'string' and string.match(k, '^[%a_][%w_]*$') then
+    return k
+  end
+  return '[' .. valueText(k, MAX_DEPTH + 1) .. ']'
+end
+
+local function fieldsText(t, level, skip)
+  if type(t) ~= 'table' then return '{}' end
+  if level > MAX_DEPTH then return '{...}' end
+  local keys, n, more = {}, 0, 0
+  for k in pairs(t) do
+    if not (skip and skip[k]) then
+      if n < MAX_FIELDS then
+        n = n + 1
+        keys[n] = k
+      else
+        more = more + 1
+      end
+    end
+  end
+  table.sort(keys, keyLess)
+  local parts = {}
+  for i = 1, n do
+    local k = keys[i]
+    parts[i] = keyText(k) .. '=' .. valueText(rawget(t, k), level + 1)
+  end
+  if more > 0 then
+    parts[n + 1] = '...+' .. more
+  end
+  return '{' .. table.concat(parts, ', ') .. '}'
+end
+
+-- describeTable names a table. The second result says whether the description can be kept
+-- for the table's lifetime: frames, prototype instances and item data are named by
+-- identity; contexts and plain tables are described as they are at each call.
+---@param v table
+---@param level number
+---@return string text
+---@return boolean keep
+function describeTable(v, level)
+  if type(rawget(v, 0)) == 'userdata' then
+    local name = v.GetName and v:GetName()
+    return 'frame ' .. (type(name) == 'string' and name or '<unnamed>'), true
+  end
+  local mt = getmetatable(v)
+  local index = type(mt) == 'table' and rawget(mt, '__index') or nil
+  if index ~= nil then
+    if index == contextModule then
+      local keys = rawget(v, 'keys')
+      local event = type(keys) == 'table' and rawget(keys, 'event') or nil
+      return 'ctx ' .. tostring(event) .. ' ' .. fieldsText(keys, level, CONTEXT_SKIP), false
+    end
+    local protoName = protoNames[index]
+    if protoName then
+      local count = (instanceCounts[protoName] or 0) + 1
+      instanceCounts[protoName] = count
+      return '<' .. protoName .. ' #' .. count .. '>', true
+    end
+  end
+  local slotkey, itemInfo = rawget(v, 'slotkey'), rawget(v, 'itemInfo')
+  if type(slotkey) == 'string' and type(itemInfo) == 'table' then
+    if rawget(v, 'isItemGap') then return 'gap ' .. slotkey, true end
+    if rawget(v, 'isItemEmpty') then return 'empty ' .. slotkey, true end
+    return 'item ' .. slotkey .. ' #' .. tostring(rawget(itemInfo, 'itemID')), true
+  end
+  return fieldsText(v, level, nil), false
+end
+
+-- argSet returns the id of an argument list, storing the list the first time it is seen.
+-- Lists are found through a trie keyed by value id, so a repeated list costs one lookup
+-- per value and allocates nothing.
+local function argSet(...)
+  local n = select('#', ...)
+  local node = setRoots[n]
+  if not node then
+    node = {}
+    setRoots[n] = node
+  end
+  for i = 1, n do
+    local id = valueId((select(i, ...)))
+    scratch[i] = id
+    local nextNode = node[id]
+    if not nextNode then
+      nextNode = {}
+      node[id] = nextNode
+    end
+    node = nextNode
+  end
+  local setId = node[0]
+  if not setId then
+    setId = #sets + 1
+    sets[setId] = table.concat(scratch, ',', 1, n)
+    node[0] = setId
+  end
+  return setId
+end
+
+local function brokenSet()
+  if not brokenSetId then
+    brokenSetId = #sets + 1
+    sets[brokenSetId] = tostring(internText(BROKEN_TEXT))
+  end
+  return brokenSetId
+end
+
+-- describe runs off the clock: its time is excluded from every measurement.
+local function describe(...)
+  local x0 = clock()
+  local ok, setId = pcall(argSet, ...)
+  if not ok then setId = brokenSet() end
+  excluded = excluded + (clock() - x0)
+  return setId
+end
+
+local function resetValues()
+  values, valueIds = {}, {}
+  numIds, strIds = {}, {}
+  objIds = setmetatable({}, { __mode = 'k' })
+  protoNames, instanceCounts = {}, {}
+  setRoots, sets, scratch, brokenSetId = {}, {}, {}, nil
+  internText('nil')
+  internText('true')
+  internText('false')
+  for name, module in addon:IterateModules() do
+    objIds[module] = internText('<' .. name .. '>')
+  end
+  objIds[addon] = internText('<' .. addonName .. '>')
+  for _, proto in ipairs(perf.prototypes) do
+    protoNames[proto.tbl] = proto.name
+    objIds[proto.tbl] = internText('<' .. proto.name .. ' prototype>')
+  end
+end
+
+---------------------------------------------------------------------------------------
+-- Threads and the call stack
+---------------------------------------------------------------------------------------
+
 local function newThread(base)
   return {
     n = 0,
@@ -155,10 +587,12 @@ local function newThread(base)
     labels = {},
     sids = {},
     t0 = {},
+    us0 = {},
     pz = {},
     base = base,
     pausedTotal = 0,
     pauseStart = 0,
+    pauseUs = 0,
     detached = false,
   }
 end
@@ -172,6 +606,9 @@ local function detach(t, now)
   if t.n > 0 and not t.detached then
     t.detached = true
     t.pauseStart = now
+    if tracing then
+      tracePause(t, now)
+    end
   end
 end
 
@@ -187,6 +624,9 @@ local function attach(t, base, now)
       prev = node
     end
     t.detached = false
+    if tracing then
+      traceResume(t, now)
+    end
   end
 end
 
@@ -233,9 +673,26 @@ local function sync(now)
   return threads[key]
 end
 
+-- freeze stops all recording at once when the trace is full, so the call tree, frames and
+-- trace all end at the same moment. The capture's owner is told on the next frame and
+-- stops it; nothing recorded so far is dropped.
+local function freeze(now)
+  frozen = true
+  frozenAt = now
+  stopReason = 'traceFull'
+  active = false
+  perf.active = false
+end
+
+---@param label string
+---@return number sid 0 when the trace just filled and nothing was recorded.
 local function enter(label)
-  local now = clock()
+  local now = vclock()
   local t = sync(now)
+  if tracing and serial - sidBase >= traceMax then
+    freeze(now)
+    return 0
+  end
   -- A call made from inside a measured call charges its caller-side overhead to that
   -- caller; a top-level call charges it to the root, which is never counted.
   if cursor ~= root then
@@ -258,11 +715,18 @@ local function enter(label)
   frameCalls = frameCalls + 1
   fnCalls[label] = (fnCalls[label] or 0) + 1
   depth[label] = (depth[label] or 0) + 1
+  if tracing then
+    local startUs = us(now - startTime)
+    t.us0[n] = startUs
+    traceEnter(serial, node, startUs)
+  end
   return serial
 end
 
-local function finish(sid)
-  local now = clock()
+---@param sid number
+---@param retId? number
+local function finish(sid, retId)
+  local now = vclock()
   local t = sync(now)
   local sids = t.sids
   local n = t.n
@@ -270,12 +734,16 @@ local function finish(sid)
     n = n - 1
   end
   if n == 0 then return end
+  local endUs = tracing and us(now - startTime) or 0
   -- Frames above ours were left open by an error caught somewhere below them.
   for i = t.n, n + 1, -1 do
     local label = t.labels[i]
     depth[label] = depth[label] - 1
     abortedFrames = abortedFrames + 1
     abortedNames[label] = (abortedNames[label] or 0) + 1
+    if tracing then
+      traceClose(sids[i], t.us0[i], endUs, CALL_ABORTED, 0)
+    end
   end
   local node = t.nodes[n]
   local label = t.labels[n]
@@ -288,6 +756,9 @@ local function finish(sid)
   end
   if incl > (fnMax[label] or 0) then
     fnMax[label] = incl
+  end
+  if tracing then
+    traceClose(sid, t.us0[n], endUs, 0, retId or 0)
   end
   t.n = n - 1
   if n > 1 then
@@ -304,21 +775,34 @@ local function exit(sid, ...)
   return ...
 end
 
+local function exitWithReturns(sid, ...)
+  if active then
+    finish(sid, describe(...))
+  end
+  return ...
+end
+
 local function makeWrapper(label, fn)
   return function(...)
     if not active then
       return fn(...)
     end
     local sid = enter(label)
+    if traceArgs and sid ~= 0 then
+      traceSetArgs(sid, describe(...))
+      return exitWithReturns(sid, fn(...))
+    end
     return exit(sid, fn(...))
   end
 end
 
-local function resetState()
+-- Lua 5.1 allows 60 upvalues per function, so the reset is split by area.
+local function resetTree()
+  nodeCount = 0
+  nodeList = {}
   root = newNode(ROOT_NAME, nil)
   overflow = nil
   cursor = root
-  nodeCount = 1
   droppedNodes = 0
   threads = setmetatable({}, { __mode = 'k' })
   threads[MAIN] = newThread(root)
@@ -328,6 +812,9 @@ local function resetState()
   fnCalls, fnIncl, fnMax, depth = {}, {}, {}, {}
   totalCalls, abortedFrames, abortedNames = 0, 0, {}
   allocTotal, gcFreed = 0, 0
+end
+
+local function resetFrames()
   frameSeq, frameTotal, frameCalls, frameNested, dirty, dirtyN = 0, 0, 0, 0, {}, 0
   frames, activeFrames, worstFrameMs = 0, 0, 0
   histogram, blizzardHistogram = {}, {}
@@ -339,7 +826,24 @@ local function resetState()
   pHas, pFrame, pAt, pMs, pBlizzard, pEntries = false, nil, nil, nil, nil, nil
   timelineOurs, timelineBlizzard, timelineCalls, timelineNested = {}, {}, {}, {}
   autoStopSent = false
-  last = clock()
+  frozen, frozenAt, stopReason = false, nil, nil
+end
+
+local function resetTrace()
+  sidBase, traceCount = serial, 0
+  chunks, packed, chunkStart, chunkEnd, chunkPool = {}, {}, {}, {}, {}
+  segments, frameEnds = {}, {}
+  if tracing then
+    resetValues()
+  end
+end
+
+local function resetState()
+  excluded = 0
+  resetTree()
+  resetFrames()
+  resetTrace()
+  last = vclock()
   startTime = last
   if trackAlloc then
     lastKb = collectgarbage("count")
@@ -406,15 +910,15 @@ local function install(options)
   wrapped = {}
   local foreign = collectForeign()
   local only = toSet(options.modules)
-  local excluded = toSet(options.exclude) or {}
+  local excludedNames = toSet(options.exclude) or {}
   for name, module in addon:IterateModules() do
-    if not ALWAYS_EXCLUDED[name] and not excluded[name] and (only == nil or only[name]) then
+    if not ALWAYS_EXCLUDED[name] and not excludedNames[name] and (only == nil or only[name]) then
       wrapTable(module, name, foreign)
     end
   end
   local onlyProtos = toSet(options.prototypes)
   for _, proto in ipairs(perf.prototypes) do
-    if (onlyProtos == nil or onlyProtos[proto.name]) and not excluded[proto.name] then
+    if (onlyProtos == nil or onlyProtos[proto.name]) and not excludedNames[proto.name] then
       wrapTable(proto.tbl, proto.name, foreign)
     end
   end
@@ -432,23 +936,8 @@ local function uninstall()
   end
 end
 
-local function us(ms)
-  return math.floor(ms * 1000 + 0.5)
-end
-
-local function bytes(kb)
-  return math.floor(kb * 1024 + 0.5)
-end
-
-local function sortedChildren(node)
-  local list = {}
-  for _, c in pairs(node.children) do
-    list[#list + 1] = c
-  end
-  table.sort(list, function(a, b) return a.name < b.name end)
-  return list
-end
-
+-- finalize packs the capture into a session. Node ids are creation order, which puts every
+-- parent before its children, and are the ids the trace's call records refer to.
 local function finalize(now)
   local names, nameIds = {}, {}
   local function nameId(label)
@@ -461,19 +950,15 @@ local function finalize(now)
     return id
   end
 
-  local ids, nodes = {}, {}
+  local nodes = {}
   local instrumentedUs = 0
-  local function visit(node, parentId)
-    local id = #nodes + 1
-    ids[node] = id
+  for id = 1, nodeCount do
+    local node = nodeList[id]
     local selfUs = us(node.self)
     instrumentedUs = instrumentedUs + selfUs
+    local parentId = node.parent and node.parent.id or 0
     nodes[id] = string.format('%d,%d,%d,%d,%d,%d', parentId, nameId(node.name), selfUs, node.calls, us(node.max), bytes(node.alloc))
-    for _, c in ipairs(sortedChildren(node)) do
-      visit(c, id)
-    end
   end
-  visit(root, 0)
 
   local labels = {}
   for label in pairs(fnCalls) do
@@ -500,32 +985,49 @@ local function finalize(now)
     local entries = {}
     local flat = snap.entries
     for i = 1, #flat, 4 do
-      entries[#entries + 1] = { ids[flat[i]], flat[i + 1], flat[i + 2], flat[i + 3] }
+      entries[#entries + 1] = { flat[i].id, flat[i + 1], flat[i + 2], flat[i + 3] }
     end
     table.sort(entries, function(a, b) return a[1] < b[1] end)
-    local packed = {}
+    local packedEntries = {}
     for i, e in ipairs(entries) do
-      packed[i] = string.format('%d,%d,%d,%d', e[1], us(e[2]), e[3], bytes(e[4]))
+      packedEntries[i] = string.format('%d,%d,%d,%d', e[1], us(e[2]), e[3], bytes(e[4]))
     end
     worstOut[#worstOut + 1] = {
       frame = snap.frame,
       atUs = us(snap.atMs),
       us = us(snap.ms),
       blizzardUs = snap.blizzardMs and us(snap.blizzardMs) or nil,
-      nodes = packed,
+      nodes = packedEntries,
     }
   end
 
-  local function packTimeline(values)
+  local function packTimeline(list)
     local out = {}
-    for i, v in ipairs(values) do
+    for i, v in ipairs(list) do
       out[i] = us(v)
     end
     return table.concat(out, ',')
   end
 
+  local trace
+  if tracing then
+    trace = {
+      chunkSize = chunkSize,
+      calls = traceCount,
+      chunks = packed,
+      chunkStarts = table.concat(chunkStart, ','),
+      chunkEnds = table.concat(chunkEnd, ','),
+      segments = table.concat(segments, ','),
+      frameEnds = table.concat(frameEnds, ','),
+      values = traceArgs and values or {},
+      sets = traceArgs and sets or {},
+      args = traceArgs or nil,
+      full = frozen or nil,
+    }
+  end
+
   return {
-    formatVersion = 2,
+    formatVersion = 3,
     options = {
       modules = captureOptions.modules,
       exclude = captureOptions.exclude,
@@ -537,6 +1039,9 @@ local function finalize(now)
       pauseGC = captureOptions.pauseGC == true,
       maxDurationSec = captureOptions.maxDurationSec or 0,
       timelineFrames = timelineCap,
+      trace = tracing,
+      traceArgs = traceArgs,
+      traceMaxCalls = tracing and traceMax or nil,
     },
     stats = {
       durationMs = us(now - startTime) / 1000,
@@ -554,6 +1059,9 @@ local function finalize(now)
       overheadChildMs = overheadChild,
       allocatedKB = bytes(allocTotal) / 1024,
       gcFreedKB = bytes(gcFreed) / 1024,
+      excludedMs = us(excluded) / 1000,
+      traceCalls = tracing and traceCount or nil,
+      stopReason = stopReason,
     },
     names = names,
     nodes = nodes,
@@ -571,6 +1079,7 @@ local function finalize(now)
       nested = table.concat(timelineNested, ','),
       blizzard = frameMetric and packTimeline(timelineBlizzard) or nil,
     },
+    trace = trace,
   }
 end
 
@@ -652,6 +1161,7 @@ function perf:Init()
   self.frame:SetScript('OnUpdate', nil)
   self.active = false
   active = false
+  capturing = false
 end
 
 ---@param fn fun(): number
@@ -670,16 +1180,18 @@ function perf:RegisterPrototype(tbl, name)
   table.insert(self.prototypes, { tbl = tbl, name = name })
 end
 
+-- IsActive is true from Start until Stop, including after a full trace froze recording.
 ---@return boolean
 function perf:IsActive()
-  return active
+  return capturing
 end
 
 ---@return number overheadMs
 -- Calibrate measures what one wrapped call costs, split by where the cursor charges it:
 -- the part before the entry clock read and after the exit read lands on the caller, the
 -- rest on the called function. Each side is the time a wrapped loop spends on that node
--- minus what the same loop costs unwrapped. The best of several runs is kept.
+-- minus what the same loop costs unwrapped. The best of several runs is kept. It runs with
+-- the capture's tracing settings, so the cost of recording a call is part of it.
 ---@return number parentMs
 ---@return number childMs
 function perf:Calibrate()
@@ -690,26 +1202,28 @@ function perf:Calibrate()
   end
   local x, y, z = 1, '', true
   local bestParent, bestChild = math.huge, math.huge
+  local limit = traceMax
+  traceMax = math.huge
   for _ = 1, CALIBRATION_RUNS do
     resetState()
     active = true
 
     local k = 1
-    local t0 = clock()
+    local t0 = vclock()
     for _ = 1, CALIBRATION_CALLS do
       k = k + 1
       if k > CALIBRATION_LABELS then k = 1 end
     end
-    local rotation = (clock() - t0) / CALIBRATION_CALLS
+    local rotation = (vclock() - t0) / CALIBRATION_CALLS
 
     k = 1
-    t0 = clock()
+    t0 = vclock()
     for _ = 1, CALIBRATION_CALLS do
       k = k + 1
       if k > CALIBRATION_LABELS then k = 1 end
       body(x, y, z)
     end
-    local bare = (clock() - t0) / CALIBRATION_CALLS
+    local bare = (vclock() - t0) / CALIBRATION_CALLS
 
     local sid = enter('[calibration]')
     k = 1
@@ -731,6 +1245,7 @@ function perf:Calibrate()
     if callerCost < bestParent then bestParent = callerCost end
     if calleeCost < bestChild then bestChild = calleeCost end
   end
+  traceMax = limit
   if bestParent < 0 then bestParent = 0 end
   if bestChild < 0 then bestChild = 0 end
   return bestParent, bestChild
@@ -749,13 +1264,17 @@ end
 ---@field pauseGC? boolean
 ---@field maxDurationSec? number
 ---@field calibrate? boolean
+---@field trace? boolean Record every measured call in order.
+---@field traceArgs? boolean Also record each call's arguments and return values.
+---@field traceMaxCalls? number Recording stops (the capture freezes) after this many calls.
+---@field traceChunkSize? number Calls per packed chunk.
 ---@field frameMetric? fun(): number|nil Per-frame external metric in ms (Blizzard's addon profiler).
----@field onAutoStop? fun() Called once when maxDurationSec has passed.
+---@field onAutoStop? fun(reason: "maxDuration"|"traceFull") Called once when the capture should stop on its own.
 
 ---@param options? PerfOptions
 ---@return boolean started
 function perf:Start(options)
-  if active then return false end
+  if capturing then return false end
   options = options or {}
   captureOptions = options
   clock = self.clock or debugprofilestop
@@ -767,6 +1286,12 @@ function perf:Start(options)
   onAutoStop = options.onAutoStop
   maxDurationMs = (options.maxDurationSec or 0) * 1000
   trackAlloc = options.trackAllocations == true
+  tracing = options.trace == true
+  traceArgs = tracing and options.traceArgs == true
+  traceMax = options.traceMaxCalls or DEFAULT_MAX_CALLS
+  chunkSize = options.traceChunkSize or DEFAULT_CHUNK_SIZE
+  canAccess = type(_G.canaccessvalue) == 'function' and _G.canaccessvalue or nil
+  contextModule = addon:GetModule('Context', true)
 
   overheadParent, overheadChild = nil, nil
   if options.calibrate ~= false then
@@ -778,6 +1303,7 @@ function perf:Start(options)
   end
   resetState()
   install(options)
+  capturing = true
   active = true
   self.active = true
   self.frame:SetScript('OnUpdate', function()
@@ -788,10 +1314,16 @@ end
 
 ---@return table|nil session
 function perf:Stop()
-  if not active then return nil end
-  local now = clock()
-  charge(now)
+  if not capturing then return nil end
+  local now
+  if frozen then
+    now = frozenAt
+  else
+    now = vclock()
+    charge(now)
+  end
   active = false
+  capturing = false
   self.active = false
   self.frame:SetScript('OnUpdate', nil)
   uninstall()
@@ -799,8 +1331,14 @@ function perf:Stop()
     collectgarbage("restart")
   end
   flushPending()
+  if tracing then
+    closeOpenCalls(now)
+  end
   local session = finalize(now)
-  root, overflow, cursor, threads, dirty, worst = nil, nil, nil, nil, nil, nil
+  root, overflow, cursor, threads, dirty, worst, nodeList = nil, nil, nil, nil, nil, nil, nil
+  chunks, packed, chunkStart, chunkEnd, chunkPool, segments, frameEnds = nil, nil, nil, nil, nil, nil, nil
+  values, valueIds, numIds, strIds, objIds, setRoots, sets, scratch = nil, nil, nil, nil, nil, nil, nil, nil
+  frozen = false
   return session
 end
 
@@ -808,14 +1346,25 @@ end
 -- where no measured call can legitimately be open on the main thread, so anything still
 -- open there was left behind by an uncaught error.
 function perf:_OnFrame()
+  if frozen then
+    if not autoStopSent then
+      autoStopSent = true
+      if onAutoStop then onAutoStop(stopReason) end
+    end
+    return
+  end
   if not active then return end
-  local now = clock()
+  local now = vclock()
   local mainThread = threads[MAIN]
   if mainThread.n > 0 then
+    local endUs = tracing and us(last - startTime) or 0
     for i = mainThread.n, 1, -1 do
       local label = mainThread.labels[i]
       depth[label] = depth[label] - 1
       abortedNames[label] = (abortedNames[label] or 0) + 1
+      if tracing then
+        traceClose(mainThread.sids[i], mainThread.us0[i], endUs, CALL_ABORTED, 0)
+      end
     end
     abortedFrames = abortedFrames + mainThread.n
     mainThread.n = 0
@@ -850,6 +1399,9 @@ function perf:_OnFrame()
       timelineBlizzard[#timelineBlizzard + 1] = blizzardMs or 0
     end
   end
+  if tracing then
+    frameEnds[#frameEnds + 1] = us(now - startTime)
+  end
   considerFrame(ms, blizzardMs, now)
 
   frameSeq = frameSeq + 1
@@ -860,17 +1412,24 @@ function perf:_OnFrame()
 
   if maxDurationMs > 0 and not autoStopSent and now - startTime >= maxDurationMs then
     autoStopSent = true
-    if onAutoStop then onAutoStop() end
+    stopReason = 'maxDuration'
+    if onAutoStop then onAutoStop('maxDuration') end
   end
 end
 
--- Enter opens a manual span. It returns nil when no capture is running; pass the result
--- to Exit either way.
+-- Enter opens a manual span. It returns nil when nothing is being recorded; pass the result
+-- to Exit either way. Any extra arguments are recorded as the span's arguments when the
+-- capture records them (event and message payloads).
 ---@param label string
 ---@return number|nil token
-function perf:Enter(label)
+function perf:Enter(label, ...)
   if not active then return nil end
-  return enter(label)
+  local sid = enter(label)
+  if sid == 0 then return nil end
+  if traceArgs and select('#', ...) > 0 then
+    traceSetArgs(sid, describe(...))
+  end
+  return sid
 end
 
 ---@param token number|nil
@@ -896,7 +1455,7 @@ function perf:BeforeYield()
   if not active then return end
   local key = coroutineRunning()
   if not key then return end
-  local now = clock()
+  local now = vclock()
   local t = sync(now)
   detach(t, now)
   if chain[chainN] == key then
@@ -910,18 +1469,21 @@ end
 function perf:AfterResume()
   if not active then return end
   if not coroutineRunning() then return end
-  sync(clock())
+  sync(vclock())
 end
 
 ---@return table|nil
 function perf:GetLiveStats()
-  if not active then return nil end
+  if not capturing then return nil end
+  local now = frozen and frozenAt or vclock()
   return {
-    elapsedMs = clock() - startTime,
+    elapsedMs = now - startTime,
     calls = totalCalls,
     frames = frames,
     worstFrameMs = worstFrameMs,
     nodes = nodeCount,
     wrappedFunctions = #wrapped,
+    traceCalls = tracing and traceCount or nil,
+    traceFull = frozen,
   }
 end

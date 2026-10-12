@@ -556,7 +556,7 @@ describe("Perf engine", function()
         perf:_OnFrame()
         local session = perf:Stop()
 
-        assert.are.equal(2, session.formatVersion)
+        assert.are.equal(3, session.formatVersion)
         assert.are.equal(1, #session.worst, "no separate empty frame for the late reading")
         local frame = perfFormat:DecodeFrame(session, 1)
         assert.are.equal(1, frame.frame)

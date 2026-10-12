@@ -60,6 +60,11 @@ local function link(node, parent)
   parent.childByName[node.name] = node
 end
 
+local function byName(a, b)
+  if a.name ~= b.name then return a.name < b.name end
+  return a.id < b.id
+end
+
 -- Node ids are assigned parent-first, so walking them backwards sums every subtree.
 local function sumTotals(nodes, maxId)
   local hasAlloc = false
@@ -92,6 +97,13 @@ function perfFormat:Decode(session)
     nodes[id] = node
     if f[1] > 0 then
       link(node, nodes[f[1]])
+    end
+  end
+  -- From format version 3 node ids are creation order; earlier sessions stored them
+  -- already sorted by name.
+  if (session.formatVersion or 1) >= 3 then
+    for _, node in ipairs(nodes) do
+      table.sort(node.children, byName)
     end
   end
   local hasAlloc = sumTotals(nodes, #nodes)
@@ -302,8 +314,9 @@ function perfFormat:DecodeFrame(session, index)
     nodes[1] = newNode(1, names[1])
   end
   if maxId < 1 then maxId = 1 end
+  local sortByName = (session.formatVersion or 1) >= 3
   for _, node in pairs(nodes) do
-    table.sort(node.children, function(a, b) return a.id < b.id end)
+    table.sort(node.children, sortByName and byName or function(a, b) return a.id < b.id end)
   end
   local hasAlloc = sumTotals(nodes, maxId)
   return {
@@ -352,6 +365,338 @@ function perfFormat:DecodeTimeline(session)
     calls = decode(timeline.calls, 1),
     nested = decode(timeline.nested, 1),
   }
+end
+
+---------------------------------------------------------------------------------------
+-- Call trace (format version 3)
+---------------------------------------------------------------------------------------
+
+-- Call flags, as recorded by the engine.
+perfFormat.CALL_ABORTED = 1
+perfFormat.CALL_UNFINISHED = 2
+perfFormat.CALL_PAUSED = 4
+
+local RECORD = 6
+local DECODED_CHUNKS_KEPT = 8
+
+local function hasFlag(flags, flag)
+  return math.floor(flags / flag) % 2 == 1
+end
+
+---@class PerfTraceSegment
+---@field pausedAt number Milliseconds from the start of the capture.
+---@field resumedAt number
+---@field node number Node the call continued under after resuming.
+
+---@class PerfTraceCall
+---@field index number Position in start order, from 1.
+---@field start number Milliseconds from the start of the capture.
+---@field finish number
+---@field wall number finish - start, including any time the call was paused.
+---@field incl number wall without paused time.
+---@field node number
+---@field name string
+---@field depth number 1 for a call with no measured caller.
+---@field args number Argument set id; 0 when none was recorded.
+---@field returns number Return value set id; 0 when none was recorded.
+---@field flags number
+---@field aborted boolean
+---@field unfinished boolean
+---@field paused boolean
+---@field segments PerfTraceSegment[]|nil
+
+---@class PerfTraceSlice
+---@field call PerfTraceCall
+---@field node number
+---@field name string
+---@field depth number
+---@field start number
+---@field finish number
+
+---@class PerfTrace
+local traceProto = {}
+
+local traceCache = setmetatable({}, { __mode = 'k' })
+
+-- OpenTrace returns an accessor over a session's call trace, or nil when the session has
+-- none. Chunks are decoded on demand and the last few are kept.
+---@param session table|nil
+---@return PerfTrace|nil
+function perfFormat:OpenTrace(session)
+  local tr = session and session.trace
+  if not tr or not tr.chunks then return nil end
+  local cached = traceCache[session]
+  if cached then return cached end
+
+  local parents, nameIds, depths = {}, {}, {}
+  for id, packedNode in ipairs(session.nodes) do
+    local parentId, nameId = string.match(packedNode, '^(%d+),(%d+),')
+    parents[id] = tonumber(parentId)
+    nameIds[id] = tonumber(nameId)
+    local p = parents[id]
+    depths[id] = (p and p > 0) and ((depths[p] or 0) + 1) or 0
+  end
+
+  local segmentsByCall = {}
+  local flat = splitNumbers(tr.segments or '')
+  for i = 1, #flat, 4 do
+    local index = flat[i]
+    local list = segmentsByCall[index]
+    if not list then
+      list = {}
+      segmentsByCall[index] = list
+    end
+    list[#list + 1] = { pausedAt = flat[i + 1] / 1000, resumedAt = flat[i + 2] / 1000, node = flat[i + 3] }
+  end
+
+  local trace = setmetatable({
+    session = session,
+    names = session.names,
+    nameIds = nameIds,
+    depths = depths,
+    chunkSize = tr.chunkSize,
+    count = tr.calls or 0,
+    chunks = tr.chunks,
+    chunkStarts = splitNumbers(tr.chunkStarts or ''),
+    chunkEnds = splitNumbers(tr.chunkEnds or ''),
+    frameEnds = splitNumbers(tr.frameEnds or ''),
+    segments = segmentsByCall,
+    values = tr.values or {},
+    sets = tr.sets or {},
+    full = tr.full == true,
+    hasArgs = tr.args == true,
+    decoded = {},
+    decodedOrder = {},
+    texts = {},
+  }, { __index = traceProto })
+  traceCache[session] = trace
+  return trace
+end
+
+---@return number
+function traceProto:Count()
+  return self.count
+end
+
+-- Chunk decodes one packed chunk into parallel arrays of absolute values.
+---@param ci number
+---@return table|nil
+function traceProto:Chunk(ci)
+  local d = self.decoded[ci]
+  if d then return d end
+  local packedChunk = self.chunks[ci]
+  if not packedChunk then return nil end
+  local f = splitNumbers(packedChunk)
+  local n = #f / RECORD
+  d = { n = n, starts = {}, nodes = {}, args = {}, walls = {}, returns = {}, flags = {} }
+  local s = self.chunkStarts[ci] or 0
+  for i = 1, n do
+    local o = (i - 1) * RECORD
+    s = s + f[o + 1]
+    d.starts[i] = s
+    d.nodes[i] = f[o + 2]
+    d.args[i] = f[o + 3]
+    d.walls[i] = f[o + 4]
+    d.returns[i] = f[o + 5]
+    d.flags[i] = f[o + 6]
+  end
+  self.decoded[ci] = d
+  local order = self.decodedOrder
+  order[#order + 1] = ci
+  if #order > DECODED_CHUNKS_KEPT then
+    self.decoded[table.remove(order, 1)] = nil
+  end
+  return d
+end
+
+---@param index number
+---@return PerfTraceCall|nil
+function traceProto:Get(index)
+  if index < 1 or index > self.count then return nil end
+  local ci = math.floor((index - 1) / self.chunkSize) + 1
+  local d = self:Chunk(ci)
+  if not d then return nil end
+  local k = index - (ci - 1) * self.chunkSize
+  local start, wall = d.starts[k] / 1000, d.walls[k] / 1000
+  local node, flags = d.nodes[k], d.flags[k]
+  local segments = self.segments[index]
+  local paused = 0
+  if segments then
+    for _, seg in ipairs(segments) do
+      paused = paused + (seg.resumedAt - seg.pausedAt)
+    end
+  end
+  return {
+    index = index,
+    start = start,
+    finish = start + wall,
+    wall = wall,
+    incl = wall - paused,
+    node = node,
+    name = self.names[self.nameIds[node]] or '?',
+    depth = self.depths[node] or 0,
+    args = d.args[k],
+    returns = d.returns[k],
+    flags = flags,
+    aborted = hasFlag(flags, perfFormat.CALL_ABORTED),
+    unfinished = hasFlag(flags, perfFormat.CALL_UNFINISHED),
+    paused = hasFlag(flags, perfFormat.CALL_PAUSED),
+    segments = segments,
+  }
+end
+
+-- Text joins the descriptions of an argument or return value set; nil when nothing was
+-- recorded for the call.
+---@param setId number|nil
+---@return string|nil
+function traceProto:Text(setId)
+  if not setId or setId == 0 then return nil end
+  local cached = self.texts[setId]
+  if cached then return cached end
+  local spec = self.sets[setId]
+  if not spec then return nil end
+  local parts = {}
+  for id in string.gmatch(spec, '%d+') do
+    parts[#parts + 1] = self.values[tonumber(id)] or '?'
+  end
+  local text = table.concat(parts, ', ')
+  self.texts[setId] = text
+  return text
+end
+
+-- NodeName and NodeDepth describe a node id from the session's call tree.
+---@param node number
+---@return string
+function traceProto:NodeName(node)
+  return self.names[self.nameIds[node]] or '?'
+end
+
+---@param node number
+---@return number
+function traceProto:NodeDepth(node)
+  return self.depths[node] or 0
+end
+
+-- Slices lists what ran between fromMs and toMs, one slice per uninterrupted stretch of a
+-- call: a call that paused (a coroutine that yielded) has one slice before each pause and
+-- one after, under the node it resumed under. Slices shorter than minMs are skipped.
+---@param fromMs number
+---@param toMs number
+---@param minMs? number
+---@return PerfTraceSlice[]
+function traceProto:Slices(fromMs, toMs, minMs)
+  local out = {}
+  local fromUs, toUs = fromMs * 1000, toMs * 1000
+  local minUs = (minMs or 0) * 1000
+  for ci = 1, #self.chunks do
+    local cs, ce = self.chunkStarts[ci], self.chunkEnds[ci]
+    if cs and cs > toUs then break end
+    if cs and ce and ce >= fromUs then
+      local d = self:Chunk(ci)
+      for k = 1, d.n do
+        local s = d.starts[k]
+        if s > toUs then break end
+        local e = s + d.walls[k]
+        if e >= fromUs and e - s >= minUs then
+          local index = (ci - 1) * self.chunkSize + k
+          local call = self:Get(index)
+          local segs = call.segments
+          local pieces = {}
+          if segs then
+            local pieceStart, pieceNode = call.start, call.node
+            for _, seg in ipairs(segs) do
+              pieces[#pieces + 1] = { pieceStart, seg.pausedAt, pieceNode }
+              pieceStart, pieceNode = seg.resumedAt, seg.node
+            end
+            pieces[#pieces + 1] = { pieceStart, call.finish, pieceNode }
+          else
+            pieces[1] = { call.start, call.finish, call.node }
+          end
+          for _, piece in ipairs(pieces) do
+            if piece[2] >= fromMs and piece[1] <= toMs and piece[2] >= piece[1] then
+              out[#out + 1] = {
+                call = call,
+                node = piece[3],
+                name = self:NodeName(piece[3]),
+                depth = self:NodeDepth(piece[3]),
+                start = piece[1],
+                finish = piece[2],
+              }
+            end
+          end
+        end
+      end
+    end
+  end
+  return out
+end
+
+---@return number
+function traceProto:FrameCount()
+  return #self.frameEnds
+end
+
+-- FrameOf returns the frame a moment falls in: frame n ends at the n-th frame boundary.
+-- Moments after the last boundary are in the frame that was still running at stop.
+---@param ms number
+---@return number
+function traceProto:FrameOf(ms)
+  local us = ms * 1000
+  local ends = self.frameEnds
+  local lo, hi = 1, #ends
+  if hi == 0 or us > ends[hi] then return hi + 1 end
+  while lo < hi do
+    local mid = math.floor((lo + hi) / 2)
+    if ends[mid] >= us then
+      hi = mid
+    else
+      lo = mid + 1
+    end
+  end
+  return lo
+end
+
+-- FrameBounds returns when a frame started and ended, in milliseconds.
+---@param frame number
+---@return number fromMs
+---@return number toMs
+function traceProto:FrameBounds(frame)
+  local ends = self.frameEnds
+  local from = frame > 1 and (ends[frame - 1] or ends[#ends] or 0) / 1000 or 0
+  local to = ends[frame] and ends[frame] / 1000 or ((self.session.stats and self.session.stats.durationMs) or from)
+  return from, to
+end
+
+-- Matches tells whether a call's function name, arguments or return values contain the
+-- query, ignoring case. query must already be lower case.
+---@param call PerfTraceCall
+---@param query string
+---@return boolean
+function traceProto:Matches(call, query)
+  if string.find(string.lower(call.name), query, 1, true) then return true end
+  local args = self:Text(call.args)
+  if args and string.find(string.lower(args), query, 1, true) then return true end
+  local returns = self:Text(call.returns)
+  return returns ~= nil and string.find(string.lower(returns), query, 1, true) ~= nil
+end
+
+-- TraceBytes estimates how much of the SavedVariables file a session's trace takes.
+---@param session table
+---@return number
+function perfFormat:TraceBytes(session)
+  local tr = session and session.trace
+  if not tr then return 0 end
+  local total = 0
+  for _, chunk in ipairs(tr.chunks or {}) do
+    total = total + #chunk
+  end
+  for _, text in ipairs(tr.values or {}) do
+    total = total + #text
+  end
+  for _, spec in ipairs(tr.sets or {}) do
+    total = total + #spec
+  end
+  return total + #(tr.segments or '') + #(tr.frameEnds or '') + #(tr.chunkStarts or '') + #(tr.chunkEnds or '')
 end
 
 ---@class PerfOverhead
