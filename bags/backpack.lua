@@ -84,8 +84,7 @@ function backpack.proto:OnShow(ctx)
 	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
----@param ctx Context
-function backpack.proto:OnHide(ctx)
+function backpack.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
 
@@ -95,22 +94,12 @@ function backpack.proto:OnHide(ctx)
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
 			if self.bag.searchFrame then self.bag.searchFrame:Hide() end
-			if self.bag.drawOnClose then
-				debug:Log("draw", "Drawing bag on close")
-				self.bag.drawOnClose = false
-				self.bag:Refresh(ctx)
-			end
 			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 		end
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
 		if self.bag.searchFrame then self.bag.searchFrame:Hide() end
-		if self.bag.drawOnClose then
-			debug:Log("draw", "Drawing bag on close")
-			self.bag.drawOnClose = false
-			self.bag:Refresh(ctx)
-		end
 		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 	end
 end

@@ -1854,24 +1854,51 @@ local function resolveKind(self, data)
   return const.BAG_KIND.BACKPACK
 end
 
+-- IsNewItem decides Recent Items membership: an item is recent while it has a timer. The
+-- client's new-item flag only starts the timer (seedNewItemTimer) and drives the glow; the
+-- client clears it on hover and when Blizzard's own bag frames close, at moments unrelated
+-- to the timer. Timers end only when the bag closes (ExpireRecentItems), so nothing leaves
+-- Recent Items while the bag is open.
 function items:IsNewItem(data)
   if not data or data.isItemEmpty then return false end
-  if _G.C_NewItems and _G.C_NewItems.IsNewItem then
-    if _G.C_NewItems.IsNewItem(data.bagid, data.slotid) then
-      return true
-    end
-  end
   local guid = data.itemInfo and data.itemInfo.itemGUID
-  if guid then
-    local kind = resolveKind(self, data)
-    local timerTable = self._newItemTimers and self._newItemTimers[kind]
-    if timerTable and timerTable[guid] then
-      local diff = time() - timerTable[guid]
-      local limit = database:GetNewItemTime() or 30
-      return diff < limit
+  local timerTable = self._newItemTimers and self._newItemTimers[resolveKind(self, data)]
+  return guid ~= nil and timerTable ~= nil and timerTable[guid] ~= nil
+end
+
+-- ExpireRecentItems ends the Recent Items timer of every item of this kind that is at least
+-- the configured duration old, and returns true when any did. It runs only when the bag
+-- closes. Each expired item's client new-item flag is cleared as well: the harvest starts a
+-- timer for any item still flagged, which would make it recent again.
+---@param kind BagKind
+---@return boolean
+function items:ExpireRecentItems(kind)
+  local timers = self._newItemTimers and self._newItemTimers[kind]
+  if not timers then return false end
+  local limit = database:GetNewItemTime() or 30
+  local now = time()
+  local expired = {}
+  local anyExpired = false
+  for guid, startedAt in pairs(timers) do
+    if now - startedAt >= limit then
+      expired[guid] = true
+      anyExpired = true
     end
   end
-  return false
+  if not anyExpired then return false end
+
+  for guid in pairs(expired) do
+    timers[guid] = nil
+  end
+  local slotInfo = self.slotInfo and self.slotInfo[kind]
+  if slotInfo and slotInfo.itemsBySlotKey and _G.C_NewItems and _G.C_NewItems.RemoveNewItem then
+    for _, item in pairs(slotInfo.itemsBySlotKey) do
+      if not item.isItemEmpty and item.itemInfo and expired[item.itemInfo.itemGUID] then
+        _G.C_NewItems.RemoveNewItem(item.bagid, item.slotid)
+      end
+    end
+  end
+  return true
 end
 
 function items:ClearNewItem(ctx, slotkey)
@@ -1948,7 +1975,7 @@ function items:ClearNewItems(kind)
 end
 
 function items:MarkItemAsNew(ctx, data)
-  if data and data.itemInfo and data.itemInfo.itemGUID then
+  if data and data.itemInfo and data.itemInfo.itemGUID and data.itemInfo.itemGUID ~= "" then
     local kind = resolveKind(self, data)
     local timerTable = self._newItemTimers and self._newItemTimers[kind]
     if timerTable and timerTable[data.itemInfo.itemGUID] == nil then
@@ -2154,8 +2181,9 @@ end
 ---@param kind BagKind
 ---@param data ItemData
 local function seedNewItemTimer(self, kind, data)
-  if data.itemInfo.isNewItem and self._newItemTimers and self._newItemTimers[kind] and self._newItemTimers[kind][data.itemInfo.itemGUID] == nil then
-    self._newItemTimers[kind][data.itemInfo.itemGUID] = time()
+  local guid = data.itemInfo.itemGUID
+  if data.itemInfo.isNewItem and guid and guid ~= "" and self._newItemTimers and self._newItemTimers[kind] and self._newItemTimers[kind][guid] == nil then
+    self._newItemTimers[kind][guid] = time()
   end
 end
 

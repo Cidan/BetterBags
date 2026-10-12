@@ -121,6 +121,31 @@ function bagFrame.bagProto:Hide(ctx)
 	self.behavior:OnHide(ctx)
 end
 
+-- OnClosed runs when the bag has closed. Recent Items expire only here, so nothing leaves
+-- that section while the bag is open, and the one refresh that applies the expiry and
+-- collapses held gaps runs while the bag is hidden.
+---@param ctx Context
+function bagFrame.bagProto:OnClosed(ctx)
+	-- OnHide also fires when only a parent hid (Alt+Z hides UIParent); the bag is still open.
+	if self.frame:IsShown() then
+		return
+	end
+	local expired = items:ExpireRecentItems(self.kind)
+	if expired or self.drawOnClose then
+		self.drawOnClose = false
+		self:Refresh(ctx)
+	end
+end
+
+-- WatchForClose runs OnClosed from the frame's own OnHide, which every way of closing the
+-- bag fires: the toggle, the close button, ESC (UISpecialFrames hides the frame directly,
+-- skipping behavior:OnHide) and the end of the fade-out.
+function bagFrame.bagProto:WatchForClose()
+	addon.HookScript(self.frame, "OnHide", function(ctx)
+		self:OnClosed(ctx)
+	end)
+end
+
 ---@param ctx Context
 function bagFrame.bagProto:Toggle(ctx)
 	if self.frame:IsShown() then
@@ -931,6 +956,7 @@ function bagFrame:Create(ctx, kind)
 
 	-- Register behavior-specific events
 	b.behavior:RegisterEvents()
+	b:WatchForClose()
 
 	events:RegisterMessage("search/SetInFrame", function(ectx, shown)
 		themes:SetSearchState(ectx, b.frame, shown)

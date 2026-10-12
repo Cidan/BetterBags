@@ -1291,6 +1291,112 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_false(items:IsNewItem(bankData))
     end)
   end)
+
+  -- Recent Items membership is the timer alone, and timers only end when the bag closes
+  -- (items:ExpireRecentItems), so nothing leaves Recent Items while the bag is open.
+  describe("Recent Items timer rule", function()
+    local savedTime, savedIsNewItem, savedRemoveNewItem
+    local now, flagged, removed
+
+    local function newItem(bagid, slotid, guid, kind)
+      return {
+        kind = kind or const.BAG_KIND.BACKPACK,
+        bagid = bagid,
+        slotid = slotid,
+        slotkey = bagid .. "_" .. slotid,
+        isItemEmpty = false,
+        itemInfo = { itemGUID = guid },
+      }
+    end
+
+    before_each(function()
+      items:Init()
+      savedTime = _G.time
+      savedIsNewItem, savedRemoveNewItem = _G.C_NewItems.IsNewItem, _G.C_NewItems.RemoveNewItem
+      now, flagged, removed = 1000, {}, {}
+      _G.time = function() return now end
+      _G.C_NewItems.IsNewItem = function(bagid, slotid) return flagged[bagid .. "_" .. slotid] == true end
+      _G.C_NewItems.RemoveNewItem = function(bagid, slotid)
+        flagged[bagid .. "_" .. slotid] = nil
+        table.insert(removed, bagid .. "_" .. slotid)
+      end
+    end)
+
+    after_each(function()
+      _G.time = savedTime
+      _G.C_NewItems.IsNewItem, _G.C_NewItems.RemoveNewItem = savedIsNewItem, savedRemoveNewItem
+    end)
+
+    it("keeps an item recent after its duration has passed, until the bag closes", function()
+      local ctx = addon:GetModule("Context"):New("TestTimerOnly")
+      local item = newItem(0, 1, "GUID_A")
+      items:MarkItemAsNew(ctx, item)
+
+      now = now + 31 -- the configured duration is 30 seconds
+      assert.is_true(items:IsNewItem(item))
+    end)
+
+    it("does not make an item recent from the client's new-item flag alone", function()
+      flagged["0_1"] = true
+      assert.is_false(items:IsNewItem(newItem(0, 1, "GUID_A")))
+    end)
+
+    it("never makes an item without a GUID recent", function()
+      local ctx = addon:GetModule("Context"):New("TestEmptyGUID")
+      local item = newItem(0, 1, "")
+      items:MarkItemAsNew(ctx, item)
+
+      assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK][""])
+      assert.is_false(items:IsNewItem(item))
+    end)
+
+    it("ExpireRecentItems ends only the timers at least the configured duration old", function()
+      local ctx = addon:GetModule("Context"):New("TestExpire")
+      local old = newItem(0, 1, "GUID_OLD")
+      items:MarkItemAsNew(ctx, old)
+      now = now + 10
+      local young = newItem(0, 2, "GUID_YOUNG")
+      items:MarkItemAsNew(ctx, young)
+
+      now = now + 20 -- old is exactly 30 seconds old, young is 20
+      assert.is_true(items:ExpireRecentItems(const.BAG_KIND.BACKPACK))
+      assert.is_false(items:IsNewItem(old))
+      assert.is_true(items:IsNewItem(young))
+
+      assert.is_false(items:ExpireRecentItems(const.BAG_KIND.BACKPACK), "nothing else has expired")
+    end)
+
+    it("ExpireRecentItems clears the client flag of an expired item, so the harvest does not restart its timer", function()
+      local ctx = addon:GetModule("Context"):New("TestExpireFlag")
+      local old = newItem(0, 1, "GUID_OLD")
+      local young = newItem(0, 2, "GUID_YOUNG")
+      flagged["0_1"], flagged["0_2"] = true, true
+      items:MarkItemAsNew(ctx, old)
+      now = now + 10
+      items:MarkItemAsNew(ctx, young)
+      items.slotInfo[const.BAG_KIND.BACKPACK] = { itemsBySlotKey = { ["0_1"] = old, ["0_2"] = young } }
+
+      now = now + 25
+      items:ExpireRecentItems(const.BAG_KIND.BACKPACK)
+
+      assert.same({ "0_1" }, removed)
+      assert.is_nil(flagged["0_1"])
+      assert.is_true(flagged["0_2"], "an item that has not expired keeps its flag")
+    end)
+
+    it("ExpireRecentItems only touches its own bag kind", function()
+      local ctx = addon:GetModule("Context"):New("TestExpireScope")
+      local backpackItem = newItem(0, 1, "GUID_BP")
+      local bankItem = newItem(6, 1, "GUID_BANK", const.BAG_KIND.BANK)
+      items:MarkItemAsNew(ctx, backpackItem)
+      items:MarkItemAsNew(ctx, bankItem)
+
+      now = now + 60
+      assert.is_true(items:ExpireRecentItems(const.BAG_KIND.BACKPACK))
+      assert.is_false(items:IsNewItem(backpackItem))
+      assert.is_true(items:IsNewItem(bankItem))
+    end)
+  end)
 end)
 
 -- ─── Item stat hashing (Catalyst) ─────────────────────────────────────────────

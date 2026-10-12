@@ -387,4 +387,37 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     onShow(frame)
     assert.are.equal(1, refreshes)
   end)
+
+  -- The on-close refresh belongs to the bag frame's OnHide (bagProto:OnClosed), which every
+  -- close path fires; refreshing here as well would sweep twice on a normal close.
+  it("does not refresh from its own OnHide, with or without fading", function()
+    local loadBase = assert(loadfile("bags/backpack.lua"))
+    loadBase("BetterBags")
+    local backpack = addon:GetModule("BackpackBehavior")
+    local database = addon:GetModule("Database")
+
+    local savedForceHide = addon.ForceHideBlizzardBags
+    addon.ForceHideBlizzardBags = function() end
+    local savedFading = database.GetEnableBagFading
+
+    for _, fading in ipairs({ false, true }) do
+      database.GetEnableBagFading = function() return fading end
+      local refreshes = 0
+      local fadeOutGroup = { Play = function(self) self.callback() end }
+      local mockBag = {
+        frame = CreateFrame("Frame", "BetterBagsBackpackCloseTest"),
+        fadeOutGroup = fadeOutGroup,
+        drawOnClose = true,
+        Refresh = function() refreshes = refreshes + 1 end,
+      }
+      mockBag.frame:Show()
+
+      backpack:Create(mockBag):OnHide(addon:GetModule("Context"):New("TestClose"))
+
+      assert.are.equal(0, refreshes, "fading = " .. tostring(fading))
+    end
+
+    database.GetEnableBagFading = savedFading
+    addon.ForceHideBlizzardBags = savedForceHide
+  end)
 end)

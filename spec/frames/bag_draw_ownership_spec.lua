@@ -996,4 +996,106 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.is_nil(calls["0_1"])
     end)
   end)
+
+  -- Recent Items only expire when the bag closes, and the refresh that applies the expiry
+  -- (and collapses held gaps) runs while the bag is hidden, so nothing moves while it is open.
+  describe("closing the bag (OnClosed)", function()
+    local expireCalls, expireResult
+
+    local function closedBag(kind)
+      local bag = newBag()
+      bag.kind = kind or const.BAG_KIND.BACKPACK
+      bag.refreshes = 0
+      bag.behavior.OnRefresh = function() bag.refreshes = bag.refreshes + 1 end
+      bag.frame:Hide()
+      return bag
+    end
+
+    before_each(function()
+      expireCalls, expireResult = {}, false
+      override(addon:GetModule("Items"), "ExpireRecentItems", function(_, kind)
+        table.insert(expireCalls, kind)
+        return expireResult
+      end)
+    end)
+
+    it("expires its kind's Recent Items and refreshes once while hidden when something expired", function()
+      expireResult = true
+      local bag = closedBag()
+
+      bag:OnClosed(context:New("close"))
+
+      assert.same({ const.BAG_KIND.BACKPACK }, expireCalls)
+      assert.are.equal(1, bag.refreshes)
+    end)
+
+    it("refreshes once for held gaps when nothing expired, and clears the flag", function()
+      local bag = closedBag()
+      bag.drawOnClose = true
+
+      bag:OnClosed(context:New("close"))
+
+      assert.are.equal(1, bag.refreshes)
+      assert.is_false(bag.drawOnClose)
+    end)
+
+    it("refreshes once when something expired and gaps are held", function()
+      expireResult = true
+      local bag = closedBag()
+      bag.drawOnClose = true
+
+      bag:OnClosed(context:New("close"))
+
+      assert.are.equal(1, bag.refreshes)
+    end)
+
+    it("does not refresh when nothing expired and no gaps are held", function()
+      local bag = closedBag()
+
+      bag:OnClosed(context:New("close"))
+
+      assert.same({ const.BAG_KIND.BACKPACK }, expireCalls)
+      assert.are.equal(0, bag.refreshes)
+    end)
+
+    it("does nothing while the frame is still shown (hidden only with its parent, e.g. Alt+Z)", function()
+      expireResult = true
+      local bag = closedBag()
+      bag.drawOnClose = true
+      bag.frame:Show()
+
+      bag:OnClosed(context:New("close"))
+
+      assert.same({}, expireCalls)
+      assert.are.equal(0, bag.refreshes)
+      assert.is_true(bag.drawOnClose)
+    end)
+
+    it("expires the bank's Recent Items when the bank closes", function()
+      local bag = closedBag(const.BAG_KIND.BANK)
+
+      bag:OnClosed(context:New("close"))
+
+      assert.same({ const.BAG_KIND.BANK }, expireCalls)
+    end)
+
+    it("WatchForClose runs OnClosed from the frame's own OnHide, which every close path fires (ESC included)", function()
+      expireResult = true
+      local bag = closedBag()
+
+      bag:WatchForClose()
+      local onHide = bag.frame:GetScript("OnHide")
+      assert.is_function(onHide)
+      onHide(bag.frame)
+
+      assert.are.equal(1, bag.refreshes)
+    end)
+
+    it("bagFrame:Create watches every bag for close", function()
+      local source = assert(io.open("frames/bag.lua", "r")):read("*a")
+      local create = source:match("function bagFrame:Create%(ctx, kind%)(.-)\nend\n")
+      assert.is_not_nil(create)
+      assert.is_not_nil(create:find("b:WatchForClose()", 1, true))
+    end)
+  end)
 end)

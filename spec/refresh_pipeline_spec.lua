@@ -1727,6 +1727,85 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  describe("Recent Items (timer only, expires when the bag closes)", function()
+    local now
+
+    local function setupRecent()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(database, "GetNewItemTime", function() return 300 end)
+      saveGlobal(_G, "time")
+      now = 1000000
+      _G.time = function() return now end
+    end
+
+    it("keeps an item in Recent Items while the bag is open, after it was hovered and its duration passed", function()
+      setupRecent()
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 201, guid = "g201", count = 1 },
+      }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ wipe = true })
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+
+      now = now + 600
+      -- Hovering the item: Blizzard's ContainerFrameItemButtonMixin:OnUpdate drops its flag.
+      _G.C_NewItems.RemoveNewItem(0, 1)
+      -- Selling another item: its bag is swept.
+      mockContainer[0][2] = {}
+      slotInfo = refreshBackpack({ bags = { [0] = true } })
+
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("moves an expired item out of Recent Items on the sweep after the bag closes, for good", function()
+      setupRecent()
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+      }
+      -- Never hovered: the client keeps flagging the item new.
+      newSlots["0_1"] = true
+      refreshBackpack({ wipe = true })
+
+      now = now + 300
+      assert.is_true(items:ExpireRecentItems(const.BAG_KIND.BACKPACK))
+      local slotInfo = refreshBackpack()
+      local item = slotInfo.itemsBySlotKey["0_1"]
+      assert.are_not.equal("Recent Items", item.itemInfo.category)
+      assert.is_false(item.itemInfo.isNewItem, "the expired item stops glowing")
+
+      now = now + 10
+      slotInfo = refreshBackpack()
+      assert.are_not.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("never starts a timer for a flagged item the client reports no GUID for", function()
+      setupRecent()
+      mockContainer[0] = {
+        { itemID = 101, count = 1 },
+      }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ wipe = true })
+
+      assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK][""])
+      assert.are_not.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("keeps an item that has not expired when the bag closes", function()
+      setupRecent()
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+      }
+      newSlots["0_1"] = true
+      refreshBackpack({ wipe = true })
+
+      now = now + 100
+      assert.is_false(items:ExpireRecentItems(const.BAG_KIND.BACKPACK))
+      local slotInfo = refreshBackpack()
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+  end)
+
   describe("persistent item gaps", function()
     local function gapCount(sortedItems)
       local n = 0
