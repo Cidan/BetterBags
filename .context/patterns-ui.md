@@ -126,6 +126,9 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 
 **Related Files**: `frames/bag.lua` (`Draw`), `views/gridview.lua`, `views/bagview.lua`, `frames/item.lua` (`Wipe`/`ClearItem`).
 
+## Close-Time Work Belongs in the Frame's Own OnHide
+`behavior:OnHide` only runs when BetterBags closes the bag itself (toggle, close button). ESC hides the frame directly (`UISpecialFrames`), so anything that must happen whenever the bag closes (expiring Recent Items, the refresh that collapses held gaps) hooks the frame's `OnHide` instead (`bagProto:WatchForClose`). `OnHide` also fires when only a parent hid (Alt+Z hides `UIParent`) while the frame's own shown flag stays true, so check `frame:IsShown()` before treating it as a close. Contract: `.claude/rules/recent-items.md` §3.
+
 ## Classic Item Buttons: Blizzard's SetItemButtonQuality Always Hides The Border
 
 **Problem**: Rarity borders were missing on Classic/Era/MoP while retail was fine, even though both call the global `SetItemButtonQuality`.
