@@ -639,5 +639,51 @@ describe("Events", function()
       local node = stopAndFind({ "[bucket] TEST_PERF_GROUP" })
       assert.are.equal(5, node.self)
     end)
+
+    describe("with a call trace that records arguments", function()
+      local function restartTracing()
+        perf:Stop()
+        perf:Start({ modules = {}, prototypes = {}, includeRoot = false, calibrate = false, trace = true, traceArgs = true })
+      end
+
+      local function onlyCall()
+        local trace = perfFormat:OpenTrace(perf:Stop())
+        return trace, trace:Get(1)
+      end
+
+      it("records an event's payload, without the event name", function()
+        restartTracing()
+        events:RegisterEvent("TEST_PERF_PAYLOAD", function() end)
+        events._eventMap["TEST_PERF_PAYLOAD"].fn("TEST_PERF_PAYLOAD", 7, "x")
+        local trace, call = onlyCall()
+        assert.are.equal("[event] TEST_PERF_PAYLOAD", call.name)
+        assert.are.equal('7, "x"', trace:Text(call.args))
+      end)
+
+      it("records a message's payload", function()
+        restartTracing()
+        events:RegisterMessage("test/PerfPayload", function() end)
+        events:SendMessage(context:New("TestPerf"), "test/PerfPayload", 5)
+        local trace, call = onlyCall()
+        assert.are.equal("[msg] test/PerfPayload", call.name)
+        assert.are.equal("ctx TestPerf {}, 5", trace:Text(call.args))
+      end)
+
+      it("records the events a bucket flush delivers", function()
+        events:BucketEvent("TEST_PERF_BUCKET_ARGS", function() end)
+        restartTracing()
+        local fn = events._eventMap["TEST_PERF_BUCKET_ARGS"].fn
+        fn("TEST_PERF_BUCKET_ARGS", 42)
+        timerCallbacks[#timerCallbacks]()
+        local trace = perfFormat:OpenTrace(perf:Stop())
+        local flush
+        for i = 1, trace:Count() do
+          if trace:Get(i).name == "[bucket] TEST_PERF_BUCKET_ARGS" then flush = trace:Get(i) end
+        end
+        assert.is_not_nil(flush)
+        local text = trace:Text(flush.args)
+        assert.is_truthy(text:find('eventName="TEST_PERF_BUCKET_ARGS"', 1, true), text)
+      end)
+    end)
   end)
 end)

@@ -34,6 +34,9 @@ perfSessions.DEFAULTS = {
   trackAllocations = false,
   pauseGC = false,
   calibrate = true,
+  traceCalls = true,
+  traceArgs = true,
+  traceMaxCalls = 1000000,
 }
 
 perfSessions.LIMITS = {
@@ -43,6 +46,7 @@ perfSessions.LIMITS = {
   spikeThresholdMs = { 1, 1000 },
   timelineFrames = { 0, 216000 },
   maxDurationSec = { 0, 3600 },
+  traceMaxCalls = { 10000, 2000000 },
 }
 
 -- The pipeline preset covers everything between a bag event and the finished draw:
@@ -207,7 +211,12 @@ function perfSessions:BuildOptions()
     trackAllocations = s.trackAllocations,
     pauseGC = s.pauseGC,
     calibrate = s.calibrate,
+    trace = s.traceCalls,
+    traceArgs = s.traceArgs,
+    traceMaxCalls = s.traceMaxCalls,
     frameMetric = blizzardFrameMetric(),
+    -- The engine asks once, on a frame, when the maximum duration passed or the call
+    -- trace filled; the session records which.
     onAutoStop = function()
       self:StopCapture()
     end,
@@ -311,6 +320,35 @@ end
 function perfSessions:DeleteAllSessions()
   wipe(self.db.sessions)
   send('perf/SessionsChanged')
+end
+
+-- RemoveTrace deletes a session's call trace, the bulk of its size in SavedVariables, and
+-- keeps everything else. Returns false when the session has no trace.
+---@param id number
+---@return boolean
+function perfSessions:RemoveTrace(id)
+  local session = self:GetSession(id)
+  if not session or not session.trace then return false end
+  session.trace = nil
+  session.stats = session.stats or {}
+  session.stats.traceRemoved = true
+  send('perf/SessionsChanged')
+  return true
+end
+
+function perfSessions:RemoveAllTraces()
+  local removed = false
+  for _, session in ipairs(self.db.sessions) do
+    if session.trace then
+      session.trace = nil
+      session.stats = session.stats or {}
+      session.stats.traceRemoved = true
+      removed = true
+    end
+  end
+  if removed then
+    send('perf/SessionsChanged')
+  end
 end
 
 ---@param armed boolean

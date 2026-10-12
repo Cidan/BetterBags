@@ -213,6 +213,85 @@ describe("PerfSessions", function()
       perf:_OnFrame()
       assert.is_false(perf:IsActive())
       assert.are.equal(1, #perfSessions:GetSessions())
+      assert.are.equal("maxDuration", perfSessions:GetSessions()[1].stats.stopReason)
+    end)
+
+    it("records a call trace with arguments by default", function()
+      local settings = perfSessions:GetSettings()
+      assert.is_true(settings.traceCalls)
+      assert.is_true(settings.traceArgs)
+      assert.are.equal(1000000, settings.traceMaxCalls)
+      perfSessions:StartCapture("manual")
+      local token = perf:Enter("[event] TEST", 1)
+      perf:Exit(token)
+      local session = perfSessions:StopCapture()
+      local trace = addon:GetModule("PerfFormat"):OpenTrace(session)
+      local event
+      for i = 1, trace:Count() do
+        if trace:Get(i).name == "[event] TEST" then event = trace:Get(i) end
+      end
+      assert.is_not_nil(event)
+      assert.are.equal("1", trace:Text(event.args))
+    end)
+
+    it("builds trace options from the settings", function()
+      perfSessions:SetSetting("traceCalls", false)
+      perfSessions:SetSetting("traceArgs", false)
+      perfSessions:SetSetting("traceMaxCalls", 5)
+      local options = perfSessions:BuildOptions()
+      assert.is_false(options.trace)
+      assert.is_false(options.traceArgs)
+      assert.are.equal(10000, options.traceMaxCalls)
+      perfSessions:SetSetting("traceMaxCalls", 99999999)
+      assert.are.equal(2000000, perfSessions:GetSettings().traceMaxCalls)
+    end)
+
+    it("stops on its own once the trace is full, and saves why", function()
+      perfSessions:SetSetting("traceMaxCalls", 10000)
+      perfSessions:StartCapture("manual")
+      for _ = 1, 10001 do
+        local token = perf:Enter("[event] TEST")
+        perf:Exit(token)
+      end
+      assert.is_true(perfSessions:IsCapturing())
+      perf:_OnFrame()
+      assert.is_false(perfSessions:IsCapturing())
+      local session = perfSessions:GetSessions()[1]
+      assert.are.equal("traceFull", session.stats.stopReason)
+      assert.are.equal(10000, session.stats.traceCalls)
+      assert.is_true(session.trace.full)
+    end)
+  end)
+
+  describe("trimming traces", function()
+    local function captureOne()
+      perfSessions:StartCapture("manual")
+      local token = perf:Enter("[event] TEST")
+      perf:Exit(token)
+      return perfSessions:StopCapture()
+    end
+
+    it("removes one session's trace and keeps the rest of the session", function()
+      local first = captureOne()
+      local second = captureOne()
+      sent = {}
+      assert.is_true(perfSessions:RemoveTrace(first.id))
+      assert.is_nil(perfSessions:GetSession(first.id).trace)
+      assert.is_true(perfSessions:GetSession(first.id).stats.traceRemoved)
+      assert.is_table(perfSessions:GetSession(first.id).nodes)
+      assert.is_table(perfSessions:GetSession(second.id).trace)
+      assert.are.same({ "perf/SessionsChanged" }, sentEvents())
+      assert.is_false(perfSessions:RemoveTrace(first.id), "nothing left to remove")
+    end)
+
+    it("removes every session's trace", function()
+      captureOne()
+      captureOne()
+      perfSessions:RemoveAllTraces()
+      for _, session in ipairs(perfSessions:GetSessions()) do
+        assert.is_nil(session.trace)
+        assert.is_true(session.stats.traceRemoved)
+      end
     end)
 
     it("records Blizzard's addon profiler metrics when the client has them", function()

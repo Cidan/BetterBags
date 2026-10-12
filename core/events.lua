@@ -51,7 +51,7 @@ function events:RegisterMessage(event, callback)
     local label = '[msg] ' .. event
     self._messageMap[event] = {
       fn = function(...)
-        local token = perf.active and perf:Enter(label)
+        local token = perf.active and perf:Enter(label, select(2, ...))
         for _, cb in pairs(self._messageMap[event].cbs) do
           cb.cb(select(2, ...))
         end
@@ -80,7 +80,7 @@ function events:addEventCallback(event, entry)
     local label = '[event] ' .. event
     self._eventMap[event] = {
       fn = function(...)
-        local token = perf.active and perf:Enter(label)
+        local token = perf.active and perf:Enter(label, select(2, ...))
         for _, cb in pairs(self._eventMap[event].cbs) do
           if cb.raw then
             cb.cb(...)
@@ -161,8 +161,8 @@ function events:BucketEvent(event, callback, filter)
 
   local label = '[bucket] ' .. event
   local flush = function()
-    local token = perf.active and perf:Enter(label)
     local collected = self._eventArguments[event]
+    local token = perf.active and perf:Enter(label, collected)
     self._eventArguments[event] = {}
     self._bucketTimers[event] = nil
     for _, cb in pairs(self._bucketCallbacks[event]) do
@@ -202,7 +202,7 @@ function events:GroupBucketEvent(groupEvents, groupMessages, callback)
   for _, name in ipairs(groupMessages) do names[#names + 1] = name end
   local label = '[bucket] ' .. table.concat(names, ', ')
   local bucketFunction = function()
-    local token = perf.active and perf:Enter(label)
+    local token = perf.active and perf:Enter(label, self._eventArguments[joinedEvents])
     for _, cb in pairs(self._bucketCallbacks[joinedEvents]) do
       -- Note: use a wrapper function because xpcall in Lua 5.1 (the WoW
       -- runtime) does NOT pass extra args to f, unlike Lua 5.4. Calling
