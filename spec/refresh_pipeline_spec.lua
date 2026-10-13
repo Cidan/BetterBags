@@ -953,9 +953,17 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end)
       refreshBackpack()
       askedKeys()
+      runTimers()
+      sent = {}
       current = link:gsub("505:0", "505:6")
       refreshBackpack()
       assert.are.same({ "0_1", "0_2" }, askedKeys())
+      -- The sweep that read the new gear resolved every verdict with it, so it asks for no
+      -- second backpack refresh.
+      runTimers()
+      for _, event in ipairs(sent) do
+        assert.are_not.equal("bags/RefreshBackpack", event)
+      end
     end)
 
     -- Built-in usability (C_PlayerInfo.CanUseItem) also changes with reputation and spells
@@ -1173,13 +1181,11 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       runTimers()
       sent = {}
       refreshBackpack()
-      askedKeys()
+      assert.are.same({ "0_1", "0_2" }, askedKeys(), "the sweep that reads the gear warm asks again itself")
       runTimers()
-      local refreshed = false
       for _, event in ipairs(sent) do
-        if event == "bags/RefreshBackpack" then refreshed = true end
+        assert.are_not.equal("bags/RefreshBackpack", event, "so it needs no second backpack refresh")
       end
-      assert.is_true(refreshed, "warming gear refreshes the bags")
       refreshBackpack()
       assert.are.same({}, askedKeys(), "kept once the gear is warm")
     end)
@@ -2589,6 +2595,487 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local slotInfo = refreshBackpack()
       assert.equal("", slotInfo.itemsBySlotKey["0_1"].itemInfo.tooltipText)
       assert.is_nil(search:Search("zephyrium")["0_1"])
+    end)
+  end)
+
+  -- One bag read on login (.claude/rules/refresh-scheduler.md §7 and §8). The queue merges
+  -- requests that are still waiting, and holds every sweep at startup until the client has
+  -- delivered the bags and their item data.
+  describe("one bag read on login", function()
+    local advance, timers, sweeps, harvests
+
+    -- The hand-cranked clock of the scheduler tests, keeping timers with a real delay for
+    -- the test to fire.
+    local function installClock()
+      async.Yield = function() coroutine.yield() end
+      timers = {}
+      saveGlobal(_G.C_Timer, "After")
+      _G.C_Timer.After = function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end
+      return function()
+        local due, later = {}, {}
+        for _, t in ipairs(timers) do
+          if t.delay == 0 then due[#due + 1] = t.fn else later[#later + 1] = t end
+        end
+        timers = later
+        for _, fn in ipairs(due) do fn() end
+        return #due
+      end
+    end
+
+    local function drain()
+      for _ = 1, 100 do
+        if advance() == 0 then return end
+      end
+      error("the refresh queue never went idle")
+    end
+
+    local function fireDelayed(delay)
+      for i, t in ipairs(timers) do
+        if t.delay == delay then
+          table.remove(timers, i)
+          t.fn()
+          return true
+        end
+      end
+      return false
+    end
+
+    local function resetEvents()
+      if events._eventHandler then
+        events._eventHandler:UnregisterAllEvents()
+        events._eventHandler:UnregisterAllMessages()
+      end
+      events:Init()
+    end
+
+    before_each(function()
+      resetEvents()
+      advance = installClock()
+      sweeps, harvests = {}, 0
+      local run = items.RunRefresh
+      override(items, "RunRefresh", function(self, ectx, kind)
+        table.insert(sweeps, {
+          kind = kind,
+          wipe = ectx:Get("wipe") == true,
+          bags = ectx:Get("targetedBags"),
+          reset = ectx:Get("resetLayout") == true,
+        })
+        return run(self, ectx, kind)
+      end)
+      local harvest = items.Phase2_Harvest
+      override(items, "Phase2_Harvest", function(...)
+        harvests = harvests + 1
+        return harvest(...)
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+      mockContainer[1] = { { itemID = 201, guid = "g201", count = 1 } }
+    end)
+
+    after_each(function()
+      resetEvents()
+    end)
+
+    describe("merging waiting requests", function()
+      it("lets a waiting wipe absorb the requests that arrive after it", function()
+        refresh:RequestUpdate({ backpack = true }) -- runs now and parks at its yield
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_false(sweeps[1].wipe)
+        assert.is_true(sweeps[2].wipe)
+      end)
+
+      it("merges waiting plain requests and reads every bag any of them named", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ backpack = true, bags = { [1] = true } })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.same({ [0] = true, [1] = true }, sweeps[2].bags)
+      end)
+
+      it("reads every bag when one of the merged requests named none", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ backpack = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_nil(sweeps[2].bags)
+      end)
+
+      it("does not change the bag set a caller passed in", function()
+        local named = { [0] = true }
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = named })
+        refresh:RequestUpdate({ backpack = true, bags = { [1] = true } })
+        drain()
+        assert.same({ [0] = true }, named)
+      end)
+
+      it("keeps a wipe that arrives behind a waiting plain request separate", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_false(sweeps[2].wipe)
+        assert.is_true(sweeps[3].wipe)
+      end)
+
+      it("never merges a sort", function()
+        local sorted = 0
+        saveGlobal(_G.C_Container, "SortBags")
+        _G.C_Container.SortBags = function() sorted = sorted + 1 end
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ sort = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ sort = true })
+        drain()
+        assert.equal(2, sorted)
+        assert.equal(3, #sweeps)
+      end)
+
+      it("never merges the sort fallback", function()
+        items:MarkSortSweepPending(const.BAG_KIND.BACKPACK)
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ backpack = true, onlyIfSortPending = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [1] = true } })
+        drain()
+        -- The first request shows the sort, so the fallback finds nothing to do and the
+        -- last request is not folded into it.
+        assert.equal(2, #sweeps)
+        assert.same({ [1] = true }, sweeps[2].bags)
+      end)
+
+      it("merges a layout reset only into a waiting wipe", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, resetLayout = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_false(sweeps[2].reset)
+        assert.is_true(sweeps[3].reset)
+
+        sweeps = {}
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true, resetLayout = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_true(sweeps[2].wipe)
+      end)
+
+      -- Merging must leave the bags exactly as running the requests one at a time would,
+      -- including which items count as newly acquired.
+      for _, order in ipairs({ { "plain", "wipe" }, { "wipe", "plain" } }) do
+        it("ends in the same state as running the requests one at a time (" .. order[1] .. ", then " .. order[2] .. ")", function()
+          override(database, "GetMarkRecentItems", function() return true end)
+          override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+          local function request(name)
+            if name == "wipe" then return { wipe = true, backpack = true, bank = true } end
+            return { backpack = true, bags = { [0] = true } }
+          end
+          local function scenario(together)
+            search:Init()
+            items:Init()
+            items._firstLoad[const.BAG_KIND.BACKPACK] = false
+            items._firstLoad[const.BAG_KIND.BANK] = false
+            refresh:Init()
+            mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+            refresh:RequestUpdate({ backpack = true })
+            drain()
+            -- This unit harvests now; the loot lands while it is parked.
+            refresh:RequestUpdate({ backpack = true })
+            mockContainer[0][2] = { itemID = 202, guid = "g202", count = 1 }
+            if together then
+              refresh:RequestUpdate(request(order[1]))
+              refresh:RequestUpdate(request(order[2]))
+              drain()
+            else
+              drain()
+              refresh:RequestUpdate(request(order[1]))
+              drain()
+              refresh:RequestUpdate(request(order[2]))
+              drain()
+            end
+            local out = {}
+            for slotkey, item in pairs(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+              out[slotkey] = (item.isItemEmpty and "empty" or item.itemInfo.itemGUID) .. "|" .. tostring(item.itemInfo and item.itemInfo.category)
+            end
+            for guid in pairs(items._newItemTimers[const.BAG_KIND.BACKPACK]) do
+              out["timer " .. guid] = true
+            end
+            return out
+          end
+          assert.same(scenario(false), scenario(true))
+        end)
+      end
+    end)
+
+    describe("the startup read", function()
+      local primed, held, released, loaderCallback
+
+      local function gateEvent(name, ...)
+        local frame = refresh._startupFrame
+        if frame and frame._events[name] then
+          frame:GetScript("OnEvent")(frame, name, ...)
+        end
+      end
+
+      -- A WoW event reaches every listener: the events module's handlers and the startup
+      -- frame.
+      local function fire(name, ...)
+        local entry = events._eventMap[name]
+        if entry then entry.fn(name, ...) end
+        gateEvent(name, ...)
+      end
+
+      local function frame()
+        local f = refresh._startupFrame
+        local onUpdate = f and f:GetScript("OnUpdate")
+        if onUpdate then onUpdate(f, 0.016) end
+        advance()
+      end
+
+      before_each(function()
+        primed, held, released, loaderCallback = nil, 0, 0, nil
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "TellMeWhenABagIsUpdated", function(_, cb) loaderCallback = cb end)
+        override(loader, "Hold", function() held = held + 1 end)
+        override(loader, "Release", function() released = released + 1 end)
+        override(loader, "PrimeAll", function(_, cb) primed = cb end)
+      end)
+
+      it("holds every sweep until the client has delivered the bags", function()
+        refresh:OnEnable()
+        assert.equal(1, held)
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true })
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        fire("BAG_CONTAINER_UPDATE")
+        drain()
+        assert.equal(0, harvests)
+      end)
+
+      it("reads every bag once, after the first quiet frame past the loading screen and the item data", function()
+        refresh:OnEnable()
+        events:SendMessage(context:New("Themes_OnEnable"), "bags/FullRefreshAll")
+        fire("BAG_CONTAINER_UPDATE")
+        loaderCallback({ [0] = true, [1] = true })
+        refresh:RequestUpdate({ backpack = true })
+
+        fire("LOADING_SCREEN_DISABLED")
+        fire("BAG_UPDATE", 0)
+        frame() -- bags still changing this frame
+        assert.is_nil(primed)
+        frame() -- quiet
+        assert.is_function(primed)
+        assert.equal(0, harvests, "nothing is read while the item data loads")
+
+        primed()
+        drain()
+        assert.equal(1, harvests)
+        assert.equal(1, #sweeps)
+        assert.is_true(sweeps[1].wipe)
+        assert.equal(1, released)
+        assert.is_not_nil(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["1_1"])
+      end)
+
+      it("runs a sort asked for before the read after it", function()
+        local sorted = 0
+        saveGlobal(_G.C_Container, "SortBags")
+        _G.C_Container.SortBags = function() sorted = sorted + 1 end
+        refresh:OnEnable()
+        refresh:RequestUpdate({ sort = true })
+        refresh:RequestUpdate({ backpack = true })
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        assert.equal(0, sorted, "the read comes first")
+        drain()
+        assert.equal(1, sorted)
+        assert.equal(1, harvests)
+      end)
+
+      it("reads at the timeout when the item data is slow, and once more when it arrives", function()
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        assert.is_function(primed)
+        assert.is_true(fireDelayed(refresh.STARTUP_PRIME_TIMEOUT))
+        drain()
+        assert.equal(1, harvests)
+        assert.is_true(sweeps[1].wipe)
+
+        primed()
+        drain()
+        assert.equal(2, harvests)
+        assert.is_false(sweeps[2].wipe)
+        assert.is_nil(sweeps[2].bags)
+      end)
+
+      it("does not read again when the timeout fires after the item data arrived", function()
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        fireDelayed(refresh.STARTUP_PRIME_TIMEOUT)
+        drain()
+        assert.equal(1, harvests)
+      end)
+
+      it("stops waiting for a quiet frame after the settle timeout", function()
+        local now = 100
+        saveGlobal(_G, "GetTime")
+        _G.GetTime = function() return now end
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        for _ = 1, 5 do
+          fire("BAG_UPDATE", 0)
+          frame()
+        end
+        assert.is_nil(primed)
+        now = 100 + refresh.STARTUP_SETTLE_TIMEOUT
+        fire("BAG_UPDATE", 0)
+        frame()
+        assert.is_function(primed)
+      end)
+
+      it("reads at once when the backpack opens before the read, and again for the item data", function()
+        addon.Bags = { Backpack = { frame = CreateFrame("Frame") } }
+        refresh:OnEnable()
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        local bagFrame = addon.Bags.Backpack.frame
+        bagFrame:GetScript("OnShow")(bagFrame)
+        drain()
+        assert.equal(1, harvests)
+        assert.is_true(sweeps[1].wipe)
+        -- The item data it did not wait for is still loaded, and read when it arrives.
+        assert.is_function(primed)
+        primed()
+        drain()
+        assert.equal(2, harvests)
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        drain()
+        assert.equal(2, harvests, "the startup wait is over")
+      end)
+
+      it("reads once when the backpack opens and the item data is already loaded", function()
+        addon.Bags = { Backpack = { frame = CreateFrame("Frame") } }
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "PrimeAll", function(_, cb) cb() end)
+        refresh:OnEnable()
+        local bagFrame = addon.Bags.Backpack.frame
+        bagFrame:GetScript("OnShow")(bagFrame)
+        drain()
+        assert.equal(1, harvests)
+      end)
+
+      it("starts on PLAYER_ENTERING_WORLD on a client without LOADING_SCREEN_DISABLED", function()
+        saveGlobal(_G, "C_EventUtils")
+        _G.C_EventUtils = { IsEventValid = function(name) return name ~= "LOADING_SCREEN_DISABLED" end }
+        refresh:OnEnable()
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        frame()
+        assert.is_function(primed)
+      end)
+
+      it("starts anyway when the loading screen never reports its end", function()
+        refresh:OnEnable()
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        frame()
+        assert.is_nil(primed)
+        assert.is_true(fireDelayed(refresh.STARTUP_LOADING_TIMEOUT))
+        frame()
+        assert.is_function(primed)
+      end)
+
+      it("lets go of every startup event once the read has run", function()
+        refresh:OnEnable()
+        local startupFrame = refresh._startupFrame
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        assert.is_nil(startupFrame:GetScript("OnUpdate"))
+        assert.same({}, startupFrame._events)
+      end)
+
+      -- The captured login (BetterBags 12.1.0, a full relaunch with a cold cache): the first
+      -- sweep ran inside OnEnable and saw a backpack of 20 empty slots; the bags attached
+      -- (BAG_CONTAINER_UPDATE x14) and the items arrived over the next five seconds, and 25
+      -- refresh units followed, 17 of them full wipes.
+      it("reads the bags once on a login like the captured one, and marks nothing as new", function()
+        override(database, "GetMarkRecentItems", function() return true end)
+        override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+        local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+        override(_G, "GetInventoryItemLink", function(_, slot)
+          if slot == 5 then return link end
+          return nil
+        end)
+        override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+          local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+          local mixin = {}
+          function mixin:GetItemLocation() return loc end
+          function mixin:IsItemEmpty() return slot ~= 5 end
+          function mixin:GetItemLink() return link end
+          function mixin:GetItemID() return 505 end
+          function mixin:GetInventoryType() return 5 end
+          return mixin
+        end)
+        items._firstLoad[const.BAG_KIND.BACKPACK] = true
+        items._firstLoad[const.BAG_KIND.BANK] = true
+
+        -- PLAYER_LOGIN: the backpack has slots but nothing in them, the other bags are absent.
+        local empty = {}
+        for i = 1, 20 do empty[i] = {} end
+        mockContainer = { [0] = empty }
+        items:OnEnable()
+        refresh:OnEnable()
+        events:SendMessage(context:New("Themes_OnEnable"), "bags/FullRefreshAll")
+
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("SKILL_LINES_CHANGED")
+        fire("LEARNED_SPELL_IN_SKILL_LINE", 12345, 1, false)
+        advance()
+        -- The bags attach and the items arrive, in bursts.
+        mockContainer[1] = { { itemID = 201, guid = "g201", count = 1 }, {} }
+        for _ = 1, 14 do fire("BAG_CONTAINER_UPDATE") end
+        for slot = 1, 10 do
+          mockContainer[0][slot] = { itemID = 100 + slot, guid = "g" .. (100 + slot), count = 1 }
+          fire("BAG_UPDATE", 0)
+        end
+        fire("BAG_UPDATE_DELAYED")
+        loaderCallback({ [0] = true, [1] = true })
+        -- The config sliders' delayed refreshes.
+        events:SendMessage(context:New("OnValueChanged"), "bags/FullRefreshAll")
+        events:SendMessage(context:New("OnValueChanged"), "bags/FullRefreshAll")
+
+        fire("LOADING_SCREEN_DISABLED")
+        fire("BAG_UPDATE", 1)
+        frame()
+        frame()
+        primed()
+        drain()
+        for _ = 1, 3 do frame() end
+        drain()
+
+        assert.equal(1, harvests, "one read of the bags")
+        local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+        assert.is_not_nil(slotInfo.itemsBySlotKey["0_10"])
+        assert.is_not_nil(slotInfo.itemsBySlotKey["1_1"])
+        for slotkey, item in pairs(slotInfo.itemsBySlotKey) do
+          if not item.isItemEmpty then
+            assert.are_not.equal("Recent Items", item.itemInfo.category, slotkey .. " was in the bags at login")
+          end
+        end
+      end)
     end)
   end)
 end)

@@ -54,26 +54,61 @@ describe("ItemLoader", function()
     assert.are.equal(2, mixin2._slotID)
   end)
 
-  it("should prime and update every managed bag via LoadAllBagsAndUpdate (login path)", function()
+  -- At startup the refresh scheduler holds the loader until the client has delivered the
+  -- bags (refresh-scheduler.md §8): bag batches are only marked dirty, then dropped when the
+  -- startup read covers them.
+  it("holds bag batches while held and drops them on release", function()
     local loader = addon:GetModule("ItemLoader")
     loader:Init()
     loader:OnEnable()
+    local calls = 0
+    loader:TellMeWhenABagIsUpdated(function() calls = calls + 1 end)
 
-    local seen = nil
-    loader:TellMeWhenABagIsUpdated(function(updatedBags)
-      seen = updatedBags
-    end)
+    loader:Hold()
+    local eventMap = addon:GetModule("Events")._eventMap
+    eventMap["BAG_UPDATE"].fn("BAG_UPDATE", 0)
+    eventMap["BAG_UPDATE_DELAYED"].fn("BAG_UPDATE_DELAYED")
+    assert.equal(0, calls, "nothing is loaded while held")
 
-    -- LoadAllBagsAndUpdate must drive the exact same path a BAG_UPDATE takes (mark bags
-    -- dirty, then run ProcessPendingBagUpdates through the ContinuableContainer), but for
-    -- every managed bag at once and without needing a BAG_UPDATE event to have fired.
-    loader:LoadAllBagsAndUpdate()
+    loader:Release()
+    eventMap["BAG_UPDATE_DELAYED"].fn("BAG_UPDATE_DELAYED")
+    assert.equal(0, calls, "the held batch was dropped")
 
-    assert.is_not_nil(seen)
-    assert.is_true(seen[0])
-    assert.is_true(seen[1])
-    assert.is_true(seen[5])
-    assert.is_true(seen[10])
+    eventMap["BAG_UPDATE"].fn("BAG_UPDATE", 1)
+    eventMap["BAG_UPDATE_DELAYED"].fn("BAG_UPDATE_DELAYED")
+    assert.equal(1, calls, "batches after the release load as before")
+  end)
+
+  it("primes every managed bag and every equipped slot in one load, then calls back once", function()
+    local loader = addon:GetModule("ItemLoader")
+    loader:Init()
+    loader:OnEnable()
+    local bagCallbacks = 0
+    loader:TellMeWhenABagIsUpdated(function() bagCallbacks = bagCallbacks + 1 end)
+
+    local containers, added = 0, {}
+    local originalCreate = _G.ContinuableContainer.Create
+    _G.ContinuableContainer.Create = function()
+      containers = containers + 1
+      return {
+        AddContinuable = function(_, mixin) table.insert(added, mixin) end,
+        ContinueOnLoad = function(_, cb) cb() end,
+      }
+    end
+    local primed = 0
+    loader:PrimeAll(function() primed = primed + 1 end)
+    _G.ContinuableContainer.Create = originalCreate
+
+    assert.equal(1, containers)
+    assert.equal(1, primed)
+    assert.equal(0, bagCallbacks, "priming does not fan out to the bag-update callbacks")
+    local bagSlots, equipped = 0, 0
+    for _, mixin in ipairs(added) do
+      if mixin._bagID then bagSlots = bagSlots + 1 else equipped = equipped + 1 end
+    end
+    -- Bags 0, 1, 5 and 10 have two slots each in this spec.
+    assert.equal(8, bagSlots)
+    assert.equal(INVSLOT_LAST_EQUIPPED - INVSLOT_FIRST_EQUIPPED + 1, equipped)
   end)
 
   it("should support registering callbacks for bag updates", function()

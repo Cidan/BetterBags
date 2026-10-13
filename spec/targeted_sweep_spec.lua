@@ -113,9 +113,11 @@ loader.TellMeWhenABagIsUpdated = function(_, cb)
   registeredCallback = cb
 end
 loader.GetItemMixinFromSlotKey = function() return nil end
--- refresh:OnEnable primes the login sweep through the loader; these tests drive the
--- callback manually, so a no-op is sufficient here.
-loader.LoadAllBagsAndUpdate = function() end
+-- refresh:OnEnable holds the loader for the startup read; these tests drive the callback
+-- manually, so no-ops are sufficient here.
+loader.Hold = function() end
+loader.Release = function() end
+loader.PrimeAll = function() end
 
 ResetModuleStub("Items", "data/items.lua")
 LoadBetterBagsModule("data/items.lua")

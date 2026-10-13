@@ -34,18 +34,19 @@ request-unit is ever in flight, and a deliberate **idle hand-off frame** separat
 consecutive units so a unit's commit+draw can never share a frame with the next unit's
 harvest.
 
-- **`RequestUpdate(request)` is enqueue-only.** It appends the request to `self._queue` and,
-  if the pump is not already running, flips `self._running = true` and calls `_Step()` once.
-  It performs **no** side effects itself.
+- **`RequestUpdate(request)` is enqueue-only.** It merges the request into the last request
+  still waiting in `self._queue` when that one covers it (§7), else appends it, and, if the
+  pump is not already running and not held for the startup read (§8), flips
+  `self._running = true` and calls `_Step()` once. It performs **no** side effects itself.
 - **`_Step()` is one frame of the pump.** In priority order it: (a) advances the active
   unit's coroutine one step (`_Resume`) if one exists; else (b) burns the idle hand-off
   frame if `_idlePending`; else (c) dequeues and starts the next unit; else (d) stops the
-  clock (`self._running = false`) when the queue is empty. After (a), (b), and (c) it calls
-  `_Arm()` to schedule the next step.
+  clock (`self._running = false`) when the queue is empty or held. After (a), (b), and (c)
+  it calls `_Arm()` to schedule the next step.
 - **`_Arm()` is the ONLY clock that steps the pump.** A single `C_Timer.After(0)` chain,
   never one-per-refresh, so step ordering is fully deterministic. The sort fallback timer
-  (§6) is the one other timer in the refresh path; it never steps the pump, it only calls
-  `RequestUpdate`.
+  (§6) and the startup timers (§8) are the other timers in the refresh path; they never step
+  the pump, they only request or release work.
 - **`_Resume()`** resumes the active coroutine; when it finishes it sets `_idlePending = true`
   (arming the hand-off frame). A unit that errors is dropped and reported via
   `geterrorhandler()` — one bad sweep must not wedge the queue.
@@ -79,9 +80,11 @@ handed to the next frame by `_Arm`.
   used elsewhere.
 - **Idle frame between every unit.** Always, unconditionally. 3-frame bursts are acceptable;
   predictability beats shaving a frame.
-- **No coalescing.** Requests are processed literally, in order, one per unit. Data
-  stability is the priority; do not add "collapse the queue" optimizations here without a
-  separate, well-tested change.
+- **Merging, not coalescing by time.** A request merges only into a request that is still
+  waiting and already covers it (§7); nothing is delayed or debounced to make merges happen.
+  This replaced the original "no coalescing" rule after a captured login showed 25 queued
+  units, 17 of them identical full wipes, run back to back for 1.6 s. The merge rule is
+  tested to leave the bags exactly as running the requests one at a time would.
 - **Whole request = one unit.** A request carrying both `bank` and `backpack` runs both
   sweeps sequentially inside the same unit coroutine (bank first, then backpack), in the
   order wipe → sort calls → bank → backpack.
@@ -95,8 +98,13 @@ handed to the next frame by `_Arm`.
   callers and unit tests. `RefreshBackpack`/`RefreshBank` still wrap `ProcessRefresh`.
 - `refresh:RequestUpdate(request)` — enqueue only; never call `items:Refresh*` directly from
   production code, always go through `RequestUpdate` so serialization holds.
-- Scheduler state (`refresh._queue`, `_active`, `_idlePending`, `_running`) is initialized in
-  `refresh:Init()` and reset there; tests re-init per case.
+- Scheduler state (`refresh._queue`, `_active`, `_idlePending`, `_running`, `_held`,
+  `_startup`) is initialized in `refresh:Init()` and reset there; tests re-init per case.
+  `refresh:OnEnable()` holds the queue for the startup read (§8); tests that call it and then
+  expect sweeps open the hold through the startup events, or assert on the requests made.
+- `RefreshRequest.merged` (how many requests a merged one carries) and
+  `RefreshRequest.startup` (why the startup read ran: `primed`, `timeout` or `bagShown`) are
+  only informational; they show up in profiler call traces as `Refresh._RunUnit`'s argument.
 - `RefreshRequest.onlyIfSortPending` — set only by the sort fallback (§6). The unit drops each
   requested kind whose sort sweep is no longer pending (`items:IsSortSweepPending`) before
   doing anything else. This is not coalescing: the request literally means "sweep this kind
@@ -171,3 +179,100 @@ gating the old in-unit bank sweep had.
 Trade-off: a sort that moves nothing now shows its cleared Recent Items 0.5 s after the
 click instead of at once. A sort whose moves arrive later than 0.5 s (high latency) gets the
 fallback sweep and then the moves' sweep, which is the old cost.
+
+## 7. Merging Waiting Requests
+
+`RequestUpdate` merges an incoming request into the last request in the queue (always a
+waiting one: the running unit's request is removed from the queue when it starts) when
+`canMerge(waiting, incoming)` holds, and `mergeInto` folds it in:
+
+- **Why it is safe.** A waiting request reads the client when it runs, which is after the
+  incoming request was made, so it sees everything the incoming request is about. Run
+  separately, the incoming request would read the same state again and find nothing new.
+- **A wipe covers anything.** A waiting wipe absorbs any later non-sort request.
+- **A plain request never absorbs a wipe.** A wipe behind a waiting plain request stays
+  separate: the plain request's check for newly acquired items (`MarkAddedItemsRecent`,
+  which wipes skip) must run against the state before the wipe. Upgrading it to a wipe would
+  drop an item looted in between from Recent Items.
+- **Layout resets.** `resetLayout` applies to every kind a request names, so a reset merges
+  only into a waiting wipe (which resets every layout); otherwise requests merge only when
+  both reset or neither does. Merging a bank-open reset into a waiting backpack request
+  would have collapsed the backpack's gaps.
+- **Kinds and bags.** The merged request sweeps both requests' kinds and reads the bags
+  either named; if either named none, it reads every bag. The callers' `bags` tables are
+  copied, never changed (the loader passes its own set).
+- **Sorts and the sort fallback never merge**, in either direction: they are ordered
+  against the sweeps around them (§6).
+- `merged` counts the requests a merged request carries, for profiler traces.
+
+Coverage: `spec/refresh_pipeline_spec.lua` ("one bag read on login" → "merging waiting
+requests"): a waiting wipe absorbs later requests; plain requests merge and read the union of
+their bags; an untargeted request makes the merge untargeted; caller tables are untouched; a
+wipe behind a plain request stays separate; sorts and the fallback never merge; layout
+resets; and two equivalence tests (plain then wipe, wipe then plain, with a loot landing
+while they wait) that compare the committed bags and Recent Items timers with running the
+same requests one at a time.
+
+## 8. The Startup Read: One Read of the Bags at Login
+
+At PLAYER_LOGIN, when `refresh:OnEnable()` runs, the client has not delivered the bags. A
+captured cold login (game build 12.1.0) showed it: the login sweep inside `OnEnable`
+read a backpack of 20 empty slots and no other bag; the bags then attached
+(`BAG_CONTAINER_UPDATE` x14) and their contents arrived (`BAG_UPDATE` bursts) over the next
+five seconds, through the loading screen and one frame past it. Every step requested
+another sweep, and the queue ran 25 units (17 full wipes, 728 ms of sweeps) after the
+loading screen. The empty first commit is also a Recent Items hazard: a plain sweep that
+lands between it and the next full read treats every item delivered in between as newly
+looted.
+
+`refresh:HoldForStartup()` (called at the end of `OnEnable`) holds the queue
+(`self._held`) and the loader (`itemLoader:Hold()`, so bag batches only mark bags dirty)
+and listens on its own frame (`self._startupFrame`) to `PLAYER_ENTERING_WORLD`,
+`LOADING_SCREEN_DISABLED`, `BAG_UPDATE` and `BAG_CONTAINER_UPDATE`. Requests made meanwhile
+wait (and merge). Then:
+
+1. **Loading** until `LOADING_SCREEN_DISABLED` (verified in the API documentation of every
+   client branch: live, classic, classic_era, classic_anniversary, classic_beta,
+   classic_titan). On a client without it, `PLAYER_ENTERING_WORLD` starts the next phase;
+   with it, `PLAYER_ENTERING_WORLD` arms `STARTUP_LOADING_TIMEOUT` (10 s) as a safety net.
+2. **Settling**: the frame's `OnUpdate` waits for the first frame in which no bag event
+   fired (frames do not run during the loading screen). After `STARTUP_SETTLE_TIMEOUT`
+   (2 s) of bag events it stops waiting. In the capture, the client still sent a burst of
+   92 `BAG_UPDATE`s one frame after the loading screen; the next frame was quiet.
+3. **Priming**: `itemLoader:PrimeAll(callback)` loads the item data of every managed bag
+   slot and every equipped slot in one `ContinuableContainer`; when it completes, the read
+   runs. After `STARTUP_PRIME_TIMEOUT` (2 s) the read runs anyway, and when the data
+   arrives later, one plain read of both kinds follows (the items read cold are read warm).
+4. **The read** (`_StartupRead`): the startup frame unregisters everything, the loader is
+   released (its marked bags are dropped: the read covers them), and one request
+   `{ wipe, backpack, bank, startup = reason }` replaces every waiting non-sort request;
+   sorts asked for meanwhile run after it.
+
+Opening the backpack before the read reads at once (`_OnStartupBagShown`, hooked on the
+backpack frame's `OnShow`): priming starts, and if the item data is already loaded the read
+is the primed one; otherwise it reads now and reads again when the data arrives.
+
+What else this needed:
+- **The first gear read no longer queues a second read.** `HarvestEquipment` reported every
+  equipped slot as changed on its first read (no previous record) and called
+  `InvalidateUpgrades(true)`, which queued a backpack refresh. The backpack sweep that reads
+  the gear resolves every backpack verdict after the harvest, so it now only invalidates and
+  refreshes the open bank (caches.md §2, §3).
+- `ItemLoader:LoadAllBagsAndUpdate` (the old login sweep) was removed.
+
+Simulated against the capture (a one-off replay of the 27 recorded requests through the
+scheduler's cadence, which reproduced 731 ms against 728 ms measured): this read plus merging
+leaves one full read carrying 22 requests, then the three refreshes later steps address
+(two tooltip re-scans, and the upgrade refresh that the gear change above removes).
+
+Coverage: `spec/refresh_pipeline_spec.lua` ("one bag read on login" → "the startup read"):
+nothing is read before the read; it waits for a quiet frame after the loading screen and for
+the item data; a sort asked for meanwhile runs after it; the prime timeout reads and the late
+data reads again; no second read when the timeout fires after the data; the settle timeout;
+the backpack opening early (with and without loaded data); the `PLAYER_ENTERING_WORLD`
+fallback and the loading timeout; every startup event released after the read; and a replay
+of the captured login (empty backpack at `OnEnable`, the Themes refresh, skill-line
+invalidations, 14 `BAG_CONTAINER_UPDATE`s, item bursts, an item-load batch, the config
+sliders' refreshes, then the loading screen ending) that asserts exactly one read and that no
+item lands in Recent Items. `spec/loader_spec.lua` covers the loader's hold and
+`PrimeAll`; `spec/refresh_spec.lua` that `OnEnable` reads nothing.

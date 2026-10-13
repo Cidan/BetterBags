@@ -2074,7 +2074,10 @@ end
 -- not named it, and its previous read was not cold; otherwise it is read again with
 -- GetEquipmentInfo. rereadAll (a wipe) and level or scaling events read every slot again.
 -- When a slot's item, item level or equip location changed, or the gear stopped reading
--- cold, every kept upgrade verdict is invalidated and the bags refresh.
+-- cold, every kept upgrade verdict is invalidated. The gear is read by backpack sweeps, which
+-- resolve every backpack verdict after the harvest, so only the open bank is refreshed: a
+-- backpack refresh would re-read the bags to find what this sweep already shows (it made the
+-- first gear read of every login cost a second read of the bags).
 ---@param rereadAll? boolean
 ---@return table<number, ItemData>
 function items:HarvestEquipment(rereadAll)
@@ -2138,7 +2141,10 @@ function items:HarvestEquipment(rereadAll)
   self._equipmentIncomplete = incomplete
   self.equipmentCache = equipmentData
   if changed then
-    self:InvalidateUpgrades(true)
+    self:InvalidateUpgrades(false)
+    if addon.atBank then
+      self:RequestUpgradeRefresh(false, true)
+    end
   end
   return equipmentData
 end

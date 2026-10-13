@@ -109,6 +109,7 @@ globals = {
 	"GetScreenHeight",
 	"GetScreenWidth",
 	"GetTalentTabInfo",
+	"GetTime",
 	"GW2_ADDON",
 	"HideUIPanel",
 	"ICON_SELECTION_CLICK",

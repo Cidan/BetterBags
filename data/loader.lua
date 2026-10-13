@@ -14,6 +14,21 @@ function loader:Init()
   self.itemMixinsByBag = {}
   self.bagUpdateCallbacks = {}
   self.pendingBags = {}
+  self.held = false
+end
+
+-- Hold keeps bag batches from loading while the client delivers the bags at startup: a
+-- BAG_UPDATE only marks its bag dirty. The refresh scheduler holds the loader until its
+-- startup read (.claude/rules/refresh-scheduler.md §8).
+function loader:Hold()
+  self.held = true
+end
+
+-- Release ends the hold and drops the bags marked meanwhile: the startup read that releases
+-- the loader reads every bag.
+function loader:Release()
+  self.held = false
+  self.pendingBags = {}
 end
 
 function loader:OnEnable()
@@ -45,17 +60,23 @@ function loader:ScanAllBagsAndUpdateItemMixins()
   self:ForEachManagedBag(function(bagID) self:ScanBag(bagID) end)
 end
 
--- LoadAllBagsAndUpdate primes the item cache for every managed bag through the exact same
--- ContinuableContainer path a BAG_UPDATE takes: it marks every bag dirty (what the
--- BAG_UPDATE handler does per-bag) and then runs ProcessPendingBagUpdates (what
--- BAG_UPDATE_DELAYED calls). It exists for the initial login sweep, where no BAG_UPDATE may
--- have fired yet, so the first harvest never reads a cold cache -- an uncached
--- C_Item.GetItemInfo returns nil type/subtype and mislabels items into "Everything" until a
--- /reload. ProcessPendingBagUpdates no-ops on an empty dirty set, which is why the login
--- sweep must seed the bags here rather than just calling it.
-function loader:LoadAllBagsAndUpdate()
-  self:ForEachManagedBag(function(bagID) self.pendingBags[bagID] = true end)
-  self:ProcessPendingBagUpdates()
+-- PrimeAll loads the item data of every managed bag slot and every equipped slot in one
+-- ContinuableContainer and calls callback once, when all of it has loaded. The startup read
+-- waits for it, so the one read of the bags at login sees warm item data and warm gear. It
+-- does not go through the bag-update callbacks.
+---@param callback fun()
+function loader:PrimeAll(callback)
+  local mixins = {}
+  self:ForEachManagedBag(function(bagID)
+    self:ScanBag(bagID)
+    for _, mixin in ipairs(self.itemMixinsByBag[bagID] or {}) do
+      mixins[#mixins + 1] = mixin
+    end
+  end)
+  for slot = INVSLOT_FIRST_EQUIPPED, INVSLOT_LAST_EQUIPPED do
+    mixins[#mixins + 1] = Item:CreateFromEquipmentSlot(slot)
+  end
+  self:LoadTheseItemsAndCallback(mixins, callback)
 end
 
 function loader:ScanBag(bagID)
@@ -85,7 +106,7 @@ function loader:TellMeWhenABagIsUpdated(callback)
 end
 
 function loader:ProcessPendingBagUpdates()
-  if next(self.pendingBags) == nil then return end
+  if self.held or next(self.pendingBags) == nil then return end
 
   local updatedBags = self.pendingBags
   self.pendingBags = {}

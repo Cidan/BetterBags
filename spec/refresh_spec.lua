@@ -46,14 +46,11 @@ local registeredCallback = nil
 loader.TellMeWhenABagIsUpdated = function(_, cb)
   registeredCallback = cb
 end
--- Mirror the real loader: LoadAllBagsAndUpdate primes the cache and then fans the login
--- sweep out through the registered bag-update callback, exactly as a BAG_UPDATE would for
--- every managed bag (backpack 0/1, bank 6/7 per the const stubs above).
-loader.LoadAllBagsAndUpdate = function()
-  if registeredCallback then
-    registeredCallback({ [0] = true, [1] = true, [6] = true, [7] = true })
-  end
-end
+-- The startup read holds the loader and primes every item in one load (refresh-scheduler.md
+-- §8); spec/refresh_pipeline_spec.lua drives that path, these tests only need no-ops.
+loader.Hold = function() end
+loader.Release = function() end
+loader.PrimeAll = function() end
 
 ResetModuleStub("Refresh", "data/refresh.lua")
 LoadBetterBagsModule("data/refresh.lua")
@@ -141,35 +138,24 @@ describe("Refresh Module", function()
     assert.is_false(calledArgs[2].bank)
   end)
 
-  it("routes the initial login sweep through the ItemLoader cache-priming path", function()
-    spy.on(loader, "LoadAllBagsAndUpdate")
+  -- At PLAYER_LOGIN the client has not delivered the bags yet (a captured login read 20
+  -- empty slots here), so OnEnable reads nothing: it holds the queue and the loader until
+  -- the startup read (refresh-scheduler.md §8).
+  it("reads nothing in OnEnable and holds every request for the startup read", function()
+    spy.on(loader, "Hold")
+    spy.on(items, "RunRefresh")
     refresh:OnEnable()
-    -- The login sweep must prime the item cache via the loader (the same
-    -- ContinuableContainer path BAG_UPDATE uses) instead of harvesting a possibly-cold
-    -- cache directly, which would mislabel items into "Everything" until a /reload.
-    assert.spy(loader.LoadAllBagsAndUpdate).was.called(1)
-  end)
-
-  it("should trigger a full update on OnEnable once the item cache is primed", function()
-    spy.on(refresh, "RequestUpdate")
-    refresh:OnEnable()
-    -- LoadAllBagsAndUpdate primes the cache and, via the registered loader callback, fans
-    -- the login sweep out to RequestUpdate for the changed kinds (backpack + bank).
-    local found = false
-    for _, c in ipairs(refresh.RequestUpdate.calls) do
-      local req = c.vals[2]
-      if req and req.backpack and req.bank and req.bags then
-        found = true
-      end
-    end
-    assert.is_true(found)
+    assert.spy(loader.Hold).was.called(1)
+    refresh:RequestUpdate({ backpack = true })
+    refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+    assert.spy(items.RunRefresh).was_not.called()
   end)
 
   it("should register bags/FullRefreshAll message and trigger full update", function()
     refresh:OnEnable()
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/FullRefreshAll")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { wipe = true, backpack = true, bank = true })
   end)
 
   it("should process item updates synchronously during combat", function()
@@ -246,7 +232,7 @@ describe("Refresh Module", function()
     local eventMap = events._eventMap
     assert.is_not_nil(eventMap["BAG_CONTAINER_UPDATE"])
     eventMap["BAG_CONTAINER_UPDATE"].fn("BAG_CONTAINER_UPDATE")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { wipe = true, backpack = true, bank = true })
   end)
 
   it("should trigger a full update on EQUIPMENT_SETS_CHANGED", function()
@@ -255,7 +241,7 @@ describe("Refresh Module", function()
     local eventMap = events._eventMap
     assert.is_not_nil(eventMap["EQUIPMENT_SETS_CHANGED"])
     eventMap["EQUIPMENT_SETS_CHANGED"].fn("EQUIPMENT_SETS_CHANGED")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { wipe = true, backpack = true, bank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { wipe = true, backpack = true, bank = true })
   end)
 
   it("should trigger a bank update on PLAYERBANKSLOTS_CHANGED for non-retail", function()
@@ -265,7 +251,7 @@ describe("Refresh Module", function()
     local eventMap = events._eventMap
     assert.is_not_nil(eventMap["PLAYERBANKSLOTS_CHANGED"])
     eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { bank = true, bags = { [-1] = true } })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, bags = { [-1] = true } })
     addon.isRetail = true -- reset
   end)
 
@@ -281,8 +267,8 @@ describe("Refresh Module", function()
     local eventMap = events._eventMap
     assert.is_not_nil(eventMap["PLAYERBANKSLOTS_CHANGED"])
     eventMap["PLAYERBANKSLOTS_CHANGED"].fn("PLAYERBANKSLOTS_CHANGED")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { bank = true })
-    assert.spy(refresh.RequestUpdate).was_not.called_with(refresh, { bank = true, bags = { [-1] = true } })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true })
+    assert.spy(refresh.RequestUpdate).was_not.called_with(match._, { bank = true, bags = { [-1] = true } })
     addon.isForever = nil -- reset
   end)
 
@@ -300,7 +286,7 @@ describe("Refresh Module", function()
     addon.atBank = false
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/SortBackpack")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { sort = true })
   end)
 
   it("should also sort the bank and warbank when sorting the backpack with the bank open (retail)", function()
@@ -310,7 +296,7 @@ describe("Refresh Module", function()
     addon.hasWarbank = true
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/SortBackpack")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true, sortWarbank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { sort = true, sortBank = true, sortWarbank = true })
   end)
 
   it("should sort the bank but NOT the warbank on a client without one (Forever)", function()
@@ -320,7 +306,7 @@ describe("Refresh Module", function()
     addon.hasWarbank = false
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/SortBackpack")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { sort = true, sortBank = true })
     addon.hasWarbank = true -- reset
   end)
 
@@ -331,7 +317,7 @@ describe("Refresh Module", function()
     addon.hasWarbank = false
     spy.on(refresh, "RequestUpdate")
     events:SendMessage("bags/SortBackpack")
-    assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sort = true, sortBank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { sort = true, sortBank = true })
     addon.isRetail = true -- reset
     addon.hasWarbank = true -- reset
   end)
@@ -512,10 +498,10 @@ describe("Refresh Module", function()
       spy.on(refresh, "RequestUpdate")
 
       events:SendMessage("bags/SortBank")
-      assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sortBank = true })
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { sortBank = true })
 
       events:SendMessage("bags/SortWarbank")
-      assert.spy(refresh.RequestUpdate).was.called_with(refresh, { sortWarbank = true })
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { sortWarbank = true })
     end)
   end)
 end)
