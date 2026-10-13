@@ -59,6 +59,14 @@ local function colorFor(name)
   return PALETTE[hashString(module) % #PALETTE + 1]
 end
 
+-- ColorFor is the color a function's bars get, shared with the trace timeline so a
+-- function looks the same in both.
+---@param name string
+---@return number[]
+function flameGraph:ColorFor(name)
+  return colorFor(name)
+end
+
 ---@class FlameGraphFrame
 ---@field frame Frame
 ---@field canvas Frame

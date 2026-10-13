@@ -111,6 +111,7 @@ frames\tabs.lua
 frames\anchor.lua
 frames\itembrowser.lua
 frames\flamegraph.lua
+frames\tracechart.lua
 frames\perfpane.lua
 frames\debug.lua
 

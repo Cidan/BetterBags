@@ -413,6 +413,31 @@ describe("Perf call trace", function()
       assert.are.equal("3", trace:Text(trace:Get(1).args))
     end)
 
+    it("scans for calls by function name or argument text, a budget of calls at a time", function()
+      function A:TFind(n) return n end
+      function B:TOther() end
+      local session = capture({ traceArgs = true, traceChunkSize = 4 }, function()
+        for i = 1, 20 do
+          A:TFind(i)
+          B:TOther()
+        end
+      end)
+      local trace = traceOf(session)
+      local found = {}
+      local nextIndex = trace:Scan("tother", 1, 15, found)
+      assert.are.equal(16, nextIndex)
+      assert.are.same({ 2, 4, 6, 8, 10, 12, 14 }, found)
+      while nextIndex do
+        nextIndex = trace:Scan("tother", nextIndex, 15, found)
+      end
+      assert.are.equal(20, #found)
+
+      local byArg = {}
+      trace:Scan("<perftracea>, 1", 1, 1000, byArg)
+      -- "1", "10".."19": every TFind call whose argument text starts with 1.
+      assert.are.same({ 1, 19, 21, 23, 25, 27, 29, 31, 33, 35, 37 }, byArg)
+    end)
+
     it("records no arguments when argument tracing is off", function()
       function A:TAdd(a, b) return a + b end
       local session = capture({ traceArgs = false }, function()

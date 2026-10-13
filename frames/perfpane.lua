@@ -30,19 +30,40 @@ local perfFormat = addon:GetModule('PerfFormat')
 ---@class FlameGraph: AceModule
 local flameGraph = addon:GetModule('FlameGraph')
 
+---@class TraceChart: AceModule
+local traceChart = addon:GetModule('TraceChart')
+
 -- PerfPane is the Performance tab of the /bbdb debug window: it starts and stops profiler
 -- captures, lists the sessions saved in BetterBagsPerfDB, and shows a session as a flame
--- graph, a function table, its worst frames, and a summary.
+-- graph, a function table, its worst frames, its call trace (as a list and on a timeline),
+-- and a summary.
 ---@class PerfPane: AceModule
 local perfPane = addon:NewModule('PerfPane')
 
-local VIEW_ORDER = { 'flame', 'functions', 'frames', 'summary' }
+local VIEW_ORDER = { 'flame', 'functions', 'frames', 'calls', 'timeline', 'summary' }
 local VIEW_LABELS = {
   flame = 'Flame Graph',
   functions = 'Functions',
   frames = 'Frames',
+  calls = 'Calls',
+  timeline = 'Timeline',
   summary = 'Summary',
 }
+local VIEW_WIDTHS = { flame = 74 }
+local VIEW_WIDTH = 64
+
+local CALL_COLUMNS = {
+  { key = 'Time', label = 'Started', width = 64, justify = 'RIGHT' },
+  { key = 'Frame', label = 'Frame', width = 44, justify = 'RIGHT' },
+  { key = 'Duration', label = 'Took', width = 64, justify = 'RIGHT' },
+  { key = 'Name', label = 'Function', width = 190, justify = 'LEFT' },
+  { key = 'Args', label = 'Arguments -> returned', width = 200, justify = 'LEFT' },
+}
+local CALL_PAGE_SIZE = 100
+-- Calls examined per frame while searching the trace.
+local FILTER_BUDGET = 50000
+local MAX_INDENT = 12
+local TRACE_STRIP_HEIGHT = 40
 
 local FUNCTION_COLUMNS = {
   { key = 'name', label = 'Function', width = 180, justify = 'LEFT' },
@@ -89,6 +110,18 @@ local function initRow(button, data)
   button:SetScript('OnClick', data.onClick)
 end
 
+---@param button Button
+---@param row table
+local function initCallRow(button, row)
+  button.Time:SetText(row.time)
+  button.Frame:SetText(row.frame)
+  button.Duration:SetText(row.duration)
+  button.Name:SetText(row.name)
+  button.Args:SetText(row.args)
+  button.Selected:SetShown(row.selected == true)
+  button:SetScript('OnClick', row.onClick)
+end
+
 ---@class PerfPaneFrame
 ---@field frame Frame
 ---@field status FontString
@@ -125,6 +158,29 @@ end
 ---@field sortDescending boolean
 ---@field newestSeen number
 ---@field currentView string
+---@field trace PerfTrace|nil The selected session's call trace.
+---@field callList ListFrame
+---@field callFilter EditBox
+---@field callPageLabel FontString
+---@field callFirst Button
+---@field callPrevious Button
+---@field callNext Button
+---@field callLast Button
+---@field callDetail FontString
+---@field showInTimeline Button
+---@field callPage number
+---@field selectedCall number|nil
+---@field filterState {query: string, matches: number[], next: number|nil, done: boolean}|nil
+---@field filterBudget number
+---@field timelineChart TraceChartFrame
+---@field traceStrip Frame
+---@field traceStripBars Texture[]
+---@field traceFrame number|nil
+---@field previousFrameButton Button
+---@field nextFrameButton Button
+---@field wholeCaptureButton Button
+---@field removeTraceButton Button
+---@field removeAllTracesButton Button
 local paneProto = {}
 
 ---@param parent Frame
@@ -144,6 +200,9 @@ function perfPane:Create(parent)
   pane.sortDescending = true
   pane.newestSeen = 0
   pane.sinceStatus = 0
+  pane.callPage = 1
+  pane.filterBudget = FILTER_BUDGET
+  pane.traceStripBars = {}
 
   pane:CreateControls()
   pane:CreateSessionList()
@@ -221,8 +280,33 @@ function paneProto:CreateSessionList()
 
   self.sessionList = list:Create(f)
   self.sessionList.frame:SetPoint('TOPLEFT', f, 'TOPLEFT', 4, -56)
-  self.sessionList.frame:SetPoint('BOTTOMRIGHT', f, 'BOTTOMLEFT', 214, 36)
+  self.sessionList.frame:SetPoint('BOTTOMRIGHT', f, 'BOTTOMLEFT', 214, 64)
   self.sessionList:SetupDataSource('BetterBagsPerfRow', initRow, function() end)
+
+  self.removeTraceButton = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate') --[[@as Button]]
+  self.removeTraceButton:SetSize(98, 22)
+  self.removeTraceButton:SetPoint('BOTTOMLEFT', f, 'BOTTOMLEFT', 10, 36)
+  self.removeTraceButton:SetText('Remove Trace')
+  self.removeTraceButton:SetScript('OnClick', function()
+    if self.selectedId then
+      perfSessions:RemoveTrace(self.selectedId)
+    end
+  end)
+
+  self.removeAllTracesButton = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate') --[[@as Button]]
+  self.removeAllTracesButton:SetSize(98, 22)
+  self.removeAllTracesButton:SetPoint('LEFT', self.removeTraceButton, 'RIGHT', 6, 0)
+  self.removeAllTracesButton:SetText('All Traces')
+  self.removeAllTracesButton:SetScript('OnClick', function()
+    local count = 0
+    for _, session in ipairs(perfSessions:GetSessions()) do
+      if session.trace then count = count + 1 end
+    end
+    if count == 0 then return end
+    question:YesNo('Remove All Traces', string.format('Remove the call trace from %s? The rest of each session is kept.', plural(count, 'saved session')), function()
+      perfSessions:RemoveAllTraces()
+    end, function() end)
+  end)
 
   self.deleteButton = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate') --[[@as Button]]
   self.deleteButton:SetSize(98, 22)
@@ -252,9 +336,9 @@ function paneProto:CreateViews()
   local previous
   for _, name in ipairs(VIEW_ORDER) do
     local button = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate') --[[@as Button]]
-    button:SetSize(90, 22)
+    button:SetSize(VIEW_WIDTHS[name] or VIEW_WIDTH, 22)
     if previous then
-      button:SetPoint('LEFT', previous, 'RIGHT', 4, 0)
+      button:SetPoint('LEFT', previous, 'RIGHT', 2, 0)
     else
       button:SetPoint('TOPLEFT', f, 'TOPLEFT', 224, -38)
     end
@@ -273,7 +357,7 @@ function paneProto:CreateViews()
 
   self.adjustCheck = CreateFrame('CheckButton', nil, f, 'UICheckButtonTemplate') --[[@as CheckButton]]
   self.adjustCheck:SetSize(24, 24)
-  self.adjustCheck:SetPoint('LEFT', previous, 'RIGHT', 10, 0)
+  self.adjustCheck:SetPoint('LEFT', previous, 'RIGHT', 8, 0)
   self.adjustCheck:SetScript('OnClick', function(button)
     self.adjust = button:GetChecked()
     self:ApplyMetric()
@@ -294,6 +378,8 @@ function paneProto:CreateViews()
   self:CreateFlameView(self.views.flame)
   self:CreateFunctionsView(self.views.functions)
   self:CreateFramesView(self.views.frames)
+  self:CreateCallsView(self.views.calls)
+  self:CreateTimelineView(self.views.timeline)
   self:CreateSummaryView(self.views.summary)
 end
 
@@ -495,6 +581,406 @@ function paneProto:CreateFramesView(view)
 end
 
 ---@param view Frame
+function paneProto:CreateCallsView(view)
+  local label = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  label:SetPoint('TOPLEFT', view, 'TOPLEFT', 0, -4)
+  label:SetText('Find')
+
+  self.callFilter = CreateFrame('EditBox', nil, view, 'InputBoxTemplate') --[[@as EditBox]]
+  self.callFilter:SetSize(150, 20)
+  self.callFilter:SetPoint('LEFT', label, 'RIGHT', 10, 0)
+  self.callFilter:SetAutoFocus(false)
+  self.callFilter:SetScript('OnEnterPressed', function(box)
+    box:ClearFocus()
+    self:StartFilter(box:GetText())
+  end)
+  self.callFilter:SetScript('OnEscapePressed', function(box)
+    box:ClearFocus()
+  end)
+  self.callFilter:SetScript('OnEnter', function(box)
+    GameTooltip:SetOwner(box, 'ANCHOR_TOP')
+    GameTooltip:SetText('Find calls', 1, 1, 1)
+    GameTooltip:AddLine('Press Enter to list only the calls whose function name, arguments or return values contain this text. Empty shows every call.', nil, nil, nil, true)
+    GameTooltip:Show()
+  end)
+  self.callFilter:SetScript('OnLeave', function()
+    GameTooltip:Hide()
+  end)
+
+  local function pageButton(text, anchor, onClick)
+    local button = CreateFrame('Button', nil, view, 'UIPanelButtonTemplate') --[[@as Button]]
+    button:SetSize(28, 20)
+    if anchor then
+      button:SetPoint('RIGHT', anchor, 'LEFT', -2, 0)
+    else
+      button:SetPoint('TOPRIGHT', view, 'TOPRIGHT', 0, 0)
+    end
+    button:SetText(text)
+    button:SetScript('OnClick', onClick)
+    return button
+  end
+  self.callLast = pageButton('>|', nil, function() self:ShowCallPage(math.huge) end)
+  self.callNext = pageButton('>', self.callLast, function() self:ShowCallPage(self.callPage + 1) end)
+  self.callPrevious = pageButton('<', self.callNext, function() self:ShowCallPage(self.callPage - 1) end)
+  self.callFirst = pageButton('|<', self.callPrevious, function() self:ShowCallPage(1) end)
+
+  self.callPageLabel = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  self.callPageLabel:SetPoint('LEFT', self.callFilter, 'RIGHT', 10, 0)
+  self.callPageLabel:SetPoint('RIGHT', self.callFirst, 'LEFT', -6, 0)
+  self.callPageLabel:SetJustifyH('RIGHT')
+  self.callPageLabel:SetWordWrap(false)
+
+  local previous
+  for _, column in ipairs(CALL_COLUMNS) do
+    local header = view:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
+    header:SetSize(column.width, 18)
+    if previous then
+      header:SetPoint('LEFT', previous, 'RIGHT', 4, 0)
+    else
+      header:SetPoint('TOPLEFT', view, 'TOPLEFT', 4, -24)
+    end
+    header:SetJustifyH(column.justify)
+    header:SetText(column.label)
+    previous = header
+  end
+
+  self.showInTimeline = CreateFrame('Button', nil, view, 'UIPanelButtonTemplate') --[[@as Button]]
+  self.showInTimeline:SetSize(120, 22)
+  self.showInTimeline:SetPoint('BOTTOMRIGHT', view, 'BOTTOMRIGHT', 0, 0)
+  self.showInTimeline:SetText('Show in Timeline')
+  self.showInTimeline:SetScript('OnClick', function()
+    if self.selectedCall then
+      self:ShowCallInTimeline(self.selectedCall)
+    end
+  end)
+
+  self.callDetail = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  self.callDetail:SetPoint('BOTTOMLEFT', view, 'BOTTOMLEFT', 4, 0)
+  self.callDetail:SetPoint('RIGHT', self.showInTimeline, 'LEFT', -8, 0)
+  self.callDetail:SetHeight(48)
+  self.callDetail:SetJustifyH('LEFT')
+  self.callDetail:SetJustifyV('TOP')
+  self.callDetail:SetWordWrap(true)
+
+  self.callList = list:Create(view)
+  self.callList.frame:SetPoint('TOPLEFT', view, 'TOPLEFT', 0, -42)
+  self.callList.frame:SetPoint('BOTTOMRIGHT', view, 'BOTTOMRIGHT', 0, 54)
+  self.callList:SetupDataSource('BetterBagsPerfCallRow', initCallRow, function() end)
+
+  view:SetScript('OnUpdate', function()
+    if self.filterState and not self.filterState.done then
+      self:StepFilter()
+    end
+  end)
+end
+
+---@param view Frame
+function paneProto:CreateTimelineView(view)
+  self.previousFrameButton = CreateFrame('Button', nil, view, 'UIPanelButtonTemplate') --[[@as Button]]
+  self.previousFrameButton:SetSize(80, 20)
+  self.previousFrameButton:SetPoint('TOPLEFT', view, 'TOPLEFT', 0, 0)
+  self.previousFrameButton:SetText('< Frame')
+  self.previousFrameButton:SetScript('OnClick', function()
+    self:SelectTraceFrame((self.traceFrame or 1) - 1)
+  end)
+
+  self.nextFrameButton = CreateFrame('Button', nil, view, 'UIPanelButtonTemplate') --[[@as Button]]
+  self.nextFrameButton:SetSize(80, 20)
+  self.nextFrameButton:SetPoint('LEFT', self.previousFrameButton, 'RIGHT', 4, 0)
+  self.nextFrameButton:SetText('Frame >')
+  self.nextFrameButton:SetScript('OnClick', function()
+    self:SelectTraceFrame((self.traceFrame or 0) + 1)
+  end)
+
+  self.wholeCaptureButton = CreateFrame('Button', nil, view, 'UIPanelButtonTemplate') --[[@as Button]]
+  self.wholeCaptureButton:SetSize(110, 20)
+  self.wholeCaptureButton:SetPoint('LEFT', self.nextFrameButton, 'RIGHT', 4, 0)
+  self.wholeCaptureButton:SetText('Whole Capture')
+  self.wholeCaptureButton:SetScript('OnClick', function()
+    if not self.trace then return end
+    self.traceFrame = nil
+    self.timelineChart:SetWindow(0, self.timelineChart:CaptureEnd())
+    self:DrawTraceStrip()
+  end)
+
+  local hint = view:CreateFontString(nil, 'OVERLAY', 'GameFontDisableSmall')
+  hint:SetPoint('LEFT', self.wholeCaptureButton, 'RIGHT', 8, 0)
+  hint:SetPoint('RIGHT', view, 'RIGHT', 0, 0)
+  hint:SetJustifyH('LEFT')
+  hint:SetWordWrap(false)
+  hint:SetText('Click a frame below to show it.')
+
+  self.traceStrip = CreateFrame('Frame', nil, view)
+  self.traceStrip:SetPoint('TOPLEFT', view, 'TOPLEFT', 0, -24)
+  self.traceStrip:SetPoint('TOPRIGHT', view, 'TOPRIGHT', 0, -24)
+  self.traceStrip:SetHeight(TRACE_STRIP_HEIGHT)
+  self.traceStrip:EnableMouse(true)
+  local background = self.traceStrip:CreateTexture(nil, 'BACKGROUND')
+  background:SetAllPoints(self.traceStrip)
+  background:SetColorTexture(0, 0, 0, 0.35)
+  self.traceStrip:SetScript('OnSizeChanged', function()
+    self:DrawTraceStrip()
+  end)
+  self.traceStrip:SetScript('OnMouseUp', function(strip)
+    if not self.trace then return end
+    local frames = self.trace:FrameCount()
+    local left, width = strip:GetLeft(), strip:GetWidth()
+    if frames == 0 or not left or not width or width <= 0 then return end
+    local x = GetCursorPosition() / strip:GetEffectiveScale() - left
+    self:SelectTraceFrame(math.floor(x / width * frames) + 1)
+  end)
+
+  self.timelineChart = traceChart:Create(view)
+  self.timelineChart.frame:SetPoint('TOPLEFT', self.traceStrip, 'BOTTOMLEFT', 0, -4)
+  self.timelineChart.frame:SetPoint('BOTTOMRIGHT', view, 'BOTTOMRIGHT', 0, 0)
+end
+
+-- LoadTrace shows a session's call trace in the Calls and Timeline views.
+---@param session table|nil
+function paneProto:LoadTrace(session)
+  self.trace = session and perfFormat:OpenTrace(session) or nil
+  self.filterState = nil
+  self.callPage = 1
+  self.selectedCall = nil
+  self.traceFrame = nil
+  self.callFilter:SetText('')
+  self.timelineChart:SetTrace(self.trace)
+  if self.trace and self.trace:Count() > 0 then
+    self:SelectTraceFrame(self.trace:FrameOf(self.trace:Get(1).start))
+  end
+  self:FillCalls()
+  self:UpdateCallDetail()
+  self:DrawTraceStrip()
+  if self.trace then
+    self.removeTraceButton:Enable()
+  else
+    self.removeTraceButton:Disable()
+  end
+end
+
+-- CallSource returns the call indices the Calls view pages through (nil means every call)
+-- and how many there are.
+---@return number[]|nil
+---@return number
+function paneProto:CallSource()
+  if self.filterState then
+    return self.filterState.matches, #self.filterState.matches
+  end
+  return nil, self.trace and self.trace:Count() or 0
+end
+
+---@param page number
+function paneProto:ShowCallPage(page)
+  local _, total = self:CallSource()
+  local pages = math.max(1, math.ceil(total / CALL_PAGE_SIZE))
+  if page > pages then page = pages end
+  if page < 1 then page = 1 end
+  self.callPage = page
+  self:FillCalls()
+end
+
+---@param call PerfTraceCall
+---@return string
+function paneProto:CallArgsText(call)
+  local args, returns = self.trace:Text(call.args), self.trace:Text(call.returns)
+  if not args then return '' end
+  if returns and returns ~= '' then
+    return string.format('(%s) -> %s', args, returns)
+  end
+  return string.format('(%s)', args)
+end
+
+function paneProto:FillCalls()
+  self.callList:Wipe()
+  local trace = self.trace
+  if not trace then
+    if not self.session then
+      self.callPageLabel:SetText('')
+    elseif self.session.stats and self.session.stats.traceRemoved then
+      self.callPageLabel:SetText('The call trace of this session was removed.')
+    else
+      self.callPageLabel:SetText('This session has no call trace: tracing was off when it was captured.')
+    end
+    self:UpdateCallButtons(1, 1)
+    return
+  end
+  local source, total = self:CallSource()
+  local pages = math.max(1, math.ceil(total / CALL_PAGE_SIZE))
+  local first = (self.callPage - 1) * CALL_PAGE_SIZE + 1
+  local last = math.min(total, first + CALL_PAGE_SIZE - 1)
+  local rows = {}
+  for n = first, last do
+    local index = source and source[n] or n
+    local call = trace:Get(index)
+    local marker = call.aborted and ' !' or (call.unfinished and ' ...' or '')
+    rows[#rows + 1] = {
+      index = index,
+      time = perfFormat:Ms(call.start),
+      frame = tostring(trace:FrameOf(call.start)),
+      duration = perfFormat:Ms(call.incl) .. marker,
+      name = string.rep('  ', math.min(call.depth - 1, MAX_INDENT)) .. call.name,
+      args = self:CallArgsText(call),
+      selected = index == self.selectedCall,
+      onClick = function()
+        self:SelectCall(index)
+      end,
+    }
+  end
+  self.callList:InsertTable(rows)
+
+  local filter = self.filterState
+  if filter and not filter.done then
+    self.callPageLabel:SetText(string.format('Searching... %s of %s calls, %s found',
+      perfFormat:Count((filter.next or 1) - 1), perfFormat:Count(trace:Count()), perfFormat:Count(#filter.matches)))
+  elseif total == 0 then
+    self.callPageLabel:SetText(filter and 'No call matches' or 'No calls were recorded')
+  else
+    self.callPageLabel:SetText(string.format('%s-%s of %s%s', perfFormat:Count(first), perfFormat:Count(last),
+      perfFormat:Count(total), filter and ' matching' or ''))
+  end
+  self:UpdateCallButtons(self.callPage, pages)
+end
+
+function paneProto:UpdateCallButtons(page, pages)
+  local canBack, canForward = page > 1, page < pages
+  for _, pair in ipairs({ { self.callFirst, canBack }, { self.callPrevious, canBack },
+    { self.callNext, canForward }, { self.callLast, canForward } }) do
+    if pair[2] then pair[1]:Enable() else pair[1]:Disable() end
+  end
+end
+
+-- StartFilter lists only the calls matching text. The search runs a budget of calls per
+-- frame (StepFilter) so a million-call trace never freezes the game.
+---@param text string|nil
+function paneProto:StartFilter(text)
+  local query = string.lower(string.match(text or '', '^%s*(.-)%s*$'))
+  self.callPage = 1
+  if query == '' then
+    self.filterState = nil
+  else
+    self.filterState = { query = query, matches = {}, next = 1, done = false }
+  end
+  self:FillCalls()
+end
+
+function paneProto:StepFilter()
+  local filter = self.filterState
+  if not filter or filter.done or not self.trace then return end
+  filter.next = self.trace:Scan(filter.query, filter.next, self.filterBudget, filter.matches)
+  if not filter.next then
+    filter.done = true
+  end
+  self:FillCalls()
+end
+
+---@param index number
+function paneProto:SelectCall(index)
+  self.selectedCall = index
+  self:UpdateCallDetail()
+  self:FillCalls()
+end
+
+function paneProto:UpdateCallDetail()
+  local call = self.trace and self.selectedCall and self.trace:Get(self.selectedCall)
+  if not call then
+    self.callDetail:SetText(self.trace and 'Click a call to see it in full.' or '')
+    self.showInTimeline:Disable()
+    return
+  end
+  self.showInTimeline:Enable()
+  local state = ''
+  if call.aborted then
+    state = ', cut short by an error'
+  elseif call.unfinished then
+    state = call.paused and ', paused when the capture stopped' or ', still running when the capture stopped'
+  end
+  local lines = {
+    string.format('Call #%s  %s  started at %s (frame %d), took %s%s%s', perfFormat:Count(call.index), call.name,
+      perfFormat:Ms(call.start), self.trace:FrameOf(call.start), perfFormat:Ms(call.incl),
+      call.segments and string.format(' (%s with pauses)', perfFormat:Ms(call.wall)) or '', state),
+  }
+  local args, returns = self.trace:Text(call.args), self.trace:Text(call.returns)
+  if args then
+    lines[#lines + 1] = 'Arguments: ' .. args
+    lines[#lines + 1] = 'Returned: ' .. ((returns == nil or returns == '') and '(nothing)' or returns)
+  end
+  self.callDetail:SetText(table.concat(lines, '\n'))
+end
+
+---@param index number
+function paneProto:ShowCallInTimeline(index)
+  local call = self.trace and self.trace:Get(index)
+  if not call then return end
+  self:ShowView('timeline')
+  local pad = math.max(call.wall * 0.25, 0.05)
+  self.traceFrame = self.trace:FrameOf(call.start)
+  self.timelineChart.highlight = index
+  self.timelineChart:SetWindow(call.start - pad, call.finish + pad)
+  self:DrawTraceStrip()
+end
+
+-- SelectTraceFrame shows one frame of the trace on the timeline.
+---@param frame number
+function paneProto:SelectTraceFrame(frame)
+  if not self.trace then return end
+  local last = self.trace:FrameCount() + 1
+  if frame < 1 then frame = 1 end
+  if frame > last then frame = last end
+  self.traceFrame = frame
+  local from, to = self.trace:FrameBounds(frame)
+  self.timelineChart:SetWindow(from, to)
+  self:DrawTraceStrip()
+end
+
+-- DrawTraceStrip draws the measured time of every frame above the timeline, with the
+-- frame being shown highlighted; clicking a column shows that frame.
+function paneProto:DrawTraceStrip()
+  local strip = self.traceStrip
+  local width, height = strip:GetWidth(), strip:GetHeight()
+  local frames = self.trace and self.trace:FrameCount() or 0
+  local drawn = 0
+  if frames > 0 and width > 0 and height > 0 then
+    local ours = perfFormat:DecodeTimeline(self.session).ours
+    local columns = math.min(TIMELINE_COLUMNS, frames)
+    local perColumn = frames / columns
+    local scale = 0
+    for i = 1, frames do
+      if (ours[i] or 0) > scale then scale = ours[i] end
+    end
+    if scale <= 0 then scale = 1 end
+    local columnWidth = width / columns
+    for c = 1, columns do
+      local from = math.floor((c - 1) * perColumn) + 1
+      local to = math.max(from, math.floor(c * perColumn))
+      local peak = 0
+      local selected = false
+      for i = from, to do
+        if (ours[i] or 0) > peak then peak = ours[i] end
+        if i == self.traceFrame then selected = true end
+      end
+      local bar = self.traceStripBars[c]
+      if not bar then
+        bar = strip:CreateTexture(nil, 'ARTWORK')
+        self.traceStripBars[c] = bar
+      end
+      bar:ClearAllPoints()
+      bar:SetPoint('BOTTOMLEFT', strip, 'BOTTOMLEFT', (c - 1) * columnWidth, 0)
+      bar:SetSize(math.max(1, columnWidth - 1), math.max(2, peak / scale * height))
+      if selected then
+        bar:SetColorTexture(1, 1, 0.3, 1)
+      else
+        bar:SetColorTexture(0.95, 0.6, 0.2, 0.9)
+      end
+      bar:Show()
+      drawn = c
+    end
+  end
+  for i = drawn + 1, #self.traceStripBars do
+    self.traceStripBars[i]:Hide()
+  end
+end
+
+---@param view Frame
 function paneProto:CreateSummaryView(view)
   self.summaryText = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
   self.summaryText:SetPoint('TOPLEFT', view, 'TOPLEFT', 4, -4)
@@ -518,6 +1004,8 @@ function paneProto:ShowView(name)
   end
   if name == 'frames' then
     self:DrawTimeline()
+  elseif name == 'timeline' then
+    self:DrawTraceStrip()
   end
 end
 
@@ -550,9 +1038,15 @@ end
 function paneProto:UpdateStatus()
   local live = perf:GetLiveStats()
   if live then
-    self.status:SetText(string.format('|cff00ff00Capturing|r  %s, %s, %s, worst frame %s',
+    local traced = ''
+    if live.traceFull then
+      traced = ', call trace full, stopping'
+    elseif live.traceCalls then
+      traced = string.format(', %s traced', plural(live.traceCalls, 'call'))
+    end
+    self.status:SetText(string.format('|cff00ff00Capturing|r  %s, %s, %s, worst frame %s%s',
       perfFormat:Ms(live.elapsedMs), plural(live.calls, 'call'), plural(live.frames, 'frame'),
-      perfFormat:Ms(live.worstFrameMs)))
+      perfFormat:Ms(live.worstFrameMs), traced))
     return
   end
   local text = 'Idle, ' .. plural(#perfSessions:GetSessions(), 'saved session')
@@ -571,8 +1065,9 @@ function paneProto:FillSessions()
     items[#items + 1] = {
       id = id,
       selected = id == self.selectedId,
-      text = string.format('#%d  %s  %s%s', id, formatDate(meta.startedAt, '%m-%d %H:%M'),
-        perfFormat:Ms(stats.durationMs or 0), meta.reason == 'reload' and '  (reload)' or ''),
+      text = string.format('#%d  %s  %s%s%s', id, formatDate(meta.startedAt, '%m-%d %H:%M'),
+        perfFormat:Ms(stats.durationMs or 0), meta.reason == 'reload' and '  (reload)' or '',
+        session.trace and ('  +trace ' .. perfFormat:KB(perfFormat:TraceBytes(session) / 1024)) or ''),
       onClick = function()
         self:SelectSession(id)
       end,
@@ -587,6 +1082,8 @@ function paneProto:OnSessionsChanged()
   local newest = sessions[1]
   if self.selectedId and not perfSessions:GetSession(self.selectedId) then
     self:ClearSelection()
+  elseif self.session and self.trace and not self.session.trace then
+    self:LoadTrace(self.session)
   end
   self:FillSessions()
   self:UpdateStatus()
@@ -611,6 +1108,7 @@ function paneProto:ClearSelection()
   self:UpdateMetricButton()
   self:UpdateAdjustCheck()
   self:DrawTimeline()
+  self:LoadTrace(nil)
 end
 
 ---@param id number
@@ -645,6 +1143,7 @@ function paneProto:SelectSession(id)
   end
   self.summaryText:SetText(self:BuildSummary(session))
   self:DrawTimeline()
+  self:LoadTrace(session)
   self:FillSessions()
 end
 
@@ -890,6 +1389,27 @@ function paneProto:BuildSummary(session)
   if meta.backpackItems or meta.bankItems then
     add('Items: %s in the backpack, %s in the bank.', perfFormat:Count(meta.backpackItems or 0), perfFormat:Count(meta.bankItems or 0))
   end
+
+  add('')
+  if session.trace then
+    add('Call trace: %s calls%s, about %s of SavedVariables.', perfFormat:Count(stats.traceCalls or session.trace.calls or 0),
+      session.trace.args and ', with their arguments and return values' or '',
+      perfFormat:KB(perfFormat:TraceBytes(session) / 1024))
+  elseif stats.traceRemoved then
+    add('The call trace of this session was removed to save space.')
+  else
+    add('No call trace: tracing was off when this session was captured.')
+  end
+  if stats.stopReason == 'traceFull' then
+    add('The capture stopped on its own when the call trace reached its limit of %s calls.',
+      perfFormat:Count((session.options and session.options.traceMaxCalls) or stats.traceCalls or 0))
+  elseif stats.stopReason == 'maxDuration' then
+    add('The capture stopped on its own after its maximum duration.')
+  end
+  if (stats.excludedMs or 0) > 0 then
+    add('The profiler spent %s describing arguments and packing the trace; that time is left out of every number here.',
+      perfFormat:Ms(stats.excludedMs))
+  end
   return table.concat(lines, '\n')
 end
 
@@ -980,6 +1500,14 @@ function paneProto:CreateSettings()
   addCheckbox('Track memory allocations', 'Charge Lua memory growth to the call that caused it. Garbage collection running mid-call makes the numbers approximate unless the next option is on.', 'trackAllocations')
   addCheckbox('Pause garbage collection while capturing', 'Makes allocation numbers exact. Memory keeps growing until the capture stops, so keep captures short.', 'pauseGC')
   addCheckbox('Measure profiler overhead', 'Time 1,000 empty wrapped calls at the start of each capture to estimate how much of the measured time is the profiler itself.', 'calibrate')
+
+  f:AddSection({
+    title = 'Call trace',
+    description = 'Keep every measured call in the order it ran, to see what happened when (the Calls and Timeline views). Large traces make the SavedVariables file large; remove them from the session list when done.',
+  })
+  addCheckbox('Record every call in order', 'Keep each call with its start time and duration, not only the call tree.', 'traceCalls')
+  addCheckbox('Record arguments and return values', 'Also keep what each call was given and returned. Each distinct value and argument list is stored once.', 'traceArgs')
+  addSlider('Trace call limit', 'When the trace reaches this many calls, the capture stops on its own.', 'traceMaxCalls', 10000)
 
   f:GetFrame():SetSize(520, 600)
   f:GetFrame():SetPoint('CENTER')

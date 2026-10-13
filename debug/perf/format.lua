@@ -680,6 +680,56 @@ function traceProto:Matches(call, query)
   return returns ~= nil and string.find(string.lower(returns), query, 1, true) ~= nil
 end
 
+-- Scan looks for calls whose function name, arguments or return values contain query
+-- (lower case), starting at call `from` and examining at most `budget` calls, appending
+-- the matching indices to `out`. It returns where to continue, or nil once every call was
+-- examined. Matches are cached per node and per value set, so a scan allocates almost
+-- nothing per call and can be spread over several frames.
+---@param query string
+---@param from number
+---@param budget number
+---@param out number[]
+---@return number|nil
+function traceProto:Scan(query, from, budget, out)
+  if self.scanQuery ~= query then
+    self.scanQuery = query
+    self.scanNodes, self.scanSets = {}, {}
+  end
+  local nodeHits, setHits = self.scanNodes, self.scanSets
+  local function setMatches(setId)
+    if setId == 0 then return false end
+    local hit = setHits[setId]
+    if hit == nil then
+      local text = self:Text(setId)
+      hit = text ~= nil and string.find(string.lower(text), query, 1, true) ~= nil
+      setHits[setId] = hit
+    end
+    return hit
+  end
+  local last = math.min(self.count, from + budget - 1)
+  local index = from
+  while index <= last do
+    local ci = math.floor((index - 1) / self.chunkSize) + 1
+    local d = self:Chunk(ci)
+    local base = (ci - 1) * self.chunkSize
+    local chunkLast = math.min(last, base + d.n)
+    for k = index - base, chunkLast - base do
+      local node = d.nodes[k]
+      local hit = nodeHits[node]
+      if hit == nil then
+        hit = string.find(string.lower(self:NodeName(node)), query, 1, true) ~= nil
+        nodeHits[node] = hit
+      end
+      if hit or setMatches(d.args[k]) or setMatches(d.returns[k]) then
+        out[#out + 1] = base + k
+      end
+    end
+    index = chunkLast + 1
+  end
+  if index > self.count then return nil end
+  return index
+end
+
 -- TraceBytes estimates how much of the SavedVariables file a session's trace takes.
 ---@param session table
 ---@return number

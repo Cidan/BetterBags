@@ -328,6 +328,15 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetAutoFocus(autoFocus)
     self._autoFocus = autoFocus
   end
+  function widget:SetFocus()
+    self._hasFocus = true
+  end
+  function widget:ClearFocus()
+    self._hasFocus = false
+  end
+  function widget:HasFocus()
+    return self._hasFocus == true
+  end
   function widget:GetLineHeight()
     return self._lineHeight or 12
   end
