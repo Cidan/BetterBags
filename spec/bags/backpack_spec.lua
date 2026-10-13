@@ -299,6 +299,9 @@ describe("Backpack Module Loading and Compatibility Tests", function()
   end)
 
   it("should use instant pre-rendered tab swap on SwitchToGroup", function()
+    local savedTrigger = addon.TriggerItemContextChanged
+    addon.TriggerItemContextChanged = function() end
+    finally(function() addon.TriggerItemContextChanged = savedTrigger end)
     -- Load base backpack behavior
     local loadBase = assert(loadfile("bags/backpack.lua"))
     loadBase("BetterBags")
@@ -417,6 +420,9 @@ describe("Backpack Module Loading and Compatibility Tests", function()
 
     local savedForceHide = addon.ForceHideBlizzardBags
     addon.ForceHideBlizzardBags = function() end
+    local savedTrigger = addon.TriggerItemContextChanged
+    addon.TriggerItemContextChanged = function() end
+    finally(function() addon.TriggerItemContextChanged = savedTrigger end)
     local savedFading = database.GetEnableBagFading
 
     for _, fading in ipairs({ false, true }) do

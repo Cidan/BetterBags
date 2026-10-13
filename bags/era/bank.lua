@@ -45,7 +45,7 @@ function bank.proto:OnShow()
 		self.bag.frame:Show()
 	end
 
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 end
 
 function bank.proto:OnHide()
@@ -64,14 +64,14 @@ function bank.proto:OnHide()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
 			self.isHiding = false  -- Clear flag after animation completes
 			CloseBankFrame()
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+			addon.TriggerItemContextChanged()
 		end
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
 		self.isHiding = false  -- Clear flag immediately
 		CloseBankFrame()
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		addon.TriggerItemContextChanged()
 	end
 end
 

@@ -139,7 +139,7 @@ function bank.proto:OnShow(ctx)
 			self:SwitchToGroup(ctx, activeGroup)
 
 			self.bag.moneyFrame:Update()
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+			addon.TriggerItemContextChanged()
 
 			-- Restore the bank tab slots panel when the setting is enabled,
 			-- so re-opening the bank shows the same mode as when it was closed.
@@ -151,9 +151,9 @@ function bank.proto:OnShow(ctx)
 				local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
 				if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
 					if firstButton.bankType == Enum.BankType.Account then
-						BankPanel:SetBankType(Enum.BankType.Account)
+						addon.SetBlizzardBankType(Enum.BankType.Account)
 					else
-						BankPanel:SetBankType(Enum.BankType.Character)
+						addon.SetBlizzardBankType(Enum.BankType.Character)
 					end
 				end
 				self.bag.slots:Draw(ctx)
@@ -173,7 +173,7 @@ function bank.proto:OnShow(ctx)
 
 		self.bag.moneyFrame:Update()
 		self.bag.frame:Show()
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		addon.TriggerItemContextChanged()
 
 		-- Restore the bank tab slots panel when the setting is enabled,
 		-- so re-opening the bank shows the same mode as when it was closed.
@@ -185,9 +185,9 @@ function bank.proto:OnShow(ctx)
 			local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
 			if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
 				if firstButton.bankType == Enum.BankType.Account then
-					BankPanel:SetBankType(Enum.BankType.Account)
+					addon.SetBlizzardBankType(Enum.BankType.Account)
 				else
-					BankPanel:SetBankType(Enum.BankType.Character)
+					addon.SetBlizzardBankType(Enum.BankType.Character)
 				end
 			end
 			self.bag.slots:Draw(ctx)
@@ -220,7 +220,7 @@ function bank.proto:OnHide()
 				end
 				self.bag.slots.frame:Hide()
 			end
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+			addon.TriggerItemContextChanged()
 		end
 		self.bag.fadeOutGroup:Play()
 	else
@@ -233,7 +233,7 @@ function bank.proto:OnHide()
 			end
 			self.bag.slots.frame:Hide()
 		end
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		addon.TriggerItemContextChanged()
 	end
 end
 
@@ -255,16 +255,16 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	-- correct bank (character vs account/warbank).
 	if addon.isRetail and BankPanel and BankPanel.SetBankType then
 		if Enum.BagIndex.AccountBankTab_1 and bagIndex >= Enum.BagIndex.AccountBankTab_1 then
-			BankPanel:SetBankType(Enum.BankType.Account)
+			addon.SetBlizzardBankType(Enum.BankType.Account)
 		else
-			BankPanel:SetBankType(Enum.BankType.Character)
+			addon.SetBlizzardBankType(Enum.BankType.Character)
 		end
 	end
 
 	self.bag.currentItemCount = -1
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 
 	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
 	-- during its own data sweep, resolved against the active bank type. Switching
@@ -572,12 +572,12 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	-- Update bankType
 	if addon.isRetail and group.bankType == Enum.BankType.Account then
 		if BankPanel and BankPanel.SetBankType then
-			BankPanel:SetBankType(Enum.BankType.Account)
+			addon.SetBlizzardBankType(Enum.BankType.Account)
 		end
 		self.bag.bankTab = Enum.BagIndex.AccountBankTab_1 -- Set a default so right-click deposits know it's a Warbank tab
 	else
 		if BankPanel and BankPanel.SetBankType then
-			BankPanel:SetBankType(Enum.BankType.Character)
+			addon.SetBlizzardBankType(Enum.BankType.Character)
 		end
 		self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	end
@@ -587,7 +587,7 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BANK]
 	self.bag:Draw(ctx, slotInfo, function() end)
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 
 	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
 	-- during its own data sweep, resolved against the active bank type. Switching
@@ -604,7 +604,7 @@ function bank.proto:SwitchToBankAndWipe(ctx)
 	ctx:Set("wipe", true)
 	self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	if BankPanel and BankPanel.SetBankType then
-		BankPanel:SetBankType(Enum.BankType.Character)
+		addon.SetBlizzardBankType(Enum.BankType.Character)
 	end
 	if self.bag.tabs then
 		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)

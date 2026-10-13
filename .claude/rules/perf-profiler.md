@@ -75,6 +75,16 @@ Keep it free of WoW APIs.
   `Exit` either way). Any arguments after the label are recorded as the span's arguments
   when the trace records arguments.
 
+### Blizzard calls worth measuring
+
+A Blizzard call made inline is charged to the measured function that made it. When one may be
+costly, it goes through a function of its own on the root addon, so captures measure it with
+no timing code at the call site. `core/hooks.lua` holds them: `addon.SetBlizzardBankType`
+(`BankPanel:SetBankType`) and `addon.TriggerItemContextChanged`
+(`ItemButtonUtil.TriggerEvent(ItemContextChanged)`), added when every bank tab switch showed
+12.6-15 ms of unmeasured time that only these two calls could explain.
+`spec/core/measured_blizzard_calls_spec.lua` fails if either is called inline anywhere else.
+
 ### Stack roots (the only hand-placed hooks)
 
 These make each stack start at something readable instead of at whichever method happened

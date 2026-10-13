@@ -81,7 +81,7 @@ function backpack.proto:OnShow(ctx)
 		self.bag.frame:Show()
 	end
 
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 end
 
 function backpack.proto:OnHide()
@@ -94,13 +94,13 @@ function backpack.proto:OnHide()
 		self.bag.fadeOutGroup.callback = function()
 			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
 			if self.bag.searchFrame then self.bag.searchFrame:Hide() end
-			ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+			addon.TriggerItemContextChanged()
 		end
 		self.bag.fadeOutGroup:Play()
 	else
 		self.bag.frame:Hide()
 		if self.bag.searchFrame then self.bag.searchFrame:Hide() end
-		ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+		addon.TriggerItemContextChanged()
 	end
 end
 
@@ -367,7 +367,7 @@ function backpack.proto:SwitchToGroup(ctx, groupID)
 	self.bag.currentItemCount = -1
 	local slotInfo = items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK]
 	self.bag:Draw(ctx, slotInfo, function() end)
-	ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+	addon.TriggerItemContextChanged()
 end
 
 -- ShowCreateGroupDialog shows a dialog to create a new group.

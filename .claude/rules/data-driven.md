@@ -23,3 +23,9 @@ reasoning about it can suggest a cause; it does not establish one.
   button's record, or nil when the redraw is skipped. Both are methods of the `Item`
   prototype, so the call trace records their return value for every draw. Added when Show Bags
   showed every item button redrawing in full and the cause could only be inferred from code.
+- **Bank type and item context calls** (perf-profiler.md §2): `BankPanel:SetBankType` and
+  `ItemButtonUtil.TriggerEvent(ItemContextChanged)` go through `addon.SetBlizzardBankType` and
+  `addon.TriggerItemContextChanged`, measured as `BetterBags.*`. Added when every bank tab
+  switch showed 12.6-15 ms of unmeasured time inside `Bank.SwitchToGroup`, the same with zero
+  or 529 buttons reacting to the context change, which only one of these two calls could
+  explain.

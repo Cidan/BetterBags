@@ -38,6 +38,22 @@ if addon.hasWarbank then
   interactionEvents[Enum.PlayerInteractionType.AccountBanker] = true
 end
 
+-- SetBlizzardBankType sets the bank type of Blizzard's hidden BankPanel, which decides where
+-- right-click deposits go. Its own function so the profiler measures it: inline Blizzard calls
+-- are not measured (perf-profiler.md §2). Do not inline it.
+---@param bankType Enum.BankType
+function addon.SetBlizzardBankType(bankType)
+  if BankPanel and BankPanel.SetBankType then
+    BankPanel:SetBankType(bankType)
+  end
+end
+
+-- TriggerItemContextChanged makes every shown item button re-check whether it matches the open
+-- window. Its own function so the profiler measures it, like SetBlizzardBankType.
+function addon.TriggerItemContextChanged()
+  ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
+end
+
 function addon.ForceHideBlizzardBags()
   for i = 1, NUM_TOTAL_BAG_FRAMES, 1 do
     CloseBag(i)

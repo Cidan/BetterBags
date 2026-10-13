@@ -27,6 +27,7 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
   }
 
   local sentMessages
+  local savedSetType, savedTrigger
   local behavior
 
   before_each(function()
@@ -46,6 +47,10 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
     _G.Enum.BagIndex.Characterbanktab = 6
     _G.BankPanel = { SetBankType = function() end }
     _G.ItemButtonUtil = _G.ItemButtonUtil or { Event = { ItemContextChanged = 1 }, TriggerEvent = function() end }
+    -- core/hooks.lua's measured Blizzard calls (not loaded here).
+    savedSetType, savedTrigger = addon.SetBlizzardBankType, addon.TriggerItemContextChanged
+    addon.SetBlizzardBankType = function(bankType) _G.BankPanel:SetBankType(bankType) end
+    addon.TriggerItemContextChanged = function() end
 
     addon.isRetail = true
     addon.atBank = true
@@ -112,6 +117,7 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
   end)
 
   after_each(function()
+    addon.SetBlizzardBankType, addon.TriggerItemContextChanged = savedSetType, savedTrigger
     for _, name in ipairs(moduleNames) do
       addon.modules[name] = oldModules[name]
       aceAddon.addons["BetterBags_" .. name] = oldAddons[name]
