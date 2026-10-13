@@ -17,6 +17,9 @@ local USAGE = {
   '  --frame <n>            export the n-th worst frame instead of the whole session',
   '  --metric <time|alloc>  size bars by time (default) or allocated memory',
   '  --raw                  keep the profiler\'s own overhead in the times',
+  '  --trace                export the session\'s call trace for Perfetto (ui.perfetto.dev) instead',
+  '  --from <ms> --to <ms>  with --trace, only the calls that ran in this stretch of the capture',
+  '  --find <text>          with --trace, only the calls whose name, arguments or return values contain text',
   '  --out <dir>            directory for the output files (default: .)',
 }
 
@@ -60,11 +63,12 @@ function M.ListSessions(db)
   for i = #db.sessions, 1, -1 do
     local s = db.sessions[i]
     local meta, stats = s.meta or {}, s.stats or {}
-    lines[#lines + 1] = string.format('#%d  %s  %s - %s  %s  measured %s  %d frames  %d worst frames%s',
+    lines[#lines + 1] = string.format('#%d  %s  %s - %s  %s  measured %s  %d frames  %d worst frames%s%s',
       s.id or 0, meta.startedAt and os.date('%Y-%m-%d %H:%M:%S', meta.startedAt) or '?',
       meta.character or '?', meta.realm or '?', perfFormat:Ms(stats.durationMs or 0),
       perfFormat:Ms(stats.instrumentedMs or 0), stats.frames or 0, #perfFormat:WorstFrames(s),
-      meta.reason == 'reload' and '  (reload)' or '')
+      meta.reason == 'reload' and '  (reload)' or '',
+      s.trace and string.format('  trace: %d calls', s.trace.calls or 0) or '')
   end
   return lines
 end
@@ -128,7 +132,8 @@ local function encodeJSON(value, orderedKeys)
   local t = type(value)
   if t == 'string' then return encodeString(value) end
   if t == 'number' then
-    if value == math.floor(value) then return string.format('%d', value) end
+    -- %.0f, not %d: Lua 5.1 formats %d through a C long, which is 32 bits on Windows.
+    if value == math.floor(value) then return string.format('%.0f', value) end
     return string.format('%.6g', value)
   end
   if t == 'boolean' then return value and 'true' or 'false' end
@@ -407,6 +412,105 @@ local function summaryLines(session, frameIndex, worstIndex, adjusted)
   return lines
 end
 
+local TRACE_KEYS = {
+  'name', 'cat', 'ph', 'ts', 'dur', 'pid', 'tid', 'args',
+  'call', 'arguments', 'returned', 'state', 'continued', 'ms',
+}
+
+local function microseconds(ms)
+  return math.floor(ms * 1000 + 0.5)
+end
+
+local function categoryOf(name)
+  return string.match(name, '^%[([%w ]+)%]') or string.match(name, '^([^.]+)') or name
+end
+
+---@class ChromeTraceOptions
+---@field from? number Only calls that ran after this many milliseconds into the capture.
+---@field to? number Only calls that started before this.
+---@field find? string Only calls whose name, arguments or return values contain this text.
+
+-- WriteChromeTrace streams a session's call trace as Chrome trace-event JSON, which
+-- Perfetto (ui.perfetto.dev) and chrome://tracing open: every call is a complete event (a
+-- call that paused gets one per stretch it ran), carrying its arguments and return values,
+-- plus a counter track of BetterBags time per frame. Calls are decoded one at a time, so a
+-- million-call trace never sits in memory as tables.
+---@param session table
+---@param write fun(s: string)
+---@param opts? ChromeTraceOptions
+---@return boolean ok
+---@return string|nil err
+function M.WriteChromeTrace(session, write, opts)
+  local trace = perfFormat:OpenTrace(session)
+  if not trace then return false, 'no call trace' end
+  opts = opts or {}
+  local from, to = opts.from, opts.to
+  local find = opts.find and string.lower(opts.find) or nil
+  local first = true
+  local function emit(event)
+    write((first and '' or ',\n') .. encodeJSON(event, TRACE_KEYS))
+    first = false
+  end
+
+  write('{"displayTimeUnit":"ms","traceEvents":[\n')
+  emit({ name = 'process_name', ph = 'M', pid = 1, args = { name = string.format('BetterBags session #%d', session.id or 0) } })
+  emit({ name = 'thread_name', ph = 'M', pid = 1, tid = 1, args = { name = 'BetterBags' } })
+
+  local ours = perfFormat:DecodeTimeline(session).ours
+  local ends = trace.frameEnds
+  for frame = 1, #ends do
+    local startMs, endMs = trace:FrameBounds(frame)
+    if (not from or endMs >= from) and (not to or startMs <= to) then
+      emit({ name = 'BetterBags time per frame', ph = 'C', ts = microseconds(startMs), pid = 1, args = { ms = ours[frame] or 0 } })
+    end
+  end
+
+  for index = 1, trace:Count() do
+    local call = trace:Get(index)
+    if (not from or call.finish >= from) and (not to or call.start <= to)
+      and (not find or trace:Matches(call, find)) then
+      local pieces = {}
+      if call.segments then
+        local pieceStart, pieceNode = call.start, call.node
+        for _, seg in ipairs(call.segments) do
+          pieces[#pieces + 1] = { pieceStart, seg.pausedAt, pieceNode }
+          pieceStart, pieceNode = seg.resumedAt, seg.node
+        end
+        pieces[#pieces + 1] = { pieceStart, call.finish, pieceNode }
+      else
+        pieces[1] = { call.start, call.finish, call.node }
+      end
+      for n, piece in ipairs(pieces) do
+        local args
+        if n == 1 then
+          local state
+          if call.aborted then
+            state = 'cut short by an error'
+          elseif call.unfinished then
+            state = call.paused and 'paused when the capture stopped' or 'still running when the capture stopped'
+          end
+          args = { call = index, arguments = trace:Text(call.args), returned = trace:Text(call.returns), state = state }
+        else
+          args = { call = index, continued = true }
+        end
+        local name = trace:NodeName(piece[3])
+        emit({
+          name = name,
+          cat = categoryOf(name),
+          ph = 'X',
+          ts = microseconds(piece[1]),
+          dur = microseconds(piece[2] - piece[1]),
+          pid = 1,
+          tid = 1,
+          args = args,
+        })
+      end
+    end
+  end
+  write('\n]}\n')
+  return true
+end
+
 local function writeFile(path, contents)
   local f, err = io.open(path, 'w')
   if not f then return false, err end
@@ -428,7 +532,10 @@ function M.Main(args, out)
       opts.list = true
     elseif a == '--raw' then
       opts.raw = true
-    elseif a == '--session' or a == '--frame' or a == '--metric' or a == '--out' then
+    elseif a == '--trace' then
+      opts.trace = true
+    elseif a == '--session' or a == '--frame' or a == '--metric' or a == '--out'
+      or a == '--from' or a == '--to' or a == '--find' then
       opts[string.sub(a, 3)] = args[i + 1]
       i = i + 1
     elseif string.sub(a, 1, 2) == '--' then
@@ -463,6 +570,25 @@ function M.Main(args, out)
     out('No session ' .. tostring(opts.session) .. ' in ' .. svPath .. '. Use --list to see the saved sessions.')
     return 1
   end
+  if opts.trace then
+    if not perfFormat:OpenTrace(session) then
+      out(string.format('Session #%d has no call trace: tracing was off when it was captured, or the trace was removed.', session.id))
+      return 1
+    end
+    local path = string.format('%s/betterbags-%d.trace.json', opts.out, session.id)
+    local f, openErr = io.open(path, 'w')
+    if not f then
+      out('Could not write ' .. path .. ': ' .. tostring(openErr))
+      return 1
+    end
+    M.WriteChromeTrace(session, function(s) f:write(s) end, {
+      from = tonumber(opts.from), to = tonumber(opts.to), find = opts.find,
+    })
+    f:close()
+    out('Wrote ' .. path .. ' (open it at https://ui.perfetto.dev)')
+    return 0
+  end
+
   local frameIndex = opts.frame and tonumber(opts.frame) or nil
   local shown = perfFormat:WorstFrames(session)
   if opts.frame and (not frameIndex or not shown[frameIndex]) then

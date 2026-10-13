@@ -693,4 +693,87 @@ describe("Debug Dump Harness with test.lua", function()
     assert.is_truthy(folded:find("Items.ProcessRefresh;Async.Do;Async.DoWithDelay;Items.RunRefresh;Items.Phase2_Harvest", 1, true))
     os.execute("rm -rf '" .. dir .. "'")
   end)
+
+  it("traces every call of the real refresh pipeline with its arguments, without changing its results", function()
+    LoadBetterBagsModule("debug/perf/format.lua")
+    local perf = addon:GetModule("Perf")
+    local perfFormat = addon:GetModule("PerfFormat")
+    DB.data:SetProfile("Default")
+    local dumpItems = _G.BetterBagsDB.profiles.Default.debugBackpackDump
+    local originalHarvest = items.Harvest
+    items.Harvest = function()
+      return dumpItems, {}
+    end
+    local originalSendMessage = events.SendMessage
+    events.SendMessage = function() end
+
+    local function categoriesBySlot()
+      local out = {}
+      for slotkey, item in pairs(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+        out[slotkey] = item.itemInfo.category or false
+      end
+      return out
+    end
+
+    items:ProcessRefresh(context:New("Unprofiled"), const.BAG_KIND.BACKPACK)
+    local expected = categoriesBySlot()
+
+    perf:Init()
+    perf:SetClock(nil)
+    assert.is_true(perf:Start({
+      modules = { "Items", "Search", "Categories", "Stacks", "Database", "EquipmentSets", "TooltipScanner",
+        "QueryParser", "Binding", "Async", "Localization" },
+      prototypes = { "SlotInfo", "Stack", "IntervalTree" },
+      includeRoot = false,
+      calibrate = true,
+      trace = true,
+      traceArgs = true,
+    }))
+    items:ProcessRefresh(context:New("Traced"), const.BAG_KIND.BACKPACK)
+    perf:_OnFrame()
+    local session = perf:Stop()
+    items.Harvest = originalHarvest
+    events.SendMessage = originalSendMessage
+
+    assert.are.same(expected, categoriesBySlot())
+    assert.are.equal(0, session.stats.aborted)
+    assert.are.equal(session.stats.calls, session.stats.traceCalls)
+
+    local trace = perfFormat:OpenTrace(session)
+    assert.are.equal(session.stats.calls, trace:Count())
+    local tree = perfFormat:Decode(session)
+    local callsByName, refresh = {}, nil
+    for index = 1, trace:Count() do
+      local call = trace:Get(index)
+      assert.are.equal(index, call.index)
+      assert.is_true(call.wall >= 0, "call " .. index)
+      assert.are.equal(0, call.flags, "call " .. index)
+      callsByName[call.name] = (callsByName[call.name] or 0) + 1
+      if call.name == "Items.RunRefresh" then refresh = call end
+    end
+    -- Every call in the tree is in the trace, and nothing else.
+    for _, fn in ipairs(perfFormat:DecodeFunctions(session, tree)) do
+      assert.are.equal(fn.calls, callsByName[fn.name], fn.name)
+    end
+    assert.is_not_nil(refresh)
+    local args = trace:Text(refresh.args)
+    assert.is_truthy(args:find("ctx Traced", 1, true), args)
+    assert.is_truthy(args:find(", 0$"), args)
+
+    -- Each distinct argument list is stored once.
+    local seen = {}
+    for _, spec in ipairs(session.trace.sets) do
+      assert.is_nil(seen[spec], spec)
+      seen[spec] = true
+    end
+    assert.is_true(#session.trace.sets < trace:Count())
+
+    local out = {}
+    local tool = assert(loadfile("tools/flamegraph/flamegraph.lua"))("flamegraph-module")
+    assert.is_true(tool.WriteChromeTrace(session, function(s) out[#out + 1] = s end))
+    local json = table.concat(out)
+    local events = 0
+    for _ in string.gmatch(json, '"ph":"X"') do events = events + 1 end
+    assert.are.equal(trace:Count(), events)
+  end)
 end)
