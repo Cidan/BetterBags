@@ -101,4 +101,41 @@ describe("ItemLoader", function()
 
     assert.is_true(called)
   end)
+
+  it("roots the work done when item data finishes loading under a span that records the bags", function()
+    LoadBetterBagsModule("debug/perf/format.lua")
+    local perf = addon:GetModule("Perf")
+    local perfFormat = addon:GetModule("PerfFormat")
+    local loader = addon:GetModule("ItemLoader")
+    loader:Init()
+    loader:OnEnable()
+    local listener = addon:GetModule("PerfLoaderListener", true) or addon:NewModule("PerfLoaderListener")
+    function listener:TOnLoaded() end
+    loader:TellMeWhenABagIsUpdated(function(updatedBags) listener:TOnLoaded(updatedBags) end)
+
+    -- Item data usually arrives later, from Blizzard's own item-load listener, outside any
+    -- call of ours.
+    local pending
+    local originalCreate = _G.ContinuableContainer.Create
+    _G.ContinuableContainer.Create = function()
+      return { AddContinuable = function() end, ContinueOnLoad = function(_, cb) pending = cb end }
+    end
+    local now = 0
+    perf:Init()
+    perf:SetClock(function() return now end)
+    perf:Start({ modules = { "PerfLoaderListener" }, prototypes = {}, includeRoot = false, calibrate = false,
+      trace = true, traceArgs = true })
+    loader.pendingBags = { [1] = true }
+    loader:ProcessPendingBagUpdates()
+    pending()
+    local trace = perfFormat:OpenTrace(perf:Stop())
+    _G.ContinuableContainer.Create = originalCreate
+
+    local loaded, inner = trace:Get(1), trace:Get(2)
+    assert.are.equal("[loaded] item data", loaded.name)
+    assert.are.equal(1, loaded.depth)
+    assert.are.equal("{[1]=true}", trace:Text(loaded.args))
+    assert.are.equal("PerfLoaderListener.TOnLoaded", inner.name)
+    assert.are.equal(2, inner.depth)
+  end)
 end)

@@ -6,6 +6,8 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 local loader = addon:NewModule('ItemLoader')
 local const = addon:GetModule('Constants')
 local events = addon:GetModule('Events')
+---@class Perf: AceModule
+local perf = addon:GetModule('Perf')
 
 function loader:Init()
   self.itemMixinsBySlotKey = {}
@@ -100,9 +102,13 @@ function loader:ProcessPendingBagUpdates()
   end
 
   self:LoadTheseItemsAndCallback(mixinsToLoad, function()
+    -- Usually runs later, from Blizzard's item-load listener, outside any measured call;
+    -- the span gives the work it starts a root that names the bags whose data arrived.
+    local token = perf.active and perf:Enter('[loaded] item data', updatedBags)
     for _, callback in ipairs(self.bagUpdateCallbacks) do
       callback(updatedBags)
     end
+    if token then perf:Exit(token) end
   end)
 end
 
