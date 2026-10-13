@@ -681,7 +681,7 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           local decoration = item._decoration
           assert.is_nil(item:DrawInputChanged(decoration, data()))
           local named = {
-            { function(d) d.stackedCount = 5 end, "stackedCount" },
+            { function(d) d.stackedCount = 5 end, "shownCount" },
             { function(d) d.itemInfo.isNewItem = true end, "isNewItem" },
             { function(d) d.isUpgrade = true end, "isUpgrade" },
             { function(d) d.itemContextMatchResult = 2 end, "itemContextMatchResult" },
@@ -697,6 +697,26 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           themes.decorationGeneration = 0
           itemFrame:RestyleButtons()
           assert.equal("styleGeneration", item:DrawInputChanged(decoration, data()))
+        end)
+
+        -- A capture of Show Bags (which turns stacking off) showed all 32 item buttons drawn in
+        -- both views redrawn on each toggle with "stackedCount": a single pile records its own
+        -- count as the stack total in the normal view and none in Show Bags, the same number shown.
+        it("skips a redraw when the stack total goes away but the count shown is the same", function()
+          item:SetItemFromData(btnCtx, data({ function(d) d.stackedCount = nil end }))
+          assert.equal(0, fullDraws)
+        end)
+
+        it("redraws when a stack starts or stops hiding an armor or weapon piece's level", function()
+          local function armor(d)
+            d.itemInfo.classID = Enum.ItemClass.Armor
+            d.itemInfo.currentItemCount = 2
+            d.stackedCount = nil
+          end
+          item:SetItemFromData(btnCtx, data({ armor }))
+          fullDraws = 0
+          assert.equal("stackHidesLevel", item:DrawInputChanged(item._decoration,
+            data({ armor, function(d) d.stackedCount = 2 end })))
         end)
 
         it("names a missing record after the button was locked", function()

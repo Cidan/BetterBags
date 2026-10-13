@@ -30,7 +30,8 @@ function M.ItemData(opts)
     newItemTime = opts.newItemTime or 0,
     stacks = opts.stacks or 0,
     stackedOn = opts.stackedOn or "",
-    stackedCount = opts.stackedCount or 0,
+    -- nil or the virtual stack total (never 0), as Phase7_ApplyVirtualStacks sets it.
+    stackedCount = opts.stackedCount,
     itemHash = opts.itemHash or ("hash:" .. (opts.name or "item")),
     bagName = opts.bagName or "Backpack",
     forceClear = opts.forceClear or false,

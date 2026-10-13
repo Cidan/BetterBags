@@ -147,6 +147,18 @@ end
 -- and theme generation the button was drawn with. ResetVisuals (a release or a change
 -- between item, free slot and empty slot) and Lock clear the record; UpdateSearch keeps its
 -- search match current.
+-- stackHidesItemLevel says whether an item's virtual stack hides its item level: a stack of
+-- more than one armor or weapon piece shows its count instead (with Merge Unstackable, a
+-- setting that redraws every button when it changes). Shared by DrawItemLevel and the draw
+-- record, so the record holds exactly what the draw uses.
+---@param data ItemData
+---@return boolean
+local function stackHidesItemLevel(data)
+	local classID = data.itemInfo.classID
+	return (classID == Enum.ItemClass.Armor or classID == Enum.ItemClass.Weapon)
+		and data.stackedCount ~= nil and data.stackedCount > 1
+end
+
 -- DrawInputChanged returns the name of the first input of a full item draw that differs
 -- from the button's record, or nil when the redraw can be skipped ("record" when there is no
 -- valid record, "staticData" for item rows, which never skip). It is a method of the Item
@@ -172,8 +184,8 @@ function itemFrame.itemProto:DrawInputChanged(decoration, data)
 	if s.isBound ~= info.isBound then return "isBound" end
 	if s.currentItemLevel ~= info.currentItemLevel then return "currentItemLevel" end
 	if s.classID ~= info.classID then return "classID" end
-	if s.stackedCount ~= data.stackedCount then return "stackedCount" end
-	if s.currentItemCount ~= info.currentItemCount then return "currentItemCount" end
+	if s.shownCount ~= (data.stackedCount or info.currentItemCount) then return "shownCount" end
+	if s.stackHidesLevel ~= stackHidesItemLevel(data) then return "stackHidesLevel" end
 	if s.isNewItem ~= info.isNewItem then return "isNewItem" end
 	if s.isBattlePayItem ~= info.isBattlePayItem then return "isBattlePayItem" end
 	if s.isQuestItem ~= quest.isQuestItem then return "isQuestItem" end
@@ -206,8 +218,12 @@ local function recordItemDraw(item, decoration, data)
 	s.isBound = info.isBound
 	s.currentItemLevel = info.currentItemLevel
 	s.classID = info.classID
-	s.stackedCount = data.stackedCount
-	s.currentItemCount = info.currentItemCount
+	-- What the draw uses of the counts: the number shown and whether the stack hides the item
+	-- level. The raw stack total is empty when stacking is off (Show Bags) and equal to the
+	-- item's own count for a single pile otherwise; recording it redrew every item on each
+	-- Show Bags toggle with nothing on screen changed.
+	s.shownCount = data.stackedCount or info.currentItemCount
+	s.stackHidesLevel = stackHidesItemLevel(data)
 	s.isNewItem = info.isNewItem
 	s.isBattlePayItem = info.isBattlePayItem
 	s.isQuestItem = quest.isQuestItem
@@ -425,7 +441,7 @@ function itemFrame.itemProto:DrawItemLevel(data)
 		return
 	end
 
-	if mergeOpts.mergeUnstackable and data.stackedCount and data.stackedCount > 1 then
+	if mergeOpts.mergeUnstackable and stackHidesItemLevel(data) then
 		self.ilvlText:Hide()
 		return
 	end
