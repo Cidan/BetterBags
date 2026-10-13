@@ -635,6 +635,43 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
         assert.equal(9, _G.SetItemButtonCountVal)
       end)
 
+      -- A release already reset the button (ClearItem runs ResetVisuals). Captures of Show
+      -- Bags and of bank tab switches showed every button reset twice: once on release and
+      -- again on its next draw (146 and 465 resets).
+      it("does not reset a released button again on its next draw", function()
+        local free = { slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = true,
+          itemInfo = { emptySlotName = "Bag" } }
+        item:SetItemFromData(btnCtx, fullItem(3))
+        local done = countResets()
+        item:Release(btnCtx)
+        item:SetFreeSlots(btnCtx, free, 1)
+        assert.equal(1, done(), "the release resets; the draw does not")
+
+        item:SetFreeSlots(btnCtx, free, 1)
+        done = countResets()
+        item:Release(btnCtx)
+        item:SetItemFromData(btnCtx, fullItem(3))
+        assert.equal(1, done())
+      end)
+
+      -- Anything that changes the button's look after its release (a lock, a search, a
+      -- cooldown) means it is no longer blank, so its next draw resets it.
+      for _, case in ipairs({
+        { "locked", function() item:Lock(btnCtx) end },
+        { "searched", function() item:UpdateSearch(btnCtx, false) end },
+        { "faded", function() item:SetAlpha(0.5) end },
+      }) do
+        it("resets a released button that was " .. case[1] .. " before its next draw", function()
+          item:SetItemFromData(btnCtx, fullItem(3))
+          item:Release(btnCtx)
+          case[2]()
+          local done = countResets()
+          item:SetFreeSlots(btnCtx, { slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = true,
+            itemInfo = { emptySlotName = "Bag" } }, 1)
+          assert.equal(1, done())
+        end)
+      end
+
       it("resets the button like a release when its slot is drawn empty", function()
         item:SetItemFromData(btnCtx, fullItem(7))
         local done = countResets()

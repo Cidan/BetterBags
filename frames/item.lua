@@ -283,6 +283,7 @@ end
 ---@param ctx Context
 ---@param found? boolean
 function itemFrame.itemProto:UpdateSearch(ctx, found)
+	self.blank = false
 	if self.slotkey == nil then
 		return
 	end
@@ -347,6 +348,7 @@ end
 ---@param data ItemData
 ---@param onlyIfChanged? boolean
 function itemFrame.itemProto:UpdateCooldown(ctx, data, onlyIfChanged)
+	self.blank = false
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
 		return
@@ -390,6 +392,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:Lock(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	SetItemButtonDesaturated(decoration, true)
 	if self.drawState then
@@ -399,12 +402,14 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:Unlock(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	SetItemButtonDesaturated(decoration, false)
 end
 
 ---@param data ItemData
 function itemFrame.itemProto:ShowItemLevel(data)
+	self.blank = false
 	local ilvlOpts = database:GetItemLevelOptions(self.kind)
 	local ilvl = data.itemInfo.currentItemLevel
 	self.ilvlText:SetText(tostring(ilvl))
@@ -419,6 +424,7 @@ end
 
 ---@param data ItemData
 function itemFrame.itemProto:DrawItemLevel(data)
+	self.blank = false
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
 		self.ilvlText:Hide()
@@ -457,6 +463,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:UpdateCount(ctx, data)
+	self.blank = false
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
 		return
@@ -468,6 +475,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:UpdateUpgrade(ctx, data)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
 	if data.isItemEmpty or self.staticData then
@@ -485,6 +493,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:SetStaticItemFromData(ctx, data)
+	self.blank = false
 	self.staticData = data
 	self:SetItemFromData(ctx, data)
 end
@@ -507,10 +516,11 @@ end
 function itemFrame.itemProto:SetItemFromData(ctx, data)
 	assert(data, "data must be provided")
 	local mode = data.isItemEmpty and "empty" or "item"
-	if self.drawnAs ~= mode then
+	if self.drawnAs ~= mode and not self.blank then
 		self:ResetVisuals(ctx)
 	end
 	self.drawnAs = mode
+	self.blank = false
 	self.released = false
 	self.currentData = data
 	self.slotkey = data.slotkey
@@ -632,6 +642,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:FlashItem(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	if decoration.NewItemTexture then
 		decoration.NewItemTexture:SetAtlas("bags-glow-white")
@@ -645,6 +656,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:ClearFlashItem(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	if decoration.BattlepayItemTexture then
 		decoration.BattlepayItemTexture:Hide()
@@ -661,6 +673,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:UpdateNewItem(ctx, data)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
 	if not decoration.NewItemTexture then
@@ -755,6 +768,7 @@ end
 ---@param decoration Frame
 ---@param quality number
 function itemFrame.itemProto:DrawQualityGlow(decoration, quality)
+	self.blank = false
 	local border = decoration.IconBorder
 	if not border then return end
 	local intensity = database:GetGlowIntensity(self.kind)
@@ -792,6 +806,7 @@ end
 ---@param decoration Frame
 ---@param quality number
 function itemFrame.itemProto:DrawClassicQualityBorder(decoration, quality)
+	self.blank = false
 	if not decoration.IconBorder then return end
 	local qualityColor = quality and quality > const.ITEM_QUALITY.Common and const.ITEM_QUALITY_COLOR[quality]
 	if qualityColor then
@@ -810,10 +825,11 @@ end
 function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
-	if self.drawnAs ~= "free" then
+	if self.drawnAs ~= "free" and not self.blank then
 		self:ResetVisuals(ctx)
 	end
 	self.drawnAs = "free"
+	self.blank = false
 	self.released = false
 	local bagid, slotid = data.bagid, data.slotid
 	self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
@@ -912,6 +928,7 @@ end
 
 ---@param alpha number
 function itemFrame.itemProto:SetAlpha(alpha)
+	self.blank = false
 	self.frame:SetAlpha(alpha)
 end
 
@@ -1010,6 +1027,10 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	self.freeSlotName = ""
 	self.freeSlotCount = 0
 	decoration.UpgradeIcon:SetShown(false)
+	-- Blank until something draws on it: a draw skips its mode-change reset for a blank
+	-- button (a release already reset it). Everything that changes the button's look outside
+	-- a full draw clears this.
+	self.blank = true
 end
 
 function itemFrame:Init()
