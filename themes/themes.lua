@@ -179,9 +179,9 @@ function themes:ApplyTheme(ctx, key)
     button:Hide()
   end
 
-
-  --TODO(lobato): Create a new message just for redrawing items.
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  -- A theme only changes how the bags look, so the bags are redrawn, not read again. The
+  -- new decoration generation makes every item button draw in full.
+  events:SendMessage(ctx, 'bags/Redraw')
 end
 
 -- SetSearchState will show or hide the search bar for the given frame.

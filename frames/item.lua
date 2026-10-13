@@ -74,6 +74,8 @@ local HALO_MIN_ALPHA = 0.4
 ---@field drawState table|nil The inputs of the last full draw (see itemDrawUnchanged).
 ---@field cooldownState table|nil The cooldown last applied (see UpdateCooldown).
 itemFrame.itemProto = {}
+-- Bumped by RestyleButtons; part of every button's draw record.
+itemFrame.styleGeneration = 0
 addon:GetModule('Perf'):RegisterPrototype(itemFrame.itemProto, 'Item')
 
 local buttonCount = 0
@@ -140,10 +142,11 @@ end
 -- inputs all match skips the setters: the decoration still shows what they would set. The
 -- inputs are the item's itemHash (item ID, enchant, gems, bonus IDs, binding, item level
 -- and stats), every other ItemData field the setters read, the data phase's draw generation
--- (a new one after every wipe sweep, which is how settings changes reach the buttons), and
--- the decoration and theme generation the button was drawn with. ResetVisuals (a release or
--- a change between item, free slot and empty slot) and Lock clear the record; UpdateSearch
--- keeps its search match current.
+-- (a new one after every wipe sweep), the button style generation (RestyleButtons: settings
+-- the setters read, such as glow intensity, changed with no new data), and the decoration
+-- and theme generation the button was drawn with. ResetVisuals (a release or a change
+-- between item, free slot and empty slot) and Lock clear the record; UpdateSearch keeps its
+-- search match current.
 ---@param item Item
 ---@param decoration ItemButton
 ---@param data ItemData
@@ -156,6 +159,7 @@ local function itemDrawUnchanged(item, decoration, data)
 	local info, quest, container = data.itemInfo, data.questInfo, data.containerInfo
 	return s.decoration == decoration
 		and s.decorationGeneration == themes.decorationGeneration
+		and s.styleGeneration == itemFrame.styleGeneration
 		and s.drawGeneration == data.drawGeneration
 		and s.bagid == data.bagid
 		and s.itemHash == data.itemHash
@@ -188,6 +192,7 @@ local function recordItemDraw(item, decoration, data)
 	local info, quest, container = data.itemInfo, data.questInfo, data.containerInfo
 	s.decoration = decoration
 	s.decorationGeneration = themes.decorationGeneration
+	s.styleGeneration = itemFrame.styleGeneration
 	s.drawGeneration = data.drawGeneration
 	s.bagid = data.bagid
 	s.itemHash = data.itemHash
@@ -226,6 +231,7 @@ local function freeDrawUnchanged(item, decoration, data, count, nocount)
 	local info = data.itemInfo
 	return s.decoration == decoration
 		and s.decorationGeneration == themes.decorationGeneration
+		and s.styleGeneration == itemFrame.styleGeneration
 		and s.bagid == data.bagid
 		and s.count == count
 		and s.nocount == (nocount and true or false)
@@ -245,6 +251,7 @@ local function recordFreeDraw(item, decoration, data, count, nocount)
 	local info = data.itemInfo
 	s.decoration = decoration
 	s.decorationGeneration = themes.decorationGeneration
+	s.styleGeneration = itemFrame.styleGeneration
 	s.bagid = data.bagid
 	s.count = count
 	s.nocount = nocount and true or false
@@ -990,6 +997,12 @@ function itemFrame:Init()
 	self.buttonsBySlotkey = {}
 	self.virtualPool = {}
 	self.activeItems = setmetatable({}, { __mode = "k" })
+end
+
+-- RestyleButtons makes the next draw of every button run all of its setters, for settings
+-- the setters read that change with no new item data (glow intensity, item level display).
+function itemFrame:RestyleButtons()
+	self.styleGeneration = self.styleGeneration + 1
 end
 
 function itemFrame:OnEnable()

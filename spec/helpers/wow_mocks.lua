@@ -315,8 +315,16 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetObeyStepOnDrag(obey)
     self._obeyStepOnDrag = obey
   end
-  function widget:SetValue(value)
+  -- Slider:SetValue(value [, treatAsMouseEvent]) fires OnValueChanged(self, value, userInput)
+  -- when the value changes; userInput is false for a value set from code
+  -- (warcraft.wiki.gg UIHANDLER_OnValueChanged, API Slider_SetValue).
+  function widget:SetValue(value, treatAsMouseEvent)
+    local changed = self._value ~= value
     self._value = value
+    local onValueChanged = changed and self._scripts.OnValueChanged
+    if onValueChanged then
+      onValueChanged(self, value, treatAsMouseEvent == true)
+    end
   end
   function widget:GetValue()
     return self._value or 0

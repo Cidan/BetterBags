@@ -92,8 +92,11 @@ upgrade provider reads `equipmentCache` (`GetItemDataFromInventorySlot`).
 Kept value: what the button shows. A redraw whose inputs (the item's `itemHash` and every other
 field the setters read, `drawGeneration`, the decoration and `themes.decorationGeneration`) match
 the record is skipped. Invalidated by `ResetVisuals` (a release, or item/free/empty mode changes)
-and `Lock`; `UpdateSearch` keeps the search match current. `drawGeneration` changes on every wipe,
-which is how settings that change a button's look without changing its data reach it.
+and `Lock`; `UpdateSearch` keeps the search match current. `drawGeneration` changes on every wipe;
+`ItemFrame.styleGeneration` (also in the record, bumped by `RestyleButtons`) changes when a setting
+the setters read changes with no new data (glow intensity, item level display), which reach the
+buttons through a redraw (refresh-scheduler.md §9); `themes.decorationGeneration` changes with
+the theme.
 
 ### 5. Button cooldown record (`item.cooldownState`, `itemProto:UpdateCooldown`)
 Kept value: the cooldown last applied to the button (spiral, dimmed icon, has-item state).

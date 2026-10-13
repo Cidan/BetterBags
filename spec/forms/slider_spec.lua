@@ -79,4 +79,71 @@ describe("stacked layout slider", function()
     assert.is_true(hasRightAnchor(container.description),
       "the description must be bounded on the right so it can wrap instead of clipping")
   end)
+
+  -- Building the form, and every reload of its values, sets each slider from the stored
+  -- setting, which fires OnValueChanged with userInput false. Saving there wrote every
+  -- slider's setting back at each login and sent their refreshes (two full wipes of the
+  -- bags in a captured login).
+  describe("saving", function()
+    local saved, layout, container
+
+    before_each(function()
+      saved = {}
+      -- Like a real setting: reads back what was last saved.
+      local stored = 5
+      layout = newLayout()
+      layout:AddSlider({
+        title = "Items Per Row",
+        description = "The number of items per row in each section.",
+        min = 3,
+        max = 20,
+        step = 1,
+        getValue = function() return stored end,
+        setValue = function(_, value)
+          stored = value
+          table.insert(saved, value)
+        end,
+      })
+      container = onlySlider(layout)
+    end)
+
+    it("does not save the value the form loads into the slider", function()
+      assert.equal(5, container.slider:GetValue())
+      assert.same({}, saved)
+    end)
+
+    it("does not save when the form reloads its values", function()
+      layout.sliders[container].getValue = function() return 9 end
+      layout:ReloadAllFormElements()
+      assert.equal(9, container.slider:GetValue())
+      assert.same({}, saved)
+    end)
+
+    it("saves a value the user drags to", function()
+      container.slider:SetValue(7, true)
+      assert.same({ 7 }, saved)
+    end)
+
+    it("saves a value typed into the box when it loses focus, clamped to the range", function()
+      container.input:SetText("12")
+      container.input:GetScript("OnEditFocusLost")(container.input)
+      assert.same({ 12 }, saved)
+      container.input:SetText("40")
+      container.input:GetScript("OnEditFocusLost")(container.input)
+      assert.same({ 12, 20 }, saved)
+      assert.equal(20, container.slider:GetValue())
+    end)
+
+    it("does not save when the box loses focus without a new value", function()
+      container.input:SetText("5")
+      container.input:GetScript("OnEditFocusLost")(container.input)
+      assert.same({}, saved)
+    end)
+
+    it("saves while the user types", function()
+      container.input:SetText("15")
+      container.input:GetScript("OnTextChanged")(container.input, true)
+      assert.same({ 15 }, saved)
+    end)
+  end)
 end)

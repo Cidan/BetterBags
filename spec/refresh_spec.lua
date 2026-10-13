@@ -504,4 +504,67 @@ describe("Refresh Module", function()
       assert.spy(refresh.RequestUpdate).was.called_with(match._, { sortWarbank = true })
     end)
   end)
+
+  -- Settings that only change how the bags look redraw the committed data: no bag is read
+  -- and nothing is derived (refresh-scheduler.md §9).
+  describe("redraw-only settings", function()
+    local draws
+
+    local function bag(name, shown)
+      return {
+        IsShown = function() return shown end,
+        Draw = function(_, _, slotInfo, callback)
+          table.insert(draws, { name = name, slotInfo = slotInfo })
+          if callback then callback() end
+        end,
+      }
+    end
+
+    local function newContext()
+      return addon:GetModule("Context"):New("Test")
+    end
+
+    before_each(function()
+      draws = {}
+      items.slotInfo = { [const.BAG_KIND.BACKPACK] = { kind = "backpack" }, [const.BAG_KIND.BANK] = { kind = "bank" } }
+      items.GetAllSlotInfo = function(self) return self.slotInfo end
+      addon.Bags = { Backpack = bag("backpack", false), Bank = bag("bank", false) }
+    end)
+
+    it("draws the backpack from its committed data and reads no bag", function()
+      spy.on(items, "RunRefresh")
+      refresh:Redraw(newContext())
+      assert.spy(items.RunRefresh).was_not.called()
+      assert.equal(1, #draws)
+      assert.equal("backpack", draws[1].name)
+      assert.equal(items.slotInfo[const.BAG_KIND.BACKPACK], draws[1].slotInfo)
+    end)
+
+    it("draws the bank too while it is shown", function()
+      addon.Bags.Bank = bag("bank", true)
+      refresh:Redraw(newContext())
+      assert.equal(2, #draws)
+      assert.equal("bank", draws[2].name)
+      assert.equal(items.slotInfo[const.BAG_KIND.BANK], draws[2].slotInfo)
+    end)
+
+    it("restyles the item buttons when asked, so they draw in full", function()
+      local itemFrame, created = StubBetterBagsModule("ItemFrame")
+      local restyled = 0
+      local original = itemFrame.RestyleButtons
+      itemFrame.RestyleButtons = function() restyled = restyled + 1 end
+      refresh:Redraw(newContext(), true)
+      refresh:Redraw(newContext())
+      itemFrame.RestyleButtons = original
+      if created then ResetModuleStub("ItemFrame") end
+      assert.equal(1, restyled)
+    end)
+
+    it("routes bags/Redraw to Redraw, passing whether buttons restyle", function()
+      refresh:OnEnable()
+      spy.on(refresh, "Redraw")
+      events:SendMessage(newContext(), "bags/Redraw", { buttons = true })
+      assert.spy(refresh.Redraw).was.called_with(match._, match._, true)
+    end)
+  end)
 end)

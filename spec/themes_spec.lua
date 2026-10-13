@@ -720,4 +720,31 @@ describe("Themes", function()
       assert.are.equal(0, shows())
     end)
   end)
+
+  -- A theme only changes how the bags look: applying one redraws the bags and reads nothing.
+  describe("ApplyTheme refresh", function()
+    it("asks for a redraw with restyled buttons, not a full refresh", function()
+      themes:RegisterTheme("Default", {
+        Name = "Default",
+        Available = true,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function() end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() end,
+        ToggleSearch = function() end,
+      })
+      local sent = {}
+      local original = events.SendMessage
+      events.SendMessage = function(_, _, message, ...)
+        table.insert(sent, { message = message, args = { ... } })
+      end
+      themes:ApplyTheme({}, "Default")
+      events.SendMessage = original
+      assert.equal(1, #sent)
+      assert.equal("bags/Redraw", sent[1].message)
+    end)
+  end)
 end)

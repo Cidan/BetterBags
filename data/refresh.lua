@@ -18,9 +18,6 @@ local context = addon:GetModule('Context')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class (exact) Refresh: AceModule
 local refresh = addon:NewModule('Refresh')
 
@@ -64,13 +61,34 @@ function refresh:Init()
   self._startup = nil
 end
 
+-- Redraw draws the bags again from their committed data: no bag is read and nothing is
+-- derived. It is for settings that only change how the bags look: layout sizes, section
+-- titles, how item buttons draw, the theme (.claude/rules/refresh-scheduler.md §9). With
+-- buttons, every item button runs all of its setters (ItemFrame:RestyleButtons). Like the
+-- draw after a sweep, it draws the backpack (which defers the draw while it is hidden) and
+-- the bank only while it is shown.
 ---@param ctx Context
-function refresh:RedrawBackpack(ctx)
-  debug:Log('RedrawBackpack', 'Redrawing backpack')
-  ctx:Set('redraw', true)
-  addon.Bags.Backpack:Draw(ctx, items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK], function()
-    events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
-  end)
+---@param buttons? boolean
+function refresh:Redraw(ctx, buttons)
+  if buttons then
+    local itemFrame = addon:GetModule('ItemFrame', true)
+    if itemFrame then
+      itemFrame:RestyleButtons()
+    end
+  end
+  local slotInfo = items:GetAllSlotInfo()
+  local bags = addon.Bags
+  if not slotInfo or not bags then return end
+  if bags.Backpack and slotInfo[const.BAG_KIND.BACKPACK] then
+    bags.Backpack:Draw(ctx, slotInfo[const.BAG_KIND.BACKPACK], function()
+      events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
+    end)
+  end
+  if bags.Bank and bags.Bank:IsShown() and slotInfo[const.BAG_KIND.BANK] then
+    bags.Bank:Draw(ctx, slotInfo[const.BAG_KIND.BANK], function()
+      events:SendMessage(ctx, 'bags/Draw/Bank/Done')
+    end)
+  end
 end
 
 ---@class RefreshRequest
@@ -376,6 +394,10 @@ function refresh:OnEnable()
   end)
   events:RegisterMessage('bags/RefreshBackpack', function()
     self:RequestUpdate({ backpack = true })
+  end)
+  -- bags/Redraw (ctx, { buttons = boolean }?) redraws without reading the bags (Redraw).
+  events:RegisterMessage('bags/Redraw', function(ctx, options)
+    self:Redraw(ctx, options ~= nil and options.buttons == true)
   end)
   events:RegisterMessage('bags/RefreshBank', function()
     self:RequestUpdate({ bank = true })

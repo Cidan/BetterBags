@@ -276,3 +276,47 @@ invalidations, 14 `BAG_CONTAINER_UPDATE`s, item bursts, an item-load batch, the 
 sliders' refreshes, then the loading screen ending) that asserts exactly one read and that no
 item lands in Recent Items. `spec/loader_spec.lua` covers the loader's hold and
 `PrimeAll`; `spec/refresh_spec.lua` that `OnEnable` reads nothing.
+
+## 9. Redraw-Only Settings
+
+A setting that only changes how the bags look needs no read of the bags and no new data,
+only a draw. Such settings send `bags/Redraw` (`ctx`, optionally `{ buttons = true }`), and
+`refresh:Redraw(ctx, buttons)` draws the committed data again: the backpack always (its
+`Draw` defers itself while it is hidden, as the draw after a sweep does) and the bank only
+while it is shown (a deferred bank draw would show stale contents on the next visit). It
+goes around the queue: a draw of committed data is allowed while a sweep is parked, and the
+sweep draws again when it commits. It sends `bags/Draw/Backpack/Done` / `bags/Draw/Bank/Done`
+like the draw after a sweep. With `buttons`, `ItemFrame:RestyleButtons()` bumps the style
+generation in every button's draw record (item-drawing.md §7b), so each button runs all of
+its setters once even though its data is unchanged.
+
+**A setting qualifies only when no data phase reads it.** Checked by where each value is read:
+
+| Setting | Read in | Message |
+|---|---|---|
+| Items Per Row, Columns (`GetBagSizeInfo`) | views, bag frame, themes | `bags/Redraw` (after the sliders' 0.2 s debounce) |
+| Show Full Section Names | `frames/section.lua` (every section draw) | `bags/Redraw` |
+| Quality Glow Intensity | `frames/item.lua` `DrawQualityGlow` | `bags/Redraw`, buttons |
+| Show Item Level, Show Item Level Color (`GetItemLevelOptions`) | `frames/item.lua` | `bags/Redraw`, buttons |
+| Theme (`themes:ApplyTheme`) | themes, decorations | `bags/Redraw` (the decoration generation it bumps redraws the buttons) |
+
+Settings that look like presentation but are read by the data phase still refresh in full,
+until step 3 gives them a re-derive that reads no bags: Section Order (sorted in
+`items:Phase10_PartitionIntoTabs` and `Phase11_CommitAndDispatch`), in-bag search (`searchBox:GetSearchText` feeds
+`isSearchResult` in Phase 8), the "Show Bags" view (categories and stacking change), free
+space, gaps, sort order, stacking, categories, groups, and the upgrade provider.
+
+**Form sliders no longer save at load.** The stacked form's slider saved on every
+`OnValueChanged`, and WoW fires it with `userInput` false whenever code calls `SetValue`
+(warcraft.wiki.gg `UIHANDLER_OnValueChanged`). The form does that when it is built and on
+every reload, so each login wrote all eleven sliders back and two of them requested full
+wipes (the glow sliders' requests were dropped only because Refresh was not listening yet).
+The slider now saves only user input; the number box saves a typed value itself, clamped,
+and only when it moved the slider. The spec mock's `SetValue` fires `OnValueChanged` the
+same way the client does.
+
+Coverage: `spec/config/config_redraw_spec.lua` (each setting above sends `bags/Redraw`, with
+or without buttons, and a data setting still sends `bags/FullRefreshAll`),
+`spec/refresh_spec.lua` ("redraw-only settings"), `spec/themes_spec.lua` ("ApplyTheme
+refresh"), `spec/frames/item_spec.lua` ("redraws once after the buttons were restyled", for
+items and free slots), `spec/forms/slider_spec.lua` ("saving").

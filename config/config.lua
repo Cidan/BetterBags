@@ -462,7 +462,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetItemLevelOptions(bagType.kind).enabled = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
       end
     })
 
@@ -474,7 +474,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetItemLevelOptions(bagType.kind).color = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
       end
     })
 
@@ -491,7 +491,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetShowFullSectionNames(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw')
       end
     })
 
@@ -532,7 +532,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetGlowIntensity(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
       end
     })
 
@@ -548,7 +548,7 @@ function config:CreateConfig()
       setValue = function(ctx, value)
         db:SetBagViewSizeItems(bagType.kind, db:GetBagView(bagType.kind), value)
         bucket:Later("setItemsPerRow", 0.2, function()
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          events:SendMessage(ctx, 'bags/Redraw')
         end)
       end,
     })
@@ -565,7 +565,7 @@ function config:CreateConfig()
       setValue = function(ctx, value)
         db:SetBagViewSizeColumn(bagType.kind, db:GetBagView(bagType.kind), value)
         bucket:Later("setSectionsPerRow", 0.2, function()
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          events:SendMessage(ctx, 'bags/Redraw')
         end)
       end,
     })
