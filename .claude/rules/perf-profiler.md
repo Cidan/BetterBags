@@ -318,7 +318,13 @@ BetterBagsPerfDB = {
 Whether a capture is running is never saved: every load starts with profiling off.
 "Capture next reload" sets `armNextReload`; `core/init.lua` calls
 `perfSessions:StartIfArmed()` right after `events:Init()` (before every other `Init`), which
-clears the flag and starts a capture with reason `reload`. A capture still running on
+clears the flag and starts a capture with reason `startup`. The switch applies to the next
+load, a full relaunch as much as a `/reload`; the first `PLAYER_ENTERING_WORLD`
+(`isInitialLogin`, `isReloadingUi`) relabels the capture `login` or `reload`
+(`perfSessions:OnEnteringWorld`); later loading screens and manual captures (`manual`) keep
+their label. `PerfFormat:ReasonLabel` / `ReasonPhrase` turn the reason into the session list's
+tag and the Summary's wording, in the Performance tab and the offline tool alike. Sessions
+saved before this say `reload` for both kinds of load. A capture still running on
 `PLAYER_LOGOUT` is stopped and saved.
 
 ### Session format (version 3)

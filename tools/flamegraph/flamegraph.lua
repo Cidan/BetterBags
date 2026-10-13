@@ -67,7 +67,7 @@ function M.ListSessions(db)
       s.id or 0, meta.startedAt and os.date('%Y-%m-%d %H:%M:%S', meta.startedAt) or '?',
       meta.character or '?', meta.realm or '?', perfFormat:Ms(stats.durationMs or 0),
       perfFormat:Ms(stats.instrumentedMs or 0), stats.frames or 0, #perfFormat:WorstFrames(s),
-      meta.reason == 'reload' and '  (reload)' or '',
+      perfFormat:ReasonLabel(meta.reason) and ('  (' .. perfFormat:ReasonLabel(meta.reason) .. ')') or '',
       s.trace and string.format('  trace: %d calls', s.trace.calls or 0) or '')
   end
   return lines
@@ -390,7 +390,7 @@ local function summaryLines(session, frameIndex, worstIndex, adjusted)
   local meta, stats = session.meta or {}, session.stats or {}
   local lines = {
     string.format('Session #%d, %s - %s, captured %s (%s).', session.id or 0, meta.character or '?',
-      meta.realm or '?', meta.startedAt and os.date('%Y-%m-%d %H:%M:%S', meta.startedAt) or '?', meta.reason or '?'),
+      meta.realm or '?', meta.startedAt and os.date('%Y-%m-%d %H:%M:%S', meta.startedAt) or '?', perfFormat:ReasonPhrase(meta.reason)),
     string.format('Duration %s, measured BetterBags time %s, %d frames, %d calls.',
       perfFormat:Ms(stats.durationMs or 0), perfFormat:Ms(stats.instrumentedMs or 0), stats.frames or 0, stats.calls or 0),
   }

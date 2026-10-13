@@ -36,7 +36,7 @@ describe("PerfSessions", function()
     end
     perf:Init()
     perf:SetClock(function() return now end)
-    perfSessions._logoutHooked = nil
+    perfSessions._eventsHooked = nil
     perfSessions:Init()
     -- Calibration needs a moving clock; these tests are about storage, not overhead.
     perfSessions:SetSetting("calibrate", false)
@@ -376,11 +376,45 @@ describe("PerfSessions", function()
       assert.is_true(perfSessions:StartIfArmed())
       assert.is_true(perfSessions:IsCapturing())
       assert.is_false(perfSessions:IsArmedForNextReload())
-      local session = perfSessions:StopCapture()
-      assert.are.equal("reload", session.meta.reason)
+      perfSessions:StopCapture()
 
       assert.is_false(perfSessions:StartIfArmed())
       assert.is_false(perfSessions:IsCapturing())
+    end)
+
+    -- The switch applies to the next load, a full relaunch as much as a /reload. Which one it
+    -- was is known at the first PLAYER_ENTERING_WORLD (isInitialLogin, isReloadingUi).
+    for _, case in ipairs({ { true, false, "login" }, { false, true, "reload" } }) do
+      it("labels the capture a " .. case[3] .. " once the game says how it started", function()
+        perfSessions:SetArmedForNextReload(true)
+        perfSessions:Init()
+        assert.is_true(perfSessions:StartIfArmed())
+        assert.is_function(registered["PLAYER_ENTERING_WORLD"])
+        registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", case[1], case[2])
+        local session = perfSessions:StopCapture()
+        assert.are.equal(case[3], session.meta.reason)
+      end)
+    end
+
+    it("labels a capture stopped before the game finished loading a startup", function()
+      perfSessions:SetArmedForNextReload(true)
+      perfSessions:Init()
+      assert.is_true(perfSessions:StartIfArmed())
+      local session = perfSessions:StopCapture()
+      assert.are.equal("startup", session.meta.reason)
+    end)
+
+    it("keeps the label through later loading screens, and never relabels a manual capture", function()
+      perfSessions:SetArmedForNextReload(true)
+      perfSessions:Init()
+      perfSessions:StartIfArmed()
+      registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", true, false)
+      registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", false, false)
+      assert.are.equal("login", perfSessions:StopCapture().meta.reason)
+
+      perfSessions:StartCapture()
+      registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", false, true)
+      assert.are.equal("manual", perfSessions:StopCapture().meta.reason)
     end)
   end)
 end)

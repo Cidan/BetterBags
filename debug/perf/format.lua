@@ -909,6 +909,30 @@ function perfFormat:Layout(rootNode, opts)
   return rects
 end
 
+-- How a capture started (session.meta.reason): 'manual', or for a capture armed for the
+-- next load, 'login' or 'reload' once the game said which, else 'startup'. Sessions saved
+-- before the distinction say 'reload' for both.
+local REASON_PHRASES = {
+  login = 'at login',
+  reload = 'from a reload',
+  startup = 'at startup',
+}
+
+-- ReasonLabel is the short label of an armed capture's start, nil for a manual one.
+---@param reason string|nil
+---@return string|nil
+function perfFormat:ReasonLabel(reason)
+  if REASON_PHRASES[reason] then return reason end
+  return nil
+end
+
+-- ReasonPhrase describes how a capture started.
+---@param reason string|nil
+---@return string
+function perfFormat:ReasonPhrase(reason)
+  return REASON_PHRASES[reason] or 'manually'
+end
+
 ---@param ms number
 ---@return string
 function perfFormat:Ms(ms)

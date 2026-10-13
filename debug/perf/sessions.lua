@@ -143,10 +143,13 @@ function perfSessions:Init()
   self.db = db
   self.pendingMeta = nil
 
-  if not self._logoutHooked then
-    self._logoutHooked = true
+  if not self._eventsHooked then
+    self._eventsHooked = true
     events:RegisterEvent('PLAYER_LOGOUT', function()
       self:OnLogout()
+    end)
+    events:RegisterEvent('PLAYER_ENTERING_WORLD', function(_, _, isInitialLogin, isReloadingUi)
+      self:OnEnteringWorld(isInitialLogin, isReloadingUi)
     end)
   end
 end
@@ -228,7 +231,7 @@ function perfSessions:IsCapturing()
   return perf:IsActive()
 end
 
----@param reason string "manual" or "reload"
+---@param reason? string "manual" (default), or "startup" for a capture armed for the next load
 ---@return boolean started
 function perfSessions:StartCapture(reason)
   if perf:IsActive() then return false end
@@ -362,12 +365,28 @@ function perfSessions:IsArmedForNextReload()
   return self.db.armNextReload == true
 end
 
--- StartIfArmed consumes the one-shot "capture next reload" switch.
+-- StartIfArmed consumes the one-shot "capture next reload" switch. The switch applies to
+-- the next load, a full relaunch as much as a /reload; the capture is labeled 'startup'
+-- until the first PLAYER_ENTERING_WORLD says which it was (OnEnteringWorld).
 ---@return boolean started
 function perfSessions:StartIfArmed()
   if not self:IsArmedForNextReload() then return false end
   self.db.armNextReload = nil
-  return self:StartCapture('reload')
+  return self:StartCapture('startup')
+end
+
+-- OnEnteringWorld labels a capture armed for this load a 'login' or a 'reload'. Later
+-- loading screens, and manual captures, keep their label.
+---@param isInitialLogin boolean
+---@param isReloadingUi boolean
+function perfSessions:OnEnteringWorld(isInitialLogin, isReloadingUi)
+  local meta = self.pendingMeta
+  if not meta or meta.reason ~= 'startup' then return end
+  if isInitialLogin then
+    meta.reason = 'login'
+  elseif isReloadingUi then
+    meta.reason = 'reload'
+  end
 end
 
 function perfSessions:OnLogout()

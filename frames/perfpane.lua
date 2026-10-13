@@ -1066,7 +1066,7 @@ function paneProto:FillSessions()
       id = id,
       selected = id == self.selectedId,
       text = string.format('#%d  %s  %s%s%s', id, formatDate(meta.startedAt, '%m-%d %H:%M'),
-        perfFormat:Ms(stats.durationMs or 0), meta.reason == 'reload' and '  (reload)' or '',
+        perfFormat:Ms(stats.durationMs or 0), perfFormat:ReasonLabel(meta.reason) and ('  (' .. perfFormat:ReasonLabel(meta.reason) .. ')') or '',
         session.trace and ('  +trace ' .. perfFormat:KB(perfFormat:TraceBytes(session) / 1024)) or ''),
       onClick = function()
         self:SelectSession(id)
@@ -1290,7 +1290,7 @@ function paneProto:BuildSummary(session)
   end
 
   add('|cffffd100Session #%d|r, captured %s (%s)', session.id or 0,
-    formatDate(meta.startedAt, '%Y-%m-%d %H:%M:%S'), meta.reason == 'reload' and 'from a reload' or 'manually')
+    formatDate(meta.startedAt, '%Y-%m-%d %H:%M:%S'), perfFormat:ReasonPhrase(meta.reason))
   add('Character: %s - %s.  Client: %s %s (%s).  BetterBags %s.', meta.character or '?', meta.realm or '?',
     meta.flavor or '?', meta.gameVersion or '?', meta.gameBuild or '?', meta.addonVersion or '?')
   add('What was measured: %s.', (perfSessions.PRESETS[meta.preset or 'full'] or perfSessions.PRESETS.full).label)

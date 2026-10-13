@@ -35,6 +35,26 @@ local function sampleSession()
 end
 
 describe("PerfFormat", function()
+  -- How a capture started: a manual start, or one armed for the next load, which is a login
+  -- or a reload once the game says which (debug/perf/sessions.lua).
+  describe("capture reason", function()
+    it("labels armed captures and leaves manual ones unlabeled", function()
+      assert.equal("login", perfFormat:ReasonLabel("login"))
+      assert.equal("reload", perfFormat:ReasonLabel("reload"))
+      assert.equal("startup", perfFormat:ReasonLabel("startup"))
+      assert.is_nil(perfFormat:ReasonLabel("manual"))
+      assert.is_nil(perfFormat:ReasonLabel(nil))
+    end)
+
+    it("describes how a capture started", function()
+      assert.equal("at login", perfFormat:ReasonPhrase("login"))
+      assert.equal("from a reload", perfFormat:ReasonPhrase("reload"))
+      assert.equal("at startup", perfFormat:ReasonPhrase("startup"))
+      assert.equal("manually", perfFormat:ReasonPhrase("manual"))
+      assert.equal("manually", perfFormat:ReasonPhrase(nil))
+    end)
+  end)
+
   describe("Decode", function()
     it("rebuilds the call tree with self and subtree totals in milliseconds", function()
       local tree = perfFormat:Decode(sampleSession())
