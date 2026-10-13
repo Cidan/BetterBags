@@ -772,8 +772,8 @@ describe("Debug Dump Harness with test.lua", function()
     local tool = assert(loadfile("tools/flamegraph/flamegraph.lua"))("flamegraph-module")
     assert.is_true(tool.WriteChromeTrace(session, function(s) out[#out + 1] = s end))
     local json = table.concat(out)
-    local events = 0
-    for _ in string.gmatch(json, '"ph":"X"') do events = events + 1 end
-    assert.are.equal(trace:Count(), events)
+    local exported = 0
+    for _ in string.gmatch(json, '"ph":"X"') do exported = exported + 1 end
+    assert.are.equal(trace:Count(), exported)
   end)
 end)
