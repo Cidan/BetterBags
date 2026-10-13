@@ -914,7 +914,8 @@ end
 -- Phase2_Rederive gives a derive (refresh-scheduler.md §10) the items the last read
 -- committed, reading no bag slot. An item still in its slot (same GUID) gets the fields a
 -- read refreshes on a kept slot (refreshKeptItem): quest state, tooltip text, gear sets and
--- the new-item flag. An item whose slot now holds something else keeps its values: what the
+-- the new-item flag; one read while the client had no data for it (harvestIncomplete) is
+-- read again, as every read does with such a slot. An item whose slot now holds something else keeps its values: what the
 -- client reports for the slot belongs to the other item, and the slot's read is on its way.
 -- A backpack derive reads the equipped gear, as a backpack read does, so upgrade arrows
 -- compare with the gear worn now.
@@ -926,11 +927,19 @@ function items:Phase2_Rederive(kind, committedItems)
   local itemData = {}
   local itemLoader = addon:GetModule("ItemLoader", true)
   for slotkey, item in pairs(committedItems) do
-    if not item.isItemEmpty and not item.harvestIncomplete then
+    if not item.isItemEmpty then
       local itemMixin = itemLoader and itemLoader:GetItemMixinFromSlotKey(slotkey) or Item:CreateFromBagAndSlot(item.bagid, item.slotid) --[[@as ItemMixin]]
       local itemGUID = C_Item.GetItemGUID(itemMixin:GetItemLocation()) or ""
       if itemGUID == item.itemInfo.itemGUID then
-        self:RefreshKeptItem(kind, item, item.bagid, item.slotid, itemGUID)
+        if item.harvestIncomplete then
+          local data = {}
+          ---@cast data +ItemData
+          data.bagid, data.slotid = item.bagid, item.slotid
+          self:AttachItemInfo(data, kind)
+          item = data
+        else
+          self:RefreshKeptItem(kind, item, item.bagid, item.slotid, itemGUID)
+        end
       end
     end
     itemData[slotkey] = item

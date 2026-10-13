@@ -344,8 +344,12 @@ the last read committed.
   matches) gets what a read refreshes on a kept slot (`items:RefreshKeptItem`, shared with
   `ReuseHarvestedSlot`): quest state, tooltip text (a cache hit, or a re-scan after
   `TOOLTIP_DATA_UPDATE` dropped it), gear sets (the set map is rebuilt at the top of every
-  sweep) and the new-item flag. An item whose slot now holds something else keeps its
-  values: what the client reports for the slot belongs to the other item (writing its
+  sweep) and the new-item flag. An item read while the client had no data for it
+  (`harvestIncomplete`) and still in its slot is read again with `AttachItemInfo`, as every
+  read does with such a slot: a capture of opening the bank read 478 of 491 items cold, and
+  the recalculations after it skipped them, leaving their names and "Retrieving item
+  information" tooltips until the next open. An item whose slot now holds something else
+  keeps its values: what the client reports for the slot belongs to the other item (writing its
   new-item flag would put the moved item in Recent Items), and the slot's `BAG_UPDATE` read
   is on its way.
 - A backpack derive reads the equipped gear (`HarvestEquipment`), as a backpack read does,

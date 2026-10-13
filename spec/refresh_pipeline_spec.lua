@@ -2736,6 +2736,46 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are_not.equal("Recent Items", item.itemInfo.category)
     end)
 
+    -- A capture of opening the bank read 478 of 491 items before the client had their data
+    -- ("Retrieving item information" tooltips). Reads re-read such slots every time; the
+    -- recalculations after the open skipped them, so their names and tooltip text stayed
+    -- cold until the next open.
+    it("re-reads an item read without its data, once its slot still holds it", function()
+      local cold = true
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(itemID)
+        if cold then return nil end
+        return getItemInfo(itemID)
+      end)
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      override(tooltipScanner, "GetTooltipText", function()
+        return cold and "Retrieving item information" or "Use: channel zephyrium essence"
+      end)
+      itemNames[909] = "Warm Name"
+      mockContainer[0] = { { itemID = 909, guid = "guid-909", count = 1 } }
+      local first = refreshBackpack().itemsBySlotKey["0_1"]
+      assert.is_true(first.harvestIncomplete)
+      cold = false
+      local item = refreshBackpack({ derive = true }).itemsBySlotKey["0_1"]
+      itemNames[909] = nil
+      assert.is_false(item.harvestIncomplete)
+      assert.equal("Warm Name", item.itemInfo.itemName)
+      assert.is_true(search:Search("zephyrium")["0_1"] == true)
+    end)
+
+    it("leaves an item read without its data whose slot now holds something else", function()
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(itemID)
+        if itemID == 909 then return nil end
+        return getItemInfo(itemID)
+      end)
+      mockContainer[0] = { { itemID = 909, guid = "guid-909", count = 1 } }
+      refreshBackpack()
+      mockContainer[0] = { { itemID = 202, guid = "g202", count = 1 } }
+      local item = refreshBackpack({ derive = true }).itemsBySlotKey["0_1"]
+      assert.equal("guid-909", item.itemInfo.itemGUID)
+    end)
+
     -- A kind's first read is a wipe, which never marks the items it finds as new. A derive
     -- before it must leave it so, or the first read would put the whole bag in Recent Items.
     it("does nothing for a kind that has never been read, and the first read still marks nothing new", function()

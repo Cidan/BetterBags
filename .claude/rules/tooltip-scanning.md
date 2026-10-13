@@ -70,7 +70,8 @@ resolves — this is how Blizzard's own `GameTooltip` rebuilds itself
 Because `RemoveFromCache` only drops the invalidated GUID, the triggered recalculation
 re-scans just that item; every other item hits the warm cache. The recalculation reads no bag
 slot: it refreshes each committed item still in its slot (`items:RefreshKeptItem`), including
-`tooltipText` from `GetTooltipText`, precisely so this re-scan lands (data-loader.md §16,
+`tooltipText` from `GetTooltipText`, and re-reads one that was read without its data (most
+resolutions are of such items: the client had not loaded them yet), precisely so this re-scan lands (data-loader.md §16,
 refresh-scheduler.md §10). Its new text then makes `search:SyncKind` re-index that one item
 (search-indexing.md §1).
 
