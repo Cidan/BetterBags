@@ -1054,6 +1054,15 @@ function itemFrame:OnEnable()
 			self:GetButton(ctx, bagID .. "_" .. slotID)
 		end
 	end
+	-- Retail character bank tabs hold up to 98 slots, like Warbank tabs: a capture of
+	-- opening the bank created slots 41-98 of every character tab at runtime.
+	if addon.isRetail and const.BANK_ONLY_BAGS then
+		for bagID in pairs(const.BANK_ONLY_BAGS) do
+			for slotID = 41, 98 do
+				self:GetButton(ctx, bagID .. "_" .. slotID)
+			end
+		end
+	end
 	if const.ACCOUNT_BANK_BAGS then
 		for bagID in pairs(const.ACCOUNT_BANK_BAGS) do
 			for slotID = 1, 98 do

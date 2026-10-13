@@ -151,6 +151,53 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     assert.equal(item.slotkey, "Container")
   end)
 
+  -- Every item button must exist from boot: creating one later can taint. A capture of
+  -- opening the bank on retail created 265 buttons at runtime, all character bank tab slots
+  -- 41-98 (tabs hold 98 slots; boot made 40 for them and 98 for Warbank tabs).
+  describe("buttons created at boot", function()
+    local savedBankOnly, savedAccount
+
+    before_each(function()
+      savedBankOnly, savedAccount = const.BANK_ONLY_BAGS, const.ACCOUNT_BANK_BAGS
+    end)
+
+    after_each(function()
+      const.BANK_ONLY_BAGS, const.ACCOUNT_BANK_BAGS = savedBankOnly, savedAccount
+      addon.isRetail = true
+    end)
+
+    it("creates every slot of a retail character bank tab, up to 98", function()
+      addon.isRetail = true
+      const.BANK_ONLY_BAGS = { [6] = 6 }
+      const.ACCOUNT_BANK_BAGS = { [12] = 12 }
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      local created = 0
+      local origDoCreate = itemFrame._DoCreate
+      itemFrame._DoCreate = function(...)
+        created = created + 1
+        return origDoCreate(...)
+      end
+      local btnCtx = ctx:New("boot")
+      itemFrame:GetButton(btnCtx, "6_41")
+      itemFrame:GetButton(btnCtx, "6_98")
+      itemFrame:GetButton(btnCtx, "12_98")
+      itemFrame._DoCreate = origDoCreate
+      assert.equal(0, created, "no bank tab slot is created after boot")
+    end)
+
+    it("keeps 40 slots per bank bag on Classic", function()
+      addon.isRetail = false
+      const.BANK_ONLY_BAGS = { [6] = 6 }
+      const.ACCOUNT_BANK_BAGS = nil
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      assert.is_not_nil(itemFrame.buttonsBySlotkey["5_40"])
+      assert.is_nil(itemFrame.buttonsBySlotkey["5_41"])
+      assert.is_nil(itemFrame.buttonsBySlotkey["6_41"])
+    end)
+  end)
+
   describe("Virtual Item Button Pool Architecture", function()
     it("should pre-allocate virtual item buttons during OnEnable", function()
       itemFrame:Init()
