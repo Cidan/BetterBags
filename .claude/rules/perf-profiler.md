@@ -2,10 +2,12 @@
 
 BetterBags has a built-in instrumenting profiler. It is off by default and costs nothing
 while off. A capture records where BetterBags spends its time (a call tree with exact self
-time), how much each frame costs, and the frames that spiked; the result is saved to
-SavedVariables and can be browsed in-game as a flame graph or exported offline.
+time), how much each frame costs, the frames that spiked, and a call trace: every measured
+call in the order it ran, with its arguments and return values. The result is saved to
+SavedVariables and can be browsed in-game as a flame graph, a call list and a timeline, or
+exported offline.
 
-It exists to answer two questions the old `debug:StartProfile`/`EndProfile` pair (one
+It exists to answer three questions the old `debug:StartProfile`/`EndProfile` pair (one
 hand-placed timer that printed a number to the debug log) could not:
 
 1. Where does the whole data -> draw path spend its time (event, refresh queue, every
@@ -13,6 +15,10 @@ hand-placed timer that printed a number to the debug log) could not:
 2. Why do some players lag when they use abilities? That needs per-frame cost, the
    frames that spiked, which events fired in them, and how much of BetterBags' cost the
    instrumentation can see versus what Blizzard's own addon profiler charges to us.
+3. What happened, in what order, with what inputs? A call tree aggregates every call of a
+   path into one node, so it cannot show that refresh A ran before refresh B, or which bags
+   a refresh was asked to read. Order-dependent bugs (the login Recent Items race: a
+   single-bag refresh committing before the all-bags one) need the call trace (§4).
 
 `debug/profile.lua` was removed; its single call site (`frames/bag.lua` Draw) is covered by
 the automatic `Bag.Draw` / `View.Render` wrappers.
@@ -21,16 +27,18 @@ the automatic `Bag.Draw` / `View.Render` wrappers.
 
 | File | Module | Role |
 |---|---|---|
-| `debug/perf/engine.lua` | `Perf` | Wrapping, call tree, coroutine handling, frame clock, session packing. No BetterBags data dependencies. |
-| `debug/perf/format.lua` | `PerfFormat` | Decodes saved sessions; folded stacks; flame layout; number formatting. Pure Lua. |
-| `debug/perf/sessions.lua` | `PerfSessions` | `BetterBagsPerfDB` storage, settings, presets, start/stop, capture-next-reload, logout save. |
+| `debug/perf/engine.lua` | `Perf` | Wrapping, call tree, call trace, argument capture, coroutine handling, frame clock, session packing. No BetterBags data dependencies. |
+| `debug/perf/format.lua` | `PerfFormat` | Decodes saved sessions and call traces; folded stacks; flame layout; number formatting. Pure Lua. |
+| `debug/perf/sessions.lua` | `PerfSessions` | `BetterBagsPerfDB` storage, settings, presets, start/stop, capture-next-reload, logout save, trace removal. |
 | `frames/flamegraph.lua` | `FlameGraph` | In-game icicle flame graph widget. |
+| `frames/tracechart.lua` | `TraceChart` | In-game timeline of a call trace (calls on a time axis, one row per depth). |
 | `frames/perfpane.lua` | `PerfPane` | The Performance tab of `/bbdb`. |
-| `tools/flamegraph/flamegraph.lua` | — | Offline exporter (folded, speedscope, HTML). |
+| `tools/flamegraph/flamegraph.lua` | — | Offline exporter (folded, speedscope, HTML; Chrome trace JSON for Perfetto). |
 
 TOC order (all five TOCs): `engine.lua` and `format.lua` right after `core\boot.lua`, so
 every later file can register prototypes at load; `sessions.lua` right after
-`core\events.lua`; `flamegraph.lua` and `perfpane.lua` right before `frames\debug.lua`.
+`core\events.lua`; `flamegraph.lua`, `tracechart.lua` and `perfpane.lua` right before
+`frames\debug.lua`.
 
 `format.lua` loads two ways: inside the addon it registers the `PerfFormat` module; run with
 `dofile` and no varargs (the offline tool) it returns a plain table of the same functions.
@@ -52,8 +60,8 @@ Keep it free of WoW APIs.
 - **Never wrapped:** functions from any LibStub library (embedded Ace methods), AceAddon
   mixins (the same function object on the root addon and the modules), tables whose `[0]`
   is userdata (WoW frames), and the always-excluded modules `Perf`, `PerfFormat`,
-  `PerfSessions`, `PerfPane`, `FlameGraph`, `DebugWindow`, `Context` (Context's `Get`/`Set`
-  are so frequent the wrappers would dominate).
+  `PerfSessions`, `PerfPane`, `FlameGraph`, `TraceChart`, `DebugWindow`, `Context`
+  (Context's `Get`/`Set` are so frequent the wrappers would dominate).
 - **Safety:** only our own Lua tables are written, never Blizzard frames or globals, and
   never `coroutine.*`. Stop restores a field only if it still holds our wrapper, so a method
   replaced during the capture is not clobbered. A wrapper captured during a capture keeps
@@ -62,19 +70,29 @@ Keep it free of WoW APIs.
 - **Not visible:** `local function` helpers (their time is charged to the calling method),
   and callbacks registered as function references before the capture started (their
   callees are still measured). `perf:Wrap(label, fn)` instruments a local function, at the
-  cost of one extra call even when profiling is off. Manual spans: `perf:Enter(label)` /
-  `perf:Exit(token)` (`Enter` returns nil when off; pass the result to `Exit` either way).
+  cost of one extra call even when profiling is off. Manual spans: `perf:Enter(label, ...)` /
+  `perf:Exit(token)` (`Enter` returns nil when nothing is being recorded; pass the result to
+  `Exit` either way). Any arguments after the label are recorded as the span's arguments
+  when the trace records arguments.
 
 ### Stack roots (the only hand-placed hooks)
 
 These make each stack start at something readable instead of at whichever method happened
-to run first. Each is one `perf.active` check when off.
+to run first. Each is one `perf.active` check when off. Each passes its payload to
+`perf:Enter`, so the call trace shows what the entry point was given.
 
 - `core/events.lua`: `[event] NAME` around WoW event dispatch (counts every fire, including
-  ones a bucket filter drops), `[msg] NAME` around message dispatch, `[bucket] NAME` around
-  a `BucketEvent` or `GroupBucketEvent` flush.
+  ones a bucket filter drops; records the event's payload without the event name), `[msg]
+  NAME` around message dispatch (records the message's arguments, usually a Context first),
+  `[bucket] NAME` around a `BucketEvent` or `GroupBucketEvent` flush (records the collected
+  `EventArg[]` it delivers).
 - `core/context.lua`: `[script] OnClick` (and so on) around `addon.SetScript` /
-  `addon.HookScript` handlers.
+  `addon.HookScript` handlers (records the script's arguments: the frame, then e.g. the
+  mouse button).
+- `data/loader.lua`: `[loaded] item data` around the callbacks the ItemLoader runs once a
+  batch of item data has loaded (records the set of bags). That moment usually comes from
+  Blizzard's item-load listener, outside any measured call, so without it the refresh it
+  requests would appear with no cause; in a trace it shows when each bag's data arrived.
 
 ## 3. How time is counted
 
@@ -185,7 +203,104 @@ does not cover are shown as captured. `DecodeFrame` returns the credited reading
   (`collectgarbage("stop")`, restarted on Stop and on logout) to make the numbers exact.
 - Past `maxNodes` distinct paths, new paths fold into one `[node limit reached]` node.
 
-## 4. Storage (`BetterBagsPerfDB`)
+## 4. Call trace
+
+With `trace` on (the default in PerfSessions), every measured call is also recorded in the
+order it started. The call tree says how much; the trace says what happened when.
+
+### Call records
+
+- **One record per call**, six numbers: start (microseconds after the previous call's start
+  in its chunk; 0 for a chunk's first call, whose absolute start is in `chunkStarts`), node
+  id (the call-tree node, which gives the function and its call path), argument set id,
+  duration (wall microseconds, -1 while running), return-value set id, flags.
+- **Chunks.** Records are kept as numbers in a chunk of `traceChunkSize` (4096) calls; once
+  every call of a full chunk has ended, the chunk is packed into one comma-separated string
+  and its numeric table is reused. A call that is still running (a coroutine paused across
+  frames) keeps its chunk unpacked until it ends. `chunkStarts`/`chunkEnds` let a time
+  window skip whole chunks.
+- **Node ids are creation order.** From format version 3 a node's id is the order it was
+  created in (still parents first), so a record can name its node the moment it starts,
+  before the tree is final. The decoder sorts each node's children by name for version 3,
+  which keeps the flame graph's left-to-right order as before.
+- **Coroutines.** A call that pauses (its coroutine yielded through `async:Yield`) gets a
+  provisional end where it paused; when it resumes the end is reopened and a segment
+  `callIndex,pausedAtUs,resumedAtUs,nodeId` is recorded (the node it continued under, since
+  a resumed coroutine is re-attached under whatever resumed it). One call, several slices.
+  `call.wall` counts the pauses, `call.incl` does not.
+- **Flags.** `1` cut short by an error (left open when an outer call returned, or when the
+  frame closed with it still open on the main thread, or its coroutine died), `2` still
+  running at Stop, `4` paused at Stop (with `2`; ends where it paused).
+- **Frames.** Each frame boundary (`_OnFrame`) records its time in `frameEnds`, so any call
+  maps to its frame (`trace:FrameOf`) and any frame to its time span (`trace:FrameBounds`).
+
+### Stop when full
+
+`traceMaxCalls` (default 1,000,000) bounds the trace. The call that would exceed it is not
+recorded and the whole capture **freezes** at that moment: nothing more is recorded in the
+tree, the frames or the trace, so all three end at the same instant and nothing is dropped
+or truncated from either end. Calls in flight keep running normally (the wrappers pass
+through) and are saved as unfinished. On the next frame the engine calls
+`onAutoStop('traceFull')` once; PerfSessions stops and saves the session with
+`stats.stopReason = 'traceFull'` (`'maxDuration'` for the duration limit). `perf:IsActive()`
+stays true until Stop, so nothing can start a second capture in between.
+
+### Arguments and return values (deduplicated)
+
+With `traceArgs` on, each call's arguments and return values are recorded:
+
+- **Each distinct value is described once.** A value becomes text the first time it is seen
+  and is stored in `trace.values` (index = value id). Numbers and strings are found by value,
+  so a repeated `3` or `"Backpack"` costs one lookup.
+- **Each distinct argument list is stored once.** A list is the value ids joined by commas,
+  stored in `trace.sets` (index = set id); lists are found through a trie keyed by value id,
+  so a repeated list allocates nothing. A call holds only the set id. Measured over 40
+  refresh sweeps of the `test.lua` dump: 96,320 calls, 5,561 distinct argument lists, 756
+  distinct values.
+- **Mutable tables are copied at call time.** A plain table or a Context is described as it
+  is when the call is made (ItemData and request tables are mutated in place across sweeps,
+  so a reference would show later values). Identity-like tables are named once for their
+  lifetime: modules (`<Items>`), prototypes (`<GridFrame prototype>`), prototype instances
+  (`<GridFrame #3>`, numbered in first-seen order), frames (`frame BetterBagsBagBackpack`),
+  ItemData (`item 0_1 #1234`, `empty 0_2`, `gap 0_3`). A Context is `ctx <event> {keys}`
+  without its `event`/`events` keys. Plain tables show up to 8 fields, sorted, two levels
+  deep, strings up to 64 characters.
+- **Secret values are never read.** Each value is checked with `canaccessvalue` (when the
+  client has it; Blizzard's own `Dump.lua` does the same) and a value the addon may not
+  access is recorded as `<secret number>` (its type only).
+- **Describing never breaks the call.** It runs in a `pcall`; a value that cannot be
+  described records `<arguments could not be described>` and the call runs normally.
+
+### The virtual clock
+
+Describing values and packing chunks takes real time that must not be charged to any
+BetterBags function. Both run between two clock reads and add the difference to
+`excluded`; every measurement uses `clock() - excluded`. So call times, self times, frame
+times and the overhead calibration (which runs with the capture's tracing settings) all
+leave it out; `stats.excludedMs` reports the total, and the Summary states it. The game
+frame does take that long, so Blizzard's addon profiler numbers include it.
+
+### Cost and size (measured)
+
+Offline, PUC Lua 5.1, `test.lua` dump, 40 backpack sweeps of 2,408 calls each, CPU per
+sweep: unprofiled 0.67 ms; profiled 2.79 ms; traced 4.82 ms; traced with arguments 12.83 ms
+(of which about 7.9 ms is describing arguments, excluded from every measurement). Saved
+size: about 13 bytes per call for the trace and about 4 more for arguments, so a million
+calls is roughly 13-17 MB of SavedVariables. Turn arguments off when chasing frame-time
+spikes that the extra real time would distort; remove traces once read (§7).
+
+### Reading a trace
+
+`perfFormat:OpenTrace(session)` returns an accessor (nil for a session without a trace):
+`Count`, `Get(index)` (start, finish, wall, incl, name, depth, args/returns set ids, flags,
+segments), `Text(setId)`, `Slices(fromMs, toMs, minMs)` (what ran in a window, one slice per
+uninterrupted stretch of a call), `FrameOf`, `FrameBounds`, `FrameCount`, `Matches`, and
+`Scan(query, from, budget, out)`, which searches names, arguments and return values a budget
+of calls at a time (matches cached per node and per set) so a million-call search can be
+spread over frames. Chunks are decoded on demand and the last 8 are kept.
+`perfFormat:TraceBytes(session)` estimates a trace's saved size.
+
+## 5. Storage (`BetterBagsPerfDB`)
 
 A separate SavedVariable (declared in all five TOCs next to `BetterBagsDB`), not the AceDB
 profile, so profile reset/copy/switch never touches perf data.
@@ -193,7 +308,7 @@ profile, so profile reset/copy/switch never touches perf data.
 ```lua
 BetterBagsPerfDB = {
   version = 1,
-  settings = { ... },        -- see §5
+  settings = { ... },        -- see §6
   sessions = { session, ... },  -- oldest first; trimmed to settings.maxSessions
   nextId = n,
   armNextReload = true|nil,  -- one-shot, consumed at load
@@ -206,23 +321,24 @@ Whether a capture is running is never saved: every load starts with profiling of
 clears the flag and starts a capture with reason `reload`. A capture still running on
 `PLAYER_LOGOUT` is stopped and saved.
 
-### Session format (version 2)
+### Session format (version 3)
 
 Times are integer microseconds, memory integer bytes. Nodes are packed strings so the file
 stays small and loads fast.
 
 ```lua
 session = {
-  id, formatVersion = 2,
+  id, formatVersion = 3,
   meta = { reason, startedAt, stoppedAt, character, realm, gameVersion, gameBuild, tocVersion,
            flavor, addonVersion, preset, blizzardStart, blizzardStop, memoryStartKB,
            memoryStopKB, luaMemoryStartKB, luaMemoryStopKB, backpackItems, bankItems },
-  options = { the engine options used },
+  options = { the engine options used, including trace, traceArgs, traceMaxCalls },
   stats = { durationMs, instrumentedMs, calls, frames, activeFrames, worstFrameMs, aborted,
             nodeCount, droppedNodes, wrappedFunctions, overheadPerCallMs, overheadParentMs|nil,
-            overheadChildMs|nil, allocatedKB, gcFreedKB },
+            overheadChildMs|nil, allocatedKB, gcFreedKB, excludedMs,
+            traceCalls|nil, stopReason|nil ("traceFull"|"maxDuration"), traceRemoved|nil },
   names = { "[all]", "[event] BAG_UPDATE", ... },
-  nodes = { "parentId,nameId,selfUs,calls,maxUs,allocBytes", ... },  -- node 1 is [all]; parents come first
+  nodes = { "parentId,nameId,selfUs,calls,maxUs,allocBytes", ... },  -- node 1 is [all]; ids are creation order, parents first
   functions = { "nameId,calls,inclUs,maxUs", ... },
   aborted = { "nameId,count", ... },  -- calls an error cut short, per function
   histogram = { bounds = {1,5,16,33,50,100}, counts = {7 numbers}, blizzard = {7}|nil },
@@ -230,6 +346,15 @@ session = {
            -- blizzardUs: the readings credited to this frame (version 1: the same-frame reading)
   timeline = { ours = "us,us,...", blizzard = "us,..."|nil,
                calls = "n,n,...", nested = "n,n,..." },  -- per-frame measured calls, and those with a measured caller
+  trace = nil | {                -- §4; absent when tracing was off or the trace was removed
+    chunkSize = 4096, calls = n, full = true|nil, args = true|nil,
+    chunks = { "startDeltaUs,nodeId,argSet,durUs,retSet,flags,...", ... },  -- chunkSize records each
+    chunkStarts = "us,...", chunkEnds = "us,...",   -- first start / latest end per chunk
+    segments = "callIndex,pausedAtUs,resumedAtUs,nodeId,...",
+    frameEnds = "us,...",
+    values = { "nil", "true", "false", "<Items>", "3", ... },  -- value id -> text
+    sets = { "4,5", "", ... },                                  -- set id -> value ids
+  },
 }
 ```
 
@@ -238,10 +363,15 @@ ancestors with zero cost, and always returns a root (a frame listed only for Bli
 reading may have no measured nodes). Any change to this format bumps `formatVersion` and
 updates `format.lua`, the tool, and their specs together. Version 2 changed only the meaning
 of `worst[].blizzardUs` (see "Pairing Blizzard's reading"); version 1 sessions are re-paired
-when decoded. The overhead fields (`overheadParentMs`, `overheadChildMs`, `timeline.calls`,
-`timeline.nested`) are optional additions read only when present.
+when decoded. Version 3 made node ids creation order and added `trace`; older sessions
+decode as before (their children keep id order, which was name order). The overhead fields
+(`overheadParentMs`, `overheadChildMs`, `timeline.calls`, `timeline.nested`) are optional
+additions read only when present.
 
-## 5. Settings and presets
+`perfSessions:RemoveTrace(id)` and `RemoveAllTraces()` delete `session.trace` (the bulk of a
+session's size) and keep everything else, marking `stats.traceRemoved`.
+
+## 6. Settings and presets
 
 All settings are tweakable in the Performance tab's Settings window (a Form, created on
 first open) and clamped by `PerfSessions.LIMITS`:
@@ -259,34 +389,59 @@ first open) and clamped by `PerfSessions.LIMITS`:
 | `trackAllocations` | false | |
 | `pauseGC` | false | |
 | `calibrate` | true | measures per-call profiler overhead at Start (§3) |
+| `traceCalls` | true | record every call in order (§4) |
+| `traceArgs` | true | also record arguments and return values (§4) |
+| `traceMaxCalls` | 1,000,000 | 10,000-2,000,000; the capture stops on its own when the trace is full |
 
 The pipeline preset lists module and prototype names; `spec/debug/perf_sessions_spec.lua`
 scans the source tree and fails if a preset names something that does not exist.
 
-## 6. Performance tab (`/bbdb`)
+## 7. Performance tab (`/bbdb`)
 
 Fourth tab of the debug window. Start/Stop Capture, "Capture next reload", a live status
-line, the saved sessions (newest first; Delete, and Delete All behind a confirmation), and
-four views of the selected session: Flame Graph (search highlights matches and totals them;
-time or allocations), Functions (sortable by every column), Frames (the per-frame timeline
-with Blizzard's numbers behind ours, the worst frames, and the selected frame's flame
-graph), and Summary. A session stopped from anywhere is selected automatically.
+line (with the number of calls traced, or that the trace is full and the capture is
+stopping), the saved sessions (newest first, marked `+trace <size>` when they carry a
+trace; Delete, Delete All, Remove Trace for the selected session, and All Traces, the bulk
+deletes behind a confirmation), and six views of the selected session: Flame Graph (search
+highlights matches and totals them; time or allocations), Functions (sortable by every
+column), Frames (the per-frame timeline with Blizzard's numbers behind ours, the worst
+frames, and the selected frame's flame graph), Calls, Timeline, and Summary. A session
+stopped from anywhere is selected automatically.
+
+- **Calls** lists every traced call in start order, 100 per page: when it started, its
+  frame, how long it took (pauses excluded; `!` = cut short by an error, `...` = unfinished),
+  the function indented by call depth, and `(arguments) -> returned`. **Find** (Enter)
+  keeps only calls whose function name, arguments or return values contain the text; the
+  search scans 50,000 calls per frame from the view's `OnUpdate` (`trace:Scan`), showing its
+  progress, so a million-call trace never freezes the game. Clicking a call shows it in full
+  below the list; **Show in Timeline** jumps to it.
+- **Timeline** shows a strip of every frame's measured time (click a column to show that
+  frame), `< Frame` / `Frame >` / `Whole Capture` buttons, and the `TraceChart` widget: the
+  calls of the shown stretch on a time axis, one row per call depth, colored like the flame
+  graph. The mouse wheel zooms around the cursor, Shift+wheel scrolls rows, clicking a call
+  zooms to it, right-click zooms out; hovering shows the call's start, frame, duration,
+  pauses, state, arguments and return values. Slices narrower than a pixel are skipped, and
+  at most 2,000 bars are drawn, all pooled textures on one canvas (no frame per bar).
+- The Summary reports the trace (calls, whether it has arguments, its saved size), why the
+  capture stopped on its own, and how much profiler time was excluded (§4).
 
 **Subtract overhead** (checkbox next to the view buttons, on by default, disabled for
 sessions without a calibration) switches every time in the tab between adjusted and raw:
 flame graph bars and tooltips (which then also show the raw total and the overhead share),
 the Functions columns Total/Self/Avg (sorting follows; Max stays raw, it is a single call),
 the worst-frame list and frame flame graph, and the timeline. The Summary always gives the
-calibration and the time with and without overhead.
+calibration and the time with and without overhead. Call trace times are always raw: each
+is one call.
 
 The flame graph widget draws pooled textures on one canvas frame and hit-tests the cursor
 against the layout; it never creates a frame per bar. Left-click zooms in, right-click zooms
 out, the mouse wheel scrolls deep trees.
 
-## 7. Offline flame graphs
+## 8. Offline flame graphs and traces
 
 ```
 lua tools/flamegraph/flamegraph.lua <WTF/Account/<ACCOUNT>/SavedVariables/BetterBags.lua> [--list] [--session id|latest] [--frame n] [--metric time|alloc] [--raw] [--out dir]
+lua tools/flamegraph/flamegraph.lua <SavedVariables/BetterBags.lua> --trace [--session id|latest] [--from ms] [--to ms] [--find text] [--out dir]
 ```
 
 Times are overhead-adjusted by default when the session has a calibration; `--raw` keeps
@@ -296,7 +451,16 @@ first), and `.html` (a single self-contained page: click to zoom, right-click to
 search). The SavedVariables file is run in an empty environment. See
 `tools/flamegraph/README.md`.
 
-## 8. Using it for the two motivating problems
+`--trace` writes `betterbags-<id>.trace.json` instead: Chrome trace-event JSON that
+Perfetto (ui.perfetto.dev) and `chrome://tracing` open. Every call is a complete (`X`)
+event (a call that paused gets one per stretch, the later ones marked `continued`) carrying
+its call number, arguments, return values and state, plus a `BetterBags time per frame`
+counter track. `--from`/`--to` keep the calls that ran in that stretch of the capture
+(milliseconds), `--find` the calls whose name, arguments or return values contain the text.
+Calls are decoded and written one at a time (`M.WriteChromeTrace`), so a million-call trace
+never sits in memory as tables. `--list` marks sessions that carry a trace.
+
+## 9. Using it for the motivating problems
 
 - **Data -> draw path:** arm "Capture next reload" to see login, or start a capture, open
   and close bags, loot, sort, then stop. The flame graph shows each `[event]` root, the
@@ -307,8 +471,14 @@ search). The SavedVariables file is run in an empty environment. See
   (`[event] BAG_UPDATE_COOLDOWN` and its `[bucket]` flush into `Bag.OnCooldown` ->
   `Item.UpdateCooldown`, `[event] BAG_UPDATE`, `[event] TOOLTIP_DATA_UPDATE`, ...), and
   whether Blizzard's number is far above ours (the cost is in code the wrappers cannot see).
+- **What ran, in what order, with what inputs:** arm "Capture next reload" and relaunch
+  (a full relaunch, not `/reload`, to see a cold item cache), or capture around the action.
+  In Calls, Find `RequestUpdate` to list every refresh request with its `bags`/`wipe`
+  argument in order, Find `Phase1_DetermineBags` to see which bags each sweep read (its
+  return value), and Find `MarkItemAsNew` to see what was marked recent. Show in Timeline
+  places each one in its frame among the calls around it.
 
-## 9. Testing
+## 10. Testing
 
 - Engine (`spec/debug/perf_engine_spec.lua`): a fake clock (`perf:SetClock`) makes timings
   exact; tests pass `modules = {...}, prototypes = {}, includeRoot = false, calibrate = false`
@@ -320,8 +490,32 @@ search). The SavedVariables file is run in an empty environment. See
   prototypes with it at load.
 - `spec/debug_dump_harness_spec.lua` profiles the real refresh pipeline over the `test.lua`
   dump, checks the results match an unprofiled run, and exports the session with the tool.
+  A second test traces the same sweep with arguments and checks the results are unchanged,
+  the trace holds exactly the call tree's calls, each argument list is stored once, and the
+  Perfetto export has one event per call. (The harness stubs `async:Yield`, so pause slices
+  are covered by the trace spec, not here.)
+- Call trace (`spec/debug/perf_trace_spec.lua`): start order and times, chunk boundaries,
+  a yielding call kept as one call with a slice per stretch, the three ways a call is cut
+  short or left unfinished, stop-when-full (nothing dropped, `onAutoStop('traceFull')`),
+  frame mapping, argument and return capture, deduplication, table/frame/Context/ItemData/
+  prototype descriptions, copying a mutable argument at call time, the virtual clock,
+  `canaccessvalue`, an undescribable argument, `Enter` payloads, and `Scan`.
+- Entry-point payloads: `spec/events_spec.lua` and `spec/context_spec.lua` ("with a call
+  trace that records arguments"). Sessions: `spec/debug/perf_sessions_spec.lua` (trace
+  defaults and limits, stop when full, `RemoveTrace`/`RemoveAllTraces`). Views:
+  `spec/frames/tracechart_spec.lua` and the "call trace" block of
+  `spec/frames/perfpane_spec.lua`. Export: `spec/tools/flamegraph_spec.lua` ("call traces").
+- The pane's trace tests find the first traced test call instead of assuming its index:
+  `StartCapture` sends `perf/StateChanged`, and AceEvent's registry keeps every earlier
+  test's listener, so the trace starts with one `[msg]` call per listener.
+- Lua 5.1 allows at most 60 upvalues per function. The engine keeps its hot state in file
+  upvalues (the wrappers read them on every call), so a function that touches many of them
+  must be split (`resetState` is `resetTree` + `resetFrames` + `resetTrace`). Check with
+  `~/.local/lua51/bin/luac -p debug/perf/engine.lua`.
 - Mocks added from Blizzard's API docs: `debugprofilestop`, `Enum.AddOnProfilerMetric`,
-  `UpdateAddOnMemoryUsage`/`GetAddOnMemoryUsage`, `date`, and the Button/CheckButton
+  `UpdateAddOnMemoryUsage`/`GetAddOnMemoryUsage`, `date`, the Button/CheckButton
   `Enable`/`Disable`/`IsEnabled`/`LockHighlight`/`UnlockHighlight`/`SetChecked`/`GetChecked`
-  and `IsVisible` widget methods. `C_AddOnProfiler` is deliberately left undefined so code
-  must cope with clients that lack it; specs install it when needed.
+  and `IsVisible` widget methods, and the EditBox `SetFocus`/`ClearFocus`/`HasFocus`
+  methods. `C_AddOnProfiler` is deliberately left undefined so code must cope with clients
+  that lack it; specs install it when needed. `canaccessvalue` is left undefined too (the
+  engine checks for it); the trace spec installs one to test secret values.
