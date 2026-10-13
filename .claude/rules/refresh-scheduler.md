@@ -280,8 +280,12 @@ item lands in Recent Items. `spec/loader_spec.lua` covers the loader's hold and
 ## 9. Redraw-Only Settings
 
 A setting that only changes how the bags look needs no read of the bags and no new data,
-only a draw. Such settings send `bags/Redraw` (`ctx`, optionally `{ buttons = true }`), and
-`refresh:Redraw(ctx, buttons)` draws the committed data again: the backpack always (its
+only a draw. Such settings send `bags/Redraw` (`ctx`, optionally `{ buttons = true }`).
+`refresh:RequestRedraw(buttons)` draws on the next frame, and every request made in the same
+frame shares that one draw, restyling the buttons if any request asked for it: dragging a
+slider asks on every value it passes, and a captured glow-intensity drag asked for 22
+restyling redraws in one frame before this. `refresh:Redraw(ctx, buttons)` draws the
+committed data again: the backpack always (its
 `Draw` defers itself while it is hidden, as the draw after a sweep does) and the bank only
 while it is shown (a deferred bank draw would show stale contents on the next visit). It
 goes around the queue: a draw of committed data is allowed while a sweep is parked, and the
@@ -317,6 +321,6 @@ same way the client does.
 
 Coverage: `spec/config/config_redraw_spec.lua` (each setting above sends `bags/Redraw`, with
 or without buttons, and a data setting still sends `bags/FullRefreshAll`),
-`spec/refresh_spec.lua` ("redraw-only settings"), `spec/themes_spec.lua` ("ApplyTheme
+`spec/refresh_spec.lua` ("redraw-only settings", including one draw per frame), `spec/themes_spec.lua` ("ApplyTheme
 refresh"), `spec/frames/item_spec.lua` ("redraws once after the buttons were restyled", for
 items and free slots), `spec/forms/slider_spec.lua` ("saving").

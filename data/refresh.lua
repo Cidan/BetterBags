@@ -59,6 +59,27 @@ function refresh:Init()
   -- While held (from OnEnable until the startup read), requests wait in the queue.
   self._held = false
   self._startup = nil
+  -- The redraw asked for this frame (RequestRedraw), if any.
+  self._redrawPending = nil
+end
+
+-- RequestRedraw draws the bags again on the next frame (Redraw). Every request made in the
+-- same frame shares that one draw, which restyles the buttons if any request asked for it:
+-- dragging a slider asks on every value it passes, and a captured glow-intensity drag asked
+-- for 22 redraws in one frame, each restyling every button.
+---@param buttons? boolean
+function refresh:RequestRedraw(buttons)
+  local pending = self._redrawPending
+  if pending then
+    pending.buttons = pending.buttons or buttons == true
+    return
+  end
+  pending = { buttons = buttons == true }
+  self._redrawPending = pending
+  C_Timer.After(0, function()
+    self._redrawPending = nil
+    self:Redraw(context:New('Redraw'), pending.buttons)
+  end)
 end
 
 -- Redraw draws the bags again from their committed data: no bag is read and nothing is
@@ -395,9 +416,9 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/RefreshBackpack', function()
     self:RequestUpdate({ backpack = true })
   end)
-  -- bags/Redraw (ctx, { buttons = boolean }?) redraws without reading the bags (Redraw).
-  events:RegisterMessage('bags/Redraw', function(ctx, options)
-    self:Redraw(ctx, options ~= nil and options.buttons == true)
+  -- bags/Redraw (ctx, { buttons = boolean }?) redraws without reading the bags.
+  events:RegisterMessage('bags/Redraw', function(_, options)
+    self:RequestRedraw(options ~= nil and options.buttons == true)
   end)
   events:RegisterMessage('bags/RefreshBank', function()
     self:RequestUpdate({ bank = true })

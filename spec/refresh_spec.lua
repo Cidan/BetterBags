@@ -566,5 +566,30 @@ describe("Refresh Module", function()
       events:SendMessage(newContext(), "bags/Redraw", { buttons = true })
       assert.spy(refresh.Redraw).was.called_with(match._, match._, true)
     end)
+
+    -- Dragging a slider asks for a redraw on every value it passes, many per frame (a
+    -- captured glow-intensity drag asked for 22 in one frame, each restyling every button).
+    it("draws once on the next frame for every redraw asked for in a frame", function()
+      local frame = {}
+      _G.C_Timer.After = function(_, fn) table.insert(frame, fn) end
+      refresh:OnEnable()
+      spy.on(refresh, "Redraw")
+      events:SendMessage(newContext(), "bags/Redraw")
+      events:SendMessage(newContext(), "bags/Redraw", { buttons = true })
+      events:SendMessage(newContext(), "bags/Redraw")
+      assert.spy(refresh.Redraw).was_not.called()
+      assert.equal(1, #frame)
+      frame[1]()
+      assert.spy(refresh.Redraw).was.called(1)
+      assert.spy(refresh.Redraw).was.called_with(match._, match._, true)
+
+      -- The next frame's requests get their own draw, without the restyle.
+      frame = {}
+      events:SendMessage(newContext(), "bags/Redraw")
+      assert.equal(1, #frame)
+      frame[1]()
+      assert.spy(refresh.Redraw).was.called(2)
+      assert.spy(refresh.Redraw).was.called_with(match._, match._, false)
+    end)
   end)
 end)
