@@ -451,4 +451,8 @@ in captures, so a capture shows whether the open waited for the data or timed ou
 
 Coverage: `spec/refresh_spec.lua` ("opening the bank": shown at once, read once primed and not
 again on the timeout; read on the timeout and again when the data arrives; nothing for an ended
-open), `spec/loader_spec.lua` ("primes every bank bag, and only bank bags, in one load").
+open), `spec/loader_spec.lua` ("primes every bank bag, and only bank bags, in one load"), and
+`spec/refresh_pipeline_spec.lua` ("reads the bank once, warm, through a bank open in the
+captured order": replays a captured open, cold item data, the banker interaction, then the data
+and the tooltip resolution arriving, through the real pipeline and queue; it fails with the old
+immediate read).

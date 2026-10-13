@@ -3381,6 +3381,93 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
 
       -- After the one read at login, tooltip text resolving, gear sets and upgrade inputs
       -- changing are recalculated from the items already read (refresh-scheduler.md §10).
+      -- Replays the bank open of a capture (session #1, 21:49) in its order: BANKFRAME_OPENED
+      -- at 1.25 s with the bank's item data not loaded (478 of 491 items read cold), the banker
+      -- interaction's recalculation at 2.08 s, then at 2.51 s the item data arriving with the
+      -- tooltip resolution it sets off. The bank must be read once, warm, and not move after.
+      it("reads the bank once, warm, through a bank open in the captured order", function()
+        items:OnEnable()
+        refresh:OnEnable()
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+
+        local bankCold = true
+        local getItemInfo = _G.C_Item.GetItemInfo
+        override(_G.C_Item, "GetItemInfo", function(item)
+          local id = tonumber(tostring(item):match("item:(%d+)") or item)
+          if bankCold and id and id >= 601 and id <= 603 then return nil end
+          return getItemInfo(item)
+        end)
+        mockContainer[6] = {
+          { itemID = 601, guid = "g601", count = 1 },
+          { itemID = 602, guid = "g602", count = 1 },
+          { itemID = 603, guid = "g603", count = 1 },
+        }
+        local loader = addon:GetModule("ItemLoader")
+        local bankPrimed
+        override(loader, "PrimeBank", function(_, cb) bankPrimed = cb end)
+        override(database, "GetShowBankTabs", function() return false end)
+        override(_G, "GameMenuFrame", { IsShown = function() return false end })
+        local shown = 0
+        override(addon, "Bags", { Bank = { bankTab = 6, Show = function() shown = shown + 1 end } })
+        override(addon, "atBank", false)
+        override(addon, "atInteracting", false)
+
+        local bankReads, coldReads = 0, 0
+        local harvest = items.Phase2_Harvest
+        override(items, "Phase2_Harvest", function(self, kind, ...)
+          if kind == const.BAG_KIND.BANK then
+            bankReads = bankReads + 1
+            if bankCold then coldReads = coldReads + 1 end
+          end
+          return harvest(self, kind, ...)
+        end)
+        local layouts = {}
+        local commit = items.Phase11_CommitAndDispatch
+        override(items, "Phase11_CommitAndDispatch", function(self, ectx, kind, ...)
+          local result = commit(self, ectx, kind, ...)
+          if kind == const.BAG_KIND.BANK then
+            local order, cold = {}, false
+            for _, item in ipairs(self.slotInfo[kind].sortedItems) do
+              order[#order + 1] = item.slotkey .. "|" .. tostring(item.itemInfo and item.itemInfo.category)
+              if item.harvestIncomplete then cold = true end
+            end
+            table.insert(layouts, { order = table.concat(order, ","), cold = cold })
+          end
+          return result
+        end)
+
+        fire("BANKFRAME_OPENED")
+        drain()
+        assert.equal(1, shown, "the bank shows at once")
+        assert.equal(0, bankReads, "and is not read while its item data loads")
+
+        -- What core/hooks.lua sends when the banker interaction opens the backpack
+        -- (spec/core/interaction_refresh_spec.lua).
+        addon.atInteracting = true
+        events:SendMessage(context:New("PLAYER_INTERACTION_MANAGER_FRAME_SHOW"), "bags/Rederive", {
+          resetLayout = true, backpack = true,
+          bank = items:NeedsInteractionRecalculation(const.BAG_KIND.BANK),
+        })
+        drain()
+        assert.equal(0, #layouts, "the interaction does not recalculate a bank that has not been read")
+
+        bankCold = false
+        bankPrimed()
+        drain()
+        events:SendMessage(context:New("TooltipDataResolved"), "bags/Rederive", { backpack = true, bank = true })
+        drain()
+
+        assert.equal(1, bankReads, "read once")
+        assert.equal(0, coldReads, "after its item data loaded")
+        assert.equal(2, #layouts)
+        assert.is_false(layouts[1].cold or layouts[2].cold, "nothing committed cold")
+        assert.equal(layouts[1].order, layouts[2].order, "nothing moves after the open")
+      end)
+
       it("recalculates, without reading the bags again, what changes after the read", function()
         items:OnEnable()
         refresh:OnEnable()
