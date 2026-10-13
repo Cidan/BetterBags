@@ -372,7 +372,8 @@ request, is swept only while it is open.
 |---|---|
 | Config data settings (upgrade provider, section and item order, groups, category filters, stacking except Split Transmogged, free space, gaps) | `bags/Rederive { resetLayout, buttons }` |
 | Categories: create from an item, delete, rename, hide/show, reprocess (`categories:ReprocessAllItems`), category pane edits, search categories, item drops on a header, group drag and drop | `bags/Rederive { resetLayout, buttons }` |
-| Show Bags toggles (context menu, GW2 theme), in-bag search toggle (`themes:SetSearchState`) | `bags/Rederive { resetLayout, buttons }` |
+| In-bag search toggle (`themes:SetSearchState`) | `bags/Rederive { resetLayout, buttons }` |
+| Show Bags toggles (context menu, GW2 theme) | `bags/Rederive { resetLayout }`: nothing a button draws depends on the view except through data its draw record holds, so unchanged buttons skip |
 | Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout }` |
 | `EQUIPMENT_SETS_CHANGED` | derive of both kinds with `resetLayout` |
 | Tooltip resolved (`TooltipScanner:OnTooltipDataResolved`) | `bags/Rederive { backpack, bank = atBank }` |

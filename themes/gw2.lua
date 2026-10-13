@@ -133,7 +133,7 @@ local gw2Theme = {
           end
           database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
           bag.slots:Hide()
-          events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+          events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
         else
           if addon.isRetail and bag.kind == const.BAG_KIND.BANK then
             database:SetShowBankTabs(true)
@@ -142,7 +142,7 @@ local gw2Theme = {
           database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
           bag.slots:Draw(ctx)
           bag.slots:Show()
-          events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+          events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
         end
       end)
 

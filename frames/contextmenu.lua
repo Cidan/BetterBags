@@ -273,7 +273,7 @@ function contextMenu:CreateContextMenu(bag)
 					end
 					database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
 					bag.slots:Hide()
-					events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+					events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
 				elseif bag.slots then
 					if usesBankTabs then
 						database:SetShowBankTabs(true)
@@ -282,7 +282,7 @@ function contextMenu:CreateContextMenu(bag)
 						database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
 					bag.slots:Draw(ctx)
 					bag.slots:Show()
-					events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
+					events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
 				end
 			end,
 		})

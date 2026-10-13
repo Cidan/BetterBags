@@ -91,14 +91,11 @@ function masque:OnEnable()
     skin(item, decoration)
   end)
 
-  events:RegisterMessage('item/Clearing', function(_, item, decoration)
-    ---@cast item Item
-    if not item.kind then return end
-    if themes:GetCurrentTheme().DisableMasque then return end
-    local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
-    group:RemoveButton(decoration)
-    self.added[decoration] = nil
-  end)
+  -- A released item button stays in its group. Item buttons exist for the whole session
+  -- (created at boot), and Masque's RemoveButton is a full skin pass restoring the default
+  -- look, which the button's next draw undoes with another (leaving Show Bags spent 9.5 ms
+  -- un-skinning 145 empty-slot buttons). A released button is hidden; its next draw
+  -- re-skins it, or moves it to the other group when it is reused for the other bag.
 
   events:RegisterMessage('bagbutton/Updated', function(_, bag)
     if themes:GetCurrentTheme().DisableMasque then return end

@@ -126,9 +126,10 @@ describe("ContextMenu 'Show Bags' toggle", function()
     override(events, "SendMessage", function(_, _, event, options)
       table.insert(sentMessages, event)
       -- Show Bags changes categories, stacking and layout: every bag is recalculated with a
-      -- fresh layout and fully redrawn buttons (refresh-scheduler.md §10).
+      -- fresh layout (refresh-scheduler.md §10). Nothing a button draws depends on the view
+      -- except through data its draw record holds, so unchanged buttons skip their redraw.
       if event == "bags/Rederive" then
-        assert.are.same({ resetLayout = true, buttons = true }, options)
+        assert.are.same({ resetLayout = true }, options)
       end
     end)
 

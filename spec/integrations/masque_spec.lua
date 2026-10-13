@@ -1,7 +1,7 @@
 -- masque_spec.lua -- The Masque integration (integrations/masque.lua).
 --
--- Item buttons are redrawn without being released between passes, so Masque no longer
--- sees an item/Clearing (RemoveButton) before every item/Updated. Masque's AddButton
+-- Item buttons are redrawn without being released between passes, and a release no longer
+-- removes a button from its group (item/Clearing). Masque's AddButton
 -- returns early for a button already in the group, so the integration must re-skin it
 -- instead, or BetterBags' quality border (texcoords, blend) would stay drawn over the skin.
 
@@ -108,13 +108,29 @@ describe("Masque integration", function()
     assert.are.same({ "skin", "skin", "skin" }, groups["Backpack"].log)
   end)
 
-  it("adds a button again after it was released", function()
+  -- Item buttons exist for the whole session (they are created at boot), so a released
+  -- button stays in its group. Masque's RemoveButton is a full pass restoring the default
+  -- look, which the button's next draw would undo with another full pass: leaving Show Bags
+  -- spent 9.5 ms un-skinning 145 empty-slot buttons. The next draw re-skins it as any
+  -- redraw does.
+  it("keeps a released button in its group, and skins it again when it is drawn", function()
     local item, decoration = newButton(const.BAG_KIND.BACKPACK)
     send("item/Updated", item, decoration)
     send("item/Clearing", item, decoration)
-    send("item/Updated", item, decoration)
-    assert.are.same({ "skin", "unskin", "skin" }, groups["Backpack"].log)
+    assert.are.same({ "skin" }, groups["Backpack"].log, "a release does not un-skin")
     assert.is_true(groups["Backpack"].Buttons[decoration])
+    send("item/Updated", item, decoration)
+    assert.are.same({ "skin", "skin" }, groups["Backpack"].log)
+  end)
+
+  it("moves a released button reused for the other bag into that bag's group", function()
+    local item, decoration = newButton(const.BAG_KIND.BACKPACK)
+    send("item/Updated", item, decoration)
+    send("item/Clearing", item, decoration)
+    item.kind = const.BAG_KIND.BANK
+    send("item/Updated", item, decoration)
+    assert.is_nil(groups["Backpack"].Buttons[decoration])
+    assert.is_true(groups["Bank"].Buttons[decoration])
   end)
 
   it("moves a button reused for the other bag into that bag's group", function()
