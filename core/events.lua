@@ -33,6 +33,12 @@ local perf = addon:GetModule('Perf')
 local events = addon:NewModule('Events')
 
 function events:Init()
+  -- Re-initializing (specs do) must not leave the old handler registered: its dispatchers
+  -- read the module's current maps, so it would deliver every later event and message again.
+  if self._eventHandler and self._eventHandler.UnregisterAllEvents then
+    self._eventHandler:UnregisterAllEvents()
+    self._eventHandler:UnregisterAllMessages()
+  end
   self._eventHandler = {}
   self._messageMap = {}
   self._eventMap = {}

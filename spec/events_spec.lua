@@ -86,6 +86,30 @@ describe("Events", function()
 
   -- ─── SendMessageIf ──────────────────────────────────────────────────────────
 
+  -- Init replaces the AceEvent handler. The old one stayed registered and kept dispatching
+  -- every later message to the new handlers again (a spec that re-initialized Events made
+  -- one message reach a refresh handler seven times).
+  describe("Init", function()
+    it("unregisters the previous handler, so a message reaches each listener once", function()
+      local ctx = addon:GetModule("Context"):New("test")
+      events:RegisterMessage("test/ReInit", function() end)
+      events:Init()
+      local calls = 0
+      events:RegisterMessage("test/ReInit", function() calls = calls + 1 end)
+      events:SendMessage(ctx, "test/ReInit")
+      assert.equal(1, calls)
+    end)
+
+    it("unregisters the previous handler's events, so an event reaches each listener once", function()
+      events:RegisterEvent("TEST_REINIT_EVENT", function() end)
+      events:Init()
+      local fired = 0
+      events:RegisterEvent("TEST_REINIT_EVENT", function() fired = fired + 1 end)
+      LibStub("AceEvent-3.0").events:Fire("TEST_REINIT_EVENT")
+      assert.equal(1, fired)
+    end)
+  end)
+
   describe("SendMessageIf", function()
 
     it("sends the message when event is provided", function()
