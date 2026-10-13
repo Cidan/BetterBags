@@ -61,7 +61,7 @@ leaves on the following close once it is old enough.
 - **The on-close refresh moved here from `backpack.proto:OnHide`.** Leaving it there as well would
   sweep twice on a normal close. ESC used to skip it entirely, so held gaps also failed to
   collapse on an ESC close.
-- **Bank:** the backpack's `OnRefresh` sends `bags/RefreshBackpack`. The retail bank's `OnRefresh`
+- **Bank:** the backpack's `OnRefresh` recalculates the backpack (`bags/Rederive { backpack }`, refresh-scheduler.md §10). The retail bank's `OnRefresh`
   does nothing, and the Classic/Era bank's request does not sweep once `addon.atBank` is false.
   The bank does not need it: every bank open sweeps with `resetLayout` (`BANKFRAME_OPENED`), which
   re-resolves categories after the expiry that ran when the bank closed.

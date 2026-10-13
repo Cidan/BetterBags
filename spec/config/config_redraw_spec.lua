@@ -1,7 +1,8 @@
 -- config_redraw_spec.lua -- Which refresh each setting in the config window asks for
 -- (config/config.lua). A setting that only changes how the bags look redraws the bags
--- (bags/Redraw); a setting the data phase reads still asks for a full refresh. See
--- .claude/rules/refresh-scheduler.md §9.
+-- (bags/Redraw, refresh-scheduler.md §9); a setting the data phase reads recalculates
+-- them from the items already read (bags/Rederive, §10); only a setting a bag read itself
+-- depends on reads the bags again (bags/FullRefreshAll).
 
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
@@ -94,6 +95,15 @@ describe("Config settings refreshes", function()
       GetStackingOptions = function() return { mergeStacks = false } end,
       -- Read while the window is built (the profiles section).
       GetProfileCharacterCounts = function() return {} end,
+      SetUpgradeIconProvider = function() end,
+      SetSectionSortType = function() end,
+      SetItemSortType = function() end,
+      GetSectionSortType = function() return 1 end,
+      GetItemSortType = function() return 1 end,
+      SetGroupsEnabled = function() end,
+      GetCategoryFilters = function() return {} end,
+      SetShowAllFreeSpace = function() end,
+      SetPreserveItemGaps = function() end,
     }
     for key, fn in pairs(dbStubs) do
       saved[#saved + 1] = { db, key, db[key] }
@@ -143,8 +153,47 @@ describe("Config settings refreshes", function()
     end)
   end
 
-  it("still refreshes in full for a setting the data phase reads", function()
-    for _, opts in ipairs(settings("Merge Stacks")) do
+  -- The data phase reads these; their old full refresh (a wipe) also rebuilt the layout and
+  -- redrew every button, which the recalculation still does.
+  local derived = {
+    { "Upgrade Icon Provider", "Pawn" },
+    { "Section Order", "Alphabetically" },
+    { "Item Order", "Alphabetically" },
+    { "Enable Groups", true },
+    { "Equipment Location", true },
+    { "Expansion", true },
+    { "Equipment Set", true },
+    { "Recent Items", true },
+    { "Trade Skill", true },
+    { "Type", true },
+    { "Sub Type", true },
+    { "Merge Stacks", true },
+    { "Merge Unstackable", true },
+    { "Don't Merge Partial Stacks", true },
+    { "Unmerge on Interactions", true },
+    { "Show All Free Space Slots", true },
+    { "Preserve Empty Slots as Gaps", true },
+  }
+  for _, case in ipairs(derived) do
+    it("recalculates the bags for " .. case[1] .. ", with a fresh layout and redrawn buttons", function()
+      for _, opts in ipairs(settings(case[1])) do
+        sent = {}
+        opts.setValue(context:New("Test"), case[2])
+        local refreshes = {}
+        for _, s in ipairs(sent) do
+          if s.message:match("^bags/") then refreshes[#refreshes + 1] = s end
+        end
+        assert.equal(1, #refreshes)
+        assert.equal("bags/Rederive", refreshes[1].message)
+        assert.same({ resetLayout = true, buttons = true }, refreshes[1].args[1])
+      end
+    end)
+  end
+
+  -- The item hash, which decides what stacks, includes the transmog appearance only with
+  -- this setting; the hash is computed when a slot is read.
+  it("reads the bags again for Split Transmogged Items", function()
+    for _, opts in ipairs(settings("Split Transmogged Items")) do
       sent = {}
       opts.setValue(context:New("Test"), true)
       assert.same({ "bags/FullRefreshAll" }, messages())

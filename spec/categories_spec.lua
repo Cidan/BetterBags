@@ -543,4 +543,60 @@ describe("Categories", function()
       assert.is_nil(categories.itemsWithNoCategory[itemID])
     end)
   end)
+
+  -- Categories are applied by the data phase, so a category change recalculates the bags
+  -- from the items already read (refresh-scheduler.md §10), with a fresh layout and redrawn
+  -- buttons as the old full refresh had.
+  describe("refreshes", function()
+    local sent, savedSend
+
+    -- Earlier spec files patch the shared Events module's SendMessage without restoring it,
+    -- so the messages are captured at SendMessage itself.
+    before_each(function()
+      sent = {}
+      savedSend = events.SendMessage
+      events.SendMessage = function(_, _, message, options)
+        if message:match("^bags/") then
+          table.insert(sent, { message = message, options = options })
+        end
+      end
+    end)
+
+    after_each(function()
+      events.SendMessage = savedSend
+    end)
+
+    local function assertRecalculated()
+      assert.is_true(#sent > 0, "a refresh was requested")
+      for _, s in ipairs(sent) do
+        assert.equal("bags/Rederive", s.message)
+        assert.same({ resetLayout = true, buttons = true }, s.options)
+      end
+    end
+
+    it("recalculates after a category is deleted", function()
+      dbCategories["Gone"] = {name = "Gone", itemList = {}}
+      categories:DeleteCategory(context:New("Test"), "Gone")
+      assertRecalculated()
+    end)
+
+    it("recalculates after a category is renamed", function()
+      dbCategories["Before"] = {name = "Before", itemList = {}, save = true}
+      categories:RenameCategory(context:New("Test"), "Before", "After")
+      assertRecalculated()
+    end)
+
+    it("recalculates after a category is hidden, shown or toggled", function()
+      local ctx = context:New("Test")
+      categories:HideCategory(ctx, "Shy")
+      categories:ShowCategory(ctx, "Shy")
+      categories:ToggleCategoryShown(ctx, "Shy")
+      assertRecalculated()
+    end)
+
+    it("recalculates when every item is reprocessed", function()
+      categories:ReprocessAllItems(context:New("Test"))
+      assertRecalculated()
+    end)
+  end)
 end)

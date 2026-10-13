@@ -147,7 +147,7 @@ end
 
 ---@param ctx Context
 function backpack.proto:OnRefresh(ctx)
-	events:SendMessage(ctx, "bags/RefreshBackpack")
+	events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false })
 end
 
 ---@return FrameStrata

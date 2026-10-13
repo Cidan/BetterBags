@@ -59,7 +59,7 @@ function addon.OnUpdate(ctx)
     addon.Bags.Backpack:Show(ctx)
     addon:UpdateButtonHighlight()
     if addon.atInteracting then
-      events:SendMessage(ctx, 'bags/FullRefreshAll')
+      events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
     end
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
@@ -93,7 +93,7 @@ function addon.CloseInteractionWindow(ctx, _, interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
   addon.backpackShouldClose = true
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
   events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 

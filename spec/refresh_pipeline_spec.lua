@@ -266,6 +266,12 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       items:ClearItemCache(ctx)
       ctx:Set("wipe", true)
     end
+    if opts and opts.derive then
+      ctx:Set("derive", true)
+    end
+    if opts and opts.restyle then
+      ctx:Set("restyle", true)
+    end
     items:RefreshBackpack(ctx)
     return items.slotInfo[const.BAG_KIND.BACKPACK]
   end
@@ -789,7 +795,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
   -- each item and reused while the provider and the upgrade generation are unchanged. Every
   -- input of a verdict must invalidate it: these tests pin each one.
   describe("upgrade verdict cache", function()
-    local asked, verdicts, registered, timers, sent, provider
+    local asked, verdicts, registered, timers, sent, sentOptions, provider
 
     local function askedKeys()
       local keys = {}
@@ -818,7 +824,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end
 
     before_each(function()
-      asked, verdicts, registered, timers, sent = {}, {}, {}, {}, {}
+      asked, verdicts, registered, timers, sent, sentOptions = {}, {}, {}, {}, {}, {}
       override(database, "GetUpgradeIconProvider", function() return provider end)
       override(database, "GetUpgradeIconProviderUserSet", function() return true end)
       override(events, "RegisterEvent", function(_, name, cb) registered[name] = cb end)
@@ -826,6 +832,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local send = events.SendMessage
       override(events, "SendMessage", function(self, ctx, event, ...)
         table.insert(sent, event)
+        sentOptions[#sent] = (...)
         return send(self, ctx, event, ...)
       end)
       items:RegisterCacheEvents()
@@ -879,26 +886,28 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.same({ "0_1", "0_2" }, askedKeys())
     end)
 
+    -- Level and scaling change the bag items' own current item levels, which only a read
+    -- sees (the kept-slot check compares them). Every other input of a verdict lives outside
+    -- the bags, so the bags are recalculated from the items already read, not read again.
     local invalidating = {
-      { "PLAYER_EQUIPMENT_CHANGED", { 5, true } },
-      { "PLAYER_LEVEL_UP", { 70 } },
-      { "PLAYER_LEVEL_CHANGED", { 70, 60 } },
-      { "PLAYER_AVG_ITEM_LEVEL_UPDATE", {} },
-      { "SKILL_LINES_CHANGED", {} },
-      { "LEARNED_SPELL_IN_SKILL_LINE", { 12345, 1, false } },
-      { "PLAYER_SPECIALIZATION_CHANGED", { "player" } },
+      { "PLAYER_EQUIPMENT_CHANGED", { 5, true }, "bags/Rederive" },
+      { "PLAYER_LEVEL_UP", { 70 }, "bags/RefreshBackpack" },
+      { "PLAYER_LEVEL_CHANGED", { 70, 60 }, "bags/RefreshBackpack" },
+      { "PLAYER_AVG_ITEM_LEVEL_UPDATE", {}, "bags/RefreshBackpack" },
+      { "SKILL_LINES_CHANGED", {}, "bags/Rederive" },
+      { "LEARNED_SPELL_IN_SKILL_LINE", { 12345, 1, false }, "bags/Rederive" },
+      { "PLAYER_SPECIALIZATION_CHANGED", { "player" }, "bags/Rederive" },
     }
     for _, case in ipairs(invalidating) do
-      it("asks again after " .. case[1] .. ", and requests a backpack refresh", function()
+      local derive = case[3] == "bags/Rederive"
+      it("asks again after " .. case[1] .. ", and requests a backpack " .. (derive and "recalculation" or "read"), function()
         fire(case[1], unpack(case[2]))
         runTimers()
-        local refreshed = false
-        for _, event in ipairs(sent) do
-          if event == "bags/RefreshBackpack" then refreshed = true end
-          assert.are_not.equal("bags/RefreshBank", event, "the bank is closed")
+        assert.are.same({ case[3] }, sent, "the bank is closed")
+        if derive then
+          assert.are.same({ backpack = true, bank = false }, sentOptions[1])
         end
-        assert.is_true(refreshed)
-        refreshBackpack()
+        refreshBackpack(derive and { derive = true } or nil)
         assert.are.same({ "0_1", "0_2" }, askedKeys())
       end)
     end
@@ -927,11 +936,16 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       fire("SKILL_LINES_CHANGED")
       assert.equal(1, #timers)
       runTimers()
-      local count = 0
-      for _, event in ipairs(sent) do
-        if event == "bags/RefreshBackpack" then count = count + 1 end
-      end
-      assert.equal(1, count)
+      assert.are.same({ "bags/Rederive" }, sent)
+    end)
+
+    it("reads instead of recalculating when a level change is among the frame's invalidations", function()
+      fire("SKILL_LINES_CHANGED")
+      fire("PLAYER_LEVEL_UP", 70)
+      fire("PLAYER_EQUIPMENT_CHANGED", 5, true)
+      assert.equal(1, #timers)
+      runTimers()
+      assert.are.same({ "bags/RefreshBackpack" }, sent)
     end)
 
     it("asks again when the harvest finds that equipped gear changed, with no event", function()
@@ -962,7 +976,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       -- second backpack refresh.
       runTimers()
       for _, event in ipairs(sent) do
-        assert.are_not.equal("bags/RefreshBackpack", event)
+        assert.is_nil(event:match("^bags/"), "no refresh is requested")
       end
     end)
 
@@ -1011,8 +1025,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal(1, #timers)
       sent = {}
       runTimers()
-      table.sort(sent)
-      assert.are.same({ "bags/RefreshBackpack", "bags/RefreshBank" }, sent)
+      assert.are.same({ "bags/Rederive" }, sent)
+      assert.are.same({ backpack = true, bank = true }, sentOptions[1])
     end)
 
     it("registers its cache events when the module is enabled", function()
@@ -1073,11 +1087,12 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       refreshBackpack()
       assert.is_true(items._upgradeGeneration > generation, "a new generation")
       runTimers()
-      local bank = false
-      for _, event in ipairs(sent) do
-        if event == "bags/RefreshBank" then bank = true end
+      local requested = {}
+      for i, event in ipairs(sent) do
+        if event:match("^bags/") then table.insert(requested, { event, sentOptions[i] }) end
       end
-      assert.is_true(bank, "the open bank is refreshed")
+      assert.are.same({ { "bags/Rederive", { backpack = false, bank = true } } }, requested,
+        "the open bank is recalculated")
     end)
 
     -- A sweep that fails partway through reading the gear must not lose the change it read
@@ -1184,7 +1199,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.same({ "0_1", "0_2" }, askedKeys(), "the sweep that reads the gear warm asks again itself")
       runTimers()
       for _, event in ipairs(sent) do
-        assert.are_not.equal("bags/RefreshBackpack", event, "so it needs no second backpack refresh")
+        assert.is_nil(event:match("^bags/"), "so it needs no second refresh")
       end
       refreshBackpack()
       assert.are.same({}, askedKeys(), "kept once the gear is warm")
@@ -2598,6 +2613,200 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  -- A derive recalculates everything the data phase derives from the items the last read
+  -- committed, without reading a bag slot (.claude/rules/refresh-scheduler.md §10).
+  describe("recalculating without reading (derive)", function()
+    local reads, commits
+
+    before_each(function()
+      reads, commits = 0, 0
+      for _, name in ipairs({ "GetContainerNumSlots", "GetContainerItemInfo", "GetContainerItemID", "GetContainerItemLink" }) do
+        local original = _G.C_Container[name]
+        override(_G.C_Container, name, function(...)
+          reads = reads + 1
+          return original(...)
+        end)
+      end
+      local commit = items.Phase11_CommitAndDispatch
+      override(items, "Phase11_CommitAndDispatch", function(...)
+        commits = commits + 1
+        return commit(...)
+      end)
+    end)
+
+    it("reads no bag slot and keeps the committed items", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+      local item = refreshBackpack().itemsBySlotKey["0_1"]
+      reads = 0
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal(0, reads)
+      assert.equal(item, slotInfo.itemsBySlotKey["0_1"])
+      assert.is_true(slotInfo.itemsBySlotKey["0_2"].isItemEmpty)
+    end)
+
+    it("ends in the same state as a read when the bags did not change", function()
+      override(database, "GetStackingOptions", function() return { mergeStacks = true, mergeUnstackable = true } end)
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 202, guid = "g202a", count = 3 },
+        {},
+        { itemID = 202, guid = "g202b", count = 4 },
+      }
+      mockContainer[1] = { { itemID = 303, guid = "g303", count = 1 }, {} }
+      local function state(slotInfo)
+        local out = { total = slotInfo.totalItems, order = {} }
+        for _, item in ipairs(slotInfo.sortedItems) do
+          table.insert(out.order, item.slotkey .. "|" .. tostring(item.itemInfo and item.itemInfo.category))
+        end
+        for slotkey, item in pairs(slotInfo.itemsBySlotKey) do
+          out[slotkey] = tostring(item.itemInfo and item.itemInfo.category) .. "|" .. tostring(item.stackedCount)
+            .. "|" .. tostring(item.isUpgrade) .. "|" .. tostring(item.itemContextMatchResult)
+        end
+        for slotkey in pairs(slotInfo.visibleItemsBySlotKey) do
+          out["visible " .. slotkey] = true
+        end
+        return out
+      end
+      refreshBackpack()
+      local read = state(refreshBackpack())
+      local derived = state(refreshBackpack({ derive = true }))
+      assert.are.same(read, derived)
+    end)
+
+    it("applies a category change", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.itemID == 101 then return "Swords", 1 end
+        return nil, nil
+      end)
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Swords", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("re-scans a tooltip whose text was dropped, and indexes the new text", function()
+      local texts = { g101 = "Alpha Sword" }
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      override(tooltipScanner, "GetTooltipText", function(_, _, _, guid) return texts[guid] end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      assert.is_nil(search:Search("zephyrium")["0_1"])
+      texts.g101 = "Use: channel zephyrium essence"
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Use: channel zephyrium essence", slotInfo.itemsBySlotKey["0_1"].itemInfo.tooltipText)
+      assert.is_true(search:Search("zephyrium")["0_1"] == true)
+    end)
+
+    it("applies a gear set change", function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "GearSet" end)
+      local sets
+      local equipmentSets = addon:GetModule("EquipmentSets")
+      override(equipmentSets, "GetItemSets", function(_, bagid, slotid)
+        if bagid == 0 and slotid == 1 then return sets end
+        return nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      sets = { "Tank" }
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Gear: Tank", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("refreshes the new-item flag of an item still in its slot", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].itemInfo.isNewItem)
+    end)
+
+    -- The slot changed and its read has not run yet: what the client reports for the slot
+    -- belongs to another item, so none of it is written to the committed one.
+    it("leaves an item whose slot now holds something else as it was", function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      mockContainer[0] = { { itemID = 202, guid = "g202", count = 1 } }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ derive = true })
+      local item = slotInfo.itemsBySlotKey["0_1"]
+      assert.equal("g101", item.itemInfo.itemGUID)
+      assert.is_false(item.itemInfo.isNewItem)
+      assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK]["g101"])
+      assert.are_not.equal("Recent Items", item.itemInfo.category)
+    end)
+
+    -- A kind's first read is a wipe, which never marks the items it finds as new. A derive
+    -- before it must leave it so, or the first read would put the whole bag in Recent Items.
+    it("does nothing for a kind that has never been read, and the first read still marks nothing new", function()
+      override(database, "GetMarkRecentItems", function() return true end)
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      items._firstLoad[const.BAG_KIND.BACKPACK] = true
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack({ derive = true })
+      assert.equal(0, commits)
+      assert.is_true(items._firstLoad[const.BAG_KIND.BACKPACK])
+      local slotInfo = refreshBackpack()
+      assert.are_not.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    -- Closing the bank empties its committed items; drawing a derive of them would show an
+    -- empty bank.
+    it("does nothing for a kind whose items were cleared", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      commits = 0
+      refreshBackpack({ derive = true })
+      assert.equal(0, commits)
+    end)
+
+    it("leaves a sort's sweep pending: only a read shows a sort", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      items:MarkSortSweepPending(const.BAG_KIND.BACKPACK)
+      refreshBackpack({ derive = true })
+      assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("starts a new draw generation only when the buttons are restyled", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      local generation = items._drawGeneration[const.BAG_KIND.BACKPACK]
+      refreshBackpack({ derive = true })
+      assert.equal(generation, items._drawGeneration[const.BAG_KIND.BACKPACK])
+      local slotInfo = refreshBackpack({ derive = true, restyle = true })
+      assert.equal(generation + 1, items._drawGeneration[const.BAG_KIND.BACKPACK])
+      assert.equal(generation + 1, slotInfo.itemsBySlotKey["0_1"].drawGeneration)
+    end)
+
+    -- Upgrade arrows compare with the equipped gear, which a backpack read reads; a derive
+    -- after a gear change must see the new gear.
+    it("reads the equipped gear on a backpack derive", function()
+      local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+      local current = link
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return current end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return current end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      current = link:gsub("505:0", "505:6")
+      refreshBackpack({ derive = true })
+      assert.equal(current, items._equipped[5].link)
+    end)
+  end)
+
   -- One bag read on login (.claude/rules/refresh-scheduler.md §7 and §8). The queue merges
   -- requests that are still waiting, and holds every sweep at startup until the client has
   -- delivered the bags and their item data.
@@ -2659,6 +2868,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
           wipe = ectx:Get("wipe") == true,
           bags = ectx:Get("targetedBags"),
           reset = ectx:Get("resetLayout") == true,
+          derive = ectx:Get("derive") == true,
+          restyle = ectx:Get("restyle") == true,
         })
         return run(self, ectx, kind)
       end)
@@ -2814,6 +3025,89 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
           assert.same(scenario(false), scenario(true))
         end)
       end
+    end)
+
+    -- A derive reads no bag. It rides on a waiting read that reads every bag of its kinds,
+    -- since that read recalculates everything too; a read can never ride on a derive.
+    describe("merging derives", function()
+      before_each(function()
+        addon.atBank = true
+        addon.Bags = { Bank = {} }
+        mockContainer[6] = { { itemID = 201, guid = "g201b", count = 1 } }
+        refresh:RequestUpdate({ backpack = true, bank = true })
+        drain()
+        sweeps = {}
+      end)
+
+      it("merges waiting derives, with the kinds and restyles of both", function()
+        refresh:RequestUpdate({ backpack = true }) -- runs now
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        refresh:RequestUpdate({ derive = true, bank = true, restyle = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.same({ const.BAG_KIND.BANK, true, true }, { sweeps[2].kind, sweeps[2].derive, sweeps[2].restyle })
+        assert.same({ const.BAG_KIND.BACKPACK, true, true }, { sweeps[3].kind, sweeps[3].derive, sweeps[3].restyle })
+      end)
+
+      it("rides on a waiting read of every bag of its kinds", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, restyle = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_false(sweeps[2].derive)
+        assert.is_true(sweeps[2].restyle)
+      end)
+
+      -- A targeted read carries the other bags' items over without refreshing them, so it
+      -- would not do what the derive asked for (a re-scanned tooltip in another bag).
+      it("does not ride on a waiting read of some bags", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_true(sweeps[3].derive)
+      end)
+
+      it("does not ride on a waiting read of fewer kinds", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, bank = true })
+        drain()
+        assert.equal(4, #sweeps)
+        assert.is_true(sweeps[3].derive)
+        assert.is_true(sweeps[4].derive)
+      end)
+
+      it("never lets a read ride on a waiting derive", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_true(sweeps[2].derive)
+        assert.is_false(sweeps[3].derive)
+      end)
+
+      it("rides on a waiting wipe", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_true(sweeps[2].wipe and sweeps[3].wipe)
+      end)
+
+      it("merges a layout reset only with another reset", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, resetLayout = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_false(sweeps[2].reset)
+        assert.is_true(sweeps[3].reset)
+      end)
     end)
 
     describe("the startup read", function()
@@ -2994,6 +3288,31 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
         assert.is_true(fireDelayed(refresh.STARTUP_LOADING_TIMEOUT))
         frame()
         assert.is_function(primed)
+      end)
+
+      -- After the one read at login, tooltip text resolving, gear sets and upgrade inputs
+      -- changing are recalculated from the items already read (refresh-scheduler.md §10).
+      it("recalculates, without reading the bags again, what changes after the read", function()
+        items:OnEnable()
+        refresh:OnEnable()
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        assert.equal(1, harvests)
+        local units = #sweeps
+
+        events:SendMessage(context:New("TooltipDataResolved"), "bags/Rederive", { backpack = true, bank = false })
+        fire("EQUIPMENT_SETS_CHANGED")
+        fire("PLAYER_EQUIPMENT_CHANGED", 5, true)
+        fire("SKILL_LINES_CHANGED")
+        drain()
+        assert.equal(1, harvests, "nothing read the bags again")
+        assert.is_true(#sweeps > units, "the bags were recalculated")
+        for i = units + 1, #sweeps do
+          assert.is_true(sweeps[i].derive)
+        end
       end)
 
       it("lets go of every startup event once the read has run", function()

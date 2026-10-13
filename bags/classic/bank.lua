@@ -90,7 +90,7 @@ end
 
 ---@param ctx Context
 function bank.proto:OnRefresh(ctx)
-	events:SendMessage(ctx, "bags/RefreshBank")
+	events:SendMessage(ctx, 'bags/Rederive', { backpack = false, bank = true })
 end
 
 ---@return Money|nil

@@ -222,8 +222,7 @@ function bagFrame.bagProto:GetName()
 	return self.frame:GetName()
 end
 
--- Refresh will refresh this bag's item database, and then redraw the bag.
--- This is what would be considered a "full refresh".
+-- Refresh recalculates this bag's items from what was last read, and redraws the bag.
 ---@param ctx Context
 function bagFrame.bagProto:Refresh(ctx)
 	self.behavior:OnRefresh(ctx)
@@ -770,7 +769,7 @@ function bagFrame.bagProto:CreateCategoryForItemInCursor(ctx)
 				itemList = { [itemID] = true },
 				save = true,
 			})
-			events:SendMessage(ctx, "bags/FullRefreshAll")
+			events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 		end
 	)
 	GameTooltip:Hide()

@@ -235,13 +235,27 @@ describe("Refresh Module", function()
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { wipe = true, backpack = true, bank = true })
   end)
 
-  it("should trigger a full update on EQUIPMENT_SETS_CHANGED", function()
+  -- Gear sets are read from the set map on every sweep, never from a bag slot, so a set
+  -- change recalculates the bags (refresh-scheduler.md §10).
+  it("should recalculate both bags, with a fresh layout, on EQUIPMENT_SETS_CHANGED", function()
     refresh:OnEnable()
     spy.on(refresh, "RequestUpdate")
     local eventMap = events._eventMap
     assert.is_not_nil(eventMap["EQUIPMENT_SETS_CHANGED"])
     eventMap["EQUIPMENT_SETS_CHANGED"].fn("EQUIPMENT_SETS_CHANGED")
-    assert.spy(refresh.RequestUpdate).was.called_with(match._, { wipe = true, backpack = true, bank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, bank = true, resetLayout = true })
+  end)
+
+  it("routes bags/Rederive, recalculating both bags unless told which", function()
+    refresh:OnEnable()
+    spy.on(refresh, "RequestUpdate")
+    events:SendMessage("bags/Rederive")
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, bank = true })
+    local ctx = addon:GetModule("Context"):New("Test")
+    events:SendMessage(ctx, "bags/Rederive", { backpack = true, resetLayout = true, buttons = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, backpack = true, resetLayout = true, restyle = true })
+    events:SendMessage(ctx, "bags/Rederive", { backpack = false, bank = true })
+    assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, bank = true })
   end)
 
   it("should trigger a bank update on PLAYERBANKSLOTS_CHANGED for non-retail", function()

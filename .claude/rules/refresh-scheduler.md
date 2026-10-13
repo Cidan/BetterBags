@@ -102,6 +102,9 @@ handed to the next frame by `_Arm`.
   `_startup`) is initialized in `refresh:Init()` and reset there; tests re-init per case.
   `refresh:OnEnable()` holds the queue for the startup read (§8); tests that call it and then
   expect sweeps open the hold through the startup events, or assert on the requests made.
+- `RefreshRequest.derive` recalculates the named kinds from their committed items without
+  reading a bag slot, and `RefreshRequest.restyle` makes every button of the swept kinds draw
+  in full (§10). Production code asks for them with `bags/Rederive`.
 - `RefreshRequest.merged` (how many requests a merged one carries) and
   `RefreshRequest.startup` (why the startup read ran: `primed`, `timeout` or `bagShown`) are
   only informational; they show up in profiler call traces as `Refresh._RunUnit`'s argument.
@@ -304,9 +307,9 @@ its setters once even though its data is unchanged.
 | Show Item Level, Show Item Level Color (`GetItemLevelOptions`) | `frames/item.lua` | `bags/Redraw`, buttons |
 | Theme (`themes:ApplyTheme`) | themes, decorations | `bags/Redraw` (the decoration generation it bumps redraws the buttons) |
 
-Settings that look like presentation but are read by the data phase still refresh in full,
-until step 3 gives them a re-derive that reads no bags: Section Order (sorted in
-`items:Phase10_PartitionIntoTabs` and `Phase11_CommitAndDispatch`), in-bag search (`searchBox:GetSearchText` feeds
+Settings that look like presentation but are read by the data phase are recalculated
+instead (§10): Section Order (sorted in `items:Phase10_PartitionIntoTabs` and
+`Phase11_CommitAndDispatch`), in-bag search (`searchBox:GetSearchText` feeds
 `isSearchResult` in Phase 8), the "Show Bags" view (categories and stacking change), free
 space, gaps, sort order, stacking, categories, groups, and the upgrade provider.
 
@@ -320,7 +323,95 @@ and only when it moved the slider. The spec mock's `SetValue` fires `OnValueChan
 same way the client does.
 
 Coverage: `spec/config/config_redraw_spec.lua` (each setting above sends `bags/Redraw`, with
-or without buttons, and a data setting still sends `bags/FullRefreshAll`),
+or without buttons; the data settings are covered in §10),
 `spec/refresh_spec.lua` ("redraw-only settings", including one draw per frame), `spec/themes_spec.lua` ("ApplyTheme
 refresh"), `spec/frames/item_spec.lua` ("redraws once after the buttons were restyled", for
 items and free slots), `spec/forms/slider_spec.lua` ("saving").
+
+## 10. Recalculating Without Reading (`derive`)
+
+Most refreshes do not need the bags read again: what changed is an input of what the data
+phase derives from the items (a setting, a category, the active bank tab, the open
+interaction, tooltip text that finished loading, the equipped gear, a gear set), not the
+items. Until this section, every one of them re-read the bags, and most settings wiped them
+(re-read every slot and rebuilt the search index: about 36 ms against 13 ms for a read in a
+captured login). A recalculation (`derive`) runs every phase after the harvest on the items
+the last read committed.
+
+**How a derive sweeps (`items:RunRefresh` with `ctx` `derive`).**
+- `items:Phase2_Rederive` replaces the harvest. It reads no bag slot: it copies the
+  committed items. Each item still in its slot (its GUID read with `C_Item.GetItemGUID`
+  matches) gets what a read refreshes on a kept slot (`items:RefreshKeptItem`, shared with
+  `ReuseHarvestedSlot`): quest state, tooltip text (a cache hit, or a re-scan after
+  `TOOLTIP_DATA_UPDATE` dropped it), gear sets (the set map is rebuilt at the top of every
+  sweep) and the new-item flag. An item whose slot now holds something else keeps its
+  values: what the client reports for the slot belongs to the other item (writing its
+  new-item flag would put the moved item in Recent Items), and the slot's `BAG_UPDATE` read
+  is on its way.
+- A backpack derive reads the equipped gear (`HarvestEquipment`), as a backpack read does,
+  so upgrade arrows compare with the gear worn now.
+- Phases 3-11 then run exactly as for a read, against a copy of the committed table (so the
+  committed and new tables are distinct, as for a read). With no new GUIDs, nothing is
+  marked as newly acquired; the search index re-indexes only items whose values changed.
+- `restyle` bumps the kind's draw generation (as a wipe does), so every button draws in full.
+
+**Guards (each pinned by a test that fails without it).**
+- A kind with no committed items does nothing: never read (the kind's first sweep, which
+  `_firstLoad` makes a wipe that marks nothing new, must be a read, or that read would put the
+  whole bag in Recent Items) or emptied (`ClearBankCache` on bank close; deriving would draw
+  an empty bank).
+- A derive never shows a sort: it leaves the kind's sort sweep pending (§6), only a read
+  re-reads every bag.
+- `resetLayout` works as for a read.
+
+**What asks for what.** `bags/Rederive` (`ctx`, `{ backpack?, bank?, resetLayout?, buttons? }?`;
+naming neither kind means both) becomes `{ derive = true, ... }`; the bank, as for any
+request, is swept only while it is open.
+
+| Trigger | Request |
+|---|---|
+| Config data settings (upgrade provider, section and item order, groups, category filters, stacking except Split Transmogged, free space, gaps) | `bags/Rederive { resetLayout, buttons }` |
+| Categories: create from an item, delete, rename, hide/show, reprocess (`categories:ReprocessAllItems`), category pane edits, search categories, item drops on a header, group drag and drop | `bags/Rederive { resetLayout, buttons }` |
+| Show Bags toggles (context menu, GW2 theme), in-bag search toggle (`themes:SetSearchState`) | `bags/Rederive { resetLayout, buttons }` |
+| Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout }` |
+| `EQUIPMENT_SETS_CHANGED` | derive of both kinds with `resetLayout` |
+| Tooltip resolved (`TooltipScanner:OnTooltipDataResolved`) | `bags/Rederive { backpack, bank = atBank }` |
+| Upgrade inputs: `PLAYER_EQUIPMENT_CHANGED`, skills, spec; the gear harvest's bank refresh | `bags/Rederive` for the kinds (`items:RequestUpgradeRefresh`) |
+| Bank tab switches (grey-out) | `bags/Rederive { backpack }` |
+| A bag's refresh on close (`OnRefresh`: Recent Items expiry, held gaps); Pawn or SimpleItemLevel registering late | `bags/Rederive` for that bag / both |
+
+The settings and category requests keep everything the full refresh they replace did except
+the reads: a fresh layout and a full redraw of every button. They no longer clear the bank's
+committed items while the bank is closed (the next bank open reads the bank anyway).
+
+**Still reads, and why.**
+- `BAG_UPDATE` batches, `BAG_CONTAINER_UPDATE` (bags attached, removed or swapped; still a
+  wipe), `BANKFRAME_OPENED`, `PLAYERBANKSLOTS_CHANGED`, sorts, the startup read (§8).
+- `PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED`, `PLAYER_AVG_ITEM_LEVEL_UPDATE`: scaling changes
+  the bag items' own current item levels, which only the kept-slot check of a read sees
+  (caches.md §1). When such an event and a derive-only event fall in the same frame, the one
+  refresh is a read.
+- "Split Transmogged Items": the item hash includes the transmog appearance only with this
+  setting, and the hash is computed when a slot is read (`bags/FullRefreshAll`).
+- `DB:ResetMaxItemLevel`: the maximum is learned while slots are read (`bags/FullRefreshAll`).
+- The bank tab panel closing (`frames/bankslots.lua`): it clears the bank cache, then reads.
+- `bags/FullRefreshAll` itself is unchanged (a wipe), for these and for other addons.
+
+**Merging (§7).** A read never rides on a waiting derive (a derive reads nothing). A derive
+rides on a waiting derive, a waiting wipe, or a waiting read that reads every bag of the
+derive's kinds; not on a read of some bags, which carries the other bags' items over without
+refreshing them (a re-scanned tooltip in another bag would be missed). `restyle` merges as
+an or; `resetLayout` as for reads. The startup read absorbs derives like any request.
+
+Coverage: `spec/refresh_pipeline_spec.lua` ("recalculating without reading (derive)": no slot
+read and the same committed items; the same state as a read when nothing changed; category,
+tooltip, gear set and new-item changes applied; a moved item left alone; never-read and
+emptied kinds; a pending sort; the draw generation; the equipped gear. "merging derives";
+"the startup read" → "recalculates, without reading the bags again, what changes after the
+read"; "upgrade verdict cache": which events read and which recalculate),
+`spec/refresh_spec.lua` (routing of `bags/Rederive` and `EQUIPMENT_SETS_CHANGED`),
+`spec/config/config_redraw_spec.lua` (every data setting; Split Transmogged still reads),
+`spec/categories_spec.lua` ("refreshes"), `spec/core/interaction_refresh_spec.lua`,
+`spec/frames/contextmenu_spec.lua`, `spec/tooltip_spec.lua`,
+`spec/bags/bank_context_refresh_spec.lua`, `spec/bags/backpack_spec.lua`, `spec/items_spec.lua`
+(late Pawn registration).

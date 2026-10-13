@@ -56,9 +56,9 @@ resolves — this is how Blizzard's own `GameTooltip` rebuilds itself
   grew without bound (see event-buckets.md).
 - **`OnTooltipDataResolved(resolved)`** iterates the batch; for each resolved
   `dataInstanceID` that maps to one of our cached GUIDs it `RemoveFromCache`s the stale
-  entry (so the next harvest re-scans it warm) and, if anything was invalidated, sends
-  `bags/RefreshBackpack` (always) and `bags/RefreshBank` (**only when `addon.atBank`**, so
-  we never clobber the last-seen bank contents while away). Unknown/`nil` instance ids are
+  entry (so the next sweep re-scans it warm) and, if anything was invalidated, asks for a
+  recalculation (`bags/Rederive`, refresh-scheduler.md §10) of the backpack (always) and the
+  bank (**only when `addon.atBank`**), which re-scans without reading the bags. Unknown/`nil` instance ids are
   still ignored here too (the map can change between a fire and its flush).
 - **Bounded re-scans.** Each resolution-driven invalidation increments
   `resolveRescans[guid]`; once a GUID reaches `MAX_RESOLVE_RESCANS` (3, `data/tooltip.lua`),
@@ -67,11 +67,12 @@ resolves — this is how Blizzard's own `GameTooltip` rebuilds itself
   (dynamic text) would loop re-scan → new instance → resolve → refresh. Three allows for the
   item and spell data channels resolving separately. The cached text stays searchable.
 
-Because `RemoveFromCache` only drops the invalidated GUID, the triggered re-harvest
-re-scans just that item; every other item hits the warm cache. The item's slot is usually
-unchanged, so the harvest keeps its committed item, and the kept item's `tooltipText` is
-refreshed from `GetTooltipText` precisely so this re-scan lands (data-loader.md §16). Its new
-text then makes `search:SyncKind` re-index that one item (search-indexing.md §1).
+Because `RemoveFromCache` only drops the invalidated GUID, the triggered recalculation
+re-scans just that item; every other item hits the warm cache. The recalculation reads no bag
+slot: it refreshes each committed item still in its slot (`items:RefreshKeptItem`), including
+`tooltipText` from `GetTooltipText`, precisely so this re-scan lands (data-loader.md §16,
+refresh-scheduler.md §10). Its new text then makes `search:SyncKind` re-index that one item
+(search-indexing.md §1).
 
 **History:** until the `BucketEvent` fix (event-buckets.md), this listener's callback was
 discarded after its first flush, so the re-scan only ever worked for the first burst after
@@ -93,7 +94,7 @@ arguments to the callback").
 ## 4. Coverage
 
 `spec/tooltip_spec.lua` ("TOOLTIP_DATA_UPDATE resolution"): records the instance map,
-invalidates + re-harvests on resolution, re-scans warm on next lookup, ignores
+invalidates + recalculates the bags on resolution, re-scans warm on next lookup, ignores
 unknown/`nil` ids, gates the bank refresh on `addon.atBank`, keeps the maps 1:1 with the
 cache across re-scan, asserts the bucket registers exactly once across repeated `Init`
 (no handler leak), that the filter only admits recorded instance ids ("filters updates at

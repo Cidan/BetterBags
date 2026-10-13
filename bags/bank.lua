@@ -269,10 +269,10 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
 	-- during its own data sweep, resolved against the active bank type. Switching
 	-- bank tabs changes that context (e.g. Warbank -> Character bank), so the
-	-- backpack must be re-swept and redrawn or its grey-out stays stale until the
+	-- backpack must be recalculated and redrawn or its grey-out stays stale until the
 	-- next backpack refresh (previously only a manual sort cleared it).
 	if addon.atBank then
-		events:SendMessage(ctx, 'bags/RefreshBackpack')
+		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false })
 	end
 end
 
@@ -592,10 +592,10 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 	-- The backpack's dim/grey state is pre-computed as data.itemContextMatchResult
 	-- during its own data sweep, resolved against the active bank type. Switching
 	-- group tabs changes that context (e.g. Warbank -> Character bank), so the
-	-- backpack must be re-swept and redrawn or its grey-out stays stale until the
+	-- backpack must be recalculated and redrawn or its grey-out stays stale until the
 	-- next backpack refresh (previously only a manual sort cleared it).
 	if addon.atBank then
-		events:SendMessage(ctx, 'bags/RefreshBackpack')
+		events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = false })
 	end
 end
 

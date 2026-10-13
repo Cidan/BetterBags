@@ -189,7 +189,7 @@ function categoryPaneProto:initListItem(button, elementData)
           self.listFrame.provider:MoveElementDataToIndex(elementData, 2)
           self:UpdatePinnedItems()
           local ctx = context:New('CategoryPane_ShiftClick')
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
         else
           self:SelectCategory(elementData.title)
         end
@@ -300,7 +300,7 @@ function categoryPaneProto:ShowRenameCategoryDialog(categoryName)
             if f.data.pane.selectedCategory == f.data.categoryName then
               f.data.pane.selectedCategory = newName
             end
-            -- Delay refresh to allow bags/FullRefreshAll event to complete
+            -- Delay refresh to allow the bags' refresh to complete
             C_Timer.After(0.1, function()
               f.data.pane:RefreshList()
               f.data.pane:UpdateDetailPanel()
@@ -328,7 +328,7 @@ function categoryPaneProto:ShowRenameCategoryDialog(categoryName)
             if parent.data.pane.selectedCategory == parent.data.categoryName then
               parent.data.pane.selectedCategory = newName
             end
-            -- Delay refresh to allow bags/FullRefreshAll event to complete
+            -- Delay refresh to allow the bags' refresh to complete
             C_Timer.After(0.1, function()
               parent.data.pane:RefreshList()
               parent.data.pane:UpdateDetailPanel()
@@ -863,7 +863,7 @@ function categoryPaneProto:SaveSearchCategory()
     }
   })
 
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
   self:RefreshList()
 end
 
@@ -1169,7 +1169,7 @@ function categoryPaneProto:OnItemListDrop()
   ClearCursor()
 
   -- Refresh the bags and the item list
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
   self:LoadItemList(self.selectedCategory)
 end
 
@@ -1193,7 +1193,7 @@ function categoryPaneProto:initItemRow(frame, elementData)
         func = function()
           database:DeleteItemFromCategory(elementData.id, elementData.category)
           local refreshCtx = context:New('CategoryPane_RemoveItem')
-          events:SendMessage(refreshCtx, 'bags/FullRefreshAll')
+          events:SendMessage(refreshCtx, 'bags/Rederive', { resetLayout = true, buttons = true })
           self:LoadItemList(elementData.category)
         end
       }})
@@ -1255,7 +1255,7 @@ function categoryPaneProto:SaveManualCategory()
     color = isDefaultColor and nil or {r, g, b},  -- nil for default, explicit RGB otherwise
   })
 
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
   self:RefreshList()
 end
 
@@ -1373,7 +1373,7 @@ function categoryPaneProto:SetupDragBehavior()
     self.listFrame.dragBehavior:SetFinalizeDrop(function(_)
       local ctx = context:New('CategoryPane_FinalizeDrop')
       self:UpdatePinnedItems()
-      events:SendMessage(ctx, 'bags/FullRefreshAll')
+      events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
     end)
 
     self.listFrame:SetCanReorder(true)
@@ -1390,7 +1390,7 @@ function categoryPaneProto:SetupDragBehavior()
         self.listFrame.provider:InsertAtIndex(elementData, 2)
       end
       self:UpdatePinnedItems()
-      events:SendMessage(ctx, 'bags/FullRefreshAll')
+      events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
     end)
   end
 end

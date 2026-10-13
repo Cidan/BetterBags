@@ -1983,7 +1983,7 @@ describe("Upgrade Icon Providers", function()
       _G.PawnGetItemData = function() return {} end
       _G.PawnShouldItemLinkHaveUpgradeArrowUnbudgeted = function() return true end
       local refreshed = 0
-      events:RegisterMessage('bags/FullRefreshAll', function() refreshed = refreshed + 1 end)
+      events:RegisterMessage('bags/Rederive', function() refreshed = refreshed + 1 end)
       local handler = events._eventMap["ADDON_LOADED"]
       assert.is_not_nil(handler)
       handler.fn("ADDON_LOADED", "Pawn")

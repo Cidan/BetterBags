@@ -314,7 +314,7 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     local events = addon:GetModule("Events")
     local refreshMessageSent = false
     events.SendMessage = function(self, ctx, message)
-      if message == "bags/RefreshBackpack" then
+      if message == "bags/RefreshBackpack" or message == "bags/Rederive" then
         refreshMessageSent = true
       end
     end
@@ -341,10 +341,30 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     behavior:SwitchToGroup(ctx, 1)
 
     -- Assertions
-    assert.is_false(refreshMessageSent, "Should NOT trigger bags/RefreshBackpack")
+    assert.is_false(refreshMessageSent, "Should NOT trigger a refresh")
     assert.equal(-1, mockBag.currentItemCount, "Should reset currentItemCount to -1")
     assert.equal(ctx, drawCalledWithCtx, "Should call Draw with the correct context object")
     assert.equal(mockSlotInfo[0], drawCalledWithSlotInfo, "Should call Draw with the correct backpack slotInfo")
+  end)
+
+  -- The refresh when the bag closes applies expired Recent Items and collapses held gaps:
+  -- both are derived, so the backpack is recalculated from the items already read.
+  it("recalculates the backpack, without reading it, when it refreshes on close", function()
+    local loadBase = assert(loadfile("bags/backpack.lua"))
+    loadBase("BetterBags")
+    local backpack = addon:GetModule("BackpackBehavior")
+    local events = addon:GetModule("Events")
+    local savedSend = events.SendMessage
+    local sent = {}
+    events.SendMessage = function(_, _, message, options)
+      table.insert(sent, { message = message, options = options })
+    end
+    local behavior = backpack:Create({ frame = CreateFrame("Frame") })
+    behavior:OnRefresh(addon:GetModule("Context"):New("TestClose"))
+    events.SendMessage = savedSend
+    assert.equal(1, #sent)
+    assert.equal("bags/Rederive", sent[1].message)
+    assert.same({ backpack = true, bank = false }, sent[1].options)
   end)
 
   it("only refreshes cooldowns while shown, and refreshes them whenever the bag opens", function()

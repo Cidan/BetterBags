@@ -142,7 +142,7 @@ end
 -- inputs all match skips the setters: the decoration still shows what they would set. The
 -- inputs are the item's itemHash (item ID, enchant, gems, bonus IDs, binding, item level
 -- and stats), every other ItemData field the setters read, the data phase's draw generation
--- (a new one after every wipe sweep), the button style generation (RestyleButtons: settings
+-- (a new one after every wipe sweep and restyling recalculation), the button style generation (RestyleButtons: settings
 -- the setters read, such as glow intensity, changed with no new data), and the decoration
 -- and theme generation the button was drawn with. ResetVisuals (a release or a change
 -- between item, free slot and empty slot) and Lock clear the record; UpdateSearch keeps its

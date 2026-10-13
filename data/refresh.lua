@@ -122,6 +122,8 @@ end
 ---@field bags? table<number, boolean> Table of specific bagIDs that changed
 ---@field resetLayout? boolean Ignore the previous gap layout and rebuild a fresh, gapless sort
 ---@field onlyIfSortPending? boolean Sweep each requested kind only if its sort has not been shown yet (the sort fallback)
+---@field derive? boolean Recalculate from the items the last read committed, reading no bag slot (§10)
+---@field restyle? boolean Every button of the swept kinds draws in full (a new draw generation)
 ---@field merged? number How many requests this one carries (set by merging, for profiler traces)
 ---@field startup? string Why the startup read ran (set on the startup read, for profiler traces)
 
@@ -138,6 +140,9 @@ end
 -- acquired items (MarkAddedItemsRecent does not run on wipes). A layout reset applies to
 -- every kind a request names, so it only merges into a wipe, which resets every layout.
 -- Sorts and the sort fallback are ordered against the sweeps around them and never merge.
+-- A derive reads no bag, so a read never rides on one. A derive rides on a read that reads
+-- every bag of its kinds, which recalculates everything too; a read of some bags carries
+-- the others' items over without refreshing them (a re-scanned tooltip), so it does not.
 ---@param waiting RefreshRequest
 ---@param incoming RefreshRequest
 ---@return boolean
@@ -145,7 +150,16 @@ local function canMerge(waiting, incoming)
   if isSortRequest(waiting) or isSortRequest(incoming) then return false end
   if waiting.wipe then return true end
   if incoming.wipe then return false end
-  return (waiting.resetLayout == true) == (incoming.resetLayout == true)
+  if (waiting.resetLayout == true) ~= (incoming.resetLayout == true) then return false end
+  if waiting.derive then
+    return incoming.derive == true
+  end
+  if incoming.derive then
+    return waiting.bags == nil
+      and (not incoming.backpack or waiting.backpack == true)
+      and (not incoming.bank or waiting.bank == true)
+  end
+  return true
 end
 
 -- mergeInto folds incoming into waiting: the kinds of both, and the bags of both (none
@@ -163,6 +177,7 @@ local function mergeInto(waiting, incoming)
     for bagID in pairs(incoming.bags) do bags[bagID] = true end
     waiting.bags = bags
   end
+  waiting.restyle = waiting.restyle or incoming.restyle
   waiting.merged = (waiting.merged or 1) + (incoming.merged or 1)
 end
 
@@ -312,6 +327,13 @@ function refresh:_RunUnit(request)
     ctx:Set('resetLayout', true)
   end
 
+  if request.derive then
+    ctx:Set('derive', true)
+  end
+  if request.restyle then
+    ctx:Set('restyle', true)
+  end
+
   if request.wipe then
     items:ClearItemCache(ctx)
     ctx:Set('wipe', true)
@@ -420,6 +442,20 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/Redraw', function(_, options)
     self:RequestRedraw(options ~= nil and options.buttons == true)
   end)
+  -- bags/Rederive (ctx, { backpack?, bank?, resetLayout?, buttons? }?) recalculates the bags
+  -- from the items already read (§10); naming neither kind recalculates both. buttons makes
+  -- every button draw in full, for settings the buttons draw from.
+  events:RegisterMessage('bags/Rederive', function(_, options)
+    options = options or {}
+    local both = options.backpack == nil and options.bank == nil
+    self:RequestUpdate({
+      derive = true,
+      backpack = (both or options.backpack == true) or nil,
+      bank = (both or options.bank == true) or nil,
+      resetLayout = options.resetLayout == true or nil,
+      restyle = options.buttons == true or nil,
+    })
+  end)
   events:RegisterMessage('bags/RefreshBank', function()
     self:RequestUpdate({ bank = true })
   end)
@@ -448,8 +484,9 @@ function refresh:OnEnable()
     self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
 
+  -- Gear sets come from the set map rebuilt every sweep, never from a bag slot.
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+    self:RequestUpdate({ derive = true, backpack = true, bank = true, resetLayout = true })
   end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()

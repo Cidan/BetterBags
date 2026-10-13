@@ -191,7 +191,7 @@ end
 function themes:SetSearchState(ctx, frame, shown)
   local theme = self.themes[db:GetTheme()]
   theme.ToggleSearch(frame, shown)
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 -- GetInBagSearchBox returns the in-bag search box for the given frame, if it exists.

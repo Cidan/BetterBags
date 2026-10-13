@@ -417,7 +417,7 @@ function sectionFrame:PerformDrop()
   end
 
   local eventsModule = addon:GetModule("Events")
-  eventsModule:SendMessage(dropCtx, "bags/FullRefreshAll")
+  eventsModule:SendMessage(dropCtx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 ---@param ctx Context
@@ -441,7 +441,7 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   local category = section:GetTitle()
   categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 ---@param section Section
