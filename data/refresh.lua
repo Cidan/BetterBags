@@ -30,6 +30,9 @@ refresh.SORT_FALLBACK_SECONDS = 0.5
 refresh.STARTUP_SETTLE_TIMEOUT = 2
 -- How long to wait for the item data before reading anyway (the late data is read again):
 refresh.STARTUP_PRIME_TIMEOUT = 2
+-- Seconds a bank open waits for the bank's item data before reading it anyway (the captured
+-- opens received it 1.2 s after BANKFRAME_OPENED).
+refresh.BANK_PRIME_TIMEOUT = 2
 -- How long after PLAYER_ENTERING_WORLD to stop waiting for the end of the loading screen:
 refresh.STARTUP_LOADING_TIMEOUT = 10
 
@@ -126,6 +129,7 @@ end
 ---@field restyle? boolean Every button of the swept kinds draws in full (a new draw generation)
 ---@field merged? number How many requests this one carries (set by merging, for profiler traces)
 ---@field startup? string Why the startup read ran (set on the startup read, for profiler traces)
+---@field bankOpen? string Why a bank open's read ran, "primed" or "timeout" (for profiler traces)
 
 ---@param request RefreshRequest
 ---@return boolean
@@ -502,13 +506,17 @@ function refresh:OnEnable()
         addon.Bags.Bank.blizzardBankTab = firstButton.bagIndex
       end
     end
-    -- Opening the bank starts from a clean, gapless layout; any gaps held from a
-    -- previous session are collapsed here.
-    self:RequestUpdate({ bank = true, resetLayout = true })
+    -- The window shows at once (with the bank's committed items: none after a close) and the
+    -- bank is read once its item data has loaded (refresh-scheduler.md §11).
+    if addon.Bags and addon.Bags.Bank then
+      addon.Bags.Bank:Show(context:New('BANKFRAME_OPENED'))
+    end
+    self:_PrimeBankAndRead()
   end)
 
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
+    self._bankOpen = nil
   end)
 
   if not addon.isRetail then
@@ -605,6 +613,29 @@ function refresh:_OnStartupFrame()
     return
   end
   self:_StartupPrime()
+end
+
+-- _PrimeBankAndRead loads the bank's item data, then reads the bank, from a clean, gapless
+-- layout (gaps held from a previous visit collapse). It reads after BANK_PRIME_TIMEOUT if the
+-- data has not all arrived, and reads again when it does, since that read found it cold.
+-- Neither happens for an open that has ended (the bank closed, or opened again).
+function refresh:_PrimeBankAndRead()
+  local open = {}
+  self._bankOpen = open
+  local read = false
+  local function readBank(reason)
+    if self._bankOpen ~= open then return end
+    if read then
+      if reason == 'primed' then
+        self:RequestUpdate({ bank = true })
+      end
+      return
+    end
+    read = true
+    self:RequestUpdate({ bank = true, resetLayout = true, bankOpen = reason })
+  end
+  C_Timer.After(self.BANK_PRIME_TIMEOUT, function() readBank('timeout') end)
+  addon:GetModule('ItemLoader'):PrimeBank(function() readBank('primed') end)
 end
 
 -- _StartupPrime loads the item data of every bag slot and every equipped slot, then reads.

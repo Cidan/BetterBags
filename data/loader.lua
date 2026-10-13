@@ -79,6 +79,24 @@ function loader:PrimeAll(callback)
   self:LoadTheseItemsAndCallback(mixins, callback)
 end
 
+-- PrimeBank loads the item data of every bank slot in one ContinuableContainer and calls
+-- callback once, when all of it has loaded (synchronously when it already is). Bank containers
+-- have no slots until the bank opens, so PrimeAll at login cannot cover them. It does not go
+-- through the bag-update callbacks.
+---@param callback fun()
+function loader:PrimeBank(callback)
+  local mixins = {}
+  local function add(bagID)
+    self:ScanBag(bagID)
+    for _, mixin in ipairs(self.itemMixinsByBag[bagID] or {}) do
+      mixins[#mixins + 1] = mixin
+    end
+  end
+  for bagID in pairs(const.BANK_BAGS or {}) do add(bagID) end
+  for bagID in pairs(const.ACCOUNT_BANK_BAGS or {}) do add(bagID) end
+  self:LoadTheseItemsAndCallback(mixins, callback)
+end
+
 function loader:ScanBag(bagID)
   if not bagID then return end
   local ok, totalSlots = pcall(C_Container.GetContainerNumSlots, bagID)

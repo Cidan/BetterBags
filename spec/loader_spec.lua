@@ -111,6 +111,40 @@ describe("ItemLoader", function()
     assert.equal(INVSLOT_LAST_EQUIPPED - INVSLOT_FIRST_EQUIPPED + 1, equipped)
   end)
 
+  -- Bank containers hold no slots until the bank opens, so PrimeAll at login cannot cover
+  -- them; the bank primes on its own when it opens. A capture of opening the bank read 478 of
+  -- 491 bank items before their data had loaded.
+  it("primes every bank bag, and only bank bags, in one load, then calls back once", function()
+    local loader = addon:GetModule("ItemLoader")
+    loader:Init()
+    loader:OnEnable()
+    local bagCallbacks = 0
+    loader:TellMeWhenABagIsUpdated(function() bagCallbacks = bagCallbacks + 1 end)
+
+    local containers, added = 0, {}
+    local originalCreate = _G.ContinuableContainer.Create
+    _G.ContinuableContainer.Create = function()
+      containers = containers + 1
+      return {
+        AddContinuable = function(_, mixin) table.insert(added, mixin) end,
+        ContinueOnLoad = function(_, cb) cb() end,
+      }
+    end
+    local primed = 0
+    loader:PrimeBank(function() primed = primed + 1 end)
+    _G.ContinuableContainer.Create = originalCreate
+
+    assert.equal(1, containers)
+    assert.equal(1, primed)
+    assert.equal(0, bagCallbacks, "priming does not fan out to the bag-update callbacks")
+    local bags = {}
+    for _, mixin in ipairs(added) do
+      bags[mixin._bagID] = (bags[mixin._bagID] or 0) + 1
+    end
+    -- Bank bag 5 and account bank bag 10 have two slots each in this spec.
+    assert.same({ [5] = 2, [10] = 2 }, bags)
+  end)
+
   it("should support registering callbacks for bag updates", function()
     local loader = addon:GetModule("ItemLoader")
     loader:Init()

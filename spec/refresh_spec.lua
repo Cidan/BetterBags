@@ -258,6 +258,86 @@ describe("Refresh Module", function()
     assert.spy(refresh.RequestUpdate).was.called_with(match._, { derive = true, bank = true })
   end)
 
+  -- A capture of opening the bank read 478 of 491 bank items before the client had their
+  -- data; it arrived 1.2 s later and set off another refresh. The bank now shows at once and
+  -- is read once its item data has loaded (refresh-scheduler.md §11).
+  describe("opening the bank", function()
+    local prime, shown, savedPrimeBank, savedGetShowBankTabs, savedGameMenu
+
+    before_each(function()
+      events:Init()
+      addon.isRetail = true
+      prime, shown = nil, 0
+      savedPrimeBank = loader.PrimeBank
+      loader.PrimeBank = function(_, cb) prime = cb end
+      savedGetShowBankTabs = db.GetShowBankTabs
+      db.GetShowBankTabs = function() return false end
+      savedGameMenu = _G.GameMenuFrame
+      _G.GameMenuFrame = { IsShown = function() return false end }
+      addon.Bags = { Bank = { bankTab = 1, Show = function() shown = shown + 1 end } }
+      refresh:OnEnable()
+      spy.on(refresh, "RequestUpdate")
+    end)
+
+    after_each(function()
+      loader.PrimeBank = savedPrimeBank
+      db.GetShowBankTabs = savedGetShowBankTabs
+      _G.GameMenuFrame = savedGameMenu
+      refresh.RequestUpdate:revert()
+      addon.atBank = false
+    end)
+
+    local function fire(event)
+      events._eventMap[event].fn(event)
+    end
+
+    local function timeouts()
+      local out = {}
+      for _, t in ipairs(delayed) do
+        if t.delay == refresh.BANK_PRIME_TIMEOUT then out[#out + 1] = t end
+      end
+      return out
+    end
+
+    it("shows the bank at once and reads it once its item data has loaded", function()
+      fire("BANKFRAME_OPENED")
+      assert.equal(1, shown)
+      assert.is_true(addon.atBank)
+      assert.spy(refresh.RequestUpdate).was_not.called()
+      prime()
+      assert.spy(refresh.RequestUpdate).was.called(1)
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, resetLayout = true, bankOpen = "primed" })
+      timeouts()[1].fn()
+      assert.spy(refresh.RequestUpdate).was.called(1, "the timeout does nothing once read")
+    end)
+
+    it("reads it when the data has not loaded in time, and again when it arrives", function()
+      fire("BANKFRAME_OPENED")
+      assert.equal(1, #timeouts())
+      timeouts()[1].fn()
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true, resetLayout = true, bankOpen = "timeout" })
+      prime()
+      assert.spy(refresh.RequestUpdate).was.called(2)
+      assert.spy(refresh.RequestUpdate).was.called_with(match._, { bank = true })
+    end)
+
+    it("does not read for an open that has ended", function()
+      fire("BANKFRAME_OPENED")
+      local first = prime
+      fire("BANKFRAME_CLOSED")
+      first()
+      assert.spy(refresh.RequestUpdate).was_not.called()
+
+      fire("BANKFRAME_OPENED")
+      local second = prime
+      first()
+      timeouts()[1].fn()
+      assert.spy(refresh.RequestUpdate).was_not.called()
+      second()
+      assert.spy(refresh.RequestUpdate).was.called(1)
+    end)
+  end)
+
   it("should trigger a bank update on PLAYERBANKSLOTS_CHANGED for non-retail", function()
     addon.isRetail = false
     refresh:OnEnable()

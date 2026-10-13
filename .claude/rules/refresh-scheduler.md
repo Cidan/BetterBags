@@ -420,3 +420,35 @@ read"; "upgrade verdict cache": which events read and which recalculate),
 `spec/frames/contextmenu_spec.lua`, `spec/tooltip_spec.lua`,
 `spec/bags/bank_context_refresh_spec.lua`, `spec/bags/backpack_spec.lua`, `spec/items_spec.lua`
 (late Pawn registration).
+
+## 11. Opening the Bank: Show at Once, Read Once Primed
+
+Bank containers have no slots until the bank opens, so the startup read's priming (§8,
+`PrimeAll`) cannot cover them, and `BANKFRAME_OPENED` used to request the bank read at once.
+Two captures of a bank open show the result: 484 and 478 of 491 bank tooltips read
+"Retrieving item information" (the client had not loaded those items), every one of those
+items was read cold, and their data arrived about 1.2 s later in one batch, which set off a
+second refresh of both bags (and, before recalculations re-read cold items, re-sorted them on
+screen).
+
+Now `BANKFRAME_OPENED` (`data/refresh.lua`):
+1. sets `addon.atBank` and the bank tab as before;
+2. shows the bank window at once (`addon.Bags.Bank:Show`), with the bank's committed items,
+   which are none after a close (a loading screen will go here);
+3. `refresh:_PrimeBankAndRead()`: `itemLoader:PrimeBank` loads every bank slot's item data in
+   one `ContinuableContainer`, and the read (`{ bank = true, resetLayout = true, bankOpen =
+   "primed" }`) runs when it completes. The container calls back synchronously when the data is
+   already cached, so an open with warm data reads in the same frame as before.
+4. `BANK_PRIME_TIMEOUT` (2 s) bounds the wait: Blizzard drops the callbacks of an item whose
+   load fails (`ITEM_DATA_LOAD_RESULT` with `success == false`, `AsyncCallbackSystem.lua`), so
+   the container may never complete. Then the read runs with `bankOpen = "timeout"`, and when
+   the data does arrive the bank is read again (`{ bank = true }`), since that read found it cold.
+5. An open that has ended (`BANKFRAME_CLOSED`, or a new open) does nothing when its priming or
+   timeout completes.
+
+`items/RefreshBank/Done` (`core/init.lua`) then draws the shown bank. `bankOpen` marks the read
+in captures, so a capture shows whether the open waited for the data or timed out.
+
+Coverage: `spec/refresh_spec.lua` ("opening the bank": shown at once, read once primed and not
+again on the timeout; read on the timeout and again when the data arrives; nothing for an ended
+open), `spec/loader_spec.lua` ("primes every bank bag, and only bank bags, in one load").
