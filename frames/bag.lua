@@ -99,18 +99,27 @@ local bankBehavior = addon:GetModule("BankBehavior")
 bagFrame.bagProto = {}
 addon:GetModule('Perf'):RegisterPrototype(bagFrame.bagProto, 'Bag')
 
+-- Show shows the bag and draws a draw deferred while it was hidden, with slotInfo when
+-- given (the caller's current data; the deferred one can be an older object: the bank's is
+-- replaced when its cache is cleared). It returns whether it drew, so a caller about to draw
+-- the same data does not draw it twice.
 ---@param ctx Context
-function bagFrame.bagProto:Show(ctx)
+---@param slotInfo? SlotInfo
+---@return boolean drew
+function bagFrame.bagProto:Show(ctx, slotInfo)
 	if self.frame:IsShown() then
-		return
+		return false
 	end
 	self.behavior:OnShow(ctx)
 	if self.drawPendingOnShow then
 		self.drawPendingOnShow = false
-		if self.lastSlotInfo then
-			self:Draw(ctx, self.lastSlotInfo, function() end)
+		local data = slotInfo or self.lastSlotInfo
+		if data then
+			self:Draw(ctx, data, function() end)
+			return true
 		end
 	end
+	return false
 end
 
 ---@param ctx Context

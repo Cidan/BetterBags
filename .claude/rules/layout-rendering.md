@@ -47,6 +47,7 @@ Historically, each individual Tab View created its own `WowScrollBox` and scroll
     ```
   - The scroll child's size is explicitly updated: `scrollChild:SetSize(totalW, totalH)`.
   - `UpdateBagBounds(totalW, totalH)` is called to resize the bag frame and dynamically show or hide the global scrollbar based on screen clamping limits.
+- **A shown bag is drawn once.** `bagProto:Draw` on a hidden bag only defers (`drawPendingOnShow`), and `bagProto:Show(ctx, slotInfo)` draws the deferred draw (with the caller's `slotInfo` when given) and returns whether it drew. The bank's `items/RefreshBank/Done` handler (`core/init.lua`) draws only when showing did not: a captured bank open drew the whole bank twice in one frame (the second pass skipped every button but still cost 19 ms). Coverage: `spec/core/init_spec.lua` ("bank refresh draw"), `spec/frames/bag_draw_ownership_spec.lua` ("showing a bag (Show)").
 - **Tab-Swap Sizing:** Toggling active tab visibility (switching groups or tabs) runs through the same pure stateless drawing flow synchronously, re-evaluating the active grid's height, updating container/scroll child dimensions, and calling `UpdateBagBounds` instantly to achieve flawless sizing with zero state-holding overhead.
 
 ### 4. Absolute Position Grid and Mathematical Gap Handling

@@ -248,4 +248,59 @@ describe("Core Init and Enable flow", function()
 
     assert.has_no.errors(function() addon:UpdateButtonHighlight() end)
   end)
+
+  -- A capture of opening the bank drew it twice in one frame: showing it drew what was
+  -- deferred while hidden (176 ms raw), then the refresh handler drew the same data again
+  -- (every button skipped; 19 ms with profiler overhead subtracted).
+  describe("bank refresh draw", function()
+    local handlers, sent, drawn, savedRegister, savedSend
+
+    before_each(function()
+      handlers, sent, drawn = {}, {}, 0
+      local eventsMod = addon:GetModule("Events")
+      savedRegister, savedSend = eventsMod.RegisterMessage, eventsMod.SendMessage
+      eventsMod.RegisterMessage = function(_, name, fn) handlers[name] = fn end
+      eventsMod.SendMessage = function(_, _, name) table.insert(sent, name) end
+      local debugMod = addon:GetModule("Debug")
+      debugMod.Log = debugMod.Log or function() end
+      addon:OnInitialize()
+      addon:OnEnable()
+    end)
+
+    after_each(function()
+      local eventsMod = addon:GetModule("Events")
+      eventsMod.RegisterMessage, eventsMod.SendMessage = savedRegister, savedSend
+      addon.atBank = nil
+    end)
+
+    local function bank(shown, drawsOnShow)
+      addon.Bags.Bank = {
+        IsShown = function() return shown end,
+        Show = function() shown = true; return drawsOnShow end,
+        Draw = function(_, _, _, cb) drawn = drawn + 1; if cb then cb() end end,
+      }
+    end
+
+    it("draws the bank once when showing it drew it", function()
+      addon.atBank = true
+      bank(false, true)
+      handlers["items/RefreshBank/Done"]({}, {})
+      assert.equal(0, drawn)
+      assert.same({ "bags/Draw/Bank/Done", "bags/Draw/Bank/Loaded" }, sent)
+    end)
+
+    it("draws the bank when showing it did not", function()
+      addon.atBank = true
+      bank(false, false)
+      handlers["items/RefreshBank/Done"]({}, {})
+      assert.equal(1, drawn)
+    end)
+
+    it("draws a bank that was already shown", function()
+      addon.atBank = true
+      bank(true, false)
+      handlers["items/RefreshBank/Done"]({}, {})
+      assert.equal(1, drawn)
+    end)
+  end)
 end)

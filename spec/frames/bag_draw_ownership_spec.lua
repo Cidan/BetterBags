@@ -1097,4 +1097,36 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.is_not_nil(create:find("b:WatchForClose()", 1, true))
     end)
   end)
+
+  -- Showing a bag draws what was deferred while it was hidden, and says so, so the bank's
+  -- refresh handler does not draw the same data a second time (a captured bank open drew the
+  -- bank twice in one frame).
+  describe("showing a bag (Show)", function()
+    it("draws a deferred draw with the data it is given, and reports that it drew", function()
+      local bag = newBag()
+      bag.frame:Hide()
+      local old = slotInfoWith({ itemAt(0, 1, "Weapons") }, {})
+      bag:Draw(context:New("hidden"), old, function() end)
+      assert.is_true(bag.drawPendingOnShow)
+      local drawnWith
+      local draw = bag.Draw
+      bag.Draw = function(self, ctx, slotInfo, cb)
+        drawnWith = slotInfo
+        bag.frame:Show()
+        return draw(self, ctx, slotInfo, cb)
+      end
+      local current = slotInfoWith({ itemAt(0, 2, "Armor") }, {})
+      assert.is_true(bag:Show(context:New("show"), current))
+      assert.equal(current, drawnWith)
+    end)
+
+    it("reports that it did not draw when nothing was deferred", function()
+      local bag = newBag()
+      bag.frame:Hide()
+      local drew = false
+      bag.Draw = function() drew = true end
+      assert.is_false(bag:Show(context:New("show"), slotInfoWith({}, {})))
+      assert.is_false(drew)
+    end)
+  end)
 end)
