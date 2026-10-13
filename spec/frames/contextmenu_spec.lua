@@ -123,8 +123,14 @@ describe("ContextMenu 'Show Bags' toggle", function()
 
     override(L, "G", function(_, key) return key end)
     override(context, "New", function(_, event) return { event = event } end)
-    override(events, "SendMessage", function(_, _, event)
+    override(events, "SendMessage", function(_, _, event, options)
       table.insert(sentMessages, event)
+      -- Show Bags changes categories, stacking and layout: every bag is recalculated with a
+      -- fresh layout (refresh-scheduler.md §10). Nothing a button draws depends on the view
+      -- except through data its draw record holds, so unchanged buttons skip their redraw.
+      if event == "bags/Rederive" then
+        assert.are.same({ resetLayout = true }, options)
+      end
     end)
 
     override(database, "GetShowBankTabs", function() return persistedShowBankTabs end)
@@ -212,13 +218,13 @@ describe("ContextMenu 'Show Bags' toggle", function()
       assert.is_true(bag.slots:IsShown())
       assert.spy(bag.slots.Draw).was.called(1)
       assert.are.equal(const.BAG_VIEW.SECTION_ALL_BAGS, bagViews[const.BAG_KIND.BANK])
-      assert.are.same({ "bags/FullRefreshAll" }, sentMessages)
+      assert.are.same({ "bags/Rederive" }, sentMessages)
       assert.are.same({}, showBankTabsCalls, "toggling on must not call SetShowBankTabs on Classic")
 
       entry.func()
       assert.is_false(bag.slots:IsShown())
       assert.are.equal(const.BAG_VIEW.SECTION_GRID, bagViews[const.BAG_KIND.BANK])
-      assert.are.same({ "bags/FullRefreshAll", "bags/FullRefreshAll" }, sentMessages)
+      assert.are.same({ "bags/Rederive", "bags/Rederive" }, sentMessages)
       assert.are.same({}, showBankTabsCalls, "toggling off must not call SetShowBankTabs on Classic")
     end)
   end)
@@ -280,7 +286,7 @@ describe("ContextMenu 'Show Bags' toggle", function()
         assert.is_false(bag.slots:IsShown())
         assert.is_false(entry.checked())
         assert.are.equal(const.BAG_VIEW.SECTION_GRID, bagViews[const.BAG_KIND.BACKPACK])
-        assert.are.same({ "bags/FullRefreshAll", "bags/FullRefreshAll" }, sentMessages)
+        assert.are.same({ "bags/Rederive", "bags/Rederive" }, sentMessages)
         assert.are.same({}, showBankTabsCalls)
       end)
     end)

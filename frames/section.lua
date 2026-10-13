@@ -70,10 +70,7 @@ sectionFrame.dragTargetTab = nil  -- Track the tab we're hovering over while dra
 ---@field private fillWidth boolean
 ---@field private headerDisabled boolean
 ---@field private maxItemsPerRow number
----@field private collapsed boolean
 ---@field private kind BagKind
----@field shouldShrinkWhenCollapsed boolean Whether to actually shrink the frame when collapsed
----@field private originalTextColor? table The original RGBA color of the section title text
 local sectionProto = {}
 addon:GetModule('Perf'):RegisterPrototype(sectionProto, 'Section')
 
@@ -107,28 +104,12 @@ function sectionProto:SetTitle(text, color)
       fontString:SetTextColor(r, g, b, a or 1)
     end
   end
-
-  -- Store the current text color as the original for collapse dimming
-  local r, g, b, a = fontString:GetTextColor()
-  self.originalTextColor = {r = r, g = g, b = b, a = a}
 end
 
--- GetTitleWithoutIndicator returns the title text without the collapse indicator.
+-- GetTitle returns the title text, which is the section's category.
 ---@return string
-function sectionProto:GetTitleWithoutIndicator()
+function sectionProto:GetTitle()
   return self.title:GetText()
-end
-
--- SetCollapsed sets the collapsed state of the section.
----@param collapsed boolean
-function sectionProto:SetCollapsed(collapsed)
-  self.collapsed = collapsed
-end
-
--- IsCollapsed returns whether the section is collapsed.
----@return boolean
-function sectionProto:IsCollapsed()
-  return self.collapsed or false
 end
 
 function sectionProto:AddCell(id, cell)
@@ -193,14 +174,8 @@ function sectionProto:Wipe()
   self.frame:SetParent(nil)
   self.fillWidth = false
   self.frame:SetAlpha(1)
-  self.collapsed = false
-  self.shouldShrinkWhenCollapsed = true
   self.removeHeader = false
   self.title:Show()
-  -- Clear originalTextColor - SetTitle will set the correct color when the section is reused.
-  -- Note: We don't restore the color here because SetTitle always explicitly sets it,
-  -- ensuring pooled sections don't bleed custom colors to other categories.
-  self.originalTextColor = nil
 end
 
 -- PrepareForReuse readies a section kept from the previous render pass to be drawn
@@ -212,11 +187,8 @@ function sectionProto:PrepareForReuse()
   self.view = const.BAG_VIEW.SECTION_GRID
   self.fillWidth = false
   self.frame:SetAlpha(1)
-  self.collapsed = false
-  self.shouldShrinkWhenCollapsed = true
   self.removeHeader = false
   self.title:Show()
-  self.originalTextColor = nil
 end
 
 function sectionProto:WipeOnlyContents()
@@ -318,43 +290,10 @@ function sectionProto:Grid(kind, _view, _freeSpaceShown)
   end
   self.content:GetContainer():SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -6, 0)
 
-  -- If collapsed, hide content and optionally shrink frame
-  if self.collapsed then
-    self.content:Hide()
-    -- Apply dimmed color to indicate collapsed state
-    if self.originalTextColor then
-      local dimFactor = 0.6
-      self.title:GetFontString():SetTextColor(
-        self.originalTextColor.r * dimFactor,
-        self.originalTextColor.g * dimFactor,
-        self.originalTextColor.b * dimFactor,
-        self.originalTextColor.a
-      )
-    end
-    -- Only shrink if we're allowed to (no other expanded sections in our row)
-    if self.shouldShrinkWhenCollapsed then
-      local collapsedHeight = self.removeHeader and 0 or (self.title:GetHeight() + 6)
-      self.frame:SetSize(fullWidth, collapsedHeight)
-    else
-      -- Keep full height but hide content
-      self.frame:SetSize(fullWidth, fullHeight)
-    end
-  else
-    self.content:Show()
-    -- Restore original color when expanded
-    if self.originalTextColor then
-      self.title:GetFontString():SetTextColor(
-        self.originalTextColor.r,
-        self.originalTextColor.g,
-        self.originalTextColor.b,
-        self.originalTextColor.a
-      )
-    end
-    self.frame:SetSize(fullWidth, fullHeight)
-  end
-
+  self.content:Show()
+  self.frame:SetSize(fullWidth, fullHeight)
   self.frame:Show()
-  return fullWidth, (self.collapsed and self.shouldShrinkWhenCollapsed) and (self.removeHeader and 0 or (self.title:GetHeight() + 6)) or fullHeight
+  return fullWidth, fullHeight
 end
 
 -------
@@ -478,7 +417,7 @@ function sectionFrame:PerformDrop()
   end
 
   local eventsModule = addon:GetModule("Events")
-  eventsModule:SendMessage(dropCtx, "bags/FullRefreshAll")
+  eventsModule:SendMessage(dropCtx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 ---@param ctx Context
@@ -492,26 +431,6 @@ end
 
 ---@param ctx Context
 ---@param section Section
-function sectionFrame:OnTitleCollapseToggle(ctx, section)
-  local category = section:GetTitleWithoutIndicator()
-  -- Try to find which bag this section belongs to by checking both
-  local kind = section:GetKind()
-  if not kind then
-    -- If kind not set, try both bags
-    if addon.Bags.Backpack and addon.Bags.Backpack:IsShown() then
-      kind = const.BAG_KIND.BACKPACK
-    elseif addon.Bags.Bank and addon.Bags.Bank:IsShown() then
-      kind = const.BAG_KIND.BANK
-    end
-  end
-  if kind then
-    database:ToggleSectionCollapsed(kind, category)
-    events:SendMessage(ctx, 'bags/FullRefreshAll')
-  end
-end
-
----@param ctx Context
----@param section Section
 function sectionFrame:OnTitleClickOrDrop(ctx, section)
   if not CursorHasItem() then return end
   if not IsShiftKeyDown() then return end
@@ -519,10 +438,10 @@ function sectionFrame:OnTitleClickOrDrop(ctx, section)
   ---@cast cursorType string
   ---@cast itemID number
   if cursorType ~= "item" then return end
-  local category = section:GetTitleWithoutIndicator()
+  local category = section:GetTitle()
   categories:AddPermanentItemToCategory(ctx, itemID, category)
   ClearCursor()
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 ---@param section Section
@@ -589,7 +508,7 @@ function sectionProto:onTitleMouseEnter()
 
   -- Show group assignment info and drag hint for draggable sections
   local kind = self:GetKind()
-  local category = self:GetTitleWithoutIndicator()
+  local category = self:GetTitle()
   if category ~= L:G("Free Space") and category ~= L:G("Recent Items") then
     local groupID = groups:GetGroupForCategory(kind, category)
     if groupID then
@@ -626,8 +545,6 @@ function sectionFrame:_DoCreate()
   s.frame = f
 
   s.maxItemsPerRow = 5
-  s.collapsed = false
-  s.shouldShrinkWhenCollapsed = true
   -- Create the section title.
   local title = CreateFrame("Button", nil, f)
   title:SetText("Not set")
@@ -653,7 +570,7 @@ function sectionFrame:_DoCreate()
 
   title:SetScript("OnDragStart", function()
     if s.headerDisabled then return end
-    local category = s:GetTitleWithoutIndicator()
+    local category = s:GetTitle()
     -- Don't allow dragging special sections
     if category == L:G("Free Space") or category == L:G("Recent Items") then
       return

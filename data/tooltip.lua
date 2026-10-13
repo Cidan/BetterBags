@@ -243,7 +243,7 @@ end
 --- Handle a debounced batch of TOOLTIP_DATA_UPDATE fires (retail only). Each
 --- resolved dataInstanceID that maps to one of our cached items means that item's
 --- tooltip was scanned while still sparse and has now resolved: drop the stale
---- cache entry so the next harvest re-scans it warm, and request a re-index.
+--- cache entry so the next sweep re-scans it warm, and request that sweep.
 --- @param resolved EventArg[] Coalesced fires; each entry's args[1] is a dataInstanceID.
 function tooltipScanner:OnTooltipDataResolved(resolved)
   if not addon.isRetail then return end
@@ -260,14 +260,11 @@ function tooltipScanner:OnTooltipDataResolved(resolved)
     end
   end
   if not invalidated then return end
-  -- Re-harvest so the invalidated item(s) re-scan (now warm) and the search index
-  -- rebuilds. Backpack is always re-swept; the bank only when it's actually open,
-  -- so we never clobber the last-seen bank contents while away from it.
+  -- Recalculate the bags: the sweep re-scans the invalidated items (a cache miss, now
+  -- warm) and re-indexes them, without reading the bags (refresh-scheduler.md §10). The
+  -- backpack always; the bank only when it is open.
   local ctx = context:New('TooltipDataResolved')
-  events:SendMessage(ctx, 'bags/RefreshBackpack')
-  if addon.atBank then
-    events:SendMessage(ctx, 'bags/RefreshBank')
-  end
+  events:SendMessage(ctx, 'bags/Rederive', { backpack = true, bank = addon.atBank == true })
 end
 
 --- Get the current cache size (for debugging/monitoring)

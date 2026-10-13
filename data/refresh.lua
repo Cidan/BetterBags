@@ -18,15 +18,36 @@ local context = addon:GetModule('Context')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Debug: AceModule
-local debug = addon:GetModule('Debug')
-
 ---@class (exact) Refresh: AceModule
 local refresh = addon:NewModule('Refresh')
 
 -- How long a sort waits for its item moves before refreshing anyway. WoW has no "sort
 -- finished" event, and a sort that moves nothing fires no BAG_UPDATE at all.
 refresh.SORT_FALLBACK_SECONDS = 0.5
+
+-- The startup read (.claude/rules/refresh-scheduler.md §8). How long the bags may keep
+-- changing after the loading screen before the read runs anyway:
+refresh.STARTUP_SETTLE_TIMEOUT = 2
+-- How long to wait for the item data before reading anyway (the late data is read again):
+refresh.STARTUP_PRIME_TIMEOUT = 2
+-- Seconds a bank open waits for the bank's item data before reading it anyway (the captured
+-- opens received it 1.2 s after BANKFRAME_OPENED).
+refresh.BANK_PRIME_TIMEOUT = 2
+-- How long after PLAYER_ENTERING_WORLD to stop waiting for the end of the loading screen:
+refresh.STARTUP_LOADING_TIMEOUT = 10
+
+-- The events the startup frame listens to. The bag events mean the client is still
+-- delivering the bags.
+local STARTUP_EVENTS = { 'PLAYER_ENTERING_WORLD', 'LOADING_SCREEN_DISABLED', 'BAG_UPDATE', 'BAG_CONTAINER_UPDATE' }
+
+---@param name string
+---@return boolean
+local function isEventValid(name)
+  if _G.C_EventUtils and _G.C_EventUtils.IsEventValid then
+    return _G.C_EventUtils.IsEventValid(name)
+  end
+  return true
+end
 
 function refresh:Init()
   -- Serialized refresh queue. RequestUpdate only enqueues; the pump (_Step) runs exactly
@@ -38,15 +59,60 @@ function refresh:Init()
   self._active = nil
   self._idlePending = false
   self._running = false
+  -- While held (from OnEnable until the startup read), requests wait in the queue.
+  self._held = false
+  self._startup = nil
+  -- The redraw asked for this frame (RequestRedraw), if any.
+  self._redrawPending = nil
 end
 
----@param ctx Context
-function refresh:RedrawBackpack(ctx)
-  debug:Log('RedrawBackpack', 'Redrawing backpack')
-  ctx:Set('redraw', true)
-  addon.Bags.Backpack:Draw(ctx, items:GetAllSlotInfo()[const.BAG_KIND.BACKPACK], function()
-    events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
+-- RequestRedraw draws the bags again on the next frame (Redraw). Every request made in the
+-- same frame shares that one draw, which restyles the buttons if any request asked for it:
+-- dragging a slider asks on every value it passes, and a captured glow-intensity drag asked
+-- for 22 redraws in one frame, each restyling every button.
+---@param buttons? boolean
+function refresh:RequestRedraw(buttons)
+  local pending = self._redrawPending
+  if pending then
+    pending.buttons = pending.buttons or buttons == true
+    return
+  end
+  pending = { buttons = buttons == true }
+  self._redrawPending = pending
+  C_Timer.After(0, function()
+    self._redrawPending = nil
+    self:Redraw(context:New('Redraw'), pending.buttons)
   end)
+end
+
+-- Redraw draws the bags again from their committed data: no bag is read and nothing is
+-- derived. It is for settings that only change how the bags look: layout sizes, section
+-- titles, how item buttons draw, the theme (.claude/rules/refresh-scheduler.md §9). With
+-- buttons, every item button runs all of its setters (ItemFrame:RestyleButtons). Like the
+-- draw after a sweep, it draws the backpack (which defers the draw while it is hidden) and
+-- the bank only while it is shown.
+---@param ctx Context
+---@param buttons? boolean
+function refresh:Redraw(ctx, buttons)
+  if buttons then
+    local itemFrame = addon:GetModule('ItemFrame', true)
+    if itemFrame then
+      itemFrame:RestyleButtons()
+    end
+  end
+  local slotInfo = items:GetAllSlotInfo()
+  local bags = addon.Bags
+  if not slotInfo or not bags then return end
+  if bags.Backpack and slotInfo[const.BAG_KIND.BACKPACK] then
+    bags.Backpack:Draw(ctx, slotInfo[const.BAG_KIND.BACKPACK], function()
+      events:SendMessage(ctx, 'bags/Draw/Backpack/Done')
+    end)
+  end
+  if bags.Bank and bags.Bank:IsShown() and slotInfo[const.BAG_KIND.BANK] then
+    bags.Bank:Draw(ctx, slotInfo[const.BAG_KIND.BANK], function()
+      events:SendMessage(ctx, 'bags/Draw/Bank/Done')
+    end)
+  end
 end
 
 ---@class RefreshRequest
@@ -59,18 +125,84 @@ end
 ---@field bags? table<number, boolean> Table of specific bagIDs that changed
 ---@field resetLayout? boolean Ignore the previous gap layout and rebuild a fresh, gapless sort
 ---@field onlyIfSortPending? boolean Sweep each requested kind only if its sort has not been shown yet (the sort fallback)
+---@field derive? boolean Recalculate from the items the last read committed, reading no bag slot (§10)
+---@field restyle? boolean Every button of the swept kinds draws in full (a new draw generation)
+---@field merged? number How many requests this one carries (set by merging, for profiler traces)
+---@field startup? string Why the startup read ran (set on the startup read, for profiler traces)
+---@field bankOpen? string Why a bank open's read ran, "primed" or "timeout" (for profiler traces)
+
+---@param request RefreshRequest
+---@return boolean
+local function isSortRequest(request)
+  return (request.sort or request.sortBank or request.sortWarbank or request.onlyIfSortPending) and true or false
+end
+
+-- canMerge says whether incoming can ride on waiting, a request that has not started.
+-- waiting reads the client when it runs, after incoming was made, so it sees everything
+-- incoming is about; running incoming afterwards would find nothing new. A wipe covers
+-- anything. A plain request never absorbs a wipe: that would skip its check for newly
+-- acquired items (MarkAddedItemsRecent does not run on wipes). A layout reset applies to
+-- every kind a request names, so it only merges into a wipe, which resets every layout.
+-- Sorts and the sort fallback are ordered against the sweeps around them and never merge.
+-- A derive reads no bag, so a read never rides on one. A derive rides on a read that reads
+-- every bag of its kinds, which recalculates everything too; a read of some bags carries
+-- the others' items over without refreshing them (a re-scanned tooltip), so it does not.
+---@param waiting RefreshRequest
+---@param incoming RefreshRequest
+---@return boolean
+local function canMerge(waiting, incoming)
+  if isSortRequest(waiting) or isSortRequest(incoming) then return false end
+  if waiting.wipe then return true end
+  if incoming.wipe then return false end
+  if (waiting.resetLayout == true) ~= (incoming.resetLayout == true) then return false end
+  if waiting.derive then
+    return incoming.derive == true
+  end
+  if incoming.derive then
+    return waiting.bags == nil
+      and (not incoming.backpack or waiting.backpack == true)
+      and (not incoming.bank or waiting.bank == true)
+  end
+  return true
+end
+
+-- mergeInto folds incoming into waiting: the kinds of both, and the bags of both (none
+-- named means every bag). The caller's bag tables are never changed.
+---@param waiting RefreshRequest
+---@param incoming RefreshRequest
+local function mergeInto(waiting, incoming)
+  waiting.backpack = waiting.backpack or incoming.backpack
+  waiting.bank = waiting.bank or incoming.bank
+  if waiting.wipe or not waiting.bags or not incoming.bags then
+    waiting.bags = nil
+  else
+    local bags = {}
+    for bagID in pairs(waiting.bags) do bags[bagID] = true end
+    for bagID in pairs(incoming.bags) do bags[bagID] = true end
+    waiting.bags = bags
+  end
+  waiting.restyle = waiting.restyle or incoming.restyle
+  waiting.merged = (waiting.merged or 1) + (incoming.merged or 1)
+end
 
 -- RequestUpdate enqueues an update request onto the serialized refresh queue. It performs
 -- NO side effects itself: the request's mutations (cache wipe, recent-item clearing,
 -- Blizzard sort calls) and data sweeps all run inside the request's own unit when the
 -- pump reaches it, so a request queued while another is in flight can never corrupt the
--- in-flight sweep. If the scheduler is idle, the first step runs synchronously in this
--- call (harvesting this frame's client state); every subsequent step is handed off to the
--- next frame via _Arm.
+-- in-flight sweep. A request that another request still waiting in the queue already
+-- covers is merged into it (canMerge). If the scheduler is idle, the first step runs
+-- synchronously in this call (harvesting this frame's client state); every subsequent step
+-- is handed off to the next frame via _Arm. While the scheduler is held for the startup
+-- read, requests only wait.
 ---@param request RefreshRequest
 function refresh:RequestUpdate(request)
-  table.insert(self._queue, request)
-  if not self._running then
+  local waiting = self._queue[#self._queue]
+  if waiting and canMerge(waiting, request) then
+    mergeInto(waiting, request)
+  else
+    table.insert(self._queue, request)
+  end
+  if not self._running and not self._held then
     self._running = true
     self:_Step()
   end
@@ -120,7 +252,7 @@ function refresh:_Step()
     return
   end
 
-  local request = table.remove(self._queue, 1)
+  local request = not self._held and table.remove(self._queue, 1) or nil
   if not request then
     self._running = false
     return
@@ -197,6 +329,13 @@ function refresh:_RunUnit(request)
   -- bank ctx:Copy() below so both kinds inherit it.
   if request.resetLayout then
     ctx:Set('resetLayout', true)
+  end
+
+  if request.derive then
+    ctx:Set('derive', true)
+  end
+  if request.restyle then
+    ctx:Set('restyle', true)
   end
 
   if request.wipe then
@@ -303,6 +442,24 @@ function refresh:OnEnable()
   events:RegisterMessage('bags/RefreshBackpack', function()
     self:RequestUpdate({ backpack = true })
   end)
+  -- bags/Redraw (ctx, { buttons = boolean }?) redraws without reading the bags.
+  events:RegisterMessage('bags/Redraw', function(_, options)
+    self:RequestRedraw(options ~= nil and options.buttons == true)
+  end)
+  -- bags/Rederive (ctx, { backpack?, bank?, resetLayout?, buttons? }?) recalculates the bags
+  -- from the items already read (§10); naming neither kind recalculates both. buttons makes
+  -- every button draw in full, for settings the buttons draw from.
+  events:RegisterMessage('bags/Rederive', function(_, options)
+    options = options or {}
+    local both = options.backpack == nil and options.bank == nil
+    self:RequestUpdate({
+      derive = true,
+      backpack = (both or options.backpack == true) or nil,
+      bank = (both or options.bank == true) or nil,
+      resetLayout = options.resetLayout == true or nil,
+      restyle = options.buttons == true or nil,
+    })
+  end)
   events:RegisterMessage('bags/RefreshBank', function()
     self:RequestUpdate({ bank = true })
   end)
@@ -331,8 +488,9 @@ function refresh:OnEnable()
     self:RequestUpdate({ wipe = true, backpack = true, bank = true })
   end)
 
+  -- Gear sets come from the set map rebuilt every sweep, never from a bag slot.
   events:RegisterEvent('EQUIPMENT_SETS_CHANGED', function()
-    self:RequestUpdate({ wipe = true, backpack = true, bank = true })
+    self:RequestUpdate({ derive = true, backpack = true, bank = true, resetLayout = true })
   end)
 
   events:RegisterEvent('BANKFRAME_OPENED', function()
@@ -348,13 +506,17 @@ function refresh:OnEnable()
         addon.Bags.Bank.blizzardBankTab = firstButton.bagIndex
       end
     end
-    -- Opening the bank starts from a clean, gapless layout; any gaps held from a
-    -- previous session are collapsed here.
-    self:RequestUpdate({ bank = true, resetLayout = true })
+    -- The window shows at once (with the bank's committed items: none after a close) and the
+    -- bank is read once its item data has loaded (refresh-scheduler.md §11).
+    if addon.Bags and addon.Bags.Bank then
+      addon.Bags.Bank:Show(context:New('BANKFRAME_OPENED'))
+    end
+    self:_PrimeBankAndRead()
   end)
 
   events:RegisterEvent('BANKFRAME_CLOSED', function()
     addon.atBank = false
+    self._bankOpen = nil
   end)
 
   if not addon.isRetail then
@@ -369,11 +531,176 @@ function refresh:OnEnable()
     end)
   end
 
-  -- Route the initial login sweep through the ItemLoader's ContinuableContainer, exactly
-  -- like a BAG_UPDATE, so the first harvest only runs once the item cache is primed.
-  -- Harvesting a cold cache here reads nil type/subtype from C_Item.GetItemInfo and dumps
-  -- items into "Everything" until a /reload. The loader's callback (registered above) fans
-  -- this out to RequestUpdate, and RunRefresh forces a wipe on each kind's first sweep, so
-  -- no explicit wipe is needed here.
-  itemLoader:LoadAllBagsAndUpdate()
+  self:HoldForStartup()
+end
+
+-- HoldForStartup holds every sweep until the client has delivered the bags, then reads
+-- them once (.claude/rules/refresh-scheduler.md §8). At PLAYER_LOGIN, when OnEnable runs,
+-- the client has not attached the bags or sent their contents yet: a captured login read a
+-- backpack of 20 empty slots here, and the bags then arrived over five seconds, each step
+-- requesting another sweep. Requests made meanwhile wait in the queue; the startup read
+-- absorbs them. The read runs:
+--   1. after the loading screen ends (LOADING_SCREEN_DISABLED, or PLAYER_ENTERING_WORLD
+--      where the client lacks it, or STARTUP_LOADING_TIMEOUT after PLAYER_ENTERING_WORLD),
+--   2. at the first frame without bag events (or after STARTUP_SETTLE_TIMEOUT),
+--   3. once the item data of every bag slot and equipped slot has loaded (or after
+--      STARTUP_PRIME_TIMEOUT; the late data is read again when it arrives).
+-- Opening the backpack before then reads at once.
+function refresh:HoldForStartup()
+  self._held = true
+  self._startup = { phase = 'loading', bagActivity = false }
+  addon:GetModule('ItemLoader'):Hold()
+
+  local frame = self._startupFrame
+  if not frame then
+    frame = CreateFrame('Frame')
+    self._startupFrame = frame
+  end
+  for _, event in ipairs(STARTUP_EVENTS) do
+    if isEventValid(event) then
+      frame:RegisterEvent(event)
+    end
+  end
+  frame:SetScript('OnEvent', function(_, event)
+    self:_OnStartupEvent(event)
+  end)
+
+  local backpack = addon.Bags and addon.Bags.Backpack
+  if backpack and backpack.frame then
+    addon.HookScript(backpack.frame, 'OnShow', function()
+      self:_OnStartupBagShown()
+    end)
+  end
+end
+
+---@param event string
+function refresh:_OnStartupEvent(event)
+  local startup = self._startup
+  if not startup then return end
+  if event == 'BAG_UPDATE' or event == 'BAG_CONTAINER_UPDATE' then
+    startup.bagActivity = true
+  elseif event == 'LOADING_SCREEN_DISABLED' then
+    self:_StartupSettle()
+  elseif event == 'PLAYER_ENTERING_WORLD' then
+    if not isEventValid('LOADING_SCREEN_DISABLED') then
+      self:_StartupSettle()
+    else
+      C_Timer.After(self.STARTUP_LOADING_TIMEOUT, function()
+        self:_StartupSettle()
+      end)
+    end
+  end
+end
+
+-- _StartupSettle starts waiting for a frame without bag events. Frames do not run during
+-- the loading screen, so the first one comes after it.
+function refresh:_StartupSettle()
+  local startup = self._startup
+  if not startup or startup.phase ~= 'loading' then return end
+  startup.phase = 'settling'
+  startup.bagActivity = false
+  startup.settleStart = GetTime()
+  self._startupFrame:SetScript('OnUpdate', function()
+    self:_OnStartupFrame()
+  end)
+end
+
+function refresh:_OnStartupFrame()
+  local startup = self._startup
+  if not startup or startup.phase ~= 'settling' then return end
+  if startup.bagActivity and GetTime() - startup.settleStart < self.STARTUP_SETTLE_TIMEOUT then
+    startup.bagActivity = false
+    return
+  end
+  self:_StartupPrime()
+end
+
+-- _PrimeBankAndRead loads the bank's item data, then reads the bank, from a clean, gapless
+-- layout (gaps held from a previous visit collapse). It reads after BANK_PRIME_TIMEOUT if the
+-- data has not all arrived, and reads again when it does, since that read found it cold.
+-- Neither happens for an open that has ended (the bank closed, or opened again).
+function refresh:_PrimeBankAndRead()
+  local open = {}
+  self._bankOpen = open
+  local read = false
+  local function readBank(reason)
+    if self._bankOpen ~= open then return end
+    if read then
+      if reason == 'primed' then
+        self:RequestUpdate({ bank = true })
+      end
+      return
+    end
+    read = true
+    self:RequestUpdate({ bank = true, resetLayout = true, bankOpen = reason })
+  end
+  C_Timer.After(self.BANK_PRIME_TIMEOUT, function() readBank('timeout') end)
+  addon:GetModule('ItemLoader'):PrimeBank(function() readBank('primed') end)
+end
+
+-- _StartupPrime loads the item data of every bag slot and every equipped slot, then reads.
+function refresh:_StartupPrime()
+  local startup = self._startup
+  if not startup or startup.priming then return end
+  startup.phase = 'priming'
+  startup.priming = true
+  self._startupFrame:SetScript('OnUpdate', nil)
+  C_Timer.After(self.STARTUP_PRIME_TIMEOUT, function()
+    self:_StartupRead('timeout')
+  end)
+  addon:GetModule('ItemLoader'):PrimeAll(function()
+    self:_OnStartupPrimed()
+  end)
+end
+
+function refresh:_OnStartupPrimed()
+  if self._startup then
+    self:_StartupRead('primed')
+    return
+  end
+  -- The read ran before the item data arrived (timeout, or the backpack opened), so the
+  -- items it read cold are read again.
+  self:RequestUpdate({ backpack = true, bank = true })
+end
+
+function refresh:_OnStartupBagShown()
+  local startup = self._startup
+  if not startup then return end
+  if not startup.priming then
+    -- Reads at once when the item data is already loaded.
+    self:_StartupPrime()
+  end
+  self:_StartupRead('bagShown')
+end
+
+-- _StartupRead ends the hold: one wipe of both kinds absorbs every request made while
+-- held, and sorts asked for meanwhile run after it.
+---@param reason string
+function refresh:_StartupRead(reason)
+  if not self._startup then return end
+  self._startup = nil
+  local frame = self._startupFrame
+  frame:SetScript('OnUpdate', nil)
+  frame:SetScript('OnEvent', nil)
+  for _, event in ipairs(STARTUP_EVENTS) do
+    frame:UnregisterEvent(event)
+  end
+  addon:GetModule('ItemLoader'):Release()
+
+  ---@type RefreshRequest
+  local read = { wipe = true, backpack = true, bank = true, startup = reason, merged = 0 }
+  local queue = { read }
+  for _, request in ipairs(self._queue) do
+    if isSortRequest(request) then
+      table.insert(queue, request)
+    else
+      read.merged = read.merged + (request.merged or 1)
+    end
+  end
+  self._queue = queue
+  self._held = false
+  if not self._running then
+    self._running = true
+    self:_Step()
+  end
 end

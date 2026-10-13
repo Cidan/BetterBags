@@ -254,4 +254,81 @@ BetterBagsPerfDB = {
     assert.are.equal(1, tool.Main({}, out))
     assert.is_true(#printed >= 4)
   end)
+
+  describe("call traces", function()
+    -- Items.Outer(<Items>, 3) -> 9 runs from 0 to 8 ms, with [event] BAG_UPDATE(2) from 1 to
+    -- 6 ms inside it; one frame ends at 10 ms.
+    local TRACED = [[
+BetterBagsPerfDB = {
+  ["version"] = 1,
+  ["sessions"] = {
+    {
+      ["id"] = 7,
+      ["formatVersion"] = 3,
+      ["meta"] = { ["character"] = "Tracer", ["realm"] = "R", ["startedAt"] = 1700000900, ["reason"] = "manual" },
+      ["stats"] = { ["durationMs"] = 10, ["instrumentedMs"] = 8, ["frames"] = 1, ["traceCalls"] = 2 },
+      ["names"] = { "[all]", "Items.Outer", "[event] BAG_UPDATE" },
+      ["nodes"] = { "0,1,0,0,0,0", "1,2,3000,1,8000,0", "2,3,5000,1,5000,0" },
+      ["functions"] = { "2,1,8000,8000", "3,1,5000,5000" },
+      ["worst"] = {},
+      ["timeline"] = { ["ours"] = "8000" },
+      ["trace"] = {
+        ["chunkSize"] = 4,
+        ["calls"] = 2,
+        ["chunks"] = { "0,2,1,8000,2,0,1000,3,3,5000,0,0" },
+        ["chunkStarts"] = "0",
+        ["chunkEnds"] = "8000",
+        ["segments"] = "",
+        ["frameEnds"] = "10000",
+        ["values"] = { "nil", "true", "false", "<Items>", "3", "9", "2" },
+        ["sets"] = { "4,5", "6", "7" },
+        ["args"] = true,
+      },
+    },
+  },
+}
+]]
+
+    local tracedPath
+
+    before_each(function()
+      tracedPath = dir .. "/Traced.lua"
+      local f = assert(io.open(tracedPath, "w"))
+      f:write(TRACED)
+      f:close()
+    end)
+
+    it("exports a session's call trace as a Chrome trace that Perfetto opens", function()
+      assert.are.equal(0, tool.Main({ tracedPath, "--trace", "--out", dir }, function() end))
+      local json = readFile(dir .. "/betterbags-7.trace.json")
+      assert.is_truthy(json:find('"traceEvents":[', 1, true))
+      assert.is_truthy(json:find('{"name":"Items.Outer","cat":"Items","ph":"X","ts":0,"dur":8000,"pid":1,"tid":1,"args":{"call":1,"arguments":"<Items>, 3","returned":"9"}}', 1, true), json)
+      assert.is_truthy(json:find('{"name":"[event] BAG_UPDATE","cat":"event","ph":"X","ts":1000,"dur":5000,"pid":1,"tid":1,"args":{"call":2,"arguments":"2"}}', 1, true), json)
+      assert.is_truthy(json:find('{"name":"BetterBags time per frame","ph":"C","ts":0,"pid":1,"args":{"ms":8}}', 1, true), json)
+    end)
+
+    it("limits the export to a time window and to the calls that match", function()
+      local function exported(...)
+        assert.are.equal(0, tool.Main({ tracedPath, "--trace", "--out", dir, ... }, function() end))
+        return readFile(dir .. "/betterbags-7.trace.json")
+      end
+      local windowed = exported("--from", "7", "--to", "9")
+      assert.is_truthy(windowed:find('"name":"Items.Outer"', 1, true))
+      assert.is_falsy(windowed:find('"name":"[event] BAG_UPDATE"', 1, true))
+      local found = exported("--find", "bag_update")
+      assert.is_falsy(found:find('"name":"Items.Outer"', 1, true))
+      assert.is_truthy(found:find('"name":"[event] BAG_UPDATE"', 1, true))
+    end)
+
+    it("says when the session has no call trace", function()
+      local printed = {}
+      assert.are.equal(1, tool.Main({ svPath, "--trace", "--out", dir }, function(line) table.insert(printed, line) end))
+      assert.is_truthy(printed[#printed]:find("no call trace", 1, true))
+    end)
+
+    it("marks sessions that carry a trace in the list", function()
+      local lines = tool.ListSessions(tool.LoadSavedVariables(tracedPath))
+      assert.is_truthy(lines[1]:find("trace: 2 calls", 1, true), lines[1])
+    end)
+  end)
 end)

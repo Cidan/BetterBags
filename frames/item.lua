@@ -71,9 +71,11 @@ local HALO_MIN_ALPHA = 0.4
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
----@field drawState table|nil The inputs of the last full draw (see itemDrawUnchanged).
+---@field drawState table|nil The inputs of the last full draw (see DrawInputChanged).
 ---@field cooldownState table|nil The cooldown last applied (see UpdateCooldown).
 itemFrame.itemProto = {}
+-- Bumped by RestyleButtons; part of every button's draw record.
+itemFrame.styleGeneration = 0
 addon:GetModule('Perf'):RegisterPrototype(itemFrame.itemProto, 'Item')
 
 local buttonCount = 0
@@ -140,43 +142,61 @@ end
 -- inputs all match skips the setters: the decoration still shows what they would set. The
 -- inputs are the item's itemHash (item ID, enchant, gems, bonus IDs, binding, item level
 -- and stats), every other ItemData field the setters read, the data phase's draw generation
--- (a new one after every wipe sweep, which is how settings changes reach the buttons), and
--- the decoration and theme generation the button was drawn with. ResetVisuals (a release or
--- a change between item, free slot and empty slot) and Lock clear the record; UpdateSearch
--- keeps its search match current.
----@param item Item
----@param decoration ItemButton
+-- (a new one after every wipe sweep and restyling recalculation), the button style generation (RestyleButtons: settings
+-- the setters read, such as glow intensity, changed with no new data), and the decoration
+-- and theme generation the button was drawn with. ResetVisuals (a release or a change
+-- between item, free slot and empty slot) and Lock clear the record; UpdateSearch keeps its
+-- search match current.
+-- stackHidesItemLevel says whether an item's virtual stack hides its item level: a stack of
+-- more than one armor or weapon piece shows its count instead (with Merge Unstackable, a
+-- setting that redraws every button when it changes). Shared by DrawItemLevel and the draw
+-- record, so the record holds exactly what the draw uses.
 ---@param data ItemData
 ---@return boolean
-local function itemDrawUnchanged(item, decoration, data)
-	local s = item.drawState
-	if not s or not s.valid or item.staticData then
-		return false
-	end
+local function stackHidesItemLevel(data)
+	local classID = data.itemInfo.classID
+	return (classID == Enum.ItemClass.Armor or classID == Enum.ItemClass.Weapon)
+		and data.stackedCount ~= nil and data.stackedCount > 1
+end
+
+-- DrawInputChanged returns the name of the first input of a full item draw that differs
+-- from the button's record, or nil when the redraw can be skipped ("record" when there is no
+-- valid record, "staticData" for item rows, which never skip). It is a method of the Item
+-- prototype so the profiler's call trace records the answer for every draw, which is how a
+-- capture shows why a button redrew (data-driven.md).
+---@param decoration ItemButton
+---@param data ItemData
+---@return string|nil
+function itemFrame.itemProto:DrawInputChanged(decoration, data)
+	local s = self.drawState
+	if not s or not s.valid then return "record" end
+	if self.staticData then return "staticData" end
 	local info, quest, container = data.itemInfo, data.questInfo, data.containerInfo
-	return s.decoration == decoration
-		and s.decorationGeneration == themes.decorationGeneration
-		and s.drawGeneration == data.drawGeneration
-		and s.bagid == data.bagid
-		and s.itemHash == data.itemHash
-		and s.itemLink == info.itemLink
-		and s.itemIcon == info.itemIcon
-		and s.itemQuality == info.itemQuality
-		and s.isBound == info.isBound
-		and s.currentItemLevel == info.currentItemLevel
-		and s.classID == info.classID
-		and s.stackedCount == data.stackedCount
-		and s.currentItemCount == info.currentItemCount
-		and s.isNewItem == info.isNewItem
-		and s.isBattlePayItem == info.isBattlePayItem
-		and s.isQuestItem == quest.isQuestItem
-		and s.questID == quest.questID
-		and s.isActive == quest.isActive
-		and s.readable == (container and container.isReadable)
-		and s.noValue == (container and container.hasNoValue)
-		and s.matches == searchMatch(data)
-		and s.isUpgrade == data.isUpgrade
-		and s.itemContextMatchResult == data.itemContextMatchResult
+	if s.decoration ~= decoration then return "decoration" end
+	if s.decorationGeneration ~= themes.decorationGeneration then return "decorationGeneration" end
+	if s.styleGeneration ~= itemFrame.styleGeneration then return "styleGeneration" end
+	if s.drawGeneration ~= data.drawGeneration then return "drawGeneration" end
+	if s.bagid ~= data.bagid then return "bagid" end
+	if s.itemHash ~= data.itemHash then return "itemHash" end
+	if s.itemLink ~= info.itemLink then return "itemLink" end
+	if s.itemIcon ~= info.itemIcon then return "itemIcon" end
+	if s.itemQuality ~= info.itemQuality then return "itemQuality" end
+	if s.isBound ~= info.isBound then return "isBound" end
+	if s.currentItemLevel ~= info.currentItemLevel then return "currentItemLevel" end
+	if s.classID ~= info.classID then return "classID" end
+	if s.shownCount ~= (data.stackedCount or info.currentItemCount) then return "shownCount" end
+	if s.stackHidesLevel ~= stackHidesItemLevel(data) then return "stackHidesLevel" end
+	if s.isNewItem ~= info.isNewItem then return "isNewItem" end
+	if s.isBattlePayItem ~= info.isBattlePayItem then return "isBattlePayItem" end
+	if s.isQuestItem ~= quest.isQuestItem then return "isQuestItem" end
+	if s.questID ~= quest.questID then return "questID" end
+	if s.isActive ~= quest.isActive then return "isActive" end
+	if s.readable ~= (container and container.isReadable) then return "readable" end
+	if s.noValue ~= (container and container.hasNoValue) then return "noValue" end
+	if s.matches ~= searchMatch(data) then return "matches" end
+	if s.isUpgrade ~= data.isUpgrade then return "isUpgrade" end
+	if s.itemContextMatchResult ~= data.itemContextMatchResult then return "itemContextMatchResult" end
+	return nil
 end
 
 ---@param item Item
@@ -188,6 +208,7 @@ local function recordItemDraw(item, decoration, data)
 	local info, quest, container = data.itemInfo, data.questInfo, data.containerInfo
 	s.decoration = decoration
 	s.decorationGeneration = themes.decorationGeneration
+	s.styleGeneration = itemFrame.styleGeneration
 	s.drawGeneration = data.drawGeneration
 	s.bagid = data.bagid
 	s.itemHash = data.itemHash
@@ -197,8 +218,12 @@ local function recordItemDraw(item, decoration, data)
 	s.isBound = info.isBound
 	s.currentItemLevel = info.currentItemLevel
 	s.classID = info.classID
-	s.stackedCount = data.stackedCount
-	s.currentItemCount = info.currentItemCount
+	-- What the draw uses of the counts: the number shown and whether the stack hides the item
+	-- level. The raw stack total is empty when stacking is off (Show Bags) and equal to the
+	-- item's own count for a single pile otherwise; recording it redrew every item on each
+	-- Show Bags toggle with nothing on screen changed.
+	s.shownCount = data.stackedCount or info.currentItemCount
+	s.stackHidesLevel = stackHidesItemLevel(data)
 	s.isNewItem = info.isNewItem
 	s.isBattlePayItem = info.isBattlePayItem
 	s.isQuestItem = quest.isQuestItem
@@ -212,26 +237,26 @@ local function recordItemDraw(item, decoration, data)
 	s.valid = true
 end
 
----@param item Item
+-- FreeDrawInputChanged is DrawInputChanged for a free-slot draw.
 ---@param decoration ItemButton
 ---@param data ItemData
 ---@param count number
 ---@param nocount? boolean
----@return boolean
-local function freeDrawUnchanged(item, decoration, data, count, nocount)
-	local s = item.drawState
-	if not s or not s.valid then
-		return false
-	end
+---@return string|nil
+function itemFrame.itemProto:FreeDrawInputChanged(decoration, data, count, nocount)
+	local s = self.drawState
+	if not s or not s.valid then return "record" end
 	local info = data.itemInfo
-	return s.decoration == decoration
-		and s.decorationGeneration == themes.decorationGeneration
-		and s.bagid == data.bagid
-		and s.count == count
-		and s.nocount == (nocount and true or false)
-		and s.emptySlotName == (info and info.emptySlotName)
-		and s.emptySlotFamilyIcon == (info and info.emptySlotFamilyIcon)
-		and s.itemQuality == (info and info.itemQuality)
+	if s.decoration ~= decoration then return "decoration" end
+	if s.decorationGeneration ~= themes.decorationGeneration then return "decorationGeneration" end
+	if s.styleGeneration ~= itemFrame.styleGeneration then return "styleGeneration" end
+	if s.bagid ~= data.bagid then return "bagid" end
+	if s.count ~= count then return "count" end
+	if s.nocount ~= (nocount and true or false) then return "nocount" end
+	if s.emptySlotName ~= (info and info.emptySlotName) then return "emptySlotName" end
+	if s.emptySlotFamilyIcon ~= (info and info.emptySlotFamilyIcon) then return "emptySlotFamilyIcon" end
+	if s.itemQuality ~= (info and info.itemQuality) then return "itemQuality" end
+	return nil
 end
 
 ---@param item Item
@@ -245,6 +270,7 @@ local function recordFreeDraw(item, decoration, data, count, nocount)
 	local info = data.itemInfo
 	s.decoration = decoration
 	s.decorationGeneration = themes.decorationGeneration
+	s.styleGeneration = itemFrame.styleGeneration
 	s.bagid = data.bagid
 	s.count = count
 	s.nocount = nocount and true or false
@@ -257,6 +283,7 @@ end
 ---@param ctx Context
 ---@param found? boolean
 function itemFrame.itemProto:UpdateSearch(ctx, found)
+	self.blank = false
 	if self.slotkey == nil then
 		return
 	end
@@ -321,6 +348,7 @@ end
 ---@param data ItemData
 ---@param onlyIfChanged? boolean
 function itemFrame.itemProto:UpdateCooldown(ctx, data, onlyIfChanged)
+	self.blank = false
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
 		return
@@ -364,6 +392,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:Lock(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	SetItemButtonDesaturated(decoration, true)
 	if self.drawState then
@@ -373,12 +402,14 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:Unlock(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	SetItemButtonDesaturated(decoration, false)
 end
 
 ---@param data ItemData
 function itemFrame.itemProto:ShowItemLevel(data)
+	self.blank = false
 	local ilvlOpts = database:GetItemLevelOptions(self.kind)
 	local ilvl = data.itemInfo.currentItemLevel
 	self.ilvlText:SetText(tostring(ilvl))
@@ -393,6 +424,7 @@ end
 
 ---@param data ItemData
 function itemFrame.itemProto:DrawItemLevel(data)
+	self.blank = false
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
 		self.ilvlText:Hide()
@@ -415,7 +447,7 @@ function itemFrame.itemProto:DrawItemLevel(data)
 		return
 	end
 
-	if mergeOpts.mergeUnstackable and data.stackedCount and data.stackedCount > 1 then
+	if mergeOpts.mergeUnstackable and stackHidesItemLevel(data) then
 		self.ilvlText:Hide()
 		return
 	end
@@ -431,6 +463,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:UpdateCount(ctx, data)
+	self.blank = false
 	assert(data, "data must be provided")
 	if data.isItemEmpty then
 		return
@@ -442,6 +475,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:UpdateUpgrade(ctx, data)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
 	if data.isItemEmpty or self.staticData then
@@ -459,6 +493,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:SetStaticItemFromData(ctx, data)
+	self.blank = false
 	self.staticData = data
 	self:SetItemFromData(ctx, data)
 end
@@ -481,10 +516,11 @@ end
 function itemFrame.itemProto:SetItemFromData(ctx, data)
 	assert(data, "data must be provided")
 	local mode = data.isItemEmpty and "empty" or "item"
-	if self.drawnAs ~= mode then
+	if self.drawnAs ~= mode and not self.blank then
 		self:ResetVisuals(ctx)
 	end
 	self.drawnAs = mode
+	self.blank = false
 	self.released = false
 	self.currentData = data
 	self.slotkey = data.slotkey
@@ -492,7 +528,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	decoration._itemData = data
 	self.kind = bagKindFromBagID(data.bagid)
 
-	if mode == "item" and itemDrawUnchanged(self, decoration, data) then
+	if mode == "item" and not self:DrawInputChanged(decoration, data) then
 		-- The new-item glow loops; a full draw replays the one-shot flash whenever the glow
 		-- has stopped, so a new item still goes through UpdateNewItem.
 		if data.itemInfo.isNewItem then
@@ -606,6 +642,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:FlashItem(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	if decoration.NewItemTexture then
 		decoration.NewItemTexture:SetAtlas("bags-glow-white")
@@ -619,6 +656,7 @@ end
 
 ---@param ctx Context
 function itemFrame.itemProto:ClearFlashItem(ctx)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	if decoration.BattlepayItemTexture then
 		decoration.BattlepayItemTexture:Hide()
@@ -635,6 +673,7 @@ end
 ---@param ctx Context
 ---@param data ItemData
 function itemFrame.itemProto:UpdateNewItem(ctx, data)
+	self.blank = false
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
 	if not decoration.NewItemTexture then
@@ -729,6 +768,7 @@ end
 ---@param decoration Frame
 ---@param quality number
 function itemFrame.itemProto:DrawQualityGlow(decoration, quality)
+	self.blank = false
 	local border = decoration.IconBorder
 	if not border then return end
 	local intensity = database:GetGlowIntensity(self.kind)
@@ -766,6 +806,7 @@ end
 ---@param decoration Frame
 ---@param quality number
 function itemFrame.itemProto:DrawClassicQualityBorder(decoration, quality)
+	self.blank = false
 	if not decoration.IconBorder then return end
 	local qualityColor = quality and quality > const.ITEM_QUALITY.Common and const.ITEM_QUALITY_COLOR[quality]
 	if qualityColor then
@@ -784,16 +825,17 @@ end
 function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	local decoration = themes:GetItemButton(ctx, self)
 	assert(data, "data must be provided")
-	if self.drawnAs ~= "free" then
+	if self.drawnAs ~= "free" and not self.blank then
 		self:ResetVisuals(ctx)
 	end
 	self.drawnAs = "free"
+	self.blank = false
 	self.released = false
 	local bagid, slotid = data.bagid, data.slotid
 	self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
 	self.kind = bagKindFromBagID(bagid)
 
-	if freeDrawUnchanged(self, decoration, data, count, nocount) then
+	if not self:FreeDrawInputChanged(decoration, data, count, nocount) then
 		self.frame:Show()
 		self.button:Show()
 		return
@@ -886,6 +928,7 @@ end
 
 ---@param alpha number
 function itemFrame.itemProto:SetAlpha(alpha)
+	self.blank = false
 	self.frame:SetAlpha(alpha)
 end
 
@@ -984,12 +1027,22 @@ function itemFrame.itemProto:ResetVisuals(ctx)
 	self.freeSlotName = ""
 	self.freeSlotCount = 0
 	decoration.UpgradeIcon:SetShown(false)
+	-- Blank until something draws on it: a draw skips its mode-change reset for a blank
+	-- button (a release already reset it). Everything that changes the button's look outside
+	-- a full draw clears this.
+	self.blank = true
 end
 
 function itemFrame:Init()
 	self.buttonsBySlotkey = {}
 	self.virtualPool = {}
 	self.activeItems = setmetatable({}, { __mode = "k" })
+end
+
+-- RestyleButtons makes the next draw of every button run all of its setters, for settings
+-- the setters read that change with no new item data (glow intensity, item level display).
+function itemFrame:RestyleButtons()
+	self.styleGeneration = self.styleGeneration + 1
 end
 
 function itemFrame:OnEnable()
@@ -1020,6 +1073,15 @@ function itemFrame:OnEnable()
 	for bagID in pairs(const.BANK_BAGS) do
 		for slotID = 1, 40 do
 			self:GetButton(ctx, bagID .. "_" .. slotID)
+		end
+	end
+	-- Retail character bank tabs hold up to 98 slots, like Warbank tabs: a capture of
+	-- opening the bank created slots 41-98 of every character tab at runtime.
+	if addon.isRetail and const.BANK_ONLY_BAGS then
+		for bagID in pairs(const.BANK_ONLY_BAGS) do
+			for slotID = 41, 98 do
+				self:GetButton(ctx, bagID .. "_" .. slotID)
+			end
 		end
 	end
 	if const.ACCOUNT_BANK_BAGS then

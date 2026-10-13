@@ -51,7 +51,7 @@ function pawn:OnEnable()
   events:RegisterEvent("ADDON_LOADED", function(ctx)
     if pawn._registered then return end
     if pawn:Register() then
-      events:SendMessage(ctx, 'bags/FullRefreshAll')
+      events:SendMessage(ctx, 'bags/Rederive')
     end
   end)
 end

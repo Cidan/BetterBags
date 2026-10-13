@@ -421,15 +421,6 @@ function DB:DeleteItemCategory(category)
       end
     end
 
-    if DB.data.profile.collapsedSections[kind] then
-      DB.data.profile.collapsedSections[kind][category] = nil
-      for name in pairs(DB.data.profile.collapsedSections[kind]) do
-        if name:sub(1, #groupedPrefix) == groupedPrefix then
-          DB.data.profile.collapsedSections[kind][name] = nil
-        end
-      end
-    end
-
     if DB.data.profile.categoryToGroup[kind] then
       DB.data.profile.categoryToGroup[kind][category] = nil
       if addon.isRetail and kind == const.BAG_KIND.BANK then
@@ -575,27 +566,6 @@ end
 ---@return table<string, number>
 function DB:GetCustomSectionSort(kind)
   return DB.data.profile.customSectionSort[kind]
-end
-
----@param kind BagKind
----@param category string
----@return boolean
-function DB:GetSectionCollapsed(kind, category)
-  return DB.data.profile.collapsedSections[kind][category] or false
-end
-
----@param kind BagKind
----@param category string
----@param collapsed boolean
-function DB:SetSectionCollapsed(kind, category, collapsed)
-  DB.data.profile.collapsedSections[kind][category] = collapsed
-end
-
----@param kind BagKind
----@param category string
-function DB:ToggleSectionCollapsed(kind, category)
-  local current = DB:GetSectionCollapsed(kind, category)
-  DB:SetSectionCollapsed(kind, category, not current)
 end
 
 ---@param guid string
@@ -927,24 +897,7 @@ function DB:RenameCategory(oldName, newName)
     end
   end
 
-  -- 6. Update collapse state for all bag kinds
-  for _, kind in pairs(const.BAG_KIND) do
-    if DB.data.profile.collapsedSections[kind] and DB.data.profile.collapsedSections[kind][oldName] ~= nil then
-      DB.data.profile.collapsedSections[kind][newName] = DB.data.profile.collapsedSections[kind][oldName]
-      DB.data.profile.collapsedSections[kind][oldName] = nil
-    end
-
-    -- Delete grouped sub-categories from collapsed sections
-    if DB.data.profile.collapsedSections[kind] then
-      for categoryName, _ in pairs(DB.data.profile.collapsedSections[kind]) do
-        if categoryName:sub(1, #groupedPrefix) == groupedPrefix then
-          DB.data.profile.collapsedSections[kind][categoryName] = nil
-        end
-      end
-    end
-  end
-
-  -- 7. Update custom section sort (pinned position) for all bag kinds
+  -- 6. Update custom section sort (pinned position) for all bag kinds
   for _, kind in pairs(const.BAG_KIND) do
     if DB.data.profile.customSectionSort[kind] and DB.data.profile.customSectionSort[kind][oldName] ~= nil then
       DB.data.profile.customSectionSort[kind][newName] = DB.data.profile.customSectionSort[kind][oldName]
@@ -1247,13 +1200,10 @@ function DB:Migrate()
   end
 
   --[[
-    Clear all collapsed section states since the collapse feature has been disabled.
-    Do not remove before Q1'27.
+    Section collapsing was removed: drop its saved state.
+    Do not remove before Q3'27.
   ]]--
-  DB.data.profile.collapsedSections = {
-    [const.BAG_KIND.BACKPACK] = {},
-    [const.BAG_KIND.BANK] = {},
-  }
+  DB.data.profile.collapsedSections = nil
 
   -- ============================================================
   -- Dynamic Item Level Coloring Migration (Q1'27)

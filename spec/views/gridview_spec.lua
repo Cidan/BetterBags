@@ -92,7 +92,6 @@ local sectionProto = {
   GetAllCells = function() return {} end,
   AddCell = function() end,
   WipeOnlyContents = function() end,
-  IsCollapsed = function() return false end,
 }
 sectionFrame.Create = function()
   local s = setmetatable({}, { __index = sectionProto })
@@ -607,7 +606,6 @@ describe("Phase 6 View Placement and Rendering Tests", function()
             SetMaxCellWidth = function() end,
             RemoveHeader = function() end,
             Draw = function() return 50, 50 end,
-            IsCollapsed = function() return false end,
             GetAllCells = function() return {} end,
             AddCell = function(_, id, cell)
               table.insert(addedCells, { id = id, cell = cell })

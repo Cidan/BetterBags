@@ -36,7 +36,7 @@ describe("PerfSessions", function()
     end
     perf:Init()
     perf:SetClock(function() return now end)
-    perfSessions._logoutHooked = nil
+    perfSessions._eventsHooked = nil
     perfSessions:Init()
     -- Calibration needs a moving clock; these tests are about storage, not overhead.
     perfSessions:SetSetting("calibrate", false)
@@ -213,6 +213,85 @@ describe("PerfSessions", function()
       perf:_OnFrame()
       assert.is_false(perf:IsActive())
       assert.are.equal(1, #perfSessions:GetSessions())
+      assert.are.equal("maxDuration", perfSessions:GetSessions()[1].stats.stopReason)
+    end)
+
+    it("records a call trace with arguments by default", function()
+      local settings = perfSessions:GetSettings()
+      assert.is_true(settings.traceCalls)
+      assert.is_true(settings.traceArgs)
+      assert.are.equal(1000000, settings.traceMaxCalls)
+      perfSessions:StartCapture("manual")
+      local token = perf:Enter("[event] TEST", 1)
+      perf:Exit(token)
+      local session = perfSessions:StopCapture()
+      local trace = addon:GetModule("PerfFormat"):OpenTrace(session)
+      local event
+      for i = 1, trace:Count() do
+        if trace:Get(i).name == "[event] TEST" then event = trace:Get(i) end
+      end
+      assert.is_not_nil(event)
+      assert.are.equal("1", trace:Text(event.args))
+    end)
+
+    it("builds trace options from the settings", function()
+      perfSessions:SetSetting("traceCalls", false)
+      perfSessions:SetSetting("traceArgs", false)
+      perfSessions:SetSetting("traceMaxCalls", 5)
+      local options = perfSessions:BuildOptions()
+      assert.is_false(options.trace)
+      assert.is_false(options.traceArgs)
+      assert.are.equal(10000, options.traceMaxCalls)
+      perfSessions:SetSetting("traceMaxCalls", 99999999)
+      assert.are.equal(2000000, perfSessions:GetSettings().traceMaxCalls)
+    end)
+
+    it("stops on its own once the trace is full, and saves why", function()
+      perfSessions:SetSetting("traceMaxCalls", 10000)
+      perfSessions:StartCapture("manual")
+      for _ = 1, 10001 do
+        local token = perf:Enter("[event] TEST")
+        perf:Exit(token)
+      end
+      assert.is_true(perfSessions:IsCapturing())
+      perf:_OnFrame()
+      assert.is_false(perfSessions:IsCapturing())
+      local session = perfSessions:GetSessions()[1]
+      assert.are.equal("traceFull", session.stats.stopReason)
+      assert.are.equal(10000, session.stats.traceCalls)
+      assert.is_true(session.trace.full)
+    end)
+  end)
+
+  describe("trimming traces", function()
+    local function captureOne()
+      perfSessions:StartCapture("manual")
+      local token = perf:Enter("[event] TEST")
+      perf:Exit(token)
+      return perfSessions:StopCapture()
+    end
+
+    it("removes one session's trace and keeps the rest of the session", function()
+      local first = captureOne()
+      local second = captureOne()
+      sent = {}
+      assert.is_true(perfSessions:RemoveTrace(first.id))
+      assert.is_nil(perfSessions:GetSession(first.id).trace)
+      assert.is_true(perfSessions:GetSession(first.id).stats.traceRemoved)
+      assert.is_table(perfSessions:GetSession(first.id).nodes)
+      assert.is_table(perfSessions:GetSession(second.id).trace)
+      assert.are.same({ "perf/SessionsChanged" }, sentEvents())
+      assert.is_false(perfSessions:RemoveTrace(first.id), "nothing left to remove")
+    end)
+
+    it("removes every session's trace", function()
+      captureOne()
+      captureOne()
+      perfSessions:RemoveAllTraces()
+      for _, session in ipairs(perfSessions:GetSessions()) do
+        assert.is_nil(session.trace)
+        assert.is_true(session.stats.traceRemoved)
+      end
     end)
 
     it("records Blizzard's addon profiler metrics when the client has them", function()
@@ -297,11 +376,45 @@ describe("PerfSessions", function()
       assert.is_true(perfSessions:StartIfArmed())
       assert.is_true(perfSessions:IsCapturing())
       assert.is_false(perfSessions:IsArmedForNextReload())
-      local session = perfSessions:StopCapture()
-      assert.are.equal("reload", session.meta.reason)
+      perfSessions:StopCapture()
 
       assert.is_false(perfSessions:StartIfArmed())
       assert.is_false(perfSessions:IsCapturing())
+    end)
+
+    -- The switch applies to the next load, a full relaunch as much as a /reload. Which one it
+    -- was is known at the first PLAYER_ENTERING_WORLD (isInitialLogin, isReloadingUi).
+    for _, case in ipairs({ { true, false, "login" }, { false, true, "reload" } }) do
+      it("labels the capture a " .. case[3] .. " once the game says how it started", function()
+        perfSessions:SetArmedForNextReload(true)
+        perfSessions:Init()
+        assert.is_true(perfSessions:StartIfArmed())
+        assert.is_function(registered["PLAYER_ENTERING_WORLD"])
+        registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", case[1], case[2])
+        local session = perfSessions:StopCapture()
+        assert.are.equal(case[3], session.meta.reason)
+      end)
+    end
+
+    it("labels a capture stopped before the game finished loading a startup", function()
+      perfSessions:SetArmedForNextReload(true)
+      perfSessions:Init()
+      assert.is_true(perfSessions:StartIfArmed())
+      local session = perfSessions:StopCapture()
+      assert.are.equal("startup", session.meta.reason)
+    end)
+
+    it("keeps the label through later loading screens, and never relabels a manual capture", function()
+      perfSessions:SetArmedForNextReload(true)
+      perfSessions:Init()
+      perfSessions:StartIfArmed()
+      registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", true, false)
+      registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", false, false)
+      assert.are.equal("login", perfSessions:StopCapture().meta.reason)
+
+      perfSessions:StartCapture()
+      registered["PLAYER_ENTERING_WORLD"]({}, "PLAYER_ENTERING_WORLD", false, true)
+      assert.are.equal("manual", perfSessions:StopCapture().meta.reason)
     end)
   end)
 end)

@@ -122,72 +122,11 @@ local function GridView(view, ctx, bag, slotInfo, callback)
   view.content.maxCellWidth = sizeInfo.columnCount
   view.sortRequired = false
 
-  -- Pass 1: Draw layout
-  for _, section in ipairs(view.content.cells) do
-    section.shouldShrinkWhenCollapsed = false
-  end
-
   view.content:Draw({
     cells = view.content.cells,
     maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
     columns = sizeInfo.columnCount,
   })
-
-  -- Pass 2: Row collapse shrink optimization
-  local maxRowWidth = ((37 + 4) * sizeInfo.itemsPerRow) + 16
-  local spacing = 4
-  local rowSections = {}
-  local currentRowWidth = 0
-  local currentRow = 1
-  local needsRedraw = false
-
-  for _, section in ipairs(view.content.cells) do
-    if section.frame and section.frame:IsShown() then
-      local sectionWidth = section.frame:GetWidth()
-      if currentRowWidth > 0 and currentRowWidth + sectionWidth > maxRowWidth then
-        currentRow = currentRow + 1
-        currentRowWidth = sectionWidth
-      else
-        if currentRowWidth > 0 then
-          currentRowWidth = currentRowWidth + sectionWidth + spacing
-        else
-          currentRowWidth = sectionWidth
-        end
-      end
-
-      if not rowSections[currentRow] then
-        rowSections[currentRow] = {}
-      end
-      table.insert(rowSections[currentRow], section)
-    end
-  end
-
-  for _, sectionsInRow in pairs(rowSections) do
-    local allCollapsed = true
-    for _, section in ipairs(sectionsInRow) do
-      if not section:IsCollapsed() then
-        allCollapsed = false
-        break
-      end
-    end
-    for _, section in ipairs(sectionsInRow) do
-      if section.shouldShrinkWhenCollapsed ~= allCollapsed then
-        section.shouldShrinkWhenCollapsed = allCollapsed
-        needsRedraw = true
-      end
-    end
-  end
-
-  if needsRedraw then
-    for _, section in ipairs(view.content.cells) do
-      section:Draw(bag.kind, database:GetBagView(bag.kind), false)
-    end
-    view.content:Draw({
-      cells = view.content.cells,
-      maxWidthPerRow = ((37 + 4) * sizeInfo.itemsPerRow) + 16,
-      columns = sizeInfo.columnCount,
-    })
-  end
 
   for _, section in pairs(view.sections) do
     debug:WalkAndFixAnchorGraph(section.frame)

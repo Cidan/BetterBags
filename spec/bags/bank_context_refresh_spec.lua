@@ -27,6 +27,7 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
   }
 
   local sentMessages
+  local savedSetType, savedTrigger
   local behavior
 
   before_each(function()
@@ -46,6 +47,10 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
     _G.Enum.BagIndex.Characterbanktab = 6
     _G.BankPanel = { SetBankType = function() end }
     _G.ItemButtonUtil = _G.ItemButtonUtil or { Event = { ItemContextChanged = 1 }, TriggerEvent = function() end }
+    -- core/hooks.lua's measured Blizzard calls (not loaded here).
+    savedSetType, savedTrigger = addon.SetBlizzardBankType, addon.TriggerItemContextChanged
+    addon.SetBlizzardBankType = function(bankType) _G.BankPanel:SetBankType(bankType) end
+    addon.TriggerItemContextChanged = function() end
 
     addon.isRetail = true
     addon.atBank = true
@@ -63,8 +68,8 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
     -- Events stub records every SendMessage so tests can assert the refresh.
     sentMessages = {}
     local events = StubBetterBagsModule("Events")
-    function events:SendMessage(_, message, ...)
-      table.insert(sentMessages, message)
+    function events:SendMessage(_, message, options)
+      table.insert(sentMessages, { message = message, options = options })
     end
     function events:RegisterEvent() end
     function events:RegisterMessage() end
@@ -112,15 +117,21 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
   end)
 
   after_each(function()
+    addon.SetBlizzardBankType, addon.TriggerItemContextChanged = savedSetType, savedTrigger
     for _, name in ipairs(moduleNames) do
       addon.modules[name] = oldModules[name]
       aceAddon.addons["BetterBags_" .. name] = oldAddons[name]
     end
   end)
 
+  -- The grey-out is derived from the active bank tab, not read from the bags, so the
+  -- backpack is recalculated (refresh-scheduler.md §10).
   local function refreshedBackpack()
-    for _, message in ipairs(sentMessages) do
-      if message == "bags/RefreshBackpack" then return true end
+    for _, sent in ipairs(sentMessages) do
+      if sent.message == "bags/Rederive" and sent.options and sent.options.backpack == true
+        and sent.options.bank == false then
+        return true
+      end
     end
     return false
   end
@@ -129,14 +140,14 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
     local ctx = { Copy = function(self) return self end }
     behavior:SwitchToGroup(ctx, 2) -- switch to Character "Bank" group
     assert.is_true(refreshedBackpack(),
-      "switching bank group tabs must send bags/RefreshBackpack so the backpack context grey-out recomputes")
+      "switching bank group tabs must recalculate the backpack so its context grey-out recomputes")
   end)
 
   it("SwitchToBlizzardTab requests a backpack refresh and updates bankTab", function()
     local ctx = { Copy = function(self) return self end }
     behavior:SwitchToBlizzardTab(ctx, _G.Enum.BagIndex.Characterbanktab)
     assert.is_true(refreshedBackpack(),
-      "switching Blizzard bank tabs must send bags/RefreshBackpack so the backpack context grey-out recomputes")
+      "switching Blizzard bank tabs must recalculate the backpack so its context grey-out recomputes")
     assert.equal(_G.Enum.BagIndex.Characterbanktab, behavior.bag.bankTab,
       "SwitchToBlizzardTab must update bag.bankTab so ResolveItemContextMatchResult reads the active tab")
   end)

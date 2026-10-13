@@ -815,44 +815,52 @@ function stackedLayout:AddSlider(opts)
   container.slider:SetMinMaxValues(opts.min, opts.max)
   container.slider:SetValueStep(opts.step)
   container.slider:SetObeyStepOnDrag(true)
+  -- Only the user's own changes are saved. The form sets the slider from the stored setting
+  -- when it is built and on every reload, which fires OnValueChanged with userInput false;
+  -- saving those wrote every slider's setting back at each login and sent its refresh.
   addon.SetScript(container.slider, "OnValueChanged", function(ctx, _, value, user)
-    opts.setValue(ctx, value)
     if user then
+      opts.setValue(ctx, value)
       container.input:SetText(tostring(value))
       self:ReloadAllFormElements()
     end
   end)
+
+  -- applyTyped moves the slider to a value typed into the box, clamped to the range, and
+  -- saves it when it changed the slider.
+  local function applyTyped(ctx, value)
+    if value < opts.min then
+      value = opts.min
+    elseif value > opts.max then
+      value = opts.max
+    end
+    local before = container.slider:GetValue()
+    container.slider:SetValue(value)
+    container.input:SetText(tostring(value))
+    local after = container.slider:GetValue()
+    if after ~= before then
+      opts.setValue(ctx, after)
+    end
+  end
 
   container.input = CreateFrame("EditBox", nil, container, "InputBoxTemplate") --[[@as EditBox]]
   container.input:SetSize(50, 20)
   container.input:SetPoint("TOP", container.slider, "BOTTOM", 0, -5)
   container.input:SetNumeric(true)
   container.input:SetAutoFocus(false)
-  addon.SetScript(container.input, "OnEditFocusLost", function(_)
+  addon.SetScript(container.input, "OnEditFocusLost", function(ctx)
     local value = tonumber(container.input:GetText())
     if value then
-      if value < opts.min then
-        value = opts.min
-      elseif value > opts.max then
-        value = opts.max
-      end
-      container.slider:SetValue(value)
-      container.input:SetText(tostring(value))
+      applyTyped(ctx, value)
     end
     container.input:SetText(tostring(container.slider:GetValue()))
     self:ReloadAllFormElements()
   end)
-  addon.SetScript(container.input, "OnTextChanged", function(_, _, user)
+  addon.SetScript(container.input, "OnTextChanged", function(ctx, _, user)
     if user then
       local value = tonumber(container.input:GetText())
       if value then
-        if value < opts.min then
-          value = opts.min
-        elseif value > opts.max then
-          value = opts.max
-        end
-        container.slider:SetValue(value)
-        container.input:SetText(tostring(value))
+        applyTyped(ctx, value)
       end
     else
       container.input:SetText(tostring(container.slider:GetValue()))

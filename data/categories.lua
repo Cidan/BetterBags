@@ -393,7 +393,7 @@ function categories:DeleteCategory(ctx, category)
 
   database:DeleteItemCategory(category)
   events:SendMessage(ctx, 'categories/Changed')
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 -- RenameCategory renames a category.
@@ -462,7 +462,7 @@ function categories:RenameCategory(ctx, oldName, newName)
 
   debug:Log("categories", "Renamed category: %s -> %s", oldName, newName)
   events:SendMessage(ctx, 'categories/Changed', newName, oldName)
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
   return true
 end
 
@@ -476,7 +476,7 @@ function categories:HideCategory(ctx, category)
     ctx = context:New('HideCategory')
   end
   database:GetCategoryOptions(category).shown = false
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 ---@param ctx Context
@@ -489,7 +489,7 @@ function categories:ShowCategory(ctx, category)
     ctx = context:New('ShowCategory')
   end
   database:GetCategoryOptions(category).shown = true
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 ---@param category string
@@ -528,7 +528,7 @@ function categories:ToggleCategoryShown(ctx, category)
   end
   local options = database:GetCategoryOptions(category)
   options.shown = not options.shown
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 -- GetCustomCategory returns the custom category for an item, or nil if it doesn't have one.
@@ -650,5 +650,5 @@ end
 ---@param ctx Context
 function categories:ReprocessAllItems(ctx)
   wipe(self.itemsWithNoCategory)
-  events:SendMessage(ctx, 'bags/FullRefreshAll')
+  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end

@@ -154,7 +154,7 @@ local perf = addon:GetModule('Perf')
 function addon.HookScript(obj, script, func)
   local label = '[script] ' .. script
   obj:HookScript(script, function(...)
-    local token = perf.active and perf:Enter(label)
+    local token = perf.active and perf:Enter(label, ...)
     local ctx = context:New(script)
     func(ctx, unpack({...}))
     if token then perf:Exit(token) end
@@ -167,7 +167,7 @@ end
 function addon.SetScript(obj, script, func)
   local label = '[script] ' .. script
   obj:SetScript(script, function(...)
-    local token = perf.active and perf:Enter(label)
+    local token = perf.active and perf:Enter(label, ...)
     local ctx = context:New(script)
     func(ctx, unpack({...}))
     if token then perf:Exit(token) end

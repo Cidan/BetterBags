@@ -151,6 +151,53 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     assert.equal(item.slotkey, "Container")
   end)
 
+  -- Every item button must exist from boot: creating one later can taint. A capture of
+  -- opening the bank on retail created 265 buttons at runtime, all character bank tab slots
+  -- 41-98 (tabs hold 98 slots; boot made 40 for them and 98 for Warbank tabs).
+  describe("buttons created at boot", function()
+    local savedBankOnly, savedAccount
+
+    before_each(function()
+      savedBankOnly, savedAccount = const.BANK_ONLY_BAGS, const.ACCOUNT_BANK_BAGS
+    end)
+
+    after_each(function()
+      const.BANK_ONLY_BAGS, const.ACCOUNT_BANK_BAGS = savedBankOnly, savedAccount
+      addon.isRetail = true
+    end)
+
+    it("creates every slot of a retail character bank tab, up to 98", function()
+      addon.isRetail = true
+      const.BANK_ONLY_BAGS = { [6] = 6 }
+      const.ACCOUNT_BANK_BAGS = { [12] = 12 }
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      local created = 0
+      local origDoCreate = itemFrame._DoCreate
+      itemFrame._DoCreate = function(...)
+        created = created + 1
+        return origDoCreate(...)
+      end
+      local btnCtx = ctx:New("boot")
+      itemFrame:GetButton(btnCtx, "6_41")
+      itemFrame:GetButton(btnCtx, "6_98")
+      itemFrame:GetButton(btnCtx, "12_98")
+      itemFrame._DoCreate = origDoCreate
+      assert.equal(0, created, "no bank tab slot is created after boot")
+    end)
+
+    it("keeps 40 slots per bank bag on Classic", function()
+      addon.isRetail = false
+      const.BANK_ONLY_BAGS = { [6] = 6 }
+      const.ACCOUNT_BANK_BAGS = nil
+      itemFrame:Init()
+      itemFrame:OnEnable()
+      assert.is_not_nil(itemFrame.buttonsBySlotkey["5_40"])
+      assert.is_nil(itemFrame.buttonsBySlotkey["5_41"])
+      assert.is_nil(itemFrame.buttonsBySlotkey["6_41"])
+    end)
+  end)
+
   describe("Virtual Item Button Pool Architecture", function()
     it("should pre-allocate virtual item buttons during OnEnable", function()
       itemFrame:Init()
@@ -588,6 +635,43 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
         assert.equal(9, _G.SetItemButtonCountVal)
       end)
 
+      -- A release already reset the button (ClearItem runs ResetVisuals). Captures of Show
+      -- Bags and of bank tab switches showed every button reset twice: once on release and
+      -- again on its next draw (146 and 465 resets).
+      it("does not reset a released button again on its next draw", function()
+        local free = { slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = true,
+          itemInfo = { emptySlotName = "Bag" } }
+        item:SetItemFromData(btnCtx, fullItem(3))
+        local done = countResets()
+        item:Release(btnCtx)
+        item:SetFreeSlots(btnCtx, free, 1)
+        assert.equal(1, done(), "the release resets; the draw does not")
+
+        item:SetFreeSlots(btnCtx, free, 1)
+        done = countResets()
+        item:Release(btnCtx)
+        item:SetItemFromData(btnCtx, fullItem(3))
+        assert.equal(1, done())
+      end)
+
+      -- Anything that changes the button's look after its release (a lock, a search, a
+      -- cooldown) means it is no longer blank, so its next draw resets it.
+      for _, case in ipairs({
+        { "locked", function() item:Lock(btnCtx) end },
+        { "searched", function() item:UpdateSearch(btnCtx, false) end },
+        { "faded", function() item:SetAlpha(0.5) end },
+      }) do
+        it("resets a released button that was " .. case[1] .. " before its next draw", function()
+          item:SetItemFromData(btnCtx, fullItem(3))
+          item:Release(btnCtx)
+          case[2]()
+          local done = countResets()
+          item:SetFreeSlots(btnCtx, { slotkey = "0_6", bagid = 0, slotid = 6, isItemEmpty = true,
+            itemInfo = { emptySlotName = "Bag" } }, 1)
+          assert.equal(1, done())
+        end)
+      end
+
       it("resets the button like a release when its slot is drawn empty", function()
         item:SetItemFromData(btnCtx, fullItem(7))
         local done = countResets()
@@ -673,6 +757,65 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           themes.decorationGeneration = 1
           item:SetItemFromData(btnCtx, data())
           assert.equal(1, fullDraws)
+        end)
+
+        -- The profiler's call trace records this method's return value for every draw, which
+        -- is how a capture shows why a button redrew (data-driven.md).
+        it("names the input that changed, and nothing when the redraw can be skipped", function()
+          local decoration = item._decoration
+          assert.is_nil(item:DrawInputChanged(decoration, data()))
+          local named = {
+            { function(d) d.stackedCount = 5 end, "shownCount" },
+            { function(d) d.itemInfo.isNewItem = true end, "isNewItem" },
+            { function(d) d.isUpgrade = true end, "isUpgrade" },
+            { function(d) d.itemContextMatchResult = 2 end, "itemContextMatchResult" },
+            { function(d) d.drawGeneration = 2 end, "drawGeneration" },
+            { function(d) d.isSearchResult = false end, "matches" },
+            { function(d) d.itemHash = "hash-other" end, "itemHash" },
+          }
+          for _, case in ipairs(named) do
+            assert.equal(case[2], item:DrawInputChanged(decoration, data({ case[1] })))
+          end
+          themes.decorationGeneration = 1
+          assert.equal("decorationGeneration", item:DrawInputChanged(decoration, data()))
+          themes.decorationGeneration = 0
+          itemFrame:RestyleButtons()
+          assert.equal("styleGeneration", item:DrawInputChanged(decoration, data()))
+        end)
+
+        -- A capture of Show Bags (which turns stacking off) showed all 32 item buttons drawn in
+        -- both views redrawn on each toggle with "stackedCount": a single pile records its own
+        -- count as the stack total in the normal view and none in Show Bags, the same number shown.
+        it("skips a redraw when the stack total goes away but the count shown is the same", function()
+          item:SetItemFromData(btnCtx, data({ function(d) d.stackedCount = nil end }))
+          assert.equal(0, fullDraws)
+        end)
+
+        it("redraws when a stack starts or stops hiding an armor or weapon piece's level", function()
+          local function armor(d)
+            d.itemInfo.classID = Enum.ItemClass.Armor
+            d.itemInfo.currentItemCount = 2
+            d.stackedCount = nil
+          end
+          item:SetItemFromData(btnCtx, data({ armor }))
+          fullDraws = 0
+          assert.equal("stackHidesLevel", item:DrawInputChanged(item._decoration,
+            data({ armor, function(d) d.stackedCount = 2 end })))
+        end)
+
+        it("names a missing record after the button was locked", function()
+          item:Lock(btnCtx)
+          assert.equal("record", item:DrawInputChanged(item._decoration, data()))
+        end)
+
+        -- Settings that only change how buttons draw (glow intensity, item level display)
+        -- reach the buttons through a redraw with no new data, so they restyle the buttons.
+        it("redraws once after the buttons were restyled", function()
+          itemFrame:RestyleButtons()
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws)
+          item:SetItemFromData(btnCtx, data())
+          assert.equal(1, fullDraws, "the next redraw skips again")
         end)
 
         it("redraws after the live search dimmed the button, not after it applied the same match", function()
@@ -797,6 +940,22 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           assert.equal(0, fullDraws)
           assert.is_true(item.isFreeSlot)
           assert.is_true(item.frame:IsShown())
+        end)
+
+        it("redraws once after the buttons were restyled", function()
+          itemFrame:RestyleButtons()
+          item:SetFreeSlots(btnCtx, slot(), 3)
+          assert.equal(1, fullDraws)
+          item:SetFreeSlots(btnCtx, slot(), 3)
+          assert.equal(1, fullDraws, "the next redraw skips again")
+        end)
+
+        it("names the free-slot input that changed, and nothing when the redraw can be skipped", function()
+          local decoration = item._decoration
+          assert.is_nil(item:FreeDrawInputChanged(decoration, slot(), 3))
+          assert.equal("count", item:FreeDrawInputChanged(decoration, slot(), 4))
+          assert.equal("emptySlotName", item:FreeDrawInputChanged(decoration,
+            slot({ function(d) d.itemInfo.emptySlotName = "Reagent Bag" end }), 3))
         end)
 
         it("redraws after a theme is applied, on a new decoration, or for another bag", function()

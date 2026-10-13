@@ -158,10 +158,9 @@ function config:CreateConfig()
     end,
     setValue = function(ctx, value)
       db:SetUpgradeIconProvider(value)
-      -- A full refresh re-runs the data sweep so Phase6 re-resolves each item's
-      -- data.isUpgrade with the newly selected provider. bag/RedrawIcons only
-      -- re-reads the already-committed (stale) isUpgrade and would not update.
-      events:SendMessage(ctx, 'bags/FullRefreshAll')
+      -- The data sweep re-resolves each item's data.isUpgrade with the newly selected
+      -- provider; a redraw alone would draw the committed (stale) isUpgrade.
+      events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
     end,
   })
 
@@ -230,7 +229,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetSectionSortType(bagType.kind, db:GetBagView(bagType.kind), sectionOrders[value])
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end,
     })
 
@@ -249,7 +248,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetItemSortType(bagType.kind, db:GetBagView(bagType.kind), itemOrders[value])
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end,
     })
 
@@ -264,7 +263,7 @@ function config:CreateConfig()
         setValue = function(ctx, value)
           db:SetGroupsEnabled(bagType.kind, value)
           events:SendMessage(ctx, 'groups/EnabledChanged', bagType.kind, value)
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
         end
       })
     end
@@ -286,7 +285,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetCategoryFilters(bagType.kind).EquipmentLocation = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -298,7 +297,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetCategoryFilters(bagType.kind).Expansion = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -310,7 +309,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetCategoryFilters(bagType.kind).GearSet = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -322,7 +321,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetCategoryFilters(bagType.kind).RecentItems = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -334,7 +333,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetCategoryFilters(bagType.kind).TradeSkill = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -346,7 +345,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetCategoryFilters(bagType.kind).Type = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -358,7 +357,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetCategoryFilters(bagType.kind).Subtype = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -397,7 +396,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetStackingOptions(bagType.kind).mergeStacks = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -409,7 +408,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetStackingOptions(bagType.kind).mergeUnstackable = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -421,7 +420,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetStackingOptions(bagType.kind).dontMergePartial = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -433,6 +432,8 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetStackingOptions(bagType.kind).dontMergeTransmog = value
+        -- The item hash includes the transmog appearance only with this setting, and a slot's
+        -- hash is computed when the slot is read, so the bags are read again.
         events:SendMessage(ctx, 'bags/FullRefreshAll')
       end
     })
@@ -445,7 +446,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetStackingOptions(bagType.kind).unmergeAtShop = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -462,7 +463,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetItemLevelOptions(bagType.kind).enabled = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
       end
     })
 
@@ -474,7 +475,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:GetItemLevelOptions(bagType.kind).color = value
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
       end
     })
 
@@ -491,7 +492,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetShowFullSectionNames(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw')
       end
     })
 
@@ -503,7 +504,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetShowAllFreeSpace(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -515,7 +516,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetPreserveItemGaps(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
       end
     })
 
@@ -532,7 +533,7 @@ function config:CreateConfig()
       end,
       setValue = function(ctx, value)
         db:SetGlowIntensity(bagType.kind, value)
-        events:SendMessage(ctx, 'bags/FullRefreshAll')
+        events:SendMessage(ctx, 'bags/Redraw', { buttons = true })
       end
     })
 
@@ -548,7 +549,7 @@ function config:CreateConfig()
       setValue = function(ctx, value)
         db:SetBagViewSizeItems(bagType.kind, db:GetBagView(bagType.kind), value)
         bucket:Later("setItemsPerRow", 0.2, function()
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          events:SendMessage(ctx, 'bags/Redraw')
         end)
       end,
     })
@@ -565,7 +566,7 @@ function config:CreateConfig()
       setValue = function(ctx, value)
         db:SetBagViewSizeColumn(bagType.kind, db:GetBagView(bagType.kind), value)
         bucket:Later("setSectionsPerRow", 0.2, function()
-          events:SendMessage(ctx, 'bags/FullRefreshAll')
+          events:SendMessage(ctx, 'bags/Redraw')
         end)
       end,
     })

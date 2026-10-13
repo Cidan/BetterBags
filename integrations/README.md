@@ -73,7 +73,7 @@ Integrates with Masque for custom button skinning.
 **Event Handlers:**
 - `item/NewButton` - Register new item buttons
 - `item/Updated` - Update button registration (sent by a full button draw; a redraw whose inputs are unchanged is skipped and sends nothing)
-- `item/Clearing` - Remove button from group
+- `item/Clearing` - Not handled: a released item button stays in its group (buttons exist for the whole session; its next draw re-skins it)
 - `bagbutton/Updated` - Register bag slot buttons
 - `bagbutton/Clearing` - Remove bag slot buttons
 

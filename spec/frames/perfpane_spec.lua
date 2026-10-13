@@ -27,6 +27,7 @@ local question = stubModule("Question")
 LoadBetterBagsModule("debug/perf/format.lua")
 LoadFreshBetterBagsModule("PerfSessions", "debug/perf/sessions.lua")
 LoadBetterBagsModule("frames/flamegraph.lua")
+LoadBetterBagsModule("frames/tracechart.lua")
 LoadFreshBetterBagsModule("PerfPane", "frames/perfpane.lua")
 
 local perf = addon:GetModule("Perf")
@@ -450,12 +451,194 @@ describe("PerfPane", function()
     end)
   end)
 
+  describe("call trace", function()
+    local T = addon:GetModule("PerfPaneTraceA", true) or addon:NewModule("PerfPaneTraceA")
+
+    -- 250 calls of 1 ms each, T:TCall(n) returning n * 10, a frame every 50 calls. The
+    -- trace starts with the perf/StateChanged message StartCapture sends, once per listener
+    -- (AceEvent's registry outlives each test's pane), so T:TCall(n) is call n + offset.
+    local function captureTrace()
+      function T:TCall(n)
+        now = now + 1
+        return n * 10
+      end
+      override(perfSessions, "BuildOptions", function()
+        return {
+          modules = { "PerfPaneTraceA" }, prototypes = {}, includeRoot = false, calibrate = false,
+          trace = true, traceArgs = true, traceChunkSize = 64,
+        }
+      end)
+      perfSessions:StartCapture("manual")
+      for i = 1, 250 do
+        T:TCall(i)
+        if i % 50 == 0 then perf:_OnFrame() end
+      end
+      return perfSessions:StopCapture()
+    end
+
+    local function renderCallRow(row)
+      local button = CreateFrame("Button")
+      for _, key in ipairs({ "Time", "Frame", "Duration", "Name", "Args" }) do
+        button[key] = button:CreateFontString()
+      end
+      button.Selected = button:CreateTexture()
+      pane.callList.init(button, row)
+      return button
+    end
+
+    local function click(button)
+      button:GetScript("OnClick")(button)
+    end
+
+    local session, offset, total
+
+    before_each(function()
+      session = captureTrace()
+      local trace = perfFormat:OpenTrace(session)
+      offset = 0
+      while trace:Get(offset + 1).name ~= "PerfPaneTraceA.TCall" do
+        offset = offset + 1
+      end
+      total = trace:Count()
+      assert.are.equal(250 + offset, total)
+      pane.timelineChart.canvas:SetSize(500, 200)
+      pane.traceStrip:SetSize(500, 40)
+    end)
+
+    it("selects the new session and lists its calls in start order, a page at a time", function()
+      assert.are.equal(session.id, pane.selectedId)
+      pane:ShowView("calls")
+      local rows = itemsOf(pane.callList)
+      assert.are.equal(100, #rows)
+      assert.are.equal(1, rows[1].index)
+      assert.are.equal(100, rows[100].index)
+      assert.is_truthy(pane.callPageLabel:GetText():find("1-100 of " .. total, 1, true))
+      click(pane.callNext)
+      assert.are.equal(101, itemsOf(pane.callList)[1].index)
+      click(pane.callLast)
+      assert.are.equal(total - 200, #itemsOf(pane.callList))
+      assert.is_truthy(pane.callPageLabel:GetText():find("201-" .. total .. " of " .. total, 1, true))
+      click(pane.callFirst)
+      click(pane.callPrevious)
+      assert.are.equal(1, itemsOf(pane.callList)[1].index)
+    end)
+
+    it("fills a call row's columns", function()
+      local button = renderCallRow(itemsOf(pane.callList)[offset + 3])
+      assert.are.equal("2.00 ms", button.Time:GetText())
+      assert.are.equal("1", button.Frame:GetText())
+      assert.are.equal("1.00 ms", button.Duration:GetText())
+      assert.are.equal("PerfPaneTraceA.TCall", button.Name:GetText())
+      assert.are.equal("(<PerfPaneTraceA>, 3) -> 30", button.Args:GetText())
+    end)
+
+    it("filters calls by name, argument or return text, a budget of calls per frame", function()
+      pane.filterBudget = 60
+      pane.callFilter:SetText("7")
+      pane.callFilter:GetScript("OnEnterPressed")(pane.callFilter)
+      assert.is_truthy(pane.callPageLabel:GetText():find("Searching", 1, true))
+      local steps = 0
+      while not pane.filterState.done do
+        pane:StepFilter()
+        steps = steps + 1
+      end
+      assert.is_true(steps > 1, "the search was spread over several frames")
+      local rows = itemsOf(pane.callList)
+      assert.are.equal(43, #rows)
+      assert.are.equal(offset + 7, rows[1].index)
+      assert.is_truthy(pane.callPageLabel:GetText():find("1-43 of 43 matching", 1, true))
+      pane.callFilter:SetText("")
+      pane.callFilter:GetScript("OnEnterPressed")(pane.callFilter)
+      assert.are.equal(100, #itemsOf(pane.callList))
+    end)
+
+    it("shows a call's details and jumps to it on the timeline", function()
+      local row = itemsOf(pane.callList)[offset + 5]
+      click(renderCallRow(row))
+      assert.are.equal(offset + 5, pane.selectedCall)
+      assert.is_truthy(pane.callDetail:GetText():find("<PerfPaneTraceA>, 5", 1, true))
+      assert.is_truthy(pane.callDetail:GetText():find("50", 1, true))
+      click(pane.showInTimeline)
+      assert.are.equal("timeline", pane.currentView)
+      assert.are.equal(offset + 5, pane.timelineChart.highlight)
+      assert.is_true(pane.timelineChart.from <= 4 and pane.timelineChart.to >= 5)
+    end)
+
+    it("opens the timeline on the first frame and steps between frames", function()
+      pane:ShowView("timeline")
+      assert.are.equal(0, pane.timelineChart.from)
+      assert.are.equal(50, pane.timelineChart.to)
+      click(pane.nextFrameButton)
+      assert.are.equal(50, pane.timelineChart.from)
+      assert.are.equal(100, pane.timelineChart.to)
+      click(pane.previousFrameButton)
+      assert.are.equal(0, pane.timelineChart.from)
+      click(pane.wholeCaptureButton)
+      assert.are.equal(250, pane.timelineChart.to)
+      pane:SelectTraceFrame(3)
+      assert.are.equal(100, pane.timelineChart.from)
+      assert.are.equal(150, pane.timelineChart.to)
+    end)
+
+    it("says when the selected session has no call trace", function()
+      table.insert(perfSessions.db.sessions, makeSession(99))
+      pane:Update()
+      pane:SelectSession(99)
+      pane:ShowView("calls")
+      assert.are.equal(0, #itemsOf(pane.callList))
+      assert.is_truthy(pane.callPageLabel:GetText():find("no call trace", 1, true))
+      assert.is_nil(pane.timelineChart.trace)
+    end)
+
+    it("marks sessions that carry a trace and removes the selected session's trace", function()
+      local row = itemsOf(pane.sessionList)[1]
+      assert.is_truthy(row.text:find("trace", 1, true))
+      click(pane.removeTraceButton)
+      assert.is_nil(perfSessions:GetSession(session.id).trace)
+      assert.are.equal(0, #itemsOf(pane.callList))
+      assert.is_truthy(pane.callPageLabel:GetText():find("removed", 1, true))
+      assert.is_falsy(itemsOf(pane.sessionList)[1].text:find("trace", 1, true))
+    end)
+
+    it("asks before removing every trace", function()
+      click(pane.removeAllTracesButton)
+      assert.is_not_nil(yesNo)
+      assert.is_table(perfSessions:GetSession(session.id).trace)
+      yesNo.yes()
+      assert.is_nil(perfSessions:GetSession(session.id).trace)
+    end)
+
+    it("reports the trace in the summary and the status line", function()
+      local text = pane.summaryText:GetText()
+      assert.is_truthy(text:find("Call trace: " .. total .. " calls", 1, true), text)
+      perfSessions:StartCapture("manual")
+      T:TCall(1)
+      pane:UpdateStatus()
+      local traced = perf:GetLiveStats().traceCalls
+      assert.is_true(traced >= 1)
+      assert.is_truthy(pane.status:GetText():find(perfFormat:Count(traced) .. " call", 1, true), pane.status:GetText())
+      assert.is_truthy(pane.status:GetText():find("traced", 1, true), pane.status:GetText())
+    end)
+  end)
+
   describe("settings", function()
     local function entry(title)
       for _, e in ipairs(createdForm.entries) do
         if e.opts.title == title then return e end
       end
     end
+
+    it("offers the call trace settings", function()
+      pane.settingsButton:GetScript("OnClick")(pane.settingsButton)
+      local ctx = context:New("Test")
+      entry("Record every call in order").opts.setValue(ctx, false)
+      assert.is_false(perfSessions:GetSettings().traceCalls)
+      entry("Record arguments and return values").opts.setValue(ctx, false)
+      assert.is_false(perfSessions:GetSettings().traceArgs)
+      entry("Trace call limit").opts.setValue(ctx, 50000)
+      assert.are.equal(50000, perfSessions:GetSettings().traceMaxCalls)
+      assert.are.equal(50000, entry("Trace call limit").opts.getValue(ctx))
+    end)
 
     it("opens one settings window and writes changes to the profiler settings", function()
       pane.settingsButton:GetScript("OnClick")(pane.settingsButton)

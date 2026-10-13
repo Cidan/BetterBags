@@ -34,6 +34,9 @@ perfSessions.DEFAULTS = {
   trackAllocations = false,
   pauseGC = false,
   calibrate = true,
+  traceCalls = true,
+  traceArgs = true,
+  traceMaxCalls = 1000000,
 }
 
 perfSessions.LIMITS = {
@@ -43,6 +46,7 @@ perfSessions.LIMITS = {
   spikeThresholdMs = { 1, 1000 },
   timelineFrames = { 0, 216000 },
   maxDurationSec = { 0, 3600 },
+  traceMaxCalls = { 10000, 2000000 },
 }
 
 -- The pipeline preset covers everything between a bag event and the finished draw:
@@ -139,10 +143,13 @@ function perfSessions:Init()
   self.db = db
   self.pendingMeta = nil
 
-  if not self._logoutHooked then
-    self._logoutHooked = true
+  if not self._eventsHooked then
+    self._eventsHooked = true
     events:RegisterEvent('PLAYER_LOGOUT', function()
       self:OnLogout()
+    end)
+    events:RegisterEvent('PLAYER_ENTERING_WORLD', function(_, _, isInitialLogin, isReloadingUi)
+      self:OnEnteringWorld(isInitialLogin, isReloadingUi)
     end)
   end
 end
@@ -207,7 +214,12 @@ function perfSessions:BuildOptions()
     trackAllocations = s.trackAllocations,
     pauseGC = s.pauseGC,
     calibrate = s.calibrate,
+    trace = s.traceCalls,
+    traceArgs = s.traceArgs,
+    traceMaxCalls = s.traceMaxCalls,
     frameMetric = blizzardFrameMetric(),
+    -- The engine asks once, on a frame, when the maximum duration passed or the call
+    -- trace filled; the session records which.
     onAutoStop = function()
       self:StopCapture()
     end,
@@ -219,7 +231,7 @@ function perfSessions:IsCapturing()
   return perf:IsActive()
 end
 
----@param reason string "manual" or "reload"
+---@param reason? string "manual" (default), or "startup" for a capture armed for the next load
 ---@return boolean started
 function perfSessions:StartCapture(reason)
   if perf:IsActive() then return false end
@@ -313,6 +325,35 @@ function perfSessions:DeleteAllSessions()
   send('perf/SessionsChanged')
 end
 
+-- RemoveTrace deletes a session's call trace, the bulk of its size in SavedVariables, and
+-- keeps everything else. Returns false when the session has no trace.
+---@param id number
+---@return boolean
+function perfSessions:RemoveTrace(id)
+  local session = self:GetSession(id)
+  if not session or not session.trace then return false end
+  session.trace = nil
+  session.stats = session.stats or {}
+  session.stats.traceRemoved = true
+  send('perf/SessionsChanged')
+  return true
+end
+
+function perfSessions:RemoveAllTraces()
+  local removed = false
+  for _, session in ipairs(self.db.sessions) do
+    if session.trace then
+      session.trace = nil
+      session.stats = session.stats or {}
+      session.stats.traceRemoved = true
+      removed = true
+    end
+  end
+  if removed then
+    send('perf/SessionsChanged')
+  end
+end
+
 ---@param armed boolean
 function perfSessions:SetArmedForNextReload(armed)
   self.db.armNextReload = armed and true or nil
@@ -324,12 +365,28 @@ function perfSessions:IsArmedForNextReload()
   return self.db.armNextReload == true
 end
 
--- StartIfArmed consumes the one-shot "capture next reload" switch.
+-- StartIfArmed consumes the one-shot "capture next reload" switch. The switch applies to
+-- the next load, a full relaunch as much as a /reload; the capture is labeled 'startup'
+-- until the first PLAYER_ENTERING_WORLD says which it was (OnEnteringWorld).
 ---@return boolean started
 function perfSessions:StartIfArmed()
   if not self:IsArmedForNextReload() then return false end
   self.db.armNextReload = nil
-  return self:StartCapture('reload')
+  return self:StartCapture('startup')
+end
+
+-- OnEnteringWorld labels a capture armed for this load a 'login' or a 'reload'. Later
+-- loading screens, and manual captures, keep their label.
+---@param isInitialLogin boolean
+---@param isReloadingUi boolean
+function perfSessions:OnEnteringWorld(isInitialLogin, isReloadingUi)
+  local meta = self.pendingMeta
+  if not meta or meta.reason ~= 'startup' then return end
+  if isInitialLogin then
+    meta.reason = 'login'
+  elseif isReloadingUi then
+    meta.reason = 'reload'
+  end
 end
 
 function perfSessions:OnLogout()

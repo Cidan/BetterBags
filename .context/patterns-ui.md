@@ -75,7 +75,7 @@ StaticPopup_Show("MY_DIALOG", nil, nil, { value = x })
 ## Object Pooling Patterns
 
 ### Always Reset ALL Properties When Releasing Pooled Objects
-**Problem**: Pooled objects retain state (colors, collapsed flags, cached data) from prior use, causing visual glitches when reused.
+**Problem**: Pooled objects retain state (colors, flags, cached data) from prior use, causing visual glitches when reused.
 **Rule**: In `Wipe()`/`_DoReset()`, reset **every** custom property. Reset visual properties (restore original colors) before clearing the cached values needed to restore them. Add a comment near every new field reminding future devs to reset it.
 
 ### Track Active Pooled Frames for Incremental UI Updates
@@ -162,3 +162,11 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 3. Tab views become perfectly dumb and non-scrollable, rendering their layout grids directly into `tabContainer` via `grid:Create(parent, false)` and `SetAllPoints(parent)`.
 4. Switch tabs by simply toggling visibility of the layout grids in `tabContainer` with zero secure reparenting or combat taint.
 **Key Files**: `frames/bag.lua`, `frames/grid.lua`, `views/gridview_new.lua`, `views/bagview_new.lua`.
+
+## Form Sliders Save Only User Input
+**Problem**: WoW fires a Slider's `OnValueChanged(self, value, userInput)` whenever its value changes, including when code calls `SetValue` (`userInput` false). A form that sets each slider from its stored setting at build time and on reload, and saves in `OnValueChanged`, writes every setting back and fires every setting's side effect (refreshes) at every login.
+**Solution**: save only when `userInput` is true; paths that move the slider for the user from code (a typed number box) call the setter themselves, and only when the value changed. Keep spec mocks faithful: `SetValue` must fire `OnValueChanged` with `userInput` false, or the bug is invisible in tests. See `.claude/rules/refresh-scheduler.md` §9.
+
+## Windows Built on First Use Are Themed at Registration
+**Problem**: `themes:ApplyTheme` decorates every registered window (background, border, close button), and runs at startup when the Themes module is enabled (AceAddon enables modules after the addon's own `OnEnable`, so windows built there, like the config window, are registered in time). A window built later on first use (the profiler's Settings form, the "Create New Bank Tab" group dialog) was registered after that and stayed undecorated until the next theme change: no background and no close button.
+**Solution**: `themes:RegisterSimpleWindow` / `RegisterFlatWindow` decorate the window with the active theme at once when a theme has already been applied (`themes.themeApplied`); otherwise the first `ApplyTheme` does. Coverage: `spec/themes_spec.lua` ("windows registered after a theme was applied").

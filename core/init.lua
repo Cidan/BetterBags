@@ -419,17 +419,20 @@ function addon:OnEnable()
   if addon.Bags.Bank then
     events:RegisterMessage('items/RefreshBank/Done', function(ctx, slotInfo)
       debug:Log("init/OnInitialize/items", "Drawing bank")
-       -- Show the bank frame if it's not already shown.
-      if not addon.Bags.Bank:IsShown() and addon.atBank then
-        addon.Bags.Bank:Show(ctx)
-      end
-      addon.Bags.Bank:Draw(ctx, slotInfo, function()
+      local function drawn()
         events:SendMessage(ctx, 'bags/Draw/Bank/Done')
         if not addon.Bags.Bank.loaded then
           addon.Bags.Bank.loaded = true
           events:SendMessage(ctx, 'bags/Draw/Bank/Loaded')
         end
-      end)
+      end
+      -- Show the bank frame if it's not already shown. Showing it draws it (the draw its
+      -- behavior deferred while it was hidden), so it is not drawn a second time.
+      if not addon.Bags.Bank:IsShown() and addon.atBank and addon.Bags.Bank:Show(ctx, slotInfo) then
+        drawn()
+        return
+      end
+      addon.Bags.Bank:Draw(ctx, slotInfo, drawn)
     end)
   end
 

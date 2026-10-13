@@ -284,35 +284,46 @@ end
 -- InvalidateUpgrades starts a new upgrade generation, so kept verdicts are computed again.
 -- With refresh, the backpack and (while open) the bank are refreshed on the next frame so
 -- arrows update right away; without it, the next refresh recomputes them (used for frequent
--- events).
+-- events). The refresh recalculates the bags from the items already read, unless reread:
+-- level and scaling change the bag items' own current item levels, which only a read sees.
 ---@param refresh boolean
-function items:InvalidateUpgrades(refresh)
+---@param reread? boolean
+function items:InvalidateUpgrades(refresh, reread)
   self._upgradeGeneration = self._upgradeGeneration + 1
   if refresh then
-    self:RequestUpgradeRefresh(true, addon.atBank == true)
+    self:RequestUpgradeRefresh(true, addon.atBank == true, reread)
   end
 end
 
--- RequestUpgradeRefresh asks, on the next frame, for refreshes of the given bag kinds.
--- Requests made in the same frame share one timer and one refresh per kind.
+-- RequestUpgradeRefresh asks, on the next frame, for refreshes of the given bag kinds:
+-- recalculations (bags/Rederive), or reads when any request of the frame asked to reread.
+-- Requests made in the same frame share one timer and one refresh.
 ---@param backpack boolean
 ---@param bank boolean
-function items:RequestUpgradeRefresh(backpack, bank)
+---@param reread? boolean
+function items:RequestUpgradeRefresh(backpack, bank, reread)
   local pending = self._upgradeRefreshPending
   local scheduled = pending.backpack or pending.bank
   pending.backpack = pending.backpack or backpack
   pending.bank = pending.bank or bank
+  pending.reread = pending.reread or reread == true
   if scheduled or not (pending.backpack or pending.bank) then
     return
   end
   C_Timer.After(0, function()
-    local doBackpack, doBank = pending.backpack, pending.bank
-    pending.backpack, pending.bank = false, false
+    local doBackpack, doBank, doReread = pending.backpack, pending.bank and addon.atBank == true, pending.reread
+    pending.backpack, pending.bank, pending.reread = false, false, false
     local ctx = context:New('InvalidateUpgrades')
+    if not doReread then
+      if doBackpack or doBank then
+        events:SendMessage(ctx, 'bags/Rederive', { backpack = doBackpack, bank = doBank })
+      end
+      return
+    end
     if doBackpack then
       events:SendMessage(ctx, 'bags/RefreshBackpack')
     end
-    if doBank and addon.atBank then
+    if doBank then
       events:SendMessage(ctx, 'bags/RefreshBank')
     end
   end)
@@ -334,7 +345,9 @@ end
 --     effective-level changes), PLAYER_AVG_ITEM_LEVEL_UPDATE (also re-read all gear);
 --   * proficiencies and skills: SKILL_LINES_CHANGED, LEARNED_SPELL_IN_SKILL_LINE;
 --   * specialization: PLAYER_SPECIALIZATION_CHANGED for the player.
--- Each invalidates every kept verdict and refreshes the bags. The built-in provider's
+-- Each invalidates every kept verdict and refreshes the bags: level and scaling events read
+-- them (the bag items' own current item levels change), the others recalculate them from the
+-- items already read (refresh-scheduler.md §10). The built-in provider's
 -- usability check (C_PlayerInfo.CanUseItem) also changes with reputation and spells, the
 -- events Blizzard's own usability refresh listens for (Blizzard_Wardrobe.lua):
 -- UPDATE_FACTION and SPELLS_CHANGED fire often, so they invalidate without a refresh (the
@@ -356,7 +369,7 @@ function items:RegisterCacheEvents()
   for _, name in ipairs({ 'PLAYER_LEVEL_UP', 'PLAYER_LEVEL_CHANGED', 'PLAYER_AVG_ITEM_LEVEL_UPDATE' }) do
     register(name, function()
       self._equipmentDirtyAll = true
-      self:InvalidateUpgrades(true)
+      self:InvalidateUpgrades(true, true)
     end)
   end
   for _, name in ipairs({ 'SKILL_LINES_CHANGED', 'LEARNED_SPELL_IN_SKILL_LINE' }) do
@@ -447,10 +460,13 @@ function items:Init()
     [const.BAG_KIND.BACKPACK] = false,
     [const.BAG_KIND.BANK] = false,
   }
-  -- Stamped on every item each sweep (Phase6_EnrichData) and bumped by every wipe sweep.
-  -- Item buttons skip a redraw whose inputs are unchanged; settings that change how a
-  -- button looks without changing its data all reach the buttons through a wipe
-  -- (bags/FullRefreshAll), so a new generation makes every button of the kind redraw.
+  -- The interaction state (addon.atInteracting) each kind's committed stacks were built
+  -- under (see NeedsInteractionRecalculation).
+  self._stackedInteracting = {}
+  -- Stamped on every item each sweep (Phase6_EnrichData) and bumped by every wipe sweep and
+  -- every restyling recalculation (settings, bags/Rederive with buttons). Item buttons skip a
+  -- redraw whose inputs are unchanged, so a new generation makes every button of the kind
+  -- redraw.
   self._drawGeneration = {
     [const.BAG_KIND.BACKPACK] = 0,
     [const.BAG_KIND.BANK] = 0,
@@ -461,7 +477,7 @@ function items:Init()
   self.previousItemGUID = {}
   -- Upgrade verdict cache (ResolveUpgrade) and equipped gear cache (HarvestEquipment).
   self._upgradeGeneration = 0
-  self._upgradeRefreshPending = { backpack = false, bank = false }
+  self._upgradeRefreshPending = { backpack = false, bank = false, reread = false }
   self._equipmentIncomplete = false
   self._equipped = {}
   self._equipmentDirty = {}
@@ -890,12 +906,71 @@ function items:Phase1_DetermineBags(ctx, kind)
   return bagList
 end
 
+-- NeedsInteractionRecalculation says whether an interaction window opening or closing
+-- changes the kind's committed data: stacks unmerge while interacting when the kind's
+-- "Unmerge on Interactions" option is on (ShouldMergeItem), so the answer is yes only when
+-- the committed stacks were built under the other interaction state. A kind with no committed
+-- items has nothing to recalculate (its next read stacks them).
+---@param kind BagKind
+---@return boolean
+function items:NeedsInteractionRecalculation(kind)
+  local committed = self.slotInfo and self.slotInfo[kind] and self.slotInfo[kind].itemsBySlotKey
+  if not committed or next(committed) == nil then
+    return false
+  end
+  local opts = database:GetStackingOptions(kind)
+  if not (opts.mergeStacks and opts.unmergeAtShop) then
+    return false
+  end
+  return self._stackedInteracting[kind] ~= (addon.atInteracting == true)
+end
+
 ---@param kind BagKind
 ---@param bagList table<number, number>
 ---@param previousItems? table<string, ItemData> The committed items, whose unchanged slots are kept.
 ---@param rereadEquipment? boolean Read every equipped slot again (wipe sweeps).
 function items:Phase2_Harvest(kind, bagList, previousItems, rereadEquipment)
   return self:Harvest(kind, bagList, kind == const.BAG_KIND.BACKPACK, previousItems, rereadEquipment)
+end
+
+-- Phase2_Rederive gives a derive (refresh-scheduler.md §10) the items the last read
+-- committed, reading no bag slot. An item still in its slot (same GUID) gets the fields a
+-- read refreshes on a kept slot (refreshKeptItem): quest state, tooltip text, gear sets and
+-- the new-item flag; one read while the client had no data for it (harvestIncomplete) is
+-- read again, as every read does with such a slot. An item whose slot now holds something else keeps its values: what the
+-- client reports for the slot belongs to the other item, and the slot's read is on its way.
+-- A backpack derive reads the equipped gear, as a backpack read does, so upgrade arrows
+-- compare with the gear worn now.
+---@param kind BagKind
+---@param committedItems table<string, ItemData>
+---@return table<string, ItemData> itemData
+---@return table<number, ItemData> equipmentData
+function items:Phase2_Rederive(kind, committedItems)
+  local itemData = {}
+  local itemLoader = addon:GetModule("ItemLoader", true)
+  for slotkey, item in pairs(committedItems) do
+    if not item.isItemEmpty then
+      local itemMixin = itemLoader and itemLoader:GetItemMixinFromSlotKey(slotkey) or Item:CreateFromBagAndSlot(item.bagid, item.slotid) --[[@as ItemMixin]]
+      local itemGUID = C_Item.GetItemGUID(itemMixin:GetItemLocation()) or ""
+      if itemGUID == item.itemInfo.itemGUID then
+        if item.harvestIncomplete then
+          local data = {}
+          ---@cast data +ItemData
+          data.bagid, data.slotid = item.bagid, item.slotid
+          self:AttachItemInfo(data, kind)
+          item = data
+        else
+          self:RefreshKeptItem(kind, item, item.bagid, item.slotid, itemGUID)
+        end
+      end
+    end
+    itemData[slotkey] = item
+  end
+  local equipmentData = {}
+  if kind == const.BAG_KIND.BACKPACK then
+    equipmentData = self:HarvestEquipment()
+  end
+  return itemData, equipmentData
 end
 
 function items:Phase6_EnrichData(ctx, kind, itemData, emptySlotsByBag)
@@ -1638,11 +1713,26 @@ end
 ---@param ectx Context
 ---@param kind BagKind
 function items:RunRefresh(ectx, kind)
+  -- A derive recalculates from the items the last read committed, reading no bag slot
+  -- (refresh-scheduler.md §10). A kind with no committed items has nothing to recalculate:
+  -- never read (deriving it would take the kind's first sweep, which must be a read that
+  -- marks nothing as new) or the bank cleared on close (it would draw an empty bank).
+  local wipeRequested = ectx:Get("wipe") == true
+  local derive = ectx:Get("derive") == true and not wipeRequested
+  local committedItems
+  if not wipeRequested and self.slotInfo and self.slotInfo[kind] then
+    committedItems = self.slotInfo[kind].itemsBySlotKey
+  end
+  if derive and (committedItems == nil or next(committedItems) == nil) then
+    return
+  end
+
   -- The first sweep after a sort shows the sort. It re-reads every bag of the kind, even
   -- when a BAG_UPDATE named only some: the sort may have moved items anywhere, and the
   -- new-item flags it cleared live on every bag (an untouched bag would keep its stale
-  -- glow). It also rebuilds the layout from scratch, collapsing held gaps.
-  local sortSweep = self._sortSweepPending[kind] == true
+  -- glow). It also rebuilds the layout from scratch, collapsing held gaps. Only a read can
+  -- show it, so a derive leaves it pending.
+  local sortSweep = not derive and self._sortSweepPending[kind] == true
   if sortSweep then
     ectx:Delete("targetedBags")
     ectx:Set("resetLayout", true)
@@ -1657,14 +1747,14 @@ function items:RunRefresh(ectx, kind)
   equipmentSets:Update()
 
   local bagList = self:Phase1_DetermineBags(ectx, kind)
-  -- A wipe re-reads every slot; any other sweep keeps the committed item of each slot
-  -- whose contents have not changed (ReuseHarvestedSlot).
-  local committedItems
-  local wipeRequested = ectx:Get("wipe") == true
-  if not wipeRequested and self.slotInfo and self.slotInfo[kind] then
-    committedItems = self.slotInfo[kind].itemsBySlotKey
+  -- A wipe re-reads every slot; any other read keeps the committed item of each slot whose
+  -- contents have not changed (ReuseHarvestedSlot); a derive reads no slot.
+  local itemData, equipmentData
+  if derive then
+    itemData, equipmentData = self:Phase2_Rederive(kind, committedItems)
+  else
+    itemData, equipmentData = self:Phase2_Harvest(kind, bagList, committedItems, wipeRequested)
   end
-  local itemData, equipmentData = self:Phase2_Harvest(kind, bagList, committedItems, wipeRequested)
 
   -- The harvest captured this frame's client state. Everything below runs on the
   -- next frame against the state committed by then.
@@ -1682,6 +1772,9 @@ function items:RunRefresh(ectx, kind)
   if isWipe then
     self._drawGeneration[kind] = self._drawGeneration[kind] + 1
     self:InvalidateUpgrades(false)
+  elseif ectx:Get("restyle") == true then
+    -- A setting the buttons draw from changed: every button of the kind draws in full.
+    self._drawGeneration[kind] = self._drawGeneration[kind] + 1
   end
 
   if targetedBags and not isWipe then
@@ -1705,12 +1798,14 @@ function items:RunRefresh(ectx, kind)
 
   local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData, emptySlotsByBag)
 
+  local stackedInteracting = addon.atInteracting == true
   local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
   local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
   local sortedItems = self:BuildOrderedItems(ectx, kind, visibleItemsBySlotKey, emptySlotByBagAndSlot, previousSortedItems)
   local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
 
   self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
+  self._stackedInteracting[kind] = stackedInteracting
 
   -- Only a committed sweep counts as having shown the sort; one that failed above leaves
   -- the flag set for the next sweep or the fallback.
@@ -2074,7 +2169,10 @@ end
 -- not named it, and its previous read was not cold; otherwise it is read again with
 -- GetEquipmentInfo. rereadAll (a wipe) and level or scaling events read every slot again.
 -- When a slot's item, item level or equip location changed, or the gear stopped reading
--- cold, every kept upgrade verdict is invalidated and the bags refresh.
+-- cold, every kept upgrade verdict is invalidated. The gear is read by backpack sweeps, which
+-- resolve every backpack verdict after the harvest, so only the open bank is refreshed: a
+-- backpack refresh would re-read the bags to find what this sweep already shows (it made the
+-- first gear read of every login cost a second read of the bags).
 ---@param rereadAll? boolean
 ---@return table<number, ItemData>
 function items:HarvestEquipment(rereadAll)
@@ -2138,7 +2236,10 @@ function items:HarvestEquipment(rereadAll)
   self._equipmentIncomplete = incomplete
   self.equipmentCache = equipmentData
   if changed then
-    self:InvalidateUpgrades(true)
+    self:InvalidateUpgrades(false)
+    if addon.atBank then
+      self:RequestUpgradeRefresh(false, true)
+    end
   end
   return equipmentData
 end
@@ -2251,9 +2352,25 @@ function items:ReuseHarvestedSlot(kind, previous, bagid, slotid)
     end
   end
 
-  previous.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
-  if not previous.questInfo then
-    previous.questInfo = {
+  self:RefreshKeptItem(kind, previous, bagid, slotid, itemGUID)
+  return previous, info
+end
+
+-- RefreshKeptItem refreshes the fields of a kept item that change without its slot
+-- changing, each computed exactly as AttachItemInfo computes it: quest state, tooltip text
+-- (a cache hit, or a re-scan after TOOLTIP_DATA_UPDATE dropped it), gear sets (the set map
+-- is rebuilt every sweep) and the new-item flag. The caller has checked that the slot still
+-- holds the item (its GUID).
+---@param kind BagKind
+---@param item ItemData
+---@param bagid number
+---@param slotid number
+---@param itemGUID string
+function items:RefreshKeptItem(kind, item, bagid, slotid, itemGUID)
+  local itemInfo = item.itemInfo
+  item.questInfo = C_Container.GetContainerItemQuestInfo(bagid, slotid)
+  if not item.questInfo then
+    item.questInfo = {
       isQuestItem = false,
       isActive = false,
     }
@@ -2263,8 +2380,7 @@ function items:ReuseHarvestedSlot(kind, previous, bagid, slotid)
   itemInfo.tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID) or ""
   itemInfo.equipmentSets = equipmentSets:GetItemSets(bagid, slotid)
   itemInfo.isNewItem = clientNewItemFlag(bagid, slotid)
-  seedNewItemTimer(self, kind, previous)
-  return previous, info
+  seedNewItemTimer(self, kind, item)
 end
 
 -- REUSED DETAILED METADATA UTILITIES FROM LEGACY IMPLEMENTATION

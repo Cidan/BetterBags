@@ -34,13 +34,17 @@ end
 local origBucketEvent, origSendMessage = events.BucketEvent, events.SendMessage
 local capturedBucket, capturedFilter
 local sentMessages = {}
+local sentOptions = {}
 events.BucketEvent = function(_, event, cb, filter)
   if event == "TOOLTIP_DATA_UPDATE" then
     capturedBucket = cb
     capturedFilter = filter
   end
 end
-events.SendMessage = function(_, _, msg) table.insert(sentMessages, msg) end
+events.SendMessage = function(_, _, msg, options)
+  table.insert(sentMessages, msg)
+  sentOptions[#sentMessages] = options
+end
 
 ResetModuleStub("TooltipScanner", "data/tooltip.lua")
 LoadBetterBagsModule("data/tooltip.lua")
@@ -261,7 +265,7 @@ describe("TooltipScanner", function()
       assert.are.equal(555, tooltipScanner.guidToInstance["guid-potion"])
     end)
 
-    it("invalidates the cached tooltip and re-harvests when its instance resolves", function()
+    it("invalidates the cached tooltip and recalculates the bags when its instance resolves", function()
       tooltipScanner:GetTooltipText(0, 1, "guid-potion")
       assert.are.equal("Minor Healing Potion", tooltipScanner.cache["guid-potion"])
       assert.is_function(capturedBucket)
@@ -272,7 +276,9 @@ describe("TooltipScanner", function()
       assert.is_nil(tooltipScanner.cache["guid-potion"], "stale cache entry must be dropped")
       assert.is_nil(tooltipScanner.instanceToGUID[555])
       assert.is_nil(tooltipScanner.guidToInstance["guid-potion"])
-      assert.are.same({ "bags/RefreshBackpack" }, sentMessages)
+      -- The next sweep re-scans the item (a cache miss) without reading the bags.
+      assert.are.same({ "bags/Rederive" }, sentMessages)
+      assert.are.same({ backpack = true, bank = false }, sentOptions[1])
     end)
 
     it("re-scans warm on the next lookup after invalidation", function()
@@ -300,11 +306,12 @@ describe("TooltipScanner", function()
       assert.are.equal(0, #sentMessages)
     end)
 
-    it("re-harvests the bank too, but only when at the bank", function()
+    it("recalculates the bank too, but only when at the bank", function()
       tooltipScanner:GetTooltipText(0, 1, "guid-potion")
       addon.atBank = true
       capturedBucket(context:New("t"), { { eventName = "TOOLTIP_DATA_UPDATE", args = { 555 } } })
-      assert.are.same({ "bags/RefreshBackpack", "bags/RefreshBank" }, sentMessages)
+      assert.are.same({ "bags/Rederive" }, sentMessages)
+      assert.are.same({ backpack = true, bank = true }, sentOptions[1])
     end)
 
     it("keeps the instance maps 1:1 with the cache when re-scanned under a new instance", function()

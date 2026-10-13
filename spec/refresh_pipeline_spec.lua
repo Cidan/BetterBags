@@ -266,6 +266,12 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       items:ClearItemCache(ctx)
       ctx:Set("wipe", true)
     end
+    if opts and opts.derive then
+      ctx:Set("derive", true)
+    end
+    if opts and opts.restyle then
+      ctx:Set("restyle", true)
+    end
     items:RefreshBackpack(ctx)
     return items.slotInfo[const.BAG_KIND.BACKPACK]
   end
@@ -789,7 +795,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
   -- each item and reused while the provider and the upgrade generation are unchanged. Every
   -- input of a verdict must invalidate it: these tests pin each one.
   describe("upgrade verdict cache", function()
-    local asked, verdicts, registered, timers, sent, provider
+    local asked, verdicts, registered, timers, sent, sentOptions, provider
 
     local function askedKeys()
       local keys = {}
@@ -818,7 +824,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end
 
     before_each(function()
-      asked, verdicts, registered, timers, sent = {}, {}, {}, {}, {}
+      asked, verdicts, registered, timers, sent, sentOptions = {}, {}, {}, {}, {}, {}
       override(database, "GetUpgradeIconProvider", function() return provider end)
       override(database, "GetUpgradeIconProviderUserSet", function() return true end)
       override(events, "RegisterEvent", function(_, name, cb) registered[name] = cb end)
@@ -826,6 +832,7 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local send = events.SendMessage
       override(events, "SendMessage", function(self, ctx, event, ...)
         table.insert(sent, event)
+        sentOptions[#sent] = (...)
         return send(self, ctx, event, ...)
       end)
       items:RegisterCacheEvents()
@@ -879,26 +886,28 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.are.same({ "0_1", "0_2" }, askedKeys())
     end)
 
+    -- Level and scaling change the bag items' own current item levels, which only a read
+    -- sees (the kept-slot check compares them). Every other input of a verdict lives outside
+    -- the bags, so the bags are recalculated from the items already read, not read again.
     local invalidating = {
-      { "PLAYER_EQUIPMENT_CHANGED", { 5, true } },
-      { "PLAYER_LEVEL_UP", { 70 } },
-      { "PLAYER_LEVEL_CHANGED", { 70, 60 } },
-      { "PLAYER_AVG_ITEM_LEVEL_UPDATE", {} },
-      { "SKILL_LINES_CHANGED", {} },
-      { "LEARNED_SPELL_IN_SKILL_LINE", { 12345, 1, false } },
-      { "PLAYER_SPECIALIZATION_CHANGED", { "player" } },
+      { "PLAYER_EQUIPMENT_CHANGED", { 5, true }, "bags/Rederive" },
+      { "PLAYER_LEVEL_UP", { 70 }, "bags/RefreshBackpack" },
+      { "PLAYER_LEVEL_CHANGED", { 70, 60 }, "bags/RefreshBackpack" },
+      { "PLAYER_AVG_ITEM_LEVEL_UPDATE", {}, "bags/RefreshBackpack" },
+      { "SKILL_LINES_CHANGED", {}, "bags/Rederive" },
+      { "LEARNED_SPELL_IN_SKILL_LINE", { 12345, 1, false }, "bags/Rederive" },
+      { "PLAYER_SPECIALIZATION_CHANGED", { "player" }, "bags/Rederive" },
     }
     for _, case in ipairs(invalidating) do
-      it("asks again after " .. case[1] .. ", and requests a backpack refresh", function()
+      local derive = case[3] == "bags/Rederive"
+      it("asks again after " .. case[1] .. ", and requests a backpack " .. (derive and "recalculation" or "read"), function()
         fire(case[1], unpack(case[2]))
         runTimers()
-        local refreshed = false
-        for _, event in ipairs(sent) do
-          if event == "bags/RefreshBackpack" then refreshed = true end
-          assert.are_not.equal("bags/RefreshBank", event, "the bank is closed")
+        assert.are.same({ case[3] }, sent, "the bank is closed")
+        if derive then
+          assert.are.same({ backpack = true, bank = false }, sentOptions[1])
         end
-        assert.is_true(refreshed)
-        refreshBackpack()
+        refreshBackpack(derive and { derive = true } or nil)
         assert.are.same({ "0_1", "0_2" }, askedKeys())
       end)
     end
@@ -927,11 +936,16 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       fire("SKILL_LINES_CHANGED")
       assert.equal(1, #timers)
       runTimers()
-      local count = 0
-      for _, event in ipairs(sent) do
-        if event == "bags/RefreshBackpack" then count = count + 1 end
-      end
-      assert.equal(1, count)
+      assert.are.same({ "bags/Rederive" }, sent)
+    end)
+
+    it("reads instead of recalculating when a level change is among the frame's invalidations", function()
+      fire("SKILL_LINES_CHANGED")
+      fire("PLAYER_LEVEL_UP", 70)
+      fire("PLAYER_EQUIPMENT_CHANGED", 5, true)
+      assert.equal(1, #timers)
+      runTimers()
+      assert.are.same({ "bags/RefreshBackpack" }, sent)
     end)
 
     it("asks again when the harvest finds that equipped gear changed, with no event", function()
@@ -953,9 +967,17 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       end)
       refreshBackpack()
       askedKeys()
+      runTimers()
+      sent = {}
       current = link:gsub("505:0", "505:6")
       refreshBackpack()
       assert.are.same({ "0_1", "0_2" }, askedKeys())
+      -- The sweep that read the new gear resolved every verdict with it, so it asks for no
+      -- second backpack refresh.
+      runTimers()
+      for _, event in ipairs(sent) do
+        assert.is_nil(event:match("^bags/"), "no refresh is requested")
+      end
     end)
 
     -- Built-in usability (C_PlayerInfo.CanUseItem) also changes with reputation and spells
@@ -1003,8 +1025,8 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal(1, #timers)
       sent = {}
       runTimers()
-      table.sort(sent)
-      assert.are.same({ "bags/RefreshBackpack", "bags/RefreshBank" }, sent)
+      assert.are.same({ "bags/Rederive" }, sent)
+      assert.are.same({ backpack = true, bank = true }, sentOptions[1])
     end)
 
     it("registers its cache events when the module is enabled", function()
@@ -1065,11 +1087,12 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       refreshBackpack()
       assert.is_true(items._upgradeGeneration > generation, "a new generation")
       runTimers()
-      local bank = false
-      for _, event in ipairs(sent) do
-        if event == "bags/RefreshBank" then bank = true end
+      local requested = {}
+      for i, event in ipairs(sent) do
+        if event:match("^bags/") then table.insert(requested, { event, sentOptions[i] }) end
       end
-      assert.is_true(bank, "the open bank is refreshed")
+      assert.are.same({ { "bags/Rederive", { backpack = false, bank = true } } }, requested,
+        "the open bank is recalculated")
     end)
 
     -- A sweep that fails partway through reading the gear must not lose the change it read
@@ -1173,13 +1196,11 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       runTimers()
       sent = {}
       refreshBackpack()
-      askedKeys()
+      assert.are.same({ "0_1", "0_2" }, askedKeys(), "the sweep that reads the gear warm asks again itself")
       runTimers()
-      local refreshed = false
       for _, event in ipairs(sent) do
-        if event == "bags/RefreshBackpack" then refreshed = true end
+        assert.is_nil(event:match("^bags/"), "so it needs no second refresh")
       end
-      assert.is_true(refreshed, "warming gear refreshes the bags")
       refreshBackpack()
       assert.are.same({}, askedKeys(), "kept once the gear is warm")
     end)
@@ -2589,6 +2610,967 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       local slotInfo = refreshBackpack()
       assert.equal("", slotInfo.itemsBySlotKey["0_1"].itemInfo.tooltipText)
       assert.is_nil(search:Search("zephyrium")["0_1"])
+    end)
+  end)
+
+  -- A derive recalculates everything the data phase derives from the items the last read
+  -- committed, without reading a bag slot (.claude/rules/refresh-scheduler.md §10).
+  describe("recalculating without reading (derive)", function()
+    local reads, commits
+
+    before_each(function()
+      reads, commits = 0, 0
+      for _, name in ipairs({ "GetContainerNumSlots", "GetContainerItemInfo", "GetContainerItemID", "GetContainerItemLink" }) do
+        local original = _G.C_Container[name]
+        override(_G.C_Container, name, function(...)
+          reads = reads + 1
+          return original(...)
+        end)
+      end
+      local commit = items.Phase11_CommitAndDispatch
+      override(items, "Phase11_CommitAndDispatch", function(...)
+        commits = commits + 1
+        return commit(...)
+      end)
+    end)
+
+    it("reads no bag slot and keeps the committed items", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+      local item = refreshBackpack().itemsBySlotKey["0_1"]
+      reads = 0
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal(0, reads)
+      assert.equal(item, slotInfo.itemsBySlotKey["0_1"])
+      assert.is_true(slotInfo.itemsBySlotKey["0_2"].isItemEmpty)
+    end)
+
+    it("ends in the same state as a read when the bags did not change", function()
+      override(database, "GetStackingOptions", function() return { mergeStacks = true, mergeUnstackable = true } end)
+      mockContainer[0] = {
+        { itemID = 101, guid = "g101", count = 1 },
+        { itemID = 202, guid = "g202a", count = 3 },
+        {},
+        { itemID = 202, guid = "g202b", count = 4 },
+      }
+      mockContainer[1] = { { itemID = 303, guid = "g303", count = 1 }, {} }
+      local function state(slotInfo)
+        local out = { total = slotInfo.totalItems, order = {} }
+        for _, item in ipairs(slotInfo.sortedItems) do
+          table.insert(out.order, item.slotkey .. "|" .. tostring(item.itemInfo and item.itemInfo.category))
+        end
+        for slotkey, item in pairs(slotInfo.itemsBySlotKey) do
+          out[slotkey] = tostring(item.itemInfo and item.itemInfo.category) .. "|" .. tostring(item.stackedCount)
+            .. "|" .. tostring(item.isUpgrade) .. "|" .. tostring(item.itemContextMatchResult)
+        end
+        for slotkey in pairs(slotInfo.visibleItemsBySlotKey) do
+          out["visible " .. slotkey] = true
+        end
+        return out
+      end
+      refreshBackpack()
+      local read = state(refreshBackpack())
+      local derived = state(refreshBackpack({ derive = true }))
+      assert.are.same(read, derived)
+    end)
+
+    it("applies a category change", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      override(categories, "GetCustomCategory", function(_, _, _, data)
+        if data.itemInfo.itemID == 101 then return "Swords", 1 end
+        return nil, nil
+      end)
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Swords", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("re-scans a tooltip whose text was dropped, and indexes the new text", function()
+      local texts = { g101 = "Alpha Sword" }
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      override(tooltipScanner, "GetTooltipText", function(_, _, _, guid) return texts[guid] end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      assert.is_nil(search:Search("zephyrium")["0_1"])
+      texts.g101 = "Use: channel zephyrium essence"
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Use: channel zephyrium essence", slotInfo.itemsBySlotKey["0_1"].itemInfo.tooltipText)
+      assert.is_true(search:Search("zephyrium")["0_1"] == true)
+    end)
+
+    it("applies a gear set change", function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "GearSet" end)
+      local sets
+      local equipmentSets = addon:GetModule("EquipmentSets")
+      override(equipmentSets, "GetItemSets", function(_, bagid, slotid)
+        if bagid == 0 and slotid == 1 then return sets end
+        return nil
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      sets = { "Tank" }
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.equal("Gear: Tank", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("refreshes the new-item flag of an item still in its slot", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ derive = true })
+      assert.is_true(slotInfo.itemsBySlotKey["0_1"].itemInfo.isNewItem)
+    end)
+
+    -- The slot changed and its read has not run yet: what the client reports for the slot
+    -- belongs to another item, so none of it is written to the committed one.
+    it("leaves an item whose slot now holds something else as it was", function()
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      mockContainer[0] = { { itemID = 202, guid = "g202", count = 1 } }
+      newSlots["0_1"] = true
+      local slotInfo = refreshBackpack({ derive = true })
+      local item = slotInfo.itemsBySlotKey["0_1"]
+      assert.equal("g101", item.itemInfo.itemGUID)
+      assert.is_false(item.itemInfo.isNewItem)
+      assert.is_nil(items._newItemTimers[const.BAG_KIND.BACKPACK]["g101"])
+      assert.are_not.equal("Recent Items", item.itemInfo.category)
+    end)
+
+    -- A capture of opening the bank read 478 of 491 items before the client had their data
+    -- ("Retrieving item information" tooltips). Reads re-read such slots every time; the
+    -- recalculations after the open skipped them, so their names and tooltip text stayed
+    -- cold until the next open.
+    it("re-reads an item read without its data, once its slot still holds it", function()
+      local cold = true
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(itemID)
+        if cold then return nil end
+        return getItemInfo(itemID)
+      end)
+      local tooltipScanner = addon:GetModule("TooltipScanner")
+      override(tooltipScanner, "GetTooltipText", function()
+        return cold and "Retrieving item information" or "Use: channel zephyrium essence"
+      end)
+      itemNames[909] = "Warm Name"
+      mockContainer[0] = { { itemID = 909, guid = "guid-909", count = 1 } }
+      local first = refreshBackpack().itemsBySlotKey["0_1"]
+      assert.is_true(first.harvestIncomplete)
+      cold = false
+      local item = refreshBackpack({ derive = true }).itemsBySlotKey["0_1"]
+      itemNames[909] = nil
+      assert.is_false(item.harvestIncomplete)
+      assert.equal("Warm Name", item.itemInfo.itemName)
+      assert.is_true(search:Search("zephyrium")["0_1"] == true)
+    end)
+
+    it("leaves an item read without its data whose slot now holds something else", function()
+      local getItemInfo = _G.C_Item.GetItemInfo
+      override(_G.C_Item, "GetItemInfo", function(itemID)
+        if itemID == 909 then return nil end
+        return getItemInfo(itemID)
+      end)
+      mockContainer[0] = { { itemID = 909, guid = "guid-909", count = 1 } }
+      refreshBackpack()
+      mockContainer[0] = { { itemID = 202, guid = "g202", count = 1 } }
+      local item = refreshBackpack({ derive = true }).itemsBySlotKey["0_1"]
+      assert.equal("guid-909", item.itemInfo.itemGUID)
+    end)
+
+    -- Opening or closing an interaction window recalculates the bags; the bank's only input
+    -- that depends on it is stack unmerging (ShouldMergeItem). A capture of opening the bank
+    -- showed the banker interaction recalculating the bank (149 ms) into the same layout its
+    -- own read had just committed, already stacked for the open interaction.
+    describe("NeedsInteractionRecalculation", function()
+      local savedInteracting
+      before_each(function()
+        savedInteracting = addon.atInteracting
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, unmergeAtShop = true, mergeUnstackable = true }
+        end)
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      end)
+      after_each(function() addon.atInteracting = savedInteracting end)
+
+      it("is false when the committed stacks were built for the current interaction state", function()
+        addon.atInteracting = true
+        refreshBackpack()
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+
+      it("is true when the interaction state changed since, and false again once recalculated", function()
+        addon.atInteracting = false
+        refreshBackpack()
+        addon.atInteracting = true
+        assert.is_true(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+        refreshBackpack({ derive = true })
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+
+      it("is false when the kind does not unmerge at interactions", function()
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, unmergeAtShop = false, mergeUnstackable = true }
+        end)
+        addon.atInteracting = false
+        refreshBackpack()
+        addon.atInteracting = true
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+
+      it("is false when the kind has no committed items (its next read stacks them)", function()
+        addon.atInteracting = false
+        refreshBackpack()
+        items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+        addon.atInteracting = true
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+    end)
+
+    -- A kind's first read is a wipe, which never marks the items it finds as new. A derive
+    -- before it must leave it so, or the first read would put the whole bag in Recent Items.
+    it("does nothing for a kind that has never been read, and the first read still marks nothing new", function()
+      override(database, "GetMarkRecentItems", function() return true end)
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      items._firstLoad[const.BAG_KIND.BACKPACK] = true
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack({ derive = true })
+      assert.equal(0, commits)
+      assert.is_true(items._firstLoad[const.BAG_KIND.BACKPACK])
+      local slotInfo = refreshBackpack()
+      assert.are_not.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    -- Closing the bank empties its committed items; drawing a derive of them would show an
+    -- empty bank.
+    it("does nothing for a kind whose items were cleared", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+      commits = 0
+      refreshBackpack({ derive = true })
+      assert.equal(0, commits)
+    end)
+
+    it("leaves a sort's sweep pending: only a read shows a sort", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      items:MarkSortSweepPending(const.BAG_KIND.BACKPACK)
+      refreshBackpack({ derive = true })
+      assert.is_true(items:IsSortSweepPending(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("starts a new draw generation only when the buttons are restyled", function()
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      local generation = items._drawGeneration[const.BAG_KIND.BACKPACK]
+      refreshBackpack({ derive = true })
+      assert.equal(generation, items._drawGeneration[const.BAG_KIND.BACKPACK])
+      local slotInfo = refreshBackpack({ derive = true, restyle = true })
+      assert.equal(generation + 1, items._drawGeneration[const.BAG_KIND.BACKPACK])
+      assert.equal(generation + 1, slotInfo.itemsBySlotKey["0_1"].drawGeneration)
+    end)
+
+    -- Upgrade arrows compare with the equipped gear, which a backpack read reads; a derive
+    -- after a gear change must see the new gear.
+    it("reads the equipped gear on a backpack derive", function()
+      local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+      local current = link
+      override(_G, "GetInventoryItemLink", function(_, slot)
+        if slot == 5 then return current end
+        return nil
+      end)
+      override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+        local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+        local mixin = {}
+        function mixin:GetItemLocation() return loc end
+        function mixin:IsItemEmpty() return slot ~= 5 end
+        function mixin:GetItemLink() return current end
+        function mixin:GetItemID() return 505 end
+        function mixin:GetInventoryType() return 5 end
+        return mixin
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      refreshBackpack()
+      current = link:gsub("505:0", "505:6")
+      refreshBackpack({ derive = true })
+      assert.equal(current, items._equipped[5].link)
+    end)
+  end)
+
+  -- One bag read on login (.claude/rules/refresh-scheduler.md §7 and §8). The queue merges
+  -- requests that are still waiting, and holds every sweep at startup until the client has
+  -- delivered the bags and their item data.
+  describe("one bag read on login", function()
+    local advance, timers, sweeps, harvests
+
+    -- The hand-cranked clock of the scheduler tests, keeping timers with a real delay for
+    -- the test to fire.
+    local function installClock()
+      async.Yield = function() coroutine.yield() end
+      timers = {}
+      saveGlobal(_G.C_Timer, "After")
+      _G.C_Timer.After = function(delay, fn) table.insert(timers, { delay = delay, fn = fn }) end
+      return function()
+        local due, later = {}, {}
+        for _, t in ipairs(timers) do
+          if t.delay == 0 then due[#due + 1] = t.fn else later[#later + 1] = t end
+        end
+        timers = later
+        for _, fn in ipairs(due) do fn() end
+        return #due
+      end
+    end
+
+    local function drain()
+      for _ = 1, 100 do
+        if advance() == 0 then return end
+      end
+      error("the refresh queue never went idle")
+    end
+
+    local function fireDelayed(delay)
+      for i, t in ipairs(timers) do
+        if t.delay == delay then
+          table.remove(timers, i)
+          t.fn()
+          return true
+        end
+      end
+      return false
+    end
+
+    local function resetEvents()
+      if events._eventHandler then
+        events._eventHandler:UnregisterAllEvents()
+        events._eventHandler:UnregisterAllMessages()
+      end
+      events:Init()
+    end
+
+    before_each(function()
+      resetEvents()
+      advance = installClock()
+      sweeps, harvests = {}, 0
+      local run = items.RunRefresh
+      override(items, "RunRefresh", function(self, ectx, kind)
+        table.insert(sweeps, {
+          kind = kind,
+          wipe = ectx:Get("wipe") == true,
+          bags = ectx:Get("targetedBags"),
+          reset = ectx:Get("resetLayout") == true,
+          derive = ectx:Get("derive") == true,
+          restyle = ectx:Get("restyle") == true,
+        })
+        return run(self, ectx, kind)
+      end)
+      local harvest = items.Phase2_Harvest
+      override(items, "Phase2_Harvest", function(...)
+        harvests = harvests + 1
+        return harvest(...)
+      end)
+      mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+      mockContainer[1] = { { itemID = 201, guid = "g201", count = 1 } }
+    end)
+
+    after_each(function()
+      resetEvents()
+    end)
+
+    describe("merging waiting requests", function()
+      it("lets a waiting wipe absorb the requests that arrive after it", function()
+        refresh:RequestUpdate({ backpack = true }) -- runs now and parks at its yield
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_false(sweeps[1].wipe)
+        assert.is_true(sweeps[2].wipe)
+      end)
+
+      it("merges waiting plain requests and reads every bag any of them named", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ backpack = true, bags = { [1] = true } })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.same({ [0] = true, [1] = true }, sweeps[2].bags)
+      end)
+
+      it("reads every bag when one of the merged requests named none", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ backpack = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_nil(sweeps[2].bags)
+      end)
+
+      it("does not change the bag set a caller passed in", function()
+        local named = { [0] = true }
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = named })
+        refresh:RequestUpdate({ backpack = true, bags = { [1] = true } })
+        drain()
+        assert.same({ [0] = true }, named)
+      end)
+
+      it("keeps a wipe that arrives behind a waiting plain request separate", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_false(sweeps[2].wipe)
+        assert.is_true(sweeps[3].wipe)
+      end)
+
+      it("never merges a sort", function()
+        local sorted = 0
+        saveGlobal(_G.C_Container, "SortBags")
+        _G.C_Container.SortBags = function() sorted = sorted + 1 end
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ sort = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ sort = true })
+        drain()
+        assert.equal(2, sorted)
+        assert.equal(3, #sweeps)
+      end)
+
+      it("never merges the sort fallback", function()
+        items:MarkSortSweepPending(const.BAG_KIND.BACKPACK)
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ backpack = true, onlyIfSortPending = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [1] = true } })
+        drain()
+        -- The first request shows the sort, so the fallback finds nothing to do and the
+        -- last request is not folded into it.
+        assert.equal(2, #sweeps)
+        assert.same({ [1] = true }, sweeps[2].bags)
+      end)
+
+      it("merges a layout reset only into a waiting wipe", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, resetLayout = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_false(sweeps[2].reset)
+        assert.is_true(sweeps[3].reset)
+
+        sweeps = {}
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true, resetLayout = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_true(sweeps[2].wipe)
+      end)
+
+      -- Merging must leave the bags exactly as running the requests one at a time would,
+      -- including which items count as newly acquired.
+      for _, order in ipairs({ { "plain", "wipe" }, { "wipe", "plain" } }) do
+        it("ends in the same state as running the requests one at a time (" .. order[1] .. ", then " .. order[2] .. ")", function()
+          override(database, "GetMarkRecentItems", function() return true end)
+          override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+          local function request(name)
+            if name == "wipe" then return { wipe = true, backpack = true, bank = true } end
+            return { backpack = true, bags = { [0] = true } }
+          end
+          local function scenario(together)
+            search:Init()
+            items:Init()
+            items._firstLoad[const.BAG_KIND.BACKPACK] = false
+            items._firstLoad[const.BAG_KIND.BANK] = false
+            refresh:Init()
+            mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+            refresh:RequestUpdate({ backpack = true })
+            drain()
+            -- This unit harvests now; the loot lands while it is parked.
+            refresh:RequestUpdate({ backpack = true })
+            mockContainer[0][2] = { itemID = 202, guid = "g202", count = 1 }
+            if together then
+              refresh:RequestUpdate(request(order[1]))
+              refresh:RequestUpdate(request(order[2]))
+              drain()
+            else
+              drain()
+              refresh:RequestUpdate(request(order[1]))
+              drain()
+              refresh:RequestUpdate(request(order[2]))
+              drain()
+            end
+            local out = {}
+            for slotkey, item in pairs(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey) do
+              out[slotkey] = (item.isItemEmpty and "empty" or item.itemInfo.itemGUID) .. "|" .. tostring(item.itemInfo and item.itemInfo.category)
+            end
+            for guid in pairs(items._newItemTimers[const.BAG_KIND.BACKPACK]) do
+              out["timer " .. guid] = true
+            end
+            return out
+          end
+          assert.same(scenario(false), scenario(true))
+        end)
+      end
+    end)
+
+    -- A derive reads no bag. It rides on a waiting read that reads every bag of its kinds,
+    -- since that read recalculates everything too; a read can never ride on a derive.
+    describe("merging derives", function()
+      before_each(function()
+        addon.atBank = true
+        addon.Bags = { Bank = {} }
+        mockContainer[6] = { { itemID = 201, guid = "g201b", count = 1 } }
+        refresh:RequestUpdate({ backpack = true, bank = true })
+        drain()
+        sweeps = {}
+      end)
+
+      it("merges waiting derives, with the kinds and restyles of both", function()
+        refresh:RequestUpdate({ backpack = true }) -- runs now
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        refresh:RequestUpdate({ derive = true, bank = true, restyle = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.same({ const.BAG_KIND.BANK, true, true }, { sweeps[2].kind, sweeps[2].derive, sweeps[2].restyle })
+        assert.same({ const.BAG_KIND.BACKPACK, true, true }, { sweeps[3].kind, sweeps[3].derive, sweeps[3].restyle })
+      end)
+
+      it("rides on a waiting read of every bag of its kinds", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, restyle = true })
+        drain()
+        assert.equal(2, #sweeps)
+        assert.is_false(sweeps[2].derive)
+        assert.is_true(sweeps[2].restyle)
+      end)
+
+      -- A targeted read carries the other bags' items over without refreshing them, so it
+      -- would not do what the derive asked for (a re-scanned tooltip in another bag).
+      it("does not ride on a waiting read of some bags", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true, bags = { [0] = true } })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_true(sweeps[3].derive)
+      end)
+
+      it("does not ride on a waiting read of fewer kinds", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, bank = true })
+        drain()
+        assert.equal(4, #sweeps)
+        assert.is_true(sweeps[3].derive)
+        assert.is_true(sweeps[4].derive)
+      end)
+
+      it("never lets a read ride on a waiting derive", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        refresh:RequestUpdate({ backpack = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_true(sweeps[2].derive)
+        assert.is_false(sweeps[3].derive)
+      end)
+
+      it("rides on a waiting wipe", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_true(sweeps[2].wipe and sweeps[3].wipe)
+      end)
+
+      it("merges a layout reset only with another reset", function()
+        refresh:RequestUpdate({ backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true })
+        refresh:RequestUpdate({ derive = true, backpack = true, resetLayout = true })
+        drain()
+        assert.equal(3, #sweeps)
+        assert.is_false(sweeps[2].reset)
+        assert.is_true(sweeps[3].reset)
+      end)
+    end)
+
+    describe("the startup read", function()
+      local primed, held, released, loaderCallback
+
+      local function gateEvent(name, ...)
+        local frame = refresh._startupFrame
+        if frame and frame._events[name] then
+          frame:GetScript("OnEvent")(frame, name, ...)
+        end
+      end
+
+      -- A WoW event reaches every listener: the events module's handlers and the startup
+      -- frame.
+      local function fire(name, ...)
+        local entry = events._eventMap[name]
+        if entry then entry.fn(name, ...) end
+        gateEvent(name, ...)
+      end
+
+      local function frame()
+        local f = refresh._startupFrame
+        local onUpdate = f and f:GetScript("OnUpdate")
+        if onUpdate then onUpdate(f, 0.016) end
+        advance()
+      end
+
+      before_each(function()
+        primed, held, released, loaderCallback = nil, 0, 0, nil
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "TellMeWhenABagIsUpdated", function(_, cb) loaderCallback = cb end)
+        override(loader, "Hold", function() held = held + 1 end)
+        override(loader, "Release", function() released = released + 1 end)
+        override(loader, "PrimeAll", function(_, cb) primed = cb end)
+      end)
+
+      it("holds every sweep until the client has delivered the bags", function()
+        refresh:OnEnable()
+        assert.equal(1, held)
+        refresh:RequestUpdate({ wipe = true, backpack = true, bank = true })
+        refresh:RequestUpdate({ backpack = true })
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        fire("BAG_CONTAINER_UPDATE")
+        drain()
+        assert.equal(0, harvests)
+      end)
+
+      it("reads every bag once, after the first quiet frame past the loading screen and the item data", function()
+        refresh:OnEnable()
+        events:SendMessage(context:New("Themes_OnEnable"), "bags/FullRefreshAll")
+        fire("BAG_CONTAINER_UPDATE")
+        loaderCallback({ [0] = true, [1] = true })
+        refresh:RequestUpdate({ backpack = true })
+
+        fire("LOADING_SCREEN_DISABLED")
+        fire("BAG_UPDATE", 0)
+        frame() -- bags still changing this frame
+        assert.is_nil(primed)
+        frame() -- quiet
+        assert.is_function(primed)
+        assert.equal(0, harvests, "nothing is read while the item data loads")
+
+        primed()
+        drain()
+        assert.equal(1, harvests)
+        assert.equal(1, #sweeps)
+        assert.is_true(sweeps[1].wipe)
+        assert.equal(1, released)
+        assert.is_not_nil(items.slotInfo[const.BAG_KIND.BACKPACK].itemsBySlotKey["1_1"])
+      end)
+
+      it("runs a sort asked for before the read after it", function()
+        local sorted = 0
+        saveGlobal(_G.C_Container, "SortBags")
+        _G.C_Container.SortBags = function() sorted = sorted + 1 end
+        refresh:OnEnable()
+        refresh:RequestUpdate({ sort = true })
+        refresh:RequestUpdate({ backpack = true })
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        assert.equal(0, sorted, "the read comes first")
+        drain()
+        assert.equal(1, sorted)
+        assert.equal(1, harvests)
+      end)
+
+      it("reads at the timeout when the item data is slow, and once more when it arrives", function()
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        assert.is_function(primed)
+        assert.is_true(fireDelayed(refresh.STARTUP_PRIME_TIMEOUT))
+        drain()
+        assert.equal(1, harvests)
+        assert.is_true(sweeps[1].wipe)
+
+        primed()
+        drain()
+        assert.equal(2, harvests)
+        assert.is_false(sweeps[2].wipe)
+        assert.is_nil(sweeps[2].bags)
+      end)
+
+      it("does not read again when the timeout fires after the item data arrived", function()
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        fireDelayed(refresh.STARTUP_PRIME_TIMEOUT)
+        drain()
+        assert.equal(1, harvests)
+      end)
+
+      it("stops waiting for a quiet frame after the settle timeout", function()
+        local now = 100
+        saveGlobal(_G, "GetTime")
+        _G.GetTime = function() return now end
+        refresh:OnEnable()
+        fire("LOADING_SCREEN_DISABLED")
+        for _ = 1, 5 do
+          fire("BAG_UPDATE", 0)
+          frame()
+        end
+        assert.is_nil(primed)
+        now = 100 + refresh.STARTUP_SETTLE_TIMEOUT
+        fire("BAG_UPDATE", 0)
+        frame()
+        assert.is_function(primed)
+      end)
+
+      it("reads at once when the backpack opens before the read, and again for the item data", function()
+        addon.Bags = { Backpack = { frame = CreateFrame("Frame") } }
+        refresh:OnEnable()
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        local bagFrame = addon.Bags.Backpack.frame
+        bagFrame:GetScript("OnShow")(bagFrame)
+        drain()
+        assert.equal(1, harvests)
+        assert.is_true(sweeps[1].wipe)
+        -- The item data it did not wait for is still loaded, and read when it arrives.
+        assert.is_function(primed)
+        primed()
+        drain()
+        assert.equal(2, harvests)
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        drain()
+        assert.equal(2, harvests, "the startup wait is over")
+      end)
+
+      it("reads once when the backpack opens and the item data is already loaded", function()
+        addon.Bags = { Backpack = { frame = CreateFrame("Frame") } }
+        local loader = addon:GetModule("ItemLoader")
+        override(loader, "PrimeAll", function(_, cb) cb() end)
+        refresh:OnEnable()
+        local bagFrame = addon.Bags.Backpack.frame
+        bagFrame:GetScript("OnShow")(bagFrame)
+        drain()
+        assert.equal(1, harvests)
+      end)
+
+      it("starts on PLAYER_ENTERING_WORLD on a client without LOADING_SCREEN_DISABLED", function()
+        saveGlobal(_G, "C_EventUtils")
+        _G.C_EventUtils = { IsEventValid = function(name) return name ~= "LOADING_SCREEN_DISABLED" end }
+        refresh:OnEnable()
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        frame()
+        assert.is_function(primed)
+      end)
+
+      it("starts anyway when the loading screen never reports its end", function()
+        refresh:OnEnable()
+        fire("PLAYER_ENTERING_WORLD", true, false)
+        frame()
+        assert.is_nil(primed)
+        assert.is_true(fireDelayed(refresh.STARTUP_LOADING_TIMEOUT))
+        frame()
+        assert.is_function(primed)
+      end)
+
+      -- After the one read at login, tooltip text resolving, gear sets and upgrade inputs
+      -- changing are recalculated from the items already read (refresh-scheduler.md §10).
+      -- Replays the bank open of a capture (session #1, 21:49) in its order: BANKFRAME_OPENED
+      -- at 1.25 s with the bank's item data not loaded (478 of 491 items read cold), the banker
+      -- interaction's recalculation at 2.08 s, then at 2.51 s the item data arriving with the
+      -- tooltip resolution it sets off. The bank must be read once, warm, and not move after.
+      it("reads the bank once, warm, through a bank open in the captured order", function()
+        items:OnEnable()
+        refresh:OnEnable()
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+
+        local bankCold = true
+        local getItemInfo = _G.C_Item.GetItemInfo
+        override(_G.C_Item, "GetItemInfo", function(item)
+          local id = tonumber(tostring(item):match("item:(%d+)") or item)
+          if bankCold and id and id >= 601 and id <= 603 then return nil end
+          return getItemInfo(item)
+        end)
+        mockContainer[6] = {
+          { itemID = 601, guid = "g601", count = 1 },
+          { itemID = 602, guid = "g602", count = 1 },
+          { itemID = 603, guid = "g603", count = 1 },
+        }
+        local loader = addon:GetModule("ItemLoader")
+        local bankPrimed
+        override(loader, "PrimeBank", function(_, cb) bankPrimed = cb end)
+        override(database, "GetShowBankTabs", function() return false end)
+        override(_G, "GameMenuFrame", { IsShown = function() return false end })
+        local shown = 0
+        override(addon, "Bags", { Bank = { bankTab = 6, Show = function() shown = shown + 1 end } })
+        override(addon, "atBank", false)
+        override(addon, "atInteracting", false)
+
+        local bankReads, coldReads = 0, 0
+        local harvest = items.Phase2_Harvest
+        override(items, "Phase2_Harvest", function(self, kind, ...)
+          if kind == const.BAG_KIND.BANK then
+            bankReads = bankReads + 1
+            if bankCold then coldReads = coldReads + 1 end
+          end
+          return harvest(self, kind, ...)
+        end)
+        local layouts = {}
+        local commit = items.Phase11_CommitAndDispatch
+        override(items, "Phase11_CommitAndDispatch", function(self, ectx, kind, ...)
+          local result = commit(self, ectx, kind, ...)
+          if kind == const.BAG_KIND.BANK then
+            local order, cold = {}, false
+            for _, item in ipairs(self.slotInfo[kind].sortedItems) do
+              order[#order + 1] = item.slotkey .. "|" .. tostring(item.itemInfo and item.itemInfo.category)
+              if item.harvestIncomplete then cold = true end
+            end
+            table.insert(layouts, { order = table.concat(order, ","), cold = cold })
+          end
+          return result
+        end)
+
+        fire("BANKFRAME_OPENED")
+        drain()
+        assert.equal(1, shown, "the bank shows at once")
+        assert.equal(0, bankReads, "and is not read while its item data loads")
+
+        -- What core/hooks.lua sends when the banker interaction opens the backpack
+        -- (spec/core/interaction_refresh_spec.lua).
+        addon.atInteracting = true
+        events:SendMessage(context:New("PLAYER_INTERACTION_MANAGER_FRAME_SHOW"), "bags/Rederive", {
+          resetLayout = true, backpack = true,
+          bank = items:NeedsInteractionRecalculation(const.BAG_KIND.BANK),
+        })
+        drain()
+        assert.equal(0, #layouts, "the interaction does not recalculate a bank that has not been read")
+
+        bankCold = false
+        bankPrimed()
+        drain()
+        events:SendMessage(context:New("TooltipDataResolved"), "bags/Rederive", { backpack = true, bank = true })
+        drain()
+
+        assert.equal(1, bankReads, "read once")
+        assert.equal(0, coldReads, "after its item data loaded")
+        assert.equal(2, #layouts)
+        assert.is_false(layouts[1].cold or layouts[2].cold, "nothing committed cold")
+        assert.equal(layouts[1].order, layouts[2].order, "nothing moves after the open")
+      end)
+
+      it("recalculates, without reading the bags again, what changes after the read", function()
+        items:OnEnable()
+        refresh:OnEnable()
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 }, {} }
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        assert.equal(1, harvests)
+        local units = #sweeps
+
+        events:SendMessage(context:New("TooltipDataResolved"), "bags/Rederive", { backpack = true, bank = false })
+        fire("EQUIPMENT_SETS_CHANGED")
+        fire("PLAYER_EQUIPMENT_CHANGED", 5, true)
+        fire("SKILL_LINES_CHANGED")
+        drain()
+        assert.equal(1, harvests, "nothing read the bags again")
+        assert.is_true(#sweeps > units, "the bags were recalculated")
+        for i = units + 1, #sweeps do
+          assert.is_true(sweeps[i].derive)
+        end
+      end)
+
+      it("lets go of every startup event once the read has run", function()
+        refresh:OnEnable()
+        local startupFrame = refresh._startupFrame
+        fire("LOADING_SCREEN_DISABLED")
+        frame()
+        primed()
+        drain()
+        assert.is_nil(startupFrame:GetScript("OnUpdate"))
+        assert.same({}, startupFrame._events)
+      end)
+
+      -- The captured login (BetterBags 12.1.0, a full relaunch with a cold cache): the first
+      -- sweep ran inside OnEnable and saw a backpack of 20 empty slots; the bags attached
+      -- (BAG_CONTAINER_UPDATE x14) and the items arrived over the next five seconds, and 25
+      -- refresh units followed, 17 of them full wipes.
+      it("reads the bags once on a login like the captured one, and marks nothing as new", function()
+        override(database, "GetMarkRecentItems", function() return true end)
+        override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+        local link = "|cnIQ4:|Hitem:505:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:::|h[Gear]|h|r"
+        override(_G, "GetInventoryItemLink", function(_, slot)
+          if slot == 5 then return link end
+          return nil
+        end)
+        override(_G.Item, "CreateFromEquipmentSlot", function(_, slot)
+          local loc = _G.ItemLocation:CreateFromEquipmentSlot(slot)
+          local mixin = {}
+          function mixin:GetItemLocation() return loc end
+          function mixin:IsItemEmpty() return slot ~= 5 end
+          function mixin:GetItemLink() return link end
+          function mixin:GetItemID() return 505 end
+          function mixin:GetInventoryType() return 5 end
+          return mixin
+        end)
+        items._firstLoad[const.BAG_KIND.BACKPACK] = true
+        items._firstLoad[const.BAG_KIND.BANK] = true
+
+        -- PLAYER_LOGIN: the backpack has slots but nothing in them, the other bags are absent.
+        local empty = {}
+        for i = 1, 20 do empty[i] = {} end
+        mockContainer = { [0] = empty }
+        items:OnEnable()
+        refresh:OnEnable()
+        events:SendMessage(context:New("Themes_OnEnable"), "bags/FullRefreshAll")
+
+        fire("PLAYER_ENTERING_WORLD", false, false)
+        fire("SKILL_LINES_CHANGED")
+        fire("LEARNED_SPELL_IN_SKILL_LINE", 12345, 1, false)
+        advance()
+        -- The bags attach and the items arrive, in bursts.
+        mockContainer[1] = { { itemID = 201, guid = "g201", count = 1 }, {} }
+        for _ = 1, 14 do fire("BAG_CONTAINER_UPDATE") end
+        for slot = 1, 10 do
+          mockContainer[0][slot] = { itemID = 100 + slot, guid = "g" .. (100 + slot), count = 1 }
+          fire("BAG_UPDATE", 0)
+        end
+        fire("BAG_UPDATE_DELAYED")
+        loaderCallback({ [0] = true, [1] = true })
+        -- The config sliders' delayed refreshes.
+        events:SendMessage(context:New("OnValueChanged"), "bags/FullRefreshAll")
+        events:SendMessage(context:New("OnValueChanged"), "bags/FullRefreshAll")
+
+        fire("LOADING_SCREEN_DISABLED")
+        fire("BAG_UPDATE", 1)
+        frame()
+        frame()
+        primed()
+        drain()
+        for _ = 1, 3 do frame() end
+        drain()
+
+        assert.equal(1, harvests, "one read of the bags")
+        local slotInfo = items.slotInfo[const.BAG_KIND.BACKPACK]
+        assert.is_not_nil(slotInfo.itemsBySlotKey["0_10"])
+        assert.is_not_nil(slotInfo.itemsBySlotKey["1_1"])
+        for slotkey, item in pairs(slotInfo.itemsBySlotKey) do
+          if not item.isItemEmpty then
+            assert.are_not.equal("Recent Items", item.itemInfo.category, slotkey .. " was in the bags at login")
+          end
+        end
+      end)
     end)
   end)
 end)

@@ -139,4 +139,59 @@
       <Color r="1" g="1" b="1" a="0.08"/>
     </HighlightTexture>
   </Button>
+  <Button name="BetterBagsPerfCallRow" virtual="true">
+    <Size>
+      <AbsDimension y="18"/>
+    </Size>
+    <Layers>
+      <Layer level="BACKGROUND">
+        <Texture parentKey="Selected" hidden="true" setAllPoints="true">
+          <Color r="1" g="0.82" b="0" a="0.25"/>
+        </Texture>
+      </Layer>
+      <Layer level="OVERLAY">
+        <FontString inherits="GameFontHighlightSmall" parentKey="Time" justifyH="RIGHT" wordwrap="false">
+          <Size>
+            <AbsDimension x="64" y="18"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" x="4"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Frame" justifyH="RIGHT" wordwrap="false">
+          <Size>
+            <AbsDimension x="44" y="18"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Time" relativePoint="RIGHT" x="4"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Duration" justifyH="RIGHT" wordwrap="false">
+          <Size>
+            <AbsDimension x="64" y="18"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Frame" relativePoint="RIGHT" x="4"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Name" justifyH="LEFT" wordwrap="false">
+          <Size>
+            <AbsDimension x="190" y="18"/>
+          </Size>
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Duration" relativePoint="RIGHT" x="4"/>
+          </Anchors>
+        </FontString>
+        <FontString inherits="GameFontHighlightSmall" parentKey="Args" justifyH="LEFT" wordwrap="false">
+          <Anchors>
+            <Anchor point="LEFT" relativeKey="$parent.Name" relativePoint="RIGHT" x="4"/>
+            <Anchor point="RIGHT" x="-4"/>
+          </Anchors>
+        </FontString>
+      </Layer>
+    </Layers>
+    <HighlightTexture setAllPoints="true" alphaMode="ADD">
+      <Color r="1" g="1" b="1" a="0.08"/>
+    </HighlightTexture>
+  </Button>
 </Ui>

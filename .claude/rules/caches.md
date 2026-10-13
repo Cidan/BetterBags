@@ -14,10 +14,16 @@ reads must add the matching invalidation here and a test that fails without it.*
   ("Incremental Work Without Drift").
 - **Unknown is never kept.** A value read while the client had no data for it (cold item cache:
   `harvestIncomplete`), or an answer a provider could not give yet (`nil`), is not cached.
-- **Wipes rebuild everything.** Every `wipe` sweep (`bags/FullRefreshAll` from every settings
-  change, `BAG_CONTAINER_UPDATE`, `EQUIPMENT_SETS_CHANGED`, the first sweep per kind) starts from
-  an emptied committed state, re-reads every slot and equipped item, bumps the draw and upgrade
-  generations, and rebuilds the kind's search entries.
+- **Wipes rebuild everything.** Every `wipe` sweep (`bags/FullRefreshAll` from the settings a
+  read depends on and from other addons, `BAG_CONTAINER_UPDATE`, the first sweep per kind)
+  starts from an emptied committed state, re-reads every slot and equipped item, bumps the draw
+  and upgrade generations, and rebuilds the kind's search entries.
+- **Recalculations read no bag slot.** A `derive` sweep (refresh-scheduler.md §10: most settings,
+  categories, gear sets, tooltips resolving, upgrade inputs) runs every phase after the harvest on
+  the committed items, refreshing a kept item's volatile fields (cache 1) only while its slot
+  still holds it. Settings and category recalculations also bump the draw generation and reset
+  the layout, as their old wipes did. Anything a derive cannot see (a slot's own contents, the
+  item level scaling changes) must still request a read.
 - **An event that changes an input invalidates and refreshes.** Invalidation alone would leave
   stale values on screen until the next unrelated refresh.
 - **Over-invalidating is acceptable; under-invalidating is not.** When in doubt, invalidate.
@@ -33,7 +39,8 @@ item was read from:
 | Item identity (two identical stacks swapped) | `C_Item.GetItemGUID` |
 | Current item level (scaling changes it without the link) | `C_Item.GetCurrentItemLevel` |
 | Cold read | `harvestIncomplete` items are never kept |
-Refreshed on every kept item, computed exactly as a fresh read: new-item flag (`clientNewItemFlag`),
+Refreshed on every kept item, computed exactly as a fresh read (`items:RefreshKeptItem`, also run
+by recalculations on every item still in its slot): new-item flag (`clientNewItemFlag`),
 gear sets, quest state, tooltip text. Known staleness, the same as an unvisited bag: a refundable
 purchase's binding expiring, an appearance being collected (until the slot changes or a wipe).
 
@@ -48,17 +55,17 @@ kind requested later in the frame).
 | Input | Invalidation |
 |---|---|
 | The bag item | A changed slot is a new ItemData (cache 1), which has no verdict |
-| Which provider is active | Provider name in the key; the dropdown also sends `bags/FullRefreshAll` |
-| Equipped gear (item level and equip location in the item's slots; whether a slot is empty; the main hand's handedness; the item worn in a ring or trinket's other slot) | `PLAYER_EQUIPMENT_CHANGED`; the gear harvest invalidates and refreshes when a slot's link, item level or equip location changed, or when the gear stopped reading cold (cache 3) |
+| Which provider is active | Provider name in the key; the dropdown also recalculates the bags (`bags/Rederive`) |
+| Equipped gear (item level and equip location in the item's slots; whether a slot is empty; the main hand's handedness; the item worn in a ring or trinket's other slot) | `PLAYER_EQUIPMENT_CHANGED`; the gear harvest invalidates when a slot's link, item level or equip location changed, or when the gear stopped reading cold (cache 3), and refreshes only the open bank: the backpack sweep that read the gear resolves every backpack verdict after its harvest (a backpack refresh there made every login read the bags twice) |
 | Equipped gear not read yet | `equipmentCache` is nil until the first backpack sweep; no verdict is kept until then (a naked character's first read detects no change that would invalidate one) |
 | The gear a verdict compares with | `HarvestEquipment` publishes `equipmentCache` as soon as it reads the gear, before anything else in the sweep, so a sweep that fails later cannot leave the bank judged against old gear under a new generation |
-| Equipped gear read cold | No verdict is kept while any equipped slot reads cold (`_equipmentIncomplete`); once it reads warm the harvest invalidates and refreshes |
+| Equipped gear read cold | No verdict is kept while any equipped slot reads cold (`_equipmentIncomplete`); once it reads warm the harvest invalidates (and refreshes the open bank), and that same sweep asks every backpack verdict again. The startup read primes the gear's item data, so it normally reads warm the first time |
 | Player level and effective level (the item's level requirement, usability, scaling) | `PLAYER_LEVEL_UP`, `PLAYER_LEVEL_CHANGED` (level sync and other effective-level changes), `PLAYER_AVG_ITEM_LEVEL_UPDATE`; each also re-reads all gear |
 | Proficiencies, skills and dual wield (`C_PlayerInfo.CanUseItem`, `CanDualWield`) | `SKILL_LINES_CHANGED`, `LEARNED_SPELL_IN_SKILL_LINE` (learning Dual Wield) |
 | Reputation and spells (`C_PlayerInfo.CanUseItem`; the events Blizzard's usability refresh in `Blizzard_Wardrobe.lua` listens for) | `UPDATE_FACTION`, `SPELLS_CHANGED`: they fire often, so they invalidate without a refresh; the next refresh recomputes the verdicts, as before caching |
 | Specialization (the spec's primary stat; dual wield) | `PLAYER_SPECIALIZATION_CHANGED` for `"player"` |
 | The item's stats (primary stats) | Part of the item: a changed slot is a new ItemData; scaling items change with level (above) |
-| Settings | Every wipe invalidates |
+| Settings | No setting but the provider is an input; every wipe invalidates anyway |
 | Cold item | Verdicts of `harvestIncomplete` items are not kept |
 Optional events are registered only when `C_EventUtils.IsEventValid` says the client has them
 (Blizzard's own pattern); every event above exists on retail, WoW: Forever and every Classic
@@ -92,8 +99,11 @@ upgrade provider reads `equipmentCache` (`GetItemDataFromInventorySlot`).
 Kept value: what the button shows. A redraw whose inputs (the item's `itemHash` and every other
 field the setters read, `drawGeneration`, the decoration and `themes.decorationGeneration`) match
 the record is skipped. Invalidated by `ResetVisuals` (a release, or item/free/empty mode changes)
-and `Lock`; `UpdateSearch` keeps the search match current. `drawGeneration` changes on every wipe,
-which is how settings that change a button's look without changing its data reach it.
+and `Lock`; `UpdateSearch` keeps the search match current. `drawGeneration` changes on every wipe;
+`ItemFrame.styleGeneration` (also in the record, bumped by `RestyleButtons`) changes when a setting
+the setters read changes with no new data (glow intensity, item level display), which reach the
+buttons through a redraw (refresh-scheduler.md §9); `themes.decorationGeneration` changes with
+the theme.
 
 ### 5. Button cooldown record (`item.cooldownState`, `itemProto:UpdateCooldown`)
 Kept value: the cooldown last applied to the button (spiral, dimmed icon, has-item state).
@@ -114,7 +124,8 @@ against a clean rebuild by a randomized test and a per-field test.
 
 ### 7. Tooltip text (`TooltipScanner`, tooltip-scanning.md)
 Kept value: an item's tooltip text by GUID. Invalidated by `TOOLTIP_DATA_UPDATE` for the item's
-tooltip instance (bounded re-scans). Kept harvest slots re-fetch it, so a re-scan lands.
+tooltip instance (bounded re-scans). Kept harvest slots and recalculations re-fetch it, so a
+re-scan lands; a resolution asks for a recalculation, not a read.
 
 ### Not caches
 - Phase 6's bag names and qualities for empty slots are looked up once per bag **per sweep**
