@@ -71,7 +71,7 @@ local HALO_MIN_ALPHA = 0.4
 ---@field Cooldown Cooldown
 ---@field UpdateTooltip function
 ---@field IconQuestTexture Texture
----@field drawState table|nil The inputs of the last full draw (see itemDrawUnchanged).
+---@field drawState table|nil The inputs of the last full draw (see DrawInputChanged).
 ---@field cooldownState table|nil The cooldown last applied (see UpdateCooldown).
 itemFrame.itemProto = {}
 -- Bumped by RestyleButtons; part of every button's draw record.
@@ -147,40 +147,44 @@ end
 -- and theme generation the button was drawn with. ResetVisuals (a release or a change
 -- between item, free slot and empty slot) and Lock clear the record; UpdateSearch keeps its
 -- search match current.
----@param item Item
+-- DrawInputChanged returns the name of the first input of a full item draw that differs
+-- from the button's record, or nil when the redraw can be skipped ("record" when there is no
+-- valid record, "staticData" for item rows, which never skip). It is a method of the Item
+-- prototype so the profiler's call trace records the answer for every draw, which is how a
+-- capture shows why a button redrew (data-driven.md).
 ---@param decoration ItemButton
 ---@param data ItemData
----@return boolean
-local function itemDrawUnchanged(item, decoration, data)
-	local s = item.drawState
-	if not s or not s.valid or item.staticData then
-		return false
-	end
+---@return string|nil
+function itemFrame.itemProto:DrawInputChanged(decoration, data)
+	local s = self.drawState
+	if not s or not s.valid then return "record" end
+	if self.staticData then return "staticData" end
 	local info, quest, container = data.itemInfo, data.questInfo, data.containerInfo
-	return s.decoration == decoration
-		and s.decorationGeneration == themes.decorationGeneration
-		and s.styleGeneration == itemFrame.styleGeneration
-		and s.drawGeneration == data.drawGeneration
-		and s.bagid == data.bagid
-		and s.itemHash == data.itemHash
-		and s.itemLink == info.itemLink
-		and s.itemIcon == info.itemIcon
-		and s.itemQuality == info.itemQuality
-		and s.isBound == info.isBound
-		and s.currentItemLevel == info.currentItemLevel
-		and s.classID == info.classID
-		and s.stackedCount == data.stackedCount
-		and s.currentItemCount == info.currentItemCount
-		and s.isNewItem == info.isNewItem
-		and s.isBattlePayItem == info.isBattlePayItem
-		and s.isQuestItem == quest.isQuestItem
-		and s.questID == quest.questID
-		and s.isActive == quest.isActive
-		and s.readable == (container and container.isReadable)
-		and s.noValue == (container and container.hasNoValue)
-		and s.matches == searchMatch(data)
-		and s.isUpgrade == data.isUpgrade
-		and s.itemContextMatchResult == data.itemContextMatchResult
+	if s.decoration ~= decoration then return "decoration" end
+	if s.decorationGeneration ~= themes.decorationGeneration then return "decorationGeneration" end
+	if s.styleGeneration ~= itemFrame.styleGeneration then return "styleGeneration" end
+	if s.drawGeneration ~= data.drawGeneration then return "drawGeneration" end
+	if s.bagid ~= data.bagid then return "bagid" end
+	if s.itemHash ~= data.itemHash then return "itemHash" end
+	if s.itemLink ~= info.itemLink then return "itemLink" end
+	if s.itemIcon ~= info.itemIcon then return "itemIcon" end
+	if s.itemQuality ~= info.itemQuality then return "itemQuality" end
+	if s.isBound ~= info.isBound then return "isBound" end
+	if s.currentItemLevel ~= info.currentItemLevel then return "currentItemLevel" end
+	if s.classID ~= info.classID then return "classID" end
+	if s.stackedCount ~= data.stackedCount then return "stackedCount" end
+	if s.currentItemCount ~= info.currentItemCount then return "currentItemCount" end
+	if s.isNewItem ~= info.isNewItem then return "isNewItem" end
+	if s.isBattlePayItem ~= info.isBattlePayItem then return "isBattlePayItem" end
+	if s.isQuestItem ~= quest.isQuestItem then return "isQuestItem" end
+	if s.questID ~= quest.questID then return "questID" end
+	if s.isActive ~= quest.isActive then return "isActive" end
+	if s.readable ~= (container and container.isReadable) then return "readable" end
+	if s.noValue ~= (container and container.hasNoValue) then return "noValue" end
+	if s.matches ~= searchMatch(data) then return "matches" end
+	if s.isUpgrade ~= data.isUpgrade then return "isUpgrade" end
+	if s.itemContextMatchResult ~= data.itemContextMatchResult then return "itemContextMatchResult" end
+	return nil
 end
 
 ---@param item Item
@@ -217,27 +221,26 @@ local function recordItemDraw(item, decoration, data)
 	s.valid = true
 end
 
----@param item Item
+-- FreeDrawInputChanged is DrawInputChanged for a free-slot draw.
 ---@param decoration ItemButton
 ---@param data ItemData
 ---@param count number
 ---@param nocount? boolean
----@return boolean
-local function freeDrawUnchanged(item, decoration, data, count, nocount)
-	local s = item.drawState
-	if not s or not s.valid then
-		return false
-	end
+---@return string|nil
+function itemFrame.itemProto:FreeDrawInputChanged(decoration, data, count, nocount)
+	local s = self.drawState
+	if not s or not s.valid then return "record" end
 	local info = data.itemInfo
-	return s.decoration == decoration
-		and s.decorationGeneration == themes.decorationGeneration
-		and s.styleGeneration == itemFrame.styleGeneration
-		and s.bagid == data.bagid
-		and s.count == count
-		and s.nocount == (nocount and true or false)
-		and s.emptySlotName == (info and info.emptySlotName)
-		and s.emptySlotFamilyIcon == (info and info.emptySlotFamilyIcon)
-		and s.itemQuality == (info and info.itemQuality)
+	if s.decoration ~= decoration then return "decoration" end
+	if s.decorationGeneration ~= themes.decorationGeneration then return "decorationGeneration" end
+	if s.styleGeneration ~= itemFrame.styleGeneration then return "styleGeneration" end
+	if s.bagid ~= data.bagid then return "bagid" end
+	if s.count ~= count then return "count" end
+	if s.nocount ~= (nocount and true or false) then return "nocount" end
+	if s.emptySlotName ~= (info and info.emptySlotName) then return "emptySlotName" end
+	if s.emptySlotFamilyIcon ~= (info and info.emptySlotFamilyIcon) then return "emptySlotFamilyIcon" end
+	if s.itemQuality ~= (info and info.itemQuality) then return "itemQuality" end
+	return nil
 end
 
 ---@param item Item
@@ -499,7 +502,7 @@ function itemFrame.itemProto:SetItemFromData(ctx, data)
 	decoration._itemData = data
 	self.kind = bagKindFromBagID(data.bagid)
 
-	if mode == "item" and itemDrawUnchanged(self, decoration, data) then
+	if mode == "item" and not self:DrawInputChanged(decoration, data) then
 		-- The new-item glow loops; a full draw replays the one-shot flash whenever the glow
 		-- has stopped, so a new item still goes through UpdateNewItem.
 		if data.itemInfo.isNewItem then
@@ -800,7 +803,7 @@ function itemFrame.itemProto:SetFreeSlots(ctx, data, count, nocount)
 	self.slotkey = data.slotkey or items:GetSlotKeyFromBagAndSlot(bagid, slotid)
 	self.kind = bagKindFromBagID(bagid)
 
-	if freeDrawUnchanged(self, decoration, data, count, nocount) then
+	if not self:FreeDrawInputChanged(decoration, data, count, nocount) then
 		self.frame:Show()
 		self.button:Show()
 		return

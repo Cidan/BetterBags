@@ -675,6 +675,35 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           assert.equal(1, fullDraws)
         end)
 
+        -- The profiler's call trace records this method's return value for every draw, which
+        -- is how a capture shows why a button redrew (data-driven.md).
+        it("names the input that changed, and nothing when the redraw can be skipped", function()
+          local decoration = item._decoration
+          assert.is_nil(item:DrawInputChanged(decoration, data()))
+          local named = {
+            { function(d) d.stackedCount = 5 end, "stackedCount" },
+            { function(d) d.itemInfo.isNewItem = true end, "isNewItem" },
+            { function(d) d.isUpgrade = true end, "isUpgrade" },
+            { function(d) d.itemContextMatchResult = 2 end, "itemContextMatchResult" },
+            { function(d) d.drawGeneration = 2 end, "drawGeneration" },
+            { function(d) d.isSearchResult = false end, "matches" },
+            { function(d) d.itemHash = "hash-other" end, "itemHash" },
+          }
+          for _, case in ipairs(named) do
+            assert.equal(case[2], item:DrawInputChanged(decoration, data({ case[1] })))
+          end
+          themes.decorationGeneration = 1
+          assert.equal("decorationGeneration", item:DrawInputChanged(decoration, data()))
+          themes.decorationGeneration = 0
+          itemFrame:RestyleButtons()
+          assert.equal("styleGeneration", item:DrawInputChanged(decoration, data()))
+        end)
+
+        it("names a missing record after the button was locked", function()
+          item:Lock(btnCtx)
+          assert.equal("record", item:DrawInputChanged(item._decoration, data()))
+        end)
+
         -- Settings that only change how buttons draw (glow intensity, item level display)
         -- reach the buttons through a redraw with no new data, so they restyle the buttons.
         it("redraws once after the buttons were restyled", function()
@@ -815,6 +844,14 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           assert.equal(1, fullDraws)
           item:SetFreeSlots(btnCtx, slot(), 3)
           assert.equal(1, fullDraws, "the next redraw skips again")
+        end)
+
+        it("names the free-slot input that changed, and nothing when the redraw can be skipped", function()
+          local decoration = item._decoration
+          assert.is_nil(item:FreeDrawInputChanged(decoration, slot(), 3))
+          assert.equal("count", item:FreeDrawInputChanged(decoration, slot(), 4))
+          assert.equal("emptySlotName", item:FreeDrawInputChanged(decoration,
+            slot({ function(d) d.itemInfo.emptySlotName = "Reagent Bag" end }), 3))
         end)
 
         it("redraws after a theme is applied, on a new decoration, or for another bag", function()
