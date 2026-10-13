@@ -747,4 +747,52 @@ describe("Themes", function()
       assert.equal("bags/Redraw", sent[1].message)
     end)
   end)
+
+  -- Windows built on first use (the profiler's Settings form, the new bank tab dialog) are
+  -- registered after the startup theme was applied; they must get the active theme then,
+  -- or they show no background and no close button.
+  describe("windows registered after a theme was applied", function()
+    local simple, flat, opacity
+
+    before_each(function()
+      simple, flat, opacity = {}, {}, {}
+      themes:RegisterTheme("Default", {
+        Name = "Default",
+        Available = true,
+        Portrait = function() end,
+        Simple = function(frame) table.insert(simple, frame) end,
+        Flat = function(frame) table.insert(flat, frame) end,
+        Opacity = function(frame, value) table.insert(opacity, { frame, value }) end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() end,
+        ToggleSearch = function() end,
+      })
+    end)
+
+    it("decorates a simple window registered later with the active theme", function()
+      themes:ApplyTheme({}, "Default")
+      simple, opacity = {}, {}
+      local frame = CreateFrame("Frame", "TestLateSimpleWindow")
+      themes:RegisterSimpleWindow(frame, "Settings")
+      assert.same({ frame }, simple)
+      assert.same({ { frame, 100 } }, opacity)
+    end)
+
+    it("decorates a flat window registered later with the active theme", function()
+      themes:ApplyTheme({}, "Default")
+      flat = {}
+      local frame = CreateFrame("Frame", "TestLateFlatWindow")
+      themes:RegisterFlatWindow(frame, "")
+      assert.same({ frame }, flat)
+    end)
+
+    it("leaves a window registered before any theme to the first ApplyTheme", function()
+      local frame = CreateFrame("Frame", "TestEarlySimpleWindow")
+      themes:RegisterSimpleWindow(frame, "Settings")
+      assert.same({}, simple)
+      themes:ApplyTheme({}, "Default")
+      assert.same({ frame }, simple)
+    end)
+  end)
 end)

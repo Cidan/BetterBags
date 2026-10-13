@@ -70,6 +70,17 @@ function themes:Init()
   -- Bumped whenever a theme is applied, which hides every decoration; item buttons
   -- re-resolve (and so re-show) their decoration on the next lookup.
   self.decorationGeneration = 0
+  -- Set once a theme has been applied: windows registered after that are decorated as
+  -- they register.
+  self.themeApplied = false
+end
+
+---@param theme Theme
+---@param frame Frame
+local function applySimple(theme, frame)
+  theme.Simple(frame)
+  local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
+  theme.Opacity(frame, sizeInfo.opacity)
 end
 
 function themes:OnEnable()
@@ -115,6 +126,7 @@ function themes:ApplyTheme(ctx, key)
   local theme = self.themes[key]
   db:SetTheme(key)
   self.decorationGeneration = (self.decorationGeneration or 0) + 1
+  self.themeApplied = true
 
   -- Hide all tab decorations.
   --for _, tab in pairs(self.tabs) do
@@ -159,9 +171,7 @@ function themes:ApplyTheme(ctx, key)
 
   -- Apply all simple frame themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.SIMPLE]) do
-    theme.Simple(frame)
-    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
-    theme.Opacity(frame, sizeInfo.opacity)
+    applySimple(theme, frame)
   end
 
   -- Apply all flat frame themes.
@@ -217,20 +227,29 @@ function themes:RegisterPortraitWindow(frame, title)
   self.titles[frame:GetName()] = title
 end
 
--- RegisterSimpleWindow is used to register a protrait window frame to be themed by themes.
+-- RegisterSimpleWindow is used to register a simple window frame to be themed by themes.
+-- A window registered after a theme was applied (a form or dialog built on first use) is
+-- decorated with the active theme at once; otherwise the first ApplyTheme decorates it.
 ---@param frame Frame
 ---@param title string
 function themes:RegisterSimpleWindow(frame, title)
   table.insert(self.windows[const.WINDOW_KIND.SIMPLE], frame)
   self.titles[frame:GetName()] = title
+  if self.themeApplied then
+    applySimple(self:GetCurrentTheme(), frame)
+  end
 end
 
--- RegisterFlatWindow is used to register a protrait window frame to be themed by themes.
+-- RegisterFlatWindow is used to register a flat window frame to be themed by themes. Like
+-- RegisterSimpleWindow, a window registered after a theme was applied is decorated at once.
 ---@param frame Frame
 ---@param title string
 function themes:RegisterFlatWindow(frame, title)
   table.insert(self.windows[const.WINDOW_KIND.FLAT], frame)
   self.titles[frame:GetName()] = title
+  if self.themeApplied then
+    self:GetCurrentTheme().Flat(frame)
+  end
 end
 
 -- RegisterSectionFont is used to register a font to be used in the section headers.
