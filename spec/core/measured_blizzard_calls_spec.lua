@@ -11,7 +11,7 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 describe("Blizzard calls the profiler measures", function()
   local aceAddon = LibStub("AceAddon-3.0")
-  local moduleNames = { "Debug", "Events", "Context" }
+  local moduleNames = { "Debug", "Events", "Context", "Constants" }
   local oldModules, oldAddons = {}, {}
   local savedEnum, savedBankPanel, savedItemButtonUtil
   local savedSetType, savedTrigger
@@ -26,6 +26,7 @@ describe("Blizzard calls the profiler measures", function()
     StubBetterBagsModule("Debug").Log = function() end
     StubBetterBagsModule("Events").SendMessage = function() end
     StubBetterBagsModule("Context")
+    StubBetterBagsModule("Constants").BAG_KIND = { BACKPACK = 0, BANK = 1 }
     savedEnum = _G.Enum
     _G.Enum = _G.Enum or {}
     _G.Enum.PlayerInteractionType = _G.Enum.PlayerInteractionType or {

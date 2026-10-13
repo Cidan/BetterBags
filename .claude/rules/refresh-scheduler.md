@@ -378,7 +378,7 @@ request, is swept only while it is open.
 | Categories: create from an item, delete, rename, hide/show, reprocess (`categories:ReprocessAllItems`), category pane edits, search categories, item drops on a header, group drag and drop | `bags/Rederive { resetLayout, buttons }` |
 | In-bag search toggle (`themes:SetSearchState`) | `bags/Rederive { resetLayout, buttons }` |
 | Show Bags toggles (context menu, GW2 theme) | `bags/Rederive { resetLayout }`: nothing a button draws depends on the view except through data its draw record holds, so unchanged buttons skip |
-| Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout }` |
+| Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout, backpack, bank = items:NeedsInteractionRecalculation(BANK) }`: the backpack's grey-out depends on the open window; the bank's only interaction-dependent input is stack unmerging, so it is recalculated only when its committed stacks were built under the other interaction state (recorded per kind at commit, `items._stackedInteracting`). A captured bank open recalculated the bank (149 ms) into the layout its own read had just committed under the banker interaction |
 | `EQUIPMENT_SETS_CHANGED` | derive of both kinds with `resetLayout` |
 | Tooltip resolved (`TooltipScanner:OnTooltipDataResolved`) | `bags/Rederive { backpack, bank = atBank }` |
 | Upgrade inputs: `PLAYER_EQUIPMENT_CHANGED`, skills, spec; the gear harvest's bank refresh | `bags/Rederive` for the kinds (`items:RequestUpgradeRefresh`) |

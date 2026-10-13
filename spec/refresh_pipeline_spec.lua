@@ -2776,6 +2776,55 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
       assert.equal("guid-909", item.itemInfo.itemGUID)
     end)
 
+    -- Opening or closing an interaction window recalculates the bags; the bank's only input
+    -- that depends on it is stack unmerging (ShouldMergeItem). A capture of opening the bank
+    -- showed the banker interaction recalculating the bank (149 ms) into the same layout its
+    -- own read had just committed, already stacked for the open interaction.
+    describe("NeedsInteractionRecalculation", function()
+      local savedInteracting
+      before_each(function()
+        savedInteracting = addon.atInteracting
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, unmergeAtShop = true, mergeUnstackable = true }
+        end)
+        mockContainer[0] = { { itemID = 101, guid = "g101", count = 1 } }
+      end)
+      after_each(function() addon.atInteracting = savedInteracting end)
+
+      it("is false when the committed stacks were built for the current interaction state", function()
+        addon.atInteracting = true
+        refreshBackpack()
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+
+      it("is true when the interaction state changed since, and false again once recalculated", function()
+        addon.atInteracting = false
+        refreshBackpack()
+        addon.atInteracting = true
+        assert.is_true(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+        refreshBackpack({ derive = true })
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+
+      it("is false when the kind does not unmerge at interactions", function()
+        override(database, "GetStackingOptions", function()
+          return { mergeStacks = true, unmergeAtShop = false, mergeUnstackable = true }
+        end)
+        addon.atInteracting = false
+        refreshBackpack()
+        addon.atInteracting = true
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+
+      it("is false when the kind has no committed items (its next read stacks them)", function()
+        addon.atInteracting = false
+        refreshBackpack()
+        items:WipeSlotInfo(const.BAG_KIND.BACKPACK)
+        addon.atInteracting = true
+        assert.is_false(items:NeedsInteractionRecalculation(const.BAG_KIND.BACKPACK))
+      end)
+    end)
+
     -- A kind's first read is a wipe, which never marks the items it finds as new. A derive
     -- before it must leave it so, or the first read would put the whole bag in Recent Items.
     it("does nothing for a kind that has never been read, and the first read still marks nothing new", function()

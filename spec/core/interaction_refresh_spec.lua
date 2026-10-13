@@ -9,10 +9,10 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 describe("interaction window refreshes", function()
   local aceAddon = LibStub("AceAddon-3.0")
-  local moduleNames = { "Debug", "Events", "Context" }
+  local moduleNames = { "Debug", "Events", "Context", "Items", "Constants" }
   local oldModules, oldAddons = {}, {}
   local savedEnum, savedBags, savedGameMenu, savedState
-  local sent
+  local sent, bankNeedsRecalculation
 
   before_each(function()
     for _, name in ipairs(moduleNames) do
@@ -30,6 +30,12 @@ describe("interaction window refreshes", function()
     end
     events.SendMessageLater = function() end
     StubBetterBagsModule("Context")
+    StubBetterBagsModule("Constants").BAG_KIND = { BACKPACK = 0, BANK = 1 }
+    bankNeedsRecalculation = false
+    StubBetterBagsModule("Items").NeedsInteractionRecalculation = function(_, kind)
+      assert.equal(1, kind, "asked about the bank")
+      return bankNeedsRecalculation
+    end
 
     savedEnum = _G.Enum
     _G.Enum = _G.Enum or {}
@@ -77,23 +83,31 @@ describe("interaction window refreshes", function()
     return out
   end
 
-  it("recalculates the bags when an interaction opens the backpack", function()
-    addon.OpenInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
-    sent = {}
-    addon.OnUpdate(nil)
-    local requested = refreshes()
-    assert.equal(1, #requested)
-    assert.equal("bags/Rederive", requested[1].message)
-    assert.same({ resetLayout = true }, requested[1].options)
-  end)
+  -- The backpack's grey-out depends on the open window, so it is always recalculated. The
+  -- bank's only input that depends on it is stack unmerging, so it is recalculated only when
+  -- its committed stacks were built under the other interaction state.
+  for _, bank in ipairs({ false, true }) do
+    local which = bank and "both bags" or "only the backpack"
+    it("recalculates " .. which .. " when an interaction opens the backpack", function()
+      bankNeedsRecalculation = bank
+      addon.OpenInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
+      sent = {}
+      addon.OnUpdate(nil)
+      local requested = refreshes()
+      assert.equal(1, #requested)
+      assert.equal("bags/Rederive", requested[1].message)
+      assert.same({ resetLayout = true, backpack = true, bank = bank }, requested[1].options)
+    end)
 
-  it("recalculates the bags when the interaction closes", function()
-    addon.OpenInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
-    sent = {}
-    addon.CloseInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
-    local requested = refreshes()
-    assert.equal(1, #requested)
-    assert.equal("bags/Rederive", requested[1].message)
-    assert.same({ resetLayout = true }, requested[1].options)
-  end)
+    it("recalculates " .. which .. " when the interaction closes", function()
+      bankNeedsRecalculation = bank
+      addon.OpenInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
+      sent = {}
+      addon.CloseInteractionWindow(nil, nil, Enum.PlayerInteractionType.Merchant)
+      local requested = refreshes()
+      assert.equal(1, #requested)
+      assert.equal("bags/Rederive", requested[1].message)
+      assert.same({ resetLayout = true, backpack = true, bank = bank }, requested[1].options)
+    end)
+  end
 end)

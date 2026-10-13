@@ -460,6 +460,9 @@ function items:Init()
     [const.BAG_KIND.BACKPACK] = false,
     [const.BAG_KIND.BANK] = false,
   }
+  -- The interaction state (addon.atInteracting) each kind's committed stacks were built
+  -- under (see NeedsInteractionRecalculation).
+  self._stackedInteracting = {}
   -- Stamped on every item each sweep (Phase6_EnrichData) and bumped by every wipe sweep and
   -- every restyling recalculation (settings, bags/Rederive with buttons). Item buttons skip a
   -- redraw whose inputs are unchanged, so a new generation makes every button of the kind
@@ -901,6 +904,25 @@ function items:Phase1_DetermineBags(ctx, kind)
   end
 
   return bagList
+end
+
+-- NeedsInteractionRecalculation says whether an interaction window opening or closing
+-- changes the kind's committed data: stacks unmerge while interacting when the kind's
+-- "Unmerge on Interactions" option is on (ShouldMergeItem), so the answer is yes only when
+-- the committed stacks were built under the other interaction state. A kind with no committed
+-- items has nothing to recalculate (its next read stacks them).
+---@param kind BagKind
+---@return boolean
+function items:NeedsInteractionRecalculation(kind)
+  local committed = self.slotInfo and self.slotInfo[kind] and self.slotInfo[kind].itemsBySlotKey
+  if not committed or next(committed) == nil then
+    return false
+  end
+  local opts = database:GetStackingOptions(kind)
+  if not (opts.mergeStacks and opts.unmergeAtShop) then
+    return false
+  end
+  return self._stackedInteracting[kind] ~= (addon.atInteracting == true)
 end
 
 ---@param kind BagKind
@@ -1776,12 +1798,14 @@ function items:RunRefresh(ectx, kind)
 
   local emptySlotByBagAndSlot, freeSlotKeys, freeSlotKeysByBag, emptySlotsSorted, totalItems = self:Phase6_EnrichData(ectx, kind, itemData, emptySlotsByBag)
 
+  local stackedInteracting = addon.atInteracting == true
   local visibleItemsBySlotKey, stackData = self:Phase7_ApplyVirtualStacks(kind, itemData)
   local sectionLayouts = self:Phase8_EnrichCategories(ectx, kind, itemData, emptySlotByBagAndSlot)
   local sortedItems = self:BuildOrderedItems(ectx, kind, visibleItemsBySlotKey, emptySlotByBagAndSlot, previousSortedItems)
   local tabData = self:Phase10_PartitionIntoTabs(ectx, kind, sortedItems, emptySlotsSorted, emptySlotsByBag, freeSlotKeysByBag, itemData)
 
   self:Phase11_CommitAndDispatch(ectx, kind, itemData, equipmentData, previousItems, previousTotalItems, emptySlots, emptySlotsByBag, emptySlotByBagAndSlot, totalItems, emptySlotsSorted, freeSlotKeys, freeSlotKeysByBag, visibleItemsBySlotKey, stackData, sectionLayouts, sortedItems, tabData)
+  self._stackedInteracting[kind] = stackedInteracting
 
   -- Only a committed sweep counts as having shown the sort; one that failed above leaves
   -- the flag set for the next sweep or the fallback.

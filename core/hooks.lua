@@ -16,6 +16,9 @@ local events = addon:GetModule('Events')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
 addon.backpackShouldOpen = false
 addon.backpackShouldClose = false
 
@@ -54,6 +57,20 @@ function addon.TriggerItemContextChanged()
   ItemButtonUtil.TriggerEvent(ItemButtonUtil.Event.ItemContextChanged)
 end
 
+-- interactionRecalculation is what an interaction window opening or closing recalculates:
+-- always the backpack (its grey-out depends on the open window), and the bank only when its
+-- committed stacks were built under the other interaction state, its only input that depends
+-- on it (items:NeedsInteractionRecalculation).
+---@return table options for bags/Rederive
+local function interactionRecalculation()
+  local items = addon:GetModule('Items')
+  return {
+    resetLayout = true,
+    backpack = true,
+    bank = items:NeedsInteractionRecalculation(const.BAG_KIND.BANK),
+  }
+end
+
 function addon.ForceHideBlizzardBags()
   for i = 1, NUM_TOTAL_BAG_FRAMES, 1 do
     CloseBag(i)
@@ -75,7 +92,7 @@ function addon.OnUpdate(ctx)
     addon.Bags.Backpack:Show(ctx)
     addon:UpdateButtonHighlight()
     if addon.atInteracting then
-      events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
+      events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
     end
   elseif addon.backpackShouldClose then
     debug:Log('Hooks', 'OnUpdate', addon.backpackShouldOpen, addon.backpackShouldClose)
@@ -109,7 +126,7 @@ function addon.CloseInteractionWindow(ctx, _, interactionType)
   addon.atInteracting = false
   addon.atWarbank = false
   addon.backpackShouldClose = true
-  events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
+  events:SendMessage(ctx, 'bags/Rederive', interactionRecalculation())
   events:SendMessageLater(ctx, 'bags/OpenClose')
 end
 
