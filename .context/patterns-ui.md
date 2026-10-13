@@ -75,7 +75,7 @@ StaticPopup_Show("MY_DIALOG", nil, nil, { value = x })
 ## Object Pooling Patterns
 
 ### Always Reset ALL Properties When Releasing Pooled Objects
-**Problem**: Pooled objects retain state (colors, collapsed flags, cached data) from prior use, causing visual glitches when reused.
+**Problem**: Pooled objects retain state (colors, flags, cached data) from prior use, causing visual glitches when reused.
 **Rule**: In `Wipe()`/`_DoReset()`, reset **every** custom property. Reset visual properties (restore original colors) before clearing the cached values needed to restore them. Add a comment near every new field reminding future devs to reset it.
 
 ### Track Active Pooled Frames for Incremental UI Updates

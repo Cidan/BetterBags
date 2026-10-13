@@ -120,7 +120,6 @@ const.DATABASE_DEFAULTS = {
     sectionSort = { [0] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 }, [1] = { [1] = 1, [2] = 1, [3] = 1, [4] = 1 } },
     itemSort = { [0] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 }, [1] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 } },
     customSectionSort = { [0] = {}, [1] = {} },
-    collapsedSections = { [0] = {}, [1] = {} },
     size = {
       [1] = {
         [0] = { columnCount = 15, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
@@ -225,6 +224,15 @@ describe("Database Migration", function()
       DB:Migrate()
       assert.equal(85, DB.data.profile.glowIntensity[const.BAG_KIND.BACKPACK])
       assert.equal(60, DB.data.profile.glowIntensity[const.BAG_KIND.BANK])
+    end)
+  end)
+
+  -- Section collapsing was removed; its saved state is dropped from every profile.
+  describe("removed section collapse state", function()
+    it("drops the saved collapsedSections table", function()
+      DB.data.profile.collapsedSections = { [const.BAG_KIND.BACKPACK] = { Junk = true }, [const.BAG_KIND.BANK] = {} }
+      DB:Migrate()
+      assert.is_nil(DB.data.profile.collapsedSections)
     end)
   end)
 

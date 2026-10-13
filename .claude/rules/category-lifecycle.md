@@ -16,7 +16,6 @@ A custom category's name is a key in **multiple** independent profile tables (`c
 - `categoryToGroup[kind][name]` (and, on retail bank, `categoryToGroup[kind][groupID][name]`)
   — tab/group assignment.
 - `categoryOptions[name]` — `{ shown = … }` visibility.
-- `collapsedSections[kind][name]` — collapse state.
 - `customSectionSort[kind][name] = index` — the config "Pinned" ordering.
 
 The **in-memory** `categories.ephemeralCategories` (`data/categories.lua`) is a separate table
@@ -30,8 +29,8 @@ in-memory `ephemeralCategories` only.
 `categories:DeleteCategory`) must remove the name — and any grouped sub-categories
 (`"name - …"`) — from **every** side table in §1, exactly as `DB:RenameCategory` already does.
 For years `DeleteItemCategory` scrubbed only `customCategoryFilters`, `ephemeralCategoryFilters`
-and `customCategoryIndex`, leaving `customSectionSort`, `categoryOptions`, `collapsedSections`
-and `categoryToGroup` behind.
+and `customCategoryIndex`, leaving `customSectionSort`, `categoryOptions` and `categoryToGroup`
+behind (and `collapsedSections`, from section collapsing, since removed; `DB:Migrate` drops it).
 
 **Failure mode (the "undeletable dynamic category" bug):** the config Categories pane's
 `categoryPaneProto:LoadPinnedItems` (`config/categorypane.lua`) inserts **every**
@@ -43,7 +42,7 @@ deleted." with no delete button and no item list — so the user could neither d
 its (non-existent) contents. It is **self-perpetuating**: `UpdatePinnedItems` rebuilds
 `customSectionSort` from the current list, re-persisting the ghost every time the pane is
 touched. Coverage: `spec/database_spec.lua` ("DeleteItemCategory scrubs pinned sort, options,
-collapse, and group for all kinds", "…scrubs grouped sub-categories from side tables").
+and group for all kinds", "…scrubs grouped sub-categories from side tables").
 
 ## 3. Self-heal existing corrupted profiles
 

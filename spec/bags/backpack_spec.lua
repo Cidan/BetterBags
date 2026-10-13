@@ -86,7 +86,6 @@ describe("Backpack Module Loading and Compatibility Tests", function()
           [1] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 },
         },
         customSectionSort = { [0] = {}, [1] = {} },
-        collapsedSections = { [0] = {}, [1] = {} },
         size = {
           [1] = {
             [0] = { columnCount = 15, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },

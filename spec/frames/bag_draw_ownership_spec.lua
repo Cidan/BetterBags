@@ -162,7 +162,6 @@ local function stubModules()
   override(database, "GetItemLevelOptions", function() return { enabled = false, color = false } end)
   override(database, "GetStackingOptions", function() return { mergeUnstackable = false } end)
   override(database, "GetGlowIntensity", function() return 60 end)
-  override(database, "ToggleSectionCollapsed", function() end)
   override(database, "GetUpgradeIconProvider", function() return "None" end)
 
   local color = stubModule("Color")

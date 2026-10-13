@@ -54,9 +54,7 @@ To enforce strict functional isolation and eliminate UI state leakage or out-of-
 To achieve sub-millisecond redraw performance while ensuring that the grid layout remains perfectly aligned, visually fluid, and free of overlap/gaps:
 - **Rule:** Page placement is a pure, top-down clean-sweep operation. It is triggered synchronously when the data backend emits `items/RefreshBackpack/Done` or `items/RefreshBank/Done` messages.
 - **Unified Views:** GridView, OneBagView, and Blizzard Bag View are handled polymorphically within `views/gridview.lua` and `views/bagview.lua`. They avoid redundant layout files by treating views as alternative naming classifications.
-- **Two-Pass Column packing:**
-  - **Pass 1:** Determines the default height/width of all category sections and splits them into equal-height vertical columns using the `calculateColumns` algorithm inside `frames/grid.lua`.
-  - **Pass 2 (Row collapse shrink optimization):** Measures row-level layouts to shrink-wrap category sections when all items within a row are collapsed. This dynamically adjusts bounding heights and prevents massive blank gaps.
+- **Column packing:** One pass determines the height/width of all category sections and splits them into equal-height vertical columns using the `calculateColumns` algorithm inside `frames/grid.lua`. (A second pass that shrank rows of collapsed sections went with section collapsing, which was removed.)
 - **Bounds Clamping:** The view calculates the total bag height and width, clamps the parent frame within safe screen limits (`UIParent:GetHeight() * 0.90`), and toggles the scrollbars and frame points dynamically.
 - **Shared, Stateless Sizing (`UpdateBagBounds`):** To ensure uniform sizing when switching tabs instantly without caching state, all bag views call a shared, stateless helper method `view:UpdateBagBounds(bag, w, h)`. This centralizes the bounds calculations, clamping, scrollbar visibility, and search-offset positioning. It is invoked at the end of the full rendering pipeline, achieving visual size parity with zero state-holding overhead.
 

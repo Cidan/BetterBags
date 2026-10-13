@@ -140,7 +140,6 @@ const.DATABASE_DEFAULTS = {
       [1] = { [1] = 2, [2] = 2, [3] = 2, [4] = 2 },
     },
     customSectionSort = { [0] = {}, [1] = {} },
-    collapsedSections = { [0] = {}, [1] = {} },
     size = {
       [1] = {
         [0] = { columnCount = 15, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
@@ -740,7 +739,7 @@ describe("Database", function()
       assert.is_nil(DB.data.profile.customCategoryIndex[2])
     end)
 
-    it("DeleteItemCategory scrubs pinned sort, options, collapse, and group for all kinds", function()
+    it("DeleteItemCategory scrubs pinned sort, options, and group for all kinds", function()
       -- Reproduces the orphaned-category bug: deleting a category must remove
       -- every reference to it, otherwise a leftover customSectionSort ("Pinned")
       -- entry resurfaces it forever as an undeletable "dynamic" category.
@@ -751,8 +750,6 @@ describe("Database", function()
       DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Orphan"] = 3
       DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Orphan"] = 4
       DB.data.profile.categoryOptions["Orphan"] = { shown = false }
-      DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Orphan"] = true
-      DB.data.profile.collapsedSections[const.BAG_KIND.BANK]["Orphan"] = true
       DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"] = 5
       DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Orphan"] = 7
 
@@ -761,8 +758,6 @@ describe("Database", function()
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"])
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["Orphan"])
       assert.is_nil(DB.data.profile.categoryOptions["Orphan"])
-      assert.is_nil(DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Orphan"])
-      assert.is_nil(DB.data.profile.collapsedSections[const.BAG_KIND.BANK]["Orphan"])
       assert.is_nil(DB.data.profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Orphan"])
       assert.is_nil(DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["Orphan"])
     end)
@@ -774,14 +769,12 @@ describe("Database", function()
       DB.data.profile.ephemeralCategoryFilters["Parent - Consumable"] = { name = "Parent - Consumable" }
       DB.data.profile.categoryOptions["Parent - Consumable"] = { shown = true }
       DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Parent - Consumable"] = 2
-      DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Parent - Consumable"] = true
 
       DB:DeleteItemCategory("Parent")
 
       assert.is_nil(DB.data.profile.ephemeralCategoryFilters["Parent - Consumable"])
       assert.is_nil(DB.data.profile.categoryOptions["Parent - Consumable"])
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Parent - Consumable"])
-      assert.is_nil(DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["Parent - Consumable"])
     end)
 
     it("PruneOrphanedSectionSort drops pins with no backing category, keeps valid ones", function()
@@ -858,8 +851,6 @@ describe("Database", function()
       DB.data.profile.categoryToGroup[const.BAG_KIND.BANK]["OldName"] = 2
       DB.data.profile.ephemeralCategoryFilters["OldName"] = { name = "OldName", enabled = { [0] = true, [1] = true } }
       DB.data.profile.categoryOptions["OldName"] = { shown = false }
-      DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["OldName"] = true
-      DB.data.profile.collapsedSections[const.BAG_KIND.BANK]["OldName"] = false
       DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["OldName"] = 5
       DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["OldName"] = 3
     end)
@@ -900,12 +891,6 @@ describe("Database", function()
       assert.is_false(DB.data.profile.categoryOptions["NewName"].shown)
     end)
 
-    it("updates collapsedSections for all kinds", function()
-      DB:RenameCategory("OldName", "NewName")
-      assert.is_true(DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["NewName"])
-      assert.is_false(DB.data.profile.collapsedSections[const.BAG_KIND.BANK]["NewName"])
-    end)
-
     it("updates customSectionSort for all kinds", function()
       DB:RenameCategory("OldName", "NewName")
       assert.are.equal(5, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["NewName"])
@@ -931,36 +916,13 @@ describe("Database", function()
     it("cleans up grouped sub-categories", function()
       DB.data.profile.ephemeralCategoryFilters["OldName - Consumable"] = { name = "OldName - Consumable" }
       DB.data.profile.categoryOptions["OldName - Consumable"] = { shown = true }
-      DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["OldName - Consumable"] = true
       DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["OldName - Consumable"] = 2
 
       DB:RenameCategory("OldName", "NewName")
 
       assert.is_nil(DB.data.profile.ephemeralCategoryFilters["OldName - Consumable"])
       assert.is_nil(DB.data.profile.categoryOptions["OldName - Consumable"])
-      assert.is_nil(DB.data.profile.collapsedSections[const.BAG_KIND.BACKPACK]["OldName - Consumable"])
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["OldName - Consumable"])
-    end)
-  end)
-
-  -- ─── Section collapse ──────────────────────────────────────────────────────────
-
-  describe("section collapse", function()
-
-    it("GetSectionCollapsed returns false by default", function()
-      assert.is_false(DB:GetSectionCollapsed(const.BAG_KIND.BACKPACK, "SomeSection"))
-    end)
-
-    it("SetSectionCollapsed sets collapse state", function()
-      DB:SetSectionCollapsed(const.BAG_KIND.BANK, "MySection", true)
-      assert.is_true(DB:GetSectionCollapsed(const.BAG_KIND.BANK, "MySection"))
-    end)
-
-    it("ToggleSectionCollapsed flips the state", function()
-      DB:ToggleSectionCollapsed(const.BAG_KIND.BACKPACK, "ToggleMe")
-      assert.is_true(DB:GetSectionCollapsed(const.BAG_KIND.BACKPACK, "ToggleMe"))
-      DB:ToggleSectionCollapsed(const.BAG_KIND.BACKPACK, "ToggleMe")
-      assert.is_false(DB:GetSectionCollapsed(const.BAG_KIND.BACKPACK, "ToggleMe"))
     end)
   end)
 

@@ -23,8 +23,6 @@ sort.GetItemSortFunction = function() end
 
 local database = StubBetterBagsModule("Database")
 database.GetShowFullSectionNames = function() return false end
-database.GetShowFullSectionNames = function() return false end
-database.ToggleSectionCollapsed = function() end
 
 local themes = StubBetterBagsModule("Themes")
 themes.UpdateSectionFont = function() end
@@ -132,12 +130,10 @@ describe("Section Frame", function()
       local ctx = context:New("TestPool")
       local s = sectionFrame:Create(ctx)
       s:SetTitle("Category A")
-      s:SetCollapsed(true)
       s:Release(ctx)
-      -- Acquire again, should be reset (collapsed=false, but text remains until overwritten)
+      -- Acquire again: the text remains until overwritten
       local s2 = sectionFrame:Create(ctx)
       assert.are.equal(s2.title:GetText(), "Category A")
-      assert.is_false(s2:IsCollapsed())
     end)
   end)
 
@@ -146,7 +142,7 @@ describe("Section Frame", function()
       local ctx = context:New("TestTitle")
       local s = sectionFrame:Create(ctx)
       s:SetTitle("Weapons")
-      assert.are.equal(s:GetTitleWithoutIndicator(), "Weapons")
+      assert.are.equal(s:GetTitle(), "Weapons")
     end)
 
     it("supports custom title color", function()
@@ -158,16 +154,6 @@ describe("Section Frame", function()
       assert.are.equal(g, 0)
       assert.are.equal(b, 0)
       assert.are.equal(a, 1)
-    end)
-  end)
-
-  describe("Collapsed State", function()
-    it("sets and retrieves collapsed state", function()
-      local ctx = context:New("TestCollapse")
-      local s = sectionFrame:Create(ctx)
-      assert.is_false(s:IsCollapsed())
-      s:SetCollapsed(true)
-      assert.is_true(s:IsCollapsed())
     end)
   end)
 
@@ -244,28 +230,6 @@ describe("Section Frame", function()
       local w, h = s:Draw(const.BAG_KIND.BACKPACK, nil, false)
       assert.are.equal(w, 112)
       assert.are.equal(h, 74)
-    end)
-
-    it("returns title-only height when collapsed and shouldShrinkWhenCollapsed is true", function()
-      local ctx = context:New("TestDrawCollapsed")
-      local s = sectionFrame:Create(ctx)
-      s:AddCell("cell1", {})
-      s:SetCollapsed(true)
-      s.shouldShrinkWhenCollapsed = true
-      local w, h = s:Draw(const.BAG_KIND.BACKPACK, nil, false)
-      assert.are.equal(w, 112)
-      assert.are.equal(h, 24) -- title:GetHeight() + 6 = 18 + 6 = 24
-    end)
-
-    it("returns full height when collapsed and shouldShrinkWhenCollapsed is false", function()
-      local ctx = context:New("TestDrawCollapsedNoShrink")
-      local s = sectionFrame:Create(ctx)
-      s:AddCell("cell1", {})
-      s:SetCollapsed(true)
-      s.shouldShrinkWhenCollapsed = false
-      local w, h = s:Draw(const.BAG_KIND.BACKPACK, nil, false)
-      assert.are.equal(w, 112)
-      assert.are.equal(h, 74) -- full height is still 74 even when collapsed if shrink is false
     end)
 
     it("supports headerless section layout", function()
