@@ -40,7 +40,7 @@ item was read from:
 | Current item level (scaling changes it without the link) | `C_Item.GetCurrentItemLevel` |
 | Cold read | `harvestIncomplete` items are never kept |
 Refreshed on every kept item, computed exactly as a fresh read (`items:RefreshKeptItem`, also run
-by recalculations on every item still in its slot): new-item flag (`clientNewItemFlag`),
+by recalculations on every item still in its slot): new-item flag (`items:ClientNewItemFlag`),
 gear sets, quest state, tooltip text. Known staleness, the same as an unvisited bag: a refundable
 purchase's binding expiring, an appearance being collected (until the slot changes or a wipe).
 

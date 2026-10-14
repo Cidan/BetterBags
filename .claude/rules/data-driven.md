@@ -29,3 +29,9 @@ reasoning about it can suggest a cause; it does not establish one.
   switch showed 12.6-15 ms of unmeasured time inside `Bank.SwitchToGroup`, the same with zero
   or 529 buttons reacting to the context change, which only one of these two calls could
   explain.
+- **New-item flags and Recent Items timers** (recent-items.md §1): `items:ClientNewItemFlag(bag,
+  slot)` returns what the client reports for a slot, and `items:SeedNewItemTimer(kind, item)`
+  returns what it did: `"started"`, `"running"` (the GUID already has a timer), `"not new"` (the
+  client does not flag the item) or `"no guid"`. Both were local functions. Added when a vendor
+  purchase onto a partial stack did not enter Recent Items and no capture could show whether the
+  client flagged the slot.

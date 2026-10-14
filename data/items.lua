@@ -1950,7 +1950,7 @@ local function resolveKind(self, data)
 end
 
 -- IsNewItem decides Recent Items membership: an item is recent while it has a timer. The
--- client's new-item flag only starts the timer (seedNewItemTimer) and drives the glow; the
+-- client's new-item flag only starts the timer (SeedNewItemTimer) and drives the glow; the
 -- client clears it on hover and when Blizzard's own bag frames close, at moments unrelated
 -- to the timer. Timers end only when the bag closes (ExpireRecentItems), so nothing leaves
 -- Recent Items while the bag is open.
@@ -2265,27 +2265,34 @@ SlashCmdList["BETTERBAGS_DEBUGITEMS"] = function(msg)
   end
 end
 
--- clientNewItemFlag is an item's new-item flag (the glow): the client's own flag alone. The
+-- ClientNewItemFlag is an item's new-item flag (the glow): the client's own flag alone. The
 -- Recent Items timer (IsNewItem with a GUID) decides the category, not the glow, so an item
 -- the player hovered (which drops the client flag) stops glowing but stays in Recent Items.
+-- A method so captures record what the client reported for each slot read.
 ---@param bagid number
 ---@param slotid number
 ---@return boolean
-local function clientNewItemFlag(bagid, slotid)
+function items:ClientNewItemFlag(bagid, slotid)
   return _G.C_NewItems ~= nil and _G.C_NewItems.IsNewItem ~= nil
     and _G.C_NewItems.IsNewItem(bagid, slotid) and true or false
 end
 
--- seedNewItemTimer starts the Recent Items timer of a new item the first time a sweep sees
--- it, so it stays recent after the client drops its own new-item flag.
----@param self Items
+-- SeedNewItemTimer starts the Recent Items timer of a new item the first time a sweep sees
+-- it, so it stays recent after the client drops its own new-item flag. It returns what it
+-- decided, which captures record: "started", "running" (the GUID already has a timer, which
+-- is not restarted), "not new" (the client does not flag the item) or "no guid".
 ---@param kind BagKind
 ---@param data ItemData
-local function seedNewItemTimer(self, kind, data)
+---@return string
+function items:SeedNewItemTimer(kind, data)
   local guid = data.itemInfo.itemGUID
-  if data.itemInfo.isNewItem and guid and guid ~= "" and self._newItemTimers and self._newItemTimers[kind] and self._newItemTimers[kind][guid] == nil then
-    self._newItemTimers[kind][guid] = time()
-  end
+  if not data.itemInfo.isNewItem then return "not new" end
+  if not guid or guid == "" then return "no guid" end
+  local timers = self._newItemTimers and self._newItemTimers[kind]
+  if not timers then return "no timers" end
+  if timers[guid] ~= nil then return "running" end
+  timers[guid] = time()
+  return "started"
 end
 
 -- ReuseHarvestedSlot returns a slot's committed item when the slot still holds the same
@@ -2379,8 +2386,8 @@ function items:RefreshKeptItem(kind, item, bagid, slotid, itemGUID)
   local tooltipScanner = addon:GetModule('TooltipScanner')
   itemInfo.tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID) or ""
   itemInfo.equipmentSets = equipmentSets:GetItemSets(bagid, slotid)
-  itemInfo.isNewItem = clientNewItemFlag(bagid, slotid)
-  seedNewItemTimer(self, kind, item)
+  itemInfo.isNewItem = self:ClientNewItemFlag(bagid, slotid)
+  self:SeedNewItemTimer(kind, item)
 end
 
 -- REUSED DETAILED METADATA UTILITIES FROM LEGACY IMPLEMENTATION
@@ -2717,7 +2724,7 @@ function items:AttachItemInfo(data, kind, containerInfo)
     itemIcon = data.containerInfo.iconFileID or itemTexture or 134400,
     isBound = data.containerInfo.isBound or false,
     isLocked = data.containerInfo.isLocked or false,
-    isNewItem = clientNewItemFlag(bagid, slotid),
+    isNewItem = self:ClientNewItemFlag(bagid, slotid),
     isBattlePayItem = (_G.C_Container and _G.C_Container.IsBattlePayItem and _G.C_Container.IsBattlePayItem(bagid, slotid)) and true or false,
     currentItemCount = data.containerInfo.stackCount or 1,
     category = "",
@@ -2739,7 +2746,7 @@ function items:AttachItemInfo(data, kind, containerInfo)
     end
   end
 
-  seedNewItemTimer(self, kind, data)
+  self:SeedNewItemTimer(kind, data)
 
   data.itemLinkInfo = self:ParseItemLink(itemLink)
   data.itemHash = self:GenerateItemHash(data)
