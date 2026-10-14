@@ -300,6 +300,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
           frame = { Show = function() end, IsShown = function() return true end }
         },
         slots = panel,
+        purchaseBankButton = CreateFrame("Button"),
         Wipe = function() end,
         Draw = function() end,
         blizzardBankTab = 10,

@@ -230,9 +230,9 @@ Definitive container map on Camelot (verified live via a per-container `/run` du
 `origin/forever` source):
 
 - **Character bank storage = the purchased tabs `CharacterBankTab_1..9` = bag ids 6..14.** The
-  first character tab is auto-granted free (`BankFrameMixin:PurchaseFirstSlot`,
-  `Blizzard_UIPanels_Game/Camelot/BankFrame.lua` — `tabCost == 0` ⇒ auto `PurchaseBankTab`), the
-  rest are bought. `C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)` returns the
+  first character tab costs nothing, but it is still a purchase, and under BetterBags it is
+  never made for you (§10); the rest are bought for gold.
+  `C_Bank.FetchPurchasedBankTabData(Enum.BankType.Character)` returns the
   purchased tabs' container ids (6, then 7…). BetterBags already scans these — they are in
   `const.BANK_BAGS` (§2). A live dump showed `6: slots=48, free=48` for a character with one
   48-slot tab, matching the player's hand-counted 48 free.
@@ -254,10 +254,10 @@ was reverted. The keyring guards in `Phase5_UpdateFreeSlots`/`Phase6_EnrichData`
 (`bagid == Enum.BagIndex.Keyring`) are correct as-is: -1 is not in `BACKPACK_BAGS` or `BANK_BAGS`,
 so it is simply never scanned.
 
-If a Camelot bank ever renders blank with tabs that *do* have slots, the cause is the async
-first-tab grant/load not being reflected at the `BANKFRAME_OPENED` scan (there is no retail
-re-scan on `BANK_TABS_CHANGED`), **not** a missing base-bank container — diagnose that path
-rather than re-adding -1.
+A Camelot bank that renders blank usually means the character owns no tab yet (the Purchase
+Bank button, §10, shows then). If it renders blank with tabs that *do* have slots, look at the
+read after the tab arrived (there is no bank read on `BANK_TABS_CHANGED`), **not** at a missing
+base-bank container. Do not re-add -1.
 
 ## 8. PLAYER_MONEY crash while looting away from the bank (directly UnregisterEvent BankPanel.MoneyDisplay)
 
@@ -363,7 +363,55 @@ mapping, live-retail no-op, drop/drag/click/shift-click, base tab, combat refusa
 tooltips, redraw events) and `spec/refresh_spec.lua` ("sweep every bank bag on
 PLAYERBANKSLOTS_CHANGED on Forever", "not listen … on live retail").
 
-## 10. Still pending (not yet done)
+## 10. The free first bank tab: a Purchase Bank button, because it cannot be bought for you
+
+On Forever a new character owns no character bank tab. Blizzard's own bank window buys the free
+first one when it opens: `BankFrameBaseMixin:OnShow` → `SelectDefaultTab` → `SetTab`, which on
+Camelot calls `BankFrameMixin:PurchaseFirstSlot`, and that calls
+`C_Bank.PurchaseBankTab(Enum.BankType.Character)` when `FetchNextPurchasableBankTabData`
+reports `tabCost == 0` (`Blizzard_UIPanels_Game/Camelot/BankFrame.lua`,
+`Mainline/BankFrameTemplates.lua`). Live retail has no such code.
+
+BetterBags breaks that chain on purpose: `HideBlizzardBags` (`core/init.lua`) reparents
+`BankFrame` under the hidden `BetterBagsSneakyFrame` and clears its `OnShow`, so the open never
+runs Blizzard's handler and the tab is never bought. The bank opened empty, and the only way in
+was the "+" on the first tab in the Show Bags panel.
+
+**It cannot be bought from BetterBags code.** `C_Bank.PurchaseBankTab` is protected
+(`HasRestrictions = true` in `BankDocumentation.lua` on Forever and live; addon calls fail with
+`ADDON_ACTION_FORBIDDEN`, e.g. ArkInventory issue #2003), and calling
+`BankFrame:PurchaseFirstSlot()` from addon code is the same call. Restoring Blizzard's `OnShow`
+would make the whole Blizzard bank window run beside ours, with our `BankPanel` calls firing its
+show/hide handlers from addon code, which is the `BankPanel` taint that breaks `UseContainerItem`
+(`core/init.lua`). The user has to click.
+
+**The button** (`bags/bank.lua`):
+- `OnCreate` creates `bag.purchaseBankButton`, a `"BankPanelPurchaseButtonScriptTemplate,
+  UIPanelButtonTemplate"` button (the same pair Blizzard's own purchase prompt button inherits)
+  reading "Purchase Bank", with `overrideBankType = Enum.BankType.Character`, centered on the
+  bag's `scrollBox` and 10 levels above it, hidden. The template's own `OnClick` opens Blizzard's
+  `CONFIRM_BUY_BANK_TAB` dialog, whose accept buys the tab: the same secure path as the bank tab
+  slots panel's purchase buttons (`frames/bankslots.lua`). **Never set or hook its `OnClick`.**
+- `bank.proto:NeedsBankPurchase()` is true when the shown bank type is the character bank (the
+  bag's `bankTab` is not in `const.ACCOUNT_BANK_BAGS`), `C_Bank.FetchNumPurchasedBankTabs(Character)`
+  is 0 and `C_Bank.FetchNextPurchasableBankTabData(Character)` is not nil. It is a `Bank`
+  prototype method, so a profiler trace records each answer.
+- `bank.proto:UpdatePurchaseBankButton()` shows or hides the button from it. It runs from
+  `SwitchToGroup` (every bank open goes through it), `SwitchToBlizzardTab` (the Show Bags tabs)
+  and `BANK_TABS_CHANGED` (the purchase landing).
+- Gated on the data, not on `addon.isForever`: a live-retail character with no character tab gets
+  the same button over the character bank, and never over a Warbank group or tab.
+
+Not verified by a capture yet: which events read the new tab's slots into the bank after the
+purchase. The button adds no read; the bank refreshes the way it did after a purchase from the
+Show Bags panel.
+
+Coverage: `spec/bags/bank_purchase_button_spec.lua` (template, attribute, no `OnClick` of ours,
+placement; shown with no tab, hidden with a tab, with nothing purchasable, after
+`BANK_TABS_CHANGED`, over the Warbank by group and by Show Bags tab; shown on Forever). Each guard
+was mutation-tested.
+
+## 11. Still pending (not yet done)
 
 - `C_Bank.ShouldUsePlayerBagsInBank`, `FetchMaxNumBankTabs` and `BankBagTypeAndIDToInvSlot`
   (Camelot-only) are still unused; the socket feature (§9) works from the

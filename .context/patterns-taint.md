@@ -65,3 +65,10 @@ end)
 - **Classic/Era** (`bags/era/bank.lua:43-60`, `bags/classic/bank.lua:43-60`): Instance-level `self.isHiding` flag in OnHide; no `CloseBankFrame()` in OnHide; no hooksecurefunc (skipped via `addon.isRetail` check).
 
 Use `C_Timer.After(0, ...)` to clear the Retail guard after event processing completes.
+
+## Buy Bank Tabs Through Blizzard's Script-Only Purchase Template
+**Problem**: `C_Bank.PurchaseBankTab` is protected (`HasRestrictions`). Calling it, or a Blizzard function that calls it (`BankFrame:PurchaseFirstSlot()` on WoW: Forever), from addon code is blocked with `ADDON_ACTION_FORBIDDEN`.
+
+**Solution**: Create the button with `BankPanelPurchaseButtonScriptTemplate` (Blizzard's "script-only template for use by addons", `Mainline/BankFrameTemplates.xml`), add `UIPanelButtonTemplate` for a standard look, and set the `overrideBankType` attribute. Its own `OnClick` opens `CONFIRM_BUY_BANK_TAB`, and the dialog's accept makes the purchase. Never set or hook the button's `OnClick`.
+
+**Related Files**: `frames/bankslots.lua` (tab purchase buttons), `bags/bank.lua` (Purchase Bank button), `.claude/rules/camelot-forever.md` §10

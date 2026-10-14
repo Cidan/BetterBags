@@ -95,6 +95,7 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field tabs Tab
 ---@field bankTab BankTab
 ---@field blizzardBankTab number? When set, the bank is filtered to show only items from this specific Blizzard bag index (set by the bank slots panel).
+---@field purchaseBankButton Button? Retail bank: shown in the middle of the bank while the character owns no character bank tab.
 ---@field behavior BackpackBehaviorProto|BankBehaviorProto The bag-type-specific behavior
 bagFrame.bagProto = {}
 addon:GetModule('Perf'):RegisterPrototype(bagFrame.bagProto, 'Bag')
