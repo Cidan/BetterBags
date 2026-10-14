@@ -496,19 +496,19 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 	end
 	self.headerContainer:SetHeight(math.max(1, headerH))
 
-	-- 2. Scan and draw Free Space inside self.footerContainer (except SECTION_ALL_BAGS mode)
+	-- 2. Draw Free Space inside self.footerContainer when this tab's data carries it: the data
+	-- phase leaves it out of a tab with no free slots (except SECTION_ALL_BAGS mode)
 	local footerW, footerH = 0, 0
-	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
-		local tabID = self:GetCurrentTabID()
-		local tabData = slotInfo.tabs and slotInfo.tabs[tabID] or slotInfo
-
+	local tabID = self:GetCurrentTabID()
+	local tabData = slotInfo.tabs and slotInfo.tabs[tabID] or slotInfo
+	local freeSpaceData = tabData.freeSpace
+	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS and freeSpaceData then
 		local freeSlotsSection = self:GetOrCreateGlobalSection(ctx, L:G("Free Space"))
 		freeSlotsSection.frame:SetParent(self.footerContainer)
 		freeSlotsSection.frame:ClearAllPoints()
 		freeSlotsSection.frame:SetPoint("TOPLEFT", self.footerContainer, "TOPLEFT", 0, 0)
 		freeSlotsSection:SetTitle(L:G("Free Space"))
 
-		local freeSpaceData = tabData.freeSpace or { showAll = true, buttons = {} }
 		if freeSpaceData.showAll then
 			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
 			for _, btn in ipairs(freeSpaceData.buttons) do

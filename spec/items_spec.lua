@@ -942,6 +942,31 @@ describe("Items (New Data Farming Engine)", function()
       groups.CategoryBelongsToGroup = originalCategoryBelongsToGroup
       const.BACKPACK_BAGS = originalBackpackBags
     end)
+
+    -- The Free Space section is drawn only when the tab's data carries freeSpace, so a tab
+    -- with nothing to show in it carries none: full bags (Phase 5 records them with a 0
+    -- count), and a bag kind with no containers at all (a bank before its first tab).
+    it("leaves freeSpace out of a tab with no free slots, in both free space modes", function()
+      local DB = addon:GetModule("Database")
+      local originalGetGroupsEnabled = DB.GetGroupsEnabled
+      local originalGetShowAllFreeSpace = DB.GetShowAllFreeSpace
+      DB.GetGroupsEnabled = function() return false end
+
+      local ctx = addon:GetModule("Context"):New("TestNoFreeSpace")
+      local fullBag = { [0] = { name = "Bag", count = 0, family = 0 } }
+      for _, showAll in ipairs({ true, false }) do
+        DB.GetShowAllFreeSpace = function() return showAll end
+
+        local tabs = items:Phase10_PartitionIntoTabs(ctx, const.BAG_KIND.BACKPACK, {}, {}, fullBag, {}, {})
+        assert.is_nil(tabs[1].freeSpace, "full bags (showAll " .. tostring(showAll) .. ")")
+
+        tabs = items:Phase10_PartitionIntoTabs(ctx, const.BAG_KIND.BACKPACK, {}, {}, {}, {}, {})
+        assert.is_nil(tabs[1].freeSpace, "no bags (showAll " .. tostring(showAll) .. ")")
+      end
+
+      DB.GetGroupsEnabled = originalGetGroupsEnabled
+      DB.GetShowAllFreeSpace = originalGetShowAllFreeSpace
+    end)
   end)
 
   describe("GetItemData API", function()

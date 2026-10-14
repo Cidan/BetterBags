@@ -38,7 +38,7 @@ Historically, each individual Tab View created its own `WowScrollBox` and scroll
 ### 3. Stateless Sizing Orchestration (`UpdateBagBounds`)
 - **Rule:** Resizing the main Bag UI window and managing scrollbar visibility is the sole responsibility of the Bag Frame (`bagProto:UpdateBagBounds(w, h)`), not individual views.
 - **Draw Flow:**
-  - `DrawGlobalSections(ctx, slotInfo)` sweeps physical items, populates the global `Recent Items` and `Free Space` sections, renders them directly in the global containers, and returns their calculated bounds (`headerH`, `footerH`, etc.).
+  - `DrawGlobalSections(ctx, slotInfo)` sweeps physical items, populates the global `Recent Items` and `Free Space` sections, renders them directly in the global containers, and returns their calculated bounds (`headerH`, `footerH`, etc.). It draws `Free Space` only when the current tab's data carries `freeSpace` (the data phase leaves it out of a tab with no free slots, data-loader.md §8) and never makes up free-space data of its own; a Free Space section from the previous pass is then released by `FinishGlobalSections`, and its buttons by the pass's sweep. Coverage: `spec/frames/bag_draw_ownership_spec.lua` ("Free Space only when the data carries it").
   - `view:Render(ctx, self, slotInfo, callback)` renders the active tab's static grid.
   - In the callback, the Bag frame computes the true total accumulated width and height:
     ```lua
