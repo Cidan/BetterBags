@@ -1089,11 +1089,14 @@ end
 -- MarkAddedItemsRecent implements the "All Items Recent" option
 -- (database:GetMarkRecentItems). It marks every genuinely-acquired item as recent
 -- independent of the client's C_NewItems flag, which is required because WoW does not flag
--- items auto-looted from an opened container (e.g. a loot bag) as new. An item is treated as
--- acquired when its GUID is not present anywhere in the previously committed state; this
--- covers a brand-new slot, a slot whose contents changed in place (the container's own slot
--- being filled by its contents), and excludes a pure move (the same GUID reappearing in a
--- different slot), which Phase4_ClearMovedItemGlows handles instead.
+-- items auto-looted from an opened container (e.g. a loot bag) as new, nor a stack that grows
+-- (a vendor purchase onto a partial stack). An item is treated as acquired when its GUID is
+-- not present anywhere in the previously committed state; this covers a brand-new slot, a
+-- slot whose contents changed in place (the container's own slot being filled by its
+-- contents), and excludes a pure move (the same GUID reappearing in a different slot), which
+-- Phase4_ClearMovedItemGlows handles instead. A stack that kept its GUID is acquired when its
+-- count grew and so did its item's total count in the kind, which excludes stacks merged by
+-- hand (the total is unchanged).
 ---@param ctx Context
 ---@param kind BagKind
 ---@param previousItems table<string, ItemData>
@@ -1105,16 +1108,34 @@ function items:MarkAddedItemsRecent(ctx, kind, previousItems, itemData)
   if kind ~= const.BAG_KIND.BACKPACK then return end
   if not (database.GetMarkRecentItems and database:GetMarkRecentItems(kind)) then return end
 
-  local previousGUIDs = {}
+  -- previousCounts[guid] is the GUID's count in the previous state; totals are per item ID.
+  local previousCounts, previousTotals, totals = {}, {}, {}
   for _, oldItem in pairs(previousItems) do
-    if not oldItem.isItemEmpty and oldItem.itemInfo and oldItem.itemInfo.itemGUID then
-      previousGUIDs[oldItem.itemInfo.itemGUID] = true
+    if not oldItem.isItemEmpty and oldItem.itemInfo then
+      local info = oldItem.itemInfo
+      if info.itemGUID then
+        previousCounts[info.itemGUID] = info.currentItemCount or 0
+      end
+      if info.itemID then
+        previousTotals[info.itemID] = (previousTotals[info.itemID] or 0) + (info.currentItemCount or 0)
+      end
+    end
+  end
+  for _, item in pairs(itemData) do
+    local info = item.itemInfo
+    if not item.isItemEmpty and info and info.itemID then
+      totals[info.itemID] = (totals[info.itemID] or 0) + (info.currentItemCount or 0)
     end
   end
 
   for _, newItem in pairs(itemData) do
-    if not newItem.isItemEmpty and newItem.itemInfo and newItem.itemInfo.itemGUID then
-      if not previousGUIDs[newItem.itemInfo.itemGUID] then
+    local info = newItem.itemInfo
+    if not newItem.isItemEmpty and info and info.itemGUID then
+      local previousCount = previousCounts[info.itemGUID]
+      if previousCount == nil then
+        self:MarkItemAsNew(ctx, newItem)
+      elseif (info.currentItemCount or 0) > previousCount and info.itemID
+        and (totals[info.itemID] or 0) > (previousTotals[info.itemID] or 0) then
         self:MarkItemAsNew(ctx, newItem)
       end
     end

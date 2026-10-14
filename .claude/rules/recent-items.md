@@ -13,6 +13,11 @@ has an entry in `items._newItemTimers[kind]`. Nothing else decides it.
     `ReuseHarvestedSlot`);
   - "All Items Recent" (`MarkAddedItemsRecent` → `MarkItemAsNew`), for an item whose GUID was not
     in the previous sweep (data-loader.md §12).
+  - "All Items Recent", for a stack that kept its GUID but grew, when its item's total count in
+    the kind grew too (a vendor purchase onto a partial stack). The client did not flag the stack
+    a captured purchase grew (`C_NewItems.IsNewItem` false for its slot), while it flagged the item
+    bought into an empty slot. Merging stacks by hand leaves the total unchanged, so it does not
+    count.
 - **The client's new-item flag only starts the timer and drives the glow**
   (`itemInfo.isNewItem` = `items:ClientNewItemFlag`, read by `frames/item.lua`). It must not decide the
   category: the client clears it on hover (`ContainerFrameItemButtonMixin:OnUpdate` calls
