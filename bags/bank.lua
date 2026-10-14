@@ -250,6 +250,7 @@ function bank.proto:SwitchToBlizzardTab(ctx, bagIndex)
 	-- resolver (items:ResolveItemContextMatchResult) sees the active bank tab
 	-- when deciding whether an item is greyed out for the current bank type.
 	self.bag.bankTab = bagIndex
+	self:UpdatePurchaseBankButton()
 
 	-- Update BankPanel bank type so right-click item deposits go to the
 	-- correct bank (character vs account/warbank).
@@ -293,6 +294,17 @@ function bank.proto:OnCreate(ctx)
 		end
 	end
 
+	-- Buying a bank tab is protected (C_Bank.PurchaseBankTab), so the click must be the
+	-- template's own OnClick, which opens Blizzard's purchase dialog. Never set an OnClick.
+	local purchaseBankButton = CreateFrame("Button", "BetterBagsPurchaseBankButton", self.bag.frame, "BankPanelPurchaseButtonScriptTemplate, UIPanelButtonTemplate")
+	purchaseBankButton:SetAttribute("overrideBankType", Enum.BankType.Character)
+	purchaseBankButton:SetText(L:G("Purchase Bank"))
+	purchaseBankButton:SetSize(purchaseBankButton:GetTextWidth() + 40, 26)
+	purchaseBankButton:SetPoint("CENTER", self.bag.scrollBox, "CENTER")
+	purchaseBankButton:SetFrameLevel(self.bag.scrollBox:GetFrameLevel() + 10)
+	purchaseBankButton:Hide()
+	self.bag.purchaseBankButton = purchaseBankButton
+
 	self.bag.tabs:SetClickHandler(function(ectx, tabID, button)
 		if tabID == NEW_GROUP_TAB_ID then
 			behavior:ShowCreateGroupDialog()
@@ -318,6 +330,23 @@ end
 
 function bank.proto:OnRefresh()
 	-- Retail bank is event-driven, refresh handled via BANKFRAME events
+end
+
+-- NeedsBankPurchase returns whether the bank shows the character bank while the character
+-- owns no character bank tab and one can be bought, so the bank has nothing to show. On WoW:
+-- Forever the first tab is free, but only Blizzard's own bank window, which BetterBags hides,
+-- buys it (BankFrameMixin:PurchaseFirstSlot).
+---@return boolean
+function bank.proto:NeedsBankPurchase()
+	if const.ACCOUNT_BANK_BAGS[self.bag.bankTab] then
+		return false
+	end
+	return C_Bank.FetchNumPurchasedBankTabs(Enum.BankType.Character) == 0
+		and C_Bank.FetchNextPurchasableBankTabData(Enum.BankType.Character) ~= nil
+end
+
+function bank.proto:UpdatePurchaseBankButton()
+	self.bag.purchaseBankButton:SetShown(self:NeedsBankPurchase())
 end
 
 ---@return FrameStrata
@@ -351,6 +380,7 @@ function bank.proto:RegisterEvents()
 
 	events:RegisterEvent("BANK_TABS_CHANGED", function(ectx)
 		behavior:GenerateGroupTabs(ectx)
+		behavior:UpdatePurchaseBankButton()
 	end)
 
 	events:RegisterEvent("BANK_TAB_SETTINGS_UPDATED", function(ctx, _)
@@ -581,6 +611,7 @@ function bank.proto:SwitchToGroup(ctx, groupID)
 		end
 		self.bag.bankTab = Enum.BagIndex.Characterbanktab or Enum.BagIndex.Bank or -1
 	end
+	self:UpdatePurchaseBankButton()
 
 	self.bag:SetTitle(group.name)
 	self.bag.currentItemCount = -1

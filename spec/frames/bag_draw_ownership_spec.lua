@@ -486,6 +486,40 @@ describe("Bag Draw: shared item button ownership across global sections and view
     assert.is_true(bag.globalSections["Recent Items"]:HasItem(button1))
   end)
 
+  -- The data phase leaves freeSpace out of a tab with no free slots (data/items.lua
+  -- Phase10_PartitionIntoTabs); the draw follows the data. An empty Free Space section
+  -- showed its header squeezed into two dots: an empty grid reports its spacing as width.
+  describe("Free Space only when the data carries it", function()
+    it("draws no Free Space section when the tab's data carries no freeSpace", function()
+      local bag = newBag()
+      local info = slotInfoWith({ itemAt(0, 1, "Weapons") }, {})
+      info.tabs[1].freeSpace = nil
+
+      bag:Draw(context:New("draw"), info, function() end)
+
+      assert.is_nil(bag.globalSections["Free Space"])
+      assert.is_true(itemFrame.buttonsBySlotkey["0_1"].frame:IsShown())
+    end)
+
+    it("removes the Free Space section once the bag fills up", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw1"), slotInfoWith({ itemAt(0, 1, "Weapons") }, { freeSpaceButton(0, 2, 1) }), function() end)
+      local freeSection = bag.globalSections["Free Space"]
+      assert.is_not_nil(freeSection)
+      assert.is_true(freeSection.frame:IsShown())
+
+      local full = slotInfoWith({ itemAt(0, 1, "Weapons"), itemAt(0, 2, "Weapons") }, {})
+      full.tabs[1].freeSpace = nil
+      bag:Draw(context:New("draw2"), full, function() end)
+
+      assert.is_nil(bag.globalSections["Free Space"])
+      assert.is_false(freeSection.frame:IsShown(), "the old Free Space section is released")
+      local button2 = itemFrame.buttonsBySlotkey["0_2"]
+      assert.is_false(button2.isFreeSlot or false)
+      assert.is_true(button2.frame:IsShown())
+    end)
+  end)
+
   -- Claim, then sweep. A draw pass releases nothing up front: every renderer claims the
   -- buttons and sections it draws, and only what the previous pass drew and nobody
   -- claimed is released, after every renderer has run. A button drawn in consecutive

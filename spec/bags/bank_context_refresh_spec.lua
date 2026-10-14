@@ -64,6 +64,7 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
     const.BAG_KIND = { BACKPACK = 0, BANK = 1, UNDEFINED = -1 }
     const.BANK_TAB = { BANK = -1, ACCOUNT_BANK_1 = 13 }
     const.OFFSETS = { BAG_LEFT_INSET = 0, BAG_RIGHT_INSET = 0 }
+    const.ACCOUNT_BANK_BAGS = { [13] = true }
 
     -- Events stub records every SendMessage so tests can assert the refresh.
     sentMessages = {}
@@ -108,6 +109,7 @@ describe("Bank tab switch refreshes backpack item context grey-out", function()
       currentItemCount = 0,
       bankTab = nil,
       blizzardBankTab = nil,
+      purchaseBankButton = CreateFrame("Button"),
       Hide = function() end,
       SetTitle = function() end,
       Draw = function() end,

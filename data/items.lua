@@ -1518,11 +1518,8 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
       emptySlotsByBag = {},
       emptySlots = {},
       totalItems = 0,
-      freeSpace = {
-        showAll = showAll,
-        buttons = {},
-      },
     }
+    local freeSpaceButtons = {}
 
     -- Filter emptySlotsSorted and emptySlotsByBag for this tab
     for _, item in ipairs(emptySlotsSorted or {}) do
@@ -1540,10 +1537,9 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
       end
     end
 
-    -- Populate tabData.freeSpace.buttons
     if showAll then
       for _, item in ipairs(tabs[tabID].emptySlotsSorted) do
-        table.insert(tabs[tabID].freeSpace.buttons, {
+        table.insert(freeSpaceButtons, {
           slotkey = item.slotkey,
           bagid = item.bagid,
           slotid = item.slotid,
@@ -1579,7 +1575,7 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
         if freeSlotCount > 0 and slotKey ~= nil then
           local freeSlotBag, freeSlotID = slotKey:match("^(%-?%d+)_(%d+)$")
           if freeSlotBag and freeSlotID then
-            table.insert(tabs[tabID].freeSpace.buttons, {
+            table.insert(freeSpaceButtons, {
               slotkey = slotKey,
               bagid = tonumber(freeSlotBag),
               slotid = tonumber(freeSlotID),
@@ -1597,6 +1593,11 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
           end
         end
       end
+    end
+
+    -- The bag draws a Free Space section only for a tab whose data carries freeSpace.
+    if #freeSpaceButtons > 0 then
+      tabs[tabID].freeSpace = { showAll = showAll, buttons = freeSpaceButtons }
     end
   end
 

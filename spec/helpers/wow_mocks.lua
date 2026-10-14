@@ -165,6 +165,10 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:EnableMouseWheel(enable)
     self._mouseWheelEnabled = enable
   end
+  -- Frame:EnableKeyboard(enable)
+  function widget:EnableKeyboard(enable)
+    self._keyboardEnabled = enable
+  end
   function widget:RegisterForClicks(...)
     self._registeredClicks = {...}
   end
@@ -836,6 +840,19 @@ _G.Enum.ItemClass = {
 _G.C_Bank = _G.C_Bank or {}
 _G.C_Bank.FetchDepositedMoney = function(bankType)
   return _G._depositedMoney
+end
+-- BankDocumentation.lua: FetchNumPurchasedBankTabs(bankType) -> numPurchasedBankTabs (number,
+-- non-nilable); FetchNextPurchasableBankTabData(bankType) -> nextPurchasableTabData
+-- (PurchasableBankTabData: tabCost, canAfford, purchasePromptTitle, purchasePromptBody,
+-- purchasePromptConfirmation; nilable). Specs set _G._purchasedBankTabs[bankType] (a count)
+-- and _G._nextPurchasableBankTab[bankType].
+_G._purchasedBankTabs = {}
+_G._nextPurchasableBankTab = {}
+_G.C_Bank.FetchNumPurchasedBankTabs = function(bankType)
+  return _G._purchasedBankTabs[bankType] or 0
+end
+_G.C_Bank.FetchNextPurchasableBankTabData = function(bankType)
+  return _G._nextPurchasableBankTab[bankType]
 end
 
 -- C_Container Setup
