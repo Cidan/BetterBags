@@ -9,18 +9,23 @@ leaves the section while the bag is open.
 has an entry in `items._newItemTimers[kind]`. Nothing else decides it.
 
 - **What starts a timer** (the current `time()`, only if the GUID has none):
-  - the harvest, for an item the client flags new (`seedNewItemTimer`, from `AttachItemInfo` and
+  - the harvest, for an item the client flags new (`items:SeedNewItemTimer`, from `AttachItemInfo` and
     `ReuseHarvestedSlot`);
   - "All Items Recent" (`MarkAddedItemsRecent` → `MarkItemAsNew`), for an item whose GUID was not
     in the previous sweep (data-loader.md §12).
+  - "All Items Recent", for a stack that kept its GUID but grew, when its item's total count in
+    the kind grew too (a vendor purchase onto a partial stack). The client did not flag the stack
+    a captured purchase grew (`C_NewItems.IsNewItem` false for its slot), while it flagged the item
+    bought into an empty slot. Merging stacks by hand leaves the total unchanged, so it does not
+    count.
 - **The client's new-item flag only starts the timer and drives the glow**
-  (`itemInfo.isNewItem` = `clientNewItemFlag`, read by `frames/item.lua`). It must not decide the
+  (`itemInfo.isNewItem` = `items:ClientNewItemFlag`, read by `frames/item.lua`). It must not decide the
   category: the client clears it on hover (`ContainerFrameItemButtonMixin:OnUpdate` calls
   `C_NewItems.RemoveNewItem`, `Blizzard_UIPanels_Game/Mainline/ContainerFrame.lua`) and when
   Blizzard's own bag frames close (`CloseBag_Individual` → `UpdateNewItemList`). Those frames
   still open and close under BetterBags' hidden parent, because `ToggleAllBags` is only
   post-hooked.
-- **No timer for an empty GUID.** `seedNewItemTimer` and `MarkItemAsNew` skip `""`. A shared `""`
+- **No timer for an empty GUID.** `items:SeedNewItemTimer` and `MarkItemAsNew` skip `""`. A shared `""`
   key would make every GUID-less item recent, and expiring it would clear all their flags.
 
 **Failure mode (fixed):** `IsNewItem` used to return true whenever the client flag was set, with

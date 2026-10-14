@@ -1089,11 +1089,14 @@ end
 -- MarkAddedItemsRecent implements the "All Items Recent" option
 -- (database:GetMarkRecentItems). It marks every genuinely-acquired item as recent
 -- independent of the client's C_NewItems flag, which is required because WoW does not flag
--- items auto-looted from an opened container (e.g. a loot bag) as new. An item is treated as
--- acquired when its GUID is not present anywhere in the previously committed state; this
--- covers a brand-new slot, a slot whose contents changed in place (the container's own slot
--- being filled by its contents), and excludes a pure move (the same GUID reappearing in a
--- different slot), which Phase4_ClearMovedItemGlows handles instead.
+-- items auto-looted from an opened container (e.g. a loot bag) as new, nor a stack that grows
+-- (a vendor purchase onto a partial stack). An item is treated as acquired when its GUID is
+-- not present anywhere in the previously committed state; this covers a brand-new slot, a
+-- slot whose contents changed in place (the container's own slot being filled by its
+-- contents), and excludes a pure move (the same GUID reappearing in a different slot), which
+-- Phase4_ClearMovedItemGlows handles instead. A stack that kept its GUID is acquired when its
+-- count grew and so did its item's total count in the kind, which excludes stacks merged by
+-- hand (the total is unchanged).
 ---@param ctx Context
 ---@param kind BagKind
 ---@param previousItems table<string, ItemData>
@@ -1105,16 +1108,34 @@ function items:MarkAddedItemsRecent(ctx, kind, previousItems, itemData)
   if kind ~= const.BAG_KIND.BACKPACK then return end
   if not (database.GetMarkRecentItems and database:GetMarkRecentItems(kind)) then return end
 
-  local previousGUIDs = {}
+  -- previousCounts[guid] is the GUID's count in the previous state; totals are per item ID.
+  local previousCounts, previousTotals, totals = {}, {}, {}
   for _, oldItem in pairs(previousItems) do
-    if not oldItem.isItemEmpty and oldItem.itemInfo and oldItem.itemInfo.itemGUID then
-      previousGUIDs[oldItem.itemInfo.itemGUID] = true
+    if not oldItem.isItemEmpty and oldItem.itemInfo then
+      local info = oldItem.itemInfo
+      if info.itemGUID then
+        previousCounts[info.itemGUID] = info.currentItemCount or 0
+      end
+      if info.itemID then
+        previousTotals[info.itemID] = (previousTotals[info.itemID] or 0) + (info.currentItemCount or 0)
+      end
+    end
+  end
+  for _, item in pairs(itemData) do
+    local info = item.itemInfo
+    if not item.isItemEmpty and info and info.itemID then
+      totals[info.itemID] = (totals[info.itemID] or 0) + (info.currentItemCount or 0)
     end
   end
 
   for _, newItem in pairs(itemData) do
-    if not newItem.isItemEmpty and newItem.itemInfo and newItem.itemInfo.itemGUID then
-      if not previousGUIDs[newItem.itemInfo.itemGUID] then
+    local info = newItem.itemInfo
+    if not newItem.isItemEmpty and info and info.itemGUID then
+      local previousCount = previousCounts[info.itemGUID]
+      if previousCount == nil then
+        self:MarkItemAsNew(ctx, newItem)
+      elseif (info.currentItemCount or 0) > previousCount and info.itemID
+        and (totals[info.itemID] or 0) > (previousTotals[info.itemID] or 0) then
         self:MarkItemAsNew(ctx, newItem)
       end
     end
@@ -1950,7 +1971,7 @@ local function resolveKind(self, data)
 end
 
 -- IsNewItem decides Recent Items membership: an item is recent while it has a timer. The
--- client's new-item flag only starts the timer (seedNewItemTimer) and drives the glow; the
+-- client's new-item flag only starts the timer (SeedNewItemTimer) and drives the glow; the
 -- client clears it on hover and when Blizzard's own bag frames close, at moments unrelated
 -- to the timer. Timers end only when the bag closes (ExpireRecentItems), so nothing leaves
 -- Recent Items while the bag is open.
@@ -2265,27 +2286,34 @@ SlashCmdList["BETTERBAGS_DEBUGITEMS"] = function(msg)
   end
 end
 
--- clientNewItemFlag is an item's new-item flag (the glow): the client's own flag alone. The
+-- ClientNewItemFlag is an item's new-item flag (the glow): the client's own flag alone. The
 -- Recent Items timer (IsNewItem with a GUID) decides the category, not the glow, so an item
 -- the player hovered (which drops the client flag) stops glowing but stays in Recent Items.
+-- A method so captures record what the client reported for each slot read.
 ---@param bagid number
 ---@param slotid number
 ---@return boolean
-local function clientNewItemFlag(bagid, slotid)
+function items:ClientNewItemFlag(bagid, slotid)
   return _G.C_NewItems ~= nil and _G.C_NewItems.IsNewItem ~= nil
     and _G.C_NewItems.IsNewItem(bagid, slotid) and true or false
 end
 
--- seedNewItemTimer starts the Recent Items timer of a new item the first time a sweep sees
--- it, so it stays recent after the client drops its own new-item flag.
----@param self Items
+-- SeedNewItemTimer starts the Recent Items timer of a new item the first time a sweep sees
+-- it, so it stays recent after the client drops its own new-item flag. It returns what it
+-- decided, which captures record: "started", "running" (the GUID already has a timer, which
+-- is not restarted), "not new" (the client does not flag the item) or "no guid".
 ---@param kind BagKind
 ---@param data ItemData
-local function seedNewItemTimer(self, kind, data)
+---@return string
+function items:SeedNewItemTimer(kind, data)
   local guid = data.itemInfo.itemGUID
-  if data.itemInfo.isNewItem and guid and guid ~= "" and self._newItemTimers and self._newItemTimers[kind] and self._newItemTimers[kind][guid] == nil then
-    self._newItemTimers[kind][guid] = time()
-  end
+  if not data.itemInfo.isNewItem then return "not new" end
+  if not guid or guid == "" then return "no guid" end
+  local timers = self._newItemTimers and self._newItemTimers[kind]
+  if not timers then return "no timers" end
+  if timers[guid] ~= nil then return "running" end
+  timers[guid] = time()
+  return "started"
 end
 
 -- ReuseHarvestedSlot returns a slot's committed item when the slot still holds the same
@@ -2379,8 +2407,8 @@ function items:RefreshKeptItem(kind, item, bagid, slotid, itemGUID)
   local tooltipScanner = addon:GetModule('TooltipScanner')
   itemInfo.tooltipText = tooltipScanner:GetTooltipText(bagid, slotid, itemGUID) or ""
   itemInfo.equipmentSets = equipmentSets:GetItemSets(bagid, slotid)
-  itemInfo.isNewItem = clientNewItemFlag(bagid, slotid)
-  seedNewItemTimer(self, kind, item)
+  itemInfo.isNewItem = self:ClientNewItemFlag(bagid, slotid)
+  self:SeedNewItemTimer(kind, item)
 end
 
 -- REUSED DETAILED METADATA UTILITIES FROM LEGACY IMPLEMENTATION
@@ -2717,7 +2745,7 @@ function items:AttachItemInfo(data, kind, containerInfo)
     itemIcon = data.containerInfo.iconFileID or itemTexture or 134400,
     isBound = data.containerInfo.isBound or false,
     isLocked = data.containerInfo.isLocked or false,
-    isNewItem = clientNewItemFlag(bagid, slotid),
+    isNewItem = self:ClientNewItemFlag(bagid, slotid),
     isBattlePayItem = (_G.C_Container and _G.C_Container.IsBattlePayItem and _G.C_Container.IsBattlePayItem(bagid, slotid)) and true or false,
     currentItemCount = data.containerInfo.stackCount or 1,
     category = "",
@@ -2739,7 +2767,7 @@ function items:AttachItemInfo(data, kind, containerInfo)
     end
   end
 
-  seedNewItemTimer(self, kind, data)
+  self:SeedNewItemTimer(kind, data)
 
   data.itemLinkInfo = self:ParseItemLink(itemLink)
   data.itemHash = self:GenerateItemHash(data)

@@ -1341,6 +1341,34 @@ describe("Items (New Data Farming Engine)", function()
       assert.is_false(items:IsNewItem(newItem(0, 1, "GUID_A")))
     end)
 
+    -- Captures record a method's arguments and return value, so these two are methods that
+    -- say what they decided: whether the client flagged a slot, and what that did to its
+    -- timer (data-driven.md).
+    it("reports the client's new-item flag for a slot", function()
+      flagged["0_1"] = true
+      assert.is_true(items:ClientNewItemFlag(0, 1))
+      assert.is_false(items:ClientNewItemFlag(0, 2))
+    end)
+
+    it("reports what starting a timer did: started, running, not new, or no guid", function()
+      local item = newItem(0, 1, "GUID_A")
+      item.itemInfo.isNewItem = true
+      assert.equal("started", items:SeedNewItemTimer(const.BAG_KIND.BACKPACK, item))
+      assert.is_true(items:IsNewItem(item))
+      now = now + 10
+      assert.equal("running", items:SeedNewItemTimer(const.BAG_KIND.BACKPACK, item))
+      assert.equal(1000, items._newItemTimers[const.BAG_KIND.BACKPACK]["GUID_A"], "a running timer is not restarted")
+
+      local unflagged = newItem(0, 2, "GUID_B")
+      unflagged.itemInfo.isNewItem = false
+      assert.equal("not new", items:SeedNewItemTimer(const.BAG_KIND.BACKPACK, unflagged))
+      assert.is_false(items:IsNewItem(unflagged))
+
+      local guidless = newItem(0, 3, "")
+      guidless.itemInfo.isNewItem = true
+      assert.equal("no guid", items:SeedNewItemTimer(const.BAG_KIND.BACKPACK, guidless))
+    end)
+
     it("never makes an item without a GUID recent", function()
       local ctx = addon:GetModule("Context"):New("TestEmptyGUID")
       local item = newItem(0, 1, "")

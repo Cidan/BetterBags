@@ -1748,6 +1748,106 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     end)
   end)
 
+  -- The client does not flag a stack that grows as new. A capture of buying at a vendor
+  -- (session #4, 2026-10-13) showed C_NewItems.IsNewItem false for Dalaran Sharp's slot after
+  -- its stack went from 5 to 10, and true for Darnassian Bleu, bought into an empty slot.
+  -- "All Items Recent" (on by default) marks a grown stack recent when the item's total in the
+  -- backpack grew, so stacks merged or split by hand do not count.
+  describe("All Items Recent: a stack that grows", function()
+    local function enableAllItemsRecent()
+      override(database, "GetMarkRecentItems", function(_, kind) return kind == const.BAG_KIND.BACKPACK end)
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      override(items, "IsBagOpen", function() return true end)
+    end
+
+    local function bag(size, filled)
+      local slots = {}
+      for i = 1, size do slots[i] = filled[i] or {} end
+      return slots
+    end
+
+    -- The reads of the captured purchase, in order, with the captured items and slots. Every
+    -- baseline is a full refresh, as the login read is: it marks nothing new, so the stack is
+    -- not recent before the purchase (the capture: IsNewItem false for it).
+    it("marks the stack a vendor purchase grew, in the captured order", function()
+      enableAllItemsRecent()
+      mockContainer[0] = bag(13, { [13] = { itemID = 414, guid = "g-sharp", count = 5 } })
+      mockContainer[1] = bag(24, {})
+      local before = refreshBackpack({ wipe = true })
+      assert.are_not.equal("Recent Items", before.itemsBySlotKey["0_13"].itemInfo.category)
+
+      -- 3.51 s: bag 0 read; Dalaran Sharp 5 -> 10, same GUID, the client does not flag it.
+      mockContainer[0][13].count = 10
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["0_13"].itemInfo.category)
+
+      -- 5.46 s: bag 1 read with nothing changed.
+      slotInfo = refreshBackpack({ bags = { [1] = true } })
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["0_13"].itemInfo.category)
+
+      -- 6.12 s: Darnassian Bleu bought into the empty slot 1_23; the client flags it.
+      mockContainer[1][23] = { itemID = 2070, guid = "g-bleu", count = 5 }
+      newSlots["1_23"] = true
+      slotInfo = refreshBackpack({ bags = { [1] = true } })
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["1_23"].itemInfo.category)
+
+      -- 7.09 s: slot 1_23 read again after it grew; still flagged, its timer already running.
+      mockContainer[1][23].count = 10
+      slotInfo = refreshBackpack({ bags = { [1] = true } })
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["1_23"].itemInfo.category)
+      assert.equal("Recent Items", slotInfo.itemsBySlotKey["0_13"].itemInfo.category)
+    end)
+
+    it("does not mark a stack merged into by hand", function()
+      enableAllItemsRecent()
+      mockContainer[0] = {
+        { itemID = 414, guid = "g-a", count = 5 },
+        { itemID = 414, guid = "g-b", count = 3 },
+      }
+      refreshBackpack({ wipe = true })
+      mockContainer[0] = { { itemID = 414, guid = "g-a", count = 8 }, {} }
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are_not.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("does not mark a stack part of another stack was moved onto", function()
+      enableAllItemsRecent()
+      mockContainer[0] = {
+        { itemID = 414, guid = "g-a", count = 5 },
+        { itemID = 414, guid = "g-b", count = 3 },
+      }
+      refreshBackpack({ wipe = true })
+      mockContainer[0][1].count = 7
+      mockContainer[0][2].count = 1
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are_not.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("does not mark a grown stack with the option off", function()
+      override(database, "GetMarkRecentItems", function() return false end)
+      override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
+      mockContainer[0] = { { itemID = 414, guid = "g-sharp", count = 5 } }
+      refreshBackpack({ wipe = true })
+      mockContainer[0][1].count = 10
+      local slotInfo = refreshBackpack({ bags = { [0] = true } })
+      assert.are_not.equal("Recent Items", slotInfo.itemsBySlotKey["0_1"].itemInfo.category)
+    end)
+
+    it("keeps a running timer when a recent stack grows again", function()
+      enableAllItemsRecent()
+      local now = 1000
+      override(_G, "time", function() return now end)
+      mockContainer[0] = { { itemID = 414, guid = "g-sharp", count = 5 } }
+      refreshBackpack({ wipe = true })
+      mockContainer[0][1].count = 10
+      refreshBackpack({ bags = { [0] = true } })
+      now = 1100
+      mockContainer[0][1].count = 15
+      refreshBackpack({ bags = { [0] = true } })
+      assert.equal(1000, items._newItemTimers[const.BAG_KIND.BACKPACK]["g-sharp"])
+    end)
+  end)
+
   describe("Recent Items (timer only, expires when the bag closes)", function()
     local now
 
