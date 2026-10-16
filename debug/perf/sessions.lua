@@ -61,13 +61,15 @@ perfSessions.PRESETS = {
       'Events', 'Async', 'Bucket', 'Refresh', 'ItemLoader', 'Items', 'Search', 'QueryParser',
       'Categories', 'Groups', 'EquipmentSets', 'TooltipScanner', 'Stacks', 'Binding', 'Sort',
       'Database', 'Views', 'BagFrame', 'ItemFrame', 'ItemRowFrame', 'SectionFrame', 'Grid',
-      'BackpackBehavior', 'BankBehavior', 'Themes', 'SearchBox', 'Masque', 'Pawn',
+      'BackpackBehavior', 'BankBehavior', 'Render', 'Window', 'Sonata', 'SonataElements',
+      'SonataDecoration', 'BagCanvas', 'SearchBox', 'Masque', 'Pawn',
       'SimpleItemLevel', 'Pool', 'Currency', 'MoneyFrame', 'BagSlots', 'BankSlots',
     },
     prototypes = {
       'Bag', 'Backpack', 'Bank', 'Item', 'ItemRow', 'Section', 'GridFrame', 'View', 'SlotInfo',
       'Stack', 'PoolItem', 'IntervalTree', 'SearchBoxFrame', 'TabFrame', 'Header', 'Money',
       'BagSlotsPanel', 'BankSlotsPanel', 'BankSlotButton', 'CurrencyIconGrid',
+      'WindowFrame', 'ScrollboxFrame', 'BagCanvasFrame', 'SonataWindowDecoration',
     },
   },
 }

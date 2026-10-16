@@ -62,9 +62,6 @@ sort.SortSectionsAlphabetically = function() return true end
 sort.GetSectionSortFunction = function() return function() return true end end
 sort.GetItemSortFunction = function() return function() return true end end
 
-local themes = StubBetterBagsModule("Themes")
-themes.RegisterPortraitWindow = function() end
-themes.SetSearchState = function() end
 
 local categories
 local ok = pcall(function() categories = addon:GetModule("Categories") end)

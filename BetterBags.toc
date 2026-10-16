@@ -80,7 +80,6 @@ sonata\themes\elvui.lua
 sonata\themes\gw2.lua
 
 # The Theme API loads earlier than actual themes.
-themes\themes.lua
 
 util\trees\trees.lua
 util\trees\intervaltree.lua
@@ -147,10 +146,6 @@ frames\menubutton.lua
 frames\bagactions.lua
 frames\bag.lua
 
-themes\default.lua
-themes\simpledark.lua
-themes\gw2.lua
-themes\elvui.lua
 
 config\categorypane.lua
 config\themepane.lua

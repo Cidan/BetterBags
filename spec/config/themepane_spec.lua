@@ -1,0 +1,136 @@
+-- themepane_spec.lua -- The settings window's Theme pane (config/themepane.lua): the themes
+-- Sonata knows, which one is applied, and applying another.
+local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
+
+LoadBetterBagsModule("core/context.lua")
+LoadBetterBagsModule("core/events.lua")
+local events = addon:GetModule("Events")
+events:Init()
+local context = addon:GetModule("Context")
+
+local createdStubs = {}
+local function stubModule(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local db = stubModule("Database")
+local fonts = stubModule("Fonts")
+fonts.UnitFrame12White = fonts.UnitFrame12White or CreateFont("BetterBagsThemePaneSpecWhite")
+
+-- A list that keeps its entries in order (frames/list.lua's AddToEnd, AddToStart, Wipe).
+local list = stubModule("List")
+
+LoadBetterBagsModule("sonata/engine.lua")
+local sonata = addon:GetModule("Sonata")
+
+ResetModuleStub("ThemePane", "config/themepane.lua")
+LoadBetterBagsModule("config/themepane.lua")
+local themePane = addon:GetModule("ThemePane")
+
+describe("ThemePane", function()
+  local saved, originalThemes, savedTheme
+
+  local function override(tbl, key, value)
+    table.insert(saved, { tbl, key, rawget(tbl, key) })
+    tbl[key] = value
+  end
+
+  before_each(function()
+    saved = {}
+    originalThemes = sonata.themes
+    sonata.themes = {}
+    sonata:Init()
+    sonata:RegisterTheme({ Name = "Base", Hidden = true })
+    sonata:RegisterTheme({ Name = "Default", DisplayName = "Default", Description = "The default theme." })
+    sonata:RegisterTheme({ Name = "SimpleDark", DisplayName = "Simple Dark", Description = "A simple dark theme." })
+    sonata:RegisterTheme({ Name = "elvui", DisplayName = "ElvUI", Available = function() return false end })
+    savedTheme = "Default"
+    override(db, "GetTheme", function() return savedTheme end)
+    override(db, "SetTheme", function(_, key) savedTheme = key end)
+    override(events, "SendMessage", function() end)
+    override(list, "Create", function(_, parent)
+      local l = { frame = CreateFrame("Frame", nil, parent), items = {} }
+      l.ScrollBox = { ForEachFrame = function() end }
+      function l:SetupDataSource() end
+      function l:Wipe() self.items = {} end
+      function l:AddToEnd(data) table.insert(self.items, data) end
+      function l:AddToStart(data) table.insert(self.items, 1, data) end
+      return l
+    end)
+    sonata:ApplyTheme(context:New("spec"), "Default")
+  end)
+
+  after_each(function()
+    sonata.themes = originalThemes
+    for i = #saved, 1, -1 do
+      saved[i][1][saved[i][2]] = saved[i][3]
+    end
+  end)
+
+  teardown(function()
+    ResetModuleStub("ThemePane", "config/themepane.lua")
+    for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
+  end)
+
+  local function newPane()
+    return themePane:New(CreateFrame("Frame", nil, UIParent))
+  end
+
+  it("lists every theme Sonata knows by its name, in order, those it cannot use too", function()
+    local pane = newPane()
+    pane:RefreshList()
+    local names = {}
+    for _, entry in ipairs(pane.listFrame.items) do
+      table.insert(names, entry.name)
+    end
+    assert.are.same({ "Default", "ElvUI", "Simple Dark" }, names)
+    local byKey = {}
+    for _, entry in ipairs(pane.listFrame.items) do byKey[entry.key] = entry end
+    assert.is_true(byKey.Default.active)
+    assert.is_false(byKey.SimpleDark.active)
+    assert.is_true(byKey.SimpleDark.available)
+    assert.is_false(byKey.elvui.available)
+    assert.are.equal("A simple dark theme.", byKey.SimpleDark.description)
+  end)
+
+  it("shows whether a theme is applied, available or not", function()
+    local pane = newPane()
+    for key, expected in pairs({
+      Default = { "Currently Active", false, "Active" },
+      SimpleDark = { "Available", true, "Apply Theme" },
+      elvui = { "Unavailable", false, "Unavailable" },
+    }) do
+      pane:SelectTheme(key)
+      local detail = pane.themeDetail
+      assert.are.equal(expected[1], detail.statusLabel:GetText(), key)
+      assert.are.equal(expected[2], detail.applyButton:IsEnabled(), key)
+      assert.are.equal(expected[3], detail.applyButton:GetText(), key)
+    end
+    pane:SelectTheme("SimpleDark")
+    assert.are.equal("Simple Dark", pane.themeDetail.nameLabel:GetText())
+  end)
+
+  it("applies the chosen theme through Sonata, and then shows it applied", function()
+    local pane = newPane()
+    pane:RefreshList()
+    pane:SelectTheme("SimpleDark")
+    pane.themeDetail.applyButton:GetScript("OnClick")(pane.themeDetail.applyButton, "LeftButton")
+    assert.are.equal("SimpleDark", sonata:GetCurrentThemeKey())
+    assert.are.equal("SimpleDark", savedTheme)
+    assert.are.equal("Currently Active", pane.themeDetail.statusLabel:GetText())
+    for _, entry in ipairs(pane.listFrame.items) do
+      assert.are.equal(entry.key == "SimpleDark", entry.active, entry.key)
+    end
+  end)
+
+  it("marks the theme applied, not a saved theme that is not loaded", function()
+    savedTheme = "elvui"
+    local pane = newPane()
+    pane:RefreshList()
+    for _, entry in ipairs(pane.listFrame.items) do
+      assert.are.equal(entry.key == "Default", entry.active, entry.key)
+    end
+  end)
+end)

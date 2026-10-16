@@ -359,6 +359,10 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:IsEnabled()
     return self._enabled ~= false
   end
+  -- SetEnabled(enabled) (SimpleButtonAPIDocumentation.lua).
+  function widget:SetEnabled(enabled)
+    self._enabled = enabled and true or false
+  end
   function widget:LockHighlight()
     self._highlightLocked = true
   end

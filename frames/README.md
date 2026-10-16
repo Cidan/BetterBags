@@ -430,7 +430,7 @@ Dialog for creating or renaming a group tab. Used by the bank to accept a name a
 - Pre-fillable input (for rename workflows — pass `initialValue` to `Show()`)
 - Configurable confirm-button label (pass `confirmText` to `Show()`)
 - Optional bank-type dropdown (shown when `showDropdown = true`)
-- Themed via the addon's active theme: the dialog is registered as a Simple window with the Themes module so it visually matches the rest of the UI
+- A Panel window (`window/window.lua`) sized to its text, drawn by the active Sonata theme like the rest of the UI
 
 **`Show()` Signature:**
 ```lua
@@ -658,7 +658,7 @@ local query = searchBox:GetText()
 1. **Context Usage**: Always pass Context objects for tracking operations
 2. **Pool Management**: Use item pools for performance
 3. **Event Handling**: Register frame events through the Events module
-4. **Theme Integration**: Use Themes module for consistent styling
+4. **Theme Integration**: Build windows on the Window module and register buttons, tabs and other elements with Sonata; never style them by hand (`sonata/README.md`)
 5. **Animation**: Use Animations module for transitions
 6. **Search Performance**: Implement efficient search filtering
 7. **Memory Management**: Release frames back to pools when done

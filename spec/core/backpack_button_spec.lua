@@ -53,7 +53,7 @@ describe("Bag-bar backpack button click", function()
       "Localization", "Database", "BagFrame", "Constants", "Items", "ItemFrame",
       "Events", "Masque", "SectionFrame", "Categories", "ContextMenu", "Config",
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
-      "QuickFind", "Refresh", "ItemLoader", "Themes", "Views", "SearchCategoryConfig",
+      "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "Render", "Sonata", "Tabs"
     }
@@ -97,9 +97,6 @@ describe("Bag-bar backpack button click", function()
         IsShown = function() return frame:IsShown() end,
       }
     end
-
-    local themes = addon:GetModule("Themes")
-    themes.Enable = function() end
 
     _G.ContainerFrameCombinedBags = _G.ContainerFrameCombinedBags or CreateFrame("Frame")
     _G.BagsBar = _G.BagsBar or CreateFrame("Frame")

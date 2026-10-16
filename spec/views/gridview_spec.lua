@@ -16,8 +16,6 @@ local items = StubBetterBagsModule("Items")
 items.GetItemDataFromSlotKey = function() return nil end
 items.GetCategory = function() return "TestCategory" end
 
-local themes = StubBetterBagsModule("Themes")
-themes.GetFlatHeaderHeight = function() return 12 end
 
 local database = StubBetterBagsModule("Database")
 database.GetBagSizeInfo = function()
@@ -167,7 +165,6 @@ describe("Phase 6 View Placement and Rendering Tests", function()
   after_each(function()
     ResetModuleStub("Localization", "core/localization.lua")
     ResetModuleStub("Items", "data/items.lua")
-    ResetModuleStub("Themes", "themes/themes.lua")
     ResetModuleStub("Database", "core/database.lua")
     ResetModuleStub("Constants", "core/constants.lua")
     ResetModuleStub("Sort", "util/sort.lua")

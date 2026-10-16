@@ -22,7 +22,6 @@ local database = StubBetterBagsModule("Database")
 -- (themes:GetInBagSearchBox etc.) is never reached.
 database.GetInBagSearch = function() return false end
 
-StubBetterBagsModule("Themes")
 
 LoadBetterBagsModule("integrations/quickfind.lua")
 local quickfind = addon:GetModule("QuickFind")

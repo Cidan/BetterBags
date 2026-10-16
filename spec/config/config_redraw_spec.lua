@@ -27,7 +27,6 @@ local events = stubModule("Events")
 local db = stubModule("Database")
 local bucket = stubModule("Bucket")
 local form = stubModule("Form")
-stubModule("Themes")
 local sonata = stubModule("Sonata")
 stubModule("CategoryPane")
 stubModule("ThemePane")
@@ -193,6 +192,28 @@ describe("Config settings refreshes", function()
 
   -- Opacity and scale belong to the bag's window: it fades its background or rescales and
   -- lays itself out again, with no message to the bags at all.
+  -- The size mode: sized to its items (content) or a window the player sizes (window).
+  it("makes each bag a window the player sizes, or one sized to its items, and redraws it", function()
+    local modes = {}
+    saved[#saved + 1] = { db, "GetBagSizeMode", db.GetBagSizeMode }
+    saved[#saved + 1] = { db, "SetBagSizeMode", db.SetBagSizeMode }
+    db.GetBagSizeMode = function(_, kind) return modes[kind] or "content" end
+    db.SetBagSizeMode = function(_, kind, mode) modes[kind] = mode end
+    local found = settings("Resizable Window")
+    assert.are.equal(2, #found)
+    for _, opts in ipairs(found) do
+      sent, modes = {}, {}
+      assert.is_false(opts.getValue(context:New("Test")))
+      opts.setValue(context:New("Test"), true)
+      local kind = next(modes)
+      assert.are.equal("window", modes[kind])
+      assert.is_true(opts.getValue(context:New("Test")))
+      opts.setValue(context:New("Test"), false)
+      assert.are.equal("content", modes[kind])
+      assert.are.same({ "bags/Redraw", "bags/Redraw" }, messages())
+    end
+  end)
+
   describe("opacity and scale", function()
     local windows, savedValues, opacityUpdates
 

@@ -223,6 +223,11 @@ function sonata:RegisterTheme(theme)
     end
   end
   self.themes[theme.Name] = theme
+  -- A theme from another addon registers when that addon loads, after Sonata applied Default
+  -- in place of the saved theme; the saved theme is applied as soon as it can be.
+  if self.applied and self.current ~= theme.Name and db():GetTheme() == theme.Name and self:IsSelectable(theme.Name) then
+    self:ApplyTheme(context:New('Sonata_LateTheme'), theme.Name, false)
+  end
 end
 
 ---@param key string
@@ -249,6 +254,19 @@ end
 function sonata:IsSelectable(key)
   local theme = self.themes[key]
   return theme ~= nil and theme.Hidden ~= true and self:IsAvailable(key)
+end
+
+-- GetThemes returns every theme that is not hidden, whether its addon is loaded or not (the
+-- theme picker lists unavailable themes as such).
+---@return table<string, SonataTheme>
+function sonata:GetThemes()
+  local list = {}
+  for key, theme in pairs(self.themes) do
+    if theme.Hidden ~= true then
+      list[key] = theme
+    end
+  end
+  return list
 end
 
 -- GetAllThemes returns every theme a player can pick.

@@ -123,6 +123,16 @@ describe("Sonata engine", function()
       assert.is_nil(all.Gone)
       assert.is_nil(all.Base)
     end)
+
+    it("lists every theme that is not hidden, available or not, for the theme picker", function()
+      sonata:RegisterTheme(base())
+      sonata:RegisterTheme({ Name = "Shown" })
+      sonata:RegisterTheme({ Name = "Gone", Available = false })
+      local all = sonata:GetThemes()
+      assert.is_not_nil(all.Shown)
+      assert.is_not_nil(all.Gone)
+      assert.is_nil(all.Base)
+    end)
   end)
 
   describe("resolution", function()
@@ -700,6 +710,28 @@ describe("Sonata engine", function()
     it("falls back to Default for a saved theme that is hidden", function()
       savedTheme = "Base"
       sonata:OnEnable()
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+    end)
+
+    -- A theme from another addon registers when that addon loads, after BetterBags.
+    it("applies the saved theme when it registers after the fallback to Default", function()
+      savedTheme = "Plugin"
+      sonata:OnEnable()
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      sonata:RegisterTheme({ Name = "Elsewhere" })
+      assert.are.equal("Default", sonata:GetCurrentThemeKey())
+      sonata:RegisterTheme({ Name = "Plugin" })
+      assert.are.equal("Plugin", sonata:GetCurrentThemeKey())
+      assert.are.equal("Plugin", savedTheme)
+    end)
+
+    it("does not apply a late theme before Sonata applied one, or that cannot be used", function()
+      savedTheme = "Plugin"
+      sonata:RegisterTheme({ Name = "Plugin" })
+      assert.is_nil(sonata:GetCurrentThemeKey())
+      savedTheme = "LateOff"
+      sonata:OnEnable()
+      sonata:RegisterTheme({ Name = "LateOff", Available = false })
       assert.are.equal("Default", sonata:GetCurrentThemeKey())
     end)
 

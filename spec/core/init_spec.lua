@@ -44,7 +44,7 @@ describe("Core Init and Enable flow", function()
       "Localization", "Database", "BagFrame", "Constants", "Items", "ItemFrame",
       "Events", "Masque", "SectionFrame", "Categories", "ContextMenu", "Config",
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
-      "QuickFind", "Refresh", "ItemLoader", "Themes", "Views", "SearchCategoryConfig",
+      "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
       "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "Render", "Sonata", "Tabs"
     }
@@ -87,10 +87,6 @@ describe("Core Init and Enable flow", function()
         SetTitle = function() end,
       }
     end)
-
-    -- Stub themes:Enable
-    local themes = addon:GetModule("Themes")
-    themes.Enable = spy.new(function() end)
 
     -- Stub other global functions that init.lua touches
     _G.ContainerFrameCombinedBags = _G.ContainerFrameCombinedBags or CreateFrame("Frame")

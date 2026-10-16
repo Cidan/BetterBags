@@ -339,7 +339,7 @@ describe("PerfSessions", function()
   describe("presets", function()
     local function sourceFiles()
       local files = {}
-      local pipe = io.popen("find animations bags config core data debug forms frames integrations themes util views -name '*.lua'")
+      local pipe = io.popen("find animations bags config core data debug forms frames integrations render sonata util views window -name '*.lua'")
       for path in pipe:lines() do files[#files + 1] = path end
       pipe:close()
       return files
@@ -353,6 +353,8 @@ describe("PerfSessions", function()
         f:close()
         for name in src:gmatch("addon:NewModule%(['\"]([%w_]+)['\"]") do modules[name] = true end
         for name in src:gmatch("RegisterPrototype%([^,]+,%s*['\"]([%w_]+)['\"]%)") do prototypes[name] = true end
+        -- Drawable prototypes register through drawable:Extend(proto, name).
+        for name in src:gmatch("drawable:Extend%([^,]+,%s*['\"]([%w_]+)['\"]%)") do prototypes[name] = true end
       end
       for presetName, preset in pairs(perfSessions.PRESETS) do
         for _, name in ipairs(preset.modules or {}) do

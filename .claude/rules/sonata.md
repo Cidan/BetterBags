@@ -25,7 +25,7 @@ register as they load, before `Init`, which never clears `sonata.themes`.
 | `Available` | boolean, or a function (an addon the theme depends on is loaded) |
 | `Masque` | `false`: item buttons are not handed to Masque |
 | `Variables` | values or functions, used as `"$Name"` |
-| `Windows` | window styles by window kind: `Bag`, `Panel`, `Flat`, `Dialog` (§3) |
+| `Windows` | window styles by window kind: `Bag`, `Panel`, `Flat`, `Dialog`, `Slots`, `Search` (§3, §3b) |
 | `Elements` | element styles by element kind (item buttons, tabs, ...) |
 | `Clients` | partial themes applied on a client (below) |
 
@@ -69,7 +69,13 @@ Resolution never changes the registered tables.
   the window (its title, its opacity).
 - `OnEnable` applies the saved theme. A saved theme that is missing, hidden or unavailable this
   session falls back to `Default` **without changing the saved choice**, so a theme whose addon
-  is disabled for one session comes back with it.
+  is disabled for one session comes back with it. **A theme registered after that** (another
+  addon's theme registers when that addon loads, after BetterBags enabled Sonata in its own
+  `ADDON_LOADED`) is applied at once, unsaved, when it is the saved choice, not already applied,
+  and selectable. (The old theme module reset a missing saved theme to Default at login, so a
+  third-party theme never survived a reload.)
+- `GetThemes()` lists every theme that is not hidden, available or not (the theme pane shows
+  unavailable ones as such); `GetAllThemes()` lists only those a player can pick now.
 - `GetCurrentTheme()` is the resolved active theme (before any apply: the saved one, or
   Default), cached until the next apply. `GetWindowStyle(kind)` / `GetElementStyle(kind)` read
   it; a kind the theme does not style gets one shared, read-only empty table. **Styles are

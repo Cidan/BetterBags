@@ -14,7 +14,6 @@ BetterBags is a bag replacement addon for World of Warcraft, inspired by AdiBags
 It has a fresh, clean look, updated to the 2026 World of Warcraft art style.
 
 It currently includes most of the features of AdiBags and is being worked on daily.  
-One of the last major features currently missing is user selectable themes.  
 If you have any feedback, please let us know in the [Discord](https://discord.gg/a6DQuK8hV7).
 
 BetterBags currently supports the following versions of World of Warcraft:  
@@ -70,7 +69,8 @@ Classic (Era, MoP Classic, SoD, BC Anniversary, etc.)
 - Powerful recent items support with customizable duration (mark all new items as recent, flash all recent items).
 - Right-click category header to move or vendor all items currently in the category.
 - Comprehensive Search that allows you to find an item most properties of an item (`Type`, `Subtype`, `iLvl`, and many more).
-- Multiple built-in themes with plugin support for the creation of more themes.
+- Multiple built-in themes (Default, Simple Dark, three Moonlight frames, and ElvUI and GW2 UI themes when those are installed), with a declarative theme API for creating more.
+- Bags that size themselves to their items, or windows you resize by dragging their corner (Settings > Resizable Window).
 - Profiles to allow easy swapping of layouts and categories between characters.
 - Category import and export strings to easily share your categories between friends.
 - Robust plugin system allows for custom categories, configurations for user fine-tuning and even localization.
@@ -512,8 +512,10 @@ To create a Search Category, type in a search, then press `Enter`. Fill out the 
 </table>
 
 ## Themes
-BetterBags offers a few built-in themes and an API to allow addon authors to create their own themes.  
-BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon specific theme.
+BetterBags offers built-in themes, chosen in Settings > Theme: Default (Blizzard's look), Simple Dark, and the Moonlight Dark, Dark Round and Parchment frames.  
+BetterBags will detect if you have ElvUI or GW2 UI installed and offer an addon specific theme that follows your ElvUI or GW2 UI settings.
+
+Themes are data: a theme describes how each kind of window and element looks, and BetterBags applies it to every bag, bank, dialog, panel, item button, tab, section title, search box and button. Addon authors can write their own; see [`sonata/README.md`](sonata/README.md).
 
 <table>
 	<tr>
@@ -583,7 +585,7 @@ BetterBags has a robust plugin system that allows developers to write custom cat
 Plugins have the following options:
 - Custom Category API, to create new categories through the plugin.
 - Config Module API, allowing plugin authors to let users fine-tune their own experience.
-- Theme API, to allow plugins to create new themes.
+- Theme API, to allow plugins to create new themes ([`sonata/README.md`](sonata/README.md)).
 - Localization module, which allows the plugin author to localize their text.
 
 <div align="center" style="text-align:center">
@@ -602,7 +604,6 @@ The following features are under active development:
 
 These features are planned for the long term:
 - Feature parity between search categories and manual categories.
-- User customizable themes.
 - Dynamic number of columns.
 - Reagent bag markers for items in the reagent bag.
 - Faster/smoother item updates.

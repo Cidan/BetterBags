@@ -537,6 +537,20 @@ function config:CreateConfig()
       end
     })
 
+    f:AddCheckbox({
+      title = 'Resizable Window',
+      description = 'If enabled, the ' .. string.lower(bagType.name) .. ' is a window you size by dragging its corner, '
+        .. 'and its sections fill it (Columns still sets how many sit side by side). '
+        .. 'If disabled, it sizes itself to its items, Items Per Row wide.',
+      getValue = function(_)
+        return db:GetBagSizeMode(bagType.kind) == "window"
+      end,
+      setValue = function(ctx, value)
+        db:SetBagSizeMode(bagType.kind, value and "window" or "content")
+        events:SendMessage(ctx, 'bags/Redraw')
+      end
+    })
+
     f:AddSlider({
       title = 'Items Per Row',
       description = 'The number of items per row in each section.',
