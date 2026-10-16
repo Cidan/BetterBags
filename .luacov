@@ -9,7 +9,9 @@ return {
       "data",
       "animations",
       "integrations",
-      "themes",
+      "render",
+      "sonata",
+      "window",
     },
 
     -- Code to exclude from the coverage report. These are third-party
