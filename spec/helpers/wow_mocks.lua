@@ -1080,6 +1080,8 @@ clientFont("GameFontHighlightSmall", "Fonts\\FRIZQT__.TTF", 10, "", WHITE, true)
 clientFont("GameFontDisableSmall", "Fonts\\FRIZQT__.TTF", 10, "", DISABLED, true)
 clientFont("NumberFontNormal", "Fonts\\ARIALN.TTF", 14, "OUTLINE", WHITE, false)
 clientFont("ChatFontNormal", "Fonts\\ARIALN.TTF", 14, "", WHITE, true)
+-- GameFontWhite inherits GameFontBlack (SystemFont_Med1, FRIZQT__ 12, no shadow) with white.
+clientFont("GameFontWhite", "Fonts\\FRIZQT__.TTF", 12, "", WHITE, false)
 
 -- Mixin(object, ...) copies every key of each mixin into object (Blizzard_SharedXMLBase).
 _G.Mixin = function(object, ...)

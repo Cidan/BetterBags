@@ -113,6 +113,7 @@ local function snapshotButton(button)
     points = points,
     width = button:GetWidth(),
     height = button:GetHeight(),
+    font = button:GetNormalFontObject(),
     text = button:GetText() or "",
     hit = { button:GetHitRectInsets() },
     states = states,
@@ -127,6 +128,9 @@ local function restoreButton(button, snap)
     button:SetPoint(p[1], p[2], p[3], p[4], p[5])
   end
   button:SetSize(snap.width, snap.height)
+  if snap.font ~= nil then
+    button:SetNormalFontObject(snap.font)
+  end
   button:SetText(snap.text)
   button:SetHitRectInsets(snap.hit[1] or 0, snap.hit[2] or 0, snap.hit[3] or 0, snap.hit[4] or 0)
   for _, state in ipairs(BUTTON_STATES) do
@@ -532,6 +536,8 @@ function decorationProto:applyCloseButton(closeSpec)
   button.sonataHoverColor = closeSpec.HoverColor
   button.sonataNormalColor = normal and (normal.Color or normal.VertexColor) or nil
   if closeSpec.Text ~= nil then
+    local font = spec(closeSpec.Font)
+    button:SetNormalFontObject(apply:FontObject(font and font.Object or "GameFontNormal"))
     button:SetText(closeSpec.Text)
   end
   local hit = closeSpec.HitRectInsets

@@ -432,6 +432,16 @@ describe("SonataDecoration", function()
       assert.are.same({ "LeftButtonUp", "RightButtonUp" }, deco:GetCloseButton()._registeredClicks)
     end)
 
+    it("letters a close button in a font, GameFontNormal unless the style names one", function()
+      local window = newWindow()
+      local deco = decorate(window, { CloseButton = { Text = "X" } })
+      local close = deco:GetCloseButton()
+      assert.are.equal("X", close:GetText())
+      assert.are.equal(GameFontNormal, close:GetNormalFontObject())
+      deco = decorate(window, { CloseButton = { Text = "X", Font = { Object = "GameFontHighlight" } } })
+      assert.are.equal(GameFontHighlight, deco:GetCloseButton():GetNormalFontObject())
+    end)
+
     it("sizes, places and textures a plain close button", function()
       local window = newWindow()
       local deco = decorate(window, {

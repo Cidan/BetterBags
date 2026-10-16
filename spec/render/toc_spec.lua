@@ -66,6 +66,29 @@ describe("render pipeline and Sonata load order", function()
     assert.are.equal(5, count)
   end)
 
+  it("lists every Sonata theme file in every TOC, after Base and before the frames", function()
+    local themes = {}
+    local list = io.popen("ls sonata/themes/*.lua")
+    for file in list:lines() do
+      table.insert(themes, (file:gsub("/", "\\")))
+    end
+    list:close()
+    assert.is_true(#themes >= 4)
+    local pipe = io.popen("ls *.toc")
+    for path in pipe:lines() do
+      local lines = readToc(path)
+      local base = indexOf(lines, "sonata\\themes\\base.lua")
+      local grid = indexOf(lines, "frames\\grid.lua")
+      assert.is_not_nil(base, path)
+      for _, theme in ipairs(themes) do
+        local at = indexOf(lines, theme)
+        assert.is_not_nil(at, path .. " lists " .. theme)
+        assert.is_true(base <= at and at < grid, path .. " " .. theme)
+      end
+    end
+    pipe:close()
+  end)
+
   it("initializes the render module before the themes and frames", function()
     local f = assert(io.open("core/init.lua", "r"))
     local source = f:read("*a")

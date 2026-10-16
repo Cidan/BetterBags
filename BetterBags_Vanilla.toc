@@ -75,6 +75,8 @@ window\window.lua
 # BetterBags' Sonata themes. Base holds what every theme inherits.
 sonata\themes\base.lua
 sonata\themes\default.lua
+sonata\themes\simpledark.lua
+sonata\themes\moonlight.lua
 
 # The Theme API loads earlier than actual themes.
 themes\themes.lua

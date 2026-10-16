@@ -95,7 +95,7 @@ lays out again there, window.md §2).
 | `Border` | a texture filling the window; `Above = true` puts it over the content |
 | `Textures` | named textures: anchored by `Points` (`RelativeTo` = `Window`, `Title` (only when the style has a title), or an earlier texture's `Name`; an unknown name is an error) or `Inset`; `Size` (`Width`, `Height`, or `MaxWidth` with `WidthOffset`: the window width plus the offset, capped, kept current on resize); `Above`; `Opacity = true` to fade. A texture with one point needs a `Size`. |
 | `Title` | a font string: `Font`, `Color`, `Points` (default TOP, -5; may name a texture), `Height`, `Justify` (default the font's `Justify`, else CENTER) |
-| `CloseButton` | `Template` (one button per template, reused), `Size` (default 24 without a template), `Points` (default TOPRIGHT -4,-4 without a template), `Normal`/`Highlight`/`Pushed`/`Disabled` (a texture, atlas or color; `false` clears the state), `HoverColor`, `Text`, `HitRectInsets` ({ left, right, top, bottom }); clicks call `window:OnCloseClicked(ctx)` |
+| `CloseButton` | `Template` (one button per template, reused), `Size` (default 24 without a template), `Points` (default TOPRIGHT -4,-4 without a template), `Normal`/`Highlight`/`Pushed`/`Disabled` (a texture, atlas or color; `false` clears the state), `HoverColor`, `Text` (drawn in `Font = { Object }`, default `GameFontNormal`; the button's own font is put back on release), `HitRectInsets` ({ left, right, top, bottom }); clicks call `window:OnCloseClicked(ctx)` |
 | `Resize`, `Animations` | read by the window module |
 | `Layout` | geometry for parts the window owns (search box, menu button, footer), `GetLayout()` |
 
@@ -276,9 +276,29 @@ overlay search panel).
   on retail, BetterBags' own panel art on Classic) with no title and its `Inset` hidden. Section
   titles in `UnitFrame12Yellow`.
 
+- **Simple Dark** (`SimpleDark`, the key saved profiles already use): every window a black
+  `ChatFrameBackground` backdrop with a 1px gray (0.5) edge that fades with the opacity, border
+  included (`BorderOpacity`); titles in `UnitFrame12White` at TOP, 30 high, on bags, panels,
+  flat windows and dialogs; BetterBags' 12px `textures\close.png` close button at TOPRIGHT
+  -8, -8 where windows close (not dialogs); slots panels and the search panel are the bare
+  backdrop. The bag's search box sits at 20, -40 to -10, -60 and the menu button at 4, -6 with
+  its art at 85% (`BagButton` portrait and highlight 40.8 x 51); section titles
+  `UnitFrame12White`.
+- **The Moonlight set** (`MoonlightDark`, `MoonlightDarkRound`, `MoonlightParchment`, children of
+  the hidden `Moonlight`): Moonlight's art, shipped in `textures\moonlight\`, nine-sliced with
+  24px margins as every window's `Background` (`$Frame`, `$SliceMode`: tiled dark frame, tiled
+  round dark frame, stretched parchment), content insets 18, 24, 40, 12, white
+  `GameFontHighlight` titles at TOPLEFT 44, -15 (20, -15 on dialogs), and a 32px close button
+  lettered "X" (`CloseButton.Font`, §3). The bag's search box sits at 18, -40 to -24, -60
+  (reserve 24), its footer at 18, 24, bottom 12, and a 32px menu button (art 32 x 40) at 8, -6.
+  Parchment hangs its 281 x 84 ribbon over the bag (BOTTOM 40 below the window's TOP) and
+  centers the bag's title on it.
+
 Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
 bag panel, levels, title font, opacity, close button and content box; panels, flat windows,
-dialogs; slots panels on retail, Classic and Forever; section font).
+dialogs; slots panels on retail, Classic and Forever; section font) and
+`spec/sonata/theme_ports_spec.lua` (Simple Dark; the Moonlight set and its art). Every file in
+`sonata/themes/` is listed in every TOC after Base (`spec/render/toc_spec.lua`).
 
 ## 4. Load order
 
