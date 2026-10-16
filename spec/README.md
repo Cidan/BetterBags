@@ -8,7 +8,7 @@ Unit tests for BetterBags, powered by [busted](https://olivinelabs.com/busted/) 
 
 Install the test tools with **your system-installed LuaRocks** against a **Lua 5.1**
 interpreter. This is exactly what CI does (`.github/workflows/test.yml` pins Lua 5.1 via
-`leafo/gh-actions-lua@v10`, then `luarocks install busted luacov`). **Never commit a rocks
+`leafo/gh-actions-lua@v10`, then `luarocks install busted` and runs `busted`). **Never commit a rocks
 tree into the repo** — `busted`/`luacheck`/`luacov` are per-developer tools, not addon
 dependencies, and `install-deps.sh` deliberately does not install them.
 
@@ -22,6 +22,10 @@ dependencies, and `install-deps.sh` deliberately does not install them.
 luarocks install busted luacheck luacov   # rocks land in your normal 5.1 tree
 busted
 ```
+
+Coverage is optional and local only: `busted --coverage`, then `luacov` writes
+`luacov.report.out` (settings in `.luacov`). CI does not run it, because the line hook makes the
+suite about 40 times slower (6 s against 256 s, measured 2026-10-16).
 
 ### If your system Lua is a different version (e.g. 5.4)
 
