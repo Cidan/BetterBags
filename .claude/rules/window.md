@@ -13,21 +13,23 @@ close code, and themes built each window's search box and buttons.
 
 | Option | Meaning |
 |---|---|
-| `Kind` | required: the Sonata window kind (`Bag`, `Panel`, `Flat`, `Dialog`) |
+| `Kind` | required: the Sonata window kind (`Bag`, `Panel`, `Flat`, `Dialog`, `Slots`; sonata.md §3b) |
 | `Name` | the frame's global name; required with `Escape` |
 | `Title`, `Parent` (UIParent), `Strata`, `Level`, `Toplevel` | the frame |
 | `Movable` (`false` to never move), `CanMove(ctx)`, `OnMoveStart(ctx)`, `OnMoved(ctx)` | dragging |
 | `Position` | a LibWindow-1.1 config: registered, restored, saved after a move or resize |
-| `Point` | where it sits without a `Position` (default the center of UIParent) |
+| `Points` | where it sits without a `Position`: a list of `{ Point, RelativeTo, RelativePoint, X, Y }` (relative to its parent by default; default the parent's center) |
 | `Escape` | close with Escape (`UISpecialFrames`) |
 | `Opacity()` | background opacity 0-100 (default 100); `UpdateOpacity()` reapplies |
 | `Scale()` | the frame's scale; `UpdateScale()` reapplies and lays out again |
 | `SizeMode()` | `"content"` (default) or `"window"` |
 | `Size()`, `OnResized(ctx, w, h)` | the player's saved size, and where to save it |
+| `Resizable` | `false`: in the window mode the window keeps its size (the owner's, or `Size()`) and has no grip; for fixed-size windows such as forms |
 | `MinWidth`, `MinHeight` | the frame's minimum (number, function, or `false`) |
 | `MinContentWidth`, `MinContentHeight` | the content box's minimum (number or function) |
 | `Fade()` | `false` shows and hides at once (default: fade) |
-| `OnClose(ctx)` | the close button's action (default `Hide`) |
+| `OnClose(ctx, button)` | the close button's action, with the mouse button that clicked (default `Hide`) |
+| `CloseClicks` | the clicks the close button takes (`RegisterForClicks`), default `{ "LeftButtonUp" }`; the debug window takes right clicks too |
 | `OnRendered(ctx, w, h)` | after every render, with the size it took (growth anchoring) |
 | `OnShow(ctx)`, `OnHide(ctx)` | hooked on the frame's own `OnShow`/`OnHide`, so they run on every path, Escape included |
 | `Content` | the drawable it lays out (`SetContent` replaces it, hiding and detaching the old one) |
@@ -141,13 +143,12 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   high; the window at least as wide as the slots panel while it shows.
 - **BuildParts** creates the in-bag search box (`searchBox:CreateBox`, kept as
   `bag.searchBox`; `searchBox:GetSearchText` and QuickFind read it there), the menu button
-  (`BagMenuButton`, bag-menu-button.md), the footer bar the money and currencies sit on, and the
-  side anchor the theme config panel hangs from.
+  (`BagMenuButton`, bag-menu-button.md) and the footer bar the money and currencies sit on.
 - **PlaceParts** (the window's `OnDecorated`, after every theme) places those parts from the
   theme's bag window `Layout` (sonata.md): `Search` (`Points` relative to the window,
   `Reserve` rows above the content while in-bag search is on), `Footer` (`Left`, `Right`,
-  `Bottom`, `Height`, `Reserve` rows below the content), `MenuButton` (`Points`), `SideOffset`
-  (how far left of the window side panels sit). It reserves those rows with `SetExtraInsets`,
+  `Bottom`, `Height`, `Reserve` rows below the content), `MenuButton` (`Points`). It reserves
+  those rows with `SetExtraInsets`,
   then reloads the tabs and redraws a shown slots panel. The Base theme carries the layout every
   theme inherits (`sonata/themes/base.lua`). `SetSearchShown` follows the in-bag search setting
   (`search/SetInFrame`) and recalculates the bags (`bags/Rederive`).
@@ -164,7 +165,24 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
 
 Coverage: `spec/frames/bag_draw_ownership_spec.lua` ("the bag's window": the window and canvas,
 settings, saved size, minimums, close, scale and opacity per draw, size mode only on change,
-search box placement and reserve, footer, menu button, side anchor, `OnResize` in both modes),
+search box placement and reserve, footer, menu button, `OnResize` in both modes),
 `spec/frames/bagcanvas_spec.lua`, `spec/frames/menubutton_spec.lua`, `spec/sonata/themes_spec.lua`,
 `spec/config/config_redraw_spec.lua` ("opacity and scale"), `spec/database_spec.lua` (size mode),
 `spec/views/persistent_tabs_spec.lua` ("sizes the bag window around its canvas").
+
+## 8. The other windows
+
+Every BetterBags window is a Window; none builds its own frame, chrome, drag or fade.
+
+- **Forms** (`forms/form.lua`: the settings window, the profiler's Settings): Panel windows,
+  strata DIALOG at level 500, in the window mode with `Resizable = false`, so the size their
+  owner gives them (`GetFrame():SetSize`) holds across themes and the player cannot change it.
+  The form's scroll box fills the window's content box, its scroll bar sits 16 pixels in from
+  the content's right edge, and the stacked layout's index hangs from the content box (6, -4),
+  so a theme's insets decide where they go. `Show`/`Hide` go through the window (the theme's
+  fade). Their opacity is the backpack's (`Opacity` option), reapplied by
+  `Sonata:UpdateOpacity()`. Coverage: `spec/forms/form_spec.lua`.
+- The side theme-configuration panel (`frames/themeconfig.lua`) and the window grouping it was
+  the only user of (`util/windowgroup.lua`) were removed: nothing had opened the panel since
+  the window group's opener was removed, so it was a hidden frame built at every login. Themes
+  are chosen in the settings window's Theme pane.

@@ -88,18 +88,6 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 -- On setting change: iterate self.activeItems and update visuals
 ```
 
-## WindowGrouping Integration
-
-### Frame-like Objects Must Implement Show/Hide/IsShown and Fade Animations
-**Problem**: Objects added via `windowGrouping:AddWindow()` must behave like WoW frames with `Show()`, `Hide(callback)`, `IsShown()`, plus `fadeIn`/`fadeOut` animation groups.
-**Solution**:
-1. Implement the three methods on your wrapper object (delegate to the real frame)
-2. Attach animations: `obj.fadeIn, obj.fadeOut = animations:AttachFadeGroup(frame)`
-3. `Hide(callback)` must play `fadeOut` and call `callback` when provided (for animation chaining)
-
-**Checklist**: `Show()` ✅ `Hide(callback)` ✅ `IsShown()` ✅ `obj.fadeIn` ✅ `obj.fadeOut` ✅
-**Reference**: `frames/classic/currency.lua:65-81,168`, `frames/themeconfig.lua:98`
-
 ## Use Discrete Color Tiers to Avoid Unwanted Midpoint Hues
 **Problem**: Smooth blending between distant hues (e.g., blue→orange) produces unexpected intermediate colors (gray/green) at the midpoint.
 **Solution**: Compute breakpoints (low/mid/high/max) and pick the tier color directly — no interpolation between tiers.

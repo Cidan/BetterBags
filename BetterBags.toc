@@ -97,7 +97,6 @@ data\refresh.lua
 util\color.lua
 util\sort.lua
 util\bucket.lua
-util\windowgroup.lua
 util\movementflow.lua
 util\cursorplacement.lua
 util\serialization.lua
@@ -124,7 +123,6 @@ frames\bagslots.lua
 frames\bankslots.lua
 frames\currency.lua
 frames\list.lua
-frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
 frames\itembrowser.lua

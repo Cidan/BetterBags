@@ -35,9 +35,6 @@ local searchBox = addon:GetModule("SearchBox")
 ---@class Currency: AceModule
 local currency = addon:GetModule("Currency")
 
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule("ThemeConfig")
-
 ---@class MoneyFrame: AceModule
 local money = addon:GetModule("MoneyFrame")
 
@@ -103,9 +100,6 @@ function backpack.proto:OnCreate(ctx)
 	-- Currency icon grid (bottom of backpack)
 	self.bag.currencyIconGrid = currency:CreateIconGrid(self.bag.frame)
 
-	-- Theme config
-	self.bag.themeConfigFrame = themeConfig:Create(self.bag.sideAnchor)
-	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
 
 	-- Group tabs
 	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)

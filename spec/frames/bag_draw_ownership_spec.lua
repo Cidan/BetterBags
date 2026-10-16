@@ -261,7 +261,6 @@ local function stubModules()
   override(database, "SetTheme", function() end)
   stubModule("Fonts")
   stubModule("Question")
-  stubModule("WindowGroup")
   stubModule("Anchor")
   stubModule("BackpackBehavior")
   stubModule("BankBehavior")
@@ -1342,7 +1341,6 @@ describe("Bag Draw: shared item button ownership across global sections and view
             { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -10, Y = -50 } }, Reserve = 20 },
           Footer = { Left = 6, Right = 6, Bottom = 6, Height = 20, Reserve = 26 },
           MenuButton = { Points = { { Point = "TOPLEFT", X = -10, Y = 7 } } },
-          SideOffset = -4,
         },
       } } })
       sonata:RegisterTheme({ Name = "Default" })
@@ -1474,7 +1472,7 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
     end)
 
-    it("puts the footer bar along the bottom, the menu button and the side panels where the theme says", function()
+    it("puts the footer bar along the bottom and the menu button where the theme says", function()
       local bag = partsBag()
       assert.are.same({ "BOTTOMLEFT", bag.frame, "BOTTOMLEFT", 6, 6 }, { bag.bottomBar:GetPoint(1) })
       assert.are.same({ "BOTTOMRIGHT", bag.frame, "BOTTOMRIGHT", -6, 6 }, { bag.bottomBar:GetPoint(2) })
@@ -1484,7 +1482,6 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.same({ { Point = "TOPLEFT", X = -10, Y = 7 } }, last.layout.Points)
       assert.are.equal(bag.frame, last.frame)
       assert.are.equal(bag.window.decoration:GetOverlayFrame(), last.overlay)
-      assert.are.same({ "TOPRIGHT", bag.frame, "TOPLEFT", -4, 0 }, { bag.sideAnchor:GetPoint(1) })
     end)
 
     it("keeps its bottom edge, or follows its anchor, when sized to its content", function()

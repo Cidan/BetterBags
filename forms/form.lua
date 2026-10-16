@@ -6,23 +6,28 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
-
 ---@class FormLayouts: AceModule
 local layouts = addon:GetModule('FormLayouts')
+
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
 
 ---@class (exact) Form: AceModule
 local form = addon:NewModule('Form')
 
+-- A form is a Panel window (window/window.lua) whose content box holds the form's scroll box
+-- and index. Its owner gives it a fixed size (GetFrame():SetSize), which the player cannot
+-- change; the window moves it, fades it, and draws its chrome from the theme.
 ---@class (exact) FormFrame: AceModule
 ---@field layout FormLayout
+---@field window BetterBagsWindow The form's window.
 ---@field frame Frame This is the container frame for the form window.
----@field fadeIn AnimationGroup
----@field fadeOut AnimationGroup
 ---@field ScrollBox WowScrollBox This is the scroll box that contains the inner frame.
 ---@field ScrollBar MinimalScrollBar This is the scrollbar that controls the scroll box.
 ---@field inner Frame This is the inner frame that contains the form elements.
@@ -41,19 +46,29 @@ local formCounter = 0
 ---@return FormFrame
 function form:Create(opts)
   local l = setmetatable({}, {__index = formFrame}) --[[@as FormFrame]]
-  l.frame = CreateFrame('Frame', format("BetterBagsForm%d%s", formCounter, opts.title), UIParent)
+  l.window = window:Create({
+    Kind = "Panel",
+    Name = format("BetterBagsForm%d%s", formCounter, opts.title),
+    Title = opts.title,
+    Strata = "DIALOG",
+    Level = 500,
+    SizeMode = function() return "window" end,
+    Resizable = false,
+    Opacity = function()
+      return database:GetBagSizeInfo(const.BAG_KIND.BACKPACK, database:GetBagView(const.BAG_KIND.BACKPACK)).opacity
+    end,
+  })
+  l.frame = l.window.frame
   formCounter = formCounter + 1
+  local content = l.window.content
 
-  l.frame:SetFrameStrata("DIALOG")
-  l.frame:SetFrameLevel(500)
-
-  l.ScrollBox = CreateFrame("Frame", nil, l.frame, "WowScrollBox") --[[@as WowScrollBox]]
-  l.ScrollBox:SetPoint("TOPLEFT", l.frame, "TOPLEFT", 4, -30)
-  l.ScrollBox:SetPoint("BOTTOMRIGHT", l.frame, "BOTTOMRIGHT", 0, 4)
+  l.ScrollBox = CreateFrame("Frame", nil, content, "WowScrollBox") --[[@as WowScrollBox]]
+  l.ScrollBox:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+  l.ScrollBox:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 0, 0)
 
   l.ScrollBar = CreateFrame("EventFrame", nil, l.ScrollBox, "MinimalScrollBar") --[[@as MinimalScrollBar]]
-  l.ScrollBar:SetPoint("TOPLEFT", l.frame, "TOPRIGHT", -16, -36)
-  l.ScrollBar:SetPoint("BOTTOMLEFT", l.frame, "BOTTOMRIGHT", -16, 6)
+  l.ScrollBar:SetPoint("TOPLEFT", content, "TOPRIGHT", -16, -6)
+  l.ScrollBar:SetPoint("BOTTOMLEFT", content, "BOTTOMRIGHT", -16, 2)
 
   l.ScrollBox:SetInterpolateScroll(true)
   l.ScrollBar:SetInterpolateScroll(true)
@@ -67,23 +82,14 @@ function form:Create(opts)
   local view = CreateScrollBoxLinearView()
   view:SetPanExtent(60)
 
-  l.frame:EnableMouse(true)
-  l.frame:SetMovable(true)
-  l.frame:SetScript("OnMouseDown", l.frame.StartMoving)
-  l.frame:SetScript("OnMouseUp", l.frame.StopMovingOrSizing)
-
   ScrollUtil.InitScrollBoxWithScrollBar(l.ScrollBox, l.ScrollBar, view)
 
   -- For tabbed mode, we need to ensure scrolling works properly
   l.view = view
-  themes:RegisterSimpleWindow(l.frame, opts.title)
 
   if opts.layout == const.FORM_LAYOUT.STACKED then
-    l.layout = layouts:NewStackedLayout(l.inner, l.frame, l.ScrollBox, opts.index, opts.tabbed)
+    l.layout = layouts:NewStackedLayout(l.inner, content, l.ScrollBox, opts.index, opts.tabbed)
   end
-
-  l.fadeIn, l.fadeOut = animations:AttachFadeGroup(l.frame)
-  l.frame:Hide()
   return l
 end
 
@@ -210,10 +216,10 @@ function formFrame:GetFrame()
 end
 
 function formFrame:Show()
-  self.fadeIn:Play()
+  self.window:Show(context:New('Form_Show'))
   self.layout:UpdateUnderline()
 end
 
 function formFrame:Hide()
-  self.fadeOut:Play()
+  self.window:Hide(context:New('Form_Hide'))
 end

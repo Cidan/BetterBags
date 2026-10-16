@@ -75,7 +75,6 @@ spec/
   context_spec.lua       # Context object (Set/Get/Cancel/Copy/Timeout)
   pool_spec.lua          # Object pool (Acquire/Release/reuse)
   bucket_spec.lua        # Debounce/throttle with controllable timer mock
-  windowgroup_spec.lua   # Window group show/hide toggling
   movementflow_spec.lua  # Game context detection (bank/mail/trade/merchant)
   stacks_spec.lua        # Stack data structure (add/remove/count/root promotion)
   events_spec.lua        # Event system (message register/send/catch)

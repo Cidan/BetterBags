@@ -61,19 +61,21 @@ local DEFAULT_GRIP = {
 ---@field OnMoveStart? fun(ctx: Context) Called before the window starts moving.
 ---@field OnMoved? fun(ctx: Context) Called after the player moved it.
 ---@field Position? table A LibWindow-1.1 config table: the position is restored and saved.
----@field Point? {Point: FramePoint, RelativeTo?: Region, RelativePoint?: FramePoint, X?: number, Y?: number} Where it sits without a saved position (the center of the screen when unset).
+---@field Points? {Point: FramePoint, RelativeTo?: Region, RelativePoint?: FramePoint, X?: number, Y?: number}[] Where it sits without a saved position (the center of its parent when unset).
 ---@field Escape? boolean Close with Escape (UISpecialFrames).
 ---@field Opacity? fun(): number The window's background opacity, 0 to 100.
 ---@field Scale? fun(): number The window's scale (1 is 100%).
 ---@field SizeMode? fun(): WindowSizeMode
 ---@field Size? fun(): number?, number? The size the player left it at, for the window mode.
+---@field Resizable? boolean false: in the window mode it keeps its size and has no grip.
 ---@field OnResized? fun(ctx: Context, width: number, height: number) Called after the player resized it.
 ---@field MinWidth? number|false|fun(): number The window's minimum width.
 ---@field MinHeight? number|false|fun(): number The window's minimum height.
 ---@field MinContentWidth? number|fun(): number The content box's minimum width.
 ---@field MinContentHeight? number|fun(): number The content box's minimum height.
 ---@field Fade? fun(): boolean false: show and hide at once. Fades when unset.
----@field OnClose? fun(ctx: Context) Called when its close button is clicked, instead of hiding.
+---@field OnClose? fun(ctx: Context, button: string?) Called when its close button is clicked, instead of hiding.
+---@field CloseClicks? string[] The clicks its close button takes (RegisterForClicks); LeftButtonUp when unset.
 ---@field OnRendered? fun(ctx: Context?, width: number, height: number) Called after every render, with the size the window took.
 ---@field OnDecorated? fun(ctx: Context, decoration: SonataWindowDecoration) Called after every theme the window was decorated with, once its content moved: for parts the owner places from the theme's layout.
 ---@field OnShow? fun(ctx: Context) Called whenever the frame shows, however it was shown.
@@ -162,8 +164,9 @@ function window:Create(opts)
     LibWindow.RegisterConfig(frame, opts.Position)
     LibWindow.RestorePosition(frame)
   else
-    local p = opts.Point or { Point = "CENTER" }
-    frame:SetPoint(p.Point, p.RelativeTo or UIParent, p.RelativePoint or p.Point, p.X or 0, p.Y or 0)
+    for _, p in ipairs(opts.Points or { { Point = "CENTER" } }) do
+      frame:SetPoint(p.Point, p.RelativeTo or frame:GetParent(), p.RelativePoint or p.Point, p.X or 0, p.Y or 0)
+    end
   end
   if opts.Escape then
     table.insert(UISpecialFrames, opts.Name)
@@ -348,12 +351,18 @@ function windowProto:UpdateScale(quiet)
 end
 
 ---@param ctx Context
-function windowProto:OnCloseClicked(ctx)
+---@param button? string The mouse button that clicked.
+function windowProto:OnCloseClicked(ctx, button)
   if self.opts.OnClose ~= nil then
-    self.opts.OnClose(ctx)
+    self.opts.OnClose(ctx, button)
     return
   end
   self:Hide(ctx)
+end
+
+---@return string[]
+function windowProto:GetCloseClicks()
+  return self.opts.CloseClicks or { "LeftButtonUp" }
 end
 
 -- OnDecorated runs after Sonata applied a theme to the window: the content moves to the new
@@ -608,7 +617,8 @@ function windowProto:UpdateSizeMode()
   local frame = self.frame
   if self:GetSizeMode() == "window" then
     local minWidth, minHeight = self:minimumSize()
-    frame:SetResizable(true)
+    local resizable = self.opts.Resizable ~= false
+    frame:SetResizable(resizable)
     frame:SetResizeBounds(minWidth, minHeight)
     local width, height
     if self.opts.Size ~= nil then
@@ -618,8 +628,12 @@ function windowProto:UpdateSizeMode()
       width, height = frame:GetWidth(), frame:GetHeight()
     end
     frame:SetSize(math.max(minWidth, width or 0), math.max(minHeight, height or 0))
-    self:styleResizeGrip()
-    self.resizeGrip:Show()
+    if resizable then
+      self:styleResizeGrip()
+      self.resizeGrip:Show()
+    elseif self.resizeGrip ~= nil then
+      self.resizeGrip:Hide()
+    end
   else
     frame:SetResizable(false)
     if self.resizeGrip ~= nil then

@@ -55,9 +55,6 @@ local menuButton = addon:GetModule("BagMenuButton")
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule("SearchBox")
 
----@class WindowGroup: AceModule
-local windowGroup = addon:GetModule("WindowGroup")
-
 ---@class Anchor: AceModule
 local anchor = addon:GetModule("Anchor")
 
@@ -100,7 +97,6 @@ local MIN_CONTENT_HEIGHT = 100
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
 ---@field currencyFrame CurrencyIconGrid The currency frame.
----@field themeConfigFrame ThemeConfigFrame The theme config frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
 ---@field slots bagSlots
@@ -114,8 +110,6 @@ local MIN_CONTENT_HEIGHT = 100
 ---@field toReleaseSections Section[]
 ---@field views table<BagView, View>
 ---@field loaded boolean
----@field windowGrouping WindowGrouping
----@field sideAnchor Frame
 ---@field previousSize number
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
@@ -772,7 +766,7 @@ function bagFrame.bagProto:BuildWindow(name)
 end
 
 -- BuildParts creates the parts of the bag window the theme places: the in-bag search box, the
--- menu button, the footer bar along the bottom, and the anchor its side panels hang from.
+-- menu button and the footer bar along the bottom.
 function bagFrame.bagProto:BuildParts()
 	self.searchBox = searchBox:CreateBox(self.kind, self.frame)
 	self.menuButton = menuButton:Create(self)
@@ -781,17 +775,6 @@ function bagFrame.bagProto:BuildParts()
 	bottomBar:SetHeight(20)
 	bottomBar:Show()
 	self.bottomBar = bottomBar
-
-	self.sideAnchor = CreateFrame("Frame", self.frame:GetName() .. "LeftAnchor", self.frame)
-	self.sideAnchor:SetWidth(1)
-	self:PlaceSideAnchor(0)
-end
-
----@param offset number
-function bagFrame.bagProto:PlaceSideAnchor(offset)
-	self.sideAnchor:ClearAllPoints()
-	self.sideAnchor:SetPoint("TOPRIGHT", self.frame, "TOPLEFT", offset, 0)
-	self.sideAnchor:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMLEFT", offset, 0)
 end
 
 -- PlaceParts puts the bag's own parts where the theme's layout says, and reserves the room
@@ -826,7 +809,6 @@ function bagFrame.bagProto:PlaceParts(ctx, decoration)
 	end
 
 	menuButton:Place(self.menuButton, layout.MenuButton, self.frame, overlay)
-	self:PlaceSideAnchor(layout.SideOffset or 0)
 	self:UpdateSearchShown()
 
 	if self.tabs then
@@ -983,7 +965,6 @@ function bagFrame:Create(ctx, kind)
 	b.toRelease = {}
 	b.toReleaseSections = {}
 	b.kind = kind
-	b.windowGrouping = windowGroup:Create()
 
 	-- Instantiate the appropriate behavior based on bag kind
 	if kind == const.BAG_KIND.BACKPACK then

@@ -171,8 +171,12 @@ describe("Window", function()
       local w = window:Create({ Kind = "Dialog" })
       assert.are.same({ "CENTER", UIParent, "CENTER", 0, 0 }, { w.frame:GetPoint(1) })
       local anchor = CreateFrame("Frame")
-      w = window:Create({ Kind = "Dialog", Point = { Point = "TOPLEFT", RelativeTo = anchor, RelativePoint = "TOPRIGHT", X = 4 } })
+      w = window:Create({ Kind = "Dialog", Points = {
+        { Point = "TOPLEFT", RelativeTo = anchor, RelativePoint = "TOPRIGHT", X = 4 },
+        { Point = "BOTTOMLEFT", RelativeTo = anchor, RelativePoint = "BOTTOMRIGHT", Y = 2 },
+      } })
       assert.are.same({ "TOPLEFT", anchor, "TOPRIGHT", 4, 0 }, { w.frame:GetPoint(1) })
+      assert.are.same({ "BOTTOMLEFT", anchor, "BOTTOMRIGHT", 0, 2 }, { w.frame:GetPoint(2) })
     end)
 
     it("is a drawable prototype the profiler measures", function()
@@ -291,6 +295,19 @@ describe("Window", function()
       close:GetScript("OnClick")(close, "LeftButton")
       assert.is_not_nil(asked)
       assert.is_true(owned.frame:IsShown())
+    end)
+
+    it("hands its owner the mouse button that clicked close, for the clicks it asked for", function()
+      sonata.themes.Base.Windows.Bag.CloseButton = { Size = 12 }
+      local clicks = {}
+      local w = window:Create({ Name = name(), Kind = "Bag", CloseClicks = { "LeftButtonUp", "RightButtonUp" },
+        OnClose = function(_, button) table.insert(clicks, button) end })
+      apply()
+      assert.are.same({ "LeftButtonUp", "RightButtonUp" }, w.decoration:GetCloseButton()._registeredClicks)
+      local close = w.decoration:GetCloseButton()
+      close:GetScript("OnClick")(close, "RightButton")
+      assert.are.same({ "RightButton" }, clicks)
+      assert.are.same({ "LeftButtonUp" }, window:Create({ Name = name(), Kind = "Bag" }):GetCloseClicks())
     end)
 
     it("reads its opacity from its owner and fades its decoration with it", function()
@@ -500,6 +517,15 @@ describe("Window", function()
       assert.is_true(render:IsDirty(w))
       advance()
       assert.are.equal(312, w.frame:GetWidth())
+    end)
+
+    it("keeps a fixed size the player cannot change when it is not resizable", function()
+      local w = resizable(content(1, 1), { Resizable = false })
+      apply()
+      w:UpdateSizeMode()
+      assert.is_false(w.frame._resizable)
+      assert.is_true(w.resizeGrip == nil or not w.resizeGrip:IsShown())
+      assert.are.same({ 640, 480 }, { w.frame:GetWidth(), w.frame:GetHeight() })
     end)
 
     it("shows a resize grip only while the player sizes it", function()

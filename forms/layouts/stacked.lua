@@ -45,7 +45,7 @@ local stackedLayout = {}
 addon:GetModule('Perf'):RegisterPrototype(stackedLayout, 'StackedLayout')
 
 ---@param targetFrame Frame
----@param baseFrame Frame
+---@param baseFrame Frame The form window's content box; the index hangs from it.
 ---@param scrollBox WowScrollBox
 ---@param index boolean
 ---@param tabbed boolean
@@ -117,7 +117,7 @@ end
 ---@package
 function stackedLayout:setupIndex()
   self.indexFrame = CreateFrame("Frame", nil, self.baseFrame) --[[@as Frame]]
-  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 10, -34)
+  self.indexFrame:SetPoint("TOPLEFT", self.baseFrame, "TOPLEFT", 6, -4)
   self.indexFrame:SetPoint("BOTTOM", self.baseFrame, "BOTTOM", 0, 0)
   self.indexFrame:SetWidth(120)
 

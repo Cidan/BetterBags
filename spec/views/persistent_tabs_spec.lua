@@ -245,8 +245,6 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     searchBox.GetText = function() return "" end
     searchBox.GetSearchText = function() return "" end
 
-    StubBetterBagsModule("ThemeConfig")
-    StubBetterBagsModule("WindowGroup")
     local anchor = StubBetterBagsModule("Anchor")
     anchor.New = function() return {} end
 
@@ -329,8 +327,6 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     createdBagStubs = {}
     ResetModuleStub("Currency")
     ResetModuleStub("SearchBox")
-    ResetModuleStub("ThemeConfig")
-    ResetModuleStub("WindowGroup", "util/windowgroup.lua")
     ResetModuleStub("Anchor")
     ResetModuleStub("Question")
     ResetModuleStub("BackpackBehavior")

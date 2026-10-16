@@ -161,6 +161,29 @@ describe("SonataDecoration", function()
     end)
   end)
 
+  describe("template backdrop colors", function()
+    it("colors a template's backdrop and border, and gives the template its colors back", function()
+      local window = newWindow()
+      local deco = decorate(window, { Template = { Name = "TooltipBorderedFrameTemplate",
+        BackdropColor = { 0, 0, 0, 0.9 }, BackdropBorderColor = { 1, 1, 1, 1 } } })
+      local tmpl = deco:GetTemplateFrame()
+      assert.are.same({ r = 0, g = 0, b = 0, a = 0.9 }, tmpl._backdropColor)
+      assert.are.same({ r = 1, g = 1, b = 1, a = 1 }, tmpl._backdropBorderColor)
+      decorate(window, { Template = { Name = "TooltipBorderedFrameTemplate", BackdropColor = { 0.2, 0.2, 0.2, 1 } } })
+      assert.are.same({ r = 0.2, g = 0.2, b = 0.2, a = 1 }, tmpl._backdropColor)
+      assert.are.same({ r = 1, g = 1, b = 1, a = 1 }, tmpl._backdropBorderColor)
+      decorate(window, {})
+      assert.are.same({ r = 0, g = 0, b = 0, a = 0.8 }, tmpl._backdropColor)
+    end)
+
+    it("leaves a template that has no backdrop alone", function()
+      local window = newWindow()
+      assert.has_no.errors(function()
+        decorate(window, { Template = { Name = "DefaultPanelFlatTemplate", BackdropColor = { 0, 0, 0, 1 } } })
+      end)
+    end)
+  end)
+
   describe("backdrops", function()
     it("sets the backdrop and colors on the window frame itself", function()
       local window = newWindow()
@@ -392,6 +415,21 @@ describe("SonataDecoration", function()
       close:GetScript("OnClick")(close, "LeftButton")
       assert.are.equal(1, window.closed)
       assert.is_true(window.frame:IsShown())
+    end)
+
+    it("passes the mouse button on, and takes the clicks the window asks for", function()
+      local window = newWindow()
+      local buttons = {}
+      function window:OnCloseClicked(_, button) table.insert(buttons, button) end
+      local deco = decorate(window, { CloseButton = { Template = "UIPanelCloseButtonDefaultAnchors" } })
+      local close = deco:GetCloseButton()
+      assert.are.same({ "LeftButtonUp" }, close._registeredClicks)
+      close:GetScript("OnClick")(close, "RightButton")
+      assert.are.same({ "RightButton" }, buttons)
+
+      function window:GetCloseClicks() return { "LeftButtonUp", "RightButtonUp" } end
+      deco = decorate(window, { CloseButton = { Template = "UIPanelCloseButtonDefaultAnchors" } })
+      assert.are.same({ "LeftButtonUp", "RightButtonUp" }, deco:GetCloseButton()._registeredClicks)
     end)
 
     it("sizes, places and textures a plain close button", function()

@@ -89,7 +89,7 @@ lays out again there, window.md §2).
 | Style key | What it builds |
 |---|---|
 | `Insets` | the content box (`GetInsets()`, unset sides 0) |
-| `Template` | a Blizzard frame template behind the window: `Name`, `Level` (offset from the window, default -1, never below 0), `Levels` (offsets from the window for the template's child **frames**, e.g. `NineSlice`; naming anything else is an error), `TitleFont`, `Title = false` (the template's title stays empty), `HideTitleWhenEmpty`, `Opacity` (the key of the region that fades), `Hide` (keys of template parts to hide) |
+| `Template` | a Blizzard frame template behind the window: `Name`, `Level` (offset from the window, default -1, never below 0), `Levels` (offsets from the window for the template's child **frames**, e.g. `NineSlice`; naming anything else is an error), `TitleFont`, `Title = false` (the template's title stays empty), `HideTitleWhenEmpty`, `Opacity` (the key of the region that fades), `Hide` (keys of template parts to hide), `BackdropColor` / `BackdropBorderColor` (for a template with `SetBackdropColor`, such as `TooltipBorderedFrameTemplate`; the template's own colors are recorded and given back when the next style releases it) |
 | `Backdrop` | a backdrop on the window frame: `BgFile`, `EdgeFile`, `EdgeSize`, `Tile`, `TileEdge`, `TileSize`, `Insets`, `Color`, `BorderColor`, `Opacity` (default on; `false` keeps the fill), `BorderOpacity = true` (the border fades too), `Outlines` (extra edge-only borders, `Offset` > 0 outside, < 0 inside; `EdgeFile` defaults to `Interface\Buttons\WHITE8X8`) |
 | `Background` | a texture filling the window (or `Inset`/`Points`), fading with opacity unless `Opacity = false` |
 | `Border` | a texture filling the window; `Above = true` puts it over the content |
@@ -158,11 +158,15 @@ the window), hooked with `addon.HookScript` so profiler captures see it: a scrip
 owner sets on the window frame cannot remove it. The close button's hover hooks also use
 `addon.HookScript`; on leave it returns to its normal state's `Color` or `VertexColor`.
 
+The close button takes the clicks `window:GetCloseClicks()` lists (`LeftButtonUp` for a
+window without it) and passes the mouse button to `window:OnCloseClicked(ctx, button)`.
+
 `SetTitle(text)` retitles the template (empty when `Title = false`; it shows or hides its title
 bar for `HideTitleWhenEmpty`) and the decoration's own title. `SetOpacity(pct)` fades the
 template's `Opacity` region, the backdrop fill (and its border with `BorderOpacity`), the
 background and `Opacity = true` textures. Windows call these directly for title and opacity
-changes; `Sonata:Redecorate` rebuilds the whole chrome.
+changes; `Sonata:Redecorate` rebuilds the whole chrome. `Sonata:UpdateOpacity()` tells every
+registered window that has `UpdateOpacity` to apply its opacity again (the Opacity sliders).
 
 ## 3a. Element styles (`sonata/elements.lua`)
 
@@ -217,18 +221,33 @@ Details:
 
 Each theme is a data file that calls `sonata:RegisterTheme`, listed in every TOC right after
 `window\window.lua`, Base first.
+Window kinds: **Bag** (the backpack and bank), **Panel** (forms: the settings and profiler
+settings windows; the group dialog), **Flat** (the debug window), **Dialog** (question dialogs,
+the search category editor), **Slots** (the Show Bags and bank tab panels).
+
 - **Base** (hidden): what every theme inherits. Its `Windows.Bag` carries the bag's insets
   (6, 6, 42, 3), the default fade (`Animations`, 0.1 s alpha in and out) and the bag window's
   `Layout` (window.md §7): `Search` (points, `Reserve` 20), `Footer` (6, 6, bottom 6, height 20,
-  `Reserve` 26), `MenuButton` (TOPLEFT -10, 7), `SideOffset` 0. Its `Elements.SectionHeader`
-  font is `GameFontNormal`.
-- **Default**: Blizzard's look. The bag is a `DefaultPanelTemplate` one level below the window
-  (its `Bg` fades with the opacity; `NineSlice` and `TitleContainer` at window level + 500 and
-  + 501, above the content), titled in `UnitFrame12Yellow`, with Blizzard's
-  `UIPanelCloseButtonDefaultAnchors` close button; section titles in `UnitFrame12Yellow`.
+  `Reserve` 26), `MenuButton` (TOPLEFT -10, 7). Panel insets 4, 0, 30, 4; Flat and Dialog
+  5, 5, 25, 5; Slots 8 on every side, with a fade that drops 10 pixels as it hides. Its
+  `Elements.SectionHeader` font is `GameFontNormal`.
+- **Default**: Blizzard's look. Bags and panels are a `DefaultPanelTemplate` one level below
+  the window (its `Bg` fades with the opacity; `NineSlice` and `TitleContainer` at window level
+  + 500 and + 501, above the content), titled in `UnitFrame12Yellow`, with Blizzard's
+  `UIPanelCloseButtonDefaultAnchors` close button. Flat windows and dialogs are
+  `DefaultPanelFlatTemplate` (title in `UnitFrame12Yellow`, hidden when empty); flat windows add
+  a `UIPanelCloseButton` at TOPRIGHT 2, 2. Slots panels are a headerless
+  `DefaultPanelFlatTemplate` with insets 10, 6, 30, 12; on Classic (`Clients.Classic`) they are
+  a tooltip backdrop on the window frame (`UI-Tooltip-Background`/`-Border`, edge 16, insets 4,
+  black at 0.9, white border, not faded) because that template draws a title band there that
+  cannot be hidden (classic-bag-slots-panel.md); on WoW: Forever (`Clients.Forever`) they are a
+  `TooltipBorderedFrameTemplate` below the window colored black 0.9 with a white border, because
+  that client redraws the flat template's header art too tall (camelot-forever.md §5). Both use
+  even padding of 8. Section titles in `UnitFrame12Yellow`.
 
-Coverage: `spec/sonata/themes_spec.lua` (Base hidden and its geometry and fade inherited;
-Default's panel, levels, title font, opacity, close button and content box; section font).
+Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
+bag panel, levels, title font, opacity, close button and content box; panels, flat windows,
+dialogs; slots panels on retail, Classic and Forever; section font).
 
 ## 4. Load order
 

@@ -220,6 +220,13 @@ function decorationProto:releaseTemplate()
   if record.changed.titleFont and record.titleFont ~= nil then
     apply:Font(frame:GetTitleText(), { Object = record.titleFont })
   end
+  local color, border = record.changed.backdropColor, record.changed.backdropBorderColor
+  if color ~= nil and color[1] ~= nil then
+    frame:SetBackdropColor(color[1], color[2], color[3], color[4])
+  end
+  if border ~= nil and border[1] ~= nil then
+    frame:SetBackdropBorderColor(border[1], border[2], border[3], border[4])
+  end
   record.changed = { alpha = {}, shown = {}, titleFont = false }
   frame:Hide()
   self.template = nil
@@ -389,6 +396,18 @@ function decorationProto:applyTemplate(templateSpec)
     apply:Font(frame:GetTitleText(), templateSpec.TitleFont)
     record.changed.titleFont = true
   end
+  if templateSpec.BackdropColor ~= nil and frame.SetBackdropColor ~= nil then
+    if record.changed.backdropColor == nil and frame.GetBackdropColor ~= nil then
+      record.changed.backdropColor = { frame:GetBackdropColor() }
+    end
+    frame:SetBackdropColor(apply:Color(templateSpec.BackdropColor))
+  end
+  if templateSpec.BackdropBorderColor ~= nil and frame.SetBackdropBorderColor ~= nil then
+    if record.changed.backdropBorderColor == nil and frame.GetBackdropBorderColor ~= nil then
+      record.changed.backdropBorderColor = { frame:GetBackdropBorderColor() }
+    end
+    frame:SetBackdropBorderColor(apply:Color(templateSpec.BackdropBorderColor))
+  end
   for _, key in ipairs(templateSpec.Hide or {}) do
     local region = frame[key]
     if region == nil then
@@ -472,8 +491,8 @@ function decorationProto:applyCloseButton(closeSpec)
   local button = self.closeButtons[key]
   if button == nil then
     button = CreateFrame("Button", nil, self.overlay, closeSpec.Template)
-    addon.SetScript(button, "OnClick", function(ctx)
-      self.window:OnCloseClicked(ctx)
+    addon.SetScript(button, "OnClick", function(ctx, _, mouseButton)
+      self.window:OnCloseClicked(ctx, mouseButton)
     end)
     addon.HookScript(button, "OnEnter", function(_, b)
       if b.sonataHoverColor ~= nil then
@@ -489,6 +508,11 @@ function decorationProto:applyCloseButton(closeSpec)
     self.closeSnapshots[button] = snapshotButton(button)
   end
   button:SetFrameLevel(self.overlay:GetFrameLevel() + 1)
+  if self.window.GetCloseClicks ~= nil then
+    button:RegisterForClicks(unpack(self.window:GetCloseClicks()))
+  else
+    button:RegisterForClicks("LeftButtonUp")
+  end
   local size = closeSpec.Size
   if type(size) == "number" then
     button:SetSize(size, size)

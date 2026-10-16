@@ -164,12 +164,6 @@ describe("Backpack Module Loading and Compatibility Tests", function()
       return CreateFrame("Frame")
     end
 
-    StubBetterBagsModule("ThemeConfig")
-    local tc = addon:GetModule("ThemeConfig")
-    tc.Create = tc.Create or function()
-      return CreateFrame("Frame")
-    end
-
     StubBetterBagsModule("MoneyFrame")
     local money = addon:GetModule("MoneyFrame")
     money.Create = money.Create or function()
@@ -243,8 +237,6 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     local mockBag = {
       frame = parentFrame,
       tabsResizedAfterLoad = false,
-      sideAnchor = CreateFrame("Frame"),
-      windowGrouping = { AddWindow = function() end },
     }
     local behavior = backpack:Create(mockBag)
 
@@ -280,8 +272,6 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     local mockBag = {
       frame = parentFrame,
       tabsResizedAfterLoad = false,
-      sideAnchor = CreateFrame("Frame"),
-      windowGrouping = { AddWindow = function() end },
     }
     local behavior = backpack:Create(mockBag)
 

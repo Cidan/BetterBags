@@ -1131,6 +1131,11 @@ _G.__mockTemplates.TooltipBackdropTemplate = function(frame)
     local c = self._backdropColor
     if c then return c.r, c.g, c.b, c.a end
   end
+  function frame:GetBackdropBorderColor()
+    local c = self._backdropBorderColor
+    if c then return c.r, c.g, c.b, c.a end
+    return 1, 1, 1, 1
+  end
   frame:SetBackdropColor(0, 0, 0, frame.backdropColorAlpha or 1)
 end
 _G.__mockTemplates.TooltipBorderedFrameTemplate = function(frame)

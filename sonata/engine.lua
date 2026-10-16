@@ -52,9 +52,9 @@ sonata.themes = {}
 ---@field Available? boolean|fun(): boolean
 ---@field Masque? boolean false: item buttons are not handed to Masque.
 ---@field Variables? table<string, any|fun(): any>
----@field Windows? table<string, table> Window styles by window kind (Bag, Panel, Flat, Dialog).
+---@field Windows? table<string, table> Window styles by window kind (Bag, Panel, Flat, Dialog, Slots).
 ---@field Elements? table<string, table> Element styles by element kind.
----@field Clients? table<string, SonataTheme> Partial themes applied on a client (Retail, Forever, Classic, Era, TBC, Mists, Anniversary).
+---@field Clients? table<string, SonataTheme> Partial themes applied on a client (Retail, Forever, Classic, Era, TBC, Mists, Anniversary, Cata).
 
 -- The client override keys a theme may use (GetClientKeys).
 local CLIENT_KEYS = {
@@ -422,7 +422,7 @@ end
 -- RegisterWindow adds a window to be decorated with the style of its kind. A window that
 -- registers after a theme was applied is decorated at once.
 ---@param window table
----@param kind string Bag, Panel, Flat or Dialog.
+---@param kind string Bag, Panel, Flat, Dialog or Slots.
 function sonata:RegisterWindow(window, kind)
   if self.windowIndex[window] ~= nil then
     error("a window was registered with Sonata twice")
@@ -431,6 +431,16 @@ function sonata:RegisterWindow(window, kind)
   self.windowIndex[window] = kind
   if self.applied then
     self:decorate(window, kind)
+  end
+end
+
+-- UpdateOpacity tells every registered window that has an opacity (UpdateOpacity) to apply
+-- it again, after an opacity setting changed.
+function sonata:UpdateOpacity()
+  for _, entry in ipairs(self.windows) do
+    if entry.window.UpdateOpacity ~= nil then
+      entry.window:UpdateOpacity()
+    end
   end
 end
 

@@ -603,6 +603,17 @@ describe("Sonata engine", function()
       assert.is_nil(sonata:GetCurrentThemeKey())
     end)
 
+    it("tells every registered window that can fade to update its opacity", function()
+      local a, b, plain = { opacity = 0 }, { opacity = 0 }, {}
+      function a:UpdateOpacity() self.opacity = self.opacity + 1 end
+      function b:UpdateOpacity() self.opacity = self.opacity + 1 end
+      sonata:RegisterWindow(a, "Bag")
+      sonata:RegisterWindow(b, "Panel")
+      sonata:RegisterWindow(plain, "Flat")
+      sonata:UpdateOpacity()
+      assert.are.same({ 1, 1 }, { a.opacity, b.opacity })
+    end)
+
     it("redecorates windows with the current theme without saving or redrawing", function()
       local a, b = {}, {}
       sonata:RegisterWindow(a, "Bag")
