@@ -42,19 +42,26 @@ local apply = addon:NewModule('SonataApply')
 ---@field X? number
 ---@field Y? number
 
----@param color? SonataColor
+-- Color reads a color as a list { r, g, b, a? } or keyed { r =, g =, b =, a? }.
+---@param color? SonataColor|{r: number, g: number, b: number, a?: number}
 ---@param fallback? SonataColor
 ---@return number r, number g, number b, number a
 function apply:Color(color, fallback)
   local c = color or fallback or { 1, 1, 1, 1 }
+  if c.r ~= nil then
+    return c.r, c.g or 1, c.b or 1, c.a or 1
+  end
   return c[1] or 1, c[2] or 1, c[3] or 1, c[4] or 1
 end
 
--- FontObject returns the font object named name: one of BetterBags' (core/fonts.lua) or a
--- global font object.
----@param name string
+-- FontObject returns a font object: one given as an object, or one of BetterBags' (core/fonts.lua)
+-- or the client's by name.
+---@param name string|FontObject
 ---@return FontObject
 function apply:FontObject(name)
+  if type(name) == "table" then
+    return name
+  end
   local fonts = addon:GetModule('Fonts', true)
   local object = fonts and fonts[name]
   if type(object) ~= "table" then
@@ -66,14 +73,23 @@ function apply:FontObject(name)
   return object
 end
 
+-- Font applies spec to a font string or edit box: the font object first (with its color and
+-- shadow, so nothing set by an earlier style stays), then a font file, then the color, shadow
+-- and justification the spec sets.
 ---@param fontString FontString|EditBox
 ---@param spec? SonataFont
 function apply:Font(fontString, spec)
-  if spec == nil then
+  if type(spec) ~= "table" then
     return
   end
   if spec.Object ~= nil then
-    fontString:SetFontObject(self:FontObject(spec.Object))
+    local object = self:FontObject(spec.Object)
+    fontString:SetFontObject(object)
+    if object.GetTextColor ~= nil then
+      fontString:SetTextColor(object:GetTextColor())
+      fontString:SetShadowColor(object:GetShadowColor())
+      fontString:SetShadowOffset(object:GetShadowOffset())
+    end
   end
   if spec.Path ~= nil then
     fontString:SetFont(spec.Path, spec.Size or 12, spec.Flags or "")
@@ -90,22 +106,34 @@ function apply:Font(fontString, spec)
   end
 end
 
--- Texture applies spec to texture. Everything a spec can set is set, to the spec's value or
--- the default, so a reused texture keeps nothing of what it drew before.
+-- Texture applies spec to texture. The texture is reset first, then given its file, atlas or
+-- color, then whatever else the spec sets, so a reused texture keeps nothing of what it drew
+-- before and an atlas keeps the texture coordinates, tiling and slicing it brings.
 ---@param texture Texture
 ---@param spec SonataTexture
 function apply:Texture(texture, spec)
-  if spec.Layer ~= nil then
-    texture:SetDrawLayer(spec.Layer, spec.SubLevel or 0)
+  local layer = spec.Layer
+  if layer == nil then
+    layer = texture:GetDrawLayer()
   end
+  texture:SetDrawLayer(layer, spec.SubLevel or 0)
+  texture:ClearTextureSlice()
+  texture:SetTexCoord(0, 1, 0, 1)
+  texture:SetHorizTile(false)
+  texture:SetVertTile(false)
+  texture:SetVertexColor(1, 1, 1, 1)
+  texture:SetBlendMode("BLEND")
+  texture:SetDesaturated(false)
+  texture:SetAlpha(1)
+
   if spec.Atlas ~= nil then
-    texture:SetAtlas(spec.Atlas)
+    texture:SetAtlas(spec.Atlas, spec.UseAtlasSize == true)
   elseif spec.Color ~= nil then
     texture:SetColorTexture(self:Color(spec.Color))
   else
     texture:SetTexture(spec.Texture)
   end
-  texture:ClearTextureSlice()
+
   if spec.SliceMargins ~= nil then
     local m = spec.SliceMargins
     texture:SetTextureSliceMargins(m.Left or 0, m.Top or 0, m.Right or 0, m.Bottom or 0)
@@ -114,15 +142,25 @@ function apply:Texture(texture, spec)
   local coords = spec.TexCoords
   if coords ~= nil then
     texture:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
-  else
-    texture:SetTexCoord(0, 1, 0, 1)
   end
-  texture:SetVertexColor(self:Color(spec.VertexColor))
-  texture:SetBlendMode(spec.BlendMode or "BLEND")
-  texture:SetDesaturated(spec.Desaturated == true)
-  texture:SetHorizTile(spec.HorizTile == true)
-  texture:SetVertTile(spec.VertTile == true)
-  texture:SetAlpha(spec.Alpha or 1)
+  if spec.HorizTile ~= nil then
+    texture:SetHorizTile(spec.HorizTile)
+  end
+  if spec.VertTile ~= nil then
+    texture:SetVertTile(spec.VertTile)
+  end
+  if spec.VertexColor ~= nil then
+    texture:SetVertexColor(self:Color(spec.VertexColor))
+  end
+  if spec.BlendMode ~= nil then
+    texture:SetBlendMode(spec.BlendMode)
+  end
+  if spec.Desaturated ~= nil then
+    texture:SetDesaturated(spec.Desaturated)
+  end
+  if spec.Alpha ~= nil then
+    texture:SetAlpha(spec.Alpha)
+  end
 end
 
 -- ResetTexture returns a texture to blank, for reuse.
@@ -130,9 +168,12 @@ end
 function apply:ResetTexture(texture)
   texture:Hide()
   texture:ClearAllPoints()
+  texture:SetSize(0, 0)
   texture:SetTexture(nil)
   texture:ClearTextureSlice()
   texture:SetTexCoord(0, 1, 0, 1)
+  texture:SetHorizTile(false)
+  texture:SetVertTile(false)
   texture:SetVertexColor(1, 1, 1, 1)
   texture:SetBlendMode("BLEND")
   texture:SetDesaturated(false)
@@ -171,28 +212,42 @@ function apply:Inset(region, owner, inset)
 end
 
 local STATES = {
-  { key = "Normal", setTexture = "SetNormalTexture", setAtlas = "SetNormalAtlas", get = "GetNormalTexture" },
-  { key = "Highlight", setTexture = "SetHighlightTexture", setAtlas = "SetHighlightAtlas", get = "GetHighlightTexture" },
-  { key = "Pushed", setTexture = "SetPushedTexture", setAtlas = "SetPushedAtlas", get = "GetPushedTexture" },
-  { key = "Disabled", setTexture = "SetDisabledTexture", setAtlas = "SetDisabledAtlas", get = "GetDisabledTexture" },
+  { key = "Normal", setTexture = "SetNormalTexture", setAtlas = "SetNormalAtlas", get = "GetNormalTexture", clear = "ClearNormalTexture" },
+  { key = "Highlight", setTexture = "SetHighlightTexture", setAtlas = "SetHighlightAtlas", get = "GetHighlightTexture", clear = "ClearHighlightTexture" },
+  { key = "Pushed", setTexture = "SetPushedTexture", setAtlas = "SetPushedAtlas", get = "GetPushedTexture", clear = "ClearPushedTexture" },
+  { key = "Disabled", setTexture = "SetDisabledTexture", setAtlas = "SetDisabledAtlas", get = "GetDisabledTexture", clear = "ClearDisabledTexture" },
 }
 
 -- ButtonStates applies spec.Normal, spec.Highlight, spec.Pushed and spec.Disabled to a
--- button's state textures. A state the spec leaves out keeps what the button has.
+-- button's state textures. A state given a file, atlas or color draws it; a state with only a
+-- tint, coordinates, blend mode, inset or alpha changes the art the button has; false clears
+-- the state; a state left out keeps what the button has.
 ---@param button Button
----@param spec table<string, SonataTexture?>
+---@param spec table<string, SonataTexture|false|nil>
 function apply:ButtonStates(button, spec)
   for _, state in ipairs(STATES) do
     local s = spec[state.key]
-    if s ~= nil then
+    if s == false then
+      button[state.clear](button)
+    elseif type(s) == "table" then
+      local art = s.Atlas ~= nil or s.Color ~= nil or s.Texture ~= nil
       if s.Atlas ~= nil then
-        button[state.setAtlas](button, s.Atlas, s.BlendMode)
+        button[state.setAtlas](button, s.Atlas)
       elseif s.Color ~= nil then
-        button[state.setTexture](button, "Interface\\Buttons\\WHITE8X8", s.BlendMode)
-      else
-        button[state.setTexture](button, s.Texture, s.BlendMode)
+        button[state.setTexture](button, "Interface\\Buttons\\WHITE8X8")
+      elseif s.Texture ~= nil then
+        button[state.setTexture](button, s.Texture)
       end
       local region = button[state.get](button)
+      if region ~= nil and art then
+        if s.Atlas == nil then
+          region:SetTexCoord(0, 1, 0, 1)
+        end
+        region:SetVertexColor(1, 1, 1, 1)
+        region:SetAlpha(1)
+        region:ClearAllPoints()
+        region:SetAllPoints(button)
+      end
       if region ~= nil then
         local coords = s.TexCoords
         if coords ~= nil then
@@ -200,8 +255,11 @@ function apply:ButtonStates(button, spec)
         end
         if s.Color ~= nil then
           region:SetVertexColor(self:Color(s.Color))
-        else
+        elseif s.VertexColor ~= nil then
           region:SetVertexColor(self:Color(s.VertexColor))
+        end
+        if s.BlendMode ~= nil then
+          region:SetBlendMode(s.BlendMode)
         end
         if s.Inset ~= nil then
           self:Inset(region, button, s.Inset)

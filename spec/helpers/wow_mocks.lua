@@ -127,6 +127,14 @@ local function CreateMockWidget(widgetType, name, parent)
   if parent ~= nil and not isRegion and type(parent._children) == "table" then
     table.insert(parent._children, widget)
   end
+  -- warcraft.wiki.gg "Frame Strata": every frame starts one level above its parent.
+  if not isRegion then
+    if parent ~= nil and type(parent.GetFrameLevel) == "function" then
+      widget._frameLevel = parent:GetFrameLevel() + 1
+    else
+      widget._frameLevel = 0
+    end
+  end
 
   -- Core frame behavior
   function widget:SetScript(scriptName, handler)
@@ -239,6 +247,7 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:ClearAllPoints()
     self._points = {}
+    self._allPoints = nil
   end
   function widget:SetPoint(point, relativeTo, relativePoint, x, y)
     table.insert(self._points, {
@@ -323,15 +332,21 @@ local function CreateMockWidget(widgetType, name, parent)
     table.insert(self._fontstrings, fs)
     return fs
   end
-  function widget:SetNormalTexture(texture)
-    if type(texture) == "string" then
-      local normal = self:GetNormalTexture()
-      if normal and type(normal) == "table" and normal.SetTexture then
-        normal:SetTexture(texture)
-      end
-    else
-      self.NormalTexture = texture
+  -- SimpleButtonAPIDocumentation.lua: Set{Normal,Pushed,Disabled,Highlight}Texture(asset)
+  -- take a texture file or file ID (non-nilable) and draw it in the state's region; a texture
+  -- object becomes the region.
+  local function setStateTexture(button, getter, field, texture, fnName)
+    if texture == nil then
+      error("bad argument #1 to '" .. fnName .. "' (Usage: self:" .. fnName .. "(asset))", 3)
     end
+    if type(texture) == "string" or type(texture) == "number" then
+      button[getter](button):SetTexture(texture)
+    else
+      button[field] = texture
+    end
+  end
+  function widget:SetNormalTexture(texture)
+    setStateTexture(self, "GetNormalTexture", "NormalTexture", texture, "SetNormalTexture")
   end
   function widget:GetNormalTexture()
     if (not self.NormalTexture or type(self.NormalTexture) == "string") and widgetType ~= "Texture" then
@@ -356,18 +371,11 @@ local function CreateMockWidget(widgetType, name, parent)
   -- variants likewise set their state region.
   function widget:SetHighlightTexture(texture, blendMode)
     self._highlightTexture = texture
-    if type(texture) == "string" or type(texture) == "number" then
-      local highlight = self:GetHighlightTexture()
-      highlight:SetTexture(texture)
-      if blendMode then highlight:SetBlendMode(blendMode) end
-    end
+    setStateTexture(self, "GetHighlightTexture", "HighlightTexture", texture, "SetHighlightTexture")
+    if blendMode then self:GetHighlightTexture():SetBlendMode(blendMode) end
   end
   function widget:SetPushedTexture(texture)
-    if type(texture) == "string" or type(texture) == "number" then
-      self:GetPushedTexture():SetTexture(texture)
-    else
-      self.PushedTexture = texture
-    end
+    setStateTexture(self, "GetPushedTexture", "PushedTexture", texture, "SetPushedTexture")
   end
   function widget:GetDisabledTexture()
     if not self.DisabledTexture and widgetType ~= "Texture" then
@@ -376,11 +384,44 @@ local function CreateMockWidget(widgetType, name, parent)
     return self.DisabledTexture
   end
   function widget:SetDisabledTexture(texture)
-    if type(texture) == "string" or type(texture) == "number" then
-      self:GetDisabledTexture():SetTexture(texture)
-    else
-      self.DisabledTexture = texture
+    setStateTexture(self, "GetDisabledTexture", "DisabledTexture", texture, "SetDisabledTexture")
+  end
+  -- Clear{Normal,Pushed,Disabled,Highlight}Texture() remove what the state draws.
+  local function clearState(button, getter)
+    local region = button[getter](button)
+    if region ~= nil then
+      region:SetTexture(nil)
     end
+  end
+  function widget:ClearNormalTexture() clearState(self, "GetNormalTexture") end
+  function widget:ClearPushedTexture() clearState(self, "GetPushedTexture") end
+  function widget:ClearDisabledTexture() clearState(self, "GetDisabledTexture") end
+  function widget:ClearHighlightTexture() clearState(self, "GetHighlightTexture") end
+  -- Frame:SetHitRectInsets(left, right, top, bottom) / GetHitRectInsets().
+  function widget:SetHitRectInsets(left, right, top, bottom)
+    self._hitRectInsets = { left, right, top, bottom }
+  end
+  function widget:GetHitRectInsets()
+    local i = self._hitRectInsets or { 0, 0, 0, 0 }
+    return i[1], i[2], i[3], i[4]
+  end
+  -- UIObject:GetObjectType() -> the widget type ("Frame", "Button", "Texture", ...);
+  -- IsObjectType(type) is also true for the types it derives from (every frame type is a
+  -- Frame, every widget a Region).
+  function widget:GetObjectType()
+    return self._type
+  end
+  function widget:IsObjectType(objectType)
+    if objectType == self._type or objectType == "Region" or objectType == "Object" then
+      return true
+    end
+    if objectType == "Frame" then
+      return not isRegion
+    end
+    if objectType == "Button" then
+      return self._type == "CheckButton" or self._type == "ItemButton"
+    end
+    return false
   end
   function widget:SetHighlightAtlas(atlas, blendMode)
     self._highlightAtlas = atlas
@@ -476,6 +517,10 @@ local function CreateMockWidget(widgetType, name, parent)
     self._drawLayer = layer
     self._sublevel = sublevel
   end
+  -- Region:GetDrawLayer() -> layer, sublevel.
+  function widget:GetDrawLayer()
+    return self._drawLayer or "ARTWORK", self._sublevel or 0
+  end
   -- TextureBase:SetTexture(textureAsset) replaces whatever the texture drew (an atlas or a
   -- color texture); nil clears it.
   function widget:SetTexture(path)
@@ -496,12 +541,25 @@ local function CreateMockWidget(widgetType, name, parent)
     end
     return unpack(c)
   end
+  -- TextureBase:SetAtlas(atlas, useAtlasSize) draws the atlas with its own texture
+  -- coordinates, tiling and nine-slice data (SimpleTextureBaseAPIDocumentation.lua; the
+  -- mock leaves those unset, so a later SetTexCoord, tiling or slicing call shows).
   function widget:SetAtlas(atlas, useAtlasSize)
     self._atlas = atlas
     self._useAtlasSize = useAtlasSize
+    self._texturePath = nil
+    self._colorTexture = nil
+    self._texCoords = nil
+    self._horizTile = nil
+    self._vertTile = nil
+    self._sliceMargins = nil
+    self._sliceMode = nil
   end
+  -- TextureBase:SetColorTexture(r, g, b, a?) replaces a texture or atlas with a solid color.
   function widget:SetColorTexture(r, g, b, a)
     self._colorTexture = {r = r, g = g, b = b, a = a or 1}
+    self._atlas = nil
+    self._texturePath = nil
   end
   -- TextureBase:SetDesaturated(desaturated?) / IsDesaturated() -> boolean.
   function widget:SetDesaturated(desaturated)
@@ -512,6 +570,7 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:SetNormalAtlas(atlas)
     self._normalAtlas = atlas
+    self:GetNormalTexture():SetAtlas(atlas)
   end
   function widget:SetNormalFontObject(fontObject)
     self._normalFontObject = fontObject
@@ -637,13 +696,18 @@ local function CreateMockWidget(widgetType, name, parent)
     end
     return 1, 1, 1, 1
   end
+  -- FontInstance:GetFontObject() -> the font object set with SetFontObject, else the one the
+  -- font string inherits (CreateFontString's template).
   function widget:GetFontObject()
-    local fo = {
+    local fo = self._fontObject or (self._inherits and _G[self._inherits])
+    if fo ~= nil then
+      return fo
+    end
+    return {
       GetTextColor = function()
         return 1, 1, 1, 1
       end
     }
-    return fo
   end
   function widget:SetVertexColor(r, g, b, a)
     self._vertexColor = {r = r, g = g, b = b, a = a or 1}
@@ -676,23 +740,32 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetFrameStrata()
     return self._frameStrata or "MEDIUM"
   end
+  -- warcraft.wiki.gg "Frame Strata": when a frame's level changes, every descendant shifts by
+  -- the same amount, and a descendant that would go below 0 is set to 10000.
+  local function shiftDescendants(frame, delta)
+    for _, child in ipairs(frame._children or {}) do
+      if child._frameLevel ~= nil then
+        local level = child._frameLevel + delta
+        if level < 0 then
+          level = 10000
+        end
+        child._frameLevel = level
+      end
+      shiftDescendants(child, delta)
+    end
+  end
   function widget:SetFrameLevel(level)
     if not level or type(level) ~= "number" or level < 0 or level > 65535 then
       error("bad argument #1 to 'SetFrameLevel' (outside of expected range 0 to 65535 - Usage: self:SetFrameLevel(frameLevel))", 2)
     end
+    local previous = self._frameLevel or 0
     self._frameLevel = level
+    if level ~= previous then
+      shiftDescendants(self, level - previous)
+    end
   end
   function widget:GetFrameLevel()
-    return self._frameLevel or 1
-  end
-  function widget:SetBackdrop(backdrop)
-    self._backdrop = backdrop
-  end
-  function widget:SetBackdropColor(r, g, b, a)
-    self._backdropColor = {r = r, g = g, b = b, a = a or 1}
-  end
-  function widget:SetBackdropBorderColor(r, g, b, a)
-    self._backdropBorderColor = {r = r, g = g, b = b, a = a or 1}
+    return self._frameLevel or 0
   end
 
   -- Grid Frame scroll/mousewheel APIs
@@ -844,10 +917,142 @@ end
 -- UITextureConstantsDocumentation.lua: Enum.UITextureSliceMode.
 _G.Enum.UITextureSliceMode = { Stretched = 0, Tiled = 1 }
 
--- BackdropTemplate (Blizzard_SharedXML/Backdrop.xml, BackdropTemplateMixin): every mocked
--- frame already records SetBackdrop/SetBackdropColor/SetBackdropBorderColor.
+-- Font objects (SimpleFontAPIDocumentation.lua; CreateFont(name) in FontDocumentation.lua):
+-- SetFont/GetFont, SetTextColor/GetTextColor, SetShadowColor/GetShadowColor,
+-- SetShadowOffset/GetShadowOffset, SetJustifyH/GetJustifyH, SetFontObject/CopyFontObject.
+local function CreateMockFont(name)
+  local font = { _name = name, _color = { 1, 1, 1, 1 }, _shadowColor = { 0, 0, 0, 0 }, _shadowOffset = { 0, 0 } }
+  function font:GetName() return self._name end
+  function font:SetFont(path, height, flags) self._path, self._height, self._flags = path, height, flags end
+  function font:GetFont() return self._path, self._height, self._flags end
+  function font:SetTextColor(r, g, b, a) self._color = { r, g, b, a or 1 } end
+  function font:GetTextColor() return unpack(self._color) end
+  function font:SetShadowColor(r, g, b, a) self._shadowColor = { r, g, b, a or 1 } end
+  function font:GetShadowColor() return unpack(self._shadowColor) end
+  function font:SetShadowOffset(x, y) self._shadowOffset = { x, y } end
+  function font:GetShadowOffset() return unpack(self._shadowOffset) end
+  function font:SetJustifyH(justify) self._justifyH = justify end
+  function font:GetJustifyH() return self._justifyH or "CENTER" end
+  function font:CopyFontObject(other)
+    self._path, self._height, self._flags = other:GetFont()
+    self._color = { other:GetTextColor() }
+    self._shadowColor = { other:GetShadowColor() }
+    self._shadowOffset = { other:GetShadowOffset() }
+  end
+  font.SetFontObject = font.CopyFontObject
+  if name then _G[name] = font end
+  return font
+end
+_G.CreateFont = CreateMockFont
+
+-- The client font objects BetterBags uses (Blizzard_Fonts_Shared FontStyles.xml / Fonts.xml):
+-- the font file, height, outline, shadow and NORMAL_FONT_COLOR (1, 0.82, 0),
+-- HIGHLIGHT/WHITE (1, 1, 1), DISABLED (0.5, 0.5, 0.5) colors their templates inherit.
+local function clientFont(name, path, height, flags, color, shadow)
+  local font = CreateMockFont(name)
+  font:SetFont(path, height, flags or "")
+  font:SetTextColor(color[1], color[2], color[3], 1)
+  if shadow then
+    font:SetShadowColor(0, 0, 0, 1)
+    font:SetShadowOffset(1, -1)
+  end
+  return font
+end
+local NORMAL = { 1, 0.82, 0 }
+local WHITE = { 1, 1, 1 }
+local DISABLED = { 0.5, 0.5, 0.5 }
+clientFont("GameFontNormal", "Fonts\\FRIZQT__.TTF", 12, "", NORMAL, true)
+clientFont("GameFontHighlight", "Fonts\\FRIZQT__.TTF", 12, "", WHITE, true)
+clientFont("GameFontDisable", "Fonts\\FRIZQT__.TTF", 12, "", DISABLED, true)
+clientFont("GameFontNormalSmall", "Fonts\\FRIZQT__.TTF", 10, "", NORMAL, true)
+clientFont("GameFontHighlightSmall", "Fonts\\FRIZQT__.TTF", 10, "", WHITE, true)
+clientFont("GameFontDisableSmall", "Fonts\\FRIZQT__.TTF", 10, "", DISABLED, true)
+clientFont("NumberFontNormal", "Fonts\\ARIALN.TTF", 14, "OUTLINE", WHITE, false)
+clientFont("ChatFontNormal", "Fonts\\ARIALN.TTF", 14, "", WHITE, true)
+
+-- Mixin(object, ...) copies every key of each mixin into object (Blizzard_SharedXMLBase).
+_G.Mixin = function(object, ...)
+  for i = 1, select("#", ...) do
+    for k, v in pairs((select(i, ...))) do
+      object[k] = v
+    end
+  end
+  return object
+end
+
+-- BackdropTemplateMixin (Blizzard_SharedXML/Backdrop.lua): only frames that inherit
+-- BackdropTemplate (or mix it in) have a backdrop. SetBackdrop(info) ignores the table it
+-- already shows, clears the backdrop for nil or an info with neither bgFile nor edgeFile,
+-- and otherwise applies it with both colors reset to white; SetBackdropColor and
+-- SetBackdropBorderColor do nothing without a backdrop.
+_G.BackdropTemplateMixin = {
+  SetBackdrop = function(self, backdropInfo)
+    if backdropInfo then
+      if self._backdrop == backdropInfo then
+        return
+      end
+      if not backdropInfo.edgeFile and not backdropInfo.bgFile then
+        self:ClearBackdrop()
+        return
+      end
+      self._backdrop = backdropInfo
+      self._backdropColor = { r = 1, g = 1, b = 1, a = 1 }
+      self._backdropBorderColor = { r = 1, g = 1, b = 1, a = 1 }
+    else
+      self:ClearBackdrop()
+    end
+  end,
+  ClearBackdrop = function(self)
+    self._backdrop = nil
+    self._backdropColor = nil
+    self._backdropBorderColor = nil
+  end,
+  GetBackdrop = function(self)
+    return self._backdrop
+  end,
+  SetBackdropColor = function(self, r, g, b, a)
+    if not self._backdrop then return end
+    self._backdropColor = { r = r, g = g, b = b, a = a or 1 }
+  end,
+  GetBackdropColor = function(self)
+    local c = self._backdropColor
+    if c then return c.r, c.g, c.b, c.a end
+  end,
+  SetBackdropBorderColor = function(self, r, g, b, a)
+    if not self._backdrop then return end
+    self._backdropBorderColor = { r = r, g = g, b = b, a = a or 1 }
+  end,
+  GetBackdropBorderColor = function(self)
+    local c = self._backdropBorderColor
+    if c then return c.r, c.g, c.b, c.a end
+  end,
+}
+
+-- BackdropTemplate (Blizzard_SharedXML/Backdrop.xml): mixin="BackdropTemplateMixin".
 _G.__mockTemplates.BackdropTemplate = function(frame)
   frame._backdropTemplate = true
+  Mixin(frame, BackdropTemplateMixin)
+end
+
+-- TooltipBackdropTemplate (Blizzard_SharedXML/SharedTooltipTemplates.xml/.lua, every client
+-- branch): not a BackdropTemplate. A NineSlice frame (useParentLevel) and
+-- TooltipBackdropTemplateMixin, whose SetBackdropColor / SetBackdropBorderColor color the
+-- NineSlice; OnLoad sets the center color (backdropColorAlpha, default 1).
+-- TooltipBorderedFrameTemplate sets backdropColorAlpha to 0.8.
+_G.__mockTemplates.TooltipBackdropTemplate = function(frame)
+  frame.NineSlice = CreateMockWidget("Frame", nil, frame)
+  frame.NineSlice:SetFrameLevel(frame:GetFrameLevel())
+  function frame:SetBackdropColor(r, g, b, a) self._backdropColor = { r = r, g = g, b = b, a = a or 1 } end
+  function frame:SetBackdropBorderColor(r, g, b, a) self._backdropBorderColor = { r = r, g = g, b = b, a = a or 1 } end
+  function frame:GetBackdropColor()
+    local c = self._backdropColor
+    if c then return c.r, c.g, c.b, c.a end
+  end
+  frame:SetBackdropColor(0, 0, 0, frame.backdropColorAlpha or 1)
+end
+_G.__mockTemplates.TooltipBorderedFrameTemplate = function(frame)
+  frame.backdropColorAlpha = 0.8
+  _G.__mockTemplates.TooltipBackdropTemplate(frame)
 end
 
 -- DefaultPanelBaseTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): a

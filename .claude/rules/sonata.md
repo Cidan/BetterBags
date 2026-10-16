@@ -87,44 +87,85 @@ The window object provides `frame` (inheriting `BackdropTemplate`), `GetTitle()`
 | Style key | What it builds |
 |---|---|
 | `Insets` | the content box (`GetInsets()`, unset sides 0) |
-| `Template` | a Blizzard frame template behind the window: `Name`, `Level` (offset from the window, default -1, never below 0), `Levels` (offsets for the template's child frames, e.g. `NineSlice`), `TitleFont`, `Title = false`, `HideTitleWhenEmpty`, `Opacity` (the key of the region that fades) |
-| `Backdrop` | a backdrop on the window frame: `BgFile`, `EdgeFile`, `EdgeSize`, `Tile`, `TileEdge`, `TileSize`, `Insets`, `Color`, `BorderColor`, `Opacity` (default on; `false` keeps the fill), `Outlines` (extra edge-only borders, `Offset` > 0 outside, < 0 inside) |
+| `Template` | a Blizzard frame template behind the window: `Name`, `Level` (offset from the window, default -1, never below 0), `Levels` (offsets from the window for the template's child **frames**, e.g. `NineSlice`; naming anything else is an error), `TitleFont`, `Title = false` (the template's title stays empty), `HideTitleWhenEmpty`, `Opacity` (the key of the region that fades), `Hide` (keys of template parts to hide) |
+| `Backdrop` | a backdrop on the window frame: `BgFile`, `EdgeFile`, `EdgeSize`, `Tile`, `TileEdge`, `TileSize`, `Insets`, `Color`, `BorderColor`, `Opacity` (default on; `false` keeps the fill), `BorderOpacity = true` (the border fades too), `Outlines` (extra edge-only borders, `Offset` > 0 outside, < 0 inside; `EdgeFile` defaults to `Interface\Buttons\WHITE8X8`) |
 | `Background` | a texture filling the window (or `Inset`/`Points`), fading with opacity unless `Opacity = false` |
 | `Border` | a texture filling the window; `Above = true` puts it over the content |
-| `Textures` | named textures: anchored by `Points` (`RelativeTo` = `Window`, `Title`, or an earlier texture's `Name`; an unknown name is an error) or `Inset`; `Size` (`Width`, `Height`, or `MaxWidth` with `WidthOffset`: the window width plus the offset, capped, kept current on resize); `Above`; `Opacity = true` to fade |
-| `Title` | a font string: `Font`, `Color`, `Points` (default TOP, -5), `Height`, `Justify` (default CENTER) |
-| `CloseButton` | `Template` (one button per template, reused), `Size`, `Points` (default TOPRIGHT -4,-4 without a template), `Normal`/`Highlight`/`Pushed`/`Disabled` textures or atlases, `HoverColor`, `Text`; clicks call `window:OnCloseClicked(ctx)` |
+| `Textures` | named textures: anchored by `Points` (`RelativeTo` = `Window`, `Title` (only when the style has a title), or an earlier texture's `Name`; an unknown name is an error) or `Inset`; `Size` (`Width`, `Height`, or `MaxWidth` with `WidthOffset`: the window width plus the offset, capped, kept current on resize); `Above`; `Opacity = true` to fade. A texture with one point needs a `Size`. |
+| `Title` | a font string: `Font`, `Color`, `Points` (default TOP, -5; may name a texture), `Height`, `Justify` (default the font's `Justify`, else CENTER) |
+| `CloseButton` | `Template` (one button per template, reused), `Size` (default 24 without a template), `Points` (default TOPRIGHT -4,-4 without a template), `Normal`/`Highlight`/`Pushed`/`Disabled` (a texture, atlas or color; `false` clears the state), `HoverColor`, `Text`, `HitRectInsets` ({ left, right, top, bottom }); clicks call `window:OnCloseClicked(ctx)` |
 | `Resize`, `Animations` | read by the window module |
 | `Layout` | geometry for parts the window owns (search box, menu button, footer), `GetLayout()` |
 
-Specs (`sonata/apply.lua`): colors are `{ r, g, b, a? }`; fonts are `{ Object }` (BetterBags'
-`Fonts` module first, then a global font object; unknown is an error) or `{ Path, Size, Flags }`
-plus `Color`, `Shadow`, `Justify`; textures are `Texture`, `Atlas` or `Color` plus `Layer`,
-`SubLevel`, `SliceMode` (`Stretched`/`Tiled`) and `SliceMargins`, `TexCoords`, `VertexColor`,
-`BlendMode`, `Desaturated`, `HorizTile`, `VertTile`, `Alpha`. Applying a texture spec sets every
-one of these (to the spec's value or the default; slicing is cleared with
-`ClearTextureSlice`, present on every client), so a reused texture keeps nothing.
+**Any key set to `false`** (or any other non-table) builds nothing: a per-client override can
+turn off a template, a backdrop, a title or a close button whether or not a parent theme
+defined one.
+
+Specs (`sonata/apply.lua`):
+- Colors are `{ r, g, b, a? }` or `{ r =, g =, b =, a? }`.
+- Fonts are `{ Object }` (a font object, or a name: BetterBags' `Fonts` module first, then the
+  client's; unknown is an error), applied with the object's color and shadow so nothing an
+  earlier style set stays; then `Path`, `Size`, `Flags`; then `Color`, `Shadow`, `Justify`.
+- Textures are `Texture`, `Atlas` (`UseAtlasSize`) or `Color` plus `Layer` (kept when unset),
+  `SubLevel`, `SliceMode` (`Stretched`/`Tiled`) and `SliceMargins`, `TexCoords`, `VertexColor`,
+  `BlendMode`, `Desaturated`, `HorizTile`, `VertTile`, `Alpha`. `apply:Texture` **resets the
+  texture first** (slicing cleared with `ClearTextureSlice`, present on every client;
+  coordinates, tiling, tint, blend, desaturation, alpha), **then** draws the file, atlas or
+  color, **then** applies what the spec sets. The order matters: `SetAtlas` brings the atlas's
+  own texture coordinates, tiling and nine-slice data (`SimpleTextureBaseAPIDocumentation.lua`),
+  which a reset after it would undo. `apply:ResetTexture` blanks a texture for reuse, size
+  included.
+- Button states (`apply:ButtonStates`): a state given a file, atlas or color draws it, reset to
+  fill the button, untinted, at full alpha; a state with only `VertexColor`, `TexCoords`,
+  `BlendMode`, `Inset` or `Alpha` changes the art the button already has (the
+  `Set*Texture` setters take no nil asset); `false` clears the state (`Clear*Texture`, every
+  client); a state left out is kept. Blend modes are set on the region (only
+  `SetHighlightTexture` takes one).
 
 **Where things go, so content always draws above its fill** (see patterns-ui.md, "Filled
 Backdrops Belong on the Panel Frame"): the backdrop is on the window frame itself; the
 background, border and textures are the window frame's own regions (a frame's regions draw
-below its child frames); a template sits one level below the window. Only what a style marks
-`Above`, the title and the close button go on the **overlay frame**, 500 levels above the
-window, which never takes the mouse (the window frame must stay the drop target, bag-drop-zone.md).
+below its child frames); a template sits below the window. What a style marks `Above`, the
+title and the close button go on the **overlay frame**, 500 levels above the window, which
+never takes the mouse; neither does a template or any of its children that is not a button
+(the window frame must stay the drop target, bag-drop-zone.md).
 
-**Switching themes leaves nothing behind**: applying a style first hides the template, clears
-the backdrop, hides outlines, returns every texture to a pool (reset), hides the title and the
-close button. Templates and close buttons are kept per name and reused.
+**Template frame levels.** When a frame's level changes, every descendant shifts by the same
+amount, and a descendant that would go below 0 jumps to 10000 (warcraft.wiki.gg "Frame
+Strata"). `DefaultPanelFlatTemplate`'s `Bg` is pinned at `frameLevel="0"`, so lowering the
+template under the window used to throw the background above the whole window. Each child's
+level relative to the template is recorded when the template is created and put back, clamped
+at 0, every time the template is placed.
 
-`SetTitle(text)` retitles the template (and shows or hides its title bar for
-`HideTitleWhenEmpty`) and the decoration's own title. `SetOpacity(pct)` fades the template's
-`Opacity` region, the backdrop fill (not its border), the background and `Opacity = true`
-textures.
+**Switching themes leaves nothing behind.** Applying a style first releases the last one:
+- the template gives back its title font, the alpha of its faded region and the shown state of
+  the parts it hid or its title bar, then hides;
+- the backdrop and outlines are cleared, and every texture returns to a pool, reset;
+- the title is hidden, emptied, unanchored, height 0, back to `GameFontNormal` (its color and
+  shadow) and centered;
+- the close button gets back the points, size, text, hit rect and state art it was created
+  with (a plain button: nothing), then hides.
+Templates and close buttons are kept per name and reused.
+
+**Build order**: template, backdrop, the title's font, background, border, textures, the title's
+anchors, capped widths, close button, so a title can sit on a texture and a texture on the
+title.
+
+The capped widths follow the window through the overlay's `OnSizeChanged` (the overlay fills
+the window), hooked with `addon.HookScript` so profiler captures see it: a script the window's
+owner sets on the window frame cannot remove it. The close button's hover hooks also use
+`addon.HookScript`; on leave it returns to its normal state's `Color` or `VertexColor`.
+
+`SetTitle(text)` retitles the template (empty when `Title = false`; it shows or hides its title
+bar for `HideTitleWhenEmpty`) and the decoration's own title. `SetOpacity(pct)` fades the
+template's `Opacity` region, the backdrop fill (and its border with `BorderOpacity`), the
+background and `Opacity = true` textures. Windows call these directly for title and opacity
+changes; `Sonata:Redecorate` rebuilds the whole chrome.
 
 ## 4. Load order
 
-`sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua` follow the render modules in
-every TOC; `core/init.lua` calls `addon:GetModule('Sonata'):Init()` after Render's
+`sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua`, `sonata\elements.lua` follow
+the render modules in every TOC, and `window\window.lua` follows them; `core/init.lua` calls `addon:GetModule('Sonata'):Init()` after Render's
 (initialization.md). Modules start disabled; Sonata is enabled once windows exist.
 
 ## 5. Coverage
@@ -138,10 +179,27 @@ changes), error isolation for windows and elements, registry changes during an a
 idempotent elements, cache reuse, `Redecorate`, `GetDecoration`, late decorators and stylers,
 the shared empty style; enabling: saved theme, fallbacks that keep the saved choice, Masque).
 `spec/sonata/decoration_spec.lua` (decorator registration, insets, layout, one decoration per
-window, templates: placement, levels, title, font, empty titles, opacity, reuse; backdrops,
-fill opacity, outlines, clearing; background, border above, textures: anchors, unknown anchor,
-capped widths, release, pooling; titles and font objects; close buttons: templates, clicks,
-plain ones, art replacement, hover tint, one per template; a clean switch from a templated
-theme to a flat one). The mocks follow Blizzard's templates (`DefaultPanelTemplate`,
-`DefaultPanelFlatTemplate`, `UIPanelCloseButton*`, `BackdropTemplate`) and texture, button and
-font APIs (`spec/helpers/wow_mocks.lua`).
+window, templates: placement, levels, a flat template's background kept below the window,
+child levels, title, font, empty titles, opacity, reuse, the mouse, hidden parts; backdrops,
+fill and border opacity, outlines and their default edge and level, clearing; background, border
+above, textures: anchors (title on a texture and back, no title for a style without one),
+unknown anchor, capped widths through the overlay, release, pooling, fading only the current
+theme's, atlases on reused textures; titles and font objects, justification, reset between
+themes, template title font and title bar restored, `Title = false`; close buttons: templates,
+clicks, plain ones, art replacement and its restore, hit rects, a plain button started from
+nothing, hover tint and a solid normal color, the overlay; `false` keys; the overlay following
+the window's level; a clean switch from a templated theme to a flat one).
+`spec/sonata/apply_spec.lua` (both color forms, font objects by name or object, a font object's
+color and shadow, font order; texture reset, atlas coordinates/tiling/slicing kept, explicit
+atlas settings, solid colors, kept draw layer, reset for reuse; anchors and resolution errors,
+insets; button states: art, blend modes, tint-only, `false`, reset of a state given new art,
+insets).
+The mocks follow the client: frame levels (a frame starts one above its parent; descendants
+shift with it; below 0 becomes 10000), `SetAtlas` bringing its own coordinates, tiling and
+slicing, `SetColorTexture` replacing a file or atlas, button state setters rejecting nil and
+`Clear*Texture`, `BackdropTemplateMixin` (only frames that inherit or mix it in have a backdrop;
+`SetBackdrop` semantics from `Backdrop.lua`), `Mixin`, `TooltipBackdropTemplate` (a `NineSlice`
+and its own color setters, no `SetBackdrop`), font objects and `CreateFont` (`FontStyles.xml`),
+`GetFontObject` returning the inherited font, `IsObjectType`, hit rects, `ClearAllPoints`
+clearing `SetAllPoints`, Blizzard's templates (`DefaultPanelTemplate`,
+`DefaultPanelFlatTemplate`, `UIPanelCloseButton*`) (`spec/helpers/wow_mocks.lua`).
