@@ -121,3 +121,50 @@ turned off entirely or for hide only, building and caching per theme, finishing 
 change, a fade-in stopped by a hide and the alpha after it, a fade-out stopped by a show, shown
 while shown, shown twice while fading in, hidden while hidden, Escape mid-fade, toggling during a
 fade-out, `IsClosing`).
+
+## 7. The bag windows (`frames/bag.lua`)
+
+The backpack and the bank are Windows of kind `Bag`. `bagFrame:Create` builds the window
+(`BuildWindow`), then the bag's own parts (`BuildParts`), then the behavior's parts (slots panel,
+tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-drop-zone.md).
+
+- **BuildWindow** creates the window named `BetterBagsBag<Backpack|Bank>` with the behavior's
+  strata and level, the saved position (`database:GetBagPosition`), and options read from the
+  bag's settings for the view it shows: `Opacity` and `Scale` from `GetBagSizeInfo`, `SizeMode`
+  from `database:GetBagSizeMode` (per view, default `"content"`), `Size`/`OnResized` from
+  `Get/SetBagViewFrameSize`, `Fade` from `GetEnableBagFading`. `CanMove` is false while an
+  item is on the cursor (pressing on the window is a drop then). `OnClose` is `bag:Hide`.
+  `OnRendered` runs `bag:OnResize`. Its content is a `Scrollbox` whose child is the bag's
+  canvas (`frames/bagcanvas.lua`, layout-rendering.md §3); `bag.scrollBox`, `headerContainer`,
+  `tabContainer` and `footerContainer` point into them.
+- **Minimums**: content at least 260 wide (or the tabs' width) plus the scroll bar, and 100
+  high; the window at least as wide as the slots panel while it shows.
+- **BuildParts** creates the in-bag search box (`searchBox:CreateBox`, kept as
+  `bag.searchBox`; `searchBox:GetSearchText` and QuickFind read it there), the menu button
+  (`BagMenuButton`, bag-menu-button.md), the footer bar the money and currencies sit on, and the
+  side anchor the theme config panel hangs from.
+- **PlaceParts** (the window's `OnDecorated`, after every theme) places those parts from the
+  theme's bag window `Layout` (sonata.md): `Search` (`Points` relative to the window,
+  `Reserve` rows above the content while in-bag search is on), `Footer` (`Left`, `Right`,
+  `Bottom`, `Height`, `Reserve` rows below the content), `MenuButton` (`Points`), `SideOffset`
+  (how far left of the window side panels sit). It reserves those rows with `SetExtraInsets`,
+  then reloads the tabs and redraws a shown slots panel. The Base theme carries the layout every
+  theme inherits (`sonata/themes/base.lua`). `SetSearchShown` follows the in-bag search setting
+  (`search/SetInFrame`) and recalculates the bags (`bags/Rederive`).
+- **Each draw** binds, then `ApplySizeSettings` (scale and opacity always; the size mode only
+  when it or the view changed, since applying it takes the saved size and would undo a resize
+  in progress), then renders the window now. The Opacity and Scale sliders call
+  `window:UpdateOpacity()` / `window:UpdateScale()` directly and send nothing to the bags.
+- **OnResize**: a bag sized to its content keeps its bottom edge (it grows upwards) or follows
+  its anchor (`frames/anchor.lua`); a bag the player sized stays where it was put.
+- **Showing and hiding** go through the behaviors (`OnShow`/`OnHide` call `window:Show`/
+  `window:Hide`). The bank's open setup (`SuppressBlizzardBankPanel`, the active group, money,
+  the slots panel) runs before the window shows, never in a fade callback: a stopped fade drops
+  its callback (§4). Closing the Classic/Era bank calls `CloseBankFrame` in the hide callback.
+
+Coverage: `spec/frames/bag_draw_ownership_spec.lua` ("the bag's window": the window and canvas,
+settings, saved size, minimums, close, scale and opacity per draw, size mode only on change,
+search box placement and reserve, footer, menu button, side anchor, `OnResize` in both modes),
+`spec/frames/bagcanvas_spec.lua`, `spec/frames/menubutton_spec.lua`, `spec/sonata/themes_spec.lua`,
+`spec/config/config_redraw_spec.lua` ("opacity and scale"), `spec/database_spec.lua` (size mode),
+`spec/views/persistent_tabs_spec.lua` ("sizes the bag window around its canvas").

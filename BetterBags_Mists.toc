@@ -72,6 +72,10 @@ sonata\elements.lua
 # Every BetterBags window is a Window: its frame, chrome, content box and layout.
 window\window.lua
 
+# BetterBags' Sonata themes. Base holds what every theme inherits.
+sonata\themes\base.lua
+sonata\themes\default.lua
+
 # The Theme API loads earlier than actual themes.
 themes\themes.lua
 
@@ -92,7 +96,6 @@ data\loader.lua
 data\refresh.lua
 
 util\color.lua
-util\resize.lua
 util\sort.lua
 util\bucket.lua
 util\windowgroup.lua
@@ -139,6 +142,8 @@ bags\classic\backpack.lua
 bags\bank.lua
 bags\classic\bank.lua
 
+frames\bagcanvas.lua
+frames\menubutton.lua
 frames\bag.lua
 
 themes\default.lua

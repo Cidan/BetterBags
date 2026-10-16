@@ -15,6 +15,9 @@ local sonata = addon:GetModule('Sonata')
 ---@class SonataApply: AceModule
 local apply = addon:GetModule('SonataApply')
 
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
 ---@class LibWindow-1.1: AceAddon
 local LibWindow = LibStub('LibWindow-1.1')
 
@@ -72,6 +75,7 @@ local DEFAULT_GRIP = {
 ---@field Fade? fun(): boolean false: show and hide at once. Fades when unset.
 ---@field OnClose? fun(ctx: Context) Called when its close button is clicked, instead of hiding.
 ---@field OnRendered? fun(ctx: Context?, width: number, height: number) Called after every render, with the size the window took.
+---@field OnDecorated? fun(ctx: Context, decoration: SonataWindowDecoration) Called after every theme the window was decorated with, once its content moved: for parts the owner places from the theme's layout.
 ---@field OnShow? fun(ctx: Context) Called whenever the frame shows, however it was shown.
 ---@field OnHide? fun(ctx: Context) Called whenever the frame hides, however it was hidden (Escape included).
 ---@field Content? Drawable
@@ -359,6 +363,9 @@ function windowProto:OnDecorated(decoration)
   self.decoration = decoration
   self:UpdateContentAnchors()
   self:buildAnimations()
+  if self.opts.OnDecorated ~= nil then
+    self.opts.OnDecorated(context:New('Window_OnDecorated'), decoration)
+  end
   self:UpdateSizeMode()
   self:Invalidate()
 end

@@ -658,11 +658,12 @@ const.FORM_LAYOUT = {
 
 ---@class SizeInfo
 ---@field columnCount number
----@field itemsPerRow number
+---@field itemsPerRow number Used when the window fits its contents (sizeMode "content").
 ---@field scale number
----@field width number
+---@field width number The window's width when the player sizes it (sizeMode "window").
 ---@field height number
 ---@field opacity number
+---@field sizeMode WindowSizeMode
 
 ---@class (exact) CategoryOptions
 ---@field shown boolean
@@ -809,6 +810,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 2,
@@ -817,6 +819,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
         },
       },
       [const.BAG_VIEW.SECTION_ALL_BAGS] = {
@@ -827,6 +830,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 1,
@@ -835,6 +839,7 @@ const.DATABASE_DEFAULTS = {
           width = 700,
           height = 500,
           opacity = 89,
+          sizeMode = "content",
         },
       },
     },

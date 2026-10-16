@@ -213,6 +213,23 @@ Details:
 - Edge sizes and insets are in UI units. Pixel-perfect edges at any scale are not yet
   expressible.
 
+## 3b. BetterBags' themes (`sonata/themes/*.lua`)
+
+Each theme is a data file that calls `sonata:RegisterTheme`, listed in every TOC right after
+`window\window.lua`, Base first.
+- **Base** (hidden): what every theme inherits. Its `Windows.Bag` carries the bag's insets
+  (6, 6, 42, 3), the default fade (`Animations`, 0.1 s alpha in and out) and the bag window's
+  `Layout` (window.md §7): `Search` (points, `Reserve` 20), `Footer` (6, 6, bottom 6, height 20,
+  `Reserve` 26), `MenuButton` (TOPLEFT -10, 7), `SideOffset` 0. Its `Elements.SectionHeader`
+  font is `GameFontNormal`.
+- **Default**: Blizzard's look. The bag is a `DefaultPanelTemplate` one level below the window
+  (its `Bg` fades with the opacity; `NineSlice` and `TitleContainer` at window level + 500 and
+  + 501, above the content), titled in `UnitFrame12Yellow`, with Blizzard's
+  `UIPanelCloseButtonDefaultAnchors` close button; section titles in `UnitFrame12Yellow`.
+
+Coverage: `spec/sonata/themes_spec.lua` (Base hidden and its geometry and fade inherited;
+Default's panel, levels, title font, opacity, close button and content box; section font).
+
 ## 4. Load order
 
 `sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua`, `sonata\elements.lua` follow

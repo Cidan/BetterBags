@@ -1,4 +1,4 @@
-# Layout Rendering and Global ScrollBox Architecture
+# Layout Rendering and the Bag's Scroll Box
 
 This document defines the architecture, design guidelines, and API contracts for layout rendering, tab containers, and global scrolling components within BetterBags.
 
@@ -6,15 +6,17 @@ This document defines the architecture, design guidelines, and API contracts for
 
 ### 1. Unified Global ScrollBox Architecture (Zero-Reparenting Secure Frame Design)
 Historically, each individual Tab View created its own `WowScrollBox` and scrollbar, and rendered special sections (`Recent Items` and `Free Space`) as internal header/footer cells inside that specific view's scrollbox. Because WoW secure item frames are bound to unique physical slot keys and cannot be reparented or dynamically moved between views during active combat without causing fatal "Action blocked" taint errors, we decouple the scrolling and special sections from individual tab views.
-- **Rule:** The entire Bag window must contain exactly **one single global `WowScrollBox` and `MinimalScrollBar`** defined natively at the `Bag` level (`frames/bag.lua`).
+- **Rule:** The entire Bag window must contain exactly **one scroll box**: the `Scrollbox` drawable (`render/scrollbox.lua`, one `WowScrollBox` and `MinimalScrollBar`), which is the content of the bag's `Window` (window.md §7).
 - **Hierarchy:**
   ```
-  Bag Window Frame (frames/bag.lua)
-    └── Global WowScrollBox
-         └── Global Scroll Child
-              ├── Header Container (Recent Items section)
-              ├── Tab Container (Active Tab View layout grid)
-              └── Footer Container (Free Space section)
+  Bag Window (window/window.lua; frames/bag.lua BuildWindow)
+    └── Content box (the theme's insets, plus the search box and footer rows)
+         └── Scrollbox (render/scrollbox.lua)
+              └── Scroll child
+                   └── Bag canvas (frames/bagcanvas.lua)
+                        ├── Header Container (Recent Items section)
+                        ├── Tab Container (Active Tab View layout grid)
+                        └── Footer Container (Free Space section)
   ```
 - **Benefits:** Since `Recent Items` (Header) and `Free Space` (Footer) are attached globally to the scroll child of the Bag frame and never hidden or reparented on tab switches, they scroll seamlessly together with the active tab's items as a single unified canvas. Tab switching simply toggles visibility of the active tab view's layout grid inside the `Tab Container` with zero secure reparenting or combat taint.
 - **Claim, Then Sweep (Shared Button Ownership):** Every physical slot has exactly one static item button (`itemFrame.buttonsBySlotkey`), and that button is shared by the global sections and by every tab view. A `bagProto:Draw` pass releases **nothing** up front:
@@ -35,20 +37,16 @@ Historically, each individual Tab View created its own `WowScrollBox` and scroll
 - **Parent Anchoring:** Views must anchor themselves exclusively to `bag.tabContainer` using `view.content:GetContainer():SetAllPoints(parent)`.
 - **Dumb Rendering:** Views do not calculate or render `Recent Items` or `Free Space` categories, and they omit the `header` and `footer` parameters in their `content:Draw()` calls. They strictly render categories belonging directly to their tab index.
 
-### 3. Stateless Sizing Orchestration (`UpdateBagBounds`)
-- **Rule:** Resizing the main Bag UI window and managing scrollbar visibility is the sole responsibility of the Bag Frame (`bagProto:UpdateBagBounds(w, h)`), not individual views.
-- **Draw Flow:**
+### 3. Sizing Through the Render Pipeline
+- **Rule:** No view and no bag code computes the bag window's size. A draw binds data, then the bag's window renders its tree (`render:RenderNow`, render-pipeline.md), and each drawable sizes itself from what its children returned: the canvas from the sections, the scroll box from the canvas, the window from the scroll box plus the theme's insets.
+- **Draw Flow (`bagProto:Draw`):**
   - `BindGlobalSections(ctx, slotInfo)` puts the global `Recent Items` and `Free Space` data into their sections (it draws `Free Space` only when the current tab's data carries `freeSpace`, data-loader.md §8, and never makes up free-space data of its own; a Free Space section from the previous pass is then released by `FinishGlobalSections`, and its buttons by the pass's sweep), and `LayoutGlobalSections(layout)` lays them out and returns their bounds (`headerW`, `headerH`, `footerW`, `footerH`). Coverage: `spec/frames/bag_draw_ownership_spec.lua` ("Free Space only when the data carries it").
-  - `view:Bind(ctx, self, slotInfo)` binds the active tab's data and `view:Layout(ctx, layout)` lays out its static grid. The layout is `{ itemsPerRow, columns }`.
-  - In the callback, the Bag frame computes the true total accumulated width and height:
-    ```lua
-    local totalW = math.max(headerW, tabW, footerW)
-    local totalH = headerH + tabH + footerH
-    ```
-  - The scroll child's size is explicitly updated: `scrollChild:SetSize(totalW, totalH)`.
-  - `UpdateBagBounds(totalW, totalH)` is called to resize the bag frame and dynamically show or hide the global scrollbar based on screen clamping limits.
+  - `view:Bind(ctx, self, slotInfo)` binds the active tab's data; then `FinishDrawPass` sweeps the buttons nobody claimed.
+  - `ApplySizeSettings` gives the window the view's scale and opacity, and its size mode when that or the view changed (window.md §7).
+  - `render:RenderNow(self.window, { ctx = ctx })` lays everything out in this frame: the canvas (`frames/bagcanvas.lua`) calls `LayoutGlobalSections(layout)` and `view:Layout(ctx, layout)` with the layout `{ itemsPerRow, columns }` and stacks the three containers (total width the widest of them, height their sum); the scroll box sizes its child, caps its own height at the window's `MaxHeight` (90% of the screen in the window's scale) and shows its bar only when the content is taller; the window adds the theme's insets and its parts' rows, never going below its minimums (260 x 100 of content, the tabs' width, the slots panel's width).
+  - A window the player sized (size mode `"window"`) instead hands the content its inner box: the canvas keeps the bag's columns and fits as many items per row as the width allows.
 - **A shown bag is drawn once.** `bagProto:Draw` on a hidden bag only defers (`drawPendingOnShow`), and `bagProto:Show(ctx, slotInfo)` draws the deferred draw (with the caller's `slotInfo` when given) and returns whether it drew. The bank's `items/RefreshBank/Done` handler (`core/init.lua`) draws only when showing did not: a captured bank open drew the whole bank twice in one frame (the second pass skipped every button but still cost 19 ms). Coverage: `spec/core/init_spec.lua` ("bank refresh draw"), `spec/frames/bag_draw_ownership_spec.lua` ("showing a bag (Show)").
-- **Tab-Swap Sizing:** Toggling active tab visibility (switching groups or tabs) runs through the same pure stateless drawing flow synchronously, re-evaluating the active grid's height, updating container/scroll child dimensions, and calling `UpdateBagBounds` instantly to achieve flawless sizing with zero state-holding overhead.
+- **Tab-Swap Sizing:** switching groups or tabs draws again through the same flow, so the window takes the new tab's size at once with nothing cached.
 
 ### 4. Absolute Position Grid and Mathematical Gap Handling
 To support visual gaps and spacers without polluting the UI with thousands of invisible frame regions or heavy unused `ItemButton` objects, the Grid layout engine uses a mathematically calculated absolute-position layout system.

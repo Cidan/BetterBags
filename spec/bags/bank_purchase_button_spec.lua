@@ -147,6 +147,10 @@ describe("Bank Purchase Bank button", function()
       Hide = function() end,
       SetTitle = function() end,
       Draw = function() end,
+      window = {
+        Show = function() frame:Show() end,
+        Hide = function(_, _, callback) frame:Hide() if callback then callback() end end,
+      },
     }
     behavior = bankBehavior:Create(bag)
     behavior:OnCreate(newContext())

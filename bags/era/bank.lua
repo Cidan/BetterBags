@@ -19,9 +19,6 @@ local events = addon:GetModule("Events")
 ---@class Localization: AceModule
 local L = addon:GetModule("Localization")
 
----@class Database: AceModule
-local database = addon:GetModule('Database')
-
 ---@class BagSlots: AceModule
 local bagSlots = addon:GetModule("BagSlots")
 
@@ -35,21 +32,18 @@ local bagSlots = addon:GetModule("BagSlots")
 --- (gated on bag.slots) disappears from the bank.
 -------
 
-function bank.proto:OnShow()
+---@param ctx Context
+function bank.proto:OnShow(ctx)
 	PlaySound(SOUNDKIT.IG_MAINMENU_OPEN)
-
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeInGroup:Play()
-	else
-		self.bag.frame:Show()
-	end
-
+	self.bag.window:Show(ctx)
 	addon.TriggerItemContextChanged()
 end
 
-function bank.proto:OnHide()
-	-- Guard against re-entry to prevent recursion.
+-- OnHide closes the bank window, then the bank itself. CloseBankFrame fires BANKFRAME_CLOSED,
+-- which hides the bag again: the guard stops that while this hide runs, and the window's own
+-- state (hidden, or fading out) stops it afterwards.
+---@param ctx Context
+function bank.proto:OnHide(ctx)
 	if self.isHiding then
 		return
 	end
@@ -58,21 +52,11 @@ function bank.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeOutGroup.callback = function()
-			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			self.isHiding = false  -- Clear flag after animation completes
-			CloseBankFrame()
-			addon.TriggerItemContextChanged()
-		end
-		self.bag.fadeOutGroup:Play()
-	else
-		self.bag.frame:Hide()
-		self.isHiding = false  -- Clear flag immediately
+	self.bag.window:Hide(ctx, function()
 		CloseBankFrame()
 		addon.TriggerItemContextChanged()
-	end
+	end)
+	self.isHiding = false
 end
 
 ---@param ctx Context

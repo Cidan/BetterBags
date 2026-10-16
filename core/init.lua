@@ -271,6 +271,9 @@ function addon:OnInitialize()
 
   -- Apply themes globally -- do not instantiate new windows after this call.
   themes:Enable()
+  -- Sonata decorates every window registered so far with the saved theme (Default when it is
+  -- missing or unavailable this session); windows made later are decorated as they register.
+  addon:GetModule('Sonata'):Enable()
 
   addon.Bags.Backpack:SetTitle(L:G("Backpack"))
 

@@ -3,11 +3,18 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Database: AceModule
-local db = addon:GetModule('Database')
+-- The saved theme lives in the Database module, read when a theme is applied or first looked
+-- up (never per draw).
+---@return Database
+local function db()
+  return addon:GetModule('Database')
+end
 
----@class Events: AceModule
-local events = addon:GetModule('Events')
+-- Messages go out only when a theme is applied.
+---@return Events
+local function events()
+  return addon:GetModule('Events')
+end
 
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
@@ -524,7 +531,7 @@ function sonata:ApplyTheme(ctx, key, save)
   self.applied = true
   self.generation = self.generation + 1
   if save ~= false then
-    db:SetTheme(key)
+    db():SetTheme(key)
   end
 
   local snapshot = {}
@@ -545,15 +552,15 @@ function sonata:ApplyTheme(ctx, key, save)
     end
   end
 
-  events:SendMessage(ctx, 'sonata/ThemeChanged', key)
-  events:SendMessage(ctx, 'bags/Redraw')
+  events():SendMessage(ctx, 'sonata/ThemeChanged', key)
+  events():SendMessage(ctx, 'bags/Redraw')
 end
 
 -- OnEnable applies the saved theme. A saved theme that is missing or unavailable this
 -- session (its addon is not loaded) is replaced by Default without changing the saved
 -- choice, so it comes back once its addon does.
 function sonata:OnEnable()
-  local key = db:GetTheme()
+  local key = db():GetTheme()
   if self:IsSelectable(key) then
     self:ApplyTheme(context:New('Sonata_OnEnable'), key)
   else
@@ -572,7 +579,7 @@ end
 function sonata:GetCurrentTheme()
   local key = self.current
   if key == nil then
-    key = db:GetTheme()
+    key = db():GetTheme()
     if not self:IsSelectable(key) then
       key = 'Default'
     end

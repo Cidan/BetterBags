@@ -213,6 +213,23 @@ function DB:SetBagViewFrameSize(kind, view, width, height)
   DB.data.profile.size[view][kind].height = height
 end
 
+-- GetBagSizeMode returns how the bag's window is sized in the view it shows: "content" (it
+-- fits its contents) or "window" (the player sizes it and its contents reflow).
+---@param kind BagKind
+---@return WindowSizeMode
+function DB:GetBagSizeMode(kind)
+  return DB.data.profile.size[DB:GetBagView(kind)][kind].sizeMode
+end
+
+---@param kind BagKind
+---@param mode WindowSizeMode
+function DB:SetBagSizeMode(kind, mode)
+  if mode ~= "content" and mode ~= "window" then
+    error("unknown bag size mode: " .. tostring(mode))
+  end
+  DB.data.profile.size[DB:GetBagView(kind)][kind].sizeMode = mode
+end
+
 function DB:GetItemLevelOptions(kind)
   return DB.data.profile.itemLevel[kind]
 end

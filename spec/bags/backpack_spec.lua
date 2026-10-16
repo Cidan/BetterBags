@@ -88,20 +88,20 @@ describe("Backpack Module Loading and Compatibility Tests", function()
         customSectionSort = { [0] = {}, [1] = {} },
         size = {
           [1] = {
-            [0] = { columnCount = 15, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
-            [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
+            [0] = { columnCount = 15, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+            [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
           },
           [2] = {
-            [0] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89 },
-            [1] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89 },
+            [0] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+            [1] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
           },
           [3] = {
-            [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
-            [1] = { columnCount = 5, itemsPerRow = 5, scale = 100, width = 700, height = 500, opacity = 89 },
+            [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+            [1] = { columnCount = 5, itemsPerRow = 5, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
           },
           [4] = {
-            [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
-            [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
+            [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+            [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
           },
         },
         views = { [0] = 2, [1] = 2 },
@@ -411,38 +411,45 @@ describe("Backpack Module Loading and Compatibility Tests", function()
   end)
 
   -- The on-close refresh belongs to the bag frame's OnHide (bagProto:OnClosed), which every
-  -- close path fires; refreshing here as well would sweep twice on a normal close.
-  it("does not refresh from its own OnHide, with or without fading", function()
+  -- close path fires; refreshing here as well would sweep twice on a normal close. Fading is
+  -- the window's (window/window.lua), so the behavior hides the same way with or without it.
+  it("hides through the bag's window and does not refresh from its own OnHide", function()
     local loadBase = assert(loadfile("bags/backpack.lua"))
     loadBase("BetterBags")
     local backpack = addon:GetModule("BackpackBehavior")
-    local database = addon:GetModule("Database")
 
     local savedForceHide = addon.ForceHideBlizzardBags
     addon.ForceHideBlizzardBags = function() end
     local savedTrigger = addon.TriggerItemContextChanged
-    addon.TriggerItemContextChanged = function() end
-    finally(function() addon.TriggerItemContextChanged = savedTrigger end)
-    local savedFading = database.GetEnableBagFading
+    local triggered = 0
+    addon.TriggerItemContextChanged = function() triggered = triggered + 1 end
+    finally(function()
+      addon.TriggerItemContextChanged = savedTrigger
+      addon.ForceHideBlizzardBags = savedForceHide
+    end)
 
-    for _, fading in ipairs({ false, true }) do
-      database.GetEnableBagFading = function() return fading end
-      local refreshes = 0
-      local fadeOutGroup = { Play = function(self) self.callback() end }
-      local mockBag = {
-        frame = CreateFrame("Frame", "BetterBagsBackpackCloseTest"),
-        fadeOutGroup = fadeOutGroup,
-        drawOnClose = true,
-        Refresh = function() refreshes = refreshes + 1 end,
-      }
-      mockBag.frame:Show()
+    local refreshes, hides = 0, 0
+    local searchHidden = false
+    local ctx = addon:GetModule("Context"):New("TestClose")
+    local mockBag = {
+      frame = CreateFrame("Frame", "BetterBagsBackpackCloseTest"),
+      drawOnClose = true,
+      Refresh = function() refreshes = refreshes + 1 end,
+      searchFrame = { Hide = function() searchHidden = true end },
+      window = {
+        Hide = function(_, hideCtx, callback)
+          assert.are.equal(ctx, hideCtx)
+          hides = hides + 1
+          callback()
+        end,
+      },
+    }
 
-      backpack:Create(mockBag):OnHide(addon:GetModule("Context"):New("TestClose"))
+    backpack:Create(mockBag):OnHide(ctx)
 
-      assert.are.equal(0, refreshes, "fading = " .. tostring(fading))
-    end
-
-    database.GetEnableBagFading = savedFading
-    addon.ForceHideBlizzardBags = savedForceHide
+    assert.are.equal(1, hides)
+    assert.are.equal(0, refreshes)
+    assert.is_true(searchHidden)
+    assert.are.equal(1, triggered)
   end)
 end)

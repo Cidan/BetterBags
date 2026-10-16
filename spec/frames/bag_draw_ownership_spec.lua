@@ -250,7 +250,16 @@ local function stubModules()
 
   local contextMenu = stubModule("ContextMenu")
   override(contextMenu, "CreateContextMenu", function() return {} end)
-  stubModule("Resize")
+  stubModule("BagMenuButton")
+  stubModule("SearchBox")
+  override(database, "GetBagPosition", function() return {} end)
+  override(database, "GetBagSizeMode", function() return "content" end)
+  override(database, "GetBagViewFrameSize", function() return 700, 500 end)
+  override(database, "SetBagViewFrameSize", function() end)
+  override(database, "GetEnableBagFading", function() return false end)
+  override(database, "GetTheme", function() return "Default" end)
+  override(database, "SetTheme", function() end)
+  stubModule("Fonts")
   stubModule("Question")
   stubModule("WindowGroup")
   stubModule("Anchor")
@@ -259,6 +268,17 @@ local function stubModules()
 end
 
 local function loadRealModules()
+  LoadBetterBagsModule("render/render.lua")
+  LoadBetterBagsModule("render/drawable.lua")
+  LoadBetterBagsModule("render/scrollbox.lua")
+  LoadBetterBagsModule("sonata/engine.lua")
+  LoadBetterBagsModule("sonata/apply.lua")
+  LoadBetterBagsModule("sonata/decoration.lua")
+  LoadBetterBagsModule("window/window.lua")
+  ResetModuleStub("BagCanvas", "frames/bagcanvas.lua")
+  LoadBetterBagsModule("frames/bagcanvas.lua")
+  addon:GetModule("Render"):Init()
+  addon:GetModule("Sonata"):Init()
   ResetModuleStub("ItemFrame", "frames/item.lua")
   LoadBetterBagsModule("frames/item.lua")
   ResetModuleStub("SectionFrame", "frames/section.lua")
@@ -275,6 +295,7 @@ end
 
 local function unloadRealModules()
   ResetModuleStub("BagFrame", "frames/bag.lua")
+  ResetModuleStub("BagCanvas", "frames/bagcanvas.lua")
   ResetModuleStub("Views", "views/views.lua")
   ResetModuleStub("GridViewDummy", "views/gridview.lua")
   ResetModuleStub("BagViewDummy", "views/bagview.lua")
@@ -282,27 +303,27 @@ local function unloadRealModules()
   ResetModuleStub("ItemFrame", "frames/item.lua")
 end
 
--- Builds a Bag object on top of the real bagProto with the frame hierarchy that
--- bagFrame:Create() would normally wire up.
+-- Builds a Bag object on top of the real bagProto with the window, scroll box and canvas
+-- bagFrame:Create() builds (BuildWindow), shown, as an open bag is.
+local bagCount = 0
 local function newBag()
   local bagProto = addon:GetModule("BagFrame").bagProto
-  local frame = CreateFrame("Frame", "BetterBagsOwnershipTestBag")
-  frame.SetScale = function() end
-  local scrollChild = CreateFrame("Frame", nil, frame)
-  local bag = {
+  bagCount = bagCount + 1
+  local bag = setmetatable({
     kind = const.BAG_KIND.BACKPACK,
-    frame = frame,
     tabViews = {},
     itemFrames = {},
     globalSections = {},
-    scrollChild = scrollChild,
-    headerContainer = CreateFrame("Frame", nil, scrollChild),
-    tabContainer = CreateFrame("Frame", nil, scrollChild),
-    footerContainer = CreateFrame("Frame", nil, scrollChild),
-    OnResize = function() end,
-    behavior = { OnShow = function() end },
-  }
-  return setmetatable(bag, { __index = bagProto })
+    behavior = {
+      OnShow = function() end,
+      GetFrameStrata = function() return "MEDIUM" end,
+      GetFrameLevel = function() return 500 end,
+    },
+  }, { __index = bagProto })
+  bag:BuildWindow("OwnershipSpec" .. bagCount)
+  bag.OnResize = function() end
+  bag.frame:Show()
+  return bag
 end
 
 local function itemAt(bagid, slotid, category)
@@ -1276,6 +1297,214 @@ describe("Bag Draw: shared item button ownership across global sections and view
       sectionFrame:OnTitleClickOrDrop(context:New("drop"), section)
       assert.are.same({ { itemID = 1001, category = "Armor" } }, added)
       assert.are.same({}, placements)
+    end)
+  end)
+
+  describe("the bag's window (BuildWindow, BuildParts, PlaceParts)", function()
+    local sizeInfo, sizeMode, view, frameSizes, inBagSearch, sent, placed
+
+    before_each(function()
+      sizeInfo = { itemsPerRow = 5, columnCount = 2, scale = 100, opacity = 89 }
+      sizeMode, view, inBagSearch = "content", const.BAG_VIEW.SECTION_GRID, false
+      frameSizes, sent, placed = {}, {}, {}
+      local database = addon:GetModule("Database")
+      override(database, "GetBagSizeInfo", function() return sizeInfo end)
+      override(database, "GetBagView", function() return view end)
+      override(database, "GetBagSizeMode", function() return sizeMode end)
+      override(database, "GetInBagSearch", function() return inBagSearch end)
+      override(database, "GetBagViewFrameSize", function() return 640, 480 end)
+      override(database, "SetBagViewFrameSize", function(_, kind, v, w, h)
+        table.insert(frameSizes, { kind, v, w, h })
+      end)
+      override(events, "SendMessage", function(_, _, message, payload)
+        table.insert(sent, { message, payload })
+      end)
+      local searchBox = addon:GetModule("SearchBox")
+      override(searchBox, "CreateBox", function(_, kind, parent)
+        return { kind = kind, frame = CreateFrame("Frame", nil, parent) }
+      end)
+      local menuButton = addon:GetModule("BagMenuButton")
+      override(menuButton, "Create", function(_, bag) return CreateFrame("Button", nil, bag.frame) end)
+      override(menuButton, "Place", function(_, button, layout, frame, overlay)
+        table.insert(placed, { button = button, layout = layout, frame = frame, overlay = overlay })
+      end)
+    end)
+
+    -- partsBag builds a bag with its window and parts, decorated with a theme whose bag
+    -- window has insets and a layout like the Base theme's.
+    local function partsBag()
+      local sonata = addon:GetModule("Sonata")
+      override(sonata, "themes", {})
+      sonata:RegisterTheme({ Name = "Base", Hidden = true, Windows = { Bag = {
+        Insets = { Left = 6, Right = 6, Top = 42, Bottom = 3 },
+        Layout = {
+          Search = { Points = { { Point = "TOPLEFT", X = 20, Y = -30 },
+            { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -10, Y = -50 } }, Reserve = 20 },
+          Footer = { Left = 6, Right = 6, Bottom = 6, Height = 20, Reserve = 26 },
+          MenuButton = { Points = { { Point = "TOPLEFT", X = -10, Y = 7 } } },
+          SideOffset = -4,
+        },
+      } } })
+      sonata:RegisterTheme({ Name = "Default" })
+      local bag = newBag()
+      bag:BuildParts()
+      sonata:ApplyTheme(context:New("spec"), "Default")
+      return bag
+    end
+
+    it("is a Bag window named for its bag, laying out the bag's canvas in a scroll box", function()
+      local bag = newBag()
+      assert.are.equal("Bag", bag.window.kind)
+      assert.are.equal(bag.window.frame, bag.frame)
+      assert.is_truthy(bag.frame:GetName():find("^BetterBagsBag"))
+      assert.are.equal(bag.scroll, bag.window:GetContent())
+      assert.are.equal(bag.canvas, bag.scroll.child)
+      assert.are.equal(bag.canvas.headerContainer, bag.headerContainer)
+      assert.are.equal(bag.canvas.tabContainer, bag.tabContainer)
+      assert.are.equal(bag.canvas.footerContainer, bag.footerContainer)
+    end)
+
+    it("reads its opacity, scale, size mode, saved size and fading from the bag's settings", function()
+      local bag = newBag()
+      sizeInfo.opacity, sizeInfo.scale, sizeMode = 40, 150, "window"
+      assert.are.equal(40, bag.window:GetOpacity())
+      bag.window:UpdateScale(true)
+      assert.are.equal(1.5, bag.frame:GetScale())
+      assert.are.equal("window", bag.window:GetSizeMode())
+      assert.are.same({ 640, 480 }, { bag.window.opts.Size() })
+      override(addon:GetModule("Database"), "GetEnableBagFading", function() return true end)
+      assert.is_true(bag.window.opts.Fade())
+    end)
+
+    it("saves the size the player left it at for the view it shows", function()
+      local bag = newBag()
+      bag.window.opts.OnResized(context:New("spec"), 640, 480)
+      assert.are.same({ { const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID, 640, 480 } }, frameSizes)
+    end)
+
+    it("never makes its content narrower than its tabs or the minimum, plus the scroll bar", function()
+      local bag = newBag()
+      local bar = bag.scroll:GetBarWidth()
+      assert.are.equal(260 + bar, bag.window.opts.MinContentWidth())
+      bag.tabs = { width = 400 }
+      assert.are.equal(400 + bar, bag.window.opts.MinContentWidth())
+      assert.are.equal(100, bag.window.opts.MinContentHeight)
+    end)
+
+    it("is at least as wide as its slots panel while that shows", function()
+      local bag = newBag()
+      local slotsFrame = CreateFrame("Frame")
+      slotsFrame:SetWidth(500)
+      local shown = false
+      bag.slots = { frame = slotsFrame, IsShown = function() return shown end }
+      assert.are.equal(0, bag.window.opts.MinWidth())
+      shown = true
+      assert.are.equal(500, bag.window.opts.MinWidth())
+    end)
+
+    it("asks its bag to close when its close button is clicked", function()
+      local bag = newBag()
+      local hidden
+      bag.Hide = function(_, c) hidden = c end
+      local c = context:New("spec")
+      bag.window.opts.OnClose(c)
+      assert.are.equal(c, hidden)
+    end)
+
+    it("applies the view's scale and opacity on every draw", function()
+      local bag = newBag()
+      local opacities = 0
+      local updateOpacity = bag.window.UpdateOpacity
+      bag.window.UpdateOpacity = function(w)
+        opacities = opacities + 1
+        return updateOpacity(w)
+      end
+      sizeInfo.scale = 120
+      bag:Draw(context:New("spec"), slotInfoWith({}, {}), function() end)
+      assert.are.equal(1.2, bag.frame:GetScale())
+      assert.are.equal(1, opacities)
+    end)
+
+    it("applies the size mode on a draw only when it or the view changed", function()
+      local bag = newBag()
+      local applied = 0
+      local updateSizeMode = bag.window.UpdateSizeMode
+      bag.window.UpdateSizeMode = function(w)
+        applied = applied + 1
+        return updateSizeMode(w)
+      end
+      local data = slotInfoWith({}, {})
+      bag:Draw(context:New("spec"), data, function() end)
+      bag:Draw(context:New("spec"), data, function() end)
+      assert.are.equal(1, applied)
+      sizeMode = "window"
+      bag:Draw(context:New("spec"), data, function() end)
+      assert.are.equal(2, applied)
+      assert.are.same({ 640, 480 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      bag.frame:SetSize(700, 500)
+      bag:Draw(context:New("spec"), data, function() end)
+      assert.are.same({ 700, 500 }, { bag.frame:GetWidth(), bag.frame:GetHeight() })
+      view = const.BAG_VIEW.SECTION_ALL_BAGS
+      bag:Draw(context:New("spec"), data, function() end)
+      assert.are.equal(3, applied)
+    end)
+
+    it("puts the search box where the theme says, and reserves its room while in-bag search is on", function()
+      inBagSearch = true
+      local bag = partsBag()
+      local box = bag.searchBox.frame
+      assert.are.equal(const.BAG_KIND.BACKPACK, bag.searchBox.kind)
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 20, -30 }, { box:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bag.frame, "TOPRIGHT", -10, -50 }, { box:GetPoint(2) })
+      assert.is_true(box:IsShown())
+      assert.is_true(box:GetFrameLevel() > bag.window.decoration:GetOverlayFrame():GetFrameLevel())
+      assert.are.same({ Left = 6, Right = 6, Top = 62, Bottom = 29 }, bag.window:GetContentInsets())
+
+      inBagSearch = false
+      bag:UpdateSearchShown()
+      assert.is_false(box:IsShown())
+      assert.are.same({ Left = 6, Right = 6, Top = 42, Bottom = 29 }, bag.window:GetContentInsets())
+    end)
+
+    it("recalculates the bags when in-bag search is turned on or off", function()
+      local bag = partsBag()
+      inBagSearch = true
+      bag:SetSearchShown(context:New("spec"))
+      assert.is_true(bag.searchBox.frame:IsShown())
+      assert.are.same({ "bags/Rederive", { resetLayout = true, buttons = true } }, sent[#sent])
+    end)
+
+    it("puts the footer bar along the bottom, the menu button and the side panels where the theme says", function()
+      local bag = partsBag()
+      assert.are.same({ "BOTTOMLEFT", bag.frame, "BOTTOMLEFT", 6, 6 }, { bag.bottomBar:GetPoint(1) })
+      assert.are.same({ "BOTTOMRIGHT", bag.frame, "BOTTOMRIGHT", -6, 6 }, { bag.bottomBar:GetPoint(2) })
+      assert.are.equal(20, bag.bottomBar:GetHeight())
+      local last = placed[#placed]
+      assert.are.equal(bag.menuButton, last.button)
+      assert.are.same({ { Point = "TOPLEFT", X = -10, Y = 7 } }, last.layout.Points)
+      assert.are.equal(bag.frame, last.frame)
+      assert.are.equal(bag.window.decoration:GetOverlayFrame(), last.overlay)
+      assert.are.same({ "TOPRIGHT", bag.frame, "TOPLEFT", -4, 0 }, { bag.sideAnchor:GetPoint(1) })
+    end)
+
+    it("keeps its bottom edge, or follows its anchor, when sized to its content", function()
+      local bag = newBag()
+      bag.OnResize = nil
+      local anchorFrame = CreateFrame("Frame")
+      bag.anchor = { IsActive = function() return true end, anchorPoint = "BOTTOMRIGHT", frame = anchorFrame }
+      bag:OnResize()
+      assert.are.same({ "BOTTOMRIGHT", anchorFrame, "BOTTOMRIGHT", 0, 0 }, { bag.frame:GetPoint(1) })
+    end)
+
+    it("stays where the player put it when the player sizes it", function()
+      local bag = newBag()
+      bag.OnResize = nil
+      sizeMode = "window"
+      bag.frame:ClearAllPoints()
+      bag.frame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 100, -100)
+      bag.anchor = { IsActive = function() return true end, anchorPoint = "BOTTOMRIGHT", frame = CreateFrame("Frame") }
+      bag:OnResize()
+      assert.are.same({ "TOPLEFT", UIParent, "TOPLEFT", 100, -100 }, { bag.frame:GetPoint(1) })
     end)
   end)
 end)

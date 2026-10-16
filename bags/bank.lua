@@ -124,79 +124,40 @@ function bank.proto:OnShow(ctx)
 		end
 	end
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		-- Set up callback to handle BankPanel and tab initialization
-		self.bag.fadeInGroup.callback = function()
-			self.bag.fadeInGroup.callback = nil  -- Clean up callback
+	-- CRITICAL: BankPanel taint handling (see patterns.md)
+	-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
+	bank:SuppressBlizzardBankPanel()
 
-			-- CRITICAL: BankPanel taint handling (see patterns.md)
-			-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
-			bank:SuppressBlizzardBankPanel()
+	local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
+	self.bag.tabs:SetTabByID(ctx, activeGroup)
+	self:SwitchToGroup(ctx, activeGroup)
 
-			local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
-			self.bag.tabs:SetTabByID(ctx, activeGroup)
-			self:SwitchToGroup(ctx, activeGroup)
+	self.bag.moneyFrame:Update()
+	self.bag.window:Show(ctx)
+	addon.TriggerItemContextChanged()
 
-			self.bag.moneyFrame:Update()
-			addon.TriggerItemContextChanged()
-
-			-- Restore the bank tab slots panel when the setting is enabled,
-			-- so re-opening the bank shows the same mode as when it was closed.
-			if self.bag.slots and database:GetShowBankTabs() then
-				-- Ensure BankPanel bank type matches the pre-selected first tab.
-				-- SwitchToGroup() above may have set it to Account if the active
-				-- group is a Warbank group; correct it here so right-click item
-				-- deposits go to the right bank type for the displayed tab.
-				local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
-				if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
-					if firstButton.bankType == Enum.BankType.Account then
-						addon.SetBlizzardBankType(Enum.BankType.Account)
-					else
-						addon.SetBlizzardBankType(Enum.BankType.Character)
-					end
-				end
-				self.bag.slots:Draw(ctx)
-				self.bag.slots:Show()
+	-- Restore the bank tab slots panel when the setting is enabled,
+	-- so re-opening the bank shows the same mode as when it was closed.
+	if self.bag.slots and database:GetShowBankTabs() then
+		-- Ensure BankPanel bank type matches the pre-selected first tab.
+		-- SwitchToGroup() above may have set it to Account if the active
+		-- group is a Warbank group; correct it here so right-click item
+		-- deposits go to the right bank type for the displayed tab.
+		local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
+		if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
+			if firstButton.bankType == Enum.BankType.Account then
+				addon.SetBlizzardBankType(Enum.BankType.Account)
+			else
+				addon.SetBlizzardBankType(Enum.BankType.Character)
 			end
 		end
-		self.bag.fadeInGroup:Play()
-	else
-		-- Direct show path (existing logic)
-		-- CRITICAL: BankPanel taint handling (see patterns.md)
-		-- BankPanel must be shown (even invisibly) for GetActiveBankType to work.
-		bank:SuppressBlizzardBankPanel()
-
-		local activeGroup = database:GetActiveGroup(const.BAG_KIND.BANK)
-		self.bag.tabs:SetTabByID(ctx, activeGroup)
-		self:SwitchToGroup(ctx, activeGroup)
-
-		self.bag.moneyFrame:Update()
-		self.bag.frame:Show()
-		addon.TriggerItemContextChanged()
-
-		-- Restore the bank tab slots panel when the setting is enabled,
-		-- so re-opening the bank shows the same mode as when it was closed.
-		if self.bag.slots and database:GetShowBankTabs() then
-			-- Ensure BankPanel bank type matches the pre-selected first tab.
-			-- SwitchToGroup() above may have set it to Account if the active
-			-- group is a Warbank group; correct it here so right-click item
-			-- deposits go to the right bank type for the displayed tab.
-			local firstButton = self.bag.slots.buttons and self.bag.slots.buttons[1]
-			if firstButton and addon.isRetail and BankPanel and BankPanel.SetBankType then
-				if firstButton.bankType == Enum.BankType.Account then
-					addon.SetBlizzardBankType(Enum.BankType.Account)
-				else
-					addon.SetBlizzardBankType(Enum.BankType.Character)
-				end
-			end
-			self.bag.slots:Draw(ctx)
-			self.bag.slots:Show()
-		end
+		self.bag.slots:Draw(ctx)
+		self.bag.slots:Show()
 	end
 end
 
-function bank.proto:OnHide()
+---@param ctx Context
+function bank.proto:OnHide(ctx)
 	-- IMPORTANT: Do NOT touch BankPanel or call CloseBankFrame() here.
 	-- OnHide runs in protected context when triggered by UISpecialFrames (ESC key).
 	-- Any BankPanel manipulation here causes persistent taint that breaks UseContainerItem()
@@ -206,35 +167,18 @@ function bank.proto:OnHide()
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_MAINMENU_CLOSE)
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeOutGroup.callback = function()
-			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			-- Explicitly reset the bank slots panel's shown state so it does not
-			-- auto-reappear when the bank is reopened (bag.frame:Show() would
-			-- otherwise re-show any child whose IsShown() is still true).
-			if self.bag.slots then
-				local ctx = context:New("OnHide")
-				if self.bag.slots.OnClose then
-					self.bag.slots:OnClose(ctx)
-				end
-				self.bag.slots.frame:Hide()
-			end
-			addon.TriggerItemContextChanged()
-		end
-		self.bag.fadeOutGroup:Play()
-	else
-		self.bag.frame:Hide()
-		-- Explicitly reset the bank slots panel's shown state (see fade path above).
+	self.bag.window:Hide(ctx, function()
+		-- Explicitly reset the bank slots panel's shown state so it does not
+		-- auto-reappear when the bank is reopened (bag.frame:Show() would
+		-- otherwise re-show any child whose IsShown() is still true).
 		if self.bag.slots then
-			local ctx = context:New("OnHide")
 			if self.bag.slots.OnClose then
-				self.bag.slots:OnClose(ctx)
+				self.bag.slots:OnClose(ctx or context:New("OnHide"))
 			end
 			self.bag.slots.frame:Hide()
 		end
 		addon.TriggerItemContextChanged()
-	end
+	end)
 end
 
 -- SwitchToBlizzardTab filters the bank view to show only items from the

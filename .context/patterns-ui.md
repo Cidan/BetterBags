@@ -157,11 +157,11 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 
 **Problem**: WoW secure item buttons and empty slot buttons are bound to unique physical slot keys and cannot be reparented or dynamically moved between views during active combat without causing fatal "Action blocked" taint errors. Storing scrollboxes inside individual tab views requires secure buttons to be reparented on tab switches.
 **Solution**: Decouple the scrolling container from individual tab views.
-1. Implement exactly **one single global `WowScrollBox` and scrollbar** at the Bag window level (`frames/bag.lua`).
-2. Statically stack three containers vertically inside the global scroll child: `headerContainer` (Recent Items), `tabContainer` (active Tab View), and `footerContainer` (Free Space).
+1. Implement exactly **one scroll box** per bag window: the `Scrollbox` drawable (`render/scrollbox.lua`, a `WowScrollBox` with a `MinimalScrollBar`), the content of the bag's `Window`.
+2. Statically stack three containers vertically on the scroll box's child, the bag's canvas (`frames/bagcanvas.lua`): `headerContainer` (Recent Items), `tabContainer` (active Tab View), and `footerContainer` (Free Space).
 3. Tab views become perfectly dumb and non-scrollable, rendering their layout grids directly into `tabContainer` via `grid:Create(parent, false)` and `SetAllPoints(parent)`.
 4. Switch tabs by simply toggling visibility of the layout grids in `tabContainer` with zero secure reparenting or combat taint.
-**Key Files**: `frames/bag.lua`, `frames/grid.lua`, `views/gridview_new.lua`, `views/bagview_new.lua`.
+**Key Files**: `frames/bag.lua`, `frames/bagcanvas.lua`, `render/scrollbox.lua`, `window/window.lua`, `frames/grid.lua`, `views/views.lua`.
 
 ## Form Sliders Save Only User Input
 **Problem**: WoW fires a Slider's `OnValueChanged(self, value, userInput)` whenever its value changes, including when code calls `SetValue` (`userInput` false). A form that sets each slider from its stored setting at build time and on reload, and saves in `OnValueChanged`, writes every setting back and fires every setting's side effect (refreshes) at every login.

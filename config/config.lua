@@ -582,6 +582,10 @@ function config:CreateConfig()
       end,
       setValue = function(_, value)
         db:SetBagViewSizeOpacity(bagType.kind, db:GetBagView(bagType.kind), value)
+        local bag = addon:GetBagFromKind(bagType.kind)
+        if bag then
+          bag.window:UpdateOpacity()
+        end
         themes:UpdateOpacity()
       end,
     })
@@ -596,11 +600,11 @@ function config:CreateConfig()
         return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).scale
       end,
       setValue = function(_, value)
-        -- TODO(lobato): This should be an event.
-        local bag = addon:GetBagFromKind(bagType.kind)
-        if not bag then return end
-        bag.frame:SetScale(value / 100)
         db:SetBagViewSizeScale(bagType.kind, db:GetBagView(bagType.kind), value)
+        local bag = addon:GetBagFromKind(bagType.kind)
+        if bag then
+          bag.window:UpdateScale()
+        end
       end,
     })
 

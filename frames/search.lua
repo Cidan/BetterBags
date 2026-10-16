@@ -169,7 +169,7 @@ end
 --
 -- The live filter is driven by whichever box the user typed into. When in-bag
 -- search is enabled (the default), that is the per-kind in-bag box created by
--- searchBox:CreateBox and stored on the themed decoration as `decoration.search`
+-- searchBox:CreateBox and kept by its bag as `bag.searchBox`
 -- -- a distinct SearchFrame instance from the module-level overlay searchFrame.
 -- GetText() only ever sees the overlay box, so the data pipeline
 -- (data/items.lua Phase8_EnrichCategories) must call this kind-aware getter when
@@ -180,22 +180,34 @@ end
 ---@return string
 function searchBox:GetSearchText(kind)
   if kind ~= nil and database:GetInBagSearch() then
-    local themes = addon:GetModule('Themes', true)
-    local bags = addon.Bags
-    local bag = bags and ((kind == const.BAG_KIND.BANK) and bags.Bank or bags.Backpack)
-    if themes and bag and bag.frame then
-      local box = themes:GetInBagSearchBox(bag.frame)
-      if box and box.textBox then
-        local text = box.textBox:GetText()
-        if text and text ~= "" then
-          return text
-        end
+    local box = self:GetInBagBox(kind)
+    if box and box.textBox then
+      local text = box.textBox:GetText()
+      if text and text ~= "" then
+        return text
       end
     end
   end
   -- No active in-bag query: fall back to the overlay box (which searches both
   -- bags), and returns "" when it holds no text.
   return self:GetText()
+end
+
+-- GetInBagBox returns the in-bag search box of the bag of a kind, if that bag exists.
+---@param kind BagKind
+---@return SearchFrame?
+function searchBox:GetInBagBox(kind)
+  local bags = addon.Bags
+  if bags == nil then
+    return nil
+  end
+  local bag
+  if kind == const.BAG_KIND.BANK then
+    bag = bags.Bank
+  else
+    bag = bags.Backpack
+  end
+  return bag and bag.searchBox or nil
 end
 
 ---@param ctx Context
@@ -333,5 +345,6 @@ function searchBox:CreateBox(kind, parent)
   sf.helpText:ClearAllPoints()
   sf.helpText:SetPoint("CENTER")
   sf.frame:Hide()
+  addon:GetModule('Sonata'):RegisterElement("SearchBox", textBox)
   return sf
 end

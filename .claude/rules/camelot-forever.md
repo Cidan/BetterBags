@@ -136,7 +136,7 @@ the enum cannot express, so it is gated on a dedicated predicate rather than the
   - `frames/groupdialog.lua` — the group-creation dialog omits the "Warbank" bank-type option.
   - `bags/bank.lua` — `money:Create(addon.hasWarbank)` (character-only bank wallet).
   - `frames/contextmenu.lua` — omits the "Clean Up Warbank" menu entry.
-  - `themes/themes.lua` — bag-menu button drops the "Deposit Warbank Items" tooltip line and
+  - `frames/menubutton.lua` — bag-menu button drops the "Deposit Warbank Items" tooltip line and
     the shift-right deposit / SortWarbank branch; on Forever right-click always sorts the
     character bank (see bag-menu-button.md).
   - `data/refresh.lua` — a backpack sort with the bank open no longer sets `sortWarbank`.

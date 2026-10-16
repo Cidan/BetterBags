@@ -190,6 +190,56 @@ describe("Config settings refreshes", function()
     end)
   end
 
+  -- Opacity and scale belong to the bag's window: it fades its background or rescales and
+  -- lays itself out again, with no message to the bags at all.
+  describe("opacity and scale", function()
+    local windows, savedValues
+
+    before_each(function()
+      windows, savedValues = {}, {}
+      local themes = addon:GetModule("Themes")
+      for _, entry in ipairs({
+        { db, "SetBagViewSizeOpacity", function(_, kind, _, value) savedValues[#savedValues + 1] = { "opacity", kind, value } end },
+        { db, "SetBagViewSizeScale", function(_, kind, _, value) savedValues[#savedValues + 1] = { "scale", kind, value } end },
+        { themes, "UpdateOpacity", function() end },
+        { addon, "GetBagFromKind", function(_, kind)
+          windows[kind] = windows[kind] or { opacity = 0, scale = 0, quiet = {} }
+          local w = windows[kind]
+          return { window = {
+            UpdateOpacity = function() w.opacity = w.opacity + 1 end,
+            UpdateScale = function(_, quiet) w.scale = w.scale + 1 table.insert(w.quiet, quiet == true) end,
+          } }
+        end },
+      }) do
+        saved[#saved + 1] = { entry[1], entry[2], entry[1][entry[2]] }
+        entry[1][entry[2]] = entry[3]
+      end
+    end)
+
+    it("saves the opacity and fades the bag's window, sending nothing to the bags", function()
+      for _, opts in ipairs(settings("Opacity")) do
+        sent, savedValues = {}, {}
+        opts.setValue(context:New("Test"), 55)
+        assert.are.same({}, messages())
+        assert.are.equal("opacity", savedValues[1][1])
+        assert.are.equal(55, savedValues[1][3])
+        assert.are.equal(1, windows[savedValues[1][2]].opacity)
+      end
+    end)
+
+    it("saves the scale and rescales the bag's window, which lays itself out again", function()
+      for _, opts in ipairs(settings("Scale")) do
+        sent, savedValues = {}, {}
+        opts.setValue(context:New("Test"), 120)
+        assert.are.same({}, messages())
+        assert.are.equal(120, savedValues[1][3])
+        local w = windows[savedValues[1][2]]
+        assert.are.equal(1, w.scale)
+        assert.are.same({ false }, w.quiet)
+      end
+    end)
+  end)
+
   -- The item hash, which decides what stacks, includes the transmog appearance only with
   -- this setting; the hash is computed when a slot is read.
   it("reads the bags again for Split Transmogged Items", function()

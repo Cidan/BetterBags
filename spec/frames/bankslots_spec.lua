@@ -9,6 +9,16 @@ local events = addon:GetModule("Events")
 events:Init()
 
 addon.ForceHideBlizzardBags = function() end
+addon.TriggerItemContextChanged = addon.TriggerItemContextChanged or function() end
+
+-- windowOf mocks a bag window: Hide hides the frame and calls back, as Window:Hide does
+-- without a fade.
+local function windowOf(frame)
+  return {
+    Show = function() frame:Show() end,
+    Hide = function(_, _, callback) frame:Hide() if callback then callback() end end,
+  }
+end
 
 local ctx = addon:GetModule("Context")
 
@@ -304,6 +314,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
         Wipe = function() end,
         Draw = function() end,
         blizzardBankTab = 10,
+        window = windowOf(bagFrame),
       }
 
       local bankBehavior = addon:GetModule("BankBehavior")
@@ -343,6 +354,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
         },
         slots = panel,
         Wipe = function() end,
+        window = windowOf(bagFrame),
       }
 
       local bankBehavior = addon:GetModule("BankBehavior")

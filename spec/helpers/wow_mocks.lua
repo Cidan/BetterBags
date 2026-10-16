@@ -120,6 +120,11 @@ local function CreateMockAnimationGroup(region, name)
     finish(self, false)
   end
   function group:IsPlaying() return self._playing == true end
+  -- Restart(reverse, offset) stops the group and plays it again from the start.
+  function group:Restart(reverse)
+    self:Stop()
+    self:Play(reverse)
+  end
   function group:SetLooping(loopType) self._looping = loopType end
   function group:SetToFinalAlpha(setToFinalAlpha) self._toFinalAlpha = setToFinalAlpha end
   return group
@@ -255,6 +260,33 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:GetHeight()
     return self._height or 0
+  end
+  -- ScriptRegion:GetSize(ignoreRect?) -> width, height.
+  function widget:GetSize()
+    return self:GetWidth(), self:GetHeight()
+  end
+  -- ScriptRegion:GetLeft/GetRight/GetTop/GetBottom/GetCenter "MayReturnNothing": with no
+  -- layout engine in specs, a frame's rect is never resolved unless a spec sets it with
+  -- _SetRect(left, bottom, width, height).
+  function widget:_SetRect(left, bottom, width, height)
+    self._rect = { left = left, bottom = bottom }
+    self:SetSize(width, height)
+  end
+  function widget:GetLeft()
+    return self._rect and self._rect.left
+  end
+  function widget:GetBottom()
+    return self._rect and self._rect.bottom
+  end
+  function widget:GetRight()
+    return self._rect and (self._rect.left + self:GetWidth())
+  end
+  function widget:GetTop()
+    return self._rect and (self._rect.bottom + self:GetHeight())
+  end
+  function widget:GetCenter()
+    if self._rect == nil then return nil end
+    return self._rect.left + self:GetWidth() / 2, self._rect.bottom + self:GetHeight() / 2
   end
   function widget:SetAlpha(alpha)
     self._alpha = alpha
@@ -523,6 +555,13 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:SetClampedToScreen(clamped)
     self._clamped = clamped
+  end
+  function widget:IsClampedToScreen()
+    return self._clamped == true
+  end
+  -- Frame:SetClampRectInsets(left, right, top, bottom).
+  function widget:SetClampRectInsets(left, right, top, bottom)
+    self._clampRectInsets = { left, right, top, bottom }
   end
   function widget:SetMovable(movable)
     self._movable = movable

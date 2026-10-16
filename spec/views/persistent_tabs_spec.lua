@@ -227,6 +227,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   local old_strsplit = _G.strsplit
   local old_split = string.split
 
+  local createdBagStubs = {}
   local function setupBagFrameStubs()
     -- Register mock LibWindow-1.1 library
     local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
@@ -238,8 +239,6 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     contextMenu.CreateContextMenu = function() return {} end
 
     StubBetterBagsModule("BagSlots")
-    local resize = StubBetterBagsModule("Resize")
-    resize.MakeResizable = function() return { Hide = function() end } end
 
     StubBetterBagsModule("Currency")
     local searchBox = StubBetterBagsModule("SearchBox")
@@ -254,6 +253,53 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     StubBetterBagsModule("Question")
     StubBetterBagsModule("BackpackBehavior")
     StubBetterBagsModule("BankBehavior")
+    -- Stubs this spec creates are torn down after each test (another spec file may load
+    -- the real module later); modules that already existed are left alone.
+    for _, name in ipairs({ "BagMenuButton", "CursorPlacement", "Fonts" }) do
+      local _, created = StubBetterBagsModule(name)
+      if created then
+        table.insert(createdBagStubs, name)
+      end
+    end
+
+    database.GetBagPosition = database.GetBagPosition or function() return {} end
+    database.GetBagSizeMode = database.GetBagSizeMode or function() return "content" end
+    database.GetBagViewFrameSize = database.GetBagViewFrameSize or function() return 700, 500 end
+    database.GetEnableBagFading = database.GetEnableBagFading or function() return false end
+    database.GetTheme = database.GetTheme or function() return "Default" end
+
+    LoadBetterBagsModule("render/render.lua")
+    LoadBetterBagsModule("render/drawable.lua")
+    LoadBetterBagsModule("render/scrollbox.lua")
+    LoadBetterBagsModule("sonata/engine.lua")
+    LoadBetterBagsModule("sonata/apply.lua")
+    LoadBetterBagsModule("sonata/decoration.lua")
+    LoadBetterBagsModule("window/window.lua")
+    ResetModuleStub("BagCanvas", "frames/bagcanvas.lua")
+    LoadBetterBagsModule("frames/bagcanvas.lua")
+    addon:GetModule("Render"):Init()
+    addon:GetModule("Sonata"):Init()
+  end
+
+  -- windowedBag builds a bag on the real bagProto with the window bagFrame:Create builds, shown.
+  local bagCount = 0
+  local function windowedBag(fields)
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      tabViews = {},
+      behavior = {
+        OnShow = function() end,
+        GetFrameStrata = function() return "MEDIUM" end,
+        GetFrameLevel = function() return 500 end,
+      },
+    }
+    for k, v in pairs(fields or {}) do bag[k] = v end
+    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    bagCount = bagCount + 1
+    bag:BuildWindow("PersistentTabsSpec" .. bagCount)
+    bag.OnResize = function() end
+    bag.frame:Show()
+    return bag
   end
   before_each(function()
     _G.strsplit = function(sep, str, max)
@@ -277,7 +323,10 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey = {}
     ResetModuleStub("ContextMenu")
     ResetModuleStub("BagSlots")
-    ResetModuleStub("Resize")
+    for i = #createdBagStubs, 1, -1 do
+      ResetModuleStub(createdBagStubs[i])
+    end
+    createdBagStubs = {}
     ResetModuleStub("Currency")
     ResetModuleStub("SearchBox")
     ResetModuleStub("ThemeConfig")
@@ -427,20 +476,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   it("renders only the active tab's view in bag:Draw(); other tabs render when switched to", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local frame = CreateFrame("Frame")
-    frame.SetScale = function() end
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-      tabViews = {},
-      GetCurrentTabID = function() return 1 end,
-      IsShown = function() return true end,
-      OnResize = function() end,
-      behavior = {
-        OnShow = function() end,
-      }
-    }
-    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
 
     local ctx = context:New("test")
     -- Create view for Tab 1 and Tab 2
@@ -475,21 +511,10 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   it("should skip rendering in Draw() when the bag is not shown, and draw when shown", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local frame = CreateFrame("Frame")
-    frame.SetScale = function() end
     local shown = false
-    frame.IsShown = function() return shown end
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-      tabViews = {},
-      GetCurrentTabID = function() return 1 end,
-      OnResize = function() end,
-      behavior = {
-        OnShow = function() shown = true end,
-      }
-    }
-    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
+    bag.behavior.OnShow = function() shown = true end
+    bag.frame.IsShown = function() return shown end
 
     local ctx = context:New("test")
     local view = bag:GetViewForTab(ctx, 1)
@@ -865,20 +890,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   it("does not wipe any view during bag:Draw(); every view begins and finishes a render pass", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local frame = CreateFrame("Frame")
-    frame.SetScale = function() end
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-      tabViews = {},
-      GetCurrentTabID = function() return 1 end,
-      IsShown = function() return true end,
-      OnResize = function() end,
-      behavior = {
-        OnShow = function() end,
-      }
-    }
-    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
 
     local ctx = context:New("test")
     -- Create view for Tab 1 and Tab 2
@@ -935,21 +947,23 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(bagView.isNew)
   end)
 
-  it("should support stateless sizing via bagProto:UpdateBagBounds", function()
+  it("sizes the bag window around its canvas: the view, the scroll bar, at least the minimum", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local bagProto = addon:GetModule("BagFrame").bagProto
-    assert.is_not_nil(bagProto.UpdateBagBounds, "bagProto:UpdateBagBounds should be defined")
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
+    local view = bag:GetViewForTab(context:New("test"), 1)
+    view.Bind = function() end
+    view.Layout = function() return 400, 200 end
+    local slotInfo = { tabs = { [1] = { items = {}, categories = {} } }, sortedItems = {}, stacks = { GetStackInfo = function() end } }
 
-    local frame = CreateFrame("Frame")
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-    }
-    setmetatable(bag, { __index = bagProto })
+    bag:Draw(context:New("test"), slotInfo, function() end)
 
-    -- Assert that calling bagProto:UpdateBagBounds resizes the bag frame
-    bag:UpdateBagBounds(280, 200)
-    assert.are_equal(280 + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH, frame:GetWidth())
+    assert.are.equal(400 + bag.scroll:GetBarWidth(), bag.frame:GetWidth())
+    assert.are.equal(200, bag.frame:GetHeight())
+
+    view.Layout = function() return 10, 10 end
+    bag:Draw(context:New("test"), slotInfo, function() end)
+    assert.are.equal(260 + bag.scroll:GetBarWidth(), bag.frame:GetWidth())
+    assert.are.equal(100, bag.frame:GetHeight())
   end)
 end)

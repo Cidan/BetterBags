@@ -228,6 +228,21 @@ describe("Window", function()
       assert.are.equal(50 + 60 + 3, w.frame:GetHeight())
     end)
 
+    it("tells its owner after every theme it was decorated with, once its content moved", function()
+      local seen = {}
+      local w
+      w = window:Create({ Name = name(), Kind = "Bag", OnDecorated = function(c, decoration)
+        assert.is_not_nil(c)
+        table.insert(seen, { decoration, select(5, w.content:GetPoint(1)) })
+      end })
+      apply()
+      apply("Tall")
+      assert.are.equal(2, #seen)
+      assert.are.equal(w.decoration, seen[1][1])
+      assert.are.equal(-42, seen[1][2])
+      assert.are.equal(-60, seen[2][2])
+    end)
+
     it("hands out the theme's layout", function()
       sonata.themes.Base.Windows.Bag.Layout = { Search = { Top = 30 } }
       local w = window:Create({ Name = name(), Kind = "Bag" })

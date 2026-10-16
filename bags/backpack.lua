@@ -74,34 +74,18 @@ function backpack.proto:OnShow(ctx)
 		end
 	end
 
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		self.bag.fadeInGroup:Play()
-	else
-		self.bag.frame:Show()
-	end
-
+	self.bag.window:Show(ctx)
 	addon.TriggerItemContextChanged()
 end
 
-function backpack.proto:OnHide()
+---@param ctx Context
+function backpack.proto:OnHide(ctx)
 	addon.ForceHideBlizzardBags()
 	PlaySound(SOUNDKIT.IG_BACKPACK_CLOSE)
-
-	-- Use fade animation if enabled
-	if database:GetEnableBagFading() then
-		-- Set up callback to handle post-hide logic
-		self.bag.fadeOutGroup.callback = function()
-			self.bag.fadeOutGroup.callback = nil  -- Clean up callback
-			if self.bag.searchFrame then self.bag.searchFrame:Hide() end
-			addon.TriggerItemContextChanged()
-		end
-		self.bag.fadeOutGroup:Play()
-	else
-		self.bag.frame:Hide()
+	self.bag.window:Hide(ctx, function()
 		if self.bag.searchFrame then self.bag.searchFrame:Hide() end
 		addon.TriggerItemContextChanged()
-	end
+	end)
 end
 
 ---@param ctx Context
