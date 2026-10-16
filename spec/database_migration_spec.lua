@@ -227,6 +227,26 @@ describe("Database Migration", function()
     end)
   end)
 
+  -- The Moonlight themes were first released as MoonlightDark, MoonlightDarkRound and
+  -- MoonlightParchment; a profile that chose one keeps it under its new key.
+  describe("renamed Moonlight theme keys", function()
+    it("moves a saved Moonlight theme to its new key", function()
+      for old, new in pairs({ MoonlightDark = "Dark", MoonlightDarkRound = "DarkRound", MoonlightParchment = "Parchment" }) do
+        DB.data.profile.theme = old
+        DB:Migrate()
+        assert.are.equal(new, DB.data.profile.theme, old)
+      end
+    end)
+
+    it("leaves every other saved theme alone", function()
+      for _, key in ipairs({ "Default", "SimpleDark", "Dark", "elvui", "SomeoneElsesTheme" }) do
+        DB.data.profile.theme = key
+        DB:Migrate()
+        assert.are.equal(key, DB.data.profile.theme)
+      end
+    end)
+  end)
+
   -- Section collapsing was removed; its saved state is dropped from every profile.
   describe("removed section collapse state", function()
     it("drops the saved collapsedSections table", function()

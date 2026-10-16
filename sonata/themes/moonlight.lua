@@ -10,6 +10,7 @@ local sonata = addon:GetModule('Sonata')
 -- nine-sliced frame of art (textures/moonlight), titled in white at the top left, with a
 -- lettered close button. The hidden Moonlight theme holds the geometry; Dark, Dark Round and
 -- Parchment choose the art ($Frame, $SliceMode), and Parchment hangs a ribbon over the bag.
+-- Slate is Moonlight's own default: Blizzard's marble, tiled, with no frame art.
 local ART = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\"
 
 local BACKGROUND = {
@@ -49,6 +50,50 @@ bag.Layout = {
   MenuButton = { Points = { { Point = "TOPLEFT", X = 8, Y = -6 } } },
 }
 
+-- Tabs hang 2 pixels into the window; inset is how far into the tab its art starts (2 puts
+-- its top edge just below the window, 1 lays a 1-pixel edge on the window's own). Each theme
+-- gives the rest; the text sits centered in the art.
+---@param inset number
+---@param style table
+---@return table
+local function tab(inset, style)
+  local i = { Left = 0, Right = 0, Top = inset, Bottom = 0 }
+  local t = {
+    Art = "Flat",
+    Height = 26,
+    Hover = { Color = { 1, 1, 1, 0.06 }, Inset = i },
+    TextOffset = { X = 0, Y = -1 },
+    SelectedTextOffset = { X = 0, Y = -1 },
+  }
+  for k, v in pairs(style) do
+    t[k] = v
+  end
+  local parts = { t.Background, t.Border, t.Hover, t.Selected and t.Selected.Background }
+  for n = 1, 4 do
+    if parts[n] then
+      parts[n].Inset = i
+    end
+  end
+  return t
+end
+
+local GRAY_TEXT = { Object = "GameFontHighlightSmall", Color = { 0.7, 0.7, 0.7, 1 } }
+local NO_SHADOW = { X = 0, Y = 0, Color = { 0, 0, 0, 0 } }
+-- The plain middle of parchment.png, away from its burnt edges.
+local PAPER = { 0.25, 0.75, 0.3, 0.5 }
+local WHITE_TEXT = { Object = "GameFontHighlightSmall" }
+
+-- A bar along the bottom of the selected tab.
+---@param color number[]
+---@return table
+local function bottomBar(color)
+  return {
+    Color = color,
+    Height = 2,
+    Points = { { Point = "BOTTOMLEFT", X = 1, Y = 1 }, { Point = "BOTTOMRIGHT", X = -1, Y = 1 } },
+  }
+end
+
 local dialog = framed(true)
 dialog.Title = { Font = TITLE.Font, Points = { { Point = "TOPLEFT", X = 20, Y = -15 } }, Height = 24, Justify = "LEFT" }
 
@@ -74,23 +119,48 @@ sonata:RegisterTheme({
 })
 
 sonata:RegisterTheme({
-  Name = "MoonlightDark",
-  DisplayName = "Moonlight Dark",
+  Name = "Dark",
+  DisplayName = "Dark",
   Description = "A dark frame, from Moonlight.",
   Parent = "Moonlight",
+  Elements = {
+    -- The frame's translucent black inside its heavy black edge; the selected tab lighter.
+    Tab = tab(2, {
+      Background = { Color = { 0, 0, 0, 0.55 } },
+      Border = { Color = { 0.01, 0.01, 0.01, 1 }, EdgeSize = 3 },
+      Selected = { Background = { Color = { 1, 1, 1, 0.1 } } },
+      Font = GRAY_TEXT,
+      HighlightFont = WHITE_TEXT,
+      SelectedFont = WHITE_TEXT,
+    }),
+  },
 })
 
 sonata:RegisterTheme({
-  Name = "MoonlightDarkRound",
-  DisplayName = "Moonlight Dark Round",
+  Name = "DarkRound",
+  DisplayName = "Dark Round",
   Description = "A dark frame with round corners, from Moonlight.",
   Parent = "Moonlight",
   Variables = { Frame = ART .. "dark-round.png" },
+  Elements = {
+    -- The frame's dark fill inside its #3c3b3c rim; the selected tab's rim brighter.
+    Tab = tab(2, {
+      Background = { Color = { 0, 0, 0, 0.75 } },
+      Border = { Color = { 0.235, 0.231, 0.235, 1 }, EdgeSize = 2 },
+      Selected = {
+        Background = { Color = { 1, 1, 1, 0.06 } },
+        Border = { Color = { 0.55, 0.55, 0.55, 1 } },
+      },
+      Font = GRAY_TEXT,
+      HighlightFont = WHITE_TEXT,
+      SelectedFont = WHITE_TEXT,
+    }),
+  },
 })
 
 sonata:RegisterTheme({
-  Name = "MoonlightParchment",
-  DisplayName = "Moonlight Parchment",
+  Name = "Parchment",
+  DisplayName = "Parchment",
   Description = "A parchment frame under a ribbon, from Moonlight.",
   Parent = "Moonlight",
   Variables = {
@@ -110,5 +180,52 @@ sonata:RegisterTheme({
       },
       Title = { Points = { { Point = "BOTTOM", RelativeTo = "Ribbon", RelativePoint = "BOTTOM", Y = 25 } }, Justify = "CENTER" },
     },
+  },
+  Elements = {
+    -- A strip of the paper, dimmed until the tab is selected, in the burnt edge's brown, with
+    -- dark brown text and no shadow.
+    Tab = tab(2, {
+      Background = { Texture = ART .. "parchment.png", TexCoords = PAPER, VertexColor = { 0.8, 0.76, 0.7, 1 } },
+      Border = { Color = { 0.455, 0.286, 0.176, 1 }, EdgeSize = 2 },
+      Selected = { Background = { Texture = ART .. "parchment.png", TexCoords = PAPER } },
+      Hover = { Color = { 1, 1, 1, 0.12 } },
+      Font = { Object = "GameFontNormalSmall", Color = { 0.36, 0.22, 0.1, 1 }, Shadow = NO_SHADOW },
+      HighlightFont = { Object = "GameFontNormalSmall", Color = { 0.18, 0.09, 0.03, 1 }, Shadow = NO_SHADOW },
+      SelectedFont = { Object = "GameFontNormalSmall", Color = { 0.18, 0.09, 0.03, 1 }, Shadow = NO_SHADOW },
+    }),
+  },
+})
+
+-- Blizzard tiles the marble across a frame (CommunitiesMemberList.xml); it has no edge to slice.
+local MARBLE_FILE = "Interface\\FrameGeneral\\UI-Background-Marble"
+local MARBLE = { SliceMargins = false, HorizTile = true, VertTile = true }
+
+sonata:RegisterTheme({
+  Name = "Slate",
+  DisplayName = "Slate",
+  Description = "Dark marble, Moonlight's own look.",
+  Parent = "Moonlight",
+  Variables = { Frame = MARBLE_FILE },
+  Windows = {
+    Bag = { Background = MARBLE },
+    Panel = { Background = MARBLE },
+    Flat = { Background = MARBLE },
+    Dialog = { Background = MARBLE },
+    Slots = { Background = MARBLE },
+    Search = { Background = MARBLE },
+  },
+  Elements = {
+    -- The marble in a thin dark edge; a cool gray bar under the selected tab.
+    Tab = tab(1, {
+      Background = { Texture = MARBLE_FILE, HorizTile = true, VertTile = true },
+      Border = { Color = { 0.18, 0.18, 0.18, 1 }, EdgeSize = 1 },
+      Selected = {
+        Background = { Color = { 1, 1, 1, 0.04 } },
+        Bar = bottomBar({ 0.54, 0.56, 0.6, 1 }),
+      },
+      Font = GRAY_TEXT,
+      HighlightFont = WHITE_TEXT,
+      SelectedFont = WHITE_TEXT,
+    }),
   },
 })

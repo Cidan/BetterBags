@@ -189,7 +189,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 | Kind | Element | Style keys (defaults are Blizzard's) |
 |---|---|---|
 | `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (`Color` fill, `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"`, `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
-| `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar }`), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
+| `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar, Border }`: `Bar` is a texture spec with `Height` and `Points` (default along the top), `Border = { Color }` recolors the tab's border while it is selected or a drop target), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
 | `BagButton` | the bag menu (portrait) button | `Size` (40), `Portrait`, `Highlight` (texture spec + `Width`, `Height`, `X`, `Y`; OVERLAY 7) |
@@ -290,8 +290,9 @@ overlay search panel).
   backdrop. The bag's search box sits at 20, -40 to -10, -60 and the menu button at 4, -6 with
   its art at 85% (`BagButton` portrait and highlight 40.8 x 51); section titles
   `UnitFrame12White`.
-- **The Moonlight set** (`MoonlightDark`, `MoonlightDarkRound`, `MoonlightParchment`, children of
-  the hidden `Moonlight`): Moonlight's art, shipped in `textures\moonlight\`, nine-sliced with
+- **The Moonlight set** (`Dark`, `DarkRound`, `Parchment`, shown as Dark, Dark Round and
+  Parchment, children of the hidden `Moonlight`; first released as `MoonlightDark`,
+  `MoonlightDarkRound`, `MoonlightParchment`, which `DB:Migrate` moves to the new keys): Moonlight's art, shipped in `textures\moonlight\`, nine-sliced with
   24px margins as every window's `Background` (`$Frame`, `$SliceMode`: tiled dark frame, tiled
   round dark frame, stretched parchment), content insets 18, 24, 40, 12, white
   `GameFontHighlight` titles at TOPLEFT 44, -15 (20, -15 on dialogs), and a 32px close button
@@ -299,6 +300,11 @@ overlay search panel).
   (reserve 24), its footer at 18, 24, bottom 12, and a 32px menu button (art 32 x 40) at 8, -6.
   Parchment hangs its 281 x 84 ribbon over the bag (BOTTOM 40 below the window's TOP) and
   centers the bag's title on it.
+- **Slate** (`Slate`, a child of `Moonlight`): Moonlight's own default theme. Every window's
+  background is Blizzard's marble (`Interface\FrameGeneral\UI-Background-Marble`, present on
+  every client), tiled the way Blizzard tiles it (`HorizTile`, `VertTile`,
+  `CommunitiesMemberList.xml`; the inherited `SliceMargins` removed), fading with the opacity
+  setting; no border art. Everything else is the Moonlight set's.
 
 - **ElvUI** (`elvui`, offered while ElvUI is loaded): what ElvUI's skins would draw, as data,
   calling nothing of ElvUI's. Its variables read ElvUI's engine (`unpack(ElvUI)`) when the theme
@@ -337,12 +343,34 @@ overlay search panel).
   panels and flat windows. The search box: no caps, `bagsearchbg.png` 24 high across it, the
   magnifier 10px at LEFT 6, text insets 20, `UNIT_NAME_FONT` at GW2's normal size in white.
   Section titles `UnitFrame12White`. Its variables read `GW2_ADDON.settings.fonts`, with
-  GW2_UI's defaults (18, 14).
+  GW2_UI's defaults (18, 14, 12).
+
+**Tabs.** Default keeps Blizzard's tabs (`PanelTabButtonTemplate`) and ElvUI draws ElvUI's flat
+tabs (above). Every other built-in theme draws flat tabs 26 high whose art starts 1 or 2 pixels
+into the tab (the tab bar hangs 2 pixels into the window, `frames/tabs.lua`), text centered 1
+below the middle, a light hover:
+- Simple Dark: black, the window's 1px gray (0.5) edge, the selected tab 0.12 gray; text 0.7
+  gray, white when selected or hovered (`GameFontHighlightSmall`).
+- Dark: the frame art's translucent black (0.55) in a 3px near-black edge, the selected tab
+  lighter (white at 0.1); gray and white text.
+- Dark Round: the frame art's black at 0.75 in its 2px #3c3b3c rim, which turns 0.55 gray on
+  the selected tab (`Selected.Border`).
+- Parchment: a strip of `parchment.png`'s plain middle (TexCoords 0.25-0.75, 0.3-0.5), dimmed
+  (0.8, 0.76, 0.7) until selected, in a 2px burnt-brown edge (#74492d); dark brown
+  `GameFontNormalSmall` text without a shadow, darker when selected.
+- Guild Wars 2: GW2's downward tab art (`units\unittab_down.png`, what `GwSkinTab(tab, "down")`
+  uses), `UNIT_NAME_FONT` at GW2's small size without a shadow, LightHeader when selected, and
+  GW2's wine-red accent (`GW.Colors.Accent`) along the bottom of the selected tab.
+- Slate: the tiled marble in a 1px dark edge, a cool gray bar along the bottom of the selected
+  tab.
+The colors of Dark, Dark Round and Parchment were read from the art's pixels. While a tab is
+dragged, the reorder marker is as tall as the tabs (`tabs:UpdateDropPlaceholder`).
 
 Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
 bag panel, levels, title font, opacity, close button and content box; panels, flat windows,
 dialogs; slots panels on retail, Classic and Forever; section font) and
-`spec/sonata/theme_ports_spec.lua` (Simple Dark; the Moonlight set and its art; ElvUI against a
+`spec/sonata/theme_ports_spec.lua` (Simple Dark; the Moonlight set, its art and Slate; every
+theme's tabs, styled on a real tab; ElvUI against a
 stand-in engine: availability, the template in and outside pixel mode, titles and close
 button, Masque, item buttons, tabs, search box and buttons, bag layout; Guild Wars 2: availability,
 the bag's header, panel, footer and background, its title and close button, the side buttons,

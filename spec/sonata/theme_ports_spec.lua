@@ -142,8 +142,7 @@ describe("BetterBags' other themes", function()
     it("lists Dark, Dark Round and Parchment, built on a hidden Moonlight base", function()
       local all = sonata:GetAllThemes()
       assert.is_nil(all.Moonlight)
-      for key, name in pairs({ MoonlightDark = "Moonlight Dark", MoonlightDarkRound = "Moonlight Dark Round",
-        MoonlightParchment = "Moonlight Parchment" }) do
+      for key, name in pairs({ Dark = "Dark", DarkRound = "Dark Round", Parchment = "Parchment" }) do
         assert.is_not_nil(all[key], key)
         assert.are.equal(name, sonata:GetTheme(key).DisplayName)
         assert.are.equal("Moonlight", sonata:GetTheme(key).Parent)
@@ -151,8 +150,8 @@ describe("BetterBags' other themes", function()
     end)
 
     it("frames every window in its art, nine-sliced, with Moonlight's content box", function()
-      for key, art in pairs({ MoonlightDark = { "dark-frame.png", "Tiled" },
-        MoonlightDarkRound = { "dark-round.png", "Tiled" }, MoonlightParchment = { "parchment.png", "Stretched" } }) do
+      for key, art in pairs({ Dark = { "dark-frame.png", "Tiled" },
+        DarkRound = { "dark-round.png", "Tiled" }, Parchment = { "parchment.png", "Stretched" } }) do
         local bag, panel = newWindow("Bag"), newWindow("Panel")
         apply(key)
         for _, w in ipairs({ bag, panel }) do
@@ -166,23 +165,45 @@ describe("BetterBags' other themes", function()
       end
     end)
 
+    -- Slate is Moonlight's own default theme: Blizzard's marble, tiled the way Blizzard tiles it
+    -- (CommunitiesMemberList.xml: horizTile and vertTile), with no border art.
+    it("draws Slate, Moonlight's default, in Blizzard's tiled marble, fading with the opacity", function()
+      assert.are.equal("Slate", sonata:GetTheme("Slate").DisplayName)
+      assert.are.equal("Moonlight", sonata:GetTheme("Slate").Parent)
+      local windows = {}
+      for _, kind in ipairs({ "Bag", "Panel", "Flat", "Dialog", "Slots", "Search" }) do
+        windows[kind] = newWindow(kind, 60)
+      end
+      apply("Slate")
+      for kind, w in pairs(windows) do
+        local bg = w.decoration:GetTexture("Background")
+        assert.are.equal("Interface\\FrameGeneral\\UI-Background-Marble", bg:GetTexture(), kind)
+        assert.is_true(bg:GetHorizTile(), kind)
+        assert.is_true(bg:GetVertTile(), kind)
+        assert.is_nil(bg._sliceMargins, kind)
+        assert.are.equal(0.6, bg:GetAlpha(), kind)
+      end
+      assert.are.same({ Left = 18, Right = 24, Top = 40, Bottom = 12 }, windows.Bag.decoration:GetInsets())
+      assert.are.equal("X", windows.Bag.decoration:GetCloseButton():GetText())
+    end)
+
     it("titles at the top left in white, with a lettered close button and the corner grip", function()
       local bag = newWindow("Bag")
-      apply("MoonlightDark")
+      apply("Dark")
       local title = bag.decoration:GetTitleText()
       assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 44, -15 }, { title:GetPoint(1) })
       assert.are.same({ 1, 1, 1, 1 }, { title:GetTextColor() })
       local close = bag.decoration:GetCloseButton()
       assert.are.equal("X", close:GetText())
       assert.are.same({ 32, 32 }, { close:GetWidth(), close:GetHeight() })
-      local layout = sonata:Resolve("MoonlightDark").Windows.Bag.Layout
+      local layout = sonata:Resolve("Dark").Windows.Bag.Layout
       assert.are.same({ { Point = "TOPLEFT", X = 8, Y = -6 } }, layout.MenuButton.Points)
-      assert.are.equal(32, sonata:Resolve("MoonlightDark").Elements.BagButton.Size)
+      assert.are.equal(32, sonata:Resolve("Dark").Elements.BagButton.Size)
     end)
 
     it("hangs Parchment's ribbon over the top, under a centered title", function()
       local bag = newWindow("Bag")
-      apply("MoonlightParchment")
+      apply("Parchment")
       local ribbon = bag.decoration:GetTexture("Ribbon")
       assert.are.equal(ART .. "parchment-ribbon.png", ribbon:GetTexture())
       assert.are.same({ "BOTTOM", bag.frame, "TOP", 0, -40 }, { ribbon:GetPoint(1) })
@@ -484,6 +505,139 @@ describe("BetterBags' other themes", function()
       assert.are.same({ Left = 20, Right = 20, Top = 0, Bottom = 0 }, style.TextInsets)
       assert.are.same({ Path = UNIT_NAME_FONT, Size = 13, Flags = "", Color = { 1, 1, 1, 1 } }, style.Font)
       assert.are.same({ Object = "UnitFrame12White" }, sonata:Resolve("GW2").Elements.SectionHeader.Font)
+    end)
+  end)
+
+  -- Every built-in theme but Default (Blizzard's tabs) and ElvUI (ElvUI's flat tabs, covered
+  -- above) draws its own flat tabs, styled here on a real tab through the real styler.
+  describe("tabs", function()
+    local elements = addon:GetModule("SonataElements")
+    local MOONLIGHT = "Interface\\AddOns\\BetterBags\\textures\\moonlight\\"
+    local savedGW
+
+    before_each(function()
+      savedGW = _G.GW2_ADDON
+      _G.GW2_ADDON = { settings = { fonts = { size = { bigHeader = 20, normal = 13, small = 11 }, outline = "NONE" } } }
+    end)
+
+    after_each(function()
+      _G.GW2_ADDON = savedGW
+    end)
+
+    local function tabFor(key)
+      apply(key)
+      local tab = CreateFrame("Button", nil, UIParent, "PanelTabButtonTemplate")
+      sonata:RegisterElement("Tab", tab)
+      return tab
+    end
+
+    local function textColor(tab)
+      return { tab._normalFontObject:GetTextColor() }
+    end
+
+    local function rgba(t)
+      return { t.r, t.g, t.b, t.a }
+    end
+
+    it("hides Blizzard's tab art on every theme with its own tabs, and sizes them alike", function()
+      for _, key in ipairs({ "SimpleDark", "Dark", "DarkRound", "Parchment", "GW2", "Slate" }) do
+        local tab = tabFor(key)
+        assert.are.equal(0, tab.Left:GetAlpha(), key)
+        assert.are.equal(0, tab.LeftActive:GetAlpha(), key)
+        assert.are.equal(26, tab:GetHeight(), key)
+        assert.is_true(tab.sonataSkin.fill:IsShown(), key)
+        elements:SetTabState(tab, "selected")
+        local _, _, _, x, y = tab.Text:GetPoint(1)
+        assert.are.same({ 0, -1 }, { x, y }, key)
+      end
+    end)
+
+    it("draws Simple Dark's tabs black in the window's gray edge, the selected one lighter and white", function()
+      local tab = tabFor("SimpleDark")
+      local skin = tab.sonataSkin
+      assert.are.same({ 0, 0, 0, 1 }, rgba(skin.fill._colorTexture))
+      assert.are.same({ 0.5, 0.5, 0.5, 1 }, rgba(skin.edges[1]._colorTexture))
+      assert.are.equal(1, skin.edges[1]:GetHeight())
+      assert.are.same({ 0.7, 0.7, 0.7, 1 }, textColor(tab))
+      elements:SetTabState(tab, "selected")
+      assert.is_true(skin.selectedFill:IsShown())
+      assert.are.same({ 0.12, 0.12, 0.12, 1 }, rgba(skin.selectedFill._colorTexture))
+      assert.are.same({ 1, 1, 1, 1 }, textColor(tab))
+    end)
+
+    it("draws Dark's tabs in the frame's translucent black and heavy black edge", function()
+      local tab = tabFor("Dark")
+      local skin = tab.sonataSkin
+      assert.are.same({ 0, 0, 0, 0.55 }, rgba(skin.fill._colorTexture))
+      assert.are.same({ 0.01, 0.01, 0.01, 1 }, rgba(skin.edges[1]._colorTexture))
+      assert.are.equal(3, skin.edges[1]:GetHeight())
+      elements:SetTabState(tab, "selected")
+      assert.are.same({ 1, 1, 1, 0.1 }, rgba(skin.selectedFill._colorTexture))
+      assert.are.same({ 1, 1, 1, 1 }, textColor(tab))
+    end)
+
+    it("draws Dark Round's tabs in the frame's dark fill and rim, the selected rim brighter", function()
+      local tab = tabFor("DarkRound")
+      local skin = tab.sonataSkin
+      assert.are.same({ 0, 0, 0, 0.75 }, rgba(skin.fill._colorTexture))
+      assert.are.same({ 0.235, 0.231, 0.235, 1 }, rgba(skin.edges[1]._colorTexture))
+      assert.are.equal(2, skin.edges[1]:GetHeight())
+      elements:SetTabState(tab, "selected")
+      assert.are.same({ 0.55, 0.55, 0.55, 1 }, rgba(skin.edges[1]._colorTexture))
+      elements:SetTabState(tab, "normal")
+      assert.are.same({ 0.235, 0.231, 0.235, 1 }, rgba(skin.edges[1]._colorTexture))
+    end)
+
+    it("cuts Parchment's tabs from its paper, dimmed until selected, in a burnt edge and brown text", function()
+      local tab = tabFor("Parchment")
+      local skin = tab.sonataSkin
+      assert.are.equal(MOONLIGHT .. "parchment.png", skin.fill:GetTexture())
+      -- GetTexCoord returns the corners: upper left, lower left, upper right, lower right.
+      assert.are.same({ 0.25, 0.3, 0.25, 0.5, 0.75, 0.3, 0.75, 0.5 }, { skin.fill:GetTexCoord() })
+      assert.are.same({ 0.8, 0.76, 0.7, 1 }, { skin.fill:GetVertexColor() })
+      assert.are.same({ 0.455, 0.286, 0.176, 1 }, rgba(skin.edges[1]._colorTexture))
+      -- Its own hover starts where its art does, not over the window.
+      assert.are.same({ "TOPLEFT", tab, "TOPLEFT", 0, -2 }, { skin.hover:GetPoint(1) })
+      assert.are.same({ 0.36, 0.22, 0.1, 1 }, textColor(tab))
+      assert.are.same({ 0, 0 }, { tab._normalFontObject:GetShadowOffset() })
+      elements:SetTabState(tab, "selected")
+      assert.are.equal(MOONLIGHT .. "parchment.png", skin.selectedFill:GetTexture())
+      assert.are.same({ 1, 1, 1, 1 }, { skin.selectedFill:GetVertexColor() })
+      assert.are.same({ 0.18, 0.09, 0.03, 1 }, textColor(tab))
+    end)
+
+    it("draws GW2's tabs with GW2's downward tab art, its font, and its accent under the selected one", function()
+      local tab = tabFor("GW2")
+      local skin = tab.sonataSkin
+      assert.are.equal("Interface\\AddOns\\GW2_UI\\Textures\\units\\unittab_down.png", skin.fill:GetTexture())
+      assert.is_true(skin.edges == nil or not skin.edges[1]:IsShown())
+      local file, size = tab._normalFontObject:GetFont()
+      assert.are.same({ UNIT_NAME_FONT, 11 }, { file, size })
+      assert.are.same({ 0.78, 0.76, 0.7, 1 }, textColor(tab))
+      elements:SetTabState(tab, "selected")
+      assert.is_true(skin.bar:IsShown())
+      assert.are.same({ 150 / 255, 50 / 255, 50 / 255, 1 }, rgba(skin.bar._colorTexture))
+      assert.are.same({ "BOTTOMLEFT", tab, "BOTTOMLEFT", 1, 1 }, { skin.bar:GetPoint(1) })
+      assert.are.same({ 1, 0.9450, 0.8196, 1 }, textColor(tab))
+    end)
+
+    it("draws Slate's tabs in the tiled marble, with a cool gray bar under the selected one", function()
+      local tab = tabFor("Slate")
+      local skin = tab.sonataSkin
+      assert.are.equal("Interface\\FrameGeneral\\UI-Background-Marble", skin.fill:GetTexture())
+      assert.is_true(skin.fill:GetHorizTile())
+      assert.is_true(skin.fill:GetVertTile())
+      assert.are.same({ 0.18, 0.18, 0.18, 1 }, rgba(skin.edges[1]._colorTexture))
+      elements:SetTabState(tab, "selected")
+      assert.are.same({ 0.54, 0.56, 0.6, 1 }, rgba(skin.bar._colorTexture))
+      assert.are.same({ "BOTTOMLEFT", tab, "BOTTOMLEFT", 1, 1 }, { skin.bar:GetPoint(1) })
+      assert.are.same({ 1, 1, 1, 1 }, textColor(tab))
+    end)
+
+    it("leaves Default with Blizzard's tabs", function()
+      local tab = tabFor("Default")
+      assert.are.equal(1, tab.Left:GetAlpha())
+      assert.is_true(tab.sonataSkin == nil or tab.sonataSkin.fill == nil or not tab.sonataSkin.fill:IsShown())
     end)
   end)
 end)

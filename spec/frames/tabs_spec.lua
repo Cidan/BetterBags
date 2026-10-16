@@ -116,6 +116,22 @@ describe("Tabs", function()
     assert.is_true(decoration:IsShown())
   end)
 
+  it("draws the reorder marker as tall as the tab it sits beside", function()
+    withTheme("Short", { Art = "Flat", Height = 26, Background = { Color = { 0, 0, 0, 1 } } })
+    local bar = newBar()
+    local ctx = context:New("spec")
+    bar:AddTab(ctx, "Bags", 1)
+    bar:AddTab(ctx, "Herbs", 2)
+    tabs.currentTabFrame = bar
+    tabs.draggingTab = bar.tabIndex[2]
+    tabs:CreateDropPlaceholder()
+    tabs:UpdateDropPlaceholder(1, false)
+    assert.are.equal(26, tabs.dropPlaceholder:GetHeight())
+    assert.are.equal(3, tabs.dropPlaceholder:GetWidth())
+    tabs:HideDropPlaceholder()
+    tabs.currentTabFrame, tabs.draggingTab = nil, nil
+  end)
+
   it("shows the selected tab selected and the others normal, through the theme", function()
     local bar = newBar()
     local ctx = context:New("spec")

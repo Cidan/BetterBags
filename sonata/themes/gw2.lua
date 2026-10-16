@@ -18,8 +18,12 @@ local sonata = addon:GetModule('Sonata')
 --   The search box: GW2's search bar, in its font.
 local GW = "Interface\\AddOns\\GW2_UI\\Textures\\"
 
--- GW2_UI's LightHeader text color.
+-- GW2_UI's LightHeader text color, and its accent (GW.Colors.Accent, Core/color.lua).
 local LIGHT_HEADER = { 1, 0.9450, 0.8196, 1 }
+local ACCENT = { 150 / 255, 50 / 255, 50 / 255, 1 }
+local NO_SHADOW = { X = 0, Y = 0, Color = { 0, 0, 0, 0 } }
+-- Tabs hang 2 pixels into the window; their art starts just below it.
+local TAB_INSET = { Left = 0, Right = 0, Top = 2, Bottom = 0 }
 
 ---@return table
 local function fontSettings()
@@ -175,6 +179,7 @@ sonata:RegisterTheme({
     -- GwSetFontTemplate: BigHeader, two larger, in the outline setting ("NONE" is none).
     HeaderSize = function() return ((fontSettings().size or {}).bigHeader or 18) + 2 end,
     NormalSize = function() return (fontSettings().size or {}).normal or 14 end,
+    SmallSize = function() return (fontSettings().size or {}).small or 12 end,
     FontFlags = function()
       local outline = fontSettings().outline or ""
       return outline == "NONE" and "" or outline
@@ -190,6 +195,27 @@ sonata:RegisterTheme({
   },
   Elements = {
     SectionHeader = { Font = { Object = "UnitFrame12White" } },
+    -- GwSkinTab(tab, "down"): GW2's downward tab art, text without a shadow; GW2's wine-red
+    -- accent along the bottom of the selected tab, whose text is LightHeader.
+    Tab = {
+      Art = "Flat",
+      Height = 26,
+      Background = { Texture = GW .. "units\\unittab_down.png", Inset = TAB_INSET },
+      Hover = { Color = { 1, 1, 1, 0.05 }, Inset = TAB_INSET },
+      Selected = {
+        Background = { Color = { 1, 1, 1, 0.08 }, Inset = TAB_INSET },
+        Bar = {
+          Color = ACCENT,
+          Height = 2,
+          Points = { { Point = "BOTTOMLEFT", X = 1, Y = 1 }, { Point = "BOTTOMRIGHT", X = -1, Y = 1 } },
+        },
+      },
+      Font = { Path = "$NameFont", Size = "$SmallSize", Flags = "$FontFlags", Color = { 0.78, 0.76, 0.7, 1 }, Shadow = NO_SHADOW },
+      HighlightFont = { Path = "$NameFont", Size = "$SmallSize", Flags = "$FontFlags", Color = LIGHT_HEADER, Shadow = NO_SHADOW },
+      SelectedFont = { Path = "$NameFont", Size = "$SmallSize", Flags = "$FontFlags", Color = LIGHT_HEADER, Shadow = NO_SHADOW },
+      TextOffset = { X = 0, Y = -1 },
+      SelectedTextOffset = { X = 0, Y = -1 },
+    },
     -- SkinBagSearchBox: no caps, GW2's search bar across the box, the magnifier 6 in.
     SearchBox = {
       HideCaps = true,
