@@ -334,6 +334,28 @@ describe("SonataElements", function()
       assert.is_false(skin.bar:IsShown())
     end)
 
+    it("colors a flat tab's border for its state: selected, a drop target, and back", function()
+      local t = tabDecoration()
+      elements:StyleTab(t, {
+        Art = "Flat",
+        Border = { Color = { 0.2, 0.2, 0.2, 1 }, EdgeSize = 2 },
+        Selected = { Border = { Color = { 0.5, 0.5, 0.5, 1 } } },
+      })
+      local edge = t.sonataSkin.edges[1]
+      assert.are.same({ r = 0.2, g = 0.2, b = 0.2, a = 1 }, edge._colorTexture)
+      elements:SetTabState(t, "selected")
+      assert.are.same({ r = 0.5, g = 0.5, b = 0.5, a = 1 }, edge._colorTexture)
+      elements:SetTabState(t, "normal")
+      assert.are.same({ r = 0.2, g = 0.2, b = 0.2, a = 1 }, edge._colorTexture)
+      elements:SetTabState(t, "drop")
+      assert.are.same({ r = 0.5, g = 0.5, b = 0.5, a = 1 }, edge._colorTexture)
+      elements:SetTabState(t, "normal")
+      -- A style without a selected border keeps its border color in every state.
+      elements:StyleTab(t, { Art = "Flat", Border = { Color = { 0.3, 0.3, 0.3, 1 } } })
+      elements:SetTabState(t, "selected")
+      assert.are.same({ r = 0.3, g = 0.3, b = 0.3, a = 1 }, edge._colorTexture)
+    end)
+
     it("restores Blizzard's art and alphas when the next theme uses it", function()
       local t = tabDecoration()
       elements:StyleTab(t, { Art = "Flat", Background = { Color = { 0, 0, 0, 1 } } })

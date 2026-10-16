@@ -35,6 +35,23 @@ local function titled(noClose)
   return { Backdrop = BACKDROP, Title = TITLE, CloseButton = not noClose and CLOSE or nil }
 end
 
+-- Tabs hang 2 pixels into the window: inset 1 from the top, a tab's top edge lies on the
+-- window's bottom edge. Black like the window, in its gray edge; the selected tab lighter.
+local TAB_INSET = { Left = 0, Right = 0, Top = 1, Bottom = 0 }
+local TAB = {
+  Art = "Flat",
+  Height = 26,
+  Background = { Color = { 0, 0, 0, 1 }, Inset = TAB_INSET },
+  Border = { Color = { 0.5, 0.5, 0.5, 1 }, EdgeSize = 1, Inset = TAB_INSET },
+  Hover = { Color = { 1, 1, 1, 0.06 }, Inset = TAB_INSET },
+  Selected = { Background = { Color = { 0.12, 0.12, 0.12, 1 }, Inset = TAB_INSET } },
+  Font = { Object = "GameFontHighlightSmall", Color = { 0.7, 0.7, 0.7, 1 } },
+  HighlightFont = { Object = "GameFontHighlightSmall" },
+  SelectedFont = { Object = "GameFontHighlightSmall" },
+  TextOffset = { X = 0, Y = -1 },
+  SelectedTextOffset = { X = 0, Y = -1 },
+}
+
 -- The menu button's portrait and highlight at 85%.
 local PORTRAIT = { Width = 40.8, Height = 51 }
 
@@ -63,6 +80,7 @@ sonata:RegisterTheme({
   },
   Elements = {
     SectionHeader = { Font = { Object = "UnitFrame12White" } },
+    Tab = TAB,
     BagButton = { Portrait = PORTRAIT, Highlight = PORTRAIT },
   },
 })

@@ -8,7 +8,8 @@ theme cleanly when the player switches.
 
 The themes BetterBags ships are in this folder's `themes/` directory and are the best
 examples: `base.lua` (what every theme inherits), `default.lua` (Blizzard's look),
-`simpledark.lua`, `moonlight.lua` (a set sharing one hidden parent), `elvui.lua` and `gw2.lua`
+`simpledark.lua`, `moonlight.lua` (Dark, Dark Round, Parchment and Slate, sharing one hidden
+parent), `elvui.lua` and `gw2.lua`
 (themes that depend on another addon and read its settings through variables).
 
 > The theme API before BetterBags' Sonata (a `themes:RegisterTheme(key, { Portrait = function
@@ -145,7 +146,7 @@ bottom left.
 | Kind | Element | Style keys |
 |---|---|---|
 | `ItemButton` | every item button | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed`, `Backdrop` (`Color`, `Inset`, `BorderColor`, `EdgeSize`, `BorderInset`), `QualityBorder = "Backdrop"` (draw item quality on the backdrop's edge), `QualityColors` (`{ [quality] = color }`), `UpgradeIcon` (`Atlas` or `Texture`, `Scale`), `Count` (`Font`, `Points`), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
-| `Tab` | the tabs below a bag | `Art = "Flat"` (hide Blizzard's tab art) with `Background`, `Border`, `Hover`, `Selected = { Background, Bar }`; `Height`, `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
+| `Tab` | the tabs below a bag | `Art = "Flat"` (hide Blizzard's tab art) with `Background`, `Border`, `Hover`, `Selected = { Background, Bar, Border }` (`Bar` with `Height` and `Points`; `Border = { Color }` while selected); `Height`, `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
 | `SectionHeader` | section titles | `Font` |
 | `SearchBox` | the in-bag search box | `Strip` (hide its art), `HideCaps`, `Middle` (texture spec, `Points`, `Height`), `SearchIcon` (texture spec and `Points`, `Width`, `Height`; `false` hides it), `ClearButton = { Icon }`, `Background`, `Border`, `Font`, `Instructions`, `InstructionsPoints`, `TextInsets` |
 | `BagButton` | the bag menu button | `Size`, `Portrait`, `Highlight` (texture spec and `Width`, `Height`, `X`, `Y`) |

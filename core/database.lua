@@ -1567,6 +1567,15 @@ function DB:Migrate()
 
   -- Quest items are no longer named "Quest - Quest"; their settings follow the new name.
   DB:RenameRepeatedTypeCategories()
+
+  --[[
+    The Moonlight themes were first released (alpha, 2026-10-16) under these keys.
+    Do not remove before Q3'27.
+  ]]--
+  local renamedThemes = { MoonlightDark = "Dark", MoonlightDarkRound = "DarkRound", MoonlightParchment = "Parchment" }
+  if renamedThemes[DB.data.profile.theme] ~= nil then
+    DB.data.profile.theme = renamedThemes[DB.data.profile.theme]
+  end
 end
 
 -- ============================================================

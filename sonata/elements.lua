@@ -539,6 +539,12 @@ function elements:SetTabState(decoration, state)
     if skin.bar ~= nil then
       skin.bar:SetShown(active and selectedStyle ~= nil and selectedStyle.Bar ~= nil)
     end
+    local border = style.Art == "Flat" and type(style.Border) == "table" and style.Border or nil
+    if border ~= nil then
+      local selectedBorder = active and selectedStyle ~= nil and type(selectedStyle.Border) == "table"
+        and selectedStyle.Border or nil
+      setEdgeColor(decoration, (selectedBorder or border).Color)
+    end
   end
 
   if state == "drop" then

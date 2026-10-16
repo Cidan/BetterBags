@@ -757,7 +757,7 @@ function tabs:CreateDropPlaceholder(_, _)
 		self.dropPlaceholder = CreateFrame("Frame", nil, self.currentTabFrame.frame)
 		self.dropPlaceholder:SetFrameStrata("HIGH")
 		self.dropPlaceholder:SetFrameLevel(100)
-		self.dropPlaceholder:SetSize(3, 32)  -- Thin line, tab height
+		self.dropPlaceholder:SetSize(3, 32)  -- Thin line; its height follows the tabs when shown
 
 		-- Create the line texture
 		local line = self.dropPlaceholder:CreateTexture(nil, "OVERLAY")
@@ -777,6 +777,8 @@ function tabs:UpdateDropPlaceholder(targetIndex, insertAfter)
 	-- Get the target tab from the array
 	local targetTab = self.currentTabFrame.tabIndex[targetIndex]
 	if not targetTab then return end
+	-- As tall as the tabs the theme draws.
+	self.dropPlaceholder:SetHeight(targetTab:GetHeight())
 
 	-- Get the target tab's actual current screen position
 	local targetLeft = targetTab:GetLeft()
