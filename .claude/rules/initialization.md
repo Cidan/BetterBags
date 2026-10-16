@@ -26,7 +26,7 @@ ADDON_LOADED (core/init.lua: OnInitialize)
   ├── 1. Core & Utilities (events, perf + perfSessions + StartIfArmed, debug, async, bucket)
   ├── 2. Database (DB - loaded before downstream queries)
   ├── 3. Data Models & Scanners (tooltipScanner, itemLoader, categories, groups, equipmentSets, search, items, refresh)
-  ├── 4. Themes & Presentation Frames (themes, itemFrame, sectionFrame, contextMenu, bagButton, itemRowFrame)
+  ├── 4. Themes & Presentation Frames (render, sonata, themes, itemFrame, sectionFrame, contextMenu, bagButton, itemRowFrame)
   └── 5. Integrations (consoleport)
 ```
 
@@ -60,6 +60,8 @@ the session. See `.claude/rules/perf-profiler.md`.
   refresh:Init()
 
   -- 4. Themes and Presentation Frames
+  addon:GetModule('Render'):Init()
+  addon:GetModule('Sonata'):Init()
   themes:Init()
   itemFrame:Init()
   sectionFrame:Init()

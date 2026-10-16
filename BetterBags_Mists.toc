@@ -58,6 +58,16 @@ core\hooks.lua
 core\async.lua
 core\fonts.lua
 
+# The render pipeline (staged render plans) loads before anything that draws with it.
+render\render.lua
+render\drawable.lua
+render\scrollbox.lua
+
+# Sonata, the theme engine. Theme data files register after the engine.
+sonata\engine.lua
+sonata\apply.lua
+sonata\decoration.lua
+
 # The Theme API loads earlier than actual themes.
 themes\themes.lua
 

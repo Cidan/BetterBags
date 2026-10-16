@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Themes", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "Render", "Sonata"
     }
 
     for _, name in ipairs(modules) do

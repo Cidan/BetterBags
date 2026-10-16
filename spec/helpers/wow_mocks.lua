@@ -47,6 +47,11 @@ local function CreateMockWidget(widgetType, name, parent)
   widget._points = {}
   widget._textures = {}
   widget._fontstrings = {}
+  -- Regions (textures, font strings) are not child frames: GetChildren lists frames only.
+  local isRegion = widgetType == "Texture" or widgetType == "FontString" or widgetType == "MaskTexture"
+  if parent ~= nil and not isRegion and type(parent._children) == "table" then
+    table.insert(parent._children, widget)
+  end
 
   -- Core frame behavior
   function widget:SetScript(scriptName, handler)
@@ -103,7 +108,25 @@ local function CreateMockWidget(widgetType, name, parent)
     self._ownerY = y
   end
   function widget:SetParent(parentFrame)
+    local previous = self._parent
+    if not isRegion and previous ~= parentFrame then
+      if previous ~= nil and type(previous._children) == "table" then
+        for i, c in ipairs(previous._children) do
+          if c == self then
+            table.remove(previous._children, i)
+            break
+          end
+        end
+      end
+      if parentFrame ~= nil and type(parentFrame._children) == "table" then
+        table.insert(parentFrame._children, self)
+      end
+    end
     self._parent = parentFrame
+  end
+  -- Frame:GetChildren() -> the frame's child frames.
+  function widget:GetChildren()
+    return unpack(self._children)
   end
   function widget:GetParent()
     return self._parent
@@ -249,8 +272,115 @@ local function CreateMockWidget(widgetType, name, parent)
     end
     return self.HighlightTexture
   end
-  function widget:SetHighlightTexture(texture)
+  -- SimpleButtonAPIDocumentation.lua: SetHighlightTexture(asset, blendMode?) sets the
+  -- button's highlight region; Set{Pushed,Disabled}Texture(asset) and the Set*Atlas
+  -- variants likewise set their state region.
+  function widget:SetHighlightTexture(texture, blendMode)
     self._highlightTexture = texture
+    if type(texture) == "string" or type(texture) == "number" then
+      local highlight = self:GetHighlightTexture()
+      highlight:SetTexture(texture)
+      if blendMode then highlight:SetBlendMode(blendMode) end
+    end
+  end
+  function widget:SetPushedTexture(texture)
+    if type(texture) == "string" or type(texture) == "number" then
+      self:GetPushedTexture():SetTexture(texture)
+    else
+      self.PushedTexture = texture
+    end
+  end
+  function widget:GetDisabledTexture()
+    if not self.DisabledTexture and widgetType ~= "Texture" then
+      self.DisabledTexture = CreateMockWidget("Texture", nil, self)
+    end
+    return self.DisabledTexture
+  end
+  function widget:SetDisabledTexture(texture)
+    if type(texture) == "string" or type(texture) == "number" then
+      self:GetDisabledTexture():SetTexture(texture)
+    else
+      self.DisabledTexture = texture
+    end
+  end
+  function widget:SetHighlightAtlas(atlas, blendMode)
+    self._highlightAtlas = atlas
+    local highlight = self:GetHighlightTexture()
+    highlight:SetAtlas(atlas)
+    if blendMode then highlight:SetBlendMode(blendMode) end
+  end
+  function widget:SetPushedAtlas(atlas)
+    self._pushedAtlas = atlas
+    self:GetPushedTexture():SetAtlas(atlas)
+  end
+  function widget:SetDisabledAtlas(atlas)
+    self._disabledAtlas = atlas
+    self:GetDisabledTexture():SetAtlas(atlas)
+  end
+  -- SimpleTextureBaseAPIDocumentation.lua: SetTextureSliceMargins(left, top, right, bottom),
+  -- SetTextureSliceMode(sliceMode), SetHorizTile(tiling), SetVertTile(tiling); GetTexture()
+  -- and GetAtlas() return what was set.
+  function widget:SetTextureSliceMargins(left, top, right, bottom)
+    self._sliceMargins = { left = left, top = top, right = right, bottom = bottom }
+  end
+  function widget:SetTextureSliceMode(sliceMode)
+    self._sliceMode = sliceMode
+  end
+  -- ClearTextureSlice() drops the slice margins and mode.
+  function widget:ClearTextureSlice()
+    self._sliceMargins = nil
+    self._sliceMode = nil
+  end
+  function widget:SetHorizTile(tiling)
+    self._horizTile = tiling
+  end
+  function widget:SetVertTile(tiling)
+    self._vertTile = tiling
+  end
+  function widget:GetTexture()
+    return self._texturePath
+  end
+  function widget:GetAtlas()
+    return self._atlas
+  end
+  function widget:GetVertexColor()
+    local c = self._vertexColor
+    if c then return c.r, c.g, c.b, c.a end
+    return 1, 1, 1, 1
+  end
+  -- FontInstance: SetFontObject(font) / GetFontObject(), SetShadowOffset(offsetX, offsetY).
+  function widget:SetFontObject(font)
+    self._fontObject = font
+  end
+  function widget:SetShadowOffset(x, y)
+    self._shadowOffset = { x = x, y = y }
+  end
+  -- Frame:SetResizable(resizable), SetResizeBounds(minWidth, minHeight, maxWidth?, maxHeight?),
+  -- StartSizing(resizePoint?), SetToplevel(topLevel), SetClampedToScreen(clamped),
+  -- SetMovable(movable), SetScale(scale) / GetScale().
+  function widget:SetResizable(resizable)
+    self._resizable = resizable
+  end
+  function widget:SetResizeBounds(minWidth, minHeight, maxWidth, maxHeight)
+    self._resizeBounds = { minWidth = minWidth, minHeight = minHeight, maxWidth = maxWidth, maxHeight = maxHeight }
+  end
+  function widget:StartSizing(point)
+    self._sizing = point or "BOTTOMRIGHT"
+  end
+  function widget:SetToplevel(topLevel)
+    self._toplevel = topLevel
+  end
+  function widget:SetClampedToScreen(clamped)
+    self._clamped = clamped
+  end
+  function widget:SetMovable(movable)
+    self._movable = movable
+  end
+  function widget:SetScale(scale)
+    self._scale = scale
+  end
+  function widget:GetScale()
+    return self._scale or 1
   end
   function widget:SetBlendMode(mode)
     self._blendMode = mode
@@ -263,8 +393,12 @@ local function CreateMockWidget(widgetType, name, parent)
     self._drawLayer = layer
     self._sublevel = sublevel
   end
+  -- TextureBase:SetTexture(textureAsset) replaces whatever the texture drew (an atlas or a
+  -- color texture); nil clears it.
   function widget:SetTexture(path)
     self._texturePath = path
+    self._atlas = nil
+    self._colorTexture = nil
   end
   function widget:SetTexCoord(...)
     self._texCoords = {...}
@@ -547,12 +681,178 @@ _G.ContainerFrame_GetContainerNumSlots = function(bagID)
   return bagID, numSlots
 end
 
+-- Templates a mocked frame can inherit. CreateFrame applies each template named in its
+-- comma-separated template list, so a frame gets the regions and mixin methods its XML
+-- template gives it in the client. Each entry is built from Blizzard's own template.
+_G.__mockTemplates = _G.__mockTemplates or {}
+
+-- WowScrollBox (Blizzard_SharedXML/Shared/Scroll/ScrollBox.lua, ScrollBox.xml): a ScrollTarget
+-- child frame; Init(view) sets the view and scrolls to the beginning; SetView(view) binds the
+-- view (ScrollBoxViewMixin:SetScrollBox anchors the scroll target), reparents every child
+-- marked scrollable under the scroll target (ScrollBoxLinearViewMixin:ReparentScrollChildren)
+-- and lays them out (ScrollBoxViewUtil.SetPoint: TOPLEFT, and TOPRIGHT unless stretch is
+-- disabled). FullUpdate(immediately) lays them out again; SetPanExtent forwards to the view;
+-- SetInterpolateScroll comes from ScrollControllerMixin.
+_G.__mockTemplates.WowScrollBox = function(frame)
+  frame.ScrollTarget = CreateMockWidget("EventFrame", nil, frame)
+  function frame:GetScrollTarget() return self.ScrollTarget end
+  function frame:GetView() return self.view end
+  function frame:SetInterpolateScroll(canInterpolate) self._interpolateScroll = canInterpolate end
+  function frame:SetPanExtent(panExtent) self:GetView():SetPanExtent(panExtent) end
+  function frame:layoutScrollChildren()
+    local target = self:GetScrollTarget()
+    for _, child in ipairs(self.view and self.view.frames or {}) do
+      child:ClearAllPoints()
+      child:SetPoint("TOPLEFT", target, "TOPLEFT", 0, 0)
+      child:SetPoint("TOPRIGHT", target, "TOPRIGHT", 0, 0)
+    end
+  end
+  function frame:SetView(view)
+    if not view then
+      error("ScrollBoxBaseMixin:SetView requires a valid view.")
+    end
+    if type(view.SetScrollBox) ~= "function" or type(view.IsHorizontal) ~= "function" then
+      error("ScrollBoxBaseMixin:SetView requires a valid view.")
+    end
+    self.view = view
+    view:SetScrollBox(self)
+    view:ReparentScrollChildren(self:GetChildren())
+    self:layoutScrollChildren()
+  end
+  function frame:Init(view)
+    self:SetView(view)
+    self._scrolledToBegin = true
+  end
+  function frame:FullUpdate(immediately)
+    self._fullUpdates = (self._fullUpdates or 0) + 1
+    self._lastFullUpdateImmediate = immediately
+    self:layoutScrollChildren()
+  end
+end
+
+-- MinimalScrollBar (Blizzard_SharedXML/Shared/Scroll/ScrollBar.lua, ScrollBarMixin):
+-- SetHideIfUnscrollable(hide), SetInterpolateScroll(canInterpolateScroll).
+_G.__mockTemplates.MinimalScrollBar = function(frame)
+  function frame:SetHideIfUnscrollable(hide) self._hideIfUnscrollable = hide end
+  function frame:SetInterpolateScroll(canInterpolate) self._interpolateScroll = canInterpolate end
+end
+
+-- UITextureConstantsDocumentation.lua: Enum.UITextureSliceMode.
+_G.Enum.UITextureSliceMode = { Stretched = 0, Tiled = 1 }
+
+-- BackdropTemplate (Blizzard_SharedXML/Backdrop.xml, BackdropTemplateMixin): every mocked
+-- frame already records SetBackdrop/SetBackdropColor/SetBackdropBorderColor.
+_G.__mockTemplates.BackdropTemplate = function(frame)
+  frame._backdropTemplate = true
+end
+
+-- DefaultPanelBaseTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): a
+-- TitleContainer frame (frameLevel 510) holding the TitleText font string, and a NineSlice
+-- frame; DefaultPanelMixin (TitledPanelMixin, Blizzard_SharedXML/PortraitFrame.lua) gives
+-- GetTitleText and SetTitle.
+local function defaultPanelBase(frame)
+  local titleContainer = CreateMockWidget("Frame", nil, frame)
+  titleContainer:SetFrameLevel(510)
+  titleContainer.TitleText = titleContainer:CreateFontString(frame._name and (frame._name .. "TitleText") or nil, "OVERLAY", "GameFontNormal")
+  frame.TitleContainer = titleContainer
+  frame.NineSlice = CreateMockWidget("Frame", nil, frame)
+  function frame:GetTitleText() return self.TitleContainer.TitleText end
+  function frame:SetTitle(title) self:GetTitleText():SetText(title) end
+end
+
+-- DefaultPanelTemplate: a tiled rock Bg texture (BACKGROUND -6) and TopTileStreaks.
+_G.__mockTemplates.DefaultPanelTemplate = function(frame)
+  defaultPanelBase(frame)
+  frame.Bg = frame:CreateTexture(frame._name and (frame._name .. "Bg") or nil, "BACKGROUND")
+  frame.Bg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock")
+  frame.TopTileStreaks = frame:CreateTexture(nil, "BACKGROUND")
+end
+
+-- DefaultPanelFlatTemplate: a Bg frame (FlatPanelBackgroundTemplate) at frameLevel 0.
+_G.__mockTemplates.DefaultPanelFlatTemplate = function(frame)
+  defaultPanelBase(frame)
+  frame.Bg = CreateMockWidget("Frame", nil, frame)
+  frame.Bg:SetFrameLevel(0)
+end
+
+-- UIPanelCloseButtonNoScripts (SharedUIPanelTemplates.xml): 24x24, frameLevel 510, red exit
+-- atlases; UIPanelCloseButton adds an OnClick that hides the parent; ...DefaultAnchors
+-- anchors it TOPRIGHT x=1.
+_G.__mockTemplates.UIPanelCloseButtonNoScripts = function(frame)
+  frame:SetSize(24, 24)
+  frame:SetFrameLevel(510)
+  frame:SetDisabledAtlas("RedButton-Exit-Disabled")
+  frame:SetNormalAtlas("RedButton-Exit")
+  frame:SetPushedAtlas("RedButton-exit-pressed")
+  frame:SetHighlightAtlas("RedButton-Highlight", "ADD")
+end
+_G.__mockTemplates.UIPanelCloseButton = function(frame)
+  _G.__mockTemplates.UIPanelCloseButtonNoScripts(frame)
+  frame:SetScript("OnClick", function(self) self:GetParent():Hide() end)
+end
+_G.__mockTemplates.UIPanelCloseButtonDefaultAnchors = function(frame)
+  _G.__mockTemplates.UIPanelCloseButton(frame)
+  frame:SetPoint("TOPRIGHT", frame:GetParent(), "TOPRIGHT", 1, 0)
+end
+
 _G.CreateFrame = function(frameType, name, parent, template)
   local frame = CreateMockWidget(frameType, name, parent)
   if name then
     _G[name] = frame
   end
+  if type(template) == "string" then
+    frame._template = template
+    for templateName in string.gmatch(template, "[^,%s]+") do
+      local apply = _G.__mockTemplates[templateName]
+      if apply then
+        apply(frame)
+      end
+    end
+  end
   return frame
+end
+
+-- CreateScrollBoxLinearView(top, bottom, left, right, spacing) -> a ScrollBoxLinearViewMixin
+-- (Blizzard_SharedXML/Shared/Scroll/ScrollBoxLinearView.lua, ScrollBoxView.lua): SetPanExtent,
+-- SetScrollBox (anchors the scroll target TOPLEFT and TOPRIGHT), GetScrollBox, GetScrollTarget,
+-- IsHorizontal, GetFrames, and ReparentScrollChildren(...), which moves every child marked
+-- scrollable under the scroll target.
+_G.CreateScrollBoxLinearView = function(top, bottom, left, right, spacing)
+  return {
+    frames = {},
+    _padding = { top = top or 0, bottom = bottom or 0, left = left or 0, right = right or 0, spacing = spacing or 0 },
+    SetPanExtent = function(self, panExtent) self._panExtent = panExtent end,
+    SetScrollBox = function(self, scrollBox)
+      self.scrollBox = scrollBox
+      local target = scrollBox:GetScrollTarget()
+      target:ClearAllPoints()
+      target:SetPoint("TOPLEFT")
+      target:SetPoint("TOPRIGHT")
+    end,
+    GetScrollBox = function(self) return self.scrollBox end,
+    GetScrollTarget = function(self) return self:GetScrollBox():GetScrollTarget() end,
+    IsHorizontal = function() return false end,
+    GetFrames = function(self) return self.frames end,
+    ReparentScrollChildren = function(self, ...)
+      local scrollTarget = self:GetScrollTarget()
+      for index = 1, select("#", ...) do
+        local child = select(index, ...)
+        if child.scrollable then
+          child:SetParent(scrollTarget)
+          table.insert(self.frames, child)
+        end
+      end
+    end,
+  }
+end
+
+-- ScrollUtil.InitScrollBoxWithScrollBar(scrollBox, scrollBar, scrollBoxView)
+-- (Blizzard_SharedXML/Shared/Scroll/ScrollUtil.lua): binds the bar to the box, then
+-- scrollBox:Init(scrollBoxView).
+_G.ScrollUtil = {}
+_G.ScrollUtil.InitScrollBoxWithScrollBar = function(scrollBox, scrollBar, view)
+  scrollBox._scrollBar = scrollBar
+  scrollBox:Init(view)
 end
 
 _G.hooksecurefunc = function() end

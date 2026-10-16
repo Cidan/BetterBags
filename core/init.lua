@@ -193,6 +193,8 @@ function addon:OnInitialize()
   refresh:Init()
 
   -- 4. Themes and Presentation Frames
+  addon:GetModule('Render'):Init()
+  addon:GetModule('Sonata'):Init()
   themes:Init()
   itemFrame:Init()
   sectionFrame:Init()
