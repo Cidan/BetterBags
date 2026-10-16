@@ -481,6 +481,13 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetVertTile(tiling)
     self._vertTile = tiling
   end
+  -- TextureBase:GetHorizTile() / GetVertTile() -> tiling.
+  function widget:GetHorizTile()
+    return self._horizTile == true
+  end
+  function widget:GetVertTile()
+    return self._vertTile == true
+  end
   function widget:GetTexture()
     return self._texturePath
   end
@@ -608,6 +615,10 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetNormalFontObject(fontObject)
     self._normalFontObject = fontObject
   end
+  -- SimpleButtonAPIDocumentation.lua: Get{Normal,Highlight,Disabled}FontObject().
+  function widget:GetNormalFontObject() return self._normalFontObject end
+  function widget:GetHighlightFontObject() return self._highlightFontObject end
+  function widget:GetDisabledFontObject() return self._disabledFontObject end
   -- SimpleButtonAPIDocumentation.lua: SetHighlightFontObject(font), SetDisabledFontObject(font).
   function widget:SetHighlightFontObject(fontObject)
     self._highlightFontObject = fontObject

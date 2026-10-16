@@ -164,6 +164,55 @@ template's `Opacity` region, the backdrop fill (and its border with `BorderOpaci
 background and `Opacity = true` textures. Windows call these directly for title and opacity
 changes; `Sonata:Redecorate` rebuilds the whole chrome.
 
+## 3a. Element styles (`sonata/elements.lua`)
+
+`SonataElements` registers a styler per element kind. Every styler follows two rules:
+- **A style sets everything it controls.** What it leaves out falls back to Blizzard's own look
+  for that part (`withDefaults`: a part a style only partly describes keeps the rest of the
+  default; a style that names its own file, atlas or color takes none of the default's art).
+- **Template regions are recorded the first time a style changes them and put back** when a
+  later style leaves them out (`captureRegion`/`restoreRegion`: file or atlas, coordinates,
+  tint, blend, alpha, layer, desaturation, tiling, size, anchors; an atlas is restored after
+  the coordinates are reset and keeps its own). Template art a style hides (`Strip`,
+  `HideCaps`, `SearchIcon = false`) is hidden by alpha and gets its own alpha back.
+
+| Kind | Element | Style keys (defaults are Blizzard's) |
+|---|---|---|
+| `ItemButton` | an item button's visual decoration | `Icon` (`Inset`, `TexCoords`), `Highlight`, `Pushed` (button states), `Backdrop` (`Color` fill, `Inset`; `BorderColor`/`EdgeSize` draw a 4-texture edge, `BorderInset` a number or per side), `QualityBorder = "Backdrop"`, `QualityColors` (per quality index), `UpgradeIcon` (`Atlas`/`Texture`, `Scale`), `Count` (`Font`, `Points`), `QuestIcon`, `QuestStarterIcon`, `QuestBorderColor` |
+| `Tab` | a bottom tab | `Art = "Flat"` (template art hidden; `Background`, `Border`, `Hover` (HIGHLIGHT layer), `Selected = { Background, Bar }`), `Height` (default 32), `Font`, `HighlightFont`, `SelectedFont`, `TextOffset`, `SelectedTextOffset` |
+| `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
+| `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
+| `BagButton` | the bag menu (portrait) button | `Size` (40), `Portrait`, `Highlight` (texture spec + `Width`, `Height`, `X`, `Y`; OVERLAY 7) |
+| `Button` | `UIPanelButtonTemplate` buttons | `Strip`, `Background`, `Border`, `Highlight`, `Font`, `HighlightFont`, `DisabledFont` (the button's own fonts are recorded and put back) |
+| `EditBox` | `InputBoxTemplate` edit boxes | `Strip`, `Background`, `Border`, `Font` (the box's own font is put back) |
+
+Details:
+- `DrawItemQuality(decoration, color, quality)` draws quality on the backdrop edge and returns
+  true only when the style takes quality (`QualityBorder = "Backdrop"`) and draws an edge;
+  otherwise BetterBags' quality glow draws it (item-drawing.md §5).
+- `DrawItemQuest(decoration, questInfo)` goes by the item's quest data (`isQuestItem`,
+  `questID`, `isActive`, Blizzard's `UpdateQuestItem` arguments), never by whether the quest
+  texture is shown: Classic's `IconQuestTexture` has no hidden attribute and is shown on every
+  button. A quest border without a backdrop edge sets the icon border's texture
+  (`WhiteIconFrame`), blend, coordinates and color itself, so no quality halo stays on it.
+- `SetTabState(tab, "normal"|"selected"|"drop")` replaces toggling the template's art by hand
+  (`frames/tabs.lua` `SelectTab`/`DeselectTab`, the drag highlight): `drop` (a section dragged
+  over the tab) shows the active art without moving the text, and keeps the selected tab's
+  idle art hidden. Selecting sets `GameFontHighlightSmall` as the disabled font, as
+  `PanelTemplates_SelectTab` does; text offsets come from the template (`selectedTextY`, ...)
+  or `PanelTemplates_*`'s defaults (2 and -3).
+- Fonts set on button states (tabs, buttons) must be font objects: a button re-applies its
+  state's font object when hovered, which would undo `SetFont`/`SetTextColor` on its label. A
+  font spec with a `Path`, `Color`, `Shadow` or `Justify` becomes a font object made for it
+  (`CreateFont`, one per distinct spec, copied from its `Object` first).
+- Flat tab fills: background at BACKGROUND -8, selected fill at -7 (always above it), bar at
+  OVERLAY 6.
+- **Masque.** Restyling rewrites regions Masque skins (icon, highlight, pushed, count). A theme
+  apply bumps the generation in every button's draw record (caches.md §4), so every button
+  draws in full afterwards and Masque re-skins it on `item/Updated`.
+- Edge sizes and insets are in UI units. Pixel-perfect edges at any scale are not yet
+  expressible.
+
 ## 4. Load order
 
 `sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua`, `sonata\elements.lua` follow
@@ -191,7 +240,17 @@ themes, template title font and title bar restored, `Title = false`; close butto
 clicks, plain ones, art replacement and its restore, hit rects, a plain button started from
 nothing, hover tint and a solid normal color, the overlay; `false` keys; the overlay following
 the window's level; a clean switch from a templated theme to a flat one).
-`spec/sonata/apply_spec.lua` (both color forms, font objects by name or object, a font object's
+`spec/sonata/elements_spec.lua` (every styler and its reset to Blizzard's look: icons,
+highlight and pushed art with blend modes, backdrops with and without edges, per-side edge
+insets, quality on the edge and per-quality colors, upgrade arrows styled in part, count font
+and position, quest art by quest data (items, starters, Classic's always-shown texture) and the
+quest border's texture; tabs: Blizzard art by state, template offsets, drop on a normal and on
+the selected tab, flat art with fills, bar and hover, the selected fill above the normal one,
+fonts and height reset, selected-only fonts, made font objects (shared per spec), highlight
+fonts; search boxes: strip, middle art and its full restore, search icon, clear button,
+instruction anchors; bag button: art, partial portraits, layers; buttons and edit boxes:
+flattening, fonts and highlights put back, a highlight the button never had; through the
+engine). `spec/sonata/apply_spec.lua` (both color forms, font objects by name or object, a font object's
 color and shadow, font order; texture reset, atlas coordinates/tiling/slicing kept, explicit
 atlas settings, solid colors, kept draw layer, reset for reuse; anchors and resolution errors,
 insets; button states: art, blend modes, tint-only, `false`, reset of a state given new art,
