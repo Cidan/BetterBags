@@ -680,18 +680,53 @@ local function captureFonts(frame)
   }
 end
 
+-- hoverBorder colors a button's border style.HoverBorderColor while the mouse is over it. The
+-- hooks are installed once; a style without the color leaves the border alone.
+---@param button Button
+---@param style table
+local function hoverBorder(button, style)
+  local border = type(style.Border) == "table" and style.Border or nil
+  button.sonataHoverBorder = border and style.HoverBorderColor or nil
+  button.sonataBorderColor = border and border.Color or nil
+  if button.sonataHoverBorder == nil or button.sonataHoverHooked then
+    return
+  end
+  button.sonataHoverHooked = true
+  addon.HookScript(button, "OnEnter", function(_, b)
+    if b.sonataHoverBorder ~= nil then
+      setEdgeColor(b, b.sonataHoverBorder)
+    end
+  end)
+  addon.HookScript(button, "OnLeave", function(_, b)
+    if b.sonataHoverBorder ~= nil then
+      setEdgeColor(b, b.sonataBorderColor)
+    end
+  end)
+end
+
 ---@param button Button
 ---@param style table
 function elements:StyleButton(button, style)
   if next(style) == nil and button.sonataSkin == nil and button.sonataStripped == nil and button.sonataFonts == nil
-    and button.sonataRegions == nil then
+    and button.sonataRegions == nil and button.sonataHighlightAlpha == nil then
     return
   end
   strip(button, INPUT_ART, style.Strip == true)
   fill(button, style.Background, "fill", "BACKGROUND", -8)
   edges(button, style.Border)
+  hoverBorder(button, style)
 
   local highlight = button:GetHighlightTexture()
+  -- Highlight = false hides the highlight by alpha; it gets its alpha back with a later style.
+  if style.Highlight == false and highlight ~= nil then
+    if button.sonataHighlightAlpha == nil then
+      button.sonataHighlightAlpha = highlight:GetAlpha()
+    end
+    highlight:SetAlpha(0)
+  elseif button.sonataHighlightAlpha ~= nil and highlight ~= nil then
+    highlight:SetAlpha(button.sonataHighlightAlpha)
+    button.sonataHighlightAlpha = nil
+  end
   if type(style.Highlight) == "table" then
     button.sonataRegions = button.sonataRegions or {}
     if button.sonataRegions.Highlight == nil and highlight ~= nil then

@@ -87,6 +87,7 @@ globals = {
 	"GameFontHighlight",
 	"GameFontHighlightSmall",
 	"GameFontNormal",
+	"GameFontWhite",
 	"GameFontNormalSmall",
 	"GameTooltip",
 	"GameMenuFrame",

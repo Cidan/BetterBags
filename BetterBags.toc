@@ -76,6 +76,7 @@ sonata\themes\base.lua
 sonata\themes\default.lua
 sonata\themes\simpledark.lua
 sonata\themes\moonlight.lua
+sonata\themes\elvui.lua
 
 # The Theme API loads earlier than actual themes.
 themes\themes.lua

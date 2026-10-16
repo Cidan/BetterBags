@@ -187,7 +187,7 @@ registered window that has `UpdateOpacity` to apply its opacity again (the Opaci
 | `SectionHeader` | a section title font string | `Font` (default `GameFontNormal`) |
 | `SearchBox` | the in-bag `BagSearchBoxTemplate` box | `Strip`, `HideCaps`, `Middle` (texture spec + `Points`, `Height`), `SearchIcon` (`false` hides; a texture spec restyles), `ClearButton = { Icon }`, `Background`, `Border`, `Font` (default `GameFontHighlightSmall`), `Instructions` (default `GameFontDisableSmall`, 0.35 gray), `InstructionsPoints`, `TextInsets` (default 16, 20, 0, 0) |
 | `BagButton` | the bag menu (portrait) button | `Size` (40), `Portrait`, `Highlight` (texture spec + `Width`, `Height`, `X`, `Y`; OVERLAY 7) |
-| `Button` | `UIPanelButtonTemplate` buttons | `Strip`, `Background`, `Border`, `Highlight`, `Font`, `HighlightFont`, `DisabledFont` (the button's own fonts are recorded and put back) |
+| `Button` | `UIPanelButtonTemplate` buttons | `Strip`, `Background`, `Border`, `HoverBorderColor` (the border's color while the mouse is over the button; hooked once), `Highlight` (`false` hides the button's highlight by alpha, given back by a later style), `Font`, `HighlightFont`, `DisabledFont` (the button's own fonts are recorded and put back) |
 | `EditBox` | `InputBoxTemplate` edit boxes | `Strip`, `Background`, `Border`, `Font` (the box's own font is put back) |
 
 Details:
@@ -294,10 +294,33 @@ overlay search panel).
   Parchment hangs its 281 x 84 ribbon over the bag (BOTTOM 40 below the window's TOP) and
   centers the bag's title on it.
 
+- **ElvUI** (`elvui`, offered while ElvUI is loaded): what ElvUI's skins would draw, as data,
+  calling nothing of ElvUI's. Its variables read ElvUI's engine (`unpack(ElvUI)`) when the theme
+  is applied: `media.blankTex`, `glossTex`, `bordercolor`, `backdropcolor`, `backdropfadecolor`,
+  `rgbvaluecolor`, `Media.Textures.Close`/`BagQuestIcon`/`BagUpgradeIcon`, `PixelMode`,
+  `twoPixelsPlease`, `Modern`, `Border`, `TexCoords`, `Scale` (each with a fallback, so
+  resolving without ElvUI does not fail). ElvUI fills its media in its own `OnInitialize`, and
+  BetterBags lists ElvUI as an optional dependency, so they exist when Sonata applies at
+  login. Windows are the "Transparent" template (`SetTemplate`): a blank-texture backdrop in the
+  fade color, a 1px edge (2 with two-pixel borders), black inner and outer lines outside pixel
+  mode (`Outlines`), opacity left to ElvUI; `GameFontWhite` titles at TOP; ElvUI's close art
+  12px inside a 24px button at TOPRIGHT -4, -4, tinted the value color on hover, hit insets 6, 6,
+  7, 7. Item buttons (`HandleItemButton`, `HandleIconBorder`): the default template behind the
+  icon (inset by the border width, ElvUI's icon crop), quality on the edge with common items
+  black, white 30% hover and pushed fills, ElvUI's quest icon with a gold edge, its upgrade icon
+  at 120%, and no Masque. Tabs (`HandleTab`): flat, the default template inset 3 (10 on older
+  clients) from the sides, 1 (3 outside pixel mode) from the top and 3 from the bottom, text
+  centered. The search box and edit boxes (`HandleEditBox`) and dialog buttons
+  (`HandleButton`: the gloss texture, the value-color edge on hover, no highlight) are flat in
+  the default template. The bag's search box sits at 10, -40 to -10, -60 and the menu button at
+  4, -6 at 85%.
+
 Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
 bag panel, levels, title font, opacity, close button and content box; panels, flat windows,
 dialogs; slots panels on retail, Classic and Forever; section font) and
-`spec/sonata/theme_ports_spec.lua` (Simple Dark; the Moonlight set and its art). Every file in
+`spec/sonata/theme_ports_spec.lua` (Simple Dark; the Moonlight set and its art; ElvUI against a
+stand-in engine: availability, the template in and outside pixel mode, titles and close
+button, Masque, item buttons, tabs, search box and buttons, bag layout). Every file in
 `sonata/themes/` is listed in every TOC after Base (`spec/render/toc_spec.lua`).
 
 ## 4. Load order

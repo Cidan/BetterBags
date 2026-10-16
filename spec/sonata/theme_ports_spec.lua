@@ -32,7 +32,7 @@ local window = addon:GetModule("Window")
 local events = addon:GetModule("Events")
 local context = addon:GetModule("Context")
 
-local THEME_FILES = { "base", "default", "simpledark", "moonlight" }
+local THEME_FILES = { "base", "default", "simpledark", "moonlight", "elvui" }
 
 describe("BetterBags' other themes", function()
   local originalSend, originalThemes
@@ -188,6 +188,152 @@ describe("BetterBags' other themes", function()
         assert.is_not_nil(f, file)
         f:close()
       end
+    end)
+  end)
+
+  describe("ElvUI", function()
+    local savedElvUI
+
+    -- elvui stands in for ElvUI's engine (unpack(ElvUI) is E): the media, textures and pixel
+    -- settings the theme reads.
+    local function elvui(opts)
+      opts = opts or {}
+      local E = {
+        media = {
+          blankTex = "Interface\\ElvUIBlank",
+          glossTex = "Interface\\ElvUINorm",
+          bordercolor = { 0.1, 0.1, 0.1 },
+          backdropcolor = { 0.2, 0.2, 0.2 },
+          backdropfadecolor = { 0.06, 0.06, 0.06, 0.8 },
+          rgbvaluecolor = { 0.1, 0.6, 0.9 },
+        },
+        Media = { Textures = { Close = "Interface\\ElvUIClose", BagQuestIcon = "Interface\\ElvUIQuest",
+          BagUpgradeIcon = "Interface\\ElvUIUpgrade" } },
+        PixelMode = opts.pixel ~= false,
+        twoPixelsPlease = opts.two == true,
+        Modern = opts.modern ~= false,
+        Border = opts.pixel == false and 2 or 1,
+        TexCoords = { 0.08, 0.92, 0.08, 0.92 },
+      }
+      function E:Scale(n) return n end
+      _G.ElvUI = { E }
+      return E
+    end
+
+    before_each(function()
+      savedElvUI = _G.ElvUI
+      _G.ElvUI = nil
+    end)
+
+    after_each(function()
+      _G.ElvUI = savedElvUI
+    end)
+
+    it("keeps its saved key and is offered only while ElvUI is loaded", function()
+      assert.are.equal("ElvUI", sonata:GetTheme("elvui").DisplayName)
+      assert.is_false(sonata:IsAvailable("elvui"))
+      elvui()
+      assert.is_true(sonata:IsAvailable("elvui"))
+    end)
+
+    it("draws every window in ElvUI's transparent template, which ElvUI's opacity owns", function()
+      elvui()
+      local windows = {}
+      for _, kind in ipairs({ "Bag", "Panel", "Flat", "Dialog", "Slots", "Search" }) do
+        windows[kind] = newWindow(kind, 40)
+      end
+      apply("elvui")
+      for kind, w in pairs(windows) do
+        local backdrop = w.frame._backdrop
+        assert.are.equal("Interface\\ElvUIBlank", backdrop.bgFile, kind)
+        assert.are.equal("Interface\\ElvUIBlank", backdrop.edgeFile, kind)
+        assert.are.equal(1, backdrop.edgeSize, kind)
+        assert.are.same({ 0.06, 0.06, 0.06, 0.8 }, color(w.frame._backdropColor), kind)
+        assert.are.same({ 0.1, 0.1, 0.1, 1 }, color(w.frame._backdropBorderColor), kind)
+        assert.are.equal(0, #w.decoration:GetOutlineFrames(), kind)
+      end
+    end)
+
+    it("draws two-pixel edges, and black inner and outer lines outside pixel mode", function()
+      elvui({ pixel = false, two = true })
+      local w = newWindow("Bag")
+      apply("elvui")
+      assert.are.equal(2, w.frame._backdrop.edgeSize)
+      local outlines = w.decoration:GetOutlineFrames()
+      assert.are.equal(2, #outlines)
+      assert.are.same({ "TOPLEFT", w.frame, "TOPLEFT", 1, -1 }, { outlines[1]:GetPoint(1) })
+      assert.are.same({ "TOPLEFT", w.frame, "TOPLEFT", -1, 1 }, { outlines[2]:GetPoint(1) })
+      for _, o in ipairs(outlines) do
+        assert.are.same({ 0, 0, 0, 1 }, color(o._backdropBorderColor))
+      end
+    end)
+
+    it("titles windows in white at the top, with ElvUI's close button", function()
+      elvui()
+      local bag, dialog = newWindow("Bag"), newWindow("Dialog")
+      apply("elvui")
+      local title = bag.decoration:GetTitleText()
+      assert.are.equal(GameFontWhite, title:GetFontObject())
+      assert.are.same({ "TOP", bag.frame, "TOP", 0, 0 }, { title:GetPoint(1) })
+      local close = bag.decoration:GetCloseButton()
+      assert.are.same({ 24, 24 }, { close:GetWidth(), close:GetHeight() })
+      assert.are.same({ "TOPRIGHT", bag.frame, "TOPRIGHT", -4, -4 }, { close:GetPoint(1) })
+      local art = close:GetNormalTexture()
+      assert.are.equal("Interface\\ElvUIClose", art:GetTexture())
+      assert.are.same({ "TOPLEFT", close, "TOPLEFT", 6, -6 }, { art:GetPoint(1) })
+      assert.are.same({ 6, 6, 7, 7 }, { close:GetHitRectInsets() })
+      close:GetScript("OnEnter")(close)
+      assert.are.same({ 0.1, 0.6, 0.9, 1 }, { art:GetVertexColor() })
+      assert.is_nil(dialog.decoration:GetCloseButton())
+    end)
+
+    it("keeps Masque off its buttons, and draws them like ElvUI's bags", function()
+      elvui()
+      apply("elvui")
+      assert.is_false(sonata:UsesMasque())
+      local item = sonata:GetElementStyle("ItemButton")
+      assert.are.same({ Inset = 1, TexCoords = { 0.08, 0.92, 0.08, 0.92 } }, item.Icon)
+      assert.are.same({ 0.2, 0.2, 0.2, 1 }, item.Backdrop.Color)
+      assert.are.same({ 0.1, 0.1, 0.1, 1 }, item.Backdrop.BorderColor)
+      assert.are.equal("Backdrop", item.QualityBorder)
+      assert.are.same({ 0, 0, 0, 1 }, item.QualityColors[1])
+      assert.are.same({ Texture = "Interface\\ElvUIQuest" }, item.QuestIcon)
+      assert.are.same({ 1, 0.8, 0, 1 }, item.QuestBorderColor)
+      assert.are.same({ Texture = "Interface\\ElvUIUpgrade", Scale = 1.2 }, item.UpgradeIcon)
+      local inside = { Left = 1, Right = 1, Top = 1, Bottom = 1 }
+      assert.are.same({ Color = { 1, 1, 1, 0.3 }, BlendMode = "ADD", Inset = inside }, item.Highlight)
+      assert.are.same({ Color = { 1, 1, 1, 0.3 }, BlendMode = "ADD", Inset = inside }, item.Pushed)
+    end)
+
+    it("flattens tabs, the search box and dialog buttons into ElvUI's template", function()
+      elvui({ modern = false, pixel = false })
+      apply("elvui")
+      local tab = sonata:GetElementStyle("Tab")
+      assert.are.equal("Flat", tab.Art)
+      assert.are.same({ Left = 10, Right = 10, Top = 3, Bottom = 3 }, tab.Background.Inset)
+      assert.are.same({ 0.2, 0.2, 0.2, 1 }, tab.Background.Color)
+      assert.are.same({ Color = { 0.1, 0.1, 0.1, 1 }, EdgeSize = 1, Inset = { Left = 10, Right = 10, Top = 3, Bottom = 3 } }, tab.Border)
+      assert.are.same({ X = 0, Y = 0 }, tab.TextOffset)
+      assert.are.same({ X = 0, Y = 0 }, tab.SelectedTextOffset)
+      local search = sonata:GetElementStyle("SearchBox")
+      assert.is_true(search.Strip)
+      assert.are.same({ Color = { 0.2, 0.2, 0.2, 1 }, Inset = { Left = -4, Right = -4, Top = 0, Bottom = 0 } }, search.Background)
+      local button = sonata:GetElementStyle("Button")
+      assert.is_true(button.Strip)
+      assert.are.same({ Texture = "Interface\\ElvUINorm", VertexColor = { 0.2, 0.2, 0.2, 1 } }, button.Background)
+      assert.are.same({ 0.1, 0.6, 0.9, 1 }, button.HoverBorderColor)
+      assert.is_false(button.Highlight)
+      assert.is_true(sonata:GetElementStyle("EditBox").Strip)
+    end)
+
+    it("puts the search box and menu button where its bag drew them", function()
+      elvui()
+      local layout = sonata:Resolve("elvui").Windows.Bag.Layout
+      assert.are.same({
+        { Point = "TOPLEFT", X = 10, Y = -40 },
+        { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -10, Y = -60 },
+      }, layout.Search.Points)
+      assert.are.same({ { Point = "TOPLEFT", X = 4, Y = -6 } }, layout.MenuButton.Points)
     end)
   end)
 end)
