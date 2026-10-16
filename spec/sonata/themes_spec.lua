@@ -170,6 +170,7 @@ describe("BetterBags' Sonata themes", function()
         assert.is_false(panel.TitleContainer:IsShown())
         assert.is_nil(w.decoration:GetCloseButton())
         assert.are.same({ Left = 10, Right = 6, Top = 30, Bottom = 12 }, w:GetContentInsets())
+        assert.are.same({ X = 0, Y = -2 }, w:GetLayout().Offset)
       end)
 
       it("are a tooltip backdrop on the window itself on Classic, with even padding", function()
@@ -193,6 +194,8 @@ describe("BetterBags' Sonata themes", function()
         assert.are.same({ r = 1, g = 1, b = 1, a = 1 }, panel._backdropBorderColor)
         assert.is_true(panel:GetFrameLevel() < w.content:GetFrameLevel())
         assert.are.same({ Left = 8, Right = 8, Top = 8, Bottom = 8 }, w:GetContentInsets())
+        -- Its border is thicker than the bag window's; the panel moves right to line up.
+        assert.are.same({ X = 4, Y = -2 }, w:GetLayout().Offset)
       end)
     end)
 

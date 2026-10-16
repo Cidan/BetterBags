@@ -81,6 +81,8 @@ sonata:RegisterTheme({
             BackdropBorderColor = { 1, 1, 1, 1 },
           },
           Insets = TOOLTIP_PADDING,
+          -- The tooltip border is thicker than the bag window's.
+          Layout = { Offset = { X = 4, Y = -2 } },
         },
       },
     },

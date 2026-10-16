@@ -630,4 +630,24 @@ describe("Drawable", function()
     d:SetSortKey(5)
     assert.are.equal(5, d:GetSortKey())
   end)
+
+  it("wraps a frame laid out by its own code, sized by a function", function()
+    local frame = CreateFrame("Frame")
+    local given = {}
+    local d = drawable:FromFrame(frame, function(parentResult, options)
+      table.insert(given, { parentResult, options })
+      return 120, 40
+    end)
+    assert.are.equal(frame, d.frame)
+    local result = render:NewRenderChain(d, { ctx = "the context" }, { Width = 300 })
+    assert.are.same({ 120, 40 }, { result.Width, result.Height })
+    assert.are.equal(300, given[1][1].Width)
+    assert.are.equal("the context", given[1][2].ctx)
+    local perf = addon:GetModule("Perf")
+    local name
+    for _, entry in ipairs(perf.prototypes) do
+      if entry.tbl == getmetatable(d).__index then name = entry.name end
+    end
+    assert.are.equal("FrameDrawable", name)
+  end)
 end)

@@ -51,7 +51,13 @@ sonata:RegisterTheme({
     Panel = { Insets = { Left = 4, Right = 0, Top = 30, Bottom = 4 }, Animations = FADE },
     Flat = { Insets = { Left = 5, Right = 5, Top = 25, Bottom = 5 }, Animations = FADE },
     Dialog = { Insets = { Left = 5, Right = 5, Top = 25, Bottom = 5 }, Animations = FADE },
-    Slots = { Insets = { Left = 8, Right = 8, Top = 8, Bottom = 8 }, Animations = FADE_AND_DROP },
+    -- A slots panel hangs below its bag: Offset is where its top left sits from the bag's
+    -- bottom left.
+    Slots = {
+      Insets = { Left = 8, Right = 8, Top = 8, Bottom = 8 },
+      Animations = FADE_AND_DROP,
+      Layout = { Offset = { X = 0, Y = -2 } },
+    },
   },
   Elements = {
     SectionHeader = { Font = { Object = "GameFontNormal" } },

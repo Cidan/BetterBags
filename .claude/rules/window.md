@@ -154,8 +154,10 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   (`search/SetInFrame`) and recalculates the bags (`bags/Rederive`).
 - **Each draw** binds, then `ApplySizeSettings` (scale and opacity always; the size mode only
   when it or the view changed, since applying it takes the saved size and would undo a resize
-  in progress), then renders the window now. The Opacity and Scale sliders call
-  `window:UpdateOpacity()` / `window:UpdateScale()` directly and send nothing to the bags.
+  in progress), then renders the window now. The Opacity slider calls
+  `Sonata:UpdateOpacity()` (every window follows an opacity: the bags their own, the other
+  windows the backpack's) and the Scale slider `window:UpdateScale()`; neither sends anything to
+  the bags.
 - **OnResize**: a bag sized to its content keeps its bottom edge (it grows upwards) or follows
   its anchor (`frames/anchor.lua`); a bag the player sized stays where it was put.
 - **Showing and hiding** go through the behaviors (`OnShow`/`OnHide` call `window:Show`/
@@ -207,6 +209,20 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   fade. Its four tabs' contents fill the content box. Its close button takes left and right
   clicks (`CloseClicks`): left turns debug mode off, right clears the log (`OnClose`). It shows
   and hides with `config/DebugMode`. Coverage: `spec/frames/debug_window_spec.lua`.
+- **The slots panels** (`frames/bagslots.lua`: Show Bags for the backpack and the Classic/Era
+  bank; `frames/bankslots.lua`: the retail bank tab panel): Slots windows parented to their
+  bag (`BackpackBagSlots`, `BankBagSlots`, `BetterBagsBankSlots`), not movable, hidden until
+  shown. The content is the slot grid through `drawable:FromFrame` (render-pipeline.md), so the
+  window is the grid's size plus the theme's Slots insets, the chrome is the theme's per client
+  (classic-bag-slots-panel.md, camelot-forever.md §5), and the grid is never in a larger box.
+  `Draw` redraws the buttons and lays the window out at once while shown (else on show). `Show`
+  hangs the panel below its bag at the theme's `Layout.Offset` (Base 0, -2), hides the bag's
+  group tabs (remembering whether they showed) and fades in; the bank panel selects its first
+  tab once shown. `Hide` fades out, then gives the bag its tabs back (`OnClose`); the bank panel
+  also clears its tab filter and refreshes the bank. After every render a shown panel
+  invalidates its bag's window, whose minimum width is the panel's (§7), replacing the bank
+  panel's direct `SetWidth` on the bank frame. Coverage: `spec/frames/bagslots_spec.lua`,
+  `spec/frames/bankslots_spec.lua` ("9. The panel's window").
 - The side theme-configuration panel (`frames/themeconfig.lua`) and the window grouping it was
   the only user of (`util/windowgroup.lua`) were removed: nothing had opened the panel since
   the window group's opener was removed, so it was a hidden frame built at every login. Themes

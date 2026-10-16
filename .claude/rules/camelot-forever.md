@@ -150,52 +150,39 @@ false on Forever, populated + true on retail), `spec/database_migration_spec.lua
 Warbank group gating"), `spec/refresh_spec.lua` ("sort the bank but NOT the warbank on a client
 without one").
 
-## 5. Flat slots panels use a headerless tooltip decoration on Camelot
+## 5. Slots panels use Blizzard's dark tooltip frame on Camelot
 
-The Default theme decorates flat windows (`themes:RegisterFlatWindow`) with
-`DefaultPanelFlatTemplate`. On Camelot that template renders **broken**: its `Bg` starts
-20px below the top (a reserved title strip), and its `ButtonFrameTemplateNoPortrait`
-NineSlice overhangs the top with tall metal header art that Camelot re-drew even taller
+`DefaultPanelFlatTemplate` renders **broken** on Camelot: its `Bg` starts 20px below the top
+(a reserved title strip), and its `ButtonFrameTemplateNoPortrait` NineSlice overhangs the top
+with tall metal header art that Camelot re-drew even taller
 (`Blizzard_SharedXML/Camelot/NineSliceLayoutOverrides.lua`) — Blizzard shipped a Camelot-only
 `NineSliceUtil.UpdateCornerCropping` just to survive it on short frames. On the short
 bag/bank **slots panels** this showed as an empty dark title-bar band + wrong border.
 
-Fix: on `addon.isForever`, both slots panels are a **headerless
-`TooltipBorderedFrameTemplate`** (dark, thin-bordered, carries its own background;
-cross-version-safe, verified on all five TOCs) instead of a themed flat window, and take the
-**symmetric-padding** layout path (no reserved header — never feed `GetFlatHeaderHeight`,
-which still returns Default's 30, into this path). This mirrors the Classic manual-backdrop
-fix in `classic-bag-slots-panel.md`; Camelot just uses the Blizzard tooltip template rather
-than a raw `SetBackdrop`.
+Fix, as theme data (sonata.md §3b): the Default theme's `Clients.Forever` override of its
+`Slots` window style uses a **`TooltipBorderedFrameTemplate`** (dark, thin-bordered, carries
+its own background; cross-version-safe, verified on all five TOCs) colored black at 0.9 with
+a white border (`BackdropColor`, `BackdropBorderColor`), with **even padding of 8** (no
+reserved header) and the panel nudged 4 pixels right to line up with the bag window
+(`Layout.Offset`). Both slots panels are Slots windows (window.md §8), so both take it.
 
-**The template must be on the panel frame itself, never on a child "decoration" frame.** The
-first version created the tooltip template as a sibling child of the panel
-(`CreateFrame(..., f, "TooltipBorderedFrameTemplate")`). That sibling shares the frame level
-of the slot grid, which is also a child of the panel: a clipping `WowScrollBox`
-(`clipChildren="true"`, `ScrollBox.xml`) whose buttons render as a group at the scroll box's
-level. With the two at the same level the 90%-black filled centre could draw over the grid,
-so every slot button looked sunk under a dark film ("the buttons are a layer under the
-window"). A frame's own regions always sit below its child frames, so with the template on
-the panel frame the backdrop is strictly a level below the grid. Classic never hit this
-because its `SetBackdrop` is on the panel frame; retail never hit it because the themed
-decoration's only same-level art is a border (its filled `Bg` is a `frameLevel="0"` frame in
-`DefaultPanelFlatTemplate`).
+**The filled template must sit strictly below the slot grid.** The first version created the
+tooltip template as a sibling child of the panel at the grid's own frame level; the grid is a
+clipping `WowScrollBox` (`clipChildren="true"`, `ScrollBox.xml`) whose buttons render as a
+group at the scroll box's level, so the 90%-black filled centre could draw over the grid and
+every slot button looked sunk under a dark film ("the buttons are a layer under the window").
+The next version put the template on the panel frame itself, whose regions are always below
+its children. Now Sonata places every template **one level below the window frame**
+(`Level = -1`), the content box is a child of the window, and the grid a child of the content
+box, so the template is two levels below the grid (patterns-ui.md, "Filled Backdrops Belong
+on the Panel Frame"; sonata.md §3, "Where things go"). Never give a filled template a level at
+or above the window's.
 
-- `frames/bagslots.lua` — `CreatePanel` creates the panel frame with
-  `TooltipBorderedFrameTemplate` on Camelot (`BackdropTemplate` elsewhere) and colors it in an
-  `addon.isForever` branch ahead of the retail/Classic branches; `Draw` centering condition is
-  `addon.isRetail and not addon.isForever` so Camelot falls to the symmetric-padding branch.
-- `frames/bankslots.lua` — `CreatePanel` creates the panel frame with the tooltip template on
-  Camelot else registers the flat window; `Draw` uses a 12px symmetric `topInset` on Camelot.
-- Only the **slots panels** are converted. Other flat windows (`frames/searchcategory.lua`
-  config pane) still use the themed decoration; convert them the same way if they show the
-  band on Camelot.
-
-Coverage: `spec/frames/bagslots_spec.lua` ("centers the bags with symmetric padding on
-Camelot", "BagSlots panel decoration": backdrop on the panel frame, no sibling backdrop, Classic
-keeps `BackdropTemplate`) and `spec/frames/bankslots_spec.lua` ("Camelot headerless
-decoration": bypasses the themed flat window on Camelot, still uses it on ordinary retail,
-backdrop on the panel frame rather than a sibling of the grid).
+Coverage: `spec/sonata/themes_spec.lua` ("the slots panels": the tooltip frame, its colors,
+below the content, even padding, the offset), `spec/frames/bagslots_spec.lua` ("centers its bags
+with even padding on Classic and on WoW: Forever", "keeps its chrome below its bags") and
+`spec/frames/bankslots_spec.lua` ("draws Blizzard's dark tooltip frame below its tabs on WoW:
+Forever, padded evenly").
 
 ## 6. Equipment-set scan routes by API existence, not TOC version
 

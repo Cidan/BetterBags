@@ -92,8 +92,11 @@ describe("Classic/Era Bank OnCreate Bag Slots Panel", function()
 
     createPanelCalls = {}
     local bagSlots = StubBetterBagsModule("BagSlots")
+    -- BagSlots:CreatePanel returns a hidden panel parented to the bag (frames/bagslots.lua,
+    -- spec/frames/bagslots_spec.lua).
     bagSlots.CreatePanel = function(_, ctx, kind, bagFrame)
-      local panel = { frame = CreateFrame("Frame") }
+      local panel = { frame = CreateFrame("Frame", nil, bagFrame) }
+      panel.frame:Hide()
       function panel:IsShown() return self.frame:IsShown() end
       function panel:Show() self.frame:Show() end
       function panel:Hide() self.frame:Hide() end

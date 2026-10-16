@@ -15,9 +15,6 @@ local context = addon:GetModule('Context')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
 ---@class Bucket: AceModule
 local bucket = addon:GetModule('Bucket')
 
@@ -29,6 +26,9 @@ local categoryPane = addon:GetModule('CategoryPane')
 
 ---@class ThemePane: AceModule
 local themePane = addon:GetModule('ThemePane')
+
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
 
 ---@class CurrencyPane: AceModule
 local currencyPane = addon:GetModule('CurrencyPane')
@@ -582,11 +582,7 @@ function config:CreateConfig()
       end,
       setValue = function(_, value)
         db:SetBagViewSizeOpacity(bagType.kind, db:GetBagView(bagType.kind), value)
-        local bag = addon:GetBagFromKind(bagType.kind)
-        if bag then
-          bag.window:UpdateOpacity()
-        end
-        themes:UpdateOpacity()
+        sonata:UpdateOpacity()
       end,
     })
 

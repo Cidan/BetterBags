@@ -58,6 +58,8 @@ and `renderParentResult` (the constraints it was given).
 - A root whose `ShouldRender()` returns false (a hidden window) is skipped and left with
   `renderPending = true`; its owner renders it when it can.
 - `Render:Detach(d)` cuts a drawable off its tree. A parent link cycle is an error.
+- `Drawable:FromFrame(frame, measure)` wraps a frame laid out by its own code (a grid): its
+  render returns `measure(parentResult, options)` as its size (`FrameDrawable`).
 - `Render:IsDirty(d)` says whether d's tree waits for the next frame; `Render:RenderNow(d,
   options)` renders d's tree now (with `Invalidated` set) and drops the render it waited for, so
   a window shown in the frame it was invalidated in renders once (window.md §4).

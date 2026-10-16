@@ -67,6 +67,33 @@ function drawable:Create(proto, fields)
   return instance
 end
 
+-- A FrameDrawable wraps a frame laid out by its own code (a grid, a form): rendering asks
+-- measure(parentResult, options) for the size it took.
+---@class (exact) FrameDrawable: Drawable
+---@field measure fun(parentResult: RenderResult?, options: RenderChainOptions): number, number
+local frameDrawableProto = drawable:Extend({}, 'FrameDrawable')
+
+---@return RenderPlan
+function frameDrawableProto:GetRenderPlan()
+  return { Plan = { { step = render.SELF } } }
+end
+
+---@param parentResult? RenderResult
+---@param options RenderChainOptions
+---@return RenderResult
+function frameDrawableProto:Render(parentResult, options)
+  local width, height = self.measure(parentResult, options)
+  return { Width = width, Height = height }
+end
+
+-- FromFrame returns a drawable for frame, sized by measure.
+---@param frame Frame
+---@param measure fun(parentResult: RenderResult?, options: RenderChainOptions): number, number
+---@return FrameDrawable
+function drawable:FromFrame(frame, measure)
+  return drawable:Create(frameDrawableProto, { frame = frame, measure = measure })
+end
+
 ---@param parent? Frame
 function drawableProto:SetParent(parent)
   self.frame:SetParent(parent)

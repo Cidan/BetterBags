@@ -23,28 +23,49 @@ local events = addon:GetModule('Events')
 ---@class Debug: AceModule
 local debug = addon:GetModule('Debug')
 
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
-
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
--- Symmetric padding (in pixels) between the flat panel edge and the bag grid on
--- Classic/Era, where the panel is a plain backdrop with no title-bar header.
-local CLASSIC_PADDING = 8
+---@class Render: AceModule
+local render = addon:GetModule('Render')
 
+---@class DrawableModule: AceModule
+local drawable = addon:GetModule('Drawable')
+
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+-- The "Show Bags" panel is a Slots window (window/window.lua) hanging below its bag, sized to
+-- its bag buttons plus the theme's padding, and shown in place of the bag's group tabs. The
+-- theme draws its chrome (sonata.md section 3b) and says where it sits (Layout.Offset).
 ---@class bagSlots
+---@field window BetterBagsWindow
 ---@field frame Frame
+---@field bagFrame Frame
 ---@field content Grid
+---@field grid Drawable
 ---@field kind BagKind
----@field fadeInGroup AnimationGroup
----@field fadeOutGroup AnimationGroup
+---@field tabsWereShown boolean
 BagSlots.bagSlotProto = {}
 addon:GetModule('Perf'):RegisterPrototype(BagSlots.bagSlotProto, 'BagSlotsPanel')
 
+---@return Bag?
+function BagSlots.bagSlotProto:GetParentBag()
+  local bags = addon.Bags
+  if bags == nil then
+    return nil
+  end
+  if self.kind == const.BAG_KIND.BACKPACK then
+    return bags.Backpack
+  end
+  return bags.Bank
+end
+
+-- Draw redraws the bag buttons and lays the panel out again: at once while it shows, else
+-- when it is shown.
 ---@param ctx Context
 function BagSlots.bagSlotProto:Draw(ctx)
   debug:Log('BagSlots', "Bag Slots Draw called")
@@ -52,32 +73,18 @@ function BagSlots.bagSlotProto:Draw(ctx)
     ---@cast cell +BagButton
     cell:Draw(ctx)
   end
-  local w, h = self.content:Draw({
-    cells = self.content.cells,
-    maxWidthPerRow = 1024,
-  })
-
-  local container = self.content:GetContainer()
-  container:ClearAllPoints()
-
-  if addon.isRetail and not addon.isForever then
-    -- Retail uses the themed flat window, which reserves a visual header band at
-    -- the top of the panel; leave room for it and 12px at the bottom.
-    self.frame:SetWidth(w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4)
-    local headerHeight = themes:GetFlatHeaderHeight(self.frame)
-    local topInset = headerHeight > 0 and headerHeight or 12
-    local leftInset = const.OFFSETS.BAG_LEFT_INSET + 4
-    container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", leftInset, -topInset)
-    container:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
-    self.frame:SetHeight(h + topInset + 12)
+  if self.window:IsShown() then
+    render:RenderNow(self.window, { ctx = ctx })
   else
-    -- Classic/Era (and Camelot) render a plain headerless backdrop panel with no
-    -- title-bar header, so wrap the bag grid with equal padding on all sides to
-    -- keep the bags centered both horizontally and vertically.
-    self.frame:SetWidth(w + CLASSIC_PADDING * 2)
-    self.frame:SetHeight(h + CLASSIC_PADDING * 2)
-    container:SetPoint("TOPLEFT", self.frame, "TOPLEFT", CLASSIC_PADDING, -CLASSIC_PADDING)
-    container:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -CLASSIC_PADDING, CLASSIC_PADDING)
+    self.window:Invalidate()
+  end
+end
+
+-- OnRendered lays the panel's bag out again: the bag is never narrower than the panel.
+function BagSlots.bagSlotProto:OnRendered()
+  local bag = self:GetParentBag()
+  if bag ~= nil and bag.window ~= nil and self.window:IsShown() then
+    bag.window:Invalidate()
   end
 end
 
@@ -92,52 +99,43 @@ end
 ---@param callback? fun()
 function BagSlots.bagSlotProto:Show(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
+  local offset = self.window:GetLayout().Offset or {}
   self.frame:ClearAllPoints()
-  -- Camelot's tooltip-bordered decoration has thicker border art than the main bag
-  -- window, so nudge the whole panel ~4px right to line it up cleanly with the window.
-  local leftNudge = addon.isForever and 4 or 0
-  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", leftNudge, -2)
+  self.frame:SetPoint("TOPLEFT", self.bagFrame, "BOTTOMLEFT", offset.X or 0, offset.Y or 0)
 
-  local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
+  local parentBag = self:GetParentBag()
   if parentBag and parentBag.tabs then
     if not self:IsShown() then
       self.tabsWereShown = parentBag.tabs.frame:IsShown()
     end
     parentBag.tabs.frame:Hide()
-  else
-    if not self:IsShown() then
-      self.tabsWereShown = false
-    end
+  elseif not self:IsShown() then
+    self.tabsWereShown = false
   end
 
-  if callback then
-    self.fadeInGroup.callback = function()
-      self.fadeInGroup.callback = nil
-      callback()
-    end
-  end
-  self.fadeInGroup:Play()
+  self.window:Show(context:New('BagSlots_Show'), callback)
 end
 
+-- Hide fades the panel out, then gives the bag its tabs back.
 ---@param callback? fun()
 function BagSlots.bagSlotProto:Hide(callback)
   PlaySound(SOUNDKIT.GUILD_BANK_OPEN_BAG)
-  if callback then
-    self.fadeOutGroup.callback = function()
-      self.fadeOutGroup.callback = nil
+  local ctx = context:New('BagSlots_Hide')
+  self.window:Hide(ctx, function()
+    self:OnClose(ctx)
+    if callback then
       callback()
     end
-  end
-  self.fadeOutGroup:Play()
+  end)
 end
 
 function BagSlots.bagSlotProto:IsShown()
-  return self.frame:IsShown()
+  return self.window:IsShown()
 end
 
 ---@param _ctx Context
 function BagSlots.bagSlotProto:OnClose(_ctx)
-  local parentBag = addon.Bags and (self.kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
+  local parentBag = self:GetParentBag()
   if (self.tabsWereShown or database:GetGroupsEnabled(self.kind)) and parentBag and parentBag.tabs then
     parentBag.tabs.frame:Show()
   end
@@ -153,51 +151,37 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
   local b = {}
   setmetatable(b, {__index = BagSlots.bagSlotProto})
   b.bagFrame = bagFrame
+  b.kind = kind
+  b.tabsWereShown = false
   local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
-  -- Camelot (WoW: Forever): the Default theme's DefaultPanelFlatTemplate renders a
-  -- broken title-bar band and oversized metal header art on this client (its
-  -- ButtonFrameTemplateNoPortrait NineSlice overhangs the top; Blizzard even ships
-  -- a Camelot-only corner-crop workaround), so the panel is a headerless, dark,
-  -- tooltip-bordered frame instead of a themed flat window. The template goes on the
-  -- panel frame itself: on a sibling child frame the filled backdrop shares the bag
-  -- grid's frame level and draws over the bag buttons. See camelot-forever.md.
-  ---@class Frame: BackdropTemplate
-  local f = CreateFrame("Frame", name .. "BagSlots", UIParent, addon.isForever and "TooltipBorderedFrameTemplate" or "BackdropTemplate")
-  b.frame = f
 
-  if addon.isForever then
-    f:SetBackdropColor(0, 0, 0, 0.9)
-    f:SetBackdropBorderColor(1, 1, 1, 1)
-  elseif addon.isRetail then
-    themes:RegisterFlatWindow(f, "")
-  else
-    -- On Classic/Era the Default theme's DefaultPanelFlatTemplate draws a title-bar
-    -- band (a 28px _UI-Frame-TitleTile top edge on its NineSlice) that cannot be
-    -- hidden, so the panel would show an empty title bar. Bypass the themed flat
-    -- window and render a self-contained flat panel instead: a background plus a
-    -- thin border, no title bar and no close button. BackdropTemplate + SetBackdrop
-    -- behaves identically on retail, MoP, TBC, and Vanilla.
-    f:SetBackdrop({
-      bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-      edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-      tile = true,
-      tileSize = 16,
-      edgeSize = 16,
-      insets = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    f:SetBackdropColor(0, 0, 0, 0.9)
-    f:SetBackdropBorderColor(1, 1, 1, 1)
-  end
+  b.window = window:Create({
+    Kind = "Slots",
+    Name = name .. "BagSlots",
+    Title = "",
+    Parent = bagFrame,
+    Movable = false,
+    Points = { { Point = "TOPLEFT", RelativeTo = bagFrame, RelativePoint = "BOTTOMLEFT", X = 0, Y = -2 } },
+    OnRendered = function()
+      b:OnRendered()
+    end,
+  })
+  b.frame = b.window.frame
 
-  b.content = grid:Create(b.frame)
-  b.content:GetContainer():SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET + 4, -30)
-  b.content:GetContainer():SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, 12)
+  b.content = grid:Create(b.window.content)
   b.content.maxCellWidth = 10
   b.content:HideScrollBar()
   -- Bag slots grid is not scrollable; disable mouse wheel so scroll events
   -- pass through to the outer scrollable bag container.
   b.content:EnableMouseWheelScroll(false)
   b.content:Show()
+  b.grid = drawable:FromFrame(b.content:GetContainer(), function()
+    return b.content:Draw({
+      cells = b.content.cells,
+      maxWidthPerRow = 1024,
+    })
+  end)
+  b.window:SetContent(b.grid)
 
   local bags = kind == const.BAG_KIND.BACKPACK and const.BACKPACK_ONLY_BAGS_LIST or const.BANK_ONLY_BAGS_LIST
   for i, bag in pairs(bags) do
@@ -206,25 +190,9 @@ function BagSlots:CreatePanel(ctx, kind, bagFrame)
     b.content:AddCell(tostring(i), iframe)
   end
 
-  b.tabsWereShown = false
-  b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeAndSlideTop(b.frame)
-
-  addon.HookScript(b.fadeOutGroup, "OnFinished", function(_)
-    b.frame:ClearAllPoints()
-    b.frame:SetPoint("BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 14)
-
-    local parentBag = addon.Bags and (kind == const.BAG_KIND.BACKPACK and addon.Bags.Backpack or addon.Bags.Bank)
-    if (b.tabsWereShown or database:GetGroupsEnabled(kind)) and parentBag and parentBag.tabs then
-      parentBag.tabs.frame:Show()
-    end
-    b.tabsWereShown = false
-  end)
-
   events:RegisterEvent('BAG_CONTAINER_UPDATE', function(ectx) b:Draw(ectx) end)
   if not addon.isRetail then
     events:RegisterEvent('PLAYERBANKSLOTS_CHANGED', function(ectx) b:Draw(ectx) end)
   end
-  b.kind = kind
-  b.frame:Hide()
   return b
 end

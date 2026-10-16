@@ -92,9 +92,6 @@ function backpack.proto:OnCreate(ctx)
 
 	-- Bag slots panel
 	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BACKPACK, self.bag.frame)
-	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
-	slots.frame:SetParent(self.bag.frame)
-	slots.frame:Hide()
 	self.bag.slots = slots
 
 	-- Currency icon grid (bottom of backpack)

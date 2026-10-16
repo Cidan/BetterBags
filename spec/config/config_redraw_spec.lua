@@ -28,6 +28,7 @@ local db = stubModule("Database")
 local bucket = stubModule("Bucket")
 local form = stubModule("Form")
 stubModule("Themes")
+local sonata = stubModule("Sonata")
 stubModule("CategoryPane")
 stubModule("ThemePane")
 stubModule("CurrencyPane")
@@ -193,15 +194,14 @@ describe("Config settings refreshes", function()
   -- Opacity and scale belong to the bag's window: it fades its background or rescales and
   -- lays itself out again, with no message to the bags at all.
   describe("opacity and scale", function()
-    local windows, savedValues
+    local windows, savedValues, opacityUpdates
 
     before_each(function()
-      windows, savedValues = {}, {}
-      local themes = addon:GetModule("Themes")
+      windows, savedValues, opacityUpdates = {}, {}, 0
       for _, entry in ipairs({
         { db, "SetBagViewSizeOpacity", function(_, kind, _, value) savedValues[#savedValues + 1] = { "opacity", kind, value } end },
         { db, "SetBagViewSizeScale", function(_, kind, _, value) savedValues[#savedValues + 1] = { "scale", kind, value } end },
-        { themes, "UpdateOpacity", function() end },
+        { sonata, "UpdateOpacity", function() opacityUpdates = opacityUpdates + 1 end },
         { addon, "GetBagFromKind", function(_, kind)
           windows[kind] = windows[kind] or { opacity = 0, scale = 0, quiet = {} }
           local w = windows[kind]
@@ -216,14 +216,15 @@ describe("Config settings refreshes", function()
       end
     end)
 
-    it("saves the opacity and fades the bag's window, sending nothing to the bags", function()
+    -- Every window follows an opacity: the bags their own, the other windows the backpack's.
+    it("saves the opacity and fades every window with Sonata, sending nothing to the bags", function()
       for _, opts in ipairs(settings("Opacity")) do
-        sent, savedValues = {}, {}
+        sent, savedValues, opacityUpdates = {}, {}, 0
         opts.setValue(context:New("Test"), 55)
         assert.are.same({}, messages())
         assert.are.equal("opacity", savedValues[1][1])
         assert.are.equal(55, savedValues[1][3])
-        assert.are.equal(1, windows[savedValues[1][2]].opacity)
+        assert.are.equal(1, opacityUpdates)
       end
     end)
 
