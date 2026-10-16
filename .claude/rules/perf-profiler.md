@@ -33,12 +33,14 @@ the automatic `Bag.Draw` / `View.Bind` / `View.Layout` wrappers.
 | `frames/flamegraph.lua` | `FlameGraph` | In-game icicle flame graph widget. |
 | `frames/tracechart.lua` | `TraceChart` | In-game timeline of a call trace (calls on a time axis, one row per depth). |
 | `frames/perfpane.lua` | `PerfPane` | The Performance tab of `/bbdb`. |
+| `debug/simulator.lua` | `Simulator` | Fires an event BetterBags listens to at a rate for a duration (§11). |
+| `frames/simulatepane.lua` | `SimulatePane` | The Simulate tab of `/bbdb` (§11). |
 | `tools/flamegraph/flamegraph.lua` | — | Offline exporter (folded, speedscope, HTML; Chrome trace JSON for Perfetto). |
 
 TOC order (all five TOCs): `engine.lua` and `format.lua` right after `core\boot.lua`, so
 every later file can register prototypes at load; `sessions.lua` right after
-`core\events.lua`; `flamegraph.lua`, `tracechart.lua` and `perfpane.lua` right before
-`frames\debug.lua`.
+`core\events.lua`, and `debug\simulator.lua` right after it; `flamegraph.lua`,
+`tracechart.lua`, `perfpane.lua` and `simulatepane.lua` right before `frames\debug.lua`.
 
 `format.lua` loads two ways: inside the addon it registers the `PerfFormat` module; run with
 `dofile` and no varargs (the offline tool) it returns a plain table of the same functions.
@@ -99,6 +101,8 @@ to run first. Each is one `perf.active` check when off. Each passes its payload 
 - `core/context.lua`: `[script] OnClick` (and so on) around `addon.SetScript` /
   `addon.HookScript` handlers (records the script's arguments: the frame, then e.g. the
   mouse button).
+- `debug/simulator.lua`: `[simulate] NAME` around each simulated fire, so the `[event] NAME`
+  inside it is told from a real one (§11).
 - `data/loader.lua`: `[loaded] item data` around the callbacks the ItemLoader runs once a
   batch of item data has loaded (records the set of bags). That moment usually comes from
   Blizzard's item-load listener, outside any measured call, so without it the refresh it
@@ -150,6 +154,16 @@ closes one frame of measurements: the BetterBags time measured in it goes into a
 sampled too. Comparing the two series shows how much of BetterBags' cost the wrappers see;
 the rest ran in code that is not wrapped (closures, frame scripts, Blizzard template code
 running on our frames).
+
+`frameSeries` (a map of name to reader) adds more named per-frame readings, stored as
+`timeline.series[name]`. PerfSessions passes Blizzard's `LastTime` for all addons
+(`all`, `C_AddOnProfiler.GetOverallMetric`) and for the whole client (`app`,
+`GetApplicationMetric`, "the entire application (not just the UI)"), so a slow frame shows
+whether the time went to BetterBags, to any addon, or to the client itself. They are read at
+the same moment as `frameMetric`, so they pair with frames the same way. Added for the
+Dream Breath stutter in raids and Mythic+, where captures showed 100-174 ms frames with
+BetterBags under 0.06 ms by both its wrappers and Blizzard's reading, and nothing said where
+the rest went.
 
 **Pairing Blizzard's reading with our frames.** `LastTime` is "total time in the most
 recent tick", so the reading taken in our `OnUpdate` covers the game tick that just
@@ -347,7 +361,11 @@ session = {
   id, formatVersion = 3,
   meta = { reason, startedAt, stoppedAt, character, realm, gameVersion, gameBuild, tocVersion,
            flavor, addonVersion, preset, blizzardStart, blizzardStop, memoryStartKB,
-           memoryStopKB, luaMemoryStartKB, luaMemoryStopKB, backpackItems, bankItems },
+           memoryStopKB, luaMemoryStartKB, luaMemoryStopKB, backpackItems, bankItems,
+           restrictionsStart|nil, restrictionsStop|nil,  -- { Combat = "Active", Map = "Inactive", ... } (C_RestrictedActions)
+           instanceStart|nil, instanceStop|nil,          -- { name, instanceType, difficultyID, difficultyName } (GetInstanceInfo)
+           topAddonsStart|nil, topAddonsStop|nil,        -- { { name, ms }, ... }: the 10 slowest single ticks since startup (PeakTime)
+           simulation|nil },                             -- { event, rate, duration, payload, openBags } for reason "simulate"
   options = { the engine options used, including trace, traceArgs, traceMaxCalls },
   stats = { durationMs, instrumentedMs, calls, frames, activeFrames, worstFrameMs, aborted,
             nodeCount, droppedNodes, wrappedFunctions, overheadPerCallMs, overheadParentMs|nil,
@@ -361,7 +379,8 @@ session = {
   worst = { { frame, atUs, us, blizzardUs|nil, nodes = { "nodeId,selfUs,calls,allocBytes", ... } }, ... },
            -- blizzardUs: the readings credited to this frame (version 1: the same-frame reading)
   timeline = { ours = "us,us,...", blizzard = "us,..."|nil,
-               calls = "n,n,...", nested = "n,n,..." },  -- per-frame measured calls, and those with a measured caller
+               calls = "n,n,...", nested = "n,n,...",  -- per-frame measured calls, and those with a measured caller
+               series = { all = "us,...", app = "us,..." }|nil },  -- §3: Blizzard's time for all addons and the whole client
   trace = nil | {                -- §4; absent when tracing was off or the trace was removed
     chunkSize = 4096, calls = n, full = true|nil, args = true|nil,
     chunks = { "startDeltaUs,nodeId,argSet,durUs,retSet,flags,...", ... },  -- chunkSize records each
@@ -439,7 +458,11 @@ stopped from anywhere is selected automatically.
   pauses, state, arguments and return values. Slices narrower than a pixel are skipped, and
   at most 2,000 bars are drawn, all pooled textures on one canvas (no frame per bar).
 - The Summary reports the trace (calls, whether it has arguments, its saved size), why the
-  capture stopped on its own, and how much profiler time was excluded (§4).
+  capture stopped on its own, and how much profiler time was excluded (§4). For sessions that
+  carry them it also says what was simulated (§11), where the player was at the start and the
+  end, which addon restrictions were active then, the slowest frame for the whole client with
+  what all addons and BetterBags (measured and per Blizzard) took in it, and the slowest
+  addons since the client started.
 
 **Subtract overhead** (checkbox next to the view buttons, on by default, disabled for
 sessions without a calibration) switches every time in the tab between adjusted and raw:
@@ -494,6 +517,18 @@ never sits in memory as tables. `--list` marks sessions that carry a trace.
   return value), and Find `MarkItemAsNew` to see what was marked recent. Show in Timeline
   places each one in its frame among the calls around it.
 
+## 10a. Addon restrictions in captures
+
+Patch 12.x applies addon restrictions (`C_RestrictedActions`, `Enum.AddOnRestrictionType`:
+Combat, Encounter, ChallengeMode, PvPMatch, Map ("a map that applies addon restrictions":
+dungeons and raids), Chat); while one is active, guarded APIs and events return secret
+values (`SecretPredicatesDocumentation.lua`). A capture records each type's state at the start
+and the end (`perfSessions:RestrictionStates()`, `Inactive`/`Activating`/`Active`), and
+PerfSessions listens to `ADDON_RESTRICTION_STATE_CHANGED` where the client has it
+(`C_EventUtils.IsEventValid`), so the trace shows every change as an
+`[event] ADDON_RESTRICTION_STATE_CHANGED(type, state)` call at the moment it happened. The
+Simulate tab shows the live state.
+
 ## 10. Testing
 
 - Engine (`spec/debug/perf_engine_spec.lua`): a fake clock (`perf:SetClock`) makes timings
@@ -535,3 +570,37 @@ never sits in memory as tables. `--list` marks sessions that carry a trace.
   methods. `C_AddOnProfiler` is deliberately left undefined so code must cope with clients
   that lack it; specs install it when needed. `canaccessvalue` is left undefined too (the
   engine checks for it); the trace spec installs one to test secret values.
+
+## 11. The event simulator (`debug/simulator.lua`, the Simulate tab)
+
+`Simulator:Start(ctx, { event, rate, duration, payload?, payloadCount?, payloadText?, openBags?,
+capture? })` fires one of the WoW events BetterBags listens to, `rate` times a second for
+`duration` seconds (clamped to `RATE` 1-240 and `DURATION` 1-120), through BetterBags' own
+dispatcher: it calls `events._eventMap[event].fn(event, payload...)`, the function the game's
+event calls, so every handler, bucket filter and profiler root runs exactly as for a real
+fire, handlers getting the event's name before the payload. Its own frame's `OnUpdate` drives
+it; a slow frame catches up with every fire due in it, as a burst of real events would.
+
+- `GetEvents()` lists `events._eventMap`'s events, sorted, without `ADDON_LOADED`,
+  `PLAYER_LOGIN`, `PLAYER_LOGOUT` and `PLAYER_ENTERING_WORLD` (firing those again would rerun
+  or tear down BetterBags' setup); `Start` refuses anything else, or a second run.
+- `openBags` shows the backpack first: BetterBags' cooldown refresh only runs while it is
+  shown. `capture` starts a profiler capture with reason `simulate` and the run's settings in
+  `meta.simulation`, and stops it when the run ends; a capture already running is left alone.
+- Each fire is wrapped in a `[simulate] EVENT` span (§2).
+- What it cannot do: the game does not deliver a simulated event to other addons or to
+  Blizzard's frames, and it creates no addon restriction. Run it inside a dungeon or raid to
+  test under the restrictions those apply.
+- `ParsePayload(text)` reads comma-separated numbers, `true`, `false`, `nil` and strings.
+
+The Simulate tab (`frames/simulatepane.lua`, fifth tab of `/bbdb`) lists the events, takes the
+rate, duration and payload, "Open the bags first" and "Capture with the profiler" (both on),
+and shows the run's progress and the active addon restrictions. **Dream Breath test** fills in
+`BAG_UPDATE_COOLDOWN` at 22 a second for 30 seconds: the busiest second in a user's capture
+while casting Dream Breath (22 fires; 12.1 a second on average).
+
+Coverage: `spec/debug/simulator_spec.lua`, `spec/frames/simulatepane_spec.lua`,
+`spec/frames/debug_window_spec.lua` (the tab), `spec/debug/perf_sessions_spec.lua` (restrictions,
+instance, frame series, top addons, the simulation metadata, the `simulate` reason),
+`spec/debug/perf_engine_spec.lua` (frame series), `spec/frames/perfpane_spec.lua` (the
+Summary's lines).

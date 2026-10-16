@@ -26,6 +26,7 @@ local tabs = stubModule("Tabs")
 local list = stubModule("List")
 local itemBrowser = stubModule("ItemBrowser")
 local perfPane = stubModule("PerfPane")
+local simulatePane = stubModule("SimulatePane")
 
 local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
 libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
@@ -48,7 +49,7 @@ local render = addon:GetModule("Render")
 describe("DebugWindow", function()
   local saved
   local tabNames
-  local pane
+  local pane, simPane
   local debugMode, originalThemes
 
   local function override(tbl, key, value)
@@ -111,6 +112,10 @@ describe("DebugWindow", function()
       pane = content()
       return pane
     end)
+    override(simulatePane, "Create", function()
+      simPane = content()
+      return simPane
+    end)
     debugWindow:Create(context:New("Test"))
   end)
 
@@ -141,7 +146,7 @@ describe("DebugWindow", function()
 
   it("puts every tab's content in the window's content box", function()
     local box = debugWindow.window.content
-    for i = 1, 4 do
+    for i = 1, 5 do
       local frame = debugWindow.contentFrames[i].frame or debugWindow.contentFrames[i]
       assert.are.same({ "TOPLEFT", box, "TOPLEFT", 0, 0 }, { frame:GetPoint(1) }, "tab " .. i)
       assert.are.same({ "BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0 }, { frame:GetPoint(2) }, "tab " .. i)
@@ -169,8 +174,18 @@ describe("DebugWindow", function()
     assert.is_false(debugWindow.frame:IsShown())
   end)
 
-  it("has a Performance tab after the existing ones", function()
-    assert.are.same({ "Debug Log", "Items", "Dump", "Performance" }, tabNames)
+  it("has a Performance tab after the existing ones, then the Simulate tab", function()
+    assert.are.same({ "Debug Log", "Items", "Dump", "Performance", "Simulate" }, tabNames)
+  end)
+
+  it("keeps the Simulate pane hidden until its tab is chosen, then lists the events again", function()
+    assert.is_false(simPane:IsShown())
+    debugWindow:SwitchTab(5)
+    assert.is_true(simPane:IsShown())
+    assert.are.equal(1, simPane.updates)
+    assert.is_false(pane:IsShown())
+    debugWindow:SwitchTab(4)
+    assert.is_false(simPane:IsShown())
   end)
 
   it("keeps the Performance pane hidden until its tab is chosen, then refreshes it", function()

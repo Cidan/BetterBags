@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "Render", "Sonata", "Tabs"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "Simulator", "Render", "Sonata", "Tabs"
     }
 
     for _, name in ipairs(modules) do
@@ -139,13 +139,16 @@ describe("Core Init and Enable flow", function()
     local perfSessions = addon:GetModule("PerfSessions")
     local eventsMod = addon:GetModule("Events")
     local db = addon:GetModule("Database")
+    local simulatorMod = addon:GetModule("Simulator")
     local saved = {
       { perf, "Init", perf.Init },
       { perfSessions, "Init", perfSessions.Init },
       { perfSessions, "StartIfArmed", perfSessions.StartIfArmed },
+      { simulatorMod, "Init", simulatorMod.Init },
       { eventsMod, "Init", eventsMod.Init },
       { db, "Init", db.Init },
     }
+    simulatorMod.Init = function() table.insert(order, "Simulator") end
     eventsMod.Init = function() table.insert(order, "Events") end
     perf.Init = function() table.insert(order, "Perf") end
     perfSessions.Init = function() table.insert(order, "PerfSessions") end
@@ -158,7 +161,7 @@ describe("Core Init and Enable flow", function()
       s[1][s[2]] = s[3]
     end
     assert.is_true(ok, err)
-    assert.are.same({ "Events", "Perf", "PerfSessions", "StartIfArmed", "Database" }, order)
+    assert.are.same({ "Events", "Perf", "PerfSessions", "StartIfArmed", "Simulator", "Database" }, order)
   end)
 
   it("should create UI frames during OnInitialize and NOT during OnEnable", function()

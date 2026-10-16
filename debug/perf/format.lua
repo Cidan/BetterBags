@@ -359,11 +359,16 @@ function perfFormat:DecodeTimeline(session)
     return out
   end
   local timeline = session.timeline or {}
+  local series = {}
+  for name, packed in pairs(timeline.series or {}) do
+    series[name] = decode(packed, 1000)
+  end
   return {
     ours = decode(timeline.ours, 1000) or {},
     blizzard = decode(timeline.blizzard, 1000),
     calls = decode(timeline.calls, 1),
     nested = decode(timeline.nested, 1),
+    series = series,
   }
 end
 
@@ -916,6 +921,7 @@ local REASON_PHRASES = {
   login = 'at login',
   reload = 'from a reload',
   startup = 'at startup',
+  simulate = 'by the event simulator',
 }
 
 -- ReasonLabel is the short label of an armed capture's start, nil for a manual one.

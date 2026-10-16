@@ -627,6 +627,26 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
         sonata.generation = 0
       end)
 
+      -- The call trace records return values (data-driven.md): each refresh says whether it
+      -- skipped Blizzard's update or which input made it apply it.
+      it("returns why it applied Blizzard's update, or that it skipped it", function()
+        assert.equal("unchanged", item:UpdateCooldown(btnCtx, potion(), true))
+        _G._containerCooldowns["0_6"] = { 100, 60, 1 }
+        assert.equal("start", item:UpdateCooldown(btnCtx, potion(), true))
+        assert.equal("unchanged", item:UpdateCooldown(btnCtx, potion(), true))
+        _G._containerCooldowns["0_6"] = { 100, 90, 1 }
+        assert.equal("duration", item:UpdateCooldown(btnCtx, potion(), true))
+        _G._containerCooldowns["0_6"] = { 100, 90, 0 }
+        assert.equal("enable", item:UpdateCooldown(btnCtx, potion(), true))
+        local other = potion()
+        other.itemInfo.itemIcon = 1
+        assert.equal("icon", item:UpdateCooldown(btnCtx, other, true))
+        sonata.generation = 1
+        assert.equal("generation", item:UpdateCooldown(btnCtx, other, true))
+        -- A full draw always applies.
+        assert.equal("full", item:UpdateCooldown(btnCtx, other))
+      end)
+
       it("skips a refresh when the cooldown is unchanged since it was applied", function()
         item:UpdateCooldown(btnCtx, potion(), true)
         item:UpdateCooldown(btnCtx, potion(), true)

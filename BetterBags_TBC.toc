@@ -48,6 +48,7 @@ debug\analytics.lua
 
 core\events.lua
 debug\perf\sessions.lua
+debug\simulator.lua
 core\localization.lua
 core\translations.lua
 core\overrides.lua
@@ -132,6 +133,7 @@ frames\itembrowser.lua
 frames\flamegraph.lua
 frames\tracechart.lua
 frames\perfpane.lua
+frames\simulatepane.lua
 frames\debug.lua
 
 views\views.lua

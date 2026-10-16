@@ -104,6 +104,7 @@ globals = {
 	"GetCursorPosition",
 	"GetDetailedItemLevelInfo",
 	"GetFramerate",
+	"GetInstanceInfo",
 	"GetInventoryItemLink",
 	"GetInventoryItemTexture",
 	"GetInventoryItemQuality",

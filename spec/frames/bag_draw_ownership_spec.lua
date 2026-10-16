@@ -1017,6 +1017,20 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.equal(1, calls["0_2"], "Recent Items buttons live outside the tab view and must refresh too")
     end)
 
+    -- The call trace records return values (data-driven.md): each refresh says how many
+    -- buttons it checked and how many it applied Blizzard's update to.
+    it("returns how many buttons it checked and how many it updated", function()
+      local bag = newBag()
+      bag:Draw(context:New("draw"), slotInfoWith(
+        { itemAt(0, 1, "Weapons"), itemAt(0, 2, "Recent Items"), itemAt(0, 3, "Weapons") }, {}), function() end)
+      spyCooldowns({ "0_1", "0_2", "0_3" })
+      startCooldowns({ "0_1", "0_2" })
+      assert.are.same({ 3, 2 }, { bag:OnCooldown(context:New("cooldown")) })
+      assert.are.same({ 3, 0 }, { bag:OnCooldown(context:New("cooldown")) })
+      bag.frame:Hide()
+      assert.are.same({ 0, 0 }, { bag:OnCooldown(context:New("cooldown")) })
+    end)
+
     it("skips buttons whose cooldown is unchanged since it was applied", function()
       local bag = newBag()
       bag:Draw(context:New("draw"), slotInfoWith(

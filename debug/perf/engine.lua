@@ -103,6 +103,8 @@ local worst, worstCap, spikeThreshold
 local pHas, pFrame, pAt, pMs, pBlizzard, pEntries
 local timelineOurs, timelineBlizzard, timelineCalls, timelineNested, timelineCap
 local frameMetric, maxDurationMs, onAutoStop, autoStopSent
+-- Named per-frame readings recorded beside ours (options.frameSeries): { name, fn, data }.
+local frameSeries = {}
 local wrapped, overheadParent, overheadChild
 local captureOptions
 local frozen, frozenAt, stopReason
@@ -825,6 +827,9 @@ local function resetFrames()
   worst = {}
   pHas, pFrame, pAt, pMs, pBlizzard, pEntries = false, nil, nil, nil, nil, nil
   timelineOurs, timelineBlizzard, timelineCalls, timelineNested = {}, {}, {}, {}
+  for i = 1, #frameSeries do
+    frameSeries[i].data = {}
+  end
   autoStopSent = false
   frozen, frozenAt, stopReason = false, nil, nil
 end
@@ -1009,6 +1014,12 @@ local function finalize(now)
     return table.concat(out, ',')
   end
 
+  local packedSeries
+  for i = 1, #frameSeries do
+    packedSeries = packedSeries or {}
+    packedSeries[frameSeries[i].name] = packTimeline(frameSeries[i].data)
+  end
+
   local trace
   if tracing then
     trace = {
@@ -1078,6 +1089,7 @@ local function finalize(now)
       calls = table.concat(timelineCalls, ','),
       nested = table.concat(timelineNested, ','),
       blizzard = frameMetric and packTimeline(timelineBlizzard) or nil,
+      series = packedSeries,
     },
     trace = trace,
   }
@@ -1269,6 +1281,7 @@ end
 ---@field traceMaxCalls? number Recording stops (the capture freezes) after this many calls.
 ---@field traceChunkSize? number Calls per packed chunk.
 ---@field frameMetric? fun(): number|nil Per-frame external metric in ms (Blizzard's addon profiler).
+---@field frameSeries? table<string, fun(): number|nil> More named per-frame readings in ms, recorded as timeline.series[name].
 ---@field onAutoStop? fun(reason: "maxDuration"|"traceFull") Called once when the capture should stop on its own.
 
 ---@param options? PerfOptions
@@ -1283,6 +1296,11 @@ function perf:Start(options)
   spikeThreshold = options.spikeThresholdMs or 16
   timelineCap = options.timelineFrames or 18000
   frameMetric = options.frameMetric
+  frameSeries = {}
+  for name, fn in pairs(options.frameSeries or {}) do
+    frameSeries[#frameSeries + 1] = { name = name, fn = fn, data = {} }
+  end
+  table.sort(frameSeries, function(a, b) return a.name < b.name end)
   onAutoStop = options.onAutoStop
   maxDurationMs = (options.maxDurationSec or 0) * 1000
   trackAlloc = options.trackAllocations == true
@@ -1397,6 +1415,10 @@ function perf:_OnFrame()
     timelineNested[#timelineNested + 1] = frameNested
     if frameMetric then
       timelineBlizzard[#timelineBlizzard + 1] = blizzardMs or 0
+    end
+    for i = 1, #frameSeries do
+      local series = frameSeries[i]
+      series.data[#series.data + 1] = series.fn() or 0
     end
   end
   if tracing then

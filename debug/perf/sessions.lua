@@ -106,6 +106,62 @@ local function blizzardFrameMetric()
   end
 end
 
+-- frameSeries are Blizzard's per-frame readings for all addons and for the whole client
+-- (GetOverallMetric, GetApplicationMetric: LastTime), recorded beside BetterBags' own so a
+-- slow frame shows whose it was.
+local function frameSeries()
+  if not profilerAvailable() then return nil end
+  local metric = Enum.AddOnProfilerMetric.LastTime
+  local series = {}
+  if C_AddOnProfiler.GetOverallMetric then
+    series.all = function() return C_AddOnProfiler.GetOverallMetric(metric) end
+  end
+  if C_AddOnProfiler.GetApplicationMetric then
+    series.app = function() return C_AddOnProfiler.GetApplicationMetric(metric) end
+  end
+  return next(series) and series or nil
+end
+
+-- topAddons lists the addons with the slowest single tick since the client started
+-- (PeakTime), slowest first.
+local function topAddons()
+  if not profilerAvailable() or C_AddOnProfiler.GetTopKAddOnsForMetric == nil then return nil end
+  local out = {}
+  for _, r in ipairs(C_AddOnProfiler.GetTopKAddOnsForMetric(Enum.AddOnProfilerMetric.PeakTime, 10) or {}) do
+    table.insert(out, { name = r.addOnName, ms = r.metricValue })
+  end
+  return out
+end
+
+-- restrictionStates reads every addon restriction type's state (C_RestrictedActions, 12.x:
+-- combat, encounters, Mythic+, PvP, and the maps of dungeons and raids), by name.
+---@return table<string, string>?
+function perfSessions:RestrictionStates()
+  local api = _G.C_RestrictedActions
+  local types = Enum and Enum.AddOnRestrictionType
+  local states = Enum and Enum.AddOnRestrictionState
+  if api == nil or api.GetAddOnRestrictionState == nil or types == nil or states == nil then
+    return nil
+  end
+  local names = {}
+  for name, value in pairs(states) do
+    names[value] = name
+  end
+  local out = {}
+  for name, value in pairs(types) do
+    local state = api.GetAddOnRestrictionState(value)
+    out[name] = names[state] or tostring(state)
+  end
+  return out
+end
+
+-- instanceInfo says where the player is (GetInstanceInfo).
+local function instanceInfo()
+  if GetInstanceInfo == nil then return nil end
+  local name, instanceType, difficultyID, difficultyName = GetInstanceInfo()
+  return { name = name, instanceType = instanceType, difficultyID = difficultyID, difficultyName = difficultyName }
+end
+
 local function addonMemoryKB()
   if UpdateAddOnMemoryUsage == nil or GetAddOnMemoryUsage == nil then return nil end
   UpdateAddOnMemoryUsage()
@@ -153,6 +209,12 @@ function perfSessions:Init()
     events:RegisterEvent('PLAYER_ENTERING_WORLD', function(_, _, isInitialLogin, isReloadingUi)
       self:OnEnteringWorld(isInitialLogin, isReloadingUi)
     end)
+    -- Listening is enough: the event dispatcher records each change, with its type and
+    -- state, as an "[event] ADDON_RESTRICTION_STATE_CHANGED" call in a capture's trace.
+    if _G.C_EventUtils and _G.C_EventUtils.IsEventValid
+      and _G.C_EventUtils.IsEventValid('ADDON_RESTRICTION_STATE_CHANGED') then
+      events:RegisterEvent('ADDON_RESTRICTION_STATE_CHANGED', function() end)
+    end
   end
 end
 
@@ -220,6 +282,7 @@ function perfSessions:BuildOptions()
     traceArgs = s.traceArgs,
     traceMaxCalls = s.traceMaxCalls,
     frameMetric = blizzardFrameMetric(),
+    frameSeries = frameSeries(),
     -- The engine asks once, on a frame, when the maximum duration passed or the call
     -- trace filled; the session records which.
     onAutoStop = function()
@@ -233,9 +296,10 @@ function perfSessions:IsCapturing()
   return perf:IsActive()
 end
 
----@param reason? string "manual" (default), or "startup" for a capture armed for the next load
+---@param reason? string "manual" (default), "startup" for a capture armed for the next load, or "simulate" for the event simulator's
+---@param extra? table More metadata to save with the session (the simulation a capture records)
 ---@return boolean started
-function perfSessions:StartCapture(reason)
+function perfSessions:StartCapture(reason, extra)
   if perf:IsActive() then return false end
   local gameVersion, gameBuild, _, tocVersion = GetBuildInfo()
   local meta = {
@@ -252,7 +316,13 @@ function perfSessions:StartCapture(reason)
     blizzardStart = blizzardMetrics(),
     memoryStartKB = addonMemoryKB(),
     luaMemoryStartKB = collectgarbage('count'),
+    restrictionsStart = self:RestrictionStates(),
+    instanceStart = instanceInfo(),
+    topAddonsStart = topAddons(),
   }
+  for key, value in pairs(extra or {}) do
+    meta[key] = value
+  end
   if not perf:Start(self:BuildOptions()) then
     return false
   end
@@ -271,6 +341,9 @@ function perfSessions:StopCapture()
   meta.blizzardStop = blizzardMetrics()
   meta.memoryStopKB = addonMemoryKB()
   meta.luaMemoryStopKB = collectgarbage('count')
+  meta.restrictionsStop = self:RestrictionStates()
+  meta.instanceStop = instanceInfo()
+  meta.topAddonsStop = topAddons()
   meta.backpackItems = itemCount(0)
   meta.bankItems = itemCount(1)
   session.meta = meta

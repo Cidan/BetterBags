@@ -71,7 +71,19 @@ backpack overrides do not replace `RegisterEvents`):
   for the slot and skips Blizzard's cooldown update when it matches what the button last
   applied (caches.md §5). `BAG_UPDATE_COOLDOWN` fires on many spell casts, so in combat this
   refresh can run several times a second over every button; before, each one ran Blizzard's
-  full update (spiral, icon tint, has-item) on every button.
+  full update (spiral, icon tint, has-item) on every button. Each button's refresh returns
+  why it applied Blizzard's update or that it skipped it, and `OnCooldown` returns how many
+  buttons it checked and updated, so a capture's call trace shows how much each refresh did
+  (data-driven.md).
+- **Nothing else touches a button's cooldown** (12.1.5 source, checked for the Dream Breath
+  stutter): `ContainerFrameItemButtonTemplate` has no `OnEvent` and its `OnLoad` registers
+  nothing; the `ItemButton` intrinsic handles only `GET_ITEM_INFO_RECEIVED` (registered by its
+  own `SetItem` path, which BetterBags does not use); `EnchantingItemButtonAnimTemplate`
+  registers only `ENCHANT_SPELL_COMPLETED`, while shown; the `Cooldown` child is a plain
+  `CooldownFrameTemplate`. Blizzard's update (`ContainerFrameItemButtonMixin:UpdateCooldown`)
+  reads `C_Container.GetContainerItemCooldown` (its returns are not secret) and calls
+  `CooldownFrame_Set`. Blizzard's own bag windows register `BAG_UPDATE_COOLDOWN` only while
+  visible, and BetterBags keeps them under a hidden parent (`addon:HideBlizzardBags`).
 
 ## 4. Coverage
 

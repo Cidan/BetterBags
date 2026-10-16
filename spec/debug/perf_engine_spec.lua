@@ -533,6 +533,32 @@ describe("Perf engine", function()
       assert.are.same({ 80 }, perfFormat:DecodeTimeline(session).blizzard)
     end)
 
+    -- Named per-frame readings beside BetterBags' own: Blizzard's time for all addons and for
+    -- the whole client, so a slow frame shows whose it was.
+    it("samples named per-frame series and decodes them", function()
+      local all, app = { 3, 40 }, { 16, 120 }
+      perf:Start(options({ frameSeries = {
+        app = function() return table.remove(app, 1) end,
+        all = function() return table.remove(all, 1) end,
+      } }))
+      perf:_OnFrame()
+      perf:_OnFrame()
+      local session = perf:Stop()
+      local timeline = perfFormat:DecodeTimeline(session)
+      assert.are.same({ 3, 40 }, timeline.series.all)
+      assert.are.same({ 16, 120 }, timeline.series.app)
+      -- A series that reads nothing records 0 for the frame.
+      perf:Start(options({ frameSeries = { all = function() return nil end } }))
+      perf:_OnFrame()
+      assert.are.same({ 0 }, perfFormat:DecodeTimeline(perf:Stop()).series.all)
+      -- Sessions without series decode without them.
+      perf:Start(options())
+      perf:_OnFrame()
+      local plain = perf:Stop()
+      assert.is_nil(plain.timeline.series)
+      assert.are.same({}, perfFormat:DecodeTimeline(plain).series)
+    end)
+
     -- Blizzard's reading taken at the end of a frame covers the game tick that just
     -- finished, which overlaps that frame and the one before it. Work run before our
     -- OnUpdate in a tick (events, timers) shows up in the next frame's reading.
