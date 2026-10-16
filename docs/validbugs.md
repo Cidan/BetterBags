@@ -4,7 +4,7 @@ Triage date: 2026-10-15, against `main` at 20406c4.
 
 The 20 oldest open issues labeled `bug` (after closing duplicates) were checked against the
 current code. Ten no longer apply and were closed on GitHub with the reason. The ten below
-are still valid: nothing has fixed them. None of them is fixed here.
+were still valid at triage; #175 and #183 have since been fixed (marked below).
 
 Each entry says what was **verified** (read in the code, the Blizzard UI source under
 `.libraries/wow-ui-source`, or the external addon's source) and what is **inferred** (traced
@@ -12,8 +12,8 @@ from code, not shown by a capture). No in-game capture was taken for any of them
 
 | Issue | Client | Area | Confidence |
 |---|---|---|---|
-| [#175](https://github.com/Cidan/BetterBags/issues/175) | Retail, non-Latin locales | Category item list font | Verified |
-| [#183](https://github.com/Cidan/BetterBags/issues/183) | All | Category names | Verified |
+| [#175](https://github.com/Cidan/BetterBags/issues/175) | Retail, non-Latin locales | Category item list font | Verified; **fixed** |
+| [#183](https://github.com/Cidan/BetterBags/issues/183) | All | Category names | Verified; **fixed** |
 | [#204](https://github.com/Cidan/BetterBags/issues/204) | All | Currency bar | Verified |
 | [#279](https://github.com/Cidan/BetterBags/issues/279) | Retail + ConsolePort | Gamepad cursor | Never fixed; not reproduced |
 | [#280](https://github.com/Cidan/BetterBags/issues/280) | Retail + ConsolePort | Gamepad cursor | Never fixed; not reproduced |
@@ -38,8 +38,9 @@ Chinese `blei00d.TTF`). Setting one file drops every alphabet but the roman one.
 line (then with `"THICK"`) was there when the issue was filed (v0.1.6). The rows are used by
 the category pane's item list (`config/categorypane.lua:1181`).
 
-**Fix direction:** use a font object (or `SetFontObject` plus `SetTextHeight`) instead of a
-font file.
+**Fixed:** the row now uses `STANDARD_TEXT_FONT`, the locale's file that Blizzard sets on
+every client (`Blizzard_Fonts_Shared/Shared/GameFonts.xml`). Roman clients get the same file
+as before.
 
 ## #183 — "Quest - Quest - <Expansion>"
 
@@ -50,6 +51,10 @@ font file.
 type, then " - " and the subtype, with no check for them being equal. Subtype is off by
 default (`core/constants.lua` `categoryFilters`), which hides it for most users. The
 maintainer agreed it should be deduplicated.
+
+**Fixed:** a subtype equal to the type before it is skipped ("Quest", "Quest - Classic"), and
+`DB:RenameRepeatedTypeCategories` moves hidden state and group assignments saved under the old
+names (category-lifecycle.md §5).
 
 ## #204 — Only 7 currencies are shown, with no warning
 
@@ -177,6 +182,15 @@ pixel. Nothing in the theme compensates for the bag's own scale.
   `Enum.BagIndex.Keyring` in `BACKPACK_BAGS`), which is why #469 was closed. Forever loads only
   `core/constants.lua`, whose `BACKPACK_BAGS` has no keyring, so the Forever keyring (bag -1,
   camelot-forever.md §7) is never read.
+
+- **Pinned built-in categories are lost on every load: the cause of
+  [#1107](https://github.com/Cidan/BetterBags/issues/1107)** (and its duplicate #1119). `DB:Migrate`
+  runs on every load and ends with `DB:PruneOrphanedSectionSort()` (`core/database.lua`), which
+  deletes every `customSectionSort` entry whose name is in neither `customCategoryFilters` nor
+  `ephemeralCategoryFilters`. Built-in categories ("Armor", "Junk", "Miscellaneous") are in
+  neither, so their pins are dropped at each load while custom categories keep theirs, which is
+  what #1119 describes. The prune arrived in f9cf257, first released in v0.5.5; #1107 reports
+  v0.5.0 working. Verified in code; not captured.
 
 ## Closed as no longer applying
 

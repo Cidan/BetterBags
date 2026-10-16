@@ -565,6 +565,9 @@ _G.IsLoggedIn = function() return true end
 _G.SlashCmdList = {}
 _G.hash_SlashCmdList = {}
 _G.GetLocale = function() return "enUS" end
+-- Blizzard_Fonts_Shared/Shared/GameFonts.xml sets the locale's font file at load; this is
+-- the roman (enUS) branch, matching GetLocale above.
+_G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
 _G.GetBuildInfo = function() return "10.0.0", "12345", "Jan 1 2024", 100000 end
 _G.GetRealmName = function() return "TestRealm" end
 _G.UnitName = function() return "TestChar", "TestRealm" end

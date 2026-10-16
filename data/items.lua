@@ -2933,6 +2933,7 @@ function items:GetCategory(ctx, data)
   end
 
   local category = ""
+  local typeName
 
   -- Add the type filter to the category if enabled, but not to trade goods
   -- when the tradeskill filter is enabled. This makes it so trade goods are
@@ -2945,12 +2946,14 @@ function items:GetCategory(ctx, data)
     ))
     and data.itemInfo.itemType
   then
-    category = category .. data.itemInfo.itemType --[[@as string]]
+    typeName = data.itemInfo.itemType
+    category = category .. typeName --[[@as string]]
   end
 
   -- Add the subtype filter to the category if enabled, but same as with
   -- the type filter we don't add it to trade goods when the tradeskill
-  -- filter is enabled.
+  -- filter is enabled. A subtype named like its type (quest items are
+  -- "Quest" / "Quest") is not repeated.
   if
     database:GetCategoryFilter(data.kind, "Subtype")
     and not (data.itemInfo.classID == Enum.ItemClass.Tradegoods and database:GetCategoryFilter(
@@ -2958,6 +2961,7 @@ function items:GetCategory(ctx, data)
       "TradeSkill"
     ))
     and data.itemInfo.itemSubType
+    and data.itemInfo.itemSubType ~= typeName
   then
     if category ~= "" then
       category = category .. " - "

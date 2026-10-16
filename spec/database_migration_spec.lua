@@ -272,4 +272,69 @@ describe("Database Migration", function()
       assert.is_true(defaultGroupOfType(Enum.BankType.Character))
     end)
   end)
+
+  -- Issue #183: GetCategory no longer repeats a subtype equal to its type, so "Quest - Quest"
+  -- is now "Quest". Settings saved under the old name follow the category to its new name.
+  describe("category names that repeated their item type", function()
+    local profile
+
+    before_each(function()
+      profile = DB.data.profile
+      profile.categoryOptions = {}
+      profile.customCategoryFilters = {}
+      profile.ephemeralCategoryFilters = {}
+      profile.categoryToGroup = { [const.BAG_KIND.BACKPACK] = {}, [const.BAG_KIND.BANK] = {} }
+    end)
+
+    it("moves the hidden state to the new name", function()
+      profile.categoryOptions["Quest - Quest"] = { shown = false }
+      profile.categoryOptions["Quest - Quest - Classic"] = { shown = false }
+      DB:Migrate()
+      assert.are.same({ shown = false }, profile.categoryOptions["Quest"])
+      assert.are.same({ shown = false }, profile.categoryOptions["Quest - Classic"])
+      assert.is_nil(profile.categoryOptions["Quest - Quest"])
+      assert.is_nil(profile.categoryOptions["Quest - Quest - Classic"])
+    end)
+
+    it("moves group assignments, including the per-bank-type ones", function()
+      profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Quest - Quest"] = 2
+      profile.categoryToGroup[const.BAG_KIND.BANK][Enum.BankType.Character] = { ["Key - Key - Classic"] = 3 }
+      DB:Migrate()
+      assert.are.equal(2, profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Quest"])
+      assert.is_nil(profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Quest - Quest"])
+      local character = profile.categoryToGroup[const.BAG_KIND.BANK][Enum.BankType.Character]
+      assert.are.equal(3, character["Key - Classic"])
+      assert.is_nil(character["Key - Key - Classic"])
+    end)
+
+    it("skips legacy group assignments saved outside the bag kinds", function()
+      -- Profiles from before groups were split by bag kind keep name = group entries at the
+      -- top level, next to the per-kind tables; nothing reads them.
+      profile.categoryToGroup["Quest - Quest"] = 3
+      assert.has_no.errors(function() DB:Migrate() end)
+      assert.are.equal(3, profile.categoryToGroup["Quest - Quest"])
+    end)
+
+    it("keeps a setting already saved under the new name", function()
+      profile.categoryOptions["Quest"] = { shown = true }
+      profile.categoryOptions["Quest - Quest"] = { shown = false }
+      DB:Migrate()
+      assert.are.same({ shown = true }, profile.categoryOptions["Quest"])
+      assert.is_nil(profile.categoryOptions["Quest - Quest"])
+    end)
+
+    it("leaves other names and custom categories alone", function()
+      profile.categoryOptions["Weapon - One-Handed Swords"] = { shown = false }
+      profile.customCategoryFilters["Loot - Loot"] = { name = "Loot - Loot", itemList = {} }
+      profile.categoryOptions["Loot - Loot"] = { shown = false }
+      profile.ephemeralCategoryFilters["Gear - Gear"] = { name = "Gear - Gear", dynamic = true }
+      profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear - Gear"] = 2
+      DB:Migrate()
+      assert.are.same({ shown = false }, profile.categoryOptions["Weapon - One-Handed Swords"])
+      assert.are.same({ shown = false }, profile.categoryOptions["Loot - Loot"])
+      assert.are.equal(2, profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear - Gear"])
+      assert.is_nil(profile.categoryOptions["Loot"])
+      assert.is_nil(profile.categoryToGroup[const.BAG_KIND.BACKPACK]["Gear"])
+    end)
+  end)
 end)

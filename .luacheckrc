@@ -202,6 +202,7 @@ globals = {
 	"tremove",
 	"tContains",
 	"SOUNDKIT",
+	"STANDARD_TEXT_FONT",
 	"UNIT_NAME_FONT",
 	"UnitName",
 	"UnitLevel",

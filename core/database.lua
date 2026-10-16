@@ -455,6 +455,59 @@ function DB:PruneOrphanedSectionSort()
   end
 end
 
+-- The name GetCategory now gives a category whose name repeated its item type
+-- ("Quest - Quest" is "Quest", "Quest - Quest - Classic" is "Quest - Classic"), or nil.
+---@param name string
+---@return string|nil
+local function nameWithoutRepeatedType(name)
+  local separator = string.find(name, " - ", 1, true)
+  if not separator then return nil end
+  local typeName = string.sub(name, 1, separator - 1)
+  local rest = string.sub(name, separator + 3)
+  if rest == typeName or string.sub(rest, 1, #typeName + 3) == typeName .. " - " then
+    return rest
+  end
+  return nil
+end
+
+-- RenameRepeatedTypeCategories moves the hidden state and group assignments saved under
+-- a category name that repeated its item type (issue #183) to the category's current
+-- name. Custom categories keep their names, and a setting already saved under the
+-- current name wins.
+function DB:RenameRepeatedTypeCategories()
+  local profile = DB.data.profile
+  ---@param map table<any, any>
+  local function renameKeys(map)
+    local renames = {}
+    for name in pairs(map) do
+      if type(name) == "string"
+        and profile.customCategoryFilters[name] == nil
+        and profile.ephemeralCategoryFilters[name] == nil then
+        renames[name] = nameWithoutRepeatedType(name)
+      end
+    end
+    for oldName, newName in pairs(renames) do
+      if map[newName] == nil then
+        map[newName] = map[oldName]
+      end
+      map[oldName] = nil
+    end
+  end
+
+  renameKeys(profile.categoryOptions)
+  for _, kind in pairs(const.BAG_KIND) do
+    local groupsByName = profile.categoryToGroup[kind]
+    if type(groupsByName) == "table" then
+      renameKeys(groupsByName)
+      for _, groupsByBankType in pairs(groupsByName) do
+        if type(groupsByBankType) == "table" then
+          renameKeys(groupsByBankType)
+        end
+      end
+    end
+  end
+end
+
 ---@param category string
 function DB:WipeItemCategory(category)
   if DB.data.profile.customCategoryFilters[category] then
@@ -1512,6 +1565,9 @@ function DB:Migrate()
     -- Mark migration complete
     DB.data.profile.__profileSystemMigrated = true
   end
+
+  -- Quest items are no longer named "Quest - Quest"; their settings follow the new name.
+  DB:RenameRepeatedTypeCategories()
 
   -- Heal profiles corrupted by the old DeleteItemCategory, which left pinned
   -- categories behind in customSectionSort so they resurfaced as undeletable
