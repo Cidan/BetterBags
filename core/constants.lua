@@ -244,6 +244,14 @@ const.BACKPACK_ONLY_BAGS_LIST = {
   Enum.BagIndex.ReagentBag,
 }
 
+-- WoW: Forever has a keyring (Enum.BagIndex.Keyring, -1), read with the backpack as on
+-- Classic Era, and like Blizzard's own bags only while the game enables it. It has no bag
+-- slot button. Live retail's enum has a Keyring member too, but no keyring.
+if addon.isForever and C_ActionBar.ShouldShowKeyring() then
+  const.BACKPACK_BAGS[Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring
+  const.BACKPACK_ONLY_BAGS[Enum.BagIndex.Keyring] = Enum.BagIndex.Keyring
+end
+
 const.BACKPACK_ONLY_REAGENT_BAGS = {
   [Enum.BagIndex.ReagentBag] = Enum.BagIndex.ReagentBag,
 }

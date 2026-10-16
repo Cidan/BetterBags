@@ -106,7 +106,7 @@ Puts the item on the cursor into a free slot of the bags a bag window shows, the
 - Only items (`GetCursorInfo()` type `"item"`); vendor items and money are ignored.
 - An item picked up from the same window returns to its slot (`ClearCursor`); the bank window counts both bank types.
 - The backpack window fills `BACKPACK_BAGS`; the bank window fills the Warbank while its active tab is a Warbank tab, else the character bank, active tab first.
-- A bag made for the item wins (a profession bag of its family, the reagent bag for a crafting reagent, the Classic keyring for a key), else the first bag that holds anything, backpack first. A specialized bag the item does not fit is never used; bag items only go in plain bags.
+- A bag made for the item wins (a profession bag of its family, the reagent bag for a crafting reagent, the keyring for a key on Classic Era and WoW: Forever), else the first bag that holds anything, backpack first. A specialized bag the item does not fit is never used; bag items only go in plain bags.
 - Free slots are read from the client at the drop (`C_Container.GetContainerFreeSlots`), never from committed data.
 - A refundable item is left on the cursor while the bank shows the Warbank.
 - No room: `UIErrorsFrame` shows `ERR_INV_FULL` (`ERR_BANK_FULL` for the bank).

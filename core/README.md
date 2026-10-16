@@ -39,6 +39,7 @@ Contains all constant values, enumerations, and configuration defaults used thro
 #### Key Constants
 
 - **Bag Types**: `BAG_KIND` (BACKPACK, BANK)
+- **Bag Lists**: `BACKPACK_BAGS`, `BANK_BAGS`, `ACCOUNT_BANK_BAGS` and their variants: which container IDs each bag window reads. On WoW: Forever the keyring (`Enum.BagIndex.Keyring`, -1) is a backpack bag while `C_ActionBar.ShouldShowKeyring()` is true, with no bag slot button (`.claude/rules/camelot-forever.md` §7)
 - **Bank Tabs**: Definitions for different bank tab types
 - **View Modes**: `BAG_VIEW` (ONE_BAG, SECTION_GRID, LIST, SECTION_ALL_BAGS)
 - **Sort Types**: `SECTION_SORT_TYPE`, `ITEM_SORT_TYPE`
@@ -72,7 +73,7 @@ Manages all persistent data storage and settings using AceDB-3.0.
 - **Category Management**: Custom category creation, deletion, and item assignment
 - **Filter Settings**: Category filters, stacking options, sorting preferences
 - **Item Settings**: Item level display, new item marking, item locking, and per-character max item level tracking (emits `itemLevel/MaxChanged` for color refresh)
-- **Migration**: Handles database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and keeping a setting already saved under the current name
+- **Migration**: Handles database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`), pinned order (`customSectionSort`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and keeping a setting already saved under the current name. Migrations never drop a pin because its category has no stored filter: built-in categories have none (issue #1107, `.claude/rules/category-lifecycle.md` §3)
 
 ### events.lua
 

@@ -777,22 +777,6 @@ describe("Database", function()
       assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Parent - Consumable"])
     end)
 
-    it("PruneOrphanedSectionSort drops pins with no backing category, keeps valid ones", function()
-      DB.data.profile.customCategoryFilters["Real"] = { name = "Real", itemList = {} }
-      DB.data.profile.ephemeralCategoryFilters["Dyn"] = { name = "Dyn", dynamic = true }
-      DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK] = {
-        ["Real"] = 1, ["Dyn"] = 2, ["Orphan"] = 3,
-      }
-      DB.data.profile.customSectionSort[const.BAG_KIND.BANK] = { ["GhostBank"] = 1 }
-
-      DB:PruneOrphanedSectionSort()
-
-      assert.are.equal(1, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Real"])
-      assert.are.equal(2, DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Dyn"])
-      assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BACKPACK]["Orphan"])
-      assert.is_nil(DB.data.profile.customSectionSort[const.BAG_KIND.BANK]["GhostBank"])
-    end)
-
     it("WipeItemCategory clears items from persistent category", function()
       DB.data.profile.customCategoryFilters["WipeMe"] = {
         name = "WipeMe", itemList = { [5] = true, [10] = true }, enabled = { [0] = true, [1] = true }

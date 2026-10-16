@@ -62,7 +62,7 @@ The main configuration module that creates and manages the settings interface fo
      - Enhanced glow effects
      - Items per row (3-20)
      - Column count (1-20)
-     - Background opacity (0-100%)
+     - Background opacity (0-100%), per bag: the Bank's slider sets the bank window's opacity
      - Scale (50-200%)
 
 #### Chat Commands

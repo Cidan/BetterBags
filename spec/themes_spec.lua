@@ -795,4 +795,55 @@ describe("Themes", function()
       assert.same({ frame }, simple)
     end)
   end)
+
+  -- The Opacity slider is per bag (config.lua saves it under the bag's kind and view), but
+  -- every window used to get the backpack's value, so the Bank's slider did nothing.
+  describe("per-window opacity", function()
+    local applied
+    local backpack, bank
+
+    local function bagWindow(name, kind)
+      local frame = CreateFrame("Frame", name)
+      frame.Owner = { kind = kind, sideAnchor = CreateFrame("Frame") }
+      themes:RegisterPortraitWindow(frame, name)
+      return frame
+    end
+
+    before_each(function()
+      applied = {}
+      db.GetBagView = function(_, kind) return "view" .. kind end
+      db.GetBagSizeInfo = function(_, kind, view)
+        assert.are.equal("view" .. kind, view)
+        return { opacity = kind == const.BAG_KIND.BANK and 30 or 90 }
+      end
+      themes:RegisterTheme("Default", {
+        Name = "Default",
+        Available = true,
+        Portrait = function() end,
+        Simple = function() end,
+        Flat = function() end,
+        Opacity = function(frame, alpha) applied[frame] = alpha end,
+        SectionFont = function() end,
+        Reset = function() end,
+        SetTitle = function() end,
+        ToggleSearch = function() end,
+      })
+      backpack = bagWindow("TestOpacityBackpack", const.BAG_KIND.BACKPACK)
+      bank = bagWindow("TestOpacityBank", const.BAG_KIND.BANK)
+    end)
+
+    it("applies each bag window its own opacity with the theme", function()
+      themes:ApplyTheme({}, "Default")
+      assert.are.equal(90, applied[backpack])
+      assert.are.equal(30, applied[bank])
+    end)
+
+    it("applies each bag window its own opacity when the slider moves", function()
+      themes:ApplyTheme({}, "Default")
+      applied = {}
+      themes:UpdateOpacity()
+      assert.are.equal(90, applied[backpack])
+      assert.are.equal(30, applied[bank])
+    end)
+  end)
 end)

@@ -75,12 +75,20 @@ function themes:Init()
   self.themeApplied = false
 end
 
+-- The opacity setting for a window: a bag window's own (the Bank has its own slider), and the
+-- backpack's for every other window.
+---@param frame Frame
+---@return number
+local function windowOpacity(frame)
+  local kind = frame.Owner and frame.Owner.kind or const.BAG_KIND.BACKPACK
+  return db:GetBagSizeInfo(kind, db:GetBagView(kind)).opacity
+end
+
 ---@param theme Theme
 ---@param frame Frame
 local function applySimple(theme, frame)
   theme.Simple(frame)
-  local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
-  theme.Opacity(frame, sizeInfo.opacity)
+  theme.Opacity(frame, windowOpacity(frame))
 end
 
 function themes:OnEnable()
@@ -136,8 +144,7 @@ function themes:ApplyTheme(ctx, key)
   -- Apply all portrait themes.
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
     theme.Portrait(frame)
-    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
-    theme.Opacity(frame, sizeInfo.opacity)
+    theme.Opacity(frame, windowOpacity(frame))
     theme.ToggleSearch(frame, db:GetInBagSearch())
     -- Apply bagslots positioning if the theme has a custom function for it.
     if frame.Owner.slots then
@@ -290,12 +297,10 @@ function themes:UpdateOpacity()
   local theme = self.themes[db:GetTheme()]
   if not theme then return end
   for _, frame in pairs(self.windows[const.WINDOW_KIND.PORTRAIT]) do
-    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
-    theme.Opacity(frame, sizeInfo.opacity)
+    theme.Opacity(frame, windowOpacity(frame))
   end
   for _, frame in pairs(self.windows[const.WINDOW_KIND.SIMPLE]) do
-    local sizeInfo = db:GetBagSizeInfo(const.BAG_KIND.BACKPACK, db:GetBagView(const.BAG_KIND.BACKPACK))
-    theme.Opacity(frame, sizeInfo.opacity)
+    theme.Opacity(frame, windowOpacity(frame))
   end
 end
 

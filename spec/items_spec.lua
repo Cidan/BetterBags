@@ -312,6 +312,34 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- Show Bags names each backpack bag "#<n>: <name>"; the keyring comes after the last bag.
+  describe("keyring section name (Show Bags)", function()
+    local savedBags, savedKeyring
+
+    before_each(function()
+      savedBags = const.BACKPACK_BAGS
+      savedKeyring = Enum.BagIndex.Keyring
+    end)
+
+    after_each(function()
+      const.BACKPACK_BAGS = savedBags
+      Enum.BagIndex.Keyring = savedKeyring
+    end)
+
+    it("numbers the Classic Era keyring after bags 0-4", function()
+      Enum.BagIndex.Keyring = -2
+      const.BACKPACK_BAGS = { [0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4, [-2] = -2 }
+      assert.are.equal("#6: Keyring", items:GetBagName(-2))
+    end)
+
+    -- Issue #1121: Forever has a reagent bag (bag 5, "#6") as well as a keyring.
+    it("numbers the Forever keyring after the reagent bag", function()
+      Enum.BagIndex.Keyring = -1
+      const.BACKPACK_BAGS = { [0] = 0, [1] = 1, [2] = 2, [3] = 3, [4] = 4, [5] = 5, [-1] = -1 }
+      assert.are.equal("#7: Keyring", items:GetBagName(-1))
+    end)
+  end)
+
   -- Issue #183: quest items are type "Quest" and subtype "Quest", which read
   -- "Quest - Quest" with the Type and Subtype filters both on.
   describe("Category names from type and subtype (issue #183)", function()
