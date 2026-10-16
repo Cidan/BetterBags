@@ -751,6 +751,19 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetStringWidth()
     return #self._text * 6
   end
+  -- FontString:GetStringHeight() -> the height of the text as drawn: no text is 0; otherwise
+  -- one line per GetWidth() worth of characters (6 pixels each, as GetStringWidth), times the
+  -- line height. A stand-in for the client's text layout.
+  function widget:GetStringHeight()
+    local text = self._text or ""
+    if text == "" then return 0 end
+    local width = self:GetWidth()
+    local lines = 1
+    if width > 0 then
+      lines = math.max(1, math.ceil(self:GetStringWidth() / width))
+    end
+    return lines * self:GetLineHeight()
+  end
   function widget:SetFont(font, size, flags)
     if flags and flags ~= "" then
       for token in string.gmatch(flags, "[^,%s]+") do
@@ -1463,6 +1476,102 @@ _G.SOUNDKIT = {
   IG_BACKPACK_OPEN = 1,
   IG_BACKPACK_CLOSE = 2,
 }
+
+-- xpcall(f, msgh, ...) passes ... on to f in WoW (warcraft.wiki.gg API_xpcall); PUC Lua 5.1's
+-- xpcall takes only f and msgh and drops the rest.
+do
+  local nativeXpcall = xpcall
+  _G.xpcall = function(f, msgh, ...)
+    local n = select("#", ...)
+    if n == 0 then
+      return nativeXpcall(f, msgh)
+    end
+    local args = { ... }
+    return nativeXpcall(function() return f(unpack(args, 1, n)) end, msgh)
+  end
+end
+
+-- UIDropDownMenu (Blizzard_SharedXML/Mainline/UIDropDownMenu.lua, UIDropDownMenuTemplates.xml):
+-- the template gives Left/Middle/Right textures and a Text font string; Initialize stores the
+-- init function and calls it at once, and the buttons it adds (AddButton) go to that dropdown's
+-- list (recorded as _dropdownButtons); SetWidth sizes Middle, the frame (width + padding, 25
+-- on each side by default) and Text; SetText/GetText use Text.
+_G.UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING = 25
+_G.__mockTemplates.UIDropDownMenuTemplate = function(frame)
+  frame.Left = frame:CreateTexture(nil, "ARTWORK")
+  frame.Middle = frame:CreateTexture(nil, "ARTWORK")
+  frame.Right = frame:CreateTexture(nil, "ARTWORK")
+  frame.Text = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+end
+local initializingDropdown
+function _G.UIDropDownMenu_Initialize(frame, initFunction, _, level, menuList)
+  frame.menuList = menuList
+  if initFunction then
+    frame.initialize = initFunction
+    frame._dropdownButtons = {}
+    initializingDropdown = frame
+    initFunction(frame, level, menuList)
+    initializingDropdown = nil
+  end
+end
+function _G.UIDropDownMenu_CreateInfo()
+  return {}
+end
+function _G.UIDropDownMenu_AddButton(info)
+  if initializingDropdown ~= nil then
+    table.insert(initializingDropdown._dropdownButtons, info)
+  end
+end
+function _G.UIDropDownMenu_SetWidth(frame, width, padding)
+  frame.Middle:SetWidth(width)
+  if padding then
+    frame:SetWidth(width + padding)
+    frame.Text:SetWidth(width)
+  else
+    frame:SetWidth(width + UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING * 2)
+    frame.Text:SetWidth(width - UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING)
+  end
+end
+function _G.UIDropDownMenu_SetText(frame, text)
+  frame.Text:SetText(text)
+end
+function _G.UIDropDownMenu_GetText(frame)
+  return frame.Text:GetText()
+end
+
+-- CreateObjectPool(createFunc, resetFunc) (Blizzard_SharedXMLBase/Pools.lua): Acquire
+-- reuses a released object or creates one with createFunc(pool), running resetFunc(pool,
+-- object, true) on a new one, and returns object, isNew; Release runs resetFunc(pool, object)
+-- and keeps the object for the next Acquire.
+function _G.CreateObjectPool(createFunc, resetFunc)
+  local pool = { active = {}, inactive = {} }
+  function pool:Acquire()
+    local object = table.remove(self.inactive)
+    local new = object == nil
+    if new then
+      object = createFunc(self)
+      resetFunc(self, object, true)
+    end
+    self.active[object] = true
+    return object, new
+  end
+  function pool:Release(object)
+    if not self.active[object] then return false end
+    resetFunc(self, object)
+    self.active[object] = nil
+    table.insert(self.inactive, object)
+    return true
+  end
+  function pool:GetNumActive()
+    local n = 0
+    for _ in pairs(self.active) do n = n + 1 end
+    return n
+  end
+  function pool:ReleaseAll()
+    for object in pairs(self.active) do self:Release(object) end
+  end
+  return pool
+end
 
 -- GameTooltip Mock
 _G.GameTooltip = CreateMockWidget("Frame", "GameTooltip")

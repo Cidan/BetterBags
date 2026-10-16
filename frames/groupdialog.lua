@@ -6,7 +6,39 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
+---@class Constants: AceModule
+local const = addon:GetModule('Constants')
+
+---@class Render: AceModule
+local render = addon:GetModule('Render')
+
+---@class DrawableModule: AceModule
+local drawable = addon:GetModule('Drawable')
+
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
+
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
+---@class Database: AceModule
+local database = addon:GetModule('Database')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
+
+-- The dialog's text is this wide; its content box is this wide (the window 300).
+local TEXT_WIDTH = 250
+local BODY_WIDTH = 296
+-- The content's height around the text, with and without the bank type dropdown.
+local BODY_PADDING = 86
+local BODY_PADDING_WITH_DROPDOWN = 116
+
+-- The group dialog is a Panel window (window/window.lua) whose content is its body: the text,
+-- the name box, the bank type dropdown and the buttons, sized to the text.
 ---@class (exact) GroupDialog: AceModule
+---@field window BetterBagsWindow
+---@field body Drawable
 ---@field frame Frame
 ---@field text FontString
 ---@field yes Button|UIPanelButtonTemplate
@@ -22,25 +54,30 @@ function groupDialog:Initialize()
 
 	self.bankType = Enum.BankType and Enum.BankType.Character or 1
 
-	---@class Themes: AceModule
-	local themes = addon:GetModule('Themes')
+	self.window = window:Create({
+		Kind = "Panel",
+		Name = "BetterBagsGroupDialog",
+		Title = L:G("New Group"),
+		Strata = "DIALOG",
+		Level = 600,
+		Movable = false,
+		Fade = function() return false end,
+		Opacity = function()
+			return database:GetBagSizeInfo(const.BAG_KIND.BACKPACK, database:GetBagView(const.BAG_KIND.BACKPACK)).opacity
+		end,
+		OnHide = function()
+			self.open = false
+		end,
+	})
+	self.frame = self.window.frame
 
-	local f = CreateFrame('Frame', "BetterBagsGroupDialog", UIParent)
-	self.frame = f
-	f:SetFrameStrata("DIALOG")
-	f:SetFrameLevel(600)
-	f:SetSize(300, 200)
-	f:SetPoint("CENTER")
-	f:Hide()
-
-	-- Apply the active theme's Simple decoration so the dialog matches the addon UI.
-	themes:RegisterSimpleWindow(f, L:G("New Group"))
-	themes:GetCurrentTheme().Simple(f)
+	local f = CreateFrame('Frame')
+	self.body = drawable:Create(self.bodyProto, { frame = f })
 
 	self.text = f:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 	self.text:SetTextColor(1, 1, 1)
-	self.text:SetPoint('TOP', 0, -30)
-	self.text:SetWidth(250)
+	self.text:SetPoint('TOP', 0, 0)
+	self.text:SetWidth(TEXT_WIDTH)
 	self.text:SetWordWrap(true)
 	self.text:SetJustifyH("CENTER")
 
@@ -57,17 +94,16 @@ function groupDialog:Initialize()
 	self.no:SetWidth(100)
 	self.yes:SetText(L:G("Create"))
 	self.no:SetText(L:G("Cancel"))
-	self.yes:SetPoint("BOTTOMLEFT", 40, 15)
-	self.no:SetPoint("BOTTOMRIGHT", -40, 15)
+	self.yes:SetPoint("BOTTOMLEFT", 36, 11)
+	self.no:SetPoint("BOTTOMRIGHT", -40, 11)
+	sonata:RegisterElement("Button", self.yes)
+	sonata:RegisterElement("Button", self.no)
+	sonata:RegisterElement("EditBox", self.input)
 
 	self.input:SetScript("OnEscapePressed", function()
 		self:Hide()
 	end)
 	self.input:SetAutoFocus(false)
-
-	f:SetScript("OnHide", function()
-		self.open = false
-	end)
 
 	self.no:SetScript("OnClick", function()
 		self:Hide()
@@ -92,11 +128,32 @@ function groupDialog:Initialize()
 			UIDropDownMenu_AddButton(info2)
 		end
 	end)
+	self.window:SetContent(self.body)
 end
 
+---@class (exact) GroupDialogBody: Drawable
+groupDialog.bodyProto = drawable:Extend({}, 'GroupDialogBody')
+
+---@return RenderPlan
+function groupDialog.bodyProto:GetRenderPlan()
+	return { Plan = { { step = render.SELF } } }
+end
+
+---@return RenderResult
+function groupDialog.bodyProto:Render()
+	local text = groupDialog.text
+	text:SetWidth(TEXT_WIDTH)
+	local textHeight = text:GetStringHeight()
+	text:SetHeight(textHeight)
+	local padding = groupDialog.dropdown:IsShown() and BODY_PADDING_WITH_DROPDOWN or BODY_PADDING
+	return { Width = BODY_WIDTH, Height = padding + textHeight }
+end
+
+-- Hide closes the dialog. Its frame's OnHide also marks it closed, for the close button.
 function groupDialog:Hide()
-	if self.frame then
-		self.frame:Hide()
+	self.open = false
+	if self.window then
+		self.window:Hide(context:New('GroupDialog_Hide'))
 	end
 end
 
@@ -114,9 +171,7 @@ function groupDialog:Show(title, text, showDropdown, defaultBankType, onInput, i
 		self:Initialize()
 	end
 
-	---@class Themes: AceModule
-	local themes = addon:GetModule('Themes')
-	themes:SetTitle(self.frame, title)
+	self.window:SetTitle(title)
 
 	self.text:SetText(text)
 	self.input:SetText(initialValue or "")
@@ -137,12 +192,10 @@ function groupDialog:Show(title, text, showDropdown, defaultBankType, onInput, i
 			UIDropDownMenu_SetText(self.dropdown, L:G("Bank"))
 		end
 
-		self.frame:SetHeight(150 + self.text:GetStringHeight())
 	else
 		self.dropdown:Hide()
 		self.input:ClearAllPoints()
 		self.input:SetPoint("TOP", self.text, "BOTTOM", 0, -20)
-		self.frame:SetHeight(120 + self.text:GetStringHeight())
 	end
 
 	local commit = function()
@@ -156,7 +209,8 @@ function groupDialog:Show(title, text, showDropdown, defaultBankType, onInput, i
 	self.yes:SetScript("OnClick", commit)
 	self.input:SetScript("OnEnterPressed", commit)
 
-	self.frame:Show()
+	self.body:Invalidate()
+	self.window:Show(context:New('GroupDialog_Show'))
 	self.input:SetFocus()
 	self.open = true
 end

@@ -182,6 +182,19 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   so a theme's insets decide where they go. `Show`/`Hide` go through the window (the theme's
   fade). Their opacity is the backpack's (`Opacity` option), reapplied by
   `Sonata:UpdateOpacity()`. Coverage: `spec/forms/form_spec.lua`.
+- **Question dialogs** (`frames/question.lua`: `YesNo`, `Alert`, `AskForInput`): pooled
+  (`CreateObjectPool`) Dialog windows, strata DIALOG at level 600 (above the settings window),
+  centered, not movable, shown and hidden at once (`Fade` false). The content is a body
+  drawable (the text 250 wide, the input box, the buttons) that renders 290 wide and as tall
+  as the text plus the buttons plus 80, so the window is 300 wide as before. One question is
+  open at a time; a released dialog is reset (title, text, scripts, input) and reused. Buttons
+  and the edit box are Sonata `Button`/`EditBox` elements. Coverage: `spec/frames/question_spec.lua`.
+- **The group dialog** (`frames/groupdialog.lua`: create and rename group): a Panel window
+  named `BetterBagsGroupDialog`, strata DIALOG at level 600, centered, not movable, no fade,
+  the backpack's opacity. Its body renders 296 wide (the window 300) and as tall as the text
+  plus 86, or plus 116 while the bank type dropdown shows. `Hide` marks it closed; its
+  frame's `OnHide` (the window's option) does too, for the close button. Coverage:
+  `spec/frames/groupdialog_spec.lua`.
 - The side theme-configuration panel (`frames/themeconfig.lua`) and the window grouping it was
   the only user of (`util/windowgroup.lua`) were removed: nothing had opened the panel since
   the window group's opener was removed, so it was a hidden frame built at every login. Themes
