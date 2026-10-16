@@ -85,6 +85,7 @@ util\sort.lua
 util\bucket.lua
 util\windowgroup.lua
 util\movementflow.lua
+util\cursorplacement.lua
 util\serialization.lua
 
 forms\layouts\layout.lua

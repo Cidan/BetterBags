@@ -4,7 +4,7 @@ Triage date: 2026-10-15, against `main` at 20406c4.
 
 The 20 oldest open issues labeled `bug` (after closing duplicates) were checked against the
 current code. Ten no longer apply and were closed on GitHub with the reason. The ten below
-were still valid at triage; #175 and #183 have since been fixed (marked below).
+were still valid at triage; #175, #183 and #408 have since been fixed (marked below).
 
 Each entry says what was **verified** (read in the code, the Blizzard UI source under
 `.libraries/wow-ui-source`, or the external addon's source) and what is **inferred** (traced
@@ -19,7 +19,7 @@ from code, not shown by a capture). No in-game capture was taken for any of them
 | [#280](https://github.com/Cidan/BetterBags/issues/280) | Retail + ConsolePort | Gamepad cursor | Never fixed; not reproduced |
 | [#291](https://github.com/Cidan/BetterBags/issues/291) | Retail | Section clipping | Verified |
 | [#382](https://github.com/Cidan/BetterBags/issues/382) | Classic Era (and all) | Item loading | Inferred |
-| [#408](https://github.com/Cidan/BetterBags/issues/408) | All | Drag and drop | Verified |
+| [#408](https://github.com/Cidan/BetterBags/issues/408) | All | Drag and drop | Verified; **fixed** |
 | [#437](https://github.com/Cidan/BetterBags/issues/437) | All | Window position | Inferred |
 | [#463](https://github.com/Cidan/BetterBags/issues/463) | Retail + ElvUI | ElvUI theme | Verified |
 
@@ -133,6 +133,10 @@ window (`frames/bag.lua:939-948`). Nothing in the bag window, views or the defau
 handles `OnReceiveDrag` or a click with an item on the cursor; only the bag button
 (`themes/themes.lua:553`, creates a category) and section titles (shift, adds to a category)
 do. The maintainer acknowledged the request and planned it; it was never added.
+
+**Fixed:** the whole window is a drop target; the item goes into a free slot of the window's
+bags through `util/cursorplacement.lua` (`.claude/rules/bag-drop-zone.md`). Not yet checked in
+game.
 
 ## #437 — The bag moves up after a relog
 

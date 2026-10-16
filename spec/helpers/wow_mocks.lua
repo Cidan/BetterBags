@@ -175,6 +175,13 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:RegisterForDrag(...)
     self._registeredDrags = {...}
   end
+  -- Frame:StartMoving() / StopMovingOrSizing() (SimpleFrameAPIDocumentation.lua).
+  function widget:StartMoving()
+    self._moving = true
+  end
+  function widget:StopMovingOrSizing()
+    self._moving = false
+  end
   -- Button: Enable() / Disable() / IsEnabled() -> boolean, LockHighlight() / UnlockHighlight().
   function widget:Enable()
     self._enabled = true
@@ -818,7 +825,13 @@ _G.ClearCursor = function()
   _G._cursorType = nil
   _G._cursorItemID = nil
   _G._cursorItemLink = nil
+  _G._cursorItemLocation = nil
 end
+-- C_Cursor.GetCursorItem() -> ItemLocation, or nothing (CursorDocumentation.lua,
+-- MayReturnNothing). Specs set _G._cursorItemLocation to where the cursor item came from.
+_G._cursorItemLocation = nil
+_G.C_Cursor = _G.C_Cursor or {}
+_G.C_Cursor.GetCursorItem = function() return _G._cursorItemLocation end
 _G.GetCursorPosition = function() return _G._cursorX or 0, _G._cursorY or 0 end
 
 -- Enum Setup
@@ -837,6 +850,7 @@ _G.Enum.ItemClass = {
   Gem = 3,
   Armor = 4,
   Tradegoods = 7,
+  Quiver = 11,
 }
 
 -- C_Bank Setup
@@ -905,6 +919,47 @@ _G.C_Container._pickups = {}
 _G.C_Container.PickupContainerItem = function(containerIndex, slotIndex)
   table.insert(_G.C_Container._pickups, { bag = containerIndex, slot = slotIndex })
 end
+-- C_Container.GetContainerFreeSlots(containerIndex) -> freeSlots: the container's empty slot
+-- indexes (ContainerDocumentation.lua). Specs set _G._containerFreeSlots[bag] = { slots }.
+_G._containerFreeSlots = {}
+_G.C_Container.GetContainerFreeSlots = function(containerIndex)
+  return _G._containerFreeSlots[containerIndex] or {}
+end
+-- C_Item.GetItemFamily(itemInfo) -> bag family bitfield, nil for an uncached item
+-- (ItemDocumentation.lua, Nilable). Specs set _G._itemFamilies[itemID].
+_G._itemFamilies = {}
+_G.C_Item = _G.C_Item or {}
+_G.C_Item.GetItemFamily = function(itemInfo) return _G._itemFamilies[itemInfo] end
+-- C_Item.CanBeRefunded(itemLocation) -> bool (ItemDocumentation.lua). Specs list
+-- refundable locations in _G._refundableLocations["bag:slot"].
+_G._refundableLocations = {}
+_G.C_Item.CanBeRefunded = function(itemLocation)
+  local bag, slot = itemLocation:GetBagAndSlot()
+  return bag ~= nil and _G._refundableLocations[bag .. ":" .. slot] == true
+end
+-- UIErrorsFrame:AddMessage(text, r, g, b, a): the red error text in the middle of the
+-- screen. Messages are recorded for specs.
+_G.UIErrorsFrame = _G.UIErrorsFrame or {}
+_G.UIErrorsFrame._messages = {}
+_G.UIErrorsFrame.AddMessage = function(self, text, r, g, b, a)
+  table.insert(self._messages, { text = text, r = r, g = g, b = b, a = a })
+end
+-- Client global strings (GlobalStrings/enUS.lua on every client).
+_G.ERR_INV_FULL = "Inventory is full."
+_G.ERR_BANK_FULL = "Your bank is full"
+-- The client's bit library (BitLib): bit.band on non-negative 32-bit integers.
+_G.bit = _G.bit or {
+  band = function(a, b)
+    local result, place = 0, 1
+    while a > 0 and b > 0 do
+      if a % 2 == 1 and b % 2 == 1 then
+        result = result + place
+      end
+      a, b, place = math.floor(a / 2), math.floor(b / 2), place * 2
+    end
+    return result
+  end,
+}
 _G.C_Container.UseContainerItem = function(bagid, slotid, target, bankType, isReagent)
   table.insert(_G.C_Container._usedItems, {
     bagid = bagid,
