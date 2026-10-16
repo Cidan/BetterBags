@@ -3,14 +3,17 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
+
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
+---@class Context: AceModule
+local context = addon:GetModule('Context')
 
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
-
----@class Animations: AceModule
-local animations = addon:GetModule('Animations')
 
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
@@ -116,27 +119,26 @@ function searchCategoryConfig:CheckNameboxText()
   end
 end
 
+-- The editor is a Dialog window (window/window.lua) of a fixed size the player can move; its
+-- fields sit in the window's content box.
 function searchCategoryConfig:OnEnable()
-  self.frame = CreateFrame("Frame", addonName .. "SearchCategoryConfig", UIParent)
-  themes:RegisterFlatWindow(self.frame, "Configure Search Category")
-
+  self.window = window:Create({
+    Kind = "Dialog",
+    Name = addonName .. "SearchCategoryConfig",
+    Title = "Configure Search Category",
+    Strata = "DIALOG",
+    SizeMode = function() return "window" end,
+    Resizable = false,
+  })
+  self.frame = self.window.frame
   self.frame:SetSize(430, 450)
-  self.frame:SetPoint("CENTER")
-  self.frame:SetMovable(true)
-  self.frame:EnableMouse(true)
-  self.frame:SetClampedToScreen(true)
-  self.frame:RegisterForDrag("LeftButton")
-  self.frame:SetScript("OnDragStart", self.frame.StartMoving)
-  self.frame:SetScript("OnDragStop", self.frame.StopMovingOrSizing)
-  self.frame:SetFrameStrata("DIALOG")
+  local content = self.window.content
 
-  self.fadeInGroup, self.fadeOutGroup = animations:AttachFadeGroup(self.frame)
-
-  self.nameBoxLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  self.nameBoxLabel:SetPoint("TOPLEFT", 20, -40)
+  self.nameBoxLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.nameBoxLabel:SetPoint("TOPLEFT", content, "TOPLEFT", 15, -15)
   self.nameBoxLabel:SetText("Category Name")
 
-  self.nameBox = CreateFrame("EditBox", addonName .. "SearchCategoryConfigNameBox", self.frame, "InputBoxTemplate")
+  self.nameBox = CreateFrame("EditBox", addonName .. "SearchCategoryConfigNameBox", content, "InputBoxTemplate")
   self.nameBox:SetSize(200, 20)
   self.nameBox:SetPoint("TOPLEFT", self.nameBoxLabel, "BOTTOMLEFT", 2, -7)
   self.nameBox:SetAutoFocus(false)
@@ -146,11 +148,11 @@ function searchCategoryConfig:OnEnable()
     self:CheckNameboxText()
   end)
 
-  self.queryBoxLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.queryBoxLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   self.queryBoxLabel:SetPoint("TOPLEFT", self.nameBox, "BOTTOMLEFT", -2, -20)
   self.queryBoxLabel:SetText("Search Query")
 
-  self.queryBox = CreateFrame("ScrollFrame", addonName .. "SearchCategoryConfigQueryBox", self.frame, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
+  self.queryBox = CreateFrame("ScrollFrame", addonName .. "SearchCategoryConfigQueryBox", content, "InputScrollFrameTemplate") --[[@as InputScrollFrameTemplate]]
   self.queryBox:SetSize(400, 100)
   self.queryBox.EditBox:SetSize(390, 100)
   self.queryBox:SetPoint("TOPLEFT", self.queryBoxLabel, "BOTTOMLEFT", 2, -7)
@@ -188,11 +190,11 @@ function searchCategoryConfig:OnEnable()
     end
   end)
 
-  self.priorityBoxLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.priorityBoxLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   self.priorityBoxLabel:SetPoint("TOPLEFT", self.queryBox, "BOTTOMLEFT", -2, -20)
   self.priorityBoxLabel:SetText("Priority")
 
-  self.priorityBox = CreateFrame("EditBox", addonName .. "SearchCategoryConfigPriorityBox", self.frame, "InputBoxTemplate")
+  self.priorityBox = CreateFrame("EditBox", addonName .. "SearchCategoryConfigPriorityBox", content, "InputBoxTemplate")
   self.priorityBox:SetSize(200, 20)
   self.priorityBox:SetPoint("TOPLEFT", self.priorityBoxLabel, "BOTTOMLEFT", 2, -7)
   self.priorityBox:SetAutoFocus(false)
@@ -210,7 +212,7 @@ function searchCategoryConfig:OnEnable()
   end)
 
   -- Group By dropdown
-  self.groupByLabel = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.groupByLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   self.groupByLabel:SetPoint("TOPLEFT", self.priorityBox, "BOTTOMLEFT", -2, -20)
   self.groupByLabel:SetText("Group By")
 
@@ -224,7 +226,7 @@ function searchCategoryConfig:OnEnable()
   }
 
   if addon.isRetail then
-    self.groupByDropdown = CreateFrame("DropdownButton", addonName .. "SearchCategoryGroupByDropdown", self.frame, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
+    self.groupByDropdown = CreateFrame("DropdownButton", addonName .. "SearchCategoryGroupByDropdown", content, "WowStyle1DropdownTemplate") --[[@as DropdownButton]]
     self.groupByDropdown:SetPoint("TOPLEFT", self.groupByLabel, "BOTTOMLEFT", 0, -5)
     self.groupByDropdown:SetWidth(200)
 
@@ -249,7 +251,7 @@ function searchCategoryConfig:OnEnable()
     end)
   else
     -- Classic/Era dropdown using UIDropDownMenuTemplate
-    self.groupByDropdown = CreateFrame("Frame", addonName .. "SearchCategoryGroupByDropdown", self.frame, "UIDropDownMenuTemplate") --[[@as Frame]]
+    self.groupByDropdown = CreateFrame("Frame", addonName .. "SearchCategoryGroupByDropdown", content, "UIDropDownMenuTemplate") --[[@as Frame]]
     self.groupByDropdown:SetPoint("TOPLEFT", self.groupByLabel, "BOTTOMLEFT", -15, -5)
 
     UIDropDownMenu_SetWidth(self.groupByDropdown, 185)
@@ -282,18 +284,18 @@ function searchCategoryConfig:OnEnable()
     end)
   end
 
-  self.errorText = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.errorText = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   self.errorText:SetPoint("TOPLEFT", self.groupByDropdown, "BOTTOMLEFT", addon.isRetail and 0 or 15, -20)
   self.errorText:SetWidth(self.frame:GetWidth() - 40)
   self.errorText:SetText("")
   self.errorText:SetTextColor(1, 0, 0)
 
-  self.saveButton = CreateFrame("Button", addonName .. "SearchCategoryConfigSaveButton", self.frame, "UIPanelButtonTemplate")
+  self.saveButton = CreateFrame("Button", addonName .. "SearchCategoryConfigSaveButton", content, "UIPanelButtonTemplate")
   self.saveButton:SetSize(100, 30)
-  self.saveButton:SetPoint("BOTTOMRIGHT", -20, 20)
+  self.saveButton:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -15, 15)
   self.saveButton:SetText("Save")
 
-  self.cancelButton = CreateFrame("Button", addonName .. "SearchCategoryConfigCancelButton", self.frame, "UIPanelButtonTemplate")
+  self.cancelButton = CreateFrame("Button", addonName .. "SearchCategoryConfigCancelButton", content, "UIPanelButtonTemplate")
   self.cancelButton:SetSize(100, 30)
   self.cancelButton:SetPoint("RIGHT", self.saveButton, "LEFT", -10, 0)
   self.cancelButton:SetText("Cancel")
@@ -321,35 +323,36 @@ function searchCategoryConfig:OnEnable()
     end
     self.openedName = nil
     events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
-    self.fadeOutGroup:Play()
+    self.window:Hide(ctx)
   end)
 
-  self.cancelButton:SetScript("OnClick", function()
+  addon.SetScript(self.cancelButton, "OnClick", function(ctx)
     self.openedName = nil
-    self.fadeOutGroup:Play()
+    self.window:Hide(ctx)
   end)
 
-  self.frame:Hide()
+  sonata:RegisterElement("EditBox", self.nameBox)
+  sonata:RegisterElement("EditBox", self.priorityBox)
+  sonata:RegisterElement("Button", self.saveButton)
+  sonata:RegisterElement("Button", self.cancelButton)
 end
 
 function searchCategoryConfig:IsShown()
   return self.frame:IsShown()
 end
 
+---@param callback fun()
 function searchCategoryConfig:Close(callback)
-  self.fadeOutGroup.callback = function()
-    self.fadeOutGroup.callback = nil
-    callback()
-  end
-  self.fadeOutGroup:Play()
+  self.window:Hide(context:New('SearchCategoryConfig_Close'), callback)
 end
 
 ---@param filter CustomCategoryFilter
 ---@param f? Frame
 function searchCategoryConfig:Open(filter, f)
+  local ctx = context:New('SearchCategoryConfig_Open')
   if filter.name == self.openedName then
     self.openedName = nil
-    self.fadeOutGroup:Play()
+    self.window:Hide(ctx)
     return
   end
   self.nameBox:SetText(filter.name)
@@ -370,15 +373,14 @@ function searchCategoryConfig:Open(filter, f)
   -- Update dropdown display
   self:UpdateDropdownDisplay()
 
-  self.fadeInGroup.callback = function()
-    self.nameBox:SetFocus()
-    self:CheckNameboxText()
-  end
   self.frame:ClearAllPoints()
   if f then
     self.frame:SetPoint("TOPRIGHT", f, "TOPLEFT", -10, 0)
   else
-    self.frame:SetPoint("CENTER")
+    self.frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   end
-  self.fadeInGroup:Play()
+  self.window:Show(ctx, function()
+    self.nameBox:SetFocus()
+    self:CheckNameboxText()
+  end)
 end

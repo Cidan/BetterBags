@@ -195,6 +195,18 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   plus 86, or plus 116 while the bank type dropdown shows. `Hide` marks it closed; its
   frame's `OnHide` (the window's option) does too, for the close button. Coverage:
   `spec/frames/groupdialog_spec.lua`.
+- **The search category editor** (`frames/searchcategory.lua`): a Dialog window named
+  `BetterBagsSearchCategoryConfig`, strata DIALOG, 430 x 450 in the window mode with
+  `Resizable = false`, movable. Its fields sit in the content box (the first label at 15, -15,
+  Save at -15, 15). `Open` anchors it to the left of the frame that asked (or the center of the
+  screen) and shows it with the theme's fade, focusing the name box once shown; opening the
+  same category again, Save and Cancel hide it; `Close(callback)` calls back once hidden. Its
+  edit boxes and buttons are Sonata elements. Coverage: `spec/frames/searchcategory_spec.lua`.
+- **The debug window** (`frames/debug.lua`, `/bbdb`): a Flat window named
+  `BetterBagsDebugWindow`, 800 x 600 in the window mode with `Resizable = false`, movable, no
+  fade. Its four tabs' contents fill the content box. Its close button takes left and right
+  clicks (`CloseClicks`): left turns debug mode off, right clears the log (`OnClose`). It shows
+  and hides with `config/DebugMode`. Coverage: `spec/frames/debug_window_spec.lua`.
 - The side theme-configuration panel (`frames/themeconfig.lua`) and the window grouping it was
   the only user of (`util/windowgroup.lua`) were removed: nothing had opened the panel since
   the window group's opener was removed, so it was a hidden frame built at every login. Themes

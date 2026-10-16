@@ -721,6 +721,13 @@ local function CreateMockWidget(widgetType, name, parent)
     return self._value or 0
   end
   -- EditBox widget API (InputBoxTemplate).
+  -- EditBox:SetMaxLetters(maxLetters) / GetMaxLetters().
+  function widget:SetMaxLetters(maxLetters)
+    self._maxLetters = maxLetters
+  end
+  function widget:GetMaxLetters()
+    return self._maxLetters or 0
+  end
   function widget:SetNumeric(numeric)
     self._numeric = numeric
   end
@@ -897,7 +904,15 @@ local function CreateMockWidget(widgetType, name, parent)
       SetScrollMode = function() end,
       CreateButton = function(_, text) table.insert(items, text); return {} end,
       CreateCheckbox = function(_, text) table.insert(items, text); return {} end,
+      -- CreateRadio(text, isSelected, setSelected, data) (11_0_0_MenuImplementationGuide.lua).
+      CreateRadio = function(_, text, isSelected, setSelected, data)
+        table.insert(items, text)
+        self._lastMenuRadios = self._lastMenuRadios or {}
+        self._lastMenuRadios[text] = { isSelected = isSelected, setSelected = setSelected, data = data }
+        return {}
+      end,
     }
+    self._lastMenuRadios = {}
     self._menuGenerator(self, root)
     self._lastMenuItems = items
   end
@@ -1496,6 +1511,16 @@ end
 -- init function and calls it at once, and the buttons it adds (AddButton) go to that dropdown's
 -- list (recorded as _dropdownButtons); SetWidth sizes Middle, the frame (width + padding, 25
 -- on each side by default) and Text; SetText/GetText use Text.
+-- InputScrollFrameTemplate (Blizzard_SharedXML/Shared/InputBox/InputBoxTemplates.xml): a
+-- scroll frame with a CharCount font string and an EditBox scroll child (multi-line, not
+-- focused automatically) holding an Instructions font string.
+_G.__mockTemplates.InputScrollFrameTemplate = function(frame)
+  frame.CharCount = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
+  frame.EditBox = CreateFrame("EditBox", nil, frame)
+  frame.EditBox:SetAutoFocus(false)
+  frame.EditBox.Instructions = frame.EditBox:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+end
+
 _G.UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING = 25
 _G.__mockTemplates.UIDropDownMenuTemplate = function(frame)
   frame.Left = frame:CreateTexture(nil, "ARTWORK")
