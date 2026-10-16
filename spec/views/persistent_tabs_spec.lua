@@ -63,8 +63,6 @@ sort.GetSectionSortFunction = function() return function() return true end end
 sort.GetItemSortFunction = function() return function() return true end end
 
 local themes = StubBetterBagsModule("Themes")
-themes.GetTabButton = function() return {} end
-themes.GetItemButton = function() return { UpgradeIcon = { SetShown = function() end } } end
 themes.RegisterPortraitWindow = function() end
 themes.SetSearchState = function() end
 

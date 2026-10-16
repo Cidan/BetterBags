@@ -195,6 +195,7 @@ function addon:OnInitialize()
   -- 4. Themes and Presentation Frames
   addon:GetModule('Render'):Init()
   addon:GetModule('Sonata'):Init()
+  addon:GetModule('Tabs'):Init()
   themes:Init()
   itemFrame:Init()
   sectionFrame:Init()

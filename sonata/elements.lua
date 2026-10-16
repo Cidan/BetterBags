@@ -562,6 +562,14 @@ function elements:SetTabState(decoration, state)
   end
 end
 
+-- GetTabState returns the state a tab was last set to: normal or selected (a drop target
+-- keeps its state underneath).
+---@param decoration Button
+---@return "normal"|"selected"
+function elements:GetTabState(decoration)
+  return decoration.sonataTabState or "normal"
+end
+
 ---@param fontString FontString
 ---@param style table
 function elements:StyleSectionHeader(fontString, style)

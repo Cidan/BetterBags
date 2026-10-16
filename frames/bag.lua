@@ -810,10 +810,6 @@ function bagFrame.bagProto:PlaceParts(ctx, decoration)
 
 	menuButton:Place(self.menuButton, layout.MenuButton, self.frame, overlay)
 	self:UpdateSearchShown()
-
-	if self.tabs then
-		self.tabs:Reload(ctx)
-	end
 	if self.slots and self.slots:IsShown() then
 		self.slots:Draw(ctx)
 	end

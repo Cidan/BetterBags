@@ -1521,6 +1521,48 @@ _G.__mockTemplates.InputScrollFrameTemplate = function(frame)
   frame.EditBox.Instructions = frame.EditBox:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 end
 
+-- PanelTabButtonTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): 10 x 32,
+-- the tab art Left/Middle/Right, their Active versions, their Highlight versions (alpha 0.4),
+-- and the Text button text at CENTER 0, 2. BetterBags' BetterBagsSecureBagTabTemplate
+-- (templates/container.xml) is PanelTabButtonTemplate + InsecureActionButtonTemplate.
+_G.__mockTemplates.PanelTabButtonTemplate = function(frame)
+  frame:SetSize(10, 32)
+  for _, key in ipairs({ "LeftActive", "RightActive", "MiddleActive", "Left", "Right", "Middle" }) do
+    frame[key] = frame:CreateTexture(nil, "BACKGROUND")
+  end
+  for _, key in ipairs({ "LeftHighlight", "MiddleHighlight", "RightHighlight" }) do
+    frame[key] = frame:CreateTexture(nil, "HIGHLIGHT")
+    frame[key]:SetAlpha(0.4)
+  end
+  frame.Text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  frame.Text:SetPoint("CENTER", frame, "CENTER", 0, 2)
+  frame:SetFontString(frame.Text)
+end
+_G.__mockTemplates.BetterBagsSecureBagTabTemplate = _G.__mockTemplates.PanelTabButtonTemplate
+
+-- PanelTemplates_TabResize(tab, padding, absoluteSize, minWidth, maxWidth, absoluteTextSize)
+-- (SharedUIPanelTemplates.lua; TAB_SIDES_PADDING is 20).
+function _G.PanelTemplates_TabResize(tab, padding, absoluteSize, minWidth, maxWidth, absoluteTextSize)
+  local sidesPadding = 20
+  tab.Text:SetWidth(absoluteTextSize or 0)
+  local textWidth = tab.Text:GetStringWidth()
+  local width = textWidth + sidesPadding + (padding or 0)
+  local sideWidths = tab.Left:GetWidth() + tab.Right:GetWidth()
+  minWidth = minWidth or sideWidths
+  if absoluteSize then
+    width = absoluteSize < sideWidths and sideWidths or absoluteSize
+    textWidth = width - sidesPadding - (padding or 0)
+  elseif maxWidth and width > maxWidth then
+    width = maxWidth
+    textWidth = width - sidesPadding - (padding or 0)
+  elseif minWidth and width < minWidth then
+    width = minWidth
+    textWidth = width - sidesPadding - (padding or 0)
+  end
+  tab.Text:SetWidth(textWidth)
+  tab:SetWidth(width)
+end
+
 _G.UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING = 25
 _G.__mockTemplates.UIDropDownMenuTemplate = function(frame)
   frame.Left = frame:CreateTexture(nil, "ARTWORK")
@@ -1612,6 +1654,14 @@ function _G.GameTooltip:SetOwner(owner, anchor, x, y)
 end
 function _G.GameTooltip:AddLine(text, r, g, b)
   table.insert(self.lines, {text = text, r = r, g = g, b = b})
+end
+-- GameTooltip:IsOwned(frame) is true when frame owns the tooltip.
+function _G.GameTooltip:IsOwned(frame)
+  return self._owner == frame
+end
+-- GetAppropriateTooltip() (Blizzard_SharedXMLBase/FrameUtil.lua): GameTooltip in game.
+function _G.GetAppropriateTooltip()
+  return _G.GameTooltip
 end
 function _G.GameTooltip:AddDoubleLine(left, right, lr, lg, lb, rr, rg, rb)
   table.insert(self.doubleLines, {left = left, right = right, lr = lr, lg = lg, lb = lb, rr = rr, rg = rg, rb = rb})

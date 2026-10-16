@@ -254,4 +254,29 @@ describe("Section Frame", function()
       assert.is_false(s2.removeHeader)
     end)
   end)
+
+  describe("Dragging a section", function()
+    it("puts every tab of both bags back in its state when a drag ends", function()
+      local tabsModule, created = StubBetterBagsModule("Tabs")
+      local saved = { reset = rawget(tabsModule, "ResetDropHighlights"), bags = addon.Bags, hide = GameTooltip.Hide }
+      local reset, hidden = {}, 0
+      tabsModule.ResetDropHighlights = function(_, bar) table.insert(reset, bar) end
+      GameTooltip.Hide = function() hidden = hidden + 1 end
+      local backpackTabs, bankTabs = {}, {}
+      addon.Bags = { Backpack = { tabs = backpackTabs }, Bank = { tabs = bankTabs } }
+      finally(function()
+        tabsModule.ResetDropHighlights = saved.reset
+        addon.Bags = saved.bags
+        GameTooltip.Hide = saved.hide
+        if created then ResetModuleStub("Tabs") end
+      end)
+      sectionFrame:ResetTabHighlights()
+      assert.are.same({ backpackTabs, bankTabs }, reset)
+      assert.are.equal(1, hidden)
+      reset = {}
+      addon.Bags = { Bank = { tabs = bankTabs } }
+      sectionFrame:ResetTabHighlights()
+      assert.are.same({ bankTabs }, reset)
+    end)
+  end)
 end)

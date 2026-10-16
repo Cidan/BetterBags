@@ -202,7 +202,20 @@ Details:
 - `SetTabState(tab, "normal"|"selected"|"drop")` replaces toggling the template's art by hand
   (`frames/tabs.lua` `SelectTab`/`DeselectTab`, the drag highlight): `drop` (a section dragged
   over the tab) shows the active art without moving the text, and keeps the selected tab's
-  idle art hidden. Selecting sets `GameFontHighlightSmall` as the disabled font, as
+  idle art hidden. `GetTabState(tab)` returns the stored state (`normal` or `selected`; a drop
+  is never stored), which the drag code sets back when the drag leaves or ends.
+- **Tab decorations** (`frames/tabs.lua`): `Tabs:GetDecoration(ctx, tab)` makes each tab's
+  decoration once (`tab.decoration`), from `BetterBagsSecureBagTabTemplate` (Blizzard's
+  `PanelTabButtonTemplate` + `InsecureActionButtonTemplate` on retail, BetterBags' own art on
+  Classic), on the tab at TOPLEFT, clicking the secure purchase button for purchase tabs,
+  shown once out of combat, and registers it as a `Tab` element. The text is measured in the
+  theme's font (the old forced `GameFontNormalSmall` is gone) and the tab is as tall as the
+  decoration (the style's `Height`). `Tabs:Init()` (core/init.lua, after Sonata) keeps every
+  bar `Tabs:Create` makes and reloads each on `sonata/ThemeChanged`, which Sonata sends after
+  restyling every element, so the widths follow the new fonts; the bag window no longer
+  reloads its tabs when it is decorated (that ran before the elements were restyled). A drag
+  that ends resets both bags' bars (`Tabs:ResetDropHighlights`). Coverage:
+  `spec/frames/tabs_spec.lua`, `spec/frames/section_spec.lua` ("Dragging a section"). Selecting sets `GameFontHighlightSmall` as the disabled font, as
   `PanelTemplates_SelectTab` does; text offsets come from the template (`selectedTextY`, ...)
   or `PanelTemplates_*`'s defaults (2 and -3).
 - Fonts set on button states (tabs, buttons) must be font objects: a button re-applies its

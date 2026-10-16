@@ -303,13 +303,10 @@ end
 -- SetupPlusTabTooltip adds a tooltip to the "+" tab.
 ---@param ctx Context
 function backpack.proto:SetupPlusTabTooltip(ctx)
-	---@class Themes: AceModule
-	local themes = addon:GetModule("Themes")
-
 	-- Find the tab by ID
 	for _, tab in pairs(self.bag.tabs.tabIndex) do
 		if tab.id == NEW_GROUP_TAB_ID then
-			local decoration = themes:GetTabButton(ctx, tab)
+			local decoration = tabs:GetDecoration(ctx, tab)
 			decoration:SetScript("OnEnter", function(f)
 				GameTooltip:SetOwner(f, "ANCHOR_TOP")
 				GameTooltip:SetText(L:G("New Group..."), 1, 1, 1, 1, true)

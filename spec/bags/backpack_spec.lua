@@ -7,7 +7,6 @@ _G.GameTooltip.IsOwned = _G.GameTooltip.IsOwned or function() return false end
 describe("Backpack Module Loading and Compatibility Tests", function()
   local oldModules = {}
   local oldAddons = {}
-  local oldGetTabButton
 
   before_each(function()
     -- Only clear BackpackBehavior so we can load it fresh for era/classic behavior
@@ -180,26 +179,15 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     LoadBetterBagsModule("core/database.lua")
     LoadBetterBagsModule("data/groups.lua")
 
-    -- Mock/Stub Themes before loading Tabs
-    local themes = StubBetterBagsModule("Themes")
-    oldGetTabButton = themes.GetTabButton
-    themes.GetTabButton = function(self, ctx, tab)
-      local decoration = CreateFrame("Button")
-      decoration.Enable = decoration.Enable or function() end
-      decoration.Disable = decoration.Disable or function() end
-      decoration.SetDisabledFontObject = decoration.SetDisabledFontObject or function() end
-      decoration.Text = decoration:CreateFontString()
-      decoration.Text.SetFontObject = decoration.Text.SetFontObject or function() end
-      decoration.Left = decoration:CreateTexture()
-      decoration.Middle = decoration:CreateTexture()
-      decoration.Right = decoration:CreateTexture()
-      decoration.LeftActive = decoration:CreateTexture()
-      decoration.MiddleActive = decoration:CreateTexture()
-      decoration.RightActive = decoration:CreateTexture()
-      return decoration
-    end
-
+    -- Tabs draw their decorations through Sonata's element styles.
+    LoadBetterBagsModule("core/async.lua")
+    LoadBetterBagsModule("sonata/engine.lua")
+    LoadBetterBagsModule("sonata/apply.lua")
+    LoadBetterBagsModule("sonata/elements.lua")
+    addon:GetModule("Sonata"):Init()
+    ResetModuleStub("Tabs", "frames/tabs.lua")
     LoadBetterBagsModule("frames/tabs.lua")
+    addon:GetModule("Tabs"):Init()
 
     -- Setup database defaults
     local DB = addon:GetModule("Database")
@@ -209,10 +197,6 @@ describe("Backpack Module Loading and Compatibility Tests", function()
   end)
 
   after_each(function()
-    -- Restore themes
-    local themes = addon:GetModule("Themes")
-    themes.GetTabButton = oldGetTabButton
-
     -- Restore original modules to not affect other tests
     addon.modules["BackpackBehavior"] = oldModules["BackpackBehavior"]
     aceAddon.addons["BetterBags_BackpackBehavior"] = oldAddons["BackpackBehavior"]

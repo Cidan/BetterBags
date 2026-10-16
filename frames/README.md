@@ -262,6 +262,10 @@ Tab management for bank views.
 
 `SetTabsDisabled(disabled)` sets a `tabsDisabled` flag on the tab container and dims the tab bar to 50% alpha when disabled. While disabled, all `OnClick` and `OnMouseDown` handlers silently return early, preventing tab switching and drag-to-reorder. Note: the bank slots panel no longer uses `SetTabsDisabled`; it instead completely hides the tabs frame via `frame:Hide()` / `frame:Show()` for a cleaner visual transition.
 
+**Decorations and Themes:**
+
+Each tab has one decoration, `tabs:GetDecoration(ctx, tab)`, made once from `BetterBagsSecureBagTabTemplate` and styled by Sonata as a `Tab` element (`.claude/rules/sonata.md`). States go through `SonataElements:SetTabState` (normal, selected, drop). Every bar is measured again on `sonata/ThemeChanged`, since the theme sets the tabs' font and height.
+
 **Icon-Only Tab Sizing:**
 
 Tabs that display only an icon (no text label), such as the '+' new-group button, use `PanelTemplates_TabResize(decoration, nil, 50)` to enforce a 50-pixel minimum width. Without this minimum, the tab renderer returns only the width of the left and right edge textures (~20px), making icon-only tabs noticeably narrower than adjacent text tabs. Passing `50` as the third argument ensures they visually match a typical short-label tab (e.g. "Bank").

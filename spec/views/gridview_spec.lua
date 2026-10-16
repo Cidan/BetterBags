@@ -17,17 +17,7 @@ items.GetItemDataFromSlotKey = function() return nil end
 items.GetCategory = function() return "TestCategory" end
 
 local themes = StubBetterBagsModule("Themes")
-themes.GetTabButton = function() return {} end
 themes.GetFlatHeaderHeight = function() return 12 end
-themes.GetItemButton = function()
-  return {
-    ItemSlotBackground = { Hide = function() end },
-    UpgradeIcon = { SetShown = function() end },
-    IconBorder = { SetTexture = function() end, SetBlendMode = function() end, SetTexCoord = function() end },
-    SetHasItem = function() end,
-    SetItemButtonTexture = function() end,
-  }
-end
 
 local database = StubBetterBagsModule("Database")
 database.GetBagSizeInfo = function()

@@ -84,6 +84,7 @@ globals = {
 	"ElvUI",
 	"floor",
 	"format",
+	"GameFontHighlight",
 	"GameFontHighlightSmall",
 	"GameFontNormalSmall",
 	"GameTooltip",

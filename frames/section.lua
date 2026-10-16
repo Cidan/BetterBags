@@ -363,34 +363,15 @@ function sectionFrame:HideDragGhost()
   end
 end
 
--- Reset tab highlights after dragging ends
+-- ResetTabHighlights puts every tab of both bags back in its state after a drag ends.
 function sectionFrame:ResetTabHighlights()
-  local ctx = context:New("ResetTabHighlights")
-
-  local backpackBag = addon.Bags.Backpack
-  if backpackBag and backpackBag.tabs then
-    for i, tab in ipairs(backpackBag.tabs.tabIndex) do
-      if tab:IsShown() and i ~= backpackBag.tabs.selectedTab then
-        local decoration = themes:GetTabButton(ctx, tab)
-        decoration.LeftActive:Hide()
-        decoration.MiddleActive:Hide()
-        decoration.RightActive:Hide()
-      end
+  local tabs = addon:GetModule("Tabs")
+  local bags = addon.Bags or {}
+  for _, bag in ipairs({ bags.Backpack or false, bags.Bank or false }) do
+    if bag and bag.tabs then
+      tabs:ResetDropHighlights(bag.tabs)
     end
   end
-
-  local bankBag = addon.Bags.Bank
-  if bankBag and bankBag.tabs then
-    for i, tab in ipairs(bankBag.tabs.tabIndex) do
-      if tab:IsShown() and i ~= bankBag.tabs.selectedTab then
-        local decoration = themes:GetTabButton(ctx, tab)
-        decoration.LeftActive:Hide()
-        decoration.MiddleActive:Hide()
-        decoration.RightActive:Hide()
-      end
-    end
-  end
-
   GameTooltip:Hide()
 end
 

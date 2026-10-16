@@ -184,7 +184,6 @@ local function stubModules()
   override(themes, "RegisterSectionFont", function() end)
   override(themes, "RegisterPortraitWindow", function() end)
   override(themes, "SetSearchState", function() end)
-  override(themes, "GetTabButton", function() return {} end)
 
   local sort = stubModule("Sort")
   override(sort, "GetItemSortBySlot", function() end)
