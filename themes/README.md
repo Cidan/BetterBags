@@ -61,7 +61,7 @@ WINDOW_KIND = {
 | `ApplyTheme(ctx, key)` | Apply theme to all windows | `Context`, `string` | - |
 | `GetCurrentTheme()` | Get active theme | - | `Theme` |
 | `GetAllThemes()` | Get available themes | - | `table<string, Theme>` |
-| `UpdateOpacity()` | Update frame opacity | - | - |
+| `UpdateOpacity()` | Re-apply every window's opacity: a bag window's own bag setting (the Backpack and Bank sliders are separate), the Backpack's for other windows | - | - |
 | `SetTitle(frame, title)` | Set frame title | `Frame`, `string` | - |
 | `GetFlatHeaderHeight(frame)` | Get flat frame header height for layout | `Frame` | `number` |
 
@@ -231,6 +231,7 @@ Every theme must implement the following interface:
 **Opacity(frame, alpha)** - Handle opacity changes
 - Update backdrop alpha
 - Maintain visibility
+- Called by `ApplyTheme`, `UpdateOpacity` and window registration with the window's own value: a bag window (portrait window, `frame.Owner.kind`) gets its bag's opacity setting, every other window the Backpack's
 
 **SectionFont(font)** - Style section headers
 - Set font object

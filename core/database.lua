@@ -434,27 +434,6 @@ function DB:DeleteItemCategory(category)
   end
 end
 
--- PruneOrphanedSectionSort removes pinned-sort ("Pinned" list) entries whose
--- category no longer exists in either the persistent (customCategoryFilters) or
--- persisted-ephemeral (ephemeralCategoryFilters) stores. Such orphans were left
--- behind by the old DeleteItemCategory (which did not scrub customSectionSort),
--- and the config pane's LoadPinnedItems would resurface them forever as
--- undeletable "dynamic" categories. Called once from Migrate to self-heal
--- existing profiles; new deletes no longer create orphans.
-function DB:PruneOrphanedSectionSort()
-  for _, kind in pairs(const.BAG_KIND) do
-    local sort = DB.data.profile.customSectionSort[kind]
-    if sort then
-      for name in pairs(sort) do
-        if DB.data.profile.customCategoryFilters[name] == nil
-          and DB.data.profile.ephemeralCategoryFilters[name] == nil then
-          sort[name] = nil
-        end
-      end
-    end
-  end
-end
-
 -- The name GetCategory now gives a category whose name repeated its item type
 -- ("Quest - Quest" is "Quest", "Quest - Quest - Classic" is "Quest - Classic"), or nil.
 ---@param name string
@@ -470,9 +449,9 @@ local function nameWithoutRepeatedType(name)
   return nil
 end
 
--- RenameRepeatedTypeCategories moves the hidden state and group assignments saved under
--- a category name that repeated its item type (issue #183) to the category's current
--- name. Custom categories keep their names, and a setting already saved under the
+-- RenameRepeatedTypeCategories moves the hidden state, group assignments and pinned order
+-- saved under a category name that repeated its item type (issue #183) to the category's
+-- current name. Custom categories keep their names, and a setting already saved under the
 -- current name wins.
 function DB:RenameRepeatedTypeCategories()
   local profile = DB.data.profile
@@ -496,6 +475,9 @@ function DB:RenameRepeatedTypeCategories()
 
   renameKeys(profile.categoryOptions)
   for _, kind in pairs(const.BAG_KIND) do
+    if type(profile.customSectionSort[kind]) == "table" then
+      renameKeys(profile.customSectionSort[kind])
+    end
     local groupsByName = profile.categoryToGroup[kind]
     if type(groupsByName) == "table" then
       renameKeys(groupsByName)
@@ -1568,11 +1550,6 @@ function DB:Migrate()
 
   -- Quest items are no longer named "Quest - Quest"; their settings follow the new name.
   DB:RenameRepeatedTypeCategories()
-
-  -- Heal profiles corrupted by the old DeleteItemCategory, which left pinned
-  -- categories behind in customSectionSort so they resurfaced as undeletable
-  -- "dynamic" categories.
-  DB:PruneOrphanedSectionSort()
 end
 
 -- ============================================================

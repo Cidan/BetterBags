@@ -853,6 +853,11 @@ _G.Enum.ItemClass = {
   Quiver = 11,
 }
 
+-- C_ActionBar.ShouldShowKeyring() -> isKeyringEnabled (WoW: Forever only,
+-- ActionBarFrameDocumentation.lua). Specs set _G._keyringEnabled = false to turn it off.
+_G.C_ActionBar = _G.C_ActionBar or {}
+_G.C_ActionBar.ShouldShowKeyring = function() return _G._keyringEnabled ~= false end
+
 -- C_Bank Setup
 _G.C_Bank = _G.C_Bank or {}
 _G.C_Bank.FetchDepositedMoney = function(bankType)

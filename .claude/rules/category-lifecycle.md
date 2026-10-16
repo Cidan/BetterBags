@@ -44,13 +44,25 @@ its (non-existent) contents. It is **self-perpetuating**: `UpdatePinnedItems` re
 touched. Coverage: `spec/database_spec.lua` ("DeleteItemCategory scrubs pinned sort, options,
 and group for all kinds", "…scrubs grouped sub-categories from side tables").
 
-## 3. Self-heal existing corrupted profiles
+## 3. Pins are never pruned at load (issue #1107)
 
-`DB:PruneOrphanedSectionSort()` (called once from `DB:Migrate`) removes every
-`customSectionSort[kind]` entry whose name exists in **neither** `customCategoryFilters` **nor**
-`ephemeralCategoryFilters` — i.e. a delete-orphan. Valid persistent and persisted-ephemeral
-(dynamic/groupBy) pins are keyed by a real store entry and are preserved. Coverage:
-`spec/database_spec.lua` ("PruneOrphanedSectionSort drops pins with no backing category…").
+**Rule:** nothing at load drops a pin because its name has no category store entry. Built-in
+categories ("Armor", "Junk", "Miscellaneous", named by `items:GetCategory`, §5) have no entry
+in `customCategoryFilters` or `ephemeralCategoryFilters` by design, and they can be pinned like
+any other (the config pane lists the bag's sections as well as the stored categories).
+
+**Failure mode (#1107, v0.5.5 to this fix):** `DB:PruneOrphanedSectionSort()` ran from
+`DB:Migrate`, which runs on **every** load, and removed every pin whose name was in neither
+store, to heal delete-orphans from the old `DeleteItemCategory`. That is every built-in category:
+pins of custom categories survived a reload and pins of built-in ones did not ("other, junk,
+armor", issue #1119). At load no items have been read, so there is no way to tell a built-in
+category from a leftover, and the prune was removed (not narrowed).
+
+Orphans are handled without it: deletes no longer create them (§2), every profile that loaded
+v0.5.5 or later was already pruned once, and any orphan left in an older profile still has the
+"Remove Category" button (§4). Coverage: `spec/database_migration_spec.lua` ("pinned categories
+across a load") and `spec/debug_dump_harness_spec.lua` ("keeps every pinned category of a real
+profile across a load, built-in ones included", on the real profile in `test.lua`).
 
 ## 4. UI escape hatch for any unfindable category
 
@@ -59,11 +71,12 @@ calls `categories:DeleteCategory` on the selected name. Because `GetCategoryByNa
 the only route into that panel and genuine in-memory dynamic/groupBy categories are *findable*
 (they route to the manual/search panels instead), everything reaching this panel is effectively
 an orphan or a persisted-but-unloaded ephemeral — both are safe to scrub. This covers the
-sub-case a migration prune cannot (a non-dynamic ephemeral pin still present in
+sub-case §2 cannot (a non-dynamic ephemeral pin still present in
 `ephemeralCategoryFilters` but never reloaded into memory by the `if category.dynamic` guard in
-`categories:OnEnable`). Do **not** drop that reload guard to "fix" this — it intentionally keeps
-transient non-dynamic ephemerals out of the list; the correct levers are the delete/prune
-scrub (§2, §3) and this removal button.
+`categories:OnEnable`), and orphans left by deletes made before §2. Do **not** drop that reload
+guard to "fix" this — it intentionally keeps transient non-dynamic ephemerals out of the list;
+the correct levers are the delete scrub (§2) and this removal button. A built-in category also
+reaches this panel (it has no filter); removing one only clears its pin, visibility and group.
 
 ## 5. Built-in category names, and settings that follow a renamed one
 
@@ -78,16 +91,14 @@ trade skill, expansion. Their settings live in the same side tables as a custom 
   subtype is now skipped when it equals the type added before it, so they read "Quest"
   (or "Quest - Classic" with Expansion). The subtype alone (Type off) is unchanged.
 - **Renaming a built-in category moves its settings.** `DB:RenameRepeatedTypeCategories`
-  (run from `DB:Migrate`, before `PruneOrphanedSectionSort`) moves `categoryOptions` and
+  (run from `DB:Migrate`) moves `categoryOptions`, `customSectionSort[kind]` and
   `categoryToGroup[kind]` entries (including the retail bank's per-bank-type tables) from a
   name that repeated its type to the current name. It skips custom and persisted-ephemeral
   categories (a user may have named one "X - X"), keeps a setting already saved under the
   current name, and ignores legacy name = group entries at the top level of
   `categoryToGroup` (left by profiles from before groups were split by bag kind; nothing
   reads them). It is idempotent: once renamed, no name repeats its type.
-- Pinned order is not moved: `PruneOrphanedSectionSort` (§3) drops the pins of every
-  built-in category on every load (open issue #1107), so there is nothing to carry over.
-  Any future change to how `GetCategory` composes names needs the same kind of migration.
+- Any future change to how `GetCategory` composes names needs the same kind of migration.
 
 Coverage: `spec/items_spec.lua` ("Category names from type and subtype (issue #183)") and
 `spec/database_migration_spec.lua` ("category names that repeated their item type"; each guard

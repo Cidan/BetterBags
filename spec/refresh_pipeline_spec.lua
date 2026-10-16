@@ -316,6 +316,32 @@ describe("Refresh pipeline (ProcessRefresh) data-phase correctness", function()
     resetCreatedStubs()
   end)
 
+  -- Issue #1121: on WoW: Forever the keyring (bag -1) is read with the backpack, as on
+  -- Classic Era, and its empty slots are not free space.
+  it("shows the items in the Forever keyring, without counting its slots as free space", function()
+    override(_G.Enum.BagIndex, "Keyring", -1)
+    override(const, "BACKPACK_BAGS", { [-1] = -1, [0] = 0, [1] = 1 })
+    override(_G.C_Container, "GetContainerNumFreeSlots", function(bagid)
+      local free = 0
+      for _, slot in ipairs(mockContainer[bagid] or {}) do
+        if not slot.itemID then free = free + 1 end
+      end
+      return free, 0
+    end)
+    mockContainer[-1] = { { itemID = 900, guid = "guid-key" }, {}, {} }
+    mockContainer[0] = { { itemID = 101, guid = "guid-101" }, {} }
+
+    local slotInfo = refreshBackpack({ wipe = true })
+
+    local key = slotInfo.itemsBySlotKey["-1_1"]
+    assert.is_not_nil(key)
+    assert.are.equal(900, key.itemInfo.itemID)
+    assert.is_not_nil(slotInfo:GetVisibleItems()["-1_1"])
+    local free = 0
+    for _, count in pairs(slotInfo.emptySlots) do free = free + count end
+    assert.are.equal(1, free)
+  end)
+
   it("clears the Recent Items status of an item that was only moved between slots", function()
     override(database, "GetCategoryFilter", function(_, _, filter) return filter == "RecentItems" end)
     mockContainer[0] = {

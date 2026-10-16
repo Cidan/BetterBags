@@ -273,6 +273,23 @@ describe("Database Migration", function()
     end)
   end)
 
+  -- Issue #1107: Migrate runs on every load, and used to drop every pin whose category is
+  -- neither custom nor persisted-ephemeral: every built-in category ("Armor", "Junk").
+  describe("pinned categories across a load", function()
+    it("keeps the pinned order of built-in and custom categories", function()
+      local profile = DB.data.profile
+      profile.customCategoryFilters = { Midnight = { name = "Midnight", itemList = {} } }
+      profile.ephemeralCategoryFilters = {}
+      profile.customSectionSort = {
+        [const.BAG_KIND.BACKPACK] = { Armor = 1, Junk = 2, Midnight = 3 },
+        [const.BAG_KIND.BANK] = { Reagent = 1 },
+      }
+      DB:Migrate()
+      assert.are.same({ Armor = 1, Junk = 2, Midnight = 3 }, profile.customSectionSort[const.BAG_KIND.BACKPACK])
+      assert.are.same({ Reagent = 1 }, profile.customSectionSort[const.BAG_KIND.BANK])
+    end)
+  end)
+
   -- Issue #183: GetCategory no longer repeats a subtype equal to its type, so "Quest - Quest"
   -- is now "Quest". Settings saved under the old name follow the category to its new name.
   describe("category names that repeated their item type", function()
@@ -284,6 +301,15 @@ describe("Database Migration", function()
       profile.customCategoryFilters = {}
       profile.ephemeralCategoryFilters = {}
       profile.categoryToGroup = { [const.BAG_KIND.BACKPACK] = {}, [const.BAG_KIND.BANK] = {} }
+      profile.customSectionSort = { [const.BAG_KIND.BACKPACK] = {}, [const.BAG_KIND.BANK] = {} }
+    end)
+
+    it("moves the pinned order to the new name", function()
+      profile.customSectionSort[const.BAG_KIND.BACKPACK] = { ["Quest - Quest"] = 4, Armor = 1 }
+      profile.customSectionSort[const.BAG_KIND.BANK] = { ["Key - Key"] = 2 }
+      DB:Migrate()
+      assert.are.same({ Quest = 4, Armor = 1 }, profile.customSectionSort[const.BAG_KIND.BACKPACK])
+      assert.are.same({ Key = 2 }, profile.customSectionSort[const.BAG_KIND.BANK])
     end)
 
     it("moves the hidden state to the new name", function()

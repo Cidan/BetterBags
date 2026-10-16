@@ -680,7 +680,17 @@ function items:GetBagName(bagid)
   if isBackpack then
     local isKeyring = Enum and Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
     local bagname = isKeyring and L:G('Keyring') or C_Container.GetBagName(bagid)
-    local displayid = isKeyring and 6 or bagid+1
+    local displayid = bagid + 1
+    if isKeyring then
+      -- After the last bag: #6 on Classic Era (bags 0-4), #7 on Forever (with the reagent bag).
+      local lastBag = 0
+      for id in pairs(const.BACKPACK_BAGS) do
+        if id ~= bagid and id > lastBag then
+          lastBag = id
+        end
+      end
+      displayid = lastBag + 2
+    end
     return string.format("#%d: %s", displayid, bagname or "Unknown")
   end
 

@@ -218,23 +218,23 @@ describe("Debug Dump Harness with test.lua", function()
     assert.is_not_nil(currentProfile)
   end)
 
-  it("PruneOrphanedSectionSort keeps real pinned categories and only drops true orphans", function()
+  -- Issue #1107: Migrate runs on every load and used to drop every pin of a built-in
+  -- category ("Armor", "Junk"), keeping only custom ones like the dump's "Midnight".
+  it("keeps every pinned category of a real profile across a load, built-in ones included", function()
     DB.data:SetProfile("Default")
     local sort = DB.data.profile.customSectionSort[0]
-    -- The real dump pins "Midnight", which is a genuine customCategoryFilters entry.
     assert.is_not_nil(sort, "dump should carry a backpack customSectionSort table")
     assert.is_not_nil(DB.data.profile.customCategoryFilters["Midnight"],
       "'Midnight' must be a real category in the dump")
     assert.are.equal(1, sort["Midnight"])
+    assert.is_nil(DB.data.profile.customCategoryFilters["Armor"])
 
-    -- Inject a pin with no backing category (an orphan) alongside the valid one.
-    sort["TotallyGoneCategory"] = 99
+    sort["Armor"] = 2
 
-    DB:PruneOrphanedSectionSort()
+    DB:Migrate()
 
-    -- Valid pin preserved, orphan removed — no regression to real pinned data.
     assert.are.equal(1, DB.data.profile.customSectionSort[0]["Midnight"])
-    assert.is_nil(DB.data.profile.customSectionSort[0]["TotallyGoneCategory"])
+    assert.are.equal(2, DB.data.profile.customSectionSort[0]["Armor"])
   end)
 
   it("should run the full items:ProcessRefresh pipeline using the dumped items", function()

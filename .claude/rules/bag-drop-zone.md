@@ -49,7 +49,8 @@ it: `"placed"`, `"returned"`, `"full"` or `"ignored"`.
      (`bit.band(C_Item.GetItemFamily(item), bagFamily) ~= 0`, family from
      `C_Container.GetContainerNumFreeSlots`), the retail reagent bag for a crafting reagent (it
      reports family 0; `const.BACKPACK_ONLY_REAGENT_BAGS` and `GetItemInfo`'s
-     `isCraftingReagent`), the Classic keyring for a key (family 256 when the client reports 0).
+     `isCraftingReagent`), the keyring for a key on Classic Era and WoW: Forever (family 256 when the
+     client reports 0; the Forever keyring is a backpack bag, camelot-forever.md §7).
   2. Else the first bag that holds anything (family 0), in order: backpack first, the order
      Blizzard's `EquipmentManager_PutItemInInventory` uses for unequipped gear.
   - A specialized bag the item does not fit is never used. A bag or quiver item reports the

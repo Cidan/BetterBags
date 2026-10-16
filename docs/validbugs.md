@@ -4,7 +4,9 @@ Triage date: 2026-10-15, against `main` at 20406c4.
 
 The 20 oldest open issues labeled `bug` (after closing duplicates) were checked against the
 current code. Ten no longer apply and were closed on GitHub with the reason. The ten below
-were still valid at triage; #175, #183 and #408 have since been fixed and closed (marked below).
+were still valid at triage. Since then #175, #183 and #408 were fixed and closed, #204 was
+closed as working as intended, and #291 was closed because it no longer reproduces (marked
+below). #1107 and #1121 (related findings) were fixed and closed too.
 
 Each entry says what was **verified** (read in the code, the Blizzard UI source under
 `.libraries/wow-ui-source`, or the external addon's source) and what is **inferred** (traced
@@ -14,10 +16,10 @@ from code, not shown by a capture). No in-game capture was taken for any of them
 |---|---|---|---|
 | [#175](https://github.com/Cidan/BetterBags/issues/175) | Retail, non-Latin locales | Category item list font | Verified; **fixed** |
 | [#183](https://github.com/Cidan/BetterBags/issues/183) | All | Category names | Verified; **fixed** |
-| [#204](https://github.com/Cidan/BetterBags/issues/204) | All | Currency bar | Verified |
+| [#204](https://github.com/Cidan/BetterBags/issues/204) | All | Currency bar | Verified; **closed, working as intended** |
 | [#279](https://github.com/Cidan/BetterBags/issues/279) | Retail + ConsolePort | Gamepad cursor | Never fixed; not reproduced |
 | [#280](https://github.com/Cidan/BetterBags/issues/280) | Retail + ConsolePort | Gamepad cursor | Never fixed; not reproduced |
-| [#291](https://github.com/Cidan/BetterBags/issues/291) | Retail | Section clipping | Verified |
+| [#291](https://github.com/Cidan/BetterBags/issues/291) | Retail | Section clipping | Verified in code; **closed, does not reproduce** |
 | [#382](https://github.com/Cidan/BetterBags/issues/382) | Classic Era (and all) | Item loading | Inferred |
 | [#408](https://github.com/Cidan/BetterBags/issues/408) | All | Drag and drop | Verified; **fixed** |
 | [#437](https://github.com/Cidan/BetterBags/issues/437) | All | Window position | Inferred |
@@ -68,6 +70,9 @@ maximum and says so (`TokenFrameMixin:SetTokenWatched` in
 `Blizzard_TokenUI/Blizzard_TokenUI.lua`, `TOO_MANY_WATCHED_TOKENS`). The closed duplicates
 #677 (currencies overlapping the gold) and #694 (allow more than 7) are part of this.
 
+**Closed (working as intended):** 7 is the designed limit of the currency bar, and the README's
+"Show Currencies" section already says only the first 7 are shown.
+
 ## #279 and #280 — ConsolePort cursor keeps acting on BetterBags after it closes
 
 **Symptoms:** after closing the bag, the gamepad's plain Y button stops working (#279), and
@@ -97,6 +102,10 @@ bar. Cells start at x = 0, y = 0 of that box (`frames/grid.lua:464`, `:434`). Bl
 reached through `SetItemButtonQuality` (`frames/item.lua:573`), so 3 px on the left and 2 px
 on the top fall outside the clip. The reporter's frame stack screenshot shows the same nesting
 (`BetterBagsScrollGrid12` inside the bag's scroll box).
+
+**Closed (does not reproduce):** the maintainer does not see clipped pips on the current
+version, after the layout rework. The analysis above was code reading only; if clipped pips are
+reported again, the clipping scroll box around each section's cells is the place to look.
 
 ## #382 — Items can fail to appear until /reload
 
@@ -181,11 +190,13 @@ pixel. Nothing in the theme compensates for the bag's own scale.
   `themes:UpdateOpacity` apply the backpack's opacity to every window
   (`themes/themes.lua:82-83`, `:139-140`, `:293-298`, all reading
   `GetBagSizeInfo(const.BAG_KIND.BACKPACK, ...)`). Verified in code; no issue exists for it.
-- **WoW: Forever keyring** ([#1121](https://github.com/Cidan/BetterBags/issues/1121), still
-  open). The Classic Era keyring is scanned (`core/era/constants.lua` lists
-  `Enum.BagIndex.Keyring` in `BACKPACK_BAGS`), which is why #469 was closed. Forever loads only
-  `core/constants.lua`, whose `BACKPACK_BAGS` has no keyring, so the Forever keyring (bag -1,
-  camelot-forever.md §7) is never read.
+  **Fixed (#1133):** each bag window gets its own bag's opacity (`themes/README.md`).
+- **WoW: Forever keyring** ([#1121](https://github.com/Cidan/BetterBags/issues/1121)). The
+  Classic Era keyring is scanned (`core/era/constants.lua` lists `Enum.BagIndex.Keyring` in
+  `BACKPACK_BAGS`), which is why #469 was closed. Forever loads only `core/constants.lua`, whose
+  `BACKPACK_BAGS` had no keyring, so the Forever keyring (bag -1, camelot-forever.md §7) was
+  never read. **Fixed (#1133), issue closed:** it is read with the backpack while the game enables it
+  (camelot-forever.md §7). Not yet checked in game.
 
 - **Pinned built-in categories are lost on every load: the cause of
   [#1107](https://github.com/Cidan/BetterBags/issues/1107)** (and its duplicate #1119). `DB:Migrate`
@@ -194,7 +205,9 @@ pixel. Nothing in the theme compensates for the bag's own scale.
   `ephemeralCategoryFilters`. Built-in categories ("Armor", "Junk", "Miscellaneous") are in
   neither, so their pins are dropped at each load while custom categories keep theirs, which is
   what #1119 describes. The prune arrived in f9cf257, first released in v0.5.5; #1107 reports
-  v0.5.0 working. Verified in code; not captured.
+  v0.5.0 working. Verified in code; not captured. **Fixed (#1133), issue closed:** the prune was removed,
+  since no load-time check can tell a built-in category from a leftover
+  (category-lifecycle.md §3).
 
 ## Closed as no longer applying
 

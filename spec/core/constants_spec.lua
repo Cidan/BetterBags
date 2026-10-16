@@ -294,6 +294,61 @@ describe("Constants Module Offsets", function()
     end)
   end)
 
+  -- Issue #1121: Forever has a keyring (Enum.BagIndex.Keyring, Blizzard's KEYRING_CONTAINER),
+  -- read with the backpack as on Classic Era; live retail's enum keeps a Keyring member but
+  -- the game has no keyring.
+  describe("keyring (Forever only)", function()
+    local savedIsForever, savedHasWarbank
+
+    before_each(function()
+      savedIsForever = addon.isForever
+      savedHasWarbank = addon.hasWarbank
+      addon.modules["Constants"] = nil
+      local aceAddon = LibStub("AceAddon-3.0")
+      if aceAddon.addons["BetterBags_Constants"] then
+        aceAddon.addons["BetterBags_Constants"] = nil
+      end
+    end)
+
+    after_each(function()
+      addon.isForever = savedIsForever
+      addon.hasWarbank = savedHasWarbank
+    end)
+
+    it("reads the keyring with the backpack on Forever, without a bag slot button", function()
+      addon.isForever = true
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      local keyring = Enum.BagIndex.Keyring
+      assert.are.equal(keyring, const.BACKPACK_BAGS[keyring])
+      assert.are.equal(keyring, const.BACKPACK_ONLY_BAGS[keyring])
+      for _, bagid in ipairs(const.BACKPACK_ONLY_BAGS_LIST) do
+        assert.are_not.equal(keyring, bagid)
+      end
+      assert.is_nil(const.BANK_BAGS[keyring])
+    end)
+
+    it("has no keyring on live retail", function()
+      addon.isForever = nil
+      loadfile("core/constants.lua")("BetterBags")
+      local const = addon:GetModule("Constants")
+      assert.is_nil(const.BACKPACK_BAGS[Enum.BagIndex.Keyring])
+      assert.is_nil(const.BACKPACK_ONLY_BAGS[Enum.BagIndex.Keyring])
+    end)
+
+    -- Blizzard's own bags leave the keyring out while the game disables it
+    -- (ContainerFrame_IsHeldBag checks C_ActionBar.ShouldShowKeyring).
+    it("leaves the keyring out on Forever while the game disables it", function()
+      addon.isForever = true
+      _G._keyringEnabled = false
+      loadfile("core/constants.lua")("BetterBags")
+      _G._keyringEnabled = nil
+      local const = addon:GetModule("Constants")
+      assert.is_nil(const.BACKPACK_BAGS[Enum.BagIndex.Keyring])
+      assert.is_nil(const.BACKPACK_ONLY_BAGS[Enum.BagIndex.Keyring])
+    end)
+  end)
+
   describe("client flavor detection (WOW_PROJECT_ID)", function()
     local PROJECT_GLOBALS = {
       "WOW_PROJECT_ID", "WOW_PROJECT_MAINLINE", "WOW_PROJECT_CLASSIC",

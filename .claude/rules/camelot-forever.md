@@ -250,9 +250,23 @@ purchased tabs, showed only `-1: 32` because the free first tab hadn't been gran
 and concluded -1 was the "base bank." Adding it made the aggregate free-space counter read
 `keyring(32) + bank(48) = 80` when the real bank was 48, and would have surfaced 32 keyring slots
 as bank space. That change (and its `not addon.isForever` keyring-guard edits in `data/items.lua`)
-was reverted. The keyring guards in `Phase5_UpdateFreeSlots`/`Phase6_EnrichData`/`GetBagName`
-(`bagid == Enum.BagIndex.Keyring`) are correct as-is: -1 is not in `BACKPACK_BAGS` or `BANK_BAGS`,
-so it is simply never scanned.
+was reverted.
+
+**The keyring is read with the backpack (issue #1121).** `core/constants.lua` adds
+`Enum.BagIndex.Keyring` to `BACKPACK_BAGS` and `BACKPACK_ONLY_BAGS` when `addon.isForever` and
+`C_ActionBar.ShouldShowKeyring()` (Forever-only, "isKeyringEnabled", the check Blizzard's own
+`ContainerFrame_IsHeldBag` and `ItemUtil.IteratePlayerInventory` make; present since the first
+Forever build in the UI source mirror, 69913). Not in `BACKPACK_ONLY_BAGS_LIST`: like Classic
+Era, there is no bag slot button for it. Live retail's enum also has a `Keyring` member but no
+keyring, so the flag gates it, not the enum. Every backpack table consumer then covers it: the
+harvest, `BAG_UPDATE` routing (`refresh:OnEnable`), priming, the buttons created at boot (40 per
+bag; the keyring has about 32 slots), `GetBagFromBagID`, and the bag window as a drop target (keys
+go to the keyring first, nothing else does). The existing keyring guards apply as on Classic Era:
+`Phase5_UpdateFreeSlots` leaves its slots out of free space, and Show Bags names it "Keyring",
+numbered after the last bag (`items:GetBagName`: "#6" on Classic Era, "#7" on Forever, after the
+reagent bag). Coverage: `spec/core/constants_spec.lua` ("keyring (Forever only)"),
+`spec/items_spec.lua` ("keyring section name (Show Bags)"), `spec/refresh_pipeline_spec.lua`
+("shows the items in the Forever keyring, without counting its slots as free space").
 
 A Camelot bank that renders blank usually means the character owns no tab yet (the Purchase
 Bank button, §10, shows then). If it renders blank with tabs that *do* have slots, look at the

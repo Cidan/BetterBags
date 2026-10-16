@@ -120,7 +120,7 @@ This temporary view allows you to see your bags and the items within them how th
 
 ### Dropping Items Into Your Bags
 You can drop an item anywhere on the bag or bank window, not just on an empty slot: drag it there and let go, or pick it up and left-click the window. This is the quickest way to unequip gear, by dragging it from your character panel onto your bags.
-- The item goes into the first free slot of a bag made for it (a profession bag of its kind, the reagent bag for crafting reagents, the keyring for keys on Classic), otherwise into the first ordinary bag, starting with your backpack. It is never put in a special bag it doesn't fit.
+- The item goes into the first free slot of a bag made for it (a profession bag of its kind, the reagent bag for crafting reagents, the keyring for keys on Classic Era and WoW: Forever), otherwise into the first ordinary bag, starting with your backpack. It is never put in a special bag it doesn't fit.
 - Dropping on the bank window stores the item in the bank type you are looking at (your character bank or the Warband bank), starting with the tab you have selected.
 - An item you picked up from the same window goes back where it came from.
 - If there is no room, you get the usual "Inventory is full." message and the item stays on your cursor.
@@ -403,7 +403,7 @@ Search allows you to find items by the following indices (based on the item belo
 - `stackCount` or `count` (stackCount = 1) The number of items in the stack for the item. **NOTE:** Currently count only takes into account the stack size of the "base" stack when using virtual stacks. For example, a virtual stack of 20, 20, and 3 to total 43 items will only be matched with either 20 or 3, not both.
 - `class` (class = 4) The numeric representation of itemType.
 - `subclass` (subclass = 0) The numeric representation of itemSubtype. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/ItemType) for more information regarding class and subclass.
-- `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 5-10 (Classic) / 5-11 (MoP) / 6-11 (Retail) for bank bags, -1 for the bank (Classic/MoP), -2 for the keyring (Classic only), and 12-16 for warbank tabs. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/BagID) for specifics for each version of the game.
+- `bagid` (bagid = 2) The location of the bag containing the item. BagID is 0 for the main backpack, 1-4 for the bags, 5 for a reagent bag (Retail only), -1 for the main bank window, 5-10 (Classic) / 5-11 (MoP) / 6-11 (Retail) for bank bags, -1 for the bank (Classic/MoP), -2 for the keyring (Classic), -1 for the keyring (WoW: Forever), and 12-16 for warbank tabs. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/BagID) for specifics for each version of the game.
 - `slotid` (slotid = 11) The slot that the item is in, in the bag that contains it. Numbered from 1 to N for each bagID, where N is the size of the container.
 - `bindtype` (bindtype = 1) The binding type of the item returned by GetItemInfo(). 1 = BoP, 2 = BoE, 3 = BoU, 4 = Quest, 7 = BtA, 8 = BtW, 9 = WuE. See the [Warcraft Wiki](https://warcraft.wiki.gg/wiki/Enum.ItemBind) for specifics.
 
