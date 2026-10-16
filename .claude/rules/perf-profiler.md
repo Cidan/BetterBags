@@ -21,7 +21,7 @@ hand-placed timer that printed a number to the debug log) could not:
    single-bag refresh committing before the all-bags one) need the call trace (§4).
 
 `debug/profile.lua` was removed; its single call site (`frames/bag.lua` Draw) is covered by
-the automatic `Bag.Draw` / `View.Render` wrappers.
+the automatic `Bag.Draw` / `View.Bind` / `View.Layout` wrappers.
 
 ## 1. Files and modules
 
@@ -481,7 +481,7 @@ never sits in memory as tables. `--list` marks sessions that carry a trace.
 - **Data -> draw path:** arm "Capture next reload" to see login, or start a capture, open
   and close bags, loot, sort, then stop. The flame graph shows each `[event]` root, the
   refresh queue (`Refresh.RequestUpdate` / `_Step` / `_Resume`), each `Items.Phase*`, and the
-  render (`Bag.Draw`, `View.Render`, `GridFrame.*`, `Section.*`, `Item.*`).
+  render (`Bag.Draw`, `View.Bind`, `View.Layout`, `GridFrame.*`, `Section.*`, `Item.*`).
 - **Lag when using abilities:** start a capture with the bags open, use the abilities that
   lag, stop. Check the Frames view: the spikes, which `[event]` roots fired in them
   (`[event] BAG_UPDATE_COOLDOWN` and its `[bucket]` flush into `Bag.OnCooldown` ->

@@ -15,6 +15,12 @@ local itemFrame = addon:GetModule('ItemFrame')
 ---@class Categories: AceModule
 local categories = addon:GetModule('Categories')
 
+---@class Localization: AceModule
+local L = addon:GetModule('Localization')
+
+---@class Debug: AceModule
+local debug = addon:GetModule('Debug')
+
 ---@class Views: AceModule
 local views = addon:NewModule('Views')
 
@@ -37,22 +43,95 @@ local views = addon:NewModule('Views')
 ---@field rendering boolean True between BeginRender and FinishRender.
 ---@field claims table<Item, boolean>|nil The current pass's claimed buttons (see frames/bag.lua Draw).
 ---@field staleSections table<string, Section>|nil Last pass's sections not drawn again yet.
+---@field tabID number
+---@field sortRequired boolean
+---@field emptyGroupFrame? Frame The hint shown in an empty group tab.
 views.viewProto = {}
 addon:GetModule('Perf'):RegisterPrototype(views.viewProto, 'View')
 
 function views:OnEnable()
 end
 
+---@class (exact) ViewLayout
+---@field itemsPerRow number How many items a section puts in a row.
+---@field columns number How many columns of sections the view lays out.
+
+-- Bind puts the tab's data into the view: a section per category in the data's order, and a
+-- cell per item, gap and free slot, each item button drawn from its data. It ends the render
+-- pass (releasing the sections it did not draw again). Bind lays nothing out: Layout does,
+-- and can run again with other limits (a window being resized) without binding again.
 ---@param ctx Context
 ---@param bag Bag
 ---@param slotInfo SlotInfo
----@param callback fun()
-function views.viewProto:Render(ctx, bag, slotInfo, callback)
+function views.viewProto:Bind(ctx, bag, slotInfo)
+  local _ = bag
+  self:BeginRender(ctx)
+  self.isNew = false
+
+  local tabData = slotInfo.tabs and slotInfo.tabs[self.tabID] or {
+    items = {},
+    categories = {},
+  }
+
+  for _, catData in ipairs(tabData.categories) do
+    self:GetOrCreateSection(ctx, catData.name)
+  end
+
+  for _, item in ipairs(tabData.items) do
+    local slotkey = item.slotkey
+    local category = item.itemInfo and item.itemInfo.category or L:G("Everything")
+    local section = self:GetOrCreateSection(ctx, category)
+    if item.isItemGap then
+      section:AddCell(slotkey, { isGap = true, width = 37, height = 37 })
+    else
+      local itemButton = self:GetOrCreateItemButton(ctx, slotkey)
+      if item.isFreeSlot then
+        itemButton:SetFreeSlots(ctx, item, -1)
+      else
+        itemButton:SetItemFromData(ctx, item)
+      end
+      section:AddCell(slotkey, itemButton)
+    end
+    self:SetSlotSection(slotkey, section)
+  end
+
+  for sectionName, section in pairs(self.sections) do
+    local layout = slotInfo.sectionLayouts and slotInfo.sectionLayouts[sectionName]
+    if layout and layout.hideHeader then
+      section:RemoveHeader()
+    end
+  end
+
+  if self.emptyGroupFrame then
+    self.emptyGroupFrame:SetShown(self.tabID ~= nil and self.tabID > 1 and #tabData.categories == 0)
+  end
+
+  self.sortRequired = false
+  self.itemCount = slotInfo.totalItems
+  self:FinishRender(ctx)
+end
+
+-- Layout lays the bound sections out: each section puts layout.itemsPerRow items in a row,
+-- and the view arranges the sections in layout.columns columns. It returns the size it took.
+---@param ctx Context
+---@param layout ViewLayout
+---@return number width, number height
+function views.viewProto:Layout(ctx, layout)
   local _ = ctx
-  _ = bag
-  _ = slotInfo
-  _ = callback
-  error('Render method not implemented')
+  for _, section in pairs(self.sections) do
+    section:SetMaxCellWidth(layout.itemsPerRow)
+    section:Draw(self.kind, self.bagview, false, true)
+  end
+  self.content.maxCellWidth = layout.columns
+  self.content:Draw({
+    cells = self.content.cells,
+    maxWidthPerRow = ((37 + 4) * layout.itemsPerRow) + 16,
+    columns = layout.columns,
+  })
+  for _, section in pairs(self.sections) do
+    debug:WalkAndFixAnchorGraph(section.frame)
+  end
+  return self.content.contentWidth or 0, self.content.contentHeight or 0
 end
 
 ---@param oldSlotKey string

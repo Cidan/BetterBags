@@ -478,26 +478,26 @@ function bagFrame.bagProto:UpdateBagBounds(w, h)
 	end
 end
 
+-- BindGlobalSections puts this pass's Recent Items and Free Space data into the global
+-- sections (the header and footer of the bag, outside the tab views) and ends their part of
+-- the pass. LayoutGlobalSections lays them out.
 ---@param ctx Context
 ---@param slotInfo SlotInfo
----@return number headerW, number headerH, number footerW, number footerH
-function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
+function bagFrame.bagProto:BindGlobalSections(ctx, slotInfo)
 	self:BeginGlobalSections()
+	self.recentSection = nil
+	self.freeSpaceSection = nil
+	self.freeSpaceShowAll = false
 
 	if not self.headerContainer then
-		return 0, 0, 0, 0
+		return
 	end
 
 	local currentView = database:GetBagView(self.kind)
-	local sizeInfo = database:GetBagSizeInfo(self.kind, currentView)
 
-	-- 1. Scan and draw Recent Items inside self.headerContainer.
-	-- The Recent Items section must honor the ordered, gap-carrying layout the data
-	-- pipeline computed (slotInfo.sortedItems from BuildOrderedItems): it holds the
-	-- items in their stable, sorted positions and carries persistent empty gaps for
-	-- consumed/removed items. Iterating the unordered visible-item map (a hash) via
-	-- pairs() instead rendered Recent Items in an arbitrary order that re-shuffled on
-	-- every sweep and dropped every gap.
+	-- Recent Items follows the ordered, gap-carrying layout the data pipeline committed
+	-- (slotInfo.sortedItems from BuildOrderedItems), never a pairs() scan of the visible items:
+	-- that is the stable order, and the only place gaps for consumed items live.
 	local recentItems = {}
 	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
 		if slotInfo.sortedItems then
@@ -516,16 +516,12 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		end
 	end
 
-	local headerW, headerH = 0, 0
 	if #recentItems > 0 then
 		local recentSection = self:GetOrCreateGlobalSection(ctx, L:G("Recent Items"))
 		recentSection.frame:SetParent(self.headerContainer)
 		recentSection.frame:ClearAllPoints()
 		recentSection.frame:SetPoint("TOPLEFT", self.headerContainer, "TOPLEFT", 0, 0)
 		recentSection:SetTitle(L:G("Recent Items"))
-
-		recentSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-
 		for _, item in ipairs(recentItems) do
 			if item.isItemGap then
 				recentSection:AddCell(item.slotkey, { isGap = true, width = 37, height = 37 })
@@ -535,13 +531,11 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 				recentSection:AddCell(item.slotkey, itemButton)
 			end
 		end
-		headerW, headerH = recentSection:Draw(self.kind, currentView, false)
+		self.recentSection = recentSection
 	end
-	self.headerContainer:SetHeight(math.max(1, headerH))
 
-	-- 2. Draw Free Space inside self.footerContainer when this tab's data carries it: the data
-	-- phase leaves it out of a tab with no free slots (except SECTION_ALL_BAGS mode)
-	local footerW, footerH = 0, 0
+	-- Free Space only when this tab's data carries it: the data phase leaves it out of a tab
+	-- with no free slots.
 	local tabID = self:GetCurrentTabID()
 	local tabData = slotInfo.tabs and slotInfo.tabs[tabID] or slotInfo
 	local freeSpaceData = tabData.freeSpace
@@ -551,28 +545,54 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		freeSlotsSection.frame:ClearAllPoints()
 		freeSlotsSection.frame:SetPoint("TOPLEFT", self.footerContainer, "TOPLEFT", 0, 0)
 		freeSlotsSection:SetTitle(L:G("Free Space"))
-
 		if freeSpaceData.showAll then
-			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
 			for _, btn in ipairs(freeSpaceData.buttons) do
 				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
 				itemButton:SetFreeSlots(ctx, btn, 1, true)
 				freeSlotsSection:AddCell(btn.slotkey, itemButton)
 			end
-			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, true, true)
 		else
-			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
 			for _, btn in ipairs(freeSpaceData.buttons) do
 				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
 				itemButton:SetFreeSlots(ctx, btn, btn.count)
 				freeSlotsSection:AddCell(btn.key, itemButton)
 			end
-			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, false)
 		end
+		self.freeSpaceSection = freeSlotsSection
+		self.freeSpaceShowAll = freeSpaceData.showAll == true
 	end
-	self.footerContainer:SetHeight(math.max(1, footerH))
 
 	self:FinishGlobalSections(ctx)
+end
+
+-- LayoutGlobalSections lays the global sections out with the bag's layout: Recent Items and
+-- "show all" free space span every column; aggregated free space takes one section's row.
+---@param layout ViewLayout
+---@return number headerW, number headerH, number footerW, number footerH
+function bagFrame.bagProto:LayoutGlobalSections(layout)
+	local currentView = database:GetBagView(self.kind)
+	local headerW, headerH = 0, 0
+	if self.recentSection then
+		self.recentSection:SetMaxCellWidth(layout.itemsPerRow * layout.columns)
+		headerW, headerH = self.recentSection:Draw(self.kind, currentView, false)
+	end
+	if self.headerContainer then
+		self.headerContainer:SetHeight(math.max(1, headerH))
+	end
+
+	local footerW, footerH = 0, 0
+	if self.freeSpaceSection then
+		if self.freeSpaceShowAll then
+			self.freeSpaceSection:SetMaxCellWidth(layout.itemsPerRow * layout.columns)
+			footerW, footerH = self.freeSpaceSection:Draw(self.kind, currentView, true, true)
+		else
+			self.freeSpaceSection:SetMaxCellWidth(layout.itemsPerRow)
+			footerW, footerH = self.freeSpaceSection:Draw(self.kind, currentView, false)
+		end
+	end
+	if self.footerContainer then
+		self.footerContainer:SetHeight(math.max(1, footerH))
+	end
 	return headerW, headerH, footerW, footerH
 end
 
@@ -646,14 +666,17 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		tView:BeginRender(ctx, claims)
 	end
 
-	local headerW, headerH, footerW, footerH = self:DrawGlobalSections(ctx, slotInfo)
+	self:BindGlobalSections(ctx, slotInfo)
+	view:Bind(ctx, self, slotInfo)
+	self:FinishDrawPass(ctx, claims)
+	view:GetContent():Show()
+	self.currentView = view
 
-	view:Render(ctx, self, slotInfo, function()
-		self:FinishDrawPass(ctx, claims)
-		view:GetContent():Show()
-		self.currentView = view
-
-		local tabW, tabH = view.content.contentWidth or 0, view.content.contentHeight or 0
+	local sizeInfo = database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind))
+	local layout = { itemsPerRow = sizeInfo.itemsPerRow, columns = sizeInfo.columnCount }
+	local headerW, headerH, footerW, footerH = self:LayoutGlobalSections(layout)
+	local tabW, tabH = view:Layout(ctx, layout)
+	do
 		local totalW = tabW
 		local totalH = tabH
 		if self.tabContainer then
@@ -686,7 +709,7 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		events:SendMessage(ctx, "bag/RedrawIcons", self)
 		events:SendMessage(ctx, "bag/Rendered", self, slotInfo)
 		callback()
-	end)
+	end
 end
 
 function bagFrame.bagProto:KeepBagInBounds()

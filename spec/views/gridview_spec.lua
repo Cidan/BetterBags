@@ -164,6 +164,15 @@ LoadBetterBagsModule("views/bagview.lua")
 
 local context = addon:GetModule("Context")
 
+-- render binds a view's data and lays it out the way a bag sized to its content does: with
+-- the items per row and columns from the bag's settings.
+local function render(view, ctx, bag, slotInfo, callback)
+  view:Bind(ctx, bag, slotInfo)
+  local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
+  view:Layout(ctx, { itemsPerRow = sizeInfo.itemsPerRow, columns = sizeInfo.columnCount })
+  if callback then callback() end
+end
+
 describe("Phase 6 View Placement and Rendering Tests", function()
   after_each(function()
     ResetModuleStub("Localization", "core/localization.lua")
@@ -218,7 +227,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     }
 
     local rendered = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function()
+    render(view, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
@@ -262,7 +271,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     local drawSpy = spy.on(view.content, "Draw")
 
     local rendered = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function()
+    render(view, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
@@ -274,6 +283,49 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     local drawOptions = drawCall.vals[2]
     assert.are.equal(221, drawOptions.maxWidthPerRow) -- ((37 + 4) * 5) + 16
     assert.are.equal(4, drawOptions.columns) -- sizeInfo.columnCount
+  end)
+
+  it("lays out again with new limits without binding again", function()
+    local parent = CreateFrame("Frame")
+    local view = views:NewGrid(parent, const.BAG_KIND.BACKPACK)
+    local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
+    local item1 = {
+      bagid = 0, slotid = 1, slotkey = "0_1", itemHash = "hash1", isItemEmpty = false,
+      itemInfo = { itemID = 1234, currentItemCount = 10, itemStackCount = 20, itemQuality = 1, itemIcon = 136,
+        isBound = false, category = "Things" },
+      questInfo = { isQuestItem = false },
+    }
+    local slotInfo = {
+      tabs = { [1] = { items = { item1 }, categories = { { name = "Things" } } } },
+      stacks = { GetStackInfo = function() return nil end },
+    }
+    view:Bind(context:New("test"), bag, slotInfo)
+    assert.is_false(view.rendering, "binding ends the pass")
+    local section = view:GetSection("Things")
+    local added, widths = 0, {}
+    section.AddCell = function() added = added + 1 end
+    section.SetMaxCellWidth = function(_, width) table.insert(widths, width) end
+    local drawSpy = spy.on(view.content, "Draw")
+
+    view:Layout(context:New("test"), { itemsPerRow = 3, columns = 1 })
+    view:Layout(context:New("test"), { itemsPerRow = 9, columns = 2 })
+
+    assert.are.equal(0, added)
+    assert.are.same({ 3, 9 }, widths)
+    local last = drawSpy.calls[#drawSpy.calls].vals[2]
+    assert.are.equal((37 + 4) * 9 + 16, last.maxWidthPerRow)
+    assert.are.equal(2, last.columns)
+  end)
+
+  it("returns the size it laid out to", function()
+    local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)
+    view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, { tabs = { [1] = { items = {}, categories = {} } } })
+    view.content.Draw = function(self)
+      self.contentWidth, self.contentHeight = 123, 45
+      return 123, 45
+    end
+    local w, h = view:Layout(context:New("test"), { itemsPerRow = 5, columns = 1 })
+    assert.are.same({ 123, 45 }, { w, h })
   end)
 
   it("should support polymorphic NewBagView views and place items correctly", function()
@@ -313,7 +365,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     }
 
     local rendered = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function()
+    render(view, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
@@ -353,7 +405,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     }
 
     local rendered = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function()
+    render(view, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
@@ -407,7 +459,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     }
 
     local rendered = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function()
+    render(view, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
@@ -477,7 +529,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     }
 
     local rendered = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function()
+    render(view, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
@@ -490,7 +542,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     local view2 = views:NewBagView(parent, const.BAG_KIND.BANK)
     view2.tabID = 13
     rendered = false
-    view2:Render(context:New("test"), bag, mockSlotInfo, function()
+    render(view2, context:New("test"), bag, mockSlotInfo, function()
       rendered = true
     end)
 
@@ -575,7 +627,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       end
 
       local rendered = false
-      view:Render(context:New("test"), bag, mockSlotInfo, function()
+      render(view, context:New("test"), bag, mockSlotInfo, function()
         rendered = true
       end)
 
@@ -644,7 +696,7 @@ describe("Phase 6 View Placement and Rendering Tests", function()
       }
 
       local rendered = false
-      view:Render(context:New("gap"), bag, slotInfo, function() rendered = true end)
+      render(view, context:New("gap"), bag, slotInfo, function() rendered = true end)
 
       return rendered, addedCells, requestedButtons
     end

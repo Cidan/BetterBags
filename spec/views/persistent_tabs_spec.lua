@@ -214,6 +214,15 @@ LoadBetterBagsModule("views/bagview.lua")
 
 local context = addon:GetModule("Context")
 
+-- render binds a view's data and lays it out the way a bag sized to its content does: with
+-- the items per row and columns from the bag's settings.
+local function render(view, ctx, bag, slotInfo, callback)
+  view:Bind(ctx, bag, slotInfo)
+  local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
+  view:Layout(ctx, { itemsPerRow = sizeInfo.itemsPerRow, columns = sizeInfo.columnCount })
+  if callback then callback() end
+end
+
 describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function()
   local old_strsplit = _G.strsplit
   local old_split = string.split
@@ -331,7 +340,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     local ctx = context:New("test")
     ctx:Set("redraw", true)
     local bag = { kind = const.BAG_KIND.BANK, frame = CreateFrame("Frame") }
-    view:Render(ctx, bag, mockSlotInfo, function() end)
+    render(view, ctx, bag, mockSlotInfo, function() end)
 
     -- Assert that under the new refactored state-consistent logic,
     -- no ghost button is created when item data is nil.
@@ -404,13 +413,13 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       stacks = { GetStackInfo = function() end },
       totalItems = 0
     }
-    view:Render(ctx, bag, mockSlotInfo, function() end)
+    render(view, ctx, bag, mockSlotInfo, function() end)
     assert.is_false(view.emptyGroupFrame:IsShown())
 
     -- Now test custom tab ID > 1 (e.g., 2)
     local view2 = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 2) -- Tab 2
     assert.is_not_nil(view2.emptyGroupFrame)
-    view2:Render(ctx, bag, mockSlotInfo, function() end)
+    render(view2, ctx, bag, mockSlotInfo, function() end)
     -- Since totalItems is 0 and visible non-special section count is 0, emptyGroupFrame should show
     assert.is_true(view2.emptyGroupFrame:IsShown())
   end)
@@ -440,8 +449,8 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     local render1_called = false
     local render2_called = false
-    view1.Render = function(self, ...) render1_called = true; select(4, ...)(...) end
-    view2.Render = function(self, ...) render2_called = true; select(4, ...)(...) end
+    view1.Bind = function() render1_called = true end
+    view2.Bind = function() render2_called = true end
 
     local mockSlotInfo = {
       GetChangeset = function() return {}, {}, {} end,
@@ -486,7 +495,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     local view = bag:GetViewForTab(ctx, 1)
 
     local render_called = false
-    view.Render = function(self, ...) render_called = true; select(4, ...)(...) end
+    view.Bind = function() render_called = true end
 
     local mockSlotInfo = {
       GetChangeset = function() return {}, {}, {} end,
@@ -581,7 +590,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_nil(view.itemsByBagAndSlot["0_1"])
 
     local callbackCalled = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
+    render(view, context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
 
     assert.is_true(callbackCalled)
     assert.is_false(view.isNew)
@@ -627,7 +636,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_nil(view.itemsByBagAndSlot["0_1"])
 
     local callbackCalled = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
+    render(view, context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
 
     assert.is_true(callbackCalled)
     assert.is_false(view.isNew)
@@ -749,7 +758,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     -- Tab 1 (Character Bank)
     local view1 = views:NewGrid(parent, const.BAG_KIND.BANK, 1)
-    view1:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    render(view1, context:New("test"), bag, mockSlotInfo, function() end)
 
     -- Assert only charItem is drawn in view1
     assert.is_not_nil(view1.itemsByBagAndSlot["6_1"])
@@ -757,7 +766,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     -- Tab 2 (Account Bank)
     local view2 = views:NewGrid(parent, const.BAG_KIND.BANK, 2)
-    view2:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    render(view2, context:New("test"), bag, mockSlotInfo, function() end)
 
     -- Assert only warItem is drawn in view2
     assert.is_nil(view2.itemsByBagAndSlot["6_1"])
@@ -792,7 +801,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     -- Ensure no redraw or wipe flag is set in context
 
     local callback_called = false
-    view:Render(ctx, bag, mockSlotInfo, function() callback_called = true end)
+    render(view, ctx, bag, mockSlotInfo, function() callback_called = true end)
 
     assert.is_true(callback_called)
     -- We can verify it early exited without wiping or running full layout (view is still intact)
@@ -841,7 +850,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     }
 
     local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
-    view:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    render(view, context:New("test"), bag, mockSlotInfo, function() end)
 
     -- Under the buggy behavior, the item would be filtered out (not in view.itemsByBagAndSlot),
     -- and its section (which would be GetBagName(0) -> "#1: Backpack") would be hidden.
