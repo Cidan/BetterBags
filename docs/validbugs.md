@@ -6,6 +6,7 @@ and the ones still valid are listed here, unfixed.
 
 - [First batch](#first-batch-the-20-oldest): 2026-10-15, against `main` at 20406c4.
 - [Second batch](#second-batch-477-to-710): 2026-10-16, against `main` at 60b72a3 (v0.5.16).
+- [Lua error sweep](#lua-error-sweep): 2026-10-16, every open issue.
 
 # First batch: the 20 oldest
 
@@ -323,3 +324,27 @@ collapse them again after reading, the way the thread notes Altoholic does.
 #522 (use the item with the fewest charges first) and #584 (a `BetterBagsSearch()` global;
 `C_Container.SetItemSearch` itself can't drive BetterBags' search) are feature requests. Their
 `bug` label was removed and they stay open with the `feature` label. Neither is implemented.
+
+# Lua error sweep
+
+On 2026-10-16 every open issue was scanned for a reported Lua error (error text such as
+`attempt to ...`, `bad argument`, `ADDON_ACTION_FORBIDDEN`, or a BetterBags `.lua:<line>`
+location), and each match was read to confirm it. By the maintainer's decision, every confirmed
+Lua error filed more than two weeks earlier (before 2026-10-02) was closed with a comment asking
+for a new issue if it still happens on the latest version, without investigating the cause.
+
+| Issue | Reported on | Error |
+|---|---|---|
+| #730 | v0.3.18 | `util/sort.lua:108: attempt to compare string with nil` (empty bags) |
+| #740 | v0.3.18 | `data/categories.lua:161`: a plugin added a nonexistent item to a category |
+| #831 | v0.3.41 | `ADDON_ACTION_FORBIDDEN` using items after the bank |
+| #836 | Moonlight beta | `bag/stack.lua:225` (Moonlight code, not part of BetterBags) |
+| #956 | v0.4.7 | Disabling ElvUI with the ElvUI theme selected |
+
+Left open:
+- #1118 (`core/boot.lua:7: attempt to call a nil value` on WoW: Forever), filed 2026-10-07,
+  inside the two-week window.
+- Matches that are not Lua error reports: #443 (mentions AdiBags' errors), #1053 (says no Lua
+  errors occur).
+- Reports without error text: #279 (a ConsolePort binding stops working), #744 (an empty bag
+  window after switching bag addons).
