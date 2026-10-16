@@ -27,7 +27,7 @@ The main item management module that handles all item data operations including 
 - **Item Level Tracking**: Updates per-character max item level and notifies listeners for dynamic color scaling
 - **Bag Type Detection**: Identifies different bag types (normal, profession, reagent)
 - **Item Hashing**: Generates unique hashes for item stacking
-- **Category Assignment**: Determines item categories based on filters
+- **Category Assignment**: Determines item categories based on filters. Items no custom or search category claims are named from the enabled filters joined with " - ": item type, subtype, trade skill, expansion (`GetCategory`). A subtype equal to the type before it is skipped, so quest items read "Quest", not "Quest - Quest" (settings saved under old names are moved by `DB:RenameRepeatedTypeCategories`, `.claude/rules/category-lifecycle.md` §5)
 - **New Item Tracking**: Manages "new item" status with timers
 - **Equipment Data**: Handles equipped item information
 
