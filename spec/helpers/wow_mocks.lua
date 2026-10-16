@@ -790,6 +790,10 @@ local function CreateMockWidget(widgetType, name, parent)
     self._fontSize = size
     self._fontFlags = flags
   end
+  -- GetFont() -> fontFile, height, flags (SimpleFontAPIDocumentation.lua).
+  function widget:GetFont()
+    return self._font, self._fontSize, self._fontFlags or ""
+  end
   function widget:SetTextColor(r, g, b, a)
     self._textColor = {r = r, g = g, b = b, a = a or 1}
   end
@@ -1055,6 +1059,11 @@ local function CreateMockFont(name)
   return font
 end
 _G.CreateFont = CreateMockFont
+
+-- The font files of the default locale (Blizzard_Fonts_Shared/Shared/GameFonts.xml).
+_G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
+_G.UNIT_NAME_FONT = "Fonts\\FRIZQT__.TTF"
+_G.DAMAGE_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
 
 -- The client font objects BetterBags uses (Blizzard_Fonts_Shared FontStyles.xml / Fonts.xml):
 -- the font file, height, outline, shadow and NORMAL_FONT_COLOR (1, 0.82, 0),

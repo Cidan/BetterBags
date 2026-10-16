@@ -251,7 +251,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     StubBetterBagsModule("BankBehavior")
     -- Stubs this spec creates are torn down after each test (another spec file may load
     -- the real module later); modules that already existed are left alone.
-    for _, name in ipairs({ "BagMenuButton", "CursorPlacement", "Fonts" }) do
+    for _, name in ipairs({ "BagMenuButton", "BagActions", "CursorPlacement", "Fonts" }) do
       local _, created = StubBetterBagsModule(name)
       if created then
         table.insert(createdBagStubs, name)

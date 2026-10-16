@@ -315,12 +315,32 @@ overlay search panel).
   the default template. The bag's search box sits at 10, -40 to -10, -60 and the menu button at
   4, -6 at 85%.
 
+- **Guild Wars 2** (`GW2`, offered while GW2_UI is loaded, `GW2_ADDON`): GW2_UI's look from its
+  own art files (`Interface\AddOns\GW2_UI\Textures\...png`), calling nothing of GW2_UI's
+  (`CreateFrameHeaderWithBody`, `GwSkinButton`, `SkinBagSearchBox`). The bag: GW2's window
+  header (`bagheader.png` from 25 below the window's top, its width the window's less 20 capped
+  at 512, and `bagheader-right.png`), the 84px bag icon centered on the top left corner (-16,
+  0), the world map background below the header (not faded), the 40px side panel along the left
+  and the 55px footer; the title in GW2's header font (`DAMAGE_TEXT_FONT`, GW2's BigHeader size
+  + 2 and outline setting, LightHeader color) at the header's bottom left (35, 10); GW2's close
+  art on Blizzard's `UIPanelCloseButtonNoScripts` at TOPRIGHT -5, 14; no menu button
+  (`MenuButton = false`), and in the side panel four action buttons (window.md, "Action
+  buttons"): Show Bags, Sort, Settings and the menu, with GW2's micro-button icons, 32px, 5
+  apart from TOPLEFT -35, -40. Other windows: GW2's tooltip backdrop (32px edge, insets 2, not
+  faded) titled in `DAMAGE_TEXT_FONT` 16 at TOP 0, -5, GW2's close button at TOPRIGHT -1, -1 on
+  panels and flat windows. The search box: no caps, `bagsearchbg.png` 24 high across it, the
+  magnifier 10px at LEFT 6, text insets 20, `UNIT_NAME_FONT` at GW2's normal size in white.
+  Section titles `UnitFrame12White`. Its variables read `GW2_ADDON.settings.fonts`, with
+  GW2_UI's defaults (18, 14).
+
 Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
 bag panel, levels, title font, opacity, close button and content box; panels, flat windows,
 dialogs; slots panels on retail, Classic and Forever; section font) and
 `spec/sonata/theme_ports_spec.lua` (Simple Dark; the Moonlight set and its art; ElvUI against a
 stand-in engine: availability, the template in and outside pixel mode, titles and close
-button, Masque, item buttons, tabs, search box and buttons, bag layout). Every file in
+button, Masque, item buttons, tabs, search box and buttons, bag layout; Guild Wars 2: availability,
+the bag's header, panel, footer and background, its title and close button, the side buttons,
+the other windows, the search box). Every file in
 `sonata/themes/` is listed in every TOC after Base (`spec/render/toc_spec.lua`).
 
 ## 4. Load order

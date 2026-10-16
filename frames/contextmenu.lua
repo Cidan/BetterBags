@@ -96,6 +96,39 @@ local function enableTooltips(menu)
 	end
 end
 
+-- ToggleBagSlots shows or hides a bag's "Show Bags" panel and switches the bag to its
+-- physical view or back (the menu's Show Bags entry, and a theme's ShowBags action button). On
+-- the retail bank the panel is the bank tab filter, whose state is saved (showBankTabs). Bag
+-- slots cannot change in combat.
+---@param ctx Context
+---@param bag Bag
+function contextMenu:ToggleBagSlots(ctx, bag)
+	if InCombatLockdown() then
+		print("BetterBags: " .. L:G("Cannot toggle bag slots in combat."))
+		return
+	end
+	if not bag.slots then
+		return
+	end
+	local usesBankTabs = addon.isRetail and bag.kind == const.BAG_KIND.BANK
+	if bag.slots:IsShown() then
+		if usesBankTabs then
+			database:SetShowBankTabs(false)
+		end
+		database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
+		bag.slots:Hide()
+	else
+		if usesBankTabs then
+			database:SetShowBankTabs(true)
+		end
+		database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
+		database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
+		bag.slots:Draw(ctx)
+		bag.slots:Show()
+	end
+	events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
+end
+
 ---@param bag Bag
 ---@return MenuList[]
 function contextMenu:CreateContextMenu(bag)
@@ -259,31 +292,7 @@ function contextMenu:CreateContextMenu(bag)
 			tooltipTitle = L:G("Show Bags"),
 			tooltipText = L:G("Click to toggle the display of the bag slots."),
 			func = function()
-				if InCombatLockdown() then
-					print("BetterBags: " .. L:G("Cannot toggle bag slots in combat."))
-					return
-				end
-				if not bag.slots then
-					return
-				end
-				local ctx = context:New("ToggleBagSlots")
-				if bag.slots and bag.slots:IsShown() then
-					if usesBankTabs then
-						database:SetShowBankTabs(false)
-					end
-					database:SetBagView(bag.kind, database:GetPreviousView(bag.kind))
-					bag.slots:Hide()
-					events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
-				elseif bag.slots then
-					if usesBankTabs then
-						database:SetShowBankTabs(true)
-					end
-						database:SetPreviousView(bag.kind, database:GetBagView(bag.kind))
-						database:SetBagView(bag.kind, const.BAG_VIEW.SECTION_ALL_BAGS)
-					bag.slots:Draw(ctx)
-					bag.slots:Show()
-					events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true })
-				end
+				contextMenu:ToggleBagSlots(context:New("ToggleBagSlots"), bag)
 			end,
 		})
 	end

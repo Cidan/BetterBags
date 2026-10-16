@@ -221,6 +221,7 @@ local function stubModules()
   local contextMenu = stubModule("ContextMenu")
   override(contextMenu, "CreateContextMenu", function() return {} end)
   stubModule("BagMenuButton")
+  stubModule("BagActions")
   stubModule("SearchBox")
   override(database, "GetBagPosition", function() return {} end)
   override(database, "GetBagSizeMode", function() return "content" end)
@@ -1322,6 +1323,11 @@ describe("Bag Draw: shared item button ownership across global sections and view
       override(menuButton, "Place", function(_, button, layout, frame, overlay)
         table.insert(placed, { button = button, layout = layout, frame = frame, overlay = overlay })
       end)
+      local bagActions = addon:GetModule("BagActions")
+      override(bagActions, "Create", function(_, bag) return { bag = bag, buttons = {} } end)
+      override(bagActions, "Place", function(_, actions, layout, frame, overlay)
+        table.insert(placed, { actions = actions, layout = layout, frame = frame, overlay = overlay })
+      end)
     end)
 
     -- partsBag builds a bag with its window and parts, decorated with a theme whose bag
@@ -1336,6 +1342,7 @@ describe("Bag Draw: shared item button ownership across global sections and view
             { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -10, Y = -50 } }, Reserve = 20 },
           Footer = { Left = 6, Right = 6, Bottom = 6, Height = 20, Reserve = 26 },
           MenuButton = { Points = { { Point = "TOPLEFT", X = -10, Y = 7 } } },
+          Actions = { Size = 32, Buttons = { { Action = "Sort" } } },
         },
       } } })
       sonata:RegisterTheme({ Name = "Default" })
@@ -1472,11 +1479,19 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.same({ "BOTTOMLEFT", bag.frame, "BOTTOMLEFT", 6, 6 }, { bag.bottomBar:GetPoint(1) })
       assert.are.same({ "BOTTOMRIGHT", bag.frame, "BOTTOMRIGHT", -6, 6 }, { bag.bottomBar:GetPoint(2) })
       assert.are.equal(20, bag.bottomBar:GetHeight())
-      local last = placed[#placed]
-      assert.are.equal(bag.menuButton, last.button)
-      assert.are.same({ { Point = "TOPLEFT", X = -10, Y = 7 } }, last.layout.Points)
-      assert.are.equal(bag.frame, last.frame)
-      assert.are.equal(bag.window.decoration:GetOverlayFrame(), last.overlay)
+      local menu, actions
+      for _, entry in ipairs(placed) do
+        if entry.button == bag.menuButton then menu = entry end
+        if entry.actions ~= nil and entry.actions == bag.actions then actions = entry end
+      end
+      assert.are.same({ { Point = "TOPLEFT", X = -10, Y = 7 } }, menu.layout.Points)
+      assert.are.equal(bag.frame, menu.frame)
+      assert.are.equal(bag.window.decoration:GetOverlayFrame(), menu.overlay)
+      -- The theme's action buttons go where its layout says, on the bag's frame.
+      assert.are.equal(bag, bag.actions.bag)
+      assert.are.same({ Size = 32, Buttons = { { Action = "Sort" } } }, actions.layout)
+      assert.are.equal(bag.frame, actions.frame)
+      assert.are.equal(bag.window.decoration:GetOverlayFrame(), actions.overlay)
     end)
 
     it("keeps its bottom edge, or follows its anchor, when sized to its content", function()

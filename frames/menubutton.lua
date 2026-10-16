@@ -56,9 +56,12 @@ local function showTooltip(button, bag)
   GameTooltip:Show()
 end
 
+-- Sort is the menu button's right click: it sorts the bag (on the retail bank, the bank type
+-- of the active tab), or with Shift deposits into the Warbank. A theme's Sort action button
+-- (frames/bagactions.lua) does the same.
 ---@param ctx Context
 ---@param bag Bag
-local function rightClick(ctx, bag)
+function menuButton:Sort(ctx, bag)
   if bag.kind ~= const.BAG_KIND.BANK or not addon.isRetail then
     bag:Sort(ctx)
     return
@@ -147,7 +150,7 @@ function menuButton:Create(bag)
         addon:GetModule('ContextMenu'):Show(ctx, bag.menuList)
       end
     elseif mouse == "RightButton" then
-      rightClick(ctx, bag)
+      menuButton:Sort(ctx, bag)
     end
   end)
 

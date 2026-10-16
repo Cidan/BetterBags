@@ -143,13 +143,26 @@ tabs, currencies, money), then `WatchMouse` (the window as a drop target, bag-dr
   high; the window at least as wide as the slots panel while it shows.
 - **BuildParts** creates the in-bag search box (`searchBox:CreateBox`, kept as
   `bag.searchBox`; `searchBox:GetSearchText` and QuickFind read it there), the menu button
-  (`BagMenuButton`, bag-menu-button.md) and the footer bar the money and currencies sit on.
+  (`BagMenuButton`, bag-menu-button.md), the action buttons a theme may give the window
+  (`BagActions`, `bag.actions`) and the footer bar the money and currencies sit on.
 - **PlaceParts** (the window's `OnDecorated`, after every theme) places those parts from the
   theme's bag window `Layout` (sonata.md): `Search` (`Points` relative to the window,
   `Reserve` rows above the content while in-bag search is on), `Footer` (`Left`, `Right`,
-  `Bottom`, `Height`, `Reserve` rows below the content), `MenuButton` (`Points`). It reserves
-  those rows with `SetExtraInsets`,
-  then reloads the tabs and redraws a shown slots panel. The Base theme carries the layout every
+  `Bottom`, `Height`, `Reserve` rows below the content), `MenuButton` (`Points`; `false`
+  hides it), `Actions` (below). It reserves those rows with `SetExtraInsets`, then redraws a
+  shown slots panel (tabs measure themselves again on `sonata/ThemeChanged`, sonata.md).
+- **Action buttons** (`frames/bagactions.lua`, `BagActions`): a theme's `Layout.Actions` =
+  `{ Points, Size (32), Spacing (5), Buttons = { { Action, Normal, Highlight, Pushed }, ... } }`
+  places one square button per entry, the first at `Points` (relative to the window frame) and
+  each next one `Spacing` below the one before, above the window's overlay, with the entry's
+  art (states it leaves out are cleared). `Action` names one of BetterBags' own actions, so a
+  theme places and draws them but cannot add one: `ShowBags` (`ContextMenu:ToggleBagSlots`, the
+  menu's Show Bags), `Sort` (`BagMenuButton:Sort`, the menu button's right click), `Settings`
+  (`config/Open`), `Menu` (the bag's context menu); an unknown name is an error. Each button's
+  tooltip names its action. Buttons are reused across themes and hidden when a theme has none.
+  The GW2 theme puts its side panel's four buttons here (sonata.md §3b). Coverage:
+  `spec/frames/bagactions_spec.lua`, `spec/frames/bag_draw_ownership_spec.lua` ("puts the footer
+  bar along the bottom and the menu button where the theme says"). The Base theme carries the layout every
   theme inherits (`sonata/themes/base.lua`). `SetSearchShown` follows the in-bag search setting
   (`search/SetInFrame`) and recalculates the bags (`bags/Rederive`).
 - **Each draw** binds, then `ApplySizeSettings` (scale and opacity always; the size mode only

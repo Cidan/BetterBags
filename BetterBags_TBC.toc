@@ -78,6 +78,7 @@ sonata\themes\default.lua
 sonata\themes\simpledark.lua
 sonata\themes\moonlight.lua
 sonata\themes\elvui.lua
+sonata\themes\gw2.lua
 
 # The Theme API loads earlier than actual themes.
 themes\themes.lua
@@ -145,6 +146,7 @@ bags\era\bank.lua
 
 frames\bagcanvas.lua
 frames\menubutton.lua
+frames\bagactions.lua
 frames\bag.lua
 
 themes\default.lua

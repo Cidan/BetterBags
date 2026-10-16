@@ -35,8 +35,12 @@ bank tooltip lists **Right Click → Sort Bank** and, **only when `addon.hasWarb
 Right Click → Deposit Warbank Items** (on Forever the deposit line is omitted). Keep these in
 sync whenever the click branches change.
 
-Coverage: `spec/frames/menubutton_spec.lua` (every click branch, the drop, the first-time
-highlight, both tooltips with and without a Warbank, the cursor-item line, placement).
+The right click is `BagMenuButton:Sort(ctx, bag)`, which a theme's Sort action button
+(window.md, "Action buttons") calls too, so both always do the same thing.
+
+Coverage: `spec/frames/menubutton_spec.lua` (every click branch, the shared Sort, the drop, the
+first-time highlight, both tooltips with and without a Warbank, the cursor-item line,
+placement).
 
 ## 2. Sorting the backpack also sorts the open bank
 

@@ -32,7 +32,7 @@ local window = addon:GetModule("Window")
 local events = addon:GetModule("Events")
 local context = addon:GetModule("Context")
 
-local THEME_FILES = { "base", "default", "simpledark", "moonlight", "elvui" }
+local THEME_FILES = { "base", "default", "simpledark", "moonlight", "elvui", "gw2" }
 
 describe("BetterBags' other themes", function()
   local originalSend, originalThemes
@@ -334,6 +334,147 @@ describe("BetterBags' other themes", function()
         { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -10, Y = -60 },
       }, layout.Search.Points)
       assert.are.same({ { Point = "TOPLEFT", X = 4, Y = -6 } }, layout.MenuButton.Points)
+    end)
+  end)
+
+  describe("Guild Wars 2", function()
+    local GW = "Interface\\AddOns\\GW2_UI\\Textures\\"
+    local LIGHT_HEADER = { 1, 0.9450, 0.8196, 1 }
+    local savedGW
+
+    before_each(function()
+      savedGW = _G.GW2_ADDON
+      _G.GW2_ADDON = nil
+    end)
+
+    after_each(function()
+      _G.GW2_ADDON = savedGW
+    end)
+
+    -- gw2 stands in for GW2_UI's namespace: the font settings the theme reads.
+    local function gw2()
+      _G.GW2_ADDON = { settings = { fonts = { size = { bigHeader = 20, normal = 13 }, outline = "NONE" } } }
+    end
+
+    local function sized(kind, width)
+      local w = newWindow(kind)
+      w.frame:SetSize(width or 400, 300)
+      return w
+    end
+
+    it("keeps its saved key and is offered only while GW2_UI is loaded", function()
+      assert.are.equal("Guild Wars 2", sonata:GetTheme("GW2").DisplayName)
+      assert.is_false(sonata:IsAvailable("GW2"))
+      gw2()
+      assert.is_true(sonata:IsAvailable("GW2"))
+    end)
+
+    it("frames the bag in GW2's header, side panel, footer and world map background", function()
+      gw2()
+      local bag, wide = sized("Bag", 400), sized("Bag", 800)
+      apply("GW2")
+      local d = bag.decoration
+      local bg = d:GetTexture("Background")
+      assert.are.equal(GW .. "character\\worldmap-background.png", bg:GetTexture())
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 0, -25 }, { bg:GetPoint(1) })
+      local left = d:GetTexture("HeaderLeft")
+      assert.are.equal(GW .. "bag\\bagheader.png", left:GetTexture())
+      assert.are.same({ "BOTTOMLEFT", bag.frame, "TOPLEFT", 0, -25 }, { left:GetPoint(1) })
+      assert.are.same({ 380, 64 }, { left:GetWidth(), left:GetHeight() })
+      assert.are.equal(512, wide.decoration:GetTexture("HeaderLeft"):GetWidth())
+      local right = d:GetTexture("HeaderRight")
+      assert.are.equal(GW .. "bag\\bagheader-right.png", right:GetTexture())
+      assert.are.same({ "BOTTOMRIGHT", bag.frame, "TOPRIGHT", 0, -25 }, { right:GetPoint(1) })
+      local icon = d:GetTexture("Icon")
+      assert.are.equal(GW .. "bag\\bagicon.png", icon:GetTexture())
+      assert.are.same({ "CENTER", bag.frame, "TOPLEFT", -16, 0 }, { icon:GetPoint(1) })
+      assert.are.same({ 84, 84 }, { icon:GetWidth(), icon:GetHeight() })
+      local footer = d:GetTexture("Footer")
+      assert.are.equal(GW .. "bag\\bagfooter.png", footer:GetTexture())
+      assert.are.same({ "TOPLEFT", bag.frame, "BOTTOMLEFT", 0, 30 }, { footer:GetPoint(1) })
+      assert.are.equal(55, footer:GetHeight())
+      local panel = d:GetTexture("LeftPanel")
+      assert.are.equal(GW .. "bag\\bagleftpanel.png", panel:GetTexture())
+      assert.are.same({ "TOPRIGHT", bag.frame, "TOPLEFT", 0, 25 }, { panel:GetPoint(1) })
+      assert.are.equal(40, panel:GetWidth())
+    end)
+
+    it("titles the bag on its header in GW2's header font, with GW2's close button", function()
+      gw2()
+      local bag = sized("Bag")
+      apply("GW2")
+      local title = bag.decoration:GetTitleText()
+      assert.are.same({ DAMAGE_TEXT_FONT, 22, "" }, { title:GetFont() })
+      assert.are.same(LIGHT_HEADER, { title:GetTextColor() })
+      assert.are.same({ "BOTTOMLEFT", bag.decoration:GetTexture("HeaderLeft"), "BOTTOMLEFT", 35, 10 }, { title:GetPoint(1) })
+      local close = bag.decoration:GetCloseButton()
+      assert.is_truthy(close._template:find("UIPanelCloseButtonNoScripts"))
+      assert.are.same({ "TOPRIGHT", bag.frame, "TOPRIGHT", -5, 14 }, { close:GetPoint(1) })
+      assert.are.equal(GW .. "uistuff\\window-close-button-normal.png", close:GetNormalTexture():GetTexture())
+      assert.are.equal(GW .. "uistuff\\window-close-button-hover.png", close:GetHighlightTexture():GetTexture())
+    end)
+
+    it("replaces the menu button with GW2's side buttons", function()
+      gw2()
+      local layout = sonata:Resolve("GW2").Windows.Bag.Layout
+      -- false removes the menu button Base places; the bag hides it.
+      assert.is_nil(layout.MenuButton)
+      assert.are.same({ { Point = "TOPLEFT", X = -35, Y = -40 } }, layout.Actions.Points)
+      assert.are.equal(32, layout.Actions.Size)
+      assert.are.equal(5, layout.Actions.Spacing)
+      local actions, art = {}, {}
+      for _, b in ipairs(layout.Actions.Buttons) do
+        table.insert(actions, b.Action)
+        table.insert(art, b.Normal.Texture)
+        assert.are.same(b.Normal, b.Highlight)
+      end
+      assert.are.same({ "ShowBags", "Sort", "Settings", "Menu" }, actions)
+      assert.are.same({
+        GW .. "icons\\bagmicrobutton-up.png",
+        GW .. "icons\\microicons\\collectionsmicrobutton-up.png",
+        GW .. "icons\\microicons\\questlogmicrobutton-up.png",
+        GW .. "icons\\microicons\\mainmenumicrobutton-up.png",
+      }, art)
+      assert.are.same({
+        { Point = "TOPLEFT", X = 0, Y = -40 },
+        { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -10, Y = -60 },
+      }, layout.Search.Points)
+    end)
+
+    it("draws the other windows in GW2's tooltip backdrop and header font", function()
+      gw2()
+      local panel, flat, dialog, slots = sized("Panel"), sized("Flat"), sized("Dialog"), sized("Slots")
+      apply("GW2")
+      for _, w in ipairs({ panel, flat, dialog, slots }) do
+        local backdrop = w.frame._backdrop
+        assert.are.equal(GW .. "uistuff\\ui-tooltip-background.png", backdrop.bgFile)
+        assert.are.equal(GW .. "uistuff\\ui-tooltip-border.png", backdrop.edgeFile)
+        assert.are.equal(32, backdrop.edgeSize)
+        assert.are.same({ left = 2, right = 2, top = 2, bottom = 2 }, backdrop.insets)
+      end
+      local title = panel.decoration:GetTitleText()
+      assert.are.same({ DAMAGE_TEXT_FONT, 16, "" }, { title:GetFont() })
+      assert.are.same(LIGHT_HEADER, { title:GetTextColor() })
+      assert.are.same({ "TOP", panel.frame, "TOP", 0, -5 }, { title:GetPoint(1) })
+      for _, w in ipairs({ panel, flat }) do
+        assert.are.same({ "TOPRIGHT", w.frame, "TOPRIGHT", -1, -1 }, { w.decoration:GetCloseButton():GetPoint(1) })
+      end
+      assert.is_nil(dialog.decoration:GetCloseButton())
+      assert.is_true(slots.decoration:GetTitleText() == nil or not slots.decoration:GetTitleText():IsShown())
+    end)
+
+    it("draws the search box on GW2's search bar, in its font", function()
+      gw2()
+      local style = sonata:Resolve("GW2").Elements.SearchBox
+      assert.is_true(style.HideCaps)
+      assert.are.equal(GW .. "bag\\bagsearchbg.png", style.Middle.Texture)
+      assert.are.same({ { Point = "LEFT" }, { Point = "RIGHT" } }, style.Middle.Points)
+      assert.are.equal(24, style.Middle.Height)
+      assert.are.same({ Atlas = "common-search-magnifyingglass", Width = 10, Height = 10,
+        Points = { { Point = "LEFT", X = 6 } } }, style.SearchIcon)
+      assert.are.same({ Left = 20, Right = 20, Top = 0, Bottom = 0 }, style.TextInsets)
+      assert.are.same({ Path = UNIT_NAME_FONT, Size = 13, Flags = "", Color = { 1, 1, 1, 1 } }, style.Font)
+      assert.are.same({ Object = "UnitFrame12White" }, sonata:Resolve("GW2").Elements.SectionHeader.Font)
     end)
   end)
 end)

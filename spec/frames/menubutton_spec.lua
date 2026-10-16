@@ -180,6 +180,14 @@ describe("BagMenuButton", function()
       assert.is_nil(deposited)
     end)
 
+    it("is the Sort action the bag's action buttons share", function()
+      const.ACCOUNT_BANK_BAGS = { [12] = 12 }
+      menuButton:Sort({}, newBag())
+      assert.are.equal(1, sorted)
+      menuButton:Sort({}, newBag(const.BAG_KIND.BANK, 12))
+      assert.are.same({ "bags/SortWarbank" }, sent)
+    end)
+
     it("sorts through the bag on Classic", function()
       addon.isRetail = false
       click(menuButton:Create(newBag(const.BAG_KIND.BANK)), "RightButton")

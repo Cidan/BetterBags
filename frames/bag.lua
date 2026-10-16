@@ -52,6 +52,9 @@ local bagCanvas = addon:GetModule("BagCanvas")
 ---@class BagMenuButton: AceModule
 local menuButton = addon:GetModule("BagMenuButton")
 
+---@class BagActions: AceModule
+local bagActions = addon:GetModule("BagActions")
+
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule("SearchBox")
 
@@ -89,6 +92,7 @@ local MIN_CONTENT_HEIGHT = 100
 ---@field appliedView? BagView The view whose size mode the window last took.
 ---@field appliedSizeMode? WindowSizeMode
 ---@field menuButton BagButton The menu button at the window's top left.
+---@field actions BagActionSet The action buttons a theme gives the window (Layout.Actions).
 ---@field headerContainer Frame
 ---@field tabContainer Frame
 ---@field footerContainer Frame
@@ -766,10 +770,11 @@ function bagFrame.bagProto:BuildWindow(name)
 end
 
 -- BuildParts creates the parts of the bag window the theme places: the in-bag search box, the
--- menu button and the footer bar along the bottom.
+-- menu button, the action buttons a theme may give it, and the footer bar along the bottom.
 function bagFrame.bagProto:BuildParts()
 	self.searchBox = searchBox:CreateBox(self.kind, self.frame)
 	self.menuButton = menuButton:Create(self)
+	self.actions = bagActions:Create(self)
 
 	local bottomBar = CreateFrame("Frame", nil, self.frame)
 	bottomBar:SetHeight(20)
@@ -809,6 +814,7 @@ function bagFrame.bagProto:PlaceParts(ctx, decoration)
 	end
 
 	menuButton:Place(self.menuButton, layout.MenuButton, self.frame, overlay)
+	bagActions:Place(self.actions, layout.Actions, self.frame, overlay)
 	self:UpdateSearchShown()
 	if self.slots and self.slots:IsShown() then
 		self.slots:Draw(ctx)
