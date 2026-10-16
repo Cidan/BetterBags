@@ -58,6 +58,9 @@ local backpackBehavior = addon:GetModule("BackpackBehavior")
 ---@class BankBehavior: AceModule
 local bankBehavior = addon:GetModule("BankBehavior")
 
+---@class CursorPlacement: AceModule
+local cursorPlacement = addon:GetModule("CursorPlacement")
+
 -------
 --- Bag Prototype
 -------
@@ -91,6 +94,7 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@field windowGrouping WindowGrouping
 ---@field sideAnchor Frame
 ---@field previousSize number
+---@field movingWindow boolean? True while the player drags the window to move it.
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
 ---@field bankTab BankTab
@@ -154,6 +158,45 @@ function bagFrame.bagProto:WatchForClose()
 	addon.HookScript(self.frame, "OnHide", function(ctx)
 		self:OnClosed(ctx)
 	end)
+end
+
+-- WatchMouse makes the window movable by dragging it, and a drop target: an item dropped
+-- anywhere on it, or a left click on it while holding one, goes into a free slot of its bags
+-- (issue #408). Item buttons, section titles and the bag button take their own drops first.
+-- With an item on the cursor, pressing on the window is a drop and never moves it.
+function bagFrame.bagProto:WatchMouse()
+	self.frame:SetScript("OnDragStart", function(drag)
+		if CursorHasItem() then
+			return
+		end
+		self.movingWindow = true
+		self:KeepBagInBounds()
+		drag:StartMoving()
+	end)
+	self.frame:SetScript("OnDragStop", function(drag)
+		if not self.movingWindow then
+			return
+		end
+		self.movingWindow = false
+		drag:StopMovingOrSizing()
+		Window.SavePosition(self.frame)
+		self.previousSize = self.frame:GetBottom()
+		self:OnResize()
+	end)
+	addon.SetScript(self.frame, "OnReceiveDrag", function()
+		self:PlaceCursorItem()
+	end)
+	addon.SetScript(self.frame, "OnMouseUp", function(_, _, button)
+		if button == "LeftButton" then
+			self:PlaceCursorItem()
+		end
+	end)
+end
+
+-- PlaceCursorItem puts the item on the cursor into a free slot of this window's bags.
+---@return string result What CursorPlacement:PlaceCursorItem did.
+function bagFrame.bagProto:PlaceCursorItem()
+	return cursorPlacement:PlaceCursorItem(self.kind, self.bankTab)
 end
 
 ---@param ctx Context
@@ -936,16 +979,7 @@ function bagFrame:Create(ctx, kind)
 	b.frame:EnableMouse(true)
 	b.frame:RegisterForDrag("LeftButton")
 	b.frame:SetClampedToScreen(true)
-	b.frame:SetScript("OnDragStart", function(drag)
-		b:KeepBagInBounds()
-		drag:StartMoving()
-	end)
-	b.frame:SetScript("OnDragStop", function(drag)
-		drag:StopMovingOrSizing()
-		Window.SavePosition(b.frame)
-		b.previousSize = b.frame:GetBottom()
-		b:OnResize()
-	end)
+	b:WatchMouse()
 
 	b.anchor = anchor:New(kind, b.frame, name)
 	-- Load the bag position from settings.

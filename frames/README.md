@@ -11,6 +11,7 @@ The frames module contains all UI frame components for the BetterBags addon, pro
   - [Section Frame](#section-frame-sectionlua)
   - [Grid Layout](#grid-layout-gridlua)
   - [List Layout](#list-layout-listlua)
+  - [Item Row](#item-row-itemrowlua)
 - [UI Components](#ui-components)
   - [Search](#search-searchlua)
   - [Currency Display](#currency-display-currencylua)
@@ -44,6 +45,7 @@ The main container frame for displaying bags (backpack or bank).
 - Sort functionality
 - Search integration
 - Window positioning and anchoring
+- Drop target: an item dropped anywhere on the window, or the window left-clicked while holding one, goes into a free slot of its bags
 
 **Main Class:**
 ```lua
@@ -64,6 +66,12 @@ The main container frame for displaying bags (backpack or bank).
 - `Search(ctx, results)` - Apply search filter
 - `Sort(ctx)` - Sort bag contents
 - `Refresh(ctx)` - Full refresh of bag data
+- `WatchMouse()` - Wire the window's mouse (called by `Create`): dragging moves the window, a drop or a left click with an item held calls `PlaceCursorItem`
+- `PlaceCursorItem()` - Put the item on the cursor into a free slot of this window's bags (`CursorPlacement`, `util/cursorplacement.lua`)
+
+**Window Mouse and Drops:**
+
+The window frame is the only mouse-enabled frame under the bag's backgrounds (section frames, grids and scroll boxes take no mouse), so a drop on a background, a gap or the empty part of a section reaches it. Item buttons, section titles and the bag button sit above it and take their own drops first. While an item is on the cursor, pressing on the window is a drop and never moves it; `OnDragStop` saves the position only after a move started (`movingWindow`). The placement rules and why a drop cannot taint are in `.claude/rules/bag-drop-zone.md`.
 
 ### Item Frame (`item.lua`)
 
@@ -103,8 +111,8 @@ Container for grouping items into categorized sections.
 
 **Key Features:**
 - Category-based item grouping
-- Expandable/collapsible sections
 - Drag-and-drop category assignment (backpack and bank, with cross-type constraints)
+- Item drops on the title: with Shift the item is added to the section's category; without Shift the drop goes to the title's bag window (`bag:PlaceCursorItem()`)
 - Right-click section actions
 - Automatic sorting
 
@@ -189,6 +197,10 @@ Scrollable list implementation for linear item display.
 ---@field ScrollBox WowScrollBox
 ---@field provider DataProviderMixin
 ```
+
+### Item Row (`itemrow.lua`)
+
+A row of the category pane's item list (`config/categorypane.lua`): an item button with the item's name beside it, colored by quality. The name uses `STANDARD_TEXT_FONT`, the font file Blizzard sets for the client's language; a hard-coded `Fonts\FRIZQT__.TTF` has Latin glyphs only and left Russian, Korean and Chinese names unreadable.
 
 ## UI Components
 

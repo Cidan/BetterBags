@@ -312,6 +312,63 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- Issue #183: quest items are type "Quest" and subtype "Quest", which read
+  -- "Quest - Quest" with the Type and Subtype filters both on.
+  describe("Category names from type and subtype (issue #183)", function()
+    local savedGetCategoryFilter
+    local ctx = { Get = function() return nil end, Set = function() end }
+
+    local function withFilters(enabled)
+      database.GetCategoryFilter = function(_, _, filter)
+        return enabled[filter] == true
+      end
+    end
+
+    local function itemOf(itemType, itemSubType)
+      return {
+        kind = const.BAG_KIND.BACKPACK,
+        slotkey = "0_1",
+        isItemEmpty = false,
+        containerInfo = { quality = const.ITEM_QUALITY.Common },
+        itemInfo = {
+          itemType = itemType,
+          itemSubType = itemSubType,
+          classID = 12,
+          subclassID = 0,
+          expacID = 0,
+        },
+      }
+    end
+
+    before_each(function()
+      savedGetCategoryFilter = database.GetCategoryFilter
+    end)
+
+    after_each(function()
+      database.GetCategoryFilter = savedGetCategoryFilter
+    end)
+
+    it("names a subtype equal to its type once", function()
+      withFilters({ Type = true, Subtype = true })
+      assert.are.equal("Quest", items:GetCategory(ctx, itemOf("Quest", "Quest")))
+    end)
+
+    it("keeps the expansion after a deduplicated name", function()
+      withFilters({ Type = true, Subtype = true, Expansion = true })
+      assert.are.equal("Quest - Classic", items:GetCategory(ctx, itemOf("Quest", "Quest")))
+    end)
+
+    it("still joins a subtype that differs from its type", function()
+      withFilters({ Type = true, Subtype = true })
+      assert.are.equal("Weapon - One-Handed Swords", items:GetCategory(ctx, itemOf("Weapon", "One-Handed Swords")))
+    end)
+
+    it("names the subtype alone when the Type filter is off", function()
+      withFilters({ Subtype = true })
+      assert.are.equal("Quest", items:GetCategory(ctx, itemOf("Quest", "Quest")))
+    end)
+  end)
+
   describe("Category Enrichment & Search Cache", function()
     local savedContainerIDToInventoryID
     local savedGetItemSubClassInfo

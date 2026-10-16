@@ -72,3 +72,10 @@ Use `C_Timer.After(0, ...)` to clear the Retail guard after event processing com
 **Solution**: Create the button with `BankPanelPurchaseButtonScriptTemplate` (Blizzard's "script-only template for use by addons", `Mainline/BankFrameTemplates.xml`), add `UIPanelButtonTemplate` for a standard look, and set the `overrideBankType` attribute. Its own `OnClick` opens `CONFIRM_BUY_BANK_TAB`, and the dialog's accept makes the purchase. Never set or hook the button's `OnClick`.
 
 **Related Files**: `frames/bankslots.lua` (tab purchase buttons), `bags/bank.lua` (Purchase Bank button), `.claude/rules/camelot-forever.md` §10
+
+## Move Items From Addon Code With PickupContainerItem, Never Through Blizzard's Button Handlers
+**Problem**: Moving an item for the player (a drop on the bag window, issue #408) is tempting to do by forwarding the click to the target slot's item button (`button:GetScript("OnClick")(button, ...)`, as AdiBags does). Blizzard's `ContainerFrameItemButton_OnClick` then runs from our tainted call: while a spell waits for an item target it calls `C_Container.UseContainerItem` (`#protected`, blocked), and its merchant branch writes `MerchantFrame` state. Showing a Blizzard `StaticPopup` with data we supply taints the popup the same way.
+
+**Solution**: call `C_Container.PickupContainerItem(bag, emptySlot)` directly. It is not protected (no restriction tag on warcraft.wiki.gg, none in `ContainerDocumentation.lua`; BetterBags already calls it from the WoW: Forever bank sockets), it is exactly what dropping on that slot does, and it writes nothing Blizzard's code reads. Read the free slot from the client at that moment (`C_Container.GetContainerFreeSlots`): picking up onto an occupied slot swaps, putting the other item on the cursor. Leave anything that needs a Blizzard confirmation (a refundable item going into the Warbank) to Blizzard's own buttons.
+
+**Related Files**: `util/cursorplacement.lua`, `frames/bag.lua` (`WatchMouse`), `.claude/rules/bag-drop-zone.md`

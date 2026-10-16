@@ -8,6 +8,7 @@ The utilities module provides essential helper functions, data structures, and a
 - [Core Utilities](#core-utilities)
   - [Bucket System](#bucket-system-bucketlua)
   - [Color Interpolation](#color-interpolation-colorlua)
+  - [Cursor Placement](#cursor-placement-cursorplacementlua)
   - [Movement Flow Detection](#movement-flow-detection-movementflowlua)
   - [Query Parser](#query-parser-querylua)
   - [Resize Handler](#resize-handler-resizelua)
@@ -25,6 +26,7 @@ The utilities module provides fundamental services including:
 - Timer management and delayed execution
 - Color calculations for item level display
 - Context detection for item movement
+- Placing the item on the cursor into a free bag slot
 - Search query parsing and evaluation
 - Frame resizing functionality
 - Comprehensive sorting algorithms
@@ -86,6 +88,29 @@ Calculates appropriate colors for item level display using discrete tiers (low/m
 - Finds lower and upper bounds for given value
 - Performs linear interpolation between colors
 - Handles edge cases gracefully
+
+### Cursor Placement (`cursorplacement.lua`)
+
+Puts the item on the cursor into a free slot of the bags a bag window shows, the way dropping it on that slot does. Bag windows call it when an item is dropped anywhere on them, or when they are left-clicked while one is held (`bagProto:WatchMouse`, `frames/bag.lua`); section titles call it for a drop without Shift.
+
+**Methods:**
+| Method | Description | Parameters | Returns |
+|--------|-------------|------------|---------|
+| `PlaceCursorItem(kind, bankTab)` | Handle an item dropped on a window | `BagKind`, active bank tab or `nil` | `"placed"`, `"returned"`, `"full"` or `"ignored"` |
+| `TargetBags(kind, bankTab)` | The bags a drop can fill, in the order tried | `BagKind`, `number?` | `number[]` |
+| `FindFreeSlot(bags, itemID)` | The slot an item goes to | `number[]`, `number` | `bagid?, slotid?` |
+| `ShowsWarbank(kind, bankTab)` | Whether the window shows the Warbank | `BagKind`, `number?` | `boolean` |
+| `IsWindowBag(kind, bagid)` | Whether a window shows a bag | `BagKind`, `number` | `boolean` |
+
+**Rules:**
+- Only items (`GetCursorInfo()` type `"item"`); vendor items and money are ignored.
+- An item picked up from the same window returns to its slot (`ClearCursor`); the bank window counts both bank types.
+- The backpack window fills `BACKPACK_BAGS`; the bank window fills the Warbank while its active tab is a Warbank tab, else the character bank, active tab first.
+- A bag made for the item wins (a profession bag of its family, the reagent bag for a crafting reagent, the Classic keyring for a key), else the first bag that holds anything, backpack first. A specialized bag the item does not fit is never used; bag items only go in plain bags.
+- Free slots are read from the client at the drop (`C_Container.GetContainerFreeSlots`), never from committed data.
+- A refundable item is left on the cursor while the bank shows the Warbank.
+- No room: `UIErrorsFrame` shows `ERR_INV_FULL` (`ERR_BANK_FULL` for the bank).
+- Placement is `C_Container.PickupContainerItem(bag, slot)`, which is not protected; nothing Blizzard's code reads is written, so a drop taints nothing. See `.claude/rules/bag-drop-zone.md`.
 
 ### Movement Flow Detection (`movementflow.lua`)
 
@@ -410,6 +435,15 @@ bucket:Later(name: string, delay: number, func: function)
 color:GetItemLevelColor(itemLevel: number): number, number, number
 ```
 
+### CursorPlacement Module
+```lua
+cursorPlacement:PlaceCursorItem(kind: BagKind, bankTab: number?): string
+cursorPlacement:TargetBags(kind: BagKind, bankTab: number?): number[]
+cursorPlacement:FindFreeSlot(bags: number[], itemID: number): number?, number?
+cursorPlacement:ShowsWarbank(kind: BagKind, bankTab: number?): boolean
+cursorPlacement:IsWindowBag(kind: BagKind, bagid: number): boolean
+```
+
 ### MovementFlow Module
 ```lua
 movementFlow:GetMovementFlow(): MovementFlowType
@@ -473,7 +507,7 @@ IntervalTree:ExactMatch(value: number): IntervalTreeNode?
 
 - **Items Module**: Uses sorting for item organization
 - **Search Module**: Uses query parser for search syntax
-- **Frames Module**: Uses resize for bag windows
+- **Frames Module**: Uses resize for bag windows, and cursor placement for drops on bag windows and section titles
 - **Data Module**: Uses movement flow for context
 - **Views Module**: Uses window groups for panels
 - **Database Module**: Stores sort preferences

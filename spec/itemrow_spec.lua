@@ -69,6 +69,23 @@ describe("ItemRow Frame Font Validation", function()
       itemRowFrame:Create(ctx)
     end)
   end)
+
+  -- Issue #175: Fonts\FRIZQT__.TTF has roman glyphs only, so a hard-coded path left item
+  -- names on Russian, Korean and Chinese clients without their characters.
+  it("draws the item name in the client's locale font", function()
+    local originalFont = _G.STANDARD_TEXT_FONT
+    _G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT___CYR.TTF"
+    ResetModuleStub("ItemRowFrame", "frames/itemrow.lua")
+    LoadBetterBagsModule("frames/itemrow.lua")
+    local itemRowFrame = addon:GetModule("ItemRowFrame")
+    itemRowFrame:Init()
+
+    local row = itemRowFrame:Create(ctx)
+    _G.STANDARD_TEXT_FONT = originalFont
+
+    assert.are.equal("Fonts\\FRIZQT___CYR.TTF", row.text._font)
+    assert.are.equal(14, row.text._fontSize)
+  end)
 end)
 
 -- Restore original helper

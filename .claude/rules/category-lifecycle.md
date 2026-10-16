@@ -64,3 +64,31 @@ sub-case a migration prune cannot (a non-dynamic ephemeral pin still present in
 `categories:OnEnable`). Do **not** drop that reload guard to "fix" this — it intentionally keeps
 transient non-dynamic ephemerals out of the list; the correct levers are the delete/prune
 scrub (§2, §3) and this removal button.
+
+## 5. Built-in category names, and settings that follow a renamed one
+
+Items no custom or search category claims are named by `items:GetCategory`
+(`data/items.lua`) from the enabled filters, joined with " - ": item type, subtype,
+trade skill, expansion. Their settings live in the same side tables as a custom category's
+(§1), keyed by that name: `categoryOptions` (hidden), `categoryToGroup` (tab/group),
+`customSectionSort` (pinned order).
+
+- **A subtype equal to its type is not repeated** (issue #183). Quest items are type
+  "Quest" and subtype "Quest", and with Type and Subtype on they read "Quest - Quest"; the
+  subtype is now skipped when it equals the type added before it, so they read "Quest"
+  (or "Quest - Classic" with Expansion). The subtype alone (Type off) is unchanged.
+- **Renaming a built-in category moves its settings.** `DB:RenameRepeatedTypeCategories`
+  (run from `DB:Migrate`, before `PruneOrphanedSectionSort`) moves `categoryOptions` and
+  `categoryToGroup[kind]` entries (including the retail bank's per-bank-type tables) from a
+  name that repeated its type to the current name. It skips custom and persisted-ephemeral
+  categories (a user may have named one "X - X"), keeps a setting already saved under the
+  current name, and ignores legacy name = group entries at the top level of
+  `categoryToGroup` (left by profiles from before groups were split by bag kind; nothing
+  reads them). It is idempotent: once renamed, no name repeats its type.
+- Pinned order is not moved: `PruneOrphanedSectionSort` (§3) drops the pins of every
+  built-in category on every load (open issue #1107), so there is nothing to carry over.
+  Any future change to how `GetCategory` composes names needs the same kind of migration.
+
+Coverage: `spec/items_spec.lua` ("Category names from type and subtype (issue #183)") and
+`spec/database_migration_spec.lua` ("category names that repeated their item type"; each guard
+was mutation-tested).

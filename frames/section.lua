@@ -433,7 +433,14 @@ end
 ---@param section Section
 function sectionFrame:OnTitleClickOrDrop(ctx, section)
   if not CursorHasItem() then return end
-  if not IsShiftKeyDown() then return end
+  if not IsShiftKeyDown() then
+    -- Without Shift a title is part of its window's drop target (issue #408).
+    local bag = addon:GetBagFromKind(section:GetKind())
+    if bag then
+      bag:PlaceCursorItem()
+    end
+    return
+  end
   local cursorType, itemID = GetCursorInfo()
   ---@cast cursorType string
   ---@cast itemID number

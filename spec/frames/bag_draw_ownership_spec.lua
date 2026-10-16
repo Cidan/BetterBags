@@ -109,8 +109,13 @@ local function resetCreatedStubs()
 end
 
 local const
+-- What the bag windows handed to CursorPlacement, and the windows LibWindow saved.
+local placements = {}
+local savedPositions = {}
 
 local function stubModules()
+  placements = {}
+  savedPositions = {}
   local L = stubModule("Localization")
   override(L, "G", function(_, key) return key end)
 
@@ -235,6 +240,13 @@ local function stubModules()
   local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
   libWindow.RestorePosition = libWindow.RestorePosition or function() end
   libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
+  override(libWindow, "SavePosition", function(frame) table.insert(savedPositions, frame) end)
+
+  local cursorPlacement = stubModule("CursorPlacement")
+  override(cursorPlacement, "PlaceCursorItem", function(_, kind, bankTab)
+    table.insert(placements, { kind = kind, bankTab = bankTab })
+    return "placed"
+  end)
 
   local contextMenu = stubModule("ContextMenu")
   override(contextMenu, "CreateContextMenu", function() return {} end)
@@ -1161,6 +1173,108 @@ describe("Bag Draw: shared item button ownership across global sections and view
       bag.Draw = function() drew = true end
       assert.is_false(bag:Show(context:New("show"), slotInfoWith({}, {})))
       assert.is_false(drew)
+    end)
+  end)
+
+  -- Issue #408: an item dropped anywhere on a bag window, or the window clicked while holding
+  -- one, goes into a free slot of that window's bags (util/cursorplacement.lua).
+  describe("the window as a drop target (WatchMouse)", function()
+    local function watchedBag(kind, bankTab)
+      local bag = newBag()
+      bag.kind = kind or const.BAG_KIND.BACKPACK
+      bag.bankTab = bankTab
+      bag.KeepBagInBounds = function() end
+      bag.frame.GetBottom = function() return 100 end
+      bag:WatchMouse()
+      return bag
+    end
+
+    local function holdItem()
+      _G._cursorHasItem = true
+      _G._cursorType = "item"
+      _G._cursorItemID = 1001
+    end
+
+    after_each(function()
+      _G.ClearCursor()
+      _G._isShiftKeyDown = false
+    end)
+
+    it("places an item dropped on the window, in the bank's shown tab", function()
+      local bag = watchedBag(const.BAG_KIND.BANK, 12)
+      holdItem()
+      bag.frame:GetScript("OnReceiveDrag")(bag.frame)
+      assert.are.same({ { kind = const.BAG_KIND.BANK, bankTab = 12 } }, placements)
+    end)
+
+    it("places on a left click, and only on a left click", function()
+      local bag = watchedBag()
+      holdItem()
+      local onMouseUp = bag.frame:GetScript("OnMouseUp")
+      onMouseUp(bag.frame, "RightButton")
+      assert.are.same({}, placements)
+      onMouseUp(bag.frame, "LeftButton")
+      assert.are.same({ { kind = const.BAG_KIND.BACKPACK } }, placements)
+    end)
+
+    it("never moves the window while an item is on the cursor", function()
+      local bag = watchedBag()
+      holdItem()
+      bag.frame:GetScript("OnDragStart")(bag.frame)
+      bag.frame:GetScript("OnDragStop")(bag.frame)
+      assert.is_falsy(bag.frame._moving)
+      assert.are.same({}, savedPositions)
+    end)
+
+    it("still moves the window, and saves where it was left, with nothing on the cursor", function()
+      local bag = watchedBag()
+      bag.frame:GetScript("OnDragStart")(bag.frame)
+      assert.is_true(bag.frame._moving)
+      bag.frame:GetScript("OnDragStop")(bag.frame)
+      assert.is_false(bag.frame._moving)
+      assert.are.same({ bag.frame }, savedPositions)
+    end)
+
+    it("bagFrame:Create wires the window's mouse through WatchMouse", function()
+      local source = assert(io.open("frames/bag.lua", "r")):read("*a")
+      local create = source:match("function bagFrame:Create%(ctx, kind%)(.-)\nend\n")
+      assert.is_not_nil(create)
+      assert.is_not_nil(create:find("b:WatchMouse()", 1, true))
+      assert.is_nil(create:find('SetScript("OnDragStart"', 1, true))
+    end)
+
+    it("places an item dropped on a section title without Shift in the title's window", function()
+      local sectionFrame = addon:GetModule("SectionFrame")
+      local bag = watchedBag(const.BAG_KIND.BANK, 7)
+      override(addon, "GetBagFromKind", function(_, kind)
+        if kind == const.BAG_KIND.BANK then return bag end
+        return nil
+      end)
+      local section = {
+        GetKind = function() return const.BAG_KIND.BANK end,
+        GetTitle = function() return "Armor" end,
+      }
+      holdItem()
+      sectionFrame:OnTitleClickOrDrop(context:New("drop"), section)
+      assert.are.same({ { kind = const.BAG_KIND.BANK, bankTab = 7 } }, placements)
+    end)
+
+    it("still adds the item to the title's category with Shift", function()
+      local sectionFrame = addon:GetModule("SectionFrame")
+      local added = {}
+      override(addon:GetModule("Categories"), "AddPermanentItemToCategory", function(_, _, itemID, category)
+        table.insert(added, { itemID = itemID, category = category })
+      end)
+      override(addon, "GetBagFromKind", function() return watchedBag() end)
+      local section = {
+        GetKind = function() return const.BAG_KIND.BACKPACK end,
+        GetTitle = function() return "Armor" end,
+      }
+      holdItem()
+      _G._isShiftKeyDown = true
+      sectionFrame:OnTitleClickOrDrop(context:New("drop"), section)
+      assert.are.same({ { itemID = 1001, category = "Armor" } }, added)
+      assert.are.same({}, placements)
     end)
   end)
 end)

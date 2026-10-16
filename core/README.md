@@ -72,7 +72,7 @@ Manages all persistent data storage and settings using AceDB-3.0.
 - **Category Management**: Custom category creation, deletion, and item assignment
 - **Filter Settings**: Category filters, stacking options, sorting preferences
 - **Item Settings**: Item level display, new item marking, item locking, and per-character max item level tracking (emits `itemLevel/MaxChanged` for color refresh)
-- **Migration**: Handles database schema updates between versions
+- **Migration**: Handles database schema updates between versions (`DB:Migrate`, run at every load). Among them, `RenameRepeatedTypeCategories` moves the hidden state (`categoryOptions`) and group assignments (`categoryToGroup`) saved under a built-in category name that repeated its item type ("Quest - Quest") to its current name ("Quest"), skipping custom categories and keeping a setting already saved under the current name
 
 ### events.lua
 
