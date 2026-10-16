@@ -218,6 +218,14 @@ Details:
   `spec/frames/tabs_spec.lua`, `spec/frames/section_spec.lua` ("Dragging a section"). Selecting sets `GameFontHighlightSmall` as the disabled font, as
   `PanelTemplates_SelectTab` does; text offsets come from the template (`selectedTextY`, ...)
   or `PanelTemplates_*`'s defaults (2 and -3).
+- **Section titles** (`frames/section.lua`): each section registers its title's font string
+  once as a `SectionHeader` element when it is created (the old code re-applied the theme's
+  font on every `SetTitle`). `StyleSectionHeader` records the color it left on the font string
+  (the font object's, or the style's `Color`), and `GetSectionHeaderColor(fontString)` returns
+  it: `SetTitle` with no color of its own sets that color, so a pooled section that had a
+  custom color goes back to the theme's, `Color` included (resetting to the font object's
+  color, as before, would drop a theme `Color`). Coverage: `spec/frames/section_spec.lua`
+  ("Title and Colors"), `spec/sonata/elements_spec.lua` ("section headers").
 - Fonts set on button states (tabs, buttons) must be font objects: a button re-applies its
   state's font object when hovered, which would undo `SetFont`/`SetTextColor` on its label. A
   font spec with a `Path`, `Color`, `Shadow` or `Justify` becomes a font object made for it

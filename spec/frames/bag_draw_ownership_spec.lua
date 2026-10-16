@@ -179,12 +179,6 @@ local function stubModules()
   override(items, "GetItemDataFromSlotKey", function() return nil end)
   override(items, "GetAllSlotInfo", function() return {} end)
 
-  local themes = stubModule("Themes")
-  override(themes, "UpdateSectionFont", function() end)
-  override(themes, "RegisterSectionFont", function() end)
-  override(themes, "RegisterPortraitWindow", function() end)
-  override(themes, "SetSearchState", function() end)
-
   local sort = stubModule("Sort")
   override(sort, "GetItemSortBySlot", function() end)
   override(sort, "GetItemSortFunction", function() end)

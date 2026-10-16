@@ -19,8 +19,11 @@ local const = addon:GetModule('Constants')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
+---@class SonataElements: AceModule
+local elements = addon:GetModule('SonataElements')
 
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
@@ -88,21 +91,15 @@ end
 ---@param color? number[] Optional RGB color array {r, g, b} to apply to the title.
 function sectionProto:SetTitle(text, color)
   self.title:SetText(text)
-  themes:UpdateSectionFont(self.title:GetFontString())
 
-  -- SetFontObject doesn't clear explicit SetTextColor overrides in WoW's API.
-  -- We must always explicitly set the color to ensure pooled sections don't bleed colors.
+  -- The theme sets the title's font (a SectionHeader element), and a custom color stays on the
+  -- font string until something resets it, so a pooled section always sets the color: the
+  -- custom one, else the theme's.
   local fontString = self.title:GetFontString()
   if color and color[1] and color[2] and color[3] then
-    -- Apply custom color
     fontString:SetTextColor(color[1], color[2], color[3], 1)
   else
-    -- Reset to the font object's default color to clear any previous override
-    local fontObject = fontString:GetFontObject()
-    if fontObject then
-      local r, g, b, a = fontObject:GetTextColor()
-      fontString:SetTextColor(r, g, b, a or 1)
-    end
+    fontString:SetTextColor(elements:GetSectionHeaderColor(fontString))
   end
 end
 
@@ -617,7 +614,7 @@ function sectionFrame:_DoCreate()
 
   s.title = title
 
-  themes:RegisterSectionFont(title:GetFontString())
+  sonata:RegisterElement("SectionHeader", title:GetFontString())
 
   local content = grid:Create(s.frame)
   content:Show()

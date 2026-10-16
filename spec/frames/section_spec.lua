@@ -24,9 +24,16 @@ sort.GetItemSortFunction = function() end
 local database = StubBetterBagsModule("Database")
 database.GetShowFullSectionNames = function() return false end
 
-local themes = StubBetterBagsModule("Themes")
-themes.UpdateSectionFont = function() end
-themes.RegisterSectionFont = function() end
+-- Sonata: section titles are SectionHeader elements; the theme's title color is (0.2, 0.4, 0.6).
+local sonata, createdSonata = StubBetterBagsModule("Sonata")
+local elements, createdElements = StubBetterBagsModule("SonataElements")
+local replacedSonata = {
+  RegisterElement = rawget(sonata, "RegisterElement"),
+  GetSectionHeaderColor = rawget(elements, "GetSectionHeaderColor"),
+}
+local registeredElements = {}
+sonata.RegisterElement = function(_, kind, element) table.insert(registeredElements, { kind, element }) end
+elements.GetSectionHeaderColor = function() return 0.2, 0.4, 0.6, 1 end
 
 local items = StubBetterBagsModule("Items")
 local movementFlow = StubBetterBagsModule("MovementFlow")
@@ -107,7 +114,6 @@ describe("Section Frame", function()
     ResetModuleStub("Constants", "core/constants.lua")
     ResetModuleStub("Sort", "util/sort.lua")
     ResetModuleStub("Database", "core/database.lua")
-    ResetModuleStub("Themes", "themes/themes.lua")
     ResetModuleStub("Items", "data/items.lua")
     ResetModuleStub("MovementFlow", "util/movementflow.lua")
     ResetModuleStub("Groups", "data/groups.lua")
@@ -143,6 +149,25 @@ describe("Section Frame", function()
       local s = sectionFrame:Create(ctx)
       s:SetTitle("Weapons")
       assert.are.equal(s:GetTitle(), "Weapons")
+    end)
+
+    it("makes its title font a Sonata section header, once", function()
+      local s = sectionFrame:Create(context:New("TestHeader"))
+      local count = 0
+      for _, entry in ipairs(registeredElements) do
+        if entry[2] == s.title:GetFontString() then
+          count = count + 1
+          assert.are.equal("SectionHeader", entry[1])
+        end
+      end
+      assert.are.equal(1, count)
+    end)
+
+    it("gives a title without a color the theme's color back", function()
+      local s = sectionFrame:Create(context:New("TestThemeColor"))
+      s:SetTitle("Epic Items", { 1, 0, 0 })
+      s:SetTitle("Weapons")
+      assert.are.same({ 0.2, 0.4, 0.6, 1 }, { s.title:GetFontString():GetTextColor() })
     end)
 
     it("supports custom title color", function()
@@ -278,5 +303,12 @@ describe("Section Frame", function()
       sectionFrame:ResetTabHighlights()
       assert.are.same({ bankTabs }, reset)
     end)
+  end)
+
+  teardown(function()
+    sonata.RegisterElement = replacedSonata.RegisterElement
+    elements.GetSectionHeaderColor = replacedSonata.GetSectionHeaderColor
+    if createdSonata then ResetModuleStub("Sonata") end
+    if createdElements then ResetModuleStub("SonataElements") end
   end)
 end)

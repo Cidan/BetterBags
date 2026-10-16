@@ -574,6 +574,24 @@ end
 ---@param style table
 function elements:StyleSectionHeader(fontString, style)
   apply:Font(fontString, style.Font or { Object = "GameFontNormal" })
+  fontString.sonataColor = { fontString:GetTextColor() }
+end
+
+-- GetSectionHeaderColor returns the color the theme gave a section header (its font's, or the
+-- style's Color), which a title without a color of its own goes back to.
+---@param fontString FontString
+---@return number, number, number, number
+function elements:GetSectionHeaderColor(fontString)
+  local c = fontString.sonataColor
+  if c == nil then
+    local fontObject = fontString:GetFontObject()
+    if fontObject == nil then
+      return 1, 1, 1, 1
+    end
+    local r, g, b, a = fontObject:GetTextColor()
+    return r, g, b, a or 1
+  end
+  return c[1], c[2], c[3], c[4] or 1
 end
 
 ---@param box EditBox

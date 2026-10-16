@@ -86,6 +86,7 @@ globals = {
 	"format",
 	"GameFontHighlight",
 	"GameFontHighlightSmall",
+	"GameFontNormal",
 	"GameFontNormalSmall",
 	"GameTooltip",
 	"GameMenuFrame",
