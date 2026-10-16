@@ -190,12 +190,12 @@ pixel. Nothing in the theme compensates for the bag's own scale.
   `themes:UpdateOpacity` apply the backpack's opacity to every window
   (`themes/themes.lua:82-83`, `:139-140`, `:293-298`, all reading
   `GetBagSizeInfo(const.BAG_KIND.BACKPACK, ...)`). Verified in code; no issue exists for it.
-  **Fixed:** each bag window gets its own bag's opacity (`themes/README.md`).
+  **Fixed (#1133):** each bag window gets its own bag's opacity (`themes/README.md`).
 - **WoW: Forever keyring** ([#1121](https://github.com/Cidan/BetterBags/issues/1121)). The
   Classic Era keyring is scanned (`core/era/constants.lua` lists `Enum.BagIndex.Keyring` in
   `BACKPACK_BAGS`), which is why #469 was closed. Forever loads only `core/constants.lua`, whose
   `BACKPACK_BAGS` had no keyring, so the Forever keyring (bag -1, camelot-forever.md §7) was
-  never read. **Fixed and closed:** it is read with the backpack while the game enables it
+  never read. **Fixed (#1133), issue closed:** it is read with the backpack while the game enables it
   (camelot-forever.md §7). Not yet checked in game.
 
 - **Pinned built-in categories are lost on every load: the cause of
@@ -205,7 +205,7 @@ pixel. Nothing in the theme compensates for the bag's own scale.
   `ephemeralCategoryFilters`. Built-in categories ("Armor", "Junk", "Miscellaneous") are in
   neither, so their pins are dropped at each load while custom categories keep theirs, which is
   what #1119 describes. The prune arrived in f9cf257, first released in v0.5.5; #1107 reports
-  v0.5.0 working. Verified in code; not captured. **Fixed and closed:** the prune was removed,
+  v0.5.0 working. Verified in code; not captured. **Fixed (#1133), issue closed:** the prune was removed,
   since no load-time check can tell a built-in category from a leftover
   (category-lifecycle.md §3).
 
