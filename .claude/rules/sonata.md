@@ -213,7 +213,14 @@ Details:
   OVERLAY 6.
 - **Masque.** Restyling rewrites regions Masque skins (icon, highlight, pushed, count). A theme
   apply bumps the generation in every button's draw record (caches.md §4), so every button
-  draws in full afterwards and Masque re-skins it on `item/Updated`.
+  draws in full afterwards and Masque re-skins it on `item/Updated`. A theme with
+  `Masque = false` (`Sonata:UsesMasque()`) keeps Masque off its buttons: on
+  `sonata/ThemeChanged` the integration removes every button it skinned from its group
+  (`RemoveButton` gives it its own look back), and it adds nothing while that theme is active;
+  the next draw under a theme that uses Masque adds the buttons again
+  (`spec/integrations/masque_spec.lua`).
+- **Item decorations** are made once per button (`item:GetDecoration`, item-drawing.md §7a)
+  and registered as `ItemButton` elements; a theme never builds its own.
 - Edge sizes and insets are in UI units. Pixel-perfect edges at any scale are not yet
   expressible.
 

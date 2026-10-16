@@ -33,14 +33,14 @@ local bindType = select(14, C_Item.GetItemInfo(itemLink))
 ```lua
 -- BAD: creates context on every mouse event, causes taint
 addon.HookScript(button, "OnMouseDown", function(ectx)
-  themes:GetItemButton(ectx, i):GetPushedTexture():Show()
+  i:GetDecoration(ectx):GetPushedTexture():Show()
 end)
 
 -- GOOD: plain HookScript, lazy cached reference
 local decoration
 button:HookScript("OnMouseDown", function()
   if not decoration then
-    decoration = themes:GetItemButton(context:New('init'), i)
+    decoration = i:GetDecoration(context:New('init'))
   end
   decoration:GetPushedTexture():Show()
 end)

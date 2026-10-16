@@ -23,7 +23,7 @@ local const = stubModule("Constants")
 const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
 local debug = stubModule("Debug")
 debug.Log = debug.Log or function() end
-local themes = stubModule("Themes")
+local sonata = stubModule("Sonata")
 
 -- A Masque group with the behavior of Masque 12.1.0 Core/Group.lua: AddButton returns
 -- early when the button is already in this group (and moves it from another group),
@@ -64,8 +64,8 @@ local masque = addon:GetModule("Masque")
 -- Enabled once: OnEnable registers its message handlers, and registering them again for
 -- every test would leave the earlier handlers firing too.
 local disableMasque = false
-local savedTheme = themes.GetCurrentTheme
-themes.GetCurrentTheme = function() return { DisableMasque = disableMasque } end
+local savedUsesMasque = sonata.UsesMasque
+sonata.UsesMasque = function() return not disableMasque end
 events:Init()
 local savedPrint = _G.print
 _G.print = function() end
@@ -90,10 +90,11 @@ describe("Masque integration", function()
       group.Buttons = {}
       group.log = {}
     end
+    masque.added = setmetatable({}, { __mode = "k" })
   end)
 
   teardown(function()
-    themes.GetCurrentTheme = savedTheme
+    sonata.UsesMasque = savedUsesMasque
     ResetModuleStub("Masque", "integrations/masque.lua")
     for i = #createdStubs, 1, -1 do
       ResetModuleStub(createdStubs[i])
@@ -148,5 +149,24 @@ describe("Masque integration", function()
     local item, decoration = newButton(const.BAG_KIND.BACKPACK)
     send("item/Updated", item, decoration)
     assert.are.same({}, groups["Backpack"].log)
+  end)
+
+  -- Item buttons keep one decoration across themes, which the theme restyles: a theme that
+  -- turns Masque off takes the buttons Masque skinned back out of their groups, so Masque's
+  -- skin does not stay under the theme's look. The next draw under a Masque theme adds them.
+  it("takes every skinned button out of its group when a theme turns Masque off", function()
+    local backpackItem, backpackDecoration = newButton(const.BAG_KIND.BACKPACK)
+    local bankItem, bankDecoration = newButton(const.BAG_KIND.BANK)
+    send("item/Updated", backpackItem, backpackDecoration)
+    send("item/Updated", bankItem, bankDecoration)
+    disableMasque = true
+    events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Flat")
+    assert.is_nil(groups["Backpack"].Buttons[backpackDecoration])
+    assert.is_nil(groups["Bank"].Buttons[bankDecoration])
+    assert.are.same({ "skin", "unskin" }, groups["Backpack"].log)
+    disableMasque = false
+    events:SendMessage(context:New("test"), "sonata/ThemeChanged", "Default")
+    send("item/Updated", backpackItem, backpackDecoration)
+    assert.is_true(groups["Backpack"].Buttons[backpackDecoration])
   end)
 end)

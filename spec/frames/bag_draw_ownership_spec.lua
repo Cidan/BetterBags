@@ -180,29 +180,6 @@ local function stubModules()
   override(items, "GetAllSlotInfo", function() return {} end)
 
   local themes = stubModule("Themes")
-  override(themes, "GetItemButton", function(_, _, item)
-    if not item._decoration then
-      local d = CreateFrame("ItemButton", item.button:GetName() .. "Decoration", item.frame)
-      d.IconBorder = d:CreateTexture()
-      d.IconQuestTexture = d:CreateTexture()
-      d.IconTexture = d:CreateTexture()
-      d.IconOverlay = d:CreateTexture()
-      d.ItemSlotBackground = d:CreateTexture()
-      d.flashAnim = { IsPlaying = function() return false end, Play = function() end, Stop = function() end }
-      d.newitemglowAnim = { IsPlaying = function() return false end, Play = function() end, Stop = function() end }
-      d.SetMatchesSearch = function() end
-      d.SetItemButtonTexture = function() end
-      d.UpdateQuestItem = function() end
-      d.UpdateNewItem = function() end
-      d.UpdateJunkItem = function() end
-      d.UpdateItemContextMatching = function() end
-      d.UpdateCooldown = function() end
-      d.SetReadable = function() end
-      d.CheckUpdateTooltip = function() end
-      item._decoration = d
-    end
-    return item._decoration
-  end)
   override(themes, "UpdateSectionFont", function() end)
   override(themes, "RegisterSectionFont", function() end)
   override(themes, "RegisterPortraitWindow", function() end)
@@ -266,6 +243,28 @@ local function stubModules()
   stubModule("BankBehavior")
 end
 
+-- newDecoration builds what ContainerFrameItemButtonTemplate gives an item's decoration.
+local function newDecoration(item)
+  local d = CreateFrame("ItemButton", item.button:GetName() .. "Decoration", item.frame)
+  d.IconBorder = d:CreateTexture()
+  d.IconQuestTexture = d:CreateTexture()
+  d.IconTexture = d:CreateTexture()
+  d.IconOverlay = d:CreateTexture()
+  d.ItemSlotBackground = d:CreateTexture()
+  d.flashAnim = { IsPlaying = function() return false end, Play = function() end, Stop = function() end }
+  d.newitemglowAnim = { IsPlaying = function() return false end, Play = function() end, Stop = function() end }
+  d.SetMatchesSearch = function() end
+  d.SetItemButtonTexture = function() end
+  d.UpdateQuestItem = function() end
+  d.UpdateNewItem = function() end
+  d.UpdateJunkItem = function() end
+  d.UpdateItemContextMatching = function() end
+  d.UpdateCooldown = function() end
+  d.SetReadable = function() end
+  d.CheckUpdateTooltip = function() end
+  return d
+end
+
 local function loadRealModules()
   LoadBetterBagsModule("render/render.lua")
   LoadBetterBagsModule("render/drawable.lua")
@@ -273,6 +272,8 @@ local function loadRealModules()
   LoadBetterBagsModule("sonata/engine.lua")
   LoadBetterBagsModule("sonata/apply.lua")
   LoadBetterBagsModule("sonata/decoration.lua")
+  ResetModuleStub("SonataElements", "sonata/elements.lua")
+  LoadBetterBagsModule("sonata/elements.lua")
   LoadBetterBagsModule("window/window.lua")
   ResetModuleStub("BagCanvas", "frames/bagcanvas.lua")
   LoadBetterBagsModule("frames/bagcanvas.lua")
@@ -280,6 +281,7 @@ local function loadRealModules()
   addon:GetModule("Sonata"):Init()
   ResetModuleStub("ItemFrame", "frames/item.lua")
   LoadBetterBagsModule("frames/item.lua")
+  addon:GetModule("ItemFrame").CreateDecoration = function(_, item) return newDecoration(item) end
   ResetModuleStub("SectionFrame", "frames/section.lua")
   LoadBetterBagsModule("frames/section.lua")
   ResetModuleStub("Views", "views/views.lua")

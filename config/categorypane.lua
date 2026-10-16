@@ -27,9 +27,6 @@ local L = addon:GetModule('Localization')
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
 
@@ -1205,7 +1202,7 @@ function categoryPaneProto:initItemRow(frame, elementData)
 
     -- In Classic/Era, hide the NormalTexture on the decoration button that creates the border.
     if not addon.isRetail then
-      local decoration = themes:GetItemButton(ectx, frame.item.button)
+      local decoration = frame.item.button:GetDecoration(ectx)
       if decoration then
         -- The decoration button (ContainerFrameItemButtonTemplate) has a NormalTexture
         -- that creates a visible border frame around the icon in Classic/Era
