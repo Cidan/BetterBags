@@ -46,27 +46,3 @@ function animations:AttachFadeGroup(region, nohide)
   end)
   return fadeInGroup, fadeOutGroup
 end
-
----@param region Region
----@param nohide? boolean
----@return AnimationGroup, AnimationGroup
-function animations:AttachFadeAndSlideLeft(region, nohide)
-  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region, nohide)
-  local slideOut = fadeOutGroup:CreateAnimation('Translation')
-  slideOut:SetOffset(10, 0)
-  slideOut:SetDuration(0.10)
-  slideOut:SetSmoothing('IN')
-  return fadeInGroup, fadeOutGroup
-end
-
----@param region Region
----@param nohide? boolean
----@return AnimationGroup, AnimationGroup
-function animations:AttachFadeAndSlideTop(region, nohide)
-  local fadeInGroup, fadeOutGroup = self:AttachFadeGroup(region, nohide)
-  local slideOut = fadeOutGroup:CreateAnimation('Translation')
-  slideOut:SetOffset(0, -10)
-  slideOut:SetDuration(0.10)
-  slideOut:SetSmoothing('IN')
-  return fadeInGroup, fadeOutGroup
-end

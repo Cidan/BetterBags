@@ -1521,6 +1521,18 @@ _G.__mockTemplates.InputScrollFrameTemplate = function(frame)
   frame.EditBox.Instructions = frame.EditBox:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
 end
 
+-- SimplePanelTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): 338 x 424, a
+-- rock Bg texture, an Inset frame and a NineSlice frame. BetterBags' BetterBagsSearchPanelTemplate
+-- is SimplePanelTemplate on retail (templates/container.xml) and, on Classic
+-- (templates/era/container.xml), InsetFrameTemplate with border art and an Inset frame.
+_G.__mockTemplates.SimplePanelTemplate = function(frame)
+  frame:SetSize(338, 424)
+  frame.Bg = frame:CreateTexture(frame._name and (frame._name .. "Bg") or nil, "BACKGROUND")
+  frame.Inset = CreateMockWidget("Frame", nil, frame)
+  frame.NineSlice = CreateMockWidget("Frame", nil, frame)
+end
+_G.__mockTemplates.BetterBagsSearchPanelTemplate = _G.__mockTemplates.SimplePanelTemplate
+
 -- PanelTabButtonTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): 10 x 32,
 -- the tab art Left/Middle/Right, their Active versions, their Highlight versions (alpha 0.4),
 -- and the Text button text at CENTER 0, 2. BetterBags' BetterBagsSecureBagTabTemplate

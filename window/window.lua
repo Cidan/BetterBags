@@ -49,7 +49,7 @@ local DEFAULT_GRIP = {
 ---@alias WindowSizeMode "content"|"window"
 
 ---@class WindowOptions
----@field Kind string The Sonata window kind: Bag, Panel, Flat or Dialog.
+---@field Kind string The Sonata window kind: Bag, Panel, Flat, Dialog, Slots or Search.
 ---@field Name? string The frame's global name; needed to close with Escape.
 ---@field Title? string
 ---@field Parent? Frame UIParent when unset.

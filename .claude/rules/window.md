@@ -223,7 +223,20 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   invalidates its bag's window, whose minimum width is the panel's (§7), replacing the bank
   panel's direct `SetWidth` on the bank frame. Coverage: `spec/frames/bagslots_spec.lua`,
   `spec/frames/bankslots_spec.lua` ("9. The panel's window").
+- **The overlay search panel** (`frames/search.lua`, `searchBox:Create`, the search keybinding):
+  a Search window named `BetterBagsSearchFrame`, strata HIGH at level 700, 400 x 75 in the
+  window mode with `Resizable = false`, not movable, hanging above the backpack (BOTTOM to its
+  TOP, +10). Its box and labels fill the content box (the theme's Search insets; Base 10, 10, 0,
+  0). It starts hidden: before, it was created shown at alpha 0, so the first toggle of a session
+  hid an invisible panel instead of opening it (seen in the specs; not verified in game).
+  `Toggle` opens the backpack and shows it with the theme's animation (Base: fade in; fade out
+  sliding 10 pixels right), focusing the box once shown, or hides it, emptying the box, which
+  shows its help again once hidden. `addon/CloseSpecialWindows` and the backpack closing hide
+  it. In-bag search boxes (`searchBox:CreateBox`) share its prototype and have no window.
+  Coverage: `spec/frames/search_overlay_spec.lua`.
 - The side theme-configuration panel (`frames/themeconfig.lua`) and the window grouping it was
   the only user of (`util/windowgroup.lua`) were removed: nothing had opened the panel since
   the window group's opener was removed, so it was a hidden frame built at every login. Themes
-  are chosen in the settings window's Theme pane.
+  are chosen in the settings window's Theme pane. `frames/overlay.lua` (an unused overlay
+  frame, in no TOC) and the unused `AttachFadeAndSlideLeft`/`AttachFadeAndSlideTop` animation
+  helpers were removed too.

@@ -44,6 +44,9 @@ sonata:RegisterTheme({
       CloseButton = { Template = "UIPanelCloseButton", Points = { { Point = "TOPRIGHT", X = 2, Y = 2 } } },
     },
     Dialog = { Template = FLAT_TEMPLATE },
+    -- BetterBagsSearchPanelTemplate is SimplePanelTemplate on retail and BetterBags' own panel
+    -- art on Classic; both carry an Inset frame the overlay does not use.
+    Search = { Template = { Name = "BetterBagsSearchPanelTemplate", Title = false, Hide = { "Inset" } } },
     Slots = {
       Template = { Name = "DefaultPanelFlatTemplate", HideTitleWhenEmpty = true },
       Insets = { Left = 10, Right = 6, Top = 30, Bottom = 12 },

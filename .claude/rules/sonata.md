@@ -251,13 +251,14 @@ Each theme is a data file that calls `sonata:RegisterTheme`, listed in every TOC
 `window\window.lua`, Base first.
 Window kinds: **Bag** (the backpack and bank), **Panel** (forms: the settings and profiler
 settings windows; the group dialog), **Flat** (the debug window), **Dialog** (question dialogs,
-the search category editor), **Slots** (the Show Bags and bank tab panels).
+the search category editor), **Slots** (the Show Bags and bank tab panels), **Search** (the
+overlay search panel).
 
 - **Base** (hidden): what every theme inherits. Its `Windows.Bag` carries the bag's insets
   (6, 6, 42, 3), the default fade (`Animations`, 0.1 s alpha in and out) and the bag window's
   `Layout` (window.md §7): `Search` (points, `Reserve` 20), `Footer` (6, 6, bottom 6, height 20,
   `Reserve` 26), `MenuButton` (TOPLEFT -10, 7). Panel insets 4, 0, 30, 4; Flat and Dialog
-  5, 5, 25, 5; Slots 8 on every side, with a fade that drops 10 pixels as it hides. Its
+  5, 5, 25, 5; Slots 8 on every side, with a fade that drops 10 pixels as it hides; Search 10, 10, 0, 0, with a fade that slides 10 pixels right as it hides. Its
   `Elements.SectionHeader` font is `GameFontNormal`.
 - **Default**: Blizzard's look. Bags and panels are a `DefaultPanelTemplate` one level below
   the window (its `Bg` fades with the opacity; `NineSlice` and `TitleContainer` at window level
@@ -271,7 +272,9 @@ the search category editor), **Slots** (the Show Bags and bank tab panels).
   cannot be hidden (classic-bag-slots-panel.md); on WoW: Forever (`Clients.Forever`) they are a
   `TooltipBorderedFrameTemplate` below the window colored black 0.9 with a white border, because
   that client redraws the flat template's header art too tall (camelot-forever.md §5). Both use
-  even padding of 8. Section titles in `UnitFrame12Yellow`.
+  even padding of 8. The Search panel is `BetterBagsSearchPanelTemplate` (`SimplePanelTemplate`
+  on retail, BetterBags' own panel art on Classic) with no title and its `Inset` hidden. Section
+  titles in `UnitFrame12Yellow`.
 
 Coverage: `spec/sonata/themes_spec.lua` (Base hidden, its geometry and fades per kind; Default's
 bag panel, levels, title font, opacity, close button and content box; panels, flat windows,

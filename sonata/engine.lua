@@ -52,7 +52,7 @@ sonata.themes = {}
 ---@field Available? boolean|fun(): boolean
 ---@field Masque? boolean false: item buttons are not handed to Masque.
 ---@field Variables? table<string, any|fun(): any>
----@field Windows? table<string, table> Window styles by window kind (Bag, Panel, Flat, Dialog, Slots).
+---@field Windows? table<string, table> Window styles by window kind (Bag, Panel, Flat, Dialog, Slots, Search).
 ---@field Elements? table<string, table> Element styles by element kind.
 ---@field Clients? table<string, SonataTheme> Partial themes applied on a client (Retail, Forever, Classic, Era, TBC, Mists, Anniversary, Cata).
 
@@ -422,7 +422,7 @@ end
 -- RegisterWindow adds a window to be decorated with the style of its kind. A window that
 -- registers after a theme was applied is decorated at once.
 ---@param window table
----@param kind string Bag, Panel, Flat, Dialog or Slots.
+---@param kind string Bag, Panel, Flat, Dialog, Slots or Search.
 function sonata:RegisterWindow(window, kind)
   if self.windowIndex[window] ~= nil then
     error("a window was registered with Sonata twice")

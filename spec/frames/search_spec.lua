@@ -25,6 +25,7 @@ const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 local database = StubBetterBagsModule("Database")
 
 local _, createdSonata = StubBetterBagsModule("Sonata")
+local _, createdWindow = StubBetterBagsModule("Window")
 
 -- Other specs stub "SearchBox"; clear any prior stub so the real module file
 -- can register cleanly here (mirrors the data/search.lua reset-then-load pattern).
@@ -40,6 +41,7 @@ end
 describe("SearchBox:GetSearchText", function()
   teardown(function()
     if createdSonata then ResetModuleStub("Sonata") end
+    if createdWindow then ResetModuleStub("Window") end
   end)
 
   before_each(function()

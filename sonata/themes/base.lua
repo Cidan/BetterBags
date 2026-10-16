@@ -23,9 +23,18 @@ local FADE_AND_DROP = {
   },
 }
 
--- Window kinds: Bag (the backpack and bank), Panel (forms, theme config, the group dialog),
--- Flat (the debug window), Dialog (questions, the search category editor), Slots (the Show
--- Bags and bank tab panels).
+-- The overlay search panel slides 10 pixels right as it fades out.
+local FADE_AND_SLIDE = {
+  Show = FADE.Show,
+  Hide = {
+    { Type = "Alpha", From = 1, To = 0, Duration = 0.10, Smoothing = "IN" },
+    { Type = "Translation", X = 10, Y = 0, Duration = 0.10, Smoothing = "IN" },
+  },
+}
+
+-- Window kinds: Bag (the backpack and bank), Panel (forms, the group dialog), Flat (the debug
+-- window), Dialog (questions, the search category editor), Slots (the Show Bags and bank tab
+-- panels), Search (the overlay search panel).
 
 sonata:RegisterTheme({
   Name = "Base",
@@ -58,6 +67,7 @@ sonata:RegisterTheme({
       Animations = FADE_AND_DROP,
       Layout = { Offset = { X = 0, Y = -2 } },
     },
+    Search = { Insets = { Left = 10, Right = 10, Top = 0, Bottom = 0 }, Animations = FADE_AND_SLIDE },
   },
   Elements = {
     SectionHeader = { Font = { Object = "GameFontNormal" } },

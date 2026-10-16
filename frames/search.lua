@@ -24,15 +24,18 @@ local searchCategoryConfig = addon:GetModule('SearchCategoryConfig')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class WindowModule: AceModule
+local window = addon:GetModule('Window')
 
 ---@class SearchBox: AceModule
 ---@field searchFrame SearchFrame
 local searchBox = addon:NewModule('SearchBox')
 
+-- A SearchFrame is the overlay search panel (searchBox:Create, a Search window) or a bag's
+-- in-bag search box (searchBox:CreateBox, which has no window).
 ---@class (exact) SearchFrame
 ---@field frame Frame
----@field fadeInGroup AnimationGroup
----@field fadeOutGroup AnimationGroup
+---@field window? BetterBagsWindow
 ---@field textBox EditBox
 ---@field helpText FontString
 ---@field kind BagKind
@@ -52,39 +55,47 @@ function BetterBags_ToggleSearch()
 end
 
 ---@param ctx Context
+-- Toggle opens the overlay over the backpack, focusing its box once shown, or closes it.
+---@param ctx Context
 function searchBox.searchProto:Toggle(ctx)
-  if self.frame:IsShown() then
-    self.textBox:SetText("")
-    self.textBox:ClearFocus()
-    self.fadeOutGroup:Play()
+  if self.frame:IsShown() and not (self.window and self.window:IsClosing()) then
+    self:Hide(ctx)
   else
-    self.textBox:ClearFocus()
     addon.Bags.Backpack:Show(ctx)
-    self.fadeInGroup:Play()
+    self:Show(ctx)
   end
 end
 
-function searchBox.searchProto:Hide()
-  if self.frame:IsShown() then
-    self.textBox:SetText("")
-    self.textBox:ClearFocus()
-    if self.fadeOutGroup then
-      self.fadeOutGroup:Play()
-    else
-      self.frame:Hide()
-    end
-  end
-end
-
-function searchBox.searchProto:Show()
+-- Hide empties the box and closes it; the overlay fades out with its theme, then shows its
+-- help again.
+---@param ctx? Context
+function searchBox.searchProto:Hide(ctx)
   if not self.frame:IsShown() then
-    self.textBox:ClearFocus()
-    if self.fadeInGroup then
-      self.fadeInGroup:Play()
-    else
-      self.frame:Show()
-    end
+    return
   end
+  self.textBox:SetText("")
+  self.textBox:ClearFocus()
+  if self.window == nil then
+    self.frame:Hide()
+    return
+  end
+  self.window:Hide(ctx or context:New('SearchBox_Hide'), function()
+    self.textBox:SetText("")
+    self.helpText:Show()
+  end)
+end
+
+-- Show opens the box; the overlay fades in with its theme and focuses its box once shown.
+---@param ctx? Context
+function searchBox.searchProto:Show(ctx)
+  self.textBox:ClearFocus()
+  if self.window == nil then
+    self.frame:Show()
+    return
+  end
+  self.window:Show(ctx or context:New('SearchBox_Show'), function()
+    self.textBox:SetFocus()
+  end)
 end
 
 function searchBox.searchProto:SetShown(shown)
@@ -213,38 +224,48 @@ end
 ---@param ctx Context
 ---@param parent Frame
 ---@return SearchFrame
-function searchBox:Create(ctx, parent)
+-- Create makes the overlay search panel the search keybinding toggles: a Search window of a
+-- fixed size above the backpack, drawn and animated by the theme, hidden until toggled.
+---@param _ctx Context
+---@param parent Frame
+---@return SearchFrame
+function searchBox:Create(_ctx, parent)
   local sf = setmetatable({}, {__index = searchBox.searchProto})
-  local f = CreateFrame("Frame", "BetterBagsSearchFrame", UIParent, "BetterBagsSearchPanelTemplate") --[[@as Frame]]
+  sf.window = window:Create({
+    Kind = "Search",
+    Name = "BetterBagsSearchFrame",
+    Title = "",
+    Strata = "HIGH",
+    Level = 700,
+    Movable = false,
+    SizeMode = function() return "window" end,
+    Resizable = false,
+    Points = { { Point = "BOTTOM", RelativeTo = parent, RelativePoint = "TOP", X = 0, Y = 10 } },
+  })
+  local f = sf.window.frame
   f:SetSize(400, 75)
-  f:SetPoint("BOTTOM", parent, "TOP", 0, 10)
-  f:SetFrameStrata("HIGH")
-  f:SetFrameLevel(700)
-  f:SetAlpha(0)
-  f.Inset:Hide()
-  f:Show()
+  local content = sf.window.content
 
-  local enterLabel = f:CreateFontString(nil, "ARTWORK", "GameFontDisable")
-  enterLabel:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 6)
+  local enterLabel = content:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+  enterLabel:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 6, 6)
   enterLabel:SetText("[Enter] Create a new category...")
   enterLabel:Hide()
   sf.enterLabelFadeIn, sf.enterLabelFadeOut = animations:AttachFadeGroup(enterLabel)
 
   sf.enterLabel = enterLabel
 
-  local textBox = CreateFrame("EditBox", nil, f) --[[@as EditBox]]
+  local textBox = CreateFrame("EditBox", nil, content) --[[@as EditBox]]
   textBox:SetFontObject("GameFontNormalHuge")
   textBox:SetTextColor(1, 1, 1, 1)
-  textBox:SetParent(f)
-  textBox:SetPoint("TOPLEFT", f, "TOPLEFT", 10, 0)
-  textBox:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -10, 0)
+  textBox:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+  textBox:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 0, 0)
   textBox:ClearFocus()
   textBox:SetAutoFocus(false)
   textBox:SetJustifyH("CENTER")
-  textBox:SetScript("OnEscapePressed", function(me)
+  addon.SetScript(textBox, "OnEscapePressed", function(ectx, me)
     ---@cast me +EditBox
     me:ClearFocus()
-    sf:Toggle(ctx)
+    sf:Toggle(ectx)
   end)
 
   addon.SetScript(textBox, "OnTextChanged", function(ectx)
@@ -271,21 +292,12 @@ function searchBox:Create(ctx, parent)
   sf.helpTextFadeIn, sf.helpTextFadeOut = animations:AttachFadeGroup(helpText)
   sf.helpText = helpText
 
-  sf.fadeInGroup, sf.fadeOutGroup = animations:AttachFadeAndSlideLeft(f)
-  sf.fadeInGroup:HookScript("OnFinished", function()
-    textBox:SetFocus()
-  end)
-  sf.fadeOutGroup:HookScript("OnFinished", function()
-    textBox:SetText("")
-    helpText:Show()
-  end)
-
   sf.frame = f
   sf.textBox = textBox
   searchBox.searchFrame = sf
 
-  events:RegisterMessage('addon/CloseSpecialWindows', function()
-    sf:Hide()
+  events:RegisterMessage('addon/CloseSpecialWindows', function(ectx)
+    sf:Hide(ectx)
   end)
   return sf
 end

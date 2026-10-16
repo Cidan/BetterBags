@@ -65,6 +65,19 @@ describe("BetterBags' Sonata themes", function()
       assert.is_not_nil(sonata:GetAllThemes().Default)
     end)
 
+    it("draws the overlay search panel with BetterBags' search panel, its inset hidden", function()
+      local w = window:Create({ Kind = "Search", Title = "" })
+      sonata:ApplyTheme(context:New("spec"), "Default")
+      local panel = w.decoration:GetTemplateFrame()
+      assert.is_truthy(panel._template:find("BetterBagsSearchPanelTemplate"))
+      assert.is_false(panel.Inset:IsShown())
+      assert.is_nil(w.decoration:GetCloseButton())
+      assert.are.same({ Left = 10, Right = 10, Top = 0, Bottom = 0 }, w:GetContentInsets())
+      local hide = sonata:Resolve("Default").Windows.Search.Animations.Hide
+      assert.are.same({ "Alpha", "Translation" }, { hide[1].Type, hide[2].Type })
+      assert.are.same({ 10, 0 }, { hide[2].X, hide[2].Y })
+    end)
+
     it("gives every kind of window its content box and a fade", function()
       local windows = sonata:Resolve("Default").Windows
       assert.are.same({ Left = 4, Right = 0, Top = 30, Bottom = 4 }, windows.Panel.Insets)
