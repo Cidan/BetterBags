@@ -73,8 +73,13 @@ end
 
 -- An animation group (SimpleAnimGroupAPIDocumentation.lua): CreateAnimation(animationType?,
 -- name?, templateName?), Play(reverse, offset), Stop(), Finish(), IsPlaying(), SetLooping,
--- SetToFinalAlpha. There is no time in specs: Play runs the OnPlay scripts of the group and
--- its animations, and Finish runs their OnFinished scripts, the order the client runs them in.
+-- SetToFinalAlpha. There is no time in specs:
+-- * Play runs the OnPlay scripts of the group and its animations; on a group already playing
+--   it does nothing (the client has a separate Restart).
+-- * Stop runs OnStop(self, requested) on a playing group and stops its animations.
+-- * Finish ends a playing group (OnFinished(self, requested = true), warcraft.wiki.gg
+--   UIHANDLER_OnFinished) and does nothing otherwise.
+-- * _complete is test-only: the group's time ran out (OnFinished with requested = false).
 local function CreateMockAnimationGroup(region, name)
   local group = scriptable({ _region = region, _name = name, _animations = {} })
   function group:GetParent() return self._region end
@@ -84,20 +89,35 @@ local function CreateMockAnimationGroup(region, name)
     return anim
   end
   function group:Play(reverse)
+    if self._playing then return end
     self._playing = true
     self._reverse = reverse == true
     self._plays = (self._plays or 0) + 1
+    for _, anim in ipairs(self._animations) do anim._playing = true end
     self:fire("OnPlay")
     for _, anim in ipairs(self._animations) do anim:fire("OnPlay") end
   end
   function group:Stop()
+    if not self._playing then return end
     self._playing = false
-    self:fire("OnStop")
+    for _, anim in ipairs(self._animations) do anim._playing = false end
+    self:fire("OnStop", true)
+  end
+  local function finish(g, requested)
+    g._playing = false
+    for _, anim in ipairs(g._animations) do
+      anim._playing = false
+      anim:fire("OnFinished", requested)
+    end
+    g:fire("OnFinished", requested)
   end
   function group:Finish()
-    self._playing = false
-    for _, anim in ipairs(self._animations) do anim:fire("OnFinished") end
-    self:fire("OnFinished")
+    if not self._playing then return end
+    finish(self, true)
+  end
+  function group:_complete()
+    if not self._playing then return end
+    finish(self, false)
   end
   function group:IsPlaying() return self._playing == true end
   function group:SetLooping(loopType) self._looping = loopType end
@@ -287,7 +307,11 @@ local function CreateMockWidget(widgetType, name, parent)
     self._registeredDrags = {...}
   end
   -- Frame:StartMoving() / StopMovingOrSizing() (SimpleFrameAPIDocumentation.lua).
+  -- Frame:StartMoving() errors on a frame that is not movable (warcraft.wiki.gg).
   function widget:StartMoving()
+    if not self._movable then
+      error("Frame:StartMoving(): Frame is not movable", 2)
+    end
     self._moving = true
   end
   function widget:StopMovingOrSizing()
@@ -501,6 +525,15 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:GetScale()
     return self._scale or 1
+  end
+  -- Region:GetEffectiveScale() -> the frame's scale times every parent's.
+  function widget:GetEffectiveScale()
+    local scale = self:GetScale()
+    local owner = self._parent
+    if owner ~= nil and owner.GetEffectiveScale ~= nil then
+      scale = scale * owner:GetEffectiveScale()
+    end
+    return scale
   end
   -- SimpleAnimatableObjectAPIDocumentation.lua: CreateAnimationGroup(name?, templateName?).
   function widget:CreateAnimationGroup(groupName)

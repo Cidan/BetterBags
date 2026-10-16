@@ -23,22 +23,21 @@ local LibWindow = LibStub('LibWindow-1.1')
 -- insets leave (plus what the window's own parts reserve), and lays itself out through the
 -- render pipeline in one of two modes: sized to its content (the content takes its natural
 -- width, its height capped at most of the screen) or at the size the player dragged it to
--- (the content fills the box inside it and reflows, like a browser window).
+-- (the content fills the inner box and reflows, like a browser window).
+--
+-- The window sets the frame's drag and size scripts itself. Owners hook the frame's other
+-- scripts, or set ones the window does not use (the bag sets OnReceiveDrag and OnMouseUp),
+-- and never set OnDragStart, OnDragStop, OnSizeChanged, OnShow or OnHide.
 ---@class WindowModule: AceModule
 local window = addon:NewModule('Window')
 
 -- How much of the screen's height a window sized to its content may take.
 local SCREEN_FRACTION = 0.9
 
--- The fade every window uses when its theme gives no animations (animations/fade.lua).
-local DEFAULT_ANIMATIONS = {
-  Show = { { Type = "Alpha", From = 0, To = 1, Duration = 0.10, Smoothing = "IN" } },
-  Hide = { { Type = "Alpha", From = 1, To = 0, Duration = 0.10, Smoothing = "IN" } },
-}
-
--- The resize grip when the theme gives none (Interface\ChatFrame size grabber).
+-- The resize grip without a theme's: Blizzard's chat size grabber, shown while hovered.
 local DEFAULT_GRIP = {
   Size = 16,
+  ShowOnHover = true,
   Normal = { Texture = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down" },
   Highlight = { Texture = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight" },
   Pushed = { Texture = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up" },
@@ -47,27 +46,40 @@ local DEFAULT_GRIP = {
 ---@alias WindowSizeMode "content"|"window"
 
 ---@class WindowOptions
----@field Name string The frame's global name.
 ---@field Kind string The Sonata window kind: Bag, Panel, Flat or Dialog.
+---@field Name? string The frame's global name; needed to close with Escape.
 ---@field Title? string
 ---@field Parent? Frame UIParent when unset.
 ---@field Strata? FrameStrata
 ---@field Level? number
 ---@field Toplevel? boolean
 ---@field Movable? boolean false: dragging never moves it.
----@field CanMove? fun(): boolean Asked when a drag starts; false leaves the window where it is.
----@field OnMoved? fun() Called after the player moved it.
+---@field CanMove? fun(ctx: Context): boolean Asked when a drag starts; false leaves the window where it is.
+---@field OnMoveStart? fun(ctx: Context) Called before the window starts moving.
+---@field OnMoved? fun(ctx: Context) Called after the player moved it.
 ---@field Position? table A LibWindow-1.1 config table: the position is restored and saved.
+---@field Point? {Point: FramePoint, RelativeTo?: Region, RelativePoint?: FramePoint, X?: number, Y?: number} Where it sits without a saved position (the center of the screen when unset).
 ---@field Escape? boolean Close with Escape (UISpecialFrames).
 ---@field Opacity? fun(): number The window's background opacity, 0 to 100.
+---@field Scale? fun(): number The window's scale (1 is 100%).
 ---@field SizeMode? fun(): WindowSizeMode
----@field Size? fun(): number, number The size the player left it at, for the window mode.
----@field OnResized? fun(width: number, height: number) Called after the player resized it.
----@field MinWidth? number
----@field MinHeight? number
+---@field Size? fun(): number?, number? The size the player left it at, for the window mode.
+---@field OnResized? fun(ctx: Context, width: number, height: number) Called after the player resized it.
+---@field MinWidth? number|false|fun(): number The window's minimum width.
+---@field MinHeight? number|false|fun(): number The window's minimum height.
+---@field MinContentWidth? number|fun(): number The content box's minimum width.
+---@field MinContentHeight? number|fun(): number The content box's minimum height.
 ---@field Fade? fun(): boolean false: show and hide at once. Fades when unset.
 ---@field OnClose? fun(ctx: Context) Called when its close button is clicked, instead of hiding.
+---@field OnRendered? fun(ctx: Context?, width: number, height: number) Called after every render, with the size the window took.
+---@field OnShow? fun(ctx: Context) Called whenever the frame shows, however it was shown.
+---@field OnHide? fun(ctx: Context) Called whenever the frame hides, however it was hidden (Escape included).
 ---@field Content? Drawable
+
+---@class (exact) WindowAnimations
+---@field show? AnimationGroup
+---@field hide? AnimationGroup
+---@field fromAlpha number The alpha the show animation starts at.
 
 ---@class (exact) BetterBagsWindow: Drawable
 ---@field frame Frame
@@ -78,23 +90,36 @@ local DEFAULT_GRIP = {
 ---@field contentDrawable? Drawable
 ---@field extraInsets table
 ---@field plan RenderPlan
----@field animations table<string, {show: AnimationGroup, hide: AnimationGroup}>
+---@field animations table<string, WindowAnimations>
 ---@field showAnimation? AnimationGroup
 ---@field hideAnimation? AnimationGroup
+---@field fromAlpha number
 ---@field resizeGrip? Button
----@field sizing boolean
+---@field gripHover boolean
 ---@field moving boolean
 ---@field opts WindowOptions
 local windowProto = drawable:Extend({}, 'WindowFrame')
 
+---@param value number|false|nil|fun(): number
+---@return number?
+local function numberOf(value)
+  if type(value) == "function" then
+    return value()
+  end
+  if type(value) == "number" then
+    return value
+  end
+  return nil
+end
+
 ---@param opts WindowOptions
 ---@return BetterBagsWindow
 function window:Create(opts)
-  if type(opts) ~= "table" or type(opts.Name) ~= "string" then
-    error("a window needs a Name")
-  end
-  if type(opts.Kind) ~= "string" then
+  if type(opts) ~= "table" or type(opts.Kind) ~= "string" then
     error("a window needs a Kind")
+  end
+  if opts.Escape and type(opts.Name) ~= "string" then
+    error("a window that closes with Escape needs a Name")
   end
   ---@type BetterBagsWindow
   local w = drawable:Create(windowProto)
@@ -103,7 +128,8 @@ function window:Create(opts)
   w.title = opts.Title or ""
   w.extraInsets = {}
   w.animations = {}
-  w.sizing = false
+  w.fromAlpha = 0
+  w.gripHover = false
   w.moving = false
 
   local frame = CreateFrame("Frame", opts.Name, opts.Parent or UIParent, "BackdropTemplate")
@@ -120,6 +146,7 @@ function window:Create(opts)
   frame:SetClampedToScreen(true)
   frame:EnableMouse(true)
   w.frame = frame
+  w:UpdateScale(true)
 
   w.content = CreateFrame("Frame", nil, frame)
   w:UpdateContentAnchors()
@@ -130,16 +157,29 @@ function window:Create(opts)
   if opts.Position ~= nil then
     LibWindow.RegisterConfig(frame, opts.Position)
     LibWindow.RestorePosition(frame)
+  else
+    local p = opts.Point or { Point = "CENTER" }
+    frame:SetPoint(p.Point, p.RelativeTo or UIParent, p.RelativePoint or p.Point, p.X or 0, p.Y or 0)
   end
   if opts.Escape then
     table.insert(UISpecialFrames, opts.Name)
   end
 
-  frame:HookScript("OnSizeChanged", function()
+  addon.HookScript(frame, "OnSizeChanged", function()
     if w:GetSizeMode() == "window" then
       render:Invalidate(w)
     end
   end)
+  if opts.OnShow ~= nil then
+    addon.HookScript(frame, "OnShow", function(ctx)
+      opts.OnShow(ctx)
+    end)
+  end
+  if opts.OnHide ~= nil then
+    addon.HookScript(frame, "OnHide", function(ctx)
+      opts.OnHide(ctx)
+    end)
+  end
 
   if opts.Content ~= nil then
     w:SetContent(opts.Content)
@@ -170,35 +210,52 @@ function windowProto:WatchDrag()
   local frame = self.frame
   frame:SetMovable(true)
   frame:RegisterForDrag("LeftButton")
-  frame:SetScript("OnDragStart", function(f)
-    if self.opts.CanMove ~= nil and not self.opts.CanMove() then
+  addon.SetScript(frame, "OnDragStart", function(ctx, f)
+    if self.opts.CanMove ~= nil and not self.opts.CanMove(ctx) then
       return
+    end
+    if self.opts.OnMoveStart ~= nil then
+      self.opts.OnMoveStart(ctx)
     end
     self.moving = true
     f:StartMoving()
   end)
-  frame:SetScript("OnDragStop", function(f)
+  addon.SetScript(frame, "OnDragStop", function(ctx, f)
     if not self.moving then
       return
     end
     self.moving = false
     f:StopMovingOrSizing()
-    if self.opts.Position ~= nil then
-      LibWindow.SavePosition(f)
-    end
+    self:SavePosition()
     if self.opts.OnMoved ~= nil then
-      self.opts.OnMoved()
+      self.opts.OnMoved(ctx)
     end
   end)
 end
 
+-- SavePosition saves where the window is, when it has a saved position.
+function windowProto:SavePosition()
+  if self.opts.Position ~= nil then
+    LibWindow.SavePosition(self.frame)
+  end
+end
+
+-- SetContent makes content the drawable the window lays out. The content it replaces is
+-- hidden and detached, and the window lays out again.
 ---@param content Drawable
 function windowProto:SetContent(content)
+  local previous = self.contentDrawable
+  if previous ~= nil and previous ~= content then
+    previous:Hide()
+    render:Detach(previous)
+  end
   self.contentDrawable = content
   content:SetParent(self.content)
   content:ClearAllPoints()
   content.frame:SetAllPoints(self.content)
+  content.renderParent = self
   self:updatePlan()
+  self:Invalidate()
 end
 
 ---@return Drawable?
@@ -232,7 +289,8 @@ end
 -- footer), inside the theme's insets.
 ---@param insets {Left?: number, Right?: number, Top?: number, Bottom?: number}
 function windowProto:SetExtraInsets(insets)
-  self.extraInsets = insets or {}
+  local i = insets or {}
+  self.extraInsets = { Left = i.Left, Right = i.Right, Top = i.Top, Bottom = i.Bottom }
   self:UpdateContentAnchors()
   self:Invalidate()
 end
@@ -273,13 +331,25 @@ function windowProto:UpdateOpacity()
   end
 end
 
+-- UpdateScale applies the owner's scale and lays the window out again.
+---@param quiet? boolean Only set the scale.
+function windowProto:UpdateScale(quiet)
+  if self.opts.Scale == nil then
+    return
+  end
+  self.frame:SetScale(self.opts.Scale())
+  if not quiet then
+    self:Invalidate()
+  end
+end
+
 ---@param ctx Context
 function windowProto:OnCloseClicked(ctx)
   if self.opts.OnClose ~= nil then
     self.opts.OnClose(ctx)
     return
   end
-  self:Hide()
+  self:Hide(ctx)
 end
 
 -- OnDecorated runs after Sonata applied a theme to the window: the content moves to the new
@@ -293,7 +363,6 @@ function windowProto:OnDecorated(decoration)
   self:Invalidate()
 end
 
----@private
 ---@param group AnimationGroup
 ---@param specs table[]
 ---@return number? fromAlpha The alpha the first fade starts at.
@@ -328,46 +397,71 @@ local function addAnimations(group, specs)
   return fromAlpha
 end
 
+-- runCallbacks runs and clears the callbacks a finished animation was carrying.
 ---@param group AnimationGroup
-local function runCallback(group)
-  local callback = group.callback
-  group.callback = nil
-  if callback ~= nil then
+local function runCallbacks(group)
+  local callbacks = group.callbacks
+  group.callbacks = nil
+  for _, callback in ipairs(callbacks or {}) do
     callback()
   end
 end
 
+---@param group AnimationGroup
+---@param callback? fun()
+local function addCallback(group, callback)
+  if callback == nil then
+    return
+  end
+  group.callbacks = group.callbacks or {}
+  table.insert(group.callbacks, callback)
+end
+
 ---@private
 function windowProto:buildAnimations()
+  for _, group in ipairs({ self.showAnimation or false, self.hideAnimation or false }) do
+    if group and group:IsPlaying() then
+      group:Finish()
+    end
+  end
   local key = sonata:GetCurrentThemeKey() or ""
   local built = self.animations[key]
   if built == nil then
-    local specs = self.decoration and self.decoration:GetStyle().Animations or DEFAULT_ANIMATIONS
+    local specs = self.decoration and self.decoration:GetStyle().Animations
     local frame = self.frame
-    local show = frame:CreateAnimationGroup()
-    local fromAlpha = addAnimations(show, specs.Show or DEFAULT_ANIMATIONS.Show)
-    show:SetScript("OnPlay", function()
-      if fromAlpha ~= nil then
-        frame:SetAlpha(fromAlpha)
-      end
-      frame:Show()
-    end)
-    show:SetScript("OnFinished", function(group)
-      frame:SetAlpha(1)
-      frame:Show()
-      runCallback(group)
-    end)
-    local hide = frame:CreateAnimationGroup()
-    addAnimations(hide, specs.Hide or DEFAULT_ANIMATIONS.Hide)
-    hide:SetScript("OnFinished", function(group)
-      frame:Hide()
-      runCallback(group)
-    end)
-    built = { show = show, hide = hide }
+    built = { fromAlpha = 1 }
+    if type(specs) == "table" and type(specs.Show) == "table" then
+      local show = frame:CreateAnimationGroup()
+      built.fromAlpha = addAnimations(show, specs.Show) or 1
+      show:SetScript("OnFinished", function(group)
+        frame:SetAlpha(1)
+        runCallbacks(group)
+      end)
+      show:SetScript("OnStop", function(group)
+        frame:SetAlpha(1)
+        group.callbacks = nil
+      end)
+      built.show = show
+    end
+    if type(specs) == "table" and type(specs.Hide) == "table" then
+      local hide = frame:CreateAnimationGroup()
+      addAnimations(hide, specs.Hide)
+      hide:SetScript("OnFinished", function(group)
+        frame:Hide()
+        frame:SetAlpha(1)
+        runCallbacks(group)
+      end)
+      hide:SetScript("OnStop", function(group)
+        frame:SetAlpha(1)
+        group.callbacks = nil
+      end)
+      built.hide = hide
+    end
     self.animations[key] = built
   end
   self.showAnimation = built.show
   self.hideAnimation = built.hide
+  self.fromAlpha = built.fromAlpha
 end
 
 ---@return boolean
@@ -375,52 +469,101 @@ function windowProto:fades()
   return self.opts.Fade == nil or self.opts.Fade()
 end
 
--- Show shows the window (fading in unless its owner turned fading off) and renders it when it
--- was invalidated while hidden. callback runs once it is fully shown.
+-- IsClosing is true while the window fades out.
+---@return boolean
+function windowProto:IsClosing()
+  return self.hideAnimation ~= nil and self.hideAnimation:IsPlaying()
+end
+
+---@private
+---@param ctx Context
+---@return boolean rendered
+function windowProto:renderIfWaiting(ctx)
+  if self.renderPending or render:IsDirty(self) then
+    render:RenderNow(self, { ctx = ctx })
+    return true
+  end
+  return false
+end
+
+-- Show shows the window, fading in with its theme's animation unless fading is off, after
+-- rendering it if it changed while hidden. callback runs once it is fully shown. It returns
+-- whether it rendered.
+---@param ctx Context
 ---@param callback? fun()
-function windowProto:Show(callback)
-  if self.hideAnimation ~= nil and self.hideAnimation:IsPlaying() then
+---@return boolean rendered
+function windowProto:Show(ctx, callback)
+  local frame = self.frame
+  if frame:IsShown() and not self:IsClosing() then
+    local rendered = self:renderIfWaiting(ctx)
+    if self.showAnimation ~= nil and self.showAnimation:IsPlaying() then
+      addCallback(self.showAnimation, callback)
+    elseif callback ~= nil then
+      callback()
+    end
+    return rendered
+  end
+  if self.hideAnimation ~= nil then
     self.hideAnimation:Stop()
   end
-  if self:fades() and self.showAnimation ~= nil then
-    self.showAnimation.callback = callback
-    self.showAnimation:Play()
+  local rendered = self:renderIfWaiting(ctx)
+  local show = self.showAnimation
+  if self:fades() and show ~= nil then
+    show:Stop()
+    frame:SetAlpha(self.fromAlpha)
+    frame:Show()
+    addCallback(show, callback)
+    show:Play()
   else
-    self.frame:SetAlpha(1)
-    self.frame:Show()
+    frame:SetAlpha(1)
+    frame:Show()
     if callback ~= nil then
       callback()
     end
   end
-  if self.renderPending then
-    self.renderPending = nil
-    render:NewRenderChain(self, {})
-  end
+  return rendered
 end
 
--- Hide hides the window, fading out unless its owner turned fading off. callback runs once it
--- is hidden.
+-- Hide hides the window, fading out with its theme's animation unless fading is off.
+-- callback runs once it is hidden. A fade-in it interrupts is stopped without its callback.
+---@param ctx Context
 ---@param callback? fun()
-function windowProto:Hide(callback)
-  if self.showAnimation ~= nil and self.showAnimation:IsPlaying() then
+function windowProto:Hide(ctx, callback)
+  local _ = ctx
+  local frame = self.frame
+  if self.showAnimation ~= nil then
     self.showAnimation:Stop()
   end
-  if self:fades() and self.hideAnimation ~= nil then
-    self.hideAnimation.callback = callback
-    self.hideAnimation:Play()
+  if not frame:IsShown() then
+    if callback ~= nil then
+      callback()
+    end
+    return
+  end
+  local hide = self.hideAnimation
+  if hide ~= nil and hide:IsPlaying() then
+    addCallback(hide, callback)
+    return
+  end
+  if self:fades() and hide ~= nil then
+    addCallback(hide, callback)
+    hide:Play()
   else
-    self.frame:Hide()
+    frame:Hide()
+    frame:SetAlpha(1)
     if callback ~= nil then
       callback()
     end
   end
 end
 
-function windowProto:Toggle()
-  if self:IsShown() then
-    self:Hide()
+-- Toggle hides a shown window and shows a hidden one, or one fading out.
+---@param ctx Context
+function windowProto:Toggle(ctx)
+  if self:IsShown() and not self:IsClosing() then
+    self:Hide(ctx)
   else
-    self:Show()
+    self:Show(ctx)
   end
 end
 
@@ -434,19 +577,40 @@ function windowProto:ShouldRender()
   return self.frame:IsShown()
 end
 
--- UpdateSizeMode applies the owner's size mode: a window the player sizes takes its saved
--- size, can be resized and shows its grip; a window sized to its content cannot.
+---@private
+---@return number width, number height
+function windowProto:minimumSize()
+  local insets = self:GetContentInsets()
+  local width = math.max(insets.Left + insets.Right + 1, numberOf(self.opts.MinWidth) or 0)
+  local height = math.max(insets.Top + insets.Bottom + 1, numberOf(self.opts.MinHeight) or 0)
+  local minContentWidth = numberOf(self.opts.MinContentWidth)
+  if minContentWidth ~= nil then
+    width = math.max(width, minContentWidth + insets.Left + insets.Right)
+  end
+  local minContentHeight = numberOf(self.opts.MinContentHeight)
+  if minContentHeight ~= nil then
+    height = math.max(height, minContentHeight + insets.Top + insets.Bottom)
+  end
+  return width, height
+end
+
+-- UpdateSizeMode applies the owner's size mode and lays the window out again: a window the
+-- player sizes takes its saved size (or keeps the one it has), can be resized and shows its
+-- grip; a window sized to its content cannot.
 function windowProto:UpdateSizeMode()
   local frame = self.frame
   if self:GetSizeMode() == "window" then
+    local minWidth, minHeight = self:minimumSize()
     frame:SetResizable(true)
-    frame:SetResizeBounds(self.opts.MinWidth or 1, self.opts.MinHeight or 1)
+    frame:SetResizeBounds(minWidth, minHeight)
+    local width, height
     if self.opts.Size ~= nil then
-      local width, height = self.opts.Size()
-      if width ~= nil and height ~= nil then
-        frame:SetSize(width, height)
-      end
+      width, height = self.opts.Size()
     end
+    if width == nil or height == nil then
+      width, height = frame:GetWidth(), frame:GetHeight()
+    end
+    frame:SetSize(math.max(minWidth, width or 0), math.max(minHeight, height or 0))
     self:styleResizeGrip()
     self.resizeGrip:Show()
   else
@@ -454,6 +618,20 @@ function windowProto:UpdateSizeMode()
     if self.resizeGrip ~= nil then
       self.resizeGrip:Hide()
     end
+  end
+  self:Invalidate()
+end
+
+---@private
+function windowProto:updateGripAlpha()
+  local grip = self.resizeGrip
+  if grip == nil then
+    return
+  end
+  if grip.showOnHover and not self.gripHover then
+    grip:SetAlpha(0)
+  else
+    grip:SetAlpha(1)
   end
 end
 
@@ -463,23 +641,43 @@ function windowProto:styleResizeGrip()
   if grip == nil then
     grip = CreateFrame("Button", nil, self.frame)
     grip:EnableMouse(true)
-    grip:SetScript("OnMouseDown", function()
-      self.sizing = true
+    addon.SetScript(grip, "OnMouseDown", function(_, _, button)
+      if button ~= "LeftButton" then
+        return
+      end
       self.frame:StartSizing("BOTTOMRIGHT")
     end)
-    grip:SetScript("OnMouseUp", function()
-      self.sizing = false
+    addon.SetScript(grip, "OnMouseUp", function(ctx, _, button)
+      if button ~= "LeftButton" then
+        return
+      end
       self.frame:StopMovingOrSizing()
+      self:SavePosition()
       if self.opts.OnResized ~= nil then
-        self.opts.OnResized(self.frame:GetWidth(), self.frame:GetHeight())
+        self.opts.OnResized(ctx, self.frame:GetWidth(), self.frame:GetHeight())
       end
       self:Invalidate()
     end)
+    addon.SetScript(grip, "OnEnter", function()
+      self.gripHover = true
+      self:updateGripAlpha()
+    end)
+    addon.SetScript(grip, "OnLeave", function()
+      self.gripHover = false
+      self:updateGripAlpha()
+    end)
     self.resizeGrip = grip
   end
-  local style = self.decoration and self.decoration:GetStyle().Resize or DEFAULT_GRIP
+  local style = self.decoration and self.decoration:GetStyle().Resize
+  if type(style) ~= "table" then
+    style = DEFAULT_GRIP
+  end
   local size = style.Size or DEFAULT_GRIP.Size
-  grip:SetSize(size, size)
+  if type(size) == "table" then
+    grip:SetSize(size.Width, size.Height)
+  else
+    grip:SetSize(size, size)
+  end
   local overlay = self.decoration and self.decoration:GetOverlayFrame()
   grip:SetFrameLevel((overlay and overlay:GetFrameLevel() or self.frame:GetFrameLevel()) + 2)
   apply:Points(grip, style.Points or { { Point = "BOTTOMRIGHT" } }, self.frame)
@@ -488,6 +686,8 @@ function windowProto:styleResizeGrip()
     Highlight = style.Highlight or DEFAULT_GRIP.Highlight,
     Pushed = style.Pushed or DEFAULT_GRIP.Pushed,
   })
+  grip.showOnHover = style.ShowOnHover == true
+  self:updateGripAlpha()
 end
 
 ---@return RenderPlan
@@ -505,26 +705,35 @@ function windowProto:PreRender()
       Height = math.max(0, self.frame:GetHeight() - vertical),
     }
   end
+  local screen = UIParent:GetHeight() * UIParent:GetEffectiveScale() / self.frame:GetEffectiveScale()
   return {
-    MaxHeight = math.max(0, UIParent:GetHeight() * SCREEN_FRACTION - vertical),
+    MaxHeight = math.max(0, screen * SCREEN_FRACTION - vertical),
   }
 end
 
 ---@param _ RenderResult?
----@param _ RenderChainOptions
+---@param options RenderChainOptions
 ---@param results RenderResults
 ---@return RenderResult
-function windowProto:Render(_, _, results)
+function windowProto:Render(_, options, results)
   local frame = self.frame
-  if self.contentDrawable ~= nil and self:GetSizeMode() == "content" then
+  if self.contentDrawable ~= nil then
     local result = results.Results[self.contentDrawable]
     if result == nil then
       error("a window's content returned no render result")
     end
-    local insets = self:GetContentInsets()
-    local width = math.max(self.opts.MinWidth or 0, (result.Width or 0) + insets.Left + insets.Right)
-    local height = math.max(self.opts.MinHeight or 0, (result.Height or 0) + insets.Top + insets.Bottom)
-    frame:SetSize(width, height)
+    if self:GetSizeMode() == "content" then
+      local insets = self:GetContentInsets()
+      local minWidth, minHeight = self:minimumSize()
+      local width = math.max(minWidth, (result.Width or 0) + insets.Left + insets.Right)
+      local height = math.max(minHeight, (result.Height or 0) + insets.Top + insets.Bottom)
+      frame:SetSize(width, height)
+    end
+    self.contentDrawable:Show()
   end
-  return { Width = frame:GetWidth(), Height = frame:GetHeight() }
+  local width, height = frame:GetWidth(), frame:GetHeight()
+  if self.opts.OnRendered ~= nil then
+    self.opts.OnRendered(options and options.ctx, width, height)
+  end
+  return { Width = width, Height = height }
 end

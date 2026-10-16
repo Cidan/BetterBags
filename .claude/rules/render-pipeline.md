@@ -58,6 +58,9 @@ and `renderParentResult` (the constraints it was given).
 - A root whose `ShouldRender()` returns false (a hidden window) is skipped and left with
   `renderPending = true`; its owner renders it when it can.
 - `Render:Detach(d)` cuts a drawable off its tree. A parent link cycle is an error.
+- `Render:IsDirty(d)` says whether d's tree waits for the next frame; `Render:RenderNow(d,
+  options)` renders d's tree now (with `Invalidated` set) and drops the render it waited for, so
+  a window shown in the frame it was invalidated in renders once (window.md §4).
 
 ## 3. Re-entrancy and errors
 
@@ -96,7 +99,9 @@ one for its lifetime (no pool).
 ## 5. Load order and init
 
 All five TOCs list `render\render.lua`, `render\drawable.lua`, `render\scrollbox.lua` after
-`core\fonts.lua` (the profiler engine and Context load earlier) and before anything that draws.
+`core\fonts.lua` (the profiler engine and Context load earlier) and before anything that draws,
+followed by `sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua`,
+`sonata\elements.lua` and `window\window.lua`.
 `core/init.lua` calls `addon:GetModule('Render'):Init()` at the start of phase 4
 (initialization.md). Coverage: `spec/render/toc_spec.lua`.
 

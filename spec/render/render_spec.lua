@@ -461,6 +461,48 @@ describe("Render", function()
       assert.are.same({ "A:pre", "A:self" }, logA)
     end)
 
+    it("says whether a tree waits for the next frame", function()
+      local log = {}
+      local leaf = node("leaf", log)
+      local root = node("root", log, { children = { leaf } })
+      render:NewRenderChain(root, {})
+      assert.is_false(render:IsDirty(leaf))
+      render:Invalidate(leaf)
+      assert.is_true(render:IsDirty(leaf))
+      assert.is_true(render:IsDirty(root))
+      advance()
+      assert.is_false(render:IsDirty(root))
+    end)
+
+    it("renders a tree now and drops the render it waited for", function()
+      local log = {}
+      local root = node("root", log)
+      render:Invalidate(root)
+      local seen
+      local originalRender = root.Render
+      function root:Render(parentResult, options, results)
+        seen = options
+        return originalRender(self, parentResult, options, results)
+      end
+
+      local result = render:RenderNow(root, { ctx = "the context" })
+
+      assert.are.same({ "root:pre", "root:self" }, log)
+      assert.are.equal("the context", seen.ctx)
+      assert.is_true(seen.Invalidated)
+      assert.is_not_nil(result)
+      assert.is_false(render:IsDirty(root))
+      advance()
+      assert.are.same({ "root:pre", "root:self" }, log)
+    end)
+
+    it("renders a tree now even when it was not waiting", function()
+      local log = {}
+      local root = node("root", log)
+      render:RenderNow(root, {})
+      assert.are.same({ "root:pre", "root:self" }, log)
+    end)
+
     it("gives every invalidated render a context", function()
       local seen
       local d = drawable:Create({})

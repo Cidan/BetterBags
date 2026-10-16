@@ -193,6 +193,37 @@ function render:markDirty(root)
   end
 end
 
+-- IsDirty reports whether the tree d belongs to waits for a render on the next frame.
+---@param d Drawable
+---@return boolean
+function render:IsDirty(d)
+  return self.dirty[self:GetRoot(d)] == true
+end
+
+-- RenderNow renders the tree d belongs to now, and drops the render it waited for, if any.
+---@param d Drawable
+---@param options? RenderChainOptions
+---@return RenderResult?, RenderResults?
+function render:RenderNow(d, options)
+  local root = self:GetRoot(d)
+  if self.dirty[root] then
+    self.dirty[root] = nil
+    for i, entry in ipairs(self.dirtyOrder) do
+      if entry == root then
+        table.remove(self.dirtyOrder, i)
+        break
+      end
+    end
+  end
+  root.renderPending = nil
+  local chainOptions = {}
+  for k, v in pairs(options or {}) do
+    chainOptions[k] = v
+  end
+  chainOptions.Invalidated = true
+  return self:NewRenderChain(root, chainOptions)
+end
+
 -- Invalidate marks the tree d belongs to for a render on the next frame.
 ---@param d Drawable
 function render:Invalidate(d)

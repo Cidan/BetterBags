@@ -1185,6 +1185,7 @@ describe("Bag Draw: shared item button ownership across global sections and view
       bag.bankTab = bankTab
       bag.KeepBagInBounds = function() end
       bag.frame.GetBottom = function() return 100 end
+      bag.frame:SetMovable(true)
       bag:WatchMouse()
       return bag
     end

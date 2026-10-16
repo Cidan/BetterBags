@@ -82,7 +82,9 @@ Resolution never changes the registered tables.
 The decorator `SonataDecoration:Decorate(window, style, theme)` builds a window's chrome from a
 window style, creating one decoration object per window on first use (`window.decoration`).
 The window object provides `frame` (inheriting `BackdropTemplate`), `GetTitle()`,
-`GetOpacity()` (0-100) and `OnCloseClicked(ctx)`.
+`GetOpacity()` (0-100) and `OnCloseClicked(ctx)`, and may provide `OnDecorated(decoration)`,
+which the decoration calls at the end of every apply (the Window module moves its content and
+lays out again there, window.md §2).
 
 | Style key | What it builds |
 |---|---|
