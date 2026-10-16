@@ -38,7 +38,7 @@ Chinese `blei00d.TTF`). Setting one file drops every alphabet but the roman one.
 line (then with `"THICK"`) was there when the issue was filed (v0.1.6). The rows are used by
 the category pane's item list (`config/categorypane.lua:1181`).
 
-**Fixed (ce7767f, issue closed):** the row now uses `STANDARD_TEXT_FONT`, the locale's file that Blizzard sets on
+**Fixed (#1132, issue closed):** the row now uses `STANDARD_TEXT_FONT`, the locale's file that Blizzard sets on
 every client (`Blizzard_Fonts_Shared/Shared/GameFonts.xml`). Roman clients get the same file
 as before.
 
@@ -52,7 +52,7 @@ type, then " - " and the subtype, with no check for them being equal. Subtype is
 default (`core/constants.lua` `categoryFilters`), which hides it for most users. The
 maintainer agreed it should be deduplicated.
 
-**Fixed (ce7767f, issue closed):** a subtype equal to the type before it is skipped ("Quest", "Quest - Classic"), and
+**Fixed (#1132, issue closed):** a subtype equal to the type before it is skipped ("Quest", "Quest - Classic"), and
 `DB:RenameRepeatedTypeCategories` moves hidden state and group assignments saved under the old
 names (category-lifecycle.md §5).
 
@@ -134,7 +134,7 @@ handles `OnReceiveDrag` or a click with an item on the cursor; only the bag butt
 (`themes/themes.lua:553`, creates a category) and section titles (shift, adds to a category)
 do. The maintainer acknowledged the request and planned it; it was never added.
 
-**Fixed (f397560, issue closed):** the whole window is a drop target; the item goes into a free slot of the window's
+**Fixed (#1132, issue closed):** the whole window is a drop target; the item goes into a free slot of the window's
 bags through `util/cursorplacement.lua` (`.claude/rules/bag-drop-zone.md`). Not yet checked in
 game; the taint check to run is in that rules file, §3.
 
