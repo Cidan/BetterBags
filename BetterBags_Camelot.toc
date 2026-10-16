@@ -69,6 +69,10 @@ render\scrollbox.lua
 sonata\engine.lua
 sonata\apply.lua
 sonata\decoration.lua
+sonata\elements.lua
+
+# Every BetterBags window is a Window: its frame, chrome, content box and layout.
+window\window.lua
 
 # The Theme API loads earlier than actual themes.
 themes\themes.lua

@@ -30,6 +30,81 @@ _G.Enum.AddOnProfilerMetric = {
   CountTimeOver1000Ms = 11,
 }
 
+-- scriptable gives a mock object SetScript / GetScript / HookScript.
+local function scriptable(obj)
+  obj._scripts = {}
+  function obj:SetScript(scriptName, handler) self._scripts[scriptName] = handler end
+  function obj:GetScript(scriptName) return self._scripts[scriptName] end
+  function obj:HookScript(scriptName, handler)
+    local original = self._scripts[scriptName]
+    if original then
+      self._scripts[scriptName] = function(...) original(...) handler(...) end
+    else
+      self._scripts[scriptName] = handler
+    end
+  end
+  function obj:fire(scriptName, ...)
+    local handler = self._scripts[scriptName]
+    if handler then handler(self, ...) end
+  end
+  return obj
+end
+
+-- An animation (SimpleAnimAPIDocumentation.lua and the Alpha, Translation and Scale
+-- animation APIs): SetDuration, SetSmoothing, SetStartDelay, SetFromAlpha/SetToAlpha,
+-- SetOffset, SetScaleFrom/SetScaleTo/SetOrigin, Play/Stop/IsPlaying.
+local function CreateMockAnimation(group, animationType, name)
+  local anim = scriptable({ _type = animationType, _name = name, _group = group })
+  function anim:GetParent() return self._group end
+  function anim:SetDuration(duration) self._duration = duration end
+  function anim:SetSmoothing(smoothing) self._smoothing = smoothing end
+  function anim:SetStartDelay(delay) self._startDelay = delay end
+  function anim:SetFromAlpha(alpha) self._fromAlpha = alpha end
+  function anim:SetToAlpha(alpha) self._toAlpha = alpha end
+  function anim:SetOffset(x, y) self._offset = { x = x, y = y } end
+  function anim:SetScaleFrom(x, y) self._scaleFrom = { x = x, y = y } end
+  function anim:SetScaleTo(x, y) self._scaleTo = { x = x, y = y } end
+  function anim:SetOrigin(point, x, y) self._origin = { point = point, x = x, y = y } end
+  function anim:Play() self._playing = true self:fire("OnPlay") end
+  function anim:Stop() self._playing = false self:fire("OnStop") end
+  function anim:IsPlaying() return self._playing == true end
+  return anim
+end
+
+-- An animation group (SimpleAnimGroupAPIDocumentation.lua): CreateAnimation(animationType?,
+-- name?, templateName?), Play(reverse, offset), Stop(), Finish(), IsPlaying(), SetLooping,
+-- SetToFinalAlpha. There is no time in specs: Play runs the OnPlay scripts of the group and
+-- its animations, and Finish runs their OnFinished scripts, the order the client runs them in.
+local function CreateMockAnimationGroup(region, name)
+  local group = scriptable({ _region = region, _name = name, _animations = {} })
+  function group:GetParent() return self._region end
+  function group:CreateAnimation(animationType, animName)
+    local anim = CreateMockAnimation(self, animationType, animName)
+    table.insert(self._animations, anim)
+    return anim
+  end
+  function group:Play(reverse)
+    self._playing = true
+    self._reverse = reverse == true
+    self._plays = (self._plays or 0) + 1
+    self:fire("OnPlay")
+    for _, anim in ipairs(self._animations) do anim:fire("OnPlay") end
+  end
+  function group:Stop()
+    self._playing = false
+    self:fire("OnStop")
+  end
+  function group:Finish()
+    self._playing = false
+    for _, anim in ipairs(self._animations) do anim:fire("OnFinished") end
+    self:fire("OnFinished")
+  end
+  function group:IsPlaying() return self._playing == true end
+  function group:SetLooping(loopType) self._looping = loopType end
+  function group:SetToFinalAlpha(setToFinalAlpha) self._toFinalAlpha = setToFinalAlpha end
+  return group
+end
+
 -- Stateful Widget factory helper
 local function CreateMockWidget(widgetType, name, parent)
   local widget = {}
@@ -173,6 +248,10 @@ local function CreateMockWidget(widgetType, name, parent)
       x = x,
       y = y
     })
+  end
+  -- ScriptRegion:GetNumPoints() -> numPoints.
+  function widget:GetNumPoints()
+    return #self._points
   end
   function widget:GetPoint(index)
     index = index or 1
@@ -382,6 +461,10 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetScale()
     return self._scale or 1
   end
+  -- SimpleAnimatableObjectAPIDocumentation.lua: CreateAnimationGroup(name?, templateName?).
+  function widget:CreateAnimationGroup(groupName)
+    return CreateMockAnimationGroup(self, groupName)
+  end
   function widget:SetBlendMode(mode)
     self._blendMode = mode
   end
@@ -403,6 +486,16 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetTexCoord(...)
     self._texCoords = {...}
   end
+  -- TextureBase:GetTexCoord() -> the eight corner coordinates (ULx, ULy, LLx, LLy, URx, URy,
+  -- LRx, LRy); a texture set with left, right, top, bottom reports its corners.
+  function widget:GetTexCoord()
+    local c = self._texCoords or { 0, 1, 0, 1 }
+    if #c == 4 then
+      local left, right, top, bottom = c[1], c[2], c[3], c[4]
+      return left, top, left, bottom, right, top, right, bottom
+    end
+    return unpack(c)
+  end
   function widget:SetAtlas(atlas, useAtlasSize)
     self._atlas = atlas
     self._useAtlasSize = useAtlasSize
@@ -422,6 +515,17 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:SetNormalFontObject(fontObject)
     self._normalFontObject = fontObject
+  end
+  -- SimpleButtonAPIDocumentation.lua: SetHighlightFontObject(font), SetDisabledFontObject(font).
+  function widget:SetHighlightFontObject(fontObject)
+    self._highlightFontObject = fontObject
+  end
+  function widget:SetDisabledFontObject(fontObject)
+    self._disabledFontObject = fontObject
+  end
+  -- SimpleEditBoxAPIDocumentation.lua: SetTextInsets(left, right, top, bottom).
+  function widget:SetTextInsets(left, right, top, bottom)
+    self._textInsets = { left, right, top, bottom }
   end
   function widget:SetFontString(fontString)
     self._fontString = fontString

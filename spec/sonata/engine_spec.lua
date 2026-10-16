@@ -49,8 +49,14 @@ describe("Sonata engine", function()
   local sent
   local originalSend
   local savedFlags
+  local savedDecorator, savedStylers
 
   before_each(function()
+    savedDecorator = sonata.windowDecorator
+    savedStylers = {}
+    for kind, fn in pairs(sonata.elementStylers or {}) do
+      savedStylers[kind] = fn
+    end
     sonata:Init()
     sonata.themes = {}
     savedTheme = "Default"
@@ -72,6 +78,8 @@ describe("Sonata engine", function()
     for _, flag in ipairs(FLAGS) do
       addon[flag] = savedFlags[flag]
     end
+    sonata.windowDecorator = savedDecorator
+    sonata.elementStylers = savedStylers
   end)
 
   it("keeps the registered themes across Init", function()

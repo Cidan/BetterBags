@@ -368,6 +368,9 @@ function decorationProto:Apply(style, theme)
 
   self:SetTitle(self.window:GetTitle() or "")
   self:SetOpacity(self.window:GetOpacity() or 100)
+  if self.window.OnDecorated ~= nil then
+    self.window:OnDecorated(self)
+  end
 end
 
 ---@param text string

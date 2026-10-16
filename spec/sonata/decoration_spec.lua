@@ -456,6 +456,17 @@ describe("SonataDecoration", function()
     end)
   end)
 
+  describe("telling the window", function()
+    it("tells its window after every apply", function()
+      local window = newWindow()
+      local told = {}
+      function window:OnDecorated(deco) table.insert(told, deco) end
+      local deco = decorate(window, {})
+      decorate(window, { Insets = { Top = 5 } })
+      assert.are.same({ deco, deco }, told)
+    end)
+  end)
+
   describe("switching themes", function()
     it("leaves nothing of a templated theme behind when the next one is flat", function()
       local window = newWindow()
