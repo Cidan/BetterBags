@@ -128,9 +128,9 @@ end
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
--- Load the item.lua file
-LoadBetterBagsModule("frames/item.lua")
-local itemFrame = addon:GetModule("ItemFrame")
+-- A fresh frames/item.lua: a copy an earlier spec file loaded holds that file's Sonata stubs,
+-- not the ones above. Removed again in the teardown.
+local itemFrame = LoadFreshBetterBagsModule("ItemFrame", "frames/item.lua")
 itemFrame.CreateDecoration = function(_, item) return newDecoration(item) end
 
 describe("ItemFrame Static Buttons and Parent Removal Tests", function()
@@ -1257,15 +1257,6 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
 end)
 
 describe("Empty slot family icon overlay", function()
-  -- The last describe in this file puts back what the file replaced.
-  teardown(function()
-    for i = #replaced, 1, -1 do
-      replaced[i][1][replaced[i][2]] = replaced[i][3]
-    end
-    if createdSonata then ResetModuleStub("Sonata") end
-    if createdElements then ResetModuleStub("SonataElements") end
-  end)
-
   before_each(function()
     addon.isRetail = true
     _G.ClearItemButtonOverlay = _G.ClearItemButtonOverlay or function() end
@@ -1359,4 +1350,15 @@ describe("Empty slot family icon overlay", function()
     item:SetFreeSlots(btnCtx, btn, 2)
     assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
   end)
+end)
+
+-- After every block of this file (a file-level teardown also runs last when blocks are
+-- shuffled), put back what the file replaced.
+teardown(function()
+  for i = #replaced, 1, -1 do
+    replaced[i][1][replaced[i][2]] = replaced[i][3]
+  end
+  ResetModuleStub("ItemFrame", "frames/item.lua")
+  if createdSonata then ResetModuleStub("Sonata") end
+  if createdElements then ResetModuleStub("SonataElements") end
 end)

@@ -6,11 +6,20 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
 LoadBetterBagsModule("core/context.lua")
 
-local const = StubBetterBagsModule("Constants")
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local const = trackStub("Constants")
 const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
 const.BAG_VIEW = const.BAG_VIEW or { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 
-local db = StubBetterBagsModule("Database")
+local db = trackStub("Database")
 local sizeInfo = { itemsPerRow = 7, columnCount = 2 }
 local originalGetBagSizeInfo, originalGetBagView = db.GetBagSizeInfo, db.GetBagView
 
@@ -113,4 +122,10 @@ describe("BagCanvas", function()
     end
     assert.are.equal("BagCanvasFrame", name)
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)

@@ -280,7 +280,7 @@ config:AddPluginConfig("My Plugin", pluginOptions)
 - **Form Module**: UI form creation and management
 - **Database Module**: Settings persistence
 - **Events Module**: Event messaging system
-- **Themes Module**: Visual theming support
+- **Sonata Module**: the themes the Theme pane lists and applies (`sonata/README.md`)
 
 ### itemcolorpane.lua
 

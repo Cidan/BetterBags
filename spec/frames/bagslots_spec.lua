@@ -73,9 +73,9 @@ describe("BagSlots panel", function()
     render:Init()
     originalThemes = sonata.themes
     sonata.themes = {}
+    sonata:Init()
     assert(loadfile("sonata/themes/base.lua"))("BetterBags")
     assert(loadfile("sonata/themes/default.lua"))("BetterBags")
-    sonata:Init()
     savedTheme = "Default"
     database.GetTheme = function() return savedTheme end
     database.SetTheme = function(_, key) savedTheme = key end

@@ -170,6 +170,16 @@ A sweep that changed one slot should cost one slot, but every past attempt at in
 ## Built-In Category Names Exist Only While Items Are Read
 Settings keyed by a category name (`customSectionSort`, `categoryOptions`, `categoryToGroup`) cover built-in categories too, whose names `items:GetCategory` computes from item data and stores nowhere. At load, before any item is read, a built-in name is indistinguishable from a deleted category's leftover, so no migration may drop a setting because its name has no stored filter: one that did removed every built-in pin at each login (#1107, `.claude/rules/category-lifecycle.md` §3). Prevent leftovers where they are created (delete scrubs every side table) and give the user a way to remove one, instead of guessing at load. When `GetCategory` changes how it names categories, move the settings to the new names in a migration (category-lifecycle.md §5).
 
+## Spec Files Must Pass Alone and Shuffled
+The suite runs every spec file in one Lua state, so a file can pass only because an earlier one left something behind: a stub module with the methods it needs, a real module the earlier file loaded, or a copy of a module loaded with the earlier file's stubs captured in its file-scope locals (`LoadBetterBagsModule` loads a path once per state). Check a new or changed spec file with `~/.local/lua51/bin/busted <file>` and `busted --shuffle --seed=N <file>`, not only in the suite's order. The rules that keep a file independent:
+- Create stubs with `StubBetterBagsModule` and remove the ones the file created (the `created` flag) when it ends; never `x.Method = x.Method or default` on a module another file may have loaded for real (its method then runs against data this file never set up): replace it and put the original back.
+- Load the module under test fresh (`LoadFreshBetterBagsModule`) when it captures other modules at file scope, and remove it after (`spec/frames/item_spec.lua`).
+- Put file-wide restores in a file-level `teardown`, not in one `describe` block's: `--shuffle` reorders blocks, so that block's teardown can run first and undo the stubs every other block needs.
+- Revert a `stub(obj, "Method")` with `finally(function() obj.Method:revert() end)`; it otherwise stays for the rest of the file.
+- Reset shared engines before re-registering into them: the specs call `Sonata:Init()` before loading the theme files, as the addon's own load order does (`.claude/rules/sonata.md` §2: a theme registering after one was applied reads the saved theme).
+- A test that only checks scheduling should stub the scheduled work rather than run it, so it does not depend on what that work touches.
+Measured state and the remaining known failures: `docs/roadmap.md`, "Spec isolation".
+
 ## Debugging Strategies
 1. **Trace the call chain**: End symptom → query function → filter variable → where filter is set → events → switch point
 2. **Check Blizzard source first**: `.libraries/wow-ui-source/` for actual Blizzard implementation before writing hooks or workarounds

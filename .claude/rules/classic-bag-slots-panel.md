@@ -54,9 +54,9 @@ entry is missing, broken, or shows an empty/partial view.
   retail-only concept. The menu's `usesBankTabs` is therefore
   `addon.isRetail and bag.kind == BANK`. On Classic/Era the bank toggles **exactly
   like the backpack**: checkmark = `bag.slots:IsShown()`, and it only switches the bag
-  view (`SECTION_ALL_BAGS` / previous view). It never writes `showBankTabs`. The GW2
-  theme's duplicate "Show Bags" panel button (`themes/gw2.lua`) uses the same retail
-  gate. Re-opening the bank restores the panel from the view:
+  view (`SECTION_ALL_BAGS` / previous view). It never writes `showBankTabs`. The menu entry and
+  a theme's `ShowBags` action button (the GW2 theme's side panel) run the same code,
+  `ContextMenu:ToggleBagSlots` (window.md, "Action buttons"), so both use this gate. Re-opening the bank restores the panel from the view:
   `bagProto:Draw` shows `bag.slots` whenever the view is `SECTION_ALL_BAGS`.
 - **Data partition.** `ItemBelongsToTab` (`data/items.lua`) filters bank items to
   `item.bagid == tabID` in `SECTION_ALL_BAGS`, because on retail tab ID == Blizzard

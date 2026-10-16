@@ -667,7 +667,7 @@ local query = searchBox:GetText()
 
 - **Items Module**: Provides item data for display, handles filtering for character bank tabs
 - **Categories Module**: Determines section grouping
-- **Themes Module**: Handles visual styling
+- **Window and Sonata Modules**: every window is a `Window`, drawn and restyled by the active Sonata theme (`.claude/rules/window.md`, `sonata/README.md`)
 - **Events Module**: Coordinates frame updates
 - **Database Module**: Stores frame positions, settings, and character bank tabs preference
 - **Search Module**: Provides search functionality

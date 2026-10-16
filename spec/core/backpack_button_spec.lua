@@ -10,7 +10,7 @@
 -- hook; it was only harmless because it originally ran at the very end of
 -- OnInitialize. The manual-init refactor moved the loop into the MIDDLE of
 -- OnInitialize, so the throw now aborts everything after it (bank creation,
--- themes:Enable, SetTitle, UISpecialFrames registration).
+-- enabling Sonata, SetTitle, UISpecialFrames registration).
 --
 -- These tests use the REAL AceHook (they do NOT stub addon.HookScript) so the
 -- production throw reproduces, and they only reload core/init.lua so its module

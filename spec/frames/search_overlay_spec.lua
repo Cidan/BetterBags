@@ -57,9 +57,9 @@ describe("the overlay search panel", function()
     render:Init()
     originalThemes = sonata.themes
     sonata.themes = {}
+    sonata:Init()
     assert(loadfile("sonata/themes/base.lua"))("BetterBags")
     assert(loadfile("sonata/themes/default.lua"))("BetterBags")
-    sonata:Init()
     override(database, "GetTheme", function() return "Default" end)
     override(database, "SetTheme", function() end)
     override(database, "GetEnterToMakeCategory", function() return false end)

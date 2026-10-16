@@ -28,8 +28,8 @@ Defines basic container and button templates used throughout the addon.
 
 #### BetterBagsSearchPanelTemplate
 - **Inherits:** `SimplePanelTemplate`
-- **Purpose:** Base template for search panels
-- **Usage:** Search interface panels
+- **Purpose:** The look of the overlay search panel (the search keybinding)
+- **Usage:** the Default Sonata theme's `Search` window template (`sonata/themes/default.lua`)
 
 ```xml
 <Frame name="BetterBagsSearchPanelTemplate" inherits="SimplePanelTemplate" virtual="true">
@@ -342,7 +342,7 @@ Templates can inherit from multiple parents:
 
 Templates work closely with:
 - **Frames Module**: Uses templates to create UI elements
-- **Themes Module**: Applies styling to templated elements
+- **Sonata**: themes name templates in their window styles (`Template.Name`) and restyle templated elements
 - **Forms Module**: Uses templates for form controls
 - **Debug Module**: Uses debug templates for display
 

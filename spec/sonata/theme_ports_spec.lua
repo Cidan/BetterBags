@@ -6,11 +6,20 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 
-local db = StubBetterBagsModule("Database")
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local db = trackStub("Database")
 local savedTheme = "Default"
 local originalGetTheme, originalSetTheme = db.GetTheme, db.SetTheme
 
-local fonts = StubBetterBagsModule("Fonts")
+local fonts = trackStub("Fonts")
 fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsUnitFrame12Yellow")
 fonts.UnitFrame12White = fonts.UnitFrame12White or CreateFont("BetterBagsUnitFrame12White")
 
@@ -40,10 +49,10 @@ describe("BetterBags' other themes", function()
   before_each(function()
     originalThemes = sonata.themes
     sonata.themes = {}
+    sonata:Init()
     for _, file in ipairs(THEME_FILES) do
       assert(loadfile("sonata/themes/" .. file .. ".lua"))("BetterBags")
     end
-    sonata:Init()
     savedTheme = "Default"
     db.GetTheme = function() return savedTheme end
     db.SetTheme = function(_, key) savedTheme = key end
@@ -477,4 +486,10 @@ describe("BetterBags' other themes", function()
       assert.are.same({ Object = "UnitFrame12White" }, sonata:Resolve("GW2").Elements.SectionHeader.Font)
     end)
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)

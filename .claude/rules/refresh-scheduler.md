@@ -301,11 +301,12 @@ its setters once even though its data is unchanged.
 
 | Setting | Read in | Message |
 |---|---|---|
-| Items Per Row, Columns (`GetBagSizeInfo`) | views, bag frame, themes | `bags/Redraw` (after the sliders' 0.2 s debounce) |
+| Items Per Row, Columns (`GetBagSizeInfo`) | views, bag frame | `bags/Redraw` (after the sliders' 0.2 s debounce) |
+| Resizable Window (`GetBagSizeMode`) | the bag's window (`ApplySizeSettings` on draw) | `bags/Redraw` |
 | Show Full Section Names | `frames/section.lua` (every section draw) | `bags/Redraw` |
 | Quality Glow Intensity | `frames/item.lua` `DrawQualityGlow` | `bags/Redraw`, buttons |
 | Show Item Level, Show Item Level Color (`GetItemLevelOptions`) | `frames/item.lua` | `bags/Redraw`, buttons |
-| Theme (`themes:ApplyTheme`) | themes, decorations | `bags/Redraw` (the decoration generation it bumps redraws the buttons) |
+| Theme (`Sonata:ApplyTheme`) | window decorations, element styles | `bags/Redraw` (the Sonata generation it bumps redraws the buttons) |
 
 Settings that look like presentation but are read by the data phase are recalculated
 instead (§10): Section Order (sorted in `items:Phase10_PartitionIntoTabs` and
@@ -376,8 +377,8 @@ request, is swept only while it is open.
 |---|---|
 | Config data settings (upgrade provider, section and item order, groups, category filters, stacking except Split Transmogged, free space, gaps) | `bags/Rederive { resetLayout, buttons }` |
 | Categories: create from an item, delete, rename, hide/show, reprocess (`categories:ReprocessAllItems`), category pane edits, search categories, item drops on a header, group drag and drop | `bags/Rederive { resetLayout, buttons }` |
-| In-bag search toggle (`themes:SetSearchState`) | `bags/Rederive { resetLayout, buttons }` |
-| Show Bags toggles (context menu, GW2 theme) | `bags/Rederive { resetLayout }`: nothing a button draws depends on the view except through data its draw record holds, so unchanged buttons skip |
+| In-bag search toggle (`search/SetInFrame` → `bag:SetSearchShown`) | `bags/Rederive { resetLayout, buttons }` |
+| Show Bags toggles (`ContextMenu:ToggleBagSlots`: the context menu, a theme's ShowBags action button) | `bags/Rederive { resetLayout }`: nothing a button draws depends on the view except through data its draw record holds, so unchanged buttons skip |
 | Interaction window opens the backpack / closes (`core/hooks.lua`) | `bags/Rederive { resetLayout, backpack, bank = items:NeedsInteractionRecalculation(BANK) }`: the backpack's grey-out depends on the open window; the bank's only interaction-dependent input is stack unmerging, so it is recalculated only when its committed stacks were built under the other interaction state (recorded per kind at commit, `items._stackedInteracting`). A captured bank open recalculated the bank (149 ms) into the layout its own read had just committed under the banker interaction |
 | `EQUIPMENT_SETS_CHANGED` | derive of both kinds with `resetLayout` |
 | Tooltip resolved (`TooltipScanner:OnTooltipDataResolved`) | `bags/Rederive { backpack, bank = atBank }` |

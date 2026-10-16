@@ -181,6 +181,12 @@ sized in `E.mult`, one physical pixel at ElvUI's UI scale (`E:UIMult`,
 `SetScale(scale / 100)` (`frames/bag.lua:633`), which makes those borders thinner than a
 pixel. Nothing in the theme compensates for the bag's own scale.
 
+**Still applies after the Sonata overhaul (verified in code, 2026-10-16):** the ElvUI theme is
+now data (`sonata/themes/elvui.lua`) and calls nothing of ElvUI's, but its edges are still
+`E:Scale(1)` wide (`$EdgeSize`), drawn as textures of that height and width
+(`sonata/elements.lua` `edges`), inside a window the bag scales (`window/window.lua`
+`UpdateScale`).
+
 ---
 
 ## Related findings (not among the 20)
@@ -190,7 +196,8 @@ pixel. Nothing in the theme compensates for the bag's own scale.
   `themes:UpdateOpacity` apply the backpack's opacity to every window
   (`themes/themes.lua:82-83`, `:139-140`, `:293-298`, all reading
   `GetBagSizeInfo(const.BAG_KIND.BACKPACK, ...)`). Verified in code; no issue exists for it.
-  **Fixed (#1133):** each bag window gets its own bag's opacity (`themes/README.md`).
+  **Fixed (#1133):** each bag window gets its own bag's opacity (now `window.md` §7: the bags
+  follow their own, the other windows the backpack's).
 - **WoW: Forever keyring** ([#1121](https://github.com/Cidan/BetterBags/issues/1121)). The
   Classic Era keyring is scanned (`core/era/constants.lua` lists `Enum.BagIndex.Keyring` in
   `BACKPACK_BAGS`), which is why #469 was closed. Forever loads only `core/constants.lua`, whose

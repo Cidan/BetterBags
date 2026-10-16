@@ -6,15 +6,24 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 
-local const = StubBetterBagsModule("Constants")
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local const = trackStub("Constants")
 const.FORM_LAYOUT = const.FORM_LAYOUT or { STACKED = 1 }
 const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
 
-local db = StubBetterBagsModule("Database")
+local db = trackStub("Database")
 local savedTheme, opacity = "Default", 70
 local originals = { GetTheme = db.GetTheme, SetTheme = db.SetTheme, GetBagSizeInfo = db.GetBagSizeInfo, GetBagView = db.GetBagView }
 
-local fonts = StubBetterBagsModule("Fonts")
+local fonts = trackStub("Fonts")
 fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsFormSpecYellow")
 
 local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
@@ -48,9 +57,9 @@ describe("Form", function()
     render:Init()
     originalThemes = sonata.themes
     sonata.themes = {}
+    sonata:Init()
     assert(loadfile("sonata/themes/base.lua"))("BetterBags")
     assert(loadfile("sonata/themes/default.lua"))("BetterBags")
-    sonata:Init()
     savedTheme, opacity = "Default", 70
     db.GetTheme = function() return savedTheme end
     db.SetTheme = function(_, key) savedTheme = key end
@@ -152,4 +161,10 @@ describe("Form", function()
     sonata:UpdateOpacity()
     assert.are.equal(0.3, f.window.decoration:GetTemplateFrame().Bg:GetAlpha())
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)

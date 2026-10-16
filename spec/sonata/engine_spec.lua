@@ -6,7 +6,16 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 
-local db = StubBetterBagsModule("Database")
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local db = trackStub("Database")
 local savedTheme = "Default"
 db.GetTheme = function() return savedTheme end
 db.SetTheme = function(_, key) savedTheme = key end
@@ -750,4 +759,10 @@ describe("Sonata engine", function()
       assert.is_false(sonata:UsesMasque())
     end)
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)

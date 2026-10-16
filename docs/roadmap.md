@@ -51,7 +51,8 @@ before they are evaluated, cold-scan healing (tooltip-scanning.md).
 
 **Status:** not started. Opening the bank draws its 465 buttons for the first time
 (`SetItemFromData` 22 ms, `Themes.GetItemButton` 9 ms, `UpdateCooldown` 4.6 ms, grid layout
-13 ms), and every tab switch releases the old tab's buttons and draws the new tab's from
+13 ms; the Sonata overhaul removed `GetItemButton`, a button's decoration is now a field read,
+item-drawing.md §7a; not re-measured), and every tab switch releases the old tab's buttons and draws the new tab's from
 scratch (353 first draws, 78 ms, in one switch). Showing the grids runs Blizzard's show
 handlers on every newly visible button (`GridFrame.Show`, up to 40 ms at open, 22 ms in a
 switch). This is a design question: keeping inactive tab views drawn and hidden would trade
@@ -132,7 +133,22 @@ question needs the arguments (redraw reasons, layouts).
 
 ### Spec isolation
 
-**Status:** known debt. Running some spec files directly before `refresh_pipeline_spec`
-(`spec/frames/tabs_spec.lua`, `spec/frames/bankslots_spec.lua`, `spec/quickfind_spec.lua`)
-fails a group of its bank tests; this predates the 2026-10-12 work. The suite's own order
-passes. `events:Init` no longer leaves duplicate handlers behind, which removed one source.
+**Status:** known debt. The suite's own order passes (and is what CI runs). Measured on
+2026-10-16, after the windowing and Sonata overhaul:
+
+- Run directly before `refresh_pipeline_spec`, `spec/frames/bankslots_spec.lua` and
+  `spec/quickfind_spec.lua` fail 12 of its bank tests (3 failures, 9 errors); this predates the
+  2026-10-12 work. `spec/frames/tabs_spec.lua` no longer does (rewritten in the overhaul).
+- Every spec file passes run alone except `orchestrator_spec` and `targeted_sweep_spec`, whose
+  `Database` and `Constants` stubs miss methods `data/items.lua` calls (they fail alone on the
+  pre-overhaul commit too).
+- `busted --shuffle` (seeds 1-5) fails 18 to 90 tests, all in specs the overhaul did not touch
+  (`categories_spec`, `items_spec`, `equipmentsets_spec`, `loader_spec`, `async_spec`,
+  `orchestrator_spec`, `targeted_sweep_spec`) plus `bags/backpack_spec`, which loads the real
+  `core/database.lua` and fails when any earlier file registered a `Database` stub. The
+  pre-overhaul commit fails 58 to 80 with the same seeds (different orders, as it has fewer
+  files). The specs the overhaul added remove the stubs they create, restore what they replace
+  in file-level teardowns (busted shuffles blocks too, so a restore in one block's teardown can
+  run first), and pass alone and with their blocks shuffled.
+
+`events:Init` no longer leaves duplicate handlers behind, which removed one source.

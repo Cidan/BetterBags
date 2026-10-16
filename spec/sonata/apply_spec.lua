@@ -4,7 +4,16 @@
 -- coordinates, tiling and slicing it brings.
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
-local fonts = StubBetterBagsModule("Fonts")
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local fonts = trackStub("Fonts")
 fonts.SpecTitleFont = fonts.SpecTitleFont or CreateFont("BetterBagsSpecTitleFont")
 
 LoadBetterBagsModule("sonata/apply.lua")
@@ -243,4 +252,10 @@ describe("SonataApply", function()
       assert.are.same({ "TOPLEFT", b, "TOPLEFT", 1, -1 }, { b:GetHighlightTexture():GetPoint(1) })
     end)
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)

@@ -223,6 +223,10 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   local old_split = string.split
 
   local createdBagStubs = {}
+  -- Database methods the bag window reads, replaced for each test and put back after it (an
+  -- earlier spec file may have loaded the real module, whose methods read profile data this
+  -- spec does not set up).
+  local replacedDatabase = {}
   local function setupBagFrameStubs()
     -- Register mock LibWindow-1.1 library
     local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
@@ -255,11 +259,16 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       end
     end
 
-    database.GetBagPosition = database.GetBagPosition or function() return {} end
-    database.GetBagSizeMode = database.GetBagSizeMode or function() return "content" end
-    database.GetBagViewFrameSize = database.GetBagViewFrameSize or function() return 700, 500 end
-    database.GetEnableBagFading = database.GetEnableBagFading or function() return false end
-    database.GetTheme = database.GetTheme or function() return "Default" end
+    for key, fn in pairs({
+      GetBagPosition = function() return {} end,
+      GetBagSizeMode = function() return "content" end,
+      GetBagViewFrameSize = function() return 700, 500 end,
+      GetEnableBagFading = function() return false end,
+      GetTheme = function() return "Default" end,
+    }) do
+      table.insert(replacedDatabase, { key, rawget(database, key) })
+      database[key] = fn
+    end
 
     LoadBetterBagsModule("render/render.lua")
     LoadBetterBagsModule("render/drawable.lua")
@@ -327,6 +336,10 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     ResetModuleStub("BackpackBehavior")
     ResetModuleStub("BankBehavior")
     ResetModuleStub("BagFrame", "frames/bag.lua")
+    for i = #replacedDatabase, 1, -1 do
+      database[replacedDatabase[i][1]] = replacedDatabase[i][2]
+    end
+    replacedDatabase = {}
   end)
 
   it("should reproduce the nil slotkey crash when items data is transient/nil during UpdateButton", function()

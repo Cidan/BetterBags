@@ -6,14 +6,23 @@ local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 
-local const = StubBetterBagsModule("Constants")
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local const = trackStub("Constants")
 const.SEARCH_CATEGORY_GROUP_BY = const.SEARCH_CATEGORY_GROUP_BY or { NONE = 0, TYPE = 1, SUBTYPE = 2, EXPANSION = 3 }
 
-local db = StubBetterBagsModule("Database")
+local db = trackStub("Database")
 local savedTheme = "Default"
 local originalGetTheme, originalSetTheme = db.GetTheme, db.SetTheme
 
-local fonts = StubBetterBagsModule("Fonts")
+local fonts = trackStub("Fonts")
 fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsSearchCategorySpecYellow")
 
 local categories, createdCategories = StubBetterBagsModule("Categories")
@@ -43,9 +52,9 @@ describe("SearchCategoryConfig", function()
     render:Init()
     originalThemes = sonata.themes
     sonata.themes = {}
+    sonata:Init()
     assert(loadfile("sonata/themes/base.lua"))("BetterBags")
     assert(loadfile("sonata/themes/default.lua"))("BetterBags")
-    sonata:Init()
     savedTheme = "Default"
     db.GetTheme = function() return savedTheme end
     db.SetTheme = function(_, key) savedTheme = key end
@@ -168,4 +177,10 @@ describe("SearchCategoryConfig", function()
     assert.are.equal("Button", registered[config.saveButton])
     assert.are.equal("Button", registered[config.cancelButton])
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)

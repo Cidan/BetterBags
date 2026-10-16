@@ -76,7 +76,16 @@ StubBetterBagsModule("ContextMenu")
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
-local fonts = StubBetterBagsModule("Fonts")
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
+end
+
+local fonts = trackStub("Fonts")
 fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsBankSlotsSpecYellow")
 database.GetTheme = function() return "Default" end
 database.SetTheme = function() end
@@ -182,9 +191,9 @@ describe("Bank Bag/Slot Window Pane Tests", function()
     savedFlags = { isRetail = addon.isRetail, isForever = addon.isForever, isClassic = addon.isClassic }
     originalThemes = sonata.themes
     sonata.themes = {}
+    sonata:Init()
     assert(loadfile("sonata/themes/base.lua"))("BetterBags")
     assert(loadfile("sonata/themes/default.lua"))("BetterBags")
-    sonata:Init()
     sonata:ApplyTheme(ctx:New("test"), "Default")
   end)
 
@@ -784,4 +793,10 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       assert.is_nil(registered["BAG_CONTAINER_UPDATE"])
     end)
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)

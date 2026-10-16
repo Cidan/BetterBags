@@ -61,9 +61,9 @@ describe("Tabs", function()
     override(database, "SetTheme", function() end)
     originalThemes = sonata.themes
     sonata.themes = {}
+    sonata:Init()
     assert(loadfile("sonata/themes/base.lua"))("BetterBags")
     assert(loadfile("sonata/themes/default.lua"))("BetterBags")
-    sonata:Init()
     override(groups, "IsDefaultGroup", function() return false end)
     sonata:ApplyTheme(context:New("spec"), "Default")
     override(sectionFrame, "draggingCategory", nil)

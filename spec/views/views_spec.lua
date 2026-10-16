@@ -26,6 +26,18 @@ itemFrame.GetButton = function() return {} end
 local categories = StubBetterBagsModule("Categories")
 categories.GetCategoryByName = function() return nil end
 
+-- views.lua names an item's section with Localization and repairs anchors with Debug. Stubs
+-- this file creates are removed after it, so a later spec file can load the real modules.
+local createdStubs = {}
+for _, name in ipairs({ "Localization", "Debug" }) do
+  local _, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+end
+local L = addon:GetModule("Localization")
+L.G = L.G or function(_, key) return key end
+local debug = addon:GetModule("Debug")
+debug.WalkAndFixAnchorGraph = debug.WalkAndFixAnchorGraph or function() end
+
 LoadBetterBagsModule("views/views.lua")
 local views = addon:GetModule("Views")
 
@@ -197,4 +209,10 @@ describe("Views render passes", function()
     view:FinishRender(ctx)
     assert.are.equal(0, weapons.released)
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)
