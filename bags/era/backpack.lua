@@ -22,9 +22,6 @@ local bagSlots = addon:GetModule("BagSlots")
 ---@class SearchBox: AceModule
 local searchBox = addon:GetModule("SearchBox")
 
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule("ThemeConfig")
-
 -------
 --- Era Backpack Behavior Overrides
 --- Classic Era doesn't have the currency system (GetCurrencyListInfo API), so the
@@ -42,14 +39,8 @@ function backpack.proto:OnCreate(ctx)
 
 	-- Bag slots panel
 	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BACKPACK, self.bag.frame)
-	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
-	slots.frame:SetParent(self.bag.frame)
-	slots.frame:Hide()
 	self.bag.slots = slots
 
-	-- Theme config (currency grid omitted: no currency API in Era)
-	self.bag.themeConfigFrame = themeConfig:Create(self.bag.sideAnchor)
-	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
 
 	-- Group tabs
 	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)

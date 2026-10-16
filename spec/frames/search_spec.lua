@@ -3,7 +3,7 @@
 -- Focus: searchBox:GetSearchText(kind), the query source the data pipeline
 -- (data/items.lua Phase8_EnrichCategories) consults to recompute
 -- item.isSearchResult on every redraw. The live filter is driven by the
--- per-kind in-bag box (searchBox:CreateBox -> decoration.search), which is
+-- per-kind in-bag box (searchBox:CreateBox, kept by its bag as bag.searchBox), which is
 -- distinct from the module-level overlay searchFrame. Reading only the overlay
 -- box reset the filter to "everything matches" on any redraw while the user was
 -- using the in-bag search (the reported "right-click to bank clears the search
@@ -24,7 +24,8 @@ const.BAG_KIND = const.BAG_KIND or { UNDEFINED = -1, BACKPACK = 0, BANK = 1 }
 
 local database = StubBetterBagsModule("Database")
 
-local themes = StubBetterBagsModule("Themes")
+local _, createdSonata = StubBetterBagsModule("Sonata")
+local _, createdWindow = StubBetterBagsModule("Window")
 
 -- Other specs stub "SearchBox"; clear any prior stub so the real module file
 -- can register cleanly here (mirrors the data/search.lua reset-then-load pattern).
@@ -38,26 +39,24 @@ local function makeBox(text)
 end
 
 describe("SearchBox:GetSearchText", function()
-  local backpackFrame, bankFrame
-  local inBagBoxes
+  teardown(function()
+    if createdSonata then ResetModuleStub("Sonata") end
+    if createdWindow then ResetModuleStub("Window") end
+  end)
 
   before_each(function()
-    backpackFrame = {}
-    bankFrame = {}
     addon.Bags = {
-      Backpack = { frame = backpackFrame },
-      Bank = { frame = bankFrame },
+      Backpack = { frame = {} },
+      Bank = { frame = {} },
     }
-    inBagBoxes = {}
-    themes.GetInBagSearchBox = function(_, frame) return inBagBoxes[frame] end
     -- Overlay box is empty by default (mirrors in-bag search being the active box).
     searchBox.searchFrame = makeBox("")
     database.GetInBagSearch = function() return true end
   end)
 
   it("reads the per-kind in-bag box, not the empty overlay box, when in-bag search is on", function()
-    inBagBoxes[backpackFrame] = makeBox("ink")
-    inBagBoxes[bankFrame] = makeBox("")
+    addon.Bags.Backpack.searchBox = makeBox("ink")
+    addon.Bags.Bank.searchBox = makeBox("")
 
     -- The overlay-only getter still returns empty -- this is the source of the bug.
     assert.equal("", searchBox:GetText())
@@ -66,14 +65,14 @@ describe("SearchBox:GetSearchText", function()
   end)
 
   it("resolves the bank in-bag box for the BANK kind", function()
-    inBagBoxes[backpackFrame] = makeBox("ink")
-    inBagBoxes[bankFrame] = makeBox("cloth")
+    addon.Bags.Backpack.searchBox = makeBox("ink")
+    addon.Bags.Bank.searchBox = makeBox("cloth")
 
     assert.equal("cloth", searchBox:GetSearchText(const.BAG_KIND.BANK))
   end)
 
   it("falls back to the overlay box when the in-bag box is empty", function()
-    inBagBoxes[backpackFrame] = makeBox("")
+    addon.Bags.Backpack.searchBox = makeBox("")
     searchBox.searchFrame = makeBox("overlayquery")
 
     assert.equal("overlayquery", searchBox:GetSearchText(const.BAG_KIND.BACKPACK))
@@ -81,10 +80,19 @@ describe("SearchBox:GetSearchText", function()
 
   it("uses the overlay box when in-bag search is disabled", function()
     database.GetInBagSearch = function() return false end
-    inBagBoxes[backpackFrame] = makeBox("ink")
+    addon.Bags.Backpack.searchBox = makeBox("ink")
     searchBox.searchFrame = makeBox("overlayquery")
 
     assert.equal("overlayquery", searchBox:GetSearchText(const.BAG_KIND.BACKPACK))
+  end)
+
+  it("finds each bag's own in-bag box, and none for a bag that was not made", function()
+    local box = makeBox("x")
+    addon.Bags.Backpack.searchBox = box
+    addon.Bags.Bank = nil
+    assert.are.equal(box, searchBox:GetInBagBox(const.BAG_KIND.BACKPACK))
+    assert.is_nil(searchBox:GetInBagBox(const.BAG_KIND.BANK))
+    assert.equal("", searchBox:GetSearchText(const.BAG_KIND.BANK))
   end)
 
   it("returns empty string when no search box holds any text", function()

@@ -20,19 +20,36 @@ end
 
 stubModule("Constants")
 local database = stubModule("Database")
+local fonts = stubModule("Fonts")
+fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsDebugSpecYellow")
 local tabs = stubModule("Tabs")
 local list = stubModule("List")
 local itemBrowser = stubModule("ItemBrowser")
 local perfPane = stubModule("PerfPane")
 
+local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
+libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
+libWindow.RestorePosition = libWindow.RestorePosition or function() end
+libWindow.SavePosition = libWindow.SavePosition or function() end
+
+LoadBetterBagsModule("render/render.lua")
+LoadBetterBagsModule("render/drawable.lua")
+LoadBetterBagsModule("sonata/engine.lua")
+LoadBetterBagsModule("sonata/apply.lua")
+LoadBetterBagsModule("sonata/decoration.lua")
+LoadBetterBagsModule("window/window.lua")
+ResetModuleStub("DebugWindow", "frames/debug.lua")
 LoadBetterBagsModule("frames/debug.lua")
 
 local debugWindow = addon:GetModule("DebugWindow")
+local sonata = addon:GetModule("Sonata")
+local render = addon:GetModule("Render")
 
 describe("DebugWindow", function()
   local saved
   local tabNames
   local pane
+  local debugMode, originalThemes
 
   local function override(tbl, key, value)
     table.insert(saved, { tbl, key, tbl[key] })
@@ -57,6 +74,17 @@ describe("DebugWindow", function()
     saved = {}
     tabNames = {}
     events:Init()
+    render:Init()
+    originalThemes = sonata.themes
+    sonata.themes = {}
+    sonata:Init()
+    assert(loadfile("sonata/themes/base.lua"))("BetterBags")
+    assert(loadfile("sonata/themes/default.lua"))("BetterBags")
+    debugMode = false
+    override(database, "GetTheme", function() return "Default" end)
+    override(database, "SetTheme", function() end)
+    override(database, "SetDebugMode", function(_, enabled) debugMode = enabled end)
+    sonata:ApplyTheme(context:New("Test"), "Default")
     local realCreateFrame = _G.CreateFrame
     override(_G, "CreateFrame", function(frameType, name, parent, template)
       local f = realCreateFrame(frameType, name, parent, template)
@@ -90,6 +118,7 @@ describe("DebugWindow", function()
     for i = #saved, 1, -1 do
       saved[i][1][saved[i][2]] = saved[i][3]
     end
+    sonata.themes = originalThemes
   end)
 
   teardown(function()
@@ -97,6 +126,47 @@ describe("DebugWindow", function()
     for i = #createdStubs, 1, -1 do
       ResetModuleStub(createdStubs[i])
     end
+  end)
+
+  it("is a titled Flat window of a fixed size the player can move", function()
+    local w = debugWindow.window
+    assert.are.equal("Flat", w.kind)
+    assert.are.equal(debugWindow.frame, w.frame)
+    assert.are.equal("BetterBagsDebugWindow", w.frame:GetName())
+    assert.are.equal("BetterBags Debug Window", w:GetTitle())
+    assert.are.same({ 800, 600 }, { w.frame:GetWidth(), w.frame:GetHeight() })
+    assert.is_false(w.frame._resizable)
+    assert.is_true(w.frame._movable)
+  end)
+
+  it("puts every tab's content in the window's content box", function()
+    local box = debugWindow.window.content
+    for i = 1, 4 do
+      local frame = debugWindow.contentFrames[i].frame or debugWindow.contentFrames[i]
+      assert.are.same({ "TOPLEFT", box, "TOPLEFT", 0, 0 }, { frame:GetPoint(1) }, "tab " .. i)
+      assert.are.same({ "BOTTOMRIGHT", box, "BOTTOMRIGHT", 0, 0 }, { frame:GetPoint(2) }, "tab " .. i)
+    end
+  end)
+
+  it("turns debug mode off on a left click of its close button, and clears the log on a right click", function()
+    local received = {}
+    events:RegisterMessage("config/DebugMode", function(_, enabled) table.insert(received, { "mode", enabled }) end)
+    events:RegisterMessage("debug/ClearLog", function() table.insert(received, { "clear" }) end)
+    local close = debugWindow.window.decoration:GetCloseButton()
+    assert.are.same({ "LeftButtonUp", "RightButtonUp" }, close._registeredClicks)
+    close:GetScript("OnClick")(close, "RightButton")
+    assert.are.same({ { "clear" } }, received)
+    close:GetScript("OnClick")(close, "LeftButton")
+    assert.is_false(debugMode)
+    assert.are.same({ "mode", false }, received[#received])
+  end)
+
+  it("shows and hides with debug mode, at once", function()
+    events:SendMessage(context:New("Test"), "config/DebugMode", true)
+    assert.is_true(debugWindow.frame:IsShown())
+    assert.are.equal(1, debugWindow.frame:GetAlpha())
+    events:SendMessage(context:New("Test"), "config/DebugMode", false)
+    assert.is_false(debugWindow.frame:IsShown())
   end)
 
   it("has a Performance tab after the existing ones", function()

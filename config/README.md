@@ -136,9 +136,9 @@ The ThemePane module provides a theme selection interface within the main settin
 
 #### Functions
 
-- **`themePane:Create(parent)`**: Creates a new theme pane for the settings interface
-- Integrates with the Themes module for theme switching
-- Applies themes immediately when the Apply button is clicked
+- **`themePane:Create(parent)`**: Creates a new theme pane for the settings interface (`themePane:New(parent)` returns the pane object)
+- Lists every Sonata theme that is not hidden (`Sonata:GetThemes()`), unavailable ones too, sorted by name, the applied one checked
+- Applies themes immediately through `Sonata:ApplyTheme` when the Apply button is clicked
 
 #### UI Structure
 
@@ -280,7 +280,7 @@ config:AddPluginConfig("My Plugin", pluginOptions)
 - **Form Module**: UI form creation and management
 - **Database Module**: Settings persistence
 - **Events Module**: Event messaging system
-- **Themes Module**: Visual theming support
+- **Sonata Module**: the themes the Theme pane lists and applies (`sonata/README.md`)
 
 ### itemcolorpane.lua
 

@@ -75,10 +75,12 @@ describe("Blizzard calls the profiler measures", function()
   -- whichever measured function called it.
   it("is never called inline outside core/hooks.lua", function()
     local inline = {}
-    local files = io.popen("find bags frames core data themes config integrations views forms -name '*.lua'")
+    local files = io.popen("find bags frames core data config integrations views forms render sonata window -name '*.lua' 2>&1")
+    local scanned = {}
     for path in files:lines() do
+      scanned[path] = true
       if path ~= "core/hooks.lua" then
-        local f = assert(io.open(path))
+        local f = assert(io.open(path), "cannot scan " .. path)
         local n = 0
         for line in f:lines() do
           n = n + 1
@@ -91,6 +93,11 @@ describe("Blizzard calls the profiler measures", function()
       end
     end
     files:close()
+    -- A folder missing from the list (or renamed) must fail here, not pass with nothing scanned.
+    for _, path in ipairs({ "core/hooks.lua", "frames/bag.lua", "bags/bank.lua", "window/window.lua",
+      "sonata/decoration.lua", "render/render.lua" }) do
+      assert.is_true(scanned[path] == true, "the scan did not reach " .. path)
+    end
     assert.same({}, inline)
   end)
 end)

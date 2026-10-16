@@ -62,11 +62,6 @@ sort.SortSectionsAlphabetically = function() return true end
 sort.GetSectionSortFunction = function() return function() return true end end
 sort.GetItemSortFunction = function() return function() return true end end
 
-local themes = StubBetterBagsModule("Themes")
-themes.GetTabButton = function() return {} end
-themes.GetItemButton = function() return { UpgradeIcon = { SetShown = function() end } } end
-themes.RegisterPortraitWindow = function() end
-themes.SetSearchState = function() end
 
 local categories
 local ok = pcall(function() categories = addon:GetModule("Categories") end)
@@ -214,10 +209,24 @@ LoadBetterBagsModule("views/bagview.lua")
 
 local context = addon:GetModule("Context")
 
+-- render binds a view's data and lays it out the way a bag sized to its content does: with
+-- the items per row and columns from the bag's settings.
+local function render(view, ctx, bag, slotInfo, callback)
+  view:Bind(ctx, bag, slotInfo)
+  local sizeInfo = database:GetBagSizeInfo(bag.kind, database:GetBagView(bag.kind))
+  view:Layout(ctx, { itemsPerRow = sizeInfo.itemsPerRow, columns = sizeInfo.columnCount })
+  if callback then callback() end
+end
+
 describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function()
   local old_strsplit = _G.strsplit
   local old_split = string.split
 
+  local createdBagStubs = {}
+  -- Database methods the bag window reads, replaced for each test and put back after it (an
+  -- earlier spec file may have loaded the real module, whose methods read profile data this
+  -- spec does not set up).
+  local replacedDatabase = {}
   local function setupBagFrameStubs()
     -- Register mock LibWindow-1.1 library
     local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
@@ -229,22 +238,70 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     contextMenu.CreateContextMenu = function() return {} end
 
     StubBetterBagsModule("BagSlots")
-    local resize = StubBetterBagsModule("Resize")
-    resize.MakeResizable = function() return { Hide = function() end } end
 
     StubBetterBagsModule("Currency")
     local searchBox = StubBetterBagsModule("SearchBox")
     searchBox.GetText = function() return "" end
     searchBox.GetSearchText = function() return "" end
 
-    StubBetterBagsModule("ThemeConfig")
-    StubBetterBagsModule("WindowGroup")
     local anchor = StubBetterBagsModule("Anchor")
     anchor.New = function() return {} end
 
     StubBetterBagsModule("Question")
     StubBetterBagsModule("BackpackBehavior")
     StubBetterBagsModule("BankBehavior")
+    -- Stubs this spec creates are torn down after each test (another spec file may load
+    -- the real module later); modules that already existed are left alone.
+    for _, name in ipairs({ "BagMenuButton", "BagActions", "CursorPlacement", "Fonts" }) do
+      local _, created = StubBetterBagsModule(name)
+      if created then
+        table.insert(createdBagStubs, name)
+      end
+    end
+
+    for key, fn in pairs({
+      GetBagPosition = function() return {} end,
+      GetBagSizeMode = function() return "content" end,
+      GetBagViewFrameSize = function() return 700, 500 end,
+      GetEnableBagFading = function() return false end,
+      GetTheme = function() return "Default" end,
+    }) do
+      table.insert(replacedDatabase, { key, rawget(database, key) })
+      database[key] = fn
+    end
+
+    LoadBetterBagsModule("render/render.lua")
+    LoadBetterBagsModule("render/drawable.lua")
+    LoadBetterBagsModule("render/scrollbox.lua")
+    LoadBetterBagsModule("sonata/engine.lua")
+    LoadBetterBagsModule("sonata/apply.lua")
+    LoadBetterBagsModule("sonata/decoration.lua")
+    LoadBetterBagsModule("window/window.lua")
+    ResetModuleStub("BagCanvas", "frames/bagcanvas.lua")
+    LoadBetterBagsModule("frames/bagcanvas.lua")
+    addon:GetModule("Render"):Init()
+    addon:GetModule("Sonata"):Init()
+  end
+
+  -- windowedBag builds a bag on the real bagProto with the window bagFrame:Create builds, shown.
+  local bagCount = 0
+  local function windowedBag(fields)
+    local bag = {
+      kind = const.BAG_KIND.BACKPACK,
+      tabViews = {},
+      behavior = {
+        OnShow = function() end,
+        GetFrameStrata = function() return "MEDIUM" end,
+        GetFrameLevel = function() return 500 end,
+      },
+    }
+    for k, v in pairs(fields or {}) do bag[k] = v end
+    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    bagCount = bagCount + 1
+    bag:BuildWindow("PersistentTabsSpec" .. bagCount)
+    bag.OnResize = function() end
+    bag.frame:Show()
+    return bag
   end
   before_each(function()
     _G.strsplit = function(sep, str, max)
@@ -268,16 +325,21 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     items.slotInfo[const.BAG_KIND.BANK].itemsBySlotKey = {}
     ResetModuleStub("ContextMenu")
     ResetModuleStub("BagSlots")
-    ResetModuleStub("Resize")
+    for i = #createdBagStubs, 1, -1 do
+      ResetModuleStub(createdBagStubs[i])
+    end
+    createdBagStubs = {}
     ResetModuleStub("Currency")
     ResetModuleStub("SearchBox")
-    ResetModuleStub("ThemeConfig")
-    ResetModuleStub("WindowGroup", "util/windowgroup.lua")
     ResetModuleStub("Anchor")
     ResetModuleStub("Question")
     ResetModuleStub("BackpackBehavior")
     ResetModuleStub("BankBehavior")
     ResetModuleStub("BagFrame", "frames/bag.lua")
+    for i = #replacedDatabase, 1, -1 do
+      database[replacedDatabase[i][1]] = replacedDatabase[i][2]
+    end
+    replacedDatabase = {}
   end)
 
   it("should reproduce the nil slotkey crash when items data is transient/nil during UpdateButton", function()
@@ -331,7 +393,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     local ctx = context:New("test")
     ctx:Set("redraw", true)
     local bag = { kind = const.BAG_KIND.BANK, frame = CreateFrame("Frame") }
-    view:Render(ctx, bag, mockSlotInfo, function() end)
+    render(view, ctx, bag, mockSlotInfo, function() end)
 
     -- Assert that under the new refactored state-consistent logic,
     -- no ghost button is created when item data is nil.
@@ -404,13 +466,13 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
       stacks = { GetStackInfo = function() end },
       totalItems = 0
     }
-    view:Render(ctx, bag, mockSlotInfo, function() end)
+    render(view, ctx, bag, mockSlotInfo, function() end)
     assert.is_false(view.emptyGroupFrame:IsShown())
 
     -- Now test custom tab ID > 1 (e.g., 2)
     local view2 = views:NewGrid(parent, const.BAG_KIND.BACKPACK, 2) -- Tab 2
     assert.is_not_nil(view2.emptyGroupFrame)
-    view2:Render(ctx, bag, mockSlotInfo, function() end)
+    render(view2, ctx, bag, mockSlotInfo, function() end)
     -- Since totalItems is 0 and visible non-special section count is 0, emptyGroupFrame should show
     assert.is_true(view2.emptyGroupFrame:IsShown())
   end)
@@ -418,20 +480,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   it("renders only the active tab's view in bag:Draw(); other tabs render when switched to", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local frame = CreateFrame("Frame")
-    frame.SetScale = function() end
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-      tabViews = {},
-      GetCurrentTabID = function() return 1 end,
-      IsShown = function() return true end,
-      OnResize = function() end,
-      behavior = {
-        OnShow = function() end,
-      }
-    }
-    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
 
     local ctx = context:New("test")
     -- Create view for Tab 1 and Tab 2
@@ -440,8 +489,8 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     local render1_called = false
     local render2_called = false
-    view1.Render = function(self, ...) render1_called = true; select(4, ...)(...) end
-    view2.Render = function(self, ...) render2_called = true; select(4, ...)(...) end
+    view1.Bind = function() render1_called = true end
+    view2.Bind = function() render2_called = true end
 
     local mockSlotInfo = {
       GetChangeset = function() return {}, {}, {} end,
@@ -466,27 +515,16 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   it("should skip rendering in Draw() when the bag is not shown, and draw when shown", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local frame = CreateFrame("Frame")
-    frame.SetScale = function() end
     local shown = false
-    frame.IsShown = function() return shown end
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-      tabViews = {},
-      GetCurrentTabID = function() return 1 end,
-      OnResize = function() end,
-      behavior = {
-        OnShow = function() shown = true end,
-      }
-    }
-    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
+    bag.behavior.OnShow = function() shown = true end
+    bag.frame.IsShown = function() return shown end
 
     local ctx = context:New("test")
     local view = bag:GetViewForTab(ctx, 1)
 
     local render_called = false
-    view.Render = function(self, ...) render_called = true; select(4, ...)(...) end
+    view.Bind = function() render_called = true end
 
     local mockSlotInfo = {
       GetChangeset = function() return {}, {}, {} end,
@@ -581,7 +619,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_nil(view.itemsByBagAndSlot["0_1"])
 
     local callbackCalled = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
+    render(view, context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
 
     assert.is_true(callbackCalled)
     assert.is_false(view.isNew)
@@ -627,7 +665,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_nil(view.itemsByBagAndSlot["0_1"])
 
     local callbackCalled = false
-    view:Render(context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
+    render(view, context:New("test"), bag, mockSlotInfo, function() callbackCalled = true end)
 
     assert.is_true(callbackCalled)
     assert.is_false(view.isNew)
@@ -749,7 +787,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     -- Tab 1 (Character Bank)
     local view1 = views:NewGrid(parent, const.BAG_KIND.BANK, 1)
-    view1:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    render(view1, context:New("test"), bag, mockSlotInfo, function() end)
 
     -- Assert only charItem is drawn in view1
     assert.is_not_nil(view1.itemsByBagAndSlot["6_1"])
@@ -757,7 +795,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     -- Tab 2 (Account Bank)
     local view2 = views:NewGrid(parent, const.BAG_KIND.BANK, 2)
-    view2:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    render(view2, context:New("test"), bag, mockSlotInfo, function() end)
 
     -- Assert only warItem is drawn in view2
     assert.is_nil(view2.itemsByBagAndSlot["6_1"])
@@ -792,7 +830,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     -- Ensure no redraw or wipe flag is set in context
 
     local callback_called = false
-    view:Render(ctx, bag, mockSlotInfo, function() callback_called = true end)
+    render(view, ctx, bag, mockSlotInfo, function() callback_called = true end)
 
     assert.is_true(callback_called)
     -- We can verify it early exited without wiping or running full layout (view is still intact)
@@ -841,7 +879,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     }
 
     local bag = { kind = const.BAG_KIND.BACKPACK, frame = CreateFrame("Frame") }
-    view:Render(context:New("test"), bag, mockSlotInfo, function() end)
+    render(view, context:New("test"), bag, mockSlotInfo, function() end)
 
     -- Under the buggy behavior, the item would be filtered out (not in view.itemsByBagAndSlot),
     -- and its section (which would be GetBagName(0) -> "#1: Backpack") would be hidden.
@@ -856,20 +894,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
   it("does not wipe any view during bag:Draw(); every view begins and finishes a render pass", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local frame = CreateFrame("Frame")
-    frame.SetScale = function() end
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-      tabViews = {},
-      GetCurrentTabID = function() return 1 end,
-      IsShown = function() return true end,
-      OnResize = function() end,
-      behavior = {
-        OnShow = function() end,
-      }
-    }
-    setmetatable(bag, { __index = addon:GetModule("BagFrame").bagProto })
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
 
     local ctx = context:New("test")
     -- Create view for Tab 1 and Tab 2
@@ -926,21 +951,23 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(bagView.isNew)
   end)
 
-  it("should support stateless sizing via bagProto:UpdateBagBounds", function()
+  it("sizes the bag window around its canvas: the view, the scroll bar, at least the minimum", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
-    local bagProto = addon:GetModule("BagFrame").bagProto
-    assert.is_not_nil(bagProto.UpdateBagBounds, "bagProto:UpdateBagBounds should be defined")
+    local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
+    local view = bag:GetViewForTab(context:New("test"), 1)
+    view.Bind = function() end
+    view.Layout = function() return 400, 200 end
+    local slotInfo = { tabs = { [1] = { items = {}, categories = {} } }, sortedItems = {}, stacks = { GetStackInfo = function() end } }
 
-    local frame = CreateFrame("Frame")
-    local bag = {
-      kind = const.BAG_KIND.BACKPACK,
-      frame = frame,
-    }
-    setmetatable(bag, { __index = bagProto })
+    bag:Draw(context:New("test"), slotInfo, function() end)
 
-    -- Assert that calling bagProto:UpdateBagBounds resizes the bag frame
-    bag:UpdateBagBounds(280, 200)
-    assert.are_equal(280 + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH, frame:GetWidth())
+    assert.are.equal(400 + bag.scroll:GetBarWidth(), bag.frame:GetWidth())
+    assert.are.equal(200, bag.frame:GetHeight())
+
+    view.Layout = function() return 10, 10 end
+    bag:Draw(context:New("test"), slotInfo, function() end)
+    assert.are.equal(260 + bag.scroll:GetBarWidth(), bag.frame:GetWidth())
+    assert.are.equal(100, bag.frame:GetHeight())
   end)
 end)

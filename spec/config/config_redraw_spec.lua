@@ -27,7 +27,7 @@ local events = stubModule("Events")
 local db = stubModule("Database")
 local bucket = stubModule("Bucket")
 local form = stubModule("Form")
-stubModule("Themes")
+local sonata = stubModule("Sonata")
 stubModule("CategoryPane")
 stubModule("ThemePane")
 stubModule("CurrencyPane")
@@ -189,6 +189,78 @@ describe("Config settings refreshes", function()
       end
     end)
   end
+
+  -- Opacity and scale belong to the bag's window: it fades its background or rescales and
+  -- lays itself out again, with no message to the bags at all.
+  -- The size mode: sized to its items (content) or a window the player sizes (window).
+  it("makes each bag a window the player sizes, or one sized to its items, and redraws it", function()
+    local modes = {}
+    saved[#saved + 1] = { db, "GetBagSizeMode", db.GetBagSizeMode }
+    saved[#saved + 1] = { db, "SetBagSizeMode", db.SetBagSizeMode }
+    db.GetBagSizeMode = function(_, kind) return modes[kind] or "content" end
+    db.SetBagSizeMode = function(_, kind, mode) modes[kind] = mode end
+    local found = settings("Resizable Window")
+    assert.are.equal(2, #found)
+    for _, opts in ipairs(found) do
+      sent, modes = {}, {}
+      assert.is_false(opts.getValue(context:New("Test")))
+      opts.setValue(context:New("Test"), true)
+      local kind = next(modes)
+      assert.are.equal("window", modes[kind])
+      assert.is_true(opts.getValue(context:New("Test")))
+      opts.setValue(context:New("Test"), false)
+      assert.are.equal("content", modes[kind])
+      assert.are.same({ "bags/Redraw", "bags/Redraw" }, messages())
+    end
+  end)
+
+  describe("opacity and scale", function()
+    local windows, savedValues, opacityUpdates
+
+    before_each(function()
+      windows, savedValues, opacityUpdates = {}, {}, 0
+      for _, entry in ipairs({
+        { db, "SetBagViewSizeOpacity", function(_, kind, _, value) savedValues[#savedValues + 1] = { "opacity", kind, value } end },
+        { db, "SetBagViewSizeScale", function(_, kind, _, value) savedValues[#savedValues + 1] = { "scale", kind, value } end },
+        { sonata, "UpdateOpacity", function() opacityUpdates = opacityUpdates + 1 end },
+        { addon, "GetBagFromKind", function(_, kind)
+          windows[kind] = windows[kind] or { opacity = 0, scale = 0, quiet = {} }
+          local w = windows[kind]
+          return { window = {
+            UpdateOpacity = function() w.opacity = w.opacity + 1 end,
+            UpdateScale = function(_, quiet) w.scale = w.scale + 1 table.insert(w.quiet, quiet == true) end,
+          } }
+        end },
+      }) do
+        saved[#saved + 1] = { entry[1], entry[2], entry[1][entry[2]] }
+        entry[1][entry[2]] = entry[3]
+      end
+    end)
+
+    -- Every window follows an opacity: the bags their own, the other windows the backpack's.
+    it("saves the opacity and fades every window with Sonata, sending nothing to the bags", function()
+      for _, opts in ipairs(settings("Opacity")) do
+        sent, savedValues, opacityUpdates = {}, {}, 0
+        opts.setValue(context:New("Test"), 55)
+        assert.are.same({}, messages())
+        assert.are.equal("opacity", savedValues[1][1])
+        assert.are.equal(55, savedValues[1][3])
+        assert.are.equal(1, opacityUpdates)
+      end
+    end)
+
+    it("saves the scale and rescales the bag's window, which lays itself out again", function()
+      for _, opts in ipairs(settings("Scale")) do
+        sent, savedValues = {}, {}
+        opts.setValue(context:New("Test"), 120)
+        assert.are.same({}, messages())
+        assert.are.equal(120, savedValues[1][3])
+        local w = windows[savedValues[1][2]]
+        assert.are.equal(1, w.scale)
+        assert.are.same({ false }, w.quiet)
+      end
+    end)
+  end)
 
   -- The item hash, which decides what stacks, includes the transmog appearance only with
   -- this setting; the hash is computed when a slot is read.

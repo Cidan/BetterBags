@@ -57,8 +57,29 @@ core\hooks.lua
 core\async.lua
 core\fonts.lua
 
+# The render pipeline (staged render plans) loads before anything that draws with it.
+render\render.lua
+render\drawable.lua
+render\scrollbox.lua
+
+# Sonata, the theme engine. Theme data files register after the engine.
+sonata\engine.lua
+sonata\apply.lua
+sonata\decoration.lua
+sonata\elements.lua
+
+# Every BetterBags window is a Window: its frame, chrome, content box and layout.
+window\window.lua
+
+# BetterBags' Sonata themes. Base holds what every theme inherits.
+sonata\themes\base.lua
+sonata\themes\default.lua
+sonata\themes\simpledark.lua
+sonata\themes\moonlight.lua
+sonata\themes\elvui.lua
+sonata\themes\gw2.lua
+
 # The Theme API loads earlier than actual themes.
-themes\themes.lua
 
 util\trees\trees.lua
 util\trees\intervaltree.lua
@@ -77,10 +98,8 @@ data\loader.lua
 data\refresh.lua
 
 util\color.lua
-util\resize.lua
 util\sort.lua
 util\bucket.lua
-util\windowgroup.lua
 util\movementflow.lua
 util\cursorplacement.lua
 util\serialization.lua
@@ -107,7 +126,6 @@ frames\bagslots.lua
 frames\bankslots.lua
 frames\currency.lua
 frames\list.lua
-frames\themeconfig.lua
 frames\tabs.lua
 frames\anchor.lua
 frames\itembrowser.lua
@@ -123,12 +141,11 @@ views\bagview.lua
 bags\backpack.lua
 bags\bank.lua
 
+frames\bagcanvas.lua
+frames\menubutton.lua
+frames\bagactions.lua
 frames\bag.lua
 
-themes\default.lua
-themes\simpledark.lua
-themes\gw2.lua
-themes\elvui.lua
 
 config\categorypane.lua
 config\themepane.lua

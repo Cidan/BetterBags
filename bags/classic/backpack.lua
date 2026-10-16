@@ -25,9 +25,6 @@ local searchBox = addon:GetModule("SearchBox")
 ---@class Currency: AceModule
 local currency = addon:GetModule("Currency")
 
----@class ThemeConfig: AceModule
-local themeConfig = addon:GetModule("ThemeConfig")
-
 -------
 --- Classic Backpack Behavior Overrides
 --- The unified frames/bag.lua delegates search/slots/currency/theme-config
@@ -44,17 +41,11 @@ function backpack.proto:OnCreate(ctx)
 
 	-- Bag slots panel
 	local slots = bagSlots:CreatePanel(ctx, const.BAG_KIND.BACKPACK, self.bag.frame)
-	slots.frame:SetPoint("BOTTOMLEFT", self.bag.frame, "TOPLEFT", 0, 8)
-	slots.frame:SetParent(self.bag.frame)
-	slots.frame:Hide()
 	self.bag.slots = slots
 
 	-- Currency icon grid (bottom of backpack)
 	self.bag.currencyIconGrid = currency:CreateIconGrid(self.bag.frame)
 
-	-- Theme config
-	self.bag.themeConfigFrame = themeConfig:Create(self.bag.sideAnchor)
-	self.bag.windowGrouping:AddWindow("themeConfig", self.bag.themeConfigFrame)
 
 	-- Group tabs
 	self.bag.tabs = tabs:Create(self.bag.frame, const.BAG_KIND.BACKPACK)

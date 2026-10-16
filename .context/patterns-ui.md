@@ -88,18 +88,6 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 -- On setting change: iterate self.activeItems and update visuals
 ```
 
-## WindowGrouping Integration
-
-### Frame-like Objects Must Implement Show/Hide/IsShown and Fade Animations
-**Problem**: Objects added via `windowGrouping:AddWindow()` must behave like WoW frames with `Show()`, `Hide(callback)`, `IsShown()`, plus `fadeIn`/`fadeOut` animation groups.
-**Solution**:
-1. Implement the three methods on your wrapper object (delegate to the real frame)
-2. Attach animations: `obj.fadeIn, obj.fadeOut = animations:AttachFadeGroup(frame)`
-3. `Hide(callback)` must play `fadeOut` and call `callback` when provided (for animation chaining)
-
-**Checklist**: `Show()` ✅ `Hide(callback)` ✅ `IsShown()` ✅ `obj.fadeIn` ✅ `obj.fadeOut` ✅
-**Reference**: `frames/classic/currency.lua:65-81,168`, `frames/themeconfig.lua:98`
-
 ## Use Discrete Color Tiers to Avoid Unwanted Midpoint Hues
 **Problem**: Smooth blending between distant hues (e.g., blue→orange) produces unexpected intermediate colors (gray/green) at the midpoint.
 **Solution**: Compute breakpoints (low/mid/high/max) and pick the tier color directly — no interpolation between tiers.
@@ -157,20 +145,28 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 
 **Problem**: WoW secure item buttons and empty slot buttons are bound to unique physical slot keys and cannot be reparented or dynamically moved between views during active combat without causing fatal "Action blocked" taint errors. Storing scrollboxes inside individual tab views requires secure buttons to be reparented on tab switches.
 **Solution**: Decouple the scrolling container from individual tab views.
-1. Implement exactly **one single global `WowScrollBox` and scrollbar** at the Bag window level (`frames/bag.lua`).
-2. Statically stack three containers vertically inside the global scroll child: `headerContainer` (Recent Items), `tabContainer` (active Tab View), and `footerContainer` (Free Space).
+1. Implement exactly **one scroll box** per bag window: the `Scrollbox` drawable (`render/scrollbox.lua`, a `WowScrollBox` with a `MinimalScrollBar`), the content of the bag's `Window`.
+2. Statically stack three containers vertically on the scroll box's child, the bag's canvas (`frames/bagcanvas.lua`): `headerContainer` (Recent Items), `tabContainer` (active Tab View), and `footerContainer` (Free Space).
 3. Tab views become perfectly dumb and non-scrollable, rendering their layout grids directly into `tabContainer` via `grid:Create(parent, false)` and `SetAllPoints(parent)`.
 4. Switch tabs by simply toggling visibility of the layout grids in `tabContainer` with zero secure reparenting or combat taint.
-**Key Files**: `frames/bag.lua`, `frames/grid.lua`, `views/gridview_new.lua`, `views/bagview_new.lua`.
+**Key Files**: `frames/bag.lua`, `frames/bagcanvas.lua`, `render/scrollbox.lua`, `window/window.lua`, `frames/grid.lua`, `views/views.lua`.
 
 ## Form Sliders Save Only User Input
 **Problem**: WoW fires a Slider's `OnValueChanged(self, value, userInput)` whenever its value changes, including when code calls `SetValue` (`userInput` false). A form that sets each slider from its stored setting at build time and on reload, and saves in `OnValueChanged`, writes every setting back and fires every setting's side effect (refreshes) at every login.
 **Solution**: save only when `userInput` is true; paths that move the slider for the user from code (a typed number box) call the setter themselves, and only when the value changed. Keep spec mocks faithful: `SetValue` must fire `OnValueChanged` with `userInput` false, or the bug is invisible in tests. See `.claude/rules/refresh-scheduler.md` §9.
 
-## Windows Built on First Use Are Themed at Registration
-**Problem**: `themes:ApplyTheme` decorates every registered window (background, border, close button), and runs at startup when the Themes module is enabled (AceAddon enables modules after the addon's own `OnEnable`, so windows built there, like the config window, are registered in time). A window built later on first use (the profiler's Settings form, the "Create New Bank Tab" group dialog) was registered after that and stayed undecorated until the next theme change: no background and no close button.
-**Solution**: `themes:RegisterSimpleWindow` / `RegisterFlatWindow` decorate the window with the active theme at once when a theme has already been applied (`themes.themeApplied`); otherwise the first `ApplyTheme` does. Coverage: `spec/themes_spec.lua` ("windows registered after a theme was applied").
+## Windows and Elements Made on First Use Are Themed at Registration
+**Problem**: a theme is applied at startup, to the windows and elements registered so far. A window built later on first use (the profiler's Settings form, the "Create New Bank Tab" group dialog) used to stay undecorated until the next theme change: no background and no close button.
+**Solution**: `Sonata:RegisterWindow` / `RegisterElement` style what registers at once when a theme has already been applied; otherwise the first `ApplyTheme` does. Every window is a `Window` (`window/window.lua`), which registers itself. Coverage: `spec/sonata/engine_spec.lua` ("styles windows and elements registered after a theme was applied at once").
 
 ## Never Hard-Code a Font File
 **Problem**: Blizzard's fonts are font families with one file per alphabet (`Blizzard_Fonts_Shared/Mainline/Fonts.xml`: roman `FRIZQT__.TTF`, russian `FRIZQT___CYR.TTF`, korean `2002.TTF`, Chinese `ARKai_T.ttf` / `blei00d.TTF`). `FontString:SetFont("Fonts\\FRIZQT__.TTF", ...)` replaces the family with the roman file, so Cyrillic, Korean and Chinese text loses its glyphs (issue #175, the category pane's item rows).
 **Solution**: pass the locale's file from the globals Blizzard sets per locale on every client (`Blizzard_Fonts_Shared/Shared/GameFonts.xml`: `STANDARD_TEXT_FONT`, `UNIT_NAME_FONT`, `DAMAGE_TEXT_FONT`), or use a font object. Coverage: `spec/itemrow_spec.lua` ("draws the item name in the client's locale font").
+
+## Moving a Parent Moves Its Children, and Below 0 Is the Top
+**Problem**: when a frame's level changes, every descendant shifts by the same amount, and one that would go below 0 is set to 10000 (warcraft.wiki.gg "Frame Strata"). A template child pinned low in XML (`DefaultPanelFlatTemplate`'s `Bg`, `frameLevel="0"`) is therefore thrown above everything when its parent is lowered, covering the window it should sit behind.
+**Solution**: record each child's level relative to its parent when the parent is created, and after moving the parent put every child back at that offset, clamped at 0 (`sonata/decoration.lua` `applyTemplate`). Mocks must model the shift and the wrap (`spec/helpers/wow_mocks.lua` `SetFrameLevel`), or the bug cannot fail a test. See `.claude/rules/sonata.md` §3.
+
+## SetAtlas Brings Its Own Coordinates, Tiling and Slicing
+**Problem**: `Texture:SetAtlas` sets the atlas's texture coordinates, tiling and nine-slice data along with the file. Resetting a reused texture *after* `SetAtlas` (`SetTexCoord(0, 1, 0, 1)`, `ClearTextureSlice`, `SetHorizTile(false)`) shows the whole atlas sheet, stretches nine-slice atlases and stops tiling ones.
+**Solution**: reset first, draw the file, atlas or color second, apply only what the spec sets explicitly last (`sonata/apply.lua` `apply:Texture`). Likewise `SetNormalTexture`-style setters take no nil asset: a state that only tints changes the region the button already has.

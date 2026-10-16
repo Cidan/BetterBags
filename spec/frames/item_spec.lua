@@ -51,9 +51,27 @@ end
 items.GetStackData = function() return nil end
 items.IsNewItem = function() return false end
 
-local themes = StubBetterBagsModule("Themes")
-themes.GetItemButton = function(_, buttonCtx, item)
-  if not item._decoration then
+-- Sonata: the theme generation in every draw record, and the elements it styles. When the
+-- real modules are loaded already (an earlier spec file), what is replaced here is put back
+-- in the teardown; stubs this file made are removed.
+local sonata, createdSonata = StubBetterBagsModule("Sonata")
+local elements, createdElements = StubBetterBagsModule("SonataElements")
+local replaced = {}
+local function replace(tbl, key, value)
+  table.insert(replaced, { tbl, key, rawget(tbl, key) })
+  tbl[key] = value
+end
+replace(sonata, "generation", 0)
+replace(sonata, "registered", {})
+replace(sonata, "GetGeneration", function(self) return self.generation end)
+replace(sonata, "RegisterElement", function(self, kind, element) table.insert(self.registered, { kind, element }) end)
+-- By default the theme draws neither quality nor quest art.
+replace(elements, "DrawItemQuality", function() return false end)
+replace(elements, "DrawItemQuest", function() end)
+
+-- newDecoration builds what ContainerFrameItemButtonTemplate gives an item's decoration.
+local function newDecoration(item)
+  do
     item._decoration = {
       SetSize = function() end,
       SetID = function(_, id) item._decoration.id = id end,
@@ -110,9 +128,10 @@ end
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
--- Load the item.lua file
-LoadBetterBagsModule("frames/item.lua")
-local itemFrame = addon:GetModule("ItemFrame")
+-- A fresh frames/item.lua: a copy an earlier spec file loaded holds that file's Sonata stubs,
+-- not the ones above. Removed again in the teardown.
+local itemFrame = LoadFreshBetterBagsModule("ItemFrame", "frames/item.lua")
+itemFrame.CreateDecoration = function(_, item) return newDecoration(item) end
 
 describe("ItemFrame Static Buttons and Parent Removal Tests", function()
   before_each(function()
@@ -123,6 +142,105 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
     _G.SetItemButtonDesaturated = _G.SetItemButtonDesaturated or function() end
     _G.GameTooltip.GetOwner = _G.GameTooltip.GetOwner or function() return nil end
     itemFrame:Init()
+  end)
+
+  describe("decoration", function()
+    local btnCtx, originalSend, sent
+
+    before_each(function()
+      btnCtx = ctx:New("decoration")
+      sonata.registered = {}
+      sent = {}
+      originalSend = events.SendMessage
+      events.SendMessage = function(_, _, message, ...) table.insert(sent, { message, ... }) end
+    end)
+
+    after_each(function()
+      events.SendMessage = originalSend
+      elements.DrawItemQuality = function() return false end
+      elements.DrawItemQuest = function() end
+    end)
+
+    local function potion(fields)
+      local data = {
+        slotkey = "0_9", bagid = 0, slotid = 9, isItemEmpty = false,
+        questInfo = { isQuestItem = false, isActive = false },
+        containerInfo = {},
+        itemInfo = { itemID = 1, itemIcon = 1, itemQuality = 3, itemLink = "item:1", currentItemCount = 1, classID = 0,
+          currentItemLevel = 1 },
+      }
+      for k, v in pairs(fields or {}) do data[k] = v end
+      return data
+    end
+
+    it("is made once, styled by Sonata as an ItemButton, and announced", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      local decoration = item:GetDecoration(btnCtx)
+      assert.are.equal(decoration, item:GetDecoration(btnCtx))
+      local count = 0
+      for _, entry in ipairs(sonata.registered) do
+        if entry[2] == decoration then
+          count = count + 1
+          assert.are.equal("ItemButton", entry[1])
+        end
+      end
+      assert.are.equal(1, count)
+      local announced = 0
+      for _, entry in ipairs(sent) do
+        if entry[1] == "item/NewButton" and entry[3] == decoration then announced = announced + 1 end
+      end
+      assert.are.equal(1, announced)
+    end)
+
+    it("lets the theme draw quality on its border, and draws BetterBags' glow otherwise", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      local seen, glows = {}, 0
+      local glow = item.DrawQualityGlow
+      item.DrawQualityGlow = function() glows = glows + 1 end
+      elements.DrawItemQuality = function(_, decoration, qualityColor, quality)
+        table.insert(seen, { decoration, qualityColor, quality })
+        return true
+      end
+      item:SetItemFromData(btnCtx, potion())
+      assert.are.equal(0, glows)
+      local last = seen[#seen]
+      assert.are.equal(item._decoration, last[1])
+      assert.are.same(const.ITEM_QUALITY_COLOR[3], last[2])
+      assert.are.equal(3, last[3])
+      elements.DrawItemQuality = function() return false end
+      sonata.generation = sonata.generation + 1
+      item:SetItemFromData(btnCtx, potion())
+      assert.are.equal(1, glows)
+      item.DrawQualityGlow = glow
+    end)
+
+    it("gives the theme no quality color for common and poor items", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      local colors = {}
+      elements.DrawItemQuality = function(_, _, qualityColor) table.insert(colors, qualityColor or "none") return true end
+      local data = potion()
+      data.itemInfo.itemQuality = 1
+      item:SetItemFromData(btnCtx, data)
+      assert.are.equal("none", colors[#colors])
+    end)
+
+    it("hands the theme the item's quest data after Blizzard draws it", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      local got
+      elements.DrawItemQuest = function(_, decoration, questInfo) got = { decoration, questInfo } end
+      local data = potion({ questInfo = { isQuestItem = true, questID = 7, isActive = false } })
+      item:SetItemFromData(btnCtx, data)
+      assert.are.equal(item._decoration, got[1])
+      assert.are.equal(data.questInfo, got[2])
+    end)
+
+    it("draws again in full after a theme is applied", function()
+      local item = itemFrame:GetButton(btnCtx, "0_9")
+      item:SetItemFromData(btnCtx, potion())
+      assert.is_nil(item:DrawInputChanged(item._decoration, potion()))
+      sonata.generation = sonata.generation + 1
+      assert.are.equal("decorationGeneration", item:DrawInputChanged(item._decoration, potion()))
+    end)
   end)
 
   it("should create buttonsBySlotkey table on Init", function()
@@ -499,14 +617,14 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
       before_each(function()
         applied = 0
         _G._containerCooldowns = {}
-        themes.decorationGeneration = 0
+        sonata.generation = 0
         item:SetItemFromData(btnCtx, potion())
         item._decoration.UpdateCooldown = function() applied = applied + 1 end
       end)
 
       after_each(function()
         _G._containerCooldowns = {}
-        themes.decorationGeneration = nil
+        sonata.generation = 0
       end)
 
       it("skips a refresh when the cooldown is unchanged since it was applied", function()
@@ -541,13 +659,13 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
         item:UpdateCooldown(btnCtx, other, true)
         assert.equal(1, applied)
 
-        themes.decorationGeneration = 1
+        sonata.generation = 1
         item:UpdateCooldown(btnCtx, other, true)
         assert.equal(2, applied)
 
         local old = item._decoration
         item._decoration = nil
-        themes.GetItemButton(nil, btnCtx, item)
+        item:GetDecoration(btnCtx)
         item._decoration.id, item._decoration.bagID = old.id, old.bagID
         item._decoration.UpdateCooldown = function() applied = applied + 1 end
         item:UpdateCooldown(btnCtx, other, true)
@@ -704,14 +822,14 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
 
         before_each(function()
           fullDraws = 0
-          themes.decorationGeneration = 0
+          sonata.generation = 0
           item:SetItemFromData(btnCtx, data())
           -- Only a full item draw calls SetReadable (ResetVisuals does not).
           item._decoration.SetReadable = function() fullDraws = fullDraws + 1 end
         end)
 
         after_each(function()
-          themes.decorationGeneration = nil
+          sonata.generation = 0
         end)
 
         it("skips the setters but still points the button at the new data", function()
@@ -754,7 +872,7 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
         end
 
         it("redraws after a theme is applied", function()
-          themes.decorationGeneration = 1
+          sonata.generation = 1
           item:SetItemFromData(btnCtx, data())
           assert.equal(1, fullDraws)
         end)
@@ -776,9 +894,9 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           for _, case in ipairs(named) do
             assert.equal(case[2], item:DrawInputChanged(decoration, data({ case[1] })))
           end
-          themes.decorationGeneration = 1
+          sonata.generation = 1
           assert.equal("decorationGeneration", item:DrawInputChanged(decoration, data()))
-          themes.decorationGeneration = 0
+          sonata.generation = 0
           itemFrame:RestyleButtons()
           assert.equal("styleGeneration", item:DrawInputChanged(decoration, data()))
         end)
@@ -852,37 +970,11 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
           assert.equal(2, fullDraws)
         end)
 
-        -- ElvUI re-pins its backdrop's frame level whenever its decoration is looked up, so
-        -- a draw must end with a lookup made after the decoration's level is set.
-        it("looks the decoration up again after setting its frame level, on full and skipped draws", function()
-          for _, variant in ipairs({ { function(d) d.itemInfo.currentItemCount = 7 end }, {} }) do
-            local log = {}
-            local lookup = themes.GetItemButton
-            themes.GetItemButton = function(...)
-              table.insert(log, "lookup")
-              return lookup(...)
-            end
-            local setLevel = item._decoration.SetFrameLevel
-            item._decoration.SetFrameLevel = function(...)
-              table.insert(log, "level")
-              return setLevel(...)
-            end
-            item:SetItemFromData(btnCtx, data(variant))
-            themes.GetItemButton = lookup
-            item._decoration.SetFrameLevel = setLevel
-            local lastLevel, lastLookup
-            for i, entry in ipairs(log) do
-              if entry == "level" then lastLevel = i else lastLookup = i end
-            end
-            assert.is_not_nil(lastLevel)
-            assert.is_true(lastLookup > lastLevel, table.concat(log, ","))
-          end
-        end)
 
         it("redraws when the decoration is a different object", function()
           local old = item._decoration
           item._decoration = nil
-          themes.GetItemButton(nil, btnCtx, item)
+          item:GetDecoration(btnCtx)
           item._decoration.SetReadable = function() fullDraws = fullDraws + 1 end
           item:SetItemFromData(btnCtx, data())
           assert.equal(1, fullDraws)
@@ -925,13 +1017,13 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
 
         before_each(function()
           fullDraws = 0
-          themes.decorationGeneration = 0
+          sonata.generation = 0
           item:SetFreeSlots(btnCtx, slot(), 3)
           item._decoration.UpdateQuestItem = function() fullDraws = fullDraws + 1 end
         end)
 
         after_each(function()
-          themes.decorationGeneration = nil
+          sonata.generation = 0
         end)
 
         it("skips the setters when nothing changed, and still shows the button", function()
@@ -959,13 +1051,13 @@ describe("ItemFrame Static Buttons and Parent Removal Tests", function()
         end)
 
         it("redraws after a theme is applied, on a new decoration, or for another bag", function()
-          themes.decorationGeneration = 1
+          sonata.generation = 1
           item:SetFreeSlots(btnCtx, slot(), 3)
           assert.equal(1, fullDraws)
 
           local old = item._decoration
           item._decoration = nil
-          themes.GetItemButton(nil, btnCtx, item)
+          item:GetDecoration(btnCtx)
           item._decoration.UpdateQuestItem = function() fullDraws = fullDraws + 1 end
           item:SetFreeSlots(btnCtx, slot(), 3)
           assert.equal(2, fullDraws)
@@ -1258,4 +1350,15 @@ describe("Empty slot family icon overlay", function()
     item:SetFreeSlots(btnCtx, btn, 2)
     assert.is_true(item._decoration.BetterBagsFamilyIcon._shown)
   end)
+end)
+
+-- After every block of this file (a file-level teardown also runs last when blocks are
+-- shuffled), put back what the file replaced.
+teardown(function()
+  for i = #replaced, 1, -1 do
+    replaced[i][1][replaced[i][2]] = replaced[i][3]
+  end
+  ResetModuleStub("ItemFrame", "frames/item.lua")
+  if createdSonata then ResetModuleStub("Sonata") end
+  if createdElements then ResetModuleStub("SonataElements") end
 end)

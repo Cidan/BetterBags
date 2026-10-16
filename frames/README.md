@@ -262,6 +262,10 @@ Tab management for bank views.
 
 `SetTabsDisabled(disabled)` sets a `tabsDisabled` flag on the tab container and dims the tab bar to 50% alpha when disabled. While disabled, all `OnClick` and `OnMouseDown` handlers silently return early, preventing tab switching and drag-to-reorder. Note: the bank slots panel no longer uses `SetTabsDisabled`; it instead completely hides the tabs frame via `frame:Hide()` / `frame:Show()` for a cleaner visual transition.
 
+**Decorations and Themes:**
+
+Each tab has one decoration, `tabs:GetDecoration(ctx, tab)`, made once from `BetterBagsSecureBagTabTemplate` and styled by Sonata as a `Tab` element (`.claude/rules/sonata.md`). States go through `SonataElements:SetTabState` (normal, selected, drop). Every bar is measured again on `sonata/ThemeChanged`, since the theme sets the tabs' font and height.
+
 **Icon-Only Tab Sizing:**
 
 Tabs that display only an icon (no text label), such as the '+' new-group button, use `PanelTemplates_TabResize(decoration, nil, 50)` to enforce a 50-pixel minimum width. Without this minimum, the tab renderer returns only the width of the left and right edge textures (~20px), making icon-only tabs noticeably narrower than adjacent text tabs. Passing `50` as the third argument ensures they visually match a typical short-label tab (e.g. "Bank").
@@ -426,7 +430,7 @@ Dialog for creating or renaming a group tab. Used by the bank to accept a name a
 - Pre-fillable input (for rename workflows — pass `initialValue` to `Show()`)
 - Configurable confirm-button label (pass `confirmText` to `Show()`)
 - Optional bank-type dropdown (shown when `showDropdown = true`)
-- Themed via the addon's active theme: the dialog is registered as a Simple window with the Themes module so it visually matches the rest of the UI
+- A Panel window (`window/window.lua`) sized to its text, drawn by the active Sonata theme like the rest of the UI
 
 **`Show()` Signature:**
 ```lua
@@ -654,7 +658,7 @@ local query = searchBox:GetText()
 1. **Context Usage**: Always pass Context objects for tracking operations
 2. **Pool Management**: Use item pools for performance
 3. **Event Handling**: Register frame events through the Events module
-4. **Theme Integration**: Use Themes module for consistent styling
+4. **Theme Integration**: Build windows on the Window module and register buttons, tabs and other elements with Sonata; never style them by hand (`sonata/README.md`)
 5. **Animation**: Use Animations module for transitions
 6. **Search Performance**: Implement efficient search filtering
 7. **Memory Management**: Release frames back to pools when done
@@ -663,7 +667,7 @@ local query = searchBox:GetText()
 
 - **Items Module**: Provides item data for display, handles filtering for character bank tabs
 - **Categories Module**: Determines section grouping
-- **Themes Module**: Handles visual styling
+- **Window and Sonata Modules**: every window is a `Window`, drawn and restyled by the active Sonata theme (`.claude/rules/window.md`, `sonata/README.md`)
 - **Events Module**: Coordinates frame updates
 - **Database Module**: Stores frame positions, settings, and character bank tabs preference
 - **Search Module**: Provides search functionality

@@ -10,7 +10,7 @@
 -- hook; it was only harmless because it originally ran at the very end of
 -- OnInitialize. The manual-init refactor moved the loop into the MIDDLE of
 -- OnInitialize, so the throw now aborts everything after it (bank creation,
--- themes:Enable, SetTitle, UISpecialFrames registration).
+-- enabling Sonata, SetTitle, UISpecialFrames registration).
 --
 -- These tests use the REAL AceHook (they do NOT stub addon.HookScript) so the
 -- production throw reproduces, and they only reload core/init.lua so its module
@@ -53,9 +53,9 @@ describe("Bag-bar backpack button click", function()
       "Localization", "Database", "BagFrame", "Constants", "Items", "ItemFrame",
       "Events", "Masque", "SectionFrame", "Categories", "ContextMenu", "Config",
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
-      "QuickFind", "Refresh", "ItemLoader", "Themes", "Views", "SearchCategoryConfig",
+      "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "Render", "Sonata", "Tabs"
     }
     for _, name in ipairs(modules) do
       local stub = StubBetterBagsModule(name)
@@ -97,9 +97,6 @@ describe("Bag-bar backpack button click", function()
         IsShown = function() return frame:IsShown() end,
       }
     end
-
-    local themes = addon:GetModule("Themes")
-    themes.Enable = function() end
 
     _G.ContainerFrameCombinedBags = _G.ContainerFrameCombinedBags or CreateFrame("Frame")
     _G.BagsBar = _G.BagsBar or CreateFrame("Frame")

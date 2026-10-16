@@ -10,7 +10,7 @@ The animations module provides reusable animation functions that can be attached
 
 ### fade.lua
 
-The main animation module that provides fade and slide animation capabilities.
+The main animation module: fade animations for regions inside windows (labels, form panes and tabs). Windows themselves fade with the animations their theme gives them (`Animations` in a Sonata window style, built by the Window module; `.claude/rules/window.md`), not with these helpers.
 
 #### Key Functions
 
@@ -19,24 +19,12 @@ The main animation module that provides fade and slide animation capabilities.
   - `nohide`: Optional boolean - if true, element is set to alpha 0 instead of hidden after fade-out
   - Returns: Two AnimationGroup objects (fadeInGroup, fadeOutGroup)
 
-- **`AttachFadeAndSlideLeft(region, nohide)`**: Combines fade animation with a left slide motion
-  - Slides the element 10 pixels to the right during fade-out
-  - Uses the same parameters as AttachFadeGroup
-
-- **`AttachFadeAndSlideTop(region, nohide)`**: Combines fade animation with an upward slide motion
-  - Slides the element 10 pixels upward during fade-out
-  - Uses the same parameters as AttachFadeGroup
-
 ## Animation Details
 
 ### Fade Animations
 - **Duration**: 0.10 seconds for both fade-in and fade-out
 - **Smoothing**: Uses 'IN' smoothing for smooth transitions
 - **Alpha Range**: Transitions between 0 (transparent) and 1 (opaque)
-
-### Slide Animations
-- **Distance**: 10 pixels in the specified direction
-- **Timing**: Synchronized with fade animations (0.10 seconds)
 
 ## Usage Example
 
@@ -52,9 +40,6 @@ fadeIn:Play()
 
 -- Play fade-out animation
 fadeOut:Play()
-
--- Attach fade with slide effect
-local fadeInSlide, fadeOutSlide = animations:AttachFadeAndSlideLeft(myFrame)
 ```
 
 ## Callback Support

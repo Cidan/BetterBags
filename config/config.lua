@@ -15,9 +15,6 @@ local context = addon:GetModule('Context')
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
 ---@class Bucket: AceModule
 local bucket = addon:GetModule('Bucket')
 
@@ -29,6 +26,9 @@ local categoryPane = addon:GetModule('CategoryPane')
 
 ---@class ThemePane: AceModule
 local themePane = addon:GetModule('ThemePane')
+
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
 
 ---@class CurrencyPane: AceModule
 local currencyPane = addon:GetModule('CurrencyPane')
@@ -537,6 +537,20 @@ function config:CreateConfig()
       end
     })
 
+    f:AddCheckbox({
+      title = 'Resizable Window',
+      description = 'If enabled, the ' .. string.lower(bagType.name) .. ' is a window you size by dragging its corner, '
+        .. 'and its sections fill it (Columns still sets how many sit side by side). '
+        .. 'If disabled, it sizes itself to its items, Items Per Row wide.',
+      getValue = function(_)
+        return db:GetBagSizeMode(bagType.kind) == "window"
+      end,
+      setValue = function(ctx, value)
+        db:SetBagSizeMode(bagType.kind, value and "window" or "content")
+        events:SendMessage(ctx, 'bags/Redraw')
+      end
+    })
+
     f:AddSlider({
       title = 'Items Per Row',
       description = 'The number of items per row in each section.',
@@ -582,7 +596,7 @@ function config:CreateConfig()
       end,
       setValue = function(_, value)
         db:SetBagViewSizeOpacity(bagType.kind, db:GetBagView(bagType.kind), value)
-        themes:UpdateOpacity()
+        sonata:UpdateOpacity()
       end,
     })
 
@@ -596,11 +610,11 @@ function config:CreateConfig()
         return db:GetBagSizeInfo(bagType.kind, db:GetBagView(bagType.kind)).scale
       end,
       setValue = function(_, value)
-        -- TODO(lobato): This should be an event.
-        local bag = addon:GetBagFromKind(bagType.kind)
-        if not bag then return end
-        bag.frame:SetScale(value / 100)
         db:SetBagViewSizeScale(bagType.kind, db:GetBagView(bagType.kind), value)
+        local bag = addon:GetBagFromKind(bagType.kind)
+        if bag then
+          bag.window:UpdateScale()
+        end
       end,
     })
 

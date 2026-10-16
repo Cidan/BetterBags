@@ -18,9 +18,6 @@ local groups = addon:GetModule('Groups')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
 ---@class QuickFindIntegration: AceModule
 local quickfind = addon:NewModule('QuickFind')
 
@@ -173,8 +170,7 @@ function quickfind:ShowInBag(id)
     return
   end
 
-  -- Get the in-bag search box from the themes module
-  local searchBox = themes:GetInBagSearchBox(bag.frame)
+  local searchBox = bag.searchBox
   if searchBox and searchBox.textBox then
     searchBox.textBox:SetText(itemData.itemInfo.itemName)
     searchBox.textBox:SetFocus()

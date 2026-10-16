@@ -11,9 +11,7 @@ The utilities module provides essential helper functions, data structures, and a
   - [Cursor Placement](#cursor-placement-cursorplacementlua)
   - [Movement Flow Detection](#movement-flow-detection-movementflowlua)
   - [Query Parser](#query-parser-querylua)
-  - [Resize Handler](#resize-handler-resizelua)
   - [Sorting System](#sorting-system-sortlua)
-  - [Window Grouping](#window-grouping-windowgrouplua)
 - [Data Structures](#data-structures)
   - [Interval Tree](#interval-tree-treesintervaltreelua)
   - [Trees Module](#trees-module-treestreeslua)
@@ -184,29 +182,6 @@ A complete lexer and parser for search query syntax, supporting complex boolean 
 "NOT soulbound AND tradeable"
 ```
 
-### Resize Handler (`resize.lua`)
-
-Provides frame resizing functionality with visual feedback.
-
-**Methods:**
-| Method | Description | Parameters | Returns |
-|--------|-------------|------------|---------|
-| `MakeResizable(frame, onDone)` | Add resize handle | `Frame`, `function` | `Button` |
-
-**Features:**
-- Visual resize handle (corner grip)
-- Minimum size constraints (300x300)
-- Hover visibility
-- Completion callback
-
-**Usage:**
-```lua
-local handle = resize:MakeResizable(myFrame, function()
-  -- Called when resize completes
-  SaveFrameSize()
-end)
-```
-
 ### Sorting System (`sort.lua`)
 
 Comprehensive sorting algorithms for both sections and items.
@@ -256,39 +231,6 @@ ITEM_SORT_TYPE = {
 - Recent Items section always first
 - Fill-width sections sort separately
 - Invalid data handling
-
-### Window Grouping (`windowgroup.lua`)
-
-Manages groups of related windows with exclusive visibility and animations.
-
-**Key Features:**
-- Only one window visible at a time
-- Animated transitions between windows
-- Callback support for transitions
-
-**WindowGrouping Class:**
-```lua
----@class WindowGrouping
----@field windows any[]
-```
-
-**Methods:**
-| Method | Description | Parameters | Returns |
-|--------|-------------|------------|---------|
-| `Create()` | Create new window group | - | `WindowGrouping` |
-| `AddWindow(name, frame)` | Add window to group | `string`, `Frame` | - |
-| `Show(name)` | Show specific window | `string` | - |
-
-**Usage:**
-```lua
-local group = windowGroup:Create()
-group:AddWindow('config', configFrame)
-group:AddWindow('themes', themeFrame)
-group:AddWindow('currency', currencyFrame)
-
--- Show themes (hides others)
-group:Show('themes')
-```
 
 ## Data Structures
 
@@ -395,18 +337,6 @@ local sortFunc = sort:GetItemSortFunction(
 table.sort(items, sortFunc)
 ```
 
-### Window Group Example
-```lua
--- Create exclusive window group
-local sidePanel = windowGroup:Create()
-sidePanel:AddWindow('categories', categoryFrame)
-sidePanel:AddWindow('search', searchFrame)
-sidePanel:AddWindow('settings', settingsFrame)
-
--- Show categories (hides others with animation)
-sidePanel:Show('categories')
-```
-
 ### Interval Tree Example
 ```lua
 -- Create tree for item level ranges
@@ -457,22 +387,10 @@ movementFlow:AtNPCShopWindow(): boolean
 QueryParser:Query(input: string): QueryNode?
 ```
 
-### Resize Module
-```lua
-resize:MakeResizable(frame: Frame, onDone: function): Button
-```
-
 ### Sort Module
 ```lua
 sort:GetSectionSortFunction(kind: BagKind, view: BagView): function
 sort:GetItemSortFunction(kind: BagKind, view: BagView): function
-```
-
-### WindowGroup Module
-```lua
-windowGroup:Create(): WindowGrouping
-WindowGrouping:AddWindow(name: string, frame: Frame)
-WindowGrouping:Show(name: string)
 ```
 
 ### Trees Module
@@ -507,7 +425,7 @@ IntervalTree:ExactMatch(value: number): IntervalTreeNode?
 
 - **Items Module**: Uses sorting for item organization
 - **Search Module**: Uses query parser for search syntax
-- **Frames Module**: Uses resize for bag windows, and cursor placement for drops on bag windows and section titles
+- **Frames Module**: Uses cursor placement for drops on bag windows and section titles
 - **Data Module**: Uses movement flow for context
 - **Views Module**: Uses window groups for panels
 - **Database Module**: Stores sort preferences

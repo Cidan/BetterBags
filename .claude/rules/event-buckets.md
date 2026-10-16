@@ -58,8 +58,8 @@ backpack overrides do not replace `RegisterEvents`):
   whenever the frame becomes shown. A cooldown that started while the bag was closed and
   caused no `BAG_UPDATE` (e.g. an item used from an action bar with no count change) would
   otherwise stay missing until the next redraw. The hook is on the frame's own `OnShow`, not
-  `bagProto:Show`, because with fading enabled the frame is shown from the fade-in
-  animation's `OnPlay` (`animations/fade.lua`); `OnShow` fires on every show path. When a
+  `bagProto:Show`, because the bag's window (`Window:Show`, window/window.lua) shows the frame
+  itself, with or without a fade, and `OnShow` fires on every show path. When a
   deferred draw also runs on show (`drawPendingOnShow`), `SetItemFromData` refreshes the
   cooldowns again; that duplicate is harmless.
 - `bagProto:OnCooldown` (`frames/bag.lua`) returns early when the bag is hidden (a window

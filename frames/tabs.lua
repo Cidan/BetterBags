@@ -6,8 +6,14 @@ local addon = LibStub("AceAddon-3.0"):GetAddon(addonName)
 ---@class Tabs: AceModule
 local tabs = addon:NewModule("Tabs")
 
----@class Themes: AceModule
-local themes = addon:GetModule("Themes")
+---@class Sonata: AceModule
+local sonata = addon:GetModule("Sonata")
+
+---@class SonataElements: AceModule
+local elements = addon:GetModule("SonataElements")
+
+---@class Async: AceModule
+local async = addon:GetModule("Async")
 
 ---@class SectionFrame: AceModule
 local sectionFrame = addon:GetModule("SectionFrame")
@@ -70,6 +76,60 @@ tabs.dropPlaceholder = nil          ---@type Frame? Visual placeholder showing w
 ---@field tabCount number
 local tabFrame = {}
 addon:GetModule('Perf'):RegisterPrototype(tabFrame, 'TabFrame')
+
+-- Init keeps the tab bars, and measures their tabs again whenever a theme is applied: the
+-- theme sets the tabs' fonts and height (Sonata styles every element before it sends
+-- sonata/ThemeChanged).
+function tabs:Init()
+	self.bars = setmetatable({}, { __mode = "k" })
+	if not self.listening then
+		self.listening = true
+		events:RegisterMessage("sonata/ThemeChanged", function(ctx)
+			for bar in pairs(self.bars) do
+				bar:Reload(ctx)
+			end
+		end)
+	end
+end
+
+-- GetDecoration returns a tab's decoration: the button drawn over the tab that shows it and
+-- takes its clicks, made once from BetterBags' tab template and styled by Sonata as a Tab
+-- element. A purchase tab's decoration clicks the secure purchase button. It is shown once out
+-- of combat (the template is an action button).
+---@param ctx Context
+---@param tab TabButton
+---@return PanelTabButtonTemplate
+function tabs:GetDecoration(ctx, tab)
+	local decoration = tab.decoration
+	if decoration ~= nil then
+		return decoration
+	end
+	decoration = CreateFrame("Button", tab:GetName() .. "Decoration", tab, "BetterBagsSecureBagTabTemplate") --[[@as PanelTabButtonTemplate]]
+	if tab.sabtClick then
+		decoration:SetAttribute("type", "click")
+		decoration:SetAttribute("clickbutton", tab.sabtClick)
+		decoration:SetAttribute("overrideBankType", Enum.BankType.Account)
+	end
+	decoration:SetPoint("TOPLEFT", tab, "TOPLEFT", 0, 0)
+	decoration:RegisterForClicks("LeftButtonDown", "RightButtonDown")
+	tab.decoration = decoration
+	sonata:RegisterElement("Tab", decoration)
+	async:AfterCombat(ctx, function()
+		decoration:Show()
+	end)
+	return decoration
+end
+
+-- ResetDropHighlights puts every tab of a bar back in its state after a section drag.
+---@param bar Tab
+function tabs:ResetDropHighlights(bar)
+	for _, tab in ipairs(bar.tabIndex) do
+		local decoration = tab.decoration
+		if decoration ~= nil then
+			elements:SetTabState(decoration, elements:GetTabState(decoration))
+		end
+	end
+end
 
 ---@param ctx Context
 ---@param name string
@@ -379,17 +439,9 @@ end
 ---@param index number
 function tabFrame:ResizeTabByIndex(ctx, index)
 	local tab = self.tabIndex[index]
-	local decoration = themes:GetTabButton(ctx, tab)
-
-	-- Ensure decoration is shown before measuring/resizing
-	-- PanelTemplates_TabResize needs the frame to be visible to properly measure text width
-	decoration:Show()
-
-	-- Ensure the decoration's text uses the same font as the tab button
-	-- This fixes incorrect text width measurements on initial tab creation
-	if decoration.Text then
-		decoration.Text:SetFontObject(GameFontNormalSmall)
-	end
+	-- The text is measured in the theme's tab font, which Sonata set when the decoration was
+	-- made and sets again with every theme (Init measures again then).
+	local decoration = tabs:GetDecoration(ctx, tab)
 
 	-- Handle icon tabs vs text tabs
 	if tab.icon then
@@ -435,7 +487,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 		tab:SetWidth(decoration:GetWidth())
 	end
 
-	tab:SetHeight(32)
+	tab:SetHeight(decoration:GetHeight())
 	decoration:SetFrameLevel(tab:GetFrameLevel() + 1)
 
 	-- For purchase tabs (negative IDs), make decoration forward clicks to the secure tab button
@@ -513,9 +565,7 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				-- Track this as the drop target
 				sectionFrame.dragTargetTab = tab.id
 				-- Highlight the tab to indicate it's a valid drop target
-				decoration.MiddleActive:Show()
-				decoration.LeftActive:Show()
-				decoration.RightActive:Show()
+				elements:SetTabState(decoration, "drop")
 				-- Show tooltip indicating what will happen
 				GameTooltip:SetOwner(frame, "ANCHOR_TOP")
 				if groups:IsDefaultGroup(self.kind, tab.id) then
@@ -538,12 +588,8 @@ function tabFrame:ResizeTabByIndex(ctx, index)
 				if sectionFrame.dragTargetTab == tab.id then
 					sectionFrame.dragTargetTab = nil
 				end
-				-- Restore to normal deselected state (unless this tab is selected)
-				if self.selectedTab ~= tab.index then
-					decoration.MiddleActive:Hide()
-					decoration.LeftActive:Hide()
-					decoration.RightActive:Hide()
-				end
+				-- Put the tab back in its state (selected or not)
+				elements:SetTabState(decoration, elements:GetTabState(decoration))
 				GameTooltip:Hide()
 			elseif originalOnLeave then
 				originalOnLeave(frame)
@@ -644,19 +690,7 @@ end
 ---@param index number
 function tabFrame:DeselectTab(ctx, index)
 	local tab = self.tabIndex[index]
-	local decoration = themes:GetTabButton(ctx, tab)
-	decoration.Left:Show()
-	decoration.Middle:Show()
-	decoration.Right:Show()
-	decoration:Enable()
-
-	local offsetY = decoration.deselectedTextY or 2
-
-	decoration.Text:SetPoint("CENTER", decoration, "CENTER", (decoration.deselectedTextX or 0), offsetY)
-
-	decoration.LeftActive:Hide()
-	decoration.MiddleActive:Hide()
-	decoration.RightActive:Hide()
+	elements:SetTabState(tabs:GetDecoration(ctx, tab), "normal")
 end
 
 ---@private
@@ -664,21 +698,8 @@ end
 ---@param index number
 function tabFrame:SelectTab(ctx, index)
 	local tab = self.tabIndex[index]
-	local decoration = themes:GetTabButton(ctx, tab)
-	decoration:Show()
-	decoration.Left:Hide()
-	decoration.Middle:Hide()
-	decoration.Right:Hide()
-	--decoration:Disable()
-	decoration:SetDisabledFontObject(GameFontHighlightSmall)
-
-	local offsetY = decoration.selectedTextY or -3
-
-	decoration.Text:SetPoint("CENTER", decoration, "CENTER", (decoration.selectedTextX or 0), offsetY)
-
-	decoration.LeftActive:Show()
-	decoration.MiddleActive:Show()
-	decoration.RightActive:Show()
+	local decoration = tabs:GetDecoration(ctx, tab)
+	elements:SetTabState(decoration, "selected")
 
 	local tooltip = GetAppropriateTooltip()
 	if tooltip:IsOwned(decoration) then
@@ -720,6 +741,9 @@ function tabs:Create(parent, kind)
 	container.tabCount = 0
 	container.selectedTab = nil  -- Initialize to nil to avoid undefined state
 	container.tabsDisabled = false
+	if self.bars then
+		self.bars[container] = true
+	end
 	return container
 end
 
@@ -821,7 +845,7 @@ function tabs:StartTabDrag(tab, frame)
 
 	-- Visual feedback: raise frame level and dim slightly
 	local ctx = context:New("StartTabDrag")
-	local decoration = themes:GetTabButton(ctx, tab)
+	local decoration = tabs:GetDecoration(ctx, tab)
 	tab:SetFrameLevel(tab:GetFrameLevel() + 10)
 	decoration:SetAlpha(0.8)
 
@@ -959,7 +983,7 @@ function tabs:StopTabDrag()
 	if not self.isDragging then return end
 
 	local ctx = context:New("StopTabDrag")
-	local decoration = themes:GetTabButton(ctx, self.draggingTab)
+	local decoration = tabs:GetDecoration(ctx, self.draggingTab)
 	local savedTabFrame = self.currentTabFrame
 	local draggedTab = self.draggingTab
 	local startIndex = self.dragStartIndex

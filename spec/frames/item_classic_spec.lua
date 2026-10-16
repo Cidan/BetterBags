@@ -135,13 +135,24 @@ local function stubModules()
   override(items, "GetStackData", function() return nil end)
   override(items, "IsNewItem", function() return false end)
 
-  local themes = stubModule("Themes")
-  override(themes, "GetItemButton", function(_, _, item)
-    if not item._decoration then
-      item._decoration = newClassicDecoration(item)
-    end
-    return item._decoration
-  end)
+  -- Sonata: no theme draws quality or quest art here, so BetterBags' own drawing shows.
+  local sonata = stubModule("Sonata")
+  override(sonata, "GetGeneration", function() return 0 end)
+  override(sonata, "RegisterElement", function() end)
+  local elements = stubModule("SonataElements")
+  override(elements, "DrawItemQuality", function() return false end)
+  override(elements, "DrawItemQuest", function() end)
+end
+
+-- decorate makes an item's decoration; useItemModule loads a fresh ItemFrame whose
+-- decorations it makes.
+local decorate = newClassicDecoration
+local function useItemModule()
+  ResetModuleStub("ItemFrame", "frames/item.lua")
+  LoadBetterBagsModule("frames/item.lua")
+  local itemFrame = addon:GetModule("ItemFrame")
+  itemFrame.CreateDecoration = function(_, item) return decorate(item) end
+  return itemFrame
 end
 
 local function itemData(bagid, slotid, quality)
@@ -196,9 +207,8 @@ describe("ItemFrame on Classic clients", function()
     _G.NEW_ITEM_ATLAS_BY_QUALITY = { [1] = "bags-glow-white", [2] = "bags-glow-green" }
     addon.isRetail = false
 
-    ResetModuleStub("ItemFrame", "frames/item.lua")
-    LoadBetterBagsModule("frames/item.lua")
-    itemFrame = addon:GetModule("ItemFrame")
+    decorate = newClassicDecoration
+    itemFrame = useItemModule()
     itemFrame:Init()
   end)
 
@@ -410,19 +420,13 @@ describe("ItemFrame bag kind classification", function()
 
     -- Retail's ContainerFrameItemButtonTemplate carries ContainerFrameItemButtonMixin's
     -- UpdateCooldown and GetBagID (GetButton sets the bag on the decoration).
-    local themes = addon:GetModule("Themes")
-    override(themes, "GetItemButton", function(_, _, item)
-      if not item._decoration then
-        item._decoration = newClassicDecoration(item)
-        item._decoration.UpdateCooldown = function() end
-        item._decoration.GetBagID = function(self) return self.bagID end
-      end
-      return item._decoration
-    end)
-
-    ResetModuleStub("ItemFrame", "frames/item.lua")
-    LoadBetterBagsModule("frames/item.lua")
-    itemFrame = addon:GetModule("ItemFrame")
+    decorate = function(item)
+      local d = newClassicDecoration(item)
+      d.UpdateCooldown = function() end
+      d.GetBagID = function(self) return self.bagID end
+      return d
+    end
+    itemFrame = useItemModule()
     itemFrame:Init()
   end)
 
@@ -518,9 +522,8 @@ describe("ItemFrame bank tooltip dispatch on Classic", function()
     _G.BankButtonIDToInvSlotID = function(id) return 50 + id end
     _G.ButtonInventorySlot = function(self) return _G.BankButtonIDToInvSlotID(self:GetID(), self.isBag) end
 
-    ResetModuleStub("ItemFrame", "frames/item.lua")
-    LoadBetterBagsModule("frames/item.lua")
-    itemFrame = addon:GetModule("ItemFrame")
+    decorate = newClassicDecoration
+    itemFrame = useItemModule()
     itemFrame:Init()
   end)
 

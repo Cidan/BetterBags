@@ -12,8 +12,8 @@ local debug = addon:GetModule('Debug')
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
 
 ---@class MasqueTheme: AceModule
 ---@field groups table<string, MasqueGroup>
@@ -72,7 +72,7 @@ function masque:OnEnable()
   ---@param decoration ItemButton
   local function skin(item, decoration)
     if not item.kind then return end
-    if themes:GetCurrentTheme().DisableMasque then return end
+    if not sonata:UsesMasque() then return end
     local group = item.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     if self.added[decoration] == group then
       group:ReSkin(decoration)
@@ -91,6 +91,18 @@ function masque:OnEnable()
     skin(item, decoration)
   end)
 
+  -- Item buttons keep one decoration across themes, which the theme restyles. A theme that
+  -- does not use Masque takes the buttons Masque skinned out of their groups (RemoveButton
+  -- gives a button its own look back), so Masque's skin does not stay under the theme's;
+  -- the next draw under a theme that uses Masque adds them again.
+  events:RegisterMessage('sonata/ThemeChanged', function()
+    if sonata:UsesMasque() then return end
+    for decoration, group in pairs(self.added) do
+      group:RemoveButton(decoration)
+      self.added[decoration] = nil
+    end
+  end)
+
   -- A released item button stays in its group. Item buttons exist for the whole session
   -- (created at boot), and Masque's RemoveButton is a full skin pass restoring the default
   -- look, which the button's next draw undoes with another (leaving Show Bags spent 9.5 ms
@@ -98,7 +110,7 @@ function masque:OnEnable()
   -- re-skins it, or moves it to the other group when it is reused for the other bag.
 
   events:RegisterMessage('bagbutton/Updated', function(_, bag)
-    if themes:GetCurrentTheme().DisableMasque then return end
+    if not sonata:UsesMasque() then return end
     ---@cast bag BagButton
     local group = bag.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:AddButton(bag.frame)
@@ -106,7 +118,7 @@ function masque:OnEnable()
   end)
 
   events:RegisterMessage('bagbutton/Clearing', function(_, bag)
-    if themes:GetCurrentTheme().DisableMasque then return end
+    if not sonata:UsesMasque() then return end
     ---@cast bag BagButton
     local group = bag.kind == const.BAG_KIND.BANK and self.groups["Bank"] or self.groups["Backpack"]
     group:RemoveButton(bag.frame)

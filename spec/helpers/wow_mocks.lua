@@ -30,6 +30,106 @@ _G.Enum.AddOnProfilerMetric = {
   CountTimeOver1000Ms = 11,
 }
 
+-- scriptable gives a mock object SetScript / GetScript / HookScript.
+local function scriptable(obj)
+  obj._scripts = {}
+  function obj:SetScript(scriptName, handler) self._scripts[scriptName] = handler end
+  function obj:GetScript(scriptName) return self._scripts[scriptName] end
+  function obj:HookScript(scriptName, handler)
+    local original = self._scripts[scriptName]
+    if original then
+      self._scripts[scriptName] = function(...) original(...) handler(...) end
+    else
+      self._scripts[scriptName] = handler
+    end
+  end
+  function obj:fire(scriptName, ...)
+    local handler = self._scripts[scriptName]
+    if handler then handler(self, ...) end
+  end
+  return obj
+end
+
+-- An animation (SimpleAnimAPIDocumentation.lua and the Alpha, Translation and Scale
+-- animation APIs): SetDuration, SetSmoothing, SetStartDelay, SetFromAlpha/SetToAlpha,
+-- SetOffset, SetScaleFrom/SetScaleTo/SetOrigin, Play/Stop/IsPlaying.
+local function CreateMockAnimation(group, animationType, name)
+  local anim = scriptable({ _type = animationType, _name = name, _group = group })
+  function anim:GetParent() return self._group end
+  function anim:SetDuration(duration) self._duration = duration end
+  function anim:SetSmoothing(smoothing) self._smoothing = smoothing end
+  function anim:SetStartDelay(delay) self._startDelay = delay end
+  function anim:SetFromAlpha(alpha) self._fromAlpha = alpha end
+  function anim:SetToAlpha(alpha) self._toAlpha = alpha end
+  function anim:SetOffset(x, y) self._offset = { x = x, y = y } end
+  function anim:SetScaleFrom(x, y) self._scaleFrom = { x = x, y = y } end
+  function anim:SetScaleTo(x, y) self._scaleTo = { x = x, y = y } end
+  function anim:SetOrigin(point, x, y) self._origin = { point = point, x = x, y = y } end
+  function anim:Play() self._playing = true self:fire("OnPlay") end
+  function anim:Stop() self._playing = false self:fire("OnStop") end
+  function anim:IsPlaying() return self._playing == true end
+  return anim
+end
+
+-- An animation group (SimpleAnimGroupAPIDocumentation.lua): CreateAnimation(animationType?,
+-- name?, templateName?), Play(reverse, offset), Stop(), Finish(), IsPlaying(), SetLooping,
+-- SetToFinalAlpha. There is no time in specs:
+-- * Play runs the OnPlay scripts of the group and its animations; on a group already playing
+--   it does nothing (the client has a separate Restart).
+-- * Stop runs OnStop(self, requested) on a playing group and stops its animations.
+-- * Finish ends a playing group (OnFinished(self, requested = true), warcraft.wiki.gg
+--   UIHANDLER_OnFinished) and does nothing otherwise.
+-- * _complete is test-only: the group's time ran out (OnFinished with requested = false).
+local function CreateMockAnimationGroup(region, name)
+  local group = scriptable({ _region = region, _name = name, _animations = {} })
+  function group:GetParent() return self._region end
+  function group:CreateAnimation(animationType, animName)
+    local anim = CreateMockAnimation(self, animationType, animName)
+    table.insert(self._animations, anim)
+    return anim
+  end
+  function group:Play(reverse)
+    if self._playing then return end
+    self._playing = true
+    self._reverse = reverse == true
+    self._plays = (self._plays or 0) + 1
+    for _, anim in ipairs(self._animations) do anim._playing = true end
+    self:fire("OnPlay")
+    for _, anim in ipairs(self._animations) do anim:fire("OnPlay") end
+  end
+  function group:Stop()
+    if not self._playing then return end
+    self._playing = false
+    for _, anim in ipairs(self._animations) do anim._playing = false end
+    self:fire("OnStop", true)
+  end
+  local function finish(g, requested)
+    g._playing = false
+    for _, anim in ipairs(g._animations) do
+      anim._playing = false
+      anim:fire("OnFinished", requested)
+    end
+    g:fire("OnFinished", requested)
+  end
+  function group:Finish()
+    if not self._playing then return end
+    finish(self, true)
+  end
+  function group:_complete()
+    if not self._playing then return end
+    finish(self, false)
+  end
+  function group:IsPlaying() return self._playing == true end
+  -- Restart(reverse, offset) stops the group and plays it again from the start.
+  function group:Restart(reverse)
+    self:Stop()
+    self:Play(reverse)
+  end
+  function group:SetLooping(loopType) self._looping = loopType end
+  function group:SetToFinalAlpha(setToFinalAlpha) self._toFinalAlpha = setToFinalAlpha end
+  return group
+end
+
 -- Stateful Widget factory helper
 local function CreateMockWidget(widgetType, name, parent)
   local widget = {}
@@ -47,6 +147,19 @@ local function CreateMockWidget(widgetType, name, parent)
   widget._points = {}
   widget._textures = {}
   widget._fontstrings = {}
+  -- Regions (textures, font strings) are not child frames: GetChildren lists frames only.
+  local isRegion = widgetType == "Texture" or widgetType == "FontString" or widgetType == "MaskTexture"
+  if parent ~= nil and not isRegion and type(parent._children) == "table" then
+    table.insert(parent._children, widget)
+  end
+  -- warcraft.wiki.gg "Frame Strata": every frame starts one level above its parent.
+  if not isRegion then
+    if parent ~= nil and type(parent.GetFrameLevel) == "function" then
+      widget._frameLevel = parent:GetFrameLevel() + 1
+    else
+      widget._frameLevel = 0
+    end
+  end
 
   -- Core frame behavior
   function widget:SetScript(scriptName, handler)
@@ -103,7 +216,25 @@ local function CreateMockWidget(widgetType, name, parent)
     self._ownerY = y
   end
   function widget:SetParent(parentFrame)
+    local previous = self._parent
+    if not isRegion and previous ~= parentFrame then
+      if previous ~= nil and type(previous._children) == "table" then
+        for i, c in ipairs(previous._children) do
+          if c == self then
+            table.remove(previous._children, i)
+            break
+          end
+        end
+      end
+      if parentFrame ~= nil and type(parentFrame._children) == "table" then
+        table.insert(parentFrame._children, self)
+      end
+    end
     self._parent = parentFrame
+  end
+  -- Frame:GetChildren() -> the frame's child frames.
+  function widget:GetChildren()
+    return unpack(self._children)
   end
   function widget:GetParent()
     return self._parent
@@ -130,6 +261,33 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetHeight()
     return self._height or 0
   end
+  -- ScriptRegion:GetSize(ignoreRect?) -> width, height.
+  function widget:GetSize()
+    return self:GetWidth(), self:GetHeight()
+  end
+  -- ScriptRegion:GetLeft/GetRight/GetTop/GetBottom/GetCenter "MayReturnNothing": with no
+  -- layout engine in specs, a frame's rect is never resolved unless a spec sets it with
+  -- _SetRect(left, bottom, width, height).
+  function widget:_SetRect(left, bottom, width, height)
+    self._rect = { left = left, bottom = bottom }
+    self:SetSize(width, height)
+  end
+  function widget:GetLeft()
+    return self._rect and self._rect.left
+  end
+  function widget:GetBottom()
+    return self._rect and self._rect.bottom
+  end
+  function widget:GetRight()
+    return self._rect and (self._rect.left + self:GetWidth())
+  end
+  function widget:GetTop()
+    return self._rect and (self._rect.bottom + self:GetHeight())
+  end
+  function widget:GetCenter()
+    if self._rect == nil then return nil end
+    return self._rect.left + self:GetWidth() / 2, self._rect.bottom + self:GetHeight() / 2
+  end
   function widget:SetAlpha(alpha)
     self._alpha = alpha
   end
@@ -141,6 +299,7 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:ClearAllPoints()
     self._points = {}
+    self._allPoints = nil
   end
   function widget:SetPoint(point, relativeTo, relativePoint, x, y)
     table.insert(self._points, {
@@ -150,6 +309,10 @@ local function CreateMockWidget(widgetType, name, parent)
       x = x,
       y = y
     })
+  end
+  -- ScriptRegion:GetNumPoints() -> numPoints.
+  function widget:GetNumPoints()
+    return #self._points
   end
   function widget:GetPoint(index)
     index = index or 1
@@ -176,7 +339,11 @@ local function CreateMockWidget(widgetType, name, parent)
     self._registeredDrags = {...}
   end
   -- Frame:StartMoving() / StopMovingOrSizing() (SimpleFrameAPIDocumentation.lua).
+  -- Frame:StartMoving() errors on a frame that is not movable (warcraft.wiki.gg).
   function widget:StartMoving()
+    if not self._movable then
+      error("Frame:StartMoving(): Frame is not movable", 2)
+    end
     self._moving = true
   end
   function widget:StopMovingOrSizing()
@@ -191,6 +358,10 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:IsEnabled()
     return self._enabled ~= false
+  end
+  -- SetEnabled(enabled) (SimpleButtonAPIDocumentation.lua).
+  function widget:SetEnabled(enabled)
+    self._enabled = enabled and true or false
   end
   function widget:LockHighlight()
     self._highlightLocked = true
@@ -221,15 +392,21 @@ local function CreateMockWidget(widgetType, name, parent)
     table.insert(self._fontstrings, fs)
     return fs
   end
-  function widget:SetNormalTexture(texture)
-    if type(texture) == "string" then
-      local normal = self:GetNormalTexture()
-      if normal and type(normal) == "table" and normal.SetTexture then
-        normal:SetTexture(texture)
-      end
-    else
-      self.NormalTexture = texture
+  -- SimpleButtonAPIDocumentation.lua: Set{Normal,Pushed,Disabled,Highlight}Texture(asset)
+  -- take a texture file or file ID (non-nilable) and draw it in the state's region; a texture
+  -- object becomes the region.
+  local function setStateTexture(button, getter, field, texture, fnName)
+    if texture == nil then
+      error("bad argument #1 to '" .. fnName .. "' (Usage: self:" .. fnName .. "(asset))", 3)
     end
+    if type(texture) == "string" or type(texture) == "number" then
+      button[getter](button):SetTexture(texture)
+    else
+      button[field] = texture
+    end
+  end
+  function widget:SetNormalTexture(texture)
+    setStateTexture(self, "GetNormalTexture", "NormalTexture", texture, "SetNormalTexture")
   end
   function widget:GetNormalTexture()
     if (not self.NormalTexture or type(self.NormalTexture) == "string") and widgetType ~= "Texture" then
@@ -249,8 +426,168 @@ local function CreateMockWidget(widgetType, name, parent)
     end
     return self.HighlightTexture
   end
-  function widget:SetHighlightTexture(texture)
+  -- SimpleButtonAPIDocumentation.lua: SetHighlightTexture(asset, blendMode?) sets the
+  -- button's highlight region; Set{Pushed,Disabled}Texture(asset) and the Set*Atlas
+  -- variants likewise set their state region.
+  function widget:SetHighlightTexture(texture, blendMode)
     self._highlightTexture = texture
+    setStateTexture(self, "GetHighlightTexture", "HighlightTexture", texture, "SetHighlightTexture")
+    if blendMode then self:GetHighlightTexture():SetBlendMode(blendMode) end
+  end
+  function widget:SetPushedTexture(texture)
+    setStateTexture(self, "GetPushedTexture", "PushedTexture", texture, "SetPushedTexture")
+  end
+  function widget:GetDisabledTexture()
+    if not self.DisabledTexture and widgetType ~= "Texture" then
+      self.DisabledTexture = CreateMockWidget("Texture", nil, self)
+    end
+    return self.DisabledTexture
+  end
+  function widget:SetDisabledTexture(texture)
+    setStateTexture(self, "GetDisabledTexture", "DisabledTexture", texture, "SetDisabledTexture")
+  end
+  -- Clear{Normal,Pushed,Disabled,Highlight}Texture() remove what the state draws.
+  local function clearState(button, getter)
+    local region = button[getter](button)
+    if region ~= nil then
+      region:SetTexture(nil)
+    end
+  end
+  function widget:ClearNormalTexture() clearState(self, "GetNormalTexture") end
+  function widget:ClearPushedTexture() clearState(self, "GetPushedTexture") end
+  function widget:ClearDisabledTexture() clearState(self, "GetDisabledTexture") end
+  function widget:ClearHighlightTexture() clearState(self, "GetHighlightTexture") end
+  -- Frame:SetHitRectInsets(left, right, top, bottom) / GetHitRectInsets().
+  function widget:SetHitRectInsets(left, right, top, bottom)
+    self._hitRectInsets = { left, right, top, bottom }
+  end
+  function widget:GetHitRectInsets()
+    local i = self._hitRectInsets or { 0, 0, 0, 0 }
+    return i[1], i[2], i[3], i[4]
+  end
+  -- UIObject:GetObjectType() -> the widget type ("Frame", "Button", "Texture", ...);
+  -- IsObjectType(type) is also true for the types it derives from (every frame type is a
+  -- Frame, every widget a Region).
+  function widget:GetObjectType()
+    return self._type
+  end
+  function widget:IsObjectType(objectType)
+    if objectType == self._type or objectType == "Region" or objectType == "Object" then
+      return true
+    end
+    if objectType == "Frame" then
+      return not isRegion
+    end
+    if objectType == "Button" then
+      return self._type == "CheckButton" or self._type == "ItemButton"
+    end
+    return false
+  end
+  function widget:SetHighlightAtlas(atlas, blendMode)
+    self._highlightAtlas = atlas
+    local highlight = self:GetHighlightTexture()
+    highlight:SetAtlas(atlas)
+    if blendMode then highlight:SetBlendMode(blendMode) end
+  end
+  function widget:SetPushedAtlas(atlas)
+    self._pushedAtlas = atlas
+    self:GetPushedTexture():SetAtlas(atlas)
+  end
+  function widget:SetDisabledAtlas(atlas)
+    self._disabledAtlas = atlas
+    self:GetDisabledTexture():SetAtlas(atlas)
+  end
+  -- SimpleTextureBaseAPIDocumentation.lua: SetTextureSliceMargins(left, top, right, bottom),
+  -- SetTextureSliceMode(sliceMode), SetHorizTile(tiling), SetVertTile(tiling); GetTexture()
+  -- and GetAtlas() return what was set.
+  function widget:SetTextureSliceMargins(left, top, right, bottom)
+    self._sliceMargins = { left = left, top = top, right = right, bottom = bottom }
+  end
+  function widget:SetTextureSliceMode(sliceMode)
+    self._sliceMode = sliceMode
+  end
+  -- ClearTextureSlice() drops the slice margins and mode.
+  function widget:ClearTextureSlice()
+    self._sliceMargins = nil
+    self._sliceMode = nil
+  end
+  function widget:SetHorizTile(tiling)
+    self._horizTile = tiling
+  end
+  function widget:SetVertTile(tiling)
+    self._vertTile = tiling
+  end
+  -- TextureBase:GetHorizTile() / GetVertTile() -> tiling.
+  function widget:GetHorizTile()
+    return self._horizTile == true
+  end
+  function widget:GetVertTile()
+    return self._vertTile == true
+  end
+  function widget:GetTexture()
+    return self._texturePath
+  end
+  function widget:GetAtlas()
+    return self._atlas
+  end
+  function widget:GetVertexColor()
+    local c = self._vertexColor
+    if c then return c.r, c.g, c.b, c.a end
+    return 1, 1, 1, 1
+  end
+  -- FontInstance: SetFontObject(font) / GetFontObject(), SetShadowOffset(offsetX, offsetY).
+  function widget:SetFontObject(font)
+    self._fontObject = font
+  end
+  function widget:SetShadowOffset(x, y)
+    self._shadowOffset = { x = x, y = y }
+  end
+  -- Frame:SetResizable(resizable), SetResizeBounds(minWidth, minHeight, maxWidth?, maxHeight?),
+  -- StartSizing(resizePoint?), SetToplevel(topLevel), SetClampedToScreen(clamped),
+  -- SetMovable(movable), SetScale(scale) / GetScale().
+  function widget:SetResizable(resizable)
+    self._resizable = resizable
+  end
+  function widget:SetResizeBounds(minWidth, minHeight, maxWidth, maxHeight)
+    self._resizeBounds = { minWidth = minWidth, minHeight = minHeight, maxWidth = maxWidth, maxHeight = maxHeight }
+  end
+  function widget:StartSizing(point)
+    self._sizing = point or "BOTTOMRIGHT"
+  end
+  function widget:SetToplevel(topLevel)
+    self._toplevel = topLevel
+  end
+  function widget:SetClampedToScreen(clamped)
+    self._clamped = clamped
+  end
+  function widget:IsClampedToScreen()
+    return self._clamped == true
+  end
+  -- Frame:SetClampRectInsets(left, right, top, bottom).
+  function widget:SetClampRectInsets(left, right, top, bottom)
+    self._clampRectInsets = { left, right, top, bottom }
+  end
+  function widget:SetMovable(movable)
+    self._movable = movable
+  end
+  function widget:SetScale(scale)
+    self._scale = scale
+  end
+  function widget:GetScale()
+    return self._scale or 1
+  end
+  -- Region:GetEffectiveScale() -> the frame's scale times every parent's.
+  function widget:GetEffectiveScale()
+    local scale = self:GetScale()
+    local owner = self._parent
+    if owner ~= nil and owner.GetEffectiveScale ~= nil then
+      scale = scale * owner:GetEffectiveScale()
+    end
+    return scale
+  end
+  -- SimpleAnimatableObjectAPIDocumentation.lua: CreateAnimationGroup(name?, templateName?).
+  function widget:CreateAnimationGroup(groupName)
+    return CreateMockAnimationGroup(self, groupName)
   end
   function widget:SetBlendMode(mode)
     self._blendMode = mode
@@ -263,18 +600,49 @@ local function CreateMockWidget(widgetType, name, parent)
     self._drawLayer = layer
     self._sublevel = sublevel
   end
+  -- Region:GetDrawLayer() -> layer, sublevel.
+  function widget:GetDrawLayer()
+    return self._drawLayer or "ARTWORK", self._sublevel or 0
+  end
+  -- TextureBase:SetTexture(textureAsset) replaces whatever the texture drew (an atlas or a
+  -- color texture); nil clears it.
   function widget:SetTexture(path)
     self._texturePath = path
+    self._atlas = nil
+    self._colorTexture = nil
   end
   function widget:SetTexCoord(...)
     self._texCoords = {...}
   end
+  -- TextureBase:GetTexCoord() -> the eight corner coordinates (ULx, ULy, LLx, LLy, URx, URy,
+  -- LRx, LRy); a texture set with left, right, top, bottom reports its corners.
+  function widget:GetTexCoord()
+    local c = self._texCoords or { 0, 1, 0, 1 }
+    if #c == 4 then
+      local left, right, top, bottom = c[1], c[2], c[3], c[4]
+      return left, top, left, bottom, right, top, right, bottom
+    end
+    return unpack(c)
+  end
+  -- TextureBase:SetAtlas(atlas, useAtlasSize) draws the atlas with its own texture
+  -- coordinates, tiling and nine-slice data (SimpleTextureBaseAPIDocumentation.lua; the
+  -- mock leaves those unset, so a later SetTexCoord, tiling or slicing call shows).
   function widget:SetAtlas(atlas, useAtlasSize)
     self._atlas = atlas
     self._useAtlasSize = useAtlasSize
+    self._texturePath = nil
+    self._colorTexture = nil
+    self._texCoords = nil
+    self._horizTile = nil
+    self._vertTile = nil
+    self._sliceMargins = nil
+    self._sliceMode = nil
   end
+  -- TextureBase:SetColorTexture(r, g, b, a?) replaces a texture or atlas with a solid color.
   function widget:SetColorTexture(r, g, b, a)
     self._colorTexture = {r = r, g = g, b = b, a = a or 1}
+    self._atlas = nil
+    self._texturePath = nil
   end
   -- TextureBase:SetDesaturated(desaturated?) / IsDesaturated() -> boolean.
   function widget:SetDesaturated(desaturated)
@@ -285,9 +653,25 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:SetNormalAtlas(atlas)
     self._normalAtlas = atlas
+    self:GetNormalTexture():SetAtlas(atlas)
   end
   function widget:SetNormalFontObject(fontObject)
     self._normalFontObject = fontObject
+  end
+  -- SimpleButtonAPIDocumentation.lua: Get{Normal,Highlight,Disabled}FontObject().
+  function widget:GetNormalFontObject() return self._normalFontObject end
+  function widget:GetHighlightFontObject() return self._highlightFontObject end
+  function widget:GetDisabledFontObject() return self._disabledFontObject end
+  -- SimpleButtonAPIDocumentation.lua: SetHighlightFontObject(font), SetDisabledFontObject(font).
+  function widget:SetHighlightFontObject(fontObject)
+    self._highlightFontObject = fontObject
+  end
+  function widget:SetDisabledFontObject(fontObject)
+    self._disabledFontObject = fontObject
+  end
+  -- SimpleEditBoxAPIDocumentation.lua: SetTextInsets(left, right, top, bottom).
+  function widget:SetTextInsets(left, right, top, bottom)
+    self._textInsets = { left, right, top, bottom }
   end
   function widget:SetFontString(fontString)
     self._fontString = fontString
@@ -341,6 +725,13 @@ local function CreateMockWidget(widgetType, name, parent)
     return self._value or 0
   end
   -- EditBox widget API (InputBoxTemplate).
+  -- EditBox:SetMaxLetters(maxLetters) / GetMaxLetters().
+  function widget:SetMaxLetters(maxLetters)
+    self._maxLetters = maxLetters
+  end
+  function widget:GetMaxLetters()
+    return self._maxLetters or 0
+  end
   function widget:SetNumeric(numeric)
     self._numeric = numeric
   end
@@ -371,6 +762,19 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetStringWidth()
     return #self._text * 6
   end
+  -- FontString:GetStringHeight() -> the height of the text as drawn: no text is 0; otherwise
+  -- one line per GetWidth() worth of characters (6 pixels each, as GetStringWidth), times the
+  -- line height. A stand-in for the client's text layout.
+  function widget:GetStringHeight()
+    local text = self._text or ""
+    if text == "" then return 0 end
+    local width = self:GetWidth()
+    local lines = 1
+    if width > 0 then
+      lines = math.max(1, math.ceil(self:GetStringWidth() / width))
+    end
+    return lines * self:GetLineHeight()
+  end
   function widget:SetFont(font, size, flags)
     if flags and flags ~= "" then
       for token in string.gmatch(flags, "[^,%s]+") do
@@ -390,6 +794,10 @@ local function CreateMockWidget(widgetType, name, parent)
     self._fontSize = size
     self._fontFlags = flags
   end
+  -- GetFont() -> fontFile, height, flags (SimpleFontAPIDocumentation.lua).
+  function widget:GetFont()
+    return self._font, self._fontSize, self._fontFlags or ""
+  end
   function widget:SetTextColor(r, g, b, a)
     self._textColor = {r = r, g = g, b = b, a = a or 1}
   end
@@ -399,13 +807,18 @@ local function CreateMockWidget(widgetType, name, parent)
     end
     return 1, 1, 1, 1
   end
+  -- FontInstance:GetFontObject() -> the font object set with SetFontObject, else the one the
+  -- font string inherits (CreateFontString's template).
   function widget:GetFontObject()
-    local fo = {
+    local fo = self._fontObject or (self._inherits and _G[self._inherits])
+    if fo ~= nil then
+      return fo
+    end
+    return {
       GetTextColor = function()
         return 1, 1, 1, 1
       end
     }
-    return fo
   end
   function widget:SetVertexColor(r, g, b, a)
     self._vertexColor = {r = r, g = g, b = b, a = a or 1}
@@ -438,23 +851,32 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetFrameStrata()
     return self._frameStrata or "MEDIUM"
   end
+  -- warcraft.wiki.gg "Frame Strata": when a frame's level changes, every descendant shifts by
+  -- the same amount, and a descendant that would go below 0 is set to 10000.
+  local function shiftDescendants(frame, delta)
+    for _, child in ipairs(frame._children or {}) do
+      if child._frameLevel ~= nil then
+        local level = child._frameLevel + delta
+        if level < 0 then
+          level = 10000
+        end
+        child._frameLevel = level
+      end
+      shiftDescendants(child, delta)
+    end
+  end
   function widget:SetFrameLevel(level)
     if not level or type(level) ~= "number" or level < 0 or level > 65535 then
       error("bad argument #1 to 'SetFrameLevel' (outside of expected range 0 to 65535 - Usage: self:SetFrameLevel(frameLevel))", 2)
     end
+    local previous = self._frameLevel or 0
     self._frameLevel = level
+    if level ~= previous then
+      shiftDescendants(self, level - previous)
+    end
   end
   function widget:GetFrameLevel()
-    return self._frameLevel or 1
-  end
-  function widget:SetBackdrop(backdrop)
-    self._backdrop = backdrop
-  end
-  function widget:SetBackdropColor(r, g, b, a)
-    self._backdropColor = {r = r, g = g, b = b, a = a or 1}
-  end
-  function widget:SetBackdropBorderColor(r, g, b, a)
-    self._backdropBorderColor = {r = r, g = g, b = b, a = a or 1}
+    return self._frameLevel or 0
   end
 
   -- Grid Frame scroll/mousewheel APIs
@@ -490,7 +912,15 @@ local function CreateMockWidget(widgetType, name, parent)
       SetScrollMode = function() end,
       CreateButton = function(_, text) table.insert(items, text); return {} end,
       CreateCheckbox = function(_, text) table.insert(items, text); return {} end,
+      -- CreateRadio(text, isSelected, setSelected, data) (11_0_0_MenuImplementationGuide.lua).
+      CreateRadio = function(_, text, isSelected, setSelected, data)
+        table.insert(items, text)
+        self._lastMenuRadios = self._lastMenuRadios or {}
+        self._lastMenuRadios[text] = { isSelected = isSelected, setSelected = setSelected, data = data }
+        return {}
+      end,
     }
+    self._lastMenuRadios = {}
     self._menuGenerator(self, root)
     self._lastMenuItems = items
   end
@@ -547,12 +977,322 @@ _G.ContainerFrame_GetContainerNumSlots = function(bagID)
   return bagID, numSlots
 end
 
+-- Templates a mocked frame can inherit. CreateFrame applies each template named in its
+-- comma-separated template list, so a frame gets the regions and mixin methods its XML
+-- template gives it in the client. Each entry is built from Blizzard's own template.
+_G.__mockTemplates = _G.__mockTemplates or {}
+
+-- WowScrollBox (Blizzard_SharedXML/Shared/Scroll/ScrollBox.lua, ScrollBox.xml): a ScrollTarget
+-- child frame; Init(view) sets the view and scrolls to the beginning; SetView(view) binds the
+-- view (ScrollBoxViewMixin:SetScrollBox anchors the scroll target), reparents every child
+-- marked scrollable under the scroll target (ScrollBoxLinearViewMixin:ReparentScrollChildren)
+-- and lays them out (ScrollBoxViewUtil.SetPoint: TOPLEFT, and TOPRIGHT unless stretch is
+-- disabled). FullUpdate(immediately) lays them out again; SetPanExtent forwards to the view;
+-- SetInterpolateScroll comes from ScrollControllerMixin.
+_G.__mockTemplates.WowScrollBox = function(frame)
+  frame.ScrollTarget = CreateMockWidget("EventFrame", nil, frame)
+  function frame:GetScrollTarget() return self.ScrollTarget end
+  function frame:GetView() return self.view end
+  function frame:SetInterpolateScroll(canInterpolate) self._interpolateScroll = canInterpolate end
+  function frame:SetPanExtent(panExtent) self:GetView():SetPanExtent(panExtent) end
+  function frame:layoutScrollChildren()
+    local target = self:GetScrollTarget()
+    for _, child in ipairs(self.view and self.view.frames or {}) do
+      child:ClearAllPoints()
+      child:SetPoint("TOPLEFT", target, "TOPLEFT", 0, 0)
+      child:SetPoint("TOPRIGHT", target, "TOPRIGHT", 0, 0)
+    end
+  end
+  function frame:SetView(view)
+    if not view then
+      error("ScrollBoxBaseMixin:SetView requires a valid view.")
+    end
+    if type(view.SetScrollBox) ~= "function" or type(view.IsHorizontal) ~= "function" then
+      error("ScrollBoxBaseMixin:SetView requires a valid view.")
+    end
+    self.view = view
+    view:SetScrollBox(self)
+    view:ReparentScrollChildren(self:GetChildren())
+    self:layoutScrollChildren()
+  end
+  function frame:Init(view)
+    self:SetView(view)
+    self._scrolledToBegin = true
+  end
+  function frame:FullUpdate(immediately)
+    self._fullUpdates = (self._fullUpdates or 0) + 1
+    self._lastFullUpdateImmediate = immediately
+    self:layoutScrollChildren()
+  end
+end
+
+-- MinimalScrollBar (Blizzard_SharedXML/Shared/Scroll/ScrollBar.lua, ScrollBarMixin):
+-- SetHideIfUnscrollable(hide), SetInterpolateScroll(canInterpolateScroll).
+_G.__mockTemplates.MinimalScrollBar = function(frame)
+  function frame:SetHideIfUnscrollable(hide) self._hideIfUnscrollable = hide end
+  function frame:SetInterpolateScroll(canInterpolate) self._interpolateScroll = canInterpolate end
+end
+
+-- UITextureConstantsDocumentation.lua: Enum.UITextureSliceMode.
+_G.Enum.UITextureSliceMode = { Stretched = 0, Tiled = 1 }
+
+-- Font objects (SimpleFontAPIDocumentation.lua; CreateFont(name) in FontDocumentation.lua):
+-- SetFont/GetFont, SetTextColor/GetTextColor, SetShadowColor/GetShadowColor,
+-- SetShadowOffset/GetShadowOffset, SetJustifyH/GetJustifyH, SetFontObject/CopyFontObject.
+local function CreateMockFont(name)
+  local font = { _name = name, _color = { 1, 1, 1, 1 }, _shadowColor = { 0, 0, 0, 0 }, _shadowOffset = { 0, 0 } }
+  function font:GetName() return self._name end
+  function font:SetFont(path, height, flags) self._path, self._height, self._flags = path, height, flags end
+  function font:GetFont() return self._path, self._height, self._flags end
+  function font:SetTextColor(r, g, b, a) self._color = { r, g, b, a or 1 } end
+  function font:GetTextColor() return unpack(self._color) end
+  function font:SetShadowColor(r, g, b, a) self._shadowColor = { r, g, b, a or 1 } end
+  function font:GetShadowColor() return unpack(self._shadowColor) end
+  function font:SetShadowOffset(x, y) self._shadowOffset = { x, y } end
+  function font:GetShadowOffset() return unpack(self._shadowOffset) end
+  function font:SetJustifyH(justify) self._justifyH = justify end
+  function font:GetJustifyH() return self._justifyH or "CENTER" end
+  function font:CopyFontObject(other)
+    self._path, self._height, self._flags = other:GetFont()
+    self._color = { other:GetTextColor() }
+    self._shadowColor = { other:GetShadowColor() }
+    self._shadowOffset = { other:GetShadowOffset() }
+  end
+  font.SetFontObject = font.CopyFontObject
+  if name then _G[name] = font end
+  return font
+end
+_G.CreateFont = CreateMockFont
+
+-- The font files of the default locale (Blizzard_Fonts_Shared/Shared/GameFonts.xml).
+_G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
+_G.UNIT_NAME_FONT = "Fonts\\FRIZQT__.TTF"
+_G.DAMAGE_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
+
+-- The client font objects BetterBags uses (Blizzard_Fonts_Shared FontStyles.xml / Fonts.xml):
+-- the font file, height, outline, shadow and NORMAL_FONT_COLOR (1, 0.82, 0),
+-- HIGHLIGHT/WHITE (1, 1, 1), DISABLED (0.5, 0.5, 0.5) colors their templates inherit.
+local function clientFont(name, path, height, flags, color, shadow)
+  local font = CreateMockFont(name)
+  font:SetFont(path, height, flags or "")
+  font:SetTextColor(color[1], color[2], color[3], 1)
+  if shadow then
+    font:SetShadowColor(0, 0, 0, 1)
+    font:SetShadowOffset(1, -1)
+  end
+  return font
+end
+local NORMAL = { 1, 0.82, 0 }
+local WHITE = { 1, 1, 1 }
+local DISABLED = { 0.5, 0.5, 0.5 }
+clientFont("GameFontNormal", "Fonts\\FRIZQT__.TTF", 12, "", NORMAL, true)
+clientFont("GameFontHighlight", "Fonts\\FRIZQT__.TTF", 12, "", WHITE, true)
+clientFont("GameFontDisable", "Fonts\\FRIZQT__.TTF", 12, "", DISABLED, true)
+clientFont("GameFontNormalSmall", "Fonts\\FRIZQT__.TTF", 10, "", NORMAL, true)
+clientFont("GameFontHighlightSmall", "Fonts\\FRIZQT__.TTF", 10, "", WHITE, true)
+clientFont("GameFontDisableSmall", "Fonts\\FRIZQT__.TTF", 10, "", DISABLED, true)
+clientFont("NumberFontNormal", "Fonts\\ARIALN.TTF", 14, "OUTLINE", WHITE, false)
+clientFont("ChatFontNormal", "Fonts\\ARIALN.TTF", 14, "", WHITE, true)
+-- GameFontWhite inherits GameFontBlack (SystemFont_Med1, FRIZQT__ 12, no shadow) with white.
+clientFont("GameFontWhite", "Fonts\\FRIZQT__.TTF", 12, "", WHITE, false)
+
+-- Mixin(object, ...) copies every key of each mixin into object (Blizzard_SharedXMLBase).
+_G.Mixin = function(object, ...)
+  for i = 1, select("#", ...) do
+    for k, v in pairs((select(i, ...))) do
+      object[k] = v
+    end
+  end
+  return object
+end
+
+-- BackdropTemplateMixin (Blizzard_SharedXML/Backdrop.lua): only frames that inherit
+-- BackdropTemplate (or mix it in) have a backdrop. SetBackdrop(info) ignores the table it
+-- already shows, clears the backdrop for nil or an info with neither bgFile nor edgeFile,
+-- and otherwise applies it with both colors reset to white; SetBackdropColor and
+-- SetBackdropBorderColor do nothing without a backdrop.
+_G.BackdropTemplateMixin = {
+  SetBackdrop = function(self, backdropInfo)
+    if backdropInfo then
+      if self._backdrop == backdropInfo then
+        return
+      end
+      if not backdropInfo.edgeFile and not backdropInfo.bgFile then
+        self:ClearBackdrop()
+        return
+      end
+      self._backdrop = backdropInfo
+      self._backdropColor = { r = 1, g = 1, b = 1, a = 1 }
+      self._backdropBorderColor = { r = 1, g = 1, b = 1, a = 1 }
+    else
+      self:ClearBackdrop()
+    end
+  end,
+  ClearBackdrop = function(self)
+    self._backdrop = nil
+    self._backdropColor = nil
+    self._backdropBorderColor = nil
+  end,
+  GetBackdrop = function(self)
+    return self._backdrop
+  end,
+  SetBackdropColor = function(self, r, g, b, a)
+    if not self._backdrop then return end
+    self._backdropColor = { r = r, g = g, b = b, a = a or 1 }
+  end,
+  GetBackdropColor = function(self)
+    local c = self._backdropColor
+    if c then return c.r, c.g, c.b, c.a end
+  end,
+  SetBackdropBorderColor = function(self, r, g, b, a)
+    if not self._backdrop then return end
+    self._backdropBorderColor = { r = r, g = g, b = b, a = a or 1 }
+  end,
+  GetBackdropBorderColor = function(self)
+    local c = self._backdropBorderColor
+    if c then return c.r, c.g, c.b, c.a end
+  end,
+}
+
+-- BackdropTemplate (Blizzard_SharedXML/Backdrop.xml): mixin="BackdropTemplateMixin".
+_G.__mockTemplates.BackdropTemplate = function(frame)
+  frame._backdropTemplate = true
+  Mixin(frame, BackdropTemplateMixin)
+end
+
+-- TooltipBackdropTemplate (Blizzard_SharedXML/SharedTooltipTemplates.xml/.lua, every client
+-- branch): not a BackdropTemplate. A NineSlice frame (useParentLevel) and
+-- TooltipBackdropTemplateMixin, whose SetBackdropColor / SetBackdropBorderColor color the
+-- NineSlice; OnLoad sets the center color (backdropColorAlpha, default 1).
+-- TooltipBorderedFrameTemplate sets backdropColorAlpha to 0.8.
+_G.__mockTemplates.TooltipBackdropTemplate = function(frame)
+  frame.NineSlice = CreateMockWidget("Frame", nil, frame)
+  frame.NineSlice:SetFrameLevel(frame:GetFrameLevel())
+  function frame:SetBackdropColor(r, g, b, a) self._backdropColor = { r = r, g = g, b = b, a = a or 1 } end
+  function frame:SetBackdropBorderColor(r, g, b, a) self._backdropBorderColor = { r = r, g = g, b = b, a = a or 1 } end
+  function frame:GetBackdropColor()
+    local c = self._backdropColor
+    if c then return c.r, c.g, c.b, c.a end
+  end
+  function frame:GetBackdropBorderColor()
+    local c = self._backdropBorderColor
+    if c then return c.r, c.g, c.b, c.a end
+    return 1, 1, 1, 1
+  end
+  frame:SetBackdropColor(0, 0, 0, frame.backdropColorAlpha or 1)
+end
+_G.__mockTemplates.TooltipBorderedFrameTemplate = function(frame)
+  frame.backdropColorAlpha = 0.8
+  _G.__mockTemplates.TooltipBackdropTemplate(frame)
+end
+
+-- DefaultPanelBaseTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): a
+-- TitleContainer frame (frameLevel 510) holding the TitleText font string, and a NineSlice
+-- frame; DefaultPanelMixin (TitledPanelMixin, Blizzard_SharedXML/PortraitFrame.lua) gives
+-- GetTitleText and SetTitle.
+local function defaultPanelBase(frame)
+  local titleContainer = CreateMockWidget("Frame", nil, frame)
+  titleContainer:SetFrameLevel(510)
+  titleContainer.TitleText = titleContainer:CreateFontString(frame._name and (frame._name .. "TitleText") or nil, "OVERLAY", "GameFontNormal")
+  frame.TitleContainer = titleContainer
+  frame.NineSlice = CreateMockWidget("Frame", nil, frame)
+  function frame:GetTitleText() return self.TitleContainer.TitleText end
+  function frame:SetTitle(title) self:GetTitleText():SetText(title) end
+end
+
+-- DefaultPanelTemplate: a tiled rock Bg texture (BACKGROUND -6) and TopTileStreaks.
+_G.__mockTemplates.DefaultPanelTemplate = function(frame)
+  defaultPanelBase(frame)
+  frame.Bg = frame:CreateTexture(frame._name and (frame._name .. "Bg") or nil, "BACKGROUND")
+  frame.Bg:SetTexture("Interface\\FrameGeneral\\UI-Background-Rock")
+  frame.TopTileStreaks = frame:CreateTexture(nil, "BACKGROUND")
+end
+
+-- DefaultPanelFlatTemplate: a Bg frame (FlatPanelBackgroundTemplate) at frameLevel 0.
+_G.__mockTemplates.DefaultPanelFlatTemplate = function(frame)
+  defaultPanelBase(frame)
+  frame.Bg = CreateMockWidget("Frame", nil, frame)
+  frame.Bg:SetFrameLevel(0)
+end
+
+-- UIPanelCloseButtonNoScripts (SharedUIPanelTemplates.xml): 24x24, frameLevel 510, red exit
+-- atlases; UIPanelCloseButton adds an OnClick that hides the parent; ...DefaultAnchors
+-- anchors it TOPRIGHT x=1.
+_G.__mockTemplates.UIPanelCloseButtonNoScripts = function(frame)
+  frame:SetSize(24, 24)
+  frame:SetFrameLevel(510)
+  frame:SetDisabledAtlas("RedButton-Exit-Disabled")
+  frame:SetNormalAtlas("RedButton-Exit")
+  frame:SetPushedAtlas("RedButton-exit-pressed")
+  frame:SetHighlightAtlas("RedButton-Highlight", "ADD")
+end
+_G.__mockTemplates.UIPanelCloseButton = function(frame)
+  _G.__mockTemplates.UIPanelCloseButtonNoScripts(frame)
+  frame:SetScript("OnClick", function(self) self:GetParent():Hide() end)
+end
+_G.__mockTemplates.UIPanelCloseButtonDefaultAnchors = function(frame)
+  _G.__mockTemplates.UIPanelCloseButton(frame)
+  frame:SetPoint("TOPRIGHT", frame:GetParent(), "TOPRIGHT", 1, 0)
+end
+
 _G.CreateFrame = function(frameType, name, parent, template)
   local frame = CreateMockWidget(frameType, name, parent)
   if name then
     _G[name] = frame
   end
+  if type(template) == "string" then
+    frame._template = template
+    for templateName in string.gmatch(template, "[^,%s]+") do
+      local apply = _G.__mockTemplates[templateName]
+      if apply then
+        apply(frame)
+      end
+    end
+  end
   return frame
+end
+
+-- CreateScrollBoxLinearView(top, bottom, left, right, spacing) -> a ScrollBoxLinearViewMixin
+-- (Blizzard_SharedXML/Shared/Scroll/ScrollBoxLinearView.lua, ScrollBoxView.lua): SetPanExtent,
+-- SetScrollBox (anchors the scroll target TOPLEFT and TOPRIGHT), GetScrollBox, GetScrollTarget,
+-- IsHorizontal, GetFrames, and ReparentScrollChildren(...), which moves every child marked
+-- scrollable under the scroll target.
+_G.CreateScrollBoxLinearView = function(top, bottom, left, right, spacing)
+  return {
+    frames = {},
+    _padding = { top = top or 0, bottom = bottom or 0, left = left or 0, right = right or 0, spacing = spacing or 0 },
+    SetPanExtent = function(self, panExtent) self._panExtent = panExtent end,
+    SetScrollBox = function(self, scrollBox)
+      self.scrollBox = scrollBox
+      local target = scrollBox:GetScrollTarget()
+      target:ClearAllPoints()
+      target:SetPoint("TOPLEFT")
+      target:SetPoint("TOPRIGHT")
+    end,
+    GetScrollBox = function(self) return self.scrollBox end,
+    GetScrollTarget = function(self) return self:GetScrollBox():GetScrollTarget() end,
+    IsHorizontal = function() return false end,
+    GetFrames = function(self) return self.frames end,
+    ReparentScrollChildren = function(self, ...)
+      local scrollTarget = self:GetScrollTarget()
+      for index = 1, select("#", ...) do
+        local child = select(index, ...)
+        if child.scrollable then
+          child:SetParent(scrollTarget)
+          table.insert(self.frames, child)
+        end
+      end
+    end,
+  }
+end
+
+-- ScrollUtil.InitScrollBoxWithScrollBar(scrollBox, scrollBar, scrollBoxView)
+-- (Blizzard_SharedXML/Shared/Scroll/ScrollUtil.lua): binds the bar to the box, then
+-- scrollBox:Init(scrollBoxView).
+_G.ScrollUtil = {}
+_G.ScrollUtil.InitScrollBoxWithScrollBar = function(scrollBox, scrollBar, view)
+  scrollBox._scrollBar = scrollBar
+  scrollBox:Init(view)
 end
 
 _G.hooksecurefunc = function() end
@@ -767,6 +1507,166 @@ _G.SOUNDKIT = {
   IG_BACKPACK_CLOSE = 2,
 }
 
+-- xpcall(f, msgh, ...) passes ... on to f in WoW (warcraft.wiki.gg API_xpcall); PUC Lua 5.1's
+-- xpcall takes only f and msgh and drops the rest.
+do
+  local nativeXpcall = xpcall
+  _G.xpcall = function(f, msgh, ...)
+    local n = select("#", ...)
+    if n == 0 then
+      return nativeXpcall(f, msgh)
+    end
+    local args = { ... }
+    return nativeXpcall(function() return f(unpack(args, 1, n)) end, msgh)
+  end
+end
+
+-- UIDropDownMenu (Blizzard_SharedXML/Mainline/UIDropDownMenu.lua, UIDropDownMenuTemplates.xml):
+-- the template gives Left/Middle/Right textures and a Text font string; Initialize stores the
+-- init function and calls it at once, and the buttons it adds (AddButton) go to that dropdown's
+-- list (recorded as _dropdownButtons); SetWidth sizes Middle, the frame (width + padding, 25
+-- on each side by default) and Text; SetText/GetText use Text.
+-- InputScrollFrameTemplate (Blizzard_SharedXML/Shared/InputBox/InputBoxTemplates.xml): a
+-- scroll frame with a CharCount font string and an EditBox scroll child (multi-line, not
+-- focused automatically) holding an Instructions font string.
+_G.__mockTemplates.InputScrollFrameTemplate = function(frame)
+  frame.CharCount = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
+  frame.EditBox = CreateFrame("EditBox", nil, frame)
+  frame.EditBox:SetAutoFocus(false)
+  frame.EditBox.Instructions = frame.EditBox:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+end
+
+-- SimplePanelTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): 338 x 424, a
+-- rock Bg texture, an Inset frame and a NineSlice frame. BetterBags' BetterBagsSearchPanelTemplate
+-- is SimplePanelTemplate on retail (templates/container.xml) and, on Classic
+-- (templates/era/container.xml), InsetFrameTemplate with border art and an Inset frame.
+_G.__mockTemplates.SimplePanelTemplate = function(frame)
+  frame:SetSize(338, 424)
+  frame.Bg = frame:CreateTexture(frame._name and (frame._name .. "Bg") or nil, "BACKGROUND")
+  frame.Inset = CreateMockWidget("Frame", nil, frame)
+  frame.NineSlice = CreateMockWidget("Frame", nil, frame)
+end
+_G.__mockTemplates.BetterBagsSearchPanelTemplate = _G.__mockTemplates.SimplePanelTemplate
+
+-- PanelTabButtonTemplate (Blizzard_SharedXML/Mainline/SharedUIPanelTemplates.xml): 10 x 32,
+-- the tab art Left/Middle/Right, their Active versions, their Highlight versions (alpha 0.4),
+-- and the Text button text at CENTER 0, 2. BetterBags' BetterBagsSecureBagTabTemplate
+-- (templates/container.xml) is PanelTabButtonTemplate + InsecureActionButtonTemplate.
+_G.__mockTemplates.PanelTabButtonTemplate = function(frame)
+  frame:SetSize(10, 32)
+  for _, key in ipairs({ "LeftActive", "RightActive", "MiddleActive", "Left", "Right", "Middle" }) do
+    frame[key] = frame:CreateTexture(nil, "BACKGROUND")
+  end
+  for _, key in ipairs({ "LeftHighlight", "MiddleHighlight", "RightHighlight" }) do
+    frame[key] = frame:CreateTexture(nil, "HIGHLIGHT")
+    frame[key]:SetAlpha(0.4)
+  end
+  frame.Text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  frame.Text:SetPoint("CENTER", frame, "CENTER", 0, 2)
+  frame:SetFontString(frame.Text)
+end
+_G.__mockTemplates.BetterBagsSecureBagTabTemplate = _G.__mockTemplates.PanelTabButtonTemplate
+
+-- PanelTemplates_TabResize(tab, padding, absoluteSize, minWidth, maxWidth, absoluteTextSize)
+-- (SharedUIPanelTemplates.lua; TAB_SIDES_PADDING is 20).
+function _G.PanelTemplates_TabResize(tab, padding, absoluteSize, minWidth, maxWidth, absoluteTextSize)
+  local sidesPadding = 20
+  tab.Text:SetWidth(absoluteTextSize or 0)
+  local textWidth = tab.Text:GetStringWidth()
+  local width = textWidth + sidesPadding + (padding or 0)
+  local sideWidths = tab.Left:GetWidth() + tab.Right:GetWidth()
+  minWidth = minWidth or sideWidths
+  if absoluteSize then
+    width = absoluteSize < sideWidths and sideWidths or absoluteSize
+    textWidth = width - sidesPadding - (padding or 0)
+  elseif maxWidth and width > maxWidth then
+    width = maxWidth
+    textWidth = width - sidesPadding - (padding or 0)
+  elseif minWidth and width < minWidth then
+    width = minWidth
+    textWidth = width - sidesPadding - (padding or 0)
+  end
+  tab.Text:SetWidth(textWidth)
+  tab:SetWidth(width)
+end
+
+_G.UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING = 25
+_G.__mockTemplates.UIDropDownMenuTemplate = function(frame)
+  frame.Left = frame:CreateTexture(nil, "ARTWORK")
+  frame.Middle = frame:CreateTexture(nil, "ARTWORK")
+  frame.Right = frame:CreateTexture(nil, "ARTWORK")
+  frame.Text = frame:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+end
+local initializingDropdown
+function _G.UIDropDownMenu_Initialize(frame, initFunction, _, level, menuList)
+  frame.menuList = menuList
+  if initFunction then
+    frame.initialize = initFunction
+    frame._dropdownButtons = {}
+    initializingDropdown = frame
+    initFunction(frame, level, menuList)
+    initializingDropdown = nil
+  end
+end
+function _G.UIDropDownMenu_CreateInfo()
+  return {}
+end
+function _G.UIDropDownMenu_AddButton(info)
+  if initializingDropdown ~= nil then
+    table.insert(initializingDropdown._dropdownButtons, info)
+  end
+end
+function _G.UIDropDownMenu_SetWidth(frame, width, padding)
+  frame.Middle:SetWidth(width)
+  if padding then
+    frame:SetWidth(width + padding)
+    frame.Text:SetWidth(width)
+  else
+    frame:SetWidth(width + UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING * 2)
+    frame.Text:SetWidth(width - UIDROPDOWNMENU_DEFAULT_WIDTH_PADDING)
+  end
+end
+function _G.UIDropDownMenu_SetText(frame, text)
+  frame.Text:SetText(text)
+end
+function _G.UIDropDownMenu_GetText(frame)
+  return frame.Text:GetText()
+end
+
+-- CreateObjectPool(createFunc, resetFunc) (Blizzard_SharedXMLBase/Pools.lua): Acquire
+-- reuses a released object or creates one with createFunc(pool), running resetFunc(pool,
+-- object, true) on a new one, and returns object, isNew; Release runs resetFunc(pool, object)
+-- and keeps the object for the next Acquire.
+function _G.CreateObjectPool(createFunc, resetFunc)
+  local pool = { active = {}, inactive = {} }
+  function pool:Acquire()
+    local object = table.remove(self.inactive)
+    local new = object == nil
+    if new then
+      object = createFunc(self)
+      resetFunc(self, object, true)
+    end
+    self.active[object] = true
+    return object, new
+  end
+  function pool:Release(object)
+    if not self.active[object] then return false end
+    resetFunc(self, object)
+    self.active[object] = nil
+    table.insert(self.inactive, object)
+    return true
+  end
+  function pool:GetNumActive()
+    local n = 0
+    for _ in pairs(self.active) do n = n + 1 end
+    return n
+  end
+  function pool:ReleaseAll()
+    for object in pairs(self.active) do self:Release(object) end
+  end
+  return pool
+end
+
 -- GameTooltip Mock
 _G.GameTooltip = CreateMockWidget("Frame", "GameTooltip")
 _G.GameTooltip.lines = {}
@@ -781,6 +1681,14 @@ function _G.GameTooltip:SetOwner(owner, anchor, x, y)
 end
 function _G.GameTooltip:AddLine(text, r, g, b)
   table.insert(self.lines, {text = text, r = r, g = g, b = b})
+end
+-- GameTooltip:IsOwned(frame) is true when frame owns the tooltip.
+function _G.GameTooltip:IsOwned(frame)
+  return self._owner == frame
+end
+-- GetAppropriateTooltip() (Blizzard_SharedXMLBase/FrameUtil.lua): GameTooltip in game.
+function _G.GetAppropriateTooltip()
+  return _G.GameTooltip
 end
 function _G.GameTooltip:AddDoubleLine(left, right, lr, lg, lb, rr, rg, rb)
   table.insert(self.doubleLines, {left = left, right = right, lr = lr, lg = lg, lb = lb, rr = rr, rg = rg, rb = rb})

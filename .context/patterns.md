@@ -12,5 +12,5 @@
 Patterns are split into topic files for manageability:
 
 - **`patterns-taint.md`** — Taint, protected code, and secure function rules. Critical to read when working with BankPanel, item buttons, or any protected WoW actions.
-- **`patterns-ui.md`** — UI patterns: forms, tooltips, mouse wheel propagation, drag-to-reorder, StaticPopup, object pooling, WindowGrouping, color tiers.
+- **`patterns-ui.md`** — UI patterns: forms, tooltips, mouse wheel propagation, drag-to-reorder, StaticPopup, object pooling, color tiers.
 - **`patterns-state.md`** — State management and architecture: context propagation, behavior vs visual methods, bank system architecture, cross-version feature parity, defensive programming, debugging.

@@ -1,207 +1,259 @@
+-- bagslots_spec.lua -- The "Show Bags" slots panel (frames/bagslots.lua): a Slots window
+-- (window/window.lua) hanging below its bag, sized to its bag buttons plus the theme's padding,
+-- shown in place of the bag's group tabs. The theme decides its chrome per client (Default:
+-- a headerless flat panel on retail, a tooltip backdrop on Classic, Blizzard's tooltip frame on
+-- WoW: Forever; sonata.md section 3b).
 local addon = LibStub("AceAddon-3.0"):GetAddon("BetterBags")
 
--- Load required real modules
 LoadBetterBagsModule("core/context.lua")
 LoadBetterBagsModule("core/events.lua")
 
 local events = addon:GetModule("Events")
 events:Init()
+local context = addon:GetModule("Context")
 
-local ctx = addon:GetModule("Context")
-
--- Stub dependencies needed to load frames/bagslots.lua
-local L = StubBetterBagsModule("Localization")
-L.G = function(_, key) return key end
-
-local database = StubBetterBagsModule("Database")
-database.GetGroupsEnabled = function() return false end
-
-local const = StubBetterBagsModule("Constants")
-const.BAG_KIND = { BACKPACK = 1, BANK = 2 }
-const.BAG_VIEW = { SECTION_GRID = 1, SECTION_ALL_BAGS = 2 }
-const.BACKPACK_ONLY_BAGS_LIST = { 1, 2, 3, 4 }
-const.BANK_ONLY_BAGS_LIST = { 5, 6, 7, 8 }
-const.OFFSETS = {
-  BAG_LEFT_INSET = 6,
-  BAG_RIGHT_INSET = -6,
-}
-
-local themes = StubBetterBagsModule("Themes")
-themes.RegisterFlatWindow = function() end
-themes.GetFlatHeaderHeight = function() return 30 end
-
-local debug = StubBetterBagsModule("Debug")
-debug.Log = function() end
-
-local animations = StubBetterBagsModule("Animations")
-animations.AttachFadeAndSlideTop = function()
-  local g = { Play = function() end, Stop = function() end, HookScript = function() end }
-  return g, g
+local createdStubs = {}
+local function stubModule(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
 end
 
-StubBetterBagsModule("BagButton")
-StubBetterBagsModule("Grid")
+local L = stubModule("Localization")
+L.G = function(_, key) return key end
 
+local database = stubModule("Database")
+local savedTheme = "Default"
+local originals = { GetGroupsEnabled = database.GetGroupsEnabled, GetTheme = database.GetTheme, SetTheme = database.SetTheme }
+
+local const = stubModule("Constants")
+const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
+const.BACKPACK_ONLY_BAGS_LIST = { 1, 2, 3, 4 }
+const.BANK_ONLY_BAGS_LIST = { 5, 6, 7, 8 }
+
+local debug = stubModule("Debug")
+debug.Log = function() end
+
+local fonts = stubModule("Fonts")
+fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsBagSlotsSpecYellow")
+
+-- Bag buttons record their draws.
+local bagButton = stubModule("BagButton")
+local madeButtons = {}
+local originalButtonCreate = bagButton.Create
+
+-- The grid lays its cells out at a size the test sets.
+local grid = stubModule("Grid")
+local gridSize = { 200, 37 }
+local originalGridCreate = grid.Create
+
+local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
+libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
+libWindow.RestorePosition = libWindow.RestorePosition or function() end
+libWindow.SavePosition = libWindow.SavePosition or function() end
+
+LoadBetterBagsModule("render/render.lua")
+LoadBetterBagsModule("render/drawable.lua")
+LoadBetterBagsModule("sonata/engine.lua")
+LoadBetterBagsModule("sonata/apply.lua")
+LoadBetterBagsModule("sonata/decoration.lua")
+LoadBetterBagsModule("window/window.lua")
 ResetModuleStub("BagSlots", "frames/bagslots.lua")
 LoadBetterBagsModule("frames/bagslots.lua")
 
--- CLASSIC_PADDING must match the constant used inside frames/bagslots.lua.
-local PAD = 8
+local sonata = addon:GetModule("Sonata")
+local render = addon:GetModule("Render")
+local bagSlots = addon:GetModule("BagSlots")
 
----Builds a minimal bag-slots panel object bound to the real bagSlotProto, with a
----content grid that reports a fixed (w, h) and a container/frame that record the
----layout points the Draw method assigns.
-local function newPanel(contentW, contentH)
-  local bagSlots = addon:GetModule("BagSlots")
-  local panel = setmetatable({}, { __index = bagSlots.bagSlotProto })
-
-  local container = { points = {} }
-  container.ClearAllPoints = function(self) self.points = {} end
-  container.SetPoint = function(self, point, _, _, x, y)
-    self.points[point] = { x = x, y = y }
-  end
-
-  panel.frame = {
-    width = nil,
-    height = nil,
-    SetWidth = function(self, w) self.width = w end,
-    SetHeight = function(self, h) self.height = h end,
-  }
-
-  panel.content = {
-    cells = {},
-    Draw = function() return contentW, contentH end,
-    GetContainer = function() return container end,
-  }
-  panel._container = container
-  return panel
-end
-
-describe("BagSlots panel layout", function()
-  local savedIsRetail, savedIsForever
-  before_each(function() savedIsRetail = addon.isRetail; savedIsForever = addon.isForever end)
-  after_each(function() addon.isRetail = savedIsRetail; addon.isForever = savedIsForever end)
-
-  it("centers the bags with symmetric padding on Classic/Era (flat panel, no title bar)", function()
-    addon.isRetail = false
-    local panel = newPanel(120, 40)
-    panel:Draw(ctx:New("test"))
-
-    -- The frame wraps the content with equal padding on every side, so the bag
-    -- grid is centered both horizontally and vertically.
-    assert.are.equal(120 + PAD * 2, panel.frame.width)
-    assert.are.equal(40 + PAD * 2, panel.frame.height)
-
-    local c = panel._container
-    assert.are.equal(PAD, c.points["TOPLEFT"].x)
-    assert.are.equal(-PAD, c.points["TOPLEFT"].y)
-    assert.are.equal(-PAD, c.points["BOTTOMRIGHT"].x)
-    assert.are.equal(PAD, c.points["BOTTOMRIGHT"].y)
-  end)
-
-  it("centers the bags with symmetric padding on Camelot (headerless tooltip-bordered panel)", function()
-    addon.isRetail = true
-    addon.isForever = true
-    local panel = newPanel(120, 40)
-    panel:Draw(ctx:New("test"))
-
-    -- Camelot uses the headerless decoration, so it takes the same symmetric-padding
-    -- path as Classic (no phantom themed header), not the retail header-reserving path.
-    assert.are.equal(120 + PAD * 2, panel.frame.width)
-    assert.are.equal(40 + PAD * 2, panel.frame.height)
-    local c = panel._container
-    assert.are.equal(-PAD, c.points["TOPLEFT"].y)
-    assert.are.equal(PAD, c.points["BOTTOMRIGHT"].y)
-  end)
-
-  it("keeps the retail themed-header layout unchanged", function()
-    addon.isRetail = true
-    addon.isForever = false
-    local panel = newPanel(120, 40)
-    panel:Draw(ctx:New("test"))
-
-    -- Retail reserves the themed flat-window header (GetFlatHeaderHeight == 30)
-    -- at the top and 12px at the bottom.
-    assert.are.equal(120 + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + 4, panel.frame.width)
-    assert.are.equal(40 + 30 + 12, panel.frame.height)
-
-    local c = panel._container
-    assert.are.equal(-30, c.points["TOPLEFT"].y)
-    assert.are.equal(12, c.points["BOTTOMRIGHT"].y)
-  end)
-end)
-
-describe("BagSlots panel decoration", function()
-  local savedIsRetail, savedIsForever, savedCreateFrame, savedGridCreate, savedButtonCreate
-  local bagButton = addon:GetModule("BagButton")
-  local grid = addon:GetModule("Grid")
+describe("BagSlots panel", function()
+  local savedFlags, savedBags, originalThemes, originalSend, originalPlaySound
+  local tabsShown, groupsEnabled, bagInvalidations
 
   before_each(function()
-    savedIsRetail = addon.isRetail
-    savedIsForever = addon.isForever
-    savedCreateFrame = _G.CreateFrame
-    savedGridCreate = grid.Create
-    savedButtonCreate = bagButton.Create
-    grid.Create = function()
-      local container = savedCreateFrame("Frame")
-      return {
-        GetContainer = function() return container end,
-        HideScrollBar = function() end,
-        EnableMouseWheelScroll = function() end,
-        Show = function() end,
-        AddCell = function() end,
-        cells = {},
-      }
+    render:Init()
+    originalThemes = sonata.themes
+    sonata.themes = {}
+    sonata:Init()
+    assert(loadfile("sonata/themes/base.lua"))("BetterBags")
+    assert(loadfile("sonata/themes/default.lua"))("BetterBags")
+    savedTheme = "Default"
+    database.GetTheme = function() return savedTheme end
+    database.SetTheme = function(_, key) savedTheme = key end
+    groupsEnabled = false
+    database.GetGroupsEnabled = function() return groupsEnabled end
+    originalSend = events.SendMessage
+    events.SendMessage = function() end
+    originalPlaySound = _G.PlaySound
+    _G.PlaySound = function() end
+    savedFlags = { isRetail = addon.isRetail, isForever = addon.isForever, isClassic = addon.isClassic }
+    addon.isRetail, addon.isForever, addon.isClassic = true, false, false
+    madeButtons = {}
+    bagButton.Create = function()
+      local button = { frame = CreateFrame("Button"), draws = 0 }
+      function button:SetBag(_, bag) self.bag = bag end
+      function button:Draw() self.draws = self.draws + 1 end
+      table.insert(madeButtons, button)
+      return button
     end
-    bagButton.Create = function() return { SetBag = function() end } end
+    gridSize = { 200, 37 }
+    grid.Create = function(_, parent)
+      local g = { cells = {}, container = CreateFrame("Frame", nil, parent) }
+      function g:GetContainer() return self.container end
+      function g:HideScrollBar() end
+      function g:EnableMouseWheelScroll(enabled) self.wheel = enabled end
+      function g:Show() end
+      function g:AddCell(_, cell) table.insert(self.cells, cell) end
+      function g:Draw() return gridSize[1], gridSize[2] end
+      return g
+    end
+    tabsShown, bagInvalidations = true, 0
+    savedBags = addon.Bags
+    addon.Bags = { Backpack = {
+      tabs = { frame = {
+        IsShown = function() return tabsShown end,
+        Show = function() tabsShown = true end,
+        Hide = function() tabsShown = false end,
+      } },
+      window = { Invalidate = function() bagInvalidations = bagInvalidations + 1 end },
+    } }
   end)
 
   after_each(function()
-    addon.isRetail = savedIsRetail
-    addon.isForever = savedIsForever
-    _G.CreateFrame = savedCreateFrame
-    grid.Create = savedGridCreate
-    bagButton.Create = savedButtonCreate
+    events.SendMessage = originalSend
+    _G.PlaySound = originalPlaySound
+    sonata.themes = originalThemes
+    bagButton.Create, grid.Create = originalButtonCreate, originalGridCreate
+    for k, v in pairs(savedFlags) do addon[k] = v end
+    addon.Bags = savedBags
+    for k, v in pairs(originals) do database[k] = v end
   end)
 
-  -- The bag grid is a clipping WowScrollBox child of the panel. A filled backdrop on a
-  -- sibling child frame shares the grid's frame level and can render over the bag
-  -- buttons, so on Camelot the panel frame itself must own the backdrop.
-  it("draws the Camelot backdrop on the panel frame itself, not on a sibling of the grid", function()
-    addon.isRetail = true
-    addon.isForever = true
-    local calls = {}
-    _G.CreateFrame = function(frameType, name, parent, template)
-      local f = savedCreateFrame(frameType, name, parent, template)
-      table.insert(calls, { frame = f, parent = parent, template = template })
-      return f
-    end
-
-    local panel = addon:GetModule("BagSlots"):CreatePanel(ctx:New("test"), const.BAG_KIND.BACKPACK, savedCreateFrame("Frame"))
-
-    local panelTemplate
-    for _, c in ipairs(calls) do
-      if c.frame == panel.frame then panelTemplate = c.template end
-      assert.is_false(c.parent == panel.frame and c.template == "TooltipBorderedFrameTemplate",
-        "the backdrop must not be a sibling frame of the bag grid")
-    end
-    assert.are.equal("TooltipBorderedFrameTemplate", panelTemplate)
-    assert.are.same({ r = 0, g = 0, b = 0, a = 0.9 }, panel.frame._backdropColor)
+  teardown(function()
+    ResetModuleStub("BagSlots", "frames/bagslots.lua")
+    for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
   end)
 
-  it("keeps the BackdropTemplate panel on Classic/Era", function()
-    addon.isRetail = false
-    addon.isForever = false
-    local panelTemplate
-    _G.CreateFrame = function(frameType, name, parent, template)
-      local f = savedCreateFrame(frameType, name, parent, template)
-      if name == "BackpackBagSlots" then panelTemplate = template end
-      return f
+  local function apply()
+    sonata:ApplyTheme(context:New("spec"), "Default")
+  end
+
+  local function newPanel(kind)
+    local bagFrame = CreateFrame("Frame", nil, UIParent)
+    local panel = bagSlots:CreatePanel(context:New("spec"), kind or const.BAG_KIND.BACKPACK, bagFrame)
+    apply()
+    return panel, bagFrame
+  end
+
+  local function showNow(panel)
+    panel:Draw(context:New("spec"))
+    panel:Show()
+    if panel.window.showAnimation then panel.window.showAnimation:_complete() end
+  end
+
+  it("is a Slots window hanging below its bag, hidden until shown", function()
+    local panel, bagFrame = newPanel()
+    assert.are.equal("Slots", panel.window.kind)
+    assert.are.equal(panel.window.frame, panel.frame)
+    assert.are.equal("BackpackBagSlots", panel.frame:GetName())
+    assert.are.equal(bagFrame, panel.frame:GetParent())
+    assert.are.same({ "TOPLEFT", bagFrame, "BOTTOMLEFT", 0, -2 }, { panel.frame:GetPoint(1) })
+    assert.is_nil(panel.frame:GetScript("OnDragStart"))
+    assert.is_false(panel:IsShown())
+  end)
+
+  it("holds a bag button for each bag of its kind, in a grid that does not scroll", function()
+    local panel = newPanel(const.BAG_KIND.BANK)
+    assert.are.equal("BankBagSlots", panel.frame:GetName())
+    assert.are.equal(4, #madeButtons)
+    assert.are.same({ 5, 6, 7, 8 }, { madeButtons[1].bag, madeButtons[2].bag, madeButtons[3].bag, madeButtons[4].bag })
+    assert.are.equal(4, #panel.content.cells)
+    assert.is_false(panel.content.wheel)
+  end)
+
+  it("is as big as its bags plus the theme's room around them on retail", function()
+    local panel = newPanel()
+    showNow(panel)
+    assert.are.same({ 200 + 10 + 6, 37 + 30 + 12 }, { panel.frame:GetWidth(), panel.frame:GetHeight() })
+  end)
+
+  it("centers its bags with even padding on Classic and on WoW: Forever", function()
+    for _, flags in ipairs({ { false, false, true }, { true, true, false } }) do
+      addon.isRetail, addon.isForever, addon.isClassic = flags[1], flags[2], flags[3]
+      local panel = newPanel()
+      showNow(panel)
+      assert.are.same({ 200 + 16, 37 + 16 }, { panel.frame:GetWidth(), panel.frame:GetHeight() })
     end
+  end)
 
-    local panel = addon:GetModule("BagSlots"):CreatePanel(ctx:New("test"), const.BAG_KIND.BACKPACK, savedCreateFrame("Frame"))
-
-    assert.are.equal("BackdropTemplate", panelTemplate)
+  it("keeps its chrome below its bags: a backdrop on its own frame on Classic, a frame below it on Forever", function()
+    addon.isRetail, addon.isForever, addon.isClassic = false, false, true
+    local panel = newPanel()
     assert.is_not_nil(panel.frame._backdrop)
+    assert.is_nil(panel.window.decoration:GetTemplateFrame())
+    addon.isRetail, addon.isForever, addon.isClassic = true, true, false
+    panel = newPanel()
+    local tmpl = panel.window.decoration:GetTemplateFrame()
+    assert.is_true(tmpl:GetFrameLevel() < panel.content:GetContainer():GetFrameLevel())
+  end)
+
+  it("draws its bag buttons, and lays out again at once while shown", function()
+    local panel = newPanel()
+    showNow(panel)
+    assert.are.equal(1, madeButtons[1].draws)
+    gridSize = { 300, 37 }
+    panel:Draw(context:New("spec"))
+    assert.are.equal(2, madeButtons[1].draws)
+    assert.are.equal(300 + 16, panel.frame:GetWidth())
+  end)
+
+  it("shows below its bag where the theme says, in place of the bag's tabs, and calls back once shown", function()
+    addon.isRetail, addon.isForever = true, true
+    local panel, bagFrame = newPanel()
+    local shown = false
+    panel:Show(function() shown = true end)
+    assert.are.same({ "TOPLEFT", bagFrame, "BOTTOMLEFT", 4, -2 }, { panel.frame:GetPoint(1) })
+    assert.is_false(tabsShown)
+    assert.is_true(panel.tabsWereShown)
+    assert.is_true(panel.window.showAnimation:IsPlaying())
+    assert.is_false(shown)
+    panel.window.showAnimation:_complete()
+    assert.is_true(shown)
+  end)
+
+  it("remembers the tabs were shown across a second Show", function()
+    local panel = newPanel()
+    panel:Show()
+    panel:Show()
+    assert.is_true(panel.tabsWereShown)
+  end)
+
+  it("hides with the theme's fade, then gives the bag its tabs back and calls back", function()
+    local panel = newPanel()
+    showNow(panel)
+    local hidden = false
+    panel:Hide(function() hidden = true end)
+    assert.is_true(panel.window:IsClosing())
+    assert.is_false(tabsShown)
+    panel.window.hideAnimation:_complete()
+    assert.is_false(panel:IsShown())
+    assert.is_true(tabsShown)
+    assert.is_true(hidden)
+  end)
+
+  it("gives the bag its tabs back on close when groups are on, even if they were hidden", function()
+    local panel = newPanel()
+    tabsShown = false
+    panel:Show()
+    groupsEnabled = true
+    panel:OnClose(context:New("spec"))
+    assert.is_true(tabsShown)
+  end)
+
+  it("lays its bag out again after it renders, since the bag is never narrower than the panel", function()
+    local panel = newPanel()
+    showNow(panel)
+    local before = bagInvalidations
+    panel:Draw(context:New("spec"))
+    assert.are.equal(before + 1, bagInvalidations)
   end)
 end)

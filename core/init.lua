@@ -69,8 +69,6 @@ local refresh = addon:GetModule('Refresh')
 ---@class ItemLoader: AceModule
 local itemLoader = addon:GetModule('ItemLoader')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
 
 ---@class Views: AceModule
 local views = addon:GetModule('Views')
@@ -193,7 +191,9 @@ function addon:OnInitialize()
   refresh:Init()
 
   -- 4. Themes and Presentation Frames
-  themes:Init()
+  addon:GetModule('Render'):Init()
+  addon:GetModule('Sonata'):Init()
+  addon:GetModule('Tabs'):Init()
   itemFrame:Init()
   sectionFrame:Init()
   contextMenu:Init()
@@ -267,8 +267,9 @@ function addon:OnInitialize()
     addon.Bags.Bank = BagFrame:Create(rootctx:Copy(), const.BAG_KIND.BANK)
   end
 
-  -- Apply themes globally -- do not instantiate new windows after this call.
-  themes:Enable()
+  -- Sonata decorates every window registered so far with the saved theme (Default when it is
+  -- missing or unavailable this session); windows made later are decorated as they register.
+  addon:GetModule('Sonata'):Enable()
 
   addon.Bags.Backpack:SetTitle(L:G("Backpack"))
 

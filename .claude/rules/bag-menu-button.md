@@ -1,10 +1,12 @@
 # Top-Left Bag Menu Button: Click Semantics & Sort Coupling
 
 This documents the click behavior of the round top-left menu button on the bag/bank
-frames (created by `themes.SetupBagButton`, `themes/themes.lua`) and how a backpack sort
-couples to the open bank.
+frames (`BagMenuButton:Create`, `frames/menubutton.lua`; the bag creates it in
+`BuildParts`, the theme only places it with its bag window's `Layout.MenuButton` and styles
+it with the `BagButton` element, sonata.md §3a) and how a backpack sort couples to the open
+bank.
 
-## 1. Click map (`themes/themes.lua`, the button's `OnClick`)
+## 1. Click map (`frames/menubutton.lua`, the button's `OnClick`)
 
 The button registers `LeftButtonUp`/`RightButtonUp` and branches on the click arg:
 
@@ -28,10 +30,17 @@ Rationale: right-click used to *both* auto-deposit and sort the bank in one acti
 made a plain "sort" also shuffle items into the Warbank unexpectedly. Deposit and sort are
 now split — plain right-click sorts, shift+right-click deposits.
 
-The hover tooltip (`bagButton` `OnEnter`, same file) must mirror the click map. The retail
+The hover tooltip (the button's `OnEnter`, same file) must mirror the click map. The retail
 bank tooltip lists **Right Click → Sort Bank** and, **only when `addon.hasWarbank`**, **Shift
 Right Click → Deposit Warbank Items** (on Forever the deposit line is omitted). Keep these in
 sync whenever the click branches change.
+
+The right click is `BagMenuButton:Sort(ctx, bag)`, which a theme's Sort action button
+(window.md, "Action buttons") calls too, so both always do the same thing.
+
+Coverage: `spec/frames/menubutton_spec.lua` (every click branch, the shared Sort, the drop, the
+first-time highlight, both tooltips with and without a Warbank, the cursor-item line,
+placement).
 
 ## 2. Sorting the backpack also sorts the open bank
 

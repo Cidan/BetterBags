@@ -52,10 +52,9 @@ leaves on the following close once it is old enough.
 
 - `bagFrame:Create` calls `b:WatchForClose()`, which hooks the bag frame's own `OnHide`
   (`addon.HookScript`) to `bagProto:OnClosed`. The frame's `OnHide` fires on every way of closing
-  the bag: the toggle and the close button (through `behavior:OnHide` → `frame:Hide()`), ESC
+  the bag: the toggle and the close button (through `behavior:OnHide` → `Window:Hide`), ESC
   (`UISpecialFrames` hides the frame directly and never calls `behavior:OnHide`), and the end of
-  the fade-out (`animations/fade.lua` hides the region in `OnFinished`). Both bag kinds, every
-  client.
+  the window's hide animation (window.md §4). Both bag kinds, every client.
 - `bagProto:OnClosed` returns at once while `self.frame:IsShown()` is true. That case is `OnHide`
   firing because a parent hid (Alt+Z hides `UIParent`) while the bag is still open. Otherwise it
   calls `items:ExpireRecentItems(self.kind)`. If anything expired, or held gaps are waiting

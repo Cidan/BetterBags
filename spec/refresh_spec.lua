@@ -656,7 +656,8 @@ describe("Refresh Module", function()
 
     it("routes bags/Redraw to Redraw, passing whether buttons restyle", function()
       refresh:OnEnable()
-      spy.on(refresh, "Redraw")
+      stub(refresh, "Redraw")
+      finally(function() refresh.Redraw:revert() end)
       events:SendMessage(newContext(), "bags/Redraw", { buttons = true })
       assert.spy(refresh.Redraw).was.called_with(match._, match._, true)
     end)
@@ -667,7 +668,9 @@ describe("Refresh Module", function()
       local frame = {}
       _G.C_Timer.After = function(_, fn) table.insert(frame, fn) end
       refresh:OnEnable()
-      spy.on(refresh, "Redraw")
+      -- Only the scheduling is checked here; drawing and restyling are covered above.
+      stub(refresh, "Redraw")
+      finally(function() refresh.Redraw:revert() end)
       events:SendMessage(newContext(), "bags/Redraw")
       events:SendMessage(newContext(), "bags/Redraw", { buttons = true })
       events:SendMessage(newContext(), "bags/Redraw")

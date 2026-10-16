@@ -19,10 +19,9 @@ StubBetterBagsModule("Groups")
 
 local database = StubBetterBagsModule("Database")
 -- Short-circuit ShowInBag right after the tab dispatch so the search-box code
--- (themes:GetInBagSearchBox etc.) is never reached.
+-- (the bag's in-bag search box) is never reached.
 database.GetInBagSearch = function() return false end
 
-StubBetterBagsModule("Themes")
 
 LoadBetterBagsModule("integrations/quickfind.lua")
 local quickfind = addon:GetModule("QuickFind")

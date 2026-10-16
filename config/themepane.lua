@@ -6,17 +6,11 @@ local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 ---@class List: AceModule
 local list = addon:GetModule('List')
 
----@class Themes: AceModule
-local themes = addon:GetModule('Themes')
-
----@class Database: AceModule
-local database = addon:GetModule('Database')
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
 
 ---@class Fonts: AceModule
 local fonts = addon:GetModule('Fonts')
-
----@class Context: AceModule
-local context = addon:GetModule('Context')
 
 ---@class ThemePane: AceModule
 local themePane = addon:NewModule('ThemePane')
@@ -25,6 +19,14 @@ local themePane = addon:NewModule('ThemePane')
 ---@field ThemeName FontString
 ---@field CheckmarkIcon Texture
 ---@field Init boolean
+
+-- A theme as the pane lists it.
+---@class ThemePaneEntry
+---@field key string The theme's key.
+---@field name string Its display name.
+---@field description string
+---@field available boolean Its addon is loaded (it can be applied).
+---@field active boolean It is the applied theme.
 
 ---@class ThemePaneFrame
 ---@field frame Frame
@@ -66,14 +68,12 @@ function themePaneProto:initListItem(button, elementData)
     button:SetBackdropColor(0, 0, 0, 0)
   end
 
-  local currentTheme = database:GetTheme()
-  local isCurrentTheme = elementData.key == currentTheme
-
+  ---@cast elementData ThemePaneEntry
   -- Font styling - uniform white for all themes
   button.ThemeName:SetFontObject(fonts.UnitFrame12White)
 
-  -- Checkmark for currently active theme
-  if isCurrentTheme then
+  -- Checkmark for the applied theme
+  if elementData.active then
     button.CheckmarkIcon:Show()
   else
     button.CheckmarkIcon:Hide()
@@ -83,13 +83,13 @@ function themePaneProto:initListItem(button, elementData)
   if self.selectedTheme == elementData.key then
     button:SetBackdropColor(1, 0.82, 0, 0.3)
     self.selectedButton = button
-  elseif elementData.theme.Available then
+  elseif elementData.available then
     button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
   else
     button:SetBackdropColor(0, 0, 0, 0)
   end
 
-  button.ThemeName:SetText(elementData.theme.Name)
+  button.ThemeName:SetText(elementData.name)
 
   -- Click handler to select theme
   button:SetScript("OnClick", function()
@@ -105,7 +105,7 @@ function themePaneProto:initListItem(button, elementData)
   button:SetScript("OnLeave", function()
     if self.selectedTheme == elementData.key then
       button:SetBackdropColor(1, 0.82, 0, 0.3)
-    elseif elementData.theme.Available then
+    elseif elementData.available then
       button:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
     else
       button:SetBackdropColor(0, 0, 0, 0)
@@ -127,8 +127,7 @@ function themePaneProto:SelectTheme(themeKey)
   -- Deselect previous
   if self.selectedButton then
     local prevTheme = self.selectedTheme
-    local allThemes = themes:GetAllThemes()
-    if prevTheme and allThemes[prevTheme] and allThemes[prevTheme].Available then
+    if prevTheme and sonata:IsAvailable(prevTheme) then
       self.selectedButton:SetBackdropColor(0.2, 0.2, 0.2, 0.3)
     else
       self.selectedButton:SetBackdropColor(0, 0, 0, 0)
@@ -160,11 +159,9 @@ function themePaneProto:UpdateDetailPanel()
     return
   end
 
-  local allThemes = themes:GetAllThemes()
-  local theme = allThemes[self.selectedTheme]
-
-  if theme then
-    self:ShowThemeDetail(self.selectedTheme, theme)
+  local entry = themePane:Entry(self.selectedTheme)
+  if entry then
+    self:ShowThemeDetail(entry)
   else
     self:ShowEmptyDetail()
   end
@@ -184,9 +181,8 @@ function themePaneProto:ShowEmptyDetail()
   self.detailContent = self.emptyDetail
 end
 
----@param themeKey string
----@param theme Theme
-function themePaneProto:ShowThemeDetail(themeKey, theme)
+---@param entry ThemePaneEntry
+function themePaneProto:ShowThemeDetail(entry)
   if self.emptyDetail then self.emptyDetail:Hide() end
 
   if not self.themeDetail then
@@ -197,19 +193,15 @@ function themePaneProto:ShowThemeDetail(themeKey, theme)
   self.detailContent = self.themeDetail
 
   -- Populate fields
-  self.themeDetail.nameLabel:SetText(theme.Name)
-  self.themeDetail.descriptionLabel:SetText(theme.Description or "No description available.")
+  self.themeDetail.nameLabel:SetText(entry.name)
+  self.themeDetail.descriptionLabel:SetText(entry.description)
 
-  -- Update status
-  local currentTheme = database:GetTheme()
-  local isActive = themeKey == currentTheme
-
-  if isActive then
+  if entry.active then
     self.themeDetail.statusLabel:SetText("Currently Active")
     self.themeDetail.statusLabel:SetTextColor(0.2, 0.8, 0.2)
     self.themeDetail.applyButton:SetEnabled(false)
     self.themeDetail.applyButton:SetText("Active")
-  elseif theme.Available then
+  elseif entry.available then
     self.themeDetail.statusLabel:SetText("Available")
     self.themeDetail.statusLabel:SetTextColor(0.7, 0.7, 0.7)
     self.themeDetail.applyButton:SetEnabled(true)
@@ -222,7 +214,7 @@ function themePaneProto:ShowThemeDetail(themeKey, theme)
   end
 
   -- Store the key for the apply button
-  self.themeDetail.currentThemeKey = themeKey
+  self.themeDetail.currentThemeKey = entry.key
 end
 
 function themePaneProto:CreateThemeDetailPanel()
@@ -284,10 +276,9 @@ function themePaneProto:CreateThemeDetailPanel()
   applyButton:SetPoint("TOPLEFT", 10, yOffset)
   applyButton:SetSize(120, 25)
   applyButton:SetText("Apply Theme")
-  applyButton:SetScript("OnClick", function()
+  addon.SetScript(applyButton, "OnClick", function(ctx)
     if self.themeDetail.currentThemeKey then
-      local ctx = context:New('ThemePane_ApplyTheme')
-      themes:ApplyTheme(ctx, self.themeDetail.currentThemeKey)
+      sonata:ApplyTheme(ctx, self.themeDetail.currentThemeKey)
       -- Refresh the list to update current theme highlighting
       self:RefreshList()
       -- Update the detail panel to reflect the new active state
@@ -297,28 +288,55 @@ function themePaneProto:CreateThemeDetailPanel()
   self.themeDetail.applyButton = applyButton
 end
 
+-- RefreshList lists every theme Sonata knows, by name.
 function themePaneProto:RefreshList()
   self.listFrame:Wipe()
-
-  -- Get all themes and sort by name
-  local allThemes = themes:GetAllThemes()
-  local sortedThemes = {}
-  for key, theme in pairs(allThemes) do
-    table.insert(sortedThemes, { key = key, theme = theme })
-  end
-  table.sort(sortedThemes, function(a, b)
-    return a.theme.Name < b.theme.Name
-  end)
-
-  -- Add themes to the list
-  for _, themeData in ipairs(sortedThemes) do
-    self.listFrame:AddToStart({ key = themeData.key, theme = themeData.theme })
+  for _, entry in ipairs(themePane:Entries()) do
+    self.listFrame:AddToEnd(entry)
   end
 end
 
+-- Entry describes the theme of key for the pane, or nil for a theme Sonata does not list.
+---@param key string
+---@return ThemePaneEntry?
+function themePane:Entry(key)
+  local theme = sonata:GetThemes()[key]
+  if theme == nil then
+    return nil
+  end
+  return {
+    key = key,
+    name = theme.DisplayName or theme.Name,
+    description = theme.Description or "No description available.",
+    available = sonata:IsAvailable(key),
+    active = key == sonata:GetCurrentThemeKey(),
+  }
+end
+
+-- Entries describes every theme Sonata knows that is not hidden, those whose addon is not
+-- loaded too, sorted by name.
+---@return ThemePaneEntry[]
+function themePane:Entries()
+  local entries = {}
+  for key in pairs(sonata:GetThemes()) do
+    table.insert(entries, self:Entry(key))
+  end
+  table.sort(entries, function(a, b)
+    return a.name < b.name
+  end)
+  return entries
+end
+
+-- Create returns the pane's frame, for the settings window.
 ---@param parent Frame
 ---@return Frame
 function themePane:Create(parent)
+  return self:New(parent).frame
+end
+
+---@param parent Frame
+---@return ThemePaneFrame
+function themePane:New(parent)
   local pane = setmetatable({}, { __index = themePaneProto })
 
   -- Create main frame
@@ -374,5 +392,5 @@ function themePane:Create(parent)
     end
   end)
 
-  return pane.frame
+  return pane
 end

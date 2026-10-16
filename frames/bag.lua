@@ -25,9 +25,6 @@ local contextMenu = addon:GetModule("ContextMenu")
 ---@class Views: AceModule
 local views = addon:GetModule("Views")
 
----@class Resize: AceModule
-local resize = addon:GetModule("Resize")
-
 ---@class Events: AceModule
 local events = addon:GetModule("Events")
 
@@ -37,17 +34,29 @@ local question = addon:GetModule("Question")
 ---@class Categories: AceModule
 local categories = addon:GetModule("Categories")
 
----@class LibWindow-1.1: AceAddon
-local Window = LibStub("LibWindow-1.1")
-
 ---@class ItemFrame: AceModule
 local itemFrame = addon:GetModule("ItemFrame")
 
----@class Themes: AceModule
-local themes = addon:GetModule("Themes")
+---@class Render: AceModule
+local render = addon:GetModule("Render")
 
----@class WindowGroup: AceModule
-local windowGroup = addon:GetModule("WindowGroup")
+---@class WindowModule: AceModule
+local windowModule = addon:GetModule("Window")
+
+---@class Scrollbox: AceModule
+local scrollbox = addon:GetModule("Scrollbox")
+
+---@class BagCanvas: AceModule
+local bagCanvas = addon:GetModule("BagCanvas")
+
+---@class BagMenuButton: AceModule
+local menuButton = addon:GetModule("BagMenuButton")
+
+---@class BagActions: AceModule
+local bagActions = addon:GetModule("BagActions")
+
+---@class SearchBox: AceModule
+local searchBox = addon:GetModule("SearchBox")
 
 ---@class Anchor: AceModule
 local anchor = addon:GetModule("Anchor")
@@ -61,6 +70,10 @@ local bankBehavior = addon:GetModule("BankBehavior")
 ---@class CursorPlacement: AceModule
 local cursorPlacement = addon:GetModule("CursorPlacement")
 
+-- The smallest content a bag window shows: the old fixed minimum of the bag's content box.
+local MIN_CONTENT_WIDTH = 260
+local MIN_CONTENT_HEIGHT = 100
+
 -------
 --- Bag Prototype
 -------
@@ -71,19 +84,29 @@ local cursorPlacement = addon:GetModule("CursorPlacement")
 ---@class (exact) Bag
 ---@field kind BagKind
 ---@field currentView View
----@field frame Frame The fancy frame of the bag.
+---@field frame Frame The bag window's frame.
+---@field window BetterBagsWindow The bag's window: its frame, chrome, layout, moving and resizing.
+---@field scroll ScrollboxDrawable The scroll box the bag's content scrolls in.
+---@field canvas BagCanvasDrawable The bag's content: Recent Items, the active view, Free Space.
+---@field searchBox SearchFrame The in-bag search box.
+---@field appliedView? BagView The view whose size mode the window last took.
+---@field appliedSizeMode? WindowSizeMode
+---@field menuButton BagButton The menu button at the window's top left.
+---@field actions BagActionSet The action buttons a theme gives the window (Layout.Actions).
+---@field headerContainer Frame
+---@field tabContainer Frame
+---@field footerContainer Frame
+---@field scrollBox WowScrollBox
 ---@field anchor AnchorFrame The anchor frame for the bag.
 ---@field bottomBar Frame The bottom bar of the bag.
 ---@field recentItems Section The recent items section.
 ---@field currencyFrame CurrencyIconGrid The currency frame.
----@field themeConfigFrame ThemeConfigFrame The theme config frame.
 ---@field currentItemCount number
 ---@field private sections table<string, Section>
 ---@field slots bagSlots
 ---@field decorator Texture
 ---@field bg Texture
 ---@field moneyFrame Money
----@field resizeHandle Button
 ---@field drawOnClose boolean
 ---@field drawAfterCombat boolean
 ---@field menuList MenuList[]
@@ -91,10 +114,7 @@ local cursorPlacement = addon:GetModule("CursorPlacement")
 ---@field toReleaseSections Section[]
 ---@field views table<BagView, View>
 ---@field loaded boolean
----@field windowGrouping WindowGrouping
----@field sideAnchor Frame
 ---@field previousSize number
----@field movingWindow boolean? True while the player drags the window to move it.
 ---@field searchFrame SearchFrame
 ---@field tabs Tab
 ---@field bankTab BankTab
@@ -112,7 +132,7 @@ addon:GetModule('Perf'):RegisterPrototype(bagFrame.bagProto, 'Bag')
 ---@param slotInfo? SlotInfo
 ---@return boolean drew
 function bagFrame.bagProto:Show(ctx, slotInfo)
-	if self.frame:IsShown() then
+	if self.window:IsShown() and not self.window:IsClosing() then
 		return false
 	end
 	self.behavior:OnShow(ctx)
@@ -129,7 +149,7 @@ end
 
 ---@param ctx Context
 function bagFrame.bagProto:Hide(ctx)
-	if not self.frame:IsShown() then
+	if not self.window:IsShown() or self.window:IsClosing() then
 		return
 	end
 	self.behavior:OnHide(ctx)
@@ -160,29 +180,12 @@ function bagFrame.bagProto:WatchForClose()
 	end)
 end
 
--- WatchMouse makes the window movable by dragging it, and a drop target: an item dropped
--- anywhere on it, or a left click on it while holding one, goes into a free slot of its bags
--- (issue #408). Item buttons, section titles and the bag button take their own drops first.
--- With an item on the cursor, pressing on the window is a drop and never moves it.
+-- WatchMouse makes the window a drop target: an item dropped anywhere on it, or a left click
+-- on it while holding one, goes into a free slot of its bags (issue #408). Item buttons,
+-- section titles and the bag button take their own drops first. The window moves the bag
+-- when dragged (BuildWindow), except while an item is on the cursor: then pressing on the
+-- window is a drop and never moves it.
 function bagFrame.bagProto:WatchMouse()
-	self.frame:SetScript("OnDragStart", function(drag)
-		if CursorHasItem() then
-			return
-		end
-		self.movingWindow = true
-		self:KeepBagInBounds()
-		drag:StartMoving()
-	end)
-	self.frame:SetScript("OnDragStop", function(drag)
-		if not self.movingWindow then
-			return
-		end
-		self.movingWindow = false
-		drag:StopMovingOrSizing()
-		Window.SavePosition(self.frame)
-		self.previousSize = self.frame:GetBottom()
-		self:OnResize()
-	end)
 	addon.SetScript(self.frame, "OnReceiveDrag", function()
 		self:PlaceCursorItem()
 	end)
@@ -201,7 +204,7 @@ end
 
 ---@param ctx Context
 function bagFrame.bagProto:Toggle(ctx)
-	if self.frame:IsShown() then
+	if self.window:IsShown() and not self.window:IsClosing() then
 		self:Hide(ctx)
 	else
 		self:Show(ctx)
@@ -417,87 +420,26 @@ function bagFrame.bagProto:WipeGlobalSections(ctx)
 	end
 end
 
-function bagFrame.bagProto:ShowScrollBar()
-	if not self.scrollBar then return end
-	self.scrollBar:SetAttribute("nodeignore", false)
-	self.scrollBar:SetAlpha(1)
-	self.scrollBar:Show()
-end
-
-function bagFrame.bagProto:HideScrollBar()
-	if not self.scrollBar then return end
-	self.scrollBar:Hide()
-	self.scrollBar:SetAlpha(0)
-	self.scrollBar:SetAttribute("nodeignore", true)
-end
-
----@param w number
----@param h number
-function bagFrame.bagProto:UpdateBagBounds(w, h)
-	-- Set size and scrollbars
-	if w < 260 then w = 260 end
-	if self.tabs and w < self.tabs.width then
-		w = self.tabs.width
-	end
-	if self.slots and self.slots:IsShown() then
-		local minW = self.slots.frame:GetWidth()
-			- const.OFFSETS.BAG_LEFT_INSET
-			+ const.OFFSETS.BAG_RIGHT_INSET
-			- const.OFFSETS.SCROLLBAR_WIDTH
-		if w < minW then
-			w = minW
-		end
-	end
-	if h < 100 then h = 100 end
-	if database:GetInBagSearch() then
-		h = h + 20
-	end
-
-	local bagHeight = h +
-		const.OFFSETS.BAG_BOTTOM_INSET + -const.OFFSETS.BAG_TOP_INSET +
-		const.OFFSETS.BOTTOM_BAR_HEIGHT + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-
-	local maxHeight = UIParent:GetHeight() * 0.90
-	local bagWidth = w + const.OFFSETS.BAG_LEFT_INSET + -const.OFFSETS.BAG_RIGHT_INSET + const.OFFSETS.SCROLLBAR_WIDTH
-	if bagHeight > maxHeight then
-		bagHeight = maxHeight
-		self:ShowScrollBar()
-	else
-		self:HideScrollBar()
-	end
-
-	self.frame:SetWidth(bagWidth)
-	self.frame:SetHeight(bagHeight)
-
-	if self.scrollBox then
-		if database:GetInBagSearch() then
-			self.scrollBox:SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET - 20)
-		else
-			self.scrollBox:SetPoint("TOPLEFT", self.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-		end
-	end
-end
-
+-- BindGlobalSections puts this pass's Recent Items and Free Space data into the global
+-- sections (the header and footer of the bag, outside the tab views) and ends their part of
+-- the pass. LayoutGlobalSections lays them out.
 ---@param ctx Context
 ---@param slotInfo SlotInfo
----@return number headerW, number headerH, number footerW, number footerH
-function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
+function bagFrame.bagProto:BindGlobalSections(ctx, slotInfo)
 	self:BeginGlobalSections()
+	self.recentSection = nil
+	self.freeSpaceSection = nil
+	self.freeSpaceShowAll = false
 
 	if not self.headerContainer then
-		return 0, 0, 0, 0
+		return
 	end
 
 	local currentView = database:GetBagView(self.kind)
-	local sizeInfo = database:GetBagSizeInfo(self.kind, currentView)
 
-	-- 1. Scan and draw Recent Items inside self.headerContainer.
-	-- The Recent Items section must honor the ordered, gap-carrying layout the data
-	-- pipeline computed (slotInfo.sortedItems from BuildOrderedItems): it holds the
-	-- items in their stable, sorted positions and carries persistent empty gaps for
-	-- consumed/removed items. Iterating the unordered visible-item map (a hash) via
-	-- pairs() instead rendered Recent Items in an arbitrary order that re-shuffled on
-	-- every sweep and dropped every gap.
+	-- Recent Items follows the ordered, gap-carrying layout the data pipeline committed
+	-- (slotInfo.sortedItems from BuildOrderedItems), never a pairs() scan of the visible items:
+	-- that is the stable order, and the only place gaps for consumed items live.
 	local recentItems = {}
 	if currentView ~= const.BAG_VIEW.SECTION_ALL_BAGS then
 		if slotInfo.sortedItems then
@@ -516,16 +458,12 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		end
 	end
 
-	local headerW, headerH = 0, 0
 	if #recentItems > 0 then
 		local recentSection = self:GetOrCreateGlobalSection(ctx, L:G("Recent Items"))
 		recentSection.frame:SetParent(self.headerContainer)
 		recentSection.frame:ClearAllPoints()
 		recentSection.frame:SetPoint("TOPLEFT", self.headerContainer, "TOPLEFT", 0, 0)
 		recentSection:SetTitle(L:G("Recent Items"))
-
-		recentSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
-
 		for _, item in ipairs(recentItems) do
 			if item.isItemGap then
 				recentSection:AddCell(item.slotkey, { isGap = true, width = 37, height = 37 })
@@ -535,13 +473,11 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 				recentSection:AddCell(item.slotkey, itemButton)
 			end
 		end
-		headerW, headerH = recentSection:Draw(self.kind, currentView, false)
+		self.recentSection = recentSection
 	end
-	self.headerContainer:SetHeight(math.max(1, headerH))
 
-	-- 2. Draw Free Space inside self.footerContainer when this tab's data carries it: the data
-	-- phase leaves it out of a tab with no free slots (except SECTION_ALL_BAGS mode)
-	local footerW, footerH = 0, 0
+	-- Free Space only when this tab's data carries it: the data phase leaves it out of a tab
+	-- with no free slots.
 	local tabID = self:GetCurrentTabID()
 	local tabData = slotInfo.tabs and slotInfo.tabs[tabID] or slotInfo
 	local freeSpaceData = tabData.freeSpace
@@ -551,28 +487,54 @@ function bagFrame.bagProto:DrawGlobalSections(ctx, slotInfo)
 		freeSlotsSection.frame:ClearAllPoints()
 		freeSlotsSection.frame:SetPoint("TOPLEFT", self.footerContainer, "TOPLEFT", 0, 0)
 		freeSlotsSection:SetTitle(L:G("Free Space"))
-
 		if freeSpaceData.showAll then
-			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow * sizeInfo.columnCount)
 			for _, btn in ipairs(freeSpaceData.buttons) do
 				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
 				itemButton:SetFreeSlots(ctx, btn, 1, true)
 				freeSlotsSection:AddCell(btn.slotkey, itemButton)
 			end
-			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, true, true)
 		else
-			freeSlotsSection:SetMaxCellWidth(sizeInfo.itemsPerRow)
 			for _, btn in ipairs(freeSpaceData.buttons) do
 				local itemButton = self:GetOrCreateGlobalItemButton(ctx, btn.slotkey)
 				itemButton:SetFreeSlots(ctx, btn, btn.count)
 				freeSlotsSection:AddCell(btn.key, itemButton)
 			end
-			footerW, footerH = freeSlotsSection:Draw(self.kind, currentView, false)
 		end
+		self.freeSpaceSection = freeSlotsSection
+		self.freeSpaceShowAll = freeSpaceData.showAll == true
 	end
-	self.footerContainer:SetHeight(math.max(1, footerH))
 
 	self:FinishGlobalSections(ctx)
+end
+
+-- LayoutGlobalSections lays the global sections out with the bag's layout: Recent Items and
+-- "show all" free space span every column; aggregated free space takes one section's row.
+---@param layout ViewLayout
+---@return number headerW, number headerH, number footerW, number footerH
+function bagFrame.bagProto:LayoutGlobalSections(layout)
+	local currentView = database:GetBagView(self.kind)
+	local headerW, headerH = 0, 0
+	if self.recentSection then
+		self.recentSection:SetMaxCellWidth(layout.itemsPerRow * layout.columns)
+		headerW, headerH = self.recentSection:Draw(self.kind, currentView, false)
+	end
+	if self.headerContainer then
+		self.headerContainer:SetHeight(math.max(1, headerH))
+	end
+
+	local footerW, footerH = 0, 0
+	if self.freeSpaceSection then
+		if self.freeSpaceShowAll then
+			self.freeSpaceSection:SetMaxCellWidth(layout.itemsPerRow * layout.columns)
+			footerW, footerH = self.freeSpaceSection:Draw(self.kind, currentView, true, true)
+		else
+			self.freeSpaceSection:SetMaxCellWidth(layout.itemsPerRow)
+			footerW, footerH = self.freeSpaceSection:Draw(self.kind, currentView, false)
+		end
+	end
+	if self.footerContainer then
+		self.footerContainer:SetHeight(math.max(1, footerH))
+	end
 	return headerW, headerH, footerW, footerH
 end
 
@@ -646,47 +608,30 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 		tView:BeginRender(ctx, claims)
 	end
 
-	local headerW, headerH, footerW, footerH = self:DrawGlobalSections(ctx, slotInfo)
+	self:BindGlobalSections(ctx, slotInfo)
+	view:Bind(ctx, self, slotInfo)
+	self:FinishDrawPass(ctx, claims)
+	view:GetContent():Show()
+	self.currentView = view
 
-	view:Render(ctx, self, slotInfo, function()
-		self:FinishDrawPass(ctx, claims)
-		view:GetContent():Show()
-		self.currentView = view
+	self.lastSlotInfo = slotInfo
+	self:ApplySizeSettings()
 
-		local tabW, tabH = view.content.contentWidth or 0, view.content.contentHeight or 0
-		local totalW = tabW
-		local totalH = tabH
-		if self.tabContainer then
-			self.tabContainer:SetHeight(math.max(1, tabH))
-			self.tabContainer:SetWidth(math.max(1, tabW))
+	-- The window lays the bound sections out (the canvas, frames/bagcanvas.lua) and sizes
+	-- itself, now, so the draw is complete when Draw returns.
+	render:RenderNow(self.window, { ctx = ctx })
 
-			totalW = math.max(headerW, tabW, footerW)
-			totalH = headerH + tabH + footerH
-			if self.scrollChild then
-				self.scrollChild:SetSize(math.max(1, totalW), math.max(1, totalH))
-			end
-		end
-
-		self:UpdateBagBounds(totalW, totalH)
-
-		if self.scrollBox and self.scrollBox.FullUpdate then
-			self.scrollBox:FullUpdate(true)
-		end
-
-		self.frame:SetScale(database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind)).scale / 100)
-		self:OnResize()
-		if
-			database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS
-			and self.slots
-			and not self.slots:IsShown()
-		then
-			self.slots:Draw(ctx)
-			self.slots:Show()
-		end
-		events:SendMessage(ctx, "bag/RedrawIcons", self)
-		events:SendMessage(ctx, "bag/Rendered", self, slotInfo)
-		callback()
-	end)
+	if
+		database:GetBagView(self.kind) == const.BAG_VIEW.SECTION_ALL_BAGS
+		and self.slots
+		and not self.slots:IsShown()
+	then
+		self.slots:Draw(ctx)
+		self.slots:Show()
+	end
+	events:SendMessage(ctx, "bag/RedrawIcons", self)
+	events:SendMessage(ctx, "bag/Rendered", self, slotInfo)
+	callback()
 end
 
 function bagFrame.bagProto:KeepBagInBounds()
@@ -698,8 +643,15 @@ function bagFrame.bagProto:KeepBagInBounds()
 	self.frame:SetClampedToScreen(true)
 end
 
+-- OnResize runs after every render of the bag's window. A bag sized to its content keeps
+-- its bottom edge where it was (it grows upwards), or follows its anchor; a bag the player
+-- sized stays where the player put it.
 function bagFrame.bagProto:OnResize()
-	if self.anchor:IsActive() then
+	if self.window:GetSizeMode() == "window" then
+		self:KeepBagInBounds()
+		return
+	end
+	if self.anchor and self.anchor:IsActive() then
 		self.frame:ClearAllPoints()
 		self.frame:SetPoint(self.anchor.anchorPoint, self.anchor.frame, self.anchor.anchorPoint)
 		--- HACKFIX(lobato): This fixes a bug in the WoW rendering engine.
@@ -719,7 +671,173 @@ function bagFrame.bagProto:OnResize()
 end
 
 function bagFrame.bagProto:SetTitle(text)
-	themes:SetTitle(self.frame, text)
+	self.window:SetTitle(text)
+end
+
+---@return SizeInfo
+function bagFrame.bagProto:GetSizeInfo()
+	return database:GetBagSizeInfo(self.kind, database:GetBagView(self.kind))
+end
+
+-- ApplySizeSettings gives the window the scale, opacity and size mode of the view the bag
+-- shows (each view keeps its own). The size mode is applied only when it or the view changed:
+-- applying it takes the saved size, which would undo a resize in progress.
+function bagFrame.bagProto:ApplySizeSettings()
+	self.window:UpdateScale(true)
+	self.window:UpdateOpacity()
+	local view = database:GetBagView(self.kind)
+	local mode = database:GetBagSizeMode(self.kind)
+	if view ~= self.appliedView or mode ~= self.appliedSizeMode then
+		self.appliedView = view
+		self.appliedSizeMode = mode
+		self.window:UpdateSizeMode()
+	end
+end
+
+-- BuildWindow creates the bag's window, the scroll box its content scrolls in, and the
+-- canvas the content is laid out on.
+---@param name string Backpack or Bank.
+function bagFrame.bagProto:BuildWindow(name)
+	local kind = self.kind
+	self.window = windowModule:Create({
+		Kind = "Bag",
+		Name = "BetterBagsBag" .. name,
+		Title = name,
+		Strata = self.behavior:GetFrameStrata(),
+		Level = self.behavior:GetFrameLevel(),
+		Toplevel = true,
+		Position = database:GetBagPosition(kind),
+		CanMove = function()
+			return not CursorHasItem()
+		end,
+		OnMoveStart = function()
+			self:KeepBagInBounds()
+		end,
+		OnMoved = function()
+			self.previousSize = self.frame:GetBottom()
+			self:OnResize()
+		end,
+		Opacity = function()
+			return self:GetSizeInfo().opacity
+		end,
+		Scale = function()
+			return self:GetSizeInfo().scale / 100
+		end,
+		SizeMode = function()
+			return database:GetBagSizeMode(kind)
+		end,
+		Size = function()
+			return database:GetBagViewFrameSize(kind, database:GetBagView(kind))
+		end,
+		OnResized = function(_, width, height)
+			database:SetBagViewFrameSize(kind, database:GetBagView(kind), width, height)
+		end,
+		MinWidth = function()
+			if self.slots and self.slots:IsShown() then
+				return self.slots.frame:GetWidth()
+			end
+			return 0
+		end,
+		MinContentWidth = function()
+			local tabsWidth = self.tabs and self.tabs.width or 0
+			return math.max(MIN_CONTENT_WIDTH, tabsWidth) + self.scroll:GetBarWidth()
+		end,
+		MinContentHeight = MIN_CONTENT_HEIGHT,
+		Fade = function()
+			return database:GetEnableBagFading()
+		end,
+		OnClose = function(ctx)
+			self:Hide(ctx)
+		end,
+		OnRendered = function()
+			self:OnResize()
+		end,
+		OnDecorated = function(ctx, decoration)
+			self:PlaceParts(ctx, decoration)
+		end,
+	})
+	self.frame = self.window.frame
+	self.frame:SetSize(200, 200)
+
+	self.scroll = scrollbox:Create(self.frame, "BetterBagsBagScroll" .. name)
+	self.canvas = bagCanvas:Create(self, self.scroll.scrollChild)
+	self.scroll:SetChild(self.canvas)
+	self.window:SetContent(self.scroll)
+	self.scrollBox = self.scroll.scrollBox
+	self.headerContainer = self.canvas.headerContainer
+	self.tabContainer = self.canvas.tabContainer
+	self.footerContainer = self.canvas.footerContainer
+end
+
+-- BuildParts creates the parts of the bag window the theme places: the in-bag search box, the
+-- menu button, the action buttons a theme may give it, and the footer bar along the bottom.
+function bagFrame.bagProto:BuildParts()
+	self.searchBox = searchBox:CreateBox(self.kind, self.frame)
+	self.menuButton = menuButton:Create(self)
+	self.actions = bagActions:Create(self)
+
+	local bottomBar = CreateFrame("Frame", nil, self.frame)
+	bottomBar:SetHeight(20)
+	bottomBar:Show()
+	self.bottomBar = bottomBar
+end
+
+-- PlaceParts puts the bag's own parts where the theme's layout says, and reserves the room
+-- they take inside the window's content box. It runs after every theme the window took.
+---@param ctx Context
+---@param decoration SonataWindowDecoration
+function bagFrame.bagProto:PlaceParts(ctx, decoration)
+	local layout = decoration:GetLayout()
+	local overlay = decoration:GetOverlayFrame()
+
+	local search = type(layout.Search) == "table" and layout.Search or nil
+	if search ~= nil then
+		local box = self.searchBox.frame
+		box:ClearAllPoints()
+		for _, p in ipairs(search.Points or {}) do
+			box:SetPoint(p.Point, self.frame, p.RelativePoint or p.Point, p.X or 0, p.Y or 0)
+		end
+		box:SetFrameLevel(overlay:GetFrameLevel() + 2)
+	end
+	self.searchLayout = search
+
+	local footer = type(layout.Footer) == "table" and layout.Footer or nil
+	self.footerLayout = footer
+	if footer ~= nil then
+		self.bottomBar:ClearAllPoints()
+		self.bottomBar:SetPoint("BOTTOMLEFT", self.frame, "BOTTOMLEFT", footer.Left or 0, footer.Bottom or 0)
+		self.bottomBar:SetPoint("BOTTOMRIGHT", self.frame, "BOTTOMRIGHT", -(footer.Right or 0), footer.Bottom or 0)
+		self.bottomBar:SetHeight(footer.Height or 20)
+		self.bottomBar:Show()
+	else
+		self.bottomBar:Hide()
+	end
+
+	menuButton:Place(self.menuButton, layout.MenuButton, self.frame, overlay)
+	bagActions:Place(self.actions, layout.Actions, self.frame, overlay)
+	self:UpdateSearchShown()
+	if self.slots and self.slots:IsShown() then
+		self.slots:Draw(ctx)
+	end
+end
+
+-- UpdateSearchShown shows the in-bag search box when in-bag search is on, and reserves the
+-- room the theme's layout gives it, and the footer's, inside the window's content box.
+function bagFrame.bagProto:UpdateSearchShown()
+	local shown = database:GetInBagSearch() and self.searchLayout ~= nil
+	self.searchBox.frame:SetShown(shown)
+	self.window:SetExtraInsets({
+		Top = shown and (self.searchLayout.Reserve or 0) or 0,
+		Bottom = self.footerLayout and (self.footerLayout.Reserve or 0) or 0,
+	})
+end
+
+-- SetSearchShown follows the in-bag search setting: the box shows or hides, and the bags are
+-- recalculated (their search results come from whichever box holds the query).
+---@param ctx Context
+function bagFrame.bagProto:SetSearchShown(ctx)
+	self:UpdateSearchShown()
+	events:SendMessage(ctx, 'bags/Rederive', { resetLayout = true, buttons = true })
 end
 
 --- SwitchToBankAndWipe delegates to behavior for bank-specific implementation.
@@ -849,7 +967,6 @@ function bagFrame:Create(ctx, kind)
 	b.toRelease = {}
 	b.toReleaseSections = {}
 	b.kind = kind
-	b.windowGrouping = windowGroup:Create()
 
 	-- Instantiate the appropriate behavior based on bag kind
 	if kind == const.BAG_KIND.BACKPACK then
@@ -859,150 +976,30 @@ function bagFrame:Create(ctx, kind)
 	end
 
 	local name = kind == const.BAG_KIND.BACKPACK and "Backpack" or "Bank"
-	-- The main display frame for the bag.
-	---@class Frame: BetterBagsBagPortraitTemplate
-	local f = CreateFrame("Frame", "BetterBagsBag" .. name, nil)
-
-	-- Register this window with the theme system.
-	themes:RegisterPortraitWindow(f, name)
-
-	-- Setup the main frame defaults.
-	b.frame = f
-	b.sideAnchor = CreateFrame("Frame", f:GetName() .. "LeftAnchor", b.frame)
-	b.sideAnchor:SetWidth(1)
-	b.sideAnchor:SetPoint("TOPRIGHT", b.frame, "TOPLEFT")
-	b.sideAnchor:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMLEFT")
-	f.Owner = b
-	b.frame:SetParent(UIParent)
-	b.frame:SetToplevel(true)
-	b.frame:SetFrameStrata(b.behavior:GetFrameStrata())
-	local frameLevel = b.behavior:GetFrameLevel()
-	if frameLevel then
-		b.frame:SetFrameLevel(frameLevel)
-	end
-	b.frame:Hide()
-	b.frame:SetSize(200, 200)
-
-	-- Attach fade animations (created once, used conditionally based on settings)
-	local animations = addon:GetModule('Animations')
-	b.fadeInGroup, b.fadeOutGroup = animations:AttachFadeGroup(b.frame)
-
-	--b.frame.Bg:SetAlpha(sizeInfo.opacity / 100)
-	--b.frame.CloseButton:SetScript("OnClick", function()
-	--  b:Hide()
-	--  if b.kind == const.BAG_KIND.BANK then CloseBankFrame() end
-	--end)
-
 	b.tabViews = {}
 	b.itemFrames = {}
 	b.globalSections = {}
-
-	-- Create the single global scrollBox and scrollBar
-	local scrollBox = CreateFrame("Frame", "BetterBagsBagScroll" .. name, b.frame, "WowScrollBox")
-	scrollBox:SetInterpolateScroll(true)
-	local scrollBar = CreateFrame("EventFrame", nil, scrollBox, "MinimalScrollBar")
-	scrollBar:SetPoint("TOPLEFT", scrollBox, "TOPRIGHT", -12, 0)
-	scrollBar:SetPoint("BOTTOMLEFT", scrollBox, "BOTTOMRIGHT", -12, 0)
-	scrollBar:SetInterpolateScroll(true)
-	scrollBar:SetHideIfUnscrollable(true)
-
-	local scrollChild = CreateFrame("Frame", nil, scrollBox)
-	scrollChild:SetPoint("TOPLEFT", scrollBox, "TOPLEFT")
-	scrollChild:SetPoint("TOPRIGHT", scrollBox, "TOPRIGHT")
-	scrollChild:SetSize(200, 200)
-
-	local scrollView = CreateScrollBoxLinearView()
-	scrollView:SetPanExtent(100)
-	scrollChild:SetParent(scrollBox)
-	scrollChild.scrollable = true
-	ScrollUtil.InitScrollBoxWithScrollBar(scrollBox, scrollBar, scrollView)
-
-	b.scrollBox = scrollBox
-	b.scrollBar = scrollBar
-	b.scrollChild = scrollChild
-	b.scrollView = scrollView
-
-	-- Create headerContainer, tabContainer, and footerContainer inside scrollChild
-	local headerContainer = CreateFrame("Frame", nil, scrollChild)
-	headerContainer:SetPoint("TOPLEFT", scrollChild, "TOPLEFT")
-	headerContainer:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT")
-	headerContainer:SetHeight(1)
-
-	local tabContainer = CreateFrame("Frame", nil, scrollChild)
-	tabContainer:SetPoint("TOPLEFT", headerContainer, "BOTTOMLEFT", 0, 0)
-	tabContainer:SetPoint("TOPRIGHT", headerContainer, "BOTTOMRIGHT", 0, 0)
-	tabContainer:SetHeight(1)
-
-	local footerContainer = CreateFrame("Frame", nil, scrollChild)
-	footerContainer:SetPoint("TOPLEFT", tabContainer, "BOTTOMLEFT", 0, 0)
-	footerContainer:SetPoint("TOPRIGHT", tabContainer, "BOTTOMRIGHT", 0, 0)
-	footerContainer:SetHeight(1)
-
-	b.headerContainer = headerContainer
-	b.tabContainer = tabContainer
-	b.footerContainer = footerContainer
-
-	b.scrollBox:SetPoint("TOPLEFT", b.frame, "TOPLEFT", const.OFFSETS.BAG_LEFT_INSET, const.OFFSETS.BAG_TOP_INSET)
-	b.scrollBox:SetPoint("BOTTOMRIGHT", b.frame, "BOTTOMRIGHT", const.OFFSETS.BAG_RIGHT_INSET, const.OFFSETS.BAG_BOTTOM_INSET + const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET + 20)
-
-	-- Register the bag frame so that window positions are saved.
-	Window.RegisterConfig(b.frame, database:GetBagPosition(kind))
-
-	-- Create the bottom bar for currency and money display.
-	local bottomBar = CreateFrame("Frame", nil, b.frame)
-	bottomBar:SetPoint(
-		"BOTTOMLEFT",
-		b.frame,
-		"BOTTOMLEFT",
-		const.OFFSETS.BOTTOM_BAR_LEFT_INSET,
-		const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-	)
-	bottomBar:SetPoint(
-		"BOTTOMRIGHT",
-		b.frame,
-		"BOTTOMRIGHT",
-		const.OFFSETS.BOTTOM_BAR_RIGHT_INSET,
-		const.OFFSETS.BOTTOM_BAR_BOTTOM_INSET
-	)
-	bottomBar:SetHeight(20)
-	bottomBar:Show()
-	b.bottomBar = bottomBar
+	b:BuildWindow(name)
+	b:BuildParts()
 
 	-- Setup money frame via behavior
-	b.moneyFrame = b.behavior:SetupMoneyFrame(bottomBar)
+	b.moneyFrame = b.behavior:SetupMoneyFrame(b.bottomBar)
 
-	-- Call behavior-specific creation (search, slots, currency, tabs, etc.)
+	-- Call behavior-specific creation (slots, currency, tabs, etc.)
 	b.behavior:OnCreate(ctx)
 
-	-- Enable dragging of the bag frame.
-	b.frame:SetMovable(true)
-	b.frame:EnableMouse(true)
-	b.frame:RegisterForDrag("LeftButton")
-	b.frame:SetClampedToScreen(true)
 	b:WatchMouse()
 
 	b.anchor = anchor:New(kind, b.frame, name)
-	-- Load the bag position from settings.
-	Window.RestorePosition(b.frame)
 	b.previousSize = b.frame:GetBottom()
-
-	b.frame:SetScript("OnSizeChanged", function()
-		b:OnResize()
-	end)
-
-	b.resizeHandle = resize:MakeResizable(b.frame, function()
-		local fw, fh = b.frame:GetSize()
-		database:SetBagViewFrameSize(b.kind, database:GetBagView(b.kind), fw, fh)
-	end)
-	b.resizeHandle:Hide()
 	b:KeepBagInBounds()
 
 	-- Register behavior-specific events
 	b.behavior:RegisterEvents()
 	b:WatchForClose()
 
-	events:RegisterMessage("search/SetInFrame", function(ectx, shown)
-		themes:SetSearchState(ectx, b.frame, shown)
+	events:RegisterMessage("search/SetInFrame", function(ectx)
+		b:SetSearchShown(ectx)
 	end)
 
 	events:RegisterMessage("bag/RedrawIcons", function(ectx)

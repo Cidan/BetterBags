@@ -142,20 +142,20 @@ const.DATABASE_DEFAULTS = {
     customSectionSort = { [0] = {}, [1] = {} },
     size = {
       [1] = {
-        [0] = { columnCount = 15, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
-        [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
+        [0] = { columnCount = 15, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+        [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
       },
       [2] = {
-        [0] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89 },
-        [1] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89 },
+        [0] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+        [1] = { columnCount = 2, itemsPerRow = 7, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
       },
       [3] = {
-        [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
-        [1] = { columnCount = 5, itemsPerRow = 5, scale = 100, width = 700, height = 500, opacity = 89 },
+        [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+        [1] = { columnCount = 5, itemsPerRow = 5, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
       },
       [4] = {
-        [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
-        [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89 },
+        [0] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
+        [1] = { columnCount = 1, itemsPerRow = 15, scale = 100, width = 700, height = 500, opacity = 89, sizeMode = "content" },
       },
     },
     views = { [0] = 2, [1] = 2 },
@@ -359,6 +359,30 @@ describe("Database", function()
       local w, h = DB:GetBagViewFrameSize(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
       assert.are.equal(800, w)
       assert.are.equal(600, h)
+    end)
+
+    it("sizes every bag window to its contents by default", function()
+      for _, kind in pairs({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }) do
+        for _, view in pairs({ const.BAG_VIEW.SECTION_GRID, const.BAG_VIEW.SECTION_ALL_BAGS }) do
+          assert.are.equal("content", DB:GetBagSizeInfo(kind, view).sizeMode)
+        end
+        assert.are.equal("content", DB:GetBagSizeMode(kind))
+      end
+    end)
+
+    it("keeps the size mode of the view the bag shows", function()
+      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+      DB:SetBagSizeMode(const.BAG_KIND.BACKPACK, "window")
+      assert.are.equal("window", DB:GetBagSizeMode(const.BAG_KIND.BACKPACK))
+      assert.are.equal("content", DB:GetBagSizeMode(const.BAG_KIND.BANK))
+      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_ALL_BAGS)
+      assert.are.equal("content", DB:GetBagSizeMode(const.BAG_KIND.BACKPACK))
+      DB:SetBagView(const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID)
+      assert.are.equal("window", DB:GetBagSizeMode(const.BAG_KIND.BACKPACK))
+    end)
+
+    it("rejects a size mode it does not know", function()
+      assert.has_error(function() DB:SetBagSizeMode(const.BAG_KIND.BACKPACK, "huge") end)
     end)
   end)
 

@@ -371,10 +371,11 @@ When enabled, provides a clickable index of all sections:
 ## Styling
 
 ### Theme Integration
-Forms automatically use the addon's theme system:
-```lua
-themes:RegisterSimpleWindow(frame, title)
-```
+A form is a `Panel` window (`window/window.lua`): `form:Create` builds it with
+`window:Create({ Kind = "Panel", ... })`, and the active Sonata theme draws its chrome (background,
+border, title, close button) and redraws it when the player switches themes. The form's controls
+are its own; it fades with the backpack's opacity. See `.claude/rules/window.md` and
+`sonata/README.md`.
 
 ### Custom Styling
 Widget appearance can be customized:

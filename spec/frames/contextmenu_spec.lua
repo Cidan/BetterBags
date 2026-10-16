@@ -291,4 +291,37 @@ describe("ContextMenu 'Show Bags' toggle", function()
       end)
     end)
   end
+
+  -- ToggleBagSlots is the entry's action, shared with the action buttons a theme can give a bag
+  -- (frames/bagactions.lua).
+  describe("ToggleBagSlots", function()
+    before_each(function()
+      addon.isRetail = true
+      addon.hasWarbank = true
+    end)
+
+    it("shows and hides a bag's slots exactly as the menu entry does", function()
+      local bag = newBag(const.BAG_KIND.BANK, false)
+      contextMenu:ToggleBagSlots(context:New("test"), bag)
+      assert.is_true(bag.slots:IsShown())
+      assert.are.same({ true }, showBankTabsCalls)
+      assert.are.equal(const.BAG_VIEW.SECTION_ALL_BAGS, bagViews[const.BAG_KIND.BANK])
+      contextMenu:ToggleBagSlots(context:New("test"), bag)
+      assert.is_false(bag.slots:IsShown())
+      assert.are.same({ true, false }, showBankTabsCalls)
+      assert.are.same({ "bags/Rederive", "bags/Rederive" }, sentMessages)
+    end)
+
+    it("refuses in combat, and does nothing for a bag without slots", function()
+      local bag = newBag(const.BAG_KIND.BACKPACK, false)
+      _G.InCombatLockdown = function() return true end
+      override(_G, "print", function() end)
+      contextMenu:ToggleBagSlots(context:New("test"), bag)
+      assert.is_false(bag.slots:IsShown())
+      _G.InCombatLockdown = function() return false end
+      bag.slots = nil
+      contextMenu:ToggleBagSlots(context:New("test"), bag)
+      assert.are.same({}, sentMessages)
+    end)
+  end)
 end)

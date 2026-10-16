@@ -97,13 +97,13 @@ upgrade provider reads `equipmentCache` (`GetItemDataFromInventorySlot`).
 
 ### 4. Button draw record (`item.drawState`, item-drawing.md §7b)
 Kept value: what the button shows. A redraw whose inputs (the item's `itemHash` and every other
-field the setters read, `drawGeneration`, the decoration and `themes.decorationGeneration`) match
+field the setters read, `drawGeneration`, the decoration and Sonata's generation) match
 the record is skipped. Invalidated by `ResetVisuals` (a release, or item/free/empty mode changes)
 and `Lock`; `UpdateSearch` keeps the search match current. `drawGeneration` changes on every wipe;
 `ItemFrame.styleGeneration` (also in the record, bumped by `RestyleButtons`) changes when a setting
 the setters read changes with no new data (glow intensity, item level display), which reach the
-buttons through a redraw (refresh-scheduler.md §9); `themes.decorationGeneration` changes with
-the theme.
+buttons through a redraw (refresh-scheduler.md §9); Sonata's generation (`Sonata:GetGeneration()`)
+changes with every theme applied, which restyles the decoration.
 
 ### 5. Button cooldown record (`item.cooldownState`, `itemProto:UpdateCooldown`)
 Kept value: the cooldown last applied to the button (spiral, dimmed icon, has-item state).

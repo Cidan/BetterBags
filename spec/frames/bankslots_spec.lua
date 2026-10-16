@@ -9,6 +9,16 @@ local events = addon:GetModule("Events")
 events:Init()
 
 addon.ForceHideBlizzardBags = function() end
+addon.TriggerItemContextChanged = addon.TriggerItemContextChanged or function() end
+
+-- windowOf mocks a bag window: Hide hides the frame and calls back, as Window:Hide does
+-- without a fade.
+local function windowOf(frame)
+  return {
+    Show = function() frame:Show() end,
+    Hide = function(_, _, callback) frame:Hide() if callback then callback() end end,
+  }
+end
 
 local ctx = addon:GetModule("Context")
 
@@ -63,28 +73,42 @@ StubBetterBagsModule("Tabs")
 StubBetterBagsModule("Groups")
 StubBetterBagsModule("ContextMenu")
 
-local themes = StubBetterBagsModule("Themes")
-themes.RegisterFlatWindow = function() end
-themes.GetFlatHeaderHeight = function() return 12 end
-
 local debug = StubBetterBagsModule("Debug")
 debug.Log = function() end
 
-local animations = StubBetterBagsModule("Animations")
-animations.AttachFadeAndSlideTop = function(region)
-  local mockAnimGroup = {
-    Play = function() end,
-    Stop = function() end,
-    HookScript = function() end,
-  }
-  return mockAnimGroup, mockAnimGroup
+-- Stubs this file creates are removed after it (the teardown at the end), so a later spec
+-- file can load the real modules.
+local createdStubs = {}
+local function trackStub(name)
+  local mod, created = StubBetterBagsModule(name)
+  if created then table.insert(createdStubs, name) end
+  return mod
 end
 
+local fonts = trackStub("Fonts")
+fonts.UnitFrame12Yellow = fonts.UnitFrame12Yellow or CreateFont("BetterBagsBankSlotsSpecYellow")
+database.GetTheme = function() return "Default" end
+database.SetTheme = function() end
+
+local libWindow = LibStub:NewLibrary("LibWindow-1.1", 1) or LibStub("LibWindow-1.1")
+libWindow.RegisterConfig = libWindow.RegisterConfig or function() end
+libWindow.RestorePosition = libWindow.RestorePosition or function() end
+libWindow.SavePosition = libWindow.SavePosition or function() end
+
+LoadBetterBagsModule("render/render.lua")
+LoadBetterBagsModule("render/drawable.lua")
+LoadBetterBagsModule("sonata/engine.lua")
+LoadBetterBagsModule("sonata/apply.lua")
+LoadBetterBagsModule("sonata/decoration.lua")
+LoadBetterBagsModule("window/window.lua")
+local sonata = addon:GetModule("Sonata")
+local render = addon:GetModule("Render")
+
 local grid = StubBetterBagsModule("Grid")
-grid.Create = function()
+grid.Create = function(_, parent)
+  local container = CreateFrame("Frame", nil, parent)
   return {
     GetContainer = function()
-      local container = CreateFrame("Frame")
       return container
     end,
     HideScrollBar = function() end,
@@ -156,11 +180,26 @@ LoadBetterBagsModule("bags/bank.lua")
 addon:GetModule("BagButton"):Init()
 
 describe("Bank Bag/Slot Window Pane Tests", function()
+  local originalThemes, savedFlags
+
   before_each(function()
     _G.BankFrame = nil
     _G.BankPanel = nil
     _G.AccountBankPanel = nil
     events:Init()
+    render:Init()
+    savedFlags = { isRetail = addon.isRetail, isForever = addon.isForever, isClassic = addon.isClassic }
+    originalThemes = sonata.themes
+    sonata.themes = {}
+    sonata:Init()
+    assert(loadfile("sonata/themes/base.lua"))("BetterBags")
+    assert(loadfile("sonata/themes/default.lua"))("BetterBags")
+    sonata:ApplyTheme(ctx:New("test"), "Default")
+  end)
+
+  after_each(function()
+    sonata.themes = originalThemes
+    for k, v in pairs(savedFlags) do addon[k] = v end
   end)
 
   describe("1. Classic/Era Event Typo (PLAYERBANKSLOTS_CHANGED)", function()
@@ -304,6 +343,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
         Wipe = function() end,
         Draw = function() end,
         blizzardBankTab = 10,
+        window = windowOf(bagFrame),
       }
 
       local bankBehavior = addon:GetModule("BankBehavior")
@@ -343,6 +383,7 @@ describe("Bank Bag/Slot Window Pane Tests", function()
         },
         slots = panel,
         Wipe = function() end,
+        window = windowOf(bagFrame),
       }
 
       local bankBehavior = addon:GetModule("BankBehavior")
@@ -441,74 +482,79 @@ describe("Bank Bag/Slot Window Pane Tests", function()
     end)
   end)
 
-  describe("9. Camelot headerless decoration", function()
-    local savedIsForever, savedRegister
-    before_each(function()
-      savedIsForever = addon.isForever
-      savedRegister = themes.RegisterFlatWindow
-    end)
-    after_each(function()
-      addon.isForever = savedIsForever
-      themes.RegisterFlatWindow = savedRegister
-    end)
-
-    it("does not use the themed flat window on Camelot (uses a headerless decoration)", function()
-      addon.isRetail = true
-      addon.isForever = true
-      local registered = false
-      themes.RegisterFlatWindow = function() registered = true end
-
+  describe("9. The panel's window", function()
+    local function newPanel(flags)
+      addon.isRetail, addon.isForever, addon.isClassic = flags.retail, flags.forever, false
       local bagFrame = CreateFrame("Frame")
-      local bankSlots = addon:GetModule("BankSlots")
-      local panel = bankSlots:CreatePanel(ctx:New("test"), bagFrame)
+      local panel = addon:GetModule("BankSlots"):CreatePanel(ctx:New("test"), bagFrame)
+      sonata:ApplyTheme(ctx:New("test"), "Default")
+      return panel, bagFrame
+    end
 
-      assert.is_not_nil(panel)
-      assert.is_false(registered, "Camelot must not register the broken themed flat window")
+    it("is a Slots window hanging below the bank, sized to its tab buttons plus the theme's room", function()
+      local panel, bagFrame = newPanel({ retail = true, forever = false })
+      assert.are.equal("Slots", panel.window.kind)
+      assert.are.equal("BetterBagsBankSlots", panel.frame:GetName())
+      assert.are.equal(bagFrame, panel.frame:GetParent())
+      assert.is_false(panel:IsShown())
+      panel:Draw(ctx:New("test"))
+      panel:Show()
+      assert.are.same({ "TOPLEFT", bagFrame, "BOTTOMLEFT", 0, -2 }, { panel.frame:GetPoint(1) })
+      assert.are.same({ 100 + 10 + 6, 100 + 30 + 12 }, { panel.frame:GetWidth(), panel.frame:GetHeight() })
     end)
 
-    it("still uses the themed flat window on ordinary retail", function()
-      addon.isRetail = true
-      addon.isForever = false
-      local registered = false
-      themes.RegisterFlatWindow = function() registered = true end
-
-      local bagFrame = CreateFrame("Frame")
-      local bankSlots = addon:GetModule("BankSlots")
-      bankSlots:CreatePanel(ctx:New("test"), bagFrame)
-
-      assert.is_true(registered)
+    -- WoW: Forever's flat template draws a broken header; its slots panels are Blizzard's dark
+    -- tooltip frame instead, below the panel so its filled center can never cover the tabs
+    -- (camelot-forever.md section 5), with even padding, nudged right to line up.
+    it("draws Blizzard's dark tooltip frame below its tabs on WoW: Forever, padded evenly", function()
+      local savedFirstTab = Enum.BagIndex.CharacterBankTab_1
+      Enum.BagIndex.CharacterBankTab_1 = 10
+      finally(function() Enum.BagIndex.CharacterBankTab_1 = savedFirstTab end)
+      local panel, bagFrame = newPanel({ retail = true, forever = true })
+      local tmpl = panel.window.decoration:GetTemplateFrame()
+      assert.is_truthy(tmpl._template:find("TooltipBorderedFrameTemplate"))
+      assert.are.same({ r = 0, g = 0, b = 0, a = 0.9 }, tmpl._backdropColor)
+      assert.is_true(tmpl:GetFrameLevel() < panel.content:GetContainer():GetFrameLevel())
+      panel:Draw(ctx:New("test"))
+      panel:Show()
+      assert.are.same({ "TOPLEFT", bagFrame, "BOTTOMLEFT", 4, -2 }, { panel.frame:GetPoint(1) })
+      assert.are.same({ 100 + 16, 100 + 16 }, { panel.frame:GetWidth(), panel.frame:GetHeight() })
     end)
 
-    -- The slot grid is a clipping WowScrollBox child of the panel. A filled backdrop on a
-    -- sibling child frame shares the grid's frame level and can render over the buttons
-    -- (the darkened "buttons under the window" look). The panel frame must own the
-    -- backdrop so it always sits a level below the grid.
-    it("draws the Camelot backdrop on the panel frame itself, not on a sibling of the grid", function()
-      addon.isRetail = true
-      addon.isForever = true
+    it("selects the first tab once shown, and lays the bank out again after it renders", function()
+      local panel = newPanel({ retail = true, forever = false })
+      local invalidations, switched = 0, nil
+      addon.Bags = { Bank = {
+        window = { Invalidate = function() invalidations = invalidations + 1 end },
+        behavior = { SwitchToBlizzardTab = function(_, _, bagIndex) switched = bagIndex end },
+      } }
+      panel:Draw(ctx:New("test"))
+      panel:Show()
+      assert.is_nil(switched)
+      panel.window.showAnimation:_complete()
+      assert.are.equal(10, switched)
+      local before = invalidations
+      panel:Draw(ctx:New("test"))
+      assert.are.equal(before + 1, invalidations)
+    end)
 
-      local calls = {}
-      local origCreateFrame = _G.CreateFrame
-      _G.CreateFrame = function(frameType, name, parent, template)
-        local f = origCreateFrame(frameType, name, parent, template)
-        table.insert(calls, { frame = f, parent = parent, template = template })
-        return f
-      end
-      local bagFrame = origCreateFrame("Frame")
-      local ok, panel = pcall(function()
-        return addon:GetModule("BankSlots"):CreatePanel(ctx:New("test"), bagFrame)
-      end)
-      _G.CreateFrame = origCreateFrame
-      assert.is_true(ok, tostring(panel))
-
-      local panelTemplate
-      for _, c in ipairs(calls) do
-        if c.frame == panel.frame then panelTemplate = c.template end
-        assert.is_false(c.parent == panel.frame and c.template == "TooltipBorderedFrameTemplate",
-          "the backdrop must not be a sibling frame of the slot grid")
-      end
-      assert.are.equal("TooltipBorderedFrameTemplate", panelTemplate)
-      assert.are.same({ r = 0, g = 0, b = 0, a = 0.9 }, panel.frame._backdropColor)
+    it("clears its tab filter and refreshes the bank once hidden", function()
+      local panel = newPanel({ retail = true, forever = false })
+      local refreshed = 0
+      events:RegisterMessage("bags/RefreshBank", function() refreshed = refreshed + 1 end)
+      addon.Bags = { Bank = { blizzardBankTab = 10 } }
+      panel:Draw(ctx:New("test"))
+      panel:Show()
+      panel.window.showAnimation:_complete()
+      panel.selectedBagIndex = 10
+      local hidden = false
+      panel:Hide(function() hidden = true end)
+      assert.are.equal(0, refreshed)
+      panel.window.hideAnimation:_complete()
+      assert.is_nil(addon.Bags.Bank.blizzardBankTab)
+      assert.is_nil(panel.selectedBagIndex)
+      assert.are.equal(1, refreshed)
+      assert.is_true(hidden)
     end)
   end)
 
@@ -747,4 +793,10 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       assert.is_nil(registered["BAG_CONTAINER_UPDATE"])
     end)
   end)
+end)
+
+teardown(function()
+  for i = #createdStubs, 1, -1 do
+    ResetModuleStub(createdStubs[i])
+  end
 end)
