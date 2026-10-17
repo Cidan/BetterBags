@@ -42,6 +42,7 @@ local ALWAYS_EXCLUDED = {
   FlameGraph = true,
   TraceChart = true,
   DebugWindow = true,
+  RenderRecorder = true,
   Context = true,
 }
 

@@ -290,6 +290,21 @@ function gridProto:calculateCellMask(options)
   return result
 end
 
+-- cellSize returns a cell's size rounded to whole pixels, the size the grid lays it out at. A
+-- frame reports its size back with float noise (scale conversions), and a size a hair over its
+-- whole value at a row or column limit (two 131-wide sections against a 262-wide row) moved cells
+-- to another row or column, flipping the layout from one redraw to the next. Cells are 37-pixel
+-- buttons and sections built from them; a section as wide as its title's text moves by less than
+-- half a pixel.
+---@param cell Cell
+---@return number width, number height
+local function cellSize(cell)
+  if cell.isGap then
+    return cell.width or 37, cell.height or 37
+  end
+  return math.floor(cell.frame:GetWidth() + 0.5), math.floor(cell.frame:GetHeight() + 0.5)
+end
+
 -- calculateColumns takes a list of cells and a column count. It will then
 -- return a list of list of cells, where each list of cells is a column.
 -- The columns are divided evenly by the height of all the cell frames
@@ -306,8 +321,7 @@ function gridProto:calculateColumns(options)
   local maxCellHeight = 0
   ---@type Cell[][]
   for i, cell in ipairs(maskedCells) do
-    local cellWidth = cell.isGap and (cell.width or 37) or cell.frame:GetWidth()
-    local cellHeight = cell.isGap and (cell.height or 37) or cell.frame:GetHeight()
+    local cellWidth, cellHeight = cellSize(cell)
 
     if i ~= 1 then
       if rowWidth + cellWidth > options.maxWidthPerRow then
@@ -339,8 +353,7 @@ function gridProto:calculateColumns(options)
     algorithmAttempt = algorithmAttempt + 1
 
     for i, cell in ipairs(maskedCells) do
-      local cellWidth = cell.isGap and (cell.width or 37) or cell.frame:GetWidth()
-      local cellHeight = cell.isGap and (cell.height or 37) or cell.frame:GetHeight()
+      local cellWidth, cellHeight = cellSize(cell)
 
       if i ~= 1 then
         if rowWidth + cellWidth > options.maxWidthPerRow then
@@ -397,8 +410,7 @@ function gridProto:layoutSingleColumn(cells, options, currentOffset, topOffset)
   local rowHeight = 0
 
   for i, cell in ipairs(cells) do
-    local cellWidth = cell.isGap and (cell.width or 37) or cell.frame:GetWidth()
-    local cellHeight = cell.isGap and (cell.height or 37) or cell.frame:GetHeight()
+    local cellWidth, cellHeight = cellSize(cell)
 
     if i ~= 1 then
       if rowWidth + cellWidth > options.maxWidthPerRow then

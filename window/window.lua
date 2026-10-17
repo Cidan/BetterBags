@@ -18,6 +18,9 @@ local apply = addon:GetModule('SonataApply')
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
 
+---@class Perf: AceModule
+local perf = addon:GetModule('Perf')
+
 ---@class LibWindow-1.1: AceAddon
 local LibWindow = LibStub('LibWindow-1.1')
 
@@ -103,6 +106,7 @@ local DEFAULT_GRIP = {
 ---@field resizeGrip? Button
 ---@field gripHover boolean
 ---@field moving boolean
+---@field sizing? boolean The player is sizing it (between the grip's mouse down and up).
 ---@field opts WindowOptions
 local windowProto = drawable:Extend({}, 'WindowFrame')
 
@@ -116,6 +120,46 @@ local function numberOf(value)
     return value
   end
   return nil
+end
+
+-- Init fits every window to the screen again whenever the screen's size in UI units changes.
+function window:Init()
+  self.windows = self.windows or setmetatable({}, { __mode = "k" })
+  ---@class Events: AceModule
+  local events = addon:GetModule('Events')
+  for _, event in ipairs({ "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }) do
+    events:RegisterEvent(event, function()
+      for w in pairs(self.windows) do
+        w:FitToScreen()
+        w:KeepOnScreen()
+        w:Invalidate()
+      end
+    end)
+  end
+end
+
+-- recording returns the render recorder (debug/renderrecorder.lua) while it records.
+---@return RenderRecorder?
+local function recording()
+  local recorder = addon:GetModule('RenderRecorder', true)
+  if recorder ~= nil and recorder.recording then
+    return recorder
+  end
+  return nil
+end
+
+-- trace describes the window at a step of a resize or a move, to a running profiler capture
+-- (the call trace records Geometry's return value) and to the render recorder.
+---@param w BetterBagsWindow
+---@param step string
+local function trace(w, step)
+  if perf.active then
+    w:Geometry(step)
+  end
+  local recorder = recording()
+  if recorder ~= nil then
+    recorder:WindowStep(w, step)
+  end
 end
 
 ---@param opts WindowOptions
@@ -149,10 +193,16 @@ function window:Create(opts)
   if opts.Toplevel then
     frame:SetToplevel(true)
   end
+  -- No part of a window may be off the screen (KeepOnScreen, FitToScreen).
   frame:SetClampedToScreen(true)
+  frame:SetClampRectInsets(0, 0, 0, 0)
   frame:EnableMouse(true)
   w.frame = frame
-  w:UpdateScale(true)
+  -- Only the scale: fitting to the screen reads the owner's minimums, which can read parts the
+  -- owner makes after the window (a bag's scroll box). UpdateSizeMode fits it later.
+  if opts.Scale ~= nil then
+    frame:SetScale(opts.Scale())
+  end
 
   w.content = CreateFrame("Frame", nil, frame)
   w:UpdateContentAnchors()
@@ -173,6 +223,9 @@ function window:Create(opts)
   end
 
   addon.HookScript(frame, "OnSizeChanged", function()
+    if w.sizing then
+      trace(w, "resizing")
+    end
     if w:GetSizeMode() == "window" then
       render:Invalidate(w)
     end
@@ -194,6 +247,9 @@ function window:Create(opts)
     w:updatePlan()
   end
   sonata:RegisterWindow(w, opts.Kind)
+  if window.windows ~= nil then
+    window.windows[w] = true
+  end
   return w
 end
 
@@ -225,6 +281,7 @@ function windowProto:WatchDrag()
       self.opts.OnMoveStart(ctx)
     end
     self.moving = true
+    trace(self, "move start")
     f:StartMoving()
   end)
   addon.SetScript(frame, "OnDragStop", function(ctx, f)
@@ -233,7 +290,11 @@ function windowProto:WatchDrag()
     end
     self.moving = false
     f:StopMovingOrSizing()
+    trace(self, "move stopped")
+    self:KeepOnScreen()
+    trace(self, "on screen")
     self:SavePosition()
+    trace(self, "position saved")
     if self.opts.OnMoved ~= nil then
       self.opts.OnMoved(ctx)
     end
@@ -345,6 +406,7 @@ function windowProto:UpdateScale(quiet)
     return
   end
   self.frame:SetScale(self.opts.Scale())
+  self:FitToScreen()
   if not quiet then
     self:Invalidate()
   end
@@ -593,6 +655,67 @@ function windowProto:ShouldRender()
   return self.frame:IsShown()
 end
 
+-- screenSize returns the screen's size measured in the window's own scale, and never less than
+-- the minimum given.
+---@private
+---@param minWidth? number
+---@param minHeight? number
+---@return number width, number height
+function windowProto:screenSize(minWidth, minHeight)
+  local ratio = UIParent:GetEffectiveScale() / self.frame:GetEffectiveScale()
+  return math.max(minWidth or 0, UIParent:GetWidth() * ratio), math.max(minHeight or 0, UIParent:GetHeight() * ratio)
+end
+
+-- FitToScreen makes the screen the largest size the player can give the window (measured in
+-- its own scale), and brings the window down to it when it is bigger. Only a window the player
+-- sizes, and never while they are sizing it.
+function windowProto:FitToScreen()
+  if self.sizing or self:GetSizeMode() ~= "window" then
+    return
+  end
+  local frame = self.frame
+  local minWidth, minHeight = self:minimumSize()
+  local maxWidth, maxHeight = self:screenSize(minWidth, minHeight)
+  frame:SetResizeBounds(minWidth, minHeight, maxWidth, maxHeight)
+  local width, height = frame:GetWidth(), frame:GetHeight()
+  if width > maxWidth or height > maxHeight then
+    frame:SetSize(math.min(width, maxWidth), math.min(height, maxHeight))
+  end
+end
+
+-- KeepOnScreen pulls the window back inside the screen. A clamped frame stays on the screen as
+-- it is moved; turning the clamp off and on applies it after the window changed size too. It
+-- waits while the player is sizing the window.
+function windowProto:KeepOnScreen()
+  if self.sizing then
+    return
+  end
+  local frame = self.frame
+  frame:SetClampRectInsets(0, 0, 0, 0)
+  frame:SetClampedToScreen(false)
+  frame:SetClampedToScreen(true)
+end
+
+-- Geometry describes the window's anchors, rect, scale, clamp and the cursor, for the
+-- profiler's call trace (trace calls it at each step of a resize or a move while a capture runs).
+---@param step string Which step of a resize or a move it describes.
+---@return string
+function windowProto:Geometry(step)
+  local _ = step
+  local frame = self.frame
+  local anchors = {}
+  for i = 1, frame:GetNumPoints() do
+    local point, relativeTo, relativePoint, x, y = frame:GetPoint(i)
+    local target = relativeTo and relativeTo.GetName and relativeTo:GetName() or tostring(relativeTo)
+    table.insert(anchors, string.format("%s>%s %s %.1f,%.1f", point, tostring(target), tostring(relativePoint), x or 0, y or 0))
+  end
+  local scale = frame:GetEffectiveScale()
+  local cursorX, cursorY = GetCursorPosition()
+  return string.format("%s | rect %.1f,%.1f %.1fx%.1f | scale %.2f | clamped %s | cursor %.1f,%.1f",
+    table.concat(anchors, "; "), frame:GetLeft() or 0, frame:GetTop() or 0, frame:GetWidth(), frame:GetHeight(),
+    scale, tostring(frame:IsClampedToScreen()), cursorX / scale, cursorY / scale)
+end
+
 ---@private
 ---@return number width, number height
 function windowProto:minimumSize()
@@ -617,9 +740,10 @@ function windowProto:UpdateSizeMode()
   local frame = self.frame
   if self:GetSizeMode() == "window" then
     local minWidth, minHeight = self:minimumSize()
+    local maxWidth, maxHeight = self:screenSize(minWidth, minHeight)
     local resizable = self.opts.Resizable ~= false
     frame:SetResizable(resizable)
-    frame:SetResizeBounds(minWidth, minHeight)
+    frame:SetResizeBounds(minWidth, minHeight, maxWidth, maxHeight)
     local width, height
     if self.opts.Size ~= nil then
       width, height = self.opts.Size()
@@ -627,7 +751,7 @@ function windowProto:UpdateSizeMode()
     if width == nil or height == nil then
       width, height = frame:GetWidth(), frame:GetHeight()
     end
-    frame:SetSize(math.max(minWidth, width or 0), math.max(minHeight, height or 0))
+    frame:SetSize(math.min(maxWidth, math.max(minWidth, width or 0)), math.min(maxHeight, math.max(minHeight, height or 0)))
     if resizable then
       self:styleResizeGrip()
       self.resizeGrip:Show()
@@ -666,14 +790,26 @@ function windowProto:styleResizeGrip()
       if button ~= "LeftButton" then
         return
       end
-      self.frame:StartSizing("BOTTOMRIGHT")
+      trace(self, "resize start")
+      self.sizing = true
+      -- From where the player pressed (alwaysStartFromMouse, as Blizzard's PanelResizeButtonMixin
+      -- does): without it the client resized the window the moment sizing started, from a point an
+      -- earlier move or resize left, and every click on the grip made the next jump bigger.
+      self.frame:StartSizing("BOTTOMRIGHT", true)
+      trace(self, "resize started")
     end)
     addon.SetScript(grip, "OnMouseUp", function(ctx, _, button)
       if button ~= "LeftButton" then
         return
       end
+      trace(self, "resize stop")
       self.frame:StopMovingOrSizing()
+      self.sizing = false
+      trace(self, "resize stopped")
+      self:KeepOnScreen()
+      trace(self, "on screen")
       self:SavePosition()
+      trace(self, "position saved")
       if self.opts.OnResized ~= nil then
         self.opts.OnResized(ctx, self.frame:GetWidth(), self.frame:GetHeight())
       end
@@ -726,7 +862,7 @@ function windowProto:PreRender()
       Height = math.max(0, self.frame:GetHeight() - vertical),
     }
   end
-  local screen = UIParent:GetHeight() * UIParent:GetEffectiveScale() / self.frame:GetEffectiveScale()
+  local _, screen = self:screenSize()
   return {
     MaxHeight = math.max(0, screen * SCREEN_FRACTION - vertical),
   }
@@ -755,6 +891,15 @@ function windowProto:Render(_, options, results)
   local width, height = frame:GetWidth(), frame:GetHeight()
   if self.opts.OnRendered ~= nil then
     self.opts.OnRendered(options and options.ctx, width, height)
+  end
+  if self.sizing then
+    trace(self, "rendered while resizing")
+  else
+    self:KeepOnScreen()
+  end
+  local recorder = recording()
+  if recorder ~= nil then
+    recorder:WindowRendered(self)
   end
   return { Width = width, Height = height }
 end

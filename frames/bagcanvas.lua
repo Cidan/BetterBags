@@ -20,10 +20,15 @@ local database = addon:GetModule('Database')
 ---@class BagCanvas: AceModule
 local bagCanvas = addon:NewModule('BagCanvas')
 
--- A section of N items per row is 41 * N + 8 wide: N 37-pixel cells 4 apart, plus the section's
--- 6-pixel padding on each side (frames/section.lua Grid, frames/grid.lua layoutSingleColumn).
+-- A column of the view is at most 41 * N + 20 wide for N items per row. A section of N items per
+-- row is 41 * N + 8 (N 37-pixel cells 4 apart, plus 6 pixels of padding on each side,
+-- frames/section.lua Grid), and the view packs sections into a row up to 41 * N + 16
+-- (views/views.lua) without counting the 4-pixel gap before the row's last section
+-- (frames/grid.lua layoutSingleColumn): two sections whose items add up to N take 41 * N + 20.
+-- Budgeting a column at 41 * N + 8 laid views out up to 12 pixels per column wider than the
+-- window gave them.
 local CELL_STRIDE = 41
-local SECTION_EXTRA = 8
+local COLUMN_EXTRA = 20
 
 ---@class (exact) BagCanvasDrawable: Drawable
 ---@field bag Bag
@@ -76,7 +81,7 @@ function canvasProto:GetLayout(width)
   if width == nil then
     return { itemsPerRow = sizeInfo.itemsPerRow, columns = columns }
   end
-  local perColumn = width / columns - SECTION_EXTRA
+  local perColumn = width / columns - COLUMN_EXTRA
   return { itemsPerRow = math.max(1, math.floor(perColumn / CELL_STRIDE)), columns = columns }
 end
 

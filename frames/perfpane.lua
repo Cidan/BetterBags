@@ -27,6 +27,9 @@ local perf = addon:GetModule('Perf')
 ---@class PerfSessions: AceModule
 local perfSessions = addon:GetModule('PerfSessions')
 
+---@class RenderRecorder: AceModule
+local renderRecorder = addon:GetModule('RenderRecorder')
+
 ---@class PerfFormat: AceModule
 local perfFormat = addon:GetModule('PerfFormat')
 
@@ -133,6 +136,7 @@ end
 ---@field frame Frame
 ---@field status FontString
 ---@field startButton Button
+---@field recordButton Button Starts and stops the render recorder (debug/renderrecorder.lua).
 ---@field armCheck CheckButton
 ---@field settingsButton Button
 ---@field deleteButton Button
@@ -221,6 +225,9 @@ function perfPane:Create(parent)
     pane:UpdateControls()
     pane:UpdateStatus()
   end)
+  events:RegisterMessage('renderRecorder/StateChanged', function()
+    pane:UpdateControls()
+  end)
   events:RegisterMessage('perf/SessionsChanged', function()
     pane:OnSessionsChanged()
   end)
@@ -253,6 +260,17 @@ function paneProto:CreateControls()
     end
   end)
 
+  self.recordButton = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate') --[[@as Button]]
+  self.recordButton:SetSize(130, 22)
+  self.recordButton:SetPoint('LEFT', self.startButton, 'RIGHT', 6, 0)
+  self.recordButton:SetScript('OnClick', function()
+    if renderRecorder:IsRecording() then
+      renderRecorder:Stop()
+    else
+      renderRecorder:Start()
+    end
+  end)
+
   self.settingsButton = CreateFrame('Button', nil, f, 'UIPanelButtonTemplate') --[[@as Button]]
   self.settingsButton:SetSize(90, 22)
   self.settingsButton:SetPoint('TOPRIGHT', f, 'TOPRIGHT', -10, -8)
@@ -273,7 +291,7 @@ function paneProto:CreateControls()
   end)
 
   self.status = sonata:CreateText(f, "Body")
-  self.status:SetPoint('LEFT', self.startButton, 'RIGHT', 12, 0)
+  self.status:SetPoint('LEFT', self.recordButton, 'RIGHT', 12, 0)
   self.status:SetPoint('RIGHT', self.armCheck, 'LEFT', -8, 0)
   self.status:SetJustifyH('LEFT')
   self.status:SetWordWrap(false)
@@ -1039,6 +1057,11 @@ function paneProto:UpdateControls()
     self.startButton:SetText('Stop Capture')
   else
     self.startButton:SetText('Start Capture')
+  end
+  if renderRecorder:IsRecording() then
+    self.recordButton:SetText('Stop Recording')
+  else
+    self.recordButton:SetText('Record Rendering')
   end
   self.armCheck:SetChecked(perfSessions:IsArmedForNextReload())
 end

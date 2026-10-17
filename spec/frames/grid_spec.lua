@@ -178,3 +178,68 @@ describe("Grid gap layout tests", function()
   end)
 end)
 
+
+-- Frames report their size back with float noise (a bag at 0.65 scale), and the grid decides where
+-- cells go by comparing those sizes with its row width and column height limits. A size a hair
+-- over its whole value at a limit flipped the layout between two states on every redraw (a render
+-- recording of a bank: two 131-wide sections against a 262-wide row, laid out side by side in one
+-- render and wrapped in the next, moving every section below).
+describe("Grid layout under measurement noise", function()
+  local function sectionCell(width, height)
+    local f = CreateFrame("Frame")
+    f:SetSize(width, height)
+    return { frame = f }
+  end
+
+  local function positions(g)
+    local out = {}
+    for i, cell in ipairs(g.cells) do
+      local _, _, _, x, y = cell.frame:GetPoint(1)
+      out[i] = { x, y }
+    end
+    return out
+  end
+
+  it("keeps two sections that exactly fill a row on that row, whatever noise their widths carry", function()
+    for _, noise in ipairs({ 0, 0.00001, -0.00001, 0.004 }) do
+      local g = grid:Create(CreateFrame("Frame"), false)
+      g:AddCell("feet", sectionCell(131 + noise, 61))
+      g:AddCell("finger", sectionCell(131 + noise, 61))
+      g:Draw({ cells = g.cells, maxWidthPerRow = (37 + 4) * 6 + 16 })
+      assert.are.same({ { 0, 0 }, { 135, 0 } }, positions(g), tostring(noise))
+    end
+  end)
+
+  it("lays cells out the same with and without sub-pixel noise in their sizes, over 1000 layouts", function()
+    local seed = 1234567
+    local function random(n)
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % n
+    end
+    for run = 1, 1000 do
+      local ipr = 2 + random(9)
+      local columns = 1 + random(3)
+      local count = 4 + random(26)
+      local sizes = {}
+      for i = 1, count do
+        local items = 1 + random(ipr)
+        local rows = 1 + random(4)
+        sizes[i] = { 41 * items + 8, 41 * rows + 20 }
+      end
+      local function layout(noisy)
+        local g = grid:Create(CreateFrame("Frame"), false)
+        for i, size in ipairs(sizes) do
+          local nw = noisy and ((random(3) - 1) * 0.00003) or 0
+          local nh = noisy and ((random(3) - 1) * 0.00003) or 0
+          g:AddCell("s" .. i, sectionCell(size[1] + nw, size[2] + nh))
+        end
+        local w, h = g:Draw({ cells = g.cells, maxWidthPerRow = (37 + 4) * ipr + 16, columns = columns })
+        return positions(g), w, h
+      end
+      local exact, ew, eh = layout(false)
+      local noisy, nw, nh = layout(true)
+      assert.are.same(exact, noisy, "layout " .. run)
+      assert.are.same({ ew, eh }, { nw, nh }, "layout " .. run)
+    end
+  end)
+end)

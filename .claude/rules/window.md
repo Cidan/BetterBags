@@ -68,9 +68,47 @@ The window is a render root (its plan: PRE, DEP content, SELF).
 The grip is a button at the overlay's level + 2 (above the close button), styled from the
 theme's `Resize` (`Size` number or `{Width, Height}`, `Points` (default BOTTOMRIGHT), `Normal`,
 `Highlight`, `Pushed`, `ShowOnHover`) or the default (Blizzard's chat size grabber, shown only
-while hovered). Left button only: down starts sizing from BOTTOMRIGHT, up stops it, saves the
-position and calls `OnResized`. Restyling sets every state with art, so nothing of the last
-theme's grip stays.
+while hovered). Left button only: down starts sizing from BOTTOMRIGHT from where the player
+pressed (`StartSizing("BOTTOMRIGHT", true)`: `alwaysStartFromMouse`, documented on every client
+branch, the way Blizzard's `PanelResizeButtonMixin` starts its resizes), up stops it, puts the
+window back on the screen, saves the position and calls `OnResized`. Without
+`alwaysStartFromMouse` the client resized the window inside `StartSizing`, before the cursor
+moved, from a point an earlier move or resize had left: a render recording (render-recorder.md)
+of a bank after the player moved it and resized it back and forth shows every click on the grip
+resizing it (775.8 x 238.6 to 757.0 x 287.0, then 728.3 x 387.9, 665.1 x 580.7, 538.7 x 972.1, and
+the screen's full height), each jump about double the last, and a drag then following the cursor
+241 pixels away from the corner. An earlier recording with 136 resize starts showed none. Restyling sets every state
+with art, so nothing of the last theme's grip stays.
+
+### 3a. On the screen
+
+No window is ever off the screen. The window manager does this for every window; owners do not
+touch the clamp.
+- **Clamped, with nothing off it.** `Create` clamps the frame to the screen with zero clamp
+  insets. (The bag used to set its own insets, `KeepBagInBounds`: `0, -w + 50, 0, h - 50`, which
+  let all but 50 pixels of it leave the screen; a user's bank grew past the screen and its grip
+  became unreachable, even at 50% scale. It is gone.)
+- **Never bigger than the screen.** `screenSize()` is the screen measured in the window's own
+  scale (`UIParent` size x its effective scale / the frame's), at least the minimums. In window
+  mode it is the resize bounds' maximum, a saved size is cut down to it, and `FitToScreen()`
+  (run by `UpdateScale`, and for every window on `UI_SCALE_CHANGED` and `DISPLAY_SIZE_CHANGED`,
+  registered by `window:Init`, which `core/init.lua` runs after Render) sets the bounds again
+  and brings the window down to them. Content mode already caps the height at 90% of the screen
+  (§3); its width follows the content.
+- **Pulled back after every change.** A clamped frame stays on the screen as it moves, but a
+  size change does not re-apply the clamp; `KeepOnScreen()` turns it off and on. It runs after
+  every render (after `OnRendered`, so after the bag placed itself), when the player lets go of
+  the grip or of a drag (before the position is saved), and on the screen events above.
+- **Never during a resize.** While the player holds the grip (`sizing`), `KeepOnScreen` and
+  `FitToScreen` do nothing: moving or resizing a window the engine is sizing fights the drag.
+- **Diagnostics.** While a profiler capture runs, each step of a resize or a move (`resize
+  start`, `resize started`, `resizing`, `rendered while resizing`, `resize stop`, `resize
+  stopped`, `on screen`, `position saved`, `move start`, `move stopped`) calls
+  `windowProto:Geometry(step)`, whose return value (anchors, rect, effective scale, clamp, the
+  cursor in the window's scale) the call trace records (data-driven.md).
+
+Coverage: `spec/window/window_spec.lua` ("kept on the screen"), `spec/frames/bag_draw_ownership_spec.lua`
+("leaves keeping the window on the screen to the window").
 
 ## 4. Showing and hiding
 

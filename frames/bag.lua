@@ -634,21 +634,11 @@ function bagFrame.bagProto:Draw(ctx, slotInfo, callback)
 	callback()
 end
 
-function bagFrame.bagProto:KeepBagInBounds()
-	local w, h = self.frame:GetSize()
-	self.frame:SetClampRectInsets(0, -w + 50, 0, h - 50)
-	-- Toggle the clamp setting to force the frame to rebind to the screen
-	-- on the correct clamp insets.
-	self.frame:SetClampedToScreen(false)
-	self.frame:SetClampedToScreen(true)
-end
-
 -- OnResize runs after every render of the bag's window. A bag sized to its content keeps
 -- its bottom edge where it was (it grows upwards), or follows its anchor; a bag the player
--- sized stays where the player put it.
+-- sized stays where the player put it. The window keeps it on the screen afterwards.
 function bagFrame.bagProto:OnResize()
 	if self.window:GetSizeMode() == "window" then
-		self:KeepBagInBounds()
 		return
 	end
 	if self.anchor and self.anchor:IsActive() then
@@ -666,7 +656,6 @@ function bagFrame.bagProto:OnResize()
 		self.frame:ClearAllPoints()
 		self.frame:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left, self.previousSize) --, left, self.previousSize * self.frame:GetScale())
 	end
-	self:KeepBagInBounds()
 	self.previousSize = self.frame:GetBottom()
 end
 
@@ -709,9 +698,6 @@ function bagFrame.bagProto:BuildWindow(name)
 		Position = database:GetBagPosition(kind),
 		CanMove = function()
 			return not CursorHasItem()
-		end,
-		OnMoveStart = function()
-			self:KeepBagInBounds()
 		end,
 		OnMoved = function()
 			self.previousSize = self.frame:GetBottom()
@@ -1025,7 +1011,6 @@ function bagFrame:Create(ctx, kind)
 
 	b.anchor = anchor:New(kind, b.frame, name)
 	b.previousSize = b.frame:GetBottom()
-	b:KeepBagInBounds()
 
 	-- Register behavior-specific events
 	b.behavior:RegisterEvents()

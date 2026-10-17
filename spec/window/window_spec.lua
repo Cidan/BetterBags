@@ -558,6 +558,11 @@ describe("Window", function()
       assert.is_nil(w.frame._sizing)
       w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
       assert.are.equal("BOTTOMRIGHT", w.frame._sizing)
+      -- From where the player pressed: without alwaysStartFromMouse the client resized the window
+      -- the moment sizing started, from a point left by an earlier move or resize (render
+      -- recording: a bank 775.8 x 238.6 became 757.0 x 287.0 on a click, and each click after it
+      -- roughly doubled the jump until the window filled the screen's height).
+      assert.is_true(w.frame._sizingFromMouse)
       w.frame:SetSize(700, 500)
       w.frame:GetScript("OnSizeChanged")(w.frame, 700, 500)
       assert.is_true(render:IsDirty(w))
@@ -574,6 +579,157 @@ describe("Window", function()
       advance()
       w.frame:GetScript("OnSizeChanged")(w.frame, 10, 10)
       assert.is_false(render:IsDirty(w))
+    end)
+
+    -- No window is ever off the screen: clamped with nothing allowed off it, never sized past
+    -- it, and pulled back after every change that can push it off (window.md, "on the screen").
+    describe("kept on the screen", function()
+      local function clampCalls(w)
+        local calls = {}
+        local original = w.frame.SetClampedToScreen
+        w.frame.SetClampedToScreen = function(f, on)
+          table.insert(calls, on)
+          return original(f, on)
+        end
+        return calls
+      end
+
+      it("is clamped to the screen with nothing allowed off it", function()
+        local w = resizable(content(1, 1))
+        assert.is_true(w.frame:IsClampedToScreen())
+        assert.are.same({ 0, 0, 0, 0 }, w.frame._clampRectInsets)
+      end)
+
+      it("can never be sized past the screen, measured in its own scale", function()
+        local w = resizable(content(1, 1))
+        apply()
+        w:UpdateSizeMode()
+        assert.are.same({ 1920, 1200 }, { w.frame._resizeBounds.maxWidth, w.frame._resizeBounds.maxHeight })
+        local scaled = resizable(content(1, 1), { Scale = function() return 2 end })
+        apply()
+        scaled:UpdateSizeMode()
+        assert.are.same({ 960, 600 }, { scaled.frame._resizeBounds.maxWidth, scaled.frame._resizeBounds.maxHeight })
+      end)
+
+      it("cuts a saved size larger than the screen down to it", function()
+        local w = resizable(content(1, 1), nil, { 3000, 2500 })
+        apply()
+        w:UpdateSizeMode()
+        assert.are.same({ 1920, 1200 }, { w.frame:GetWidth(), w.frame:GetHeight() })
+      end)
+
+      it("fits itself to the screen again when its scale grows", function()
+        local scale = 1
+        local w = resizable(content(1, 1), { Scale = function() return scale end }, { 1500, 1000 })
+        apply()
+        w:UpdateSizeMode()
+        scale = 2
+        w:UpdateScale(true)
+        assert.are.same({ 960, 600 }, { w.frame:GetWidth(), w.frame:GetHeight() })
+        assert.are.same({ 960, 600 }, { w.frame._resizeBounds.maxWidth, w.frame._resizeBounds.maxHeight })
+      end)
+
+      it("pulls itself back on the screen after every render, once its owner has placed it", function()
+        for _, m in ipairs({ "window", "content" }) do
+          local order = {}
+          local w = resizable(content(1, 1), { OnRendered = function() table.insert(order, "rendered") end })
+          mode = m
+          apply()
+          w:UpdateSizeMode()
+          local original = w.frame.SetClampedToScreen
+          w.frame.SetClampedToScreen = function(f, on)
+            table.insert(order, on)
+            return original(f, on)
+          end
+          render:NewRenderChain(w, {})
+          assert.are.same({ "rendered", false, true }, order, m)
+          assert.is_true(w.frame:IsClampedToScreen(), m)
+        end
+      end)
+
+      it("leaves the player's resize alone until they let go, then pulls it back on the screen", function()
+        local w = resizable(content(1, 1))
+        apply()
+        w:UpdateSizeMode()
+        w:Show(ctx())
+        advance()
+        local calls = clampCalls(w)
+        w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+        w.frame:SetSize(700, 500)
+        w.frame:GetScript("OnSizeChanged")(w.frame, 700, 500)
+        advance()
+        assert.are.same({}, calls)
+        w.resizeGrip:GetScript("OnMouseUp")(w.resizeGrip, "LeftButton")
+        assert.are.same({ false, true }, calls)
+      end)
+
+      it("fits every window to the screen again when the UI scale or the display size changes", function()
+        local current = addon:GetModule("Events")
+        current:Init()
+        window:Init()
+        local w = resizable(content(1, 1), nil, { 1800, 1100 })
+        apply()
+        w:UpdateSizeMode()
+        render:Init()
+        local calls = clampCalls(w)
+        UIParent:SetSize(1280, 720)
+        for _, event in ipairs({ "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }) do
+          current._eventMap[event].fn(event)
+        end
+        UIParent:SetSize(1920, 1200)
+        assert.are.same({ 1280, 720 }, { w.frame:GetWidth(), w.frame:GetHeight() })
+        assert.are.same({ 1280, 720 }, { w.frame._resizeBounds.maxWidth, w.frame._resizeBounds.maxHeight })
+        assert.are.same({ false, true, false, true }, calls)
+        assert.is_true(render:IsDirty(w))
+      end)
+
+      -- Diagnostics: while a profiler capture runs, each step of a resize or a move records the
+      -- window's anchors and rect as Geometry's return value in the call trace.
+      it("describes itself to a running profiler at each step of a resize and a move", function()
+        local perf = addon:GetModule("Perf")
+        local w = resizable(content(1, 1))
+        apply()
+        w:UpdateSizeMode()
+        w:Show(ctx())
+        advance()
+        local steps = {}
+        local geometry = w.Geometry
+        w.Geometry = function(self, step)
+          table.insert(steps, step)
+          return geometry(self, step)
+        end
+        w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+        w.resizeGrip:GetScript("OnMouseUp")(w.resizeGrip, "LeftButton")
+        assert.are.same({}, steps)
+        local wasActive = perf.active
+        perf.active = true
+        w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+        w.frame:GetScript("OnSizeChanged")(w.frame, 700, 500)
+        advance()
+        w.resizeGrip:GetScript("OnMouseUp")(w.resizeGrip, "LeftButton")
+        w.frame:GetScript("OnDragStart")(w.frame)
+        w.frame:GetScript("OnDragStop")(w.frame)
+        perf.active = wasActive
+        assert.are.same({ "resize start", "resize started", "resizing", "rendered while resizing",
+          "resize stop", "resize stopped", "on screen", "position saved",
+          "move start", "move stopped", "on screen", "position saved" }, steps)
+      end)
+
+      it("describes its anchors, rect, scale, clamp and the cursor", function()
+        local w = resizable(content(1, 1))
+        apply()
+        w:UpdateSizeMode()
+        w.frame:ClearAllPoints()
+        w.frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMRIGHT", -20, 30)
+        _G._cursorX, _G._cursorY = 1500, 200
+        local text = w:Geometry("spec")
+        _G._cursorX, _G._cursorY = nil, nil
+        assert.is_truthy(text:find("BOTTOMRIGHT>UIParent BOTTOMRIGHT -20.0,30.0", 1, true), text)
+        assert.is_truthy(text:find("640.0x480.0", 1, true), text)
+        assert.is_truthy(text:find("scale 1.00", 1, true), text)
+        assert.is_truthy(text:find("clamped true", 1, true), text)
+        assert.is_truthy(text:find("cursor 1500.0,200.0", 1, true), text)
+      end)
     end)
 
     it("draws the grip the theme describes, above its close button", function()
