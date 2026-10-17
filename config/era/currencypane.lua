@@ -4,6 +4,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
 
@@ -21,10 +24,9 @@ function currencyPane:Create(parent)
   local frame = CreateFrame("Frame", nil, parent)
   frame:SetAllPoints()
 
-  local text = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local text = sonata:CreateText(frame, "Empty")
   text:SetPoint("CENTER", 0, 0)
   text:SetText(L:G("Currency is not available in this version of World of Warcraft."))
-  text:SetTextColor(0.5, 0.5, 0.5)
 
   return frame
 end

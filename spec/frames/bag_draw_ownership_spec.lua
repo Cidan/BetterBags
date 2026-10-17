@@ -273,6 +273,8 @@ local function loadRealModules()
   LoadBetterBagsModule("frames/bagcanvas.lua")
   addon:GetModule("Render"):Init()
   addon:GetModule("Sonata"):Init()
+  -- Base and Default: the views draw their hints with Base's text roles.
+  UseSonataTextRoles()
   ResetModuleStub("ItemFrame", "frames/item.lua")
   LoadBetterBagsModule("frames/item.lua")
   addon:GetModule("ItemFrame").CreateDecoration = function(_, item) return newDecoration(item) end

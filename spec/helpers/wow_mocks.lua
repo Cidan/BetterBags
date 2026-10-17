@@ -616,6 +616,10 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetTexCoord(...)
     self._texCoords = {...}
   end
+  -- TextureBase:SetGradient(orientation, minColor, maxColor) with two ColorMixins.
+  function widget:SetGradient(orientation, minColor, maxColor)
+    self._gradient = { orientation = orientation, min = minColor, max = maxColor }
+  end
   -- TextureBase:GetTexCoord() -> the eight corner coordinates (ULx, ULy, LLx, LLy, URx, URy,
   -- LRx, LRy); a texture set with left, right, top, bottom reports its corners.
   function widget:GetTexCoord()
@@ -759,6 +763,29 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetShadowColor(r, g, b, a)
     self._shadowColor = {r = r, g = g, b = b, a = a or 1}
   end
+  -- A font instance's own shadow, else that of the font object it inherits.
+  function widget:GetShadowColor()
+    local c = self._shadowColor
+    if c then
+      return c.r, c.g, c.b, c.a
+    end
+    local fo = self:GetFontObject()
+    if fo.GetShadowColor then
+      return fo:GetShadowColor()
+    end
+    return 0, 0, 0, 0
+  end
+  function widget:GetShadowOffset()
+    local o = self._shadowOffset
+    if o then
+      return o.x, o.y
+    end
+    local fo = self:GetFontObject()
+    if fo.GetShadowOffset then
+      return fo:GetShadowOffset()
+    end
+    return 0, 0
+  end
   function widget:GetText()
     return self._text
   end
@@ -807,11 +834,13 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetTextColor(r, g, b, a)
     self._textColor = {r = r, g = g, b = b, a = a or 1}
   end
+  -- A font instance's own color, else the default color of the font object it inherits
+  -- (changing a font object updates every font string set to it with SetFontObject).
   function widget:GetTextColor()
     if self._textColor then
       return self._textColor.r, self._textColor.g, self._textColor.b, self._textColor.a
     end
-    return 1, 1, 1, 1
+    return self:GetFontObject():GetTextColor()
   end
   -- FontInstance:GetFontObject() -> the font object set with SetFontObject, else the one the
   -- font string inherits (CreateFontString's template).
@@ -1067,6 +1096,10 @@ local function CreateMockFont(name)
   function font:GetShadowColor() return unpack(self._shadowColor) end
   function font:SetShadowOffset(x, y) self._shadowOffset = { x, y } end
   function font:GetShadowOffset() return unpack(self._shadowOffset) end
+  -- Font:SetFontHeight(height) / GetFontHeight() (SimpleFontAPIDocumentation.lua); Blizzard's
+  -- Text Size setting rescales the client fonts with it (TextSizeManager.lua).
+  function font:SetFontHeight(height) self._height = height end
+  function font:GetFontHeight() return self._height end
   function font:SetJustifyH(justify) self._justifyH = justify end
   function font:GetJustifyH() return self._justifyH or "CENTER" end
   function font:CopyFontObject(other)
@@ -1074,12 +1107,56 @@ local function CreateMockFont(name)
     self._color = { other:GetTextColor() }
     self._shadowColor = { other:GetShadowColor() }
     self._shadowOffset = { other:GetShadowOffset() }
+    self._justifyH = other._justifyH
   end
   font.SetFontObject = font.CopyFontObject
   if name then _G[name] = font end
   return font
 end
 _G.CreateFont = CreateMockFont
+
+-- EventRegistry (Blizzard_SharedXMLBase/GlobalCallbackRegistry.lua, CallbackRegistryMixin in
+-- CallbackRegistry.lua): RegisterCallback(event, func, owner?) keeps one callback per owner
+-- per event (registering again replaces it) and returns the owner; TriggerEvent(event, ...)
+-- calls each func(owner, ...); UnregisterCallback(event, owner). Undefined events are allowed.
+do
+  local callbacks = {}
+  local nextOwner = 0
+  _G.EventRegistry = {
+    RegisterCallback = function(_, event, func, owner)
+      if owner == nil then
+        nextOwner = nextOwner + 1
+        owner = nextOwner
+      end
+      callbacks[event] = callbacks[event] or {}
+      callbacks[event][owner] = func
+      return owner
+    end,
+    UnregisterCallback = function(_, event, owner)
+      if callbacks[event] then
+        callbacks[event][owner] = nil
+      end
+    end,
+    TriggerEvent = function(_, event, ...)
+      local list = {}
+      for owner, func in pairs(callbacks[event] or {}) do
+        table.insert(list, { owner, func })
+      end
+      for _, entry in ipairs(list) do
+        entry[2](entry[1], ...)
+      end
+    end,
+  }
+end
+
+-- CreateColor(r, g, b, a?) -> a ColorMixin (Blizzard_SharedXMLBase/Color.lua).
+_G.CreateColor = _G.CreateColor or function(r, g, b, a)
+  local color = { r = r, g = g, b = b, a = a }
+  function color:GetRGB() return self.r, self.g, self.b end
+  function color:GetRGBA() return self.r, self.g, self.b, self.a end
+  function color:SetRGBA(nr, ng, nb, na) self.r, self.g, self.b, self.a = nr, ng, nb, na end
+  return color
+end
 
 -- The font files of the default locale (Blizzard_Fonts_Shared/Shared/GameFonts.xml).
 _G.STANDARD_TEXT_FONT = "Fonts\\FRIZQT__.TTF"
@@ -1112,6 +1189,16 @@ clientFont("NumberFontNormal", "Fonts\\ARIALN.TTF", 14, "OUTLINE", WHITE, false)
 clientFont("ChatFontNormal", "Fonts\\ARIALN.TTF", 14, "", WHITE, true)
 -- GameFontWhite inherits GameFontBlack (SystemFont_Med1, FRIZQT__ 12, no shadow) with white.
 clientFont("GameFontWhite", "Fonts\\FRIZQT__.TTF", 12, "", WHITE, false)
+-- GameFontNormalLarge inherits SystemFont_Shadow_Large (FRIZQT__ 16, black shadow) in gold;
+-- Number12Font is ARIALN 12 with no color or shadow (GameFonts.xml); NumberFontNormalRight is
+-- NumberFontNormal justified right.
+clientFont("GameFontNormalLarge", "Fonts\\FRIZQT__.TTF", 16, "", NORMAL, true)
+-- GameFontBlack inherits SystemFont_Med1 (FRIZQT__ 12, no shadow) in black.
+clientFont("GameFontBlack", "Fonts\\FRIZQT__.TTF", 12, "", { 0, 0, 0 }, false)
+-- GameFontNormalHuge inherits SystemFont_Shadow_Huge1 (FRIZQT__ 20, black shadow) in gold.
+clientFont("GameFontNormalHuge", "Fonts\\FRIZQT__.TTF", 20, "", NORMAL, true)
+clientFont("Number12Font", "Fonts\\ARIALN.TTF", 12, "", WHITE, false)
+clientFont("NumberFontNormalRight", "Fonts\\ARIALN.TTF", 14, "OUTLINE", WHITE, false):SetJustifyH("RIGHT")
 
 -- Mixin(object, ...) copies every key of each mixin into object (Blizzard_SharedXMLBase).
 _G.Mixin = function(object, ...)

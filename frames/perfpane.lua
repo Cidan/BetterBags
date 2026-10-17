@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -105,6 +108,7 @@ end
 ---@param button Button
 ---@param data table
 local function initRow(button, data)
+  sonata:SetTextRole(button.Text, "BodySmall")
   button.Text:SetText(data.text)
   button.Selected:SetShown(data.selected == true)
   button:SetScript('OnClick', data.onClick)
@@ -113,6 +117,9 @@ end
 ---@param button Button
 ---@param row table
 local function initCallRow(button, row)
+  for _, key in ipairs({ "Time", "Frame", "Duration", "Name", "Args" }) do
+    sonata:SetTextRole(button[key], "BodySmall")
+  end
   button.Time:SetText(row.time)
   button.Frame:SetText(row.frame)
   button.Duration:SetText(row.duration)
@@ -254,7 +261,7 @@ function paneProto:CreateControls()
     self:OpenSettings()
   end)
 
-  local armLabel = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  local armLabel = sonata:CreateText(f, "BodySmall")
   armLabel:SetPoint('RIGHT', self.settingsButton, 'LEFT', -12, 0)
   armLabel:SetText('Capture next reload')
 
@@ -265,7 +272,7 @@ function paneProto:CreateControls()
     perfSessions:SetArmedForNextReload(button:GetChecked())
   end)
 
-  self.status = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+  self.status = sonata:CreateText(f, "Body")
   self.status:SetPoint('LEFT', self.startButton, 'RIGHT', 12, 0)
   self.status:SetPoint('RIGHT', self.armCheck, 'LEFT', -8, 0)
   self.status:SetJustifyH('LEFT')
@@ -274,7 +281,7 @@ end
 
 function paneProto:CreateSessionList()
   local f = self.frame
-  local title = f:CreateFontString(nil, 'OVERLAY', 'GameFontNormal')
+  local title = sonata:CreateText(f, "Field")
   title:SetPoint('TOPLEFT', f, 'TOPLEFT', 10, -42)
   title:SetText('Saved Sessions')
 
@@ -371,7 +378,7 @@ function paneProto:CreateViews()
   self.adjustCheck:SetScript('OnLeave', function()
     GameTooltip:Hide()
   end)
-  local adjustLabel = f:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  local adjustLabel = sonata:CreateText(f, "BodySmall")
   adjustLabel:SetPoint('LEFT', self.adjustCheck, 'RIGHT', 2, 0)
   adjustLabel:SetText('Subtract overhead')
 
@@ -385,7 +392,7 @@ end
 
 ---@param view Frame
 function paneProto:CreateFlameView(view)
-  local label = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  local label = sonata:CreateText(view, "BodySmall")
   label:SetPoint('TOPLEFT', view, 'TOPLEFT', 0, -4)
   label:SetText('Search')
 
@@ -478,7 +485,7 @@ function paneProto:CreateFunctionsView(view)
     else
       header:SetPoint('TOPLEFT', view, 'TOPLEFT', 8, 0)
     end
-    header.text = header:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
+    header.text = sonata:CreateText(header, "FieldSmall")
     header.text:SetAllPoints(header)
     header.text:SetJustifyH(column.justify)
     header.label = column.label
@@ -502,9 +509,10 @@ function paneProto:CreateFunctionsView(view)
     button.Avg:SetText(perfFormat:Ms(adjusted and fn.adjAvg or fn.avg))
     button.Max:SetText(perfFormat:Ms(fn.max))
     button.Alloc:SetText(hasAlloc and perfFormat:KB(fn.alloc) or '-')
-    local shade = (adjusted and fn.overheadShare > ROUGH_ESTIMATE_SHARE) and 0.5 or 1
+    -- A function whose time is mostly profiler overhead is a rough estimate: greyed out.
+    local role = (adjusted and fn.overheadShare > ROUGH_ESTIMATE_SHARE) and 'MutedSmall' or 'BodySmall'
     for _, key in ipairs({ 'Name', 'Calls', 'Total', 'Self', 'Avg', 'Max', 'Alloc' }) do
-      button[key]:SetTextColor(shade, shade, shade)
+      sonata:SetTextRole(button[key], role)
     end
   end, function() end)
   self:UpdateFunctionHeaders()
@@ -563,7 +571,7 @@ function paneProto:CreateFramesView(view)
   self.timelineThreshold = self.timeline:CreateTexture(nil, 'OVERLAY')
   self.timelineThreshold:SetHeight(1)
   self.timelineThreshold:SetColorTexture(1, 0.2, 0.2, 0.8)
-  self.timelineCaption = self.timeline:CreateFontString(nil, 'OVERLAY', 'GameFontDisableSmall')
+  self.timelineCaption = sonata:CreateText(self.timeline, "MutedSmall")
   self.timelineCaption:SetPoint('TOPLEFT', self.timeline, 'TOPLEFT', 4, -2)
   self.timeline:SetScript('OnSizeChanged', function()
     self:DrawTimeline()
@@ -582,7 +590,7 @@ end
 
 ---@param view Frame
 function paneProto:CreateCallsView(view)
-  local label = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  local label = sonata:CreateText(view, "BodySmall")
   label:SetPoint('TOPLEFT', view, 'TOPLEFT', 0, -4)
   label:SetText('Find')
 
@@ -624,7 +632,7 @@ function paneProto:CreateCallsView(view)
   self.callPrevious = pageButton('<', self.callNext, function() self:ShowCallPage(self.callPage - 1) end)
   self.callFirst = pageButton('|<', self.callPrevious, function() self:ShowCallPage(1) end)
 
-  self.callPageLabel = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  self.callPageLabel = sonata:CreateText(view, "BodySmall")
   self.callPageLabel:SetPoint('LEFT', self.callFilter, 'RIGHT', 10, 0)
   self.callPageLabel:SetPoint('RIGHT', self.callFirst, 'LEFT', -6, 0)
   self.callPageLabel:SetJustifyH('RIGHT')
@@ -632,7 +640,7 @@ function paneProto:CreateCallsView(view)
 
   local previous
   for _, column in ipairs(CALL_COLUMNS) do
-    local header = view:CreateFontString(nil, 'OVERLAY', 'GameFontNormalSmall')
+    local header = sonata:CreateText(view, "FieldSmall")
     header:SetSize(column.width, 18)
     if previous then
       header:SetPoint('LEFT', previous, 'RIGHT', 4, 0)
@@ -654,7 +662,7 @@ function paneProto:CreateCallsView(view)
     end
   end)
 
-  self.callDetail = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  self.callDetail = sonata:CreateText(view, "BodySmall")
   self.callDetail:SetPoint('BOTTOMLEFT', view, 'BOTTOMLEFT', 4, 0)
   self.callDetail:SetPoint('RIGHT', self.showInTimeline, 'LEFT', -8, 0)
   self.callDetail:SetHeight(48)
@@ -703,7 +711,7 @@ function paneProto:CreateTimelineView(view)
     self:DrawTraceStrip()
   end)
 
-  local hint = view:CreateFontString(nil, 'OVERLAY', 'GameFontDisableSmall')
+  local hint = sonata:CreateText(view, "MutedSmall")
   hint:SetPoint('LEFT', self.wholeCaptureButton, 'RIGHT', 8, 0)
   hint:SetPoint('RIGHT', view, 'RIGHT', 0, 0)
   hint:SetJustifyH('LEFT')
@@ -982,7 +990,7 @@ end
 
 ---@param view Frame
 function paneProto:CreateSummaryView(view)
-  self.summaryText = view:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+  self.summaryText = sonata:CreateText(view, "Body")
   self.summaryText:SetPoint('TOPLEFT', view, 'TOPLEFT', 4, -4)
   self.summaryText:SetPoint('BOTTOMRIGHT', view, 'BOTTOMRIGHT', -4, 4)
   self.summaryText:SetJustifyH('LEFT')

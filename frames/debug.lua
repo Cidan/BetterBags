@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -80,6 +83,9 @@ end
 ---@param button BetterBagsDebugListButton
 ---@param elementData table
 local function initDebugListItem(button, elementData)
+  sonata:SetTextRole(button.RowNumber, "BodyLarge")
+  sonata:SetTextRole(button.Category, "Title")
+  sonata:SetTextRole(button.Message, "Title")
   button.RowNumber:SetText(format("%s", elementData.row))
   button.Category:SetText(elementData.title)
   button.Category:SetPoint("LEFT", button.RowNumber, "RIGHT", 10, 0)
@@ -217,18 +223,18 @@ function debugWindow:CreateDumpFrame()
   f:Hide()
 
   -- Add title and description
-  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local title = sonata:CreateText(f, "Title")
   title:SetPoint("TOPLEFT", 20, -20)
   title:SetText("Debug Data Dump")
 
-  local desc = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local desc = sonata:CreateText(f, "Body")
   desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
   desc:SetWidth(760)
   desc:SetJustifyH("LEFT")
   desc:SetText("Dump your current full backpack item data to saved variables. This data will be serialized into the WTF folder configuration, which can be extracted and used as a test harness.")
 
   -- Status Label
-  local status = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local status = sonata:CreateText(f, "Field")
   status:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -30)
 
   -- Function to update status text

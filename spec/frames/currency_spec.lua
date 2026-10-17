@@ -35,10 +35,20 @@ grid.Create = function()
 end
 
 ResetModuleStub("Currency", "frames/currency.lua")
+-- The counts are drawn with Sonata's text roles, styled from the saved theme.
+local db, createdDatabase = StubBetterBagsModule("Database")
+local originalGetTheme = db.GetTheme
+db.GetTheme = function() return "Default" end
+UseSonataTextRoles()
+
 LoadBetterBagsModule("frames/currency.lua")
 local currency = addon:GetModule("Currency")
 
 describe("Currency icon grid", function()
+  before_each(function()
+    UseSonataTextRoles()
+  end)
+
   describe("Classic legacy currency globals (no C_CurrencyInfo namespace)", function()
     local savedNamespace
     local expandCalls
@@ -113,4 +123,9 @@ describe("Currency icon grid", function()
       assert.equal(true, expandCalls[1].expand)
     end)
   end)
+end)
+
+teardown(function()
+  db.GetTheme = originalGetTheme
+  if createdDatabase then ResetModuleStub("Database") end
 end)

@@ -16,6 +16,11 @@ end
 
 local list = stubModule("List")
 local sessions = stubModule("PerfSessions")
+-- The tab draws its text with Sonata's text roles, styled from the saved theme.
+local db = stubModule("Database")
+local originalGetTheme = db.GetTheme
+db.GetTheme = function() return "Default" end
+local sonata = UseSonataTextRoles()
 
 ResetModuleStub("Simulator", "debug/simulator.lua")
 LoadBetterBagsModule("debug/simulator.lua")
@@ -42,6 +47,7 @@ describe("SimulatePane", function()
   end
 
   before_each(function()
+    UseSonataTextRoles()
     saved, started = {}, {}
     events:Init()
     simulator:Init()
@@ -65,6 +71,7 @@ describe("SimulatePane", function()
   end)
 
   teardown(function()
+    db.GetTheme = originalGetTheme
     ResetModuleStub("SimulatePane", "frames/simulatepane.lua")
     ResetModuleStub("Simulator", "debug/simulator.lua")
     for i = #createdStubs, 1, -1 do ResetModuleStub(createdStubs[i]) end
@@ -128,6 +135,7 @@ describe("SimulatePane", function()
     click(pane.startButton)
     assert.is_true(simulator:IsRunning())
     assert.are.equal("Stop", pane.startButton:GetText())
+    assert.are.equal(sonata:GetTextFont("Body"), pane.status:GetFontObject())
     simulator.frame:GetScript("OnUpdate")(simulator.frame, 0.5)
     pane:UpdateStatus()
     assert.are.equal("Firing BAG_UPDATE_COOLDOWN at 10/s: 5 of 20, 1.5 s left", pane.status:GetText())

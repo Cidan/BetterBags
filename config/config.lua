@@ -644,12 +644,12 @@ function config:CreateConfig()
       pane:SetAllPoints()
 
       -- Title
-      local title = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+      local title = sonata:CreateText(pane, "Title")
       title:SetPoint("TOPLEFT", 10, -10)
       title:SetText("QuickFind Integration")
 
       -- Description
-      local desc = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      local desc = sonata:CreateText(pane, "Body")
       desc:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
       desc:SetPoint("RIGHT", pane, "RIGHT", -10, 0)
       desc:SetWordWrap(true)
@@ -657,11 +657,11 @@ function config:CreateConfig()
       desc:SetText("BetterBags integrates with the QuickFind addon to make your items searchable.")
 
       -- How it works section
-      local howItWorksTitle = pane:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+      local howItWorksTitle = sonata:CreateText(pane, "Field")
       howItWorksTitle:SetPoint("TOPLEFT", desc, "BOTTOMLEFT", 0, -20)
       howItWorksTitle:SetText("How It Works:")
 
-      local howItWorksText = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      local howItWorksText = sonata:CreateText(pane, "BodySmall")
       howItWorksText:SetPoint("TOPLEFT", howItWorksTitle, "BOTTOMLEFT", 0, -10)
       howItWorksText:SetPoint("RIGHT", pane, "RIGHT", -10, 0)
       howItWorksText:SetWordWrap(true)

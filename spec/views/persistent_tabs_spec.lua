@@ -198,6 +198,9 @@ itemFrame.Create = function()
   return i
 end
 
+-- The views draw their hints with Sonata's text roles.
+UseSonataTextRoles()
+
 -- Load views modules
 ResetModuleStub("Views", "views/views.lua")
 ResetModuleStub("GridViewDummy", "views/gridview.lua")
@@ -304,6 +307,10 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     return bag
   end
   before_each(function()
+    -- Text roles are styled from the saved theme.
+    table.insert(replacedDatabase, { "GetTheme", rawget(database, "GetTheme") })
+    database.GetTheme = function() return "Default" end
+    UseSonataTextRoles()
     _G.strsplit = function(sep, str, max)
       if str == nil then
         error("bad argument #2 to 'strsplit' (string expected, got nil)", 2)

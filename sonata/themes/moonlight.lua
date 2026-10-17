@@ -21,9 +21,9 @@ local BACKGROUND = {
 
 local INSETS = { Left = 18, Right = 24, Top = 40, Bottom = 12 }
 
--- The title sits right of the menu button.
+-- The title sits right of the menu button, in the theme's text color.
 local TITLE = {
-  Font = { Object = "GameFontHighlight" },
+  Font = { Object = "GameFontHighlight", Color = "$TextColor", Shadow = "$TextShadow" },
   Points = { { Point = "TOPLEFT", X = 44, Y = -15 } },
   Height = 24,
   Justify = "LEFT",
@@ -76,6 +76,9 @@ local function tab(inset, style)
   end
   return t
 end
+
+-- The close button's letter in black on the paper.
+local PARCHMENT_CLOSE = { Font = { Object = "GameFontBlack" } }
 
 local GRAY_TEXT = { Object = "GameFontHighlightSmall", Color = { 0.7, 0.7, 0.7, 1 } }
 local NO_SHADOW = { X = 0, Y = 0, Color = { 0, 0, 0, 0 } }
@@ -166,6 +169,21 @@ sonata:RegisterTheme({
   Variables = {
     Frame = ART .. "parchment.png",
     SliceMode = "Stretched",
+    -- Dark text on the paper, in Blizzard's parchment text colors (GlobalColor): body text
+    -- PARCHMENT_MATERIAL_TEXT_COLOR, titles PARCHMENT_MATERIAL_TITLETEXT_COLOR, the hovered
+    -- entry PARCHMENTLARGE_MATERIAL_TITLETEXT_COLOR, good and bad states
+    -- PARCHMENT_ACCESSIBILITY_GREEN and _RED. Secondary and muted text take the browns of the
+    -- tabs' text and of the paper's burnt edge. No shadow; a faint gold glow marks the open
+    -- settings entry.
+    TextColor = { 46 / 255, 31 / 255, 15 / 255, 1 },
+    TextSoftColor = { 0.36, 0.22, 0.1, 1 },
+    TextMutedColor = { 0.455, 0.286, 0.176, 1 },
+    TextAccentColor = { 0, 0, 0, 1 },
+    TextAccentHoverColor = { 53 / 255, 0, 0, 1 },
+    TextPositiveColor = { 19 / 255, 68 / 255, 4 / 255, 1 },
+    TextNegativeColor = { 172 / 255, 3 / 255, 3 / 255, 1 },
+    TextShadow = { Color = { 0, 0, 0, 0 }, X = 0, Y = 0 },
+    TextGlow = { Color = { 1, 0.82, 0, 0.35 }, X = 0, Y = 0 },
   },
   Windows = {
     Bag = {
@@ -179,9 +197,13 @@ sonata:RegisterTheme({
         },
       },
       Title = { Points = { { Point = "BOTTOM", RelativeTo = "Ribbon", RelativePoint = "BOTTOM", Y = 25 } }, Justify = "CENTER" },
+      CloseButton = PARCHMENT_CLOSE,
     },
+    Panel = { CloseButton = PARCHMENT_CLOSE },
+    Flat = { CloseButton = PARCHMENT_CLOSE },
   },
   Elements = {
+    SectionHeader = { Font = { Object = "GameFontNormal", Color = "$TextAccentColor", Shadow = "$TextShadow" } },
     -- A strip of the paper, dimmed until the tab is selected, in the burnt edge's brown, with
     -- dark brown text and no shadow.
     Tab = tab(2, {

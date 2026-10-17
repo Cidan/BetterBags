@@ -509,6 +509,73 @@ describe("BetterBags' other themes", function()
     end)
   end)
 
+  -- Parchment's light paper needs dark text: its text roles take Blizzard's parchment text
+  -- colors (GlobalColor: PARCHMENT_MATERIAL_TEXT_COLOR, PARCHMENT_MATERIAL_TITLETEXT_COLOR,
+  -- PARCHMENTLARGE_MATERIAL_TITLETEXT_COLOR, PARCHMENT_ACCESSIBILITY_GREEN/RED) and drop the
+  -- black shadow; the dark themes keep Base's white text.
+  describe("text", function()
+    local function roleColor(role)
+      local r, g, b, a = sonata:GetTextFont(role):GetTextColor()
+      return { r, g, b, a }
+    end
+    local function roleShadow(role)
+      local font = sonata:GetTextFont(role)
+      local r, g, b, a = font:GetShadowColor()
+      local x, y = font:GetShadowOffset()
+      return { r, g, b, a, x, y }
+    end
+
+    it("draws Parchment's text in Blizzard's parchment colors, without a shadow", function()
+      apply("Parchment")
+      local BODY, TITLE = { 46 / 255, 31 / 255, 15 / 255, 1 }, { 0, 0, 0, 1 }
+      for _, role in ipairs({ "Heading", "Body", "BodySmall", "BodyLarge", "Nav", "NavSub", "Search", "Count", "Money" }) do
+        assert.are.same(BODY, roleColor(role), role)
+      end
+      for _, role in ipairs({ "Title", "Field", "FieldSmall", "NavActive", "NavSubActive" }) do
+        assert.are.same(TITLE, roleColor(role), role)
+      end
+      assert.are.same({ 0.36, 0.22, 0.1, 1 }, roleColor("Label"))
+      assert.are.same({ 0.36, 0.22, 0.1, 1 }, roleColor("Description"))
+      assert.are.same({ 0.455, 0.286, 0.176, 1 }, roleColor("Muted"))
+      assert.are.same({ 0.455, 0.286, 0.176, 1 }, roleColor("Empty"))
+      assert.are.same({ 53 / 255, 0, 0, 1 }, roleColor("NavHover"))
+      assert.are.same({ 19 / 255, 68 / 255, 4 / 255, 1 }, roleColor("Positive"))
+      assert.are.same({ 172 / 255, 3 / 255, 3 / 255, 1 }, roleColor("Negative"))
+      assert.are.same({ 0, 0, 0, 0, 0, 0 }, roleShadow("Body"))
+      assert.are.same({ 1, 0.82, 0, 0.35, 0, 0 }, roleShadow("NavActive"))
+    end)
+
+    it("titles Parchment's windows in its text color without a shadow, and letters its close button in black", function()
+      local panel, bag = newWindow("Panel"), newWindow("Bag")
+      apply("Parchment")
+      for _, w in ipairs({ panel, bag }) do
+        local title = w.decoration:GetTitleText()
+        assert.are.same({ 46 / 255, 31 / 255, 15 / 255, 1 }, { title:GetTextColor() })
+        assert.are.same({ 0, 0, 0, 0 }, { title:GetShadowColor() })
+        assert.are.equal(GameFontBlack, w.decoration:GetCloseButton():GetNormalFontObject())
+      end
+      local section = sonata:Resolve("Parchment").Elements.SectionHeader.Font
+      assert.are.same({ Object = "GameFontNormal", Color = { 0, 0, 0, 1 }, Shadow = { Color = { 0, 0, 0, 0 }, X = 0, Y = 0 } },
+        section)
+    end)
+
+    it("keeps Base's white text on the dark themes", function()
+      for _, key in ipairs({ "Dark", "DarkRound", "Slate", "SimpleDark" }) do
+        apply(key)
+        assert.are.same({ 1, 1, 1, 1 }, roleColor("Body"), key)
+        assert.are.same({ 1, 0.82, 0, 1 }, roleColor("Title"), key)
+        assert.are.same({ 0, 0, 0, 1, 1, -1 }, roleShadow("Body"), key)
+        if key ~= "SimpleDark" then
+          local w = newWindow("Panel")
+          apply(key)
+          assert.are.same({ 1, 1, 1, 1 }, { w.decoration:GetTitleText():GetTextColor() }, key)
+          assert.are.same({ 0, 0, 0, 1 }, { w.decoration:GetTitleText():GetShadowColor() }, key)
+          assert.are.equal(GameFontNormal, w.decoration:GetCloseButton():GetNormalFontObject(), key)
+        end
+      end
+    end)
+  end)
+
   -- Every built-in theme but Default (Blizzard's tabs) and ElvUI (ElvUI's flat tabs, covered
   -- above) draws its own flat tabs, styled here on a real tab through the real styler.
   describe("tabs", function()

@@ -80,3 +80,36 @@ _G.LoadFreshBetterBagsModule = function(name, filePath)
   _G.LoadBetterBagsModule(filePath)
   return addon:GetModule(name)
 end
+
+--- Make Sonata's text roles usable in a spec whose code draws text with them
+--- (Sonata:CreateText, SetTextRole, GetTextFont): loads the engine and SonataApply when they
+--- are not loaded, registers the real Base theme (replacing a stand-in Base without text
+--- roles, which other specs register) and Default when Sonata has none, forgets its resolved
+--- theme and role font objects (and the applied theme when it is no longer registered), and
+--- returns Sonata. Roles are styled from the applied theme, else the saved one
+--- (Database:GetTheme): the spec's Database must answer GetTheme. Call it where the spec sets
+--- up each test (before_each) as well, since other spec files change Sonata's themes.
+---@return table sonata
+_G.UseSonataTextRoles = function()
+  _G.LoadBetterBagsModule("sonata/engine.lua")
+  _G.LoadBetterBagsModule("sonata/apply.lua")
+  local sonata = addon:GetModule("Sonata")
+  sonata.textFonts = sonata.textFonts or {}
+  local base = sonata.themes.Base
+  if base ~= nil and base.Text == nil then
+    sonata.themes.Base = nil
+  end
+  for key, file in pairs({ Base = "sonata/themes/base.lua", Default = "sonata/themes/default.lua" }) do
+    if sonata.themes[key] == nil then
+      assert(loadfile(file))("BetterBags")
+    end
+  end
+  if sonata.current ~= nil and sonata.themes[sonata.current] == nil then
+    sonata.current = nil
+  end
+  sonata.resolved, sonata.resolvedKey = nil, nil
+  sonata.textFonts = {}
+  sonata.texts = sonata.texts or setmetatable({}, { __mode = "k" })
+  sonata.buttonTexts = sonata.buttonTexts or setmetatable({}, { __mode = "k" })
+  return sonata
+end

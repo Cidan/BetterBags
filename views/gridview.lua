@@ -4,6 +4,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Constants: AceModule
 local const = addon:GetModule('Constants')
 
@@ -72,10 +75,9 @@ function views:NewGrid(parent, kind, tabID)
     emptyGroupFrame:SetFrameLevel(view.content:GetContainer():GetFrameLevel() + 10)
     emptyGroupFrame:Hide()
 
-    local helpText = emptyGroupFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local helpText = sonata:CreateText(emptyGroupFrame, "Muted")
     helpText:SetPoint("CENTER", emptyGroupFrame, "CENTER", 0, 0)
     helpText:SetText(L:G("Drag a section header to this tab at the bottom of the window to add a section to this group!"))
-    helpText:SetTextColor(0.6, 0.6, 0.6, 1)
     helpText:SetWidth(220)
     helpText:SetJustifyH("CENTER")
 

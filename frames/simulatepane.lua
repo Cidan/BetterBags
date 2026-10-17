@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -54,7 +57,7 @@ addon:GetModule('Perf'):RegisterPrototype(paneProto, 'SimulatePaneFrame')
 ---@param y number
 ---@return FontString
 local function label(parent, text, anchor, y)
-  local fs = parent:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+  local fs = sonata:CreateText(parent, "Body")
   fs:SetPoint('TOPLEFT', anchor, 'BOTTOMLEFT', 0, y)
   fs:SetText(text)
   return fs
@@ -82,7 +85,7 @@ local function checkbox(parent, text, anchor)
   local check = CreateFrame('CheckButton', nil, parent, 'UICheckButtonTemplate') --[[@as CheckButton]]
   check:SetSize(24, 24)
   check:SetPoint('TOPLEFT', anchor, 'BOTTOMLEFT', -6, -10)
-  local fs = parent:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+  local fs = sonata:CreateText(parent, "Body")
   fs:SetPoint('LEFT', check, 'RIGHT', 2, 0)
   fs:SetText(text)
   check.label = fs
@@ -109,11 +112,11 @@ function simulatePane:Create(parent)
   right:SetPoint('TOPLEFT', pane.eventList.frame, 'TOPRIGHT', 16, -8)
   right:SetPoint('BOTTOMRIGHT', f, 'BOTTOMRIGHT', -10, 8)
 
-  local title = right:CreateFontString(nil, 'OVERLAY', 'GameFontNormalLarge')
+  local title = sonata:CreateText(right, "Title")
   title:SetPoint('TOPLEFT', right, 'TOPLEFT', 0, 0)
   title:SetText('Simulate an event')
 
-  local help = right:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  local help = sonata:CreateText(right, "BodySmall")
   help:SetPoint('TOPLEFT', title, 'BOTTOMLEFT', 0, -6)
   help:SetPoint('RIGHT', right, 'RIGHT', 0, 0)
   help:SetJustifyH('LEFT')
@@ -122,7 +125,7 @@ function simulatePane:Create(parent)
     .. 'test under the addon restrictions those apply.')
 
   local eventTitle = label(right, 'Event', help, -14)
-  pane.eventLabel = right:CreateFontString(nil, 'OVERLAY', 'GameFontNormal')
+  pane.eventLabel = sonata:CreateText(right, "Field")
   pane.eventLabel:SetPoint('LEFT', eventTitle, 'RIGHT', 10, 0)
   pane.eventLabel:SetText('none picked')
 
@@ -167,13 +170,13 @@ function simulatePane:Create(parent)
     pane:ApplyPreset()
   end)
 
-  pane.status = right:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+  pane.status = sonata:CreateText(right, "Body")
   pane.status:SetPoint('TOPLEFT', pane.startButton, 'BOTTOMLEFT', 0, -14)
   pane.status:SetPoint('RIGHT', right, 'RIGHT', 0, 0)
   pane.status:SetJustifyH('LEFT')
   pane.status:SetText('')
 
-  pane.restrictions = right:CreateFontString(nil, 'OVERLAY', 'GameFontHighlightSmall')
+  pane.restrictions = sonata:CreateText(right, "BodySmall")
   pane.restrictions:SetPoint('TOPLEFT', pane.status, 'BOTTOMLEFT', 0, -10)
   pane.restrictions:SetPoint('RIGHT', right, 'RIGHT', 0, 0)
   pane.restrictions:SetJustifyH('LEFT')
@@ -197,7 +200,7 @@ end
 function paneProto:InitEventButton(button, entry)
   local text = button.Text or button.text
   if text == nil then
-    text = button:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+    text = sonata:CreateText(button, "Body")
     text:SetPoint('LEFT', button, 'LEFT', 8, 0)
     button.text = text
   end

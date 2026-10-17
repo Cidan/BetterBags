@@ -117,6 +117,16 @@ describe("the overlay search panel", function()
     assert.are.same({ "BOTTOMRIGHT", content, "BOTTOMRIGHT", 6, 6 }, { sf.enterLabel:GetPoint(1) })
   end)
 
+  -- The panel draws on its window's background, so a theme colors its text.
+  it("draws its typed text and hints with text roles", function()
+    local sf = create()
+    assert.are.equal(sonata:GetTextFont("Search"), sf.textBox:GetFontObject())
+    assert.is_nil(sf.textBox._textColor)
+    assert.are.equal(sonata:GetTextFont("Muted"), sf.enterLabel:GetFontObject())
+    assert.are.equal(sonata:GetTextFont("Empty"), sf.helpText:GetFontObject())
+    assert.are.equal("BetterBagsSearchHelpText", sf.helpText:GetName())
+  end)
+
   it("opens the backpack and fades in, focusing the box once shown", function()
     local sf = create()
     sf:Toggle(context:New("spec"))

@@ -9,9 +9,6 @@ local list = addon:GetModule('List')
 ---@class Sonata: AceModule
 local sonata = addon:GetModule('Sonata')
 
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
-
 ---@class ThemePane: AceModule
 local themePane = addon:NewModule('ThemePane')
 
@@ -69,8 +66,7 @@ function themePaneProto:initListItem(button, elementData)
   end
 
   ---@cast elementData ThemePaneEntry
-  -- Font styling - uniform white for all themes
-  button.ThemeName:SetFontObject(fonts.UnitFrame12White)
+  sonata:SetTextRole(button.ThemeName, "Body")
 
   -- Checkmark for the applied theme
   if elementData.active then
@@ -172,10 +168,9 @@ function themePaneProto:ShowEmptyDetail()
     self.emptyDetail = CreateFrame("Frame", nil, self.detailFrame)
     self.emptyDetail:SetAllPoints()
 
-    local text = self.emptyDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local text = sonata:CreateText(self.emptyDetail, "Empty")
     text:SetPoint("CENTER", 0, 0)
     text:SetText("Select a theme to view its details")
-    text:SetTextColor(0.5, 0.5, 0.5)
   end
   self.emptyDetail:Show()
   self.detailContent = self.emptyDetail
@@ -198,17 +193,17 @@ function themePaneProto:ShowThemeDetail(entry)
 
   if entry.active then
     self.themeDetail.statusLabel:SetText("Currently Active")
-    self.themeDetail.statusLabel:SetTextColor(0.2, 0.8, 0.2)
+    sonata:SetTextRole(self.themeDetail.statusLabel, "Positive")
     self.themeDetail.applyButton:SetEnabled(false)
     self.themeDetail.applyButton:SetText("Active")
   elseif entry.available then
     self.themeDetail.statusLabel:SetText("Available")
-    self.themeDetail.statusLabel:SetTextColor(0.7, 0.7, 0.7)
+    sonata:SetTextRole(self.themeDetail.statusLabel, "Description")
     self.themeDetail.applyButton:SetEnabled(true)
     self.themeDetail.applyButton:SetText("Apply Theme")
   else
     self.themeDetail.statusLabel:SetText("Unavailable")
-    self.themeDetail.statusLabel:SetTextColor(0.6, 0.3, 0.3)
+    sonata:SetTextRole(self.themeDetail.statusLabel, "Negative")
     self.themeDetail.applyButton:SetEnabled(false)
     self.themeDetail.applyButton:SetText("Unavailable")
   end
@@ -224,9 +219,8 @@ function themePaneProto:CreateThemeDetailPanel()
   local yOffset = -10
 
   -- Theme Name (large title)
-  local nameLabel = self.themeDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local nameLabel = sonata:CreateText(self.themeDetail, "Title")
   nameLabel:SetPoint("TOPLEFT", 10, yOffset)
-  nameLabel:SetTextColor(1, 0.82, 0)
   self.themeDetail.nameLabel = nameLabel
 
   yOffset = yOffset - 30
@@ -241,15 +235,14 @@ function themePaneProto:CreateThemeDetailPanel()
   yOffset = yOffset - 20
 
   -- Description Label
-  local descTitle = self.themeDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local descTitle = sonata:CreateText(self.themeDetail, "Body")
   descTitle:SetPoint("TOPLEFT", 10, yOffset)
   descTitle:SetText("Description")
-  descTitle:SetTextColor(0.9, 0.9, 0.9)
 
   yOffset = yOffset - 20
 
   -- Description Text
-  local descriptionLabel = self.themeDetail:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local descriptionLabel = sonata:CreateText(self.themeDetail, "Body")
   descriptionLabel:SetPoint("TOPLEFT", 10, yOffset)
   descriptionLabel:SetPoint("RIGHT", self.themeDetail, "RIGHT", -10, 0)
   descriptionLabel:SetJustifyH("LEFT")
@@ -260,12 +253,11 @@ function themePaneProto:CreateThemeDetailPanel()
   yOffset = yOffset - 60
 
   -- Status Label
-  local statusTitle = self.themeDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local statusTitle = sonata:CreateText(self.themeDetail, "Body")
   statusTitle:SetPoint("TOPLEFT", 10, yOffset)
   statusTitle:SetText("Status:")
-  statusTitle:SetTextColor(0.9, 0.9, 0.9)
 
-  local statusLabel = self.themeDetail:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local statusLabel = sonata:CreateText(self.themeDetail, "Body")
   statusLabel:SetPoint("LEFT", statusTitle, "RIGHT", 10, 0)
   self.themeDetail.statusLabel = statusLabel
 

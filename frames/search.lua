@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Animations: AceModule
 local animations = addon:GetModule('Animations')
 
@@ -246,7 +249,7 @@ function searchBox:Create(_ctx, parent)
   f:SetSize(400, 75)
   local content = sf.window.content
 
-  local enterLabel = content:CreateFontString(nil, "ARTWORK", "GameFontDisable")
+  local enterLabel = sonata:CreateText(content, "Muted", "ARTWORK")
   enterLabel:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 6, 6)
   enterLabel:SetText("[Enter] Create a new category...")
   enterLabel:Hide()
@@ -255,8 +258,7 @@ function searchBox:Create(_ctx, parent)
   sf.enterLabel = enterLabel
 
   local textBox = CreateFrame("EditBox", nil, content) --[[@as EditBox]]
-  textBox:SetFontObject("GameFontNormalHuge")
-  textBox:SetTextColor(1, 1, 1, 1)
+  sonata:SetTextRole(textBox, "Search")
   textBox:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
   textBox:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 0, 0)
   textBox:ClearFocus()
@@ -285,7 +287,8 @@ function searchBox:Create(_ctx, parent)
     end
   end)
 
-  local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK", "GameFontDisableLarge")
+  local helpText = textBox:CreateFontString("BetterBagsSearchHelpText", "ARTWORK")
+  sonata:SetTextRole(helpText, "Empty")
   helpText:SetPoint("CENTER", textBox, "CENTER", 0, 0)
   helpText:SetText("Start typing to search your bags...")
   helpText:Show()

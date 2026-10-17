@@ -64,7 +64,7 @@ describe("DebugWindow", function()
     function c:IsShown() return self.frame:IsShown() end
     function c:Update() self.updates = self.updates + 1 end
     function c:GetFrame() return self.frame end
-    function c:SetupDataSource() end
+    function c:SetupDataSource(template, init) self.template, self.init = template, init end
     function c:InsertTable() end
     function c:ScrollToEnd() end
     function c:Wipe() end
@@ -172,6 +172,22 @@ describe("DebugWindow", function()
     assert.are.equal(1, debugWindow.frame:GetAlpha())
     events:SendMessage(context:New("Test"), "config/DebugMode", false)
     assert.is_false(debugWindow.frame:IsShown())
+  end)
+
+  -- The log's rows come from an XML template with client fonts; binding a row gives its text
+  -- the text roles, so a theme restyles it.
+  it("draws a log row's number, title and message with text roles", function()
+    local log = debugWindow.contentFrames[1]
+    assert.are.equal("BetterBagsDebugListButton", log.template)
+    local row = CreateFrame("Button")
+    for _, key in ipairs({ "RowNumber", "Category", "Message" }) do
+      row[key] = row:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    end
+    log.init(row, { row = 3, title = "Refresh", message = "swept the backpack" })
+    assert.are.equal(sonata:GetTextFont("BodyLarge"), row.RowNumber:GetFontObject())
+    assert.are.equal(sonata:GetTextFont("Title"), row.Category:GetFontObject())
+    assert.are.equal(sonata:GetTextFont("Title"), row.Message:GetFontObject())
+    assert.are.equal("3", row.RowNumber:GetText())
   end)
 
   it("has a Performance tab after the existing ones, then the Simulate tab", function()

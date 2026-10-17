@@ -38,6 +38,9 @@ local context = addon:GetModule('Context')
 ---@field private resolvedKey? string
 ---@field private applied boolean
 ---@field private generation number
+---@field private textFonts table<string, Font> This theme's font object of every text role asked for.
+---@field private texts table<FontString|EditBox, string> The text role of every text drawn with one.
+---@field private buttonTexts table<Button, string> The text role of every button's text drawn with one.
 local sonata = addon:NewModule('Sonata')
 
 -- Themes register as their files load, before Init runs.
@@ -54,6 +57,7 @@ sonata.themes = {}
 ---@field Variables? table<string, any|fun(): any>
 ---@field Windows? table<string, table> Window styles by window kind (Bag, Panel, Flat, Dialog, Slots, Search).
 ---@field Elements? table<string, table> Element styles by element kind.
+---@field Text? table<string, SonataFont> Text roles: the fonts of BetterBags' own text in windows and on the bag.
 ---@field Clients? table<string, SonataTheme> Partial themes applied on a client (Retail, Forever, Classic, Era, TBC, Mists, Anniversary, Cata).
 
 -- The client override keys a theme may use (GetClientKeys).
@@ -88,6 +92,15 @@ function sonata:Init()
   self.decorations = setmetatable({}, { __mode = "k" })
   self.elements = {}
   self.elementStylers = self.elementStylers or {}
+  self.textFonts = {}
+  self.texts = setmetatable({}, { __mode = "k" })
+  self.buttonTexts = setmetatable({}, { __mode = "k" })
+  -- The client rescales its fonts (the Text Size setting) after VARIABLES_LOADED and whenever
+  -- the setting changes; role fonts are copies of them, so new ones are made. One callback per
+  -- owner and event: registering again replaces it.
+  EventRegistry:RegisterCallback("TextSizeManager.OnTextScaleUpdated", function()
+    self:newTextFonts()
+  end, self)
   self.current = nil
   self.resolved = nil
   self.resolvedKey = nil
@@ -365,6 +378,7 @@ function sonata:Resolve(key)
   resolved.Hidden = leaf.Hidden
   resolved.Windows = resolved.Windows or {}
   resolved.Elements = resolved.Elements or {}
+  resolved.Text = resolved.Text or {}
   return resolved
 end
 
@@ -562,6 +576,7 @@ function sonata:ApplyTheme(ctx, key, save)
     db():SetTheme(key)
   end
 
+  self:newTextFonts()
   local snapshot = {}
   for kind, set in pairs(self.elements) do
     local list = {}
@@ -645,4 +660,103 @@ end
 ---@return boolean
 function sonata:UsesMasque()
   return self:GetCurrentTheme().Masque ~= false
+end
+
+-- Text roles. BetterBags' own text (settings, dialogs, editors, the debug window, the bag's
+-- footer and hints) is drawn with one font object per role of the theme's Text table, made
+-- when first asked for. A font object is styled once, when it is made, and never changed:
+-- a font object changed while text used it left that text out of step once the text switched
+-- to another font object (hovering a settings entry changed its size). So every theme
+-- application, and every rescale of the client's fonts, makes a new font object per role, and
+-- Sonata moves each text and button drawn with a role to it. Such text must not set its own
+-- color or shadow, which would override its font object.
+
+-- The number of role font objects made: their names must be unique.
+local textFontCount = 0
+
+-- styleTextFont makes font a copy of its role's client font, then applies what the role sets.
+-- A copy, never a font that inherits from it (Font:SetFontObject): Blizzard makes its own
+-- runtime font objects by copying (FontableFrameMixin).
+---@param font Font
+---@param spec SonataFont
+local function styleTextFont(font, spec)
+  local apply = addon:GetModule('SonataApply')
+  local rest = {}
+  for key, value in pairs(spec) do
+    if key ~= "Object" then
+      rest[key] = value
+    end
+  end
+  if spec.Object ~= nil then
+    font:CopyFontObject(apply:FontObject(spec.Object))
+  end
+  apply:Font(font, rest)
+end
+
+-- GetTextFont returns the current theme's font object for a role, made the first time it is
+-- asked for.
+---@param role string
+---@return Font
+function sonata:GetTextFont(role)
+  local font = self.textFonts[role]
+  if font == nil then
+    local spec = self:GetCurrentTheme().Text[role]
+    if spec == nil then
+      error("unknown text role: " .. tostring(role))
+    end
+    textFontCount = textFontCount + 1
+    font = CreateFont("BetterBagsText" .. role .. textFontCount)
+    styleTextFont(font, spec)
+    self.textFonts[role] = font
+  end
+  return font
+end
+
+-- CreateText makes a font string drawn with a text role.
+---@param parent Frame
+---@param role string
+---@param layer? DrawLayer The default is OVERLAY.
+---@return FontString
+function sonata:CreateText(parent, role, layer)
+  local text = parent:CreateFontString(nil, layer or "OVERLAY")
+  self:SetTextRole(text, role)
+  return text
+end
+
+-- SetTextRole draws a font string or edit box with a text role.
+---@param text FontString|EditBox
+---@param role string
+function sonata:SetTextRole(text, role)
+  text:SetFontObject(self:GetTextFont(role))
+  self.texts[text] = role
+end
+
+-- SetButtonTextRole draws a button's text with a text role (its normal font object).
+---@param button Button
+---@param role string
+function sonata:SetButtonTextRole(button, role)
+  button:SetNormalFontObject(self:GetTextFont(role))
+  self.buttonTexts[button] = role
+end
+
+-- newTextFonts starts a new set of role font objects for the current theme and moves every
+-- text and button drawn with a role to its role's new font object. Text whose role the theme
+-- does not define keeps its font object.
+---@private
+function sonata:newTextFonts()
+  self.textFonts = {}
+  if next(self.texts) == nil and next(self.buttonTexts) == nil then
+    return
+  end
+  local roles = self:GetCurrentTheme().Text
+  for text, role in pairs(self.texts) do
+    if roles[role] ~= nil then
+      text:SetFontObject(self:GetTextFont(role))
+    end
+  end
+  for button, role in pairs(self.buttonTexts) do
+    if roles[role] ~= nil then
+      button:SetNormalFontObject(self:GetTextFont(role))
+    end
+  end
 end

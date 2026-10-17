@@ -3,6 +3,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -26,9 +29,6 @@ local L = addon:GetModule('Localization')
 
 ---@class Question: AceModule
 local question = addon:GetModule('Question')
-
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
 
 ---@class Context: AceModule
 local context = addon:GetModule('Context')
@@ -138,11 +138,9 @@ function categoryPaneProto:initListItem(button, elementData)
     button.Category:SetJustifyH("LEFT")
     button.Category:SetPoint("LEFT", button, "LEFT", 10, 0)
     button.Category:SetPoint("RIGHT", button, "RIGHT", -40, 0)
-    button.Note = button:CreateFontString(nil, "OVERLAY")
+    button.Note = sonata:CreateText(button, "Muted")
     button.Note:SetHeight(30)
     button.Note:SetPoint("RIGHT", button, "RIGHT", -10, 0)
-    button.Note:SetTextColor(0.6, 0.6, 0.6, 1)
-    button.Note:SetFontObject(fonts.UnitFrame12White)
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
       insets = { left = 0, right = 0, top = 0, bottom = 0 },
@@ -152,11 +150,11 @@ function categoryPaneProto:initListItem(button, elementData)
 
   -- Header styling
   if elementData.header then
-    button.Category:SetFontObject(fonts.UnitFrame12Yellow)
+    sonata:SetTextRole(button.Category, "Field")
     button.Note:SetText("")
     button:SetBackdropColor(0.1, 0.1, 0.1, 0.5)
   else
-    button.Category:SetFontObject(fonts.UnitFrame12White)
+    sonata:SetTextRole(button.Category, "Body")
 
     -- Show note based on category state (priority for both search and item list categories)
     local filter = categories:GetCategoryByName(elementData.title)
@@ -378,10 +376,9 @@ function categoryPaneProto:ShowEmptyDetail()
     self.emptyDetail = CreateFrame("Frame", nil, self.detailFrame)
     self.emptyDetail:SetAllPoints()
 
-    local text = self.emptyDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local text = sonata:CreateText(self.emptyDetail, "Empty")
     text:SetPoint("CENTER", 0, 0)
     text:SetText("Select a category to view its settings")
-    text:SetTextColor(0.5, 0.5, 0.5)
   end
   self.emptyDetail:Show()
   self.detailContent = self.emptyDetail
@@ -476,9 +473,8 @@ function categoryPaneProto:CreateSearchDetailPanel()
   local yOffset = -10
 
   -- Category Name (read-only display)
-  local nameLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local nameLabel = sonata:CreateText(self.searchDetail, "Title")
   nameLabel:SetPoint("TOPLEFT", 10, yOffset)
-  nameLabel:SetTextColor(1, 0.82, 0)
   self.searchDetail.nameLabel = nameLabel
 
   yOffset = yOffset - 30
@@ -493,7 +489,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   yOffset = yOffset - 20
 
   -- Query Label
-  local queryLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local queryLabel = sonata:CreateText(self.searchDetail, "Field")
   queryLabel:SetPoint("TOPLEFT", 10, yOffset)
   queryLabel:SetText("Search Query")
 
@@ -583,7 +579,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   yOffset = yOffset - 75
 
   -- Priority Label
-  local priorityLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local priorityLabel = sonata:CreateText(self.searchDetail, "Field")
   priorityLabel:SetPoint("TOPLEFT", 10, yOffset)
   priorityLabel:SetText("Priority (0-99)")
 
@@ -601,7 +597,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   yOffset = yOffset - 40
 
   -- Group By Label
-  local groupByLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local groupByLabel = sonata:CreateText(self.searchDetail, "Field")
   groupByLabel:SetPoint("TOPLEFT", 10, yOffset)
   groupByLabel:SetText("Group By")
 
@@ -662,7 +658,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   yOffset = yOffset - 45
 
   -- Color Label
-  local colorLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local colorLabel = sonata:CreateText(self.searchDetail, "Field")
   colorLabel:SetPoint("TOPLEFT", 10, yOffset)
   colorLabel:SetText("Color")
 
@@ -719,16 +715,14 @@ function categoryPaneProto:CreateSearchDetailPanel()
   showCheckbox:SetPoint("TOPLEFT", 10, yOffset)
   self.searchDetail.showCheckbox = showCheckbox
 
-  local showLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local showLabel = sonata:CreateText(self.searchDetail, "Field")
   showLabel:SetPoint("LEFT", showCheckbox, "RIGHT", 5, 0)
   showLabel:SetText("Show Section")
 
-  local showDesc = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local showDesc = sonata:CreateText(self.searchDetail, "Muted")
   showDesc:SetPoint("TOPLEFT", showLabel, "BOTTOMLEFT", 0, -5)
   showDesc:SetPoint("RIGHT", self.searchDetail, "RIGHT", -10, 0)
   showDesc:SetText("When unchecked, this category will be hidden from the bag view.")
-  showDesc:SetTextColor(0.6, 0.6, 0.6)
-  showDesc:SetFontObject(fonts.UnitFrame12White)
 
   showCheckbox:SetScript("OnClick", function()
     if not self.selectedCategory then return end
@@ -739,7 +733,7 @@ function categoryPaneProto:CreateSearchDetailPanel()
   yOffset = yOffset - 60
 
   -- Items Label
-  local itemsLabel = self.searchDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local itemsLabel = sonata:CreateText(self.searchDetail, "Field")
   itemsLabel:SetPoint("TOPLEFT", 10, yOffset)
   itemsLabel:SetText("Additional Items (drag items here to add)")
 
@@ -931,9 +925,8 @@ function categoryPaneProto:CreateManualDetailPanel()
   local yOffset = -10
 
   -- Category Name
-  local nameLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local nameLabel = sonata:CreateText(self.manualDetail, "Title")
   nameLabel:SetPoint("TOPLEFT", 10, yOffset)
-  nameLabel:SetTextColor(1, 0.82, 0)
   self.manualDetail.nameLabel = nameLabel
 
   yOffset = yOffset - 30
@@ -948,7 +941,7 @@ function categoryPaneProto:CreateManualDetailPanel()
   yOffset = yOffset - 20
 
   -- Color Label
-  local colorLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local colorLabel = sonata:CreateText(self.manualDetail, "Field")
   colorLabel:SetPoint("TOPLEFT", 10, yOffset)
   colorLabel:SetText("Color")
 
@@ -1001,7 +994,7 @@ function categoryPaneProto:CreateManualDetailPanel()
   yOffset = yOffset - 40
 
   -- Priority Label
-  local priorityLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local priorityLabel = sonata:CreateText(self.manualDetail, "Field")
   priorityLabel:SetPoint("TOPLEFT", 10, yOffset)
   priorityLabel:SetText("Priority (0-99)")
 
@@ -1023,16 +1016,14 @@ function categoryPaneProto:CreateManualDetailPanel()
   showCheckbox:SetPoint("TOPLEFT", 10, yOffset)
   self.manualDetail.showCheckbox = showCheckbox
 
-  local showLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local showLabel = sonata:CreateText(self.manualDetail, "Field")
   showLabel:SetPoint("LEFT", showCheckbox, "RIGHT", 5, 0)
   showLabel:SetText("Show Section")
 
-  local showDesc = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local showDesc = sonata:CreateText(self.manualDetail, "Muted")
   showDesc:SetPoint("TOPLEFT", showLabel, "BOTTOMLEFT", 0, -5)
   showDesc:SetPoint("RIGHT", self.manualDetail, "RIGHT", -10, 0)
   showDesc:SetText("When unchecked, this category will be hidden from the bag view.")
-  showDesc:SetTextColor(0.6, 0.6, 0.6)
-  showDesc:SetFontObject(fonts.UnitFrame12White)
 
   showCheckbox:SetScript("OnClick", function()
     if not self.selectedCategory then return end
@@ -1043,7 +1034,7 @@ function categoryPaneProto:CreateManualDetailPanel()
   yOffset = yOffset - 60
 
   -- Items Label
-  local itemsLabel = self.manualDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local itemsLabel = sonata:CreateText(self.manualDetail, "Field")
   itemsLabel:SetPoint("TOPLEFT", 10, yOffset)
   itemsLabel:SetText("Items in Category (drag items here to add)")
 
@@ -1266,15 +1257,13 @@ function categoryPaneProto:ShowDynamicCategoryDetail(categoryName)
     self.dynamicDetail = CreateFrame("Frame", nil, self.detailFrame)
     self.dynamicDetail:SetAllPoints()
 
-    local nameLabel = self.dynamicDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local nameLabel = sonata:CreateText(self.dynamicDetail, "Title")
     nameLabel:SetPoint("TOPLEFT", 10, -10)
-    nameLabel:SetTextColor(1, 0.82, 0)
     self.dynamicDetail.nameLabel = nameLabel
 
-    local infoLabel = self.dynamicDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local infoLabel = sonata:CreateText(self.dynamicDetail, "Description")
     infoLabel:SetPoint("TOPLEFT", 10, -50)
     infoLabel:SetText("This is a dynamic category. It is generated automatically\nand cannot be edited.\n\nIf this category is a leftover you can no longer see or use,\nremove it below to clear it from the list.")
-    infoLabel:SetTextColor(0.7, 0.7, 0.7)
 
     -- Escape hatch for orphaned categories: a name that has no backing filter
     -- (deleted, or an ephemeral category dropped on reload) falls through to

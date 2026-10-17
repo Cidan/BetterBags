@@ -4,14 +4,14 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
 ---@class List: AceModule
 local list = addon:GetModule('List')
-
----@class Fonts: AceModule
-local fonts = addon:GetModule('Fonts')
 
 ---@class Localization: AceModule
 local L = addon:GetModule('Localization')
@@ -85,7 +85,7 @@ function currencyPaneProto:initListItem(button, elementData)
     button.CurrencyCount:SetHeight(30)
     button.CurrencyCount:SetJustifyH("RIGHT")
     button.CurrencyCount:SetPoint("RIGHT", button, "RIGHT", -10, 0)
-    button.CurrencyCount:SetFontObject(fonts.UnitFrame12White)
+    sonata:SetTextRole(button.CurrencyCount, "Body")
 
     button:SetBackdrop({
       bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -108,10 +108,10 @@ function currencyPaneProto:initListItem(button, elementData)
 
   -- Font styling based on header state
   if isHeader then
-    button.CurrencyName:SetFontObject(fonts.UnitFrame12Yellow)
+    sonata:SetTextRole(button.CurrencyName, "Field")
     button.CurrencyCount:SetText("")
   else
-    button.CurrencyName:SetFontObject(fonts.UnitFrame12White)
+    sonata:SetTextRole(button.CurrencyName, "Body")
     button.CurrencyCount:SetText(BreakUpLargeNumbers(info.quantity or 0))
   end
 
@@ -226,10 +226,9 @@ function currencyPaneProto:ShowEmptyDetail()
     self.emptyDetail = CreateFrame("Frame", nil, self.detailFrame)
     self.emptyDetail:SetAllPoints()
 
-    local text = self.emptyDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local text = sonata:CreateText(self.emptyDetail, "Empty")
     text:SetPoint("CENTER", 0, 0)
     text:SetText(L:G("Select a currency to view its details"))
-    text:SetTextColor(0.5, 0.5, 0.5)
   end
   self.emptyDetail:Show()
   self.detailContent = self.emptyDetail
@@ -282,11 +281,11 @@ function currencyPaneProto:ShowCurrencyDetail(index, info)
   if isShown then
     self.currencyDetail.toggleButton:SetText(L:G("Hide in Backpack"))
     self.currencyDetail.statusLabel:SetText(L:G("Shown in backpack"))
-    self.currencyDetail.statusLabel:SetTextColor(0.2, 0.8, 0.2)
+    sonata:SetTextRole(self.currencyDetail.statusLabel, "Positive")
   else
     self.currencyDetail.toggleButton:SetText(L:G("Show in Backpack"))
     self.currencyDetail.statusLabel:SetText(L:G("Hidden from backpack"))
-    self.currencyDetail.statusLabel:SetTextColor(0.7, 0.7, 0.7)
+    sonata:SetTextRole(self.currencyDetail.statusLabel, "Description")
   end
 
   -- Store the index for the toggle button
@@ -306,11 +305,10 @@ function currencyPaneProto:CreateCurrencyDetailPanel()
   self.currencyDetail.icon = icon
 
   -- Currency Name (large title, next to icon)
-  local nameLabel = self.currencyDetail:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  local nameLabel = sonata:CreateText(self.currencyDetail, "Title")
   nameLabel:SetPoint("LEFT", icon, "RIGHT", 10, 0)
   nameLabel:SetPoint("RIGHT", self.currencyDetail, "RIGHT", -10, 0)
   nameLabel:SetJustifyH("LEFT")
-  nameLabel:SetTextColor(1, 0.82, 0)
   self.currencyDetail.nameLabel = nameLabel
 
   yOffset = yOffset - 50
@@ -325,7 +323,7 @@ function currencyPaneProto:CreateCurrencyDetailPanel()
   yOffset = yOffset - 20
 
   -- Quantity Label
-  local quantityLabel = self.currencyDetail:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local quantityLabel = sonata:CreateText(self.currencyDetail, "Body")
   quantityLabel:SetPoint("TOPLEFT", 10, yOffset)
   quantityLabel:SetJustifyH("LEFT")
   self.currencyDetail.quantityLabel = quantityLabel
@@ -333,7 +331,7 @@ function currencyPaneProto:CreateCurrencyDetailPanel()
   yOffset = yOffset - 20
 
   -- Max Quantity Label
-  local maxQuantityLabel = self.currencyDetail:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local maxQuantityLabel = sonata:CreateText(self.currencyDetail, "Body")
   maxQuantityLabel:SetPoint("TOPLEFT", 10, yOffset)
   maxQuantityLabel:SetJustifyH("LEFT")
   self.currencyDetail.maxQuantityLabel = maxQuantityLabel
@@ -341,7 +339,7 @@ function currencyPaneProto:CreateCurrencyDetailPanel()
   yOffset = yOffset - 20
 
   -- Weekly Label
-  local weeklyLabel = self.currencyDetail:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local weeklyLabel = sonata:CreateText(self.currencyDetail, "Body")
   weeklyLabel:SetPoint("TOPLEFT", 10, yOffset)
   weeklyLabel:SetJustifyH("LEFT")
   self.currencyDetail.weeklyLabel = weeklyLabel
@@ -349,12 +347,11 @@ function currencyPaneProto:CreateCurrencyDetailPanel()
   yOffset = yOffset - 30
 
   -- Status Label
-  local statusTitle = self.currencyDetail:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  local statusTitle = sonata:CreateText(self.currencyDetail, "Body")
   statusTitle:SetPoint("TOPLEFT", 10, yOffset)
   statusTitle:SetText(L:G("Status") .. ":")
-  statusTitle:SetTextColor(0.9, 0.9, 0.9)
 
-  local statusLabel = self.currencyDetail:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  local statusLabel = sonata:CreateText(self.currencyDetail, "Body")
   statusLabel:SetPoint("LEFT", statusTitle, "RIGHT", 10, 0)
   self.currencyDetail.statusLabel = statusLabel
 

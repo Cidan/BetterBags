@@ -4,6 +4,9 @@ local addonName = ... ---@type string
 ---@class BetterBags: AceAddon
 local addon = LibStub('AceAddon-3.0'):GetAddon(addonName)
 
+---@class Sonata: AceModule
+local sonata = addon:GetModule('Sonata')
+
 ---@class Currency: AceModule
 local currency = addon:NewModule('Currency')
 
@@ -144,7 +147,7 @@ function CurrencyIconGrid:CreateCurrencyItem(index)
   item.icon:SetSize(24, 24)
   item.icon:SetPoint("LEFT", item.frame, "LEFT", 0, 0)
 
-  item.count = item.frame:CreateFontString(nil, "ARTWORK", "Number12Font")
+  item.count = sonata:CreateText(item.frame, "Count", "ARTWORK")
   item.count:SetPoint("RIGHT", item.frame, "RIGHT", -5, 0)
   local _ = index
 

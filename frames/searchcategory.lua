@@ -134,7 +134,7 @@ function searchCategoryConfig:OnEnable()
   self.frame:SetSize(430, 450)
   local content = self.window.content
 
-  self.nameBoxLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.nameBoxLabel = sonata:CreateText(content, "Body")
   self.nameBoxLabel:SetPoint("TOPLEFT", content, "TOPLEFT", 15, -15)
   self.nameBoxLabel:SetText("Category Name")
 
@@ -148,7 +148,7 @@ function searchCategoryConfig:OnEnable()
     self:CheckNameboxText()
   end)
 
-  self.queryBoxLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.queryBoxLabel = sonata:CreateText(content, "Body")
   self.queryBoxLabel:SetPoint("TOPLEFT", self.nameBox, "BOTTOMLEFT", -2, -20)
   self.queryBoxLabel:SetText("Search Query")
 
@@ -190,7 +190,7 @@ function searchCategoryConfig:OnEnable()
     end
   end)
 
-  self.priorityBoxLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.priorityBoxLabel = sonata:CreateText(content, "Body")
   self.priorityBoxLabel:SetPoint("TOPLEFT", self.queryBox, "BOTTOMLEFT", -2, -20)
   self.priorityBoxLabel:SetText("Priority")
 
@@ -212,7 +212,7 @@ function searchCategoryConfig:OnEnable()
   end)
 
   -- Group By dropdown
-  self.groupByLabel = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.groupByLabel = sonata:CreateText(content, "Body")
   self.groupByLabel:SetPoint("TOPLEFT", self.priorityBox, "BOTTOMLEFT", -2, -20)
   self.groupByLabel:SetText("Group By")
 
@@ -284,11 +284,10 @@ function searchCategoryConfig:OnEnable()
     end)
   end
 
-  self.errorText = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  self.errorText = sonata:CreateText(content, "Negative")
   self.errorText:SetPoint("TOPLEFT", self.groupByDropdown, "BOTTOMLEFT", addon.isRetail and 0 or 15, -20)
   self.errorText:SetWidth(self.frame:GetWidth() - 40)
   self.errorText:SetText("")
-  self.errorText:SetTextColor(1, 0, 0)
 
   self.saveButton = CreateFrame("Button", addonName .. "SearchCategoryConfigSaveButton", content, "UIPanelButtonTemplate")
   self.saveButton:SetSize(100, 30)

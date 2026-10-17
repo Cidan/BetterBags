@@ -23,6 +23,11 @@ const.FORM_LAYOUT = const.FORM_LAYOUT or { STACKED = 1 }
 local list = stubModule("List")
 local form = stubModule("Form")
 local question = stubModule("Question")
+-- The pane draws its text with Sonata's text roles, styled from the saved theme.
+local db = stubModule("Database")
+local originalGetTheme = db.GetTheme
+db.GetTheme = function() return "Default" end
+local sonata = UseSonataTextRoles()
 
 LoadBetterBagsModule("debug/perf/format.lua")
 LoadFreshBetterBagsModule("PerfSessions", "debug/perf/sessions.lua")
@@ -155,7 +160,12 @@ describe("PerfPane", function()
     end
   end)
 
+  before_each(function()
+    UseSonataTextRoles()
+  end)
+
   teardown(function()
+    db.GetTheme = originalGetTheme
     for i = #createdStubs, 1, -1 do
       ResetModuleStub(createdStubs[i])
     end
@@ -427,9 +437,12 @@ describe("PerfPane", function()
       local row = functionRow("Bag.Draw")
       assert.is_true(row.overheadShare > 0.75)
       local button = renderRow(row)
+      assert.are.equal(sonata:GetTextFont("MutedSmall"), button.Name:GetFontObject())
+      assert.are.equal(sonata:GetTextFont("MutedSmall"), button.Alloc:GetFontObject())
       local r, g, b = button.Name:GetTextColor()
       assert.is_true(r < 1 and g < 1 and b < 1)
       local harvest = renderRow(functionRow("Items.Harvest"))
+      assert.are.equal(sonata:GetTextFont("BodySmall"), harvest.Name:GetFontObject())
       local hr, hg, hb = harvest.Name:GetTextColor()
       assert.are.same({ 1, 1, 1 }, { hr, hg, hb })
     end)

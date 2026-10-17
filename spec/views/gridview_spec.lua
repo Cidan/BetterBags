@@ -18,6 +18,9 @@ items.GetCategory = function() return "TestCategory" end
 
 
 local database = StubBetterBagsModule("Database")
+-- The views draw their hints with Sonata's text roles, styled from the saved theme.
+database.GetTheme = function() return "Default" end
+UseSonataTextRoles()
 database.GetBagSizeInfo = function()
   return { itemsPerRow = 5, columnCount = 4 }
 end
@@ -162,6 +165,12 @@ local function render(view, ctx, bag, slotInfo, callback)
 end
 
 describe("Phase 6 View Placement and Rendering Tests", function()
+  before_each(function()
+    -- Each test's after_each unregisters Database; Sonata reads the saved theme from it.
+    StubBetterBagsModule("Database").GetTheme = function() return "Default" end
+    UseSonataTextRoles()
+  end)
+
   after_each(function()
     ResetModuleStub("Localization", "core/localization.lua")
     ResetModuleStub("Items", "data/items.lua")
