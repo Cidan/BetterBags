@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -53,7 +54,7 @@ func TestValidateCutsLongText(t *testing.T) {
 func TestValidateKeepsAtMostMaxEntries(t *testing.T) {
 	s := Summary{Headline: "h"}
 	for i := 0; i < maxEntries+5; i++ {
-		s.Entries = append(s.Entries, Entry{Category: "New", Title: "t", Details: "d"})
+		s.Entries = append(s.Entries, Entry{Category: "New", Title: fmt.Sprintf("Change %d", i), Details: "d"})
 	}
 	got, err := s.Validate()
 	if err != nil {
@@ -61,6 +62,22 @@ func TestValidateKeepsAtMostMaxEntries(t *testing.T) {
 	}
 	if len(got.Entries) != maxEntries {
 		t.Errorf("kept %d entries", len(got.Entries))
+	}
+}
+
+// The same change twice (the model wrote it from two commits) is kept once: titles that only
+// differ in case, spacing or punctuation are the same entry.
+func TestValidateDropsRepeatedEntries(t *testing.T) {
+	got, err := Summary{Headline: "h", Entries: []Entry{
+		{Category: "Fixed", Title: "Keyring slots are not free space", Details: "first"},
+		{Category: "New", Title: "Theme previews", Details: "d"},
+		{Category: "Fixed", Title: "keyring slots are NOT free-space.", Details: "second"},
+	}}.Validate()
+	if err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	if len(got.Entries) != 2 || got.Entries[0].Details != "first" || got.Entries[1].Title != "Theme previews" {
+		t.Errorf("entries = %+v", got.Entries)
 	}
 }
 

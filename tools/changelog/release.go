@@ -77,14 +77,28 @@ func cleanText(s string, max int) string {
 	return strings.ReplaceAll(s, "|", "||")
 }
 
-// Validate checks a summary Gemini wrote and returns a cleaned copy.
+// titleKey is a title without case, spacing or punctuation: two entries with the same key say
+// the same thing.
+func titleKey(title string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(title) {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// Validate checks a summary Gemini wrote and returns a cleaned copy. An entry whose title
+// repeats an earlier one's is dropped.
 func (s Summary) Validate() (Summary, error) {
 	out := Summary{Headline: cleanText(s.Headline, maxHeadline), Entries: []Entry{}}
 	if out.Headline == "" {
 		return Summary{}, errors.New("the summary has no headline")
 	}
+	seen := map[string]bool{}
 	for i, e := range s.Entries {
-		if i >= maxEntries {
+		if len(out.Entries) >= maxEntries {
 			break
 		}
 		if !categories[e.Category] {
@@ -94,6 +108,11 @@ func (s Summary) Validate() (Summary, error) {
 		if title == "" {
 			return Summary{}, fmt.Errorf("entry %d has no title", i+1)
 		}
+		key := titleKey(title)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
 		clients := []string{}
 		for _, name := range clientNames {
 			for _, c := range e.Clients {

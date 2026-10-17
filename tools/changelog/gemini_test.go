@@ -41,7 +41,9 @@ func newGemini(url string) (*Gemini, *[]time.Duration) {
 
 func TestSummarizeSendsAnInteraction(t *testing.T) {
 	var got map[string]any
+	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
 		if r.Method != http.MethodPost || r.URL.Path != "/v1beta/interactions" {
 			t.Errorf("request %s %s", r.Method, r.URL.Path)
 		}
@@ -52,8 +54,10 @@ func TestSummarizeSendsAnInteraction(t *testing.T) {
 			t.Errorf("content type %q", r.Header.Get("Content-Type"))
 		}
 		body, _ := io.ReadAll(r.Body)
-		if err := json.Unmarshal(body, &got); err != nil {
-			t.Errorf("body: %v", err)
+		if calls == 1 {
+			if err := json.Unmarshal(body, &got); err != nil {
+				t.Errorf("body: %v", err)
+			}
 		}
 		io.WriteString(w, interaction("completed", summaryJSON))
 	}))
@@ -70,8 +74,11 @@ func TestSummarizeSendsAnInteraction(t *testing.T) {
 	if got["model"] != "gemini-3.8-flash" || got["input"] != "the commits" || got["store"] != false {
 		t.Errorf("model, input, store = %v, %v, %v", got["model"], got["input"], got["store"])
 	}
-	if instruction, _ := got["system_instruction"].(string); !strings.Contains(instruction, "BetterBags") {
-		t.Errorf("system instruction = %q", instruction)
+	instruction, _ := got["system_instruction"].(string)
+	for _, rule := range []string{"BetterBags", "new in this build", "never as separate Improved or Fixed entries", "Never say the same thing twice"} {
+		if !strings.Contains(instruction, rule) {
+			t.Errorf("system instruction lacks %q", rule)
+		}
 	}
 	format, _ := got["response_format"].(map[string]any)
 	if format["type"] != "text" || format["mime_type"] != "application/json" {
@@ -106,7 +113,8 @@ func TestSummarizeRetriesBusyAndFailingServers(t *testing.T) {
 	if _, err := g.Summarize(context.Background(), "x"); err != nil {
 		t.Fatalf("Summarize: %v", err)
 	}
-	if calls != 3 || len(*slept) != 2 || (*slept)[0] >= (*slept)[1] {
+	// Two failures, the draft, then the review.
+	if calls != 4 || len(*slept) != 2 || (*slept)[0] >= (*slept)[1] {
 		t.Errorf("calls %d, slept %v", calls, *slept)
 	}
 }
@@ -159,5 +167,66 @@ func TestSummarizeRejectsUnusableAnswers(t *testing.T) {
 			t.Errorf("%s: no error", name)
 		}
 		server.Close()
+	}
+}
+
+const reviewedJSON = `{"headline":"Reviewed.","entries":[{"category":"New","title":"Themed tabs","details":"Tabs match the theme, and fit under every border.","clients":[]}]}`
+
+// The draft is reviewed by a second interaction: the commits and the draft go in, and the notes
+// that come back are the build's.
+func TestSummarizeReviewsItsDraft(t *testing.T) {
+	var inputs []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		raw, _ := io.ReadAll(r.Body)
+		json.Unmarshal(raw, &body)
+		input, _ := body["input"].(string)
+		inputs = append(inputs, input)
+		if _, ok := body["response_format"].(map[string]any)["schema"]; !ok {
+			t.Errorf("request %d has no schema", len(inputs))
+		}
+		if len(inputs) == 1 {
+			io.WriteString(w, interaction("completed", summaryJSON))
+		} else {
+			io.WriteString(w, interaction("completed", reviewedJSON))
+		}
+	}))
+	defer server.Close()
+	g, _ := newGemini(server.URL)
+
+	s, err := g.Summarize(context.Background(), "=== Commit: Themed tabs\n=== Commit: Fix the tabs under borders")
+	if err != nil {
+		t.Fatalf("Summarize: %v", err)
+	}
+	if len(inputs) != 2 {
+		t.Fatalf("%d interactions", len(inputs))
+	}
+	if s.Headline != "Reviewed." {
+		t.Errorf("summary = %+v", s)
+	}
+	review := inputs[1]
+	for _, want := range []string{"Fix the tabs under borders", `"title": "Themed tabs"`, "Tabs match the theme."} {
+		if !strings.Contains(review, want) {
+			t.Errorf("the review lacks %q:\n%s", want, review)
+		}
+	}
+}
+
+// A review that fails leaves the draft: it is valid notes already.
+func TestSummarizeKeepsTheDraftWhenTheReviewFails(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls == 1 {
+			io.WriteString(w, interaction("completed", summaryJSON))
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer server.Close()
+	g, _ := newGemini(server.URL)
+	s, err := g.Summarize(context.Background(), "x")
+	if err != nil || s.Headline != "Tabs for every theme." {
+		t.Errorf("summary %+v, %v", s, err)
 	}
 }

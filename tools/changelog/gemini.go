@@ -32,14 +32,18 @@ type Gemini struct {
 	HTTP     *http.Client
 	Attempts int
 	Sleep    func(time.Duration)
+	// Log reports a review that failed (the draft is kept); nil reports nothing.
+	Log io.Writer
 }
 
 // systemInstruction tells Gemini who the notes are for and how to write them.
 const systemInstruction = `You write the in-game changelog of BetterBags, a bag addon for World of Warcraft.
 
-You are given the commit messages of one build: every change merged since the previous build. A commit can come with the commits of the pull request it merged. Write the notes for players, in plain language:
+You are given the commit messages of one build: every change merged since the previous build. A commit can come with the commits of the pull request it merged. Write the notes for players, in plain language, describing how this build differs from the previous one:
 
 - Group related commits into a single entry. Commits often build on, fix or revert each other; describe the end result once, never one entry per commit.
+- A feature that is new in this build is one New entry describing it as it ships. Changes and fixes made to it within this build are part of that entry, never as separate Improved or Fixed entries: players never saw the earlier versions. Improved and Fixed are only for things that existed before this build.
+- Never say the same thing twice. When several commits fix or describe the same problem, even in different words, or one commit fixes several things other commits also mention, write each change once, in one entry.
 - Leave out what players cannot notice: tests, CI, refactors, documentation, code comments and developer tooling, unless it changes or fixes something they see.
 - category: "New" for a feature, "Improved" for a feature that works better, "Fixed" for a bug fixed.
 - title: what changed, at most 60 characters, no period at the end.
@@ -112,9 +116,43 @@ type retryable struct{ err error }
 func (r retryable) Error() string { return r.err.Error() }
 func (r retryable) Unwrap() error { return r.err }
 
-// Summarize asks Gemini for a build's notes, retrying a busy or failing server and an answer
-// that does not match the schema.
+// reviewInput asks Gemini to check its draft of a build's notes against the commits.
+func reviewInput(input string, draft Summary) string {
+	data, _ := json.MarshalIndent(draft, "", "  ")
+	return `Below are a build's commit messages and a draft of its notes. Check the draft against the rules and return the corrected notes:
+- Every feature that is new in this build is one New entry. Remove each Improved or Fixed entry about changing or fixing it, folding anything players will notice into the New entry.
+- Merge entries that describe the same change or the same fix, even in different words, so nothing is said twice.
+- Remove entries about what players cannot notice.
+- Keep every remaining fact accurate to the commits, and add nothing they do not say.
+
+=== The commits
+` + input + `
+
+=== The draft
+` + string(data) + "\n"
+}
+
+// Summarize asks Gemini for a build's notes, then asks it to review that draft against the
+// commits (folding iterations on new features into them, merging repeats). A review that fails
+// leaves the draft.
 func (g *Gemini) Summarize(ctx context.Context, input string) (Summary, error) {
+	draft, err := g.ask(ctx, input)
+	if err != nil {
+		return Summary{}, err
+	}
+	reviewed, err := g.ask(ctx, reviewInput(input, draft))
+	if err != nil {
+		if g.Log != nil {
+			fmt.Fprintf(g.Log, "changelog: the review failed, keeping the draft: %v\n", err)
+		}
+		return draft, nil
+	}
+	return reviewed, nil
+}
+
+// ask runs one interaction, retrying a busy or failing server and an answer that does not
+// match the schema.
+func (g *Gemini) ask(ctx context.Context, input string) (Summary, error) {
 	attempts := g.Attempts
 	if attempts < 1 {
 		attempts = 1

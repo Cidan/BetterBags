@@ -40,6 +40,7 @@ func main() {
 			HTTP:     &http.Client{Timeout: 3 * time.Minute},
 			Attempts: 3,
 			Sleep:    time.Sleep,
+			Log:      os.Stderr,
 		}
 	}
 	if *repo != "" {

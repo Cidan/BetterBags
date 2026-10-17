@@ -16,24 +16,18 @@ changelogData.releases = {
     version = "Development build",
     channel = "alpha",
     date = "2026-10-17",
-    headline = "Rebuilt windows and themes, theme previews, and fixes for resizing, stutters and free slots.",
+    headline = "Rebuilt windows and themes, resizable bags, theme previews and this What's New window, with fixes for stutters, off-screen bags and free slots.",
     entries = {
       {
         category = "New",
         title = "Rebuilt windows and themes",
-        details = "Every BetterBags window and theme was rebuilt. Themes now style the whole window, including item buttons, tabs, section titles, the search box and dialog buttons, and switching themes leaves nothing of the old one behind.",
+        details = "Every BetterBags window and theme was rebuilt. Themes now style the whole window, including item buttons, tabs, section titles, the search box and dialog buttons, and switching themes leaves nothing of the old one behind. New built-in themes include Dark, Parchment and Slate, the group tabs under a bag match the theme you use, and theme addons can style more of the window.",
         clients = {},
       },
       {
         category = "New",
         title = "Resizable bag windows",
-        details = "The new Resizable Window setting lets you size a bag by its corner, its items reflowing to fit. With it off, a bag sizes itself to its items as before.",
-        clients = {},
-      },
-      {
-        category = "New",
-        title = "Slate theme, and tabs that match each theme",
-        details = "Slate joins the built-in themes, and the group tabs under a bag now match the built-in theme you use.",
+        details = "Turn on Resizable Window to size a bag by its corner, its items reflowing to fit the window. With it off, a bag sizes itself to its items as before.",
         clients = {},
       },
       {
@@ -43,9 +37,9 @@ changelogData.releases = {
         clients = {},
       },
       {
-        category = "Improved",
-        title = "More options for theme addons",
-        details = "Theme addons can now restyle the bag menu button, place the Show Bags panel above the bag, and move the tabs below their art.",
+        category = "New",
+        title = "What's New",
+        details = "This window: the changes in each update, shown when you log in after one. Open it any time from the bag menu or with /bb changelog.",
         clients = {},
       },
       {
@@ -56,20 +50,14 @@ changelogData.releases = {
       },
       {
         category = "Fixed",
-        title = "Windows stay on the screen",
-        details = "Bag windows can no longer be moved or sized off the screen, and a window larger than the screen shrinks to fit, including after a UI scale change.",
+        title = "Bags stay on the screen",
+        details = "Bag windows can no longer be moved partly off the screen, and they stay on it after a UI scale change.",
         clients = {},
       },
       {
         category = "Fixed",
-        title = "Resizing no longer jumps",
-        details = "Clicking a bag's resize corner could make the bag grow by itself, sometimes past the screen. Resizing now starts from where you click.",
-        clients = {},
-      },
-      {
-        category = "Fixed",
-        title = "Steadier layouts",
-        details = "Items no longer swap between two arrangements each time a bag redraws at the same size, and a resized bag no longer lays items out wider than its window.",
+        title = "Items stay put when a bag redraws",
+        details = "Items no longer swap between two arrangements each time a bag redraws without changing size.",
         clients = {},
       },
       {
@@ -82,12 +70,6 @@ changelogData.releases = {
         category = "Fixed",
         title = "No colored border on specialized bag free slots",
         details = "Free slots of reagent and other specialized bags no longer draw a colored border when shown one by one.",
-        clients = {},
-      },
-      {
-        category = "Fixed",
-        title = "Theme fixes",
-        details = "Slate's background tiles cleanly, Parchment colors all of BetterBags' own text, Dark keeps its button and currencies inside its border, and Dark Round is now part of Dark.",
         clients = {},
       },
     },

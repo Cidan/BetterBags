@@ -95,8 +95,12 @@ files with their edits, and checks nothing is uncommitted. The generator overwri
 **Gemini** (`gemini.go`): the Interactions API, `POST
 https://generativelanguage.googleapis.com/v1beta/interactions` with the AI Studio key in the
 `x-goog-api-key` header (`GEMINI_API_KEY` repository secret), model `gemini-3.8-flash`,
-`system_instruction` (who the notes are for: group related commits into one entry, leave out what
-players cannot notice, the categories and clients, plain text without `|`),
+`system_instruction` (who the notes are for, and how this build differs from the previous one:
+group related commits into one entry; a feature new in this build is one New entry describing it
+as it ships, its changes and fixes within the build part of that entry, never separate Improved or
+Fixed entries, which are only for things that existed before the build; never say the same thing
+twice, even in different words or when one commit fixes several things others mention; leave out
+what players cannot notice; the categories and clients; plain text without `|`),
 `input` (every commit message, oldest first, each followed by its pull request's commits),
 `response_format: { type: "text", mime_type: "application/json", schema }` (headline, entries with
 the category and client enums), `generation_config: { thinking_level: "medium",
@@ -106,11 +110,20 @@ Interactions breaking changes of May 2026: `steps` replaced `outputs`; `generate
 supported but not recommended for new work). A busy or failing server (429, 5xx), an unusable reply
 and notes that fail validation are retried (3 attempts, 4 s then 16 s apart); a 4xx is not.
 
+**Review pass:** every build's notes take two interactions. The first writes a draft from the
+commits; the second gets the commits and the draft (`reviewInput`) and returns the notes corrected
+against the same rules: iterations on a new feature folded into its New entry, entries saying the
+same thing merged, what players cannot notice removed, nothing added the commits do not say. A
+review that fails (after its retries) keeps the draft, which is valid notes already. Asked by the
+player: a release's notes describe what shipped, not how it was iterated on within the release,
+and commits that fix several things and restate others must not repeat entries.
+
 **Validation** (`Summary.Validate`): a headline is required; categories must be New, Improved or
 Fixed; every text is made one line of valid UTF-8 without control characters, trimmed and cut
 (headline 300, title 100, details 1200 runes), with `|` doubled (the game reads `|` as an escape;
 `||` draws one); clients are kept only if known, once each, in the order Retail, Classic, Forever;
-at most 40 entries.
+an entry whose title repeats an earlier one's, ignoring case, spacing and punctuation, is dropped
+(a safety net under the instructions and the review); at most 40 entries.
 
 **Never blocking a release:**
 - Without a key, or when Gemini fails, the notes list the commit subjects (category `Changed`,
@@ -148,12 +161,12 @@ temporary store, in the job summary. The `changelog-generator` job runs the Go t
   `changelog/Open`, the empty text), `spec/frames/contextmenu_spec.lua` (What's New),
   `spec/core/init_spec.lua` ("enables the changelog window"),
   `spec/config/config_redraw_spec.lua` ("slash commands").
-- Generator: `go test ./tools/changelog/` (validation, ranges, the Gemini request and replies,
-  retries, GitHub reads, the store, bundles, the Lua writer against golden files, whole runs with
+- Generator: `go test ./tools/changelog/` (validation and repeated titles, ranges, the Gemini
+  request, its rules, replies and retries, the review pass and a failed review, GitHub reads, the store, bundles, the Lua writer against golden files, whole runs with
   fakes, and `store.sh` against bare repositories, including two builds saving at once).
 - Across the two: `spec/tools/changelog_data_spec.lua` loads the generator's golden and empty
   output and the committed copy as `ChangelogData` and reads them with the real `Changelog`.
-- Every guard in the window and the generator was mutation-tested (10 and 11 mutations, each
+- Every guard in the window and the generator was mutation-tested (10 and 14 mutations, each
   failing at least one test).
 - Not verified yet: a real Gemini call (the key is a repository secret; the first pull request
   preview or alpha build exercises it), and the window in game.
