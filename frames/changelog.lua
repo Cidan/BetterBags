@@ -34,7 +34,7 @@ local database = addon:GetModule('Database')
 local changelog = addon:GetModule('Changelog')
 
 -- ChangelogWindow shows the changelog (data/changelog.lua): a Panel window listing the bundled
--- releases newest first, each entry expanding to its details on a click, with a "Don't show me
+-- releases newest first, every entry with its details, with a "Don't show me
 -- this again" checkbox and an "Okay!" button under the list. It opens by itself after the first
 -- loading screen of a session when the player allows it and has a release they have not seen,
 -- and on changelog/Open (the bag menu, /bb changelog). Closing it marks every release seen.
@@ -52,17 +52,20 @@ local changelogWindow = addon:NewModule('ChangelogWindow')
 local WIDTH, HEIGHT = 560, 540
 -- The room under the list for the checkbox and the button.
 local BOTTOM_ROW = 34
+-- The room right of the list: its scroll bar then sits 16 in from the content box's edge, as the
+-- settings window's does (forms/form.lua), clear of a frame drawn up to the content box (the
+-- Panel kind has no right inset in Default).
+local RIGHT_GAP = 4
 -- The list's padding: left and right of every part, above the first.
 local PAD = 10
 local TOP = 8
 -- A release's header: the gap between its version line and its headline, and after it.
 local HEADLINE_GAP = 4
 local AFTER_HEADER = 8
--- An entry: the padding above and below its text, the gap between entries, the columns of its
--- expand marker and its category, and the gap above its details.
+-- An entry: the padding above and below its text, the gap between entries, the column of its
+-- category, and the gap above its details.
 local ROW_PAD = 3
 local ROW_GAP = 2
-local MARKER_WIDTH = 14
 local TAG_WIDTH = 70
 local DETAILS_GAP = 4
 local AFTER_RELEASE = 14
@@ -77,14 +80,14 @@ local TAG_ROLES = { New = "Positive", Improved = "Field", Fixed = "Field", Chang
 ---@field badge FontString
 ---@field headline FontString
 
+-- An entry: a button only so the game highlights it under the pointer.
 ---@class (exact) ChangelogRow
 ---@field button Button
----@field marker FontString
+---@field highlight Texture
 ---@field tag FontString
 ---@field title FontString
 ---@field details FontString
 ---@field entry? ChangelogEntry
----@field expanded boolean
 
 -- The list inside the scroll area: a header per release and a row per entry, laid out top to
 -- bottom at the scroll area's width.
@@ -139,34 +142,25 @@ function canvasProto:row(i)
     highlight:SetColorTexture(1, 1, 1, 0.06)
     r = {
       button = button,
-      marker = sonata:CreateText(button, "Muted"),
+      highlight = highlight,
       tag = sonata:CreateText(button, "Field"),
       title = sonata:CreateText(button, "Body"),
       details = sonata:CreateText(button, "Description"),
-      expanded = false,
     }
-    r.marker:SetPoint("TOPLEFT", button, "TOPLEFT", 0, -ROW_PAD)
-    r.tag:SetPoint("TOPLEFT", button, "TOPLEFT", MARKER_WIDTH, -ROW_PAD)
+    r.tag:SetPoint("TOPLEFT", button, "TOPLEFT", 0, -ROW_PAD)
     r.tag:SetJustifyH("LEFT")
-    r.title:SetPoint("TOPLEFT", button, "TOPLEFT", MARKER_WIDTH + TAG_WIDTH, -ROW_PAD)
+    r.title:SetPoint("TOPLEFT", button, "TOPLEFT", TAG_WIDTH, -ROW_PAD)
     r.title:SetJustifyH("LEFT")
     r.title:SetWordWrap(true)
     r.details:SetPoint("TOPLEFT", r.title, "BOTTOMLEFT", 0, -DETAILS_GAP)
     r.details:SetJustifyH("LEFT")
     r.details:SetWordWrap(true)
-    addon.SetScript(button, "OnClick", function()
-      if r.entry == nil or (r.entry.details or "") == "" then
-        return
-      end
-      r.expanded = not r.expanded
-      self:Invalidate()
-    end)
     self.rows[i] = r
   end
   return r
 end
 
--- SetReleases lists releases, every entry collapsed, marking the ones the player has not seen.
+-- SetReleases lists releases, marking the ones the player has not seen.
 ---@param releases ChangelogRelease[]
 function canvasProto:SetReleases(releases)
   for _, h in ipairs(self.headers) do
@@ -175,7 +169,6 @@ function canvasProto:SetReleases(releases)
   for _, r in ipairs(self.rows) do
     r.button:Hide()
     r.entry = nil
-    r.expanded = false
   end
   self.parts = {}
   local rowCount = 0
@@ -235,18 +228,12 @@ function canvasProto:Render(parentResult)
       y = y - height - AFTER_HEADER
     else
       local r = part.row
-      local textWidth = math.max(1, inner - MARKER_WIDTH - TAG_WIDTH)
+      local textWidth = math.max(1, inner - TAG_WIDTH)
       r.title:SetWidth(textWidth)
       r.details:SetWidth(textWidth)
       r.tag:SetWidth(TAG_WIDTH)
-      local hasDetails = (r.entry.details or "") ~= ""
-      if hasDetails then
-        r.marker:SetText(r.expanded and "-" or "+")
-      else
-        r.marker:SetText("")
-      end
       local height = math.max(r.title:GetStringHeight(), r.tag:GetStringHeight())
-      if r.expanded then
+      if (r.entry.details or "") ~= "" then
         r.details:Show()
         height = height + DETAILS_GAP + r.details:GetStringHeight()
       else
@@ -280,7 +267,7 @@ end
 function bodyProto:PreRender(parentResult)
   local width = parentResult and parentResult.Width or 0
   local height = parentResult and parentResult.Height or 0
-  return { Width = width, Height = math.max(0, height - BOTTOM_ROW) }
+  return { Width = math.max(0, width - RIGHT_GAP), Height = math.max(0, height - BOTTOM_ROW) }
 end
 
 ---@param parentResult? RenderResult
@@ -294,7 +281,7 @@ function changelogWindow:Create()
   local body = drawable:Create(bodyProto, { frame = CreateFrame("Frame") })
   local scroll = scrollbox:Create(body.frame, "BetterBagsChangelogScroll")
   scroll.frame:SetPoint("TOPLEFT", body.frame, "TOPLEFT", 0, 0)
-  scroll.frame:SetPoint("BOTTOMRIGHT", body.frame, "BOTTOMRIGHT", 0, BOTTOM_ROW)
+  scroll.frame:SetPoint("BOTTOMRIGHT", body.frame, "BOTTOMRIGHT", -RIGHT_GAP, BOTTOM_ROW)
   scroll.renderParent = body
   local canvas = drawable:Create(canvasProto, {
     frame = CreateFrame("Frame", nil, scroll.scrollChild),

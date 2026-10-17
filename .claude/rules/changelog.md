@@ -38,13 +38,17 @@ Dialog windows have none), named `BetterBagsChangelog` (closes with Escape), tit
 in BetterBags", 560 x 540, not resizable, in the `DIALOG` strata, with the backpack's opacity, no
 fade. Built the first time it opens.
 - Content: a `ChangelogBody` drawable (plan PRE, DEP scroll, SELF) whose PRE hands the scroll box
-  the content box minus the 34-pixel bottom row; the scroll box (`render/scrollbox.lua`) scrolls a
-  `ChangelogCanvas` drawable laid out at the scroll area's width: per release a header (version in
-  `Heading`, date in `MutedSmall` with " - Alpha" for an alpha, a `New` badge in `Positive` while
-  unseen, the headline in `Description`, wrapped), then a row per entry (an expand marker, the
-  category tag in its role: `New` Positive, `Improved`/`Fixed` Field, `Changed` Muted; the title in
-  `Body`). Clicking a row with details expands it (details in `Description` under the title, the
-  marker `+`/`-`) and lays the canvas out again; a row without details does not expand. With
+  the content box minus the 34-pixel bottom row and 4 pixels on the right. The scroll area stops
+  those 4 pixels short (`RIGHT_GAP`), so its bar sits 16 in from the content box's right edge, as
+  the settings window's does (`forms/form.lua`): the Panel kind has no right inset in Default, and
+  at the edge the bar drew over the frame's border. The scroll box (`render/scrollbox.lua`)
+  scrolls a `ChangelogCanvas` drawable laid out at the scroll area's width: per release a header
+  (version in `Heading`, date in `MutedSmall` with " - Alpha" for an alpha, a `New` badge in
+  `Positive` while unseen, the headline in `Description`, wrapped), then a row per entry: the
+  category tag in its role (`New` Positive, `Improved`/`Fixed` Field, `Changed` Muted) in a
+  70-pixel column, the title in `Body` beside it, and the details in `Description` under the title,
+  always shown (an entry without details is its title alone). Each row is a button only so the
+  game highlights it under the pointer (a `HIGHLIGHT` texture); it does nothing on a click. With
   nothing to show it says "There are no changes to show yet."
 - Bottom row, inside the content box: a `UICheckButtonTemplate` checkbox "Don't show me this
   again" at the bottom left (checked = `autoOpen` off; clicking sets it), and an "Okay!" button
@@ -135,8 +139,9 @@ temporary store, in the job summary. The `changelog-generator` job runs the Go t
 - In game: `spec/changelog_spec.lua` (client names, filtering and order, unseen, marking seen,
   opening on login, the setting, no data), `spec/database_spec.lua` ("changelog": defaults, kept,
   shared by profiles), `spec/frames/changelog_spec.lua` (the Panel window and its size, the layout
-  of headers and rows across the scroll area, alpha labels, the New badge, expanding and collapsing
-  details, rows without details, the bottom row and the list's height above it, the checkbox,
+  of headers and rows across the scroll area, alpha labels, the New badge, details always shown
+  under the title and the hover highlight, rows without details, the tag and title columns, the
+  bottom row and the scroll area's size (bottom row, right gap), the checkbox,
   Okay!, marking seen on close, opening once per session on login, not when off or all seen,
   `changelog/Open`, the empty text), `spec/frames/contextmenu_spec.lua` (What's New),
   `spec/core/init_spec.lua` ("enables the changelog window"),
@@ -146,7 +151,7 @@ temporary store, in the job summary. The `changelog-generator` job runs the Go t
   fakes, and `store.sh` against bare repositories, including two builds saving at once).
 - Across the two: `spec/tools/changelog_data_spec.lua` loads the generator's golden and empty
   output and the committed copy as `ChangelogData` and reads them with the real `Changelog`.
-- Every guard in the window and the generator was mutation-tested (7 and 11 mutations, each
+- Every guard in the window and the generator was mutation-tested (10 and 11 mutations, each
   failing at least one test).
 - Not verified yet: a real Gemini call (the key is a repository secret; the first pull request
   preview or alpha build exercises it), and the window in game.

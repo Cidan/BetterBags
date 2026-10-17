@@ -1,6 +1,6 @@
 -- changelog_spec.lua -- The changelog window (frames/changelog.lua): a Sonata Panel window
--- (window/window.lua) listing the bundled releases (data/changelog.lua), newest first, each
--- entry expanding to its details on a click, with a "Don't show me this again" checkbox at the
+-- (window/window.lua) listing the bundled releases (data/changelog.lua), newest first, every
+-- entry showing its details and highlighted under the pointer, with a "Don't show me this again" checkbox at the
 -- bottom left and an "Okay!" button at the bottom right. It opens by itself after the first
 -- loading screen when the player has not turned that off and has not seen a release, and on
 -- changelog/Open. Closing it marks every bundled release seen.
@@ -189,7 +189,9 @@ describe("ChangelogWindow", function()
   it("lays the releases out top to bottom across the scroll area, and scrolls them", function()
     open()
     local insets = cw.window:GetContentInsets()
-    local canvasWidth = 560 - insets.Left - insets.Right - cw.scroll:GetBarWidth()
+    -- The scroll area stops 4 short of the content box's right edge: its bar then sits 16 in
+    -- from it, as the settings window's does, clear of a frame drawn up to the content box.
+    local canvasWidth = 560 - insets.Left - insets.Right - 4 - cw.scroll:GetBarWidth()
     assert.are.equal(canvasWidth, cw.canvas.frame:GetWidth())
     local last = 1
     local function below(frame)
@@ -206,33 +208,30 @@ describe("ChangelogWindow", function()
     assert.is_true(cw.canvas.frame:GetHeight() > -last)
   end)
 
-  it("shows an entry's details when it is clicked, and hides them on the next click", function()
+  it("shows every entry's details under its title, and highlights the entry under the pointer", function()
     open()
     local row = cw.canvas.rows[1]
-    assert.is_false(row.details:IsShown())
-    assert.are.equal("+", row.marker:GetText())
-    local height, rowHeight = cw.canvas.frame:GetHeight(), row.button:GetHeight()
-    row.button:GetScript("OnClick")(row.button, "LeftButton")
-    advance()
     assert.is_true(row.details:IsShown())
     assert.are.equal("Each theme now styles the group tabs to match its art.", row.details:GetText())
-    assert.are.equal("-", row.marker:GetText())
-    local grown = row.details:GetStringHeight() + 4
-    assert.are.equal(rowHeight + grown, row.button:GetHeight())
-    assert.are.equal(height + grown, cw.canvas.frame:GetHeight())
-    row.button:GetScript("OnClick")(row.button, "LeftButton")
-    advance()
-    assert.is_false(row.details:IsShown())
-    assert.are.equal(height, cw.canvas.frame:GetHeight())
+    assert.are.same({ "TOPLEFT", row.title, "BOTTOMLEFT", 0, -4 }, { row.details:GetPoint(1) })
+    assert.are.equal(3 + row.title:GetStringHeight() + 4 + row.details:GetStringHeight() + 3, row.button:GetHeight())
+    assert.are.equal("HIGHLIGHT", row.highlight:GetDrawLayer())
+    assert.is_nil(row.button:GetScript("OnClick"))
+    assert.is_nil(row.marker)
   end)
 
-  it("does not expand an entry with no details", function()
+  it("shows an entry with no details as its title alone", function()
     open()
     local row = cw.canvas.rows[3]
-    assert.are.equal("", row.marker:GetText())
-    row.button:GetScript("OnClick")(row.button, "LeftButton")
-    advance()
     assert.is_false(row.details:IsShown())
+    assert.are.equal(3 + row.title:GetStringHeight() + 3, row.button:GetHeight())
+  end)
+
+  it("puts the category tag first, and the title beside it", function()
+    open()
+    local row = cw.canvas.rows[1]
+    assert.are.same({ "TOPLEFT", row.button, "TOPLEFT", 0, -3 }, { row.tag:GetPoint(1) })
+    assert.are.same({ "TOPLEFT", row.button, "TOPLEFT", 70, -3 }, { row.title:GetPoint(1) })
   end)
 
   it("puts the checkbox at the bottom left and the Okay! button at the bottom right, under the scroll area", function()
@@ -242,9 +241,10 @@ describe("ChangelogWindow", function()
     assert.are.equal("Don't show me this again", cw.checkboxLabel:GetText())
     assert.are.same({ "BOTTOMRIGHT", body, "BOTTOMRIGHT", -6, 6 }, { cw.okay:GetPoint(1) })
     assert.are.equal("Okay!", cw.okay:GetText())
-    assert.are.same({ "BOTTOMRIGHT", body, "BOTTOMRIGHT", 0, 34 }, { cw.scroll.frame:GetPoint(2) })
-    -- The list scrolls in the height above the bottom row, not the whole content box.
-    assert.are.same({ Width = 500, Height = 466 }, cw.body:PreRender({ Width = 500, Height = 500 }))
+    assert.are.same({ "BOTTOMRIGHT", body, "BOTTOMRIGHT", -4, 34 }, { cw.scroll.frame:GetPoint(2) })
+    -- The list scrolls in the scroll area: the content box less the bottom row and the 4 pixels
+    -- on the right.
+    assert.are.same({ Width = 496, Height = 466 }, cw.body:PreRender({ Width = 500, Height = 500 }))
     assert.are.equal("Button", registered[cw.okay])
   end)
 
