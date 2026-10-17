@@ -53,7 +53,17 @@ func alphaGit() fakeGit {
 
 func alphaConfig(dir string) Config {
 	return Config{Channel: "alpha", From: "before", To: "head", StoreDir: filepath.Join(dir, "store"),
-		Out: filepath.Join(dir, "changelogdata.lua"), Now: func() time.Time { return now }}
+		Out: filepath.Join(dir, "changelogdata.lua"), Markdown: filepath.Join(dir, "CHANGELOG.md"),
+		Now: func() time.Time { return now }}
+}
+
+func markdownFor(t *testing.T, r Release) string {
+	t.Helper()
+	var b bytes.Buffer
+	if err := WriteMarkdown(&b, r); err != nil {
+		t.Fatalf("WriteMarkdown: %v", err)
+	}
+	return b.String()
 }
 
 var written = Summary{Headline: "A changelog.", Entries: []Entry{{Category: "New", Title: "What's New", Details: "Read what changed.", Clients: []string{}}}}
@@ -102,6 +112,52 @@ func TestRunWritesAnAlphasNotesFromItsCommitsAndPullRequests(t *testing.T) {
 	}
 	if got := readOut(t, cfg); got != luaFor(t, stored) {
 		t.Errorf("output:\n%s", got)
+	}
+	// The packager's manual changelog: the notes of this build only.
+	md, err := os.ReadFile(cfg.Markdown)
+	if err != nil || string(md) != markdownFor(t, stored[0]) {
+		t.Errorf("markdown %q, %v", md, err)
+	}
+}
+
+// The Markdown holds only the build's own notes, also when the data carries earlier builds'.
+func TestRunWritesOnlyTheBuildsNotesToTheMarkdown(t *testing.T) {
+	cfg := alphaConfig(t.TempDir())
+	older := Release{ID: 7, Version: "v0.5.16-14-gceff32a", Channel: "alpha", Date: "2026-10-17", Headline: "Older.", Entries: written.Entries}
+	if err := (Store{Dir: cfg.StoreDir}).Save(older); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(context.Background(), cfg, Deps{Git: alphaGit(), GitHub: &fakeGitHub{}, Gemini: &fakeSummarizer{summary: written}}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	md, _ := os.ReadFile(cfg.Markdown)
+	if strings.Contains(string(md), "Older.") || !strings.HasPrefix(string(md), written.Headline) {
+		t.Errorf("markdown:\n%s", md)
+	}
+}
+
+// A run that fails leaves no Markdown, so the packager writes its own changelog from the commits.
+func TestRunRemovesTheMarkdownBeforeAnythingCanFail(t *testing.T) {
+	cfg := alphaConfig(t.TempDir())
+	if err := os.WriteFile(cfg.Markdown, []byte("stale"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Run(context.Background(), cfg, Deps{Git: fakeGit{}}); err == nil {
+		t.Fatalf("no error")
+	}
+	if _, err := os.Stat(cfg.Markdown); !os.IsNotExist(err) {
+		t.Errorf("the Markdown is still there: %v", err)
+	}
+}
+
+func TestRunWritesNoMarkdownWhenNotAsked(t *testing.T) {
+	cfg := alphaConfig(t.TempDir())
+	cfg.Markdown = ""
+	if err := Run(context.Background(), cfg, Deps{Git: alphaGit(), GitHub: &fakeGitHub{}, Gemini: &fakeSummarizer{summary: written}}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(cfg.Out), "CHANGELOG.md")); !os.IsNotExist(err) {
+		t.Errorf("wrote a Markdown: %v", err)
 	}
 }
 

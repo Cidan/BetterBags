@@ -145,9 +145,28 @@ them. A player who skipped builds sees every one they missed.
 test checks the committed copy starts with it). Strings are Lua 5.1 literals with control
 characters as three-digit decimal escapes.
 
+**The sites' changelog** (`markdown.go`): CurseForge, Wago, WoWInterface and the GitHub release
+showed the packager's changelog of commits, which players found long and meaningless. The release
+workflows pass `-markdown CHANGELOG.md`, and the generator writes the build's own notes there (only
+this build's, not the bundle's): the headline, then `## New`, `## Improved`, `## Fixed` and
+`## Changes` (notes listed from commits), each entry `- **Title** (WoW: Forever only): details`,
+the client note only when an entry does not apply to every client. Text is escaped for Markdown
+(the game's doubled `|` written single and escaped; a line that would start a heading or a list
+escaped). `.pkgmeta` names it the manual changelog (`manual-changelog: filename: CHANGELOG.md,
+markup-type: markdown`). From packager v2.6.1 `release.sh`: a manual changelog generated for the
+build is used even though it is untracked (`vcs_addignore`: "Don't ignore a manual changelog
+generated for the build"), sent to CurseForge with its markup type, to Wago, as the GitHub
+release body, and to WoWInterface converted to BBCode when pandoc is there; when the file is
+missing, the packager warns and writes its changelog of commits as before. `Run` removes the file
+before anything can fail, and the workflows remove it when the generator fails, so a failed run
+gets the commit changelog, never a stale one. `/CHANGELOG.md` is git-ignored; the packaged addon
+carries it. A Go test checks `.pkgmeta` and both workflows name the same file and remove it on a
+failure.
+
 **Preview on pull requests** (`test.yml`, `changelog-preview`): for pull requests from this
 repository (forks get no secrets), the notes the pull request would ship, written by Gemini into a
-temporary store, in the job summary. The `changelog-generator` job runs the Go tests.
+temporary store, in the job summary: the Markdown the sites would show, rendered, and the in-game
+data under it. The `changelog-generator` job runs the Go tests.
 
 ## 3. Coverage
 
@@ -161,7 +180,9 @@ temporary store, in the job summary. The `changelog-generator` job runs the Go t
   `changelog/Open`, the empty text), `spec/frames/contextmenu_spec.lua` (What's New),
   `spec/core/init_spec.lua` ("enables the changelog window"),
   `spec/config/config_redraw_spec.lua` ("slash commands").
-- Generator: `go test ./tools/changelog/` (validation and repeated titles, ranges, the Gemini
+- Generator: `go test ./tools/changelog/` (the Markdown against a golden file, its sections,
+  client notes and escaping, the build's own notes only, removed on a failure, and `.pkgmeta` and
+  the workflows naming the same file; validation and repeated titles, ranges, the Gemini
   request, its rules, replies and retries, the review pass and a failed review, GitHub reads, the store, bundles, the Lua writer against golden files, whole runs with
   fakes, and `store.sh` against bare repositories, including two builds saving at once).
 - Across the two: `spec/tools/changelog_data_spec.lua` loads the generator's golden and empty
