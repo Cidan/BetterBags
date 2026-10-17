@@ -1,0 +1,17 @@
+{
+  "id": 1792253741,
+  "version": "v0.5.16-9-ge91d21e",
+  "channel": "alpha",
+  "date": "2026-10-17",
+  "from": "ceff32a6e8727c54eba55d87641351dddbfd24e7",
+  "to": "e91d21eca1360b1e62639e144b0fcf1f4cfc6424",
+  "headline": "Introduces an in-game changelog window to view recent updates on login or on demand.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "In-game changelog window",
+      "details": "A new What's New window automatically shows you what changed in recent updates when you log in. You can also review update notes at any time from the bag menu or by typing /bb changelog.",
+      "clients": []
+    }
+  ]
+}
