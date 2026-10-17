@@ -1,0 +1,55 @@
+{
+  "id": 1792277837,
+  "version": "v0.5.17",
+  "channel": "release",
+  "date": "2026-10-17",
+  "from": "v0.5.16",
+  "to": "v0.5.17",
+  "headline": "Overhauled the window and theme system with resizable bags and new built-in themes, added an in-game changelog, and fixed combat performance stutter.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "In-game changelog",
+      "details": "A new window displays what changed when you log in after an update. You can revisit it at any time from the bag menu or with the /bb changelog command.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Overhauled theme system and built-in themes",
+      "details": "Windows and themes have been rebuilt from the ground up, featuring built-in themes like Slate, Dark, Parchment, ElvUI, and GW2 alongside live previews in settings. Existing third-party theme addons must update to the new theme format.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Drag-to-resize bags and animated movement",
+      "details": "Bags can now be resized by dragging their corner or set to automatically snap to fit their contents. An optional animated item movement setting smoothly glides items and sections to their new positions as bag contents change.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Centered bag layouts and screen clamping",
+      "details": "Items are now evenly centered with consistent padding across all themes. Windows also reliably stay within your screen boundaries when moved or resized.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Performance stutter during spellcasts and combat",
+      "details": "Inactive item buttons now remain hidden until bags are opened, preventing background game events from causing frame drops during combat actions like Evoker casts.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Settings navigation text wrapping",
+      "details": "Category names in the settings sidebar no longer wrap onto a second line or get clipped after hovering or clicking them.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Keyring slots displayed as free bag slots",
+      "details": "Free slot displays no longer include locked keyring slots or padlocks, and bag quality borders are no longer drawn around individual free slots.",
+      "clients": [
+        "Forever"
+      ]
+    }
+  ]
+}
