@@ -1166,7 +1166,6 @@ function itemFrame:OnEnable()
 	for _ = 1, 50 do
 		local vItem = self:_DoCreate(ctx, -3)
 		vItem.isVirtual = true
-		vItem.frame:Hide()
 		tinsert(self.virtualPool, vItem)
 	end
 
@@ -1216,7 +1215,12 @@ function itemFrame:_DoCreate(_, bagID)
 	local name = format("BetterBagsItemButton%d", buttonCount)
 	buttonCount = buttonCount + 1
 
+	-- Hidden until a draw shows it inside a bag window, before the Blizzard buttons exist: they
+	-- react to being visible (the enchant event and the item context callback), so a slot that
+	-- is never drawn must never be visible, with the bags open or closed. Blizzard's Initialize
+	-- shows the buttons themselves; this holder keeps them from being visible.
 	local parent = CreateFrame("Frame", name .. "parent")
+	parent:Hide()
 	parent:SetID(bagID)
 	parent.IsCombinedBagContainer = function() return false end
 

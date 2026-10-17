@@ -70,6 +70,18 @@ describe("ItemRow Frame Font Validation", function()
     end)
   end)
 
+  -- A row's item button is one of Blizzard's container item buttons, which reacts to being
+  -- shown; a row is not visible until the settings pane draws it.
+  it("keeps a new row hidden until it is drawn", function()
+    ResetModuleStub("ItemRowFrame", "frames/itemrow.lua")
+    LoadBetterBagsModule("frames/itemrow.lua")
+    local itemRowFrame = addon:GetModule("ItemRowFrame")
+    itemRowFrame:Init()
+    local row = itemRowFrame:Create(ctx)
+    assert.is_false(row.frame:IsShown())
+    assert.is_false(row.rowButton:IsVisible())
+  end)
+
   -- Issue #175: Fonts\FRIZQT__.TTF has roman glyphs only, so a hard-coded path left item
   -- names on Russian, Korean and Chinese clients without their characters.
   it("draws the item name in the client's locale font", function()

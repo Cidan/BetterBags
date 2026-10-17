@@ -554,6 +554,25 @@ describe("Bag Draw: shared item button ownership across global sections and view
   -- passes is never hidden or unparented in between, so Blizzard's OnHide/OnShow
   -- handlers on the item button template do not run on every redraw.
   describe("claim, then sweep", function()
+    -- Blizzard's item buttons react to being visible (the enchant event, the item context
+    -- callback). Only the buttons a draw placed are visible: a slot made earlier and never
+    -- drawn stays hidden, and closing the bag hides the drawn ones with it.
+    it("leaves visible only the buttons it drew, and none once the bag closes", function()
+      local bag = newBag()
+      local untouched = itemFrame:GetButton(context:New("boot"), "0_7")
+      bag:Draw(context:New("draw"), slotInfoWith(
+        { itemAt(0, 1, "Weapons"), itemAt(0, 2, "Recent Items") }, {}), function() end)
+      local drawn = { itemFrame.buttonsBySlotkey["0_1"], itemFrame.buttonsBySlotkey["0_2"] }
+      for _, item in ipairs(drawn) do
+        assert.is_true(item.button:IsVisible(), item.slotkey)
+      end
+      assert.is_false(untouched.button:IsVisible())
+      bag.frame:Hide()
+      for _, item in ipairs(drawn) do
+        assert.is_false(item.button:IsVisible(), item.slotkey)
+      end
+    end)
+
     local log
 
     local function watch(button)
