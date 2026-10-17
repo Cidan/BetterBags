@@ -180,6 +180,9 @@ const.DATABASE_DEFAULTS = {
     groupsEnabled = { [0] = true, [1] = true },
     __profileSystemMigrated = false,
   },
+  global = {
+    changelog = { lastSeen = 0, autoOpen = true },
+  },
   char = {},
 }
 
@@ -1285,6 +1288,38 @@ describe("Database", function()
   end)
 
   -- ─── Debug backpack dump ───────────────────────────────────────────────────────
+
+  -- The changelog's state is account wide (AceDB global): the newest release the player has
+  -- seen, and whether the changelog opens by itself on login.
+  describe("changelog", function()
+    it("starts with nothing seen and opening on login", function()
+      DB.data.global.changelog = nil
+      DB.data:ResetDB()
+      assert.are.equal(0, DB:GetChangelogLastSeen())
+      assert.is_true(DB:GetChangelogAutoOpen())
+    end)
+
+    it("keeps what was set", function()
+      DB:SetChangelogLastSeen(1792195200)
+      DB:SetChangelogAutoOpen(false)
+      assert.are.equal(1792195200, DB:GetChangelogLastSeen())
+      assert.is_false(DB:GetChangelogAutoOpen())
+      DB:SetChangelogAutoOpen(true)
+      assert.is_true(DB:GetChangelogAutoOpen())
+    end)
+
+    it("is shared by every profile, and a profile reset leaves it", function()
+      DB:SetChangelogLastSeen(42)
+      DB:SetChangelogAutoOpen(false)
+      DB.data:SetProfile("ChangelogSpecOther")
+      assert.are.equal(42, DB:GetChangelogLastSeen())
+      assert.is_false(DB:GetChangelogAutoOpen())
+      DB.data:ResetProfile(false, true)
+      assert.are.equal(42, DB:GetChangelogLastSeen())
+      DB.data:SetProfile("Default")
+      DB:SetChangelogAutoOpen(true)
+    end)
+  end)
 
   describe("debug backpack dump", function()
     it("GetDebugBackpackDump returns empty table by default", function()

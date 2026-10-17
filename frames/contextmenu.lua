@@ -321,6 +321,18 @@ function contextMenu:CreateContextMenu(bag)
 	end
 
 	table.insert(menuList, {
+		text = L:G("What's New"),
+		notCheckable = true,
+		tooltipTitle = L:G("What's New"),
+		tooltipText = L:G("Click to see what changed in BetterBags."),
+		func = function()
+			local ctx = context:New("OpenChangelog")
+			contextMenu:Hide(ctx)
+			events:SendMessage(ctx, "changelog/Open")
+		end,
+	})
+
+	table.insert(menuList, {
 		text = L:G("Open Options Screen"),
 		notCheckable = true,
 		tooltipTitle = L:G("Open Options Screen"),

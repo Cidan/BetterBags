@@ -126,6 +126,44 @@ describe("Config settings refreshes", function()
     end
   end)
 
+  -- /bb opens the settings; /bb changelog opens the changelog (frames/changelog.lua).
+  describe("slash commands", function()
+    local handlers, opened, console, savedRegister, savedRegisterMessage, savedOpen
+
+    before_each(function()
+      handlers, opened = {}, 0
+      console = LibStub("AceConsole-3.0")
+      savedRegister = console.RegisterChatCommand
+      console.RegisterChatCommand = function(_, command, fn) handlers[command] = fn end
+      savedRegisterMessage = events.RegisterMessage
+      events.RegisterMessage = function() end
+      savedOpen = config.Open
+      config.Open = function() opened = opened + 1 end
+      config:RegisterSettings()
+    end)
+
+    after_each(function()
+      console.RegisterChatCommand = savedRegister
+      events.RegisterMessage = savedRegisterMessage
+      config.Open = savedOpen
+    end)
+
+    it("opens the settings on /bb", function()
+      handlers.bb("")
+      assert.are.equal(1, opened)
+      assert.are.same({}, sent)
+    end)
+
+    it("opens the changelog on /bb changelog, in any case and spacing", function()
+      handlers.bb("changelog")
+      handlers.bb("  ChangeLog ")
+      assert.are.equal(0, opened)
+      assert.are.equal(2, #sent)
+      assert.are.equal("changelog/Open", sent[1].message)
+      assert.are.equal("changelog/Open", sent[2].message)
+    end)
+  end)
+
   local function messages()
     local out = {}
     for _, s in ipairs(sent) do out[#out + 1] = s.message end

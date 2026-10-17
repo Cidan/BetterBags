@@ -39,3 +39,45 @@ jobs:
 
       - name: Run tests
         run: busted
+
+  # The changelog generator (tools/changelog) and the script that keeps its notes.
+  changelog-generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test the changelog generator
+        run: go test ./tools/changelog/
+
+  # The in-game changelog this pull request would ship, written by Gemini, in the job summary.
+  # Only for pull requests from this repository: forks have no access to the key.
+  changelog-preview:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Write the changelog
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          go run ./tools/changelog -channel alpha -from "${{ github.event.pull_request.base.sha }}" -to "${{ github.event.pull_request.head.sha }}" -store "$RUNNER_TEMP/changelog-store" -out "$RUNNER_TEMP/changelogdata.lua"
+          {
+            echo "### The changelog this pull request would ship"
+            echo '```lua'
+            sed -n '/^changelogData.releases/,$p' "$RUNNER_TEMP/changelogdata.lua"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

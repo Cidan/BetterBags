@@ -1121,7 +1121,12 @@ function config:Open()
 end
 
 function config:RegisterSettings()
-  LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function()
+  -- /bb opens the settings; /bb changelog opens the changelog (frames/changelog.lua).
+  LibStub('AceConsole-3.0'):RegisterChatCommand("bb", function(input)
+    if strtrim(input or ""):lower() == "changelog" then
+      events:SendMessage(context:New('SlashChangelog'), 'changelog/Open')
+      return
+    end
     self:Open()
   end)
 
