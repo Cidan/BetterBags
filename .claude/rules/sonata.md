@@ -448,6 +448,25 @@ gray, so no theme could change it, and on Parchment's light paper it was white o
   size until a theme switch restyled everything together. Restyling only at a different moment
   (re-copying on the client's rescale) did not fix it in game. The rule now: never change a font
   object after it is made; make a new one. `Sonata:Init` starts empty registries.
+- **Text sized to its content refits after every font change** (`Sonata:WatchTextFont(text,
+  fn)`, weak table `textWatchers`): `fn(text)` runs after `SetTextRole` and after `newTextFonts`
+  moves the text (a theme, a client rescale). A button's own font string is sized when the
+  button's text is set and keeps that width when its font changes; Blizzard documents it and
+  resets it by setting the font string's width to 0, then the button's text again
+  (`QuestLogTitleButton_Resize`, `Blizzard_UIPanels_Game/Cata/QuestLogFrame.lua`, "HACK ALERT").
+  **Failure mode (fixed):** with font objects made once (above), settings entries still wrapped
+  onto a clipped second line after a hover or a selection in game (Default and Dark, WoW:
+  Forever): "Import/" left of "Import/Export", "General" cut too. A render recording
+  (render-recorder.md, text entries) showed every Nav role in the same font and size, but the
+  Nav role's shadow (offset 1) made a string about 0.8 wider than the hover and selected roles'
+  glow (offset 0): "Import/Export" 110.8 against 110.0, "General" 64.2 against 63.3. Once sized
+  in a glow role the entry kept the narrower width, so in Nav it wrapped (`lines=2`,
+  `truncated=true`). Blizzard's reset (width 0, then the same text) refreshed the string's width
+  but left the entry's at 110.0, also a frame later. The settings navigation
+  (`forms/layouts/stacked.lua` `fitNavText`) therefore measures the entry when it is made and
+  after every font change, and sets that width explicitly, rounded up with a pixel to spare, as
+  Blizzard sizes a tab after changing its font (`CRFRaidMarkersMixin:SetTab`:
+  `GetFontString():GetStringWidth()`). Text with a fixed width or two anchors needs no watcher.
 - **A role font is a copy of its client font.** `styleTextFont` copies the role's client font
   with `Font:CopyFontObject`, then applies the role's color, shadow, file and justification;
   never `Font:SetFontObject`, which makes a font inherit from another (Blizzard makes its own

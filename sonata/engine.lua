@@ -95,6 +95,7 @@ function sonata:Init()
   self.textFonts = {}
   self.texts = setmetatable({}, { __mode = "k" })
   self.buttonTexts = setmetatable({}, { __mode = "k" })
+  self.textWatchers = setmetatable({}, { __mode = "k" })
   -- The client rescales its fonts (the Text Size setting) after VARIABLES_LOADED and whenever
   -- the setting changes; role fonts are copies of them, so new ones are made. One callback per
   -- owner and event: registering again replaces it.
@@ -753,6 +754,41 @@ end
 function sonata:SetTextRole(text, role)
   text:SetFontObject(self:GetTextFont(role))
   self.texts[text] = role
+  self:fontChanged(text)
+end
+
+-- WatchTextFont calls fn(text) after every change of text's font object: a role switch, a
+-- theme's new font objects, the client rescaling its fonts. For text sized to its content: a
+-- button's font string keeps the width it had when the button's text was set
+-- (QuestLogTitleButton_Resize, Blizzard_UIPanels_Game QuestLogFrame.lua), so its owner refits it.
+---@param text FontString
+---@param fn fun(text: FontString)
+function sonata:WatchTextFont(text, fn)
+  self.textWatchers[text] = fn
+end
+
+-- fontChanged runs the text's watcher, telling a running render recorder about the change, the
+-- refit, and the refit text a frame later: a SetWidth is applied on the next update tick
+-- (render-recorder.md).
+---@private
+---@param text FontString|EditBox
+function sonata:fontChanged(text)
+  local recorder = addon:GetModule('RenderRecorder', true)
+  local recording = recorder ~= nil and recorder.recording
+  if recording then
+    recorder:TextChanged(text, self.texts[text], "font")
+  end
+  local watcher = self.textWatchers[text]
+  if watcher ~= nil then
+    watcher(text)
+    if recording then
+      local role = self.texts[text]
+      recorder:TextChanged(text, role, "refit")
+      C_Timer.After(0, function()
+        recorder:TextChanged(text, role, "next frame")
+      end)
+    end
+  end
 end
 
 -- SetButtonTextRole draws a button's text with a text role (its normal font object).
@@ -776,6 +812,7 @@ function sonata:newTextFonts()
   for text, role in pairs(self.texts) do
     if roles[role] ~= nil then
       text:SetFontObject(self:GetTextFont(role))
+      self:fontChanged(text)
     end
   end
   for button, role in pairs(self.buttonTexts) do

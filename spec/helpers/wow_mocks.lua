@@ -705,9 +705,14 @@ local function CreateMockWidget(widgetType, name, parent)
     return self._fontString
   end
 
-  -- Text and Fonts
+  -- Text and Fonts. A button's text is its font string's (Blizzard sizes buttons from
+  -- button:GetFontString():GetStringWidth() after setting their text, InspectPaperDollFrame.lua,
+  -- Blizzard_CompactRaidFrameManager.lua).
   function widget:SetText(text)
     self._text = tostring(text or "")
+    if self._fontString ~= nil then
+      self._fontString._text = self._text
+    end
   end
   function widget:SetTextHeight(height)
     self._textHeight = height
@@ -806,6 +811,23 @@ local function CreateMockWidget(widgetType, name, parent)
   end
   function widget:GetStringWidth()
     return #self._text * 6
+  end
+  -- FontString:GetNumLines() -> numLines, IsTruncated() -> isTruncated, CanWordWrap() -> wrap
+  -- (SimpleFontStringAPIDocumentation). Lines as GetStringHeight counts them; never truncated.
+  function widget:GetNumLines()
+    local text = self._text or ""
+    if text == "" then return 0 end
+    local width = self:GetWidth()
+    if width > 0 then
+      return math.max(1, math.ceil(self:GetStringWidth() / width))
+    end
+    return 1
+  end
+  function widget:IsTruncated()
+    return false
+  end
+  function widget:CanWordWrap()
+    return self._wordWrap ~= false
   end
   -- FontString:GetStringHeight() -> the height of the text as drawn: no text is 0; otherwise
   -- one line per GetWidth() worth of characters (6 pixels each, as GetStringWidth), times the

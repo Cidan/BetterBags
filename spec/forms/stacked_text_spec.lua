@@ -132,6 +132,81 @@ describe("stacked layout text", function()
     assert.are.equal(height, select(2, nav:GetFont()))
   end)
 
+  -- An entry wrapped onto a clipped second line in game ("Import/" for "Import/Export"). A render
+  -- recording on WoW: Forever showed why: the Nav role's shadow (offset 1) makes the text 0.8
+  -- wider than the hover and selected roles' glow (offset 0), and once sized in one of those the
+  -- entry kept the narrower width (110.0 for a 110.8 string). Setting the width to 0 and the text
+  -- again (Blizzard's QuestLogTitleButton_Resize) refreshed the string's width but not the
+  -- entry's. So after every font change the entry is measured, then given that width
+  -- explicitly, rounded up with a pixel to spare.
+  it("re-measures every navigation entry after each change of its font, and sets that width", function()
+    local layout = newLayout(true, true)
+    layout:AddSection({ title = "General", description = "" })
+    layout:AddSubIndex({ title = "Sizes" })
+    layout:AddPaneLink({ title = "Import/Export", createPane = function(parent) return CreateFrame("Frame", nil, parent) end })
+    local steps = {}
+    for i = 1, 3 do
+      local button = layout.sections[i].button
+      local fs = button:GetFontString()
+      local setWidth, setText = fs.SetWidth, button.SetText
+      fs.SetWidth = function(self, width)
+        table.insert(steps, { i, "width", width })
+        return setWidth(self, width)
+      end
+      button.SetText = function(self, text)
+        table.insert(steps, { i, "text", text })
+        return setText(self, text)
+      end
+    end
+    -- The frame mock measures 6 pixels per character.
+    local function refit(i, text)
+      return { { i, "width", 0 }, { i, "text", text }, { i, "width", #text * 6 + 1 } }
+    end
+    local link = layout.sections[3].button
+    link:GetScript("OnEnter")(link)
+    assert.are.same(refit(3, "  Import/Export"), steps)
+    steps = {}
+    link:GetScript("OnLeave")(link)
+    assert.are.same(refit(3, "  Import/Export"), steps)
+    steps = {}
+    local sizes = layout.sections[2].button
+    sizes:GetScript("OnEnter")(sizes)
+    assert.are.same(refit(2, "  Sizes"), steps)
+    steps = {}
+    layout:UpdateTabHighlighting(1)
+    local expected = {}
+    for _, step in ipairs(refit(1, "General")) do table.insert(expected, step) end
+    for _, step in ipairs(refit(2, "  Sizes")) do table.insert(expected, step) end
+    for _, step in ipairs(refit(3, "  Import/Export")) do table.insert(expected, step) end
+    assert.are.same(expected, steps)
+    steps = {}
+    local events = addon:GetModule("Events")
+    local originalSend = events.SendMessage
+    events.SendMessage = function() end
+    sonata:ApplyTheme(addon:GetModule("Context"):New("spec"), "Default", false)
+    events.SendMessage = originalSend
+    -- Sonata moves texts to the new theme's font objects in no set order: each entry is refit once.
+    assert.are.equal(9, #steps)
+    local byEntry = {}
+    for _, step in ipairs(steps) do
+      byEntry[step[1]] = byEntry[step[1]] or {}
+      table.insert(byEntry[step[1]], step)
+    end
+    assert.are.same(refit(1, "General"), byEntry[1])
+    assert.are.same(refit(2, "  Sizes"), byEntry[2])
+    assert.are.same(refit(3, "  Import/Export"), byEntry[3])
+  end)
+
+  it("gives every navigation entry its measured width when it is made", function()
+    local layout = newLayout(true, true)
+    layout:AddSection({ title = "General", description = "" })
+    layout:AddSubIndex({ title = "Sizes" })
+    layout:AddPaneLink({ title = "Import/Export", createPane = function(parent) return CreateFrame("Frame", nil, parent) end })
+    assert.are.equal(#"General" * 6 + 1, layout.sections[1].button:GetFontString():GetWidth())
+    assert.are.equal(#"  Sizes" * 6 + 1, layout.sections[2].button:GetFontString():GetWidth())
+    assert.are.equal(#"  Import/Export" * 6 + 1, layout.sections[3].button:GetFontString():GetWidth())
+  end)
+
   it("draws a pane link with the sub navigation roles", function()
     local layout = newLayout(true, true)
     layout:AddSection({ title = "General", description = "" })
