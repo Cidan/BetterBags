@@ -158,6 +158,37 @@ local function titleOf(section)
   return "?"
 end
 
+---@param frame? Frame
+---@return boolean
+local function shown(frame)
+  return frame ~= nil and frame:IsShown() == true
+end
+
+-- buttonState describes what an item button shows: how it was last drawn ("item", "free" with
+-- its count and bag name, "empty"), its quality border's color, Blizzard's padlock (the frame
+-- ContainerFrameItemButtonMixin:UpdateExtended shows on a slot past the bag's usable slots,
+-- which also stops the mouse), whether it takes the mouse, and the empty slot glyph.
+---@param cell Item
+---@return string
+local function buttonState(cell)
+  local parts = { tostring(cell.drawnAs) }
+  if cell.drawnAs == "free" then
+    table.insert(parts, string.format("count=%s name=%s", tostring(cell.freeSlotCount), tostring(cell.freeSlotName)))
+  end
+  local decoration = cell._decoration
+  local border = "off"
+  if decoration ~= nil and shown(decoration.IconBorder) then
+    local r, g, b = decoration.IconBorder:GetVertexColor()
+    border = string.format("%.2f,%.2f,%.2f", r, g, b)
+  end
+  local button = cell.button
+  local padlock = (button ~= nil and shown(button.extendedFrame)) or (decoration ~= nil and shown(decoration.extendedFrame))
+  local glyph = decoration ~= nil and shown(decoration.BetterBagsFamilyIcon) and decoration.BetterBagsFamilyIcon:GetAtlas() or "none"
+  table.insert(parts, string.format("border=%s padlock=%s mouse=%s glyph=%s", border, tostring(padlock),
+    tostring(button ~= nil and button:IsMouseEnabled() == true), tostring(glyph)))
+  return table.concat(parts, " ")
+end
+
 -- describeSections adds a line for each section (sorted by title) and each of its items.
 ---@param lines string[]
 ---@param label string
@@ -178,7 +209,11 @@ local function describeSections(lines, label, sections, origin)
       if cell.isGap then
         table.insert(lines, "  gap")
       elseif cell.frame ~= nil then
-        table.insert(lines, string.format("  item %s %s", tostring(cell.slotkey), rectIn(cell.frame, origin)))
+        local line = string.format("  item %s %s", tostring(cell.slotkey), rectIn(cell.frame, origin))
+        if cell.drawnAs ~= nil then
+          line = line .. " " .. buttonState(cell)
+        end
+        table.insert(lines, line)
       end
     end
   end
