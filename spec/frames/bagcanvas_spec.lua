@@ -19,6 +19,10 @@ local const = trackStub("Constants")
 const.BAG_KIND = const.BAG_KIND or { BACKPACK = 0, BANK = 1 }
 const.BAG_VIEW = const.BAG_VIEW or { SECTION_GRID = 2, SECTION_ALL_BAGS = 4 }
 
+local debugModule = trackStub("Debug")
+debugModule.Log = debugModule.Log or function() end
+const.GRID_COMPACT_STYLE = const.GRID_COMPACT_STYLE or { NONE = 0, SIMPLE = 1, COMPACT = 2 }
+
 local db = trackStub("Database")
 local sizeInfo = { itemsPerRow = 7, columnCount = 2 }
 local originalGetBagSizeInfo, originalGetBagView = db.GetBagSizeInfo, db.GetBagView
@@ -26,6 +30,9 @@ local originalGetBagSizeInfo, originalGetBagView = db.GetBagSizeInfo, db.GetBagV
 LoadBetterBagsModule("render/render.lua")
 LoadBetterBagsModule("render/drawable.lua")
 LoadBetterBagsModule("frames/bagcanvas.lua")
+ResetModuleStub("Grid", "frames/grid.lua")
+LoadBetterBagsModule("frames/grid.lua")
+local grid = addon:GetModule("Grid")
 
 local render = addon:GetModule("Render")
 local bagCanvas = addon:GetModule("BagCanvas")
@@ -82,15 +89,47 @@ describe("BagCanvas", function()
     assert.are.equal(200, canvas.tabContainer:GetHeight())
   end)
 
+  -- A view column is at most 41 * N + 20 wide (two sections sharing a row, frames/grid.lua), so
+  -- a width fits N items per row in each column when it holds that many columns that wide.
   it("fits as many items per row as a given width allows, and fills it", function()
     local bag = fakeBag({ 0, 0 }, { 300, 100 }, { 0, 0 })
     local canvas = bagCanvas:Create(bag, CreateFrame("Frame"))
 
-    local result = render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = 2 * (41 * 9 + 8) + 20 })
+    local result = render:NewRenderChain(canvas, { ctx = context:New("spec") }, { Width = 2 * (41 * 9 + 20) })
 
     assert.are.same({ itemsPerRow = 9, columns = 2 }, bag.layouts[2][2])
-    assert.are.equal(2 * (41 * 9 + 8) + 20, result.Width)
+    assert.are.equal(2 * (41 * 9 + 20), result.Width)
     assert.are.equal(100, result.Height)
+    assert.are.same({ itemsPerRow = 8, columns = 2 }, canvas:GetLayout(2 * (41 * 9 + 20) - 0.01))
+  end)
+
+  -- The widest view the grid can make for N items per row: every row two sections whose items add
+  -- up to N (41 * N + 20 with the gap between them), in every column. Laid out by the real grid
+  -- with the view's limits (views/views.lua), it must fit the width the layout was chosen for.
+  it("never lays a view out wider than the width it was given", function()
+    local canvas = bagCanvas:Create(fakeBag({ 0, 0 }, { 0, 0 }, { 0, 0 }), CreateFrame("Frame"))
+    local overflow = {}
+    for _, columns in ipairs({ 1, 2, 3 }) do
+      sizeInfo = { itemsPerRow = 7, columnCount = columns }
+      for step = 0, 600 do
+        local width = columns * 61 + step * 3.37
+        local ipr = canvas:GetLayout(width).itemsPerRow
+        local g = grid:Create(CreateFrame("Frame"), false)
+        for row = 1, columns * 4 do
+          local left = 1 + (row % math.max(1, ipr - 1))
+          for _, items in ipairs({ left, math.max(1, ipr - left) }) do
+            local f = CreateFrame("Frame")
+            f:SetSize(41 * items + 8, 61)
+            g:AddCell("s" .. row .. "_" .. items .. "_" .. _, { frame = f })
+          end
+        end
+        local w = g:Draw({ cells = g.cells, maxWidthPerRow = (37 + 4) * ipr + 16, columns = columns })
+        if w > width then
+          table.insert(overflow, string.format("%d columns, width %.2f: %d per row laid out %d", columns, width, ipr, w))
+        end
+      end
+    end
+    assert.are.same({}, overflow)
   end)
 
   it("keeps at least one item per row in a narrow window", function()
