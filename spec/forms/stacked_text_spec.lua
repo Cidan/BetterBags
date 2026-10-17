@@ -132,12 +132,14 @@ describe("stacked layout text", function()
     assert.are.equal(height, select(2, nav:GetFont()))
   end)
 
-  -- A button's font string is sized when the button's text is set and keeps that width when its
-  -- font changes, so an entry that changed fonts (hover, selection, a theme, the client's text
-  -- size) wrapped onto a clipped second line in game: "Import/" for "Import/Export". Each entry
-  -- is re-measured after every font change, the way Blizzard does it (QuestLogTitleButton_Resize:
-  -- the font string's width set to 0, then the button's text set again).
-  it("re-measures every navigation entry after each change of its font", function()
+  -- An entry wrapped onto a clipped second line in game ("Import/" for "Import/Export"). A render
+  -- recording on WoW: Forever showed why: the Nav role's shadow (offset 1) makes the text 0.8
+  -- wider than the hover and selected roles' glow (offset 0), and once sized in one of those the
+  -- entry kept the narrower width (110.0 for a 110.8 string). Setting the width to 0 and the text
+  -- again (Blizzard's QuestLogTitleButton_Resize) refreshed the string's width but not the
+  -- entry's. So after every font change the entry is measured, then given that width
+  -- explicitly, rounded up with a pixel to spare.
+  it("re-measures every navigation entry after each change of its font, and sets that width", function()
     local layout = newLayout(true, true)
     layout:AddSection({ title = "General", description = "" })
     layout:AddSubIndex({ title = "Sizes" })
@@ -156,8 +158,9 @@ describe("stacked layout text", function()
         return setText(self, text)
       end
     end
+    -- The frame mock measures 6 pixels per character.
     local function refit(i, text)
-      return { { i, "width", 0 }, { i, "text", text } }
+      return { { i, "width", 0 }, { i, "text", text }, { i, "width", #text * 6 + 1 } }
     end
     local link = layout.sections[3].button
     link:GetScript("OnEnter")(link)
@@ -171,8 +174,11 @@ describe("stacked layout text", function()
     assert.are.same(refit(2, "  Sizes"), steps)
     steps = {}
     layout:UpdateTabHighlighting(1)
-    assert.are.same({ { 1, "width", 0 }, { 1, "text", "General" }, { 2, "width", 0 }, { 2, "text", "  Sizes" },
-      { 3, "width", 0 }, { 3, "text", "  Import/Export" } }, steps)
+    local expected = {}
+    for _, step in ipairs(refit(1, "General")) do table.insert(expected, step) end
+    for _, step in ipairs(refit(2, "  Sizes")) do table.insert(expected, step) end
+    for _, step in ipairs(refit(3, "  Import/Export")) do table.insert(expected, step) end
+    assert.are.same(expected, steps)
     steps = {}
     local events = addon:GetModule("Events")
     local originalSend = events.SendMessage
@@ -180,6 +186,7 @@ describe("stacked layout text", function()
     sonata:ApplyTheme(addon:GetModule("Context"):New("spec"), "Default", false)
     events.SendMessage = originalSend
     -- Sonata moves texts to the new theme's font objects in no set order: each entry is refit once.
+    assert.are.equal(9, #steps)
     local byEntry = {}
     for _, step in ipairs(steps) do
       byEntry[step[1]] = byEntry[step[1]] or {}
@@ -188,6 +195,16 @@ describe("stacked layout text", function()
     assert.are.same(refit(1, "General"), byEntry[1])
     assert.are.same(refit(2, "  Sizes"), byEntry[2])
     assert.are.same(refit(3, "  Import/Export"), byEntry[3])
+  end)
+
+  it("gives every navigation entry its measured width when it is made", function()
+    local layout = newLayout(true, true)
+    layout:AddSection({ title = "General", description = "" })
+    layout:AddSubIndex({ title = "Sizes" })
+    layout:AddPaneLink({ title = "Import/Export", createPane = function(parent) return CreateFrame("Frame", nil, parent) end })
+    assert.are.equal(#"General" * 6 + 1, layout.sections[1].button:GetFontString():GetWidth())
+    assert.are.equal(#"  Sizes" * 6 + 1, layout.sections[2].button:GetFontString():GetWidth())
+    assert.are.equal(#"  Import/Export" * 6 + 1, layout.sections[3].button:GetFontString():GetWidth())
   end)
 
   it("draws a pane link with the sub navigation roles", function()

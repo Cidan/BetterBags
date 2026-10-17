@@ -705,9 +705,14 @@ local function CreateMockWidget(widgetType, name, parent)
     return self._fontString
   end
 
-  -- Text and Fonts
+  -- Text and Fonts. A button's text is its font string's (Blizzard sizes buttons from
+  -- button:GetFontString():GetStringWidth() after setting their text, InspectPaperDollFrame.lua,
+  -- Blizzard_CompactRaidFrameManager.lua).
   function widget:SetText(text)
     self._text = tostring(text or "")
+    if self._fontString ~= nil then
+      self._fontString._text = self._text
+    end
   end
   function widget:SetTextHeight(height)
     self._textHeight = height

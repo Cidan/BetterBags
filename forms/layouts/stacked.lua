@@ -160,19 +160,24 @@ function stackedLayout:createTextAreaBackground(parent)
   return frame
 end
 
--- fitNavText keeps a navigation entry as wide as its text in its current font. A button's font
--- string is sized when the button's text is set and keeps that width when its font changes, so
--- an entry that changed fonts (hover, selection, a theme, the client's text size) wrapped onto a
--- clipped second line ("Import/" for "Import/Export"). After every font change the entry is
--- re-measured the way Blizzard does it (QuestLogTitleButton_Resize): the font string's width set
--- to 0, then the button's text set again.
+-- fitNavText keeps a navigation entry as wide as its text in its current font, from when it is
+-- made and after every font change (hover, selection, a theme, the client's text size). The Nav
+-- roles differ in their shadow: Nav's (offset 1) makes the text about 0.8 wider than the hover
+-- and selected roles' glow (offset 0), and an entry sized in one of those kept the narrower width,
+-- so in the Nav role it wrapped onto a clipped second line ("Import/" for "Import/Export"; a
+-- render recording on WoW: Forever: width 110.0 for a 110.8 string). Setting the width to 0 and
+-- the text again (Blizzard's QuestLogTitleButton_Resize) refreshes the string's width but left the
+-- entry's, so the entry then takes that width explicitly, rounded up, with a pixel to spare.
 ---@param button Button
 local function fitNavText(button)
   local fs = button:GetFontString()
-  sonata:WatchTextFont(fs, function()
+  local function fit()
     fs:SetWidth(0)
     button:SetText(button:GetText())
-  end)
+    fs:SetWidth(math.ceil(fs:GetStringWidth()) + 1)
+  end
+  sonata:WatchTextFont(fs, fit)
+  fit()
 end
 
 ---@package
