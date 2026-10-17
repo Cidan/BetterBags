@@ -1,0 +1,17 @@
+{
+  "id": 1792259873,
+  "version": "v0.5.16-11-gab73cbd",
+  "channel": "alpha",
+  "date": "2026-10-17",
+  "from": "65a2d536902f0ac26b0ec9c141f5ae25b4d6bc1c",
+  "to": "ab73cbdb1deb81ea668fe26795169fa3de677e11",
+  "headline": "Fixes an issue where settings navigation labels could get cut off after being hovered or selected.",
+  "entries": [
+    {
+      "category": "Fixed",
+      "title": "Clipped text in settings navigation",
+      "details": "Settings sidebar entries such as Import/Export no longer wrap onto a clipped second line after hovering over them or changing selections.",
+      "clients": []
+    }
+  ]
+}
