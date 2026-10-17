@@ -294,6 +294,75 @@ describe("ContextMenu 'Show Bags' toggle", function()
 
   -- ToggleBagSlots is the entry's action, shared with the action buttons a theme can give a bag
   -- (frames/bagactions.lua).
+  -- Both bags' menus start the same: Drag to Resize, Show Bags, Bag Anchor. Each bag's own entries
+  -- follow (the backpack's Show Bag Button, the bank's sorts, kept together), then What's New, the
+  -- options and Close Menu.
+  describe("menu order and Drag to Resize", function()
+    local sizeModes, sizeModeCalls
+
+    before_each(function()
+      addon.isRetail = true
+      addon.hasWarbank = true
+      override(_G.C_Container, "SortAccountBankBags", function() end)
+      sizeModes, sizeModeCalls = {}, {}
+      override(database, "GetBagSizeMode", function(_, kind) return sizeModes[kind] or "content" end)
+      override(database, "SetBagSizeMode", function(_, kind, mode)
+        table.insert(sizeModeCalls, { kind, mode })
+        sizeModes[kind] = mode
+      end)
+    end)
+
+    -- texts lists the menu's entries below its title.
+    local function texts(menuList)
+      local out = {}
+      for i = 2, #menuList do
+        out[#out + 1] = menuList[i].text
+      end
+      return out
+    end
+
+    it("puts Drag to Resize first and Bag Anchor third in the backpack's menu", function()
+      local menuList = contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BACKPACK, false))
+      assert.is_true(menuList[1].isTitle)
+      assert.are.same({ "Drag to Resize", "Show Bags", "Bag Anchor", "Show Bag Button", "What's New",
+        "Open Options Screen", "Close Menu" }, texts(menuList))
+    end)
+
+    it("puts Drag to Resize first and Bag Anchor third in the bank's menu, its sorts together after it", function()
+      local menuList = contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BANK, false))
+      assert.are.same({ "Drag to Resize", "Show Bags", "Bag Anchor", "Sort Bank", "Clean Up Warbank", "What's New",
+        "Open Options Screen", "Close Menu" }, texts(menuList))
+    end)
+
+    it("keeps the same order on a bank without a Warbank", function()
+      addon.isRetail = false
+      addon.hasWarbank = false
+      local menuList = contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BANK, false))
+      assert.are.same({ "Drag to Resize", "Show Bags", "Bag Anchor", "Sort Bank", "What's New",
+        "Open Options Screen", "Close Menu" }, texts(menuList))
+    end)
+
+    -- The Resizable Window option (config/config.lua), as a toggle: the bag's size mode for the view
+    -- it shows, then a redraw, which applies it (bagProto:ApplySizeSettings).
+    it("toggles each bag between sizing by its corner and sizing to its items, like Resizable Window", function()
+      for _, kind in ipairs({ const.BAG_KIND.BACKPACK, const.BAG_KIND.BANK }) do
+        sizeModeCalls, sentMessages = {}, {}
+        local entry = findEntry(contextMenu:CreateContextMenu(newBag(kind, false)), "Drag to Resize")
+        assert.is_falsy(entry.notCheckable)
+        assert.is_false(entry.checked())
+        entry.func()
+        assert.are.same({ { kind, "window" } }, sizeModeCalls)
+        assert.is_true(entry.checked())
+        assert.are.same({ "bags/Redraw" }, sentMessages)
+        entry.func()
+        assert.are.same({ { kind, "window" }, { kind, "content" } }, sizeModeCalls)
+        assert.is_false(entry.checked())
+        assert.are.same("Drag to Resize", entry.tooltipTitle)
+        assert.is_true(entry.tooltipOnButton)
+      end
+    end)
+  end)
+
   describe("ToggleBagSlots", function()
     before_each(function()
       addon.isRetail = true

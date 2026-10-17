@@ -63,3 +63,33 @@ inventory also sorts the bank" behavior.
 
 Coverage: `spec/refresh_spec.lua` ("should also sort the bank and warbank when sorting the
 backpack with the bank open (retail)", "…(classic)", and the unchanged closed-bank case).
+
+## 3. The menu a left-click opens (`frames/contextmenu.lua`, `CreateContextMenu`)
+
+Both bags' menus start the same way, then list each bag's own entries, then the common ones:
+
+| Backpack | Bank |
+|---|---|
+| Drag to Resize | Drag to Resize |
+| Show Bags | Show Bags |
+| Bag Anchor ▸ | Bag Anchor ▸ |
+| Show Bag Button | Sort Bank |
+| | Clean Up Warbank (with a Warbank) |
+| What's New | What's New |
+| Open Options Screen | Open Options Screen |
+| Close Menu | Close Menu |
+
+(asked: Drag to Resize at the top, Bag Anchor third, on both bags). The bank's Show Bags used to
+come after its sorts; it moved up so both menus start alike and the two sorts stay together.
+Show Bags is only listed when the bag has a slots panel.
+
+- **Drag to Resize** is the Resizable Window option (`config/config.lua`) as a toggle: checked
+  while `database:GetBagSizeMode(kind) == "window"`; a click sets "window" or "content" for the
+  view the bag shows and sends `bags/Redraw`, whose draw applies it (`bagProto:ApplySizeSettings`).
+  The options screen reads the same setting when it opens.
+- New strings ("Drag to Resize" and its tooltip) have no translations yet and show in English
+  (`L:G` falls back to the key), like "What's New".
+
+Coverage: `spec/frames/contextmenu_spec.lua` ("menu order and Drag to Resize": the backpack, the
+retail bank, a bank without a Warbank, and the toggle on both bags). Each guard was
+mutation-tested.

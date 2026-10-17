@@ -147,6 +147,45 @@ function contextMenu:CreateContextMenu(bag)
 		notCheckable = true,
 	})
 
+	-- The Resizable Window option (config/config.lua) as a toggle: the bag's size mode for the view
+	-- it shows; the redraw applies it (bagProto:ApplySizeSettings).
+	table.insert(menuList, {
+		text = L:G("Drag to Resize"),
+		tooltipTitle = L:G("Drag to Resize"),
+		tooltipText = L:G("Click to toggle sizing the bag by dragging its corner. When off, it sizes itself to its items."),
+		checked = function()
+			return database:GetBagSizeMode(bag.kind) == "window"
+		end,
+		func = function()
+			local resizable = database:GetBagSizeMode(bag.kind) == "window"
+			database:SetBagSizeMode(bag.kind, resizable and "content" or "window")
+			events:SendMessage(context:New("ToggleDragToResize"), "bags/Redraw")
+		end,
+	})
+
+	-- Show bag slot toggle (only if slots are available).
+	if bag.slots then
+		-- Only the retail bank's panel is the bank-tab filter persisted by showBankTabs;
+		-- the Classic/Era bank uses the plain bag-slots panel and toggles like the backpack.
+		local usesBankTabs = addon.isRetail and bag.kind == const.BAG_KIND.BANK
+		table.insert(menuList, {
+			text = L:G("Show Bags"),
+			checked = function()
+				-- For the retail bank, use the persisted setting so the checkmark
+				-- reflects the state that will be restored on next open.
+				if usesBankTabs then
+					return database:GetShowBankTabs()
+				end
+				return bag.slots and bag.slots:IsShown()
+			end,
+			tooltipTitle = L:G("Show Bags"),
+			tooltipText = L:G("Click to toggle the display of the bag slots."),
+			func = function()
+				contextMenu:ToggleBagSlots(context:New("ToggleBagSlots"), bag)
+			end,
+		})
+	end
+
 	table.insert(menuList, {
 		text = L:G("Bag Anchor"),
 		notCheckable = true,
@@ -272,29 +311,6 @@ function contextMenu:CreateContextMenu(bag)
 				end,
 			})
 		end
-	end
-
-	-- Show bag slot toggle (only if slots are available).
-	if bag.slots then
-		-- Only the retail bank's panel is the bank-tab filter persisted by showBankTabs;
-		-- the Classic/Era bank uses the plain bag-slots panel and toggles like the backpack.
-		local usesBankTabs = addon.isRetail and bag.kind == const.BAG_KIND.BANK
-		table.insert(menuList, {
-			text = L:G("Show Bags"),
-			checked = function()
-				-- For the retail bank, use the persisted setting so the checkmark
-				-- reflects the state that will be restored on next open.
-				if usesBankTabs then
-					return database:GetShowBankTabs()
-				end
-				return bag.slots and bag.slots:IsShown()
-			end,
-			tooltipTitle = L:G("Show Bags"),
-			tooltipText = L:G("Click to toggle the display of the bag slots."),
-			func = function()
-				contextMenu:ToggleBagSlots(context:New("ToggleBagSlots"), bag)
-			end,
-		})
 	end
 
 	if bag.kind == const.BAG_KIND.BACKPACK then
