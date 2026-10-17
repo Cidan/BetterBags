@@ -1054,6 +1054,66 @@ describe("Items (New Data Farming Engine)", function()
     end)
   end)
 
+  -- "Show free slots" (database:GetShowAllFreeSpace) draws a button for each free slot.
+  describe("Free slots shown one by one", function()
+    local DB, saved
+    before_each(function()
+      DB = addon:GetModule("Database")
+      saved = {
+        groups = DB.GetGroupsEnabled, showAll = DB.GetShowAllFreeSpace,
+        bags = const.BACKPACK_BAGS, keyring = _G.Enum.BagIndex.Keyring,
+      }
+      DB.GetGroupsEnabled = function() return false end
+      DB.GetShowAllFreeSpace = function() return true end
+    end)
+    after_each(function()
+      DB.GetGroupsEnabled, DB.GetShowAllFreeSpace = saved.groups, saved.showAll
+      const.BACKPACK_BAGS = saved.bags
+      _G.Enum.BagIndex.Keyring = saved.keyring
+    end)
+
+    local function slotkeys(tabs)
+      local out = {}
+      for _, button in ipairs(tabs[1].freeSpace.buttons) do table.insert(out, button.slotkey) end
+      return out
+    end
+
+    -- WoW: Forever reads its keyring (bag -1) with the backpack. Its slots hold only keys, so
+    -- they are not free space: Phase 5 leaves them out of the counts, and they are not shown one
+    -- by one either (they showed as free slots, and past the first 4 with Blizzard's padlock).
+    it("leaves the keyring out", function()
+      _G.Enum.BagIndex.Keyring = -1
+      const.BACKPACK_BAGS = { [-1] = -1, [0] = 0 }
+      local ctx = addon:GetModule("Context"):New("TestKeyringFreeSlots")
+      local empties = {
+        { bagid = -1, slotid = 1, slotkey = "-1_1", itemInfo = { emptySlotName = "Keyring" } },
+        { bagid = -1, slotid = 2, slotkey = "-1_2", itemInfo = { emptySlotName = "Keyring" } },
+        { bagid = 0, slotid = 2, slotkey = "0_2", itemInfo = { emptySlotName = "Bag" } },
+      }
+      local tabs = items:Phase10_PartitionIntoTabs(ctx, const.BAG_KIND.BACKPACK, {}, empties,
+        { [0] = { name = "Bag", count = 1, family = 0 } }, {}, {})
+      assert.are.same({ "0_2" }, slotkeys(tabs))
+    end)
+
+    -- Like the combined free space button, a free slot carries its bag's name and glyph but not
+    -- its bag's quality: the reagent bag's quality drew a colored border around each of its slots.
+    it("shows each free slot with its bag's name and glyph, and no quality", function()
+      const.BACKPACK_BAGS = { [0] = 0, [5] = 5 }
+      local ctx = addon:GetModule("Context"):New("TestFreeSlotQuality")
+      local empties = {
+        { bagid = 5, slotid = 1, slotkey = "5_1",
+          itemInfo = { emptySlotName = "Reagent Bag", emptySlotFamilyIcon = "Mobile-Herbalism", itemQuality = 2 } },
+      }
+      local tabs = items:Phase10_PartitionIntoTabs(ctx, const.BAG_KIND.BACKPACK, {}, empties,
+        { [5] = { name = "Reagent Bag", count = 1, family = "ReagentBag" } }, {}, {})
+      local info = tabs[1].freeSpace.buttons[1].itemInfo
+      assert.is_nil(info.itemQuality)
+      assert.are.equal("Mobile-Herbalism", info.emptySlotFamilyIcon)
+      assert.are.equal("Reagent Bag", info.emptySlotName)
+      assert.are.equal(2, empties[1].itemInfo.itemQuality)
+    end)
+  end)
+
   describe("GetItemData API", function()
     it("should retrieve formatted item data asynchronously using ContinuableContainer", function()
       local savedGetItemInfo = _G.C_Item.GetItemInfo
