@@ -51,6 +51,8 @@ fade. Built the first time it opens.
   (`UIPanelButtonTemplate`, styled as a Sonata `Button` element) at the bottom right, which closes
   the window.
 - Closing it any way (Okay!, the X, Escape) marks every bundled release seen (`OnHide`).
+- Enabled by `addon:OnEnable()` (`core/init.lua`): modules are not enabled automatically
+  (initialization.md), and its `OnEnable` registers both ways it opens.
 - Opens: by itself on the first `LOADING_SCREEN_DISABLED` of a session when `ShouldOpenOnLogin()`
   (once per session); on the `changelog/Open` message, sent by the bag menu's **What's New** entry
   (`frames/contextmenu.lua`, above Open Options Screen) and by `/bb changelog` (`config/config.lua`;
@@ -137,6 +139,7 @@ temporary store, in the job summary. The `changelog-generator` job runs the Go t
   details, rows without details, the bottom row and the list's height above it, the checkbox,
   Okay!, marking seen on close, opening once per session on login, not when off or all seen,
   `changelog/Open`, the empty text), `spec/frames/contextmenu_spec.lua` (What's New),
+  `spec/core/init_spec.lua` ("enables the changelog window"),
   `spec/config/config_redraw_spec.lua` ("slash commands").
 - Generator: `go test ./tools/changelog/` (validation, ranges, the Gemini request and replies,
   retries, GitHub reads, the store, bundles, the Lua writer against golden files, whole runs with

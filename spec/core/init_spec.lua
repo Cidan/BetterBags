@@ -46,7 +46,7 @@ describe("Core Init and Enable flow", function()
       "Currency", "Search", "ConsolePort", "Pawn", "Question", "SimpleItemLevel",
       "QuickFind", "Refresh", "ItemLoader", "Views", "SearchCategoryConfig",
       "Async", "Context", "Debug", "Form", "Bucket", "TooltipScanner", "Groups",
-      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs"
+      "EquipmentSets", "BagButton", "ItemRowFrame", "Perf", "PerfSessions", "RenderRecorder", "Simulator", "Render", "Window", "Sonata", "Tabs", "ChangelogWindow"
     }
 
     for _, name in ipairs(modules) do
@@ -162,6 +162,17 @@ describe("Core Init and Enable flow", function()
     end
     assert.is_true(ok, err)
     assert.are.same({ "Events", "Perf", "PerfSessions", "StartIfArmed", "Simulator", "Database" }, order)
+  end)
+
+  -- core/boot.lua turns Ace's automatic module enabling off (SetDefaultModuleState(false)), so
+  -- OnEnable enables each module whose OnEnable registers something. The changelog window
+  -- registers its login check and changelog/Open there: not enabled, it never opens.
+  it("enables the changelog window", function()
+    local changelogWindow = addon:GetModule("ChangelogWindow")
+    changelogWindow.Enable = spy.new(function() end)
+    addon:OnInitialize()
+    addon:OnEnable()
+    assert.spy(changelogWindow.Enable).was.called(1)
   end)
 
   it("should create UI frames during OnInitialize and NOT during OnEnable", function()
