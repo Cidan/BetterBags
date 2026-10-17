@@ -135,7 +135,7 @@ A `Bag` style's `Layout` places the parts the bag owns, relative to the window:
 | Key | What it places |
 |---|---|
 | `Search` | the in-bag search box: `Points`, and `Reserve` (the rows above the content it takes while shown) |
-| `Footer` | the money and currency bar: `Left`, `Right`, `Bottom`, `Height`, `Reserve` |
+| `Footer` | the money and currency bar: `Left`, `Right`, `Bottom`, `Height`, `Reserve`; the money sits 4 in from its right end, the currencies 4 in from its left end |
 | `MenuButton` | the round bag menu button: `Points`; `false` hides it |
 | `Actions` | buttons running BetterBags actions (GW2's side panel): `Points` (the first button), `Size`, `Spacing`, `Buttons = { { Action, Normal, Highlight, Pushed }, ... }`, where `Action` is `ShowBags`, `Sort`, `Settings` or `Menu`; buttons stack downwards |
 

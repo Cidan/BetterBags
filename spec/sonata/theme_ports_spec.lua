@@ -153,7 +153,7 @@ describe("BetterBags' other themes", function()
     end)
 
     it("frames every window in its art, nine-sliced, with Moonlight's content box", function()
-      for key, art in pairs({ Dark = { "dark-frame.png", "Tiled" }, Parchment = { "parchment.png", "Stretched" } }) do
+      for key, art in pairs({ Dark = { "dark-frame.png", "Tiled", 48 }, Parchment = { "parchment.png", "Stretched", 40 } }) do
         local bag, panel = newWindow("Bag"), newWindow("Panel")
         apply(key)
         for _, w in ipairs({ bag, panel }) do
@@ -163,8 +163,29 @@ describe("BetterBags' other themes", function()
           assert.are.equal(Enum.UITextureSliceMode[art[2]], bg._sliceMode, key)
           assert.is_nil(w.decoration:GetTemplateFrame(), key)
         end
-        assert.are.same({ Left = 18, Right = 24, Top = 40, Bottom = 12 }, bag.decoration:GetInsets(), key)
+        assert.are.same({ Left = 18, Right = 24, Top = art[3], Bottom = 12 }, bag.decoration:GetInsets(), key)
       end
+    end)
+
+    -- Dark's frame has a heavy border whose inside starts about 16 in (dark-frame.png): its menu
+    -- button sits inside it, the title and search box move to make room, and the money and
+    -- currencies sit on its footer, inside the border too.
+    it("keeps Dark's menu button inside its frame's border, with the title and search box clear of it", function()
+      local bag = newWindow("Bag")
+      apply("Dark")
+      local layout = bag.decoration:GetLayout()
+      assert.are.same({ { Point = "TOPLEFT", X = 14, Y = -12 } }, layout.MenuButton.Points)
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 50, -15 }, { bag.decoration:GetTitleText():GetPoint(1) })
+      assert.are.same({
+        { Point = "TOPLEFT", X = 18, Y = -48 },
+        { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -24, Y = -68 },
+      }, layout.Search.Points)
+      assert.are.equal(24, layout.Search.Reserve)
+      assert.are.same({ Left = 18, Right = 24, Bottom = 12, Height = 20, Reserve = 26 }, layout.Footer)
+      -- Only Dark: Parchment and Slate keep Moonlight's.
+      apply("Slate")
+      assert.are.same({ { Point = "TOPLEFT", X = 8, Y = -6 } }, bag.decoration:GetLayout().MenuButton.Points)
+      assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 44, -15 }, { bag.decoration:GetTitleText():GetPoint(1) })
     end)
 
     -- Slate is Moonlight's own default theme: Blizzard's marble, tiled the way Blizzard tiles it
@@ -190,17 +211,19 @@ describe("BetterBags' other themes", function()
       assert.are.equal("X", windows.Bag.decoration:GetCloseButton():GetText())
     end)
 
+    -- The set's own geometry, which Slate keeps (Dark moves its button, title and search box in).
     it("titles at the top left in white, with a lettered close button and the corner grip", function()
       local bag = newWindow("Bag")
-      apply("Dark")
+      apply("Slate")
       local title = bag.decoration:GetTitleText()
       assert.are.same({ "TOPLEFT", bag.frame, "TOPLEFT", 44, -15 }, { title:GetPoint(1) })
       assert.are.same({ 1, 1, 1, 1 }, { title:GetTextColor() })
       local close = bag.decoration:GetCloseButton()
       assert.are.equal("X", close:GetText())
       assert.are.same({ 32, 32 }, { close:GetWidth(), close:GetHeight() })
-      local layout = sonata:Resolve("Dark").Windows.Bag.Layout
+      local layout = sonata:Resolve("Slate").Windows.Bag.Layout
       assert.are.same({ { Point = "TOPLEFT", X = 8, Y = -6 } }, layout.MenuButton.Points)
+      assert.are.equal(32, sonata:Resolve("Slate").Elements.BagButton.Size)
       assert.are.equal(32, sonata:Resolve("Dark").Elements.BagButton.Size)
     end)
 

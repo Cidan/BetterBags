@@ -237,6 +237,33 @@ describe("Backpack Module Loading and Compatibility Tests", function()
     assert.is_not_nil(mockBag.searchFrame, "era backpack OnCreate must create the search frame")
   end)
 
+  it("hands the currency grid its bag's footer bar, on retail and Classic", function()
+    local currency = addon:GetModule("Currency")
+    local originalCreate = currency.CreateIconGrid
+    local calls = {}
+    currency.CreateIconGrid = function(_, parent, footer)
+      table.insert(calls, { parent, footer })
+      return CreateFrame("Frame")
+    end
+    for _, override in ipairs({ false, "bags/classic/backpack.lua" }) do
+      ResetModuleStub("BackpackBehavior")
+      assert(loadfile("bags/backpack.lua"))("BetterBags")
+      if override then
+        assert(loadfile(override))("BetterBags")
+      end
+      local backpack = addon:GetModule("BackpackBehavior")
+      local parentFrame = CreateFrame("Frame", "BetterBagsBackpack")
+      parentFrame.GetFrameLevel = function() return 10 end
+      parentFrame.GetFrameStrata = function() return "MEDIUM" end
+      local mockBag = { frame = parentFrame, bottomBar = CreateFrame("Frame", nil, parentFrame) }
+      backpack:Create(mockBag):OnCreate({})
+      local call = calls[#calls]
+      assert.are.equal(parentFrame, call[1], tostring(override))
+      assert.are.equal(mockBag.bottomBar, call[2], tostring(override))
+    end
+    currency.CreateIconGrid = originalCreate
+  end)
+
   it("should successfully run classic backpack OnCreate without crashes", function()
     -- Load base backpack behavior using loadfile directly to bypass load-once logic
     local loadBase = assert(loadfile("bags/backpack.lua"))

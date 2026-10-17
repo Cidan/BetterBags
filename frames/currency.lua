@@ -13,9 +13,6 @@ local currency = addon:NewModule('Currency')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
----@class Constants: AceModule
-local const = addon:GetModule('Constants')
-
 ---@class Events: AceModule
 local events = addon:GetModule('Events')
 
@@ -154,9 +151,12 @@ function CurrencyIconGrid:CreateCurrencyItem(index)
   return item
 end
 
+-- CreateIconGrid makes the currency icons, sitting 4 in from the left end of the bag's footer
+-- bar (the theme's Layout.Footer), as the money sits 4 in from its right end.
 ---@param parent Frame
+---@param footer Frame The bag's footer bar.
 ---@return CurrencyIconGrid
-function currency:CreateIconGrid(parent)
+function currency:CreateIconGrid(parent, footer)
   ---@class CurrencyIconGrid
   local b = {}
   setmetatable(b, {__index = CurrencyIconGrid})
@@ -166,7 +166,7 @@ function currency:CreateIconGrid(parent)
   -- Setup the currency grid
   local g = grid:Create(parent)
   g:GetContainer():ClearAllPoints()
-  g:GetContainer():SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", const.OFFSETS.BAG_LEFT_INSET+4, const.OFFSETS.BAG_BOTTOM_INSET+3)
+  g:GetContainer():SetPoint("BOTTOMLEFT", footer, "BOTTOMLEFT", 4, 0)
   g:GetContainer():SetWidth(200)
   g:HideScrollBar()
   -- Currency grid is not scrollable; disable mouse wheel so scroll events

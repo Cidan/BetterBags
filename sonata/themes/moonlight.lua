@@ -126,6 +126,23 @@ sonata:RegisterTheme({
   DisplayName = "Dark",
   Description = "A dark frame, from Moonlight.",
   Parent = "Moonlight",
+  Windows = {
+    -- The frame's heavy border ends about 16 in: the menu button sits inside it, the title
+    -- right of it, and the search box and content below it.
+    Bag = {
+      Insets = { Top = 48 },
+      Title = { Points = { { Point = "TOPLEFT", X = 50, Y = -15 } } },
+      Layout = {
+        Search = {
+          Points = {
+            { Point = "TOPLEFT", X = 18, Y = -48 },
+            { Point = "BOTTOMRIGHT", RelativePoint = "TOPRIGHT", X = -24, Y = -68 },
+          },
+        },
+        MenuButton = { Points = { { Point = "TOPLEFT", X = 14, Y = -12 } } },
+      },
+    },
+  },
   Elements = {
     -- Translucent black inside the frame's heavy black edge; the selected tab lighter.
     Tab = tab(2, {

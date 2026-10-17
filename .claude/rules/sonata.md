@@ -306,7 +306,11 @@ overlay search panel).
   `GameFontHighlight` titles in the text palette (`$TextColor`, `$TextShadow`: white with a black
   shadow on the dark themes) at TOPLEFT 44, -15 (20, -15 on dialogs), and a 32px close button
   lettered "X" (`CloseButton.Font`, §3). The bag's search box sits at 18, -40 to -24, -60
-  (reserve 24), its footer at 18, 24, bottom 12, and a 32px menu button (art 32 x 40) at 8, -6.
+  (reserve 24), its footer at 18, 24, bottom 12 (the money and currencies sit on it), and a
+  32px menu button (art 32 x 40) at 8, -6. **Dark** brings its menu button inside its frame's
+  heavy border (which ends about 16 in): the button at 14, -12, the title at 50, -15, the
+  search box at 18, -48 to -24, -68, and the bag's content box 48 from the top (8 lower).
+  Parchment and Slate keep the set's positions.
   Parchment hangs its 281 x 84 ribbon over the bag (BOTTOM 40 below the window's TOP) and
   centers the bag's title on it.
   **Dark's fill** is Dark Round's: black at 0.75 (`0,0,0,192`) inside the frame's border, where
