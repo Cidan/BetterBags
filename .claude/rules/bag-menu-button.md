@@ -66,22 +66,23 @@ backpack with the bank open (retail)", "…(classic)", and the unchanged closed-
 
 ## 3. The menu a left-click opens (`frames/contextmenu.lua`, `CreateContextMenu`)
 
-Both bags' menus start the same way, then list each bag's own entries, then the common ones:
+The toggles come first, then Bag Anchor, then the bank's sorts, then the common entries:
 
 | Backpack | Bank |
 |---|---|
 | Drag to Resize | Drag to Resize |
 | Show Bags | Show Bags |
-| Bag Anchor ▸ | Bag Anchor ▸ |
-| Show Bag Button | Sort Bank |
+| Show Bag Button | Bag Anchor ▸ |
+| Bag Anchor ▸ | Sort Bank |
 | | Clean Up Warbank (with a Warbank) |
 | What's New | What's New |
 | Open Options Screen | Open Options Screen |
 | Close Menu | Close Menu |
 
-(asked: Drag to Resize at the top, Bag Anchor third, on both bags). The bank's Show Bags used to
-come after its sorts; it moved up so both menus start alike and the two sorts stay together.
-Show Bags is only listed when the bag has a slots panel.
+(asked: Drag to Resize at the top of both bags' menus, Bag Anchor below the toggles, Show Bag
+Button above Bag Anchor). The bank's Show Bags used to come after its sorts; it moved up so both
+menus start alike and the two sorts stay together. Show Bags is only listed when the bag has a
+slots panel.
 
 - **Drag to Resize** is the Resizable Window option (`config/config.lua`) as a toggle: checked
   while `database:GetBagSizeMode(kind) == "window"`; a click sets "window" or "content" for the

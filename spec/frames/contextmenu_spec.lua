@@ -294,9 +294,8 @@ describe("ContextMenu 'Show Bags' toggle", function()
 
   -- ToggleBagSlots is the entry's action, shared with the action buttons a theme can give a bag
   -- (frames/bagactions.lua).
-  -- Both bags' menus start the same: Drag to Resize, Show Bags, Bag Anchor. Each bag's own entries
-  -- follow (the backpack's Show Bag Button, the bank's sorts, kept together), then What's New, the
-  -- options and Close Menu.
+  -- The toggles come first (Drag to Resize, Show Bags, and the backpack's Show Bag Button), then
+  -- Bag Anchor, then the bank's sorts (kept together), then What's New, the options and Close Menu.
   describe("menu order and Drag to Resize", function()
     local sizeModes, sizeModeCalls
 
@@ -321,10 +320,10 @@ describe("ContextMenu 'Show Bags' toggle", function()
       return out
     end
 
-    it("puts Drag to Resize first and Bag Anchor third in the backpack's menu", function()
+    it("puts Drag to Resize first and Show Bag Button above Bag Anchor in the backpack's menu", function()
       local menuList = contextMenu:CreateContextMenu(newBag(const.BAG_KIND.BACKPACK, false))
       assert.is_true(menuList[1].isTitle)
-      assert.are.same({ "Drag to Resize", "Show Bags", "Bag Anchor", "Show Bag Button", "What's New",
+      assert.are.same({ "Drag to Resize", "Show Bags", "Show Bag Button", "Bag Anchor", "What's New",
         "Open Options Screen", "Close Menu" }, texts(menuList))
     end)
 
