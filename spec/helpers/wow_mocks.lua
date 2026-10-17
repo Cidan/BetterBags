@@ -325,6 +325,14 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:EnableMouse(enable)
     self._mouseEnabled = enable
   end
+  -- ScriptRegion:IsMouseEnabled() -> enabled (SimpleScriptRegionAPIDocumentation). Buttons take
+  -- the mouse until told otherwise.
+  function widget:IsMouseEnabled()
+    if self._mouseEnabled ~= nil then
+      return self._mouseEnabled == true
+    end
+    return self._type == "Button" or self._type == "CheckButton"
+  end
   function widget:EnableMouseWheel(enable)
     self._mouseWheelEnabled = enable
   end

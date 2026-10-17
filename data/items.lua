@@ -771,7 +771,9 @@ end
 
 local function IncludeBagInFreeSpace(kind, bagid, tabID)
   if kind == const.BAG_KIND.BACKPACK then
-    return const.BACKPACK_BAGS[bagid] ~= nil
+    -- The keyring (WoW: Forever) holds only keys: its slots are not free space.
+    local isKeyring = Enum.BagIndex and Enum.BagIndex.Keyring and bagid == Enum.BagIndex.Keyring
+    return const.BACKPACK_BAGS[bagid] ~= nil and not isKeyring
   end
   if database.GetShowBankTabs and database:GetShowBankTabs() then
     local viewBagView = database.GetBagView and database:GetBagView(kind) or const.BAG_VIEW.SECTION_GRID
@@ -1549,6 +1551,7 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
 
     if showAll then
       for _, item in ipairs(tabs[tabID].emptySlotsSorted) do
+        local info = item.itemInfo or {}
         table.insert(freeSpaceButtons, {
           slotkey = item.slotkey,
           bagid = item.bagid,
@@ -1556,7 +1559,12 @@ function items:Phase10_PartitionIntoTabs(ctx, kind, sortedItems, emptySlotsSorte
           count = 1,
           isIndividual = true,
           key = item.slotkey,
-          itemInfo = item.itemInfo,
+          -- Like the aggregated button below: the bag's name and glyph, and no itemQuality (the
+          -- empty slot's itemInfo carries its bag's quality, which drew a colored border).
+          itemInfo = {
+            emptySlotName = info.emptySlotName,
+            emptySlotFamilyIcon = info.emptySlotFamilyIcon,
+          },
         })
       end
     else

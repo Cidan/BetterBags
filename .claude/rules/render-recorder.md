@@ -33,7 +33,12 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   `canvas @... layout ipr=<items per row> columns=<n> header=<h> tab=<h> footer=<h>` (the layout
   `BagCanvas:GetLayout` computes for the canvas width in window mode, the settings otherwise);
   `global section` / `view section <title> ipr=<n> cells=<n> shown=<bool> @...`, sorted by
-  title; under each, `  item <slotkey> @...` per item button and `  gap` per gap cell.
+  title; under each, `  item <slotkey> @...` per item button and `  gap` per gap cell. An item
+  button's line adds what it shows: how it was last drawn (`item`, `free count=<n> name=<bag>`,
+  `empty`), `border=<r,g,b>` or `off` (the decoration's `IconBorder`), `padlock=<bool>` (Blizzard's
+  "extended" slot frame, `UpdateExtended`, on the button or the decoration), `mouse=<bool>` (the
+  interaction button's `IsMouseEnabled`) and `glyph=<atlas>` or `none` (the empty slot glyph).
+  Added for free slots on WoW: Forever that showed a padlock and a quality border.
 
 ## 3. Storage
 

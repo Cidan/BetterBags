@@ -184,6 +184,44 @@ describe("RenderRecorder", function()
     assert.is_truthy(text:find("  gap", 1, true), text)
   end)
 
+  -- What each item button shows, beyond where it is: how it was last drawn (an item, a free slot
+  -- with its count and bag name), its quality border, Blizzard's padlock (UpdateExtended's
+  -- "extended" slot), whether it takes the mouse, and the empty slot glyph.
+  it("describes what each item button shows", function()
+    local w = newWindow({ 640, 480 })
+    local bag = fakeBag(w)
+    local function button(slotkey, x, drawnAs)
+      local frame = CreateFrame("Frame", nil, w.frame)
+      frame:SetSize(37, 37)
+      frame._rect = { left = w.frame:GetLeft() + x, bottom = w.frame:GetTop() - 100 - 37 }
+      local decoration = CreateFrame("Button", nil, frame)
+      decoration.IconBorder = decoration:CreateTexture()
+      decoration.IconBorder:Hide()
+      local interaction = CreateFrame("Button", nil, frame)
+      return { slotkey = slotkey, frame = frame, drawnAs = drawnAs, _decoration = decoration, button = interaction }
+    end
+    local free = button("-1_7", 10, "free")
+    free.freeSlotCount, free.freeSlotName = 1, "Keyring"
+    free.button.extendedFrame = CreateFrame("Frame", nil, free.button)
+    free.button:EnableMouse(false)
+    local reagent = button("5_1", 51, "free")
+    reagent.freeSlotCount, reagent.freeSlotName = 1, "Reagent Bag"
+    reagent._decoration.IconBorder:SetVertexColor(0.12, 1, 0, 1)
+    reagent._decoration.IconBorder:Show()
+    reagent._decoration.BetterBagsFamilyIcon = reagent._decoration:CreateTexture()
+    reagent._decoration.BetterBagsFamilyIcon:SetAtlas("Mobile-Herbalism")
+    local item = button("0_1", 92, "item")
+    bag.globalSections = { ["Free Space"] = {
+      frame = w.frame, title = { GetText = function() return "Free Space" end }, maxItemsPerRow = 7,
+      content = { cells = { free, reagent, item } },
+    } }
+    bag.currentView = nil
+    local text = table.concat(recorder:Snapshot(w), "\n")
+    assert.is_truthy(text:find("  item -1_7 @10.0,100.0 37.0x37.0 free count=1 name=Keyring border=off padlock=true mouse=false glyph=none", 1, true), text)
+    assert.is_truthy(text:find("  item 5_1 @51.0,100.0 37.0x37.0 free count=1 name=Reagent Bag border=0.12,1.00,0.00 padlock=false mouse=true glyph=Mobile-Herbalism", 1, true), text)
+    assert.is_truthy(text:find("  item 0_1 @92.0,100.0 37.0x37.0 item border=off padlock=false mouse=true glyph=none", 1, true), text)
+  end)
+
   it("records each step of a resize and a move with the window's geometry", function()
     local w = newWindow({ 640, 480 })
     w:Show(context:New("spec"))

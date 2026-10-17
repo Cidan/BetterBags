@@ -255,6 +255,19 @@ reagent bag). Coverage: `spec/core/constants_spec.lua` ("keyring (Forever only)"
 `spec/items_spec.lua` ("keyring section name (Show Bags)"), `spec/refresh_pipeline_spec.lua`
 ("shows the items in the Forever keyring, without counting its slots as free space").
 
+**Nor are its slots shown as free slots.** With "show free slots" (`GetShowAllFreeSpace`), every
+empty slot of the kind is a button, and `IncludeBagInFreeSpace` (`data/items.lua`) let the
+keyring's through: a Forever screenshot showed 32 free slots for the keyring, each saying "1 slot
+free", the first 4 plain and the other 28 under a padlock. The padlock is Blizzard's:
+`SetFreeSlots` runs `ContainerFrameItemButtonMixin:UpdateExtended` (retail code, so on Forever),
+which marks a slot past `ContainerFrame_GetContainerNumSlots(bag)` as an "extended" slot, shows
+`ContainerFrameExtendedItemButtonTemplate` (the `Bags-padlock-authenticator` atlas) and turns the
+mouse off; for the keyring that count is `GetKeyRingSize()`
+(`Blizzard_MainMenuBarBagButtons/Camelot/MainMenuBarBagButtons.lua`), the filled slots rounded up
+to a multiple of 4, which is 4 for an empty keyring. `IncludeBagInFreeSpace` now leaves the
+keyring out of the backpack's free space, so neither shows. Coverage: `spec/items_spec.lua` ("Free
+slots shown one by one": "leaves the keyring out").
+
 A Camelot bank that renders blank usually means the character owns no tab yet (the Purchase
 Bank button, §10, shows then). If it renders blank with tabs that *do* have slots, look at the
 read after the tab arrived (there is no bank read on `BANK_TABS_CHANGED`), **not** at a missing

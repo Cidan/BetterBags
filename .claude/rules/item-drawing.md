@@ -163,9 +163,14 @@ centered, semi-transparent glyph so the slot's restriction is visible at a glanc
   button a fresh `itemInfo` **without `itemQuality`** (nil), and `SetFreeSlots` no longer coerces a
   missing quality to `Common` (Blizzard's `ColorManager` returns a color for `Common`, so `Common`
   *would* draw a border; **nil** is what clears it — `SetItemButtonQuality(nil)` and
-  `DrawClassicQualityBorder(nil)` both hide the border). Individual free-slot buttons and Show-Bags
-  empties still pass their harvested quality through unchanged. Coverage: `spec/frames/item_spec.lua`
-  ("passes nil (not Common) to SetItemButtonQuality when a free slot has no itemQuality").
+  `DrawClassicQualityBorder(nil)` both hide the border). **The free slots shown one by one** ("show
+  free slots") reused the harvested `itemInfo` too, so each slot of a specialized bag kept its border
+  (seen on Forever); `Phase10` now builds each of them a fresh `itemInfo` with only `emptySlotName`
+  and `emptySlotFamilyIcon`, the two fields besides the quality that `SetFreeSlots` and its draw
+  record read. Show-Bags empties carry `itemQuality = -1`. Coverage: `spec/frames/item_spec.lua`
+  ("passes nil (not Common) to SetItemButtonQuality when a free slot has no itemQuality"),
+  `spec/items_spec.lua` ("Free slots shown one by one": "shows each free slot with its bag's name and
+  glyph, and no quality").
 - **Draw (`frames/item.lua`).** `SetFreeSlots` reads `data.itemInfo.emptySlotFamilyIcon` and, when
   set, shows a lazily-created `OVERLAY` texture on the **themed decoration** (`decoration.BetterBagsFamilyIcon`
   via `getFamilyIconTexture`) via `SetAtlas` — 24×24, centered, `0.4` alpha (re-applying `SetSize`
