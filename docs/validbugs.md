@@ -1,6 +1,14 @@
-# Valid Bugs (Triage of the 20 Oldest Open Bug Reports)
+# Valid Bugs (Triage of the Oldest Open Bug Reports)
 
-Triage date: 2026-10-15, against `main` at 20406c4.
+Open issues labeled `bug` are triaged oldest first, 20 at a time. Each batch was checked
+against the current code; issues that no longer apply were closed on GitHub with the reason,
+and the ones still valid are listed here, unfixed.
+
+- [First batch](#first-batch-the-20-oldest): 2026-10-15, against `main` at 20406c4.
+- [Second batch](#second-batch-477-to-710): 2026-10-16, against `main` at 60b72a3 (v0.5.16).
+- [Lua error sweep](#lua-error-sweep): 2026-10-16, every open issue.
+
+# First batch: the 20 oldest
 
 The 20 oldest open issues labeled `bug` (after closing duplicates) were checked against the
 current code. Ten no longer apply and were closed on GitHub with the reason. The ten below
@@ -229,3 +237,121 @@ now data (`sonata/themes/elvui.lua`) and calls nothing of ElvUI's, but its edges
 | #455 | The 60 s refresh context timeout that cancelled slow loads was removed (d242acd); nothing cancels contexts now. |
 | #465 | Item buttons created mid-combat made the bag frame protected; every button is now created at boot (`frames/item.lua` `itemFrame:OnEnable`). |
 | #469 | Keyring items were filtered out of the views; added back in 52df52e. |
+
+# Second batch: #477 to #710
+
+The next 20 oldest open bugs, triaged on 2026-10-16 against v0.5.16. Issues reporting a Lua
+error were closed without further investigation, by the maintainer's decision: every one was
+from v0.3.x or older, and the code they pointed at has been rewritten. Four are still valid:
+
+| Issue | Client | Area | Confidence |
+|---|---|---|---|
+| [#528](https://github.com/Cidan/BetterBags/issues/528) | All | Bag scale in Show Bags | Verified in code |
+| [#550](https://github.com/Cidan/BetterBags/issues/550) | Classic Era, WoW: Forever | Free space count | Verified in code |
+| [#620](https://github.com/Cidan/BetterBags/issues/620) | Retail + Pawn | Upgrade arrows | Verified in code (and #1061's capture) |
+| [#689](https://github.com/Cidan/BetterBags/issues/689) | All | Currency tab state | Verified in code |
+
+## #528 — Turning on Show Bags snaps a scaled bag back to 100%
+
+**Symptom:** a bag scaled to, say, 78% jumps back to full size when Show Bags is turned on, and
+can end up partly off screen; it returns to 78% when Show Bags is turned off.
+
+**Cause (verified):** size settings are stored per bag view (`DB:GetBagSizeInfo(kind, view)`
+reads `size[view][kind]`, `core/database.lua:175`), scale and opacity included. The Scale slider
+saves to the current view (`config/config.lua:596-603`), and the bag applies the current view's
+scale on every draw (`frames/bag.lua:676`). Show Bags is its own view
+(`const.BAG_VIEW.SECTION_ALL_BAGS`) with its own scale, 100% by default, so it ignores the scale
+set in the category view. Items per row and columns are reasonably per view; scale and opacity
+apply to the whole window, which is presumably what the player expects. The fix is a design
+call: one scale and opacity per bag, not per view (with a migration), or keep them per view.
+
+## #550 — "Show all free space" counts the keyring's empty slots
+
+**Symptom:** with "Show all free space slots" on, the bag shows far more free slots than there
+are (34 shown for 4 real, Classic Era); confirmed again in June and December 2025.
+
+**Cause (verified):** the aggregated free-space counter leaves the keyring out
+(`items:Phase5_UpdateFreeSlots`, the `Enum.BagIndex.Keyring` guard, `data/items.lua:660`), but
+"show all" builds one button per empty slot from `emptySlotsSorted`, filtered only by
+`IncludeBagInFreeSpace` (`data/items.lua:772`), which accepts every bag in `BACKPACK_BAGS`,
+the keyring included (`data/items.lua:1550-1561`). On Classic Era that adds the keyring's 30-odd
+empty slots, matching the report.
+
+**Regression on WoW: Forever:** since v0.5.16 (#1121) the Forever keyring is a backpack bag too,
+so players there with "Show all free space" on see the same thing. The test added with #1121
+only checked the aggregated count. The fix is the same keyring exclusion in the "show all" path.
+
+## #620 — Pawn upgrade arrows stall the game on every bag change
+
+**Symptom:** with Pawn installed, looting, using an item or moving items freezes the game
+briefly. #1061 (closed as its duplicate) measured 124 calls and about 64 ms in one frame per bag
+render on retail, v0.4.10.
+
+**Cause (verified):** `integrations/pawn.lua:35` calls `PawnShouldItemLinkHaveUpgradeArrowUnbudgeted`
+for every item on every sweep; Pawn's verdicts are deliberately not cached (caches.md §2: an
+attempt was reverted because it made sorting hitch), and the budgeted Pawn API is not used because
+it answers nil once its budget is spent. Sweeps now read only changed slots (data-loader.md §16),
+but every sweep still asks Pawn about every item. Pawn is picked automatically when it is
+installed and the player never chose a provider (`items:GetActiveUpgradeProvider`,
+`data/items.lua:123-131`).
+
+**What changed since the report:** the "make it optional" request is done: choosing another
+provider under "Upgrade Icon Provider" stops BetterBags from calling Pawn. The stall itself
+remains for anyone who uses Pawn. Not captured on the current version.
+
+## #689 — Collapsed currency headers expand again after a reload
+
+**Symptom:** expansion headers collapsed in Blizzard's currency tab are expanded again after a
+reload, which also affects other addons that read the currency list.
+
+**Cause (verified):** `CurrencyIconGrid:Update` (`frames/currency.lua:96-98`) expands every
+collapsed header (`C_CurrencyInfo.ExpandCurrencyList`, or the Classic global) so it can read the
+whole list, and never collapses them again. The header state belongs to the client, so the
+change shows in Blizzard's currency tab. The fix is to remember which headers were collapsed and
+collapse them again after reading, the way the thread notes Altoholic does.
+
+## Closed in the second batch
+
+| Issue | Why |
+|---|---|
+| #631, #647, #652, #674 | Lua errors from v0.2.2 and v0.3.x, closed by the maintainer's rule for this batch. The code they point at was rewritten or removed (`frames/sectionitemlist.lua`, gone in v0.4.0). |
+| #477 | Item level colors now scale with the character's own highest item level, in four tiers whose colors can be set (`util/color.lua`); the fixed Dragonflight item levels that turned everything orange are gone. Coloring by item level rather than quality is the design. |
+| #571 | The custom category item list with that close button was removed in v0.4.0 (423f719). |
+| #594 | The reporter traced the FPS drop to TradeSkillMaster. |
+| #595 | Classic Era's own item button code (`frames/era/item.lua`, hid the glow and called a mixin method on the wrong frame) was merged into the shared item frame (#1044), which plays Era's own `NewItemTexture`, `flashAnim` and `newitemglowAnim`, and Era has `C_NewItems.IsNewItem`. |
+| #618 | Settings, including theme and positions, are in the AceDB profile, shared ("Default") unless a character picks another; characters on automatic per-character profiles are moved to "Default" at login (`DB:Migrate`). |
+| #621 | Categories are found by item ID (`customCategoryIndex`), and adding an item is a single write, so nothing scales with the category's size. From code; not profiled. |
+| #688 | The square is the bag anchor, created hidden and shown only when its saved state says so (`frames/anchor.lua:132`), which only the anchor's Show sets; it defaults to off. |
+| #693 | `[[...]]` and `"..."` give the same string in Lua on every platform; the glow was rewritten since. |
+| #706 | Caused by an outdated plugin; resolved when the plugin updated (per the reporter). |
+| #710 | User categories are saved by item ID and beat built-in categories in `items:GetCategory`; a search category winning at equal priority is by design (priority is configurable); plugin categories are rebuilt by the plugin each session. From code. |
+
+## Feature requests filed as bugs
+
+#522 (use the item with the fewest charges first) and #584 (a `BetterBagsSearch()` global;
+`C_Container.SetItemSearch` itself can't drive BetterBags' search) are feature requests. Their
+`bug` label was removed and they stay open with the `feature` label. Neither is implemented.
+
+# Lua error sweep
+
+On 2026-10-16 every open issue was scanned for a reported Lua error (error text such as
+`attempt to ...`, `bad argument`, `ADDON_ACTION_FORBIDDEN`, or a BetterBags `.lua:<line>`
+location), and each match was read to confirm it. By the maintainer's decision, every confirmed
+Lua error filed more than two weeks earlier (before 2026-10-02) was closed with a comment asking
+for a new issue if it still happens on the latest version, without investigating the cause.
+
+| Issue | Reported on | Error |
+|---|---|---|
+| #730 | v0.3.18 | `util/sort.lua:108: attempt to compare string with nil` (empty bags) |
+| #740 | v0.3.18 | `data/categories.lua:161`: a plugin added a nonexistent item to a category |
+| #831 | v0.3.41 | `ADDON_ACTION_FORBIDDEN` using items after the bank |
+| #836 | Moonlight beta | `bag/stack.lua:225` (Moonlight code, not part of BetterBags) |
+| #956 | v0.4.7 | Disabling ElvUI with the ElvUI theme selected |
+
+Left open:
+- #1118 (`core/boot.lua:7: attempt to call a nil value` on WoW: Forever), filed 2026-10-07,
+  inside the two-week window.
+- Matches that are not Lua error reports: #443 (mentions AdiBags' errors), #1053 (says no Lua
+  errors occur).
+- Reports without error text: #279 (a ConsolePort binding stops working), #744 (an empty bag
+  window after switching bag addons).
