@@ -958,7 +958,7 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
     assert.is_true(bagView.isNew)
   end)
 
-  it("sizes the bag window around its canvas: the view, the scroll bar, at least the minimum", function()
+  it("sizes the bag window around its canvas: the view, the scroll bar's room on both sides, at least the minimum", function()
     setupBagFrameStubs()
     LoadBetterBagsModule("frames/bag.lua")
     local bag = windowedBag({ GetCurrentTabID = function() return 1 end })
@@ -969,12 +969,12 @@ describe("Persistent Tab Views and Zero-Guard State Consistency Tests", function
 
     bag:Draw(context:New("test"), slotInfo, function() end)
 
-    assert.are.equal(400 + bag.scroll:GetBarWidth(), bag.frame:GetWidth())
+    assert.are.equal(400 + 2 * bag.scroll:GetBarWidth(), bag.frame:GetWidth())
     assert.are.equal(200, bag.frame:GetHeight())
 
     view.Layout = function() return 10, 10 end
     bag:Draw(context:New("test"), slotInfo, function() end)
-    assert.are.equal(260 + bag.scroll:GetBarWidth(), bag.frame:GetWidth())
+    assert.are.equal(260 + 2 * bag.scroll:GetBarWidth(), bag.frame:GetWidth())
     assert.are.equal(100, bag.frame:GetHeight())
   end)
 end)

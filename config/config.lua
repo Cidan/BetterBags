@@ -551,6 +551,18 @@ function config:CreateConfig()
       end
     })
 
+    f:AddCheckbox({
+      title = 'Snap to Content',
+      description = 'With Resizable Window on, when you let go after resizing the ' .. string.lower(bagType.name)
+        .. ', it shrinks to fit its items, so there is no empty space at the sides.',
+      getValue = function(_)
+        return db:GetBagSnapToContent(bagType.kind)
+      end,
+      setValue = function(_, value)
+        db:SetBagSnapToContent(bagType.kind, value)
+      end
+    })
+
     f:AddSlider({
       title = 'Items Per Row',
       description = 'The number of items per row in each section.',

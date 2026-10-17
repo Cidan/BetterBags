@@ -90,6 +90,14 @@ one for its lifetime (no pool).
   height capped at `MaxHeight` (a window sized to its content), with `Scrollable` set when the
   child is more than half a pixel taller. Its width is the parent's `Width`, else the child's
   width plus the bar reserve. A child that returns no result is an error.
+- **Options** (`scrollbox:Create(parent, name, opts)`): `Symmetric` keeps the bar's room on both
+  sides (the child is inset by 14 and gets the width less 28; `GetGutterWidth` is 28, else 14);
+  `AutoHideBar` shows the bar only while the wheel scrolls or the pointer is over its room
+  (window.md §3b). Only the bag's box uses them; the changelog's keeps the old behavior.
+- **Widths for snapping**: a child's `FitWidth` (the narrowest width it lays out the same in)
+  goes up with the room added, and the parent's `LayoutWidth` (the width to lay out for, when it
+  differs from the width shown: a window animating to its snapped width) goes down with the room
+  taken off (window.md §3b).
 - The scroll child is created with `.scrollable = true`, so initializing the box moves it under
   the box's scroll target and anchors it TOPLEFT and TOPRIGHT (Blizzard's
   `ReparentScrollChildren` and `ScrollBoxViewUtil.SetPoint`): its width follows the box.

@@ -664,6 +664,7 @@ const.FORM_LAYOUT = {
 ---@field height number
 ---@field opacity number
 ---@field sizeMode WindowSizeMode
+---@field snapToContent boolean After a resize the window shrinks to its content's width (sizeMode "window").
 
 ---@class (exact) CategoryOptions
 ---@field shown boolean
@@ -811,6 +812,7 @@ const.DATABASE_DEFAULTS = {
           height = 500,
           opacity = 89,
           sizeMode = "content",
+          snapToContent = true,
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 2,
@@ -820,6 +822,7 @@ const.DATABASE_DEFAULTS = {
           height = 500,
           opacity = 89,
           sizeMode = "content",
+          snapToContent = true,
         },
       },
       [const.BAG_VIEW.SECTION_ALL_BAGS] = {
@@ -831,6 +834,7 @@ const.DATABASE_DEFAULTS = {
           height = 500,
           opacity = 89,
           sizeMode = "content",
+          snapToContent = true,
         },
         [const.BAG_KIND.BANK] = {
           columnCount = 1,
@@ -840,6 +844,7 @@ const.DATABASE_DEFAULTS = {
           height = 500,
           opacity = 89,
           sizeMode = "content",
+          snapToContent = true,
         },
       },
     },

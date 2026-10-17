@@ -46,6 +46,13 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   "extended" slot frame, `UpdateExtended`, on the button or the decoration), `mouse=<bool>` (the
   interaction button's `IsMouseEnabled`) and `glyph=<atlas>` or `none` (the empty slot glyph).
   Added for free slots on WoW: Forever that showed a padlock and a quality border.
+- For a bag, `padding items left=<px> right=<px> | sections left=<px> right=<px> | border left=<px>
+  right=<px> <NineSlice|backdrop> | visible left=<px> right=<px>`: how far the outermost shown item
+  buttons and sections (titles included) are from each side of the window, how far in the theme's
+  border art ends (a template's `NineSlice.LeftEdge`/`RightEdge`, or the backdrop's `edgeSize`),
+  and the items' distance from the border. `border unknown` for art painted in a texture
+  (Moonlight's frames: measured from the image files instead). Left and right should match on
+  every theme (window.md §3b). Added for centering the bag's content.
 
 ## 3. Storage
 

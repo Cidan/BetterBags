@@ -313,6 +313,18 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     assert.are.equal(2, last.columns)
   end)
 
+  -- A window the player sized gives each column its width (frames/bagcanvas.lua): rows pack up
+  -- to the limit the layout gives instead of the one items per row implies.
+  it("packs rows up to the layout's row width when it gives one, and reports its widest column", function()
+    local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)
+    view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, { tabs = { [1] = { items = {}, categories = {} } } })
+    local drawSpy = spy.on(view.content, "Draw")
+    view.content.maxColumnWidth = 321
+    local _, _, widest = view:Layout(context:New("test"), { itemsPerRow = 9, columns = 2, rowWidth = 376 })
+    assert.are.equal(376, drawSpy.calls[1].vals[2].maxWidthPerRow)
+    assert.are.equal(321, widest)
+  end)
+
   it("returns the size it laid out to", function()
     local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)
     view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, { tabs = { [1] = { items = {}, categories = {} } } })

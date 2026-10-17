@@ -718,6 +718,9 @@ function bagFrame.bagProto:BuildWindow(name)
 		OnResized = function(_, width, height)
 			database:SetBagViewFrameSize(kind, database:GetBagView(kind), width, height)
 		end,
+		SnapToContent = function()
+			return database:GetBagSnapToContent(kind)
+		end,
 		MinWidth = function()
 			if self.slots and self.slots:IsShown() then
 				return self.slots.frame:GetWidth()
@@ -726,7 +729,7 @@ function bagFrame.bagProto:BuildWindow(name)
 		end,
 		MinContentWidth = function()
 			local tabsWidth = self.tabs and self.tabs.width or 0
-			return math.max(MIN_CONTENT_WIDTH, tabsWidth) + self.scroll:GetBarWidth()
+			return math.max(MIN_CONTENT_WIDTH, tabsWidth) + self.scroll:GetGutterWidth()
 		end,
 		MinContentHeight = MIN_CONTENT_HEIGHT,
 		Fade = function()
@@ -745,7 +748,9 @@ function bagFrame.bagProto:BuildWindow(name)
 	self.frame = self.window.frame
 	self.frame:SetSize(200, 200)
 
-	self.scroll = scrollbox:Create(self.frame, "BetterBagsBagScroll" .. name)
+	-- The bar's room on both sides keeps the content centered and still when the bar shows; the
+	-- bar shows only while it is used (window.md, centering).
+	self.scroll = scrollbox:Create(self.frame, "BetterBagsBagScroll" .. name, { Symmetric = true, AutoHideBar = true })
 	self.canvas = bagCanvas:Create(self, self.scroll.scrollChild)
 	self.scroll:SetChild(self.canvas)
 	self.window:SetContent(self.scroll)

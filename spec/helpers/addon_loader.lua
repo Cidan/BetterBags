@@ -111,5 +111,6 @@ _G.UseSonataTextRoles = function()
   sonata.textFonts = {}
   sonata.texts = sonata.texts or setmetatable({}, { __mode = "k" })
   sonata.buttonTexts = sonata.buttonTexts or setmetatable({}, { __mode = "k" })
+  sonata.textWatchers = sonata.textWatchers or setmetatable({}, { __mode = "k" })
   return sonata
 end

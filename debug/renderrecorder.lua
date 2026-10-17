@@ -219,6 +219,82 @@ local function describeSections(lines, label, sections, origin)
   end
 end
 
+-- bounds returns how far the shown frames are from the window's left and right edges, or nil
+-- when none is shown.
+---@param frames Frame[]
+---@param window Frame
+---@return number? left, number? right
+local function bounds(frames, window)
+  local left, right
+  for _, f in ipairs(frames) do
+    if f:IsShown() and f:GetLeft() ~= nil then
+      local l, r = f:GetLeft() - window:GetLeft(), window:GetRight() - f:GetRight()
+      left = left == nil and l or math.min(left, l)
+      right = right == nil and r or math.min(right, r)
+    end
+  end
+  return left, right
+end
+
+-- borderOf returns how far in from the window's left and right edges the theme's border art
+-- ends, and where that was read: a template's NineSlice edge pieces, or the backdrop's edge
+-- size. Other art (a texture with its border painted in) cannot be measured from frames.
+---@param window BetterBagsWindow
+---@return number? left, number? right, string? source
+local function borderOf(window)
+  local frame = window.frame
+  local template = window.decoration and window.decoration.template
+  local nine = template and template.NineSlice
+  if nine ~= nil and nine.LeftEdge ~= nil and nine.RightEdge ~= nil and nine.LeftEdge:GetRight() ~= nil then
+    return nine.LeftEdge:GetRight() - frame:GetLeft(), frame:GetRight() - nine.RightEdge:GetLeft(), "NineSlice"
+  end
+  local backdrop = frame.GetBackdrop ~= nil and frame:GetBackdrop() or nil
+  if backdrop ~= nil and backdrop.edgeFile ~= nil and backdrop.edgeFile ~= "" then
+    local edge = backdrop.edgeSize or 0
+    return edge, edge, "backdrop"
+  end
+  return nil
+end
+
+-- describePadding measures how far the bag's items, and its sections (titles included), are
+-- from each side of the window, where the theme's border ends, and so how far the items are
+-- from the border: the left and right figures should match (window.md, centering).
+---@param window BetterBagsWindow
+---@param bag Bag
+---@return string
+local function describePadding(window, bag)
+  local sections, items = {}, {}
+  local function collect(list)
+    for _, section in pairs(list or {}) do
+      table.insert(sections, section.frame)
+      for _, cell in ipairs(section.content and section.content.cells or {}) do
+        if not cell.isGap and cell.frame ~= nil then
+          table.insert(items, cell.frame)
+        end
+      end
+    end
+  end
+  collect(bag.globalSections)
+  collect(bag.currentView and bag.currentView.sections)
+  local frame = window.frame
+  local itemLeft, itemRight = bounds(items, frame)
+  local sectionLeft, sectionRight = bounds(sections, frame)
+  local parts = {
+    itemLeft and string.format("padding items left=%s right=%s", num(itemLeft), num(itemRight)) or "padding items none",
+    sectionLeft and string.format("sections left=%s right=%s", num(sectionLeft), num(sectionRight)) or "sections none",
+  }
+  local borderLeft, borderRight, source = borderOf(window)
+  if borderLeft == nil then
+    table.insert(parts, "border unknown")
+  else
+    table.insert(parts, string.format("border left=%s right=%s %s", num(borderLeft), num(borderRight), source))
+    if itemLeft ~= nil then
+      table.insert(parts, string.format("visible left=%s right=%s", num(itemLeft - borderLeft), num(itemRight - borderRight)))
+    end
+  end
+  return table.concat(parts, " | ")
+end
+
 -- Snapshot describes what a window shows, one line per part: the window (Geometry), its
 -- content box, and for a bag its scroll area, canvas, layout, sections and item buttons.
 -- Positions are relative to the window's top left.
@@ -250,6 +326,7 @@ function recorder:Snapshot(window)
       rectIn(canvas.frame, frame), tostring(layout.itemsPerRow), tostring(layout.columns),
       num(canvas.headerContainer:GetHeight()), num(canvas.tabContainer:GetHeight()), num(canvas.footerContainer:GetHeight())))
   end
+  table.insert(lines, describePadding(window, bag))
   describeSections(lines, "global", bag.globalSections, frame)
   if bag.currentView ~= nil then
     describeSections(lines, "view", bag.currentView.sections, frame)

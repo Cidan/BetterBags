@@ -288,6 +288,19 @@ local function CreateMockWidget(widgetType, name, parent)
     if self._rect == nil then return nil end
     return self._rect.left + self:GetWidth() / 2, self._rect.bottom + self:GetHeight() / 2
   end
+  -- ScriptRegion:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRight)
+  -- (SimpleScriptRegionAPIDocumentation): whether the cursor (GetCursorPosition, in the region's
+  -- scale) is inside the region's rect moved out by the offsets; Blizzard enlarges it with
+  -- IsMouseOver(10, -10, 0, 10) (FloatingChatFrame.lua). False for a region with no rect.
+  function widget:IsMouseOver(offsetTop, offsetBottom, offsetLeft, offsetRight)
+    local left, right, top, bottom = self:GetLeft(), self:GetRight(), self:GetTop(), self:GetBottom()
+    if left == nil then return false end
+    local scale = self:GetEffectiveScale()
+    local x, y = GetCursorPosition()
+    x, y = x / scale, y / scale
+    return x >= left + (offsetLeft or 0) and x <= right + (offsetRight or 0)
+      and y >= bottom + (offsetBottom or 0) and y <= top + (offsetTop or 0)
+  end
   function widget:SetAlpha(alpha)
     self._alpha = alpha
   end

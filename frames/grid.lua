@@ -480,6 +480,7 @@ function gridProto:stage(options)
   local footerWidth = 0
   local footerHeight = 0
   local bottomColumnPosition = 0
+  local widestColumn = 0
   if options.header then
     ---@type RenderOptions
     local headerOptions = {
@@ -492,6 +493,7 @@ function gridProto:stage(options)
 
   for _, column in ipairs(columns) do
     local columnWidth, columnHeight = self:layoutSingleColumn(column, options, currentOffset, topOffset)
+    widestColumn = math.max(widestColumn, columnWidth)
     w = w + columnWidth
     h = math.max(h, columnHeight)
     currentOffset = currentOffset + columnWidth
@@ -525,6 +527,7 @@ function gridProto:stage(options)
   self.inner:SetSize(w, h)
   self.contentWidth = w
   self.contentHeight = h
+  self.maxColumnWidth = widestColumn
   return w, h
 end
 

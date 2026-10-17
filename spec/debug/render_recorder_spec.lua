@@ -184,6 +184,70 @@ describe("RenderRecorder", function()
     assert.is_truthy(text:find("  gap", 1, true), text)
   end)
 
+  -- How far the bag's items (and its sections, titles included) are from each side of the
+  -- window, and how far in the theme's border art ends: a template's NineSlice edges, or a
+  -- backdrop's edge. Left and right should match on every theme (window.md, centering).
+  describe("padding", function()
+    local function paddingLine(w)
+      for _, line in ipairs(recorder:Snapshot(w)) do
+        if line:find("^padding ") then return line end
+      end
+    end
+
+    it("measures the items and sections from each side of the window", function()
+      local w = newWindow({ 640, 480 })
+      fakeBag(w)
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("padding items left=16.0 right=546.0 | sections left=10.0 right=450.0", 1, true), line)
+      assert.is_truthy(line:find("| border unknown", 1, true), line)
+    end)
+
+    it("measures a template's border from its NineSlice edges", function()
+      local w = newWindow({ 640, 480 })
+      fakeBag(w)
+      local template = CreateFrame("Frame", nil, w.frame)
+      template.NineSlice = CreateFrame("Frame", nil, template)
+      template.NineSlice.LeftEdge = template.NineSlice:CreateTexture()
+      template.NineSlice.LeftEdge:SetSize(16, 400)
+      template.NineSlice.LeftEdge._rect = { left = 92, bottom = 220 }
+      template.NineSlice.RightEdge = template.NineSlice:CreateTexture()
+      template.NineSlice.RightEdge:SetSize(16, 400)
+      template.NineSlice.RightEdge._rect = { left = 728, bottom = 220 }
+      w.decoration.template = template
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("| border left=8.0 right=12.0 NineSlice | visible left=8.0 right=534.0", 1, true), line)
+    end)
+
+    it("measures a backdrop's border from its edge size", function()
+      local w = newWindow({ 640, 480 })
+      fakeBag(w)
+      w.frame:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 3 })
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("| border left=3.0 right=3.0 backdrop | visible left=13.0 right=543.0", 1, true), line)
+    end)
+
+    -- The global sections are measured before the view's: the rightmost item there must still
+    -- set the right padding when a view item further left comes after it.
+    it("measures from the outermost items wherever they are", function()
+      local w = newWindow({ 640, 480 })
+      local bag = fakeBag(w)
+      local recent = bag.globalSections["Recent Items"]
+      local far = CreateFrame("Frame", nil, recent.frame)
+      far:SetSize(37, 37)
+      far._rect = { left = w.frame:GetLeft() + 500, bottom = recent.frame:GetBottom() }
+      table.insert(recent.content.cells, { slotkey = "0_9", frame = far })
+      local line = paddingLine(w)
+      assert.is_truthy(line:find("padding items left=16.0 right=103.0", 1, true), line)
+    end)
+
+    it("says when the bag shows no items", function()
+      local w = newWindow({ 640, 480 })
+      local bag = fakeBag(w)
+      bag.globalSections, bag.currentView = {}, nil
+      assert.is_truthy(paddingLine(w):find("padding items none | sections none", 1, true))
+    end)
+  end)
+
   -- What each item button shows, beyond where it is: how it was last drawn (an item, a free slot
   -- with its count and bag name), its quality border, Blizzard's padlock (UpdateExtended's
   -- "extended" slot), whether it takes the mouse, and the empty slot glyph.

@@ -55,6 +55,7 @@ end
 ---@class (exact) ViewLayout
 ---@field itemsPerRow number How many items a section puts in a row.
 ---@field columns number How many columns of sections the view lays out.
+---@field rowWidth? number How wide a row of sections may be (frames/bagcanvas.lua); 41 * itemsPerRow + 16 without one.
 
 -- Bind puts the tab's data into the view: a section per category in the data's order, and a
 -- cell per item, gap and free slot, each item button drawn from its data. It ends the render
@@ -112,10 +113,11 @@ function views.viewProto:Bind(ctx, bag, slotInfo)
 end
 
 -- Layout lays the bound sections out: each section puts layout.itemsPerRow items in a row,
--- and the view arranges the sections in layout.columns columns. It returns the size it took.
+-- and the view arranges the sections in layout.columns columns, packing rows up to
+-- layout.rowWidth. It returns the size it took and the width of its widest column.
 ---@param ctx Context
 ---@param layout ViewLayout
----@return number width, number height
+---@return number width, number height, number widestColumn
 function views.viewProto:Layout(ctx, layout)
   local _ = ctx
   for _, section in pairs(self.sections) do
@@ -125,13 +127,14 @@ function views.viewProto:Layout(ctx, layout)
   self.content.maxCellWidth = layout.columns
   self.content:Draw({
     cells = self.content.cells,
-    maxWidthPerRow = ((37 + 4) * layout.itemsPerRow) + 16,
+    maxWidthPerRow = layout.rowWidth or ((37 + 4) * layout.itemsPerRow) + 16,
     columns = layout.columns,
   })
   for _, section in pairs(self.sections) do
     debug:WalkAndFixAnchorGraph(section.frame)
   end
-  return self.content.contentWidth or 0, self.content.contentHeight or 0
+  local width = self.content.contentWidth or 0
+  return width, self.content.contentHeight or 0, self.content.maxColumnWidth or width
 end
 
 ---@param oldSlotKey string

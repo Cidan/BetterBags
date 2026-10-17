@@ -252,6 +252,32 @@ describe("Config settings refreshes", function()
     end
   end)
 
+  -- Snap to Content is read when the player lets go of the resize grip (window.md, snapping):
+  -- nothing to redraw when it changes. It sits right below Resizable Window.
+  it("turns Snap to Content on and off for each bag, next to Resizable Window, with no refresh", function()
+    local snaps = {}
+    saved[#saved + 1] = { db, "GetBagSnapToContent", db.GetBagSnapToContent }
+    saved[#saved + 1] = { db, "SetBagSnapToContent", db.SetBagSnapToContent }
+    db.GetBagSnapToContent = function(_, kind) return snaps[kind] ~= false end
+    db.SetBagSnapToContent = function(_, kind, value) snaps[kind] = value end
+    local found = settings("Snap to Content")
+    assert.are.equal(2, #found)
+    for _, opts in ipairs(found) do
+      sent, snaps = {}, {}
+      assert.is_true(opts.getValue(context:New("Test")))
+      opts.setValue(context:New("Test"), false)
+      local kind = next(snaps)
+      assert.is_false(snaps[kind])
+      assert.is_false(opts.getValue(context:New("Test")))
+      assert.are.same({}, messages())
+    end
+    for i, entry in ipairs(entries) do
+      if entry.opts.title == "Snap to Content" then
+        assert.are.equal("Resizable Window", entries[i - 1].opts.title)
+      end
+    end
+  end)
+
   describe("opacity and scale", function()
     local windows, savedValues, opacityUpdates
 

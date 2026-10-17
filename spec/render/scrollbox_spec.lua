@@ -205,6 +205,151 @@ describe("Scrollbox", function()
     assert.are.equal(1, sb.scrollChild:GetHeight())
   end)
 
+  -- A bag's scroll box keeps the bar's room on both sides at all times, so its content is
+  -- centered and never moves when the bar appears; the bar itself shows only while the player
+  -- scrolls with the mouse wheel or points at it (window.md, centering).
+  describe("for a bag (Symmetric, AutoHideBar)", function()
+    local function bagScroll()
+      local sb = scrollbox:Create(CreateFrame("Frame"), nil, { Symmetric = true, AutoHideBar = true })
+      sb.frame:SetSize(400, 300)
+      sb.frame._rect = { left = 100, bottom = 100 }
+      return sb
+    end
+
+    it("keeps the bar's room on both sides: the child is inset by it and gets the width less both", function()
+      local sb = bagScroll()
+      local c = child(300, 200)
+      sb:SetChild(c)
+      assert.are.equal(28, sb:GetGutterWidth())
+      assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 14, 0 }, { c.frame:GetPoint(1) })
+      local result = render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {})
+      assert.are.same({ 640 - 28 }, c.given)
+      assert.are.equal(640, result.Width)
+      local natural = render:NewRenderChain(root(sb, { MaxHeight = 500 }), {})
+      assert.are.equal(300 + 28, natural.Width)
+    end)
+
+    -- A window snapping to its content: the child's narrowest width comes up with the box's
+    -- room, and the width to lay out for goes down without it.
+    it("passes the child's fit width up and a layout width down, each with the room on both sides", function()
+      local sb = bagScroll()
+      local c = child(300, 200)
+      local seen
+      function c:Render(parentResult)
+        seen = parentResult
+        return { Width = parentResult.Width, Height = 200, FitWidth = 410 }
+      end
+      sb:SetChild(c)
+      local result = render:NewRenderChain(root(sb, { Width = 640, Height = 480, LayoutWidth = 600 }), {})
+      assert.are.equal(612, seen.Width)
+      assert.are.equal(572, seen.LayoutWidth)
+      assert.are.equal(438, result.FitWidth)
+      render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {})
+      assert.is_nil(seen.LayoutWidth)
+    end)
+
+    it("keeps the child where it is whether or not it scrolls", function()
+      local sb = bagScroll()
+      local tall, short = child(300, 900), child(300, 100)
+      sb:SetChild(tall)
+      render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {})
+      sb:SetChild(short)
+      render:NewRenderChain(root(sb, { Width = 640, Height = 480 }), {})
+      assert.are.same({ 612 }, tall.given)
+      assert.are.same({ 612 }, short.given)
+      assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 14, 0 }, { short.frame:GetPoint(1) })
+    end)
+
+    it("keeps the bar's room on the right only for other scroll boxes", function()
+      local sb = scrollbox:Create(CreateFrame("Frame"))
+      local c = child(300, 200)
+      sb:SetChild(c)
+      assert.are.equal(14, sb:GetGutterWidth())
+      assert.are.same({ "TOPLEFT", sb.scrollChild, "TOPLEFT", 0, 0 }, { c.frame:GetPoint(1) })
+      assert.is_nil(sb.barDriver)
+      assert.are.equal(1, sb.scrollBar:GetAlpha())
+    end)
+
+    describe("the bar", function()
+      local savedCursor
+      before_each(function()
+        savedCursor = { _G._cursorX, _G._cursorY }
+      end)
+      after_each(function()
+        _G._cursorX, _G._cursorY = savedCursor[1], savedCursor[2]
+      end)
+
+      local function tick(sb, seconds)
+        local update = sb.barDriver:GetScript("OnUpdate")
+        local steps = math.floor(seconds / 0.05 + 0.5)
+        for _ = 1, steps do update(sb.barDriver, 0.05) end
+      end
+
+      local function pointAt(x, y)
+        _G._cursorX, _G._cursorY = x, y
+      end
+
+      it("starts hidden", function()
+        local sb = bagScroll()
+        assert.are.equal(0, sb.scrollBar:GetAlpha())
+        assert.are.equal(sb.scrollBar, sb.barDriver:GetParent())
+      end)
+
+      it("shows while the pointer is in the bar's room on the right, then fades a second after it leaves", function()
+        local sb = bagScroll()
+        pointAt(494, 250)
+        tick(sb, 0.2)
+        assert.are.equal(1, sb.scrollBar:GetAlpha())
+        tick(sb, 3)
+        assert.are.equal(1, sb.scrollBar:GetAlpha())
+        pointAt(300, 250)
+        tick(sb, 0.9)
+        assert.are.equal(1, sb.scrollBar:GetAlpha())
+        tick(sb, 0.5)
+        assert.are.equal(0, sb.scrollBar:GetAlpha())
+      end)
+
+      it("stays hidden while the pointer is over the content", function()
+        local sb = bagScroll()
+        pointAt(300, 250)
+        tick(sb, 2)
+        assert.are.equal(0, sb.scrollBar:GetAlpha())
+        pointAt(480, 250)
+        tick(sb, 1)
+        assert.are.equal(0, sb.scrollBar:GetAlpha())
+      end)
+
+      it("shows when the mouse wheel scrolls, then fades", function()
+        local sb = bagScroll()
+        pointAt(300, 250)
+        sb.scrollBox:GetScript("OnMouseWheel")(sb.scrollBox, -1)
+        tick(sb, 0.2)
+        assert.are.equal(1, sb.scrollBar:GetAlpha())
+        tick(sb, 1.4)
+        assert.are.equal(0, sb.scrollBar:GetAlpha())
+      end)
+
+      it("fades in and out over a moment, not at once", function()
+        local sb = bagScroll()
+        pointAt(494, 250)
+        tick(sb, 0.05)
+        local alpha = sb.scrollBar:GetAlpha()
+        assert.is_true(alpha > 0 and alpha < 1, tostring(alpha))
+      end)
+
+      it("starts hidden again each time it reappears", function()
+        local sb = bagScroll()
+        pointAt(494, 250)
+        tick(sb, 0.2)
+        assert.are.equal(1, sb.scrollBar:GetAlpha())
+        -- Blizzard hides the bar when nothing scrolls (SetHideIfUnscrollable) and shows it again
+        -- when something does; the spec frame mock does not fire OnShow.
+        sb.barDriver:GetScript("OnShow")(sb.barDriver)
+        assert.are.equal(0, sb.scrollBar:GetAlpha())
+      end)
+    end)
+  end)
+
   it("errors when rendered without a child", function()
     local sb = scrollbox:Create(CreateFrame("Frame"))
     assert.has_error(function() render:NewRenderChain(root(sb, { MaxHeight = 500 }), {}) end)

@@ -571,6 +571,151 @@ describe("Window", function()
       assert.are.equal(1, saved[w.frame])
     end)
 
+    -- Snap to Content: when the player lets go of the grip, the window shrinks to the narrowest
+    -- width its content lays out the same in (the content's FitWidth plus the insets), with a
+    -- small bounce past it, then saves that size (window.md, snapping).
+    describe("snapping to its content", function()
+      local snap
+
+      -- fitting builds content whose narrowest width is fit, recording what it was given.
+      local function fitting(fit)
+        local c = content(300, 200)
+        function c:Render(parentResult)
+          table.insert(self.given, parentResult)
+          return { Width = parentResult and parentResult.Width or 300, Height = parentResult and parentResult.Height or 200,
+            FitWidth = fit }
+        end
+        return c
+      end
+
+      local function snapping(c, opts)
+        snap = true
+        local o = { SnapToContent = function() return snap end }
+        for k, v in pairs(opts or {}) do o[k] = v end
+        local w = resizable(c, o)
+        apply()
+        w:UpdateSizeMode()
+        w:Show(ctx())
+        advance()
+        w.frame._rect = { left = 100, bottom = 200 }
+        return w
+      end
+
+      local function resizeTo(w, width, height)
+        w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+        w.frame:SetSize(width, height)
+        w.frame:GetScript("OnSizeChanged")(w.frame, width, height)
+        w.resizeGrip:GetScript("OnMouseUp")(w.resizeGrip, "LeftButton")
+      end
+
+      -- step runs the snap's frames (16 ms each) until it ends, returning each width it took.
+      local function run(w)
+        local widths = {}
+        for _ = 1, 200 do
+          local update = w.snapDriver:GetScript("OnUpdate")
+          if update == nil then break end
+          update(w.snapDriver, 0.016)
+          table.insert(widths, w.frame:GetWidth())
+          advance()
+        end
+        return widths
+      end
+
+      it("shrinks to its content's width when the player lets go, with a small bounce, then saves it", function()
+        local c = fitting(400)
+        local w = snapping(c)
+        resizeTo(w, 700, 500)
+        assert.is_nil(saveSize, "saved once the snap ends")
+        assert.are.equal(0, saved[w.frame] or 0)
+        local widths = run(w)
+        local low, lowAt = math.huge, 0
+        for i, width in ipairs(widths) do
+          if width < low then low, lowAt = width, i end
+        end
+        assert.is_true(low < 412 and low >= 412 - 10, tostring(low))
+        for i = 2, lowAt do assert.is_true(widths[i] <= widths[i - 1], "shrinks to the bounce") end
+        for i = lowAt + 1, #widths do assert.is_true(widths[i] >= widths[i - 1], "settles from the bounce") end
+        assert.are.equal(412, widths[#widths])
+        assert.is_true(#widths >= 15 and #widths <= 30, tostring(#widths))
+        assert.are.same({ 412, 500 }, saveSize)
+        assert.are.equal(1, saved[w.frame])
+        assert.is_nil(w.snapDriver:GetScript("OnUpdate"))
+      end)
+
+      it("keeps the content's layout while it moves, centering it in the width it passes", function()
+        local c = fitting(400)
+        local w = snapping(c)
+        resizeTo(w, 700, 500)
+        w.snapDriver:GetScript("OnUpdate")(w.snapDriver, 0.1)
+        advance()
+        local given = c.given[#c.given]
+        assert.are.equal(400, given.LayoutWidth)
+        assert.are.equal(w.frame:GetWidth() - 12, given.Width)
+        run(w)
+        assert.is_nil(c.given[#c.given].LayoutWidth)
+      end)
+
+      it("moves the edge the player dragged: its top left stays put", function()
+        local w = snapping(fitting(400))
+        resizeTo(w, 700, 500)
+        assert.are.same({ "TOPLEFT", UIParent, "BOTTOMLEFT", 100, 700 }, { w.frame:GetPoint(1) })
+      end)
+
+      it("keeps the player's width when snapping is off, or when the window already fits", function()
+        local w = snapping(fitting(400))
+        snap = false
+        resizeTo(w, 700, 500)
+        assert.are.same({ 700, 500 }, saveSize)
+        assert.is_nil(w.snapDriver)
+        snap = true
+        local fits = snapping(fitting(688))
+        resizeTo(fits, 700, 500)
+        assert.are.same({ 700, 500 }, saveSize)
+        assert.is_true(fits.snapDriver == nil or fits.snapDriver:GetScript("OnUpdate") == nil)
+      end)
+
+      it("never snaps or bounces narrower than its minimum", function()
+        local w = snapping(fitting(100))
+        resizeTo(w, 700, 500)
+        local widths = run(w)
+        for _, width in ipairs(widths) do assert.is_true(width >= 260, tostring(width)) end
+        assert.are.same({ 260, 500 }, saveSize)
+      end)
+
+      it("ends the snap at its width when the player grabs the grip or moves the window, or it hides", function()
+        local w = snapping(fitting(400))
+        resizeTo(w, 700, 500)
+        w.snapDriver:GetScript("OnUpdate")(w.snapDriver, 0.05)
+        w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
+        assert.are.equal(412, w.frame:GetWidth())
+        assert.are.same({ 412, 500 }, saveSize)
+        assert.is_nil(w.snapDriver:GetScript("OnUpdate"))
+        w.resizeGrip:GetScript("OnMouseUp")(w.resizeGrip, "LeftButton")
+
+        resizeTo(w, 700, 500)
+        w.frame:GetScript("OnDragStart")(w.frame, "LeftButton")
+        assert.are.equal(412, w.frame:GetWidth())
+        w.frame:GetScript("OnDragStop")(w.frame)
+
+        resizeTo(w, 700, 500)
+        w:Hide(ctx())
+        assert.are.equal(412, w.frame:GetWidth())
+        assert.is_nil(w.snapDriver:GetScript("OnUpdate"))
+      end)
+
+      it("follows a bounce curve: from the start, past the end, back to the end", function()
+        assert.are.equal(700, window.SnapWidthAt(700, 412, 10, 0))
+        assert.are.equal(412, window.SnapWidthAt(700, 412, 10, 1))
+        assert.are.equal(402, window.SnapWidthAt(700, 412, 10, 0.65))
+        local previous = 700
+        for i = 1, 100 do
+          local width = window.SnapWidthAt(700, 412, 10, i / 100)
+          assert.is_true(math.abs(width - previous) < 40, "no jumps")
+          previous = width
+        end
+      end)
+    end)
+
     it("does not lay out again for size changes it made itself while sized to its content", function()
       local w = resizable(content(1, 1))
       mode = "content"

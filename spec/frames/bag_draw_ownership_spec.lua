@@ -1483,13 +1483,35 @@ describe("Bag Draw: shared item button ownership across global sections and view
       assert.are.same({ { const.BAG_KIND.BACKPACK, const.BAG_VIEW.SECTION_GRID, 640, 480 } }, frameSizes)
     end)
 
-    it("never makes its content narrower than its tabs or the minimum, plus the scroll bar", function()
+    it("never makes its content narrower than its tabs or the minimum, plus the scroll bar's room on both sides", function()
       local bag = newBag()
-      local bar = bag.scroll:GetBarWidth()
-      assert.are.equal(260 + bar, bag.window.opts.MinContentWidth())
+      local room = 2 * bag.scroll:GetBarWidth()
+      assert.are.equal(room, bag.scroll:GetGutterWidth())
+      assert.are.equal(260 + room, bag.window.opts.MinContentWidth())
       bag.tabs = { width = 400 }
-      assert.are.equal(400 + bar, bag.window.opts.MinContentWidth())
+      assert.are.equal(400 + room, bag.window.opts.MinContentWidth())
       assert.are.equal(100, bag.window.opts.MinContentHeight)
+    end)
+
+    -- Its content is centered and never moves for the scroll bar: the bar's room is kept on both
+    -- sides, and the bar shows only while it is used (window.md, centering).
+    it("scrolls its canvas in a box with the bar's room on both sides and a bar that hides itself", function()
+      local bag = newBag()
+      assert.is_true(bag.scroll.symmetric)
+      assert.is_not_nil(bag.scroll.barDriver)
+      assert.are.equal(0, bag.scroll.scrollBar:GetAlpha())
+    end)
+
+    it("snaps to its content after a resize when the bag's setting says so", function()
+      local bag = newBag()
+      local snap = true
+      override(addon:GetModule("Database"), "GetBagSnapToContent", function(_, kind)
+        assert.are.equal(const.BAG_KIND.BACKPACK, kind)
+        return snap
+      end)
+      assert.is_true(bag.window.opts.SnapToContent())
+      snap = false
+      assert.is_false(bag.window.opts.SnapToContent())
     end)
 
     it("is at least as wide as its slots panel while that shows", function()

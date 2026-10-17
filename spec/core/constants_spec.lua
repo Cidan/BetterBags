@@ -123,6 +123,20 @@ describe("Constants Module Offsets", function()
     assert.are.equal(14, const.OFFSETS.SCROLLBAR_WIDTH)
   end)
 
+  -- Snap to Content (window.md, snapping) is on for every bag window in every view.
+  it("snaps every bag window to its content by default", function()
+    loadfile("core/constants.lua")("BetterBags")
+    local const = addon:GetModule("Constants")
+    local count = 0
+    for _, kinds in pairs(const.DATABASE_DEFAULTS.profile.size) do
+      for _, info in pairs(kinds) do
+        assert.is_true(info.snapToContent)
+        count = count + 1
+      end
+    end
+    assert.is_true(count >= 4)
+  end)
+
   it("should have SCROLLBAR_WIDTH defined in the era constants offsets", function()
     loadfile("core/constants.lua")("BetterBags")
     loadfile("core/era/constants.lua")("BetterBags")
