@@ -558,6 +558,11 @@ describe("Window", function()
       assert.is_nil(w.frame._sizing)
       w.resizeGrip:GetScript("OnMouseDown")(w.resizeGrip, "LeftButton")
       assert.are.equal("BOTTOMRIGHT", w.frame._sizing)
+      -- From where the player pressed: without alwaysStartFromMouse the client resized the window
+      -- the moment sizing started, from a point left by an earlier move or resize (render
+      -- recording: a bank 775.8 x 238.6 became 757.0 x 287.0 on a click, and each click after it
+      -- roughly doubled the jump until the window filled the screen's height).
+      assert.is_true(w.frame._sizingFromMouse)
       w.frame:SetSize(700, 500)
       w.frame:GetScript("OnSizeChanged")(w.frame, 700, 500)
       assert.is_true(render:IsDirty(w))

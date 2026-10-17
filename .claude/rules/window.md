@@ -68,8 +68,16 @@ The window is a render root (its plan: PRE, DEP content, SELF).
 The grip is a button at the overlay's level + 2 (above the close button), styled from the
 theme's `Resize` (`Size` number or `{Width, Height}`, `Points` (default BOTTOMRIGHT), `Normal`,
 `Highlight`, `Pushed`, `ShowOnHover`) or the default (Blizzard's chat size grabber, shown only
-while hovered). Left button only: down starts sizing from BOTTOMRIGHT, up stops it, puts the
-window back on the screen, saves the position and calls `OnResized`. Restyling sets every state
+while hovered). Left button only: down starts sizing from BOTTOMRIGHT from where the player
+pressed (`StartSizing("BOTTOMRIGHT", true)`: `alwaysStartFromMouse`, documented on every client
+branch, the way Blizzard's `PanelResizeButtonMixin` starts its resizes), up stops it, puts the
+window back on the screen, saves the position and calls `OnResized`. Without
+`alwaysStartFromMouse` the client resized the window inside `StartSizing`, before the cursor
+moved, from a point an earlier move or resize had left: a render recording (render-recorder.md)
+of a bank after the player moved it and resized it back and forth shows every click on the grip
+resizing it (775.8 x 238.6 to 757.0 x 287.0, then 728.3 x 387.9, 665.1 x 580.7, 538.7 x 972.1, and
+the screen's full height), each jump about double the last, and a drag then following the cursor
+241 pixels away from the corner. An earlier recording with 136 resize starts showed none. Restyling sets every state
 with art, so nothing of the last theme's grip stays.
 
 ### 3a. On the screen

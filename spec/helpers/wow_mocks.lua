@@ -553,8 +553,10 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:SetResizeBounds(minWidth, minHeight, maxWidth, maxHeight)
     self._resizeBounds = { minWidth = minWidth, minHeight = minHeight, maxWidth = maxWidth, maxHeight = maxHeight }
   end
-  function widget:StartSizing(point)
+  -- Frame:StartSizing(resizePoint?, alwaysStartFromMouse = false) (SimpleFrameAPIDocumentation).
+  function widget:StartSizing(point, alwaysStartFromMouse)
     self._sizing = point or "BOTTOMRIGHT"
+    self._sizingFromMouse = alwaysStartFromMouse == true
   end
   function widget:SetToplevel(topLevel)
     self._toplevel = topLevel

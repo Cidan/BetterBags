@@ -792,7 +792,10 @@ function windowProto:styleResizeGrip()
       end
       trace(self, "resize start")
       self.sizing = true
-      self.frame:StartSizing("BOTTOMRIGHT")
+      -- From where the player pressed (alwaysStartFromMouse, as Blizzard's PanelResizeButtonMixin
+      -- does): without it the client resized the window the moment sizing started, from a point an
+      -- earlier move or resize left, and every click on the grip made the next jump bigger.
+      self.frame:StartSizing("BOTTOMRIGHT", true)
       trace(self, "resize started")
     end)
     addon.SetScript(grip, "OnMouseUp", function(ctx, _, button)
