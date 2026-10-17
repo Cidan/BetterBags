@@ -55,8 +55,9 @@ The window is a render root (its plan: PRE, DEP content, SELF).
   window's own scale (`UIParent` height x its effective scale / the frame's), minus the vertical
   insets, and no width (natural). SELF sizes the frame to the content's result plus the insets,
   at least the minimums.
-- **Window mode**: PRE gives the content the inner box (`Width`, `Height`); SELF keeps the frame
-  size. `UpdateSizeMode()` makes the frame resizable with bounds = the minimums, takes `Size()`
+- **Window mode**: PRE gives the content the inner box (`Width`, `Height`), from the frame's size
+  rounded to a hundredth of a unit (`SIZE_PRECISION`, §3b: the client reads sizes back with float
+  error at a UI scale); SELF keeps the frame size. `UpdateSizeMode()` makes the frame resizable with bounds = the minimums, takes `Size()`
   clamped to them (or keeps the current size when nothing was saved, at least the minimums),
   shows the grip, and lays out again; content mode hides the grip and lays out again. In window
   mode `OnSizeChanged` invalidates, so dragging the grip reflows the content.
@@ -144,6 +145,19 @@ canvas pinned the content to its left edge whatever width it was given.
   box anchored its child with an x offset and a nil y offset, which the client drops (both are
   required, `SimpleScriptRegionResizingAPIDocumentation`). `drawableProto:SetPoint` passes 0 for
   a missing one, and the frame mock rejects one offset without the other (render-pipeline.md).
+- **Failure mode (fixed, measured): a snapped bag lost a step of its layout once it settled.** A
+  retail render recording at scale 0.65 shows it four times: a bag snapped to 466 (a layout 426
+  wide) and, 10 ms later, after the snap re-anchored the window by its center to save its
+  position, the same window width chose the next narrower layout (344 wide), with 61 px on each
+  side instead of 20, until a click on the grip snapped again (to 384); the same at 302, which
+  fell to 300. The layout is whole numbers wide, and it can only be rejected at a canvas width
+  printed as 426.0 when that width is a hair under 426: the client handed the window's width
+  back with float error. During the snap the window hands its content the exact target
+  (`LayoutWidth`), which is why the snap itself looked right. The window now rounds the size it
+  hands its content to a hundredth of a unit (`withoutFloatError`), and the recorder prints the
+  exact width each layout was chosen for (`for=`, render-recorder.md) so a capture shows it.
+  Only the window's content size needed it: the other sizes the client hands back (the capped
+  theme textures, the screen clamp) make no exact comparison.
 - **A layout is a function of items per row and columns alone** (render-pipeline.md, the layout
   engine). A resizable window takes the densest layout no wider than its width: the canvas tries
   every items per row from the one past which nothing changes down to one. **Failure mode (fixed,
@@ -176,7 +190,8 @@ canvas pinned the content to its left edge whatever width it was given.
 Coverage: `spec/frames/bagcanvas_spec.lua` (plans, the snap property, densest, centering,
 measures kept across renders), `spec/render/scrollbox_spec.lua` ("for a bag (Symmetric,
 AutoHideBar)"), `spec/render/render_spec.lua` ("anchors with both offsets when only one is
-given"), `spec/window/window_spec.lua` ("snapping to its content"),
+given"), `spec/window/window_spec.lua` ("snapping to its content", "hands its content its size
+without the client's float error"),
 `spec/sonata/theme_ports_spec.lua` ("pads every theme's bag the same on both sides"),
 `spec/config/config_redraw_spec.lua` ("Snap to Content"). Every guard was
 mutation-tested. To check a theme in game, record rendering (render-recorder.md): each bag

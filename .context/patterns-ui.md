@@ -190,3 +190,7 @@ self.activeItems = setmetatable({}, { __mode = "k" })
 ## Measure Then Arrange
 **Problem**: a layout that positions frames while it measures cannot answer "how wide would this be?", so callers re-derive geometry with formulas that drift from what the layout does (snapped bag windows ended 5 to 111 px wider than their content).
 **Solution**: compute the layout as data first (`Flow:Pack`, `grid:Measure`, `section:Measure`, `view:Measure`, `canvas:Plan`), choose, then apply it (`Arrange`); one function places every cell (`gridProto:PlaceCell`), which is where an animation between two layouts would hook in. See `.claude/rules/render-pipeline.md` §4b.
+
+## Sizes Read From the Client Carry Float Error at a UI Scale
+**Problem**: at a UI scale (0.65 in the capture) `frame:GetWidth()` can return a hair under the size that was set (a window set to 466 read back just under it once it was anchored by its center). Code that compares such a value with whole-number layouts makes the wrong choice at exactly the fitting width: the bag rejected the layout it had just snapped to.
+**Solution**: round sizes read from the client before comparing them exactly. The window rounds the size it hands its content to a hundredth of a unit (`withoutFloatError`, `window/window.lua`), far below a pixel. See `.claude/rules/window.md` §3b.

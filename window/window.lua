@@ -48,6 +48,17 @@ local SNAP_TURN = 0.65
 local SNAP_OVERSHOOT = 10
 local SNAP_OVERSHOOT_SHARE = 0.1
 
+-- At a UI scale the client reads a frame's size back with float error (a window set to 466 reads
+-- a hair under it), and content compares the size it is given with layouts that are whole
+-- numbers wide. Sizes handed to content are rounded to this fraction of a unit, far below a pixel.
+local SIZE_PRECISION = 100
+
+---@param value number
+---@return number
+local function withoutFloatError(value)
+  return math.floor(value * SIZE_PRECISION + 0.5) / SIZE_PRECISION
+end
+
 -- The resize grip without a theme's: Blizzard's chat size grabber, shown while hovered.
 local DEFAULT_GRIP = {
   Size = 16,
@@ -987,8 +998,8 @@ function windowProto:PreRender()
   local vertical = insets.Top + insets.Bottom
   if self:GetSizeMode() == "window" then
     return {
-      Width = math.max(0, self.frame:GetWidth() - insets.Left - insets.Right),
-      Height = math.max(0, self.frame:GetHeight() - vertical),
+      Width = math.max(0, withoutFloatError(self.frame:GetWidth()) - insets.Left - insets.Right),
+      Height = math.max(0, withoutFloatError(self.frame:GetHeight()) - vertical),
       LayoutWidth = self.snap and self.snap.contentWidth or nil,
     }
   end

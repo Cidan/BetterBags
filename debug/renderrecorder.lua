@@ -322,8 +322,9 @@ function recorder:Snapshot(window)
   local canvas = bag.canvas
   if canvas ~= nil then
     local plan = canvas.plan or {}
-    table.insert(lines, string.format("canvas %s layout ipr=%s columns=%s width=%s header=%s tab=%s footer=%s",
-      rectIn(canvas.frame, frame), tostring(plan.itemsPerRow), tostring(plan.columns), num(plan.width or 0),
+    local plannedFor = canvas.plannedFor and string.format("%.6f", canvas.plannedFor) or "content"
+    table.insert(lines, string.format("canvas %s layout ipr=%s columns=%s width=%s for=%s header=%s tab=%s footer=%s",
+      rectIn(canvas.frame, frame), tostring(plan.itemsPerRow), tostring(plan.columns), num(plan.width or 0), plannedFor,
       num(canvas.headerContainer:GetHeight()), num(canvas.tabContainer:GetHeight()), num(canvas.footerContainer:GetHeight())))
   end
   table.insert(lines, describePadding(window, bag))

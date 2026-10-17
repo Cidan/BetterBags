@@ -133,6 +133,7 @@ describe("RenderRecorder", function()
         tabContainer = frameIn(canvasFrame, 0, -50, 386, 400),
         footerContainer = frameIn(canvasFrame, 0, -450, 386, 50),
         plan = { itemsPerRow = 4, columns = 2, width = 372 },
+        plannedFor = 385.99997,
       },
       globalSections = { ["Recent Items"] = section("Recent Items", 8, { "0_1" }) },
       currentView = { sections = { Armor = section("Armor", 4, { "0_2", "0_3" }) } },
@@ -170,13 +171,26 @@ describe("RenderRecorder", function()
     assert.are.same({ recording }, BetterBagsPerfDB.renderRecordings)
   end)
 
+  -- The width a layout was chosen for, exactly: a layout exactly as wide as its window is rejected
+  -- when the window reads back a hair narrower (a retail recording at scale 0.65), which one
+  -- decimal cannot show.
+  it("gives the exact width the canvas planned for, or that it was sized to its content", function()
+    local w = newWindow({ 640, 480 })
+    local bag = fakeBag(w)
+    local text = table.concat(recorder:Snapshot(w), "\n")
+    assert.is_truthy(text:find(" for=385.999970 ", 1, true), text)
+    bag.canvas.plannedFor = nil
+    text = table.concat(recorder:Snapshot(w), "\n")
+    assert.is_truthy(text:find(" for=content ", 1, true), text)
+  end)
+
   it("describes a bag down to its item buttons: scroll, canvas layout, sections, items", function()
     local w = newWindow({ 640, 480 })
     fakeBag(w)
     local lines = recorder:Snapshot(w)
     local text = table.concat(lines, "\n")
     assert.is_truthy(text:find("scroll @6.0,42.0 400.0x300.0 child 500.0 bar=false", 1, true), text)
-    assert.is_truthy(text:find("canvas @6.0,42.0 386.0x500.0 layout ipr=4 columns=2 width=372.0 header=50.0 tab=400.0 footer=50.0", 1, true), text)
+    assert.is_truthy(text:find("canvas @6.0,42.0 386.0x500.0 layout ipr=4 columns=2 width=372.0 for=385.999970 header=50.0 tab=400.0 footer=50.0", 1, true), text)
     assert.is_truthy(text:find("global section Recent Items ipr=8 cells=2 shown=true @10.0,60.0 180.0x90.0", 1, true), text)
     assert.is_truthy(text:find("view section Armor ipr=4 cells=3", 1, true), text)
     assert.is_truthy(text:find("  item 0_2 @16.0,80.0 37.0x37.0", 1, true), text)

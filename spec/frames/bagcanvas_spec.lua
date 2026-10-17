@@ -152,6 +152,17 @@ describe("BagCanvas", function()
     assert.are.equal(8, canvas.plan.itemsPerRow)
   end)
 
+  -- The render recorder prints it: the number that decided the layout (render-recorder.md).
+  it("remembers the width it planned for: the layout width, else its width, none when sized to its content", function()
+    local canvas = bagCanvas:Create(bag({ section(4) }), CreateFrame("Frame"))
+    draw(canvas, { Width = 500 })
+    assert.are.equal(500, canvas.plannedFor)
+    draw(canvas, { Width = 500, LayoutWidth = 300 })
+    assert.are.equal(300, canvas.plannedFor)
+    draw(canvas)
+    assert.is_nil(canvas.plannedFor)
+  end)
+
   it("keeps one item per row when nothing fits", function()
     local canvas = bagCanvas:Create(bag({ section(4) }), CreateFrame("Frame"))
     draw(canvas, { Width = 20 })

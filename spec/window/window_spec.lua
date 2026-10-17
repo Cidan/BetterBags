@@ -642,6 +642,28 @@ describe("Window", function()
         assert.is_nil(w.snapDriver:GetScript("OnUpdate"))
       end)
 
+      -- At a UI scale the client reads a size back with float error once the window is anchored by
+      -- its center: a retail recording (scale 0.65) had a bag snapped to 466 hand its canvas a width
+      -- just under 426, which rejected the 426-wide layout it had snapped to and showed the next
+      -- narrower one, with twice the space on each side, until the player clicked the grip.
+      it("hands its content its size without the client's float error", function()
+        local c = fitting(400)
+        local w = snapping(c)
+        resizeTo(w, 700, 500)
+        run(w)
+        local getWidth, getHeight = w.frame.GetWidth, w.frame.GetHeight
+        w.frame.GetWidth = function(self) return getWidth(self) - 0.00003 end
+        w.frame.GetHeight = function(self) return getHeight(self) + 0.00003 end
+        local before = #c.given
+        w:Invalidate()
+        advance()
+        assert.is_true(#c.given > before)
+        local insets = w:GetContentInsets()
+        local given = c.given[#c.given]
+        assert.are.equal(400, given.Width)
+        assert.are.equal(500 - insets.Top - insets.Bottom, given.Height)
+      end)
+
       it("keeps the content's layout while it moves, centering it in the width it passes", function()
         local c = fitting(400)
         local w = snapping(c)
@@ -650,7 +672,7 @@ describe("Window", function()
         advance()
         local given = c.given[#c.given]
         assert.are.equal(400, given.LayoutWidth)
-        assert.are.equal(w.frame:GetWidth() - 12, given.Width)
+        assert.are.equal(math.floor(w.frame:GetWidth() * 100 + 0.5) / 100 - 12, given.Width, "its width, to a hundredth")
         run(w)
         assert.is_nil(c.given[#c.given].LayoutWidth)
       end)

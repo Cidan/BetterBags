@@ -48,6 +48,7 @@ local SPACING = 4
 ---@field tabContainer Frame
 ---@field footerContainer Frame
 ---@field plan? CanvasPlan The plan of the last render.
+---@field plannedFor? number The width the last plan had to fit; nil when sized to its content.
 ---@field measured? {caps: table<Section, number>, byItemsPerRow: table<Section, table<number, SectionMeasure>>} Section measures kept across renders until the bag binds new data (ForgetMeasures).
 local canvasProto = drawable:Extend({}, 'BagCanvasFrame')
 
@@ -229,8 +230,10 @@ end
 ---@return RenderResult
 function canvasProto:Render(parentResult)
   local width = parentResult and parentResult.Width
-  local plan = self:Plan(parentResult and parentResult.LayoutWidth or width)
+  local plannedFor = parentResult and parentResult.LayoutWidth or width
+  local plan = self:Plan(plannedFor)
   self.plan = plan
+  self.plannedFor = plannedFor
   local bag = self.bag
   bag:ArrangeGlobalSections(plan.global)
   local tabH = 0
