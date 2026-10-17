@@ -198,7 +198,11 @@ function window:Create(opts)
   frame:SetClampRectInsets(0, 0, 0, 0)
   frame:EnableMouse(true)
   w.frame = frame
-  w:UpdateScale(true)
+  -- Only the scale: fitting to the screen reads the owner's minimums, which can read parts the
+  -- owner makes after the window (a bag's scroll box). UpdateSizeMode fits it later.
+  if opts.Scale ~= nil then
+    frame:SetScale(opts.Scale())
+  end
 
   w.content = CreateFrame("Frame", nil, frame)
   w:UpdateContentAnchors()

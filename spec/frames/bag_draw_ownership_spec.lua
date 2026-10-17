@@ -1444,6 +1444,15 @@ describe("Bag Draw: shared item button ownership across global sections and view
       end
     end)
 
+    -- Its minimums read parts BuildWindow makes after the window (the scroll box), so creating
+    -- the window must not ask for them, even for a bag the player sized.
+    it("builds its window when the bag is sized by the player", function()
+      sizeMode = "window"
+      local bag
+      assert.has_no.errors(function() bag = newBag() end)
+      assert.is_not_nil(bag.scroll)
+    end)
+
     it("is a Bag window named for its bag, laying out the bag's canvas in a scroll box", function()
       local bag = newBag()
       assert.are.equal("Bag", bag.window.kind)
