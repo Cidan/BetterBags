@@ -132,6 +132,64 @@ describe("stacked layout text", function()
     assert.are.equal(height, select(2, nav:GetFont()))
   end)
 
+  -- A button's font string is sized when the button's text is set and keeps that width when its
+  -- font changes, so an entry that changed fonts (hover, selection, a theme, the client's text
+  -- size) wrapped onto a clipped second line in game: "Import/" for "Import/Export". Each entry
+  -- is re-measured after every font change, the way Blizzard does it (QuestLogTitleButton_Resize:
+  -- the font string's width set to 0, then the button's text set again).
+  it("re-measures every navigation entry after each change of its font", function()
+    local layout = newLayout(true, true)
+    layout:AddSection({ title = "General", description = "" })
+    layout:AddSubIndex({ title = "Sizes" })
+    layout:AddPaneLink({ title = "Import/Export", createPane = function(parent) return CreateFrame("Frame", nil, parent) end })
+    local steps = {}
+    for i = 1, 3 do
+      local button = layout.sections[i].button
+      local fs = button:GetFontString()
+      local setWidth, setText = fs.SetWidth, button.SetText
+      fs.SetWidth = function(self, width)
+        table.insert(steps, { i, "width", width })
+        return setWidth(self, width)
+      end
+      button.SetText = function(self, text)
+        table.insert(steps, { i, "text", text })
+        return setText(self, text)
+      end
+    end
+    local function refit(i, text)
+      return { { i, "width", 0 }, { i, "text", text } }
+    end
+    local link = layout.sections[3].button
+    link:GetScript("OnEnter")(link)
+    assert.are.same(refit(3, "  Import/Export"), steps)
+    steps = {}
+    link:GetScript("OnLeave")(link)
+    assert.are.same(refit(3, "  Import/Export"), steps)
+    steps = {}
+    local sizes = layout.sections[2].button
+    sizes:GetScript("OnEnter")(sizes)
+    assert.are.same(refit(2, "  Sizes"), steps)
+    steps = {}
+    layout:UpdateTabHighlighting(1)
+    assert.are.same({ { 1, "width", 0 }, { 1, "text", "General" }, { 2, "width", 0 }, { 2, "text", "  Sizes" },
+      { 3, "width", 0 }, { 3, "text", "  Import/Export" } }, steps)
+    steps = {}
+    local events = addon:GetModule("Events")
+    local originalSend = events.SendMessage
+    events.SendMessage = function() end
+    sonata:ApplyTheme(addon:GetModule("Context"):New("spec"), "Default", false)
+    events.SendMessage = originalSend
+    -- Sonata moves texts to the new theme's font objects in no set order: each entry is refit once.
+    local byEntry = {}
+    for _, step in ipairs(steps) do
+      byEntry[step[1]] = byEntry[step[1]] or {}
+      table.insert(byEntry[step[1]], step)
+    end
+    assert.are.same(refit(1, "General"), byEntry[1])
+    assert.are.same(refit(2, "  Sizes"), byEntry[2])
+    assert.are.same(refit(3, "  Import/Export"), byEntry[3])
+  end)
+
   it("draws a pane link with the sub navigation roles", function()
     local layout = newLayout(true, true)
     layout:AddSection({ title = "General", description = "" })

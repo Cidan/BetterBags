@@ -160,6 +160,21 @@ function stackedLayout:createTextAreaBackground(parent)
   return frame
 end
 
+-- fitNavText keeps a navigation entry as wide as its text in its current font. A button's font
+-- string is sized when the button's text is set and keeps that width when its font changes, so
+-- an entry that changed fonts (hover, selection, a theme, the client's text size) wrapped onto a
+-- clipped second line ("Import/" for "Import/Export"). After every font change the entry is
+-- re-measured the way Blizzard does it (QuestLogTitleButton_Resize): the font string's width set
+-- to 0, then the button's text set again.
+---@param button Button
+local function fitNavText(button)
+  local fs = button:GetFontString()
+  sonata:WatchTextFont(fs, function()
+    fs:SetWidth(0)
+    button:SetText(button:GetText())
+  end)
+end
+
 ---@package
 ---@param title string
 ---@param point Frame
@@ -177,6 +192,7 @@ function stackedLayout:addIndex(title, point, sub)
   fs:ClearAllPoints()
   fs:SetPoint("LEFT", indexButton, "LEFT", 5, 0)
   fs:SetJustifyH("LEFT")
+  fitNavText(indexButton)
 
   -- Change OnClick behavior based on mode
   if self.tabbed then
@@ -1230,6 +1246,7 @@ function stackedLayout:AddPaneLink(opts)
   fs:ClearAllPoints()
   fs:SetPoint("LEFT", indexButton, "LEFT", 5, 0)
   fs:SetJustifyH("LEFT")
+  fitNavText(indexButton)
 
   indexButton:SetScript("OnEnter", function()
     sonata:SetTextRole(fs, "NavSubHover")
