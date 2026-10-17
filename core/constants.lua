@@ -927,5 +927,11 @@ const.DATABASE_DEFAULTS = {
     -- Saved backpack dump for testing and debugging
     debugBackpackDump = {},
   },
+  -- Account wide: shared by every character and profile.
+  global = {
+    -- The newest changelog release the player has seen (its id), and whether the changelog
+    -- opens by itself on login when there is a release they have not seen.
+    changelog = { lastSeen = 0, autoOpen = true },
+  },
   char = {}
 }

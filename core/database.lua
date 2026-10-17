@@ -30,6 +30,29 @@ function DB:GetData()
   return DB.data
 end
 
+-- GetChangelogLastSeen returns the id of the newest changelog release the player has seen.
+-- The changelog's state is account wide (AceDB global).
+---@return number
+function DB:GetChangelogLastSeen()
+  return DB.data.global.changelog.lastSeen
+end
+
+---@param id number
+function DB:SetChangelogLastSeen(id)
+  DB.data.global.changelog.lastSeen = id
+end
+
+-- GetChangelogAutoOpen returns whether the changelog opens by itself on login.
+---@return boolean
+function DB:GetChangelogAutoOpen()
+  return DB.data.global.changelog.autoOpen
+end
+
+---@param value boolean
+function DB:SetChangelogAutoOpen(value)
+  DB.data.global.changelog.autoOpen = value
+end
+
 ---@param kind BagKind
 ---@return table
 function DB:GetBagPosition(kind)

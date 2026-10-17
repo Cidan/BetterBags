@@ -17,6 +17,12 @@ jobs:
     # we can run our steps on pretty much anything, but the "ubuntu-latest" image is a safe bet
     runs-on: ubuntu-latest
 
+    # contents: write publishes the release and saves the changelog branch; pull-requests: read
+    # lets the changelog read the commits of the pull requests a push merged.
+    permissions:
+      contents: write
+      pull-requests: read
+
     env:
       GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}  # "GITHUB_TOKEN" is a secret always provided to the workflow
                                                  # for your own token, the name cannot start with "GITHUB_"
@@ -30,6 +36,31 @@ jobs:
         with:
           fetch-depth: 0  # gets git history for changelogs
 
-      # once cloned, we just run the GitHub Action for the packager project
+      # once cloned, write the in-game changelog (data/changelogdata.lua) before packaging: Gemini
+      # summarizes every commit since the previous tag, and the notes are kept on the changelog branch
+      # (tools/changelog, .claude/rules/changelog.md). A failure ships an empty changelog, never the
+      # repository's copy, and never stops the release.
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check out the stored changelogs
+        run: bash tools/changelog/store.sh checkout "$RUNNER_TEMP/changelog-store" || mkdir -p "$RUNNER_TEMP/changelog-store"
+
+      - name: Write the changelog
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          go run ./tools/changelog -channel release -tag "${{ github.ref_name }}" -store "$RUNNER_TEMP/changelog-store" -out data/changelogdata.lua || {
+            echo "::warning::The changelog could not be written; this build ships an empty one."
+            cp tools/changelog/testdata/changelogdata.empty.lua data/changelogdata.lua
+          }
+
+      - name: Save the stored changelogs
+        run: bash tools/changelog/store.sh save "$RUNNER_TEMP/changelog-store" "Notes for ${{ github.ref_name }}" || echo "::warning::The changelog's notes could not be saved."
+
+      # then run the GitHub Action for the packager project
       - name: Package and release
         uses: BigWigsMods/packager@v2.6.1

@@ -392,6 +392,7 @@ function addon:OnEnable()
   searchCategoryConfig:Enable()
   async:Enable()
   form:Enable()
+  addon:GetModule('ChangelogWindow'):Enable()
 
   consoleport:Enable()
   quickfind:Enable()

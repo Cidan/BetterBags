@@ -97,5 +97,12 @@ Both leave the bag-bar buttons lit after the bag is gone.
 ## API Contracts and Maintenance
 
 - **Adding a New Module:** When creating a new module, do **not** use `OnInitialize()`. Use `Init()`, and explicitly register/call it inside `addon:OnInitialize()` in `core/init.lua` in its correct dependency position.
+- **Enabling a Module:** `core/boot.lua` turns Ace's automatic enabling off
+  (`addon:SetDefaultModuleState(false)`), so a module's `OnEnable` runs only when
+  `addon:OnEnable()` in `core/init.lua` calls its `Enable()`. A new module with an `OnEnable`
+  (event or message registrations) must be added there, or it silently never runs: the
+  changelog window first shipped without it and neither opened on login nor from its menu entry,
+  with no error, while its own specs (which call `OnEnable` themselves) passed. Cover it in
+  `spec/core/init_spec.lua` (spy on the module's `Enable`).
 - **Double-Initialization Safety:** Because we bypass Ace3's loop entirely, modules are initialized exactly once in a predictable environment.
 - **Unit and Integration Testing:** Test setup blocks in the `spec/` suite must mimic this sequence. If a test loads or stubs a module, it must manually invoke `:Init()` to establish the module's baseline states instead of relying on Ace3 mock hooks.

@@ -99,6 +99,8 @@ data\stacks.lua
 data\slots.lua
 data\loader.lua
 data\refresh.lua
+data\changelogdata.lua
+data\changelog.lua
 
 util\color.lua
 util\sort.lua
@@ -116,6 +118,7 @@ forms\form.lua
 frames\searchcategory.lua
 frames\question.lua
 frames\groupdialog.lua
+frames\changelog.lua
 frames\search.lua
 frames\slider.lua
 frames\money.lua

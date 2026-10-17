@@ -312,6 +312,24 @@ describe("ContextMenu 'Show Bags' toggle", function()
       assert.are.same({ "bags/Rederive", "bags/Rederive" }, sentMessages)
     end)
 
+    -- The changelog (frames/changelog.lua) opens from the menu, above the options entry.
+    it("opens the changelog from a What's New entry, above the options entry", function()
+      local bag = newBag(const.BAG_KIND.BACKPACK, false)
+      local menuList = contextMenu:CreateContextMenu(bag)
+      local entry = findEntry(menuList, "What's New")
+      assert.is_not_nil(entry)
+      assert.is_true(entry.notCheckable)
+      local position, options
+      for i, e in ipairs(menuList) do
+        if e == entry then position = i end
+        if e.text == "Open Options Screen" then options = i end
+      end
+      assert.are.equal(options - 1, position)
+      override(contextMenu, "Hide", function() end)
+      entry.func()
+      assert.are.same({ "changelog/Open" }, sentMessages)
+    end)
+
     it("refuses in combat, and does nothing for a bag without slots", function()
       local bag = newBag(const.BAG_KIND.BACKPACK, false)
       _G.InCombatLockdown = function() return true end
