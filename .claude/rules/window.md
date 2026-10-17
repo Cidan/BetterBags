@@ -238,7 +238,9 @@ Every BetterBags window is a Window; none builds its own frame, chrome, drag or 
   window is the grid's size plus the theme's Slots insets, the chrome is the theme's per client
   (classic-bag-slots-panel.md, camelot-forever.md §5), and the grid is never in a larger box.
   `Draw` redraws the buttons and lays the window out at once while shown (else on show). `Show`
-  hangs the panel below its bag at the theme's `Layout.Offset` (Base 0, -2), hides the bag's
+  hangs the panel below its bag at the theme's `Layout.Offset` (Base 0, -2), or anchors it by the
+  theme's `Layout.Points` relative to the bag when given (a theme can sit it above the bag, as
+  the BetterBags - Themes race themes did with `PositionBagSlots`), hides the bag's
   group tabs (remembering whether they showed) and fades in; the bank panel selects its first
   tab once shown. `Hide` fades out, then gives the bag its tabs back (`OnClose`); the bank panel
   also clears its tab filter and refreshes the bank. After every render a shown panel

@@ -503,6 +503,18 @@ describe("Bank Bag/Slot Window Pane Tests", function()
       assert.are.same({ 100 + 10 + 6, 100 + 30 + 12 }, { panel.frame:GetWidth(), panel.frame:GetHeight() })
     end)
 
+    it("sits where the theme's Layout.Points say, relative to the bank", function()
+      sonata:RegisterTheme({ Name = "Above", Windows = { Slots = { Layout = {
+        Points = { { Point = "BOTTOMLEFT", RelativePoint = "TOPLEFT" } },
+      } } } })
+      local panel, bagFrame = newPanel({ retail = true, forever = false })
+      sonata:ApplyTheme(ctx:New("test"), "Above")
+      panel:Draw(ctx:New("test"))
+      panel:Show()
+      assert.are.equal(1, panel.frame:GetNumPoints())
+      assert.are.same({ "BOTTOMLEFT", bagFrame, "TOPLEFT", 0, 0 }, { panel.frame:GetPoint(1) })
+    end)
+
     -- WoW: Forever's flat template draws a broken header; its slots panels are Blizzard's dark
     -- tooltip frame instead, below the panel so its filled center can never cover the tabs
     -- (camelot-forever.md section 5), with even padding, nudged right to line up.

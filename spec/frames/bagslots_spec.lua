@@ -220,6 +220,19 @@ describe("BagSlots panel", function()
     assert.is_true(shown)
   end)
 
+  -- A theme may place the panel anywhere around its bag (Layout.Points, relative to the bag),
+  -- above it for instance, instead of hanging it below (Layout.Offset).
+  it("sits where the theme's Layout.Points say, relative to its bag", function()
+    sonata:RegisterTheme({ Name = "Above", Windows = { Slots = { Layout = {
+      Points = { { Point = "BOTTOMLEFT", RelativePoint = "TOPLEFT", X = 3, Y = 5 } },
+    } } } })
+    local panel, bagFrame = newPanel()
+    sonata:ApplyTheme(context:New("spec"), "Above")
+    panel:Show()
+    assert.are.equal(1, panel.frame:GetNumPoints())
+    assert.are.same({ "BOTTOMLEFT", bagFrame, "TOPLEFT", 3, 5 }, { panel.frame:GetPoint(1) })
+  end)
+
   it("remembers the tabs were shown across a second Show", function()
     local panel = newPanel()
     panel:Show()
