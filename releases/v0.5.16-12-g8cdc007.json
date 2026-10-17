@@ -1,0 +1,41 @@
+{
+  "id": 1792277129,
+  "version": "v0.5.16-12-g8cdc007",
+  "channel": "alpha",
+  "date": "2026-10-17",
+  "from": "ab73cbdb1deb81ea668fe26795169fa3de677e11",
+  "to": "8cdc00781dcb0914cfe76c8c266d6d5cd167bd27",
+  "headline": "This update introduces Snap to Content resizing, animated item movements, a Drag to Resize bag menu toggle, and centered layouts across all themes.",
+  "entries": [
+    {
+      "category": "New",
+      "title": "Snap to Content for resizable windows",
+      "details": "Releasing the resize handle snaps the window's width and height to fit your items, removing unused space with a brief bounce. This feature is enabled by default under Resizable Window settings.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Animate Item Movement setting",
+      "details": "Added an option in general settings to smoothly glide items, rows, and sections to their new positions when your bag layout changes, rather than instantly jumping. This feature is turned off by default.",
+      "clients": []
+    },
+    {
+      "category": "New",
+      "title": "Drag to Resize bag menu toggle",
+      "details": "Added a Drag to Resize toggle at the top of the backpack and bank menus for quick access to window resizing. The remaining menu options have also been rearranged to match cleanly between the backpack and bank.",
+      "clients": []
+    },
+    {
+      "category": "Improved",
+      "title": "Centered layouts and auto-hiding scroll bars",
+      "details": "Bag items are now evenly centered with identical padding on both sides across all themes. The scroll bar automatically hides when not in use and reserves equal room on both sides so content never shifts when scrolling.",
+      "clients": []
+    },
+    {
+      "category": "Fixed",
+      "title": "Bottom slot clipping when Recent Items is hidden",
+      "details": "Fixed an alignment issue where the bottom edge of free space buttons could be clipped by one pixel when Recent Items was not shown.",
+      "clients": []
+    }
+  ]
+}
