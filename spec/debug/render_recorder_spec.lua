@@ -171,6 +171,46 @@ describe("RenderRecorder", function()
     assert.are.same({ recording }, BetterBagsPerfDB.renderRecordings)
   end)
 
+  -- A frame Motion is moving shows where it started and where it goes, as offsets from the frame it
+  -- hangs from (render/motion.lua): a snapshot is taken as the window renders, when its moves start,
+  -- so its positions are the starts.
+  it("says which sections, items and containers are moving, from where to where", function()
+    local w = newWindow({ 640, 480 })
+    local bag = fakeBag(w)
+    local motion = addon:GetModule("Motion")
+    motion:Init()
+    local armor = bag.currentView.sections.Armor
+    local moved, still = armor.content.cells[2].frame, armor.content.cells[1].frame
+    local tab, canvasFrame = bag.canvas.tabContainer, bag.canvas.frame
+    local k = {}
+    motion:BeginPass(k)
+    motion:Place(moved, armor.frame, 47, -20)
+    motion:Place(still, armor.frame, 6, -20)
+    motion:Place(armor.frame, w.frame, 10, -60)
+    motion:Place(tab, canvasFrame, 0, -50)
+    motion:EndPass()
+    motion:BeginPass(k)
+    motion:Place(moved, armor.frame, 6, -61)
+    motion:Place(still, armor.frame, 6, -20)
+    motion:Place(armor.frame, w.frame, 200, -60)
+    motion:Place(tab, canvasFrame, 0, -80)
+    motion:EndPass()
+    local lines = recorder:Snapshot(w)
+    motion:Init()
+    local function lineWith(start)
+      for _, line in ipairs(lines) do
+        if line:find(start, 1, true) then return line end
+      end
+      return ""
+    end
+    local text = table.concat(lines, "\n")
+    assert.is_truthy(lineWith("  item 0_3 "):find(" moving from 47.0,-20.0 to 6.0,-61.0", 1, true), text)
+    assert.is_truthy(lineWith("view section Armor "):find(" moving from 10.0,-60.0 to 200.0,-60.0", 1, true), text)
+    assert.is_truthy(lineWith("canvas "):find(" | tab moving from 0.0,-50.0 to 0.0,-80.0", 1, true), text)
+    assert.is_nil(lineWith("  item 0_2 "):find("moving", 1, true), text)
+    assert.is_nil(lineWith("canvas "):find("footer moving", 1, true), text)
+  end)
+
   -- The width a layout was chosen for, exactly: a layout exactly as wide as its window is rejected
   -- when the window reads back a hair narrower (a retail recording at scale 0.65), which one
   -- decimal cannot show.

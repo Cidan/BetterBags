@@ -67,6 +67,7 @@ render\render.lua
 render\drawable.lua
 render\scrollbox.lua
 render\flow.lua
+render\motion.lua
 
 # Sonata, the theme engine. Theme data files register after the engine.
 sonata\engine.lua

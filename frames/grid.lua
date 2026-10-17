@@ -12,6 +12,9 @@ local grid = addon:NewModule('Grid')
 ---@class Flow: AceModule
 local flow = addon:GetModule('Flow')
 
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
+
 ---@class Cell
 ---@field frame Frame
 
@@ -318,7 +321,7 @@ function gridProto:Arrange(measured)
 end
 
 -- PlaceCell puts one cell at x, y from the grid's top left. Every cell of every grid is placed
--- here: the one place an animation between two layouts would take over.
+-- here, through Motion: in a bag's render a cell whose place changed moves there.
 ---@param cell Cell
 ---@param x number
 ---@param y number
@@ -326,8 +329,7 @@ function gridProto:PlaceCell(cell, x, y)
   if cell.frame:GetParent() ~= self.inner then
     cell.frame:SetParent(self.inner)
   end
-  cell.frame:ClearAllPoints()
-  cell.frame:SetPoint("TOPLEFT", self.inner, "TOPLEFT", x, y)
+  motion:Place(cell.frame, self.inner, x, y)
   cell.frame:Show()
 end
 

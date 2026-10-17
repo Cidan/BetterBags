@@ -307,7 +307,15 @@ local function CreateMockWidget(widgetType, name, parent)
   function widget:GetAlpha()
     return self._alpha or 1
   end
+  -- ScriptRegionResizing:SetAllPoints([relativeTo, doResize]): only the TOPLEFT and BOTTOMRIGHT
+  -- points are set, after clearing the others (warcraft.wiki.gg); relativeTo defaults to the
+  -- parent.
   function widget:SetAllPoints(other)
+    local relativeTo = other or self:GetParent()
+    self._points = {
+      { point = "TOPLEFT", relativeTo = relativeTo, relativePoint = "TOPLEFT", x = 0, y = 0 },
+      { point = "BOTTOMRIGHT", relativeTo = relativeTo, relativePoint = "BOTTOMRIGHT", x = 0, y = 0 },
+    }
     self._allPoints = other or true
   end
   function widget:ClearAllPoints()
@@ -322,13 +330,22 @@ local function CreateMockWidget(widgetType, name, parent)
     if type(relativePoint) == "string" and (x == nil) ~= (y == nil) then
       error("SetPoint: offsetX and offsetY must be given together, got " .. tostring(x) .. ", " .. tostring(y), 2)
     end
-    table.insert(self._points, {
+    -- A region has one anchor per point: setting a point again replaces it (warcraft.wiki.gg's
+    -- SetPoint example sets the same point several times "with the same result").
+    local anchor = {
       point = point,
       relativeTo = relativeTo,
       relativePoint = relativePoint,
       x = x,
       y = y
-    })
+    }
+    for i, existing in ipairs(self._points) do
+      if existing.point == point then
+        self._points[i] = anchor
+        return
+      end
+    end
+    table.insert(self._points, anchor)
   end
   -- ScriptRegion:GetNumPoints() -> numPoints.
   function widget:GetNumPoints()

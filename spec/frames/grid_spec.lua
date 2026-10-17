@@ -243,3 +243,53 @@ describe("Grid layout under measurement noise", function()
     end
   end)
 end)
+
+-- Every cell of every grid is placed by Motion (render/motion.lua): in a pass of a root, a cell
+-- whose place changed moves there from where it was; the others stay put (render-pipeline.md,
+-- motion).
+describe("Grid cells in motion", function()
+  local motion = addon:GetModule("Motion")
+
+  before_each(function()
+    motion:Init()
+  end)
+
+  local function cell()
+    local f = CreateFrame("Frame")
+    f:SetSize(37, 37)
+    return { frame = f }
+  end
+
+  local function draw(g, perRow, key)
+    if key ~= nil then motion:BeginPass(key) end
+    g:Draw({ cells = g.cells, maxWidthPerRow = 41 * perRow + 16 })
+    if key ~= nil then return motion:EndPass() end
+  end
+
+  it("moves only the cells whose place changed, each from where it was", function()
+    local g = grid:Create(CreateFrame("Frame"), false)
+    local a, b, c = cell(), cell(), cell()
+    g:AddCell("a", a)
+    g:AddCell("b", b)
+    g:AddCell("c", c)
+    local key = {}
+    draw(g, 3, key)
+    assert.are.equal(1, draw(g, 2, key))
+    assert.is_nil(motion:GetMove(a.frame))
+    assert.is_nil(motion:GetMove(b.frame))
+    assert.are.same({ 82, 0, 0, -41 }, { motion:GetMove(c.frame) })
+    assert.are.same({ "TOPLEFT", g.inner, "TOPLEFT", 82, 0 }, { c.frame:GetPoint(1) })
+    assert.is_true(c.frame:IsShown())
+  end)
+
+  it("places every cell at once outside a pass", function()
+    local g = grid:Create(CreateFrame("Frame"), false)
+    local a, b = cell(), cell()
+    g:AddCell("a", a)
+    g:AddCell("b", b)
+    draw(g, 2)
+    draw(g, 1)
+    assert.is_nil(motion:GetMove(b.frame))
+    assert.are.same({ "TOPLEFT", g.inner, "TOPLEFT", 0, -41 }, { b.frame:GetPoint(1) })
+  end)
+end)

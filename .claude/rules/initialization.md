@@ -62,6 +62,7 @@ the session. See `.claude/rules/perf-profiler.md`.
 
   -- 4. Themes and Presentation Frames
   addon:GetModule('Render'):Init()
+  addon:GetModule('Motion'):Init()
   addon:GetModule('Sonata'):Init()
   addon:GetModule('Tabs'):Init()
   itemFrame:Init()

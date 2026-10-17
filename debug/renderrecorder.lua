@@ -194,6 +194,18 @@ end
 ---@param label string
 ---@param sections table<any, Section>
 ---@param origin Frame
+-- moving says where a frame Motion is moving started and where it goes, as offsets from the frame
+-- it hangs from, or nothing when it is still (render/motion.lua).
+---@param frame Frame
+---@return string
+local function moving(frame)
+  local x0, y0, x1, y1 = addon:GetModule('Motion'):GetMove(frame)
+  if x0 == nil then
+    return ""
+  end
+  return string.format(" moving from %s,%s to %s,%s", num(x0), num(y0), num(x1), num(y1))
+end
+
 local function describeSections(lines, label, sections, origin)
   local sorted = {}
   for _, section in pairs(sections or {}) do
@@ -203,8 +215,8 @@ local function describeSections(lines, label, sections, origin)
   for _, section in ipairs(sorted) do
     local frame = section.frame
     local cells = section.content and section.content.cells or {}
-    table.insert(lines, string.format("%s section %s ipr=%s cells=%d shown=%s %s", label, titleOf(section),
-      tostring(section.maxItemsPerRow), #cells, tostring(frame:IsShown()), rectIn(frame, origin)))
+    table.insert(lines, string.format("%s section %s ipr=%s cells=%d shown=%s %s%s", label, titleOf(section),
+      tostring(section.maxItemsPerRow), #cells, tostring(frame:IsShown()), rectIn(frame, origin), moving(frame)))
     for _, cell in ipairs(cells) do
       if cell.isGap then
         table.insert(lines, "  gap")
@@ -213,7 +225,7 @@ local function describeSections(lines, label, sections, origin)
         if cell.drawnAs ~= nil then
           line = line .. " " .. buttonState(cell)
         end
-        table.insert(lines, line)
+        table.insert(lines, line .. moving(cell.frame))
       end
     end
   end
@@ -323,9 +335,16 @@ function recorder:Snapshot(window)
   if canvas ~= nil then
     local plan = canvas.plan or {}
     local plannedFor = canvas.plannedFor and string.format("%.6f", canvas.plannedFor) or "content"
-    table.insert(lines, string.format("canvas %s layout ipr=%s columns=%s width=%s for=%s header=%s tab=%s footer=%s",
+    local line = string.format("canvas %s layout ipr=%s columns=%s width=%s for=%s header=%s tab=%s footer=%s",
       rectIn(canvas.frame, frame), tostring(plan.itemsPerRow), tostring(plan.columns), num(plan.width or 0), plannedFor,
-      num(canvas.headerContainer:GetHeight()), num(canvas.tabContainer:GetHeight()), num(canvas.footerContainer:GetHeight())))
+      num(canvas.headerContainer:GetHeight()), num(canvas.tabContainer:GetHeight()), num(canvas.footerContainer:GetHeight()))
+    for _, part in ipairs({ { "tab", canvas.tabContainer }, { "footer", canvas.footerContainer } }) do
+      local move = moving(part[2])
+      if move ~= "" then
+        line = line .. " | " .. part[1] .. move
+      end
+    end
+    table.insert(lines, line)
   end
   table.insert(lines, describePadding(window, bag))
   describeSections(lines, "global", bag.globalSections, frame)

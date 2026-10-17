@@ -159,16 +159,17 @@ function views.viewProto:Measure(itemsPerRow, columns, measureSection)
   }
 end
 
--- Arrange applies a measure: every section's cells and size, then the sections where it put them.
--- It returns the size it took.
+-- Arrange applies a measure: the sections where it put them, then every section's cells and size.
+-- Sections go first so an item that changes section moves from where its new section stands
+-- (render/motion.lua). It returns the size it took.
 ---@param measured ViewMeasure
 ---@return number width, number height
 function views.viewProto:Arrange(measured)
+  self.content.maxCellWidth = measured.columns
+  self.content:Arrange(measured.content)
   for section, sectionMeasure in pairs(measured.sections) do
     section:Arrange(self.kind, sectionMeasure)
   end
-  self.content.maxCellWidth = measured.columns
-  self.content:Arrange(measured.content)
   for _, section in pairs(self.sections) do
     debug:WalkAndFixAnchorGraph(section.frame)
   end

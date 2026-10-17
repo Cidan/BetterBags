@@ -179,14 +179,89 @@ Coverage: `spec/render/flow_spec.lua`, `spec/frames/grid_spec.lua`, `spec/frames
 its section measures…"), `spec/frames/bagcanvas_spec.lua` (the snap property over 300 random
 bags, densest, measures kept and forgotten, centering). Every guard was mutation-tested.
 
+## 4c. Motion: frames travel to their new places (`render/motion.lua`)
+
+**Asked:** rows, sections and item buttons move to their new places instead of jumping, and only
+what changed place moves: a section alone, an item alone, or any mix. The motion eases slow, fast,
+slow.
+
+- **One function places the bag's frames.** `Motion:Place(frame, relativeTo, x, y)` anchors a
+  frame's TOPLEFT to `relativeTo`'s TOPLEFT at an offset. Every grid cell goes through it
+  (`gridProto:PlaceCell`: item buttons in sections, sections in views, slots panels, currency
+  icons), and so do the canvas's view and Free Space containers (`hangFromHeader`). Offsets are
+  from the frame a frame hangs from, so each level moves on its own: a section travels with its
+  items still in it, an item travels inside a section that stays, and both compose.
+- **Passes decide what moves.** `BeginPass(root)` / `EndPass()` bracket one render of a root (the
+  bag's canvas, while it is visible). In a pass, a frame the root's previous pass also placed
+  travels from where it is now to its new place. Everything else is placed at once: outside a pass
+  (other grids), in a root's first pass, after `Forget(root)`, and a frame the previous pass did not
+  place (a button or section newly shown, or released and drawn again: its old anchors mean
+  nothing). Pass ids are unique across roots, so a frame placed by one bag never animates in the
+  other's. A frame already at its place (within 0.01) is left alone, so a render that changes
+  nothing (most resize renders) re-anchors nothing.
+- **The curve.** A cubic Hermite from the frame's position and speed to its place at rest, over
+  0.3 s; from rest it is 3u^2 - 2u^3, slow, fast, slow. A frame given a new place mid-move starts a
+  new move from where it is, keeping its speed (no stop before turning). A frame re-placed with the
+  same target keeps its move. A move closer than half a pixel is placed at once.
+- **Changing parent.** An item that changes section (or moves between the view and Recent Items)
+  starts where it was on screen. `locate` walks a frame's anchors up while they are TOPLEFT to
+  TOPLEFT, plus links, summing offsets; the frame's old position minus its new parent's position,
+  both relative to the frame both walks reach, is the move's start in the new parent. When the walks
+  end at different frames (an old section released this draw, a brand-new frame) it is placed at
+  once. A section's cells hang from its grid's inner frame, which Blizzard's scroll box positions,
+  so the section links it to its own frame at `GetCellOrigin()` (6 in, a title's height down, or no
+  title when the header is removed; a retail recording shows every item at exactly that offset).
+- **Parents first.** A view places its sections before their items (`views.viewProto:Arrange`) and
+  the canvas hangs its containers before arranging what is in them, so when an item is placed its
+  new parent is already anchored where it visually starts: its old spot when it is moving, its final
+  spot when it just appeared. So an item also travels into a section that appeared in the same draw.
+  Before the reorder, sections were placed after their items.
+- **Visibility.** The canvas runs a pass only while its frame `IsVisible()`; a hidden canvas
+  `Forget`s itself and places at once. Its own `OnHide` (every way a bag closes, a fade included)
+  calls `Forget`, which ends its moves at their targets, so a bag never opens mid-move and the first
+  render after it opens places everything at once. The header container (centering) is never
+  animated: it follows the window as it is resized.
+- **Dropping moves.** Each frame of a move checks the frame is still anchored where the move last
+  put it (within half a pixel; anchors read back carry float error) and still shown. A frame
+  something else re-anchored, released (cleared anchors) or hid is dropped and never pulled back.
+- **Driver.** One frame's `OnUpdate`, set while anything moves and removed when nothing does.
+  `Motion` is a module, so profiler captures measure `Motion.Place` (every placement) and
+  `Motion.Step` (each frame of moves). Not yet measured in game: the cost of many frames moving at
+  once (a sort of a large bank); capture one.
+- **Diagnostics.** The render recorder adds `moving from x0,y0 to x1,y1` to each moving item and
+  section line and `| tab moving ...` / `| footer moving ...` to the canvas line
+  (render-recorder.md); a snapshot is taken as the render that starts the moves ends, so its
+  positions are the moves' starts.
+
+Coverage: `spec/render/motion_spec.lua` (at once outside a pass, in a first pass, for a frame the
+previous pass skipped, a fraction off its place put exactly; moving from where it is; the curve
+and duration; still frames untouched; same target kept; new target keeps speed; carried to another
+parent; links; unreachable old place placed at once; moves dropped when released, hidden or moved
+by something else; `Forget`; roots apart; moves counted), `spec/render/motion_layout_spec.lua`
+(real sections in a real grid: a section moves with its items still, items move in a section that
+stays, an item carried to another section and into a section that just appeared, each from where
+it was), `spec/frames/grid_spec.lua` ("Grid cells in motion"), `spec/frames/section_spec.lua`
+("where its cells start"), `spec/views/gridview_spec.lua` ("places its sections before their
+items"), `spec/frames/bagcanvas_spec.lua` ("in motion": containers slide when Recent Items appears,
+only while shown, forgotten on hide, the pass closed, containers before contents, the header never
+moves), `spec/debug/render_recorder_spec.lua` ("says which sections, items and containers are
+moving"). Every guard was mutation-tested (30 mutations; each that first survived led to a test or
+to removing dead code).
+
+The frame mock was made faithful for this (spec/helpers/wow_mocks.lua): `SetAllPoints` sets
+TOPLEFT and BOTTOMRIGHT points (it set none), and `SetPoint` replaces a point already set
+(it appended), both per warcraft.wiki.gg. One test that relied on the old behavior was corrected.
+
 ## 5. Load order and init
 
-All five TOCs list `render\render.lua`, `render\drawable.lua`, `render\scrollbox.lua`, `render\flow.lua` after
+All five TOCs list `render\render.lua`, `render\drawable.lua`, `render\scrollbox.lua`, `render\flow.lua`, `render\motion.lua` after
 `core\fonts.lua` (the profiler engine and Context load earlier) and before anything that draws,
 followed by `sonata\engine.lua`, `sonata\apply.lua`, `sonata\decoration.lua`,
 `sonata\elements.lua` and `window\window.lua`.
-`core/init.lua` calls `addon:GetModule('Render'):Init()` at the start of phase 4
-(initialization.md). Coverage: `spec/render/toc_spec.lua`.
+`core/init.lua` calls `addon:GetModule('Render'):Init()` at the start of phase 4, then
+`addon:GetModule('Motion'):Init()` (initialization.md). `spec/setup.lua` loads `render/motion.lua`
+for every spec, since grids and sections look it up when they load. Coverage:
+`spec/render/toc_spec.lua`.
 
 ## 6. Coverage
 

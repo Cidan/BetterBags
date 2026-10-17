@@ -43,7 +43,12 @@ One line per part, positions relative to the window's top left (`@x,y WxH`):
   decimals, or `content` when sized to its content: a layout exactly as wide as its window was
   rejected at a width printed as 426.0, window.md §3b, which one decimal could not show);
   `global section` / `view section <title> ipr=<n> cells=<n> shown=<bool> @...`, sorted by
-  title; under each, `  item <slotkey> @...` per item button and `  gap` per gap cell. An item
+  title; under each, `  item <slotkey> @...` per item button and `  gap` per gap cell. A section
+  or item Motion is moving ends with `moving from <x0>,<y0> to <x1>,<y1>` (offsets from the frame
+  it hangs from: where the move started and where it goes), and the canvas line with
+  `| tab moving ...` / `| footer moving ...` for its containers (render-pipeline.md §4c). The
+  snapshot is taken as the render that starts the moves ends, so the `@` positions (and the padding
+  line) are the moves' starts. An item
   button's line adds what it shows: how it was last drawn (`item`, `free count=<n> name=<bag>`,
   `empty`), `border=<r,g,b>` or `off` (the decoration's `IconBorder`), `padlock=<bool>` (Blizzard's
   "extended" slot frame, `UpdateExtended`, on the button or the decoration), `mouse=<bool>` (the

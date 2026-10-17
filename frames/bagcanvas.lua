@@ -12,6 +12,9 @@ local drawable = addon:GetModule('Drawable')
 ---@class Database: AceModule
 local database = addon:GetModule('Database')
 
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
+
 -- BagCanvas is the drawable inside a bag's scroll box: three stacked containers for the Recent
 -- Items header, the active tab view and the Free Space footer (the bag binds data to their
 -- sections before rendering). It plans a layout, arranges it, and centers it in its width, so the
@@ -24,6 +27,10 @@ local database = addon:GetModule('Database')
 -- past which nothing changes down to one: the same candidates for any width, so the layout chosen
 -- at a width is also the one chosen at that layout's own width (FitWidth), which is what a window
 -- snaps to (window.md 3b).
+--
+-- Each render while the canvas is shown is a Motion pass (render/motion.lua): every section, item
+-- and container whose place changed travels there, the rest stay put. A hidden canvas places
+-- everything at once, and hiding ends its moves and forgets them, so a bag never opens mid-move.
 ---@class BagCanvas: AceModule
 local bagCanvas = addon:NewModule('BagCanvas')
 
@@ -73,17 +80,18 @@ function bagCanvas:Create(bag, parent)
   -- would push everything below it down a pixel past the height the canvas reports.
   local tab = CreateFrame("Frame", nil, frame)
   tab:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 0)
-  tab:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, 0)
-  tab:SetHeight(1)
+  tab:SetSize(1, 1)
 
   local footer = CreateFrame("Frame", nil, frame)
   footer:SetPoint("TOPLEFT", header, "TOPLEFT", 0, 0)
-  footer:SetPoint("TOPRIGHT", header, "TOPRIGHT", 0, 0)
-  footer:SetHeight(1)
+  footer:SetSize(1, 1)
 
   canvas.headerContainer = header
   canvas.tabContainer = tab
   canvas.footerContainer = footer
+  addon.SetScript(frame, "OnHide", function()
+    motion:Forget(canvas)
+  end)
   return canvas
 end
 
@@ -221,14 +229,15 @@ function canvasProto:ForgetMeasures()
   self.measured = nil
 end
 
--- hangFromHeader anchors a container below the header's top: it shares the header's left and
--- right edges (centered with it) and starts y below its top.
+-- hangFromHeader places a container y below the header's top, as wide as the layout: it shares
+-- the header's left edge (centered with it). It travels there when the header or the view above
+-- it changed height.
 ---@param container Frame
 ---@param y number
-function canvasProto:hangFromHeader(container, y)
-  container:ClearAllPoints()
-  container:SetPoint("TOPLEFT", self.headerContainer, "TOPLEFT", 0, -y)
-  container:SetPoint("TOPRIGHT", self.headerContainer, "TOPRIGHT", 0, -y)
+---@param width number
+function canvasProto:hangFromHeader(container, y, width)
+  container:SetWidth(math.max(1, width))
+  motion:Place(container, self.headerContainer, 0, -y)
 end
 
 ---@return RenderPlan
@@ -247,16 +256,28 @@ function canvasProto:Render(parentResult)
   local plan = self:Plan(plannedFor)
   self.plan = plan
   self.plannedFor = plannedFor
-  local bag = self.bag
-  local _, headerH = bag:ArrangeGlobalSections(plan.global)
-  local tabH = 0
-  if bag.currentView ~= nil and plan.view ~= nil then
-    local _, h = bag.currentView:Arrange(plan.view)
-    tabH = h
+  local shown = self.frame:IsVisible()
+  if shown then
+    motion:BeginPass(self)
+  else
+    motion:Forget(self)
   end
+  -- The containers first, then what is in them: an item that changes container moves from where
+  -- its new one stands (render/motion.lua).
+  local bag = self.bag
+  local view = bag.currentView ~= nil and plan.view or nil
+  local headerH = plan.global.header and plan.global.header.height or 0
+  local tabH = view and view.height or 0
   self.tabContainer:SetHeight(math.max(1, tabH))
-  self:hangFromHeader(self.tabContainer, headerH)
-  self:hangFromHeader(self.footerContainer, headerH + tabH)
+  self:hangFromHeader(self.tabContainer, headerH, plan.width)
+  self:hangFromHeader(self.footerContainer, headerH + tabH, plan.width)
+  bag:ArrangeGlobalSections(plan.global)
+  if view ~= nil then
+    bag.currentView:Arrange(view)
+  end
+  if shown then
+    motion:EndPass()
+  end
 
   local totalW = width or plan.width
   local offset = (totalW - plan.width) / 2

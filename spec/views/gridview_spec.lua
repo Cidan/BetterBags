@@ -355,6 +355,30 @@ describe("Phase 6 View Placement and Rendering Tests", function()
     assert.are.equal(measured.content, view.content.arranged)
   end)
 
+  -- Motion carries an item that changes section from where it was, worked out from where its new
+  -- section is anchored at that moment: the sections are placed before their items, so a section
+  -- that just appeared is already where it goes (render/motion.lua).
+  it("places its sections before their items", function()
+    local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)
+    local item1 = {
+      bagid = 0, slotid = 1, slotkey = "0_1", itemHash = "hash1", isItemEmpty = false,
+      itemInfo = { itemID = 1, currentItemCount = 1, itemStackCount = 1, itemQuality = 1, itemIcon = 1, isBound = false,
+        category = "Things" },
+      questInfo = { isQuestItem = false },
+    }
+    view:Bind(context:New("test"), { kind = const.BAG_KIND.BACKPACK }, {
+      tabs = { [1] = { items = { item1 }, categories = { { name = "Things" } } } },
+      stacks = { GetStackInfo = function() return nil end },
+    })
+    local section = view:GetSection("Things")
+    local order = {}
+    local arrangeSections, arrangeItems = view.content.Arrange, section.Arrange
+    view.content.Arrange = function(...) table.insert(order, "sections") return arrangeSections(...) end
+    section.Arrange = function(...) table.insert(order, "items") return arrangeItems(...) end
+    view:Arrange(view:Measure(7, 2))
+    assert.are.same({ "sections", "items" }, order)
+  end)
+
   -- A measure function from the canvas replaces the sections' own (it caches them across layouts).
   it("measures its sections with the function it is given", function()
     local view = views:NewGrid(CreateFrame("Frame"), const.BAG_KIND.BACKPACK)

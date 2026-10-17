@@ -39,6 +39,9 @@ LoadBetterBagsModule("debug/perf/engine.lua")
 -- Flow is the pure packing every grid lays out with (render/flow.lua); the grid looks it up when
 -- it loads, so every spec that loads a grid needs it present.
 LoadBetterBagsModule("render/flow.lua")
+-- Motion positions the cells and sections of every grid (render/motion.lua); grids and sections
+-- look it up when they load.
+LoadBetterBagsModule("render/motion.lua")
 
 -- Step 4: Load shared mock data factories
 dofile("spec/helpers/mock_data.lua")

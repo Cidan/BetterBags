@@ -28,6 +28,9 @@ local elements = addon:GetModule('SonataElements')
 ---@class GridFrame: AceModule
 local grid = addon:GetModule('Grid')
 
+---@class Motion: AceModule
+local motion = addon:GetModule('Motion')
+
 ---@class Database: AceModule
 local db = addon:GetModule('Database')
 
@@ -311,6 +314,16 @@ function sectionProto:Arrange(kind, measured)
   self.frame:SetSize(measured.width, measured.height)
   self.frame:Show()
   return measured.width, measured.height
+end
+
+-- GetCellOrigin returns where the section's cells start, from its top left: 6 pixels in, below
+-- its title unless the header is removed.
+---@return number x, number y
+function sectionProto:GetCellOrigin()
+  if self.removeHeader then
+    return 6, 0
+  end
+  return 6, -self.title:GetHeight()
 end
 
 -- GetItemsPerRowCap returns the items per row from which all the section's cells fit one row:
@@ -655,6 +668,9 @@ function sectionFrame:_DoCreate()
   sonata:RegisterElement("SectionHeader", title:GetFontString())
 
   local content = grid:Create(s.frame)
+  motion:Link(content.inner, f, function()
+    return s:GetCellOrigin()
+  end)
   content:Show()
   content:HideScrollBar()
   -- Section content grids are not scrollable; disable mouse wheel so scroll

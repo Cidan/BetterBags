@@ -107,7 +107,9 @@ local grid = StubBetterBagsModule("Grid")
 grid.Create = function()
   local g = setmetatable({
     cells = {},
-    idToCell = {}
+    idToCell = {},
+    -- The frame the real grid's cells hang from (frames/grid.lua).
+    inner = CreateFrame("Frame"),
   }, { __index = mockGridProto })
   return g
 end
@@ -134,6 +136,23 @@ describe("Section Frame", function()
     ResetModuleStub("Groups", "data/groups.lua")
     ResetModuleStub("Localization", "core/localization.lua")
     ResetModuleStub("Grid", "frames/grid.lua")
+  end)
+
+  -- Motion works out where an item that changes section was from the anchors up to a frame both
+  -- sections hang from; the frame a section's cells hang from is placed by Blizzard's scroll box,
+  -- so the section links it to its own frame at the offset its cells start (render/motion.lua).
+  -- A render recording shows every item 6 pixels in and a title's height down from its section.
+  describe("where its cells start", function()
+    it("links the frame its cells hang from to its own frame, past its title", function()
+      local motion = addon:GetModule("Motion")
+      local s = sectionFrame:Create(context:New("test"))
+      local link = motion.links[s.content.inner]
+      assert.are.equal(s.frame, link.to)
+      assert.are.same({ 6, -s.title:GetHeight() }, { link.offset() })
+      assert.are.same({ 6, -s.title:GetHeight() }, { s:GetCellOrigin() })
+      s:RemoveHeader()
+      assert.are.same({ 6, 0 }, { link.offset() })
+    end)
   end)
 
   describe("Creation and Pooling", function()

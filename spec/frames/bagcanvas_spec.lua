@@ -33,6 +33,7 @@ ResetModuleStub("BagCanvas", "frames/bagcanvas.lua")
 LoadBetterBagsModule("frames/bagcanvas.lua")
 
 local render = addon:GetModule("Render")
+local motion = addon:GetModule("Motion")
 local flow = addon:GetModule("Flow")
 local bagCanvas = addon:GetModule("BagCanvas")
 local context = addon:GetModule("Context")
@@ -106,6 +107,7 @@ end
 describe("BagCanvas", function()
   before_each(function()
     render:Init()
+    motion:Init()
     db.GetBagSizeInfo = function() return sizeInfo end
     db.GetBagView = function() return const.BAG_VIEW.SECTION_GRID end
     sizeInfo = { itemsPerRow = 7, columnCount = 2 }
@@ -138,9 +140,9 @@ describe("BagCanvas", function()
     local tabH = b.currentView.arranged.height
     local footerH = b.arrangedGlobal.footer.height
     assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, 0 }, { canvas.tabContainer:GetPoint(1) })
-    assert.are.same({ "TOPRIGHT", canvas.headerContainer, "TOPRIGHT", 0, 0 }, { canvas.tabContainer:GetPoint(2) })
     assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, -tabH }, { canvas.footerContainer:GetPoint(1) })
-    assert.are.same({ "TOPRIGHT", canvas.headerContainer, "TOPRIGHT", 0, -tabH }, { canvas.footerContainer:GetPoint(2) })
+    assert.are.same({ 1, 1 }, { canvas.tabContainer:GetNumPoints(), canvas.footerContainer:GetNumPoints() })
+    assert.are.same({ canvas.plan.width, canvas.plan.width }, { canvas.tabContainer:GetWidth(), canvas.footerContainer:GetWidth() })
     assert.are.equal(tabH + footerH, result.Height)
 
     local withRecent = bag({ section(9) }, section(2, "recent"), section(4, "free"))
@@ -243,6 +245,95 @@ describe("BagCanvas", function()
             denser.height, plan.itemsPerRow, plan.width, plan.height))
       end
     end
+  end)
+
+  -- The view and Free Space slide to their new places when what is above them changes height
+  -- (Recent Items appearing, a row more or less), through Motion (render/motion.lua): only while
+  -- the bag is shown, and never into a bag that just opened (render-pipeline.md, motion).
+  describe("in motion", function()
+    local function recentAppears(parent)
+      local b = bag({ section(9) }, nil, section(4, "free"))
+      local canvas = bagCanvas:Create(b, parent)
+      draw(canvas)
+      b.recent = section(3, "recent")
+      draw(canvas)
+      return canvas, b
+    end
+
+    it("slides the view and Free Space down when Recent Items appears, while shown", function()
+      local canvas, b = recentAppears(CreateFrame("Frame"))
+      local headerH = b.arrangedGlobal.header.height
+      local tabH = b.currentView.arranged.height
+      assert.are.same({ 0, 0, 0, -headerH }, { motion:GetMove(canvas.tabContainer) })
+      assert.are.same({ 0, -tabH, 0, -(headerH + tabH) }, { motion:GetMove(canvas.footerContainer) })
+      assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, 0 }, { canvas.tabContainer:GetPoint(1) })
+    end)
+
+    it("places everything at once while hidden, and forgets what it placed", function()
+      local parent = CreateFrame("Frame")
+      parent:Hide()
+      local canvas, b = recentAppears(parent)
+      assert.is_nil(motion:GetMove(canvas.tabContainer))
+      assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, -b.arrangedGlobal.header.height },
+        { canvas.tabContainer:GetPoint(1) })
+      parent:Show()
+      b.recent = nil
+      draw(canvas)
+      assert.is_nil(motion:GetMove(canvas.tabContainer), "its first pass once shown places at once")
+    end)
+
+    it("ends its moves where they were going and forgets them when it hides", function()
+      local canvas, b = recentAppears(CreateFrame("Frame"))
+      canvas.frame:GetScript("OnHide")(canvas.frame)
+      assert.is_nil(motion:GetMove(canvas.tabContainer))
+      assert.are.same({ "TOPLEFT", canvas.headerContainer, "TOPLEFT", 0, -b.arrangedGlobal.header.height },
+        { canvas.tabContainer:GetPoint(1) })
+      b.recent = nil
+      draw(canvas)
+      assert.is_nil(motion:GetMove(canvas.tabContainer))
+    end)
+
+    -- Grids placed outside a bag's render (the currency icons, the slots panels) are no part of its
+    -- passes: they are placed at once.
+    it("closes its pass when it is done", function()
+      local canvas = bagCanvas:Create(bag({ section(3) }), CreateFrame("Frame"))
+      local other, parent = CreateFrame("Frame"), CreateFrame("Frame")
+      other:Show()
+      draw(canvas)
+      motion:Place(other, parent, 0, 0)
+      draw(canvas)
+      motion:Place(other, parent, 50, 0)
+      assert.is_nil(motion:GetMove(other))
+      assert.are.same({ "TOPLEFT", parent, "TOPLEFT", 50, 0 }, { other:GetPoint(1) })
+    end)
+
+    -- Parents are placed before what hangs from them, so an item that changes container starts
+    -- from where its new container is anchored at that moment (render/motion.lua).
+    it("hangs its containers before it arranges what is in them", function()
+      local b = bag({ section(9) }, section(2, "recent"), section(4, "free"))
+      local canvas = bagCanvas:Create(b, CreateFrame("Frame"))
+      local order = {}
+      local place = motion.Place
+      motion.Place = function(self, frame, ...)
+        if frame == canvas.tabContainer then table.insert(order, "tab") end
+        if frame == canvas.footerContainer then table.insert(order, "footer") end
+        return place(self, frame, ...)
+      end
+      local arrangeGlobal, arrangeView = b.ArrangeGlobalSections, b.currentView.Arrange
+      b.ArrangeGlobalSections = function(...) table.insert(order, "global") return arrangeGlobal(...) end
+      b.currentView.Arrange = function(...) table.insert(order, "view") return arrangeView(...) end
+      draw(canvas)
+      motion.Place = place
+      assert.are.same({ "tab", "footer", "global", "view" }, order)
+    end)
+
+    it("leaves the header container to the centering: it follows the window, it does not travel", function()
+      sizeInfo = { itemsPerRow = 7, columnCount = 1 }
+      local canvas = bagCanvas:Create(bag({ section(3) }), CreateFrame("Frame"))
+      draw(canvas, { Width = 400 })
+      draw(canvas, { Width = 500 })
+      assert.is_nil(motion:GetMove(canvas.headerContainer))
+    end)
   end)
 
   it("measures each section once per items per row it needs, never past where it stops changing", function()
